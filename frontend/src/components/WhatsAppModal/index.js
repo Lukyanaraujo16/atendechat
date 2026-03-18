@@ -25,7 +25,7 @@ import {
   Box,
   Typography,
 } from "@material-ui/core";
-import { ContentCopy, Refresh } from "@material-ui/icons";
+import { FileCopyOutlined, Refresh } from "@material-ui/icons";
 
 import api from "../../services/api";
 import { i18n } from "../../translate/i18n";
@@ -380,7 +380,7 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
                             <InputAdornment position="end">
                               <Button
                                 size="small"
-                                startIcon={<ContentCopy />}
+                                startIcon={<FileCopyOutlined />}
                                 onClick={() => copyToClipboard(values.token)}
                                 disabled={!values.token}
                               >
@@ -600,7 +600,7 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
                 <InputAdornment position="end">
                   <Button
                     size="small"
-                    startIcon={<ContentCopy />}
+                    startIcon={<FileCopyOutlined />}
                     onClick={() => copyToClipboard(createdToken)}
                   >
                     {i18n.t("whatsappModal.form.copyToken")}
