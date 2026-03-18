@@ -16,11 +16,12 @@ import UpdateTicketService from "../services/TicketServices/UpdateTicketService"
 import DeleteWhatsAppMessage from "../services/WbotServices/DeleteWhatsAppMessage";
 import SendWhatsAppMedia from "../services/WbotServices/SendWhatsAppMedia";
 import SendWhatsAppMessage from "../services/WbotServices/SendWhatsAppMessage";
-import { verifyMessage } from "../services/WbotServices/wbotMessageListener";
+import CreateMessageService from "../services/MessageServices/CreateMessageService";
 import CheckContactNumber from "../services/WbotServices/CheckNumber";
 import CheckIsValidContact from "../services/WbotServices/CheckIsValidContact";
 import GetProfilePicUrl from "../services/WbotServices/GetProfilePicUrl";
 import CreateOrUpdateContactService from "../services/ContactServices/CreateOrUpdateContactService";
+import { v4 as uuidv4 } from "uuid";
 type IndexQuery = {
   pageNumber: string;
 };
@@ -86,20 +87,23 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
   } else {
     const sentMessage = await SendWhatsAppMessage({ body, ticket, quotedMsg });
     const bodyToSave = formatBody(body, ticket.contact);
-    if (sentMessage && ticket.contact) {
-      await verifyMessage(
-        {
-          ...(sentMessage as any),
-          key: {
-            ...(sentMessage as any)?.key,
-            fromMe: true
-          }
-        } as any,
-        ticket,
-        ticket.contact,
-        bodyToSave
-      );
-    }
+    const idToSave = (sentMessage as any)?.key?.id || uuidv4();
+    await CreateMessageService({
+      messageData: {
+        id: idToSave,
+        ticketId: ticket.id,
+        body: bodyToSave,
+        fromMe: true,
+        read: true,
+        ack: (sentMessage as any)?.status,
+        mediaType: "conversation",
+        // mantém rastreabilidade do retorno do Baileys, mas não depende dele para o body
+        ...(sentMessage
+          ? { dataJson: JSON.stringify(sentMessage as any) }
+          : {})
+      } as any,
+      companyId: ticket.companyId
+    });
   }
 
   return res.send();
@@ -181,24 +185,28 @@ export const send = async (req: Request, res: Response): Promise<Response> => {
         })
       );
     } else {
-      const sentMessage = await SendWhatsAppMessage({ body: formatBody(body, contact), ticket });
+      const formatted = formatBody(body, contact);
+      const sentMessage = await SendWhatsAppMessage({ body: formatted, ticket });
 
       await ticket.update({
         lastMessage: body,
       });
-      // Salva imediatamente o texto real enviado (evita “Aguardando mensagem…” virar body)
-      await verifyMessage(
-        {
-          ...(sentMessage as any),
-          key: {
-            ...(sentMessage as any)?.key,
-            fromMe: true
-          }
+      const idToSave = (sentMessage as any)?.key?.id || uuidv4();
+      await CreateMessageService({
+        messageData: {
+          id: idToSave,
+          ticketId: ticket.id,
+          body: formatted,
+          fromMe: true,
+          read: true,
+          ack: (sentMessage as any)?.status,
+          mediaType: "conversation",
+          ...(sentMessage
+            ? { dataJson: JSON.stringify(sentMessage as any) }
+            : {})
         } as any,
-        ticket,
-        contact,
-        formatBody(body, contact)
-      );
+        companyId
+      });
 
     }
 
