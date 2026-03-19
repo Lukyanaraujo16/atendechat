@@ -178,8 +178,8 @@ const useStyles = makeStyles(theme => ({
 	statusPill: {
 		fontSize: "0.75rem",
 		fontWeight: 600,
-		padding: "4px 10px",
-		borderRadius: 6,
+		padding: "6px 12px",
+		borderRadius: 8,
 	},
 	statusPillBtn: {
 		cursor: "pointer",
@@ -198,8 +198,8 @@ const useStyles = makeStyles(theme => ({
 		display: "flex",
 		alignItems: "center",
 		justifyContent: "center",
-		backgroundColor: "rgba(36, 199, 118, 0.22)",
-		color: "#24c776",
+		backgroundColor: "#24c776",
+		color: "#fff",
 		fontWeight: 700,
 		fontSize: "0.72rem",
 	},
@@ -210,24 +210,26 @@ const useStyles = makeStyles(theme => ({
 		display: "flex",
 		alignItems: "center",
 		justifyContent: "center",
-		backgroundColor: "rgba(233, 30, 99, 0.20)",
-		color: "#e91e63",
+		backgroundColor: "#e91e63",
+		color: "#fff",
 		fontWeight: 700,
 		fontSize: "0.72rem",
 	},
 	statusPillGreen: {
-		backgroundColor: "rgba(36, 199, 118, 0.15)",
+		backgroundColor: "rgba(36, 199, 118, 0.10)",
+		border: "1px solid rgba(36, 199, 118, 0.35)",
 		color: "#24c776",
 	},
 	statusPillGreenActive: {
-		boxShadow: "inset 0 0 0 2px rgba(36, 199, 118, 0.35)",
+		boxShadow: "inset 0 0 0 2px rgba(36, 199, 118, 0.25)",
 	},
 	statusPillPink: {
-		backgroundColor: "rgba(233, 30, 99, 0.12)",
+		backgroundColor: "rgba(233, 30, 99, 0.10)",
+		border: "1px solid rgba(233, 30, 99, 0.30)",
 		color: "#e91e63",
 	},
 	statusPillPinkActive: {
-		boxShadow: "inset 0 0 0 2px rgba(233, 30, 99, 0.28)",
+		boxShadow: "inset 0 0 0 2px rgba(233, 30, 99, 0.22)",
 	},
 	searchRow: {
 		display: "flex",
@@ -390,21 +392,6 @@ const TicketsManagerTabs = () => {
 
   const handleChangeTabOpen = (e, newValue) => {
     setTabOpen(newValue);
-  };
-
-  const applyPanelStyle = (status) => {
-    if (tabOpen !== status) {
-      return {
-        position: "absolute",
-        top: 0,
-        left: 0,
-        width: 0,
-        height: 0,
-        overflow: "hidden",
-        pointerEvents: "none",
-      };
-    }
-    return undefined;
   };
 
   const handleCloseOrOpenTicket = (ticket) => {
@@ -678,7 +665,7 @@ const TicketsManagerTabs = () => {
         </IconButton>
       </div>
 
-      {(tab === "open" || tab === "closed" || tab === "search") && (
+      {tab === "search" && (
         <Paper square elevation={0} className={classes.ticketOptionsBox}>
           <Can
             role={user.profile}
@@ -712,26 +699,29 @@ const TicketsManagerTabs = () => {
 
       <TabPanel value={tab} name="open" className={classes.ticketsWrapper}>
         <Paper className={classes.ticketsWrapper} style={{ position: "relative" }}>
-          <TicketsList
-            status="open"
-            showAll={showAllTickets}
-            selectedQueueIds={selectedQueueIds}
-            updateCount={(val) => setOpenCount(val)}
-            style={applyPanelStyle("open")}
-          />
-          <TicketsList
-            status="pending"
-            selectedQueueIds={selectedQueueIds}
-            updateCount={(val) => setPendingCount(val)}
-            style={applyPanelStyle("pending")}
-          />
-          <TicketsList
-            status="pending"
-            selectedQueueIds={selectedQueueIds}
-            chatbotOnly
-            updateCount={(val) => setChatbotCount(val)}
-            style={applyPanelStyle("chatbot")}
-          />
+          {tabOpen === "open" && (
+            <TicketsList
+              status="open"
+              showAll={showAllTickets}
+              selectedQueueIds={selectedQueueIds}
+              updateCount={(val) => setOpenCount(val)}
+            />
+          )}
+          {tabOpen === "pending" && (
+            <TicketsList
+              status="pending"
+              selectedQueueIds={selectedQueueIds}
+              updateCount={(val) => setPendingCount(val)}
+            />
+          )}
+          {tabOpen === "chatbot" && (
+            <TicketsList
+              status="pending"
+              selectedQueueIds={selectedQueueIds}
+              chatbotOnly
+              updateCount={(val) => setChatbotCount(val)}
+            />
+          )}
         </Paper>
       </TabPanel>
       <TabPanel value={tab} name="closed" className={classes.ticketsWrapper}>
