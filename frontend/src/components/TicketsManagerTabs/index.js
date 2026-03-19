@@ -81,6 +81,10 @@ const useStyles = makeStyles(theme => ({
 	tab: {
 		minWidth: 120,
 		width: 120,
+		color: "rgba(0,0,0,0.45)",
+		"&.Mui-selected": {
+			color: "rgba(0,0,0,0.87)",
+		},
 	},
 
 	internalTab: {
@@ -198,9 +202,9 @@ const useStyles = makeStyles(theme => ({
 		display: "flex",
 		alignItems: "center",
 		justifyContent: "center",
-		backgroundColor: "rgba(36, 199, 118, 0.12)",
-		border: "1px solid rgba(36, 199, 118, 0.35)",
-		color: "#24c776",
+		backgroundColor: "#24c776",
+		border: "none",
+		color: "#fff",
 		fontWeight: 700,
 		fontSize: "0.72rem",
 	},
@@ -211,9 +215,9 @@ const useStyles = makeStyles(theme => ({
 		display: "flex",
 		alignItems: "center",
 		justifyContent: "center",
-		backgroundColor: "rgba(233, 30, 99, 0.12)",
-		border: "1px solid rgba(233, 30, 99, 0.35)",
-		color: "#e91e63",
+		backgroundColor: "#e91e63",
+		border: "none",
+		color: "#fff",
 		fontWeight: 700,
 		fontSize: "0.72rem",
 	},
@@ -223,7 +227,7 @@ const useStyles = makeStyles(theme => ({
 		color: "#24c776",
 	},
 	statusPillGreenActive: {
-		boxShadow: "inset 0 0 0 2px rgba(36, 199, 118, 0.20)",
+		boxShadow: "inset 0 0 0 2px rgba(36, 199, 118, 0.18)",
 	},
 	statusPillPink: {
 		backgroundColor: "rgba(233, 30, 99, 0.10)",
@@ -557,8 +561,7 @@ const TicketsManagerTabs = () => {
           value={tab}
           onChange={handleChangeTab}
           variant="fullWidth"
-          indicatorColor="primary"
-          textColor="primary"
+          indicatorColor="inherit"
         >
           <Tab
             value={"open"}
