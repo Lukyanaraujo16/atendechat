@@ -69,8 +69,9 @@ const useStyles = makeStyles((theme) => ({
 
 	noTicketsDiv: {
 		display: "flex",
-		height: "100px",
-		margin: 40,
+		height: "100%",
+		margin: 0,
+		width: "100%",
 		flexDirection: "column",
 		alignItems: "center",
 		justifyContent: "center",
@@ -347,7 +348,7 @@ const TicketsList = (props) => {
 				className={classes.ticketsList}
 				onScroll={handleScroll}
 			>
-				<List style={{ paddingTop: 0 }}>
+				<List style={{ paddingTop: 0, height: "100%" }}>
 					{ticketsList.length === 0 && !loading ? (
 						<div className={classes.noTicketsDiv}>
 							<span className={classes.noTicketsTitle}>

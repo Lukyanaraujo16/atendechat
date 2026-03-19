@@ -40,9 +40,13 @@ import api from "../../services/api";
 import { toast } from "react-toastify";
 import toastError from "../../errors/toastError";
 import TicketsQueueSelect from "../TicketsQueueSelect";
-import { Button } from "@material-ui/core";
+import { Button, ButtonBase } from "@material-ui/core";
 import { TagsFilter } from "../TagsFilter";
 import { UsersFilter } from "../UsersFilter";
+
+import CheckCircleIcon from "@material-ui/icons/CheckCircle";
+import GroupIcon from "@material-ui/icons/Group";
+import FilterListIcon from "@material-ui/icons/FilterList";
 
 const useStyles = makeStyles(theme => ({
 	ticketsWrapper: {
@@ -177,13 +181,53 @@ const useStyles = makeStyles(theme => ({
 		padding: "4px 10px",
 		borderRadius: 6,
 	},
+	statusPillBtn: {
+		cursor: "pointer",
+		border: "none",
+		display: "flex",
+		alignItems: "center",
+		gap: theme.spacing(1),
+	},
+	statusPillIcon: {
+		fontSize: 16,
+	},
+	statusCountGreen: {
+		width: 20,
+		height: 20,
+		borderRadius: "50%",
+		display: "flex",
+		alignItems: "center",
+		justifyContent: "center",
+		backgroundColor: "rgba(36, 199, 118, 0.22)",
+		color: "#24c776",
+		fontWeight: 700,
+		fontSize: "0.72rem",
+	},
+	statusCountPink: {
+		width: 20,
+		height: 20,
+		borderRadius: "50%",
+		display: "flex",
+		alignItems: "center",
+		justifyContent: "center",
+		backgroundColor: "rgba(233, 30, 99, 0.20)",
+		color: "#e91e63",
+		fontWeight: 700,
+		fontSize: "0.72rem",
+	},
 	statusPillGreen: {
 		backgroundColor: "rgba(36, 199, 118, 0.15)",
 		color: "#24c776",
 	},
+	statusPillGreenActive: {
+		boxShadow: "inset 0 0 0 2px rgba(36, 199, 118, 0.35)",
+	},
 	statusPillPink: {
 		backgroundColor: "rgba(233, 30, 99, 0.12)",
 		color: "#e91e63",
+	},
+	statusPillPinkActive: {
+		boxShadow: "inset 0 0 0 2px rgba(233, 30, 99, 0.28)",
 	},
 	searchRow: {
 		display: "flex",
@@ -302,6 +346,7 @@ const TicketsManagerTabs = () => {
 
   const [openCount, setOpenCount] = useState(0);
   const [pendingCount, setPendingCount] = useState(0);
+  const [chatbotCount, setChatbotCount] = useState(0);
 
   const userQueueIds = user.queues.map((q) => q.id);
   const [selectedQueueIds, setSelectedQueueIds] = useState(userQueueIds || []);
@@ -349,8 +394,17 @@ const TicketsManagerTabs = () => {
 
   const applyPanelStyle = (status) => {
     if (tabOpen !== status) {
-      return { width: 0, height: 0 };
+      return {
+        position: "absolute",
+        top: 0,
+        left: 0,
+        width: 0,
+        height: 0,
+        overflow: "hidden",
+        pointerEvents: "none",
+      };
     }
+    return undefined;
   };
 
   const handleCloseOrOpenTicket = (ticket) => {
@@ -517,24 +571,83 @@ const TicketsManagerTabs = () => {
           indicatorColor="primary"
           textColor="primary"
         >
-          <Tab value={"open"} label="ABERTAS" classes={{ root: classes.tab, label: classes.tabLabel }} />
-          <Tab value={"closed"} label="RESOLVIDOS" classes={{ root: classes.tab, label: classes.tabLabel }} />
-          <Tab value={"groups"} label="GRUPOS" classes={{ root: classes.tab, label: classes.tabLabel }} />
-          <Tab value={"search"} label="FILTROS" classes={{ root: classes.tab, label: classes.tabLabel }} />
+          <Tab
+            value={"open"}
+            classes={{ root: classes.tab }}
+            label={
+              <span className={classes.tabLabel}>
+                <FolderOpenIcon style={{ fontSize: 16, color: "#24c776", marginRight: 6 }} />
+                ABERTAS
+              </span>
+            }
+          />
+          <Tab
+            value={"closed"}
+            classes={{ root: classes.tab }}
+            label={
+              <span className={classes.tabLabel}>
+                <CheckCircleIcon style={{ fontSize: 16, color: "#24c776", marginRight: 6 }} />
+                RESOLVIDOS
+              </span>
+            }
+          />
+          <Tab
+            value={"groups"}
+            classes={{ root: classes.tab, label: classes.tabLabel }}
+            label={
+              <span className={classes.tabLabel}>
+                <GroupIcon style={{ fontSize: 16, color: "#24c776", marginRight: 6 }} />
+                GRUPOS
+              </span>
+            }
+          />
+          <Tab
+            value={"search"}
+            classes={{ root: classes.tab, label: classes.tabLabel }}
+            label={
+              <span className={classes.tabLabel}>
+                <FilterListIcon style={{ fontSize: 16, color: "#24c776", marginRight: 6 }} />
+                FILTROS
+              </span>
+            }
+          />
         </Tabs>
       </Paper>
 
       {tab === "open" && (
         <div className={classes.statusPillsRow}>
-          <span className={`${classes.statusPill} ${classes.statusPillGreen}`}>
-            {openCount} ATENDENDO
-          </span>
-          <span className={`${classes.statusPill} ${classes.statusPillPink}`}>
-            {pendingCount} AGUARDANDO
-          </span>
-          <span className={`${classes.statusPill} ${classes.statusPillGreen}`}>
-            0 CHATBOT
-          </span>
+          <ButtonBase
+            className={`${classes.statusPill} ${classes.statusPillBtn} ${classes.statusPillGreen} ${
+              tabOpen === "open" ? classes.statusPillGreenActive : ""
+            }`}
+            onClick={() => setTabOpen("open")}
+          >
+            <span className={classes.statusCountGreen}>{openCount}</span>
+            <FolderOpenIcon className={classes.statusPillIcon} />
+            ATENDENDO
+          </ButtonBase>
+
+          <ButtonBase
+            className={`${classes.statusPill} ${classes.statusPillBtn} ${classes.statusPillPink} ${
+              tabOpen === "pending" ? classes.statusPillPinkActive : ""
+            }`}
+            onClick={() => setTabOpen("pending")}
+          >
+            <span className={classes.statusCountPink}>{pendingCount}</span>
+            <PersonIcon className={classes.statusPillIcon} />
+            AGUARDANDO
+          </ButtonBase>
+
+          <ButtonBase
+            className={`${classes.statusPill} ${classes.statusPillBtn} ${classes.statusPillGreen} ${
+              tabOpen === "chatbot" ? classes.statusPillGreenActive : ""
+            }`}
+            onClick={() => setTabOpen("chatbot")}
+          >
+            <span className={classes.statusCountGreen}>{chatbotCount}</span>
+            <AndroidIcon className={classes.statusPillIcon} />
+            CHATBOT
+          </ButtonBase>
         </div>
       )}
 
@@ -598,39 +711,7 @@ const TicketsManagerTabs = () => {
       )}
 
       <TabPanel value={tab} name="open" className={classes.ticketsWrapper}>
-        <Tabs
-          value={tabOpen}
-          onChange={handleChangeTabOpen}
-          indicatorColor="primary"
-          textColor="primary"
-          variant="fullWidth"
-        >
-          <Tab
-            label={
-              <Badge
-                className={classes.badge}
-                badgeContent={openCount}
-                color="primary"
-              >
-                {i18n.t("ticketsList.assignedHeader")}
-              </Badge>
-            }
-            value={"open"}
-          />
-          <Tab
-            label={
-              <Badge
-                className={classes.badge}
-                badgeContent={pendingCount}
-                color="secondary"
-              >
-                {i18n.t("ticketsList.pendingHeader")}
-              </Badge>
-            }
-            value={"pending"}
-          />
-        </Tabs>
-        <Paper className={classes.ticketsWrapper}>
+        <Paper className={classes.ticketsWrapper} style={{ position: "relative" }}>
           <TicketsList
             status="open"
             showAll={showAllTickets}
@@ -643,6 +724,13 @@ const TicketsManagerTabs = () => {
             selectedQueueIds={selectedQueueIds}
             updateCount={(val) => setPendingCount(val)}
             style={applyPanelStyle("pending")}
+          />
+          <TicketsList
+            status="pending"
+            selectedQueueIds={selectedQueueIds}
+            chatbotOnly
+            updateCount={(val) => setChatbotCount(val)}
+            style={applyPanelStyle("chatbot")}
           />
         </Paper>
       </TabPanel>
