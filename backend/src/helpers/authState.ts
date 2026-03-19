@@ -12,7 +12,11 @@ const KEY_MAP: { [T in keyof SignalDataTypeMap]: string } = {
   "sender-key": "senderKeys",
   "app-state-sync-key": "appStateSyncKeys",
   "app-state-sync-version": "appStateVersions",
-  "sender-key-memory": "senderKeyMemory"
+  "sender-key-memory": "senderKeyMemory",
+  // Baileys v7 adicionou campos de credenciais/estado adicionais
+  "lid-mapping": "lid-mapping",
+  "device-list": "device-list",
+  tctoken: "tctoken",
 };
 
 const authState = async (

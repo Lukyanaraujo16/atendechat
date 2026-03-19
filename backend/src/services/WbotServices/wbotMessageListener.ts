@@ -501,7 +501,9 @@ const getContactMessage = async (msg: proto.IWebMessageInfo, wbot: Session) => {
 const downloadMedia = async (msg: proto.IWebMessageInfo) => {
   let buffer;
   try {
-    buffer = await downloadMediaMessage(msg, "buffer", {});
+    // Baileys v7 alterou os tipos esperados por downloadMediaMessage
+    // Mantemos o comportamento, apenas ajustando o cast de tipagem.
+    buffer = await downloadMediaMessage(msg as any, "buffer", {});
   } catch (err) {
     console.error("Erro ao baixar mídia:", err);
 
@@ -1461,7 +1463,7 @@ export const handleRating = async (
 
 const handleChartbot = async (
   ticket: Ticket,
-  msg: WAMessage,
+  msg: proto.IWebMessageInfo,
   wbot: Session,
   dontReadTheFirstQuestion: boolean = false
 ) => {
