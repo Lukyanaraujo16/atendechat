@@ -270,7 +270,7 @@ const MainListItems = (props) => {
     if (chats.length > 0) {
       for (let chat of chats) {
         for (let chatUser of chat.users) {
-          if (chatUser.userId === user.id) {
+          if (Number(chatUser.userId) === Number(user.id)) {
             unreadsCount += chatUser.unreads;
           }
         }

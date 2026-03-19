@@ -147,9 +147,10 @@ export default function ChatPopover() {
     socket.on(`company-${companyId}-chat`, (data) => {
       if (data.action === "new-message") {
         dispatch({ type: "CHANGE_CHAT", payload: data });
-        const userIds = data.newMessage.chat.users.map(userObj => userObj.userId);
+        const userIds = data.newMessage.chat.users.map((userObj) => Number(userObj.userId));
+        const myId = Number(user.id);
 
-        if (userIds.includes(user.id) && data.newMessage.senderId !== user.id) {
+        if (userIds.includes(myId) && Number(data.newMessage.senderId) !== myId) {
           soundAlertRef.current();
         }
       }
@@ -167,7 +168,7 @@ export default function ChatPopover() {
     if (chats.length > 0) {
       for (let chat of chats) {
         for (let chatUser of chat.users) {
-          if (chatUser.userId === user.id) {
+          if (Number(chatUser.userId) === Number(user.id)) {
             unreadsCount += chatUser.unreads;
           }
         }
