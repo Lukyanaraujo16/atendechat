@@ -3,6 +3,7 @@ import { getIO } from "../libs/socket";
 import CreateQueueService from "../services/QueueService/CreateQueueService";
 import DeleteQueueService from "../services/QueueService/DeleteQueueService";
 import ListQueuesService from "../services/QueueService/ListQueuesService";
+import ListQueueUsersService from "../services/QueueService/ListQueueUsersService";
 import ShowQueueService from "../services/QueueService/ShowQueueService";
 import UpdateQueueService from "../services/QueueService/UpdateQueueService";
 import { isNil } from "lodash";
@@ -58,6 +59,15 @@ export const show = async (req: Request, res: Response): Promise<Response> => {
   const queue = await ShowQueueService(queueId, companyId);
 
   return res.status(200).json(queue);
+};
+
+export const listUsers = async (req: Request, res: Response): Promise<Response> => {
+  const { queueId } = req.params;
+  const { companyId } = req.user;
+
+  const users = await ListQueueUsersService({ queueId, companyId });
+
+  return res.status(200).json(users);
 };
 
 export const update = async (

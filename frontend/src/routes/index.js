@@ -13,6 +13,7 @@ import Financeiro from "../pages/Financeiro/";
 import Users from "../pages/Users";
 import Contacts from "../pages/Contacts/";
 import Queues from "../pages/Queues/";
+import Setores from "../pages/Setores/";
 import Tags from "../pages/Tags/";
 import MessagesAPI from "../pages/MessagesAPI/";
 import Helps from "../pages/Helps/";
@@ -122,6 +123,7 @@ const Routes = () => {
                   isPrivate
                 />
                 <Route exact path="/queues" component={Queues} isPrivate />
+                <Route exact path="/setores" component={Setores} isPrivate />
                 <Route
                   exact
                   path="/announcements"

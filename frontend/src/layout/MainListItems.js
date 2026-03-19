@@ -183,6 +183,7 @@ const MainListItems = (props) => {
   const [openFlowsSubmenu, setOpenFlowsSubmenu] = useState(false);
   const [openDashboardSubmenu, setOpenDashboardSubmenu] = useState(true);
   const [openGestaoSubmenu, setOpenGestaoSubmenu] = useState(true);
+  const [openAdministracaoSubmenu, setOpenAdministracaoSubmenu] = useState(true);
   const location = useLocation();
 
   const socketManager = useContext(SocketContext);
@@ -209,6 +210,18 @@ const MainListItems = (props) => {
       "/schedules",
     ].includes(path);
     setOpenGestaoSubmenu(shouldOpen);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const path = location.pathname;
+    const shouldOpen = [
+      "/users",
+      "/messages-api",
+      "/queues",
+      "/setores",
+      "/financeiro",
+    ].includes(path);
+    setOpenAdministracaoSubmenu(shouldOpen);
   }, [location.pathname]);
 
   useEffect(() => {
@@ -542,6 +555,97 @@ const MainListItems = (props) => {
         </List>
       </Collapse>
 
+      <Can
+        role={user.profile}
+        perform="drawer-admin-items:view"
+        yes={() => (
+          <>
+            <ListItem
+              button
+              onClick={() => setOpenAdministracaoSubmenu((prev) => !prev)}
+              className={classes.listItem}
+            >
+              <ListItemIcon className={classes.listItemIcon}>
+                <SettingsOutlinedIcon />
+              </ListItemIcon>
+              <ListItemText primary="Administração" className={classes.listItemText} />
+              {openAdministracaoSubmenu ? (
+                <ExpandLessIcon style={{ color: SIDEBAR_GREEN }} />
+              ) : (
+                <ExpandMoreIcon style={{ color: SIDEBAR_GREEN }} />
+              )}
+            </ListItem>
+
+            <Collapse
+              style={{ paddingLeft: 15 }}
+              in={openAdministracaoSubmenu}
+              timeout="auto"
+              unmountOnExit
+            >
+              <List component="div" disablePadding>
+                <ListItem
+                  button
+                  dense
+                  component={RouterLink}
+                  to="/users"
+                  className={classes.listItem}
+                  selected={location.pathname === "/users"}
+                >
+                  <ListItemIcon className={classes.listItemIcon}>
+                    <PeopleAltOutlinedIcon />
+                  </ListItemIcon>
+                  <ListItemText primary={i18n.t("mainDrawer.listItems.users")} className={classes.listItemText} />
+                </ListItem>
+
+                {showExternalApi && (
+                  <ListItem
+                    button
+                    dense
+                    component={RouterLink}
+                    to="/messages-api"
+                    className={classes.listItem}
+                    selected={location.pathname === "/messages-api"}
+                  >
+                    <ListItemIcon className={classes.listItemIcon}>
+                      <CodeRoundedIcon />
+                    </ListItemIcon>
+                    <ListItemText primary="API" className={classes.listItemText} />
+                  </ListItem>
+                )}
+
+                <ListItem
+                  button
+                  dense
+                  component={RouterLink}
+                  to="/setores"
+                  className={classes.listItem}
+                  selected={location.pathname === "/setores" || location.pathname === "/queues"}
+                >
+                  <ListItemIcon className={classes.listItemIcon}>
+                    <AccountTreeOutlinedIcon />
+                  </ListItemIcon>
+                  <ListItemText primary="Setores" className={classes.listItemText} />
+                </ListItem>
+
+                <ListItem
+                  button
+                  dense
+                  component={RouterLink}
+                  to="/financeiro"
+                  className={classes.listItem}
+                  selected={location.pathname === "/financeiro"}
+                >
+                  <ListItemIcon className={classes.listItemIcon}>
+                    <LocalAtmIcon />
+                  </ListItemIcon>
+                  <ListItemText primary="Financeiro" className={classes.listItemText} />
+                </ListItem>
+              </List>
+            </Collapse>
+          </>
+        )}
+      />
+
       <ListItemLink
         to="/helps"
         primary={i18n.t("mainDrawer.listItems.helps")}
@@ -677,32 +781,6 @@ const MainListItems = (props) => {
               listItemIconClassName={classes.listItemIcon}
               listItemTextClassName={classes.listItemText}
             />
-            <ListItemLink
-              to="/queues"
-              primary={i18n.t("mainDrawer.listItems.queues")}
-              icon={<AccountTreeOutlinedIcon />}
-              listItemClassName={classes.listItem}
-              listItemIconClassName={classes.listItemIcon}
-              listItemTextClassName={classes.listItemText}
-            />
-            <ListItemLink
-              to="/users"
-              primary={i18n.t("mainDrawer.listItems.users")}
-              icon={<PeopleAltOutlinedIcon />}
-              listItemClassName={classes.listItem}
-              listItemIconClassName={classes.listItemIcon}
-              listItemTextClassName={classes.listItemText}
-            />
-            {showExternalApi && (
-              <ListItemLink
-                to="/messages-api"
-                primary={i18n.t("mainDrawer.listItems.messagesAPI")}
-                icon={<CodeRoundedIcon />}
-                listItemClassName={classes.listItem}
-                listItemIconClassName={classes.listItemIcon}
-                listItemTextClassName={classes.listItemText}
-              />
-            )}
             <ListItemLink
               to="/settings"
               primary={i18n.t("mainDrawer.listItems.settings")}
