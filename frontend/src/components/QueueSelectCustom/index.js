@@ -29,7 +29,7 @@ const QueueSelectCustom = ({ selectedQueueIds, companyId, onChange }) => {
 				const { data } = await api.get("/queue", {
 					params: { companyId }
 				});
-				setQueues(data);
+				setQueues(Array.isArray(data) ? data : []);
 			} catch (err) {
 				toastError(err);
 			}

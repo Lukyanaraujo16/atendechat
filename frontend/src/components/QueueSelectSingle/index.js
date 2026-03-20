@@ -24,7 +24,7 @@ const QueueSelectSingle = (touched, errors) => {
         (async () => {
             try {
                 const { data } = await api.get("/queue");
-                setQueues(data);
+                setQueues(Array.isArray(data) ? data : []);
             } catch (err) {
                 toastError(`QUEUESELETSINGLE >>> ${err}`);
             }

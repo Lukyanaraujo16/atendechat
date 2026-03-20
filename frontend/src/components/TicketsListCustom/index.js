@@ -172,6 +172,7 @@ const TicketsListCustom = (props) => {
   const [ticketsList, dispatch] = useReducer(reducer, []);
   const { user } = useContext(AuthContext);
   const { profile, queues } = user;
+  const safeQueues = Array.isArray(queues) ? queues : [];
 
   const socketManager = useContext(SocketContext);
 
@@ -191,7 +192,7 @@ const TicketsListCustom = (props) => {
   });
 
   useEffect(() => {
-    const queueIds = queues.map((q) => q.id);
+    const queueIds = safeQueues.map((q) => q.id);
     const filteredTickets = tickets.filter(
       (t) => queueIds.indexOf(t.queueId) > -1
     );
@@ -209,7 +210,7 @@ const TicketsListCustom = (props) => {
         payload: chatbotOnly ? tickets.filter((t) => t.chatbot) : tickets,
       });
     }
-  }, [tickets, status, searchParam, queues, profile, chatbotOnly]);
+  }, [tickets, status, searchParam, safeQueues, profile, chatbotOnly]);
 
   useEffect(() => {
     const companyId = localStorage.getItem("companyId");
@@ -256,7 +257,7 @@ const TicketsListCustom = (props) => {
     });
 
     socket.on(`company-${companyId}-appMessage`, (data) => {
-      const queueIds = queues.map((q) => q.id);
+      const queueIds = safeQueues.map((q) => q.id);
       if (
         profile === "user" &&
         (queueIds.indexOf(data.ticket?.queue?.id) === -1 ||

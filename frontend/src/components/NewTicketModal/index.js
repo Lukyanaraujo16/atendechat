@@ -83,11 +83,11 @@ const NewTicketModal = ({ modalOpen, onClose, initialContact }) => {
       const fetchQueues = async (  ) => {
 
         if( user.profile !== "admin" ){
-
-          setQueues( user.queues );
+          const userQueues = Array.isArray(user.queues) ? user.queues : [];
+          setQueues( userQueues );
           
-          if (user.queues.length === 1) {
-            setSelectedQueue(user.queues[0].id)
+          if (userQueues.length === 1) {
+            setSelectedQueue(userQueues[0].id)
           }
 
           return;
@@ -95,7 +95,8 @@ const NewTicketModal = ({ modalOpen, onClose, initialContact }) => {
 
         try{
 
-          const {data: queues} = await api.get('/queue');
+          const {data: queuesData} = await api.get('/queue');
+          const queues = Array.isArray(queuesData) ? queuesData : [];
           setQueues( queues )
 
           if( queues.length === 1) {

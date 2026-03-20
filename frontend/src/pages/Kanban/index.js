@@ -63,6 +63,7 @@ const Kanban = () => {
   const { whatsApps } = useContext(WhatsAppsContext);
   const { users: usersList } = useUsers();
   const { profile, queues } = user;
+  const queuesList = Array.isArray(queues) ? queues : [];
 
   const [tags, setTags] = useState([]);
   const [file, setFile] = useState({ lanes: [] });
@@ -73,15 +74,16 @@ const Kanban = () => {
   const [filterConexao, setFilterConexao] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
 
-  const queueIdsParam = queues?.length
-    ? (filterSetor ? [Number(filterSetor)] : queues.map((q) => q.id))
+  const queueIdsParam = queuesList.length
+    ? (filterSetor ? [Number(filterSetor)] : queuesList.map((q) => q.id))
     : [];
   const usersParam = filterUser ? [Number(filterUser)] : [];
 
   const fetchTags = async () => {
     try {
       const response = await api.get("/tags/kanban");
-      setTags(response.data.lista ?? []);
+      const lista = response.data?.lista;
+      setTags(Array.isArray(lista) ? lista : []);
     } catch (error) {
       console.log(error);
     }
@@ -154,9 +156,10 @@ const Kanban = () => {
           href: "/tickets/" + ticket.uuid,
         })),
       },
-      ...tags.map((tag) => {
+      ...(Array.isArray(tags) ? tags : []).map((tag) => {
         const tagsTickets = tickets.filter((ticket) => {
-          const tagIds = ticket.tags.map((tag) => tag.id);
+          const ticketTags = ticket.tags;
+          const tagIds = Array.isArray(ticketTags) ? ticketTags.map((t) => t.id) : [];
           return tagIds.includes(tag.id);
         });
 
@@ -256,7 +259,7 @@ const Kanban = () => {
             label="Conexão"
           >
             <MenuItem value="">Todas</MenuItem>
-            {(whatsApps || []).map((w) => (
+            {(Array.isArray(whatsApps) ? whatsApps : []).map((w) => (
               <MenuItem key={w.id} value={String(w.id)}>{w.name || `Conexão ${w.id}`}</MenuItem>
             ))}
           </Select>

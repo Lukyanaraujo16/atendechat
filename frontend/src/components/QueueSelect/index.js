@@ -32,7 +32,7 @@ const QueueSelect = ({ selectedQueueIds, onChange, multiple = true, title = i18n
 	const fetchQueues = async () => {
 		try {
 			const { data } = await api.get("/queue");
-			setQueues(data);
+			setQueues(Array.isArray(data) ? data : []);
 		} catch (err) {
 			toastError(err);
 		}

@@ -175,7 +175,8 @@ const TicketsList = (props) => {
 	const [pageNumber, setPageNumber] = useState(1);
 	const [ticketsList, dispatch] = useReducer(reducer, []);
 	const { user } = useContext(AuthContext);
-	const { profile, queues } = user;
+	const { profile, queues: userQueues } = user;
+	const safeQueues = Array.isArray(userQueues) ? userQueues : [];
 	const [settings, setSettings] = useState([]);
 
 
@@ -228,7 +229,7 @@ const TicketsList = (props) => {
 
 	useEffect(() => {
 
-		const queueIds = queues.map((q) => q.id);
+		const queueIds = safeQueues.map((q) => q.id);
 		const filteredTickets = tickets.filter((t) => queueIds.indexOf(t.queueId) > -1);
 		const getSettingValue = key => {
 			const { value } = settings.find(s => s.key === key);
@@ -249,7 +250,7 @@ const TicketsList = (props) => {
 
 
 
-	}, [tickets, status, searchParam, queues, profile]);
+	}, [tickets, status, searchParam, safeQueues, profile]);
 
 	useEffect(() => {
 		const socket = openSocket();

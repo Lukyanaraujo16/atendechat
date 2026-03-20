@@ -234,7 +234,12 @@ const LoggedInLayout = ({ children, themeToggle }) => {
   const [anchorEl, setAnchorEl] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const { handleLogout, loading } = useContext(AuthContext);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(() => {
+    const saved = localStorage.getItem("drawerOpen");
+    if (saved !== null) return saved === "true";
+    if (typeof window !== "undefined" && window.innerWidth > 1200) return true;
+    return false;
+  });
   const [drawerVariant, setDrawerVariant] = useState("permanent");
   // const [dueDate, setDueDate] = useState("");
   const { user } = useContext(AuthContext);
@@ -300,8 +305,9 @@ const LoggedInLayout = ({ children, themeToggle }) => {
 
   const socketManager = useContext(SocketContext);
 
+  // Valor padrão em telas grandes, apenas quando não houver preferência salva
   useEffect(() => {
-    if (document.body.offsetWidth > 1200) {
+    if (localStorage.getItem("drawerOpen") === null && document.body.offsetWidth > 1200) {
       setDrawerOpen(true);
     }
   }, []);
