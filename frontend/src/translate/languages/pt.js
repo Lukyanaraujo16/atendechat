@@ -906,6 +906,12 @@ const messages = {
         appBar: {
           refresh: "Recarregar página",
           notRegister: "Sem notificações",
+          pauseAttendance: {
+            title: "Pausar atendimento?",
+            message: "Ao pausar o atendimento, o sistema enviará automaticamente uma mensagem aos contatos informando que o atendente não está disponível no momento. Deseja continuar?",
+            cancel: "CANCELAR",
+            confirm: "SIM, PAUSAR",
+          },
           greeting: {
 						hello: "Olá",
 						welcome: "Bem vindo a",
@@ -1006,6 +1012,7 @@ const messages = {
         },
       },
       notifications: {
+        title: "Notificações",
         noTickets: "Nenhuma notificação.",
       },
       quickMessages: {

@@ -184,6 +184,7 @@ const MainListItems = (props) => {
   const [openDashboardSubmenu, setOpenDashboardSubmenu] = useState(true);
   const [openGestaoSubmenu, setOpenGestaoSubmenu] = useState(true);
   const [openAdministracaoSubmenu, setOpenAdministracaoSubmenu] = useState(true);
+  const [openAjustesSubmenu, setOpenAjustesSubmenu] = useState(true);
   const location = useLocation();
 
   const socketManager = useContext(SocketContext);
@@ -222,6 +223,17 @@ const MainListItems = (props) => {
       "/financeiro",
     ].includes(path);
     setOpenAdministracaoSubmenu(shouldOpen);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const path = location.pathname;
+    const shouldOpen = [
+      "/prompts",
+      "/queue-integration",
+      "/settings",
+      "/connections",
+    ].includes(path);
+    setOpenAjustesSubmenu(shouldOpen);
   }, [location.pathname]);
 
   useEffect(() => {
@@ -642,17 +654,92 @@ const MainListItems = (props) => {
                 </ListItem>
               </List>
             </Collapse>
+
+            <ListItem
+              button
+              onClick={() => setOpenAjustesSubmenu((prev) => !prev)}
+              className={classes.listItem}
+            >
+              <ListItemIcon className={classes.listItemIcon}>
+                <SettingsOutlinedIcon />
+              </ListItemIcon>
+              <ListItemText primary="Ajustes" className={classes.listItemText} />
+              {openAjustesSubmenu ? (
+                <ExpandLessIcon style={{ color: SIDEBAR_GREEN }} />
+              ) : (
+                <ExpandMoreIcon style={{ color: SIDEBAR_GREEN }} />
+              )}
+            </ListItem>
+
+            <Collapse
+              style={{ paddingLeft: 15 }}
+              in={openAjustesSubmenu}
+              timeout="auto"
+              unmountOnExit
+            >
+              <List component="div" disablePadding>
+                {showOpenAi && (
+                  <ListItem
+                    button
+                    dense
+                    component={RouterLink}
+                    to="/prompts"
+                    className={classes.listItem}
+                    selected={location.pathname === "/prompts"}
+                  >
+                    <ListItemIcon className={classes.listItemIcon}>
+                      <AllInclusive />
+                    </ListItemIcon>
+                    <ListItemText primary="OPEN.AI" className={classes.listItemText} />
+                  </ListItem>
+                )}
+                {showIntegrations && (
+                  <ListItem
+                    button
+                    dense
+                    component={RouterLink}
+                    to="/queue-integration"
+                    className={classes.listItem}
+                    selected={location.pathname === "/queue-integration"}
+                  >
+                    <ListItemIcon className={classes.listItemIcon}>
+                      <DeviceHubOutlined />
+                    </ListItemIcon>
+                    <ListItemText primary="Integrações" className={classes.listItemText} />
+                  </ListItem>
+                )}
+                <ListItem
+                  button
+                  dense
+                  component={RouterLink}
+                  to="/settings"
+                  className={classes.listItem}
+                  selected={location.pathname === "/settings"}
+                >
+                  <ListItemIcon className={classes.listItemIcon}>
+                    <SettingsOutlinedIcon />
+                  </ListItemIcon>
+                  <ListItemText primary="Configurações" className={classes.listItemText} />
+                </ListItem>
+                <ListItem
+                  button
+                  dense
+                  component={RouterLink}
+                  to="/connections"
+                  className={classes.listItem}
+                  selected={location.pathname === "/connections"}
+                >
+                  <ListItemIcon className={classes.listItemIcon}>
+                    <Badge badgeContent={connectionWarning ? "!" : 0} color="error">
+                      <SyncAltIcon />
+                    </Badge>
+                  </ListItemIcon>
+                  <ListItemText primary="Conexões" className={classes.listItemText} />
+                </ListItem>
+              </List>
+            </Collapse>
           </>
         )}
-      />
-
-      <ListItemLink
-        to="/helps"
-        primary={i18n.t("mainDrawer.listItems.helps")}
-        icon={<HelpOutlineIcon />}
-        listItemClassName={classes.listItem}
-        listItemIconClassName={classes.listItemIcon}
-        listItemTextClassName={classes.listItemText}
       />
 
       <Can
@@ -660,20 +747,6 @@ const MainListItems = (props) => {
         perform="drawer-admin-items:view"
         yes={() => (
           <>
-            <Divider />
-            <ListSubheader
-              hidden={collapsed}
-              style={{
-                position: "relative",
-                fontSize: "17px",
-                textAlign: "left",
-                paddingLeft: 20
-              }}
-              inset
-              color="inherit">
-              {i18n.t("mainDrawer.listItems.administration")}
-            </ListSubheader>
-			
             {showCampaigns && (
               <>
                 <ListItem
@@ -745,34 +818,6 @@ const MainListItems = (props) => {
                 listItemTextClassName={classes.listItemText}
               />
             )}
-            {showOpenAi && (
-              <ListItemLink
-                to="/prompts"
-                primary={i18n.t("mainDrawer.listItems.prompts")}
-                icon={<AllInclusive />}
-                listItemClassName={classes.listItem}
-                listItemIconClassName={classes.listItemIcon}
-                listItemTextClassName={classes.listItemText}
-              />
-            )}
-            {showIntegrations && (
-              <ListItemLink
-                to="/queue-integration"
-                primary={i18n.t("mainDrawer.listItems.queueIntegration")}
-                icon={<DeviceHubOutlined />}
-                listItemClassName={classes.listItem}
-                listItemIconClassName={classes.listItemIcon}
-                listItemTextClassName={classes.listItemText}
-              />
-            )}
-            <ListItemLink
-              to="/connections"
-              primary={i18n.t("mainDrawer.listItems.connections")}
-              icon={<Badge badgeContent={connectionWarning ? "!" : 0} color="error"><SyncAltIcon /></Badge>}
-              listItemClassName={classes.listItem}
-              listItemIconClassName={classes.listItemIcon}
-              listItemTextClassName={classes.listItemText}
-            />
             <ListItemLink
               to="/files"
               primary={i18n.t("mainDrawer.listItems.files")}
@@ -781,32 +826,25 @@ const MainListItems = (props) => {
               listItemIconClassName={classes.listItemIcon}
               listItemTextClassName={classes.listItemText}
             />
-            <ListItemLink
-              to="/settings"
-              primary={i18n.t("mainDrawer.listItems.settings")}
-              icon={<SettingsOutlinedIcon />}
-              listItemClassName={classes.listItem}
-              listItemIconClassName={classes.listItemIcon}
-              listItemTextClassName={classes.listItemText}
-            />
-			
-			
+
             {!collapsed && <React.Fragment>
               <Divider />
-              {/* 
-              // IMAGEM NO MENU
-              <Hidden only={['sm', 'xs']}>
-                <img style={{ width: "100%", padding: "10px" }} src={logo} alt="image" />            
-              </Hidden> 
-              */}
               <Typography style={{ fontSize: "12px", padding: "10px", textAlign: "right", fontWeight: "bold" }}>
                 8.0.1
               </Typography>
             </React.Fragment>
             }
-			
           </>
         )}
+      />
+
+      <ListItemLink
+        to="/helps"
+        primary={i18n.t("mainDrawer.listItems.helps")}
+        icon={<HelpOutlineIcon />}
+        listItemClassName={classes.listItem}
+        listItemIconClassName={classes.listItemIcon}
+        listItemTextClassName={classes.listItemText}
       />
     </div>
   );

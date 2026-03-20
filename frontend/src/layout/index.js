@@ -13,14 +13,13 @@ import {
   MenuItem,
   IconButton,
   Menu,
+  Switch,
   useTheme,
   useMediaQuery,
 } from "@material-ui/core";
 
 import MenuIcon from "@material-ui/icons/Menu";
-import ChevronLeftIcon from "@material-ui/icons/ChevronLeft";
 import AccountCircle from "@material-ui/icons/AccountCircle";
-import CachedIcon from "@material-ui/icons/Cached";
 
 import MainListItems from "./MainListItems";
 import NotificationsPopOver from "../components/NotificationsPopOver";
@@ -43,10 +42,10 @@ import ColorModeContext from "../layout/themeContext";
 import Brightness4Icon from '@material-ui/icons/Brightness4';
 import Brightness7Icon from '@material-ui/icons/Brightness7';
 import LanguageControl from "../components/LanguageControl";
-import { LanguageOutlined } from "@material-ui/icons";
+import ConfirmationModal from "../components/ConfirmationModal";
 import { versionSystem } from "../../package.json";
 
-const drawerWidth = 240;
+const drawerWidth = 299;
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -70,22 +69,35 @@ const useStyles = makeStyles((theme) => ({
     width: "100%",
   },
   toolbar: {
-    paddingRight: 24, // keep right padding when drawer closed
-    color: theme.palette.dark.main,
-    background: theme.palette.barraSuperior,
+    paddingRight: 24,
+    minHeight: 50,
+    height: 50,
+    color: "rgba(0, 0, 0, 0.87)",
+    backgroundColor: "#ffffff",
+    borderBottom: "1px solid rgba(0, 0, 0, 0.08)",
+    "& .MuiIconButton-root": {
+      color: "rgba(0, 0, 0, 0.54) !important",
+    },
+    "& .MuiIconButton-root:hover": {
+      backgroundColor: "rgba(0, 0, 0, 0.04)",
+    },
   },
   toolbarIcon: {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
     padding: "0 8px",
-    minHeight: "48px",
+    minHeight: 50,
     [theme.breakpoints.down("sm")]: {
-      height: "48px"
+      height: 50
     }
   },
   appBar: {
     zIndex: theme.zIndex.drawer + 1,
+    backgroundColor: "#ffffff",
+    color: "rgba(0, 0, 0, 0.87)",
+    boxShadow: "none",
+    borderBottom: "1px solid rgba(0, 0, 0, 0.08)",
     transition: theme.transitions.create(["width", "margin"], {
       easing: theme.transitions.easing.sharp,
       duration: theme.transitions.duration.leavingScreen,
@@ -111,7 +123,7 @@ const useStyles = makeStyles((theme) => ({
   title: {
     flexGrow: 1,
     fontSize: 14,
-    color: "white",
+    color: "rgba(0, 0, 0, 0.87)",
   },
   drawerPaper: {
     position: "relative",
@@ -151,7 +163,7 @@ const useStyles = makeStyles((theme) => ({
     }
   },
   appBarSpacer: {
-    minHeight: "48px",
+    minHeight: 50,
   },
   content: {
     flex: 1,
@@ -232,13 +244,12 @@ const LoggedInLayout = ({ children, themeToggle }) => {
   const greaterThenSm = useMediaQuery(theme.breakpoints.up("sm"));
 
   const [volume, setVolume] = useState(localStorage.getItem("volume") || 1);
+  const [attendancePaused, setAttendancePaused] = useState(
+    () => localStorage.getItem("attendancePaused") === "true"
+  );
+  const [showPauseConfirmDialog, setShowPauseConfirmDialog] = useState(false);
 
   const { dateToClient } = useDate();
-
-  // Languages
-  const [anchorElLanguage, setAnchorElLanguage] = useState(null);
-  const [menuLanguageOpen, setMenuLanguageOpen] = useState(false);
-
 
   //################### CODIGOS DE TESTE #########################################
   // useEffect(() => {
@@ -335,20 +346,10 @@ const LoggedInLayout = ({ children, themeToggle }) => {
     setMenuOpen(true);
   };
 
-  const handlemenuLanguage = ( event ) => {
-    setAnchorElLanguage(event.currentTarget);
-    setMenuLanguageOpen( true );
-  }
-
   const handleCloseMenu = () => {
     setAnchorEl(null);
     setMenuOpen(false);
   };
-
-  const handleCloseMenuLanguage = (  ) => {
-    setAnchorElLanguage(null);
-    setMenuLanguageOpen(false);
-  }
 
   const handleOpenUserModal = () => {
     setUserModalOpen(true);
@@ -366,9 +367,22 @@ const LoggedInLayout = ({ children, themeToggle }) => {
     }
   };
 
-  const handleRefreshPage = () => {
-    window.location.reload(false);
-  }
+  const handleAttendancePausedChange = (event) => {
+    const wantToPause = !event.target.checked;
+    if (wantToPause) {
+      setShowPauseConfirmDialog(true);
+    } else {
+      setAttendancePaused(false);
+      localStorage.setItem("attendancePaused", "false");
+    }
+  };
+
+  const handleConfirmPause = () => {
+    setAttendancePaused(true);
+    localStorage.setItem("attendancePaused", "true");
+    setShowPauseConfirmDialog(false);
+    // TODO: emitir para backend e enviar mensagem automática quando pausado
+  };
 
   const handleMenuItemClick = () => {
     const { innerWidth: width } = window;
@@ -401,9 +415,6 @@ const LoggedInLayout = ({ children, themeToggle }) => {
         <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
           <div className={clsx(classes.toolbarIcon, classes.drawerToolbar)}>
             <img src={logo} className={classes.logo} alt="logo" />
-            <IconButton onClick={() => setDrawerOpen(!drawerOpen)}>
-              <ChevronLeftIcon />
-            </IconButton>
           </div>
           <Divider />
           <List className={classes.containerWithScroll}>
@@ -436,78 +447,38 @@ const LoggedInLayout = ({ children, themeToggle }) => {
         onClose={() => setUserModalOpen(false)}
         userId={user?.id}
       />
+      <ConfirmationModal
+        open={showPauseConfirmDialog}
+        onClose={() => setShowPauseConfirmDialog(false)}
+        onConfirm={handleConfirmPause}
+        title={i18n.t("mainDrawer.appBar.pauseAttendance.title")}
+        confirmText={i18n.t("mainDrawer.appBar.pauseAttendance.confirm")}
+        cancelText={i18n.t("mainDrawer.appBar.pauseAttendance.cancel")}
+      >
+        {i18n.t("mainDrawer.appBar.pauseAttendance.message")}
+      </ConfirmationModal>
       <AppBar
         position="absolute"
         className={clsx(classes.appBar, drawerOpen && classes.appBarShift)}
-        color="primary"
+        color="default"
       >
         <Toolbar variant="dense" className={classes.toolbar}>
           <IconButton
             edge="start"
-            variant="contained"
-            aria-label="open drawer"
+            aria-label="menu"
             onClick={() => setDrawerOpen(!drawerOpen)}
-            className={clsx(
-              classes.menuButton,
-              drawerOpen && classes.menuButtonHidden
-            )}
+            className={classes.menuButton}
+            style={{ color: "rgba(0, 0, 0, 0.54)" }}
           >
             <MenuIcon />
           </IconButton>
 
-          <Typography
-            component="h2"
-            variant="h6"
-            color="inherit"
-            noWrap
-            className={classes.title}
-          >
-            {/* {greaterThenSm && user?.profile === "admin" && getDateAndDifDays(user?.company?.dueDate).difData < 7 ? ( */}
-            {greaterThenSm && user?.profile === "admin" && user?.company?.dueDate ? (
-              <>
-                {i18n.t("mainDrawer.appBar.greeting.hello")} <b>{user.name}</b>, {i18n.t("mainDrawer.appBar.greeting.welcome")} <b>{user?.company?.name}</b>! ({i18n.t("mainDrawer.appBar.greeting.active")} {dateToClient(user?.company?.dueDate)})
-              </>
-            ) : (
-              <>
-                {i18n.t("mainDrawer.appBar.greeting.hello")} <b>{user.name}</b>, {i18n.t("mainDrawer.appBar.greeting.welcome")} <b>{user?.company?.name}</b>!
-              </>
-            )}
-          </Typography>
-          
-          <div>
-            <IconButton edge="start">
-              <LanguageOutlined
-                aria-label="account of current user"
-                aria-controls="menu-appbar"
-                aria-haspopup="true"
-                onClick={handlemenuLanguage}
-                variant="contained"
-                style={{ color: "white",marginRight:10 }}
-              />
-            </IconButton>
-            <Menu
-              id="menu-appbar-language"
-              anchorEl={anchorElLanguage}
-              getContentAnchorEl={null}
-              anchorOrigin={{
-                vertical: "bottom",
-                horizontal: "right",
-              }}
-              transformOrigin={{
-                vertical: "top",
-                horizontal: "right",
-              }}
-              open={menuLanguageOpen}
-              onClose={handleCloseMenuLanguage}
-            >
-              <MenuItem>
-                <LanguageControl />
-              </MenuItem>
-            </Menu>
-          </div>          
+          <Typography component="div" className={classes.title} style={{ flex: 1 }}/>
 
-          <IconButton edge="start" onClick={toggleColorMode}>
-            {theme.mode === 'dark' ? <Brightness7Icon style={{ color: "white" }} /> : <Brightness4Icon style={{ color: "white" }} />}
+          <LanguageControl />
+
+          <IconButton onClick={toggleColorMode} style={{ color: "rgba(0, 0, 0, 0.54)" }}>
+            {theme.mode === 'dark' ? <Brightness7Icon /> : <Brightness4Icon />}
           </IconButton>
 
           <NotificationsVolume
@@ -515,28 +486,31 @@ const LoggedInLayout = ({ children, themeToggle }) => {
             volume={volume}
           />
 
-          <IconButton
-            onClick={handleRefreshPage}
-            aria-label={i18n.t("mainDrawer.appBar.refresh")}
-            color="inherit"
-          >
-            <CachedIcon style={{ color: "white" }} />
-          </IconButton>
-
           {user.id && <NotificationsPopOver volume={volume} />}
 
           <AnnouncementsPopover />
 
           <ChatPopover />
 
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <Typography variant="body2" style={{ fontSize: 12, color: "rgba(0,0,0,0.6)" }}>
+              {attendancePaused ? "Pausado" : "Ativo"}
+            </Typography>
+            <Switch
+              checked={!attendancePaused}
+              onChange={handleAttendancePausedChange}
+              color="primary"
+              size="small"
+            />
+          </div>
+
           <div>
             <IconButton
-              aria-label="account of current user"
+              aria-label="conta"
               aria-controls="menu-appbar"
               aria-haspopup="true"
               onClick={handleMenu}
-              variant="contained"
-              style={{ color: "white" }}
+              style={{ color: "rgba(0, 0, 0, 0.54)" }}
             >
               <AccountCircle />
             </IconButton>

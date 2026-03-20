@@ -9,13 +9,11 @@ import useSound from "use-sound";
 import Popover from "@material-ui/core/Popover";
 import IconButton from "@material-ui/core/IconButton";
 import List from "@material-ui/core/List";
-import ListItem from "@material-ui/core/ListItem";
-import ListItemText from "@material-ui/core/ListItemText";
 import { makeStyles } from "@material-ui/core/styles";
-import Badge from "@material-ui/core/Badge";
 import ChatIcon from "@material-ui/icons/Chat";
 
 import TicketListItem from "../TicketListItemCustom";
+import NotificationPopoverLayout, { PulsingNotificationBadge } from "../NotificationPopoverLayout";
 import useTickets from "../../hooks/useTickets";
 import alertSound from "../../assets/sound.mp3";
 import { AuthContext } from "../../context/Auth/AuthContext";
@@ -23,26 +21,16 @@ import { i18n } from "../../translate/i18n";
 import toastError from "../../errors/toastError";
 
 const useStyles = makeStyles(theme => ({
-	tabContainer: {
-		overflowY: "auto",
-		maxHeight: 350,
-		...theme.scrollbarStyles,
-	},
 	popoverPaper: {
-		width: "100%",
-		maxWidth: 350,
 		marginLeft: theme.spacing(2),
 		marginRight: theme.spacing(1),
-		[theme.breakpoints.down("sm")]: {
-			maxWidth: 270,
+		"& > div": {
+			boxShadow: "none",
 		},
-	},
-	noShadow: {
-		boxShadow: "none !important",
 	},
 }));
 
-const NotificationsPopOver = (volume) => {
+const NotificationsPopOver = ({ volume }) => {
 	const classes = useStyles();
 
 	const history = useHistory();
@@ -59,7 +47,7 @@ const NotificationsPopOver = (volume) => {
 
 	const { tickets } = useTickets({ withUnreadMessages: "true" });
 
-	const [play] = useSound(alertSound, volume);
+	const [play] = useSound(alertSound, { volume: volume ?? 1 });
 	const soundAlertRef = useRef();
 
 	const historyRef = useRef(history);
@@ -228,11 +216,11 @@ const NotificationsPopOver = (volume) => {
 				ref={anchorEl}
 				aria-label="Open Notifications"
 				color="inherit"
-				style={{color:"white"}}
+				style={{ color: "rgba(0, 0, 0, 0.54)" }}
 			>
-				<Badge overlap="rectangular" badgeContent={notifications.length} color="secondary">
+				<PulsingNotificationBadge hasNotification={notifications.length > 0}>
 					<ChatIcon />
-				</Badge>
+				</PulsingNotificationBadge>
 			</IconButton>
 			<Popover
 				disableScrollLock
@@ -249,19 +237,19 @@ const NotificationsPopOver = (volume) => {
 				classes={{ paper: classes.popoverPaper }}
 				onClose={handleClickAway}
 			>
-				<List dense className={classes.tabContainer}>
-					{notifications.length === 0 ? (
-						<ListItem>
-							<ListItemText>{i18n.t("notifications.noTickets")}</ListItemText>
-						</ListItem>
-					) : (
-						notifications.map(ticket => (
+				<NotificationPopoverLayout
+					title={i18n.t("notifications.title")}
+					emptyText={i18n.t("notifications.noTickets")}
+					hasItems={notifications.length}
+				>
+					<List dense>
+						{notifications.map(ticket => (
 							<NotificationTicket key={ticket.id}>
 								<TicketListItem ticket={ticket} />
 							</NotificationTicket>
-						))
-					)}
-				</List>
+						))}
+					</List>
+				</NotificationPopoverLayout>
 			</Popover>
 		</>
 	);

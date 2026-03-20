@@ -10,14 +10,13 @@ import toastError from "../../errors/toastError";
 import Popover from "@material-ui/core/Popover";
 import ForumIcon from "@material-ui/icons/Forum";
 import {
-  Badge,
   IconButton,
   List,
   ListItem,
   ListItemText,
-  Paper,
   Typography,
 } from "@material-ui/core";
+import NotificationPopoverLayout, { PulsingNotificationBadge } from "../../components/NotificationPopoverLayout";
 import api from "../../services/api";
 import { isArray } from "lodash";
 import { SocketContext } from "../../context/Socket/SocketContext";
@@ -29,13 +28,10 @@ import useSound from "use-sound";
 import { i18n } from "../../translate/i18n";
 
 const useStyles = makeStyles((theme) => ({
-  mainPaper: {
-    flex: 1,
-    maxHeight: 300,
-    maxWidth: 500,
-    padding: theme.spacing(1),
-    overflowY: "scroll",
-    ...theme.scrollbarStyles,
+  popoverPaper: {
+    "& > div": {
+      boxShadow: "none",
+    },
   },
 }));
 
@@ -226,14 +222,12 @@ export default function ChatPopover() {
     <div>
       <IconButton
         aria-describedby={id}
-        variant="contained"
-        color={invisible ? "default" : "inherit"}
         onClick={handleClick}
-        style={{ color: "white" }}
+        style={{ color: "rgba(0, 0, 0, 0.54)" }}
       >
-        <Badge color="secondary" variant="dot" invisible={invisible}>
+        <PulsingNotificationBadge hasNotification={!invisible}>
           <ForumIcon />
-        </Badge>
+        </PulsingNotificationBadge>
       </IconButton>
       <Popover
         id={id}
@@ -248,25 +242,28 @@ export default function ChatPopover() {
           vertical: "top",
           horizontal: "center",
         }}
+        classes={{ paper: classes.popoverPaper }}
       >
-        <Paper
-          variant="outlined"
+        <NotificationPopoverLayout
+          title="Mensagens internas"
+          emptyText={i18n.t("mainDrawer.appBar.notRegister")}
+          hasItems={chats.length}
           onScroll={handleScroll}
-          className={classes.mainPaper}
         >
           <List
             component="nav"
-            aria-label="main mailbox folders"
-            style={{ minWidth: 300 }}
+            aria-label="mensagens internas"
+            style={{ padding: 0 }}
           >
             {isArray(chats) &&
               chats.map((item, key) => (
                 <ListItem
                   key={key}
                   style={{
-                    background: key % 2 === 0 ? "#ededed" : "white",
+                    background: key % 2 === 0 ? "#f9f9f9" : "white",
                     border: "1px solid #eee",
                     cursor: "pointer",
+                    marginBottom: 4,
                   }}
                   onClick={() => goToMessages(item)}
                   button
@@ -284,11 +281,8 @@ export default function ChatPopover() {
                   />
                 </ListItem>
               ))}
-            {isArray(chats) && chats.length === 0 && (
-              <ListItemText primary={i18n.t("mainDrawer.appBar.notRegister")} />
-            )}
           </List>
-        </Paper>
+        </NotificationPopoverLayout>
       </Popover>
     </div>
   );

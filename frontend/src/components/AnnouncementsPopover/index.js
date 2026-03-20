@@ -2,19 +2,16 @@ import React, { useEffect, useReducer, useState, useContext } from "react";
 import { makeStyles } from "@material-ui/core/styles";
 import toastError from "../../errors/toastError";
 import Popover from "@material-ui/core/Popover";
-import AnnouncementIcon from "@material-ui/icons/Announcement";
-import Notifications from "@material-ui/icons/Notifications"
+import Notifications from "@material-ui/icons/Notifications";
 
 import {
   Avatar,
-  Badge,
   IconButton,
   List,
   ListItem,
   ListItemAvatar,
   ListItemText,
   Dialog,
-  Paper,
   Typography,
   DialogTitle,
   DialogContent,
@@ -22,19 +19,17 @@ import {
   Button,
   DialogContentText,
 } from "@material-ui/core";
+import NotificationPopoverLayout, { PulsingNotificationBadge } from "../NotificationPopoverLayout";
 import api from "../../services/api";
 import { isArray } from "lodash";
 import moment from "moment";
 import { SocketContext } from "../../context/Socket/SocketContext";
 
 const useStyles = makeStyles((theme) => ({
-  mainPaper: {
-    flex: 1,
-    maxHeight: 3000,
-    maxWidth: 5000,
-    padding: theme.spacing(1),
-    overflowY: "scroll",
-    ...theme.scrollbarStyles,
+  popoverPaper: {
+    "& > div": {
+      boxShadow: "none",
+    },
   },
 }));
 
@@ -245,18 +240,13 @@ export default function AnnouncementsPopover() {
         handleClose={() => setShowAnnouncementDialog(false)}
       />
       <IconButton
-        variant="contained"
         aria-describedby={id}
         onClick={handleClick}
-        style={{ color: "white" }}
+        style={{ color: "rgba(0, 0, 0, 0.54)" }}
       >
-        <Badge
-          color="secondary"
-          variant="dot"
-          invisible={invisible || announcements.length < 1}
-        >
+        <PulsingNotificationBadge hasNotification={announcements.length > 0 && !invisible}>
           <Notifications />
-        </Badge>
+        </PulsingNotificationBadge>
       </IconButton>
       <Popover
         id={id}
@@ -271,26 +261,28 @@ export default function AnnouncementsPopover() {
           vertical: "top",
           horizontal: "center",
         }}
+        classes={{ paper: classes.popoverPaper }}
       >
-        <Paper
-          variant="outlined"
+        <NotificationPopoverLayout
+          title="Comunicados"
+          emptyText="Nenhuma notificação."
+          hasItems={announcements.length}
           onScroll={handleScroll}
-          className={classes.mainPaper}
         >
           <List
             component="nav"
-            aria-label="main mailbox folders"
-            style={{ minWidth: 300 }}
+            aria-label="comunicados"
+            style={{ padding: 0 }}
           >
             {isArray(announcements) &&
               announcements.map((item, key) => (
                 <ListItem
                   key={key}
                   style={{
-                    //background: key % 2 === 0 ? "#ededed" : "white",
                     border: "1px solid #eee",
                     borderLeft: borderPriority(item.priority),
                     cursor: "pointer",
+                    marginBottom: 4,
                   }}
                   onClick={() => handleShowAnnouncementDialog(item)}
                 >
@@ -318,11 +310,8 @@ export default function AnnouncementsPopover() {
                   />
                 </ListItem>
               ))}
-            {isArray(announcements) && announcements.length === 0 && (
-              <ListItemText primary="Nenhum registro" />
-            )}
           </List>
-        </Paper>
+        </NotificationPopoverLayout>
       </Popover>
     </div>
   );
