@@ -1650,6 +1650,10 @@ const messages = {
           message: "Esta ação não pode ser revertida.",
         },
       },
+      errors: {
+        connectionError: "Não foi possível conectar ao servidor. Verifique a URL do backend e se o servidor está online.",
+        generic: "Ocorreu um erro. Tente novamente.",
+      },
       backendErrors: {
         ERR_INTERNAL_SERVER_ERROR:
             "Ocorreu um erro inesperado. Por favor, tente novamente mais tarde",

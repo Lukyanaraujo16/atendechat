@@ -1586,6 +1586,10 @@ const messages = {
           message: "Esta acción no puede ser revertida.",
         },
       },
+      errors: {
+        connectionError: "No se pudo conectar al servidor. Verifique la URL del backend y si el servidor está en línea.",
+        generic: "Ocurrió un error. Por favor, intente nuevamente.",
+      },
       backendErrors: {
         ERR_INTERNAL_SERVER_ERROR: "Ocurrió un error inesperado. Por favor, intente nuevamente más tarde",
         ERR_NO_OTHER_WHATSAPP: "Debe haber al menos un WhatsApp predeterminado.",

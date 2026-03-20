@@ -1622,6 +1622,10 @@ const messages = {
 					message: "This action cannot be undone.",
 				},
 			},
+			errors: {
+				connectionError: "Could not connect to server. Check the backend URL and if the server is online.",
+				generic: "An error occurred. Please try again.",
+			},
 			backendErrors: {
 				ERR_INTERNAL_SERVER_ERROR: "An unexpected error occurred. Please try again later",
 				ERR_NO_OTHER_WHATSAPP: "There must be at least one default WhatsApp.",

@@ -38,17 +38,16 @@ const toastError = err => {
         }
     } if (isString(err)) {
         console.error(`Error: ${err}`);
-        // Optionally log the error to an external service here
-        /*
         toast.error(err);
-        */
         return;
     } else {
-        console.error("An error occurred!");
-        // Optionally log the error to an external service here
-        /*
-        toast.error("An error occurred!");
-        */
+        const msg = err?.message || err?.response?.statusText;
+        const isNetworkError = err?.message === "Network Error" || err?.code === "ERR_NETWORK" || !err?.response;
+        console.error("An error occurred!", err);
+        const displayMsg = isNetworkError
+            ? (i18n.exists("errors.connectionError") ? i18n.t("errors.connectionError") : "Não foi possível conectar ao servidor. Verifique a URL do backend e se o servidor está online.")
+            : (msg || (i18n.exists("errors.generic") ? i18n.t("errors.generic") : "Ocorreu um erro. Tente novamente."));
+        toast.error(displayMsg, { autoClose: 5000 });
         return;
     }
 };

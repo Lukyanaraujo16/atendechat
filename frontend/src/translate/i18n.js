@@ -4,7 +4,7 @@ import { messages } from "./languages";
 const savedLanguage = localStorage.getItem('i18nextLng') || 'en';
 
 i18n.init({
-	debug: true,
+	debug: process.env.NODE_ENV === "development",
 	defaultNS: ["translations"],
 	fallbackLng: "pt",
 	ns: ["translations"],

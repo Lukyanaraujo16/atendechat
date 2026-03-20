@@ -2,30 +2,62 @@
 set -e
 
 ###############################################################################
-# CONFIGURAÇÕES – Ubuntu 20.04, Postgres + Redis local
-# O IP do servidor é detectado automaticamente na instalação.
+# INSTALAÇÃO ATENDECHAT – Ubuntu 20.04, Postgres + Redis local
+# Um único script para instalar tudo. Ao finalizar, basta acessar o sistema.
 ###############################################################################
 
 PROJETO_DIR="/var/www/atendechat"
 LINUX_USER="root"
 
-# IP detectado automaticamente (use SERVER_IP=1.2.3.4 ./install.sh para forçar um IP específico)
+###############################################################################
+# PERGUNTA O IP DO SERVIDOR
+###############################################################################
+echo ""
+echo "=============================================="
+echo "  Instalação Atendechat"
+echo "=============================================="
+echo ""
+
 if [ -z "$SERVER_IP" ]; then
-  echo "==> Detectando IP do servidor..."
-  # Tenta IP público primeiro (ideal para acesso remoto)
-  SERVER_IP=$(curl -s --max-time 3 ifconfig.me 2>/dev/null || curl -s --max-time 3 icanhazip.com 2>/dev/null)
-  if [ -z "$SERVER_IP" ]; then
-    SERVER_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+  if [ -t 0 ]; then
+    echo "Qual é o IP do servidor onde está instalando?"
+    echo "(O IP que você usará para acessar o sistema, ex: 89.117.79.221)"
+    echo ""
+    echo -n "Digite o IP [Enter para detectar automaticamente]: "
+    read -r SERVER_IP
   fi
+
   if [ -z "$SERVER_IP" ]; then
-    SERVER_IP=$(ip route get 1.1.1.1 2>/dev/null | awk '{print $7; exit}')
+    echo ""
+    echo "==> Detectando IP automaticamente..."
+    SERVER_IP=$(curl -s --max-time 3 ifconfig.me 2>/dev/null || curl -s --max-time 3 icanhazip.com 2>/dev/null)
+    if [ -z "$SERVER_IP" ]; then
+      SERVER_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+    fi
+    if [ -z "$SERVER_IP" ]; then
+      SERVER_IP=$(ip route get 1.1.1.1 2>/dev/null | awk '{print $7; exit}')
+    fi
+    if [ -z "$SERVER_IP" ]; then
+      echo ">> ERRO: Não foi possível detectar o IP."
+      echo "   Execute novamente e digite o IP manualmente."
+      exit 1
+    fi
+    echo "    IP detectado: ${SERVER_IP}"
+  else
+    # Remove espaços
+    SERVER_IP=$(echo "$SERVER_IP" | xargs)
+    echo ""
+    echo "    IP informado: ${SERVER_IP}"
   fi
-  if [ -z "$SERVER_IP" ]; then
-    echo ">> ERRO: Não foi possível detectar o IP. Defina manualmente: SERVER_IP=SEU_IP ./install.sh"
-    exit 1
-  fi
-  echo "    IP detectado: ${SERVER_IP}"
 fi
+
+echo ""
+echo ">>> O sistema será configurado para: http://${SERVER_IP}"
+if [ -t 0 ]; then
+  echo ">>> Iniciando instalação em 3 segundos... (Ctrl+C para cancelar)"
+  sleep 3
+fi
+echo ""
 
 DB_NAME="atendechat"
 DB_USER="atendechat"
@@ -104,7 +136,8 @@ if [ -n "$DOMAIN" ] && [ -n "$API_DOMAIN" ]; then
   BACKEND_URL_VALUE="https://${API_DOMAIN}"
   FRONTEND_URL_VALUE="https://${DOMAIN}"
 else
-  BACKEND_URL_VALUE="http://${SERVER_IP}:8080"
+  # Com IP: frontend e API usam a mesma origem (porta 80); Nginx faz proxy para o backend
+  BACKEND_URL_VALUE="http://${SERVER_IP}"
   FRONTEND_URL_VALUE="http://${SERVER_IP}"
 fi
 
@@ -235,17 +268,33 @@ EOF
 else
   echo "==> Configurando Nginx (acesso por IP ${SERVER_IP})"
   rm -f /etc/nginx/sites-enabled/default 2>/dev/null || true
-  cat > /etc/nginx/sites-available/atendechat << EOF
+  cat > /etc/nginx/sites-available/atendechat << 'NGINX_EOF'
 server {
     listen 80 default_server;
     server_name _;
-    root ${PROJETO_DIR}/frontend/build;
+    root PROJETO_DIR/frontend/build;
     index index.html;
+
+    # Proxy das requisições da API para o backend
+    location ~ ^/(auth|users|settings|contacts|tickets|whatsapp|messages|whatsappSession|queues|companies|plans|ticketNotes|quickMessages|helps|dashboard|queueOptions|schedules|tags|contactLists|contactListItems|campaigns|campaignSettings|announcements|chats|subscription|invoices|ticketTags|files|prompts|queueIntegrations|forgetpassword|flowDefault|flowBuilder|flowCampaign|public|socket\.io) {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+        proxy_read_timeout 86400;
+    }
+
     location / {
-        try_files \$uri \$uri/ /index.html;
+        try_files $uri $uri/ /index.html;
     }
 }
-EOF
+NGINX_EOF
+  sed -i "s|PROJETO_DIR|${PROJETO_DIR}|g" /etc/nginx/sites-available/atendechat
   ln -sf /etc/nginx/sites-available/atendechat /etc/nginx/sites-enabled/
 fi
 
@@ -258,17 +307,19 @@ nginx -t && systemctl restart nginx || {
 ###############################################################################
 echo ""
 echo "=============================================="
-echo "  Instalação concluída."
+echo "  INSTALAÇÃO CONCLUÍDA!"
 echo "=============================================="
-echo "  Frontend:  http://${SERVER_IP}"
-echo "  Backend:   http://${SERVER_IP}:8080"
 echo ""
-echo "  Backend (serviço): systemctl status atendechat-backend"
-echo "  Logs:              journalctl -u atendechat-backend -f"
+echo "  Acesse o sistema:"
+echo "    http://${SERVER_IP}"
 echo ""
-echo "  Usuário: admin@admin.com"
-echo "  Senha: 123456"
+echo "  Login padrão:"
+echo "    Usuário: admin@admin.com"
+echo "    Senha:   123456"
 echo ""
 echo "  Abra o firewall se necessário:"
-echo "    ufw allow 22 && ufw allow 80 && ufw allow 8080 && ufw enable"
+echo "    ufw allow 22 && ufw allow 80 && ufw enable"
+echo ""
+echo "  Tudo pronto! Basta acessar o link acima."
 echo "=============================================="
+echo ""
