@@ -32,6 +32,7 @@ import { randomString } from "../../utils/randomCode";
 import ShowQueueService from "../QueueService/ShowQueueService";
 import { getIO } from "../../libs/socket";
 import UpdateTicketService from "../TicketServices/UpdateTicketService";
+import TicketTag from "../../models/TicketTag";
 import FindOrCreateATicketTrakingService from "../TicketServices/FindOrCreateATicketTrakingService";
 import ShowTicketUUIDService from "../TicketServices/ShowTicketFromUUIDService";
 import {logger} from "../../utils/logger";
@@ -342,6 +343,17 @@ export const ActionsWebhookService = async (
         break;
       }
 
+      if (nodeSelected.type === "waitForInteraction") {
+        await ticket.update({
+          userId: null,
+          companyId: companyId,
+          lastFlowId: nodeSelected.id,
+          hashFlowId: hashWebhookId,
+          flowStopped: idFlowDb.toString()
+        });
+        break;
+      }
+
       if (nodeSelected.type === "ticket") {
         /*const queueId = nodeSelected.data?.data?.id || nodeSelected.data?.id;
         const queue = await ShowQueueService(queueId, companyId);
@@ -423,6 +435,56 @@ export const ActionsWebhookService = async (
             lastMessage: bodyFila
           });
         }*/
+      }
+
+      if (nodeSelected.type === "sector" && idTicket) {
+        const queueId = nodeSelected.data?.queue?.id || nodeSelected.data?.id;
+        if (queueId) {
+          const queue = await ShowQueueService(queueId, companyId);
+          if (queue) {
+            await UpdateTicketService({
+              ticketData: {
+                status: "pending",
+                queueId: queue.id
+              },
+              ticketId: String(idTicket),
+              companyId
+            });
+            ticket = await Ticket.findOne({
+              where: { id: idTicket, companyId }
+            });
+          }
+        }
+        await intervalWhats("1");
+      }
+
+      if (nodeSelected.type === "closeTicket" && idTicket) {
+        await UpdateTicketService({
+          ticketData: { status: "closed" },
+          ticketId: String(idTicket),
+          companyId
+        });
+        ticket = await Ticket.findOne({
+          where: { id: idTicket, companyId }
+        });
+        io.of(String(companyId)).emit(`company-${companyId}-ticket`, {
+          action: "delete",
+          ticketId: idTicket
+        });
+        await intervalWhats("1");
+      }
+
+      if (nodeSelected.type === "tag" && idTicket) {
+        const tagId = nodeSelected.data?.tag?.id || nodeSelected.data?.id;
+        if (tagId) {
+          const existing = await TicketTag.findOne({
+            where: { ticketId: idTicket, tagId }
+          });
+          if (!existing) {
+            await TicketTag.create({ ticketId: idTicket, tagId });
+          }
+        }
+        await intervalWhats("1");
       }
 
       if (nodeSelected.type === "singleBlock") {

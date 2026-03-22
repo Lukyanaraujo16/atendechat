@@ -1,15 +1,17 @@
 import {
-  ArrowForwardIos, ContentCopy,
-  Delete, ConfirmationNumber
+  ArrowForwardIos,
+  ContentCopy,
+  Delete,
+  LocalOffer,
 } from "@mui/icons-material";
 import React, { memo } from "react";
-import TextField from '@mui/material/TextField';
 import { useNodeStorage } from "../../../stores/useNodeStorage";
 import { Handle } from "react-flow-renderer";
-import { Typography } from "@material-ui/core";
 
 export default memo(({ data, isConnectable, id }) => {
   const storageItems = useNodeStorage();
+  const tagName = data?.tag?.name || data?.name || "Selecione tag";
+  const tagColor = data?.tag?.color || data?.color || "#6366f1";
 
   return (
     <div
@@ -18,21 +20,21 @@ export default memo(({ data, isConnectable, id }) => {
         padding: "8px",
         borderRadius: "8px",
         boxShadow: "rgba(0, 0, 0, 0.05) 0px 3px 5px",
-        border: '1px solid rgba(33, 94, 151, 0.25)'
+        border: "1px solid rgba(99, 102, 241, 0.25)",
       }}
     >
       <Handle
         type="target"
         position="left"
         style={{
-          background: "#0872b9",
+          background: "#6366f1",
           width: "18px",
           height: "18px",
           top: "20px",
           left: "-12px",
-          cursor: 'pointer'
+          cursor: "pointer",
         }}
-        onConnect={params => console.log("handle onConnect", params)}
+        onConnect={(params) => console.log("handle onConnect", params)}
         isConnectable={isConnectable}
       >
         <ArrowForwardIos
@@ -42,7 +44,7 @@ export default memo(({ data, isConnectable, id }) => {
             height: "10px",
             marginLeft: "2.9px",
             marginBottom: "1px",
-            pointerEvents: 'none'
+            pointerEvents: "none",
           }}
         />
       </Handle>
@@ -53,7 +55,7 @@ export default memo(({ data, isConnectable, id }) => {
           right: 5,
           top: 5,
           cursor: "pointer",
-          gap: 6
+          gap: 6,
         }}
       >
         <ContentCopy
@@ -61,56 +63,47 @@ export default memo(({ data, isConnectable, id }) => {
             storageItems.setNodesStorage(id);
             storageItems.setAct("duplicate");
           }}
-          sx={{ width: "12px", height: "12px", color: "#F7953B" }}
+          sx={{ width: "12px", height: "12px", color: "#6366f1" }}
         />
-
         <Delete
           onClick={() => {
             storageItems.setNodesStorage(id);
             storageItems.setAct("delete");
           }}
-          sx={{ width: "12px", height: "12px", color: "#F7953B" }}
+          sx={{ width: "12px", height: "12px", color: "#6366f1" }}
         />
       </div>
       <div
         style={{
-          color: "#ededed",
+          color: "#232323",
           fontSize: "16px",
           flexDirection: "row",
-          display: "flex"
+          display: "flex",
         }}
       >
-        <ConfirmationNumber
+        <LocalOffer
           sx={{
             width: "16px",
             height: "16px",
             marginRight: "4px",
             marginTop: "4px",
-            color: "#3aba38"
+            color: "#6366f1",
           }}
         />
-        <div style={{ color: "#232323", fontSize: "16px" }}>
-          Ticket
-        </div>
+        <div style={{ color: "#232323", fontSize: "16px" }}>Tag Kanban</div>
       </div>
       <div style={{ color: "#232323", fontSize: "12px", width: 180 }}>
         <div
           style={{
-            backgroundColor: "#F6EEEE",
+            backgroundColor: `${tagColor}20`,
+            color: tagColor,
             marginBottom: "3px",
-            borderRadius: "5px"
+            borderRadius: "5px",
+            padding: "6px",
+            fontWeight: 500,
           }}
         >
-          <div style={{ gap: "5px", padding: "6px" }}>
-            <div style={{ textAlign: "center" }}>
-              {Object.keys(data)[0] === "data" ? (
-                data.data.name
-              ) : (
-                data.name
-              )
-              }
-            </div>
-          </div>
+          {tagName}
         </div>
       </div>
       <Handle
@@ -118,12 +111,12 @@ export default memo(({ data, isConnectable, id }) => {
         position="right"
         id="a"
         style={{
-          background: "#0872b9",
+          background: "#6366f1",
           width: "18px",
           height: "18px",
           top: "70%",
           right: "-11px",
-          cursor: 'pointer'
+          cursor: "pointer",
         }}
         isConnectable={isConnectable}
       >
@@ -134,7 +127,7 @@ export default memo(({ data, isConnectable, id }) => {
             height: "10px",
             marginLeft: "2.9px",
             marginBottom: "1px",
-            pointerEvents: "none"
+            pointerEvents: "none",
           }}
         />
       </Handle>

@@ -276,7 +276,7 @@ server {
     index index.html;
 
     # Proxy das requisições da API para o backend
-    location ~ ^/(auth|users|settings|contacts|tickets|whatsapp|messages|whatsappSession|queues|companies|plans|ticketNotes|quickMessages|helps|dashboard|queueOptions|schedules|tags|contactLists|contactListItems|campaigns|campaignSettings|announcements|chats|subscription|invoices|ticketTags|files|prompts|queueIntegrations|forgetpassword|flowdefault|flowbuilder|flowcampaign|user-ratings|rating-templates|public|socket\.io) {
+    location ~ ^/(auth|users|settings|contacts|tickets|whatsapp|messages|whatsappSession|queue|queues|companies|plans|ticketNotes|quickMessages|helps|dashboard|queueOptions|schedules|tags|contactLists|contactListItems|campaigns|campaignSettings|announcements|chats|subscription|invoices|ticketTags|files|prompts|queueIntegrations|forgetpassword|flowdefault|flowbuilder|flowcampaign|user-ratings|rating-templates|public|socket\.io) {
         proxy_pass http://127.0.0.1:8080;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;

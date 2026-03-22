@@ -2543,6 +2543,7 @@ const handleMessage = async (
     let isMenu = false;
     let isOpenai = false;
     let isQuestion = false;
+    let isWaitForInteraction = false;
 
     if (flow) {
       isMenu =
@@ -2554,6 +2555,44 @@ const handleMessage = async (
       isQuestion =
         flow.flow["nodes"].find((node: any) => node.id === ticket.lastFlowId)
           ?.type === "question";
+      isWaitForInteraction =
+        flow.flow["nodes"].find((node: any) => node.id === ticket.lastFlowId)
+          ?.type === "waitForInteraction";
+    }
+
+    if (!isNil(flow) && isWaitForInteraction && !msg.key.fromMe) {
+      const connections: IConnections[] = flow.flow["connections"];
+      const nextConnection = connections.find(
+        (c: any) => c.source === ticket.lastFlowId
+      );
+      if (nextConnection) {
+        const nextNodeId = nextConnection.target;
+        await ticket.update({ lastFlowId: nextNodeId });
+
+        const nodes: INodes[] = flow.flow["nodes"];
+        const mountDataContact = {
+          number: contact.number,
+          name: contact.name,
+          email: contact.email
+        };
+
+        await ActionsWebhookService(
+          whatsapp.id,
+          parseInt(ticket.flowStopped),
+          ticket.companyId,
+          nodes,
+          connections,
+          nextNodeId,
+          null,
+          "",
+          "",
+          "",
+          ticket.id,
+          mountDataContact,
+          msg
+        );
+      }
+      return;
     }
 
     if (!isNil(flow) && isQuestion && !msg.key.fromMe) {

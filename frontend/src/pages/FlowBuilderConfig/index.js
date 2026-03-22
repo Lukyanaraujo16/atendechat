@@ -1,13 +1,9 @@
 import React, {
   useState,
   useEffect,
-  useReducer,
   useContext,
   useCallback,
 } from "react";
-import { SiOpenai } from "react-icons/si";
-import typebotIcon from "../../assets/typebot-ico.png";
-import { HiOutlinePuzzle } from "react-icons/hi";
 
 import { toast } from "react-toastify";
 import { useHistory } from "react-router-dom";
@@ -30,6 +26,10 @@ import questionNode from "./nodes/questionNode";
 import RemoveEdge from "./nodes/removeEdge";
 import singleBlockNode from "./nodes/singleBlockNode";
 import ticketNode from "./nodes/ticketNode";
+import sectorNode from "./nodes/sectorNode";
+import closeTicketNode from "./nodes/closeTicketNode";
+import tagNode from "./nodes/tagNode";
+import waitForInteractionNode from "./nodes/waitForInteractionNode";
 
 import api from "../../services/api";
 
@@ -40,15 +40,12 @@ import MainContainer from "../../components/MainContainer";
 import toastError from "../../errors/toastError";
 import { AuthContext } from "../../context/Auth/AuthContext";
 import {
-  SpeedDial,
-  SpeedDialAction,
-  SpeedDialIcon,
+  IconButton,
   Stack,
   Typography,
 } from "@mui/material";
 import { useParams } from "react-router-dom/cjs/react-router-dom.min";
-import { Box, CircularProgress } from "@material-ui/core";
-import BallotIcon from "@mui/icons-material/Ballot";
+import { CircularProgress } from "@material-ui/core";
 
 import "reactflow/dist/style.css";
 
@@ -76,19 +73,12 @@ import FlowBuilderSingleBlockModal from "../../components/FlowBuilderSingleBlock
 import FlowBuilderTypebotModal from "../../components/FlowBuilderAddTypebotModal";
 import FlowBuilderOpenAIModal from "../../components/FlowBuilderAddOpenAIModal";
 import FlowBuilderAddQuestionModal from "../../components/FlowBuilderAddQuestionModal";
+import FlowBuilderSectorModal from "../../components/FlowBuilderSectorModal";
+import FlowBuilderTagModal from "../../components/FlowBuilderTagModal";
+import FlowBuilderCloseTicketModal from "../../components/FlowBuilderCloseTicketModal";
+import FlowBuilderAddNodeMenu from "../../components/FlowBuilderAddNodeMenu";
 
-import {
-  AccessTime,
-  CallSplit,
-  DynamicFeed,
-  Image,
-  ImportExport,
-  LibraryBooks,
-  Message,
-  MicNone,
-  RocketLaunch,
-  Videocam,
-} from "@mui/icons-material";
+import { Add } from "@mui/icons-material";
 
 import { useNodeStorage } from "../../stores/useNodeStorage";
 import { ConfirmationNumber } from "@material-ui/icons";
@@ -133,6 +123,10 @@ const nodeTypes = {
   typebot: typebotNode,
   openai: openaiNode,
   question: questionNode,
+  sector: sectorNode,
+  closeTicket: closeTicketNode,
+  tag: tagNode,
+  waitForInteraction: waitForInteractionNode,
 };
 
 const edgeTypes = {
@@ -175,6 +169,10 @@ const FlowBuilderConfig = () => {
   const [modalAddTypebot, setModalAddTypebot] = useState(null);
   const [modalAddOpenAI, setModalAddOpenAI] = useState(null);
   const [modalAddQuestion, setModalAddQuestion] = useState(null);
+  const [modalAddSector, setModalAddSector] = useState(null);
+  const [modalAddTag, setModalAddTag] = useState(null);
+  const [modalAddCloseTicket, setModalAddCloseTicket] = useState(null);
+  const [addNodeMenuAnchor, setAddNodeMenuAnchor] = useState(null);
 
   const connectionLineStyle = { stroke: "#2b2b2b", strokeWidth: "6px" };
 
@@ -376,6 +374,62 @@ const FlowBuilderConfig = () => {
         ];
       });
     }
+
+    if (type === "sector") {
+      return setNodes((old) => {
+        return [
+          ...old,
+          {
+            id: geraStringAleatoria(30),
+            position: { x: posX, y: posY },
+            data: data?.data || {},
+            type: "sector",
+          },
+        ];
+      });
+    }
+
+    if (type === "closeTicket") {
+      return setNodes((old) => {
+        return [
+          ...old,
+          {
+            id: geraStringAleatoria(30),
+            position: { x: posX, y: posY },
+            data: {},
+            type: "closeTicket",
+          },
+        ];
+      });
+    }
+
+    if (type === "tag") {
+      return setNodes((old) => {
+        return [
+          ...old,
+          {
+            id: geraStringAleatoria(30),
+            position: { x: posX, y: posY },
+            data: data?.data || {},
+            type: "tag",
+          },
+        ];
+      });
+    }
+
+    if (type === "waitForInteraction") {
+      return setNodes((old) => {
+        return [
+          ...old,
+          {
+            id: geraStringAleatoria(30),
+            position: { x: posX, y: posY },
+            data: {},
+            type: "waitForInteraction",
+          },
+        ];
+      });
+    }
   };
 
   const textAdd = (data) => {
@@ -430,6 +484,22 @@ const FlowBuilderConfig = () => {
     addNode("question", data);
   };
 
+  const sectorAdd = (data) => {
+    addNode("sector", data);
+  };
+
+  const closeTicketAdd = (data) => {
+    addNode("closeTicket", data || {});
+  };
+
+  const tagAdd = (data) => {
+    addNode("tag", data);
+  };
+
+  const waitForInteractionAdd = () => {
+    addNode("waitForInteraction", {});
+  };
+
   const loadMore = () => {
     setPageNumber((prevState) => prevState + 1);
   };
@@ -463,7 +533,6 @@ const FlowBuilderConfig = () => {
   };
 
   const doubleClick = (event, node) => {
-    console.log("NODE", node);
     setDataNode(node);
     if (node.type === "message") {
       setModalAddText("edit");
@@ -498,6 +567,15 @@ const FlowBuilderConfig = () => {
     }
     if (node.type === "question") {
       setModalAddQuestion("edit");
+    }
+    if (node.type === "sector") {
+      setModalAddSector("edit");
+    }
+    if (node.type === "tag") {
+      setModalAddTag("edit");
+    }
+    if (node.type === "closeTicket") {
+      setModalAddCloseTicket("edit");
     }
   };
 
@@ -543,117 +621,12 @@ const FlowBuilderConfig = () => {
     setModalAddMenu(null);
     setModalAddOpenAI(null);
     setModalAddTypebot(null);
+    setModalAddSector(null);
+    setModalAddTag(null);
+    setModalAddCloseTicket(null);
   };
 
-  const actions = [
-    {
-      icon: (
-        <RocketLaunch
-          sx={{
-            color: "#3ABA38",
-          }}
-        />
-      ),
-      name: "Inicio",
-      type: "start",
-    },
-    {
-      icon: (
-        <LibraryBooks
-          sx={{
-            color: "#EC5858",
-          }}
-        />
-      ),
-      name: "Conteúdo",
-      type: "content",
-    },
-    {
-      icon: (
-        <DynamicFeed
-          sx={{
-            color: "#683AC8",
-          }}
-        />
-      ),
-      name: "Menu",
-      type: "menu",
-    },
-    {
-      icon: (
-        <CallSplit
-          sx={{
-            color: "#1FBADC",
-          }}
-        />
-      ),
-      name: "Randomizador",
-      type: "random",
-    },
-    {
-      icon: (
-        <AccessTime
-          sx={{
-            color: "#F7953B",
-          }}
-        />
-      ),
-      name: "Intervalo",
-      type: "interval",
-    },
-    {
-      icon: (
-        <ConfirmationNumber
-          sx={{
-            color: "#F7953B",
-          }}
-        />
-      ),
-      name: "Ticket",
-      type: "ticket",
-    },
-    {
-      icon: (
-        <Box
-          component="img"
-          sx={{
-            width: 24,
-            height: 24,
-            color: "#3aba38",
-          }}
-          src={typebotIcon}
-          alt="icon"
-        />
-      ),
-      name: "TypeBot",
-      type: "typebot",
-    },
-    {
-      icon: (
-        <SiOpenai
-          sx={{
-            color: "#F7953B",
-          }}
-        />
-      ),
-      name: "OpenAI",
-      type: "openai",
-    },
-    {
-      icon: (
-        <BallotIcon
-          sx={{
-            color: "#F7953B",
-          }}
-        />
-      ),
-      name: "Pergunta",
-      type: "question",
-    },
-  ];
-
   const clickActions = (type) => {
-
     switch (type) {
       case "start":
         addNode("start");
@@ -678,10 +651,22 @@ const FlowBuilderConfig = () => {
         break;
       case "openai":
         setModalAddOpenAI("create");
-        break
+        break;
       case "question":
         setModalAddQuestion("create");
-        break
+        break;
+      case "sector":
+        setModalAddSector("create");
+        break;
+      case "closeTicket":
+        setModalAddCloseTicket("create");
+        break;
+      case "tag":
+        setModalAddTag("create");
+        break;
+      case "waitForInteraction":
+        waitForInteractionAdd();
+        break;
       default:
     }
   };
@@ -839,6 +824,27 @@ const FlowBuilderConfig = () => {
         onUpdate={updateNode}
         close={setModalAddQuestion}
       />
+      <FlowBuilderSectorModal
+        open={modalAddSector}
+        onSave={sectorAdd}
+        data={dataNode}
+        onUpdate={updateNode}
+        close={setModalAddSector}
+      />
+      <FlowBuilderTagModal
+        open={modalAddTag}
+        onSave={tagAdd}
+        data={dataNode}
+        onUpdate={updateNode}
+        close={setModalAddTag}
+      />
+      <FlowBuilderCloseTicketModal
+        open={modalAddCloseTicket}
+        onSave={closeTicketAdd}
+        data={dataNode}
+        onUpdate={updateNode}
+        close={setModalAddCloseTicket}
+      />
 
       <MainHeader>
         <Title>Desenhe seu fluxo</Title>
@@ -850,30 +856,27 @@ const FlowBuilderConfig = () => {
           onScroll={handleScroll}
         >
           <Stack>
-            <SpeedDial
-              ariaLabel="SpeedDial basic example"
+            <IconButton
+              aria-label="Adicionar nó"
+              onClick={(e) => setAddNodeMenuAnchor(e.currentTarget)}
               sx={{
                 position: "absolute",
-                top: 16,
-                left: 16,
+                top: 8,
+                left: 8,
+                backgroundColor: "primary.main",
+                color: "white",
+                "&:hover": { backgroundColor: "primary.dark" },
+                zIndex: 10,
               }}
-              icon={<SpeedDialIcon />}
-              direction={"down"}
             >
-              {actions.map((action) => (
-                <SpeedDialAction
-                  key={action.name}
-                  icon={action.icon}
-                  tooltipTitle={action.name}
-                  tooltipOpen
-                  tooltipPlacement={"right"}
-                  onClick={() => {
-                    console.log(action.type);
-                    clickActions(action.type);
-                  }}
-                />
-              ))}
-            </SpeedDial>
+              <Add />
+            </IconButton>
+            <FlowBuilderAddNodeMenu
+              anchorEl={addNodeMenuAnchor}
+              open={Boolean(addNodeMenuAnchor)}
+              onClose={() => setAddNodeMenuAnchor(null)}
+              onSelectAction={clickActions}
+            />
           </Stack>
           <Stack
             sx={{
