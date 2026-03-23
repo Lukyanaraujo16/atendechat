@@ -84,7 +84,9 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
     expiresTicket: 0,
     timeUseBotQueues: 0,
     maxUseBotQueues: 3,
-    integration: null
+    integration: null,
+    flowIdWelcome: null,
+    flowIdNotPhrase: null
   };
 
   const [whatsApp, setWhatsApp] = useState(initialState);
@@ -95,6 +97,9 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
   const [prompts, setPrompts] = useState([]);
   const [integrations, setIntegrations] = useState([]);
   const [selectedIntegration, setSelectedIntegration] = useState(null);
+  const [flows, setFlows] = useState([]);
+  const [selectedFlowWelcome, setSelectedFlowWelcome] = useState(null);
+  const [selectedFlowNotPhrase, setSelectedFlowNotPhrase] = useState(null);
   const [tokenDialogOpen, setTokenDialogOpen] = useState(false);
   const [createdToken, setCreatedToken] = useState("");
   const [generatingToken, setGeneratingToken] = useState(false);
@@ -136,6 +141,8 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
           const whatsQueueIds = data.queues?.map((queue) => queue.id);
           setSelectedQueueIds(whatsQueueIds);
           setSelectedQueueId(data.transferQueueId);
+          setSelectedFlowWelcome(data.flowIdWelcome || null);
+          setSelectedFlowNotPhrase(data.flowIdNotPhrase || null);
         } catch (err) {
           toastError(err);
         }
@@ -151,6 +158,9 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
 
         const { data: dataIntegration } = await api.get("/queueIntegration");
         setIntegrations(dataIntegration?.queueIntegrations ?? []);
+
+        const { data: dataFlows } = await api.get("/flowbuilder");
+        setFlows(dataFlows?.flows ?? []);
 
       } catch (err) {
         toastError(err);
@@ -173,7 +183,9 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
     const whatsappData = {
       ...values, queueIds: selectedQueueIds, transferQueueId: selectedQueueId,
       promptId: selectedPrompt ? selectedPrompt : null,
-      integrationId: selectedIntegration
+      integrationId: selectedIntegration,
+      flowIdWelcome: selectedFlowWelcome || null,
+      flowIdNotPhrase: selectedFlowNotPhrase || null
     };
     delete whatsappData["queues"];
     delete whatsappData["session"];
@@ -220,6 +232,8 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
     setWhatsApp(initialState);
 	  setSelectedQueueId(null);
     setSelectedQueueIds([]);
+    setSelectedFlowWelcome(null);
+    setSelectedFlowNotPhrase(null);
     setTokenDialogOpen(false);
     setCreatedToken("");
   };
@@ -486,6 +500,70 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
                       </MenuItem>
                     ))}
                   </Select>
+                </FormControl>
+                <FormControl
+                  margin="dense"
+                  variant="outlined"
+                  fullWidth
+                >
+                  <InputLabel>Fluxo de boas-vindas</InputLabel>
+                  <Select
+                    labelId="dialog-select-flow-welcome-label"
+                    id="dialog-select-flow-welcome"
+                    value={selectedFlowWelcome || ""}
+                    onChange={(e) => setSelectedFlowWelcome(e.target.value || null)}
+                    label="Fluxo de boas-vindas"
+                    fullWidth
+                    MenuProps={{
+                      anchorOrigin: { vertical: "bottom", horizontal: "left" },
+                      transformOrigin: { vertical: "top", horizontal: "left" },
+                      getContentAnchorEl: null,
+                    }}
+                  >
+                    <MenuItem value="">
+                      <em>Nenhum</em>
+                    </MenuItem>
+                    {(flows || []).map((flow) => (
+                      <MenuItem key={flow.id} value={flow.id}>
+                        {flow.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                  <Typography variant="caption" color="textSecondary" display="block" style={{ marginTop: 4 }}>
+                    Executa quando o cliente retorna e envia uma mensagem que não corresponde a nenhuma frase de campanha
+                  </Typography>
+                </FormControl>
+                <FormControl
+                  margin="dense"
+                  variant="outlined"
+                  fullWidth
+                >
+                  <InputLabel>Fluxo padrão (primeira mensagem)</InputLabel>
+                  <Select
+                    labelId="dialog-select-flow-notphrase-label"
+                    id="dialog-select-flow-notphrase"
+                    value={selectedFlowNotPhrase || ""}
+                    onChange={(e) => setSelectedFlowNotPhrase(e.target.value || null)}
+                    label="Fluxo padrão (primeira mensagem)"
+                    fullWidth
+                    MenuProps={{
+                      anchorOrigin: { vertical: "bottom", horizontal: "left" },
+                      transformOrigin: { vertical: "top", horizontal: "left" },
+                      getContentAnchorEl: null,
+                    }}
+                  >
+                    <MenuItem value="">
+                      <em>Nenhum</em>
+                    </MenuItem>
+                    {(flows || []).map((flow) => (
+                      <MenuItem key={flow.id} value={flow.id}>
+                        {flow.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                  <Typography variant="caption" color="textSecondary" display="block" style={{ marginTop: 4 }}>
+                    Executa na primeira mensagem do cliente quando não corresponde a nenhuma frase de campanha
+                  </Typography>
                 </FormControl>
                 <div>
                   <h3>{i18n.t("whatsappModal.form.queueRedirection")}</h3>

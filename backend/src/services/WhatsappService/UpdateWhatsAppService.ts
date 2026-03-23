@@ -26,7 +26,9 @@ interface WhatsappData {
   timeUseBotQueues?: number;
   expiresTicket?: number;
   expiresInactiveMessage?: string;
-  integrationId?: number
+  integrationId?: number;
+  flowIdWelcome?: number;
+  flowIdNotPhrase?: number;
 }
 
 interface Request {
@@ -71,7 +73,9 @@ const UpdateWhatsAppService = async ({
     timeUseBotQueues,
     expiresTicket,
     expiresInactiveMessage,
-    integrationId
+    integrationId,
+    flowIdWelcome,
+    flowIdNotPhrase
   } = whatsappData;
 
   try {
@@ -124,6 +128,12 @@ const UpdateWhatsAppService = async ({
   };
   if (token !== undefined) {
     updateData.token = token;
+  }
+  if (flowIdWelcome !== undefined) {
+    updateData.flowIdWelcome = flowIdWelcome;
+  }
+  if (flowIdNotPhrase !== undefined) {
+    updateData.flowIdNotPhrase = flowIdNotPhrase;
   }
 
   await whatsapp.update(updateData);
