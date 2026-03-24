@@ -19,7 +19,7 @@ export function TagsFilter({ onFiltered }) {
   const loadTags = async () => {
     try {
       const { data } = await api.get(`/tags/list`);
-      setTags(data);
+      setTags(Array.isArray(data) ? data : (data?.tags || []));
     } catch (err) {
       toastError(err);
     }
@@ -40,7 +40,7 @@ export function TagsFilter({ onFiltered }) {
         onChange={(e, v, r) => onChange(v)}
         getOptionLabel={(option) => option.name}
         renderTags={(value, getTagProps) =>
-          value.map((option, index) => (
+          (value || []).map((option, index) => (
             <Chip
               variant="outlined"
               style={{

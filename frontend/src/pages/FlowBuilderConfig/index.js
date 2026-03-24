@@ -515,9 +515,17 @@ const FlowBuilderConfig = () => {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
-  const onConnect = useCallback(
-    (params) => setEdges((eds) => addEdge(params, eds)),
+  const onRemoveEdge = useCallback(
+    (edgeId) => setEdges((eds) => eds.filter((e) => e.id !== edgeId)),
     [setEdges]
+  );
+
+  const onConnect = useCallback(
+    (params) => setEdges((eds) => addEdge(
+      { ...params, type: "buttonedge", data: { onRemove: onRemoveEdge } },
+      eds
+    )),
+    [setEdges, onRemoveEdge]
   );
 
   const saveFlow = async () => {
@@ -680,7 +688,12 @@ const FlowBuilderConfig = () => {
           if (data.flow.flow !== null) {
             const flowNodes = data.flow.flow.nodes;
             setNodes(flowNodes);
-            setEdges(data.flow.flow.connections);
+            const connections = data.flow.flow.connections || [];
+            setEdges(connections.map((e) => ({
+              ...e,
+              type: "buttonedge",
+              data: { ...e.data, onRemove: (edgeId) => setEdges((eds) => eds.filter((ed) => ed.id !== edgeId)) },
+            })));
             const filterVariables = flowNodes.filter(
               (nd) => nd.type === "question"
             );

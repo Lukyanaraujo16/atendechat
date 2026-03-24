@@ -1,19 +1,14 @@
-import React, { useContext } from "react";
+import React, { useCallback } from "react";
 import {
   getBezierPath,
   getEdgeCenter,
-  getMarkerEnd
+  getMarkerEnd,
 } from "react-flow-renderer";
 
 import "./css/buttonedge.css";
 import { Delete } from "@mui/icons-material";
 
-const onEdgeClick = (evt, id) => {
-  evt.stopPropagation();
-  //removeEdgeList(id);
-};
-
-export default function removeEdge({
+export default function RemoveEdge({
   id,
   sourceX,
   sourceY,
@@ -26,6 +21,14 @@ export default function removeEdge({
   arrowHeadType,
   markerEndId
 }) {
+  const onRemove = useCallback(
+    (evt) => {
+      evt.stopPropagation();
+      data?.onRemove?.(id);
+    },
+    [id, data]
+  );
+
   const edgePath = getBezierPath({
     sourceX,
     sourceY,
@@ -48,10 +51,12 @@ export default function removeEdge({
     <>
       <path
         id={id}
-        style={style}
+        style={{ ...style, cursor: "pointer" }}
         className="react-flow__edge-path"
         d={edgePath}
         markerEnd={markerEnd}
+        onClick={onRemove}
+        onDoubleClick={onRemove}
       />
       <foreignObject
         width={foreignObjectSize}
@@ -62,12 +67,13 @@ export default function removeEdge({
         requiredExtensions="http://www.w3.org/1999/xhtml"
       >
         <body>
-          {/* <button
+          <button
             className="edgebutton"
-            onClick={event => onEdgeClick(event, id)}
+            onClick={onRemove}
+            type="button"
           >
             <Delete sx={{ width: "12px", height: "12px", color: "#0000FF" }} />
-          </button> */}
+          </button>
         </body>
       </foreignObject>
     </>

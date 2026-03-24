@@ -175,7 +175,7 @@ const ContactDrawer = ({ open, handleDrawerClose, contact, ticket, loading }) =>
 							<Typography variant="subtitle1">
 								{i18n.t("contactDrawer.extraInfo")}
 							</Typography>
-							{contact?.extraInfo?.map(info => (
+							{(contact?.extraInfo || []).map(info => (
 								<Paper
 									key={info.id}
 									square

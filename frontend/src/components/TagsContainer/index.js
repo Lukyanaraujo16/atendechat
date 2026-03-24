@@ -41,7 +41,7 @@ export function TagsContainer({ ticket }) {
     const loadTags = async () => {
         try {
             const { data } = await api.get(`/tags/list`);
-            setTags(data);
+            setTags(Array.isArray(data) ? data : (data?.tags || []));
         } catch (err) {
             toastError(err);
         }
@@ -82,13 +82,13 @@ export function TagsContainer({ ticket }) {
             <Autocomplete
                 multiple
                 size="small"
-                options={tags}
-                value={selecteds}
+                options={tags || []}
+                value={selecteds || []}
                 freeSolo
                 onChange={(e, v, r) => onChange(v, r)}
                 getOptionLabel={(option) => option.name}
                 renderTags={(value, getTagProps) =>
-                    value.map((option, index) => (
+                    (value || []).map((option, index) => (
                         <Chip
                             variant="outlined"
                             style={{
