@@ -330,8 +330,8 @@ export const ActionsWebhookService = async (
       }
 
       if (nodeSelected.type === "question") {
-        const webhook = ticket?.dataWebhook;
-        const variables = ticket?.dataWebhook?.variables;
+        const webhook = ticket?.dataWebhook as { variables?: Record<string, unknown> } | null | undefined;
+        const variables = webhook?.variables;
 
         if (!variables || variables === undefined || variables === null) {
           const { message } = nodeSelected.data.typebotIntegration;
@@ -526,9 +526,9 @@ export const ActionsWebhookService = async (
 
             let msg;
 
-            const webhook = ticket.dataWebhook;
+            const webhook = ticket.dataWebhook as { variables?: Record<string, unknown> } | null | undefined;
 
-            if (webhook && webhook.hasOwnProperty("variables")) {
+            if (webhook && "variables" in webhook && webhook.variables) {
               msg = replaceMessages(webhook.variables, bodyFor);
             } else {
               msg = bodyFor;
