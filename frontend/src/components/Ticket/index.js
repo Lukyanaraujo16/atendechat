@@ -6,6 +6,7 @@ import clsx from "clsx";
 
 import { Paper, makeStyles } from "@material-ui/core";
 
+import ErrorBoundary from "../ErrorBoundary";
 import ContactDrawer from "../ContactDrawer";
 import MessageInput from "../MessageInputCustom/";
 import TicketHeader from "../TicketHeader";
@@ -181,12 +182,12 @@ const Ticket = () => {
           <TicketActionButtons ticket={ticket} />
         </TicketHeader>
         {ticket?.id && (
-          <>
+          <ErrorBoundary>
             <Paper>
               <TagsContainer ticket={ticket} />
             </Paper>
             <ReplyMessageProvider>{renderMessagesList()}</ReplyMessageProvider>
-          </>
+          </ErrorBoundary>
         )}
       </Paper>
       <ContactDrawer

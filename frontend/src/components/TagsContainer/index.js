@@ -73,9 +73,9 @@ export function TagsContainer({ ticket }) {
         } else {
             optionsChanged = value;
         }
-        setSelecteds(optionsChanged);
+        setSelecteds(Array.isArray(optionsChanged) ? optionsChanged : []);
         if (ticket?.id) {
-          await syncTags({ ticketId: ticket.id, tags: optionsChanged });
+          await syncTags({ ticketId: ticket.id, tags: Array.isArray(optionsChanged) ? optionsChanged : [] });
         }
     }
 
@@ -84,13 +84,13 @@ export function TagsContainer({ ticket }) {
             <Autocomplete
                 multiple
                 size="small"
-                options={tags || []}
-                value={selecteds || []}
+                options={Array.isArray(tags) ? tags : []}
+                value={Array.isArray(selecteds) ? selecteds : []}
                 freeSolo
                 onChange={(e, v, r) => onChange(v, r)}
                 getOptionLabel={(option) => (typeof option === 'string' ? option : option?.name) || ''}
                 renderTags={(value, getTagProps) =>
-                    (value || []).map((option, index) => (
+                    (Array.isArray(value) ? value : []).map((option, index) => (
                         <Chip
                             variant="outlined"
                             style={{

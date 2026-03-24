@@ -59,7 +59,7 @@ export function UsersFilter({ onFiltered, initialUsers }) {
           );
         }}
         renderTags={(value, getUserProps) =>
-          (value || []).map((option, index) => (
+          (Array.isArray(value) ? value : []).map((option, index) => (
             <Chip
               variant="outlined"
               style={{

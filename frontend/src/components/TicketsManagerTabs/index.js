@@ -538,7 +538,7 @@ const TicketsManagerTabs = () => {
                     <MenuItem value="">
                       <em>Selecione</em>
                     </MenuItem>
-                    {(whatsApps || []).map((w) => (
+                    {(Array.isArray(whatsApps) ? whatsApps : []).map((w) => (
                       <MenuItem key={w.id} value={String(w.id)}>
                         {w.name || `Conexão ${w.id}`}
                       </MenuItem>

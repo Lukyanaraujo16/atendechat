@@ -117,7 +117,7 @@ export function ContactNotes ({ ticket }) {
     }
 
     const renderNoteList = () => {
-        return (notes || []).map((note) => {
+        return (Array.isArray(notes) ? notes : []).map((note) => {
             return <ContactNotesDialogListItem
                 note={note}
                 key={note.id}

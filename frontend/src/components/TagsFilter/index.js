@@ -40,7 +40,7 @@ export function TagsFilter({ onFiltered }) {
         onChange={(e, v, r) => onChange(v)}
         getOptionLabel={(option) => option.name}
         renderTags={(value, getTagProps) =>
-          (value || []).map((option, index) => (
+          (Array.isArray(value) ? value : []).map((option, index) => (
             <Chip
               variant="outlined"
               style={{
