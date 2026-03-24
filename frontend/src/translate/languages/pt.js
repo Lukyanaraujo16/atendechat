@@ -1686,6 +1686,7 @@ const messages = {
       },
       contactDrawer: {
         header: "Dados do contato",
+        hiddenNumber: "Número oculto (privacidade WhatsApp)",
         buttons: {
           edit: "Editar contato",
         },

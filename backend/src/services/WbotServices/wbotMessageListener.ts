@@ -467,17 +467,22 @@ const getSenderMessage = (
 };
 
 /**
- * Para chat 1:1, retorna sempre o JID no formato @s.whatsapp.net (número real).
- * Quando a mensagem vem com @lid (Linked Identity), usa key.senderPn para obter o número real,
- * evitando que respostas sejam enviadas para o destino errado (ex.: para o próprio número).
+ * Para chat 1:1, retorna sempre o JID no formato @s.whatsapp.net (número real) quando disponível.
+ * Quando a mensagem vem com @lid (Linked Identity), tenta obter o número real por:
+ * 1. key.senderPn - número em formato string
+ * 2. key.remoteJidAlt - JID alternativo com número (ex: 5511999999999@s.whatsapp.net)
+ * Caso contrário retorna o LID para envio, mas o contato ficará com número "LID" para exibição.
  */
 const getContactJidForChat = (msg: proto.IWebMessageInfo): string => {
   const remoteJid = msg.key.remoteJid || "";
   if (remoteJid.endsWith("@lid")) {
-    const senderPn = (msg.key as { senderPn?: string }).senderPn;
-    if (senderPn) {
-      const phone = String(senderPn).replace(/\D/g, "");
+    const key = msg.key as { senderPn?: string; remoteJidAlt?: string };
+    if (key.senderPn) {
+      const phone = String(key.senderPn).replace(/\D/g, "");
       if (phone) return `${phone}@s.whatsapp.net`;
+    }
+    if (key.remoteJidAlt && key.remoteJidAlt.endsWith("@s.whatsapp.net")) {
+      return key.remoteJidAlt;
     }
   }
   return remoteJid;
@@ -554,9 +559,16 @@ const verifyContact = async (
     profilePicUrl = `${process.env.FRONTEND_URL}/nopicture.png`;
   }
 
+  // Para LID sem número resolvível: não usar dígitos do JID (não é o telefone real)
+  const rawId = msgContact.id;
+  const isLidWithoutNumber = rawId.endsWith("@lid");
+  const number = isLidWithoutNumber
+    ? "LID"
+    : rawId.replace(/\D/g, "");
+
   const contactData = {
-    name: msgContact?.name || msgContact.id.replace(/\D/g, ""),
-    number: msgContact.id.replace(/\D/g, ""),
+    name: msgContact?.name || (isLidWithoutNumber ? "Cliente" : rawId.replace(/\D/g, "")),
+    number,
     profilePicUrl,
     isGroup: msgContact.id.includes("g.us"),
     companyId,
@@ -2378,6 +2390,14 @@ const handleMessage = async (
       companyId,
       groupContact
     );
+
+    // Persistir remoteJid para envio correto (essencial em conversas LID)
+    const existingData = (ticket.dataWebhook as Record<string, unknown>) || {};
+    if (msg.key.remoteJid) {
+      await ticket.update({
+        dataWebhook: { ...existingData, remoteJid: msg.key.remoteJid }
+      } as any);
+    }
 
     await provider(ticket, msg, companyId, contact, wbot as WASocket);
 

@@ -142,7 +142,11 @@ const ContactDrawer = ({ open, handleDrawerClose, contact, ticket, loading }) =>
 								subheader={
 									<>
 										<Typography style={{fontSize: 12}}>
-											<Link href={`tel:${contact.number}`}>{contact.number}</Link>
+											{contact.number === "LID" ? (
+												i18n.t("contactDrawer.hiddenNumber")
+											) : (
+												<Link href={`tel:${contact.number}`}>{contact.number}</Link>
+											)}
 										</Typography>
 										<Typography style={{fontSize: 12}}>
 											<Link href={`mailto:${contact.email}`}>{contact.email}</Link>

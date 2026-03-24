@@ -1572,6 +1572,7 @@ const messages = {
 			},
 			contactDrawer: {
 				header: "Contact Information",
+				hiddenNumber: "Hidden number (WhatsApp privacy)",
 				buttons: {
 					edit: "Edit contact",
 				},

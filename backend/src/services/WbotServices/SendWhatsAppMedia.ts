@@ -6,6 +6,7 @@ import path from "path";
 import ffmpegPath from "@ffmpeg-installer/ffmpeg";
 import AppError from "../../errors/AppError";
 import GetTicketWbot from "../../helpers/GetTicketWbot";
+import { getTicketRemoteJid } from "../../helpers/GetTicketRemoteJid";
 import Ticket from "../../models/Ticket";
 import { lookup } from "mime-types";
 import formatBody from "../../helpers/Mustache";
@@ -186,10 +187,16 @@ const SendWhatsAppMedia = async ({
       };
     }
 
-    const destNumber = String(ticket.contact.number || "").replace(/\D/g, "");
-    const number = ticket.isGroup
-      ? `${destNumber}@g.us`
-      : `${destNumber}@s.whatsapp.net`;
+    let number = await getTicketRemoteJid(ticket);
+    if (!number) {
+      const destNumber = String(ticket.contact?.number || "").replace(/\D/g, "");
+      if (!destNumber && !ticket.isGroup) {
+        throw new AppError("Não foi possível obter o destino. O contato pode ter número oculto (LID) e não há histórico de conversa.");
+      }
+      number = ticket.isGroup
+        ? `${destNumber}@g.us`
+        : `${destNumber}@s.whatsapp.net`;
+    }
     const sentMessage = await wbot.sendMessage(number, {
       ...options
     });

@@ -2,6 +2,7 @@ import { WAMessage, jidNormalizedUser } from "@whiskeysockets/baileys";
 import * as Sentry from "@sentry/node";
 import AppError from "../../errors/AppError";
 import GetTicketWbot from "../../helpers/GetTicketWbot";
+import { getTicketRemoteJid } from "../../helpers/GetTicketRemoteJid";
 import Message from "../../models/Message";
 import Ticket from "../../models/Ticket";
 
@@ -24,20 +25,24 @@ const SendWhatsAppMessage = async ({
   let options = {};
   const wbot = await GetTicketWbot(ticket);
   // Evitar enviar para o próprio número da conexão (resposta indo para "si mesmo")
-  if (!ticket.isGroup && ticket.contact?.number && wbot.user?.id) {
+  if (!ticket.isGroup && ticket.contact?.number && ticket.contact.number !== "LID" && wbot.user?.id) {
     const destNumber = String(ticket.contact.number).replace(/\D/g, "");
     const myNumber = jidNormalizedUser(wbot.user.id).replace(/\D/g, "");
     if (destNumber && myNumber && destNumber === myNumber) {
       throw new AppError("Não é possível enviar mensagem para o próprio número da conexão. Verifique o contato do ticket.");
     }
   }
-  // Usar o JID da conversa original quando disponível (resolve LID: resposta no mesmo chat do cliente)
-  const number = remoteJidOverride || (() => {
-    const destNumber = String(ticket.contact.number || "").replace(/\D/g, "");
-    return ticket.isGroup
+  // Obter JID para envio: override > ticket (dataWebhook ou última mensagem) > construir do contato
+  let number = remoteJidOverride || (await getTicketRemoteJid(ticket));
+  if (!number) {
+    const destNumber = String(ticket.contact?.number || "").replace(/\D/g, "");
+    if (!destNumber && !ticket.isGroup) {
+      throw new AppError("Não foi possível obter o destino da mensagem. O contato pode ter número oculto (LID) e não há histórico de conversa.");
+    }
+    number = ticket.isGroup
       ? `${destNumber}@g.us`
       : `${destNumber}@s.whatsapp.net`;
-  })();
+  }
 
   if (quotedMsg) {
       const chatMessages = await Message.findOne({
