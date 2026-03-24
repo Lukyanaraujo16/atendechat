@@ -420,12 +420,12 @@ const TicketsManagerTabs = () => {
   };
 
   const handleSelectedTags = (selecteds) => {
-    const tags = selecteds.map((t) => t.id);
+    const tags = (Array.isArray(selecteds) ? selecteds : []).map((t) => t?.id).filter(Boolean);
     setSelectedTags(tags);
   };
 
   const handleSelectedUsers = (selecteds) => {
-    const users = selecteds.map((t) => t.id);
+    const users = (Array.isArray(selecteds) ? selecteds : []).map((t) => t?.id).filter(Boolean);
     setSelectedUsers(users);
   };
 

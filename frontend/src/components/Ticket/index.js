@@ -180,10 +180,14 @@ const Ticket = () => {
           {renderTicketInfo()}
           <TicketActionButtons ticket={ticket} />
         </TicketHeader>
-        <Paper>
-          <TagsContainer ticket={ticket} />
-        </Paper>
-        <ReplyMessageProvider>{renderMessagesList()}</ReplyMessageProvider>
+        {ticket?.id && (
+          <>
+            <Paper>
+              <TagsContainer ticket={ticket} />
+            </Paper>
+            <ReplyMessageProvider>{renderMessagesList()}</ReplyMessageProvider>
+          </>
+        )}
       </Paper>
       <ContactDrawer
         open={drawerOpen}

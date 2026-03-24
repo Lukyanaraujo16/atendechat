@@ -430,7 +430,7 @@ const CustomInput = (props) => {
         open={popupOpen}
         id="grouped-demo"
         value={inputMessage}
-        options={options}
+        options={Array.isArray(options) ? options : []}
         closeIcon={null}
         getOptionLabel={(option) => {
           if (isObject(option)) {
