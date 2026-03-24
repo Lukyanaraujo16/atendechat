@@ -212,7 +212,7 @@ const useStyles = makeStyles((theme) => ({
       setWhatsAppName(ticket.whatsapp.name?.toUpperCase());
     }
 
-    setTag(ticket?.tags);
+    setTag(Array.isArray(ticket?.tags) ? ticket.tags : []);
 
     return () => {
       isMounted.current = false;
@@ -222,7 +222,7 @@ const useStyles = makeStyles((theme) => ({
 
   {/*CÓDIGO NOVO SAUDAÇÃO*/}
   const handleCloseTicket = async (id) => {
-    setTag(ticket?.tags);
+    setTag(Array.isArray(ticket?.tags) ? ticket.tags : []);
     setLoading(true);
     try {
       await api.put(`/tickets/${id}`, {
@@ -453,11 +453,9 @@ const useStyles = makeStyles((theme) => ({
                   <Badge style={{ backgroundColor: ticket.queue?.color || "#7c7c7c" }} className={classes.connectionTag}>{ticket.queue?.name?.toUpperCase() || i18n.t("ticketsListItem.noQueue")}</Badge>
                 </span>
                 <span style={{ paddingTop: "2px" }} className={classes.secondaryContentSecond} >
-                  {tag?.map((tag) => {
-                    return (
-                      <ContactTag tag={tag} key={`ticket-contact-tag-${ticket.id}-${tag.id}`} />
-                    );
-                  })}
+                  {(Array.isArray(tag) ? tag : []).map((tagItem) => (
+                    <ContactTag tag={tagItem} key={`ticket-contact-tag-${ticket.id}-${tagItem.id}`} />
+                  ))}
                 </span>
               </Typography>
 

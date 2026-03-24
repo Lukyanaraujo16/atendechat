@@ -1871,6 +1871,12 @@ const flowbuilderIntegration = async (
       }
     });
     if (flow) {
+      await UpdateTicketService({
+        ticketData: { chatbot: true },
+        ticketId: ticket.id,
+        companyId: ticket.companyId
+      });
+
       const nodes: INodes[] = flow.flow["nodes"];
       const connections: IConnections[] = flow.flow["connections"];
 
@@ -1879,28 +1885,6 @@ const flowbuilderIntegration = async (
         name: contact.name,
         email: contact.email
       };
-
-      // const worker = new Worker("./src/services/WebhookService/WorkerAction.ts");
-
-      // // Enviar as variáveis como parte da mensagem para o Worker
-      // console.log('DISPARO1')
-      // const data = {
-      //   idFlowDb: flowUse.flowIdWelcome,
-      //   companyId: ticketUpdate.companyId,
-      //   nodes: nodes,
-      //   connects: connections,
-      //   nextStage: flow.flow["nodes"][0].id,
-      //   dataWebhook: null,
-      //   details: "",
-      //   hashWebhookId: "",
-      //   pressKey: null,
-      //   idTicket: ticketUpdate.id,
-      //   numberPhrase: mountDataContact
-      // };
-      // worker.postMessage(data);
-      // worker.on("message", message => {
-      //   console.log(`Mensagem do worker: ${message}`);
-      // });
 
       await ActionsWebhookService(
         whatsapp.id,
@@ -1949,6 +1933,12 @@ const flowbuilderIntegration = async (
     });
 
     if (flow) {
+      await UpdateTicketService({
+        ticketData: { chatbot: true },
+        ticketId: ticket.id,
+        companyId: ticket.companyId
+      });
+
       const nodes: INodes[] = flow.flow["nodes"];
       const connections: IConnections[] = flow.flow["connections"];
 

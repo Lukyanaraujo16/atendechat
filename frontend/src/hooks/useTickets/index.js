@@ -38,7 +38,7 @@ const useTickets = ({
               withUnreadMessages,
             },
           });
-          setTickets(data.tickets);
+          setTickets(Array.isArray(data.tickets) ? data.tickets : []);
           setHasMore(data.hasMore);
           setLoading(false);
         } catch (err) {

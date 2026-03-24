@@ -67,8 +67,8 @@ const QueueSelect = ({ selectedQueueIds, onChange, multiple = true, title = i18n
 					renderValue={selected => {
 						return (
 							<div className={classes.chips}>
-								{selected?.length > 0 && multiple ? (
-									selected.map(id => {
+								{((selected || []).length > 0) && multiple ? (
+									(selected || []).map(id => {
 										const queue = queues.find(q => q.id === id);
 										return queue ? (
 											<Chip

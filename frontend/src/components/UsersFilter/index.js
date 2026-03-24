@@ -31,7 +31,7 @@ export function UsersFilter({ onFiltered, initialUsers }) {
   const loadUsers = async () => {
     try {
       const { data } = await api.get(`/users/list`);
-      const userList = data.map((u) => ({ id: u.id, name: u.name }));
+      const userList = Array.isArray(data) ? data.map((u) => ({ id: u.id, name: u.name })) : [];
       setUsers(userList);
     } catch (err) {
       toastError(err);
@@ -59,7 +59,7 @@ export function UsersFilter({ onFiltered, initialUsers }) {
           );
         }}
         renderTags={(value, getUserProps) =>
-          value.map((option, index) => (
+          (value || []).map((option, index) => (
             <Chip
               variant="outlined"
               style={{

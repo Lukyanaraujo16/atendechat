@@ -74,7 +74,9 @@ export function TagsContainer({ ticket }) {
             optionsChanged = value;
         }
         setSelecteds(optionsChanged);
-        await syncTags({ ticketId: ticket.id, tags: optionsChanged });
+        if (ticket?.id) {
+          await syncTags({ ticketId: ticket.id, tags: optionsChanged });
+        }
     }
 
     return (
@@ -86,7 +88,7 @@ export function TagsContainer({ ticket }) {
                 value={selecteds || []}
                 freeSolo
                 onChange={(e, v, r) => onChange(v, r)}
-                getOptionLabel={(option) => option.name}
+                getOptionLabel={(option) => (typeof option === 'string' ? option : option?.name) || ''}
                 renderTags={(value, getTagProps) =>
                     (value || []).map((option, index) => (
                         <Chip
@@ -100,7 +102,7 @@ export function TagsContainer({ ticket }) {
                                 fontSize: "0.8em",
                                 whiteSpace: "nowrap"
                             }}
-                            label={option.name.toUpperCase()}
+                            label={(typeof option === 'string' ? option : option?.name || '').toUpperCase()}
                             {...getTagProps({ index })}
                             size="small"
                         />

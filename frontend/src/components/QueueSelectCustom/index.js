@@ -62,7 +62,7 @@ const QueueSelectCustom = ({ selectedQueueIds, companyId, onChange }) => {
 					}}
 					renderValue={selected => (
 						<div className={classes.chips}>
-							{selected?.length > 0 &&
+							{Array.isArray(selected) && selected.length > 0 &&
 								selected.map(id => {
 									const queue = queues.find(q => q.id === id);
 									return queue ? (

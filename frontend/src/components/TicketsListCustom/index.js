@@ -171,7 +171,7 @@ const TicketsListCustom = (props) => {
   const [pageNumber, setPageNumber] = useState(1);
   const [ticketsList, dispatch] = useReducer(reducer, []);
   const { user } = useContext(AuthContext);
-  const { profile, queues } = user;
+  const { profile, queues } = user || {};
   const safeQueues = Array.isArray(queues) ? queues : [];
 
   const socketManager = useContext(SocketContext);

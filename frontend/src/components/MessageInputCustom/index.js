@@ -359,7 +359,7 @@ const CustomInput = (props) => {
     async function fetchData() {
       const companyId = localStorage.getItem("companyId");
       const messages = await listQuickMessages({ companyId, userId: user.id });
-      const options = messages.map((m) => {
+      const options = (Array.isArray(messages) ? messages : []).map((m) => {
         let truncatedMessage = m.message;
         if (isString(truncatedMessage) && truncatedMessage.length > 35) {
           truncatedMessage = m.message.substring(0, 35) + "...";
