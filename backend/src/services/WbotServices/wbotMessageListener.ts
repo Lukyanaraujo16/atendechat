@@ -1127,6 +1127,60 @@ const Push = (msg: proto.IWebMessageInfo) => {
   return msg.pushName;
 };
 
+/** Fluxos novos: primeiro node é `start`; o executável é o target da primeira aresta. Fluxos antigos: primeiro node já é message/menu/etc. */
+const resolveFirstFlowExecutableNodeId = (
+  nodes: INodes[],
+  connections: IConnections[]
+): {
+  startNodeId: string | null;
+  firstEdgeTarget: string | null;
+  firstExecutableNodeId: string | null;
+  firstExecutableNodeType: string | null;
+} => {
+  const safeNodes = Array.isArray(nodes) ? nodes : [];
+  const safeConnections = Array.isArray(connections) ? connections : [];
+  const first = safeNodes[0];
+  if (!first) {
+    return {
+      startNodeId: null,
+      firstEdgeTarget: null,
+      firstExecutableNodeId: null,
+      firstExecutableNodeType: null
+    };
+  }
+
+  if (first.type !== "start") {
+    return {
+      startNodeId: first.id,
+      firstEdgeTarget: null,
+      firstExecutableNodeId: first.id,
+      firstExecutableNodeType: first.type
+    };
+  }
+
+  const startNodeId = first.id;
+  const outgoing = safeConnections.filter(c => c && c.source === startNodeId);
+  const firstEdge = outgoing[0];
+  const firstEdgeTarget = firstEdge?.target ?? null;
+
+  if (!firstEdgeTarget) {
+    return {
+      startNodeId,
+      firstEdgeTarget: null,
+      firstExecutableNodeId: null,
+      firstExecutableNodeType: null
+    };
+  }
+
+  const targetNode = safeNodes.find(n => n.id === firstEdgeTarget);
+  return {
+    startNodeId,
+    firstEdgeTarget,
+    firstExecutableNodeId: targetNode?.id ?? firstEdgeTarget,
+    firstExecutableNodeType: targetNode?.type ?? null
+  };
+};
+
 const verifyQueue = async (
   wbot: Session,
   msg: proto.IWebMessageInfo,
@@ -1137,8 +1191,9 @@ const verifyQueue = async (
 
   const companyId = ticket.companyId;
 
+  const whatsappSession = await ShowWhatsAppService(wbot.id!, ticket.companyId);
   const { queues, greetingMessage, maxUseBotQueues, timeUseBotQueues } =
-    await ShowWhatsAppService(wbot.id!, ticket.companyId);
+    whatsappSession;
 
   if (queues.length === 1) {
     const sendGreetingMessageOneQueues = await Setting.findOne({
@@ -1184,7 +1239,10 @@ const verifyQueue = async (
         wbot,
         integrations,
         ticket,
-        companyId
+        companyId,
+        null,
+        whatsappSession,
+        contact
       );
 
       await ticket.update({
@@ -1313,7 +1371,10 @@ const verifyQueue = async (
           wbot,
           integrations,
           ticket,
-          companyId
+          companyId,
+          null,
+          whatsappSession,
+          contact
         );
 
         await ticket.update({
@@ -1799,7 +1860,7 @@ const flowbuilderIntegration = async (
   companyId: number,
   queueIntegration: QueueIntegrations,
   ticket: Ticket,
-  contact: Contact,
+  contact: Contact | null,
   isFirstMsg?: Ticket,
   isTranfered?: boolean
 ) => {
@@ -1865,6 +1926,18 @@ const flowbuilderIntegration = async (
     return;
   }
 
+  let contactForFlow: Contact | null = contact;
+  if (!contactForFlow && ticket.contactId) {
+    contactForFlow = await Contact.findByPk(ticket.contactId);
+  }
+  if (!contactForFlow) {
+    logger.warn(
+      { ticketId: ticket.id, companyId },
+      "[FlowBuilder] flowbuilderIntegration: contact ausente; passe contact em handleMessageIntegration ou garanta ticket.contactId"
+    );
+    return;
+  }
+
   const whatsapp = await ShowWhatsAppService(wbot.id!, companyId);
 
   const listPhrase = await FlowCampaignModel.findAll({
@@ -1911,47 +1984,62 @@ const flowbuilderIntegration = async (
       );
     }
     if (flow) {
-      const welcomeFirstNodeId = flow.flow["nodes"][0]?.id;
+      const nodes: INodes[] = flow.flow["nodes"];
+      const connections: IConnections[] = flow.flow["connections"];
+      const resolved = resolveFirstFlowExecutableNodeId(nodes, connections);
+
       logger.info(
         {
           flowBuilderWelcome: true,
           flowId: whatsapp.flowIdWelcome,
-          firstNodeId: welcomeFirstNodeId,
+          startNodeId: resolved.startNodeId,
+          firstEdgeTarget: resolved.firstEdgeTarget,
+          firstExecutableNodeId: resolved.firstExecutableNodeId,
+          firstExecutableNodeType: resolved.firstExecutableNodeType,
           ticketId: ticket.id
         },
-        "[FlowBuilder][DEBUG] welcome: enviando primeiro node via ActionsWebhookService"
+        "[FlowBuilder][DEBUG] welcome: primeiro node executável resolvido"
       );
 
-      await UpdateTicketService({
-        ticketData: { chatbot: true },
-        ticketId: ticket.id,
-        companyId: ticket.companyId
-      });
+      if (!resolved.firstExecutableNodeId) {
+        logger.warn(
+          {
+            flowBuilderWelcome: true,
+            flowId: whatsapp.flowIdWelcome,
+            startNodeId: resolved.startNodeId,
+            firstEdgeTarget: resolved.firstEdgeTarget
+          },
+          "[FlowBuilder] welcome: sem conexão saindo do start (ou fluxo vazio); não disparando ActionsWebhookService"
+        );
+      } else {
+        await UpdateTicketService({
+          ticketData: { chatbot: true },
+          ticketId: ticket.id,
+          companyId: ticket.companyId
+        });
 
-      const nodes: INodes[] = flow.flow["nodes"];
-      const connections: IConnections[] = flow.flow["connections"];
+        const mountDataContact = {
+          number: contactForFlow.number,
+          name: contactForFlow.name,
+          email: contactForFlow.email
+        };
 
-      const mountDataContact = {
-        number: contact.number,
-        name: contact.name,
-        email: contact.email
-      };
-
-      await ActionsWebhookService(
-        whatsapp.id,
-        whatsapp.flowIdWelcome,
-        ticket.companyId,
-        nodes,
-        connections,
-        flow.flow["nodes"][0].id,
-        null,
-        "",
-        "",
-        null,
-        ticket.id,
-        mountDataContact,
-        msg
-      );
+        await ActionsWebhookService(
+          whatsapp.id,
+          whatsapp.flowIdWelcome,
+          ticket.companyId,
+          nodes,
+          connections,
+          resolved.firstExecutableNodeId,
+          null,
+          "",
+          "",
+          null,
+          ticket.id,
+          mountDataContact,
+          msg
+        );
+      }
     }
   }
 
@@ -1981,36 +2069,49 @@ const flowbuilderIntegration = async (
     });
 
     if (flow) {
-      await UpdateTicketService({
-        ticketData: { chatbot: true },
-        ticketId: ticket.id,
-        companyId: ticket.companyId
-      });
-
       const nodes: INodes[] = flow.flow["nodes"];
       const connections: IConnections[] = flow.flow["connections"];
+      const resolvedNp = resolveFirstFlowExecutableNodeId(nodes, connections);
 
-      const mountDataContact = {
-        number: contact.number,
-        name: contact.name,
-        email: contact.email
-      };
+      if (!resolvedNp.firstExecutableNodeId) {
+        logger.warn(
+          {
+            flowBuilderNotPhrase: true,
+            flowId: whatsapp.flowIdNotPhrase,
+            startNodeId: resolvedNp.startNodeId,
+            firstEdgeTarget: resolvedNp.firstEdgeTarget
+          },
+          "[FlowBuilder] flowIdNotPhrase: sem primeiro node executável; abortando"
+        );
+      } else {
+        await UpdateTicketService({
+          ticketData: { chatbot: true },
+          ticketId: ticket.id,
+          companyId: ticket.companyId
+        });
 
-      await ActionsWebhookService(
-        whatsapp.id,
-        whatsapp.flowIdNotPhrase,
-        ticket.companyId,
-        nodes,
-        connections,
-        flow.flow["nodes"][0].id,
-        null,
-        "",
-        "",
-        null,
-        ticket.id,
-        mountDataContact,
-        msg
-      );
+        const mountDataContact = {
+          number: contactForFlow.number,
+          name: contactForFlow.name,
+          email: contactForFlow.email
+        };
+
+        await ActionsWebhookService(
+          whatsapp.id,
+          whatsapp.flowIdNotPhrase,
+          ticket.companyId,
+          nodes,
+          connections,
+          resolvedNp.firstExecutableNodeId,
+          null,
+          "",
+          "",
+          null,
+          ticket.id,
+          mountDataContact,
+          msg
+        );
+      }
     }
   }
 
@@ -2025,11 +2126,25 @@ const flowbuilderIntegration = async (
     });
     const nodes: INodes[] = flow.flow["nodes"];
     const connections: IConnections[] = flow.flow["connections"];
+    const resolvedCamp = resolveFirstFlowExecutableNodeId(nodes, connections);
+
+    if (!resolvedCamp.firstExecutableNodeId) {
+      logger.warn(
+        {
+          flowBuilderCampaign: true,
+          flowId: flowDispar.flowId,
+          startNodeId: resolvedCamp.startNodeId,
+          firstEdgeTarget: resolvedCamp.firstEdgeTarget
+        },
+        "[FlowBuilder] campanha: sem primeiro node executável; abortando"
+      );
+      return;
+    }
 
     const mountDataContact = {
-      number: contact.number,
-      name: contact.name,
-      email: contact.email
+      number: contactForFlow.number,
+      name: contactForFlow.name,
+      email: contactForFlow.email
     };
 
     //const worker = new Worker("./src/services/WebhookService/WorkerAction.ts");
@@ -2061,7 +2176,7 @@ const flowbuilderIntegration = async (
       ticket.companyId,
       nodes,
       connections,
-      flow.flow["nodes"][0].id,
+      resolvedCamp.firstExecutableNodeId,
       null,
       "",
       "",
@@ -2151,9 +2266,9 @@ const flowbuilderIntegration = async (
       }
 
       const mountDataContact = {
-        number: contact.number,
-        name: contact.name,
-        email: contact.email
+        number: contactForFlow.number,
+        name: contactForFlow.name,
+        email: contactForFlow.email
       };
 
       // const worker = new Worker("./src/services/WebhookService/WorkerAction.ts");
@@ -2861,7 +2976,9 @@ const handleMessage = async (
         integrations,
         ticket,
         companyId,
-        isMenu
+        isMenu,
+        whatsapp,
+        contact
       );
 
       return;
