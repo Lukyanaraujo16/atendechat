@@ -10,6 +10,7 @@ import { getTicketRemoteJid } from "../../helpers/GetTicketRemoteJid";
 import Ticket from "../../models/Ticket";
 import mime from "mime-types";
 import Contact from "../../models/Contact";
+import { logger } from "../../utils/logger";
 
 interface Request {
   media: Express.Multer.File;
@@ -97,28 +98,46 @@ const SendWhatsAppMediaFlow = async ({
   try {
     const wbot = await GetTicketWbot(ticket);
 
-    const mimetype = mime.lookup(media)
-    const pathMedia = media
+    const pathMedia = path.resolve(media);
+    const mimetype = mime.lookup(pathMedia);
+    const fileExists = fs.existsSync(pathMedia);
+    const mediaName = nameFileDiscovery(pathMedia);
 
     let typeMessage = "";
-
     if (typeof mimetype === "string") {
       typeMessage = mimetype.split("/")[0];
     }
-    const mediaName = nameFileDiscovery(media)
 
-    let options: AnyMessageContent;
+    logger.info(
+      {
+        flowMediaSend: true,
+        ticketId: ticket.id,
+        pathMedia,
+        fileExists,
+        mimetype: mimetype || "(mime não detectado)",
+        typeMessage: typeMessage || "(vazio)",
+        fileName: mediaName,
+        isFlow
+      },
+      "[FlowBuilder] SendWhatsAppMediaFlow: arquivo antes do envio"
+    );
 
-    if( mimetype ){
+    if (!fileExists) {
+      const errMsg = `Arquivo de mídia não encontrado: ${pathMedia}`;
+      logger.error({ flowMediaSend: true, ticketId: ticket.id, pathMedia }, errMsg);
+      throw new AppError(errMsg, 400);
+    }
+
+    let options: AnyMessageContent | undefined;
+
+    if (mimetype) {
       if (typeMessage === "video") {
         options = {
           video: fs.readFileSync(pathMedia),
           caption: body,
           fileName: mediaName
-          // gifPlayback: true
         };
       } else if (typeMessage === "audio") {
-        console.log('record', isRecord)
         if (isRecord) {
           const convert = await processAudio(pathMedia);
           options = {
@@ -134,6 +153,12 @@ const SendWhatsAppMediaFlow = async ({
             ptt: false
           };
         }
+      } else if (typeMessage === "image") {
+        /** Antes não havia ramo para image/* — options ficava undefined e a mídia não era enviada. */
+        options = {
+          image: fs.readFileSync(pathMedia),
+          caption: body || ""
+        };
       } else if (typeMessage === "document" || typeMessage === "text") {
         options = {
           document: fs.readFileSync(pathMedia),
@@ -152,9 +177,25 @@ const SendWhatsAppMediaFlow = async ({
     } else {
       options = {
         image: fs.readFileSync(pathMedia),
-        caption: body
+        caption: body || ""
       };
     }
+
+    if (!options) {
+      const errMsg = `Tipo de mídia não suportado ou não mapeado (mime: ${String(mimetype)}, tipo: ${typeMessage})`;
+      logger.error(
+        { flowMediaSend: true, ticketId: ticket.id, mimetype, typeMessage },
+        errMsg
+      );
+      throw new AppError(errMsg, 400);
+    }
+
+    const payloadSummary = Object.fromEntries(
+      Object.entries(options as Record<string, unknown>).map(([k, v]) => [
+        k,
+        Buffer.isBuffer(v) ? `<Buffer len=${v.length}>` : v
+      ])
+    );
 
     let chatJid = await getTicketRemoteJid(ticket);
     if (!chatJid) {
@@ -172,17 +213,53 @@ const SendWhatsAppMediaFlow = async ({
     }
     const dest = chatJid.includes("@") ? jidNormalizedUser(chatJid) : chatJid;
 
+    logger.info(
+      {
+        flowMediaSend: true,
+        ticketId: ticket.id,
+        destJid: dest,
+        payloadKeys: Object.keys(options),
+        payloadSummary
+      },
+      "[FlowBuilder] SendWhatsAppMediaFlow: enviando ao WhatsApp (buffers resumidos)"
+    );
+
     const sentMessage = await wbot.sendMessage(dest, {
       ...options
     });
+
+    logger.info(
+      {
+        flowMediaSend: true,
+        ticketId: ticket.id,
+        destJid: dest,
+        messageId: (sentMessage as any)?.key?.id,
+        success: true
+      },
+      "[FlowBuilder] SendWhatsAppMediaFlow: envio concluído"
+    );
 
     await ticket.update({ lastMessage: mediaName });
 
     return sentMessage;
   } catch (err) {
     Sentry.captureException(err);
+    logger.error(
+      {
+        flowMediaSend: true,
+        ticketId: ticket?.id,
+        err: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined
+      },
+      "[FlowBuilder] SendWhatsAppMediaFlow: falha no envio"
+    );
     console.log(err);
-    throw new AppError("ERR_SENDING_WAPP_MSG");
+    if (err instanceof AppError) {
+      throw err;
+    }
+    throw new AppError(
+      `ERR_SENDING_WAPP_MSG: ${err instanceof Error ? err.message : String(err)}`
+    );
   }
 };
 
