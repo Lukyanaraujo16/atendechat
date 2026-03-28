@@ -100,47 +100,49 @@ const FlowBuilderAddQuestionModal = ({
   };
 
   const handleSavePrompt = (values) => {
-   
+    const key = String(values.answerKey || "").trim();
+    const payload = { ...values, answerKey: key, message };
 
     if (open === "edit") {
+      let oldVariable = localStorage.getItem("variables");
 
-      let oldVariable = localStorage.getItem("variables")
+      const oldNameKey = data.data.typebotIntegration.answerKey;
 
-      const oldNameKey = data.data.typebotIntegration.answerKey
-      
-      if(oldVariable){
-        oldVariable = JSON.parse(oldVariable)
-      }else{
-        oldVariable = []
+      if (oldVariable) {
+        oldVariable = JSON.parse(oldVariable);
+      } else {
+        oldVariable = [];
       }
-  
-      oldVariable = oldVariable.filter(item => item !== oldNameKey)
-      localStorage.setItem('variables', JSON.stringify([...oldVariable, values.answerKey]))    
+
+      oldVariable = oldVariable.filter((item) => item !== oldNameKey);
+      localStorage.setItem(
+        "variables",
+        JSON.stringify([...oldVariable, key])
+      );
 
       handleClose();
       onUpdate({
         ...data,
-        data: { typebotIntegration: { ...values, message } },
+        data: { typebotIntegration: payload },
       });
     } else if (open === "create") {
-      
-      let oldVariable = localStorage.getItem("variables")
+      let oldVariable = localStorage.getItem("variables");
 
-      if(oldVariable){
-        oldVariable = JSON.parse(oldVariable)
-      }else{
-        oldVariable = []
+      if (oldVariable) {
+        oldVariable = JSON.parse(oldVariable);
+      } else {
+        oldVariable = [];
       }
-  
-      oldVariable = oldVariable.filter(item => item !== values.answerKey)
-      localStorage.setItem('variables', JSON.stringify([...oldVariable, values.answerKey]))    
+
+      oldVariable = oldVariable.filter((item) => item !== key);
+      localStorage.setItem(
+        "variables",
+        JSON.stringify([...oldVariable, key])
+      );
 
       handleClose();
       onSave({
-        typebotIntegration: {
-          ...values,
-          message
-        },
+        typebotIntegration: payload,
       });
     }
   };
@@ -186,10 +188,13 @@ const FlowBuilderAddQuestionModal = ({
                 />
                 <Field
                   as={TextField}
-                  label="Salvar resposta"
+                  label="Chave da variável (sem espaços)"
                   name="answerKey"
                   error={touched.answerKey && Boolean(errors.answerKey)}
-                  helperText={touched.answerKey && errors.answerKey}
+                  helperText={
+                    (touched.answerKey && errors.answerKey) ||
+                    "Ex.: nome — nas próximas mensagens use {{nome}}. Evite a chave name (nome do contato no sistema)."
+                  }
                   variant="outlined"
                   margin="dense"
                   fullWidth

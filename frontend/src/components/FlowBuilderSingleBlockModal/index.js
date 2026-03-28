@@ -44,6 +44,41 @@ import {
 import { capitalize } from "../../utils/capitalize";
 import { Box, Divider } from "@material-ui/core";
 
+/** Aguarda compressão e monta FormData na ordem de `medias` (evita POST antes do append). */
+const compressImageForFlow = (file) =>
+  new Promise((resolve, reject) => {
+    new Compressor(file, {
+      quality: 0.7,
+      success: (result) => {
+        const blob = result;
+        const out =
+          blob instanceof File
+            ? blob
+            : new File([blob], file.name, {
+                type: blob.type || file.type || "image/jpeg",
+              });
+        resolve(out);
+      },
+      error: reject,
+    });
+  });
+
+const buildFlowContentFormData = async (mediasList) => {
+  const formData = new FormData();
+  for (const media of mediasList) {
+    if (!media) continue;
+    if (media?.type?.split("/")[0] === "image") {
+      const compressed = await compressImageForFlow(media);
+      formData.append("medias", compressed);
+      formData.append("body", compressed.name);
+    } else {
+      formData.append("medias", media);
+      formData.append("body", media.name);
+    }
+  }
+  return formData;
+};
+
 const useStyles = makeStyles((theme) => ({
   root: {
     display: "flex",
@@ -983,158 +1018,125 @@ const FlowBuilderSingleBlockModal = ({
   };
 
   const handleSaveNode = async () => {
-    if (open === "edit") {
-      setLoading(true);
-      const formData = new FormData();
+    if (open !== "edit" && open !== "create") {
+      return;
+    }
 
-      medias.forEach(async (media, idx) => {
-        const file = media;
+    const flowLog =
+      process.env.NODE_ENV === "development"
+        ? (msg, extra) =>
+            console.debug("[FlowBuilder][upload]", msg, extra ?? "")
+        : () => {};
 
-        if (!file) {
-          return;
-        }
+    setLoading(true);
 
-        if (media?.type.split("/")[0] == "image") {
-          new Compressor(file, {
-            quality: 0.7,
+    try {
+      if (open === "edit") {
+        flowLog("início", {
+          mode: "edit",
+          mediasCount: medias?.length,
+          numberImg,
+          numberAudio,
+          numberVideo,
+        });
 
-            async success(media) {
-              formData.append("medias", media);
-              formData.append("body", media.name);
-            },
-            error(err) {
-              alert("erro");
-              console.log(err.message);
-            },
-          });
-        } else {
-          formData.append("medias", media);
-          formData.append("body", media.name);
-        }
-      });
-
-      setTimeout(async () => {
         if (
           (numberAudio === 0 && numberVideo === 0 && numberImg === 0) ||
           medias.length === 0
         ) {
-          try {
-            const mountData = {
-              seq: elementsSeq,
-              elements: handleElements(null),
-            };
-            console.log("QUI", mountData);
-            onUpdate({
-              ...data,
-              data: mountData,
-            });
-            toast.success("Conteúdo adicionada com sucesso!");
-            handleClose();
-            setLoading(false);
-
-            return;
-          } catch (e) {
-            console.log(e);
-            setLoading(false);
-          }
-          return;
-        }
-        const verify = verifyButtonsUpload();
-        if (verify) {
-          setLoading(false);
-          return toast.error("Delete os cards vazios(Imagem, Audio e Video)");
-        }
-        await api
-          .post("/flowbuilder/content", formData)
-          .then(async (res) => {
-            const mountData = {
-              seq: elementsSeq,
-              elements: handleElements(res.data),
-            };
-            onUpdate({
-              ...data,
-              data: mountData,
-            });
-            toast.success("Conteúdo adicionada com sucesso!");
-            await handleClose();
-            setLoading(false);
-          })
-          .catch((error) => {
-            console.log(error);
+          const mountData = {
+            seq: elementsSeq,
+            elements: handleElements(null),
+          };
+          console.log("QUI", mountData);
+          onUpdate({
+            ...data,
+            data: mountData,
           });
-      }, 1500);
-    } else if (open === "create") {
-      setLoading(true);
-      const formData = new FormData();
-
-      medias.forEach(async (media, idx) => {
-        const file = media;
-
-        if (!file) {
+          toast.success("Conteúdo adicionada com sucesso!");
+          flowLog("sucesso (sem upload)", { seq: mountData.seq?.length });
+          await handleClose();
           return;
         }
 
-        if (media?.type.split("/")[0] == "image") {
-          new Compressor(file, {
-            quality: 0.7,
-
-            async success(media) {
-              formData.append("medias", media);
-              formData.append("body", media.name);
-            },
-            error(err) {
-              alert("erro");
-              console.log(err.message);
-            },
-          });
-        } else {
-          formData.append("medias", media);
-          formData.append("body", media.name);
+        if (verifyButtonsUpload()) {
+          toast.error("Delete os cards vazios(Imagem, Audio e Video)");
+          return;
         }
-      });
 
-      setTimeout(async () => {
+        const formData = await buildFlowContentFormData(medias);
+        flowLog("POST /flowbuilder/content", {
+          fieldCount: medias.filter(Boolean).length,
+        });
+
+        const res = await api.post("/flowbuilder/content", formData);
+        flowLog("resposta OK", { status: res.status, data: res.data });
+
+        const mountData = {
+          seq: elementsSeq,
+          elements: handleElements(res.data),
+        };
+        onUpdate({
+          ...data,
+          data: mountData,
+        });
+        toast.success("Conteúdo adicionada com sucesso!");
+        await handleClose();
+        return;
+      }
+
+      if (open === "create") {
+        flowLog("início", {
+          mode: "create",
+          mediasCount: medias?.length,
+          numberImg,
+          numberAudio,
+          numberVideo,
+        });
+
         if (numberAudio === 0 && numberVideo === 0 && numberImg === 0) {
-          try {
-            const mountData = {
-              seq: elementsSeq,
-              elements: handleElements(null),
-            };
-            onSave({
-              ...mountData,
-            });
-            toast.success("Conteúdo adicionada com sucesso!");
-            handleClose();
-            setLoading(false);
-
-            return;
-          } catch (e) {
-            setLoading(false);
-          }
-        }
-        const verify = verifyButtonsUpload();
-        if (verify) {
-          setLoading(false);
-          return toast.error("Delete os cards vazios(Imagem, Audio e Video)");
-        }
-        await api
-          .post("/flowbuilder/content", formData)
-          .then((res) => {
-            const mountData = {
-              seq: elementsSeq,
-              elements: handleElements(res.data),
-            };
-            onSave({
-              ...mountData,
-            });
-            toast.success("Conteúdo adicionada com sucesso!");
-            handleClose();
-            setLoading(false);
-          })
-          .catch((error) => {
-            console.log(error);
+          const mountData = {
+            seq: elementsSeq,
+            elements: handleElements(null),
+          };
+          onSave({
+            ...mountData,
           });
-      }, 1500);
+          toast.success("Conteúdo adicionada com sucesso!");
+          flowLog("sucesso (sem upload)", { seq: mountData.seq?.length });
+          await handleClose();
+          return;
+        }
+
+        if (verifyButtonsUpload()) {
+          toast.error("Delete os cards vazios(Imagem, Audio e Video)");
+          return;
+        }
+
+        const formData = await buildFlowContentFormData(medias);
+        flowLog("POST /flowbuilder/content", {
+          fieldCount: medias.filter(Boolean).length,
+        });
+
+        const res = await api.post("/flowbuilder/content", formData);
+        flowLog("resposta OK", { status: res.status, data: res.data });
+
+        const mountData = {
+          seq: elementsSeq,
+          elements: handleElements(res.data),
+        };
+        onSave({
+          ...mountData,
+        });
+        toast.success("Conteúdo adicionada com sucesso!");
+        await handleClose();
+      }
+    } catch (error) {
+      flowLog("erro", { message: error?.message, response: error?.response });
+      console.error("[FlowBuilder][upload]", error);
+      toastError(error);
+    } finally {
+      setLoading(false);
     }
   };
 

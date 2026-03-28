@@ -134,11 +134,14 @@ export const FlowDataGetOne = async (
 };
 
 export const FlowUploadImg = async (req: Request, res: Response) => {
-  const medias = req.files as Express.Multer.File[];
+  const medias = (req.files as Express.Multer.File[]) || [];
   const { companyId } = req.user;
   const userId = parseInt(req.user.id);
 
+  console.log("[FlowUploadImg] início", { filesCount: medias.length, companyId });
+
   if (medias.length === 0) {
+    console.log("[FlowUploadImg] rejeitado: sem arquivos");
     return res.status(400).json("No File");
   }
 
@@ -148,20 +151,29 @@ export const FlowUploadImg = async (req: Request, res: Response) => {
     nameFile = medias[0].filename + "." + medias[0].mimetype.split("/")[1];
   }
 
-  const img = await UploadImgFlowBuilderService({
-    userId,
-    name: nameFile,
-    companyId
-  });
-  return res.status(200).json(img);
+  try {
+    const img = await UploadImgFlowBuilderService({
+      userId,
+      name: nameFile,
+      companyId
+    });
+    console.log("[FlowUploadImg] sucesso", { nameFile });
+    return res.status(200).json(img);
+  } catch (err) {
+    console.error("[FlowUploadImg] erro", err);
+    return res.status(500).json({ error: "upload_failed" });
+  }
 };
 
 export const FlowUploadAudio = async (req: Request, res: Response) => {
-  const medias = req.files as Express.Multer.File[];
+  const medias = (req.files as Express.Multer.File[]) || [];
   const { companyId } = req.user;
   const userId = parseInt(req.user.id);
 
+  console.log("[FlowUploadAudio] início", { filesCount: medias.length, companyId });
+
   if (medias.length === 0) {
+    console.log("[FlowUploadAudio] rejeitado: sem arquivos");
     return res.status(400).json("No File");
   }
 
@@ -171,12 +183,18 @@ export const FlowUploadAudio = async (req: Request, res: Response) => {
     nameFile = medias[0].filename + "." + medias[0].mimetype.split("/")[1];
   }
 
-  const img = await UploadAudioFlowBuilderService({
-    userId,
-    name: nameFile,
-    companyId
-  });
-  return res.status(200).json(img);
+  try {
+    const audio = await UploadAudioFlowBuilderService({
+      userId,
+      name: nameFile,
+      companyId
+    });
+    console.log("[FlowUploadAudio] sucesso", { nameFile });
+    return res.status(200).json(audio);
+  } catch (err) {
+    console.error("[FlowUploadAudio] erro", err);
+    return res.status(500).json({ error: "upload_failed" });
+  }
 };
 
 export const FlowDuplicate = async (req: Request, res: Response) => {
@@ -189,18 +207,34 @@ export const FlowDuplicate = async (req: Request, res: Response) => {
 
 
 export const FlowUploadAll = async (req: Request, res: Response) => {
-  const medias = req.files as Express.Multer.File[];
+  const medias = (req.files as Express.Multer.File[]) || [];
   const { companyId } = req.user;
   const userId = parseInt(req.user.id);
 
+  console.log("[FlowUploadAll] início", {
+    filesCount: medias.length,
+    companyId,
+    userId
+  });
+
   if (medias.length === 0) {
+    console.log("[FlowUploadAll] rejeitado: sem arquivos (field medias vazio?)");
     return res.status(400).json("No File");
   }
 
-  const items = await UploadAllFlowBuilderService({
-    userId,
-    medias: medias,
-    companyId
-  });
-  return res.status(200).json(items);
+  try {
+    const items = await UploadAllFlowBuilderService({
+      userId,
+      medias,
+      companyId
+    });
+    console.log("[FlowUploadAll] sucesso", {
+      itemsCount: Array.isArray(items) ? items.length : 0,
+      items
+    });
+    return res.status(200).json(items);
+  } catch (err) {
+    console.error("[FlowUploadAll] erro", err);
+    return res.status(500).json({ error: "upload_failed" });
+  }
 };

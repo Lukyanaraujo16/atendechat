@@ -2897,10 +2897,6 @@ const handleMessage = async (
     }
 
     if (!isNil(flow) && isQuestion && !msg.key.fromMe) {
-      console.log(
-        "|============= QUESTION =============|",
-        JSON.stringify(flow, null, 4)
-      );
       const body = getBodyMessage(msg);
       if (body) {
         const nodes: INodes[] = flow.flow["nodes"];
@@ -2910,10 +2906,34 @@ const handleMessage = async (
 
         const connections: IConnections[] = flow.flow["connections"];
 
-        const { message, answerKey } = nodeSelected.data.typebotIntegration;
-        const nodeIndex = nodes.findIndex(node => node.id === nodeSelected.id);
+        const { answerKey } = nodeSelected.data.typebotIntegration || {};
+        const key = String(answerKey ?? "").trim();
+        if (!key) {
+          logger.warn(
+            { ticketId: ticket.id, lastFlowId: ticket.lastFlowId },
+            "[FlowBuilder] pergunta sem answerKey configurado"
+          );
+          return;
+        }
 
-        const lastFlowId = nodes[nodeIndex + 1].id;
+        const nextConnection = connections.find(
+          (c: any) => c.source === ticket.lastFlowId
+        );
+        if (!nextConnection?.target) {
+          logger.warn(
+            {
+              ticketId: ticket.id,
+              lastFlowId: ticket.lastFlowId,
+              edgesFromSource: connections
+                .filter((c: any) => c.source === ticket.lastFlowId)
+                .map((c: any) => c.target)
+            },
+            "[FlowBuilder] pergunta sem aresta de saída (conecte o nó ao próximo passo)"
+          );
+          return;
+        }
+        const lastFlowId = nextConnection.target;
+
         const prevDw = parseTicketDataWebhook(ticket.dataWebhook);
         const prevVars =
           prevDw.variables && typeof prevDw.variables === "object" && !Array.isArray(prevDw.variables)
@@ -2925,12 +2945,24 @@ const handleMessage = async (
             ...prevDw,
             variables: {
               ...prevVars,
-              [answerKey]: body
+              [key]: body
             }
           } as any
         });
 
         await ticket.save();
+
+        logger.info(
+          {
+            flowBuilderQuestionAnswer: true,
+            ticketId: ticket.id,
+            answerKey: key,
+            valuePreview: body.slice(0, 120),
+            nextNodeId: lastFlowId,
+            varsCount: Object.keys({ ...prevVars, [key]: body }).length
+          },
+          "[FlowBuilder] variável salva em ticket.dataWebhook.variables"
+        );
 
         const mountDataContact = {
           number: contact.number,

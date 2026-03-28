@@ -197,19 +197,20 @@ const TicketsListCustom = (props) => {
       (t) => queueIds.indexOf(t.queueId) > -1
     );
 
-    if (profile === "user") {
-      dispatch({
-        type: "LOAD_TICKETS",
-        payload: chatbotOnly
-          ? filteredTickets.filter((t) => t.chatbot)
-          : filteredTickets,
-      });
-    } else {
-      dispatch({
-        type: "LOAD_TICKETS",
-        payload: chatbotOnly ? tickets.filter((t) => t.chatbot) : tickets,
-      });
-    }
+    const base = profile === "user" ? filteredTickets : tickets;
+
+    /** pending: separar "Aguardando" (!chatbot) de "Chatbot" (chatbot); evita o mesmo ticket nas duas abas */
+    const applyPendingChatbotSplit = (list) => {
+      if (status !== "pending") return list;
+      return chatbotOnly
+        ? list.filter((t) => !!t.chatbot)
+        : list.filter((t) => !t.chatbot);
+    };
+
+    dispatch({
+      type: "LOAD_TICKETS",
+      payload: applyPendingChatbotSplit(base),
+    });
   }, [tickets, status, searchParam, safeQueues, profile, chatbotOnly]);
 
   useEffect(() => {
@@ -222,6 +223,12 @@ const TicketsListCustom = (props) => {
 
     const notBelongsToUserQueues = (ticket) =>
       ticket.queueId && selectedQueueIds.indexOf(ticket.queueId) === -1;
+
+    /** Mesma regra da lista inicial: em pending, Chatbot vs Aguardando são mutuamente exclusivos */
+    const matchesPendingChatbotTab = (ticket) => {
+      if (status !== "pending") return true;
+      return chatbotOnly ? !!ticket.chatbot : !ticket.chatbot;
+    };
 
     socket.on("ready", () => {
       if (status) {
@@ -241,6 +248,20 @@ const TicketsListCustom = (props) => {
       }
 
       if (data.action === "update" && shouldUpdateTicket(data.ticket) && data.ticket.status === status) {
+        if (!matchesPendingChatbotTab(data.ticket)) {
+          dispatch({ type: "DELETE_TICKET", payload: data.ticket.id });
+          return;
+        }
+        if (process.env.NODE_ENV === "development") {
+          // eslint-disable-next-line no-console
+          console.debug("[ticketsList pending split]", {
+            ticketId: data.ticket?.id,
+            status: data.ticket?.status,
+            chatbot: data.ticket?.chatbot,
+            queueId: data.ticket?.queueId,
+            chatbotOnly,
+          });
+        }
         dispatch({
           type: "UPDATE_TICKET",
           payload: data.ticket,
@@ -267,6 +288,9 @@ const TicketsListCustom = (props) => {
       }
 
       if (data.action === "create" && shouldUpdateTicket(data.ticket) && ( status === undefined || data.ticket.status === status)) {
+        if (!matchesPendingChatbotTab(data.ticket)) {
+          return;
+        }
         dispatch({
           type: "UPDATE_TICKET_UNREAD_MESSAGES",
           payload: data.ticket,
@@ -286,7 +310,7 @@ const TicketsListCustom = (props) => {
     return () => {
       socket.disconnect();
     };
-  }, [status, showAll, user, selectedQueueIds, tags, users, profile, queues, socketManager]);
+  }, [status, showAll, user, selectedQueueIds, tags, users, profile, queues, socketManager, chatbotOnly]);
 
   useEffect(() => {
     if (typeof updateCount === "function") {

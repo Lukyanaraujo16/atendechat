@@ -290,22 +290,20 @@ export const ActionsWebhookService = async (
 
       if (nodeSelected.type === "message") {
 
-        let msg;
-
-        const webhook = ticket?.dataWebhook;
-
-        if (webhook && webhook.hasOwnProperty("variables")) {
-          msg = {
-            body: replaceMessages(webhook, nodeSelected.data.label)
-          };
-        } else {
-          msg = {
-            body: nodeSelected.data.label
-          };
-        }
+        const ticketDetailsForMsg = await ShowTicketService(
+          ticket.id,
+          companyId
+        );
+        const msg = {
+          body: interpolateFlowMessage(
+            nodeSelected.data.label,
+            ticket,
+            ticketDetailsForMsg.contact
+          )
+        };
 
         if (ticket && ticket.contact) {
-          const ticketDetails = await ShowTicketService(ticket.id, companyId);
+          const ticketDetails = ticketDetailsForMsg;
           const destJid =
             (await getTicketRemoteJid(ticketDetails)) ||
             originalWhatsAppMsg?.key?.remoteJid ||
@@ -330,12 +328,11 @@ export const ActionsWebhookService = async (
             ...(originalWhatsAppMsg?.key?.remoteJid && { remoteJid: originalWhatsAppMsg.key.remoteJid })
           });
           if (sentMessage) {
-            const bodyToSave = formatBody(msg.body, ticketDetails.contact);
             await CreateMessageService({
               messageData: {
                 id: (sentMessage as any)?.key?.id || uuidv4(),
                 ticketId: ticketDetails.id,
-                body: bodyToSave,
+                body: msg.body,
                 fromMe: true,
                 read: true,
                 ack: (sentMessage as any)?.status,
@@ -374,12 +371,11 @@ export const ActionsWebhookService = async (
               ...(originalWhatsAppMsg?.key?.remoteJid && { remoteJid: originalWhatsAppMsg.key.remoteJid })
             });
             if (sentMessage) {
-              const bodyToSave = formatBody(msg.body, ticketDetails.contact);
               await CreateMessageService({
                 messageData: {
                   id: (sentMessage as any)?.key?.id || uuidv4(),
                   ticketId: ticketDetails.id,
-                  body: bodyToSave,
+                  body: msg.body,
                   fromMe: true,
                   read: true,
                   ack: (sentMessage as any)?.status,
@@ -474,38 +470,48 @@ export const ActionsWebhookService = async (
       }
 
       if (nodeSelected.type === "question") {
-        const webhook = ticket?.dataWebhook as { variables?: Record<string, unknown> } | null | undefined;
-        const variables = webhook?.variables;
+        const message =
+          nodeSelected.data?.typebotIntegration?.message ?? "";
+        const ticketDetails = await ShowTicketService(ticket.id, companyId);
 
-        if (!variables || variables === undefined || variables === null) {
-          const { message } = nodeSelected.data.typebotIntegration;
-          const ticketDetails = await ShowTicketService(ticket.id, companyId);
+        const bodyFila = interpolateFlowMessage(
+          `${message}`,
+          ticket,
+          ticketDetails.contact
+        );
 
-          const bodyFila = formatBody(`${message}`, ticket.contact);
+        logger.info(
+          {
+            flowBuilderQuestionSend: true,
+            ticketId: ticket.id,
+            preview: bodyFila.slice(0, 120),
+            varsKeys: Object.keys(getFlowVariablesFromTicket(ticket))
+          },
+          "[FlowBuilder] enviando pergunta (interpolação {{chave}} + Mustache contato)"
+        );
 
-          await delay(3000);
-          await typeSimulation(ticket, "composing");
+        await delay(3000);
+        await typeSimulation(ticket, "composing");
 
-          await SendWhatsAppMessage({
-            body: bodyFila,
-            ticket: ticketDetails,
-            quotedMsg: null
-          });
+        await SendWhatsAppMessage({
+          body: bodyFila,
+          ticket: ticketDetails,
+          quotedMsg: null
+        });
 
-          SetTicketMessagesAsRead(ticketDetails);
+        SetTicketMessagesAsRead(ticketDetails);
 
-          await ticketDetails.update({
-            lastMessage: bodyFila
-          });
+        await ticketDetails.update({
+          lastMessage: bodyFila
+        });
 
-          await ticket.update({
-            userId: null,
-            companyId: companyId,
-            lastFlowId: nodeSelected.id,
-            hashFlowId: hashWebhookId,
-            flowStopped: idFlowDb.toString()
-          });
-        }
+        await ticket.update({
+          userId: null,
+          companyId: companyId,
+          lastFlowId: nodeSelected.id,
+          hashFlowId: hashWebhookId,
+          flowStopped: idFlowDb.toString()
+        });
         break;
       }
 
@@ -675,15 +681,20 @@ export const ActionsWebhookService = async (
 
             const ticketDetails = await ShowTicketService(idTicket, companyId);
 
-            let msg;
+            const msg = interpolateFlowMessage(
+              bodyFor,
+              ticket,
+              ticketDetails.contact
+            );
 
-            const webhook = ticket.dataWebhook as { variables?: Record<string, unknown> } | null | undefined;
-
-            if (webhook && "variables" in webhook && webhook.variables) {
-              msg = replaceMessages(webhook.variables, bodyFor);
-            } else {
-              msg = bodyFor;
-            }
+            logger.info(
+              {
+                flowBuilderSingleBlockMsg: true,
+                ticketId: idTicket,
+                preview: String(msg).slice(0, 100)
+              },
+              "[FlowBuilder] singleBlock: mensagem com {{variáveis}} + Mustache"
+            );
 
             await delay(3000);
             await typeSimulation(ticket, "composing");
@@ -697,7 +708,7 @@ export const ActionsWebhookService = async (
             SetTicketMessagesAsRead(ticketDetails);
 
             await ticketDetails.update({
-              lastMessage: formatBody(bodyFor, ticket.contact)
+              lastMessage: msg
             });
 
             await intervalWhats("1");
@@ -894,24 +905,27 @@ export const ActionsWebhookService = async (
 
           const menuCreate = `${nodeSelected.data.message}\n\n${optionsMenu}`;
 
-          const webhook = ticket.dataWebhook;
-
-          let msg;
-          if (webhook && webhook.hasOwnProperty("variables")) {
-            msg = {
-              body: replaceMessages(webhook, menuCreate),
-              number: numberClient,
-              companyId: companyId
-            };
-          } else {
-            msg = {
-              body: menuCreate,
-              number: numberClient,
-              companyId: companyId
-            };
-          }
-
           const ticketDetails = await ShowTicketService(ticket.id, companyId);
+          const menuBody = interpolateFlowMessage(
+            menuCreate,
+            ticket,
+            ticketDetails.contact
+          );
+
+          logger.info(
+            {
+              flowBuilderMenuBody: true,
+              ticketId: ticket.id,
+              preview: menuBody.slice(0, 100)
+            },
+            "[FlowBuilder] menu: corpo após {{variáveis}} e Mustache"
+          );
+
+          const msg = {
+            body: menuBody,
+            number: numberClient,
+            companyId: companyId
+          };
 
           //const messageData: MessageData = {
           //  wid: randomString(50),
@@ -941,7 +955,7 @@ export const ActionsWebhookService = async (
           SetTicketMessagesAsRead(ticketDetails);
 
           await ticketDetails.update({
-            lastMessage: formatBody(msg.body, ticket.contact)
+            lastMessage: msg.body
           });
           await intervalWhats("1");
 
@@ -1140,10 +1154,45 @@ const intervalWhats = (time: string) => {
   return new Promise(resolve => setTimeout(resolve, seconds));
 };
 
-const replaceMessages = (variables, message) => {
+/** Variáveis do fluxo salvas em ticket.dataWebhook.variables (chave → valor da resposta). */
+const getFlowVariablesFromTicket = (
+  ticket: Ticket | null
+): Record<string, unknown> => {
+  if (!ticket?.dataWebhook) return {};
+  const dw = parseTicketDataWebhook(ticket.dataWebhook);
+  const v = dw.variables;
+  if (v && typeof v === "object" && !Array.isArray(v)) {
+    return v as Record<string, unknown>;
+  }
+  return {};
+};
+
+/**
+ * 1) Substitui placeholders do FlowBuilder: {{chave}} usando dataWebhook.variables
+ * 2) Depois aplica Mustache do contato: {{name}}, {{firstName}}, {{protocol}}, etc.
+ */
+const interpolateFlowMessage = (
+  raw: string,
+  ticket: Ticket | null,
+  contact: Contact | undefined | null
+): string => {
+  const vars = getFlowVariablesFromTicket(ticket);
+  const afterFlow = replaceMessages(vars, raw);
+  return formatBody(afterFlow, contact as Contact);
+};
+
+const replaceMessages = (
+  variables: Record<string, unknown>,
+  message: string
+): string => {
+  if (!message || typeof message !== "string") return "";
   return message.replace(
     /{{\s*([^{}\s]+)\s*}}/g,
-    (match, key) => variables[key] || ""
+    (_match, key: string) => {
+      const v = variables[key];
+      if (v === undefined || v === null) return "";
+      return String(v);
+    }
   );
 };
 

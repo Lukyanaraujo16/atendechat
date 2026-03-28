@@ -122,6 +122,17 @@ export default memo(({ data, isConnectable, id }) => {
                 >
                 {data?.typebotIntegration?.message}
                 </Typography>
+                {data?.typebotIntegration?.answerKey && (
+                  <Typography
+                    textAlign="center"
+                    sx={{ fontSize: "9px", color: "#666", mt: 0.5 }}
+                  >
+                    →
+                    {"{{"}
+                    {data.typebotIntegration.answerKey}
+                    {"}}"}
+                  </Typography>
+                )}
               </div>
       </div>
       <Handle
