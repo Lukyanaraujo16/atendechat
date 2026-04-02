@@ -224,7 +224,8 @@ const ListTicketsServiceKanban = async ({
 
   whereCondition = {
     ...whereCondition,
-    companyId
+    companyId,
+    isGroup: false
   };
 
   const { count, rows: tickets } = await Ticket.findAndCountAll({
