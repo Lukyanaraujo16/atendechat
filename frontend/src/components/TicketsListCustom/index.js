@@ -190,6 +190,8 @@ const TicketsListCustom = (props) => {
     showAll,
     selectedQueueIds,
     chatbotOnly = false,
+    /** Apenas tickets de grupo (guia Grupos); não mistura com atendimentos 1:1 */
+    groupsOnly = false,
     updateCount,
     style,
     /** Lista mais densa (Fase 3) */
@@ -209,16 +211,17 @@ const TicketsListCustom = (props) => {
   useEffect(() => {
     dispatch({ type: "RESET" });
     setPageNumber(1);
-  }, [status, searchParam, dispatch, showAll, tags, users, selectedQueueIds]);
+  }, [status, searchParam, dispatch, showAll, tags, users, selectedQueueIds, groupsOnly]);
 
   const { tickets, hasMore, loading } = useTickets({
     pageNumber,
     searchParam,
-    status,
-    showAll,
+    status: groupsOnly ? undefined : status,
+    showAll: groupsOnly ? true : showAll,
     tags: JSON.stringify(tags),
     users: JSON.stringify(users),
     queueIds: JSON.stringify(selectedQueueIds),
+    isGroup: groupsOnly ? "true" : undefined,
   });
 
   useEffect(() => {
@@ -227,11 +230,17 @@ const TicketsListCustom = (props) => {
       (t) => queueIds.indexOf(t.queueId) > -1
     );
 
-    const base = profile === "user" ? filteredTickets : tickets;
+    let base =
+      profile === "user" && !groupsOnly ? filteredTickets : tickets;
+    if (!groupsOnly) {
+      base = base.filter((t) => !t.isGroup);
+    } else {
+      base = base.filter((t) => t.isGroup);
+    }
 
     /** pending: separar "Aguardando" (!chatbot) de "Chatbot" (chatbot); evita o mesmo ticket nas duas abas */
     const applyPendingChatbotSplit = (list) => {
-      if (status !== "pending") return list;
+      if (groupsOnly || status !== "pending") return list;
       return chatbotOnly
         ? list.filter((t) => !!t.chatbot)
         : list.filter((t) => !t.chatbot);
@@ -241,7 +250,7 @@ const TicketsListCustom = (props) => {
       type: "LOAD_TICKETS",
       payload: applyPendingChatbotSplit(base),
     });
-  }, [tickets, status, searchParam, safeQueues, profile, chatbotOnly]);
+  }, [tickets, status, searchParam, safeQueues, profile, chatbotOnly, groupsOnly]);
 
   useEffect(() => {
     if (!socketActive) return undefined;
@@ -250,20 +259,36 @@ const TicketsListCustom = (props) => {
     const socket = socketManager.getSocket(companyId);
 
     const shouldUpdateTicket = (ticket) =>
-      (!ticket.userId || ticket.userId === user?.id || showAll) &&
-      (!ticket.queueId || selectedQueueIds.indexOf(ticket.queueId) > -1);
+      (groupsOnly ||
+        (!ticket.userId || ticket.userId === user?.id || showAll)) &&
+      (groupsOnly ||
+        !ticket.queueId ||
+        selectedQueueIds.indexOf(ticket.queueId) > -1);
 
     const notBelongsToUserQueues = (ticket) =>
       ticket.queueId && selectedQueueIds.indexOf(ticket.queueId) === -1;
 
     /** Mesma regra da lista inicial: em pending, Chatbot vs Aguardando são mutuamente exclusivos */
     const matchesPendingChatbotTab = (ticket) => {
-      if (status !== "pending") return true;
+      if (groupsOnly || status !== "pending") return true;
       return chatbotOnly ? !!ticket.chatbot : !ticket.chatbot;
     };
 
+    const matchesTabStatus = (ticket) => {
+      if (groupsOnly) {
+        return (
+          ticket.isGroup &&
+          ticket.status !== "closed"
+        );
+      }
+      return ticket.status === status;
+    };
+
     socket.on("ready", () => {
-      if (status) {
+      if (groupsOnly) {
+        socket.emit("joinTickets", "open");
+        socket.emit("joinTickets", "pending");
+      } else if (status) {
         socket.emit("joinTickets", status);
       } else {
         socket.emit("joinNotification");
@@ -279,7 +304,12 @@ const TicketsListCustom = (props) => {
         });
       }
 
-      if (data.action === "update" && shouldUpdateTicket(data.ticket) && data.ticket.status === status) {
+      if (
+        data.action === "update" &&
+        shouldUpdateTicket(data.ticket) &&
+        matchesTabStatus(data.ticket) &&
+        (groupsOnly ? data.ticket.isGroup : !data.ticket.isGroup)
+      ) {
         if (!matchesPendingChatbotTab(data.ticket)) {
           dispatch({ type: "DELETE_TICKET", payload: data.ticket.id });
           return;
@@ -300,7 +330,11 @@ const TicketsListCustom = (props) => {
         });
       }
 
-      if (data.action === "update" && notBelongsToUserQueues(data.ticket)) {
+      if (
+        data.action === "update" &&
+        !groupsOnly &&
+        notBelongsToUserQueues(data.ticket)
+      ) {
         dispatch({ type: "DELETE_TICKET", payload: data.ticket.id });
       }
 
@@ -312,6 +346,7 @@ const TicketsListCustom = (props) => {
     socket.on(`company-${companyId}-appMessage`, (data) => {
       const queueIds = safeQueues.map((q) => q.id);
       if (
+        !groupsOnly &&
         profile === "user" &&
         (queueIds.indexOf(data.ticket?.queue?.id) === -1 ||
           data.ticket.queue === null)
@@ -319,7 +354,14 @@ const TicketsListCustom = (props) => {
         return;
       }
 
-      if (data.action === "create" && shouldUpdateTicket(data.ticket) && ( status === undefined || data.ticket.status === status)) {
+      if (
+        data.action === "create" &&
+        shouldUpdateTicket(data.ticket) &&
+        (groupsOnly
+          ? data.ticket.isGroup && data.ticket.status !== "closed"
+          : status === undefined || data.ticket.status === status) &&
+        (groupsOnly ? data.ticket.isGroup : !data.ticket.isGroup)
+      ) {
         if (!matchesPendingChatbotTab(data.ticket)) {
           return;
         }
@@ -354,6 +396,7 @@ const TicketsListCustom = (props) => {
     queues,
     socketManager,
     chatbotOnly,
+    groupsOnly,
   ]);
 
   useEffect(() => {

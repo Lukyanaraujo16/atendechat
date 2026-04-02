@@ -136,6 +136,7 @@ const UpdateTicketService = async ({
 
             io.to(`company-${ticket.companyId}-open`)
               .to(`queue-${ticket.queueId}-open`)
+              .to(`company-${companyId}-mainchannel`)
               .to(ticketId.toString())
               .emit(`company-${ticket.companyId}-ticket`, {
                 action: "delete",
@@ -288,6 +289,7 @@ const UpdateTicketService = async ({
     if (ticketForEmit.status !== oldStatus || ticketForEmit.user?.id !== oldUserId) {
       let deleteEmitter = io
         .to(`company-${companyId}-${oldStatus}`)
+        .to(`company-${companyId}-mainchannel`)
         .to(`user-${oldUserId}`);
       if (oldQueueId != null) {
         deleteEmitter = deleteEmitter.to(`queue-${oldQueueId}-${oldStatus}`);
@@ -300,6 +302,7 @@ const UpdateTicketService = async ({
 
     io.to(`company-${companyId}-${ticketForEmit.status}`)
       .to(`company-${companyId}-notification`)
+      .to(`company-${companyId}-mainchannel`)
       .to(`queue-${ticketForEmit.queueId}-${ticketForEmit.status}`)
       .to(`queue-${ticketForEmit.queueId}-notification`)
       .to(ticketId.toString())

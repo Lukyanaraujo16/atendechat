@@ -84,12 +84,16 @@ export default function Options(props) {
   const [userRating, setUserRating] = useState("disabled");
   const [scheduleType, setScheduleType] = useState("disabled");
   const [callType, setCallType] = useState("enabled");
+  const [callRejectSendMessage, setCallRejectSendMessage] = useState("enabled");
+  const [callRejectMessage, setCallRejectMessage] = useState("");
   const [chatbotType, setChatbotType] = useState("");
   const [CheckMsgIsGroup, setCheckMsgIsGroupType] = useState("enabled");
 
   const [loadingUserRating, setLoadingUserRating] = useState(false);
   const [loadingScheduleType, setLoadingScheduleType] = useState(false);
   const [loadingCallType, setLoadingCallType] = useState(false);
+  const [loadingCallRejectSendMessage, setLoadingCallRejectSendMessage] = useState(false);
+  const [loadingCallRejectMessage, setLoadingCallRejectMessage] = useState(false);
   const [loadingChatbotType, setLoadingChatbotType] = useState(false);
   const [loadingCheckMsgIsGroup, setCheckMsgIsGroup] = useState(false);
 
@@ -136,6 +140,10 @@ export default function Options(props) {
       if (callType) {
         setCallType(callType.value);
       }
+      const crs = settings.find((s) => s.key === "callRejectSendMessage");
+      setCallRejectSendMessage(crs ? crs.value : "enabled");
+      const crm = settings.find((s) => s.key === "callRejectMessage");
+      setCallRejectMessage(crm && crm.value != null ? String(crm.value) : "");
       const CheckMsgIsGroup = settings.find((s) => s.key === "CheckMsgIsGroup");
       if (CheckMsgIsGroup) {
         setCheckMsgIsGroupType(CheckMsgIsGroup.value);
@@ -254,6 +262,27 @@ export default function Options(props) {
     setLoadingCallType(false);
   }
 
+  async function handleCallRejectSendMessage(value) {
+    setCallRejectSendMessage(value);
+    setLoadingCallRejectSendMessage(true);
+    await update({
+      key: "callRejectSendMessage",
+      value,
+    });
+    toast.success(i18n.t("settings.options.toasts.success"));
+    setLoadingCallRejectSendMessage(false);
+  }
+
+  async function handleCallRejectMessageSave() {
+    setLoadingCallRejectMessage(true);
+    await update({
+      key: "callRejectMessage",
+      value: callRejectMessage,
+    });
+    toast.success(i18n.t("settings.options.toasts.success"));
+    setLoadingCallRejectMessage(false);
+  }
+
   async function handleChatbotType(value) {
     setChatbotType(value);
     setLoadingChatbotType(true);
@@ -273,7 +302,7 @@ export default function Options(props) {
       value,
     });
     toast.success(i18n.t("settings.options.toasts.success"));
-    setCheckMsgIsGroupType(false);
+    setCheckMsgIsGroup(false);
     /*     if (typeof scheduleTypeChanged === "function") {
           scheduleTypeChanged(value);
         } */
@@ -416,8 +445,8 @@ export default function Options(props) {
             </FormHelperText>
           </FormControl>
         </Grid>
-        <Grid xs={12} sm={6} md={4} item>
-          <FormControl className={classes.selectContainer}>
+        <Grid xs={12} sm={12} md={6} item>
+          <FormControl className={classes.selectContainer} fullWidth>
             <InputLabel id="group-type-label">
               {i18n.t("settings.options.fields.ignoreMessages.title")}
             </InputLabel>
@@ -428,16 +457,32 @@ export default function Options(props) {
                 handleGroupType(e.target.value);
               }}
             >
-              <MenuItem value={"disabled"}>{i18n.t("settings.options.fields.disabled")}</MenuItem>
-              <MenuItem value={"enabled"}>{i18n.t("settings.options.fields.active")}</MenuItem>
+              <MenuItem value={"disabled"}>
+                {i18n.t("settings.options.fields.ignoreMessages.optionReceive")}
+              </MenuItem>
+              <MenuItem value={"enabled"}>
+                {i18n.t("settings.options.fields.ignoreMessages.optionIgnore")}
+              </MenuItem>
             </Select>
-            <FormHelperText>
-              {loadingScheduleType && i18n.t("settings.options.updating")}
+            <FormHelperText component="div">
+              <Typography
+                variant="caption"
+                component="span"
+                color="textSecondary"
+                style={{ display: "block", whiteSpace: "pre-line", lineHeight: 1.45 }}
+              >
+                {i18n.t("settings.options.fields.ignoreMessages.helperText")}
+              </Typography>
+              {loadingCheckMsgIsGroup && (
+                <Typography variant="caption" display="block" color="textSecondary" style={{ marginTop: 6 }}>
+                  {i18n.t("settings.options.updating")}
+                </Typography>
+              )}
             </FormHelperText>
           </FormControl>
         </Grid>
         <Grid xs={12} sm={6} md={4} item>
-          <FormControl className={classes.selectContainer}>
+          <FormControl className={classes.selectContainer} fullWidth>
             <InputLabel id="call-type-label">
               {i18n.t("settings.options.fields.acceptCall.title")}
             </InputLabel>
@@ -448,14 +493,69 @@ export default function Options(props) {
                 handleCallType(e.target.value);
               }}
             >
-              <MenuItem value={"disabled"}>{i18n.t("settings.options.fields.acceptCall.disabled")}</MenuItem>
               <MenuItem value={"enabled"}>{i18n.t("settings.options.fields.acceptCall.enabled")}</MenuItem>
+              <MenuItem value={"disabled"}>{i18n.t("settings.options.fields.acceptCall.disabled")}</MenuItem>
             </Select>
-            <FormHelperText>
-              {loadingCallType && i18n.t("settings.options.updating")}
+            <FormHelperText component="div">
+              <Typography
+                variant="caption"
+                component="span"
+                color="textSecondary"
+                style={{ display: "block", whiteSpace: "pre-line", lineHeight: 1.45 }}
+              >
+                {i18n.t("settings.options.fields.acceptCall.helperText")}
+              </Typography>
+              {loadingCallType && (
+                <Typography variant="caption" display="block" color="textSecondary" style={{ marginTop: 6 }}>
+                  {i18n.t("settings.options.updating")}
+                </Typography>
+              )}
             </FormHelperText>
           </FormControl>
         </Grid>
+        {callType === "disabled" && (
+          <>
+            <Grid xs={12} sm={6} md={4} item>
+              <FormControl className={classes.selectContainer} fullWidth>
+                <InputLabel id="call-reject-send-label">
+                  {i18n.t("settings.options.fields.acceptCall.rejectSendTitle")}
+                </InputLabel>
+                <Select
+                  labelId="call-reject-send-label"
+                  value={callRejectSendMessage}
+                  onChange={async (e) => {
+                    handleCallRejectSendMessage(e.target.value);
+                  }}
+                >
+                  <MenuItem value={"enabled"}>{i18n.t("settings.options.fields.acceptCall.rejectSendYes")}</MenuItem>
+                  <MenuItem value={"disabled"}>{i18n.t("settings.options.fields.acceptCall.rejectSendNo")}</MenuItem>
+                </Select>
+                <FormHelperText>
+                  {loadingCallRejectSendMessage && i18n.t("settings.options.updating")}
+                </FormHelperText>
+              </FormControl>
+            </Grid>
+            <Grid xs={12} item>
+              <TextField
+                label={i18n.t("settings.options.fields.acceptCall.rejectMessageLabel")}
+                placeholder={i18n.t("settings.options.fields.acceptCall.rejectMessagePlaceholder")}
+                value={callRejectMessage}
+                onChange={(e) => setCallRejectMessage(e.target.value)}
+                onBlur={() => handleCallRejectMessageSave()}
+                disabled={callRejectSendMessage === "disabled"}
+                multiline
+                minRows={2}
+                variant="outlined"
+                fullWidth
+                helperText={
+                  loadingCallRejectMessage
+                    ? i18n.t("settings.options.updating")
+                    : i18n.t("settings.options.fields.acceptCall.rejectMessageHelper")
+                }
+              />
+            </Grid>
+          </>
+        )}
         <Grid xs={12} sm={6} md={4} item>
           <FormControl className={classes.selectContainer}>
             <InputLabel id="chatbot-type-label">

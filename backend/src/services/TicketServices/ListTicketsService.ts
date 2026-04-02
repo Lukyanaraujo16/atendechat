@@ -25,6 +25,8 @@ interface Request {
   tags: number[];
   users: number[];
   companyId: number;
+  /** "true" = só tickets de grupo; omitido/"false" = exclui grupos das listas normais */
+  isGroup?: string;
 }
 
 interface Response {
@@ -45,7 +47,8 @@ const ListTicketsService = async ({
   showAll,
   userId,
   withUnreadMessages,
-  companyId
+  companyId,
+  isGroup
 }: Request): Promise<Response> => {
   let whereCondition: Filterable["where"] = {
     [Op.or]: [{ userId }, { status: "pending" }],
@@ -214,6 +217,19 @@ const ListTicketsService = async ({
     ...whereCondition,
     companyId
   };
+
+  if (isGroup === "true") {
+    whereCondition = {
+      ...whereCondition,
+      isGroup: true,
+      ...(!status ? { status: { [Op.in]: ["open", "pending"] } } : {})
+    };
+  } else {
+    whereCondition = {
+      ...whereCondition,
+      isGroup: false
+    };
+  }
 
   const { count, rows: tickets } = await Ticket.findAndCountAll({
     where: whereCondition,

@@ -19,6 +19,7 @@ const useTickets = ({
   showAll,
   queueIds,
   withUnreadMessages,
+  isGroup,
 }) => {
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(false);
@@ -42,6 +43,7 @@ const useTickets = ({
             showAll,
             queueIds,
             withUnreadMessages,
+            isGroup,
           },
         });
         if (cancelled) return;
@@ -71,6 +73,7 @@ const useTickets = ({
     showAll,
     queueIds,
     withUnreadMessages,
+    isGroup,
   ]);
 
   return { tickets, loading, hasMore };

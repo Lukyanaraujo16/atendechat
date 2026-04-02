@@ -2704,11 +2704,13 @@ const handleMessage = async (
       }
     }
 
-    await provider(ticket, msg, companyId, contact, wbot as WASocket);
+    if (!ticket.isGroup) {
+      await provider(ticket, msg, companyId, contact, wbot as WASocket);
+    }
 
     // voltar para o menu inicial
 
-    if (bodyMessage == "#") {
+    if (bodyMessage == "#" && !ticket.isGroup) {
       await ticket.update({
         queueOptionId: null,
         chatbot: false,
@@ -2725,7 +2727,7 @@ const handleMessage = async (
     });
 
     try {
-      if (!msg.key.fromMe) {
+      if (!msg.key.fromMe && !ticket.isGroup) {
 
         if (ticketTraking !== null && verifyRating(ticketTraking)) {
           handleRating(parseFloat(bodyMessage), ticket, ticketTraking);
@@ -2751,6 +2753,10 @@ const handleMessage = async (
       mediaSent = await verifyMediaMessage(msg, ticket, contact);
     } else {
       await verifyMessage(msg, ticket, contact);
+    }
+
+    if (ticket.isGroup) {
+      return;
     }
 
     const currentSchedule = await VerifyCurrentSchedule(companyId);

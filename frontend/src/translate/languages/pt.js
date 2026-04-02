@@ -1593,12 +1593,26 @@ const messages = {
               company: "Empresa",
             },
             ignoreMessages: {
-              title: "Ignorar Mensagens de Grupos",
+              title: "Mensagens de grupos do WhatsApp",
+              helperText:
+                "Receber na guia Grupos: as mensagens criam ou atualizam conversas apenas na aba Grupos, em modo manual (sem chatbot e sem automações).\nIgnorar grupos: as mensagens de grupo não são registradas e não entram no sistema.",
+              optionReceive: "Receber na guia Grupos (manual, sem automações)",
+              optionIgnore: "Ignorar grupos (não entram no sistema)",
             },
             acceptCall: {
-              title: "Aceitar Chamada",
+              title: "Aceitar chamada (WhatsApp)",
+              helperText:
+                "Sim: chamadas de voz/vídeo seguem o comportamento normal do WhatsApp; o sistema não interfere.\nNão: chamadas recebidas são rejeitadas automaticamente; você pode enviar uma mensagem ao cliente conforme as opções abaixo.",
               disabled: "Não aceitar",
-              enabled: "Aceitar",
+              enabled: "Sim, aceitar",
+              rejectSendTitle: "Enviar mensagem ao rejeitar chamada",
+              rejectSendYes: "Sim",
+              rejectSendNo: "Não",
+              rejectMessageLabel: "Mensagem automática ao rejeitar chamada",
+              rejectMessagePlaceholder:
+                "Ex.: Este número não recebe chamadas. Envie uma mensagem de texto e responderemos por aqui.",
+              rejectMessageHelper:
+                "Deixe em branco para usar o texto padrão no idioma da empresa. A mensagem é salva ao sair do campo.",
             },
             chatbotType: {
               title: "Tipo Chatbot",

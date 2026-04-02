@@ -855,9 +855,15 @@ const TicketsManagerTabs = () => {
       </TabPanel>
 
       <TabPanel value={tab} name="groups" className={classes.ticketsWrapper}>
-        <div className={classes.groupsPlaceholder}>
-          <Typography variant="body2">Em breve.</Typography>
-        </div>
+        <Paper className={classes.ticketsWrapper} style={{ position: "relative" }}>
+          <TicketsList
+            groupsOnly
+            showAll
+            selectedQueueIds={selectedQueueIds}
+            compact={compactList}
+            socketActive={tab === "groups"}
+          />
+        </Paper>
       </TabPanel>
 
       <div className={classes.fabsWrap}>

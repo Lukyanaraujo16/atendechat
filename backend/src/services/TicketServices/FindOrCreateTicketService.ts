@@ -35,11 +35,23 @@ const FindOrCreateTicketService = async (
   });
 
   if (ticket) {
-    await ticket.update({ unreadMessages, whatsappId });
+    await ticket.update({
+      unreadMessages,
+      whatsappId,
+      ...(groupContact
+        ? { chatbot: false, useIntegration: false, integrationId: null, promptId: null }
+        : {})
+    });
   }
 
   if (ticket?.status === "closed") {
-    await ticket.update({ queueId: null, userId: null });
+    await ticket.update({
+      queueId: null,
+      userId: null,
+      ...(groupContact
+        ? { chatbot: false, useIntegration: false, integrationId: null, promptId: null }
+        : {})
+    });
   }
 
   if (!ticket && groupContact) {
@@ -56,7 +68,11 @@ const FindOrCreateTicketService = async (
         userId: null,
         unreadMessages,
         queueId: null,
-        companyId
+        companyId,
+        chatbot: false,
+        useIntegration: false,
+        integrationId: null,
+        promptId: null
       });
       await FindOrCreateATicketTrakingService({
         ticketId: ticket.id,
@@ -124,6 +140,7 @@ const FindOrCreateTicketService = async (
       contactId: groupContact ? groupContact.id : contact.id,
       status: "pending",
       isGroup: !!groupContact,
+      ...(groupContact ? { chatbot: false } : {}),
       unreadMessages,
       whatsappId,
       whatsapp,

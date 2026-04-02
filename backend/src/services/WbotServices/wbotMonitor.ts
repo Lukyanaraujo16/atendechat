@@ -1,20 +1,14 @@
 import {
   WASocket,
-  BinaryNode,
-  Contact as BContact,
+  Contact as BContact
 } from "@whiskeysockets/baileys";
 import * as Sentry from "@sentry/node";
 
-import { Op } from "sequelize";
-// import { getIO } from "../../libs/socket";
 import { Store } from "../../libs/store";
-import Contact from "../../models/Contact";
 import Setting from "../../models/Setting";
-import Ticket from "../../models/Ticket";
 import Whatsapp from "../../models/Whatsapp";
 import { logger } from "../../utils/logger";
 import createOrUpdateBaileysService from "../BaileysServices/CreateOrUpdateBaileysService";
-import CreateMessageService from "../MessageServices/CreateMessageService";
 import Company from "../../models/Company";
 
 type Session = WASocket & {
@@ -22,8 +16,35 @@ type Session = WASocket & {
   store?: Store;
 };
 
-interface IContact {
-  contacts: BContact[];
+/** Mensagem padrão quando `callRejectMessage` está vazio (idioma da empresa). */
+const DEFAULT_CALL_REJECT_MESSAGES: Record<string, string> = {
+  pt: "*Mensagem automática*\n\nEste número não recebe chamadas. Envie uma mensagem de texto que responderemos por aqui.",
+  en: "*Automatic message*\n\nThis number does not accept calls. Please send a text message and we will reply here.",
+  es: "*Mensaje automático*\n\nEste número no recibe llamadas. Envíe un mensaje de texto y responderemos aquí."
+};
+
+async function resolveCallRejectText(companyId: number): Promise<string> {
+  const custom = await Setting.findOne({
+    where: { key: "callRejectMessage", companyId }
+  });
+  const trimmed = custom?.value != null ? String(custom.value).trim() : "";
+  if (trimmed.length > 0) {
+    return trimmed;
+  }
+  const company = await Company.findByPk(companyId);
+  const lang = company?.language || "pt";
+  const key = ["pt", "en", "es"].includes(lang) ? lang : "pt";
+  return DEFAULT_CALL_REJECT_MESSAGES[key];
+}
+
+async function shouldSendCallRejectMessage(companyId: number): Promise<boolean> {
+  const s = await Setting.findOne({
+    where: { key: "callRejectSendMessage", companyId }
+  });
+  if (!s) {
+    return true;
+  }
+  return s.value !== "disabled";
 }
 
 const wbotMonitor = async (
@@ -32,92 +53,66 @@ const wbotMonitor = async (
   companyId: number
 ): Promise<void> => {
   try {
-    wbot.ws.on("CB:call", async (node: BinaryNode) => {
-      const content = node.content[0] as any;
-
-      if (content.tag === "offer") {
-        const { from, id } = node.attrs;
-
+    wbot.ev.on("call", async (calls: unknown) => {
+      const list = calls as Array<{
+        status: string;
+        id: string;
+        from: string;
+        chatId: string;
+        isGroup?: boolean;
+      }>;
+      const call = list?.[0];
+      if (!call || call.status !== "offer") {
+        return;
+      }
+      if (call.isGroup) {
+        return;
       }
 
-      if (content.tag === "terminate") {
-        const sendMsgCall = await Setting.findOne({
-          where: { key: "call", companyId },
-        });
+      const callSetting = await Setting.findOne({
+        where: { key: "call", companyId }
+      });
 
-        const translatedMessage = {
-          'pt': "*Mensagem Automática:*\n\nAs chamadas de voz e vídeo estão desabilitas para esse WhatsApp, favor enviar uma mensagem de texto. Obrigado",
-          'en': "*Automatic Message:*\n\nVoice and video calls are disabled for this WhatsApp, please send a text message. Thank you",
-          'es': "*Mensaje Automático:*\n\nLas llamadas de voz y video están deshabilitadas para este WhatsApp, por favor envía un mensaje de texto. Gracias"
-        }
+      if (!callSetting || callSetting.value !== "disabled") {
+        return;
+      }
 
-        if (sendMsgCall.value === "disabled") {
+      try {
+        await wbot.rejectCall(call.id, call.from);
+        logger.info(
+          { companyId, sessionId: wbot.id, callId: call.id },
+          "[call] chamada recebida rejeitada (configuração da empresa)"
+        );
+      } catch (err) {
+        Sentry.captureException(err);
+        logger.error(
+          { err, companyId, callId: call.id },
+          "[call] falha ao rejeitar chamada"
+        );
+      }
 
-          const company = await Company.findByPk(companyId);
+      if (!(await shouldSendCallRejectMessage(companyId))) {
+        return;
+      }
 
-          await wbot.sendMessage(node.attrs.from, {
-            text:
-              translatedMessage[company.language],
-          });
-
-          const number = node.attrs.from.replace(/\D/g, "");
-
-          const contact = await Contact.findOne({
-            where: { companyId, number },
-          });
-
-          const ticket = await Ticket.findOne({
-            where: {
-              contactId: contact.id,
-              whatsappId: wbot.id,
-              //status: { [Op.or]: ["close"] },
-              companyId
-            },
-          });
-          // se não existir o ticket não faz nada.
-          if (!ticket) return;
-
-          const date = new Date();
-          const hours = date.getHours();
-          const minutes = date.getMinutes();
-
-          const body = `Chamada de voz/vídeo perdida às ${hours}:${minutes}`;
-          const messageData = {
-            id: content.attrs["call-id"],
-            ticketId: ticket.id,
-            contactId: contact.id,
-            body,
-            fromMe: false,
-            mediaType: "call_log",
-            read: true,
-            quotedMsgId: null,
-            ack: 1,
-          };
-
-          await ticket.update({
-            lastMessage: body,
-          });
-
-
-          if(ticket.status === "closed") {
-            await ticket.update({
-              status: "pending",
-            });
-          }
-
-          return CreateMessageService({ messageData, companyId: companyId });
-        }
+      try {
+        const text = await resolveCallRejectText(companyId);
+        await wbot.sendMessage(call.chatId, { text });
+      } catch (err) {
+        Sentry.captureException(err);
+        logger.error(
+          { err, companyId },
+          "[call] falha ao enviar mensagem após rejeitar"
+        );
       }
     });
 
     wbot.ev.on("contacts.upsert", async (contacts: BContact[]) => {
-
       await createOrUpdateBaileysService({
         whatsappId: whatsapp.id,
-        contacts,
+        contacts
       });
     });
-
   } catch (err) {
     Sentry.captureException(err);
     logger.error(err);

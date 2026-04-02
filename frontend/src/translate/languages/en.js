@@ -1482,12 +1482,26 @@ const messages = {
 							company: "Company",
 						},
 						ignoreMessages: {
-							title: "Ignore Group Messages",
+							title: "WhatsApp group messages",
+							helperText:
+								"Receive in the Groups tab: messages create or update conversations only under the Groups tab, in manual mode (no chatbot and no automations).\nIgnore groups: group messages are not saved and do not enter the system.",
+							optionReceive: "Receive in Groups tab (manual, no automations)",
+							optionIgnore: "Ignore groups (do not enter the system)",
 						},
 						acceptCall: {
-							title: "Accept Call",
-							disabled: "Don't accept",
-							enabled: "Accept",
+							title: "Accept WhatsApp calls",
+							helperText:
+								"Yes: voice/video calls behave as usual; the system does not interfere.\nNo: incoming calls are rejected automatically; you can optionally send a message to the contact below.",
+							disabled: "No, do not accept",
+							enabled: "Yes, accept",
+							rejectSendTitle: "Send message when rejecting call",
+							rejectSendYes: "Yes",
+							rejectSendNo: "No",
+							rejectMessageLabel: "Automatic message when rejecting call",
+							rejectMessagePlaceholder:
+								"E.g.: This number does not accept calls. Please send a text message and we will reply here.",
+							rejectMessageHelper:
+								"Leave blank to use the company default text. Saved when you leave the field.",
 						},
 						chatbotType: {
 							title: "Chatbot Type",

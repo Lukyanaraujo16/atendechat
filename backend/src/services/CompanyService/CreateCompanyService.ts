@@ -169,16 +169,39 @@ const CreateCompanyService = async (
     },
   });
 
-  //CheckMsgIsGroup
   await Setting.findOrCreate({
     where: {
       companyId: company.id,
-      key: ""
+      key: "call"
     },
     defaults: {
       companyId: company.id,
       key: "call",
       value: "disabled"
+    },
+  });
+
+  await Setting.findOrCreate({
+    where: {
+      companyId: company.id,
+      key: "callRejectSendMessage"
+    },
+    defaults: {
+      companyId: company.id,
+      key: "callRejectSendMessage",
+      value: "enabled"
+    },
+  });
+
+  await Setting.findOrCreate({
+    where: {
+      companyId: company.id,
+      key: "callRejectMessage"
+    },
+    defaults: {
+      companyId: company.id,
+      key: "callRejectMessage",
+      value: ""
     },
   });
 

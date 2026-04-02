@@ -59,9 +59,12 @@ const CreateMessageService = async ({
   }
 
   const io = getIO();
+  // mainchannel: todos os usuários da empresa já estão na sala (libs/socket.ts).
+  // Sem isso, tickets com queueId null ou fora das filas do usuário não recebiam o evento em tempo real.
   io.to(message.ticketId.toString())
     .to(`company-${companyId}-${message.ticket.status}`)
     .to(`company-${companyId}-notification`)
+    .to(`company-${companyId}-mainchannel`)
     .to(`queue-${message.ticket.queueId}-${message.ticket.status}`)
     .to(`queue-${message.ticket.queueId}-notification`)
     .emit(`company-${companyId}-appMessage`, {
