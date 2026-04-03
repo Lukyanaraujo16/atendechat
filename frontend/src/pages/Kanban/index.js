@@ -15,6 +15,7 @@ import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 import api from "../../services/api";
+import { getApiUrl } from "../../config/backendUrl";
 import { AuthContext } from "../../context/Auth/AuthContext";
 import { WhatsAppsContext } from "../../context/WhatsApp/WhatsAppsContext";
 import { SocketContext } from "../../context/Socket/SocketContext";
@@ -378,7 +379,7 @@ const Kanban = () => {
     }
     setLoading(true);
     try {
-      const { data } = await api.get("/ticket/kanban", {
+      const { data } = await api.get(getApiUrl("/ticket/kanban"), {
         params: {
           queueIds: JSON.stringify(queueIdsParam),
           showAll: isAdmin ? "true" : "false",

@@ -17,3 +17,17 @@ export function getBackendBaseURL() {
 
   return "";
 }
+
+/**
+ * Monta URL absoluta da API (ex.: http://host:8080/ticket/kanban).
+ * `path` deve começar com / (ex: "/ticket/kanban").
+ * Evita bug em que, na rota React `/kanban`, paths relativos viram o próprio HTML do app.
+ */
+export function getApiUrl(path) {
+  const p = path.startsWith("/") ? path : `/${path}`;
+  const base = getBackendBaseURL().replace(/\/$/, "");
+  if (base) {
+    return `${base}${p}`;
+  }
+  return p;
+}
