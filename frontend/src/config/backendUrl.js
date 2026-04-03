@@ -20,14 +20,19 @@ export function getBackendBaseURL() {
 
 /**
  * Monta URL absoluta da API (ex.: http://host:8080/ticket/kanban).
- * `path` deve começar com / (ex: "/ticket/kanban").
- * Evita bug em que, na rota React `/kanban`, paths relativos viram o próprio HTML do app.
+ * No navegador **nunca** devolve só "/ticket/..." — sempre host + porta do backend,
+ * senão o axios pode resolver contra a rota atual `/kanban` e pedir HTML do SPA.
  */
 export function getApiUrl(path) {
   const p = path.startsWith("/") ? path : `/${path}`;
-  const base = getBackendBaseURL().replace(/\/$/, "");
-  if (base) {
-    return `${base}${p}`;
+  let base = getBackendBaseURL().replace(/\/$/, "");
+  if (!base && typeof window !== "undefined" && window.location?.hostname) {
+    const port = String(process.env.REACT_APP_BACKEND_PORT || "8080").trim();
+    const { protocol, hostname } = window.location;
+    base = `${protocol}//${hostname}:${port}`;
   }
-  return p;
+  if (!base) {
+    return p;
+  }
+  return `${base}${p}`;
 }

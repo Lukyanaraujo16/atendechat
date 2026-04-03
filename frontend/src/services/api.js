@@ -5,6 +5,10 @@ let warnedEmptyBackend = false;
 
 function attachBackendInterceptor(client) {
 	client.interceptors.request.use((config) => {
+		const rawUrl = config.url || "";
+		if (rawUrl.startsWith("http://") || rawUrl.startsWith("https://")) {
+			return config;
+		}
 		const base = getBackendBaseURL();
 		if (base) {
 			config.baseURL = base;
