@@ -11,6 +11,7 @@ import Tag from "../../models/Tag";
 import TicketTag from "../../models/TicketTag";
 import { intersection } from "lodash";
 import Whatsapp from "../../models/Whatsapp";
+import { parseTruthyQuery } from "../../utils/parseQueryBoolean";
 
 interface Request {
   searchParam?: string;
@@ -18,7 +19,7 @@ interface Request {
   status?: string;
   date?: string;
   updatedAt?: string;
-  showAll?: string;
+  showAll?: string | boolean;
   userId: string;
   withUnreadMessages?: string;
   queueIds: number[];
@@ -84,7 +85,7 @@ const ListTicketsService = async ({
     },
   ];
 
-  if (showAll === "true") {
+  if (parseTruthyQuery(showAll)) {
     whereCondition = { queueId: { [Op.or]: [queueIds, null] } };
   }
 
