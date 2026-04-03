@@ -343,7 +343,7 @@ const Kanban = () => {
   const { users: usersList } = useUsers();
   const { profile, queues } = user;
   const queuesList = Array.isArray(queues) ? queues : [];
-  const isAdmin = profile === "admin";
+  const isAdmin = String(profile || "").toLowerCase() === "admin";
 
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);

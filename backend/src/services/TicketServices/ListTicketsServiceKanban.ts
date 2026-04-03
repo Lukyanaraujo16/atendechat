@@ -93,7 +93,8 @@ const ListTicketsServiceKanban = async ({
     },
   ];
 
-  const thirtyDaysAgo = subDays(new Date(), 30);
+  /** Fechados recentes no Kanban (evita lista infinita; ajustável) */
+  const closedSince = subDays(new Date(), 365);
   const statusKanbanFilter =
     status && ["pending", "open", "closed"].includes(status)
       ? { status }
@@ -101,7 +102,7 @@ const ListTicketsServiceKanban = async ({
           [Op.or]: [
             { status: "pending" },
             { status: "open" },
-            { status: "closed", updatedAt: { [Op.gte]: thirtyDaysAgo } }
+            { status: "closed", updatedAt: { [Op.gte]: closedSince } }
           ]
         };
 
@@ -238,10 +239,18 @@ const ListTicketsServiceKanban = async ({
     };
   }
 
+  /**
+   * Excluir só conversas de grupo da visão Kanban (1:1).
+   * `isGroup = NULL` em tickets antigos não pode ser tratado como "grupo" — antes sumiam do Kanban.
+   */
   whereCondition = {
-    ...whereCondition,
-    companyId,
-    isGroup: false
+    [Op.and]: [
+      whereCondition,
+      { companyId },
+      {
+        [Op.or]: [{ isGroup: false }, { isGroup: null }]
+      }
+    ]
   };
 
   const { count, rows: tickets } = await Ticket.findAndCountAll({
