@@ -7,14 +7,16 @@ const useStyles = makeStyles(theme => ({
 	mainContainer: {
 		flex: 1,
 		padding: theme.spacing(2),
-		height: `calc(100% - 48px)`,
+		minHeight: 0,
+		boxSizing: "border-box",
 	},
 
 	contentWrapper: {
-		height: "100%",
-		overflowY: "hidden",
+		flex: 1,
+		minHeight: 0,
 		display: "flex",
 		flexDirection: "column",
+		overflow: "visible",
 	},
 }));
 

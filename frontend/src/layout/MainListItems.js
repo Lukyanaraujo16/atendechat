@@ -13,6 +13,13 @@ import PeopleAltOutlinedIcon from "@material-ui/icons/PeopleAltOutlined";
 import EventAvailableIcon from "@material-ui/icons/EventAvailable";
 import LocalAtmIcon from "@material-ui/icons/LocalAtm";
 import ForumIcon from "@material-ui/icons/Forum";
+import BorderColorIcon from "@material-ui/icons/BorderColor";
+import EventIcon from "@material-ui/icons/Event";
+import AnnouncementIcon from "@material-ui/icons/Announcement";
+import AttachFile from "@material-ui/icons/AttachFile";
+import LocalOfferIcon from "@material-ui/icons/LocalOffer";
+import HelpOutlineIcon from "@material-ui/icons/HelpOutline";
+import AssessmentOutlinedIcon from "@material-ui/icons/AssessmentOutlined";
 import { AccountTree } from "@material-ui/icons";
 import { i18n } from "../translate/i18n";
 import { WhatsAppsContext } from "../context/WhatsApp/WhatsAppsContext";
@@ -24,8 +31,6 @@ import api from "../services/api";
 import toastError from "../errors/toastError";
 import { makeStyles } from "@material-ui/core/styles";
 import usePlans from "../hooks/usePlans";
-import Typography from "@material-ui/core/Typography";
-import Link from "@material-ui/core/Link";
 
 const SIDEBAR_GREEN = "#24c776";
 
@@ -36,11 +41,18 @@ const useStyles = makeStyles((theme) => ({
   },
   listItemText: {
     color: "rgba(0, 0, 0, 0.87)",
+    minWidth: 0,
     "&.MuiListItemText-primary": {
       fontWeight: 500,
     },
+    "& .MuiTypography-root": {
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap",
+    },
   },
   listItem: {
+    minWidth: 0,
     "&:hover": {
       backgroundColor: "rgba(36, 199, 118, 0.08)",
     },
@@ -50,14 +62,6 @@ const useStyles = makeStyles((theme) => ({
       "& .MuiListItemIcon-root": {
         color: SIDEBAR_GREEN,
       },
-    },
-  },
-  footerLinks: {
-    padding: theme.spacing(1, 2),
-    "& a": {
-      color: theme.palette.text.secondary,
-      fontSize: "0.75rem",
-      marginRight: theme.spacing(0.5),
     },
   },
 }));
@@ -152,7 +156,7 @@ function defaultAutomacaoPath(flags, isAdmin) {
 
 const MainListItems = (props) => {
   const classes = useStyles();
-  const { drawerClose, collapsed } = props;
+  const { drawerClose } = props;
   const { whatsApps } = useContext(WhatsAppsContext);
   const { user } = useContext(AuthContext);
   const [connectionWarning, setConnectionWarning] = useState(false);
@@ -278,9 +282,7 @@ const MainListItems = (props) => {
     path.startsWith("/tickets") ||
     path === "/kanban" ||
     path === "/contacts" ||
-    path === "/group-manager" ||
-    path === "/todolist" ||
-    path === "/schedules";
+    path === "/group-manager";
   const selAutomacao =
     path.startsWith("/flowbuilder") ||
     path === "/flowbuilders" ||
@@ -302,8 +304,89 @@ const MainListItems = (props) => {
     path === "/connections" || path === "/messages-api" || path === "/settings";
   const selFinanceiro = path === "/financeiro";
 
+  const selTarefas = path === "/todolist";
+  const selAgendamentos = path === "/schedules";
+  const selAvaliacao = path === "/avaliacao";
+  const selInformativos = path === "/announcements";
+  const selArquivos = path === "/files";
+  const selTags = path === "/tags";
+  const selAjuda = path === "/helps";
+
   const toAutomacao = defaultAutomacaoPath(planFlags, isAdmin);
   const toEquipe = isAdmin ? "/users" : "/chats";
+
+  const secondaryNav = (
+    <>
+      <Divider style={{ margin: "8px 0" }} />
+      <ListItemLink
+        to="/todolist"
+        primary={i18n.t("mainDrawer.listItems.tasks")}
+        icon={<BorderColorIcon />}
+        listItemClassName={classes.listItem}
+        listItemIconClassName={classes.listItemIcon}
+        listItemTextClassName={classes.listItemText}
+        selected={selTarefas}
+      />
+      {showSchedules && (
+        <ListItemLink
+          to="/schedules"
+          primary={i18n.t("mainDrawer.listItems.schedules")}
+          icon={<EventIcon />}
+          listItemClassName={classes.listItem}
+          listItemIconClassName={classes.listItemIcon}
+          listItemTextClassName={classes.listItemText}
+          selected={selAgendamentos}
+        />
+      )}
+      <ListItemLink
+        to="/avaliacao"
+        primary={i18n.t("mainDrawer.listItems.evaluation")}
+        icon={<AssessmentOutlinedIcon />}
+        listItemClassName={classes.listItem}
+        listItemIconClassName={classes.listItemIcon}
+        listItemTextClassName={classes.listItemText}
+        selected={selAvaliacao}
+      />
+      {user.super && (
+        <ListItemLink
+          to="/announcements"
+          primary={i18n.t("mainDrawer.listItems.annoucements")}
+          icon={<AnnouncementIcon />}
+          listItemClassName={classes.listItem}
+          listItemIconClassName={classes.listItemIcon}
+          listItemTextClassName={classes.listItemText}
+          selected={selInformativos}
+        />
+      )}
+      <ListItemLink
+        to="/files"
+        primary={i18n.t("mainDrawer.listItems.files")}
+        icon={<AttachFile />}
+        listItemClassName={classes.listItem}
+        listItemIconClassName={classes.listItemIcon}
+        listItemTextClassName={classes.listItemText}
+        selected={selArquivos}
+      />
+      <ListItemLink
+        to="/tags"
+        primary={i18n.t("mainDrawer.listItems.tags")}
+        icon={<LocalOfferIcon />}
+        listItemClassName={classes.listItem}
+        listItemIconClassName={classes.listItemIcon}
+        listItemTextClassName={classes.listItemText}
+        selected={selTags}
+      />
+      <ListItemLink
+        to="/helps"
+        primary={i18n.t("mainDrawer.listItems.helps")}
+        icon={<HelpOutlineIcon />}
+        listItemClassName={classes.listItem}
+        listItemIconClassName={classes.listItemIcon}
+        listItemTextClassName={classes.listItemText}
+        selected={selAjuda}
+      />
+    </>
+  );
 
   return (
     <div onClick={drawerClose}>
@@ -394,66 +477,27 @@ const MainListItems = (props) => {
             listItemTextClassName={classes.listItemText}
             selected={selConfig}
           />
+
+          {secondaryNav}
         </>
       )}
 
       {!isAdmin && (
-        <ListItemLink
-          to="/chats"
-          primary={i18n.t("mainDrawer.sections.equipe")}
-          icon={
-            <Badge color="secondary" variant="dot" invisible={invisible}>
-              <ForumIcon />
-            </Badge>
-          }
-          listItemClassName={classes.listItem}
-          listItemIconClassName={classes.listItemIcon}
-          listItemTextClassName={classes.listItemText}
-          selected={selEquipe}
-        />
-      )}
-
-      {!collapsed && (
         <>
-          <Divider style={{ marginTop: 8 }} />
-          <div className={classes.footerLinks}>
-            <Typography variant="caption" component="div">
-              <Link component={RouterLink} to="/helps" underline="hover">
-                {i18n.t("mainDrawer.listItems.helps")}
-              </Link>
-              {" · "}
-              <Link component={RouterLink} to="/files" underline="hover">
-                {i18n.t("mainDrawer.listItems.files")}
-              </Link>
-              {" · "}
-              <Link component={RouterLink} to="/tags" underline="hover">
-                {i18n.t("mainDrawer.listItems.tags")}
-              </Link>
-              {" · "}
-              <Link component={RouterLink} to="/avaliacao" underline="hover">
-                {i18n.t("mainDrawer.listItems.evaluation")}
-              </Link>
-              {user.super && (
-                <>
-                  {" · "}
-                  <Link component={RouterLink} to="/announcements" underline="hover">
-                    {i18n.t("mainDrawer.listItems.annoucements")}
-                  </Link>
-                </>
-              )}
-            </Typography>
-          </div>
-          <Divider />
-          <Typography
-            style={{
-              fontSize: "12px",
-              padding: "10px",
-              textAlign: "right",
-              fontWeight: "bold",
-            }}
-          >
-            8.0.1
-          </Typography>
+          <ListItemLink
+            to="/chats"
+            primary={i18n.t("mainDrawer.sections.equipe")}
+            icon={
+              <Badge color="secondary" variant="dot" invisible={invisible}>
+                <ForumIcon />
+              </Badge>
+            }
+            listItemClassName={classes.listItem}
+            listItemIconClassName={classes.listItemIcon}
+            listItemTextClassName={classes.listItemText}
+            selected={selEquipe}
+          />
+          {secondaryNav}
         </>
       )}
     </div>

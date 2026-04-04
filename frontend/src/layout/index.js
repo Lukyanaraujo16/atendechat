@@ -135,6 +135,7 @@ const useStyles = makeStyles((theme) => ({
     height: "100%",
     backgroundColor: "#ffffff",
     borderRight: "1px solid rgba(0, 0, 0, 0.08)",
+    overflowX: "hidden",
     transition: theme.transitions.create("width", {
       easing: theme.transitions.easing.sharp,
       duration: theme.transitions.duration.enteringScreen,
@@ -171,7 +172,9 @@ const useStyles = makeStyles((theme) => ({
   content: {
     flex: 1,
     overflow: "auto",
-
+    overflowX: "hidden",
+    minHeight: 0,
+    WebkitOverflowScrolling: "touch",
   },
   container: {
     paddingTop: theme.spacing(4),
@@ -185,12 +188,15 @@ const useStyles = makeStyles((theme) => ({
   },
   containerWithScroll: {
     flex: 1,
-    padding: theme.spacing(1),
-    overflowY: "scroll",
+    minHeight: 0,
+    padding: theme.spacing(0.5, 0),
+    overflowY: "auto",
+    overflowX: "hidden",
     ...theme.scrollbarStyles,
   },
   drawerFooter: {
-    padding: theme.spacing(2),
+    flexShrink: 0,
+    padding: theme.spacing(1.5, 2),
     borderTop: "1px solid rgba(0, 0, 0, 0.08)",
     backgroundColor: "rgba(0, 0, 0, 0.02)",
   },
@@ -203,17 +209,13 @@ const useStyles = makeStyles((theme) => ({
   drawerFooterRole: {
     fontSize: "0.75rem",
     color: theme.palette.text.secondary,
-    marginBottom: theme.spacing(1),
+    marginBottom: 0,
   },
-  versionBadge: {
-    display: "inline-block",
-    backgroundColor: "#24c776",
-    color: "#fff",
-    fontSize: "0.7rem",
-    fontWeight: 600,
-    padding: "2px 8px",
-    borderRadius: 6,
-    marginRight: theme.spacing(0.75),
+  drawerFooterVersion: {
+    fontSize: "0.65rem",
+    color: theme.palette.text.secondary,
+    marginTop: theme.spacing(0.75),
+    opacity: 0.85,
   },
   NotificationsPopOver: {
     // color: theme.barraSuperior.secondary.main,
@@ -419,7 +421,7 @@ const LoggedInLayout = ({ children, themeToggle }) => {
           </div>
           <Divider />
           <List className={classes.containerWithScroll}>
-            <MainListItems drawerClose={drawerClose} collapsed={!drawerOpen} />
+            <MainListItems drawerClose={drawerClose} />
           </List>
           <Divider />
           {drawerOpen && (
@@ -435,10 +437,9 @@ const LoggedInLayout = ({ children, themeToggle }) => {
               <Typography className={classes.drawerFooterRole}>
                 {user?.profile === "admin" ? "Administrador" : user?.profile === "user" ? "Usuário" : user?.profile || "-"}
               </Typography>
-              <div>
-                <span className={classes.versionBadge}>Sistema {versionSystem}</span>
-                <span className={classes.versionBadge}>API 2.2.6</span>
-              </div>
+              <Typography className={classes.drawerFooterVersion} component="div">
+                v{versionSystem}
+              </Typography>
             </div>
           )}
         </div>
