@@ -69,6 +69,7 @@ const FlowBuilderOpenAIModal = ({ open, onSave, data, onUpdate, close }) => {
   const initialState = {
     name: "",
     prompt: "",
+    model: "gpt-3.5-turbo-1106",
     voice: "texto",
     voiceKey: "",
     voiceRegion: "",
@@ -95,9 +96,10 @@ const FlowBuilderOpenAIModal = ({ open, onSave, data, onUpdate, close }) => {
         title: "Editar OpenAI do fluxo",
         btn: "Salvar",
       });
-      console.log("FlowTybebotEdit", data);
       setIntegration({
         ...data.data.typebotIntegration,
+        model:
+          data.data.typebotIntegration.model || "gpt-3.5-turbo-1106",
       });
       setActiveModal(true);
     } else if (open === "create") {
@@ -214,6 +216,23 @@ const FlowBuilderOpenAIModal = ({ open, onSave, data, onUpdate, close }) => {
                   rows={10}
                   multiline={true}
                 />
+                <FormControl fullWidth margin="dense" variant="outlined">
+                  <InputLabel id="flow-openai-model-label">
+                    {i18n.t("promptModal.form.model")}
+                  </InputLabel>
+                  <Field
+                    as={Select}
+                    labelId="flow-openai-model-label"
+                    label={i18n.t("promptModal.form.model")}
+                    name="model"
+                    variant="outlined"
+                  >
+                    <MenuItem value="gpt-3.5-turbo-1106">
+                      GPT 3.5 turbo
+                    </MenuItem>
+                    <MenuItem value="gpt-4o-mini">GPT 4.0 mini</MenuItem>
+                  </Field>
+                </FormControl>
                 <div className={classes.multFieldLine}>
                   <FormControl fullWidth margin="dense" variant="outlined">
                     <InputLabel>{i18n.t("promptModal.form.voice")}</InputLabel>

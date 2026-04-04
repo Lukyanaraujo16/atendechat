@@ -565,12 +565,25 @@ const messages = {
         message: "Leia o QrCode para iniciar a sessão",
       },
       contacts: {
-        title: "Contatos",
+        title: "Contatos e histórico de atendimento",
+        subtitle:
+          "Clientes e contatos do WhatsApp com registo de interações e atendimentos.",
+        pageBanner:
+          "Centralize quem conversa com a sua empresa. As tags exibidas refletem os atendimentos (tickets) já associados a cada contato.",
+        pageExpectations:
+          "Este módulo foca-se em atendimento e histórico — não é um funil de vendas nem um pipeline comercial completo. É a base para organizar conversas e pode evoluir no futuro.",
+        tagsColumnHint:
+          "Tags mostradas a partir dos atendimentos (tickets) deste contato.",
+        tagFilterHelp:
+          "Filtra contatos que tenham pelo menos um ticket com a tag escolhida.",
+        searchHelper: "Pesquise por nome, número, email ou notas.",
+        openAttendance: "Abrir atendimento",
+        lastInteractionTooltip: "Última interação",
         toasts: {
           deleted: "Contato excluído com sucesso!",
           deletedAll: "Todos contatos excluídos com sucesso!",
         },
-        searchPlaceholder: "Pesquisar...",
+        searchPlaceholder: "Pesquisar por nome, número, email ou notas…",
         confirmationModal: {
           deleteTitle: "Deletar ",
           deleteAllTitle: "Deletar Todos",
@@ -604,8 +617,9 @@ const messages = {
           dateTo: "Atualizado até",
         },
         empty: {
-          title: "Nenhum contato encontrado",
-          subtitle: "Ajuste a busca ou os filtros, ou adicione um novo contato.",
+          title: "Nenhum contato por aqui",
+          subtitle:
+            "Ajuste a pesquisa ou os filtros, importe uma lista ou adicione um contato para começar.",
         },
       },
       contactImportModal: {
@@ -627,6 +641,31 @@ const messages = {
           add: "Adicionar projeto",
           edit: "Editar projeto",
         },
+        intro:
+          "Cada registro aqui pode ser vinculado a um setor (Filas) ou à conexão WhatsApp. O comportamento depende do tipo escolhido.",
+        groups: {
+          internal: "Automações internas",
+          external: "Integrações externas (POST HTTP)",
+          legacy: "Legado",
+        },
+        types: {
+          flowbuilder: "Flowbuilder",
+          typebot: "Typebot",
+          n8n: "N8N",
+          webhook: "Webhook",
+          dialogflow: "Dialogflow (legado)",
+        },
+        descriptions: {
+          flowbuilder: "Automação interna com lógica e fluxos personalizados",
+          typebot: "Chatbot conversacional integrado",
+          webhookN8n: "Envio de dados para sistemas externos (POST HTTP)",
+        },
+        alerts: {
+          externalPost:
+            "Essa integração envia dados para um sistema externo (POST), mas não recebe respostas automaticamente nem altera o atendimento com base na resposta HTTP. Ela não responde sozinha ao cliente no WhatsApp. Para automações completas na conversa, use Flowbuilder ou Typebot.",
+          internalHint:
+            "Esta opção participa da conversa conforme o fluxo ou o bot configurado.",
+        },
         form: {
           id: "ID",
           type: "Tipo",
@@ -634,7 +673,12 @@ const messages = {
           projectName: "Nome do Projeto",
           language: "Linguagem",
           jsonContent: "JsonContent",
+          legacyDialogflow: "Dialogflow (legado)",
+          legacyDialogflowHint:
+            "Integrações Dialogflow não são mais configuráveis nesta tela. Altere o tipo ou edite apenas o nome.",
           urlN8N: "URL",
+          urlWebhookHelper:
+            "Envio via POST — a resposta do servidor não volta automaticamente para o atendimento.",
           typebotSlug: "Typebot - Slug",
           typebotExpires: "Tempo em minutos para expirar uma conversa",
           typebotKeywordFinish: "Palavra para finalizar o ticket",
@@ -716,6 +760,10 @@ const messages = {
       },
       prompts: {
         title: "Prompts",
+        openAiHelp:
+          "Onde o OpenAI atua: na conexão WhatsApp (prompt vinculado), na fila/setor (quando o prompt do setor está ativo) e no fluxo automatizado (nó \"openai\" no Flow Builder). " +
+          "Quando responde: ao receber mensagens de texto (ou áudio, quando suportado) no ticket, desde que as regras do bot e da fila permitam. " +
+          "A resposta usa o histórico recente das mensagens daquele ticket e a instrução deste cadastro — o contexto depende do que já foi trocado na conversa.",
         table: {
           name: "Nome",
           queue: "Setor",
@@ -735,11 +783,26 @@ const messages = {
           add: "Adicionar contato",
           edit: "Editar contato",
         },
+        expectations:
+          "Atendimento e histórico — não é funil de vendas nem pipeline. Ideal para acompanhar conversas.",
         summary: {
-          title: "Resumo",
-          tickets: "Atendimentos",
+          title: "Atividade e histórico",
+          tickets: "Total de atendimentos",
           lastInteraction: "Última interação",
           lastMessage: "Última mensagem",
+        },
+        tags: {
+          added: "Tag adicionada",
+          removed: "Tag removida",
+          helpFromTickets:
+            "As tags são baseadas nos atendimentos (tickets) associados a este contato. Para adicionar ou remover, é necessário existir conversa em andamento ou encerrada.",
+        },
+        campaigns: {
+          title: "Campanhas (listas)",
+          hint:
+            "Listas de disparo onde este número já consta. Para adicionar a outra lista, use a página de listas de campanha.",
+          empty: "Este número ainda não está em nenhuma lista.",
+          manageLists: "Gerir listas de campanha",
         },
         form: {
           mainInfo: "Dados do contato",
@@ -753,10 +816,6 @@ const messages = {
           extraName: "Nome do campo",
           extraValue: "Valor",
           whatsapp: "Conexão Origem: ",
-        },
-        tags: {
-          added: "Tag adicionada",
-          removed: "Tag removida",
         },
         formErrors: {
           name: {
@@ -778,6 +837,7 @@ const messages = {
           okAdd: "Adicionar",
           okEdit: "Salvar",
           cancel: "Cancelar",
+          openAttendance: "Abrir atendimento",
         },
         success: "Contato salvo com sucesso.",
       },
@@ -915,6 +975,22 @@ const messages = {
           fillTitle: "Por favor, preencha o título da conversa.",
           fillUser: "Por favor, selecione pelo menos um usuário.",
         },
+        page: {
+          title: "Chat interno",
+          searchPlaceholder: "Buscar conversas...",
+          loadingMessages: "Carregando mensagens...",
+          loadingConversations: "Carregando conversas...",
+          messagePlaceholder: "Digite sua mensagem...",
+          emptyNoSearchTitle: "Nenhum resultado",
+          emptyNoSearchSub: "Tente outro termo ou limpe a busca.",
+          emptyNoConversationsTitle: "Nenhuma conversa ainda",
+          emptyNoConversationsSub:
+            "Crie uma conversa para começar a mensagear com sua equipe.",
+          emptySelectTitle: "Selecione uma conversa",
+          emptySelectSub: "Escolha uma conversa na lista para ver as mensagens.",
+          newConversationButton: "Nova conversa",
+          tabsAria: "Conversas e mensagens",
+        },
         modal: {
           title: "Conversa",
           titleField: "Título",
@@ -1034,14 +1110,25 @@ const messages = {
         button: "Visualizar",
       },
       mainDrawer: {
+        sections: {
+          dashboard: "Dashboard",
+          atendimento: "Atendimento",
+          equipe: "Equipe",
+          automacao: "Automação",
+          campanhas: "Campanhas",
+          financeiro: "Financeiro",
+          configuracoes: "Configurações",
+          mais: "Mais",
+        },
         listItems: {
           dashboard: "Dashboard",
           connections: "Conexões",
           tickets: "Atendimentos",
-          quickMessages: "Respostas Rápidas",
+          quickMessages: "Respostas rápidas",
           tasks: "Tarefas",
           contacts: "Contatos",
           queues: "Setores & Chatbot",
+          sectors: "Setores",
           tags: "Tags",
           administration: "Administração",
           users: "Usuários",
@@ -1050,13 +1137,22 @@ const messages = {
           messagesAPI: "API WhatsApp",
           schedules: "Agendamentos",
           campaigns: "Campanhas",
+          contactLists: "Listas de contatos",
+          campaignSettings: "Configurações",
           flows: "Fluxos",
+          flowsChatbot: "Fluxos (Chatbot)",
+          keywordsTrigger: "Gatilhos por palavra-chave",
+          integrations: "Integrações",
+          reports: "Relatórios",
+          kanban: "Kanban",
+          groups: "Grupos",
+          evaluation: "Avaliação",
           annoucements: "Informativos",
           chats: "Chat Interno",
-          financeiro: "Financeiro",
+          finance: "Financeiro",
           files: "Lista de arquivos",
-          prompts: "Open.Ai",
-          queueIntegration: "Integrações",
+          prompts: "OpenAI",
+          queueIntegration: "Automações por setor",
         },
         appBar: {
           refresh: "Recarregar página",
@@ -1079,10 +1175,17 @@ const messages = {
         },
       },
       queueIntegration: {
-        title: "Integrações",
+        title: "Automações por setor",
+        pageSubtitle:
+          "Cadastro de integrações vinculadas a setores ou à conexão WhatsApp. Tipos diferentes têm comportamentos diferentes — Webhook/N8N apenas enviam dados por POST; Flowbuilder e Typebot tratam a conversa no atendimento.",
+        pageIntro:
+          "Essa integração envia dados para um sistema externo quando for Webhook ou N8N, mas não recebe respostas automaticamente no atendimento. Guarde o registro aqui e vincule-o em Filas (e opcionalmente na conexão). Para conversa automática com o cliente no WhatsApp, use Flowbuilder ou Typebot.",
         table: {
           id: "ID",
           type: "Tipo",
+          categoryInternal: "Interna",
+          categoryExternal: "Externa",
+          categoryLegacy: "Legado",
           name: "Nome",
           projectName: "Nome do Projeto",
           language: "Linguagem",
@@ -1090,9 +1193,12 @@ const messages = {
           actions: "Ações",
         },
         buttons: {
-          add: "Adicionar Projeto",
+          add: "Adicionar automação",
         },
         searchPlaceholder: "Pesquisar...",
+        toasts: {
+          deleted: "Automação excluída com sucesso.",
+        },
         confirmationModal: {
           deleteTitle: "Excluir",
           deleteMessage:
@@ -1658,11 +1764,29 @@ const messages = {
         },
       },
       todolist: {
-        input: "Nova tarefa",
+        pageTitle: "Lista pessoal (salva neste navegador)",
+        pageSubtitle:
+          "Anotações só neste aparelho — não sincronizam com o servidor nem com outros usuários.",
+        notice:
+          "Essas anotações são salvas apenas neste navegador e não são compartilhadas com a equipe.",
+        emptyNoItems: "Nenhuma anotação ainda. Adicione uma acima.",
+        emptyFilter: "Nenhuma anotação corresponde a este filtro.",
+        storageParseError:
+          "Não foi possível carregar suas anotações. Os dados inválidos foram removidos.",
+        storageWriteError:
+          "Não foi possível salvar (armazenamento do navegador cheio ou bloqueado).",
+        input: "Nova anotação",
+        completedAria: "Marcar como concluída",
+        filter: {
+          label: "Mostrar:",
+          all: "Todas",
+          pending: "Pendentes",
+          completed: "Concluídas",
+        },
         buttons: {
           add: "Adicionar",
           save: "Salvar",
-          typeTask: "Digite uma tarefa para adicionar",
+          typeTask: "Digite uma anotação para adicionar",
         },
       },
       helps: {
@@ -1670,9 +1794,10 @@ const messages = {
       },
       evaluation: {
         title: "Avaliação",
-        addButton: "Adicionar",
-        templatesTitle: "Templates de Avaliação",
-        templateName: "Nome",
+        flowInfo:
+          "Quando a avaliação está ativa nas configurações, ao encerrar o atendimento o cliente recebe no WhatsApp um pedido de nota (escala 1 a 3). O ticket só é finalizado no sistema depois que o cliente responde com 1, 2 ou 3. Respostas inválidas são ignoradas até vir uma nota válida.",
+        scaleHint: "Escala: 1 — Insatisfeito · 2 — Satisfeito · 3 — Muito satisfeito",
+        listHint: "Cada linha é uma resposta registrada; a nota reflete a opção escolhida pelo cliente no WhatsApp.",
         avgRating: "Avaliação Média",
         totalRatings: "Total de Avaliações",
         byAttendant: "Por Atendente",
@@ -1686,7 +1811,8 @@ const messages = {
           contact: "Contato",
           attendant: "Atendente",
           setor: "Setor",
-          rating: "Avaliação",
+          rating: "Nota",
+          ratingSub: "1 a 3",
         },
       },
       evaluationModal: {

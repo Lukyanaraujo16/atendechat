@@ -503,12 +503,25 @@ const messages = {
         message: "Lea el código QR para iniciar la sesión",
       },
       contacts: {
-        title: "Contactos",
+        title: "Contactos e historial de atención",
+        subtitle:
+          "Clientes y contactos de WhatsApp con registro de interacciones y tickets.",
+        pageBanner:
+          "Centralice quién habla con su empresa. Las etiquetas reflejan los tickets asociados a cada contacto.",
+        pageExpectations:
+          "Este módulo se centra en atención e historial: no es un embudo de ventas ni un pipeline comercial completo. Es la base para organizar conversaciones y puede evolucionar.",
+        tagsColumnHint:
+          "Etiquetas mostradas a partir de los tickets de este contacto.",
+        tagFilterHelp:
+          "Filtra contactos que tengan al menos un ticket con la etiqueta elegida.",
+        searchHelper: "Busque por nombre, número, email o notas.",
+        openAttendance: "Abrir atención",
+        lastInteractionTooltip: "Última interacción",
         toasts: {
           deleted: "¡Contacto eliminado con éxito!",
           deletedAll: "¡Todos los contactos eliminados con éxito!",
         },
-        searchPlaceholder: "Buscar...",
+        searchPlaceholder: "Buscar por nombre, número, email o notas…",
         confirmationModal: {
           deleteTitle: "Eliminar ",
           deleteAllTitle: "Eliminar Todos",
@@ -527,9 +540,24 @@ const messages = {
         },
         table: {
           name: "Nombre",
+          number: "Número",
           whatsapp: "WhatsApp",
           email: "Email",
+          tags: "Etiquetas",
+          lastInteraction: "Última interacción",
+          createdAt: "Creado",
           actions: "Acciones",
+        },
+        filters: {
+          tag: "Etiqueta",
+          allTags: "Todas",
+          dateFrom: "Actualizado desde",
+          dateTo: "Actualizado hasta",
+        },
+        empty: {
+          title: "No hay contactos para mostrar",
+          subtitle:
+            "Ajuste la búsqueda o filtros, importe una lista o agregue un contacto.",
         },
       },
       contactImportModal: {
@@ -551,6 +579,31 @@ const messages = {
           add: "Agregar proyecto",
           edit: "Editar proyecto",
         },
+        intro:
+          "Cada registro puede vincularse a una cola (Filas) o a la conexión WhatsApp. El comportamiento depende del tipo elegido.",
+        groups: {
+          internal: "Automatizaciones internas",
+          external: "Integraciones externas (POST HTTP)",
+          legacy: "Legado",
+        },
+        types: {
+          flowbuilder: "Flowbuilder",
+          typebot: "Typebot",
+          n8n: "N8N",
+          webhook: "Webhook",
+          dialogflow: "Dialogflow (heredado)",
+        },
+        descriptions: {
+          flowbuilder: "Automatización interna con lógica y flujos personalizados",
+          typebot: "Chatbot conversacional integrado",
+          webhookN8n: "Envío de datos a sistemas externos (POST HTTP)",
+        },
+        alerts: {
+          externalPost:
+            "Esta integración envía datos a un sistema externo (POST), pero no recibe respuestas automáticamente ni cambia la atención según la respuesta HTTP. No responde sola al cliente en WhatsApp. Para automatización completa en el chat, use Flowbuilder o Typebot.",
+          internalHint:
+            "Esta opción participa en la conversa según el flujo o el bot configurado.",
+        },
         form: {
           id: "ID",
           type: "Tipo",
@@ -558,7 +611,12 @@ const messages = {
           projectName: "Nombre del Proyecto",
           language: "Lenguaje",
           jsonContent: "JsonContent",
+          legacyDialogflow: "Dialogflow (heredado)",
+          legacyDialogflowHint:
+            "Las integraciones Dialogflow ya no se configuran aquí. Cambie el tipo o edite solo el nombre.",
           urlN8N: "URL",
+          urlWebhookHelper:
+            "Envío por POST — la respuesta del servidor no vuelve automáticamente al ticket.",
           typebotSlug: "Typebot - Slug",
           typebotExpires: "Tiempo en minutos para expirar una conversación",
           typebotKeywordFinish: "Palabra para finalizar el ticket",
@@ -640,6 +698,10 @@ const messages = {
       },
       prompts: {
         title: "Prompts",
+        openAiHelp:
+          "Dónde actúa OpenAI: en la conexión WhatsApp (prompt vinculado), en la cola/sector (cuando el prompt del sector está activo) y en el flujo automatizado (nodo \"openai\" en Flow Builder). " +
+          "Cuándo responde: al recibir mensajes de texto (o audio, si está soportado) en el ticket, siempre que las reglas del bot y de la cola lo permitan. " +
+          "La respuesta usa el historial reciente de ese ticket y la instrucción de este registro — el contexto depende de lo ya intercambiado en la conversación.",
         table: {
           name: "Nombre",
           queue: "Sector/Cola",
@@ -659,12 +721,36 @@ const messages = {
           add: "Agregar contacto",
           edit: "Editar contacto",
         },
+        expectations:
+          "Atención e historial: no es embudo de ventas ni pipeline. Ideal para seguir conversaciones.",
+        summary: {
+          title: "Actividad e historial",
+          tickets: "Total de atenciones",
+          lastInteraction: "Última interacción",
+          lastMessage: "Último mensaje",
+        },
+        tags: {
+          added: "Etiqueta agregada",
+          removed: "Etiqueta eliminada",
+          helpFromTickets:
+            "Las etiquetas se basan en los tickets vinculados a este contacto. Para agregar o quitar, debe existir una conversación (abierta o cerrada).",
+        },
+        campaigns: {
+          title: "Campañas (listas)",
+          hint:
+            "Listas donde este número ya figura. Para añadirlo a otra lista, use la página de listas de campaña.",
+          empty: "Este número aún no está en ninguna lista.",
+          manageLists: "Gestionar listas de campaña",
+        },
         form: {
           mainInfo: "Datos del contacto",
           extraInfo: "Información adicional",
           name: "Nombre",
           number: "Número de WhatsApp",
           email: "Email",
+          notes: "Notas",
+          tags: "Etiquetas",
+          addTag: "Agregar etiqueta",
           extraName: "Nombre del campo",
           extraValue: "Valor",
           whatsapp: "Conexión Origen: ",
@@ -688,6 +774,7 @@ const messages = {
           okAdd: "Agregar",
           okEdit: "Guardar",
           cancel: "Cancelar",
+          openAttendance: "Abrir atención",
         },
         success: "Contacto guardado con éxito.",
       },
@@ -815,6 +902,22 @@ const messages = {
           fillTitle: "Por favor, complete el título de la conversación.",
           fillUser: "Por favor, seleccione al menos un usuario.",
         },
+        page: {
+          title: "Chat interno",
+          searchPlaceholder: "Buscar conversaciones...",
+          loadingMessages: "Cargando mensajes...",
+          loadingConversations: "Cargando conversaciones...",
+          messagePlaceholder: "Escriba su mensaje...",
+          emptyNoSearchTitle: "Sin resultados",
+          emptyNoSearchSub: "Pruebe otro término o borre la búsqueda.",
+          emptyNoConversationsTitle: "Aún no hay conversaciones",
+          emptyNoConversationsSub:
+            "Cree una conversación para empezar a mensajear con su equipo.",
+          emptySelectTitle: "Seleccione una conversación",
+          emptySelectSub: "Elija una de la lista para ver los mensajes.",
+          newConversationButton: "Nueva conversación",
+          tabsAria: "Conversaciones y mensajes",
+        },
         modal: {
           title: "Conversación",
           titleField: "Título",
@@ -934,29 +1037,49 @@ const messages = {
         button: "Visualizar",
       },
       mainDrawer: {
+        sections: {
+          dashboard: "Dashboard",
+          atendimento: "Atención",
+          equipe: "Equipo",
+          automacao: "Automatización",
+          campanhas: "Campañas",
+          financeiro: "Financiero",
+          configuracoes: "Configuración",
+          mais: "Más",
+        },
         listItems: {
           dashboard: "Dashboard",
           connections: "Conexiones",
           tickets: "Atenciones",
-          quickMessages: "Respuestas Rápidas",
+          quickMessages: "Respuestas rápidas",
           tasks: "Tareas",
           contacts: "Contactos",
           queues: "Colas & Chatbot",
+          sectors: "Sectores",
           tags: "Etiquetas",
           administration: "Administración",
           users: "Usuarios",
-          settings: "Configuraciones",
+          settings: "Configuración",
           helps: "Ayuda",
           messagesAPI: "API WhatsApp",
           schedules: "Programaciones",
           campaigns: "Campañas",
+          contactLists: "Listas de contactos",
+          campaignSettings: "Configuración",
           flows: "Flujos",
+          flowsChatbot: "Flujos (Chatbot)",
+          keywordsTrigger: "Disparadores por palabra clave",
+          integrations: "Integraciones",
+          reports: "Informes",
+          kanban: "Kanban",
+          groups: "Grupos",
+          evaluation: "Evaluación",
           annoucements: "Informativos",
-          chats: "Chat Interno",
-          financeiro: "Financiero",
+          chats: "Chat interno",
+          finance: "Financiero",
           files: "Lista de archivos",
-          prompts: "Open.AI",
-          queueIntegration: "Integraciones",
+          prompts: "OpenAI",
+          queueIntegration: "Automatizaciones por sector",
         },
         appBar: {
           refresh: "Recargar página",
@@ -979,10 +1102,17 @@ const messages = {
         },
       },
       queueIntegration: {
-        title: "Integraciones",
+        title: "Automatizaciones por sector",
+        pageSubtitle:
+          "Registros de integración vinculados a colas o a la conexión WhatsApp. Los tipos no se comportan igual: Webhook/N8N solo envían datos por POST; Flowbuilder y Typebot gestionan la conversación en la atención.",
+        pageIntro:
+          "Con Webhook o N8N, los datos se envían a un sistema externo, pero no se reciben respuestas automáticamente en la atención. Cree el registro aquí y vincúlelo en Colas (y opcionalmente en la conexión). Para respuestas automáticas al cliente en WhatsApp, use Flowbuilder o Typebot.",
         table: {
           id: "ID",
           type: "Tipo",
+          categoryInternal: "Interna",
+          categoryExternal: "Externa",
+          categoryLegacy: "Legado",
           name: "Nombre",
           projectName: "Nombre del Proyecto",
           language: "Lenguaje",
@@ -990,9 +1120,12 @@ const messages = {
           actions: "Acciones",
         },
         buttons: {
-          add: "Agregar Proyecto",
+          add: "Agregar automatización",
         },
         searchPlaceholder: "Buscar...",
+        toasts: {
+          deleted: "Automatización eliminada correctamente.",
+        },
         confirmationModal: {
           deleteTitle: "Eliminar",
           deleteMessage:
@@ -1460,10 +1593,29 @@ const messages = {
         },
       },
       todolist: {
-        input: "Nueva tarea",
+        pageTitle: "Lista personal (guardada en este navegador)",
+        pageSubtitle:
+          "Las notas quedan solo en este dispositivo: no se sincronizan con el servidor ni con otros usuarios.",
+        notice:
+          "Estas notas se guardan solo en este navegador y no se comparten con el equipo.",
+        emptyNoItems: "Aún no hay notas. Agregue una arriba.",
+        emptyFilter: "Ninguna nota coincide con este filtro.",
+        storageParseError:
+          "No se pudieron cargar sus notas. Se eliminaron datos inválidos.",
+        storageWriteError:
+          "No se pudo guardar (el almacenamiento del navegador puede estar lleno o bloqueado).",
+        input: "Nueva nota",
+        completedAria: "Marcar como hecha",
+        filter: {
+          label: "Mostrar:",
+          all: "Todas",
+          pending: "Pendientes",
+          completed: "Hechas",
+        },
         buttons: {
           add: "Agregar",
           save: "Guardar",
+          typeTask: "Escriba una nota para agregar",
         },
       },
       helps: {
@@ -1471,6 +1623,10 @@ const messages = {
       },
       evaluation: {
         title: "Evaluación",
+        flowInfo:
+          "Si la evaluación está activa en la configuración, al cerrar el ticket el cliente recibe en WhatsApp una solicitud de nota (escala 1 a 3). El ticket solo se finaliza después de que el cliente responda con 1, 2 o 3. Las respuestas inválidas se ignoran hasta recibir una nota válida.",
+        scaleHint: "Escala: 1 — Insatisfecho · 2 — Satisfecho · 3 — Muy satisfecho",
+        listHint: "Cada fila es una respuesta registrada; la nota refleja la opción elegida por el cliente en WhatsApp.",
         avgRating: "Evaluación Promedia",
         totalRatings: "Total de Evaluaciones",
         byAttendant: "Por Atendente",
@@ -1484,7 +1640,8 @@ const messages = {
           contact: "Contacto",
           attendant: "Atendente",
           setor: "Sector",
-          rating: "Evaluación",
+          rating: "Nota",
+          ratingSub: "1 a 3",
         },
       },
       schedules: {

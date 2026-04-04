@@ -1,10 +1,9 @@
 import React, { useContext, useEffect, useReducer, useState } from "react";
-import { Link as RouterLink, useHistory, useLocation } from "react-router-dom";
+import { Link as RouterLink, useLocation } from "react-router-dom";
 
 import ListItem from "@material-ui/core/ListItem";
 import ListItemIcon from "@material-ui/core/ListItemIcon";
 import ListItemText from "@material-ui/core/ListItemText";
-import ListSubheader from "@material-ui/core/ListSubheader";
 import Divider from "@material-ui/core/Divider";
 import { Badge, Collapse, List } from "@material-ui/core";
 import DashboardOutlinedIcon from "@material-ui/icons/DashboardOutlined";
@@ -28,22 +27,25 @@ import GroupIcon from "@material-ui/icons/Group";
 import ListIcon from "@material-ui/icons/ListAlt";
 import AnnouncementIcon from "@material-ui/icons/Announcement";
 import ForumIcon from "@material-ui/icons/Forum";
-import LocalAtmIcon from '@material-ui/icons/LocalAtm';
-import RotateRight from "@material-ui/icons/RotateRight";
+import LocalAtmIcon from "@material-ui/icons/LocalAtm";
+import MoreHorizIcon from "@material-ui/icons/MoreHoriz";
 import { i18n } from "../translate/i18n";
 import { WhatsAppsContext } from "../context/WhatsApp/WhatsAppsContext";
 import { AuthContext } from "../context/Auth/AuthContext";
-import LoyaltyRoundedIcon from '@material-ui/icons/LoyaltyRounded';
 import { Can } from "../components/Can";
 import { SocketContext } from "../context/Socket/SocketContext";
 import { isArray } from "lodash";
-import TableChartIcon from '@material-ui/icons/TableChart';
+import TableChartIcon from "@material-ui/icons/TableChart";
 import api from "../services/api";
-import BorderColorIcon from '@material-ui/icons/BorderColor';
-import ToDoList from "../pages/ToDoList/";
+import BorderColorIcon from "@material-ui/icons/BorderColor";
 import toastError from "../errors/toastError";
 import { makeStyles } from "@material-ui/core/styles";
-import { AccountTree, AllInclusive, AttachFile, BlurCircular, Chat, DeviceHubOutlined, Schedule } from '@material-ui/icons';
+import {
+  AccountTree,
+  AllInclusive,
+  AttachFile,
+  DeviceHubOutlined,
+} from "@material-ui/icons";
 import usePlans from "../hooks/usePlans";
 import Typography from "@material-ui/core/Typography";
 import { ShapeLine } from "@mui/icons-material";
@@ -51,12 +53,6 @@ import { ShapeLine } from "@mui/icons-material";
 const SIDEBAR_GREEN = "#24c776";
 
 const useStyles = makeStyles((theme) => ({
-  ListSubheader: {
-    height: 26,
-    marginTop: "-15px",
-    marginBottom: "-10px",
-    color: "rgba(0, 0, 0, 0.87)",
-  },
   listItemIcon: {
     color: SIDEBAR_GREEN,
     minWidth: 40,
@@ -81,9 +77,17 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
-
 function ListItemLink(props) {
-  const { icon, primary, to, className, listItemClassName, listItemIconClassName, listItemTextClassName, selected } = props;
+  const {
+    icon,
+    primary,
+    to,
+    className,
+    listItemClassName,
+    listItemIconClassName,
+    listItemTextClassName,
+    selected,
+  } = props;
 
   const renderLink = React.useMemo(
     () =>
@@ -102,7 +106,9 @@ function ListItemLink(props) {
         className={listItemClassName || className}
         selected={selected}
       >
-        {icon ? <ListItemIcon className={listItemIconClassName}>{icon}</ListItemIcon> : null}
+        {icon ? (
+          <ListItemIcon className={listItemIconClassName}>{icon}</ListItemIcon>
+        ) : null}
         <ListItemText primary={primary} className={listItemTextClassName} />
       </ListItem>
     </li>
@@ -169,29 +175,28 @@ const MainListItems = (props) => {
   const classes = useStyles();
   const { drawerClose, collapsed } = props;
   const { whatsApps } = useContext(WhatsAppsContext);
-  const { user, handleLogout } = useContext(AuthContext);
+  const { user } = useContext(AuthContext);
   const [connectionWarning, setConnectionWarning] = useState(false);
   const [openCampaignSubmenu, setOpenCampaignSubmenu] = useState(false);
   const [showCampaigns, setShowCampaigns] = useState(false);
   const [showKanban, setShowKanban] = useState(false);
   const [showOpenAi, setShowOpenAi] = useState(false);
-  const [showIntegrations, setShowIntegrations] = useState(false); const history = useHistory();
+  const [showIntegrations, setShowIntegrations] = useState(false);
   const [showSchedules, setShowSchedules] = useState(false);
-  const [showInternalChat, setShowInternalChat] = useState(false);
   const [showExternalApi, setShowExternalApi] = useState(false);
-
 
   const [invisible, setInvisible] = useState(true);
   const [pageNumber, setPageNumber] = useState(1);
   const [searchParam] = useState("");
   const [chats, dispatch] = useReducer(reducer, []);
   const { getPlanCompany } = usePlans();
-  
-  const [openFlowsSubmenu, setOpenFlowsSubmenu] = useState(false);
+
   const [openDashboardSubmenu, setOpenDashboardSubmenu] = useState(false);
-  const [openGestaoSubmenu, setOpenGestaoSubmenu] = useState(false);
-  const [openAdministracaoSubmenu, setOpenAdministracaoSubmenu] = useState(false);
-  const [openAjustesSubmenu, setOpenAjustesSubmenu] = useState(false);
+  const [openAtendimentoSubmenu, setOpenAtendimentoSubmenu] = useState(false);
+  const [openEquipeSubmenu, setOpenEquipeSubmenu] = useState(false);
+  const [openAutomacaoSubmenu, setOpenAutomacaoSubmenu] = useState(false);
+  const [openConfiguracoesSubmenu, setOpenConfiguracoesSubmenu] = useState(false);
+  const [openMaisSubmenu, setOpenMaisSubmenu] = useState(false);
   const location = useLocation();
 
   const socketManager = useContext(SocketContext);
@@ -203,61 +208,66 @@ const MainListItems = (props) => {
 
   useEffect(() => {
     const path = location.pathname;
-    const shouldOpen = path.startsWith("/chats") || [
-      "/",
-      "/contacts",
-      "/tags",
-      "/financeiro",
-      "/quick-messages",
+    const open =
+      path === "/tickets" ||
+      path.startsWith("/tickets/") ||
+      path === "/kanban" ||
+      path === "/contacts" ||
+      path === "/group-manager";
+    setOpenAtendimentoSubmenu(open);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const path = location.pathname;
+    const open =
+      path.startsWith("/chats") ||
+      path === "/users" ||
+      path === "/setores" ||
+      path === "/queues";
+    setOpenEquipeSubmenu(open);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const path = location.pathname;
+    const open =
+      path.startsWith("/flowbuilders") ||
+      path.startsWith("/flowbuilder/") ||
+      path.startsWith("/phrase-lists") ||
+      path === "/queue-integration" ||
+      path === "/prompts" ||
+      path === "/quick-messages";
+    setOpenAutomacaoSubmenu(open);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const path = location.pathname;
+    const open = ["/campaigns", "/contact-lists", "/campaigns-config", "/campaign"].some(
+      (p) => path === p || path.startsWith(p + "/")
+    );
+    setOpenCampaignSubmenu(open);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const path = location.pathname;
+    const open = ["/connections", "/messages-api", "/settings"].some(
+      (p) => path === p || path.startsWith(p + "/")
+    );
+    setOpenConfiguracoesSubmenu(open);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const path = location.pathname;
+    const open = [
       "/todolist",
       "/schedules",
       "/avaliacao",
-    ].some((p) => path === p || (p !== "/" && path.startsWith(p + "/")));
-    setOpenGestaoSubmenu(shouldOpen);
-  }, [location.pathname]);
-
-  useEffect(() => {
-    const path = location.pathname;
-    const shouldOpen = [
-      "/users",
-      "/messages-api",
-      "/queues",
-      "/setores",
-      "/financeiro",
-    ].includes(path);
-    setOpenAdministracaoSubmenu(shouldOpen);
-  }, [location.pathname]);
-
-  useEffect(() => {
-    const path = location.pathname;
-    const shouldOpen = [
-      "/prompts",
-      "/queue-integration",
-      "/settings",
-      "/connections",
+      "/announcements",
+      "/files",
+      "/helps",
+      "/tags",
     ].some((p) => path === p || path.startsWith(p + "/"));
-    setOpenAjustesSubmenu(shouldOpen);
+    setOpenMaisSubmenu(open);
   }, [location.pathname]);
-
-  useEffect(() => {
-    const path = location.pathname;
-    const shouldOpen = [
-      "/campaigns",
-      "/contact-lists",
-      "/campaigns-config",
-      "/campaign",
-    ].some((p) => path === p || path.startsWith(p + "/"));
-    setOpenCampaignSubmenu(shouldOpen);
-  }, [location.pathname]);
-
-  useEffect(() => {
-    const path = location.pathname;
-    const shouldOpen = path.startsWith("/phrase-lists") ||
-      path.startsWith("/flowbuilders") ||
-      path.startsWith("/flowbuilder/");
-    setOpenFlowsSubmenu(shouldOpen);
-  }, [location.pathname]);
- 
 
   useEffect(() => {
     dispatch({ type: "RESET" });
@@ -274,14 +284,11 @@ const MainListItems = (props) => {
       setShowOpenAi(planConfigs.plan.useOpenAi);
       setShowIntegrations(planConfigs.plan.useIntegrations);
       setShowSchedules(planConfigs.plan.useSchedules);
-      setShowInternalChat(planConfigs.plan.useInternalChat);
       setShowExternalApi(planConfigs.plan.useExternalApi);
     }
     fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
@@ -365,11 +372,6 @@ const MainListItems = (props) => {
     }
   };
 
-  const handleClickLogout = () => {
-    //handleCloseMenu();
-    handleLogout();
-  };
-
   return (
     <div onClick={drawerClose}>
       <Can
@@ -385,7 +387,10 @@ const MainListItems = (props) => {
               <ListItemIcon className={classes.listItemIcon}>
                 <DashboardOutlinedIcon />
               </ListItemIcon>
-              <ListItemText primary="Dashboard" className={classes.listItemText} />
+              <ListItemText
+                primary={i18n.t("mainDrawer.sections.dashboard")}
+                className={classes.listItemText}
+              />
               {openDashboardSubmenu ? (
                 <ExpandLessIcon style={{ color: SIDEBAR_GREEN }} />
               ) : (
@@ -405,7 +410,10 @@ const MainListItems = (props) => {
                   <ListItemIcon className={classes.listItemIcon}>
                     <DashboardOutlinedIcon />
                   </ListItemIcon>
-                  <ListItemText primary="Dashboard" className={classes.listItemText} />
+                  <ListItemText
+                    primary={i18n.t("mainDrawer.listItems.dashboard")}
+                    className={classes.listItemText}
+                  />
                 </ListItem>
                 <ListItem
                   button
@@ -418,7 +426,10 @@ const MainListItems = (props) => {
                   <ListItemIcon className={classes.listItemIcon}>
                     <DescriptionOutlinedIcon />
                   </ListItemIcon>
-                  <ListItemText primary="Relatórios Gerados" className={classes.listItemText} />
+                  <ListItemText
+                    primary={i18n.t("mainDrawer.listItems.reports")}
+                    className={classes.listItemText}
+                  />
                 </ListItem>
               </List>
             </Collapse>
@@ -426,81 +437,53 @@ const MainListItems = (props) => {
         )}
       />
 
-      <ListItemLink
-        to="/tickets"
-        primary={i18n.t("mainDrawer.listItems.tickets")}
-        icon={<WhatsAppIcon />}
-        listItemClassName={classes.listItem}
-        listItemIconClassName={classes.listItemIcon}
-        listItemTextClassName={classes.listItemText}
-        selected={location.pathname === "/tickets" || location.pathname.startsWith("/tickets/")}
-      />
-	{showKanban && (
-	  <ListItemLink
-        to="/kanban"
-        primary="Kanban"
-        icon={<TableChartIcon />}
-        listItemClassName={classes.listItem}
-        listItemIconClassName={classes.listItemIcon}
-        listItemTextClassName={classes.listItemText}
-        selected={location.pathname === "/kanban"}
-      />
-	)}
-
-
-      <ListItemLink
-        to="/chats"
-        primary={i18n.t("mainDrawer.listItems.chats")}
-        icon={
-          <Badge color="secondary" variant="dot" invisible={invisible}>
-            <ForumIcon />
-          </Badge>
-        }
-        listItemClassName={classes.listItem}
-        listItemIconClassName={classes.listItemIcon}
-        listItemTextClassName={classes.listItemText}
-        selected={location.pathname === "/chats" || location.pathname.startsWith("/chats/")}
-      />
-
-      <Can
-        role={user.profile}
-        perform="drawer-admin-items:view"
-        yes={() => (
-          <ListItemLink
-            to="/group-manager"
-            primary="Gestão de Grupos"
-            icon={<GroupIcon />}
-            listItemClassName={classes.listItem}
-            listItemIconClassName={classes.listItemIcon}
-            listItemTextClassName={classes.listItemText}
-            selected={location.pathname === "/group-manager"}
-          />
-        )}
-      />
-
       <ListItem
         button
-        onClick={() => setOpenGestaoSubmenu((prev) => !prev)}
+        onClick={() => setOpenAtendimentoSubmenu((prev) => !prev)}
         className={classes.listItem}
       >
         <ListItemIcon className={classes.listItemIcon}>
-          <SettingsOutlinedIcon />
+          <WhatsAppIcon />
         </ListItemIcon>
-        <ListItemText primary="Gestão" className={classes.listItemText} />
-        {openGestaoSubmenu ? (
+        <ListItemText
+          primary={i18n.t("mainDrawer.sections.atendimento")}
+          className={classes.listItemText}
+        />
+        {openAtendimentoSubmenu ? (
           <ExpandLessIcon style={{ color: SIDEBAR_GREEN }} />
         ) : (
           <ExpandMoreIcon style={{ color: SIDEBAR_GREEN }} />
         )}
       </ListItem>
-
       <Collapse
         style={{ paddingLeft: 15 }}
-        in={openGestaoSubmenu}
+        in={openAtendimentoSubmenu}
         timeout="auto"
         unmountOnExit
       >
         <List component="div" disablePadding>
+          <ListItemLink
+            to="/tickets"
+            primary={i18n.t("mainDrawer.listItems.tickets")}
+            icon={<WhatsAppIcon />}
+            listItemClassName={classes.listItem}
+            listItemIconClassName={classes.listItemIcon}
+            listItemTextClassName={classes.listItemText}
+            selected={
+              location.pathname === "/tickets" || location.pathname.startsWith("/tickets/")
+            }
+          />
+          {showKanban && (
+            <ListItemLink
+              to="/kanban"
+              primary={i18n.t("mainDrawer.listItems.kanban")}
+              icon={<TableChartIcon />}
+              listItemClassName={classes.listItem}
+              listItemIconClassName={classes.listItemIcon}
+              listItemTextClassName={classes.listItemText}
+              selected={location.pathname === "/kanban"}
+            />
+          )}
           <ListItem
             button
             dense
@@ -512,37 +495,218 @@ const MainListItems = (props) => {
             <ListItemIcon className={classes.listItemIcon}>
               <ContactPhoneOutlinedIcon />
             </ListItemIcon>
-            <ListItemText primary={i18n.t("mainDrawer.listItems.contacts")} className={classes.listItemText} />
+            <ListItemText
+              primary={i18n.t("mainDrawer.listItems.contacts")}
+              className={classes.listItemText}
+            />
           </ListItem>
+          <Can
+            role={user.profile}
+            perform="drawer-admin-items:view"
+            yes={() => (
+              <ListItemLink
+                to="/group-manager"
+                primary={i18n.t("mainDrawer.listItems.groups")}
+                icon={<GroupIcon />}
+                listItemClassName={classes.listItem}
+                listItemIconClassName={classes.listItemIcon}
+                listItemTextClassName={classes.listItemText}
+                selected={location.pathname === "/group-manager"}
+              />
+            )}
+          />
+        </List>
+      </Collapse>
 
-          <ListItem
-            button
-            dense
-            component={RouterLink}
-            to="/tags"
-            className={classes.listItem}
-            selected={location.pathname === "/tags"}
-          >
-            <ListItemIcon className={classes.listItemIcon}>
-              <LocalOfferIcon />
-            </ListItemIcon>
-            <ListItemText primary={i18n.t("mainDrawer.listItems.tags")} className={classes.listItemText} />
-          </ListItem>
+      <ListItem
+        button
+        onClick={() => setOpenEquipeSubmenu((prev) => !prev)}
+        className={classes.listItem}
+      >
+        <ListItemIcon className={classes.listItemIcon}>
+          <PeopleAltOutlinedIcon />
+        </ListItemIcon>
+        <ListItemText
+          primary={i18n.t("mainDrawer.sections.equipe")}
+          className={classes.listItemText}
+        />
+        {openEquipeSubmenu ? (
+          <ExpandLessIcon style={{ color: SIDEBAR_GREEN }} />
+        ) : (
+          <ExpandMoreIcon style={{ color: SIDEBAR_GREEN }} />
+        )}
+      </ListItem>
+      <Collapse
+        style={{ paddingLeft: 15 }}
+        in={openEquipeSubmenu}
+        timeout="auto"
+        unmountOnExit
+      >
+        <List component="div" disablePadding>
+          <ListItemLink
+            to="/chats"
+            primary={i18n.t("mainDrawer.listItems.chats")}
+            icon={
+              <Badge color="secondary" variant="dot" invisible={invisible}>
+                <ForumIcon />
+              </Badge>
+            }
+            listItemClassName={classes.listItem}
+            listItemIconClassName={classes.listItemIcon}
+            listItemTextClassName={classes.listItemText}
+            selected={location.pathname === "/chats" || location.pathname.startsWith("/chats/")}
+          />
+          <Can
+            role={user.profile}
+            perform="drawer-admin-items:view"
+            yes={() => (
+              <>
+                <ListItem
+                  button
+                  dense
+                  component={RouterLink}
+                  to="/users"
+                  className={classes.listItem}
+                  selected={location.pathname === "/users"}
+                >
+                  <ListItemIcon className={classes.listItemIcon}>
+                    <PeopleAltOutlinedIcon />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={i18n.t("mainDrawer.listItems.users")}
+                    className={classes.listItemText}
+                  />
+                </ListItem>
+                <ListItem
+                  button
+                  dense
+                  component={RouterLink}
+                  to="/setores"
+                  className={classes.listItem}
+                  selected={location.pathname === "/setores" || location.pathname === "/queues"}
+                >
+                  <ListItemIcon className={classes.listItemIcon}>
+                    <AccountTreeOutlinedIcon />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={i18n.t("mainDrawer.listItems.sectors")}
+                    className={classes.listItemText}
+                  />
+                </ListItem>
+              </>
+            )}
+          />
+        </List>
+      </Collapse>
 
-          <ListItem
-            button
-            dense
-            component={RouterLink}
-            to="/financeiro"
-            className={classes.listItem}
-            selected={location.pathname === "/financeiro"}
-          >
-            <ListItemIcon className={classes.listItemIcon}>
-              <LocalAtmIcon />
-            </ListItemIcon>
-            <ListItemText primary="Carteira de Clientes" className={classes.listItemText} />
-          </ListItem>
-
+      <ListItem
+        button
+        onClick={() => setOpenAutomacaoSubmenu((prev) => !prev)}
+        className={classes.listItem}
+      >
+        <ListItemIcon className={classes.listItemIcon}>
+          <AccountTree />
+        </ListItemIcon>
+        <ListItemText
+          primary={i18n.t("mainDrawer.sections.automacao")}
+          className={classes.listItemText}
+        />
+        {openAutomacaoSubmenu ? (
+          <ExpandLessIcon style={{ color: SIDEBAR_GREEN }} />
+        ) : (
+          <ExpandMoreIcon style={{ color: SIDEBAR_GREEN }} />
+        )}
+      </ListItem>
+      <Collapse
+        style={{ paddingLeft: 15 }}
+        in={openAutomacaoSubmenu}
+        timeout="auto"
+        unmountOnExit
+      >
+        <List component="div" disablePadding>
+          <Can
+            role={user.profile}
+            perform="drawer-admin-items:view"
+            yes={() => (
+              <>
+                {showCampaigns && (
+                  <>
+                    <ListItem
+                      button
+                      dense
+                      component={RouterLink}
+                      to="/flowbuilders"
+                      className={classes.listItem}
+                      selected={
+                        location.pathname === "/flowbuilders" ||
+                        location.pathname.startsWith("/flowbuilder/")
+                      }
+                    >
+                      <ListItemIcon className={classes.listItemIcon}>
+                        <ShapeLine />
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={i18n.t("mainDrawer.listItems.flowsChatbot")}
+                        className={classes.listItemText}
+                      />
+                    </ListItem>
+                    <ListItem
+                      button
+                      dense
+                      component={RouterLink}
+                      to="/phrase-lists"
+                      className={classes.listItem}
+                      selected={location.pathname === "/phrase-lists"}
+                    >
+                      <ListItemIcon className={classes.listItemIcon}>
+                        <EventAvailableIcon />
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={i18n.t("mainDrawer.listItems.keywordsTrigger")}
+                        className={classes.listItemText}
+                      />
+                    </ListItem>
+                  </>
+                )}
+                {showIntegrations && (
+                  <ListItem
+                    button
+                    dense
+                    component={RouterLink}
+                    to="/queue-integration"
+                    className={classes.listItem}
+                    selected={location.pathname === "/queue-integration"}
+                  >
+                    <ListItemIcon className={classes.listItemIcon}>
+                      <DeviceHubOutlined />
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={i18n.t("mainDrawer.listItems.integrations")}
+                      className={classes.listItemText}
+                    />
+                  </ListItem>
+                )}
+                {showOpenAi && (
+                  <ListItem
+                    button
+                    dense
+                    component={RouterLink}
+                    to="/prompts"
+                    className={classes.listItem}
+                    selected={location.pathname === "/prompts"}
+                  >
+                    <ListItemIcon className={classes.listItemIcon}>
+                      <AllInclusive />
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={i18n.t("mainDrawer.listItems.prompts")}
+                      className={classes.listItemText}
+                    />
+                  </ListItem>
+                )}
+              </>
+            )}
+          />
           <ListItem
             button
             dense
@@ -559,228 +723,8 @@ const MainListItems = (props) => {
               className={classes.listItemText}
             />
           </ListItem>
-
-          <ListItem
-            button
-            dense
-            component={RouterLink}
-            to="/todolist"
-            className={classes.listItem}
-            selected={location.pathname === "/todolist"}
-          >
-            <ListItemIcon className={classes.listItemIcon}>
-              <BorderColorIcon />
-            </ListItemIcon>
-            <ListItemText primary={i18n.t("mainDrawer.listItems.tasks")} className={classes.listItemText} />
-          </ListItem>
-
-          <ListItem
-            button
-            dense
-            component={RouterLink}
-            to="/schedules"
-            className={classes.listItem}
-            selected={location.pathname === "/schedules"}
-          >
-            <ListItemIcon className={classes.listItemIcon}>
-              <EventIcon />
-            </ListItemIcon>
-            <ListItemText primary={i18n.t("mainDrawer.listItems.schedules")} className={classes.listItemText} />
-          </ListItem>
-
-          <ListItem
-            button
-            dense
-            component={RouterLink}
-            to="/avaliacao"
-            className={classes.listItem}
-            selected={location.pathname === "/avaliacao"}
-          >
-            <ListItemIcon className={classes.listItemIcon}>
-              <DashboardOutlinedIcon />
-            </ListItemIcon>
-            <ListItemText primary="Avaliação" className={classes.listItemText} />
-          </ListItem>
         </List>
       </Collapse>
-
-      <Can
-        role={user.profile}
-        perform="drawer-admin-items:view"
-        yes={() => (
-          <>
-            <ListItem
-              button
-              onClick={() => setOpenAdministracaoSubmenu((prev) => !prev)}
-              className={classes.listItem}
-            >
-              <ListItemIcon className={classes.listItemIcon}>
-                <SettingsOutlinedIcon />
-              </ListItemIcon>
-              <ListItemText primary="Administração" className={classes.listItemText} />
-              {openAdministracaoSubmenu ? (
-                <ExpandLessIcon style={{ color: SIDEBAR_GREEN }} />
-              ) : (
-                <ExpandMoreIcon style={{ color: SIDEBAR_GREEN }} />
-              )}
-            </ListItem>
-
-            <Collapse
-              style={{ paddingLeft: 15 }}
-              in={openAdministracaoSubmenu}
-              timeout="auto"
-              unmountOnExit
-            >
-              <List component="div" disablePadding>
-                <ListItem
-                  button
-                  dense
-                  component={RouterLink}
-                  to="/users"
-                  className={classes.listItem}
-                  selected={location.pathname === "/users"}
-                >
-                  <ListItemIcon className={classes.listItemIcon}>
-                    <PeopleAltOutlinedIcon />
-                  </ListItemIcon>
-                  <ListItemText primary={i18n.t("mainDrawer.listItems.users")} className={classes.listItemText} />
-                </ListItem>
-
-                {showExternalApi && (
-                  <ListItem
-                    button
-                    dense
-                    component={RouterLink}
-                    to="/messages-api"
-                    className={classes.listItem}
-                    selected={location.pathname === "/messages-api"}
-                  >
-                    <ListItemIcon className={classes.listItemIcon}>
-                      <CodeRoundedIcon />
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={i18n.t("mainDrawer.listItems.messagesAPI")}
-                      className={classes.listItemText}
-                    />
-                  </ListItem>
-                )}
-
-                <ListItem
-                  button
-                  dense
-                  component={RouterLink}
-                  to="/setores"
-                  className={classes.listItem}
-                  selected={location.pathname === "/setores" || location.pathname === "/queues"}
-                >
-                  <ListItemIcon className={classes.listItemIcon}>
-                    <AccountTreeOutlinedIcon />
-                  </ListItemIcon>
-                  <ListItemText primary="Setores" className={classes.listItemText} />
-                </ListItem>
-
-                <ListItem
-                  button
-                  dense
-                  component={RouterLink}
-                  to="/financeiro"
-                  className={classes.listItem}
-                  selected={location.pathname === "/financeiro"}
-                >
-                  <ListItemIcon className={classes.listItemIcon}>
-                    <LocalAtmIcon />
-                  </ListItemIcon>
-                  <ListItemText primary="Financeiro" className={classes.listItemText} />
-                </ListItem>
-              </List>
-            </Collapse>
-
-            <ListItem
-              button
-              onClick={() => setOpenAjustesSubmenu((prev) => !prev)}
-              className={classes.listItem}
-            >
-              <ListItemIcon className={classes.listItemIcon}>
-                <SettingsOutlinedIcon />
-              </ListItemIcon>
-              <ListItemText primary="Ajustes" className={classes.listItemText} />
-              {openAjustesSubmenu ? (
-                <ExpandLessIcon style={{ color: SIDEBAR_GREEN }} />
-              ) : (
-                <ExpandMoreIcon style={{ color: SIDEBAR_GREEN }} />
-              )}
-            </ListItem>
-
-            <Collapse
-              style={{ paddingLeft: 15 }}
-              in={openAjustesSubmenu}
-              timeout="auto"
-              unmountOnExit
-            >
-              <List component="div" disablePadding>
-                {showOpenAi && (
-                  <ListItem
-                    button
-                    dense
-                    component={RouterLink}
-                    to="/prompts"
-                    className={classes.listItem}
-                    selected={location.pathname === "/prompts"}
-                  >
-                    <ListItemIcon className={classes.listItemIcon}>
-                      <AllInclusive />
-                    </ListItemIcon>
-                    <ListItemText primary="OPEN.AI" className={classes.listItemText} />
-                  </ListItem>
-                )}
-                {showIntegrations && (
-                  <ListItem
-                    button
-                    dense
-                    component={RouterLink}
-                    to="/queue-integration"
-                    className={classes.listItem}
-                    selected={location.pathname === "/queue-integration"}
-                  >
-                    <ListItemIcon className={classes.listItemIcon}>
-                      <DeviceHubOutlined />
-                    </ListItemIcon>
-                    <ListItemText primary="Integrações" className={classes.listItemText} />
-                  </ListItem>
-                )}
-                <ListItem
-                  button
-                  dense
-                  component={RouterLink}
-                  to="/settings"
-                  className={classes.listItem}
-                  selected={location.pathname === "/settings"}
-                >
-                  <ListItemIcon className={classes.listItemIcon}>
-                    <SettingsOutlinedIcon />
-                  </ListItemIcon>
-                  <ListItemText primary="Configurações" className={classes.listItemText} />
-                </ListItem>
-                <ListItem
-                  button
-                  dense
-                  component={RouterLink}
-                  to="/connections"
-                  className={classes.listItem}
-                  selected={location.pathname === "/connections"}
-                >
-                  <ListItemIcon className={classes.listItemIcon}>
-                    <Badge badgeContent={connectionWarning ? "!" : 0} color="error">
-                      <SyncAltIcon />
-                    </Badge>
-                  </ListItemIcon>
-                  <ListItemText primary="Conexões" className={classes.listItemText} />
-                </ListItem>
-              </List>
-            </Collapse>
-          </>
-        )}
-      />
 
       <Can
         role={user.profile}
@@ -798,7 +742,7 @@ const MainListItems = (props) => {
                     <EventAvailableIcon />
                   </ListItemIcon>
                   <ListItemText
-                    primary={i18n.t("mainDrawer.listItems.campaigns")}
+                    primary={i18n.t("mainDrawer.sections.campanhas")}
                     className={classes.listItemText}
                   />
                   {openCampaignSubmenu ? (
@@ -822,8 +766,13 @@ const MainListItems = (props) => {
                       className={classes.listItem}
                       selected={location.pathname === "/campaigns"}
                     >
-                      <ListItemIcon className={classes.listItemIcon}><ListIcon /></ListItemIcon>
-                      <ListItemText primary="Listagem" className={classes.listItemText} />
+                      <ListItemIcon className={classes.listItemIcon}>
+                        <ListIcon />
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={i18n.t("mainDrawer.listItems.campaigns")}
+                        className={classes.listItemText}
+                      />
                     </ListItem>
                     <ListItem
                       button
@@ -831,10 +780,18 @@ const MainListItems = (props) => {
                       component={RouterLink}
                       to="/contact-lists"
                       className={classes.listItem}
-                      selected={location.pathname === "/contact-lists" || location.pathname.startsWith("/contact-lists/")}
+                      selected={
+                        location.pathname === "/contact-lists" ||
+                        location.pathname.startsWith("/contact-lists/")
+                      }
                     >
-                      <ListItemIcon className={classes.listItemIcon}><PeopleIcon /></ListItemIcon>
-                      <ListItemText primary="Listas de Contatos" className={classes.listItemText} />
+                      <ListItemIcon className={classes.listItemIcon}>
+                        <PeopleIcon />
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={i18n.t("mainDrawer.listItems.contactLists")}
+                        className={classes.listItemText}
+                      />
                     </ListItem>
                     <ListItem
                       button
@@ -844,86 +801,247 @@ const MainListItems = (props) => {
                       className={classes.listItem}
                       selected={location.pathname === "/campaigns-config"}
                     >
-                      <ListItemIcon className={classes.listItemIcon}><SettingsOutlinedIcon /></ListItemIcon>
-                      <ListItemText primary="Configurações" className={classes.listItemText} />
-                    </ListItem>
-                  </List>
-                </Collapse>
-                <ListItem button onClick={() => setOpenFlowsSubmenu((prev) => !prev)} className={classes.listItem}>
-                  <ListItemIcon className={classes.listItemIcon}><AccountTree /></ListItemIcon>
-                  <ListItemText primary={i18n.t("mainDrawer.listItems.flows")} className={classes.listItemText} />
-                  {openFlowsSubmenu ? <ExpandLessIcon style={{ color: SIDEBAR_GREEN }} /> : <ExpandMoreIcon style={{ color: SIDEBAR_GREEN }} />}
-                </ListItem>
-                <Collapse style={{ paddingLeft: 15 }} in={openFlowsSubmenu} timeout="auto" unmountOnExit>
-                  <List component="div" disablePadding>
-                    <ListItem
-                      button
-                      dense
-                      component={RouterLink}
-                      to="/phrase-lists"
-                      className={classes.listItem}
-                      selected={location.pathname === "/phrase-lists"}
-                    >
-                      <ListItemIcon className={classes.listItemIcon}><EventAvailableIcon /></ListItemIcon>
-                      <ListItemText primary="Campanha" className={classes.listItemText} />
-                    </ListItem>
-                    <ListItem
-                      button
-                      dense
-                      component={RouterLink}
-                      to="/flowbuilders"
-                      className={classes.listItem}
-                      selected={location.pathname === "/flowbuilders" || location.pathname.startsWith("/flowbuilder/")}
-                    >
-                      <ListItemIcon className={classes.listItemIcon}><ShapeLine /></ListItemIcon>
-                      <ListItemText primary="Chatbot" className={classes.listItemText} />
+                      <ListItemIcon className={classes.listItemIcon}>
+                        <SettingsOutlinedIcon />
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={i18n.t("mainDrawer.listItems.campaignSettings")}
+                        className={classes.listItemText}
+                      />
                     </ListItem>
                   </List>
                 </Collapse>
               </>
             )}
 
-            {user.super && (
-              <ListItemLink
-                to="/announcements"
-                primary={i18n.t("mainDrawer.listItems.annoucements")}
-                icon={<AnnouncementIcon />}
-                listItemClassName={classes.listItem}
-                listItemIconClassName={classes.listItemIcon}
-                listItemTextClassName={classes.listItemText}
-                selected={location.pathname === "/announcements"}
-              />
-            )}
             <ListItemLink
-              to="/files"
-              primary={i18n.t("mainDrawer.listItems.files")}
-              icon={<AttachFile />}
+              to="/financeiro"
+              primary={i18n.t("mainDrawer.sections.financeiro")}
+              icon={<LocalAtmIcon />}
               listItemClassName={classes.listItem}
               listItemIconClassName={classes.listItemIcon}
               listItemTextClassName={classes.listItemText}
-              selected={location.pathname === "/files"}
+              selected={location.pathname === "/financeiro"}
             />
 
-            {!collapsed && <React.Fragment>
-              <Divider />
-              <Typography style={{ fontSize: "12px", padding: "10px", textAlign: "right", fontWeight: "bold" }}>
-                8.0.1
-              </Typography>
-            </React.Fragment>
-            }
+            <ListItem
+              button
+              onClick={() => setOpenConfiguracoesSubmenu((prev) => !prev)}
+              className={classes.listItem}
+            >
+              <ListItemIcon className={classes.listItemIcon}>
+                <SettingsOutlinedIcon />
+              </ListItemIcon>
+              <ListItemText
+                primary={i18n.t("mainDrawer.sections.configuracoes")}
+                className={classes.listItemText}
+              />
+              {openConfiguracoesSubmenu ? (
+                <ExpandLessIcon style={{ color: SIDEBAR_GREEN }} />
+              ) : (
+                <ExpandMoreIcon style={{ color: SIDEBAR_GREEN }} />
+              )}
+            </ListItem>
+            <Collapse
+              style={{ paddingLeft: 15 }}
+              in={openConfiguracoesSubmenu}
+              timeout="auto"
+              unmountOnExit
+            >
+              <List component="div" disablePadding>
+                <ListItem
+                  button
+                  dense
+                  component={RouterLink}
+                  to="/connections"
+                  className={classes.listItem}
+                  selected={location.pathname === "/connections"}
+                >
+                  <ListItemIcon className={classes.listItemIcon}>
+                    <Badge badgeContent={connectionWarning ? "!" : 0} color="error">
+                      <SyncAltIcon />
+                    </Badge>
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={i18n.t("mainDrawer.listItems.connections")}
+                    className={classes.listItemText}
+                  />
+                </ListItem>
+                {showExternalApi && (
+                  <ListItem
+                    button
+                    dense
+                    component={RouterLink}
+                    to="/messages-api"
+                    className={classes.listItem}
+                    selected={location.pathname === "/messages-api"}
+                  >
+                    <ListItemIcon className={classes.listItemIcon}>
+                      <CodeRoundedIcon />
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={i18n.t("mainDrawer.listItems.messagesAPI")}
+                      className={classes.listItemText}
+                    />
+                  </ListItem>
+                )}
+                <ListItem
+                  button
+                  dense
+                  component={RouterLink}
+                  to="/settings"
+                  className={classes.listItem}
+                  selected={location.pathname === "/settings"}
+                >
+                  <ListItemIcon className={classes.listItemIcon}>
+                    <SettingsOutlinedIcon />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={i18n.t("mainDrawer.listItems.settings")}
+                    className={classes.listItemText}
+                  />
+                </ListItem>
+              </List>
+            </Collapse>
           </>
         )}
       />
 
-      <ListItemLink
-        to="/helps"
-        primary={i18n.t("mainDrawer.listItems.helps")}
-        icon={<HelpOutlineIcon />}
-        listItemClassName={classes.listItem}
-        listItemIconClassName={classes.listItemIcon}
-        listItemTextClassName={classes.listItemText}
-        selected={location.pathname === "/helps"}
-      />
+      <ListItem
+        button
+        onClick={() => setOpenMaisSubmenu((prev) => !prev)}
+        className={classes.listItem}
+      >
+        <ListItemIcon className={classes.listItemIcon}>
+          <MoreHorizIcon />
+        </ListItemIcon>
+        <ListItemText
+          primary={i18n.t("mainDrawer.sections.mais")}
+          className={classes.listItemText}
+        />
+        {openMaisSubmenu ? (
+          <ExpandLessIcon style={{ color: SIDEBAR_GREEN }} />
+        ) : (
+          <ExpandMoreIcon style={{ color: SIDEBAR_GREEN }} />
+        )}
+      </ListItem>
+      <Collapse
+        style={{ paddingLeft: 15 }}
+        in={openMaisSubmenu}
+        timeout="auto"
+        unmountOnExit
+      >
+        <List component="div" disablePadding>
+          <ListItem
+            button
+            dense
+            component={RouterLink}
+            to="/todolist"
+            className={classes.listItem}
+            selected={location.pathname === "/todolist"}
+          >
+            <ListItemIcon className={classes.listItemIcon}>
+              <BorderColorIcon />
+            </ListItemIcon>
+            <ListItemText
+              primary={i18n.t("mainDrawer.listItems.tasks")}
+              className={classes.listItemText}
+            />
+          </ListItem>
+          {showSchedules && (
+            <ListItem
+              button
+              dense
+              component={RouterLink}
+              to="/schedules"
+              className={classes.listItem}
+              selected={location.pathname === "/schedules"}
+            >
+              <ListItemIcon className={classes.listItemIcon}>
+                <EventIcon />
+              </ListItemIcon>
+              <ListItemText
+                primary={i18n.t("mainDrawer.listItems.schedules")}
+                className={classes.listItemText}
+              />
+            </ListItem>
+          )}
+          <ListItem
+            button
+            dense
+            component={RouterLink}
+            to="/avaliacao"
+            className={classes.listItem}
+            selected={location.pathname === "/avaliacao"}
+          >
+            <ListItemIcon className={classes.listItemIcon}>
+              <DashboardOutlinedIcon />
+            </ListItemIcon>
+            <ListItemText
+              primary={i18n.t("mainDrawer.listItems.evaluation")}
+              className={classes.listItemText}
+            />
+          </ListItem>
+          {user.super && (
+            <ListItemLink
+              to="/announcements"
+              primary={i18n.t("mainDrawer.listItems.annoucements")}
+              icon={<AnnouncementIcon />}
+              listItemClassName={classes.listItem}
+              listItemIconClassName={classes.listItemIcon}
+              listItemTextClassName={classes.listItemText}
+              selected={location.pathname === "/announcements"}
+            />
+          )}
+          <ListItemLink
+            to="/files"
+            primary={i18n.t("mainDrawer.listItems.files")}
+            icon={<AttachFile />}
+            listItemClassName={classes.listItem}
+            listItemIconClassName={classes.listItemIcon}
+            listItemTextClassName={classes.listItemText}
+            selected={location.pathname === "/files"}
+          />
+          <ListItem
+            button
+            dense
+            component={RouterLink}
+            to="/tags"
+            className={classes.listItem}
+            selected={location.pathname === "/tags"}
+          >
+            <ListItemIcon className={classes.listItemIcon}>
+              <LocalOfferIcon />
+            </ListItemIcon>
+            <ListItemText primary={i18n.t("mainDrawer.listItems.tags")} className={classes.listItemText} />
+          </ListItem>
+          <ListItemLink
+            to="/helps"
+            primary={i18n.t("mainDrawer.listItems.helps")}
+            icon={<HelpOutlineIcon />}
+            listItemClassName={classes.listItem}
+            listItemIconClassName={classes.listItemIcon}
+            listItemTextClassName={classes.listItemText}
+            selected={location.pathname === "/helps"}
+          />
+        </List>
+      </Collapse>
+
+      {!collapsed && (
+        <React.Fragment>
+          <Divider />
+          <Typography
+            style={{
+              fontSize: "12px",
+              padding: "10px",
+              textAlign: "right",
+              fontWeight: "bold",
+            }}
+          >
+            8.0.1
+          </Typography>
+        </React.Fragment>
+      )}
     </div>
   );
 };

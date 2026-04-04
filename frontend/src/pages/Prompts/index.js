@@ -1,6 +1,7 @@
 import React, { useContext, useEffect, useReducer, useState } from "react";
 
 import {
+  Box,
   Button,
   IconButton,
   Paper,
@@ -9,7 +10,7 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  Typography // Importar Typography do Material-UI
+  Typography,
 } from "@material-ui/core";
 
 import { makeStyles } from "@material-ui/core/styles";
@@ -42,12 +43,6 @@ const useStyles = makeStyles((theme) => ({
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-  },
-  // Adicione um estilo para a box vermelha
-  redBox: {
-    backgroundColor: "#ffcccc", // Definindo a cor de fundo vermelha
-    padding: theme.spacing(2), // Adicionando um espaçamento interno
-    marginBottom: theme.spacing(2), // Adicionando margem inferior para separar do conteúdo abaixo
   },
 }));
 
@@ -143,19 +138,21 @@ const Prompts = () => {
 
   useEffect(() => {
     const socket = socketManager.getSocket(companyId);
+    const eventName = `company-${companyId}-prompt`;
 
-    socket.on(`company-${companyId}-prompt`, (data) => {
+    const onPromptSocket = (data) => {
       if (data.action === "update" || data.action === "create") {
         dispatch({ type: "UPDATE_PROMPTS", payload: data.prompt });
       }
-
-      if (data.action === "delete") {
+      if (data.action === "delete" && data.promptId != null) {
         dispatch({ type: "DELETE_PROMPT", payload: data.promptId });
       }
-    });
+    };
+
+    socket.on(eventName, onPromptSocket);
 
     return () => {
-      socket.disconnect();
+      socket.off(eventName, onPromptSocket);
     };
   }, [companyId, socketManager]);
 
@@ -230,6 +227,11 @@ const Prompts = () => {
           </Button>
         </MainHeaderButtonsWrapper>
       </MainHeader>
+      <Box p={1} mb={1} maxWidth={960}>
+        <Typography variant="body2" color="textSecondary" component="div">
+          {i18n.t("prompts.openAiHelp")}
+        </Typography>
+      </Box>
       <Paper className={classes.mainPaper} variant="outlined">
         <Table size="small">
           <TableHead>

@@ -477,6 +477,7 @@ export const ActionsWebhookService = async (
         let {
           name,
           prompt,
+          model,
           voice,
           voiceKey,
           voiceRegion,
@@ -490,14 +491,15 @@ export const ActionsWebhookService = async (
         let openAiSettings = {
           name,
           prompt,
+          model: model && String(model).trim() ? String(model).trim() : undefined,
           voice,
           voiceKey,
           voiceRegion,
-          maxTokens: parseInt(maxTokens),
-          temperature: parseInt(temperature),
+          maxTokens: parseInt(String(maxTokens), 10) || 100,
+          temperature: parseFloat(String(temperature ?? "1")) || 1,
           apiKey,
-          queueId: parseInt(queueId),
-          maxMessages: parseInt(maxMessages)
+          queueId: parseInt(String(queueId), 10),
+          maxMessages: parseInt(String(maxMessages), 10) || 10
         };
 
         const contact = await Contact.findOne({

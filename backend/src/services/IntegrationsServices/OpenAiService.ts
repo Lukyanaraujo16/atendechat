@@ -8,18 +8,21 @@ import {
   verifyMessage
 } from "../WbotServices/wbotMessageListener";
 
-import { isNil, isNull } from "lodash";
-
 import fs from "fs";
-import path, { join } from "path";
+import path from "path";
 
-import OpenAI, {Configuration, OpenAIApi} from "openai";
+import {
+  canMakeOpenAiCalls,
+  executeOpenAi,
+  executeOpenAiTranscription,
+  OPENAI_FALLBACK_CLIENT_MESSAGE,
+  resolveOpenAiModel
+} from "../OpenAi/OpenAiManager";
+import { buildOpenAiSystemPromptContent } from "../OpenAi/openAiPromptHelpers";
 import Ticket from "../../models/Ticket";
 import Contact from "../../models/Contact";
 import Message from "../../models/Message";
 import TicketTraking from "../../models/TicketTraking";
-import ShowWhatsAppService from "../WhatsappService/ShowWhatsAppService";
-import Whatsapp from "../../models/Whatsapp";
 import { logger } from "../../utils/logger";
 
 type Session = WASocket & {
@@ -36,14 +39,11 @@ interface IMe {
   id: string;
 }
 
-interface SessionOpenAi extends OpenAIApi {
-  id?: number;
-}
-const sessionsOpenAi: SessionOpenAi[] = [];
-
 interface IOpenAi {
   name: string;
   prompt: string;
+  /** Definido no nó Flow (FlowBuilder); fallback via resolveOpenAiModel. */
+  model?: string;
   voice: string;
   voiceKey: string;
   voiceRegion: string;
@@ -62,12 +62,10 @@ const deleteFileSync = (path: string): void => {
   }
 };
 
-const sanitizeName = (name: string): string => {
-  let sanitized = name.split(" ")[0];
-  sanitized = sanitized.replace(/[^a-zA-Z0-9]/g, "");
-  return sanitized.substring(0, 60);
-};
-
+/**
+ * OpenAI acionada pelo Webhook/FlowBuilder (`ActionsWebhookService`, nó `openai`).
+ * Mesmo texto de sistema que o listener; modelo via `resolveOpenAiModel(openAiSettings.model)`.
+ */
 export const handleOpenAi = async (
   openAiSettings: IOpenAi,
   msg: proto.IWebMessageInfo,
@@ -84,7 +82,6 @@ export const handleOpenAi = async (
 
   const bodyMessage = getBodyMessage(msg);
   if (!bodyMessage) return;
-  // console.log("GETTING WHATSAPP HANDLE OPENAI", ticket.whatsappId, ticket.id)
 
   if (!openAiSettings) return;
 
@@ -99,45 +96,32 @@ export const handleOpenAi = async (
     `company${ticket.companyId}`
   );
 
-  let openai: OpenAIApi | any;
-  const openAiIndex = sessionsOpenAi.findIndex(s => s.id === ticket.id);
-
-  if (openAiIndex === -1) {
-    const configuration = new Configuration({
-      apiKey: openAiSettings.apiKey
-    });
-    openai = new OpenAIApi(configuration);
-    openai.id = ticket.id;
-    sessionsOpenAi.push(openai);
-  } else {
-    openai = sessionsOpenAi[openAiIndex];
-  }
-
-  const messages = await Message.findAll({
+  const messagesDesc = await Message.findAll({
     where: { ticketId: ticket.id },
-    order: [["createdAt", "ASC"]],
+    order: [["createdAt", "DESC"]],
     limit: openAiSettings.maxMessages
   });
+  /** Últimas N mensagens do ticket, em ordem cronológica (mais antiga → mais recente). */
+  const chronologicalMessages = [...messagesDesc].reverse();
 
-  const promptSystem = `Nas respostas utilize o nome ${sanitizeName(
-    contact.name || "Amigo(a)"
-  )} para identificar o cliente.\nSua resposta deve usar no máximo ${
-    openAiSettings.maxTokens
-  } tokens e cuide para não truncar o final.\nSempre que possível, mencione o nome dele para ser mais personalizado o atendimento e mais educado. Quando a resposta requer uma transferência para o setor de atendimento, comece sua resposta com 'Ação: Transferir para o setor de atendimento'.\n
-                ${openAiSettings.prompt}\n`;
+  const promptSystem = buildOpenAiSystemPromptContent({
+    contactDisplayName: contact.name || "Amigo(a)",
+    maxTokens: openAiSettings.maxTokens,
+    instructionPrompt: openAiSettings.prompt
+  });
+  const resolvedModel = resolveOpenAiModel(openAiSettings.model);
 
   let messagesOpenAi = [];
 
   if (msg.message?.conversation || msg.message?.extendedTextMessage?.text) {
-    console.log(135, "OpenAiService");
     messagesOpenAi = [];
     messagesOpenAi.push({ role: "system", content: promptSystem });
     for (
       let i = 0;
-      i < Math.min(openAiSettings.maxMessages, messages.length);
+      i < Math.min(openAiSettings.maxMessages, chronologicalMessages.length);
       i++
     ) {
-      const message = messages[i];
+      const message = chronologicalMessages[i];
       if (
         message.mediaType === "conversation" ||
         message.mediaType === "extendedTextMessage"
@@ -151,19 +135,34 @@ export const handleOpenAi = async (
     }
     messagesOpenAi.push({ role: "user", content: bodyMessage! });
 
-    console.log(156, "OpenAiService");
-
-    const chat = await openai.createChatCompletion({
-      model: "gpt-3.5-turbo-1106",
+    const chatResult = await executeOpenAi({
+      companyId: ticket.companyId,
+      ticketId: ticket.id,
+      apiKey: openAiSettings.apiKey,
       messages: messagesOpenAi,
-      max_tokens: openAiSettings.maxTokens,
+      model: resolvedModel,
+      maxTokens: openAiSettings.maxTokens,
       temperature: openAiSettings.temperature
     });
+    if (chatResult.ok === false) {
+      logger.warn(
+        {
+          ticketId: ticket.id,
+          companyId: ticket.companyId,
+          error: chatResult.error
+        },
+        "[OpenAiService] fallback ao cliente (chat)"
+      );
+      const sentFallback = await wbot.sendMessage(msg.key.remoteJid!, {
+        text: `\u200e ${OPENAI_FALLBACK_CLIENT_MESSAGE}`
+      });
+      await verifyMessage(sentFallback!, ticket, contact);
+      return;
+    }
 
-    let response = chat.data.choices[0].message?.content;
+    let response = chatResult.content;
 
     if (response?.includes("Ação: Transferir para o setor de atendimento")) {
-      console.log(166, "OpenAiService");
       await transferQueue(openAiSettings.queueId, ticket, contact);
       response = response
         .replace("Ação: Transferir para o setor de atendimento", "")
@@ -171,15 +170,12 @@ export const handleOpenAi = async (
     }
 
     if (openAiSettings.voice === "texto") {
-      console.log(173, "OpenAiService");
-      logger.info(chat.data.choices[0].message);
       logger.info(response);
       const sentMessage = await wbot.sendMessage(msg.key.remoteJid!, {
         text: `\u200e ${response!}`
       });
       await verifyMessage(sentMessage!, ticket, contact);
     } else {
-      console.log(179, "OpenAiService");
       const fileNameWithOutExtension = `${ticket.id}_${Date.now()}`;
       convertTextToSpeechAndSaveToFile(
         keepOnlySpecifiedChars(response!),
@@ -190,7 +186,6 @@ export const handleOpenAi = async (
         "mp3"
       ).then(async () => {
         try {
-          console.log(194, "OpenAiService");
           const sendMessage = await wbot.sendMessage(msg.key.remoteJid!, {
             audio: { url: `${publicFolder}/${fileNameWithOutExtension}.mp3` },
             mimetype: "audio/mpeg",
@@ -208,34 +203,60 @@ export const handleOpenAi = async (
           deleteFileSync(`${publicFolder}/${fileNameWithOutExtension}.mp3`);
           deleteFileSync(`${publicFolder}/${fileNameWithOutExtension}.wav`);
         } catch (error) {
-          console.log(`Erro para responder com audio: ${error}`);
+          logger.warn({ err: error }, "[OpenAiService] erro ao enviar áudio TTS");
         }
       });
     }
   } else if (msg.message?.audioMessage) {
-    console.log(201, "OpenAiService");
+    if (!(await canMakeOpenAiCalls(ticket.companyId, 2))) {
+      logger.warn(
+        { ticketId: ticket.id, companyId: ticket.companyId },
+        "[OpenAiService] limite diário OpenAI (transcrição + chat)"
+      );
+      const sentLimit = await wbot.sendMessage(msg.key.remoteJid!, {
+        text: `\u200e ${OPENAI_FALLBACK_CLIENT_MESSAGE}`
+      });
+      await verifyMessage(sentLimit!, ticket, contact);
+      return;
+    }
+
     const mediaUrl = mediaSent!.mediaUrl!.split("/").pop();
     const file = fs.createReadStream(`${publicFolder}/${mediaUrl}`) as any;
 
-    const transcription = await openai.audio.transcriptions.create({
-      model: "whisper-1",
-      file: file
+    const transResult = await executeOpenAiTranscription({
+      companyId: ticket.companyId,
+      ticketId: ticket.id,
+      apiKey: openAiSettings.apiKey,
+      file
     });
+    if (transResult.ok === false) {
+      logger.warn(
+        {
+          ticketId: ticket.id,
+          companyId: ticket.companyId,
+          error: transResult.error
+        },
+        "[OpenAiService] fallback ao cliente (transcrição)"
+      );
+      const sentTransFallback = await wbot.sendMessage(msg.key.remoteJid!, {
+        text: `\u200e ${OPENAI_FALLBACK_CLIENT_MESSAGE}`
+      });
+      await verifyMessage(sentTransFallback!, ticket, contact);
+      return;
+    }
 
     messagesOpenAi = [];
     messagesOpenAi.push({ role: "system", content: promptSystem });
     for (
       let i = 0;
-      i < Math.min(openAiSettings.maxMessages, messages.length);
+      i < Math.min(openAiSettings.maxMessages, chronologicalMessages.length);
       i++
     ) {
-      const message = messages[i];
+      const message = chronologicalMessages[i];
       if (
         message.mediaType === "conversation" ||
         message.mediaType === "extendedTextMessage"
       ) {
-        console.log(238, "OpenAiService");
-
         if (message.fromMe) {
           messagesOpenAi.push({ role: "assistant", content: message.body });
         } else {
@@ -243,14 +264,34 @@ export const handleOpenAi = async (
         }
       }
     }
-    messagesOpenAi.push({ role: "user", content: transcription.text });
-    const chat = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo-1106",
+    messagesOpenAi.push({ role: "user", content: transResult.text });
+
+    const chatAfterAudio = await executeOpenAi({
+      companyId: ticket.companyId,
+      ticketId: ticket.id,
+      apiKey: openAiSettings.apiKey,
       messages: messagesOpenAi,
-      max_tokens: openAiSettings.maxTokens,
+      model: resolvedModel,
+      maxTokens: openAiSettings.maxTokens,
       temperature: openAiSettings.temperature
     });
-    let response = chat.choices[0].message?.content;
+    if (chatAfterAudio.ok === false) {
+      logger.warn(
+        {
+          ticketId: ticket.id,
+          companyId: ticket.companyId,
+          error: chatAfterAudio.error
+        },
+        "[OpenAiService] fallback ao cliente (chat pós-áudio)"
+      );
+      const sentAudioFallback = await wbot.sendMessage(msg.key.remoteJid!, {
+        text: `\u200e ${OPENAI_FALLBACK_CLIENT_MESSAGE}`
+      });
+      await verifyMessage(sentAudioFallback!, ticket, contact);
+      return;
+    }
+
+    let response = chatAfterAudio.content;
 
     if (response?.includes("Ação: Transferir para o setor de atendimento")) {
       await transferQueue(openAiSettings.queueId, ticket, contact);
@@ -291,10 +332,9 @@ export const handleOpenAi = async (
           deleteFileSync(`${publicFolder}/${fileNameWithOutExtension}.mp3`);
           deleteFileSync(`${publicFolder}/${fileNameWithOutExtension}.wav`);
         } catch (error) {
-          console.log(`Erro para responder com audio: ${error}`);
+          logger.warn({ err: error }, "[OpenAiService] erro ao enviar áudio TTS (pós-transcrição)");
         }
       });
     }
   }
-  messagesOpenAi = [];
 };

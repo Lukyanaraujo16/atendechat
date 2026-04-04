@@ -44,6 +44,7 @@ import { FlowCampaignModel } from "../models/FlowCampaign";
 import { FlowImgModel } from "../models/FlowImg";
 import RatingTemplate from "../models/RatingTemplate";
 import FlowExecutionLog from "../models/FlowExecutionLog";
+import OpenAiUsage from "../models/OpenAiUsage";
 
 // eslint-disable-next-line
 const dbConfig = require("../config/database");
@@ -97,6 +98,7 @@ const models = [
   FlowImgModel,
   RatingTemplate,
   FlowExecutionLog,
+  OpenAiUsage,
 ];
 
 sequelize.addModels(models);

@@ -137,13 +137,16 @@ export default function ChatPopover() {
     const companyId = localStorage.getItem("companyId");
     const socket = socketManager.getSocket(companyId);
     if (!socket) {
-      return () => {}; 
+      return () => {};
     }
-    
-    socket.on(`company-${companyId}-chat`, (data) => {
+
+    const eventName = `company-${companyId}-chat`;
+    const onCompanyChat = (data) => {
       if (data.action === "new-message") {
         dispatch({ type: "CHANGE_CHAT", payload: data });
-        const userIds = data.newMessage.chat.users.map((userObj) => Number(userObj.userId));
+        const userIds = data.newMessage.chat.users.map((userObj) =>
+          Number(userObj.userId)
+        );
         const myId = Number(user.id);
 
         if (userIds.includes(myId) && Number(data.newMessage.senderId) !== myId) {
@@ -153,9 +156,11 @@ export default function ChatPopover() {
       if (data.action === "update") {
         dispatch({ type: "CHANGE_CHAT", payload: data });
       }
-    });
+    };
+
+    socket.on(eventName, onCompanyChat);
     return () => {
-      socket.disconnect();
+      socket.off(eventName, onCompanyChat);
     };
   }, [socketManager, user.id]);
 

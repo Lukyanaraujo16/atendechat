@@ -1,20 +1,20 @@
 import React, { useContext, useEffect, useRef, useState } from "react";
 import {
   Box,
+  CircularProgress,
   IconButton,
   Input,
-  InputAdornment,
   makeStyles,
   Paper,
   Typography,
 } from "@material-ui/core";
 import SendIcon from "@material-ui/icons/Send";
-import AttachFileIcon from "@material-ui/icons/AttachFile";
-import MicIcon from "@material-ui/icons/Mic";
 
 import { AuthContext } from "../../context/Auth/AuthContext";
 import { useDate } from "../../hooks/useDate";
 import api from "../../services/api";
+import toastError from "../../errors/toastError";
+import { i18n } from "../../translate/i18n";
 
 const useStyles = makeStyles((theme) => ({
   mainContainer: {
@@ -64,6 +64,15 @@ const useStyles = makeStyles((theme) => ({
     minHeight: 0,
     ...theme.scrollbarStyles,
     backgroundColor: "#fafafa",
+  },
+  loadingWrap: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: theme.spacing(4),
+    color: theme.palette.text.secondary,
+    flexDirection: "column",
+    gap: theme.spacing(1),
   },
   inputBar: {
     display: "flex",
@@ -123,27 +132,34 @@ export default function ChatMessages({
     }
   };
 
-  const unreadMessages = (chat) => {
-    if (chat !== undefined) {
-      const currentUser = chat.users.find((u) => u.userId === user.id);
-      return currentUser.unreads > 0;
-    }
-    return 0;
+  const getUnreadCount = (c) => {
+    if (!c || !Array.isArray(c.users)) return 0;
+    const currentUser = c.users.find((u) => u.userId === user.id);
+    return currentUser?.unreads ?? 0;
   };
 
   useEffect(() => {
-    if (unreadMessages(chat) > 0) {
-      try {
-        api.post(`/chats/${chat.id}/read`, { userId: user.id });
-      } catch (err) {}
-    }
     scrollToBottomRef.current = scrollToBottom;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (!chat || !chat.id) return;
+    if (getUnreadCount(chat) <= 0) return;
+
+    const markRead = async () => {
+      try {
+        await api.post(`/chats/${chat.id}/read`, { userId: user.id });
+      } catch (err) {
+        toastError(err);
+      }
+    };
+    markRead();
+  }, [chat?.id, user.id]);
+
   const handleScroll = (e) => {
     const { scrollTop } = e.currentTarget;
-    if (!pageInfo.hasMore || loading) return;
+    if (!pageInfo?.hasMore || loading) return;
     if (scrollTop < 600) {
       handleLoadMore();
     }
@@ -164,6 +180,14 @@ export default function ChatMessages({
         </div>
       </div>
       <div onScroll={handleScroll} className={classes.messageList}>
+        {loading && (!messages || messages.length === 0) && (
+          <div className={classes.loadingWrap}>
+            <CircularProgress size={28} />
+            <Typography variant="body2">
+              {i18n.t("chat.page.loadingMessages")}
+            </Typography>
+          </div>
+        )}
         {Array.isArray(messages) &&
           messages.map((item, key) => {
             if (item.senderId === user.id) {
@@ -191,13 +215,10 @@ export default function ChatMessages({
         <div ref={baseRef} />
       </div>
       <div className={classes.inputBar}>
-        <IconButton size="small" aria-label="anexar">
-          <AttachFileIcon />
-        </IconButton>
         <Input
           disableUnderline
           fullWidth
-          placeholder="Digite sua mensagem..."
+          placeholder={i18n.t("chat.page.messagePlaceholder")}
           value={contentMessage}
           onKeyUp={(e) => {
             if (e.key === "Enter" && contentMessage.trim() !== "") {
@@ -209,9 +230,6 @@ export default function ChatMessages({
           className={classes.input}
           inputProps={{ "aria-label": "mensagem" }}
         />
-        <IconButton size="small" aria-label="microfone">
-          <MicIcon />
-        </IconButton>
         <IconButton
           size="small"
           aria-label="enviar"

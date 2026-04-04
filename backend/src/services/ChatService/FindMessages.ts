@@ -1,13 +1,14 @@
 import AppError from "../../errors/AppError";
 import ChatMessage from "../../models/ChatMessage";
-import ChatUser from "../../models/ChatUser";
 import User from "../../models/User";
 
 import { sortBy } from "lodash";
+import { assertChatAccessForUser } from "./ChatAccessHelper";
 
 interface Request {
   chatId: string;
-  ownerId: number;
+  userId: number;
+  companyId: number;
   pageNumber?: string;
 }
 
@@ -19,23 +20,23 @@ interface Response {
 
 const FindMessages = async ({
   chatId,
-  ownerId,
+  userId,
+  companyId,
   pageNumber = "1"
 }: Request): Promise<Response> => {
-  const userInChat = await ChatUser.count({
-    where: { chatId, userId: ownerId }
-  });
-
-  if (userInChat === 0) {
-    throw new AppError("UNAUTHORIZED", 400);
+  const chatIdNum = Number(chatId);
+  if (!Number.isFinite(chatIdNum) || chatIdNum <= 0) {
+    throw new AppError("ERR_NO_CHAT_FOUND", 404);
   }
+
+  await assertChatAccessForUser({ chatId: chatIdNum, userId, companyId });
 
   const limit = 20;
   const offset = limit * (+pageNumber - 1);
 
   const { count, rows: records } = await ChatMessage.findAndCountAll({
     where: {
-      chatId
+      chatId: chatIdNum
     },
     include: [{ model: User, as: "sender", attributes: ["id", "name"] }],
     limit,

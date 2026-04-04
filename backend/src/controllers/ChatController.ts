@@ -1,4 +1,3 @@
-import * as Yup from "yup";
 import { Request, Response } from "express";
 import { getIO } from "../libs/socket";
 
@@ -8,6 +7,7 @@ import ShowFromUuidService from "../services/ChatService/ShowFromUuidService";
 import DeleteService from "../services/ChatService/DeleteService";
 import FindMessages from "../services/ChatService/FindMessages";
 import UpdateService from "../services/ChatService/UpdateService";
+import MarkChatAsReadService from "../services/ChatService/MarkChatAsReadService";
 
 import Chat from "../models/Chat";
 import CreateMessageService from "../services/ChatService/CreateMessageService";
@@ -25,17 +25,14 @@ type StoreData = {
   title: string;
 };
 
-type FindParams = {
-  companyId: number;
-  ownerId?: number;
-};
-
 export const index = async (req: Request, res: Response): Promise<Response> => {
   const { pageNumber } = req.query as unknown as IndexQuery;
   const ownerId = +req.user.id;
+  const companyId = +req.user.companyId;
 
   const { records, count, hasMore } = await ListService({
     ownerId,
+    companyId,
     pageNumber
   });
 
@@ -69,13 +66,16 @@ export const update = async (
   req: Request,
   res: Response
 ): Promise<Response> => {
-  const { companyId } = req.user;
+  const companyId = +req.user.companyId;
   const data = req.body;
   const { id } = req.params;
+  const userId = +req.user.id;
 
   const record = await UpdateService({
     ...data,
-    id: +id
+    id: +id,
+    userId,
+    companyId
   });
 
   const io = getIO();
@@ -92,8 +92,10 @@ export const update = async (
 
 export const show = async (req: Request, res: Response): Promise<Response> => {
   const { id } = req.params;
+  const userId = +req.user.id;
+  const companyId = +req.user.companyId;
 
-  const record = await ShowFromUuidService(id);
+  const record = await ShowFromUuidService(id, userId, companyId);
 
   return res.status(200).json(record);
 };
@@ -103,9 +105,10 @@ export const remove = async (
   res: Response
 ): Promise<Response> => {
   const { id } = req.params;
-  const { companyId } = req.user;
+  const companyId = +req.user.companyId;
+  const userId = +req.user.id;
 
-  await DeleteService(id);
+  await DeleteService(id, userId, companyId);
 
   const io = getIO();
   io.to(`company-${companyId}-mainchannel`).emit(`company-${companyId}-chat`, {
@@ -120,7 +123,7 @@ export const saveMessage = async (
   req: Request,
   res: Response
 ): Promise<Response> => {
-  const { companyId } = req.user;
+  const companyId = +req.user.companyId;
   const { message } = req.body;
   const { id } = req.params;
   const senderId = +req.user.id;
@@ -129,7 +132,8 @@ export const saveMessage = async (
   const newMessage = await CreateMessageService({
     chatId,
     senderId,
-    message
+    message,
+    companyId
   });
 
   const chat = await Chat.findByPk(chatId, {
@@ -159,18 +163,15 @@ export const checkAsRead = async (
   req: Request,
   res: Response
 ): Promise<Response> => {
-  const { companyId } = req.user;
-  const { userId } = req.body;
+  const companyId = +req.user.companyId;
+  const userId = +req.user.id;
   const { id } = req.params;
+  const chatId = +id;
 
-  const chatUser = await ChatUser.findOne({ where: { chatId: id, userId } });
-  await chatUser.update({ unreads: 0 });
-
-  const chat = await Chat.findByPk(id, {
-    include: [
-      { model: User, as: "owner" },
-      { model: ChatUser, as: "users" }
-    ]
+  const chat = await MarkChatAsReadService({
+    chatId,
+    userId,
+    companyId
   });
 
   const io = getIO();
@@ -193,11 +194,13 @@ export const messages = async (
 ): Promise<Response> => {
   const { pageNumber } = req.query as unknown as IndexQuery;
   const { id: chatId } = req.params;
-  const ownerId = +req.user.id;
+  const userId = +req.user.id;
+  const companyId = +req.user.companyId;
 
   const { records, count, hasMore } = await FindMessages({
     chatId,
-    ownerId,
+    userId,
+    companyId,
     pageNumber
   });
 

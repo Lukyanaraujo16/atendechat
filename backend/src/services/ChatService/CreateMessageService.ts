@@ -1,20 +1,24 @@
-import { Op } from "sequelize";
 import Chat from "../../models/Chat";
 import ChatMessage from "../../models/ChatMessage";
 import ChatUser from "../../models/ChatUser";
 import User from "../../models/User";
+import { assertChatAccessForUser } from "./ChatAccessHelper";
 
 export interface ChatMessageData {
   senderId: number;
   chatId: number;
   message: string;
+  companyId: number;
 }
 
 export default async function CreateMessageService({
   senderId,
   chatId,
-  message
+  message,
+  companyId
 }: ChatMessageData) {
+  await assertChatAccessForUser({ chatId, userId: senderId, companyId });
+
   const newMessage = await ChatMessage.create({
     senderId,
     chatId,
@@ -34,7 +38,7 @@ export default async function CreateMessageService({
 
   const sender = await User.findByPk(senderId);
 
-  await newMessage.chat.update({ lastMessage: `${sender.name}: ${message}` });
+  await newMessage.chat.update({ lastMessage: `${sender!.name}: ${message}` });
 
   const chatUsers = await ChatUser.findAll({
     where: { chatId }

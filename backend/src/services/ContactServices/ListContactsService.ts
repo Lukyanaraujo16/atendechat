@@ -127,7 +127,21 @@ const ListContactsService = async ({
           `%${sp}%`
         )
       },
-      { number: { [Op.like]: `%${trimmed}%` } }
+      { number: { [Op.like]: `%${trimmed}%` } },
+      {
+        email: Sequelize.where(
+          Sequelize.fn("LOWER", Sequelize.col("email")),
+          "LIKE",
+          `%${sp}%`
+        )
+      },
+      {
+        notes: Sequelize.where(
+          Sequelize.fn("LOWER", Sequelize.col("notes")),
+          "LIKE",
+          `%${sp}%`
+        )
+      }
     ];
   }
 

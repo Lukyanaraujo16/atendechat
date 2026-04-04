@@ -13,6 +13,7 @@ import Paper from "@material-ui/core/Paper";
 import Button from "@material-ui/core/Button";
 import Avatar from "@material-ui/core/Avatar";
 import WhatsAppIcon from "@material-ui/icons/WhatsApp";
+import AccessTimeIcon from "@material-ui/icons/AccessTime";
 import SearchIcon from "@material-ui/icons/Search";
 import TextField from "@material-ui/core/TextField";
 import InputAdornment from "@material-ui/core/InputAdornment";
@@ -23,6 +24,7 @@ import MenuItem from "@material-ui/core/MenuItem";
 import Chip from "@material-ui/core/Chip";
 import Box from "@material-ui/core/Box";
 import Typography from "@material-ui/core/Typography";
+import Alert from "@material-ui/lab/Alert";
 import { formatDistanceToNow, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -112,6 +114,55 @@ const useStyles = makeStyles((theme) => ({
 		gap: theme.spacing(0.5),
 		maxWidth: 220,
 	},
+	tagChip: {
+		maxWidth: 140,
+		border: "1px solid rgba(0,0,0,0.12)",
+		"& .MuiChip-label": {
+			overflow: "hidden",
+			textOverflow: "ellipsis",
+		},
+	},
+	headerTitleBlock: {
+		flex: 1,
+		minWidth: 200,
+	},
+	pageAlerts: {
+		marginBottom: theme.spacing(1),
+		"& .MuiAlert-message": {
+			width: "100%",
+		},
+	},
+	filterHint: {
+		fontSize: "0.75rem",
+		color: theme.palette.text.secondary,
+		marginTop: theme.spacing(0.5),
+		width: "100%",
+	},
+	lastInteractionBox: {
+		display: "inline-flex",
+		flexDirection: "column",
+		alignItems: "center",
+		gap: 2,
+		maxWidth: 200,
+		margin: "0 auto",
+		padding: theme.spacing(0.75, 1),
+		borderRadius: 8,
+		border: `1px solid ${theme.palette.divider}`,
+	},
+	lastInteractionRow: {
+		display: "flex",
+		alignItems: "center",
+		justifyContent: "center",
+		gap: theme.spacing(0.5),
+	},
+	actionButtons: {
+		display: "inline-flex",
+		flexWrap: "wrap",
+		alignItems: "center",
+		justifyContent: "center",
+		gap: theme.spacing(0.25),
+		maxWidth: 280,
+	},
 }));
 
 const Contacts = () => {
@@ -186,7 +237,7 @@ const Contacts = () => {
 		const companyId = localStorage.getItem("companyId");
 		const socket = socketManager.getSocket(companyId);
 
-		socket.on(`company-${companyId}-contact`, (data) => {
+		const handler = (data) => {
 			if (data.action === "update" || data.action === "create") {
 				dispatch({ type: "UPDATE_CONTACTS", payload: data.contact });
 			}
@@ -194,10 +245,12 @@ const Contacts = () => {
 			if (data.action === "delete") {
 				dispatch({ type: "DELETE_CONTACT", payload: +data.contactId });
 			}
-		});
+		};
+
+		socket.on(`company-${companyId}-contact`, handler);
 
 		return () => {
-			socket.disconnect();
+			socket.off(`company-${companyId}-contact`, handler);
 		};
 	}, [socketManager]);
 
@@ -280,6 +333,115 @@ const Contacts = () => {
 		}
 	};
 
+	const lastInteractionStyle = (iso) => {
+		if (!iso) {
+			return {
+				borderColor: undefined,
+				backgroundColor: "transparent",
+				iconColor: "text.secondary",
+				primaryColor: "text.secondary",
+			};
+		}
+		const diff = Date.now() - new Date(iso).getTime();
+		const day = 86400000;
+		if (diff < day) {
+			return {
+				borderColor: "#2e7d32",
+				backgroundColor: "rgba(46, 125, 50, 0.08)",
+				iconColor: "#2e7d32",
+				primaryColor: "#1b5e20",
+			};
+		}
+		if (diff < 7 * day) {
+			return {
+				borderColor: "#f57c00",
+				backgroundColor: "rgba(245, 124, 0, 0.08)",
+				iconColor: "#ef6c00",
+				primaryColor: "#e65100",
+			};
+		}
+		return {
+			borderColor: undefined,
+			backgroundColor: "rgba(0, 0, 0, 0.04)",
+			iconColor: "action",
+			primaryColor: "textPrimary",
+		};
+	};
+
+	const renderLastInteraction = (iso) => {
+		if (!iso) {
+			return (
+				<Typography variant="body2" color="textSecondary">
+					—
+				</Typography>
+			);
+		}
+		const tone = lastInteractionStyle(iso);
+		let absolute = "";
+		try {
+			absolute = format(new Date(iso), "dd/MM/yyyy HH:mm", { locale: ptBR });
+		} catch {
+			absolute = "";
+		}
+		return (
+			<Box
+				className={classes.lastInteractionBox}
+				style={{
+					borderColor: tone.borderColor,
+					backgroundColor: tone.backgroundColor,
+				}}
+			>
+				<Tooltip
+					title={
+						absolute
+							? `${i18n.t("contacts.lastInteractionTooltip")}: ${absolute}`
+							: ""
+					}
+				>
+					<Box className={classes.lastInteractionRow}>
+						<AccessTimeIcon
+							style={{
+								fontSize: 18,
+								color:
+									typeof tone.iconColor === "string" &&
+									tone.iconColor.startsWith("#")
+										? tone.iconColor
+										: undefined,
+							}}
+							color={tone.iconColor === "action" ? "action" : "inherit"}
+						/>
+						<Typography
+							variant="body2"
+							component="span"
+							style={{
+								fontWeight: 600,
+								color:
+									typeof tone.primaryColor === "string" &&
+									tone.primaryColor.startsWith("#")
+										? tone.primaryColor
+										: undefined,
+							}}
+							color={
+								tone.primaryColor === "textPrimary"
+									? "textPrimary"
+									: tone.primaryColor === "textSecondary"
+									? "textSecondary"
+									: "inherit"
+							}
+						>
+							{formatLastInteraction(iso)}
+						</Typography>
+					</Box>
+				</Tooltip>
+				{absolute ? (
+					<Typography variant="caption" color="textSecondary" style={{ lineHeight: 1.2 }}>
+						{absolute}
+					</Typography>
+				) : null}
+			</Box>
+		);
+	};
+
 	const createdTooltipTitle = (createdAt) => {
 		if (!createdAt) return "";
 		try {
@@ -310,6 +472,11 @@ const Contacts = () => {
 				onContactSaved={(updated) => {
 					dispatch({ type: "UPDATE_CONTACTS", payload: updated });
 				}}
+				onOpenAttendance={(c) => {
+					setContactTicket(c);
+					setNewTicketModalOpen(true);
+					setContactModalOpen(false);
+				}}
 			></ContactModal>
 			<ConfirmationModal
 				title={
@@ -332,13 +499,21 @@ const Contacts = () => {
 					: `${i18n.t("contacts.confirmationModal.importMessage")}`}
 			</ConfirmationModal>
 			<MainHeader>
-				<Title>{i18n.t("contacts.title")}</Title>
+				<Box className={classes.headerTitleBlock}>
+					<Title>{i18n.t("contacts.title")}</Title>
+					<Typography variant="body2" color="textSecondary" component="p">
+						{i18n.t("contacts.subtitle")}
+					</Typography>
+				</Box>
 				<MainHeaderButtonsWrapper>
 					<TextField
 						placeholder={i18n.t("contacts.searchPlaceholder")}
 						type="search"
 						value={searchParam}
 						onChange={handleSearch}
+						helperText={i18n.t("contacts.searchHelper")}
+						variant="outlined"
+						size="small"
 						InputProps={{
 							startAdornment: (
 								<InputAdornment position="start">
@@ -377,27 +552,47 @@ const Contacts = () => {
 					</CSVLink>
 				</MainHeaderButtonsWrapper>
 			</MainHeader>
+			<Box className={classes.pageAlerts}>
+				<Alert severity="info" variant="outlined">
+					{i18n.t("contacts.pageBanner")}
+				</Alert>
+				<Box
+					mt={1}
+					p={1.5}
+					borderRadius={4}
+					bgcolor="action.hover"
+				>
+					<Typography variant="body2" color="textSecondary">
+						{i18n.t("contacts.pageExpectations")}
+					</Typography>
+				</Box>
+			</Box>
 			<Box className={classes.filtersRow}>
-				<FormControl variant="outlined" margin="dense" style={{ minWidth: 200 }}>
-					<InputLabel id="contacts-tag-filter">
-						{i18n.t("contacts.filters.tag")}
-					</InputLabel>
-					<Select
-						labelId="contacts-tag-filter"
-						value={tagFilter}
-						onChange={(e) => setTagFilter(e.target.value)}
-						label={i18n.t("contacts.filters.tag")}
-					>
-						<MenuItem value="">
-							<em>{i18n.t("contacts.filters.allTags")}</em>
-						</MenuItem>
-						{tagOptions.map((t) => (
-							<MenuItem key={t.id} value={String(t.id)}>
-								{t.name}
+				<Box display="flex" flexDirection="column">
+					<FormControl variant="outlined" margin="dense" style={{ minWidth: 200 }}>
+						<InputLabel id="contacts-tag-filter">
+							{i18n.t("contacts.filters.tag")}
+						</InputLabel>
+						<Select
+							labelId="contacts-tag-filter"
+							value={tagFilter}
+							onChange={(e) => setTagFilter(e.target.value)}
+							label={i18n.t("contacts.filters.tag")}
+						>
+							<MenuItem value="">
+								<em>{i18n.t("contacts.filters.allTags")}</em>
 							</MenuItem>
-						))}
-					</Select>
-				</FormControl>
+							{tagOptions.map((t) => (
+								<MenuItem key={t.id} value={String(t.id)}>
+									{t.name}
+								</MenuItem>
+							))}
+						</Select>
+					</FormControl>
+					<Typography className={classes.filterHint} component="span">
+						{i18n.t("contacts.tagFilterHelp")}
+					</Typography>
+				</Box>
 				<TextField
 					label={i18n.t("contacts.filters.dateFrom")}
 					type="date"
@@ -438,7 +633,11 @@ const Contacts = () => {
 								<TableCell padding="checkbox" />
 								<TableCell>{i18n.t("contacts.table.name")}</TableCell>
 								<TableCell>{i18n.t("contacts.table.number")}</TableCell>
-								<TableCell>{i18n.t("contacts.table.tags")}</TableCell>
+								<TableCell>
+									<Tooltip title={i18n.t("contacts.tagsColumnHint")}>
+										<span>{i18n.t("contacts.table.tags")}</span>
+									</Tooltip>
+								</TableCell>
 								<TableCell align="center">
 									{i18n.t("contacts.table.lastInteraction")}
 								</TableCell>
@@ -477,6 +676,7 @@ const Contacts = () => {
 														key={tag.id}
 														label={tag.name}
 														size="small"
+														className={classes.tagChip}
 														style={{
 															backgroundColor: tag.color || "#eee",
 														}}
@@ -485,7 +685,7 @@ const Contacts = () => {
 											</div>
 										</TableCell>
 										<TableCell align="center">
-											{formatLastInteraction(contact.lastInteractionAt)}
+											{renderLastInteraction(contact.lastInteractionAt)}
 										</TableCell>
 										<TableCell align="center">
 											<Tooltip
@@ -501,36 +701,43 @@ const Contacts = () => {
 											</Tooltip>
 										</TableCell>
 										<TableCell align="center">
-											<IconButton
-												size="small"
-												onClick={() => {
-													setContactTicket(contact);
-													setNewTicketModalOpen(true);
-												}}
-											>
-												<WhatsAppIcon />
-											</IconButton>
-											<IconButton
-												size="small"
-												onClick={() => hadleEditContact(contact.id)}
-											>
-												<EditIcon />
-											</IconButton>
-											<Can
-												role={user.profile}
-												perform="contacts-page:deleteContact"
-												yes={() => (
-													<IconButton
+											<Box className={classes.actionButtons}>
+												<Tooltip title={i18n.t("contacts.openAttendance")}>
+													<Button
 														size="small"
-														onClick={(e) => {
-															setConfirmOpen(true);
-															setDeletingContact(contact);
+														variant="outlined"
+														color="primary"
+														startIcon={<WhatsAppIcon />}
+														onClick={() => {
+															setContactTicket(contact);
+															setNewTicketModalOpen(true);
 														}}
 													>
-														<DeleteOutlineIcon />
-													</IconButton>
-												)}
-											/>
+														{i18n.t("contacts.openAttendance")}
+													</Button>
+												</Tooltip>
+												<IconButton
+													size="small"
+													onClick={() => hadleEditContact(contact.id)}
+												>
+													<EditIcon />
+												</IconButton>
+												<Can
+													role={user.profile}
+													perform="contacts-page:deleteContact"
+													yes={() => (
+														<IconButton
+															size="small"
+															onClick={(e) => {
+																setConfirmOpen(true);
+																setDeletingContact(contact);
+															}}
+														>
+															<DeleteOutlineIcon />
+														</IconButton>
+													)}
+												/>
+											</Box>
 										</TableCell>
 									</TableRow>
 								))}

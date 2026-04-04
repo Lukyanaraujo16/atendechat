@@ -1,14 +1,27 @@
 import Chat from "../../models/Chat";
-import AppError from "../../errors/AppError";
+import ChatUser from "../../models/ChatUser";
+import User from "../../models/User";
+import { assertChatAccessByUuid } from "./ChatAccessHelper";
 
-const ShowFromUuidService = async (uuid: string): Promise<Chat> => {
-  const record = await Chat.findOne({ where: { uuid } });
+const ShowFromUuidService = async (
+  uuid: string,
+  userId: number,
+  companyId: number
+): Promise<Chat> => {
+  const chat = await assertChatAccessByUuid({ uuid, userId, companyId });
 
-  if (!record) {
-    throw new AppError("ERR_NO_CHAT_FOUND", 404);
-  }
+  await chat.reload({
+    include: [
+      { model: User, as: "owner" },
+      {
+        model: ChatUser,
+        as: "users",
+        include: [{ model: User, as: "user" }]
+      }
+    ]
+  });
 
-  return record;
+  return chat;
 };
 
 export default ShowFromUuidService;

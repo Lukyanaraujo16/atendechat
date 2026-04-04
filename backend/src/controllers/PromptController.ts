@@ -43,8 +43,9 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
   const promptTable = await CreatePromptService({ name, apiKey, prompt, maxTokens, temperature, promptTokens, completionTokens, totalTokens, queueId, maxMessages, companyId, model });
 
   const io = getIO();
-  io.to(`company-${companyId}-mainchannel`).emit("prompt", {
-    action: "update",
+  const promptSocketEvent = `company-${companyId}-prompt`;
+  io.to(`company-${companyId}-mainchannel`).emit(promptSocketEvent, {
+    action: "create",
     prompt: promptTable
   });
 
@@ -101,9 +102,10 @@ export const remove = async (
     await DeletePromptService(promptId, companyId);
 
     const io = getIO();
-    io.to(`company-${companyId}-mainchannel`).emit("prompt", {
+    const promptSocketEvent = `company-${companyId}-prompt`;
+    io.to(`company-${companyId}-mainchannel`).emit(promptSocketEvent, {
       action: "delete",
-      intelligenceId: +promptId
+      promptId: +promptId
     });
 
     return res.status(200).json({ message: "Prompt deleted" });

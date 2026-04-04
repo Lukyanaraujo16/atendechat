@@ -1,16 +1,20 @@
 import Chat from "../../models/Chat";
-import AppError from "../../errors/AppError";
+import { assertChatAccessForUser } from "./ChatAccessHelper";
 
-const DeleteService = async (id: string): Promise<void> => {
-  const record = await Chat.findOne({
-    where: { id }
+const DeleteService = async (
+  id: string,
+  userId: number,
+  companyId: number
+): Promise<void> => {
+  const chatId = +id;
+  const chat = await assertChatAccessForUser({
+    chatId,
+    userId,
+    companyId,
+    requireOwner: true
   });
 
-  if (!record) {
-    throw new AppError("ERR_NO_CHAT_FOUND", 404);
-  }
-
-  await record.destroy();
+  await chat.destroy();
 };
 
 export default DeleteService;

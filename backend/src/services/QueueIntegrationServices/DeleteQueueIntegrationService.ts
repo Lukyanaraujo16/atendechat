@@ -1,16 +1,19 @@
 import QueueIntegrations from "../../models/QueueIntegrations";
 import AppError from "../../errors/AppError";
 
-const DeleteQueueIntegrationService = async (id: string): Promise<void> => {
-  const dialogflow = await QueueIntegrations.findOne({
-    where: { id }
+const DeleteQueueIntegrationService = async (
+  id: string | number,
+  companyId: number
+): Promise<void> => {
+  const row = await QueueIntegrations.findOne({
+    where: { id, companyId }
   });
 
-  if (!dialogflow) {
+  if (!row) {
     throw new AppError("ERR_NO_DIALOG_FOUND", 404);
   }
 
-  await dialogflow.destroy();
+  await row.destroy();
 };
 
 export default DeleteQueueIntegrationService;

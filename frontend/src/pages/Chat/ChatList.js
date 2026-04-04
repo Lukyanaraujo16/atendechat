@@ -22,6 +22,7 @@ import PersonIcon from "@material-ui/icons/Person";
 
 import ConfirmationModal from "../../components/ConfirmationModal";
 import api from "../../services/api";
+import toastError from "../../errors/toastError";
 import { i18n } from "../../translate/i18n";
 
 const useStyles = makeStyles((theme) => ({
@@ -94,7 +95,9 @@ export default function ChatList({
     if (unreadMessages(chat) > 0) {
       try {
         await api.post(`/chats/${chat.id}/read`, { userId: user.id });
-      } catch (err) {}
+      } catch (err) {
+        toastError(err);
+      }
     }
 
     if (id !== chat.uuid) {
@@ -167,7 +170,11 @@ export default function ChatList({
 
   const handleMenuEdit = () => {
     if (menuChat) {
-      goToMessages(menuChat).then(() => handleEditChat(menuChat));
+      goToMessages(menuChat).then(() => {
+        if (typeof handleEditChat === "function") {
+          handleEditChat(menuChat);
+        }
+      });
     }
     closeMenu();
   };

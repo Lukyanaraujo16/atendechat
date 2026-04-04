@@ -10,7 +10,9 @@ import { makeStyles } from "@material-ui/core/styles";
 
 import {
   Avatar,
+  Box,
   Button,
+  Chip,
   IconButton,
   InputAdornment,
   Paper,
@@ -20,15 +22,17 @@ import {
   TableHead,
   TableRow,
   TextField,
-  Tooltip
+  Typography,
 } from "@material-ui/core";
 
 import {
   DeleteOutline,
   Edit
 } from "@material-ui/icons";
+import AccountTreeIcon from "@material-ui/icons/AccountTree";
 
 import SearchIcon from "@material-ui/icons/Search";
+import Alert from "@material-ui/lab/Alert";
 
 import MainContainer from "../../components/MainContainer";
 import MainHeader from "../../components/MainHeader";
@@ -102,7 +106,31 @@ const useStyles = makeStyles((theme) => ({
     height: "40px",
     borderRadius: 4
   },
+  avatarFlow: {
+    width: 40,
+    height: 40,
+    backgroundColor: "#1565c0",
+  },
 }));
+
+const typeCategoryKey = (type) => {
+  if (type === "flowbuilder" || type === "typebot") return "categoryInternal";
+  if (type === "n8n" || type === "webhook") return "categoryExternal";
+  return "categoryLegacy";
+};
+
+const integrationTypeLabel = (type) => {
+  const key = `queueIntegrationModal.types.${type}`;
+  const t = i18n.t(key);
+  return t === key ? type || "—" : t;
+};
+
+const categoryChipColor = (type) => {
+  const k = typeCategoryKey(type);
+  if (k === "categoryInternal") return "primary";
+  if (k === "categoryExternal") return "secondary";
+  return "default";
+};
 
 const QueueIntegration = () => {
   const classes = useStyles();
@@ -155,6 +183,7 @@ const QueueIntegration = () => {
           setLoading(false);
         } catch (err) {
           toastError(err);
+          setLoading(false);
         }
       };
       fetchIntegrations();
@@ -166,7 +195,7 @@ const QueueIntegration = () => {
     const companyId = localStorage.getItem("companyId");
     const socket = socketManager.getSocket(companyId);
 
-    socket.on(`company-${companyId}-queueIntegration`, (data) => {
+    const handler = (data) => {
       if (data.action === "update" || data.action === "create") {
         dispatch({ type: "UPDATE_INTEGRATIONS", payload: data.queueIntegration });
       }
@@ -174,10 +203,12 @@ const QueueIntegration = () => {
       if (data.action === "delete") {
         dispatch({ type: "DELETE_INTEGRATION", payload: +data.integrationId });
       }
-    });
+    };
+
+    socket.on(`company-${companyId}-queueIntegration`, handler);
 
     return () => {
-      socket.disconnect();
+      socket.off(`company-${companyId}-queueIntegration`, handler);
     };
   }, [socketManager]);
 
@@ -245,7 +276,12 @@ const QueueIntegration = () => {
         integrationId={selectedIntegration && selectedIntegration.id}
       />
       <MainHeader>
-        <Title>{i18n.t("queueIntegration.title")} ({queueIntegration.length})</Title>
+        <Box>
+          <Title>{i18n.t("queueIntegration.title")} ({queueIntegration.length})</Title>
+          <Typography variant="body2" color="textSecondary" component="p">
+            {i18n.t("queueIntegration.pageSubtitle")}
+          </Typography>
+        </Box>
         <MainHeaderButtonsWrapper>
           <TextField
             placeholder={i18n.t("queueIntegration.searchPlaceholder")}
@@ -269,6 +305,9 @@ const QueueIntegration = () => {
           </Button>
         </MainHeaderButtonsWrapper>
       </MainHeader>
+      <Alert severity="info" style={{ margin: "8px 16px 0" }}>
+        {i18n.t("queueIntegration.pageIntro")}
+      </Alert>
       <Paper
         className={classes.mainPaper}
         variant="outlined"
@@ -279,25 +318,49 @@ const QueueIntegration = () => {
             <TableRow>
               <TableCell padding="checkbox"></TableCell>
               <TableCell align="center">{i18n.t("queueIntegration.table.id")}</TableCell>
+              <TableCell align="center">{i18n.t("queueIntegration.table.type")}</TableCell>
               <TableCell align="center">{i18n.t("queueIntegration.table.name")}</TableCell>
+              <TableCell align="center">{i18n.t("queueIntegration.table.actions")}</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             <>
               {queueIntegration.map((integration) => (
                 <TableRow key={integration.id}>
-                  <TableCell >
-                    {integration.type === "dialogflow" && (<Avatar 
-                      src={dialogflow} className={classes.avatar} />)}
-                    {integration.type === "n8n" && (<Avatar
-                      src={n8n} className={classes.avatar} />)}
-                    {integration.type === "webhook" && (<Avatar
-                      src={webhooks} className={classes.avatar} />)}
-                    {integration.type === "typebot" && (<Avatar
-                      src={typebot} className={classes.avatar} />)}
+                  <TableCell>
+                    {integration.type === "dialogflow" && (
+                      <Avatar src={dialogflow} className={classes.avatar} />
+                    )}
+                    {integration.type === "n8n" && (
+                      <Avatar src={n8n} className={classes.avatar} />
+                    )}
+                    {integration.type === "webhook" && (
+                      <Avatar src={webhooks} className={classes.avatar} />
+                    )}
+                    {integration.type === "typebot" && (
+                      <Avatar src={typebot} className={classes.avatar} />
+                    )}
+                    {integration.type === "flowbuilder" && (
+                      <Avatar className={classes.avatarFlow}>
+                        <AccountTreeIcon style={{ color: "#fff" }} />
+                      </Avatar>
+                    )}
                   </TableCell>
 
                   <TableCell align="center">{integration.id}</TableCell>
+                  <TableCell align="center">
+                    <Box display="flex" flexDirection="column" alignItems="center" style={{ gap: 6 }}>
+                      <Chip
+                        size="small"
+                        label={i18n.t(`queueIntegration.table.${typeCategoryKey(integration.type)}`)}
+                        color={categoryChipColor(integration.type)}
+                        variant="outlined"
+                      />
+                      <Typography variant="caption" color="textSecondary" component="span">
+                        {integrationTypeLabel(integration.type)}
+                      </Typography>
+                    </Box>
+                  </TableCell>
                   <TableCell align="center">{integration.name}</TableCell>
                   <TableCell align="center">
                     <IconButton
@@ -319,7 +382,7 @@ const QueueIntegration = () => {
                   </TableCell>
                 </TableRow>
               ))}
-              {loading && <TableRowSkeleton columns={7} />}
+              {loading && <TableRowSkeleton columns={5} />}
             </>
           </TableBody>
         </Table>

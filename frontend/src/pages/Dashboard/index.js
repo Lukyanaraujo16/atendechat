@@ -660,8 +660,11 @@ const Dashboard = () => {
                 </div>
               </div>
               <Typography className={classes.cardValue}>{avgRating}</Typography>
-              <Typography className={classes.cardSub}>Escala: 1 a 5</Typography>
-              <Typography className={classes.cardSub}>Status: {Number(avgRating) >= 4 ? "Ótimo" : Number(avgRating) >= 3 ? "Bom" : "Melhorar"}</Typography>
+              <Typography className={classes.cardSub}>Escala: 1 a 3</Typography>
+              <Typography className={classes.cardSub}>
+                Status:{" "}
+                {Number(avgRating) >= 2.5 ? "Ótimo" : Number(avgRating) >= 1.5 ? "Bom" : "Melhorar"}
+              </Typography>
               <div className={classes.chartWrap}>
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={sparkRating} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
@@ -673,7 +676,7 @@ const Dashboard = () => {
                     </defs>
                     <Area type="monotone" dataKey="value" stroke="#f44336" fill="url(#areaRed)" strokeWidth={1.5} />
                     <XAxis dataKey="name" hide />
-                    <YAxis hide domain={[0, 5]} />
+                    <YAxis hide domain={[0, 3]} />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>

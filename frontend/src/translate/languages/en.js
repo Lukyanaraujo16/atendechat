@@ -498,12 +498,25 @@ const messages = {
 				message: "Scan the QR Code to start the session",
 			},
 			contacts: {
-				title: "Contacts",
+				title: "Contacts and service history",
+				subtitle:
+					"WhatsApp customers and contacts with interaction and ticket history.",
+				pageBanner:
+					"See everyone who talks to your business. Tags shown here come from tickets linked to each contact.",
+				pageExpectations:
+					"This area focuses on service and history — it is not a full sales funnel or commercial pipeline. It is the foundation to organize conversations and can grow over time.",
+				tagsColumnHint:
+					"Tags are derived from tickets associated with this contact.",
+				tagFilterHelp:
+					"Shows contacts that have at least one ticket with the selected tag.",
+				searchHelper: "Search by name, number, email, or notes.",
+				openAttendance: "Open ticket",
+				lastInteractionTooltip: "Last interaction",
 				toasts: {
 					deleted: "Contact deleted successfully!",
 					deletedAll: "All contacts deleted successfully!",
 				},
-				searchPlaceholder: "Search...",
+				searchPlaceholder: "Search by name, number, email, or notes…",
 				confirmationModal: {
 					deleteTitle: "Delete ",
 					deleteAllTitle: "Delete All",
@@ -535,8 +548,9 @@ const messages = {
 					dateTo: "Updated until",
 				},
 				empty: {
-					title: "No contacts found",
-					subtitle: "Adjust search or filters, or add a new contact.",
+					title: "No contacts to show",
+					subtitle:
+						"Adjust search or filters, import a list, or add a contact to get started.",
 				},
 			},
 			contactImportModal: {
@@ -558,6 +572,31 @@ const messages = {
 					add: "Add project",
 					edit: "Edit project",
 				},
+				intro:
+					"Each record here can be linked to a queue (Queues) or to the WhatsApp connection. Behavior depends on the selected type.",
+				groups: {
+					internal: "Internal automations",
+					external: "External integrations (HTTP POST)",
+					legacy: "Legacy",
+				},
+				types: {
+					flowbuilder: "Flowbuilder",
+					typebot: "Typebot",
+					n8n: "N8N",
+					webhook: "Webhook",
+					dialogflow: "Dialogflow (legacy)",
+				},
+				descriptions: {
+					flowbuilder: "Internal automation with custom logic and personalized flows",
+					typebot: "Integrated conversational chatbot",
+					webhookN8n: "Send data to external systems (HTTP POST)",
+				},
+				alerts: {
+					externalPost:
+						"This integration sends data to an external system (POST) but does not receive responses automatically or change the ticket based on the HTTP response. It does not reply to the customer by itself on WhatsApp. For full in-chat automation, use Flowbuilder or Typebot.",
+					internalHint:
+						"This option participates in the conversation according to your flow or bot configuration.",
+				},
 				form: {
 					id: "ID",
 					type: "Type",
@@ -565,7 +604,12 @@ const messages = {
 					projectName: "Project Name",
 					language: "Language",
 					jsonContent: "JsonContent",
+					legacyDialogflow: "Dialogflow (legacy)",
+					legacyDialogflowHint:
+						"Dialogflow integrations can no longer be configured here. Change the type or edit the name only.",
 					urlN8N: "URL",
+					urlWebhookHelper:
+						"POST outbound — the server response is not applied back to the ticket automatically.",
 					typebotSlug: "Typebot - Slug",
 					typebotExpires: "Time in minutes to expire a conversation",
 					typebotKeywordFinish: "Keyword to finish ticket",
@@ -647,6 +691,10 @@ const messages = {
 			},
 			prompts: {
 				title: "Prompts",
+				openAiHelp:
+					"Where OpenAI runs: on the WhatsApp connection (linked prompt), on the queue/sector (when that sector’s prompt is active), and in automated flows (the \"openai\" node in Flow Builder). " +
+					"When it replies: on incoming text messages (or audio where supported) on the ticket, as long as bot and queue rules allow. " +
+					"The reply uses recent message history for that ticket and the instructions from this record — context depends on what was already exchanged in the conversation.",
 				table: {
 					name: "Name",
 					queue: "Sector/Queue",
@@ -666,11 +714,26 @@ const messages = {
 					add: "Add Contact",
 					edit: "Edit Contact",
 				},
+				expectations:
+					"Service and history — not a sales funnel or pipeline. Ideal for tracking conversations.",
 				summary: {
-					title: "Summary",
-					tickets: "Tickets",
+					title: "Activity and history",
+					tickets: "Total tickets",
 					lastInteraction: "Last interaction",
 					lastMessage: "Last message",
+				},
+				tags: {
+					added: "Tag added",
+					removed: "Tag removed",
+					helpFromTickets:
+						"Tags are based on tickets linked to this contact. Adding or removing a tag requires an existing conversation (open or closed).",
+				},
+				campaigns: {
+					title: "Campaigns (lists)",
+					hint:
+						"Lists where this number already appears. To add it to another list, use the campaign lists page.",
+					empty: "This number is not in any list yet.",
+					manageLists: "Manage campaign lists",
 				},
 				form: {
 					mainInfo: "Contact Information",
@@ -684,10 +747,6 @@ const messages = {
 					extraName: "Field Name",
 					extraValue: "Value",
 					whatsapp: "Source Connection: ",
-				},
-				tags: {
-					added: "Tag added",
-					removed: "Tag removed",
 				},
 				formErrors: {
 					name: {
@@ -709,6 +768,7 @@ const messages = {
 					okAdd: "Add",
 					okEdit: "Save",
 					cancel: "Cancel",
+					openAttendance: "Open ticket",
 				},
 				success: "Contact saved successfully.",
 			},
@@ -845,6 +905,22 @@ const messages = {
 					fillTitle: "Please fill in the conversation title.",
 					fillUser: "Please select at least one user.",
 				},
+				page: {
+					title: "Internal chat",
+					searchPlaceholder: "Search conversations...",
+					loadingMessages: "Loading messages...",
+					loadingConversations: "Loading conversations...",
+					messagePlaceholder: "Type your message...",
+					emptyNoSearchTitle: "No matches",
+					emptyNoSearchSub: "Try another term or clear the search.",
+					emptyNoConversationsTitle: "No conversations yet",
+					emptyNoConversationsSub:
+						"Start a conversation to message your team.",
+					emptySelectTitle: "Select a conversation",
+					emptySelectSub: "Pick one from the list to view messages.",
+					newConversationButton: "New conversation",
+					tabsAria: "Conversations and messages",
+				},
 				modal: {
 					title: "Conversation",
 					titleField: "Title",
@@ -962,14 +1038,25 @@ const messages = {
 				button: "Preview",
 			},
 			mainDrawer: {
+				sections: {
+					dashboard: "Dashboard",
+					atendimento: "Customer service",
+					equipe: "Team",
+					automacao: "Automation",
+					campanhas: "Campaigns",
+					financeiro: "Financial",
+					configuracoes: "Settings",
+					mais: "More",
+				},
 				listItems: {
 					dashboard: "Dashboard",
 					connections: "Connections",
-					tickets: "Services",
-					quickMessages: "Quick Responses",
+					tickets: "Tickets",
+					quickMessages: "Quick replies",
 					tasks: "Tasks",
 					contacts: "Contacts",
 					queues: "Queues & Chatbot",
+					sectors: "Queues",
 					tags: "Tags",
 					administration: "Administration",
 					users: "Users",
@@ -978,13 +1065,22 @@ const messages = {
 					messagesAPI: "WhatsApp API",
 					schedules: "Schedules",
 					campaigns: "Campaigns",
+					contactLists: "Contact lists",
+					campaignSettings: "Settings",
 					flows: "Flows",
+					flowsChatbot: "Flows (Chatbot)",
+					keywordsTrigger: "Keyword triggers",
+					integrations: "Integrations",
+					reports: "Reports",
+					kanban: "Kanban",
+					groups: "Groups",
+					evaluation: "Evaluation",
 					annoucements: "Announcements",
-					chats: "Internal Chat",
-					financeiro: "Financial",
-					files: "File List",
-					prompts: "Open.AI",
-					queueIntegration: "Integrations",
+					chats: "Internal chat",
+					finance: "Financial",
+					files: "File list",
+					prompts: "OpenAI",
+					queueIntegration: "Automations by queue",
 				},
 				appBar: {
 					refresh: "Reload page",
@@ -1007,10 +1103,17 @@ const messages = {
 				},
 			},
 			queueIntegration: {
-				title: "Integrations",
+				title: "Automations by queue",
+				pageSubtitle:
+					"Integration records linked to queues or the WhatsApp connection. Different types behave differently — Webhook/N8N only POST data; Flowbuilder and Typebot handle the conversation in attendance.",
+				pageIntro:
+					"For Webhook or N8N, this sends data to an external system but does not receive responses automatically in the ticket. Create records here and link them under Queues (and optionally the connection). For automated replies to the customer on WhatsApp, use Flowbuilder or Typebot.",
 				table: {
 					id: "ID",
 					type: "Type",
+					categoryInternal: "Internal",
+					categoryExternal: "External",
+					categoryLegacy: "Legacy",
 					name: "Name",
 					projectName: "Project Name",
 					language: "Language",
@@ -1018,9 +1121,12 @@ const messages = {
 					actions: "Actions",
 				},
 				buttons: {
-					add: "Add Project",
+					add: "Add automation",
 				},
 				searchPlaceholder: "Search...",
+				toasts: {
+					deleted: "Automation deleted successfully.",
+				},
 				confirmationModal: {
 					deleteTitle: "Delete",
 					deleteMessage: "Are you sure? This action cannot be undone! It will be removed from linked queues and connections",
@@ -1583,10 +1689,29 @@ const messages = {
 				},
 			},
 			todolist: {
-				input: "New task",
+				pageTitle: "Personal list (saved in this browser)",
+				pageSubtitle:
+					"Notes stay on this device only — they are not synced to the server or other users.",
+				notice:
+					"These notes are stored only in this browser and are not shared with your team.",
+				emptyNoItems: "No notes yet. Add one above.",
+				emptyFilter: "No notes match this filter.",
+				storageParseError:
+					"Could not load your notes. Invalid data was cleared.",
+				storageWriteError:
+					"Could not save (browser storage may be full or blocked).",
+				input: "New note",
+				completedAria: "Mark as done",
+				filter: {
+					label: "Show:",
+					all: "All",
+					pending: "Open",
+					completed: "Done",
+				},
 				buttons: {
 					add: "Add",
 					save: "Save",
+					typeTask: "Type a note to add",
 				},
 			},
 			helps: {
@@ -1594,6 +1719,10 @@ const messages = {
 			},
 			evaluation: {
 				title: "Evaluation",
+				flowInfo:
+					"When ratings are enabled in settings, closing a ticket sends the customer a WhatsApp request for a score (scale 1–3). The ticket is only finalized after the customer replies with 1, 2, or 3. Invalid replies are ignored until a valid score is received.",
+				scaleHint: "Scale: 1 — Unsatisfied · 2 — Satisfied · 3 — Very satisfied",
+				listHint: "Each row is a recorded response; the score reflects the option the customer chose on WhatsApp.",
 				avgRating: "Average Rating",
 				totalRatings: "Total Ratings",
 				byAttendant: "By Attendant",
@@ -1607,7 +1736,8 @@ const messages = {
 					contact: "Contact",
 					attendant: "Attendant",
 					setor: "Sector",
-					rating: "Rating",
+					rating: "Score",
+					ratingSub: "1 to 3",
 				},
 			},
 			schedules: {

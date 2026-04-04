@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
+import { Link as RouterLink } from "react-router-dom";
 
 import * as Yup from "yup";
 import { Formik, FieldArray, Form, Field } from "formik";
@@ -13,12 +14,16 @@ import DialogActions from "@material-ui/core/DialogActions";
 import DialogContent from "@material-ui/core/DialogContent";
 import DialogTitle from "@material-ui/core/DialogTitle";
 import Typography from "@material-ui/core/Typography";
+import Grid from "@material-ui/core/Grid";
+import Paper from "@material-ui/core/Paper";
+import Box from "@material-ui/core/Box";
 import IconButton from "@material-ui/core/IconButton";
 import DeleteOutlineIcon from "@material-ui/icons/DeleteOutline";
 import CircularProgress from "@material-ui/core/CircularProgress";
 import Chip from "@material-ui/core/Chip";
-import Box from "@material-ui/core/Box";
+import Divider from "@material-ui/core/Divider";
 import Autocomplete from "@material-ui/lab/Autocomplete";
+import Alert from "@material-ui/lab/Alert";
 
 import { i18n } from "../../translate/i18n";
 
@@ -60,9 +65,53 @@ const useStyles = makeStyles(theme => ({
 		marginTop: theme.spacing(1),
 		marginBottom: theme.spacing(1),
 	},
+	tagChip: {
+		maxWidth: 200,
+		border: "1px solid rgba(0,0,0,0.12)",
+		"& .MuiChip-label": {
+			overflow: "hidden",
+			textOverflow: "ellipsis",
+		},
+	},
+	summaryCard: {
+		padding: theme.spacing(1.5),
+		height: "100%",
+	},
+	summaryMetric: {
+		fontWeight: 700,
+		fontSize: "1.35rem",
+		lineHeight: 1.2,
+		marginTop: theme.spacing(0.5),
+		wordBreak: "break-word",
+	},
+	summaryLabel: {
+		fontSize: "0.75rem",
+		textTransform: "uppercase",
+		letterSpacing: "0.04em",
+		color: theme.palette.text.secondary,
+	},
+	dialogContent: {
+		maxHeight: "calc(100vh - 200px)",
+		overflowY: "auto",
+	},
+	campaignRow: {
+		display: "flex",
+		flexWrap: "wrap",
+		alignItems: "center",
+		gap: theme.spacing(0.75),
+		marginTop: theme.spacing(0.5),
+	},
 }));
 
-const ContactModal = ({ open, onClose, contactId, initialValues, onSave, onContactSaved }) => {
+const ContactModal = ({
+	open,
+	onClose,
+	contactId,
+	initialValues,
+	onSave,
+	onContactSaved,
+	onOpenAttendance,
+}) => {
 	const classes = useStyles();
 	const isMounted = useRef(true);
 
@@ -79,6 +128,7 @@ const ContactModal = ({ open, onClose, contactId, initialValues, onSave, onConta
 	const [allTags, setAllTags] = useState([]);
 	const [summary, setSummary] = useState(null);
 	const [summaryLoading, setSummaryLoading] = useState(false);
+	const [campaignLists, setCampaignLists] = useState([]);
 
 	const validationSchema = useMemo(
 		() =>
@@ -120,6 +170,7 @@ const ContactModal = ({ open, onClose, contactId, initialValues, onSave, onConta
 				});
 				setLocalTags([]);
 				setSummary(null);
+				setCampaignLists([]);
 				return;
 			}
 
@@ -132,6 +183,9 @@ const ContactModal = ({ open, onClose, contactId, initialValues, onSave, onConta
 						notes: data.notes ?? "",
 					});
 					setLocalTags(Array.isArray(data.tags) ? data.tags : []);
+					setCampaignLists(
+						Array.isArray(data.campaignLists) ? data.campaignLists : []
+					);
 				}
 			} catch (err) {
 				toastError(err);
@@ -184,6 +238,16 @@ const ContactModal = ({ open, onClose, contactId, initialValues, onSave, onConta
 		setContact(initialState);
 		setLocalTags([]);
 		setSummary(null);
+		setCampaignLists([]);
+	};
+
+	const handleOpenAttendance = () => {
+		if (!onOpenAttendance || !contactId || !contact) return;
+		onOpenAttendance({
+			...contact,
+			id: contactId,
+			tags: localTags,
+		});
 	};
 
 	const handleSaveContact = async values => {
@@ -257,98 +321,169 @@ const ContactModal = ({ open, onClose, contactId, initialValues, onSave, onConta
 				>
 					{({ values, errors, touched, isSubmitting }) => (
 						<Form>
-							<DialogContent dividers>
+							<DialogContent dividers className={classes.dialogContent}>
 								{contactId && (
 									<Box marginBottom={2}>
 										<Typography variant="subtitle1" gutterBottom>
 											{i18n.t("contactModal.summary.title")}
 										</Typography>
+										<Alert severity="info" variant="outlined" style={{ marginBottom: 12 }}>
+											{i18n.t("contactModal.expectations")}
+										</Alert>
 										{summaryLoading ? (
 											<CircularProgress size={22} />
 										) : summary ? (
-											<>
-												<Typography variant="body2" color="textSecondary">
-													{i18n.t("contactModal.summary.tickets")}:{" "}
-													<strong>{summary.totalTickets}</strong>
-												</Typography>
-												<Typography variant="body2" color="textSecondary">
-													{i18n.t("contactModal.summary.lastInteraction")}:{" "}
-													{summary.lastInteraction
-														? new Date(summary.lastInteraction).toLocaleString()
-														: "—"}
-												</Typography>
-												<Typography variant="body2" color="textSecondary" noWrap>
-													{i18n.t("contactModal.summary.lastMessage")}:{" "}
-													{summary.lastMessage || "—"}
-												</Typography>
-											</>
+											<Grid container spacing={2}>
+												<Grid item xs={12} sm={4}>
+													<Paper className={classes.summaryCard} variant="outlined">
+														<Typography className={classes.summaryLabel}>
+															{i18n.t("contactModal.summary.tickets")}
+														</Typography>
+														<Typography className={classes.summaryMetric} color="primary">
+															{summary.totalTickets}
+														</Typography>
+													</Paper>
+												</Grid>
+												<Grid item xs={12} sm={4}>
+													<Paper className={classes.summaryCard} variant="outlined">
+														<Typography className={classes.summaryLabel}>
+															{i18n.t("contactModal.summary.lastInteraction")}
+														</Typography>
+														<Typography className={classes.summaryMetric} component="div" style={{ fontSize: "1rem", fontWeight: 600 }}>
+															{summary.lastInteraction
+																? new Date(summary.lastInteraction).toLocaleString()
+																: "—"}
+														</Typography>
+													</Paper>
+												</Grid>
+												<Grid item xs={12} sm={4}>
+													<Paper className={classes.summaryCard} variant="outlined">
+														<Typography className={classes.summaryLabel}>
+															{i18n.t("contactModal.summary.lastMessage")}
+														</Typography>
+														<Typography variant="body2" style={{ marginTop: 8, maxHeight: 72, overflow: "auto" }}>
+															{summary.lastMessage || "—"}
+														</Typography>
+													</Paper>
+												</Grid>
+											</Grid>
 										) : null}
+
+										<Box marginTop={2}>
+											<Typography variant="subtitle2" color="textSecondary" gutterBottom>
+												{i18n.t("contactModal.campaigns.title")}
+											</Typography>
+											<Typography variant="caption" color="textSecondary" display="block" style={{ marginBottom: 8 }}>
+												{i18n.t("contactModal.campaigns.hint")}
+											</Typography>
+											<div className={classes.campaignRow}>
+												{campaignLists.length === 0 ? (
+													<Typography variant="body2" color="textSecondary">
+														{i18n.t("contactModal.campaigns.empty")}
+													</Typography>
+												) : (
+													campaignLists.map(list => (
+														<Chip
+															key={list.id}
+															label={list.name}
+															size="small"
+															component={RouterLink}
+															to={`/contact-lists/${list.id}/contacts`}
+															clickable
+															className={classes.tagChip}
+														/>
+													))
+												)}
+												<Button
+													size="small"
+													variant="outlined"
+													color="primary"
+													component={RouterLink}
+													to="/contact-lists"
+												>
+													{i18n.t("contactModal.campaigns.manageLists")}
+												</Button>
+											</div>
+										</Box>
 									</Box>
 								)}
+
+								<Divider style={{ marginBottom: 16 }} />
 
 								<Typography variant="subtitle1" gutterBottom>
 									{i18n.t("contactModal.form.mainInfo")}
 								</Typography>
-								<Field
-									as={TextField}
-									label={i18n.t("contactModal.form.name")}
-									name="name"
-									autoFocus
-									error={touched.name && Boolean(errors.name)}
-									helperText={touched.name && errors.name}
-									variant="outlined"
-									margin="dense"
-									className={classes.textField}
-								/>
-								<Field
-									as={TextField}
-									name="number"
-									label={i18n.t("contactModal.form.number")}
-									error={touched.number && Boolean(errors.number)}
-									helperText={touched.number && errors.number}
-									placeholder=""
-									variant="outlined"
-									margin="dense"
-									disabled={Boolean(contactId)}
-									InputProps={{
-										readOnly: Boolean(contactId),
-									}}
-								/>
-
-								<div>
-									<Field
-										as={TextField}
-										label={i18n.t("contactModal.form.email")}
-										name="email"
-										error={touched.email && Boolean(errors.email)}
-										helperText={touched.email && errors.email}
-										placeholder="Email address"
-										fullWidth
-										margin="dense"
-										variant="outlined"
-									/>
-								</div>
-
-								<Field
-									as={TextField}
-									label={i18n.t("contactModal.form.notes")}
-									name="notes"
-									error={touched.notes && Boolean(errors.notes)}
-									helperText={touched.notes && errors.notes}
-									fullWidth
-									margin="dense"
-									variant="outlined"
-									multiline
-									minRows={3}
-								/>
+								<Grid container spacing={1}>
+									<Grid item xs={12} md={6}>
+										<Field
+											as={TextField}
+											label={i18n.t("contactModal.form.name")}
+											name="name"
+											autoFocus
+											error={touched.name && Boolean(errors.name)}
+											helperText={touched.name && errors.name}
+											variant="outlined"
+											margin="dense"
+											fullWidth
+										/>
+									</Grid>
+									<Grid item xs={12} md={6}>
+										<Field
+											as={TextField}
+											label={i18n.t("contactModal.form.email")}
+											name="email"
+											error={touched.email && Boolean(errors.email)}
+											helperText={touched.email && errors.email}
+											placeholder="Email address"
+											fullWidth
+											margin="dense"
+											variant="outlined"
+										/>
+									</Grid>
+									<Grid item xs={12}>
+										<Field
+											as={TextField}
+											name="number"
+											label={i18n.t("contactModal.form.number")}
+											error={touched.number && Boolean(errors.number)}
+											helperText={touched.number && errors.number}
+											placeholder=""
+											fullWidth
+											variant="outlined"
+											margin="dense"
+											disabled={Boolean(contactId)}
+											InputProps={{
+												readOnly: Boolean(contactId),
+											}}
+										/>
+									</Grid>
+									<Grid item xs={12}>
+										<Field
+											as={TextField}
+											label={i18n.t("contactModal.form.notes")}
+											name="notes"
+											error={touched.notes && Boolean(errors.notes)}
+											helperText={touched.notes && errors.notes}
+											fullWidth
+											margin="dense"
+											variant="outlined"
+											multiline
+											minRows={2}
+										/>
+									</Grid>
+								</Grid>
 
 								{contactId && (
 									<>
+										<Divider style={{ margin: "16px 0" }} />
 										<Typography
-											style={{ marginBottom: 8, marginTop: 12 }}
+											style={{ marginBottom: 8 }}
 											variant="subtitle1"
 										>
 											{i18n.t("contactModal.form.tags")}
+										</Typography>
+										<Typography variant="caption" color="textSecondary" display="block" style={{ marginBottom: 8 }}>
+											{i18n.t("contactModal.tags.helpFromTickets")}
 										</Typography>
 										<div className={classes.tagsRow}>
 											{localTags.map(tag => (
@@ -356,6 +491,7 @@ const ContactModal = ({ open, onClose, contactId, initialValues, onSave, onConta
 													key={tag.id}
 													label={tag.name}
 													size="small"
+													className={classes.tagChip}
 													style={{
 														backgroundColor: tag.color || "#eee",
 													}}
@@ -382,17 +518,12 @@ const ContactModal = ({ open, onClose, contactId, initialValues, onSave, onConta
 									</>
 								)}
 
-								<Typography
-									style={{ marginBottom: 8, marginTop: 12 }}
-									variant="subtitle1"
-								>
-									{i18n.t("contactModal.form.whatsapp")}{" "}
-									{contact?.whatsapp ? contact?.whatsapp.name : ""}
+								<Divider style={{ margin: "16px 0" }} />
+								<Typography variant="caption" color="textSecondary" display="block" gutterBottom>
+									{i18n.t("contactModal.form.whatsapp")}
+									{contact?.whatsapp ? contact?.whatsapp.name : "—"}
 								</Typography>
-								<Typography
-									style={{ marginBottom: 8, marginTop: 12 }}
-									variant="subtitle1"
-								>
+								<Typography style={{ marginBottom: 8 }} variant="subtitle1">
 									{i18n.t("contactModal.form.extraInfo")}
 								</Typography>
 
@@ -453,6 +584,17 @@ const ContactModal = ({ open, onClose, contactId, initialValues, onSave, onConta
 								>
 									{i18n.t("contactModal.buttons.cancel")}
 								</Button>
+								{contactId && onOpenAttendance && (
+									<Button
+										type="button"
+										onClick={handleOpenAttendance}
+										color="primary"
+										disabled={isSubmitting}
+										variant="outlined"
+									>
+										{i18n.t("contactModal.buttons.openAttendance")}
+									</Button>
+								)}
 								<Button
 									type="submit"
 									color="primary"
