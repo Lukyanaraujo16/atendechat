@@ -88,6 +88,8 @@ const Ticket = () => {
   const classes = useStyles();
 
   const { user } = useContext(AuthContext);
+  const userRef = useRef(user);
+  userRef.current = user;
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -105,8 +107,9 @@ const Ticket = () => {
         try {
           const { data } = await api.get("/tickets/u/" + ticketId);
           const { queueId } = data;
-          const queues = user?.queues || [];
-          const { profile } = user || {};
+          const u = userRef.current;
+          const queues = u?.queues || [];
+          const { profile } = u || {};
 
           const queueAllowed = queues.find((q) => q.id === queueId);
           if (queueAllowed === undefined && profile !== "admin") {
@@ -126,7 +129,7 @@ const Ticket = () => {
       fetchTicket();
     }, 500);
     return () => clearTimeout(delayDebounceFn);
-  }, [ticketId, history, user]);
+  }, [ticketId, history]);
 
   useEffect(() => {
     const companyId = localStorage.getItem("companyId");
@@ -163,17 +166,14 @@ const Ticket = () => {
     socket.on(`company-${companyId}-ticket`, handleTicket);
     socket.on(`company-${companyId}-contact`, handleContact);
 
+    if (ticket?.id) {
+      socket.emit("joinChatBox", `${ticket.id}`);
+    }
+
     return () => {
       socket.disconnect();
     };
-  }, [ticketId, history, socketManager]);
-
-  useEffect(() => {
-    if (!ticket?.id) return;
-    const companyId = localStorage.getItem("companyId");
-    const socket = socketManager.getSocket(companyId);
-    socket.emit("joinChatBox", `${ticket.id}`);
-  }, [ticket?.id, socketManager]);
+  }, [ticketId, history, socketManager, ticket?.id]);
 
   const handleDrawerOpen = () => {
     setDrawerOpen(true);

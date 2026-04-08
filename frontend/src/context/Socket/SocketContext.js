@@ -10,7 +10,7 @@ class ManagedSocket {
     this.callbacks = [];
     this.joins = [];
 
-    this.rawSocket.on("connect", () => {
+    this._onManagedConnect = () => {
       if (!this.rawSocket.recovered) {
         const refreshJoinsOnReady = () => {
           for (const j of this.joins) {
@@ -23,10 +23,11 @@ class ManagedSocket {
           this.rawSocket.off(j.event, j.callback);
           this.rawSocket.on(j.event, j.callback);
         }
-        
+
         this.rawSocket.on("ready", refreshJoinsOnReady);
       }
-    });
+    };
+    this.rawSocket.on("connect", this._onManagedConnect);
   }
   
   on(event, callback) {
@@ -39,7 +40,9 @@ class ManagedSocket {
   
   off(event, callback) {
     const i = this.callbacks.findIndex((c) => c.event === event && c.callback === callback);
-    this.callbacks.splice(i, 1);
+    if (i !== -1) {
+      this.callbacks.splice(i, 1);
+    }
     return this.rawSocket.off(event, callback);
   }
   
@@ -60,6 +63,10 @@ class ManagedSocket {
       this.rawSocket.off(c.event, c.callback);
     }
     this.callbacks = [];
+    if (this._onManagedConnect && this.rawSocket) {
+      this.rawSocket.off("connect", this._onManagedConnect);
+      this._onManagedConnect = null;
+    }
   }
 }
 
@@ -137,11 +144,13 @@ const SocketManager = {
       
       this.currentSocket.on("connect", (...params) => {
         console.warn("socket connected", params);
-      })
-      
-      this.currentSocket.onAny((event, ...args) => {
-        console.debug("Event: ", { socket: this.currentSocket, event, args });
       });
+
+      if (process.env.NODE_ENV !== "production") {
+        this.currentSocket.onAny((event, ...args) => {
+          console.debug("Event: ", { socket: this.currentSocket, event, args });
+        });
+      }
       
       this.onReady(() => {
         this.socketReady = true;
