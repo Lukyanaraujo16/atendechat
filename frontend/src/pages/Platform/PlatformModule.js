@@ -12,10 +12,6 @@ import PlatformBranding from "./PlatformBranding";
 export default function PlatformModule() {
   const { user } = useContext(AuthContext);
 
-  if (!user?.super) {
-    return <Redirect to="/tickets" />;
-  }
-
   const tabs = useMemo(
     () => [
       { path: "/platform", label: i18n.t("platform.tabs.dashboard") },
@@ -24,6 +20,10 @@ export default function PlatformModule() {
     ],
     [i18n.language]
   );
+
+  if (!user?.super) {
+    return <Redirect to="/tickets" />;
+  }
 
   return (
     <ModuleTabsLayout tabs={tabs}>
