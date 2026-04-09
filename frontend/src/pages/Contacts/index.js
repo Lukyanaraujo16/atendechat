@@ -3,14 +3,12 @@ import React, { useState, useEffect, useReducer, useContext } from "react";
 import { toast } from "react-toastify";
 import { useHistory } from "react-router-dom";
 import { Tooltip } from "@material-ui/core";
-import { makeStyles } from "@material-ui/core/styles";
+import { alpha, makeStyles } from "@material-ui/core/styles";
 import Table from "@material-ui/core/Table";
 import TableBody from "@material-ui/core/TableBody";
 import TableCell from "@material-ui/core/TableCell";
 import TableHead from "@material-ui/core/TableHead";
 import TableRow from "@material-ui/core/TableRow";
-import Paper from "@material-ui/core/Paper";
-import Button from "@material-ui/core/Button";
 import Avatar from "@material-ui/core/Avatar";
 import WhatsAppIcon from "@material-ui/icons/WhatsApp";
 import AccessTimeIcon from "@material-ui/icons/AccessTime";
@@ -25,22 +23,28 @@ import Chip from "@material-ui/core/Chip";
 import Box from "@material-ui/core/Box";
 import Typography from "@material-ui/core/Typography";
 import Alert from "@material-ui/lab/Alert";
-import { formatDistanceToNow, format } from "date-fns";
-import { ptBR } from "date-fns/locale";
-
 import IconButton from "@material-ui/core/IconButton";
 import DeleteOutlineIcon from "@material-ui/icons/DeleteOutline";
 import EditIcon from "@material-ui/icons/Edit";
+import { formatDistanceToNow, format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+
 import api from "../../services/api";
 import TableRowSkeleton from "../../components/TableRowSkeleton";
 import ContactModal from "../../components/ContactModal";
 import ConfirmationModal from "../../components/ConfirmationModal/";
 
 import { i18n } from "../../translate/i18n";
-import MainHeader from "../../components/MainHeader";
-import Title from "../../components/Title";
-import MainHeaderButtonsWrapper from "../../components/MainHeaderButtonsWrapper";
 import MainContainer from "../../components/MainContainer";
+import {
+	AppPageHeader,
+	AppSectionCard,
+	AppPrimaryButton,
+	AppSecondaryButton,
+	AppActionBar,
+	AppTableContainer,
+	AppDangerAction,
+} from "../../ui";
 import toastError from "../../errors/toastError";
 import { AuthContext } from "../../context/Auth/AuthContext";
 import { Can } from "../../components/Can";
@@ -95,18 +99,55 @@ const reducer = (state, action) => {
 };
 
 const useStyles = makeStyles((theme) => ({
-	mainPaper: {
-		flex: 1,
-		padding: theme.spacing(1),
-		overflowY: "scroll",
-		...theme.scrollbarStyles,
-	},
-	filtersRow: {
+	pageRoot: {
 		display: "flex",
+		flexDirection: "column",
+		gap: theme.spacing(2),
+		minHeight: 0,
+		flex: 1,
+		[theme.breakpoints.up("md")]: {
+			gap: theme.spacing(3),
+		},
+	},
+	alertsBox: {
+		"& .MuiAlert-message": {
+			width: "100%",
+		},
+	},
+	expectationsBox: {
+		padding: theme.spacing(1.5, 2),
+		borderRadius: theme.shape.borderRadius,
+		backgroundColor: theme.palette.action.hover,
+	},
+	filtersBar: {
 		flexWrap: "wrap",
-		gap: theme.spacing(1),
-		alignItems: "center",
-		marginBottom: theme.spacing(1),
+		alignItems: "flex-end",
+	},
+	searchField: {
+		flex: "1 1 220px",
+		minWidth: 180,
+		maxWidth: 400,
+	},
+	tagField: {
+		minWidth: 200,
+		flex: "0 1 220px",
+	},
+	dateField: {
+		flex: "0 1 160px",
+	},
+	filterHint: {
+		fontSize: "0.75rem",
+		color: theme.palette.text.secondary,
+		marginTop: theme.spacing(0.25),
+	},
+	filterStack: {
+		display: "flex",
+		flexDirection: "column",
+		gap: theme.spacing(2),
+	},
+	tableCard: {
+		flex: 1,
+		minHeight: 0,
 	},
 	chipWrap: {
 		display: "flex",
@@ -116,38 +157,63 @@ const useStyles = makeStyles((theme) => ({
 	},
 	tagChip: {
 		maxWidth: 140,
-		border: "1px solid rgba(0,0,0,0.12)",
+		border: `1px solid ${theme.palette.divider}`,
 		"& .MuiChip-label": {
 			overflow: "hidden",
 			textOverflow: "ellipsis",
 		},
 	},
-	headerTitleBlock: {
-		flex: 1,
-		minWidth: 200,
+	tagChipNeutral: {
+		backgroundColor: theme.palette.grey[200],
 	},
-	pageAlerts: {
-		marginBottom: theme.spacing(1),
-		"& .MuiAlert-message": {
-			width: "100%",
-		},
+	avatarCell: {
+		paddingRight: theme.spacing(1),
+		width: 56,
 	},
-	filterHint: {
-		fontSize: "0.75rem",
-		color: theme.palette.text.secondary,
-		marginTop: theme.spacing(0.5),
-		width: "100%",
+	nameCell: {
+		cursor: "pointer",
 	},
 	lastInteractionBox: {
 		display: "inline-flex",
 		flexDirection: "column",
 		alignItems: "center",
-		gap: 2,
+		gap: theme.spacing(0.25),
 		maxWidth: 200,
 		margin: "0 auto",
 		padding: theme.spacing(0.75, 1),
-		borderRadius: 8,
+		borderRadius: theme.shape.borderRadius,
 		border: `1px solid ${theme.palette.divider}`,
+	},
+	lastInteractionFresh: {
+		borderColor: theme.palette.success.main,
+		backgroundColor: alpha(theme.palette.success.main, 0.08),
+		"& $interactionIcon": {
+			color: theme.palette.success.main,
+		},
+		"& $interactionPrimary": {
+			color: theme.palette.success.dark,
+			fontWeight: 600,
+		},
+	},
+	lastInteractionWeek: {
+		borderColor: theme.palette.warning.main,
+		backgroundColor: alpha(theme.palette.warning.main, 0.08),
+		"& $interactionIcon": {
+			color: theme.palette.warning.main,
+		},
+		"& $interactionPrimary": {
+			color: theme.palette.warning.dark,
+			fontWeight: 600,
+		},
+	},
+	lastInteractionStale: {
+		backgroundColor: theme.palette.action.selected,
+		"& $interactionIcon": {
+			color: theme.palette.action.active,
+		},
+		"& $interactionPrimary": {
+			fontWeight: 600,
+		},
 	},
 	lastInteractionRow: {
 		display: "flex",
@@ -155,13 +221,19 @@ const useStyles = makeStyles((theme) => ({
 		justifyContent: "center",
 		gap: theme.spacing(0.5),
 	},
+	interactionIcon: {},
+	interactionPrimary: {},
 	actionButtons: {
 		display: "inline-flex",
 		flexWrap: "wrap",
 		alignItems: "center",
 		justifyContent: "center",
-		gap: theme.spacing(0.25),
+		gap: theme.spacing(0.5),
 		maxWidth: 280,
+	},
+	csvLink: {
+		textDecoration: "none",
+		display: "inline-flex",
 	},
 }));
 
@@ -333,39 +405,13 @@ const Contacts = () => {
 		}
 	};
 
-	const lastInteractionStyle = (iso) => {
-		if (!iso) {
-			return {
-				borderColor: undefined,
-				backgroundColor: "transparent",
-				iconColor: "text.secondary",
-				primaryColor: "text.secondary",
-			};
-		}
+	const lastInteractionToneClass = (iso) => {
+		if (!iso) return null;
 		const diff = Date.now() - new Date(iso).getTime();
 		const day = 86400000;
-		if (diff < day) {
-			return {
-				borderColor: "#2e7d32",
-				backgroundColor: "rgba(46, 125, 50, 0.08)",
-				iconColor: "#2e7d32",
-				primaryColor: "#1b5e20",
-			};
-		}
-		if (diff < 7 * day) {
-			return {
-				borderColor: "#f57c00",
-				backgroundColor: "rgba(245, 124, 0, 0.08)",
-				iconColor: "#ef6c00",
-				primaryColor: "#e65100",
-			};
-		}
-		return {
-			borderColor: undefined,
-			backgroundColor: "rgba(0, 0, 0, 0.04)",
-			iconColor: "action",
-			primaryColor: "textPrimary",
-		};
+		if (diff < day) return classes.lastInteractionFresh;
+		if (diff < 7 * day) return classes.lastInteractionWeek;
+		return classes.lastInteractionStale;
 	};
 
 	const renderLastInteraction = (iso) => {
@@ -376,7 +422,7 @@ const Contacts = () => {
 				</Typography>
 			);
 		}
-		const tone = lastInteractionStyle(iso);
+		const toneClass = lastInteractionToneClass(iso);
 		let absolute = "";
 		try {
 			absolute = format(new Date(iso), "dd/MM/yyyy HH:mm", { locale: ptBR });
@@ -385,11 +431,7 @@ const Contacts = () => {
 		}
 		return (
 			<Box
-				className={classes.lastInteractionBox}
-				style={{
-					borderColor: tone.borderColor,
-					backgroundColor: tone.backgroundColor,
-				}}
+				className={`${classes.lastInteractionBox} ${toneClass || ""}`}
 			>
 				<Tooltip
 					title={
@@ -399,42 +441,22 @@ const Contacts = () => {
 					}
 				>
 					<Box className={classes.lastInteractionRow}>
-						<AccessTimeIcon
-							style={{
-								fontSize: 18,
-								color:
-									typeof tone.iconColor === "string" &&
-									tone.iconColor.startsWith("#")
-										? tone.iconColor
-										: undefined,
-							}}
-							color={tone.iconColor === "action" ? "action" : "inherit"}
-						/>
+						<AccessTimeIcon className={classes.interactionIcon} fontSize="small" />
 						<Typography
 							variant="body2"
 							component="span"
-							style={{
-								fontWeight: 600,
-								color:
-									typeof tone.primaryColor === "string" &&
-									tone.primaryColor.startsWith("#")
-										? tone.primaryColor
-										: undefined,
-							}}
-							color={
-								tone.primaryColor === "textPrimary"
-									? "textPrimary"
-									: tone.primaryColor === "textSecondary"
-									? "textSecondary"
-									: "inherit"
-							}
+							className={classes.interactionPrimary}
 						>
 							{formatLastInteraction(iso)}
 						</Typography>
 					</Box>
 				</Tooltip>
 				{absolute ? (
-					<Typography variant="caption" color="textSecondary" style={{ lineHeight: 1.2 }}>
+					<Typography
+						variant="caption"
+						color="textSecondary"
+						style={{ lineHeight: 1.2 }}
+					>
 						{absolute}
 					</Typography>
 				) : null}
@@ -452,7 +474,7 @@ const Contacts = () => {
 	};
 
 	return (
-		<MainContainer className={classes.mainContainer}>
+		<MainContainer className={classes.pageRoot}>
 			<ImportContactsModal
 				open={openModalImport}
 				onClose={handleCloseModalImport}
@@ -477,7 +499,7 @@ const Contacts = () => {
 					setNewTicketModalOpen(true);
 					setContactModalOpen(false);
 				}}
-			></ContactModal>
+			/>
 			<ConfirmationModal
 				title={
 					deletingContact
@@ -498,122 +520,129 @@ const Contacts = () => {
 					? `${i18n.t("contacts.confirmationModal.deleteMessage")}`
 					: `${i18n.t("contacts.confirmationModal.importMessage")}`}
 			</ConfirmationModal>
-			<MainHeader>
-				<Box className={classes.headerTitleBlock}>
-					<Title>{i18n.t("contacts.title")}</Title>
+
+			<AppPageHeader
+				title={
+					<Typography variant="h5" color="primary" component="h1">
+						{i18n.t("contacts.title")}
+					</Typography>
+				}
+				subtitle={
 					<Typography variant="body2" color="textSecondary" component="p">
 						{i18n.t("contacts.subtitle")}
 					</Typography>
-				</Box>
-				<MainHeaderButtonsWrapper>
-					<TextField
-						placeholder={i18n.t("contacts.searchPlaceholder")}
-						type="search"
-						value={searchParam}
-						onChange={handleSearch}
-						helperText={i18n.t("contacts.searchHelper")}
-						variant="outlined"
-						size="small"
-						InputProps={{
-							startAdornment: (
-								<InputAdornment position="start">
-									<SearchIcon style={{ color: "gray" }} />
-								</InputAdornment>
-							),
-						}}
-					/>
-					<Button
-						variant="contained"
-						color="primary"
-						onClick={handleOpenImportModal}
-					>
-						{i18n.t("contacts.buttons.import")}
-					</Button>
-					<Button
-						variant="contained"
-						color="primary"
-						onClick={handleOpenContactModal}
-					>
-						{i18n.t("contacts.buttons.add")}
-					</Button>
-					<CSVLink
-						style={{ textDecoration: "none" }}
-						separator=";"
-						filename={"contatos.csv"}
-						data={contacts.map((contact) => ({
-							name: contact.name,
-							number: contact.number,
-							email: contact.email,
-						}))}
-					>
-						<Button variant="contained" color="primary">
-							{i18n.t("contacts.buttons.export")}
-						</Button>
-					</CSVLink>
-				</MainHeaderButtonsWrapper>
-			</MainHeader>
-			<Box className={classes.pageAlerts}>
+				}
+				actions={
+					<>
+						<AppSecondaryButton onClick={handleOpenImportModal}>
+							{i18n.t("contacts.buttons.import")}
+						</AppSecondaryButton>
+						<CSVLink
+							className={classes.csvLink}
+							separator=";"
+							filename={"contatos.csv"}
+							data={contacts.map((contact) => ({
+								name: contact.name,
+								number: contact.number,
+								email: contact.email,
+							}))}
+						>
+							<AppSecondaryButton component="span">
+								{i18n.t("contacts.buttons.export")}
+							</AppSecondaryButton>
+						</CSVLink>
+						<AppPrimaryButton onClick={handleOpenContactModal}>
+							{i18n.t("contacts.buttons.add")}
+						</AppPrimaryButton>
+					</>
+				}
+			/>
+
+			<Box className={classes.alertsBox}>
 				<Alert severity="info" variant="outlined">
 					{i18n.t("contacts.pageBanner")}
 				</Alert>
-				<Box
-					mt={1}
-					p={1.5}
-					borderRadius={4}
-					bgcolor="action.hover"
-				>
+				<Box mt={1.5} className={classes.expectationsBox}>
 					<Typography variant="body2" color="textSecondary">
 						{i18n.t("contacts.pageExpectations")}
 					</Typography>
 				</Box>
 			</Box>
-			<Box className={classes.filtersRow}>
-				<Box display="flex" flexDirection="column">
-					<FormControl variant="outlined" margin="dense" style={{ minWidth: 200 }}>
-						<InputLabel id="contacts-tag-filter">
-							{i18n.t("contacts.filters.tag")}
-						</InputLabel>
-						<Select
-							labelId="contacts-tag-filter"
-							value={tagFilter}
-							onChange={(e) => setTagFilter(e.target.value)}
-							label={i18n.t("contacts.filters.tag")}
-						>
-							<MenuItem value="">
-								<em>{i18n.t("contacts.filters.allTags")}</em>
-							</MenuItem>
-							{tagOptions.map((t) => (
-								<MenuItem key={t.id} value={String(t.id)}>
-									{t.name}
-								</MenuItem>
-							))}
-						</Select>
-					</FormControl>
-					<Typography className={classes.filterHint} component="span">
-						{i18n.t("contacts.tagFilterHelp")}
-					</Typography>
+
+			<AppSectionCard dense variant="outlined">
+				<Box className={classes.filterStack}>
+					<AppActionBar className={classes.filtersBar}>
+						<TextField
+							className={classes.searchField}
+							placeholder={i18n.t("contacts.searchPlaceholder")}
+							type="search"
+							value={searchParam}
+							onChange={handleSearch}
+							helperText={i18n.t("contacts.searchHelper")}
+							variant="outlined"
+							size="small"
+							InputProps={{
+								startAdornment: (
+									<InputAdornment position="start">
+										<SearchIcon color="action" fontSize="small" />
+									</InputAdornment>
+								),
+							}}
+						/>
+						<Box display="flex" flexDirection="column" className={classes.tagField}>
+							<FormControl variant="outlined" margin="dense" fullWidth>
+								<InputLabel id="contacts-tag-filter">
+									{i18n.t("contacts.filters.tag")}
+								</InputLabel>
+								<Select
+									labelId="contacts-tag-filter"
+									value={tagFilter}
+									onChange={(e) => setTagFilter(e.target.value)}
+									label={i18n.t("contacts.filters.tag")}
+								>
+									<MenuItem value="">
+										<em>{i18n.t("contacts.filters.allTags")}</em>
+									</MenuItem>
+									{tagOptions.map((t) => (
+										<MenuItem key={t.id} value={String(t.id)}>
+											{t.name}
+										</MenuItem>
+									))}
+								</Select>
+							</FormControl>
+							<Typography className={classes.filterHint} component="span">
+								{i18n.t("contacts.tagFilterHelp")}
+							</Typography>
+						</Box>
+						<TextField
+							className={classes.dateField}
+							label={i18n.t("contacts.filters.dateFrom")}
+							type="date"
+							variant="outlined"
+							margin="dense"
+							size="small"
+							InputLabelProps={{ shrink: true }}
+							value={dateFrom}
+							onChange={(e) => setDateFrom(e.target.value)}
+						/>
+						<TextField
+							className={classes.dateField}
+							label={i18n.t("contacts.filters.dateTo")}
+							type="date"
+							variant="outlined"
+							margin="dense"
+							size="small"
+							InputLabelProps={{ shrink: true }}
+							value={dateTo}
+							onChange={(e) => setDateTo(e.target.value)}
+						/>
+					</AppActionBar>
 				</Box>
-				<TextField
-					label={i18n.t("contacts.filters.dateFrom")}
-					type="date"
-					variant="outlined"
-					margin="dense"
-					InputLabelProps={{ shrink: true }}
-					value={dateFrom}
-					onChange={(e) => setDateFrom(e.target.value)}
-				/>
-				<TextField
-					label={i18n.t("contacts.filters.dateTo")}
-					type="date"
-					variant="outlined"
-					margin="dense"
-					InputLabelProps={{ shrink: true }}
-					value={dateTo}
-					onChange={(e) => setDateTo(e.target.value)}
-				/>
-			</Box>
-			<Paper
-				className={classes.mainPaper}
+			</AppSectionCard>
+
+			<AppSectionCard
+				scrollable
+				className={classes.tableCard}
 				variant="outlined"
 				onScroll={handleScroll}
 			>
@@ -627,126 +656,142 @@ const Contacts = () => {
 						</Typography>
 					</Box>
 				) : (
-					<Table size="small">
-						<TableHead>
-							<TableRow>
-								<TableCell padding="checkbox" />
-								<TableCell>{i18n.t("contacts.table.name")}</TableCell>
-								<TableCell>{i18n.t("contacts.table.number")}</TableCell>
-								<TableCell>
-									<Tooltip title={i18n.t("contacts.tagsColumnHint")}>
-										<span>{i18n.t("contacts.table.tags")}</span>
-									</Tooltip>
-								</TableCell>
-								<TableCell align="center">
-									{i18n.t("contacts.table.lastInteraction")}
-								</TableCell>
-								<TableCell align="center">
-									{i18n.t("contacts.table.createdAt")}
-								</TableCell>
-								<TableCell align="center">
-									{i18n.t("contacts.table.actions")}
-								</TableCell>
-							</TableRow>
-						</TableHead>
-						<TableBody>
-							<>
-								{contacts.map((contact) => (
-									<TableRow key={contact.id} hover>
-										<TableCell style={{ paddingRight: 0 }}>
-											<Avatar src={contact.profilePicUrl} />
-										</TableCell>
-										<TableCell
-											style={{ cursor: "pointer" }}
-											onClick={() => hadleEditContact(contact.id)}
-										>
-											<Typography variant="subtitle1" component="span">
-												<strong>{contact.name}</strong>
-											</Typography>
-										</TableCell>
-										<TableCell>
-											<Typography variant="caption" color="textSecondary">
-												{contact.number}
-											</Typography>
-										</TableCell>
-										<TableCell>
-											<div className={classes.chipWrap}>
-												{(contact.tags || []).map((tag) => (
-													<Chip
-														key={tag.id}
-														label={tag.name}
-														size="small"
-														className={classes.tagChip}
-														style={{
-															backgroundColor: tag.color || "#eee",
-														}}
-													/>
-												))}
-											</div>
-										</TableCell>
-										<TableCell align="center">
-											{renderLastInteraction(contact.lastInteractionAt)}
-										</TableCell>
-										<TableCell align="center">
-											<Tooltip
-												title={createdTooltipTitle(contact.createdAt)}
+					<AppTableContainer nested>
+						<Table size="small">
+							<TableHead>
+								<TableRow>
+									<TableCell padding="checkbox" />
+									<TableCell>{i18n.t("contacts.table.name")}</TableCell>
+									<TableCell>{i18n.t("contacts.table.number")}</TableCell>
+									<TableCell>
+										<Tooltip title={i18n.t("contacts.tagsColumnHint")}>
+											<span>{i18n.t("contacts.table.tags")}</span>
+										</Tooltip>
+									</TableCell>
+									<TableCell align="center">
+										{i18n.t("contacts.table.lastInteraction")}
+									</TableCell>
+									<TableCell align="center">
+										{i18n.t("contacts.table.createdAt")}
+									</TableCell>
+									<TableCell align="center">
+										{i18n.t("contacts.table.actions")}
+									</TableCell>
+								</TableRow>
+							</TableHead>
+							<TableBody>
+								<>
+									{contacts.map((contact) => (
+										<TableRow key={contact.id} hover>
+											<TableCell className={classes.avatarCell}>
+												<Avatar src={contact.profilePicUrl} />
+											</TableCell>
+											<TableCell
+												className={classes.nameCell}
+												onClick={() => hadleEditContact(contact.id)}
 											>
-												<span>
-													{contact.createdAt
-														? format(new Date(contact.createdAt), "dd/MM/yyyy", {
-																locale: ptBR,
-														  })
-														: "—"}
-												</span>
-											</Tooltip>
-										</TableCell>
-										<TableCell align="center">
-											<Box className={classes.actionButtons}>
-												<Tooltip title={i18n.t("contacts.openAttendance")}>
-													<Button
-														size="small"
-														variant="outlined"
-														color="primary"
-														startIcon={<WhatsAppIcon />}
-														onClick={() => {
-															setContactTicket(contact);
-															setNewTicketModalOpen(true);
-														}}
-													>
-														{i18n.t("contacts.openAttendance")}
-													</Button>
-												</Tooltip>
-												<IconButton
-													size="small"
-													onClick={() => hadleEditContact(contact.id)}
+												<Typography variant="subtitle1" component="span">
+													<strong>{contact.name}</strong>
+												</Typography>
+											</TableCell>
+											<TableCell>
+												<Typography variant="caption" color="textSecondary">
+													{contact.number}
+												</Typography>
+											</TableCell>
+											<TableCell>
+												<div className={classes.chipWrap}>
+													{(contact.tags || []).map((tag) => (
+														<Chip
+															key={tag.id}
+															label={tag.name}
+															size="small"
+															className={`${classes.tagChip} ${
+																!tag.color ? classes.tagChipNeutral : ""
+															}`}
+															style={
+																tag.color
+																	? { backgroundColor: tag.color }
+																	: undefined
+															}
+														/>
+													))}
+												</div>
+											</TableCell>
+											<TableCell align="center">
+												{renderLastInteraction(contact.lastInteractionAt)}
+											</TableCell>
+											<TableCell align="center">
+												<Tooltip
+													title={createdTooltipTitle(contact.createdAt)}
 												>
-													<EditIcon />
-												</IconButton>
-												<Can
-													role={user.profile}
-													perform="contacts-page:deleteContact"
-													yes={() => (
+													<span>
+														{contact.createdAt
+															? format(
+																	new Date(contact.createdAt),
+																	"dd/MM/yyyy",
+																	{
+																		locale: ptBR,
+																	}
+															  )
+															: "—"}
+													</span>
+												</Tooltip>
+											</TableCell>
+											<TableCell align="center">
+												<Box className={classes.actionButtons}>
+													<Tooltip title={i18n.t("contacts.openAttendance")}>
 														<IconButton
 															size="small"
-															onClick={(e) => {
-																setConfirmOpen(true);
-																setDeletingContact(contact);
+															color="primary"
+															aria-label={i18n.t("contacts.openAttendance")}
+															onClick={() => {
+																setContactTicket(contact);
+																setNewTicketModalOpen(true);
 															}}
 														>
-															<DeleteOutlineIcon />
+															<WhatsAppIcon fontSize="small" />
 														</IconButton>
-													)}
-												/>
-											</Box>
-										</TableCell>
-									</TableRow>
-								))}
-								{loading && <TableRowSkeleton avatar columns={5} />}
-							</>
-						</TableBody>
-					</Table>
+													</Tooltip>
+													<Tooltip title={i18n.t("contacts.buttons.edit")}>
+														<IconButton
+															size="small"
+															aria-label={i18n.t("contacts.buttons.edit")}
+															onClick={() => hadleEditContact(contact.id)}
+														>
+															<EditIcon fontSize="small" />
+														</IconButton>
+													</Tooltip>
+													<Can
+														role={user.profile}
+														perform="contacts-page:deleteContact"
+														yes={() => (
+															<Tooltip title={i18n.t("contacts.buttons.deleteRow")}>
+																<AppDangerAction
+																	aria-label={i18n.t(
+																		"contacts.buttons.deleteRow"
+																	)}
+																	onClick={() => {
+																		setConfirmOpen(true);
+																		setDeletingContact(contact);
+																	}}
+																>
+																	<DeleteOutlineIcon fontSize="small" />
+																</AppDangerAction>
+															</Tooltip>
+														)}
+													/>
+												</Box>
+											</TableCell>
+										</TableRow>
+									))}
+									{loading && <TableRowSkeleton avatar columns={5} />}
+								</>
+							</TableBody>
+						</Table>
+					</AppTableContainer>
 				)}
-			</Paper>
+			</AppSectionCard>
 		</MainContainer>
 	);
 };

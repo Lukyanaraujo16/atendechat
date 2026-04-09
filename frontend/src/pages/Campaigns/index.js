@@ -6,7 +6,6 @@ import { toast } from "react-toastify";
 import { useHistory } from "react-router-dom";
 
 import { makeStyles } from "@material-ui/core/styles";
-import Paper from "@material-ui/core/Paper";
 import Button from "@material-ui/core/Button";
 import Table from "@material-ui/core/Table";
 import TableBody from "@material-ui/core/TableBody";
@@ -40,6 +39,7 @@ import { Grid, Box, LinearProgress } from "@material-ui/core";
 import { isArray } from "lodash";
 import { useDate } from "../../hooks/useDate";
 import { SocketContext } from "../../context/Socket/SocketContext";
+import { AppSectionCard, AppPrimaryButton } from "../../ui";
 
 const STATUS_STYLES = {
   INATIVA: { backgroundColor: "#9e9e9e", color: "#fff" },
@@ -98,9 +98,6 @@ const reducer = (state, action) => {
 const useStyles = makeStyles((theme) => ({
   mainPaper: {
     flex: 1,
-    padding: theme.spacing(1),
-    overflowY: "scroll",
-    ...theme.scrollbarStyles,
   },
 }));
 
@@ -435,20 +432,20 @@ const Campaigns = () => {
                 />
               </Grid>
               <Grid xs={6} sm={6} item>
-                <Button
+                <AppPrimaryButton
                   fullWidth
-                  variant="contained"
                   onClick={handleOpenCampaignModal}
-                  color="primary"
                 >
                   {i18n.t("campaigns.buttons.add")}
-                </Button>
+                </AppPrimaryButton>
               </Grid>
             </Grid>
           </Grid>
         </Grid>
       </MainHeader>
-      <Paper
+      <AppSectionCard
+        dense
+        scrollable
         className={classes.mainPaper}
         variant="outlined"
         onScroll={handleScroll}
@@ -616,7 +613,7 @@ const Campaigns = () => {
             </>
           </TableBody>
         </Table>
-      </Paper>
+      </AppSectionCard>
     </MainContainer>
   );
 };

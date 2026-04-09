@@ -12,7 +12,6 @@ import MessageInput from "../MessageInputCustom/";
 import TicketHeader from "../TicketHeader";
 import TicketInfo from "../TicketInfo";
 import TicketActionButtons from "../TicketActionButtonsCustom";
-import TicketFlowExecutionLogModal from "../TicketFlowExecutionLogModal";
 import MessagesList from "../MessagesList";
 import api from "../../services/api";
 import { ReplyMessageProvider } from "../../context/ReplyingMessage/ReplyingMessageContext";
@@ -222,7 +221,6 @@ const Ticket = () => {
       >
         <TicketHeader loading={loading}>
           {renderTicketInfo()}
-          {ticket?.id && <TicketFlowExecutionLogModal ticketId={ticket.id} />}
           <TicketActionButtons ticket={ticket} />
         </TicketHeader>
         {ticket?.id && (

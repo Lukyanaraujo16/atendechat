@@ -530,6 +530,8 @@ const messages = {
 					add: "Add Contact",
 					export: "Export Contacts",
 					delete: "Delete All Contacts",
+					edit: "Edit contact",
+					deleteRow: "Delete contact",
 				},
 				table: {
 					name: "Name",
@@ -2020,6 +2022,7 @@ const messages = {
 						reopen: "Reopen",
 						accept: "Accept",
 						download: "Download",
+						flowHistory: "Flow history",
 					},
 				},
 				lostCall: "Missed voice/video call at",

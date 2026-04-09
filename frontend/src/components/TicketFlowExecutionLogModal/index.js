@@ -17,7 +17,7 @@ import {
   CircularProgress,
 } from "@material-ui/core";
 import Button from "@material-ui/core/Button";
-import { AccountTree } from "@mui/icons-material";
+import AccountTree from "@material-ui/icons/AccountTree";
 import { format, parseISO } from "date-fns";
 import api from "../../services/api";
 import toastError from "../../errors/toastError";
@@ -32,7 +32,7 @@ function summarizeDetails(details) {
   }
 }
 
-const TicketFlowExecutionLogModal = ({ ticketId }) => {
+const TicketFlowExecutionLogModal = ({ ticketId, renderTrigger }) => {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [logs, setLogs] = useState([]);
@@ -66,17 +66,23 @@ const TicketFlowExecutionLogModal = ({ ticketId }) => {
     }
   };
 
+  const openModal = () => setOpen(true);
+
   return (
     <>
-      <Tooltip title="Histórico do fluxo (FlowBuilder)">
-        <IconButton
-          size="small"
-          onClick={() => setOpen(true)}
-          aria-label="Histórico do fluxo"
-        >
-          <AccountTree fontSize="small" />
-        </IconButton>
-      </Tooltip>
+      {typeof renderTrigger === "function" ? (
+        renderTrigger(openModal)
+      ) : (
+        <Tooltip title="Histórico do fluxo (FlowBuilder)">
+          <IconButton
+            size="small"
+            onClick={openModal}
+            aria-label="Histórico do fluxo"
+          >
+            <AccountTree fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      )}
       <Dialog
         open={open}
         onClose={() => setOpen(false)}

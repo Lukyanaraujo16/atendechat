@@ -599,6 +599,8 @@ const messages = {
           add: "Adicionar Contato",
           export: "Exportar Contatos",
           delete: "Excluir Todos Contatos",
+          edit: "Editar contato",
+          deleteRow: "Excluir contato",
         },
         table: {
           name: "Nome",
@@ -2125,6 +2127,7 @@ const messages = {
             reopen: "Reabrir",
             accept: "Aceitar",
             download: "Baixar",
+            flowHistory: "Histórico de fluxo",
           },
         },
         lostCall: "Chamada de voz/vídeo perdida às",

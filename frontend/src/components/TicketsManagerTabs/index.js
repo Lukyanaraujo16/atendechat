@@ -6,8 +6,8 @@ import { makeStyles } from "@material-ui/core/styles";
 import Paper from "@material-ui/core/Paper";
 import SearchIcon from "@material-ui/icons/Search";
 import InputBase from "@material-ui/core/InputBase";
-import Tabs from "@material-ui/core/Tabs";
 import Tab from "@material-ui/core/Tab";
+import { AppTabs } from "../../ui";
 import Fab from "@material-ui/core/Fab";
 import Typography from "@material-ui/core/Typography";
 import AddIcon from "@material-ui/icons/Add";
@@ -634,7 +634,7 @@ const TicketsManagerTabs = () => {
         </div>
       </Dialog>
       <Paper elevation={0} className={classes.tabsHeader}>
-        <Tabs
+        <AppTabs
           value={tab}
           onChange={handleChangeTab}
           variant="fullWidth"
@@ -681,7 +681,7 @@ const TicketsManagerTabs = () => {
               </span>
             }
           />
-        </Tabs>
+        </AppTabs>
       </Paper>
 
       {tab === "open" && (

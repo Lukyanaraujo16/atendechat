@@ -2,7 +2,6 @@ import React, { useState, useEffect, useReducer, useCallback, useContext } from 
 import { toast } from "react-toastify";
 import { useHistory } from "react-router-dom";
 import { makeStyles } from "@material-ui/core/styles";
-import Paper from "@material-ui/core/Paper";
 import Button from "@material-ui/core/Button";
 import TextField from "@material-ui/core/TextField";
 import InputAdornment from "@material-ui/core/InputAdornment";
@@ -12,6 +11,7 @@ import Title from "../../components/Title";
 import api from "../../services/api";
 import { i18n } from "../../translate/i18n";
 import MainHeaderButtonsWrapper from "../../components/MainHeaderButtonsWrapper";
+import { AppSectionCard } from "../../ui";
 import ScheduleModal from "../../components/ScheduleModal";
 import ConfirmationModal from "../../components/ConfirmationModal";
 import toastError from "../../errors/toastError";
@@ -105,9 +105,6 @@ const reducer = (state, action) => {
 const useStyles = makeStyles((theme) => ({
   mainPaper: {
     flex: 1,
-    padding: theme.spacing(1),
-    overflowY: "scroll",
-    ...theme.scrollbarStyles,
   },
 }));
 
@@ -346,7 +343,13 @@ const Schedules = () => {
           </Button>
         </MainHeaderButtonsWrapper>
       </MainHeader>
-      <Paper className={classes.mainPaper} variant="outlined" onScroll={handleScroll}>
+      <AppSectionCard
+        dense
+        scrollable
+        className={classes.mainPaper}
+        variant="outlined"
+        onScroll={handleScroll}
+      >
         <Typography variant="body2" color="textSecondary" style={{ padding: "8px 4px" }}>
           {i18n.t("schedules.listIntro")}{" "}
           <span style={{ whiteSpace: "nowrap" }}>
@@ -483,7 +486,7 @@ const Schedules = () => {
             })}
           </TableBody>
         </Table>
-      </Paper>
+      </AppSectionCard>
     </MainContainer>
   );
 };
