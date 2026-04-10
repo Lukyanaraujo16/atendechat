@@ -142,6 +142,14 @@ export default function PlatformBranding() {
               {i18n.t("platform.branding.restoreDefault")}
             </Button>
           </Box>
+          <Typography
+            variant="caption"
+            color="textSecondary"
+            component="div"
+            style={{ marginTop: 12, lineHeight: 1.55, whiteSpace: "pre-line" }}
+          >
+            {i18n.t("platform.branding.loginLogoHint")}
+          </Typography>
         </Box>
 
         <Box mt={3}>
@@ -175,6 +183,14 @@ export default function PlatformBranding() {
               {i18n.t("platform.branding.restoreDefault")}
             </Button>
           </Box>
+          <Typography
+            variant="caption"
+            color="textSecondary"
+            component="div"
+            style={{ marginTop: 12, lineHeight: 1.55, whiteSpace: "pre-line" }}
+          >
+            {i18n.t("platform.branding.menuLogoHint")}
+          </Typography>
         </Box>
 
         <Box mt={3}>

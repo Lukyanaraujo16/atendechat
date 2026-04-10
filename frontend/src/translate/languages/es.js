@@ -1221,6 +1221,10 @@ const messages = {
           menuLogo: "Logo del menú interno",
           uploadHint:
             "PNG, JPG, WebP, GIF o SVG hasta 2 MB. Sin archivo nuevo, se conserva el logo actual.",
+          loginLogoHint:
+            "Formatos admitidos: PNG, JPG, WebP.\nRecomendado: imagen horizontal (proporción 3:1 o 4:1).\nEjemplo: 300x100, 400x100, 600x150.\nPreferiblemente con fondo transparente.",
+          menuLogoHint:
+            "Formatos admitidos: PNG, JPG, WebP.\nRecomendado: imagen horizontal compacta (proporción 2:1 o 3:1).\nEjemplo: 200x80, 240x80.\nEvite imágenes muy altas o cuadradas.",
           chooseFile: "Elegir imagen",
           restoreDefault: "Usar logo predeterminado",
           saved: "Marca actualizada correctamente.",

@@ -1221,6 +1221,10 @@ const messages = {
 					menuLogo: "Internal menu logo",
 					uploadHint:
 						"PNG, JPG, WebP, GIF or SVG up to 2 MB. Without a new file, the current logo is kept.",
+					loginLogoHint:
+						"Supported formats: PNG, JPG, WebP.\nRecommended: horizontal image (3:1 or 4:1 aspect ratio).\nExamples: 300x100, 400x100, 600x150.\nPrefer a transparent background.",
+					menuLogoHint:
+						"Supported formats: PNG, JPG, WebP.\nRecommended: compact horizontal image (2:1 or 3:1 aspect ratio).\nExamples: 200x80, 240x80.\nAvoid very tall or square images.",
 					chooseFile: "Choose image",
 					restoreDefault: "Use default logo",
 					saved: "Branding updated successfully.",
