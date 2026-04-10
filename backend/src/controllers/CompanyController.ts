@@ -52,6 +52,35 @@ type SchedulesData = {
   schedules: [];
 };
 
+/** Primeiro utilizador com perfil `admin` da empresa (menor id), igual à listagem paginada. */
+async function buildPrimaryAdminMap(
+  companyIds: number[]
+): Promise<Record<number, { id: number; name: string; email: string }>> {
+  const primaryByCompany: Record<number, { id: number; name: string; email: string }> =
+    {};
+  if (!companyIds.length) return primaryByCompany;
+
+  const admins = await User.findAll({
+    where: {
+      companyId: { [Op.in]: companyIds },
+      profile: "admin"
+    },
+    attributes: ["id", "name", "email", "companyId"],
+    order: [["id", "ASC"]]
+  });
+  for (const u of admins) {
+    const cid = u.companyId;
+    if (primaryByCompany[cid] === undefined) {
+      primaryByCompany[cid] = {
+        id: u.id,
+        name: u.name,
+        email: u.email
+      };
+    }
+  }
+  return primaryByCompany;
+}
+
 export const index = async (req: Request, res: Response): Promise<Response> => {
   const { searchParam, pageNumber } = req.query as IndexQuery;
 
@@ -61,27 +90,7 @@ export const index = async (req: Request, res: Response): Promise<Response> => {
   });
 
   const ids = companies.map((c) => c.id);
-  let primaryByCompany: Record<number, { id: number; name: string; email: string }> = {};
-  if (ids.length) {
-    const admins = await User.findAll({
-      where: {
-        companyId: { [Op.in]: ids },
-        profile: "admin"
-      },
-      attributes: ["id", "name", "email", "companyId"],
-      order: [["id", "ASC"]]
-    });
-    for (const u of admins) {
-      const cid = u.companyId;
-      if (primaryByCompany[cid] === undefined) {
-        primaryByCompany[cid] = {
-          id: u.id,
-          name: u.name,
-          email: u.email
-        };
-      }
-    }
-  }
+  const primaryByCompany = await buildPrimaryAdminMap(ids);
 
   const enriched = companies.map((c) => {
     const row = typeof (c as any).toJSON === "function" ? (c as any).toJSON() : c;
@@ -129,9 +138,19 @@ export const show = async (req: Request, res: Response): Promise<Response> => {
 };
 
 export const list = async (req: Request, res: Response): Promise<Response> => {
-  const companies: Company[] = await FindAllCompaniesService();
+  const companiesRaw: Company[] = await FindAllCompaniesService();
+  const companies = companiesRaw.map((c) =>
+    typeof (c as any).toJSON === "function" ? (c as any).toJSON() : c
+  );
+  const ids = companies.map((row: any) => row.id as number);
+  const primaryByCompany = await buildPrimaryAdminMap(ids);
 
-  return res.status(200).json(companies);
+  const enriched = companies.map((row: any) => ({
+    ...row,
+    primaryAdmin: primaryByCompany[row.id] ?? null
+  }));
+
+  return res.status(200).json(enriched);
 };
 
 export const update = async (

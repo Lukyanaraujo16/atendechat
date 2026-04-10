@@ -1,7 +1,16 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { openApi } from "../../services/api";
+import { getApiUrl } from "../../config/backendUrl";
 import { nomeEmpresa as packageName } from "../../../package.json";
 import defaultLogo from "../../assets/logo.png";
+
+function resolveStoredLogoUrl(raw) {
+  const u = raw?.trim();
+  if (!u) return null;
+  if (u.startsWith("http://") || u.startsWith("https://")) return u;
+  if (u.startsWith("/")) return getApiUrl(u);
+  return u;
+}
 
 const defaultBranding = {
   systemName: packageName || "Atendechat",
@@ -54,13 +63,11 @@ export function BrandingProvider({ children }) {
   }, [branding.systemName]);
 
   const resolveLoginLogo = useCallback(() => {
-    const u = branding.loginLogoUrl?.trim();
-    return u ? u : defaultLogo;
+    return resolveStoredLogoUrl(branding.loginLogoUrl) || defaultLogo;
   }, [branding.loginLogoUrl]);
 
   const resolveMenuLogo = useCallback(() => {
-    const u = branding.menuLogoUrl?.trim();
-    return u ? u : defaultLogo;
+    return resolveStoredLogoUrl(branding.menuLogoUrl) || defaultLogo;
   }, [branding.menuLogoUrl]);
 
   const value = useMemo(

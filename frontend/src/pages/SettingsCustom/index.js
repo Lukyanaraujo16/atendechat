@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import MainContainer from "../../components/MainContainer";
 import { Box, makeStyles, Paper, Tabs, Tab, Typography } from "@material-ui/core";
 import { AppPageHeader } from "../../ui";
@@ -77,6 +78,7 @@ const useStyles = makeStyles((theme) => ({
 
 const SettingsCustom = () => {
   const classes = useStyles();
+  const location = useLocation();
   const [tab, setTab] = useState("options");
   const [schedules, setSchedules] = useState([]);
   const [company, setCompany] = useState({});
@@ -119,6 +121,20 @@ const SettingsCustom = () => {
     findData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const isSuperUser = Boolean(currentUser?.super);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const t = params.get("tab");
+    if (!t) return;
+    const allowed = ["options", "schedules", "companies", "plans", "helps"];
+    if (!allowed.includes(t)) return;
+    if ((t === "plans" || t === "companies" || t === "helps") && !isSuperUser) {
+      return;
+    }
+    setTab(t);
+  }, [location.search, isSuperUser]);
 
   const handleTabChange = (event, newValue) => {
       async function findData() {

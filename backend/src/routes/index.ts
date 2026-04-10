@@ -38,9 +38,11 @@ import userRatingRoutes from "./userRatingRoutes";
 import ratingTemplateRoutes from "./ratingTemplateRoutes";
 import groupRoutes from "./groupRoutes";
 import systemSettingRoutes from "./systemSettingRoutes";
+import platformSuperRoutes from "./platformSuperRoutes";
 const routes = Router();
 
 routes.use(systemSettingRoutes);
+routes.use(platformSuperRoutes);
 
 routes.use(userRoutes);
 routes.use("/auth", authRoutes);
