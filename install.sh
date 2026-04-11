@@ -8,8 +8,13 @@
 #   • Backend Node na porta API_PORT (8080), acessível em 0.0.0.0 (rede)
 #   • Frontend build com REACT_APP_BACKEND_URL = http(s)://host:8080 (API real)
 #   • FRONTEND_URL / CORS = origem onde o utilizador abre o browser (ex. :80)
-#   • Nginx na :80 só serve o SPA (build estático) — a API NÃO passa pelo Nginx
-#     (evita 405 em POST /system-settings/branding e rotas em falta no proxy)
+#   • Nginx na :80 serve o SPA (estático). Modo IP: a API é directa na API_PORT.
+#     Com DOMAIN+API_DOMAIN: Nginx faz proxy da API no subdomínio (upload grande suportado).
+#   • Pastas runtime: backend/backups, backend/backups/incoming, backend/public
+#     (permissões alinhadas ao User= do systemd quando LINUX_USER≠root)
+#   • Backup/restauro (Super Admin): requer no servidor pg_dump e psql (PostgreSQL;
+#     este script instala postgresql + cliente). Se mudar DB_DIALECT para mysql,
+#     instale mysqldump/mysql à parte.
 #   • Firewall: portas 22, 80, API_PORT abertas (ufw)
 #
 # Variáveis opcionais (antes de executar):
@@ -158,6 +163,16 @@ EOF
 }
 
 ###############################################################################
+# Pastas usadas pelo backup/restore e ficheiros públicos (idempotente)
+###############################################################################
+ensure_runtime_dirs() {
+  mkdir -p "${PROJETO_DIR}/backend/backups/incoming" "${PROJETO_DIR}/backend/public"
+  if [[ "${LINUX_USER}" != "root" ]]; then
+    chown -R "${LINUX_USER}:${LINUX_USER}" "${PROJETO_DIR}/backend/backups" "${PROJETO_DIR}/backend/public" 2>/dev/null || true
+  fi
+}
+
+###############################################################################
 # Função: build frontend com env correto (obrigatório CRA: variáveis na altura do build)
 ###############################################################################
 build_frontend() {
@@ -192,6 +207,7 @@ if [[ "${MINIMAL_UPDATE}" == "1" ]]; then
     REDIS_URI_EFFECTIVE="redis://127.0.0.1:6379"
   fi
   write_backend_env
+  ensure_runtime_dirs
   cd "${PROJETO_DIR}/backend"
   npm install --production=false
   npm run build
@@ -231,6 +247,9 @@ npm install -g pm2@latest || true
 
 echo "==> PostgreSQL"
 apt-get install -y postgresql postgresql-contrib
+if ! command -v pg_dump >/dev/null 2>&1 || ! command -v psql >/dev/null 2>&1; then
+  apt-get install -y postgresql-client || true
+fi
 systemctl enable postgresql
 systemctl start postgresql
 
@@ -262,10 +281,10 @@ else
   REDIS_URI_EFFECTIVE="redis://127.0.0.1:6379"
 fi
 
-echo "==> Nginx (limite upload)"
+echo "==> Nginx (limite upload — alinhado a restore ZIP na API; aplica-se também ao proxy DOMAIN+API_DOMAIN)"
 apt-get install -y nginx
 mkdir -p /etc/nginx/conf.d
-printf '%s\n' 'client_max_body_size 100M;' > /etc/nginx/conf.d/atendechat-limits.conf
+printf '%s\n' 'client_max_body_size 4G;' > /etc/nginx/conf.d/atendechat-limits.conf
 systemctl enable nginx
 systemctl start nginx
 
@@ -285,6 +304,7 @@ fi
 ###############################################################################
 echo "==> Backend: .env"
 write_backend_env
+ensure_runtime_dirs
 
 echo "==> Backend: npm install + build"
 cd "${PROJETO_DIR}/backend"
@@ -410,6 +430,8 @@ echo "  Abrir no browser: ${FRONTEND_URL_VALUE}"
 echo "  API Node:         ${API_PUBLIC_URL}"
 echo ""
 echo "  Login padrão (se seed correu): admin@admin.com / 123456"
+echo ""
+echo "  Backup / restauro: área Super Admin (ficheiros em backend/backups/)"
 echo ""
 echo "  Atualizações rápidas após git pull:"
 echo "    MINIMAL_UPDATE=1 ./install.sh"
