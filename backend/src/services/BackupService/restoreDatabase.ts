@@ -1,5 +1,6 @@
 import { spawn } from "child_process";
-import fs from "fs";
+import { createReadStream } from "fs";
+import { pipeline } from "stream/promises";
 
 function getEnv(): {
   dialect: string;
@@ -21,52 +22,60 @@ function getEnv(): {
 
 export async function restoreMysqlFromSqlFile(sqlPath: string): Promise<void> {
   const env = getEnv();
-  const sqlBuf = await fs.promises.readFile(sqlPath);
-  await new Promise<void>((resolve, reject) => {
-    const child = spawn(
-      "mysql",
-      ["-h", env.host, "-P", env.port, "-u", env.user, env.database],
-      {
-        env: { ...process.env, MYSQL_PWD: env.password },
-        stdio: ["pipe", "pipe", "pipe"]
-      }
-    );
-    child.stdin.write(sqlBuf);
-    child.stdin.end();
-    let errBuf = "";
-    child.stderr?.on("data", (c: Buffer) => {
-      errBuf += c.toString();
-    });
-    child.on("error", (e) => reject(e));
+  let errBuf = "";
+  const child = spawn(
+    "mysql",
+    ["-h", env.host, "-P", env.port, "-u", env.user, env.database],
+    {
+      env: { ...process.env, MYSQL_PWD: env.password },
+      stdio: ["pipe", "pipe", "pipe"]
+    }
+  );
+  child.stderr?.on("data", (c: Buffer) => {
+    errBuf += c.toString();
+  });
+  const exitPromise = new Promise<void>((resolve, reject) => {
+    child.on("error", reject);
     child.on("close", (code) => {
       if (code === 0) resolve();
       else reject(new Error(`mysql import failed (${code}): ${errBuf}`));
     });
   });
+  try {
+    await pipeline(createReadStream(sqlPath), child.stdin);
+  } catch (e) {
+    child.kill("SIGKILL");
+    throw e;
+  }
+  await exitPromise;
 }
 
 export async function restorePostgresFromSqlFile(sqlPath: string): Promise<void> {
   const env = getEnv();
-  const sqlBuf = await fs.promises.readFile(sqlPath);
-  await new Promise<void>((resolve, reject) => {
-    const child = spawn(
-      "psql",
-      ["-h", env.host, "-p", env.port, "-U", env.user, "-d", env.database, "-v", "ON_ERROR_STOP=1"],
-      {
-        env: { ...process.env, PGPASSWORD: env.password },
-        stdio: ["pipe", "pipe", "pipe"]
-      }
-    );
-    child.stdin.write(sqlBuf);
-    child.stdin.end();
-    let errBuf = "";
-    child.stderr?.on("data", (c: Buffer) => {
-      errBuf += c.toString();
-    });
-    child.on("error", (e) => reject(e));
+  let errBuf = "";
+  const child = spawn(
+    "psql",
+    ["-h", env.host, "-p", env.port, "-U", env.user, "-d", env.database, "-v", "ON_ERROR_STOP=1"],
+    {
+      env: { ...process.env, PGPASSWORD: env.password },
+      stdio: ["pipe", "pipe", "pipe"]
+    }
+  );
+  child.stderr?.on("data", (c: Buffer) => {
+    errBuf += c.toString();
+  });
+  const exitPromise = new Promise<void>((resolve, reject) => {
+    child.on("error", reject);
     child.on("close", (code) => {
       if (code === 0) resolve();
       else reject(new Error(`psql import failed (${code}): ${errBuf}`));
     });
   });
+  try {
+    await pipeline(createReadStream(sqlPath), child.stdin);
+  } catch (e) {
+    child.kill("SIGKILL");
+    throw e;
+  }
+  await exitPromise;
 }
