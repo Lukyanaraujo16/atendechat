@@ -119,6 +119,86 @@ export async function restorePostgresFromSqlFile(sqlPath: string): Promise<void>
   await exitPromise;
 }
 
+/** Aspas para identificadores PostgreSQL (nomes de roles/tabelas). */
+function pgQuoteIdent(ident: string): string {
+  return `"${String(ident).replace(/"/g, '""')}"`;
+}
+
+/**
+ * Depois de importar o SQL como superuser (DB_IMPORT_*), tabelas/sequências podem ficar
+ * com owner `postgres` → `sequelize db:migrate` como DB_USER falha com
+ * "permission denied for table SequelizeMeta". Concede privilégios ao utilizador da app.
+ */
+export async function grantPostgresAppUserAfterSuperuserImport(): Promise<void> {
+  const env = getEnv();
+  const d = env.dialect;
+  if (d !== "postgres" && d !== "postgresql") return;
+
+  const cred = getPsqlImportCredentials();
+  if (cred.user === env.user) {
+    console.log(
+      "[restore] Import com o mesmo utilizador que DB_USER — sem GRANT extra (owner já alinhado)."
+    );
+    return;
+  }
+
+  const appRole = pgQuoteIdent(env.user);
+  const sql = [
+    "SET client_min_messages TO WARNING;",
+    `GRANT USAGE ON SCHEMA public TO ${appRole};`,
+    `GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO ${appRole};`,
+    `GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO ${appRole};`,
+    `GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO ${appRole};`
+  ].join("\n");
+
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn(
+      "psql",
+      [
+        "-h",
+        env.host,
+        "-p",
+        env.port,
+        "-U",
+        cred.user,
+        "-d",
+        env.database,
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-c",
+        sql
+      ],
+      {
+        env: { ...process.env, PGPASSWORD: cred.password },
+        stdio: ["ignore", "pipe", "pipe"]
+      }
+    );
+    let errBuf = "";
+    let outBuf = "";
+    child.stdout?.on("data", (c: Buffer) => {
+      outBuf += c.toString();
+    });
+    child.stderr?.on("data", (c: Buffer) => {
+      errBuf += c.toString();
+    });
+    child.on("error", reject);
+    child.on("close", (code) => {
+      if (code === 0) {
+        console.log(
+          "[restore] Privilégios em public concedidos a DB_USER para migrations (SequelizeMeta, etc.)."
+        );
+        resolve();
+      } else {
+        reject(
+          new Error(
+            `RESTORE_GRANT_FAILED: não foi possível conceder privilégios ao utilizador da app após o import (código ${code}). ${errBuf}\n${outBuf}`
+          )
+        );
+      }
+    });
+  });
+}
+
 function resolveSequelizeCliEntry(backendRoot: string): string {
   const pkgPath = path.join(backendRoot, "node_modules", "sequelize-cli", "package.json");
   if (fs.existsSync(pkgPath)) {

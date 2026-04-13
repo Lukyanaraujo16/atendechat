@@ -5,6 +5,7 @@ import uploadConfig from "../../config/upload";
 import { getBackupsRoot, ensureBackupDirs } from "../../config/backup";
 import { createApplicationBackup } from "./createApplicationBackup";
 import {
+  grantPostgresAppUserAfterSuperuserImport,
   restoreMysqlFromSqlFile,
   restorePostgresFromSqlFile,
   runSequelizeDbMigrateAfterRestore,
@@ -67,6 +68,7 @@ export async function restoreFromValidatedZipFile(zipAbsolutePath: string): Prom
   try {
     if (currentDialect === "postgres" || currentDialect === "postgresql") {
       await restorePostgresFromSqlFile(sqlPath);
+      await grantPostgresAppUserAfterSuperuserImport();
     } else {
       await restoreMysqlFromSqlFile(sqlPath);
     }
