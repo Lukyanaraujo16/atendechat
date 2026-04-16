@@ -80,7 +80,14 @@ var defaultMessages = {
 
 const reducer = (state, action) => {
   if (action.type === "LOAD_SCHEDULES") {
-    return [...state, ...action.payload];
+    const page = action.pageNumber ?? 1;
+    const rows = action.payload || [];
+    if (page === 1) {
+      return rows;
+    }
+    const seen = new Set(state.map((s) => s.id));
+    const extra = rows.filter((s) => s != null && !seen.has(s.id));
+    return [...state, ...extra];
   }
 
   if (action.type === "UPDATE_SCHEDULES") {
@@ -88,11 +95,11 @@ const reducer = (state, action) => {
     const scheduleIndex = state.findIndex((s) => s.id === schedule.id);
 
     if (scheduleIndex !== -1) {
-      state[scheduleIndex] = schedule;
-      return [...state];
-    } else {
-      return [schedule, ...state];
+      const next = [...state];
+      next[scheduleIndex] = schedule;
+      return next;
     }
+    return [schedule, ...state];
   }
 
   if (action.type === "DELETE_SCHEDULE") {
@@ -175,7 +182,11 @@ const Schedules = () => {
         params: { searchParam, pageNumber },
       });
 
-      dispatch({ type: "LOAD_SCHEDULES", payload: data.schedules });
+      dispatch({
+        type: "LOAD_SCHEDULES",
+        payload: data.schedules,
+        pageNumber,
+      });
       setHasMore(data.hasMore);
       setLoading(false);
     } catch (err) {
