@@ -20,6 +20,25 @@ interface Response {
   hasMore: boolean;
 }
 
+const listIncludes = [
+  { model: Contact, as: "contact", attributes: ["id", "name"] },
+  { model: User, as: "user", attributes: ["id", "name"] },
+  {
+    model: Whatsapp,
+    as: "preferredWhatsapp",
+    attributes: ["id", "name", "status"],
+    required: false
+  },
+  {
+    model: ScheduleContact,
+    as: "scheduleContacts",
+    attributes: ["id", "contactId"],
+    required: false,
+    separate: true,
+    include: [{ model: Contact, as: "contact", attributes: ["id", "name"] }]
+  }
+];
+
 const ListService = async ({
   searchParam,
   contactId = "",
@@ -56,11 +75,11 @@ const ListService = async ({
           "LIKE",
           term
         ),
-        Sequelize.where(
-          Sequelize.fn("LOWER", Sequelize.col("contact.name")),
-          "LIKE",
-          term
-        ),
+        Sequelize.literal(`EXISTS (
+          SELECT 1 FROM "Contacts" c
+          WHERE c.id = "Schedule"."contactId"
+          AND LOWER(c."name") LIKE ${escaped}
+        )`),
         Sequelize.literal(`EXISTS (
           SELECT 1 FROM "ScheduleContacts" sc
           INNER JOIN "Contacts" c ON c.id = sc."contactId"
@@ -73,33 +92,18 @@ const ListService = async ({
 
   const whereCondition = { [Op.and]: clauses };
 
-  const { count, rows: schedules } = await Schedule.findAndCountAll({
+  const count = await Schedule.count({
+    where: whereCondition,
+    distinct: true,
+    col: "id"
+  });
+
+  const schedules = await Schedule.findAll({
     where: whereCondition,
     limit,
     offset,
-    distinct: true,
-    col: "Schedule.id",
-    subQuery: false,
     order: [["createdAt", "DESC"]],
-    include: [
-      { model: Contact, as: "contact", attributes: ["id", "name"] },
-      { model: User, as: "user", attributes: ["id", "name"] },
-      {
-        model: Whatsapp,
-        as: "preferredWhatsapp",
-        attributes: ["id", "name", "status"],
-        required: false
-      },
-      {
-        model: ScheduleContact,
-        as: "scheduleContacts",
-        attributes: ["id", "contactId"],
-        required: false,
-        include: [
-          { model: Contact, as: "contact", attributes: ["id", "name"] }
-        ]
-      }
-    ]
+    include: listIncludes
   });
 
   const hasMore = count > offset + schedules.length;
