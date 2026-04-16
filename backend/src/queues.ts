@@ -38,6 +38,16 @@ const SCHEDULE_RETRY_BACKOFF_MINUTES = 2;
 const SCHEDULE_MAX_ATTEMPTS = 100;
 const SCHEDULE_SEND_DELAY_MS = 40000;
 
+async function emitScheduleSocketUpdateSafe(scheduleId: number) {
+  try {
+    await emitScheduleSocketUpdate(scheduleId);
+  } catch (err: any) {
+    logger.error(
+      `[Schedule] emit socket falhou (agendamento ${scheduleId}): ${err?.message || err}`
+    );
+  }
+}
+
 async function emitScheduleSocketUpdate(scheduleId: number) {
   const schedule = await Schedule.findByPk(scheduleId, {
     include: [
@@ -273,6 +283,11 @@ async function handleVerifySchedules(job) {
               { [Op.or]: [{ scheduleType: null }, { scheduleType: "single" }] },
               { sentAt: null },
               {
+                status: {
+                  [Op.notIn]: ["ENVIADA", "ERRO"]
+                }
+              },
+              {
                 [Op.or]: [
                   {
                     status: "PENDENTE",
@@ -328,12 +343,22 @@ async function handleVerifySchedules(job) {
         schedule.scheduleContacts?.find(sc => sc.contact)?.contact?.name ||
         String(schedule.id);
       await schedule.update({ status: "AGENDADA" });
+      logger.info(
+        `[Schedule] captura para envio id=${schedule.id} tipo=${schedule.scheduleType || "single"} label="${label}"`
+      );
       await sendScheduledMessages.add(
         "SendMessage",
         { scheduleId: schedule.id },
-        { delay: SCHEDULE_SEND_DELAY_MS }
+        {
+          delay: SCHEDULE_SEND_DELAY_MS,
+          attempts: 1,
+          removeOnComplete: true,
+          removeOnFail: false
+        }
       );
-      logger.info(`[🧵] Disparo agendado para: ${label}`);
+      logger.info(
+        `[Schedule] job enfileirado id=${schedule.id} (delay ${SCHEDULE_SEND_DELAY_MS}ms, attempts=1)`
+      );
     }
   } catch (e: any) {
     Sentry.captureException(e);
@@ -367,6 +392,15 @@ async function handleSendScheduledMessage(job) {
   }
 
   const isRecurring = scheduleRecord.scheduleType === "recurring";
+
+  if (!isRecurring) {
+    if (scheduleRecord.status === "ENVIADA" || scheduleRecord.sentAt != null) {
+      logger.info(
+        `[Schedule] ignorando envio duplicado id=${scheduleId} status=${scheduleRecord.status} sentAt=${scheduleRecord.sentAt || "null"}`
+      );
+      return;
+    }
+  }
   const pivotRows = (scheduleRecord.scheduleContacts || []).filter(
     (sc: any) => sc.contact
   );
@@ -404,7 +438,7 @@ async function handleSendScheduledMessage(job) {
         lastAttemptAt: now.toDate(),
         attemptCount: nextAttempt
       });
-      await emitScheduleSocketUpdate(scheduleId);
+      await emitScheduleSocketUpdateSafe(scheduleId);
       return;
     }
     await scheduleRecord.update({
@@ -414,7 +448,7 @@ async function handleSendScheduledMessage(job) {
       lastAttemptAt: now.toDate(),
       attemptCount: nextAttempt
     });
-    await emitScheduleSocketUpdate(scheduleId);
+    await emitScheduleSocketUpdateSafe(scheduleId);
     return;
   }
 
@@ -463,7 +497,7 @@ async function handleSendScheduledMessage(job) {
           lastAttemptAt: now.toDate(),
           attemptCount: nextAttempt
         });
-        await emitScheduleSocketUpdate(scheduleId);
+        await emitScheduleSocketUpdateSafe(scheduleId);
         return;
       }
       await scheduleRecord.update({
@@ -472,21 +506,23 @@ async function handleSendScheduledMessage(job) {
         lastAttemptAt: now.toDate(),
         attemptCount: nextAttempt
       });
-      await emitScheduleSocketUpdate(scheduleId);
+      await emitScheduleSocketUpdateSafe(scheduleId);
       return;
     }
+    const completedAt = now.toDate();
     await scheduleRecord.update({
-      sentAt: now.utc().format("YYYY-MM-DD HH:mm"),
+      sentAt: completedAt,
       status: "ENVIADA",
       lastError: summaryError,
-      lastAttemptAt: now.toDate(),
+      lastAttemptAt: completedAt,
+      lastRunAt: completedAt,
       attemptCount: 0
     });
     logger.info(
-      `[🧵] Mensagem agendada enviada (${successes} contato(s)) agendamento ${scheduleId}`
+      `[Schedule] concluído id=${scheduleId} tipo=single contatos_ok=${successes} sentAt=${completedAt.toISOString()}`
     );
     sendScheduledMessages.clean(15000, "completed");
-    await emitScheduleSocketUpdate(scheduleId);
+    await emitScheduleSocketUpdateSafe(scheduleId);
     return;
   }
 
@@ -496,7 +532,7 @@ async function handleSendScheduledMessage(job) {
       lastError: "Configuração de recorrência inválida (sem horário ou frequência).",
       lastAttemptAt: now.toDate()
     });
-    await emitScheduleSocketUpdate(scheduleId);
+    await emitScheduleSocketUpdateSafe(scheduleId);
     return;
   }
 
@@ -521,10 +557,10 @@ async function handleSendScheduledMessage(job) {
   });
 
   logger.info(
-    `[🧵] Recorrência ${scheduleId} executada; próxima: ${nextRun.toISOString()}`
+    `[Schedule] recorrente id=${scheduleId} próxima_exec=${nextRun.toISOString()}`
   );
   sendScheduledMessages.clean(15000, "completed");
-  await emitScheduleSocketUpdate(scheduleId);
+  await emitScheduleSocketUpdateSafe(scheduleId);
 }
 
 async function handleVerifyCampaigns(job) {
