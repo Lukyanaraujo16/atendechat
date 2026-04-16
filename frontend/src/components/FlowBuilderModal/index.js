@@ -72,6 +72,12 @@ const FlowBuilderModal = ({
   });
 
   useEffect(() => {
+    if (open) {
+      setContact({ name: nameWebhook || "" });
+    }
+  }, [open, flowId, nameWebhook]);
+
+  useEffect(() => {
     return () => {
       isMounted.current = false;
     };

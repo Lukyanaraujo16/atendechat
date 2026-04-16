@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useReducer, useContext } from "react";
+import React, { useState, useEffect, useReducer } from "react";
 
 import { toast } from "react-toastify";
 import { useHistory } from "react-router-dom";
@@ -19,17 +19,31 @@ import Title from "../../components/Title";
 import MainHeaderButtonsWrapper from "../../components/MainHeaderButtonsWrapper";
 import MainContainer from "../../components/MainContainer";
 import toastError from "../../errors/toastError";
-import { AuthContext } from "../../context/Auth/AuthContext";
 import NewTicketModal from "../../components/NewTicketModal";
-import { AddCircle, DevicesFold, MoreVert, PostAdd } from "@mui/icons-material";
+import {
+  AddCircle,
+  PostAdd,
+  AccountTree as AccountTreeIcon,
+  Edit as EditIcon,
+  Tune as TuneIcon,
+  ContentCopy as ContentCopyIcon,
+  DeleteOutline as DeleteOutlineIcon,
+} from "@mui/icons-material";
 
 import {
+  Box,
   Button,
+  Chip,
   CircularProgress,
-  Grid,
-  Menu,
-  MenuItem,
+  IconButton,
   Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+  Tooltip,
+  Typography,
 } from "@mui/material";
 
 import FlowBuilderModal from "../../components/FlowBuilderModal";
@@ -84,11 +98,33 @@ const useStyles = makeStyles((theme) => ({
   mainPaper: {
     flex: 1,
     borderRadius: 12,
-    padding: theme.spacing(1),
-    overflowY: "scroll",
+    padding: theme.spacing(2),
+    overflowY: "auto",
     ...theme.scrollbarStyles,
   },
+  actionIcon: {
+    opacity: 0.55,
+    transition: theme.transitions.create("opacity", {
+      duration: theme.transitions.duration.shorter,
+    }),
+    "&:hover": {
+      opacity: 1,
+    },
+  },
 }));
+
+function formatFlowSubtitle(flow) {
+  const ts = flow.updatedAt;
+  if (!ts) return null;
+  try {
+    return `Atualizado ${new Date(ts).toLocaleString("pt-BR", {
+      dateStyle: "short",
+      timeStyle: "short",
+    })}`;
+  } catch {
+    return null;
+  }
+}
 
 const FlowBuilder = () => {
   const classes = useStyles();
@@ -111,8 +147,6 @@ const FlowBuilder = () => {
 
   const [hasMore, setHasMore] = useState(false);
   const [reloadData, setReloadData] = useState(false);
-  const { user, socket } = useContext(AuthContext);
-
   useEffect(() => {
     dispatch({ type: "RESET" });
     setPageNumber(1);
@@ -165,12 +199,20 @@ const FlowBuilder = () => {
 
   const handleOpenContactModal = () => {
     setSelectedContactId(null);
+    setSelectedWebhookName(null);
     setContactModalOpen(true);
   };
 
   const handleCloseContactModal = () => {
     setSelectedContactId(null);
+    setSelectedWebhookName(null);
     setContactModalOpen(false);
+  };
+
+  const handleOpenRenameModal = (flow) => {
+    setSelectedContactId(flow.id);
+    setSelectedWebhookName(flow.name || "");
+    setContactModalOpen(true);
   };
 
   const handleCloseOrOpenTicket = (ticket) => {
@@ -178,12 +220,6 @@ const FlowBuilder = () => {
     if (ticket !== undefined && ticket.uuid !== undefined) {
       history.push(`/tickets/${ticket.uuid}`);
     }
-  };
-
-  const hadleEditContact = () => {
-    setSelectedContactId(deletingContact.id);
-    setSelectedWebhookName(deletingContact.name);
-    setContactModalOpen(true);
   };
 
   const handleDeleteWebhook = async (webhookId) => {
@@ -224,24 +260,8 @@ const FlowBuilder = () => {
     }
   };
 
-  const [anchorEl, setAnchorEl] = useState(null);
-
-  const open = Boolean(anchorEl);
-
-  const handleClick = (event) => {
-    setAnchorEl(event.currentTarget);
-  };
-
-  const handleClose = () => {
-    setAnchorEl(null);
-  };
-
-  const exportLink = () => {
-    history.push(`/flowbuilder/${deletingContact.id}`);
-  };
-
   return (
-    <MainContainer className={classes.mainContainer}>
+    <MainContainer>
       <NewTicketModal
         modalOpen={newTicketModalOpen}
         initialContact={contactTicket}
@@ -342,169 +362,192 @@ const FlowBuilder = () => {
         variant="outlined"
         onScroll={handleScroll}
       >
-        <Stack>
-          <Grid container style={{ padding: "8px" }}>
-            <Grid item xs={4}>
-              {i18n.t("contacts.table.name")}
-            </Grid>
-            <Grid item xs={4} align="center">
-              Status
-            </Grid>
-            <Grid item xs={4} align="end">
-              {i18n.t("contacts.table.actions")}
-            </Grid>
-          </Grid>
-          <>
-            {(Array.isArray(webhooks) ? webhooks : []).map((contact) => (
-              <Grid
-                container
-                key={contact.id}
-                sx={{
-                  padding: "8px",
-                  borderRadius: 2,
-                  marginTop: 0.5,
-                }}
-              >
-                <Grid
-                  item
-                  xs={4}
-                  onClick={() => history.push(`/flowbuilder/${contact.id}`)}
-                >
-                  <Stack
-                    justifyContent={"center"}
-                    height={"100%"}
-                    style={{ color: "#252525" }}
-                  >
-                    <Stack direction={"row"}>
-                      <DevicesFold />
-                      <Stack justifyContent={"center"} marginLeft={1}>
-                        {contact.name}
-                      </Stack>
-                    </Stack>
-                  </Stack>
-                </Grid>
-                <Grid
-                  item
-                  xs={4}
+        {loading && !(Array.isArray(webhooks) && webhooks.length) ? (
+          <Stack
+            justifyContent="center"
+            alignItems="center"
+            minHeight="50vh"
+          >
+            <CircularProgress />
+          </Stack>
+        ) : (
+          <Table size="medium" sx={{ minWidth: 480 }}>
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 600, py: 2, fontSize: "0.8125rem" }}>
+                  {i18n.t("contacts.table.name")}
+                </TableCell>
+                <TableCell
                   align="center"
-                  style={{ color: "#252525" }}
-                  onClick={() => history.push(`/flowbuilder/${contact.id}`)}
+                  sx={{ fontWeight: 600, width: 140, py: 2, fontSize: "0.8125rem" }}
                 >
-                  <Stack justifyContent={"center"} height={"100%"}>
-                    {contact.active ? "Ativo" : "Desativado"}
-                  </Stack>
-                </Grid>
-                <Grid item xs={4} align="end">
-                  <Button
-                    id="basic-button"
-                    aria-controls={open ? "basic-menu" : undefined}
-                    aria-haspopup="true"
-                    aria-expanded={open ? "true" : undefined}
-                    onClick={(e) => {
-                      handleClick(e);
-                      setDeletingContact(contact);
-                    }}
-                    sx={{ borderRadius: "36px", minWidth: "24px" }}
-                  >
-                    <MoreVert
-                      sx={{ color: "#252525", width: "21px", height: "21px" }}
-                    />
-                  </Button>
-                  {/* <IconButton
-                    size="small"
-                    onClick={() => hadleEditContact(contact.id, contact.name)}
-                  >
-                    <EditIcon style={{ color: "#ededed" }} />
-                  </IconButton>
-                  <IconButton
-                    size="small"
-                    onClick={e => {
-                      setConfirmDuplicateOpen(true);
-                      setDeletingContact(contact);
+                  Status
+                </TableCell>
+                <TableCell
+                  align="right"
+                  sx={{ fontWeight: 600, width: 216, py: 2, fontSize: "0.8125rem" }}
+                >
+                  {i18n.t("contacts.table.actions")}
+                </TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {(Array.isArray(webhooks) ? webhooks : []).map((contact) => {
+                const subtitle = formatFlowSubtitle(contact);
+                return (
+                  <TableRow
+                    key={contact.id}
+                    hover
+                    sx={{
+                      "& td": {
+                        verticalAlign: "middle",
+                        py: 2,
+                        borderColor: "divider",
+                      },
                     }}
                   >
-                    <ContentCopy style={{ color: "#ededed" }} />
-                  </IconButton>
-                  <IconButton
-                    size="small"
-                    onClick={() => history.push(`/flowbuilder/${contact.id}`)}
-                  >
-                    <Stack sx={{ width: 24 }}>
-                      <Build sx={{ width: 20, color: "#ededed" }} />
-                    </Stack>
-                  </IconButton>
-                  <Can
-                    role={user.profile}
-                    perform="contacts-page:deleteContact"
-                    yes={() => (
-                      <IconButton
-                        size="small"
-                        onClick={e => {
-                          setConfirmOpen(true);
-                          setDeletingContact(contact);
-                        }}
+                    <TableCell
+                      onClick={() => history.push(`/flowbuilder/${contact.id}`)}
+                      sx={{
+                        cursor: "pointer",
+                        maxWidth: 360,
+                        borderRadius: 1,
+                        transition: (theme) =>
+                          theme.transitions.create("background-color", {
+                            duration: theme.transitions.duration.shortest,
+                          }),
+                        "&:hover": {
+                          bgcolor: "action.hover",
+                        },
+                      }}
+                    >
+                      <Box display="flex" alignItems="flex-start" gap={1.5}>
+                        <AccountTreeIcon
+                          sx={{
+                            mt: 0.15,
+                            color: "primary.main",
+                            fontSize: 26,
+                            flexShrink: 0,
+                            opacity: 0.92,
+                          }}
+                        />
+                        <Box minWidth={0}>
+                          <Typography
+                            variant="body1"
+                            component="div"
+                            sx={{
+                              fontWeight: 600,
+                              lineHeight: 1.35,
+                              textDecoration: "none",
+                            }}
+                          >
+                            {contact.name}
+                          </Typography>
+                          {subtitle ? (
+                            <Typography
+                              variant="caption"
+                              color="textSecondary"
+                              component="div"
+                              sx={{ display: "block", mt: 0.35 }}
+                            >
+                              {subtitle}
+                            </Typography>
+                          ) : null}
+                        </Box>
+                      </Box>
+                    </TableCell>
+                    <TableCell align="center">
+                      {contact.active ? (
+                        <Chip label="Ativo" color="success" size="small" />
+                      ) : (
+                        <Chip
+                          label="Inativo"
+                          size="small"
+                          sx={{
+                            bgcolor: "grey.300",
+                            color: "grey.800",
+                            fontWeight: 500,
+                          }}
+                        />
+                      )}
+                    </TableCell>
+                    <TableCell align="right">
+                      <Stack
+                        direction="row"
+                        spacing={0.25}
+                        justifyContent="flex-end"
+                        alignItems="center"
                       >
-                        <DeleteOutlineIcon style={{ color: "#ededed" }} />
-                      </IconButton>
-                    )}
-                  /> */}
-                </Grid>
-              </Grid>
-            ))}
-            <Menu
-              id="basic-menu"
-              anchorEl={anchorEl}
-              open={open}
-              sx={{ borderRadius: "40px" }}
-              onClose={handleClose}
-              MenuListProps={{
-                "aria-labelledby": "basic-button",
-              }}
-            >
-              <MenuItem
-                onClick={() => {
-                  handleClose();
-                  hadleEditContact();
-                }}
-              >
-                Editar nome
-              </MenuItem>
-              <MenuItem
-                onClick={() => {
-                  handleClose();
-                  exportLink();
-                }}
-              >
-                Editar fluxo
-              </MenuItem>
-              <MenuItem
-                onClick={() => {
-                  handleClose();
-                  setConfirmDuplicateOpen(true);
-                }}
-              >
-                Duplicar
-              </MenuItem>
-              <MenuItem
-                onClick={() => {
-                  handleClose();
-                  setConfirmOpen(true);
-                }}
-              >
-                Excluir
-              </MenuItem>
-            </Menu>
-            {loading && (
-              <Stack
-                justifyContent={"center"}
-                alignItems={"center"}
-                minHeight={"50vh"}
-              >
-                <CircularProgress />
-              </Stack>
-            )}
-          </>
-        </Stack>
+                        <Tooltip title="Editar nome">
+                          <IconButton
+                            size="small"
+                            className={classes.actionIcon}
+                            aria-label="Editar nome"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenRenameModal(contact);
+                            }}
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Editar fluxo">
+                          <IconButton
+                            size="small"
+                            className={classes.actionIcon}
+                            aria-label="Editar fluxo"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              history.push(`/flowbuilder/${contact.id}`);
+                            }}
+                          >
+                            <TuneIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Duplicar">
+                          <IconButton
+                            size="small"
+                            className={classes.actionIcon}
+                            aria-label="Duplicar"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeletingContact(contact);
+                              setConfirmDuplicateOpen(true);
+                            }}
+                          >
+                            <ContentCopyIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Excluir">
+                          <IconButton
+                            size="small"
+                            className={classes.actionIcon}
+                            aria-label="Excluir"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeletingContact(contact);
+                              setConfirmOpen(true);
+                            }}
+                            sx={{
+                              color: "error.main",
+                              opacity: 0.65,
+                              "&:hover": {
+                                opacity: 1,
+                                bgcolor: "action.hover",
+                              },
+                            }}
+                          >
+                            <DeleteOutlineIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Stack>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        )}
       </Paper>
     </MainContainer>
   );
