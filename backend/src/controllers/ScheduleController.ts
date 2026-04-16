@@ -12,6 +12,7 @@ import Schedule from "../models/Schedule";
 import path from "path";
 import fs from "fs";
 import { head } from "lodash";
+import { logger } from "../utils/logger";
 
 type IndexQuery = {
   searchParam?: string;
@@ -24,15 +25,23 @@ export const index = async (req: Request, res: Response): Promise<Response> => {
   const { contactId, userId, pageNumber, searchParam } = req.query as IndexQuery;
   const { companyId } = req.user;
 
-  const { schedules, count, hasMore } = await ListService({
-    searchParam,
-    contactId,
-    userId,
-    pageNumber,
-    companyId
-  });
+  try {
+    const { schedules, count, hasMore } = await ListService({
+      searchParam,
+      contactId,
+      userId,
+      pageNumber,
+      companyId
+    });
 
-  return res.json({ schedules, count, hasMore });
+    return res.json({ schedules, count, hasMore });
+  } catch (err) {
+    logger.error(
+      { err, companyId, query: req.query },
+      "[schedules] GET /schedules listagem falhou"
+    );
+    throw err;
+  }
 };
 
 export const store = async (req: Request, res: Response): Promise<Response> => {

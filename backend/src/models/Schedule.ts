@@ -117,7 +117,7 @@ class Schedule extends Model<Schedule> {
   @BelongsTo(() => Company)
   company: Company;
 
-  @BelongsTo(() => Whatsapp)
+  @BelongsTo(() => Whatsapp, "preferredWhatsappId")
   preferredWhatsapp: Whatsapp;
 }
 
