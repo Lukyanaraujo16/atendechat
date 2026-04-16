@@ -25,6 +25,7 @@ import Alert from "@material-ui/lab/Alert";
 import IconButton from "@material-ui/core/IconButton";
 import DeleteOutlineIcon from "@material-ui/icons/DeleteOutline";
 import EditIcon from "@material-ui/icons/Edit";
+import ScheduleIcon from "@material-ui/icons/Schedule";
 import { formatDistanceToNow, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -55,6 +56,7 @@ import { SocketContext } from "../../context/Socket/SocketContext";
 
 import { CSVLink } from "react-csv";
 import ImportContactsModal from "../../components/ImportContactsModal";
+import ScheduleModal from "../../components/ScheduleModal";
 
 const reducer = (state, action) => {
 	if (action.type === "LOAD_CONTACTS") {
@@ -264,6 +266,8 @@ const Contacts = () => {
 	const [hasMore, setHasMore] = useState(false);
 	const [openModalImport, setOpenModalImport] = useState(false);
 	const [tagOptions, setTagOptions] = useState([]);
+	const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
+	const [scheduleContactId, setScheduleContactId] = useState(null);
 
 	const socketManager = useContext(SocketContext);
 
@@ -398,6 +402,20 @@ const Contacts = () => {
 		setOpenModalImport(false);
 	};
 
+	const handleOpenScheduleModal = (contactId) => {
+		setScheduleContactId(contactId);
+		setScheduleModalOpen(true);
+	};
+
+	const handleCloseScheduleModal = () => {
+		setScheduleModalOpen(false);
+		setScheduleContactId(null);
+	};
+
+	const handleCleanScheduleContact = () => {
+		setScheduleContactId(null);
+	};
+
 	const formatLastInteraction = (iso) => {
 		if (!iso) return "—";
 		try {
@@ -504,6 +522,13 @@ const Contacts = () => {
 					setNewTicketModalOpen(true);
 					setContactModalOpen(false);
 				}}
+			/>
+			<ScheduleModal
+				open={scheduleModalOpen}
+				onClose={handleCloseScheduleModal}
+				contactId={scheduleContactId}
+				cleanContact={handleCleanScheduleContact}
+				redirectToSchedulesAfterContactSave={false}
 			/>
 			<ConfirmationModal
 				title={
@@ -765,6 +790,16 @@ const Contacts = () => {
 															}}
 														>
 															<WhatsAppIcon fontSize="small" />
+														</IconButton>
+													</Tooltip>
+													<Tooltip title={i18n.t("contacts.scheduleMessage")}>
+														<IconButton
+															size="small"
+															color="primary"
+															aria-label={i18n.t("contacts.scheduleMessage")}
+															onClick={() => handleOpenScheduleModal(contact.id)}
+														>
+															<ScheduleIcon fontSize="small" />
 														</IconButton>
 													</Tooltip>
 													<Tooltip title={i18n.t("contacts.buttons.edit")}>

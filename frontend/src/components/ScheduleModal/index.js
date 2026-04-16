@@ -151,7 +151,16 @@ function resolveEffectiveCompanyId(user) {
 	return Number.isFinite(n) ? n : null;
 }
 
-const ScheduleModal = ({ open, onClose, scheduleId, contactId, cleanContact, reload }) => {
+const ScheduleModal = ({
+	open,
+	onClose,
+	scheduleId,
+	contactId,
+	cleanContact,
+	reload,
+	/** Quando há contactId e cleanContact após guardar: ir para /schedules (comportamento legado). Contatos passam false para ficar na página. */
+	redirectToSchedulesAfterContactSave = true,
+}) => {
 	const classes = useStyles();
 	const history = useHistory();
 	const { user } = useContext(AuthContext);
@@ -347,7 +356,9 @@ const ScheduleModal = ({ open, onClose, scheduleId, contactId, cleanContact, rel
 			if (contactId) {
 				if (typeof cleanContact === "function") {
 					cleanContact();
-					history.push("/schedules");
+					if (redirectToSchedulesAfterContactSave) {
+						history.push("/schedules");
+					}
 				}
 			}
 		} catch (err) {

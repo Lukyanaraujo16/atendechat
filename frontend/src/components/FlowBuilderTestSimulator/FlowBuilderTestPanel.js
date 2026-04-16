@@ -10,7 +10,10 @@ import {
   Stack,
   Button,
   Divider,
+  Paper,
+  Alert,
 } from "@mui/material";
+import { useTheme, alpha } from "@mui/material/styles";
 import CloseIcon from "@mui/icons-material/Close";
 import SendIcon from "@mui/icons-material/Send";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
@@ -27,6 +30,154 @@ function uid() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+function SimulationChatRow({ row, t, theme }) {
+  if (row.kind === "simulated_action") {
+    const actionKey = row.action || "generic";
+    const detail = row.detail ? String(row.detail) : "";
+    const title =
+      actionKey === "http"
+        ? t("actionHttp")
+        : actionKey === "openai"
+          ? t("actionOpenai")
+          : actionKey === "typebot"
+            ? t("actionTypebot")
+            : actionKey === "admin"
+              ? t("actionAdmin", { type: detail || "—" })
+              : t("actionGeneric", { type: detail || "—" });
+    return (
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          mb: 1.5,
+          px: 0.5,
+        }}
+      >
+        <Paper
+          elevation={0}
+          sx={{
+            maxWidth: "94%",
+            px: 1.75,
+            py: 1.25,
+            borderRadius: 2,
+            border: "1px dashed",
+            borderColor: alpha(theme.palette.info.main, 0.45),
+            bgcolor: alpha(theme.palette.info.main, 0.06),
+          }}
+        >
+          <Typography
+            variant="caption"
+            sx={{
+              display: "block",
+              fontWeight: 700,
+              letterSpacing: 0.4,
+              color: "info.main",
+              textTransform: "uppercase",
+              fontSize: "0.65rem",
+            }}
+          >
+            {t("simulatedActionBadge")}
+          </Typography>
+          <Typography variant="body2" sx={{ mt: 0.5, fontWeight: 500 }}>
+            {title}
+            {actionKey === "http" && detail ? ` · ${detail}` : ""}
+            {actionKey === "typebot" && detail ? ` · ${detail}` : ""}
+          </Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
+            {t("notExecutedPreview")}
+          </Typography>
+        </Paper>
+      </Box>
+    );
+  }
+
+  if (row.kind === "condition_hint" && row.manualReason) {
+    return (
+      <Box sx={{ display: "flex", justifyContent: "center", mb: 1.25, px: 0.5 }}>
+        <Alert
+          severity="info"
+          variant="outlined"
+          icon={false}
+          sx={{
+            py: 0.75,
+            px: 1.5,
+            maxWidth: "94%",
+            width: "100%",
+            "& .MuiAlert-message": { width: "100%" },
+          }}
+        >
+          <Typography variant="caption" component="div" sx={{ fontWeight: 600, mb: 0.25 }}>
+            {t("conditionManualTitle")}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            {t(`conditionManual.${row.manualReason}`)}
+          </Typography>
+        </Alert>
+      </Box>
+    );
+  }
+
+  if (row.kind === "hint" && row.hintKey) {
+    return (
+      <Box sx={{ display: "flex", justifyContent: "center", mb: 1.25 }}>
+        <Chip
+          size="small"
+          label={t(row.hintKey)}
+          sx={{ fontStyle: "italic", opacity: 0.95 }}
+          variant="outlined"
+        />
+      </Box>
+    );
+  }
+
+  const isUser = row.from === "user";
+  const isSystem = row.from === "system" && !row.kind;
+  if (isSystem) {
+    return (
+      <Box sx={{ display: "flex", justifyContent: "center", mb: 1 }}>
+        <Typography variant="caption" color="text.secondary" sx={{ opacity: 0.85 }}>
+          {row.text}
+        </Typography>
+      </Box>
+    );
+  }
+
+  return (
+    <Box
+      sx={{
+        display: "flex",
+        justifyContent: isUser ? "flex-end" : "flex-start",
+        mb: 1.35,
+      }}
+    >
+      <Box
+        sx={{
+          maxWidth: "88%",
+          px: 1.5,
+          py: 1,
+          borderRadius: 2,
+          bgcolor: isUser
+            ? alpha(theme.palette.success.main, 0.18)
+            : theme.palette.background.paper,
+          boxShadow: "0 1px 2px rgba(0,0,0,0.07)",
+          border: isUser ? "none" : `1px solid ${alpha(theme.palette.divider, 0.9)}`,
+        }}
+      >
+        <Typography
+          variant="body2"
+          sx={{
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
+            fontSize: "0.9rem",
+          }}
+        >
+          {row.text}
+        </Typography>
+      </Box>
+    </Box>
+  );
+}
+
 export default function FlowBuilderTestPanel({
   open,
   onClose,
@@ -34,14 +185,17 @@ export default function FlowBuilderTestPanel({
   edges,
   flowName,
 }) {
+  const theme = useTheme();
   const [lines, setLines] = useState([]);
   const [input, setInput] = useState("");
   const [wait, setWait] = useState(null);
+  const [stepInfo, setStepInfo] = useState(null);
   const [ctx, setCtx] = useState({
     lastUserMessage: "",
     messageCount: 0,
     mockContactName: "Teste",
     mockNumber: "5511999999999",
+    mockEmail: "",
   });
   const scrollRef = useRef(null);
   const nodesRef = useRef(nodes);
@@ -49,7 +203,7 @@ export default function FlowBuilderTestPanel({
   nodesRef.current = nodes;
   edgesRef.current = edges;
 
-  const t = useCallback((key) => i18n.t(`flowBuilderSimulator.${key}`), []);
+  const t = useCallback((key, opts) => i18n.t(`flowBuilderSimulator.${key}`, opts), []);
 
   const appendBotLines = useCallback((arr) => {
     if (!arr || !arr.length) return;
@@ -57,8 +211,7 @@ export default function FlowBuilderTestPanel({
       ...prev,
       ...arr.map((m) => ({
         id: uid(),
-        from: m.from,
-        text: m.text,
+        ...m,
       })),
     ]);
   }, []);
@@ -67,11 +220,13 @@ export default function FlowBuilderTestPanel({
     setLines([]);
     setInput("");
     setWait(null);
+    setStepInfo(null);
     const c0 = {
       lastUserMessage: "",
       messageCount: 0,
       mockContactName: "Teste",
       mockNumber: "5511999999999",
+      mockEmail: "",
     };
     setCtx(c0);
 
@@ -88,12 +243,11 @@ export default function FlowBuilderTestPanel({
       return;
     }
     const result = runSimulationStep(n, e, first, c0);
-    setLines(
-      (result.messages || []).map((m) => ({ id: uid(), ...m }))
-    );
+    setLines((result.messages || []).map((m) => ({ id: uid(), ...m })));
     setWait(
       result.wait ? { kind: result.wait, payload: result.payload } : null
     );
+    setStepInfo(result.stepInfo || null);
   }, [t]);
 
   useEffect(() => {
@@ -106,6 +260,12 @@ export default function FlowBuilderTestPanel({
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [lines, open]);
+
+  const applyStepFromResult = (result) => {
+    if (result != null) {
+      setStepInfo(result.stepInfo ?? null);
+    }
+  };
 
   const handleSend = () => {
     const trimmed = String(input || "").trim();
@@ -136,11 +296,13 @@ export default function FlowBuilderTestPanel({
           nextCtx
         );
         appendBotLines(result.messages);
+        applyStepFromResult(result);
         if (result.wait) {
           setWait({ kind: result.wait, payload: result.payload });
         }
       } else {
         appendBotLines([{ from: "bot", text: t("ended") }]);
+        setStepInfo(null);
       }
       return;
     }
@@ -176,11 +338,13 @@ export default function FlowBuilderTestPanel({
         nextCtx
       );
       appendBotLines(result.messages);
+      applyStepFromResult(result);
       if (result.wait) {
         setWait({ kind: result.wait, payload: result.payload });
       }
     } else {
       appendBotLines([{ from: "bot", text: t("ended") }]);
+      setStepInfo(null);
     }
   };
 
@@ -218,13 +382,21 @@ export default function FlowBuilderTestPanel({
         nextCtx
       );
       appendBotLines(result.messages);
+      applyStepFromResult(result);
       if (result.wait) {
         setWait({ kind: result.wait, payload: result.payload });
       }
     } else {
       appendBotLines([{ from: "bot", text: t("ended") }]);
+      setStepInfo(null);
     }
   };
+
+  const stepTypeLabel = stepInfo?.nodeType
+    ? i18n.exists(`flowBuilderSimulator.nodeType.${stepInfo.nodeType}`)
+      ? t(`nodeType.${stepInfo.nodeType}`)
+      : stepInfo.nodeType
+    : null;
 
   return (
     <Drawer
@@ -233,7 +405,7 @@ export default function FlowBuilderTestPanel({
       onClose={onClose}
       PaperProps={{
         sx: {
-          width: { xs: "100%", sm: 420 },
+          width: { xs: "100%", sm: 440 },
           maxWidth: "100%",
           display: "flex",
           flexDirection: "column",
@@ -247,29 +419,97 @@ export default function FlowBuilderTestPanel({
           borderBottom: 1,
           borderColor: "divider",
           display: "flex",
-          alignItems: "center",
-          gap: 1,
+          alignItems: "flex-start",
+          gap: 1.5,
           bgcolor: "primary.main",
           color: "primary.contrastText",
         }}
       >
-        <SmartToyIcon sx={{ fontSize: 28 }} />
+        <SmartToyIcon sx={{ fontSize: 30, mt: 0.25 }} />
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography variant="subtitle1" fontWeight={700} noWrap>
             {t("title")}
           </Typography>
-          <Typography variant="caption" sx={{ opacity: 0.9 }} noWrap>
-            {flowName || "—"} · {t("subtitle")}
+          <Typography variant="body2" sx={{ opacity: 0.95, fontWeight: 500 }} noWrap title={flowName || ""}>
+            {flowName || "—"}
           </Typography>
+          <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" sx={{ mt: 0.75 }}>
+            <Chip
+              size="small"
+              label={t("badgeSimulation")}
+              sx={{
+                height: 22,
+                fontSize: "0.7rem",
+                fontWeight: 600,
+                bgcolor: alpha(theme.palette.common.white, 0.2),
+                color: "inherit",
+              }}
+            />
+            <Typography variant="caption" sx={{ opacity: 0.9 }}>
+              {t("subtitle")}
+            </Typography>
+          </Stack>
         </Box>
-        <IconButton
-          size="small"
-          onClick={onClose}
-          sx={{ color: "inherit" }}
-          aria-label={t("close")}
-        >
-          <CloseIcon />
-        </IconButton>
+        <Stack direction="row" spacing={0.5} alignItems="center">
+          <Button
+            variant="contained"
+            size="small"
+            color="inherit"
+            startIcon={<RestartAltIcon />}
+            onClick={resetAndStart}
+            sx={{
+              color: "primary.main",
+              bgcolor: "background.paper",
+              fontWeight: 700,
+              "&:hover": { bgcolor: alpha(theme.palette.common.white, 0.92) },
+              display: { xs: "none", sm: "inline-flex" },
+            }}
+          >
+            {t("restart")}
+          </Button>
+          <IconButton
+            size="small"
+            onClick={onClose}
+            sx={{ color: "inherit" }}
+            aria-label={t("close")}
+          >
+            <CloseIcon />
+          </IconButton>
+        </Stack>
+      </Box>
+
+      <Box
+        sx={{
+          px: 2,
+          py: 1,
+          borderBottom: 1,
+          borderColor: "divider",
+          bgcolor: alpha(theme.palette.primary.main, 0.04),
+        }}
+      >
+        <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1}>
+          <Typography variant="caption" color="text.secondary">
+            {stepTypeLabel ? (
+              <>
+                {t("currentStep")}: <strong>{stepTypeLabel}</strong>
+                {stepInfo?.label && stepInfo.nodeType === "message"
+                  ? ` · ${stepInfo.label}`
+                  : ""}
+              </>
+            ) : (
+              t("noStepYet")
+            )}
+          </Typography>
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<RestartAltIcon />}
+            onClick={resetAndStart}
+            sx={{ display: { xs: "inline-flex", sm: "none" }, fontWeight: 600 }}
+          >
+            {t("restart")}
+          </Button>
+        </Stack>
       </Box>
 
       <Box
@@ -278,46 +518,15 @@ export default function FlowBuilderTestPanel({
           flex: 1,
           overflowY: "auto",
           p: 2,
-          bgcolor: "#e5ddd5",
-          backgroundImage:
-            "repeating-linear-gradient(0deg, rgba(0,0,0,.02), rgba(0,0,0,.02) 1px, transparent 1px, transparent 8px)",
+          bgcolor: alpha(theme.palette.grey[500], 0.08),
+          backgroundImage: `repeating-linear-gradient(0deg, ${alpha(
+            theme.palette.common.black,
+            0.02
+          )}, ${alpha(theme.palette.common.black, 0.02)} 1px, transparent 1px, transparent 8px)`,
         }}
       >
         {lines.map((row) => (
-          <Box
-            key={row.id}
-            sx={{
-              display: "flex",
-              justifyContent: row.from === "user" ? "flex-end" : "flex-start",
-              mb: 1.25,
-            }}
-          >
-            <Box
-              sx={{
-                maxWidth: "88%",
-                px: 1.5,
-                py: 1,
-                borderRadius: 2,
-                bgcolor: row.from === "user" ? "#dcf8c6" : "#fff",
-                boxShadow: "0 1px 1px rgba(0,0,0,0.08)",
-                border:
-                  row.from === "user"
-                    ? "none"
-                    : "1px solid rgba(0,0,0,0.06)",
-              }}
-            >
-              <Typography
-                variant="body2"
-                sx={{
-                  whiteSpace: "pre-wrap",
-                  wordBreak: "break-word",
-                  fontSize: "0.9rem",
-                }}
-              >
-                {row.text}
-              </Typography>
-            </Box>
-          </Box>
+          <SimulationChatRow key={row.id} row={row} t={t} theme={theme} />
         ))}
       </Box>
 
@@ -336,7 +545,7 @@ export default function FlowBuilderTestPanel({
       )}
 
       {wait?.kind === "condition" && (
-        <Stack direction="row" spacing={1} sx={{ px: 2, pb: 1 }}>
+        <Stack direction="row" spacing={1} sx={{ px: 2, pb: 1 }} alignItems="center">
           <Button
             size="small"
             variant="contained"
@@ -385,13 +594,22 @@ export default function FlowBuilderTestPanel({
         </IconButton>
       </Box>
 
-      <Box sx={{ px: 2, pb: 2, display: "flex", justifyContent: "flex-start" }}>
+      <Box
+        sx={{
+          px: 2,
+          pb: 2,
+          display: { xs: "flex", sm: "none" },
+          justifyContent: "center",
+        }}
+      >
         <Button
           startIcon={<RestartAltIcon />}
           size="small"
+          variant="outlined"
           onClick={resetAndStart}
+          sx={{ fontWeight: 600 }}
         >
-          {t("restart")}
+          {t("restartFull")}
         </Button>
       </Box>
     </Drawer>

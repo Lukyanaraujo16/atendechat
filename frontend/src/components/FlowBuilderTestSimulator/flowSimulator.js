@@ -27,6 +27,14 @@ export function findStartNodeId(nodes) {
   return n ? n.id : null;
 }
 
+const CONTEXT_FIELDS = new Set([
+  "body",
+  "isFirstInteraction",
+  "hasQueue",
+  "hasUser",
+]);
+const CONTACT_FIELDS = new Set(["name", "number", "email"]);
+
 function resolveLeftValue(rule, ctx) {
   const { source, field } = rule;
   if (source === "context") {
@@ -38,7 +46,7 @@ function resolveLeftValue(rule, ctx) {
   if (source === "contact") {
     if (field === "name") return ctx.mockContactName || "Visitante";
     if (field === "number") return ctx.mockNumber || "";
-    if (field === "email") return "";
+    if (field === "email") return String(ctx.mockEmail || "");
   }
   return undefined;
 }
@@ -101,20 +109,33 @@ function evalOperator(left, operator, rightRaw) {
 }
 
 /**
- * Avalia condição no simulador. Retorna true/false ou null se precisar escolha manual (regras não suportadas).
- * @param {object} nodeData
- * @param {{ lastUserMessage: string, messageCount: number, mockContactName?: string, mockNumber?: string }} ctx
+ * Detalhe da avaliação de condição (preview).
+ * @returns {{ value: boolean | null, manualReason: 'variableOrTicket' | 'unknownField' | null }}
  */
-export function evaluateConditionSimulation(nodeData, ctx) {
+export function evaluateConditionDetailed(nodeData, ctx) {
   const mode = nodeData?.mode === "any" ? "any" : "all";
   const rules = Array.isArray(nodeData?.rules) ? nodeData.rules : [];
-  if (!rules.length) return false;
+  if (!rules.length) return { value: false, manualReason: null };
 
-  let unsupported = false;
+  let manualReason = null;
   const results = rules.map((rule) => {
     if (!rule || !rule.operator) return false;
     if (rule.source === "variable" || rule.source === "ticket") {
-      unsupported = true;
+      manualReason = "variableOrTicket";
+      return false;
+    }
+    if (
+      rule.source === "context" &&
+      !CONTEXT_FIELDS.has(String(rule.field || ""))
+    ) {
+      manualReason = "unknownField";
+      return false;
+    }
+    if (
+      rule.source === "contact" &&
+      !CONTACT_FIELDS.has(String(rule.field || ""))
+    ) {
+      manualReason = "unknownField";
       return false;
     }
     const left = resolveLeftValue(rule, ctx);
@@ -126,24 +147,104 @@ export function evaluateConditionSimulation(nodeData, ctx) {
       "isTrue",
       "isFalse",
     ].includes(rule.operator);
-    const ok = evalOperator(
+    return evalOperator(
       left,
       rule.operator,
       needs ? rule.value : undefined
     );
-    return ok;
   });
 
-  if (unsupported) return null;
-  return mode === "any" ? results.some(Boolean) : results.every(Boolean);
+  if (manualReason) return { value: null, manualReason };
+  const value = mode === "any" ? results.some(Boolean) : results.every(Boolean);
+  return { value, manualReason: null };
+}
+
+/**
+ * Avalia condição no simulador. Retorna true/false ou null se precisar escolha manual.
+ */
+export function evaluateConditionSimulation(nodeData, ctx) {
+  const { value } = evaluateConditionDetailed(nodeData, ctx);
+  return value;
 }
 
 const BOT = "bot";
-const USER = "user";
+
+/** Expande sequência do singleBlock (seq + elements) em mensagens de preview. */
+export function expandSingleBlockPreviewMessages(data) {
+  const seq = Array.isArray(data?.seq) ? data.seq : [];
+  const elements = Array.isArray(data?.elements) ? data.elements : [];
+  const out = [];
+  for (const ref of seq) {
+    const el = elements.find((e) => e && e.number === ref);
+    if (!el) continue;
+    if (String(ref).includes("message")) {
+      const text = String(el.value || "").trim() || "(vazio)";
+      out.push({ from: BOT, text });
+    } else if (String(ref).includes("interval")) {
+      const sec = Number(el.value) || 0;
+      out.push({
+        from: BOT,
+        text:
+          sec > 0
+            ? `⏱ Pausa de ${sec}s (simulada — sem espera real).`
+            : "⏱ Intervalo (simulado).",
+      });
+    } else if (String(ref).includes("img")) {
+      const hint = el.original || el.value || "";
+      out.push({
+        from: BOT,
+        text: `🖼 Imagem (simulado)${hint ? `: ${hint}` : ""}`,
+      });
+    } else if (String(ref).includes("audio")) {
+      const hint = el.original || el.value || "";
+      out.push({
+        from: BOT,
+        text: `🎵 Áudio (simulado)${hint ? `: ${hint}` : ""}`,
+      });
+    } else if (String(ref).includes("video")) {
+      const hint = el.original || el.value || "";
+      out.push({
+        from: BOT,
+        text: `🎬 Vídeo (simulado)${hint ? `: ${hint}` : ""}`,
+      });
+    }
+  }
+  if (!out.length) {
+    out.push({
+      from: "system",
+      kind: "hint",
+      hintKey: "singleBlockEmpty",
+    });
+  }
+  return out;
+}
+
+function stepInfoFromNode(node) {
+  if (!node) return null;
+  const d = node.data || {};
+  const t = node.type;
+  let label = t || "";
+  if (t === "message") label = String(d.label || "").trim().slice(0, 40) || "message";
+  else if (t === "menu") label = "menu";
+  else if (t === "condition") label = "condition";
+  else if (t === "singleBlock") label = "singleBlock";
+  else if (t === "question") label = "question";
+  else if (t === "waitForInteraction") label = "waitForInteraction";
+  return { nodeId: node.id, nodeType: t, label };
+}
+
+function simulatedActionRow(action, detail) {
+  return {
+    from: "system",
+    kind: "simulated_action",
+    action,
+    detail: detail != null ? String(detail) : "",
+  };
+}
 
 /**
  * Executa passos automáticos até precisar de input ou fim.
- * @returns {{ messages: {from:string,text:string}[], wait: null|'menu'|'text'|'condition', payload?: object, nextNodeId: string|null }}
+ * @returns {{ messages: object[], wait, payload, nextNodeId, stepInfo }}
  */
 export function runSimulationStep(nodes, edges, fromNodeId, ctx) {
   const messages = [];
@@ -155,7 +256,13 @@ export function runSimulationStep(nodes, edges, fromNodeId, ctx) {
     const node = nodeById(id);
     if (!node) {
       messages.push({ from: BOT, text: "⚠ Nó não encontrado." });
-      return { messages, wait: null, nextNodeId: null, payload: null };
+      return {
+        messages,
+        wait: null,
+        nextNodeId: null,
+        payload: null,
+        stepInfo: null,
+      };
     }
     const d = node.data || {};
     const t = node.type;
@@ -195,21 +302,28 @@ export function runSimulationStep(nodes, edges, fromNodeId, ctx) {
         wait: "menu",
         payload: { menuNodeId: id, options: opts },
         nextNodeId: id,
+        stepInfo: stepInfoFromNode(node),
       };
     }
 
     if (t === "condition") {
-      const ev = evaluateConditionSimulation(d, ctx);
+      const { value: ev, manualReason } = evaluateConditionDetailed(d, ctx);
       if (ev === null) {
         messages.push({
+          from: "system",
+          kind: "condition_hint",
+          manualReason: manualReason || "variableOrTicket",
+        });
+        messages.push({
           from: BOT,
-          text: "🔀 Condição: escolha o caminho (simulação).",
+          text: "🔀 Escolha o caminho (sim / não) para continuar o preview.",
         });
         return {
           messages,
           wait: "condition",
-          payload: { conditionNodeId: id },
+          payload: { conditionNodeId: id, manualReason: manualReason || "variableOrTicket" },
           nextNodeId: id,
+          stepInfo: stepInfoFromNode(node),
         };
       }
       id = pickNextNode(edges, id, ev ? "true" : "false");
@@ -266,6 +380,7 @@ export function runSimulationStep(nodes, edges, fromNodeId, ctx) {
         wait: "text",
         payload: { afterTextNodeId: id, mode: "question" },
         nextNodeId: id,
+        stepInfo: stepInfoFromNode(node),
       };
     }
 
@@ -279,14 +394,13 @@ export function runSimulationStep(nodes, edges, fromNodeId, ctx) {
         wait: "text",
         payload: { afterTextNodeId: id, mode: "wait" },
         nextNodeId: id,
+        stepInfo: stepInfoFromNode(node),
       };
     }
 
     if (t === "singleBlock") {
-      messages.push({
-        from: BOT,
-        text: "📚 Conteúdo (bloco) — simulação: mensagens do bloco não são expandidas aqui.",
-      });
+      const expanded = expandSingleBlockPreviewMessages(d);
+      expanded.forEach((row) => messages.push(row));
       id = pickNextNode(edges, id, "a");
       continue;
     }
@@ -301,28 +415,25 @@ export function runSimulationStep(nodes, edges, fromNodeId, ctx) {
       t === "blacklist" ||
       t === "flowUp"
     ) {
-      messages.push({
-        from: BOT,
-        text: `⚙ Ação “${t}” — apenas simulada (sem alterar dados).`,
-      });
+      messages.push(simulatedActionRow("admin", t));
       id = pickNextNode(edges, id, "a");
       continue;
     }
 
     if (t === "httpRequest") {
-      messages.push({
-        from: BOT,
-        text: `🌐 HTTP Request — não executado na simulação${d.url ? ` (${d.url})` : ""}.`,
-      });
+      messages.push(simulatedActionRow("http", d.url || ""));
       id = pickNextNode(edges, id, "a");
       continue;
     }
 
-    if (t === "typebot" || t === "openai") {
-      messages.push({
-        from: BOT,
-        text: `🤖 Integração (${t}) — não executada na simulação.`,
-      });
+    if (t === "typebot") {
+      messages.push(simulatedActionRow("typebot", d.slug || d.name || ""));
+      id = pickNextNode(edges, id, "a");
+      continue;
+    }
+
+    if (t === "openai") {
+      messages.push(simulatedActionRow("openai", ""));
       id = pickNextNode(edges, id, "a");
       continue;
     }
@@ -342,7 +453,13 @@ export function runSimulationStep(nodes, edges, fromNodeId, ctx) {
       text: "— Fim do fluxo (sem próximo passo). —",
     });
   }
-  return { messages, wait: null, nextNodeId: null, payload: null };
+  return {
+    messages,
+    wait: null,
+    nextNodeId: null,
+    payload: null,
+    stepInfo: null,
+  };
 }
 
 export function firstNodeAfterStart(nodes, edges) {
