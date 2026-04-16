@@ -2697,6 +2697,23 @@ const messages = {
           message: "Esta ação não pode ser revertida.",
         },
       },
+      flowBuilderSimulator: {
+        openFab: "Testar fluxo",
+        title: "Simulação do fluxo",
+        subtitle: "Sem envio real ao WhatsApp",
+        placeholder: "Digite uma mensagem…",
+        send: "Enviar",
+        restart: "Reiniciar teste",
+        close: "Fechar",
+        yes: "Sim",
+        no: "Não",
+        noStart:
+          "Não há bloco Início no fluxo. Adicione o nó Início para simular.",
+        noEdgeFromStart: "Conecte uma saída ao bloco Início.",
+        ended: "— Fim da simulação —",
+        noWaitHint:
+          "Fora dos pontos em que o fluxo pede mensagem, use Reiniciar para um novo teste.",
+      },
       errors: {
         connectionError: "Não foi possível conectar ao servidor. Verifique a URL do backend e se o servidor está online.",
         generic: "Ocorreu um erro. Tente novamente.",

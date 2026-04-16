@@ -2588,6 +2588,22 @@ const messages = {
 					message: "This action cannot be undone.",
 				},
 			},
+			flowBuilderSimulator: {
+				openFab: "Test flow",
+				title: "Flow simulation",
+				subtitle: "No real WhatsApp delivery",
+				placeholder: "Type a message…",
+				send: "Send",
+				restart: "Restart test",
+				close: "Close",
+				yes: "Yes",
+				no: "No",
+				noStart: "There is no Start block. Add a Start node to simulate.",
+				noEdgeFromStart: "Connect an edge from the Start block.",
+				ended: "— End of simulation —",
+				noWaitHint:
+					"Outside steps that wait for input, use Restart for a new test.",
+			},
 			errors: {
 				connectionError: "Could not connect to server. Check the backend URL and if the server is online.",
 				generic: "An error occurred. Please try again.",

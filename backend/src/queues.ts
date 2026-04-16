@@ -33,7 +33,7 @@ import { addSeconds, differenceInSeconds } from "date-fns";
 import formatBody from "./helpers/Mustache";
 import { ClosedAllOpenTickets } from "./services/WbotServices/wbotClosedTickets";
 
-const SCHEDULE_UPCOMING_WINDOW_SEC = 300;
+/** Retries de conexão (AGUARDANDO_CONEXAO), não antecipação de horário. */
 const SCHEDULE_RETRY_BACKOFF_MINUTES = 2;
 const SCHEDULE_MAX_ATTEMPTS = 100;
 const SCHEDULE_SEND_DELAY_MS = 40000;
@@ -259,9 +259,12 @@ async function handleCloseTicketsAutomatic() {
 
 async function handleVerifySchedules(job) {
   try {
-    const upcomingCutoff = moment
-      .utc()
-      .add(SCHEDULE_UPCOMING_WINDOW_SEC, "seconds");
+    /**
+     * Elegibilidade de envio: apenas quando sendAt / nextRunAt <= agora (UTC).
+     * Não usar janela antecipada (ex.: now+5min): isso disparava o fluxo minutos
+     * antes do horário agendado.
+     */
+    const nowUtc = moment.utc();
     const backoffCutoff = moment
       .utc()
       .subtract(SCHEDULE_RETRY_BACKOFF_MINUTES, "minutes");
@@ -291,7 +294,7 @@ async function handleVerifySchedules(job) {
                 [Op.or]: [
                   {
                     status: "PENDENTE",
-                    sendAt: { [Op.lte]: upcomingCutoff.toDate() }
+                    sendAt: { [Op.lte]: nowUtc.toDate() }
                   },
                   retryClause
                 ]
@@ -306,7 +309,7 @@ async function handleVerifySchedules(job) {
                 [Op.or]: [
                   {
                     status: "PENDENTE",
-                    nextRunAt: { [Op.lte]: upcomingCutoff.toDate() }
+                    nextRunAt: { [Op.lte]: nowUtc.toDate() }
                   },
                   { ...retryClause }
                 ]
@@ -327,6 +330,12 @@ async function handleVerifySchedules(job) {
       order: [["sendAt", "ASC"]]
     });
 
+    if (schedules.length > 0) {
+      logger.info(
+        `[Schedule] verify UTC=${nowUtc.toISOString()} capturados=${schedules.length} (critério: PENDENTE com sendAt/nextRunAt <= now UTC; retries de conexão separados)`
+      );
+    }
+
     for (const schedule of schedules) {
       const hasPivot =
         schedule.scheduleContacts &&
@@ -343,8 +352,15 @@ async function handleVerifySchedules(job) {
         schedule.scheduleContacts?.find(sc => sc.contact)?.contact?.name ||
         String(schedule.id);
       await schedule.update({ status: "AGENDADA" });
+      const sendAtIso = schedule.sendAt
+        ? moment.utc(schedule.sendAt).toISOString()
+        : "null";
+      const nextRunIso =
+        schedule.nextRunAt != null
+          ? moment.utc(schedule.nextRunAt).toISOString()
+          : "null";
       logger.info(
-        `[Schedule] captura para envio id=${schedule.id} tipo=${schedule.scheduleType || "single"} label="${label}"`
+        `[Schedule] captura envio id=${schedule.id} tipo=${schedule.scheduleType || "single"} label="${label}" sendAt_utc=${sendAtIso} nextRunAt_utc=${nextRunIso} now_utc=${nowUtc.toISOString()}`
       );
       await sendScheduledMessages.add(
         "SendMessage",

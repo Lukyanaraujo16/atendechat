@@ -88,6 +88,9 @@ import FlowBuilderSectorModal from "../../components/FlowBuilderSectorModal";
 import FlowBuilderTagModal from "../../components/FlowBuilderTagModal";
 import FlowBuilderCloseTicketModal from "../../components/FlowBuilderCloseTicketModal";
 import FlowBuilderAddNodeMenu from "../../components/FlowBuilderAddNodeMenu";
+import FlowBuilderTestPanel, {
+  FlowBuilderTestFab,
+} from "../../components/FlowBuilderTestSimulator";
 
 import {
   buildFlowExportFile,
@@ -203,6 +206,7 @@ const FlowBuilderConfig = () => {
   const [modalAddFlowUp, setModalAddFlowUp] = useState(null);
   const [addNodeMenuAnchor, setAddNodeMenuAnchor] = useState(null);
   const [flowDisplayName, setFlowDisplayName] = useState("Fluxo");
+  const [flowTestOpen, setFlowTestOpen] = useState(false);
 
   const connectionLineStyle = { stroke: "#2b2b2b", strokeWidth: "6px" };
 
@@ -1431,6 +1435,17 @@ const FlowBuilderConfig = () => {
           <CircularProgress />
         </Stack>
       )}
+      <FlowBuilderTestFab
+        visible={!loading}
+        onClick={() => setFlowTestOpen(true)}
+      />
+      <FlowBuilderTestPanel
+        open={flowTestOpen}
+        onClose={() => setFlowTestOpen(false)}
+        nodes={nodes}
+        edges={edges}
+        flowName={flowDisplayName}
+      />
     </Stack>
   );
 };
