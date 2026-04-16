@@ -131,6 +131,26 @@ const WEEKDAYS = [
 	{ v: 6, key: "sat" },
 ];
 
+/** Resposta do GET /contacts/list costuma ser array; normaliza formatos alternativos. */
+function normalizeContactListPayload(data) {
+	if (Array.isArray(data)) return data;
+	if (Array.isArray(data?.contacts)) return data.contacts;
+	if (Array.isArray(data?.records)) return data.records;
+	return [];
+}
+
+function resolveEffectiveCompanyId(user) {
+	const fromUser = user?.companyId;
+	if (fromUser != null && fromUser !== "") {
+		const n = Number(fromUser);
+		return Number.isFinite(n) ? n : null;
+	}
+	const raw = typeof localStorage !== "undefined" ? localStorage.getItem("companyId") : null;
+	if (raw == null || raw === "") return null;
+	const n = Number(raw);
+	return Number.isFinite(n) ? n : null;
+}
+
 const ScheduleModal = ({ open, onClose, scheduleId, contactId, cleanContact, reload }) => {
 	const classes = useStyles();
 	const history = useHistory();
@@ -178,21 +198,40 @@ const ScheduleModal = ({ open, onClose, scheduleId, contactId, cleanContact, rel
 
 	useEffect(() => {
 		if (!open) return;
-		const { companyId } = user;
-		(async () => {
-			try {
-				const { data: company } = await api.get(`/companies/${companyId}`);
-				const tz = company?.timezone || "America/Sao_Paulo";
-				setCompanyTz(tz);
+		const effectiveCompanyId = resolveEffectiveCompanyId(user);
 
-				const { data: contactList } = await api.get("/contacts/list", {
-					params: { companyId },
-				});
-				const customList = contactList.map(c => ({ id: c.id, name: c.name }));
+		(async () => {
+			let tz = "America/Sao_Paulo";
+
+			// Timezone da empresa (opcional): não bloquear lista de contatos se falhar.
+			if (effectiveCompanyId != null) {
+				try {
+					const { data: company } = await api.get(`/companies/${effectiveCompanyId}`);
+					tz = company?.timezone || tz;
+					setCompanyTz(tz);
+				} catch (_) {
+					setCompanyTz(tz);
+				}
+			}
+
+			// Lista vem sempre do tenant do JWT (req.user.companyId no backend). Não depende
+			// de companyId no contexto React — evita /companies/undefined e falha em cadeia.
+			try {
+				const { data } = await api.get("/contacts/list");
+				const contactList = normalizeContactListPayload(data);
+				const customList = contactList.map(c => ({
+					id: c.id,
+					name: c.name || c.number || String(c.id),
+				}));
 				if (isArray(customList)) {
 					setContacts([{ id: "", name: "" }, ...customList]);
 				}
+			} catch (err) {
+				toastError(err);
+				setContacts([{ id: "", name: "" }]);
+			}
 
+			try {
 				if (!scheduleId) {
 					setSchedule({
 						...initialState,
@@ -247,7 +286,7 @@ const ScheduleModal = ({ open, onClose, scheduleId, contactId, cleanContact, rel
 				toastError(err);
 			}
 		})();
-	}, [scheduleId, open, user, contactId]);
+	}, [scheduleId, open, contactId, user?.companyId]);
 
 	const handleClose = () => {
 		onClose();

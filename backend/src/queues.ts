@@ -36,7 +36,20 @@ import { ClosedAllOpenTickets } from "./services/WbotServices/wbotClosedTickets"
 /** Retries de conexão (AGUARDANDO_CONEXAO), não antecipação de horário. */
 const SCHEDULE_RETRY_BACKOFF_MINUTES = 2;
 const SCHEDULE_MAX_ATTEMPTS = 100;
+/** Pequeno atraso após captura (fila interna); não antecipa o horário do agendamento. */
 const SCHEDULE_SEND_DELAY_MS = 40000;
+
+/** Instante de disparo do agendamento em UTC (sendAt único; nextRunAt recorrente). */
+function getScheduleTargetInstantUtc(schedule: Schedule): moment.Moment | null {
+  if (schedule.scheduleType === "recurring") {
+    if (schedule.nextRunAt == null) return null;
+    const m = moment.utc(schedule.nextRunAt);
+    return m.isValid() ? m : null;
+  }
+  if (schedule.sendAt == null) return null;
+  const m = moment.utc(schedule.sendAt);
+  return m.isValid() ? m : null;
+}
 
 async function emitScheduleSocketUpdateSafe(scheduleId: number) {
   try {
@@ -330,13 +343,42 @@ async function handleVerifySchedules(job) {
       order: [["sendAt", "ASC"]]
     });
 
+    /**
+     * Dupla verificação em UTC no Node (após leitura Sequelize).
+     * Evita captura prematura se houver divergência entre SQL/driver/MySQL e o instante real
+     * (ex.: antecipação observada com janela de ~5 min em ambientes com TZ/config antiga).
+     * Retries AGUARDANDO_CONEXAO não exigem sendAt futuro — já passaram da hora planejada.
+     */
+    const eligibleSchedules = schedules.filter(s => {
+      if (s.status === "AGUARDANDO_CONEXAO") {
+        return true;
+      }
+      const target = getScheduleTargetInstantUtc(s);
+      if (!target) {
+        logger.warn(
+          `[Schedule] verify ignorado id=${s.id} motivo=sem_sendAt_ou_nextRunAt_valido`
+        );
+        return false;
+      }
+      if (target.isAfter(nowUtc)) {
+        const sendAtIso = s.sendAt ? moment.utc(s.sendAt).toISOString() : "null";
+        const nextIso =
+          s.nextRunAt != null ? moment.utc(s.nextRunAt).toISOString() : "null";
+        logger.info(
+          `[Schedule] verify ignorado (UTC JS) id=${s.id} status=${s.status} sendAt_utc=${sendAtIso} nextRunAt_utc=${nextIso} now_utc=${nowUtc.toISOString()} diff_sec=${target.diff(nowUtc, "seconds")} motivo=instante_futuro_pos_query`
+        );
+        return false;
+      }
+      return true;
+    });
+
     if (schedules.length > 0) {
       logger.info(
-        `[Schedule] verify UTC=${nowUtc.toISOString()} capturados=${schedules.length} (critério: PENDENTE com sendAt/nextRunAt <= now UTC; retries de conexão separados)`
+        `[Schedule] verify now_utc=${nowUtc.toISOString()} rows_sql=${schedules.length} rows_elegiveis_utc=${eligibleSchedules.length} motivo=criterio_sendAt_ou_nextRunAt_lte_now_utc`
       );
     }
 
-    for (const schedule of schedules) {
+    for (const schedule of eligibleSchedules) {
       const hasPivot =
         schedule.scheduleContacts &&
         schedule.scheduleContacts.some(sc => sc.contact);
@@ -359,8 +401,13 @@ async function handleVerifySchedules(job) {
         schedule.nextRunAt != null
           ? moment.utc(schedule.nextRunAt).toISOString()
           : "null";
+      const targetUtc = getScheduleTargetInstantUtc(schedule);
+      const diffSec =
+        targetUtc && targetUtc.isValid()
+          ? nowUtc.diff(targetUtc, "seconds")
+          : null;
       logger.info(
-        `[Schedule] captura envio id=${schedule.id} tipo=${schedule.scheduleType || "single"} label="${label}" sendAt_utc=${sendAtIso} nextRunAt_utc=${nextRunIso} now_utc=${nowUtc.toISOString()}`
+        `[Schedule] captura envio id=${schedule.id} tipo=${schedule.scheduleType || "single"} label="${label}" sendAt_utc=${sendAtIso} nextRunAt_utc=${nextRunIso} now_utc=${nowUtc.toISOString()} target_utc=${targetUtc ? targetUtc.toISOString() : "null"} diff_now_minus_target_sec=${diffSec} motivo=elegivel_sendAt_ou_nextRunAt_lte_now_utc`
       );
       await sendScheduledMessages.add(
         "SendMessage",
@@ -439,6 +486,25 @@ async function handleSendScheduledMessage(job) {
   }
 
   const now = moment.utc();
+  const targetForSend = getScheduleTargetInstantUtc(scheduleRecord);
+  if (targetForSend && targetForSend.isValid() && targetForSend.isAfter(now)) {
+    const delayMs = targetForSend.diff(now, "milliseconds");
+    logger.warn(
+      `[Schedule] envio adiado (defesa antecipação) id=${scheduleId} status=${scheduleRecord.status} target_utc=${targetForSend.toISOString()} now_utc=${now.toISOString()} requeue_delay_ms=${delayMs} motivo=target_maior_que_now_nao_enviar`
+    );
+    await sendScheduledMessages.add(
+      "SendMessage",
+      { scheduleId },
+      {
+        delay: Math.max(0, delayMs),
+        attempts: 1,
+        removeOnComplete: true,
+        removeOnFail: false
+      }
+    );
+    return;
+  }
+
   const { whatsapp } = await ResolveWhatsappForSchedule(
     scheduleRecord.companyId,
     scheduleRecord.preferredWhatsappId
