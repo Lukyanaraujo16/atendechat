@@ -10,10 +10,12 @@ import {
   TableCell,
   TableHead,
   TableRow,
+  Tooltip,
   Typography,
 } from "@material-ui/core";
 
 import { makeStyles } from "@material-ui/core/styles";
+import PsychologyIcon from "@material-ui/icons/Psychology";
 
 import MainContainer from "../../components/MainContainer";
 import MainHeader from "../../components/MainHeader";
@@ -43,6 +45,15 @@ const useStyles = makeStyles((theme) => ({
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
+  },
+  actionIcon: {
+    opacity: 0.55,
+    transition: theme.transitions.create("opacity", {
+      duration: theme.transitions.duration.shorter,
+    }),
+    "&:hover": {
+      opacity: 1,
+    },
   },
 }));
 
@@ -236,19 +247,19 @@ const Prompts = () => {
         </Typography>
       </Box>
       <Paper className={classes.mainPaper} variant="outlined">
-        <Table size="small">
+        <Table size="medium">
           <TableHead>
             <TableRow>
-              <TableCell align="left">
+              <TableCell align="left" style={{ fontWeight: 600, fontSize: "0.8125rem" }}>
                 {i18n.t("prompts.table.name")}
               </TableCell>
-              <TableCell align="left">
+              <TableCell align="left" style={{ fontWeight: 600, fontSize: "0.8125rem" }}>
                 {i18n.t("prompts.table.queue")}
               </TableCell>
-              <TableCell align="left">
+              <TableCell align="left" style={{ fontWeight: 600, fontSize: "0.8125rem", width: 120 }}>
                 {i18n.t("prompts.table.max_tokens")}
               </TableCell>
-              <TableCell align="center">
+              <TableCell align="right" style={{ fontWeight: 600, fontSize: "0.8125rem", width: 100 }}>
                 {i18n.t("prompts.table.actions")}
               </TableCell>
             </TableRow>
@@ -256,27 +267,63 @@ const Prompts = () => {
           <TableBody>
             <>
               {prompts.map((prompt) => (
-                <TableRow key={prompt.id}>
-                  <TableCell align="left">{prompt.name}</TableCell>
-                  <TableCell align="left">{prompt.queue?.name}</TableCell>
-                  <TableCell align="left">{prompt.maxTokens}</TableCell>
-                  <TableCell align="center">
-                    <IconButton
-                      size="small"
-                      onClick={() => handleEditPrompt(prompt)}
-                    >
-                      <Edit />
-                    </IconButton>
-
-                    <IconButton
-                      size="small"
-                      onClick={() => {
-                        setSelectedPrompt(prompt);
-                        setConfirmModalOpen(true);
-                      }}
-                    >
-                      <DeleteOutline />
-                    </IconButton>
+                <TableRow key={prompt.id} hover>
+                  <TableCell
+                    align="left"
+                    onClick={() => handleEditPrompt(prompt)}
+                    style={{ cursor: "pointer", maxWidth: 320 }}
+                  >
+                    <Box display="flex" alignItems="flex-start" style={{ gap: 10 }}>
+                      <PsychologyIcon
+                        color="primary"
+                        style={{ fontSize: 24, flexShrink: 0, marginTop: 2, opacity: 0.9 }}
+                      />
+                      <Typography variant="body2" style={{ fontWeight: 600 }}>
+                        {prompt.name}
+                      </Typography>
+                    </Box>
+                  </TableCell>
+                  <TableCell align="left">
+                    <Typography variant="body2" color="textSecondary">
+                      {prompt.queue?.name || "—"}
+                    </Typography>
+                  </TableCell>
+                  <TableCell align="left">
+                    <Typography variant="body2" component="span">
+                      {prompt.maxTokens}
+                    </Typography>
+                  </TableCell>
+                  <TableCell align="right">
+                    <Box display="flex" justifyContent="flex-end" alignItems="center" style={{ gap: 4 }}>
+                      <Tooltip title="Editar">
+                        <IconButton
+                          size="small"
+                          className={classes.actionIcon}
+                          aria-label="Editar prompt"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditPrompt(prompt);
+                          }}
+                        >
+                          <Edit fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Excluir">
+                        <IconButton
+                          size="small"
+                          className={classes.actionIcon}
+                          aria-label="Excluir prompt"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedPrompt(prompt);
+                            setConfirmModalOpen(true);
+                          }}
+                          style={{ color: "#d32f2f" }}
+                        >
+                          <DeleteOutline fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
                   </TableCell>
                 </TableRow>
               ))}

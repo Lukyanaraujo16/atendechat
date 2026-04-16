@@ -118,6 +118,15 @@ const useStyles = makeStyles(theme => ({
 			WebkitBoxOrient: "vertical",
 		},
 	},
+	actionIcon: {
+		opacity: 0.55,
+		transition: theme.transitions.create("opacity", {
+			duration: theme.transitions.duration.shorter,
+		}),
+		"&:hover": {
+			opacity: 1,
+		},
+	},
 }));
 
 const Quickemessages = () => {
@@ -306,28 +315,28 @@ const Quickemessages = () => {
 						</Typography>
 					</Box>
 				) : (
-					<Table size="small">
+					<Table size="medium">
 						<TableHead>
 							<TableRow>
-								<TableCell align="center">
+								<TableCell align="center" style={{ fontWeight: 600, fontSize: "0.8125rem" }}>
 									{i18n.t("quickMessages.table.shortcode")}
 								</TableCell>
-								<TableCell align="center">
+								<TableCell align="center" style={{ fontWeight: 600, fontSize: "0.8125rem" }}>
 									{i18n.t("quickMessages.table.category")}
 								</TableCell>
-								<TableCell>
+								<TableCell style={{ fontWeight: 600, fontSize: "0.8125rem" }}>
 									{i18n.t("quickMessages.table.messagePreview")}
 								</TableCell>
-								<TableCell align="center">
+								<TableCell align="center" style={{ fontWeight: 600, fontSize: "0.8125rem" }}>
 									{i18n.t("quickMessages.table.attachment")}
 								</TableCell>
-								<TableCell align="center">
+								<TableCell align="center" style={{ fontWeight: 600, fontSize: "0.8125rem" }}>
 									{i18n.t("quickMessages.table.createdAt")}
 								</TableCell>
-								<TableCell align="center">
+								<TableCell align="center" style={{ fontWeight: 600, fontSize: "0.8125rem" }}>
 									{i18n.t("quickMessages.table.updatedAt")}
 								</TableCell>
-								<TableCell align="center">
+								<TableCell align="right" style={{ fontWeight: 600, width: 100, fontSize: "0.8125rem" }}>
 									{i18n.t("quickMessages.table.actions")}
 								</TableCell>
 							</TableRow>
@@ -335,9 +344,13 @@ const Quickemessages = () => {
 						<TableBody>
 							<>
 								{quickemessages.map(qm => (
-									<TableRow key={qm.id}>
-										<TableCell align="center">
-											<Typography variant="body2">
+									<TableRow key={qm.id} hover>
+										<TableCell
+											align="center"
+											onClick={() => handleEditQuickemessage(qm)}
+											style={{ cursor: "pointer", transition: "background-color 0.15s ease" }}
+										>
+											<Typography variant="body2" style={{ fontWeight: 600, color: "#1976d2" }}>
 												/{qm.shortcode}
 											</Typography>
 										</TableCell>
@@ -365,28 +378,37 @@ const Quickemessages = () => {
 										<TableCell align="center">
 											{formatDt(qm.updatedAt)}
 										</TableCell>
-										<TableCell align="center">
-											<Tooltip title={i18n.t("quickMessages.buttons.edit")}>
-												<IconButton
-													size="small"
-													onClick={() => handleEditQuickemessage(qm)}
-													aria-label={i18n.t("quickMessages.buttons.edit")}
-												>
-													<EditIcon />
-												</IconButton>
-											</Tooltip>
-											<Tooltip title={i18n.t("quickMessages.buttons.delete")}>
-												<IconButton
-													size="small"
-													onClick={() => {
-														setConfirmModalOpen(true);
-														setDeletingQuickemessage(qm);
-													}}
-													aria-label={i18n.t("quickMessages.buttons.delete")}
-												>
-													<DeleteOutlineIcon />
-												</IconButton>
-											</Tooltip>
+										<TableCell align="right">
+											<Box display="flex" justifyContent="flex-end" alignItems="center" style={{ gap: 4 }}>
+												<Tooltip title={i18n.t("quickMessages.buttons.edit")}>
+													<IconButton
+														size="small"
+														className={classes.actionIcon}
+														onClick={e => {
+															e.stopPropagation();
+															handleEditQuickemessage(qm);
+														}}
+														aria-label={i18n.t("quickMessages.buttons.edit")}
+													>
+														<EditIcon fontSize="small" />
+													</IconButton>
+												</Tooltip>
+												<Tooltip title={i18n.t("quickMessages.buttons.delete")}>
+													<IconButton
+														size="small"
+														className={classes.actionIcon}
+														onClick={e => {
+															e.stopPropagation();
+															setConfirmModalOpen(true);
+															setDeletingQuickemessage(qm);
+														}}
+														aria-label={i18n.t("quickMessages.buttons.delete")}
+														style={{ color: "#d32f2f" }}
+													>
+														<DeleteOutlineIcon fontSize="small" />
+													</IconButton>
+												</Tooltip>
+											</Box>
 										</TableCell>
 									</TableRow>
 								))}

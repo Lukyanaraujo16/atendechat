@@ -7,6 +7,15 @@ import { makeStyles } from "@material-ui/core/styles";
 import Paper from "@material-ui/core/Paper";
 import Button from "@material-ui/core/Button";
 import IconButton from "@material-ui/core/IconButton";
+import Table from "@material-ui/core/Table";
+import TableBody from "@material-ui/core/TableBody";
+import TableCell from "@material-ui/core/TableCell";
+import TableHead from "@material-ui/core/TableHead";
+import TableRow from "@material-ui/core/TableRow";
+import Chip from "@material-ui/core/Chip";
+import Tooltip from "@material-ui/core/Tooltip";
+import Typography from "@material-ui/core/Typography";
+import Box from "@material-ui/core/Box";
 
 import DeleteOutlineIcon from "@material-ui/icons/DeleteOutline";
 import EditIcon from "@material-ui/icons/Edit";
@@ -20,7 +29,7 @@ import { i18n } from "../../translate/i18n";
 import ConfirmationModal from "../../components/ConfirmationModal";
 import toastError from "../../errors/toastError";
 import { isArray } from "lodash";
-import { AddCircle, TextFields } from "@mui/icons-material";
+import { AddCircle, Tag as TagIcon } from "@mui/icons-material";
 import { CircularProgress, Grid, Stack } from "@mui/material";
 import { Can } from "../../components/Can";
 import { AuthContext } from "../../context/Auth/AuthContext";
@@ -76,9 +85,18 @@ const useStyles = makeStyles((theme) => ({
   mainPaper: {
     flex: 1,
     borderRadius: 12,
-    padding: theme.spacing(1),
-    overflowY: "scroll",
+    padding: theme.spacing(2),
+    overflowY: "auto",
     ...theme.scrollbarStyles,
+  },
+  actionIcon: {
+    opacity: 0.55,
+    transition: theme.transitions.create("opacity", {
+      duration: theme.transitions.duration.shorter,
+    }),
+    "&:hover": {
+      opacity: 1,
+    },
   },
 }));
 
@@ -91,8 +109,6 @@ const CampaignsPhrase = () => {
   const [loading, setLoading] = useState(true);
   const [pageNumber, setPageNumber] = useState(1);
   const [hasMore, setHasMore] = useState(false);
-  const [selectedCampaign, setSelectedCampaign] = useState(null);
-  const [deletingCampaign, setDeletingCampaign] = useState(null);
   const [campaignModalOpen, setCampaignModalOpen] = useState(false);
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
   const [searchParam, setSearchParam] = useState("");
@@ -144,14 +160,14 @@ const CampaignsPhrase = () => {
     <MainContainer>
       <ConfirmationModal
         title={
-          deletingCampaign &&
+          deletingContact &&
           `${i18n.t("campaigns.confirmationModal.deleteTitle")} ${
-            deletingCampaign.name
+            deletingContact.name
           }?`
         }
         open={confirmModalOpen}
         onClose={setConfirmModalOpen}
-        onConfirm={() => handleDeleteCampaign(deletingContact.id)}
+        onConfirm={() => deletingContact && handleDeleteCampaign(deletingContact.id)}
       >
         {i18n.t("campaigns.confirmationModal.deleteMessage")}
       </ConfirmationModal>
@@ -212,88 +228,119 @@ const CampaignsPhrase = () => {
         variant="outlined"
         onScroll={handleScroll}
       >
-        <Stack>
-          <Grid container style={{ padding: "8px" }}>
-            <Grid item xs={4}>
-              Nome
-            </Grid>
-            <Grid item xs={4} align="center">
-              Status
-            </Grid>
-            <Grid item xs={4} align="end">
-              {i18n.t("contacts.table.actions")}
-            </Grid>
-          </Grid>
-          <>
-            {!loading &&
-              (Array.isArray(campaignflows) ? campaignflows : []).map((flow) => (
-                <Grid
-                  container
+        {loading && !(Array.isArray(campaignflows) && campaignflows.length) ? (
+          <Stack
+            justifyContent="center"
+            alignItems="center"
+            minHeight="50vh"
+          >
+            <CircularProgress />
+          </Stack>
+        ) : (
+          <Table size="medium">
+            <TableHead>
+              <TableRow>
+                <TableCell style={{ fontWeight: 600, fontSize: "0.8125rem" }}>
+                  Nome
+                </TableCell>
+                <TableCell align="center" style={{ fontWeight: 600, width: 140, fontSize: "0.8125rem" }}>
+                  Status
+                </TableCell>
+                <TableCell align="right" style={{ fontWeight: 600, width: 120, fontSize: "0.8125rem" }}>
+                  {i18n.t("contacts.table.actions")}
+                </TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {(Array.isArray(campaignflows) ? campaignflows : []).map((flow) => (
+                <TableRow
                   key={flow.id}
-                  sx={{
-                    padding: "8px",
-                    borderRadius: 4,
-                    marginTop: 0.5,
-                  }}
+                  hover
+                  style={{ verticalAlign: "middle" }}
                 >
-                  <Grid item xs={4}>
-                    <Stack
-                      justifyContent={"center"}
-                      height={"100%"}
-                      style={{ color: "#252525" }}
-                    >
-                      <Stack direction={"row"}>
-                        <TextFields />
-                        <Stack justifyContent={"center"} marginLeft={1}>
+                  <TableCell
+                    onClick={() => {
+                      setCampaignFlowSelected(flow.id);
+                      setModalOpenPhrase(true);
+                    }}
+                    style={{
+                      cursor: "pointer",
+                      maxWidth: 400,
+                      transition: "background-color 0.15s ease",
+                    }}
+                  >
+                    <Box display="flex" alignItems="flex-start" style={{ gap: 12 }}>
+                      <TagIcon
+                        style={{
+                          color: "#24c776",
+                          fontSize: 26,
+                          flexShrink: 0,
+                          marginTop: 2,
+                          opacity: 0.92,
+                        }}
+                      />
+                      <Box minWidth={0}>
+                        <Typography variant="body1" style={{ fontWeight: 600, lineHeight: 1.35 }}>
                           {flow.name}
-                        </Stack>
-                      </Stack>
-                    </Stack>
-                  </Grid>
-                  <Grid item xs={4} align="center" style={{ color: "#252525" }}>
-                    <Stack justifyContent={"center"} height={"100%"}>
-                      {flow.status ? "Ativo" : "Desativado"}
-                    </Stack>
-                  </Grid>
-                  <Grid item xs={4} align="end">
-                    <IconButton
-                      size="small"
-                      onClick={() => {
-                        setCampaignFlowSelected(flow.id);
-                        setModalOpenPhrase(true);
-                      }}
-                    >
-                      <EditIcon style={{ color: "#252525" }} />
-                    </IconButton>
-                    <Can
-                      role={user.profile}
-                      perform="contacts-page:deleteContact"
-                      yes={() => (
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </TableCell>
+                  <TableCell align="center">
+                    {flow.status ? (
+                      <Chip label="Ativo" size="small" style={{ backgroundColor: "#24c776", color: "#fff", fontWeight: 500 }} />
+                    ) : (
+                      <Chip
+                        label="Inativo"
+                        size="small"
+                        style={{ backgroundColor: "#e0e0e0", color: "#424242", fontWeight: 500 }}
+                      />
+                    )}
+                  </TableCell>
+                  <TableCell align="right">
+                    <Stack direction="row" spacing={0.5} justifyContent="flex-end" alignItems="center">
+                      <Tooltip title="Editar">
                         <IconButton
                           size="small"
+                          className={classes.actionIcon}
+                          aria-label="Editar"
                           onClick={(e) => {
-                            setConfirmModalOpen(true);
-                            setDeletingContact(flow);
+                            e.stopPropagation();
+                            setCampaignFlowSelected(flow.id);
+                            setModalOpenPhrase(true);
                           }}
                         >
-                          <DeleteOutlineIcon style={{ color: "#252525" }} />
+                          <EditIcon fontSize="small" />
                         </IconButton>
-                      )}
-                    />
-                  </Grid>
-                </Grid>
+                      </Tooltip>
+                      <Can
+                        role={user.profile}
+                        perform="contacts-page:deleteContact"
+                        yes={() => (
+                          <Tooltip title="Excluir">
+                            <IconButton
+                              size="small"
+                              className={classes.actionIcon}
+                              aria-label="Excluir"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setConfirmModalOpen(true);
+                                setDeletingContact(flow);
+                              }}
+                              style={{ color: "#d32f2f", opacity: 0.75 }}
+                            >
+                              <DeleteOutlineIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                      />
+                    </Stack>
+                  </TableCell>
+                </TableRow>
               ))}
-            {loading && (
-              <Stack
-                justifyContent={"center"}
-                alignItems={"center"}
-                minHeight={"50vh"}
-              >
-                <CircularProgress />
-              </Stack>
-            )}
-          </>
-        </Stack>
+            </TableBody>
+          </Table>
+        )}
       </Paper>
     </MainContainer>
   );

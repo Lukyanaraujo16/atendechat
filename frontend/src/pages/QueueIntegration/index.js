@@ -22,6 +22,7 @@ import {
   TableHead,
   TableRow,
   TextField,
+  Tooltip,
   Typography,
 } from "@material-ui/core";
 
@@ -110,6 +111,15 @@ const useStyles = makeStyles((theme) => ({
     width: 40,
     height: 40,
     backgroundColor: "#1565c0",
+  },
+  actionIcon: {
+    opacity: 0.55,
+    transition: theme.transitions.create("opacity", {
+      duration: theme.transitions.duration.shorter,
+    }),
+    "&:hover": {
+      opacity: 1,
+    },
   },
 }));
 
@@ -316,20 +326,28 @@ const QueueIntegration = () => {
         variant="outlined"
         onScroll={handleScroll}
       >
-        <Table size="small">
+        <Table size="medium">
           <TableHead>
             <TableRow>
-              <TableCell padding="checkbox"></TableCell>
-              <TableCell align="center">{i18n.t("queueIntegration.table.id")}</TableCell>
-              <TableCell align="center">{i18n.t("queueIntegration.table.type")}</TableCell>
-              <TableCell align="center">{i18n.t("queueIntegration.table.name")}</TableCell>
-              <TableCell align="center">{i18n.t("queueIntegration.table.actions")}</TableCell>
+              <TableCell padding="checkbox" style={{ fontWeight: 600, fontSize: "0.8125rem" }} />
+              <TableCell align="center" style={{ fontWeight: 600, fontSize: "0.8125rem" }}>
+                {i18n.t("queueIntegration.table.id")}
+              </TableCell>
+              <TableCell align="center" style={{ fontWeight: 600, fontSize: "0.8125rem" }}>
+                {i18n.t("queueIntegration.table.type")}
+              </TableCell>
+              <TableCell align="left" style={{ fontWeight: 600, fontSize: "0.8125rem" }}>
+                {i18n.t("queueIntegration.table.name")}
+              </TableCell>
+              <TableCell align="right" style={{ fontWeight: 600, width: 120, fontSize: "0.8125rem" }}>
+                {i18n.t("queueIntegration.table.actions")}
+              </TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             <>
               {queueIntegration.map((integration) => (
-                <TableRow key={integration.id}>
+                <TableRow key={integration.id} hover>
                   <TableCell>
                     {integration.type === "dialogflow" && (
                       <Avatar src={dialogflow} className={classes.avatar} />
@@ -364,24 +382,50 @@ const QueueIntegration = () => {
                       </Typography>
                     </Box>
                   </TableCell>
-                  <TableCell align="center">{integration.name}</TableCell>
-                  <TableCell align="center">
-                    <IconButton
-                      size="small"
-                      onClick={() => handleEditIntegration(integration)}
-                    >
-                      <Edit color="secondary" />
-                    </IconButton>
-
-                    <IconButton
-                      size="small"
-                      onClick={(e) => {
-                        setConfirmModalOpen(true);
-                        setDeletingUser(integration);
-                      }}
-                    >
-                      <DeleteOutline color="secondary" />
-                    </IconButton>
+                  <TableCell
+                    align="left"
+                    onClick={() => handleEditIntegration(integration)}
+                    style={{
+                      cursor: "pointer",
+                      maxWidth: 280,
+                      transition: "background-color 0.15s ease",
+                    }}
+                  >
+                    <Typography variant="body2" style={{ fontWeight: 600 }}>
+                      {integration.name}
+                    </Typography>
+                  </TableCell>
+                  <TableCell align="right">
+                    <Box display="flex" justifyContent="flex-end" alignItems="center" style={{ gap: 4 }}>
+                      <Tooltip title="Editar">
+                        <IconButton
+                          size="small"
+                          className={classes.actionIcon}
+                          aria-label="Editar integração"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditIntegration(integration);
+                          }}
+                        >
+                          <Edit fontSize="small" color="primary" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title={i18n.t("queueIntegration.confirmationModal.deleteTitle")}>
+                        <IconButton
+                          size="small"
+                          className={classes.actionIcon}
+                          aria-label="Excluir"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setConfirmModalOpen(true);
+                            setDeletingUser(integration);
+                          }}
+                          style={{ color: "#d32f2f" }}
+                        >
+                          <DeleteOutline fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
                   </TableCell>
                 </TableRow>
               ))}
