@@ -40,7 +40,8 @@ const useStyles = makeStyles((theme) => ({
     overflowY: "auto",
     WebkitOverflowScrolling: "touch",
     ...theme.scrollbarStyles,
-    borderTop: `2px solid ${theme.palette.divider}`,
+    borderTop: `1px solid ${theme.palette.divider}`,
+    backgroundColor: theme.palette.background.paper,
   },
 
   ticketsListHeader: {

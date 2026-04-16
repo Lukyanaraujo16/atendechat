@@ -21,6 +21,8 @@ const useStyles = makeStyles((theme) => ({
     display: "flex",
     alignItems: "center",
     minWidth: 0,
+    paddingRight: theme.spacing(1),
+    paddingLeft: theme.spacing(0.5),
   },
   legacyCluster: {
     marginRight: theme.spacing(0.5),

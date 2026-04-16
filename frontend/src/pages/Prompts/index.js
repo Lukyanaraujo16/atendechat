@@ -15,7 +15,7 @@ import {
 } from "@material-ui/core";
 
 import { makeStyles } from "@material-ui/core/styles";
-import PsychologyIcon from "@material-ui/icons/Psychology";
+import AssignmentIcon from "@material-ui/icons/Assignment";
 
 import MainContainer from "../../components/MainContainer";
 import MainHeader from "../../components/MainHeader";
@@ -274,7 +274,7 @@ const Prompts = () => {
                     style={{ cursor: "pointer", maxWidth: 320 }}
                   >
                     <Box display="flex" alignItems="flex-start" style={{ gap: 10 }}>
-                      <PsychologyIcon
+                      <AssignmentIcon
                         color="primary"
                         style={{ fontSize: 24, flexShrink: 0, marginTop: 2, opacity: 0.9 }}
                       />

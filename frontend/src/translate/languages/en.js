@@ -974,7 +974,10 @@ const messages = {
 				},
 				chats: "Chats",
 				messages: "Messages",
-				noTicketMessage: "Select a ticket to start chatting.",
+				noTicketMessage: "Select a conversation to get started",
+				emptyInboxTitle: "No conversation selected",
+				emptyInboxSubtitle:
+					"Pick a ticket from the list to view messages and reply with your team.",
 				buttons: {
 					close: "Close",
 					save: "Save",
@@ -993,6 +996,8 @@ const messages = {
 			ticketsManager: {
 				buttons: {
 					newTicket: "New",
+					fabNewTicket: "New ticket",
+					fabBulkActions: "Bulk actions",
 				},
 				toasts: {
 					bulkAssignSuccess:
@@ -1020,7 +1025,7 @@ const messages = {
 					search: { title: "Search" },
 				},
 				search: {
-					placeholder: "Search tickets and messages",
+					placeholder: "Search by contact, phone number, or message text…",
 				},
 				buttons: {
 					showAll: "All",

@@ -9,6 +9,9 @@ import InputBase from "@material-ui/core/InputBase";
 import Tab from "@material-ui/core/Tab";
 import { AppTabs } from "../../ui";
 import Fab from "@material-ui/core/Fab";
+import Menu from "@material-ui/core/Menu";
+import MenuItem from "@material-ui/core/MenuItem";
+import ListItemIcon from "@material-ui/core/ListItemIcon";
 import Typography from "@material-ui/core/Typography";
 import AddIcon from "@material-ui/icons/Add";
 import FlashOnIcon from "@material-ui/icons/FlashOn";
@@ -20,7 +23,6 @@ import Tooltip from "@material-ui/core/Tooltip";
 import FormControl from "@material-ui/core/FormControl";
 import InputLabel from "@material-ui/core/InputLabel";
 import Select from "@material-ui/core/Select";
-import MenuItem from "@material-ui/core/MenuItem";
 
 import FolderOpenIcon from "@material-ui/icons/FolderOpen";
 import PersonIcon from "@material-ui/icons/Person";
@@ -75,6 +77,7 @@ const useStyles = makeStyles(theme => ({
 		borderTopRightRadius: 0,
 		borderBottomRightRadius: 0,
 		borderRadius: 0,
+		backgroundColor: theme.palette.background.paper,
 	},
 	ticketsWrapper: {
 		position: "relative",
@@ -94,6 +97,8 @@ const useStyles = makeStyles(theme => ({
 		borderTopLeftRadius: 12,
 		borderTopRightRadius: 12,
 		borderBottom: `1px solid ${theme.palette.divider}`,
+		paddingTop: theme.spacing(0.5),
+		boxShadow: theme.palette.type === "dark" ? "none" : "0 1px 0 rgba(0,0,0,0.04)",
 		"& .MuiTabs-indicator": {
 			height: 3,
 			borderRadius: 2,
@@ -145,8 +150,14 @@ const useStyles = makeStyles(theme => ({
 		display: "flex",
 		justifyContent: "space-between",
 		alignItems: "center",
-		background: theme.palette.optionsBackground,
-		padding: theme.spacing(1),
+		flexWrap: "wrap",
+		gap: theme.spacing(1),
+		background:
+			theme.palette.type === "dark"
+				? theme.palette.background.default
+				: theme.palette.grey[50],
+		padding: theme.spacing(1.25, 1.5),
+		borderBottom: `1px solid ${theme.palette.divider}`,
 	},
 
 	ticketSearchLine: {
@@ -167,12 +178,6 @@ const useStyles = makeStyles(theme => ({
 		marginLeft: 6,
 		marginRight: 6,
 		alignSelf: "center",
-	},
-
-	searchInput: {
-		flex: 1,
-		border: "none",
-		borderRadius: 30,
 	},
 
 	insiderTabPanel: {
@@ -223,8 +228,9 @@ const useStyles = makeStyles(theme => ({
 		display: "flex",
 		flexWrap: "wrap",
 		gap: theme.spacing(1),
-		padding: theme.spacing(1, 1),
-		backgroundColor: theme.palette.background.paper,
+		padding: theme.spacing(1.25, 1.5),
+		backgroundColor:
+			theme.palette.type === "dark" ? theme.palette.background.default : theme.palette.grey[50],
 		justifyContent: "center",
 		alignItems: "center",
 		width: "100%",
@@ -233,8 +239,11 @@ const useStyles = makeStyles(theme => ({
 	statusPill: {
 		fontSize: "0.75rem",
 		fontWeight: 600,
-		padding: "6px 12px",
-		borderRadius: 6,
+		padding: "8px 14px",
+		borderRadius: 999,
+		transition: theme.transitions.create(["box-shadow", "border-color", "background-color"], {
+			duration: 200,
+		}),
 	},
 	statusPillBtn: {
 		cursor: "pointer",
@@ -277,21 +286,25 @@ const useStyles = makeStyles(theme => ({
 		backgroundColor: theme.palette.background.paper,
 		border: `1px solid ${theme.palette.divider}`,
 		color: theme.palette.text.secondary,
-		borderRadius: theme.shape.borderRadius,
+		boxShadow: theme.palette.type === "dark" ? "none" : theme.shadows[1],
 	},
 	statusPillGreenActive: {
 		borderColor: theme.palette.success.main,
-		boxShadow: `inset 0 -2px 0 ${theme.palette.success.main}`,
+		backgroundColor:
+			theme.palette.type === "dark" ? "rgba(46, 125, 50, 0.12)" : "rgba(46, 125, 50, 0.06)",
+		boxShadow: `inset 0 0 0 1px ${theme.palette.success.main}`,
 	},
 	statusPillPink: {
 		backgroundColor: theme.palette.background.paper,
 		border: `1px solid ${theme.palette.divider}`,
 		color: theme.palette.text.secondary,
-		borderRadius: theme.shape.borderRadius,
+		boxShadow: theme.palette.type === "dark" ? "none" : theme.shadows[1],
 	},
 	statusPillPinkActive: {
 		borderColor: theme.palette.secondary.main,
-		boxShadow: `inset 0 -2px 0 ${theme.palette.secondary.main}`,
+		backgroundColor:
+			theme.palette.type === "dark" ? "rgba(233, 30, 99, 0.12)" : "rgba(233, 30, 99, 0.06)",
+		boxShadow: `inset 0 0 0 1px ${theme.palette.secondary.main}`,
 	},
 	statusPillText: {
 		color: theme.palette.text.secondary,
@@ -312,10 +325,10 @@ const useStyles = makeStyles(theme => ({
 		alignItems: "center",
 		flexWrap: "wrap",
 		gap: theme.spacing(1),
-		padding: theme.spacing(1, 1.5),
+		padding: theme.spacing(1.25, 1.5),
 		borderBottom: `1px solid ${theme.palette.divider}`,
 		backgroundColor:
-			theme.palette.type === "dark" ? theme.palette.background.default : theme.palette.grey[100],
+			theme.palette.type === "dark" ? theme.palette.background.default : theme.palette.grey[50],
 		[theme.breakpoints.down("xs")]: {
 			padding: theme.spacing(1),
 		},
@@ -326,9 +339,25 @@ const useStyles = makeStyles(theme => ({
 		display: "flex",
 		alignItems: "center",
 		border: `1px solid ${theme.palette.divider}`,
-		borderRadius: theme.shape.borderRadius,
+		borderRadius: 12,
+		minHeight: 46,
 		padding: theme.spacing(0.75, 1.25),
 		backgroundColor: theme.palette.background.paper,
+		boxShadow: theme.palette.type === "dark" ? "none" : theme.shadows[1],
+		transition: theme.transitions.create(["box-shadow", "border-color"], { duration: 200 }),
+		"&:focus-within": {
+			borderColor: theme.palette.primary.light,
+			boxShadow: `0 0 0 2px ${theme.palette.type === "dark" ? "rgba(144,202,249,0.35)" : "rgba(25, 118, 210, 0.2)"}`,
+		},
+	},
+	searchIconInField: {
+		color: theme.palette.text.secondary,
+		marginRight: theme.spacing(0.75),
+		flexShrink: 0,
+	},
+	searchInput: {
+		flex: 1,
+		fontSize: "0.9375rem",
 	},
 	searchButton: {
 		backgroundColor: theme.palette.primary.main,
@@ -353,23 +382,15 @@ const useStyles = makeStyles(theme => ({
 		position: "absolute",
 		bottom: 16,
 		left: 16,
-		display: "flex",
-		flexDirection: "column",
-		gap: 10,
 		zIndex: 10,
 	},
-	fabGreen: {
-		backgroundColor: theme.palette.success.main,
-		color: theme.palette.success.contrastText,
-		boxShadow: theme.shadows[4],
-		animation: "$fabPulse 2s ease-in-out infinite",
+	fabMain: {
+		backgroundColor: theme.palette.primary.main,
+		color: theme.palette.primary.contrastText,
+		boxShadow: theme.shadows[6],
 		"&:hover": {
-			backgroundColor: theme.palette.success.dark,
+			backgroundColor: theme.palette.primary.dark,
 		},
-	},
-	"@keyframes fabPulse": {
-		"0%, 100%": { boxShadow: theme.shadows[4] },
-		"50%": { boxShadow: theme.shadows[8] },
 	},
 	// Modal Ações em massa
 	bulkDialogContent: {
@@ -424,6 +445,7 @@ const TicketsManagerTabs = () => {
   const [bulkTicketIds, setBulkTicketIds] = useState([]);
   const [bulkLoading, setBulkLoading] = useState(false);
   const [bulkAssigning, setBulkAssigning] = useState(false);
+  const [fabMenuAnchor, setFabMenuAnchor] = useState(null);
   const [showAllTickets, setShowAllTickets] = useState(false);
   const searchInputRef = useRef();
   const searchDebounceRef = useRef(null);
@@ -733,10 +755,11 @@ const TicketsManagerTabs = () => {
 
       <div className={classes.searchRow}>
         <div className={classes.searchInputWrap}>
+          <SearchIcon className={classes.searchIconInField} fontSize="small" aria-hidden />
           <InputBase
             className={classes.searchInput}
             inputRef={searchInputRef}
-            placeholder="Buscar atendimento e mensagens"
+            placeholder={i18n.t("tickets.search.placeholder")}
             type="search"
             value={searchInputDraft}
             onChange={(e) => {
@@ -745,7 +768,6 @@ const TicketsManagerTabs = () => {
             }}
             onFocus={() => tab !== "search" && setTab("search")}
             fullWidth
-            style={{ marginLeft: 4 }}
             inputProps={{
               "aria-label": i18n.t("ticketsList.searchInputAria"),
               title: i18n.t("ticketsList.keyboardShortcutsHint"),
@@ -884,21 +906,49 @@ const TicketsManagerTabs = () => {
 
       <div className={classes.fabsWrap}>
         <Fab
-          size="small"
-          className={classes.fabGreen}
-          onClick={() => setNewTicketModalOpen(true)}
-          aria-label="Novo atendimento"
+          size="medium"
+          className={classes.fabMain}
+          onClick={(e) => setFabMenuAnchor(e.currentTarget)}
+          aria-label={i18n.t("ticketsManager.buttons.newTicket")}
+          aria-haspopup="true"
+          aria-expanded={Boolean(fabMenuAnchor)}
         >
           <AddIcon />
         </Fab>
-        <Fab
-          size="small"
-          className={classes.fabGreen}
-          onClick={handleOpenBulkModal}
-          aria-label="Ações em massa"
+        <Menu
+          anchorEl={fabMenuAnchor}
+          open={Boolean(fabMenuAnchor)}
+          onClose={() => setFabMenuAnchor(null)}
+          getContentAnchorEl={null}
+          anchorOrigin={{ vertical: "top", horizontal: "left" }}
+          transformOrigin={{ vertical: "bottom", horizontal: "left" }}
+          keepMounted
         >
-          <FlashOnIcon />
-        </Fab>
+          <MenuItem
+            dense
+            onClick={() => {
+              setNewTicketModalOpen(true);
+              setFabMenuAnchor(null);
+            }}
+          >
+            <ListItemIcon>
+              <AddIcon fontSize="small" />
+            </ListItemIcon>
+            {i18n.t("ticketsManager.buttons.fabNewTicket")}
+          </MenuItem>
+          <MenuItem
+            dense
+            onClick={() => {
+              handleOpenBulkModal();
+              setFabMenuAnchor(null);
+            }}
+          >
+            <ListItemIcon>
+              <FlashOnIcon fontSize="small" />
+            </ListItemIcon>
+            {i18n.t("ticketsManager.buttons.fabBulkActions")}
+          </MenuItem>
+        </Menu>
       </div>
     </Paper>
   );

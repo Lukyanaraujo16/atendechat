@@ -1044,7 +1044,10 @@ const messages = {
         },
         chats: "Chats",
         messages: "Mensagens",
-        noTicketMessage: "Selecione um ticket para começar a conversar.",
+        noTicketMessage: "Selecione uma conversa para começar",
+        emptyInboxTitle: "Nenhuma conversa selecionada",
+        emptyInboxSubtitle:
+          "Escolha um atendimento na lista ao lado para ver mensagens e responder com sua equipe.",
         buttons: {
           close: "Fechar",
           save: "Salvar",
@@ -1063,6 +1066,8 @@ const messages = {
       ticketsManager: {
         buttons: {
           newTicket: "Novo",
+          fabNewTicket: "Novo atendimento",
+          fabBulkActions: "Ações em massa",
         },
         toasts: {
           bulkAssignSuccess:
@@ -1090,7 +1095,7 @@ const messages = {
           search: { title: "Busca" },
         },
         search: {
-          placeholder: "Buscar atendimento e mensagens",
+          placeholder: "Buscar por contato, número ou texto da mensagem…",
         },
         buttons: {
           showAll: "Todos",

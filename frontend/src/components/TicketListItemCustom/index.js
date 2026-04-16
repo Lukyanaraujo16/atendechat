@@ -1,19 +1,30 @@
-import React, { useState, useEffect, useRef, useContext, useCallback } from "react";
+import React, { useState, useEffect, useRef, useContext, useCallback, useMemo } from "react";
 
 import { useHistory } from "react-router-dom";
-import { parseISO, format, formatDistanceToNow } from "date-fns";
+import {
+  parseISO,
+  format,
+  formatDistanceToNow,
+  isToday,
+  isYesterday,
+  differenceInCalendarDays,
+  differenceInMinutes,
+  differenceInHours,
+  startOfDay,
+  isValid,
+} from "date-fns";
 import { ptBR } from "date-fns/locale";
 import clsx from "clsx";
 
 import { makeStyles, useTheme } from "@material-ui/core/styles";
-import { grey, blue } from "@material-ui/core/colors";
+import { grey, blue, amber } from "@material-ui/core/colors";
 import ListItem from "@material-ui/core/ListItem";
 import ListItemAvatar from "@material-ui/core/ListItemAvatar";
 import Typography from "@material-ui/core/Typography";
 import Avatar from "@material-ui/core/Avatar";
-import Divider from "@material-ui/core/Divider";
 import Box from "@material-ui/core/Box";
 import Chip from "@material-ui/core/Chip";
+import Badge from "@material-ui/core/Badge";
 import { Tooltip } from "@material-ui/core";
 
 import { i18n } from "../../translate/i18n";
@@ -31,6 +42,27 @@ import { v4 as uuidv4 } from "uuid";
 
 import ContactTag from "../ContactTag";
 
+const MAX_TAGS_VISIBLE = 3;
+
+/** Tempo relativo legível estilo lista de conversas (sem alterar dados do ticket). */
+function formatWhatsAppListTime(date) {
+  if (!date || !isValid(date)) return "";
+  const now = new Date();
+  if (isToday(date)) {
+    const mins = differenceInMinutes(now, date);
+    if (mins < 1) return "agora";
+    if (mins < 60) return `há ${mins} min`;
+    const hrs = differenceInHours(now, date);
+    if (hrs < 24) return `há ${hrs} h`;
+    return format(date, "HH:mm", { locale: ptBR });
+  }
+  if (isYesterday(date)) return "Ontem";
+  const dayDiff = differenceInCalendarDays(startOfDay(now), startOfDay(date));
+  if (dayDiff >= 2 && dayDiff <= 6) return `há ${dayDiff} dias`;
+  if (dayDiff > 6) return format(date, "dd/MM/yy", { locale: ptBR });
+  return formatDistanceToNow(date, { addSuffix: true, locale: ptBR });
+}
+
 /**
  * Item da lista de atendimentos.
  * Fase 3 (atalhos): setas para navegar entre linhas; Enter abre o ticket (comportamento nativo do ListItem botão).
@@ -41,14 +73,17 @@ const useStyles = makeStyles((theme) => ({
   listItemRoot: {
     position: "relative",
     alignItems: "flex-start",
-    paddingTop: theme.spacing(1.25),
-    paddingBottom: theme.spacing(1.25),
-    paddingLeft: theme.spacing(1.5),
-    paddingRight: theme.spacing(1),
-    borderRadius: theme.shape.borderRadius,
+    paddingTop: 14,
+    paddingBottom: 14,
+    paddingLeft: theme.spacing(2),
+    paddingRight: theme.spacing(2),
+    borderRadius: theme.spacing(1),
     marginLeft: theme.spacing(0.5),
     marginRight: theme.spacing(0.5),
-    transition: theme.transitions.create(["background-color"], { duration: 150 }),
+    marginBottom: theme.spacing(0.25),
+    borderBottom: `1px solid ${theme.palette.divider}`,
+    transition: theme.transitions.create(["background-color"], { duration: 200 }),
+    cursor: "pointer",
     "&:hover": {
       backgroundColor: theme.palette.action.hover,
     },
@@ -59,15 +94,15 @@ const useStyles = makeStyles((theme) => ({
     "&.Mui-selected": {
       backgroundColor:
         theme.palette.type === "dark"
-          ? "rgba(25, 118, 210, 0.22)"
-          : "rgba(25, 118, 210, 0.1)",
+          ? "rgba(25, 118, 210, 0.16)"
+          : "rgba(25, 118, 210, 0.07)",
       boxShadow: `inset 3px 0 0 ${theme.palette.primary.main}`,
     },
     "&.Mui-selected:hover": {
       backgroundColor:
         theme.palette.type === "dark"
-          ? "rgba(25, 118, 210, 0.28)"
-          : "rgba(25, 118, 210, 0.14)",
+          ? "rgba(25, 118, 210, 0.22)"
+          : "rgba(25, 118, 210, 0.1)",
     },
   },
   listItemCompact: {
@@ -82,21 +117,37 @@ const useStyles = makeStyles((theme) => ({
   },
   queueBar: {
     flex: "none",
-    width: 4,
-    minHeight: 56,
+    width: 3,
+    minHeight: 52,
     alignSelf: "stretch",
     borderRadius: 2,
-    marginRight: theme.spacing(1),
+    marginRight: theme.spacing(1.25),
+    marginTop: theme.spacing(0.5),
+  },
+  avatarWrap: {
     marginTop: theme.spacing(0.25),
+    alignSelf: "flex-start",
   },
   avatar: {
     width: 48,
     height: 48,
-    borderRadius: theme.shape.borderRadius,
+    fontSize: "1.1rem",
+    fontWeight: 600,
+    border: `1px solid ${theme.palette.divider}`,
+    boxShadow: theme.palette.type === "dark" ? "none" : "0 1px 2px rgba(0,0,0,0.06)",
   },
   avatarCompact: {
     width: 40,
     height: 40,
+  },
+  unreadBadge: {
+    fontSize: "0.62rem",
+    fontWeight: 700,
+    minWidth: 18,
+    height: 18,
+    padding: "0 5px",
+    lineHeight: "18px",
+    transform: "scale(1) translate(20%, -10%)",
   },
   mainColumn: {
     flex: 1,
@@ -107,9 +158,10 @@ const useStyles = makeStyles((theme) => ({
   },
   topRow: {
     display: "flex",
-    alignItems: "flex-start",
+    alignItems: "center",
     justifyContent: "space-between",
     gap: theme.spacing(1),
+    minHeight: 22,
   },
   nameBlock: {
     display: "flex",
@@ -122,7 +174,7 @@ const useStyles = makeStyles((theme) => ({
     fontSize: "0.875rem",
   },
   contactName: {
-    fontWeight: 700,
+    fontWeight: 600,
     fontSize: "0.9375rem",
     lineHeight: 1.35,
     color: theme.palette.text.primary,
@@ -134,19 +186,24 @@ const useStyles = makeStyles((theme) => ({
     display: "flex",
     flexDirection: "column",
     alignItems: "flex-end",
+    justifyContent: "center",
     gap: theme.spacing(0.25),
     flexShrink: 0,
-    maxWidth: "42%",
+    maxWidth: "38%",
+    paddingTop: 1,
   },
   timeText: {
-    fontSize: "0.75rem",
+    fontSize: "0.72rem",
     fontWeight: 500,
     color: theme.palette.text.secondary,
     whiteSpace: "nowrap",
+    letterSpacing: "0.01em",
   },
-  unreadChip: {
+  statusChip: {
     height: 22,
-    fontWeight: 700,
+    fontSize: "0.7rem",
+    fontWeight: 600,
+    borderRadius: 8,
     "& .MuiChip-label": {
       paddingLeft: theme.spacing(0.75),
       paddingRight: theme.spacing(0.75),
@@ -154,25 +211,37 @@ const useStyles = makeStyles((theme) => ({
   },
   lastMessagePreview: {
     fontSize: "0.8125rem",
-    lineHeight: 1.45,
+    lineHeight: 1.4,
     color: theme.palette.text.secondary,
     display: "-webkit-box",
     WebkitLineClamp: 2,
     WebkitBoxOrient: "vertical",
     overflow: "hidden",
     wordBreak: "break-word",
-    marginTop: theme.spacing(0.25),
+    marginTop: theme.spacing(0.5),
+    opacity: 0.92,
   },
   chipsRow: {
     display: "flex",
     flexWrap: "wrap",
     alignItems: "center",
+    alignContent: "flex-start",
     gap: theme.spacing(0.5),
-    marginTop: theme.spacing(0.5),
+    marginTop: theme.spacing(0.75),
+    rowGap: theme.spacing(0.5),
+  },
+  moreTagsChip: {
+    height: 22,
+    fontSize: "0.65rem",
+    fontWeight: 600,
+    borderRadius: 8,
+    opacity: 0.85,
   },
   chipQueue: {
     maxWidth: "100%",
-    height: 24,
+    height: 22,
+    fontSize: "0.7rem",
+    borderRadius: 8,
     "& .MuiChip-label": {
       overflow: "hidden",
       textOverflow: "ellipsis",
@@ -180,7 +249,9 @@ const useStyles = makeStyles((theme) => ({
   },
   chipUser: {
     maxWidth: "100%",
-    height: 24,
+    height: 22,
+    fontSize: "0.7rem",
+    borderRadius: 8,
     "& .MuiChip-label": {
       overflow: "hidden",
       textOverflow: "ellipsis",
@@ -188,7 +259,9 @@ const useStyles = makeStyles((theme) => ({
   },
   chipConnection: {
     maxWidth: "100%",
-    height: 24,
+    height: 22,
+    fontSize: "0.7rem",
+    borderRadius: 8,
     "& .MuiChip-label": {
       overflow: "hidden",
       textOverflow: "ellipsis",
@@ -349,18 +422,6 @@ const TicketListItemCustom = ({ ticket, compact = false, selected = false }) => 
     [setCurrentTicket]
   );
 
-  const renderTicketInfo = () => {
-    return (
-      <>
-        {ticket.chatbot && (
-          <Tooltip title={i18n.t("ticketsListItem.tooltip.chatbot")}>
-            <AndroidIcon fontSize="small" style={{ color: grey[700] }} />
-          </Tooltip>
-        )}
-      </>
-    );
-  };
-
   const queueColor = ticket.queue?.color || theme.palette.grey[500];
   const updatedAt = ticket.updatedAt ? parseISO(ticket.updatedAt) : null;
   const timeTooltip =
@@ -368,12 +429,58 @@ const TicketListItemCustom = ({ ticket, compact = false, selected = false }) => 
       ? format(updatedAt, "dd/MM/yyyy HH:mm", { locale: ptBR })
       : "";
 
-  const relativeTime =
-    updatedAt != null
-      ? formatDistanceToNow(updatedAt, { addSuffix: true, locale: ptBR })
-      : "";
+  const listTimeShort =
+    updatedAt != null ? formatWhatsAppListTime(updatedAt) : "";
+
+  const statusChipMeta = useMemo(() => {
+    if (ticket.status === "closed") {
+      return {
+        label: "Finalizado",
+        style: {
+          backgroundColor: theme.palette.type === "dark" ? grey[700] : grey[200],
+          color: theme.palette.type === "dark" ? grey[100] : grey[800],
+        },
+      };
+    }
+    if (ticket.status === "pending") {
+      if (ticket.chatbot) {
+        return {
+          label: i18n.t("ticketsListItem.tooltip.chatbot"),
+          icon: <AndroidIcon style={{ fontSize: 14 }} />,
+          style: {
+            backgroundColor: theme.palette.type === "dark" ? grey[700] : grey[200],
+            color: theme.palette.type === "dark" ? grey[100] : grey[700],
+          },
+        };
+      }
+      return {
+        label: i18n.t("ticketsList.pendingHeader"),
+        style: {
+          backgroundColor: theme.palette.type === "dark" ? amber[900] : amber[100],
+          color: theme.palette.type === "dark" ? amber[100] : amber[900],
+        },
+      };
+    }
+    if (ticket.status === "open") {
+      return {
+        label: "Em atendimento",
+        style: {
+          backgroundColor:
+            theme.palette.type === "dark"
+              ? "rgba(46, 125, 50, 0.35)"
+              : theme.palette.success.light,
+          color: theme.palette.type === "dark" ? theme.palette.success.light : theme.palette.success.dark,
+        },
+      };
+    }
+    return null;
+  }, [ticket.status, ticket.chatbot, theme]);
 
   const lastMessageText = ticket.lastMessage != null ? String(ticket.lastMessage) : "";
+
+  const tagList = Array.isArray(tag) ? tag : [];
+  const visibleTags = tagList.slice(0, MAX_TAGS_VISIBLE);
+  const extraTagCount = Math.max(0, tagList.length - visibleTags.length);
 
   return (
     <React.Fragment key={ticket.id}>
@@ -410,11 +517,24 @@ const TicketListItemCustom = ({ ticket, compact = false, selected = false }) => 
           />
         </Tooltip>
 
-        <ListItemAvatar>
-          <Avatar
-            className={clsx(classes.avatar, { [classes.avatarCompact]: compact })}
-            src={ticket?.contact?.profilePicUrl}
-          />
+        <ListItemAvatar className={classes.avatarWrap}>
+          <Badge
+            overlap="circular"
+            anchorOrigin={{ vertical: "top", horizontal: "right" }}
+            badgeContent={ticket.unreadMessages > 0 ? ticket.unreadMessages : null}
+            color="error"
+            invisible={!ticket.unreadMessages}
+            classes={{ badge: classes.unreadBadge }}
+          >
+            <Avatar
+              className={clsx(classes.avatar, { [classes.avatarCompact]: compact })}
+              src={ticket?.contact?.profilePicUrl}
+            >
+              {!ticket?.contact?.profilePicUrl && ticket.contact?.name
+                ? ticket.contact.name.charAt(0).toUpperCase()
+                : null}
+            </Avatar>
+          </Badge>
         </ListItemAvatar>
 
         <Box className={classes.mainColumn}>
@@ -445,22 +565,13 @@ const TicketListItemCustom = ({ ticket, compact = false, selected = false }) => 
               )}
             </Box>
             <Box className={classes.topRight}>
-              {renderTicketInfo()}
-              {ticket.lastMessage && updatedAt && (
-                <Tooltip title={timeTooltip || relativeTime}>
+              {updatedAt && (
+                <Tooltip title={timeTooltip || listTimeShort}>
                   <Typography className={classes.timeText} component="span">
-                    {relativeTime}
+                    {listTimeShort}
                   </Typography>
                 </Tooltip>
               )}
-              {ticket.unreadMessages > 0 ? (
-                <Chip
-                  size="small"
-                  color="secondary"
-                  label={`${ticket.unreadMessages} ${i18n.t("kanban.unread")}`}
-                  className={classes.unreadChip}
-                />
-              ) : null}
             </Box>
           </Box>
 
@@ -473,6 +584,15 @@ const TicketListItemCustom = ({ ticket, compact = false, selected = false }) => 
           </Typography>
 
           <Box className={classes.chipsRow}>
+            {statusChipMeta ? (
+              <Chip
+                size="small"
+                label={statusChipMeta.label}
+                className={classes.statusChip}
+                style={statusChipMeta.style}
+                {...(statusChipMeta.icon ? { icon: statusChipMeta.icon } : {})}
+              />
+            ) : null}
             {ticket?.whatsapp?.name ? (
               <Chip
                 size="small"
@@ -500,9 +620,21 @@ const TicketListItemCustom = ({ ticket, compact = false, selected = false }) => 
                 backgroundColor: `${queueColor}22`,
               }}
             />
-            {(Array.isArray(tag) ? tag : []).map((tagItem) => (
-              <ContactTag tag={tagItem} key={`ticket-contact-tag-${ticket.id}-${tagItem.id}`} />
+            {visibleTags.map((tagItem) => (
+              <ContactTag
+                tag={tagItem}
+                variant="lite"
+                key={`ticket-contact-tag-${ticket.id}-${tagItem.id}`}
+              />
             ))}
+            {extraTagCount > 0 ? (
+              <Chip
+                size="small"
+                variant="outlined"
+                label={`+${extraTagCount}`}
+                className={classes.moreTagsChip}
+              />
+            ) : null}
           </Box>
 
           {(ticket.status === "pending" ||
@@ -555,8 +687,6 @@ const TicketListItemCustom = ({ ticket, compact = false, selected = false }) => 
           )}
         </Box>
       </ListItem>
-
-      <Divider variant="inset" component="li" />
     </React.Fragment>
   );
 };
