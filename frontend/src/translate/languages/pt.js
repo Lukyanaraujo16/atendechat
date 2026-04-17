@@ -1280,6 +1280,22 @@ const messages = {
             "Estes planos são o modelo padrão da plataforma. As empresas podem ter o campo de módulos sobrescrito individualmente (Super Admin → Empresas).",
           formSectionTitle: "Criar ou editar plano",
           listSectionTitle: "Catálogo de planos",
+          newPlan: "Novo plano",
+          registeredListTitle: "Planos cadastrados",
+          registeredListSubtitle:
+            "Selecione um plano para editar ou crie um novo. Os módulos só são configurados ao criar ou editar.",
+          listRowHint: "Clique numa linha ou no ícone de edição para abrir o formulário.",
+          searchPlaceholder: "Pesquisar por nome do plano…",
+          sortLabel: "Ordenar",
+          sortByName: "Nome (A–Z)",
+          sortByValue: "Valor (menor → maior)",
+          editingBanner: "A editar: {{name}}",
+          editingContextHint:
+            "Alterações nos limites e módulos aplicam-se a este plano; a propagação para empresas segue as regras já existentes ao guardar.",
+          emptyListTitle: "Nenhum plano no catálogo",
+          emptyListSubtitle: "Crie o primeiro plano ou ajuste a pesquisa.",
+          noSearchResults: "Nenhum plano corresponde à pesquisa.",
+          listLoading: "A carregar planos…",
           moduleSave: {
             title: "Alteração de módulos do plano",
             summaryIntro:

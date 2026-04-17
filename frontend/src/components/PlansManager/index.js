@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
     makeStyles,
+    useTheme,
     Paper,
     Grid,
     TextField,
@@ -12,7 +13,15 @@ import {
     IconButton,
     Typography,
     Box,
+    FormControl,
+    InputLabel,
+    MenuItem,
+    Select,
+    InputAdornment,
+    Tooltip,
 } from "@material-ui/core";
+import { alpha } from "@material-ui/core/styles";
+import SearchIcon from "@material-ui/icons/Search";
 import { Formik, Form, Field } from 'formik';
 import ButtonWithSpinner from "../ButtonWithSpinner";
 import ConfirmationModal from "../ConfirmationModal";
@@ -22,7 +31,13 @@ import { Edit as EditIcon } from "@material-ui/icons";
 import { toast } from "react-toastify";
 import usePlans from "../../hooks/usePlans";
 import { i18n } from "../../translate/i18n";
-import { AppSectionCard, AppTableContainer } from "../../ui";
+import {
+    AppSectionCard,
+    AppTableContainer,
+    AppPrimaryButton,
+    AppEmptyState,
+    AppLoadingState,
+} from "../../ui";
 import ModuleToggleCard from "../ModuleSettings/ModuleToggleCard";
 import PlanModuleSaveDialog from "../ModuleSettings/PlanModuleSaveDialog";
 import {
@@ -66,11 +81,6 @@ const useStyles = makeStyles(theme => ({
         textAlign: 'right',
         padding: theme.spacing(1)
     },
-    platformRoot: {
-        width: "100%",
-        padding: theme.spacing(0),
-        backgroundColor: "transparent",
-    },
     platformSectionTitle: {
         fontWeight: 600,
         fontSize: "1.125rem",
@@ -91,6 +101,87 @@ const useStyles = makeStyles(theme => ({
         marginTop: theme.spacing(2),
         paddingTop: theme.spacing(2),
         borderTop: `1px solid ${theme.palette.divider}`,
+    },
+    pageStack: {
+        display: "flex",
+        flexDirection: "column",
+        gap: theme.spacing(3),
+        width: "100%",
+    },
+    sectionTitle: {
+        fontWeight: 600,
+        fontSize: "1.125rem",
+        lineHeight: 1.35,
+        letterSpacing: "-0.01em",
+        marginBottom: theme.spacing(0.75),
+        color: theme.palette.text.primary,
+    },
+    registeredSectionSubtitle: {
+        marginBottom: theme.spacing(2),
+        lineHeight: 1.55,
+        maxWidth: 720,
+    },
+    tableToolbar: {
+        display: "flex",
+        flexWrap: "wrap",
+        gap: theme.spacing(2),
+        marginBottom: theme.spacing(2),
+        alignItems: "center",
+    },
+    tableHeadCell: {
+        fontWeight: 600,
+        fontSize: "0.7rem",
+        textTransform: "uppercase",
+        letterSpacing: "0.06em",
+        color: theme.palette.text.secondary,
+        borderBottom: `2px solid ${theme.palette.divider}`,
+    },
+    tableRow: {
+        cursor: "pointer",
+        transition: theme.transitions.create("background-color", {
+            duration: 150,
+        }),
+        "&:hover": {
+            backgroundColor:
+                theme.palette.type === "dark"
+                    ? "rgba(255,255,255,0.05)"
+                    : theme.palette.action.hover,
+        },
+    },
+    tableRowSelected: {
+        backgroundColor:
+            theme.palette.type === "dark"
+                ? "rgba(25, 118, 210, 0.16)"
+                : theme.palette.action.selected,
+        "&:hover": {
+            backgroundColor:
+                theme.palette.type === "dark"
+                    ? "rgba(25, 118, 210, 0.22)"
+                    : theme.palette.action.selected,
+        },
+    },
+    editingBanner: {
+        padding: theme.spacing(2, 2.5),
+        borderRadius: theme.shape.borderRadius,
+        backgroundColor:
+            theme.palette.type === "dark"
+                ? alpha(theme.palette.primary.main, 0.12)
+                : alpha(theme.palette.primary.main, 0.06),
+        border: `1px solid ${alpha(theme.palette.primary.main, 0.22)}`,
+        borderLeftWidth: 4,
+        borderLeftColor: theme.palette.primary.main,
+        borderLeftStyle: "solid",
+    },
+    editingBannerTitle: {
+        fontWeight: 600,
+        fontSize: "1.0625rem",
+        lineHeight: 1.4,
+        color: theme.palette.text.primary,
+    },
+    editingBannerHint: {
+        marginTop: theme.spacing(0.75),
+        lineHeight: 1.5,
+        fontSize: "0.8125rem",
     },
 }));
 
@@ -266,9 +357,42 @@ export function PlanManagerForm(props) {
 }
 
 export function PlansManagerGrid(props) {
-    const { records, onSelect, variant = "settings" } = props;
+    const {
+        records,
+        onSelect,
+        variant = "settings",
+        onNewPlan,
+        selectedId,
+        loading,
+    } = props;
     const classes = useStyles();
-    
+    const theme = useTheme();
+    const [search, setSearch] = useState("");
+    const [sortBy, setSortBy] = useState("name");
+
+    const filteredRecords = useMemo(() => {
+        let list = Array.isArray(records) ? [...records] : [];
+        const q = search.trim().toLowerCase();
+        if (q) {
+            list = list.filter((row) =>
+                (row.name || "").toLowerCase().includes(q)
+            );
+        }
+        if (sortBy === "name") {
+            list.sort((a, b) =>
+                (a.name || "").localeCompare(b.name || "", undefined, {
+                    sensitivity: "base",
+                })
+            );
+        } else if (sortBy === "value") {
+            list.sort(
+                (a, b) =>
+                    (Number(a.value) || 0) - (Number(b.value) || 0)
+            );
+        }
+        return list;
+    }, [records, search, sortBy]);
+
     const renderCampaigns = (row) => {
         return row.useCampaigns === false ? `${i18n.t("plans.form.no")}` : `${i18n.t("plans.form.yes")}`;
     };
@@ -297,66 +421,284 @@ export function PlansManagerGrid(props) {
         return row.useIntegrations === false ? `${i18n.t("plans.form.no")}` : `${i18n.t("plans.form.yes")}`;
     };
 
+    const isPlatform = variant === "platform";
+    const headCls = isPlatform ? classes.tableHeadCell : undefined;
+
     const table = (
-            <Table
-                className={classes.fullWidth}
-                padding="none"
-                size={variant === "platform" ? "small" : "medium"}
-                aria-label={i18n.t("plans.table.aria")}
-            >
-                <TableHead>
-                    <TableRow>
-                        <TableCell align="center" style={{ width: '1%' }}>#</TableCell>
-                        <TableCell align="left">{i18n.t("plans.form.name")}</TableCell>
-                        <TableCell align="center">{i18n.t("plans.table.companies")}</TableCell>
-                        <TableCell align="center">{i18n.t("plans.form.users")}</TableCell>
-                        <TableCell align="center">{i18n.t("plans.form.connections")}</TableCell>
-                        <TableCell align="center">{i18n.t("plans.form.queues")}</TableCell>
-                        <TableCell align="center">{i18n.t("plans.form.value")}</TableCell>
-                        <TableCell align="center">{i18n.t("plans.form.campaigns")}</TableCell>
-                        <TableCell align="center">{i18n.t("plans.form.schedules")}</TableCell>
-                        <TableCell align="center">{i18n.t("plans.form.internalChat")}</TableCell>
-                        <TableCell align="center">{i18n.t("plans.form.externalApi")}</TableCell>
-                        <TableCell align="center">{i18n.t("plans.form.kanban")}</TableCell>
-                        <TableCell align="center">Open.Ai</TableCell>
-                        <TableCell align="center">{i18n.t("plans.form.integrations")}</TableCell>
-                    </TableRow>
-                </TableHead>
-                <TableBody>
-                    {records.map((row) => (
-                        <TableRow key={row.id}>
-                            <TableCell align="center" style={{ width: '1%' }}>
-                                <IconButton onClick={() => onSelect(row)} aria-label="edit">
-                                    <EditIcon />
-                                </IconButton>
+        <Table
+            className={classes.fullWidth}
+            padding="none"
+            size={variant === "platform" ? "small" : "medium"}
+            aria-label={i18n.t("plans.table.aria")}
+        >
+            <TableHead>
+                <TableRow>
+                    <TableCell align="center" style={{ width: "1%" }} className={headCls}>
+                        #
+                    </TableCell>
+                    <TableCell align="left" className={headCls}>
+                        {i18n.t("plans.form.name")}
+                    </TableCell>
+                    <TableCell align="center" className={headCls}>
+                        {i18n.t("plans.table.companies")}
+                    </TableCell>
+                    <TableCell align="center" className={headCls}>
+                        {i18n.t("plans.form.users")}
+                    </TableCell>
+                    <TableCell align="center" className={headCls}>
+                        {i18n.t("plans.form.connections")}
+                    </TableCell>
+                    <TableCell align="center" className={headCls}>
+                        {i18n.t("plans.form.queues")}
+                    </TableCell>
+                    <TableCell align="center" className={headCls}>
+                        {i18n.t("plans.form.value")}
+                    </TableCell>
+                    <TableCell align="center" className={headCls}>
+                        {i18n.t("plans.form.campaigns")}
+                    </TableCell>
+                    <TableCell align="center" className={headCls}>
+                        {i18n.t("plans.form.schedules")}
+                    </TableCell>
+                    <TableCell align="center" className={headCls}>
+                        {i18n.t("plans.form.internalChat")}
+                    </TableCell>
+                    <TableCell align="center" className={headCls}>
+                        {i18n.t("plans.form.externalApi")}
+                    </TableCell>
+                    <TableCell align="center" className={headCls}>
+                        {i18n.t("plans.form.kanban")}
+                    </TableCell>
+                    <TableCell align="center" className={headCls}>
+                        Open.Ai
+                    </TableCell>
+                    <TableCell align="center" className={headCls}>
+                        {i18n.t("plans.form.integrations")}
+                    </TableCell>
+                </TableRow>
+            </TableHead>
+            <TableBody>
+                {filteredRecords.map((row) => {
+                    const isSelected =
+                        isPlatform &&
+                        selectedId != null &&
+                        row.id === selectedId;
+                    const rowStyle =
+                        isPlatform && isSelected
+                            ? {
+                                  boxShadow: `inset 4px 0 0 ${theme.palette.primary.main}`,
+                              }
+                            : undefined;
+                    return (
+                        <TableRow
+                            key={row.id}
+                            className={
+                                isPlatform
+                                    ? `${classes.tableRow} ${
+                                          isSelected ? classes.tableRowSelected : ""
+                                      }`
+                                    : undefined
+                            }
+                            onClick={isPlatform ? () => onSelect(row) : undefined}
+                            selected={Boolean(isSelected)}
+                            style={rowStyle}
+                        >
+                            <TableCell
+                                align="center"
+                                style={{ width: "1%" }}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                }}
+                            >
+                                <Tooltip
+                                    title={i18n.t("platform.companies.editRow")}
+                                    arrow
+                                    enterDelay={300}
+                                >
+                                    <IconButton
+                                        size="small"
+                                        color="primary"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onSelect(row);
+                                        }}
+                                        aria-label={i18n.t(
+                                            "platform.companies.editRow"
+                                        )}
+                                    >
+                                        <EditIcon fontSize="small" />
+                                    </IconButton>
+                                </Tooltip>
                             </TableCell>
-                            <TableCell align="left">{row.name || '-'}</TableCell>
+                            <TableCell align="left">{row.name || "-"}</TableCell>
                             <TableCell align="center">
-                                {row.companiesCount != null ? row.companiesCount : "—"}
+                                {row.companiesCount != null
+                                    ? row.companiesCount
+                                    : "—"}
                             </TableCell>
-                            <TableCell align="center">{row.users || '-'}</TableCell>
-                            <TableCell align="center">{row.connections || '-'}</TableCell>
-                            <TableCell align="center">{row.queues || '-'}</TableCell>
-                            <TableCell align="center">{i18n.t("plans.form.money")} {row.value ? row.value.toLocaleString('pt-br', { minimumFractionDigits: 2 }) : '00.00'}</TableCell>
-                            <TableCell align="center">{renderCampaigns(row)}</TableCell>
-                            <TableCell align="center">{renderSchedules(row)}</TableCell>
-                            <TableCell align="center">{renderInternalChat(row)}</TableCell>
-                            <TableCell align="center">{renderExternalApi(row)}</TableCell>
+                            <TableCell align="center">{row.users || "-"}</TableCell>
+                            <TableCell align="center">
+                                {row.connections || "-"}
+                            </TableCell>
+                            <TableCell align="center">{row.queues || "-"}</TableCell>
+                            <TableCell align="center">
+                                {i18n.t("plans.form.money")}{" "}
+                                {row.value
+                                    ? row.value.toLocaleString("pt-br", {
+                                          minimumFractionDigits: 2,
+                                      })
+                                    : "00.00"}
+                            </TableCell>
+                            <TableCell align="center">
+                                {renderCampaigns(row)}
+                            </TableCell>
+                            <TableCell align="center">
+                                {renderSchedules(row)}
+                            </TableCell>
+                            <TableCell align="center">
+                                {renderInternalChat(row)}
+                            </TableCell>
+                            <TableCell align="center">
+                                {renderExternalApi(row)}
+                            </TableCell>
                             <TableCell align="center">{renderKanban(row)}</TableCell>
                             <TableCell align="center">{renderOpenAi(row)}</TableCell>
-                            <TableCell align="center">{renderIntegrations(row)}</TableCell>
+                            <TableCell align="center">
+                                {renderIntegrations(row)}
+                            </TableCell>
                         </TableRow>
-                    ))}
-                </TableBody>
-            </Table>
+                    );
+                })}
+            </TableBody>
+        </Table>
     );
 
     if (variant === "platform") {
-        return <AppTableContainer nested>{table}</AppTableContainer>;
+        const showInitialLoading = loading && (!records || records.length === 0);
+        const emptyCatalog =
+            !loading && (!records || records.length === 0);
+        const emptyFiltered =
+            !loading &&
+            records &&
+            records.length > 0 &&
+            filteredRecords.length === 0;
+
+        return (
+            <AppSectionCard>
+                <Typography className={classes.sectionTitle} component="h2">
+                    {i18n.t("platform.plans.registeredListTitle")}
+                </Typography>
+                <Typography
+                    variant="body2"
+                    color="textSecondary"
+                    className={classes.registeredSectionSubtitle}
+                >
+                    {i18n.t("platform.plans.registeredListSubtitle")}
+                </Typography>
+                <Typography
+                    variant="caption"
+                    color="textSecondary"
+                    display="block"
+                    style={{ marginBottom: 16 }}
+                >
+                    {i18n.t("platform.plans.listRowHint")}
+                </Typography>
+                <Box className={classes.tableToolbar}>
+                    {typeof onNewPlan === "function" ? (
+                        <AppPrimaryButton
+                            type="button"
+                            onClick={onNewPlan}
+                            style={{ flexShrink: 0 }}
+                        >
+                            {i18n.t("platform.plans.newPlan")}
+                        </AppPrimaryButton>
+                    ) : null}
+                    <TextField
+                        size="small"
+                        variant="outlined"
+                        placeholder={i18n.t("platform.plans.searchPlaceholder")}
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        InputProps={{
+                            startAdornment: (
+                                <InputAdornment position="start">
+                                    <SearchIcon color="action" fontSize="small" />
+                                </InputAdornment>
+                            ),
+                        }}
+                        style={{ minWidth: 220, flex: "1 1 200px" }}
+                    />
+                    <FormControl
+                        variant="outlined"
+                        size="small"
+                        style={{ minWidth: 200 }}
+                    >
+                        <InputLabel id="plans-sort-label">
+                            {i18n.t("platform.plans.sortLabel")}
+                        </InputLabel>
+                        <Select
+                            labelId="plans-sort-label"
+                            label={i18n.t("platform.plans.sortLabel")}
+                            value={sortBy}
+                            onChange={(e) => setSortBy(e.target.value)}
+                        >
+                            <MenuItem value="name">
+                                {i18n.t("platform.plans.sortByName")}
+                            </MenuItem>
+                            <MenuItem value="value">
+                                {i18n.t("platform.plans.sortByValue")}
+                            </MenuItem>
+                        </Select>
+                    </FormControl>
+                </Box>
+                {showInitialLoading ? (
+                    <AppLoadingState
+                        message={i18n.t("platform.plans.listLoading")}
+                    />
+                ) : emptyCatalog ? (
+                    <AppEmptyState
+                        title={i18n.t("platform.plans.emptyListTitle")}
+                        description={i18n.t("platform.plans.emptyListSubtitle")}
+                    >
+                        {typeof onNewPlan === "function" ? (
+                            <AppPrimaryButton
+                                type="button"
+                                onClick={onNewPlan}
+                            >
+                                {i18n.t("platform.plans.newPlan")}
+                            </AppPrimaryButton>
+                        ) : null}
+                    </AppEmptyState>
+                ) : emptyFiltered ? (
+                    <AppEmptyState
+                        title={i18n.t("platform.plans.noSearchResults")}
+                    />
+                ) : (
+                    <AppTableContainer nested className={classes.tableContainer}>
+                        {table}
+                    </AppTableContainer>
+                )}
+            </AppSectionCard>
+        );
     }
 
     return <Paper className={classes.tableContainer}>{table}</Paper>;
 }
+
+const defaultPlanRecord = () => ({
+    name: "",
+    users: 0,
+    connections: 0,
+    queues: 0,
+    value: 0,
+    useCampaigns: true,
+    useSchedules: true,
+    useInternalChat: true,
+    useExternalApi: true,
+    useKanban: true,
+    useOpenAi: true,
+    useIntegrations: true,
+});
 
 export default function PlansManager({ variant = "settings" }) {
     const classes = useStyles();
@@ -367,23 +709,11 @@ export default function PlansManager({ variant = "settings" }) {
         data: null,
         diff: [],
     });
-    const [showConfirmDialog, setShowConfirmDialog] = useState(false)
-    const [loading, setLoading] = useState(false)
-    const [records, setRecords] = useState([])
-    const [record, setRecord] = useState({
-        name: '',
-        users: 0,
-        connections: 0,
-        queues: 0,
-        value: 0,
-        useCampaigns: true,
-        useSchedules: true,
-        useInternalChat: true,
-        useExternalApi: true,
-        useKanban: true,
-        useOpenAi: true,
-        useIntegrations: true,
-    })
+    const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [records, setRecords] = useState([]);
+    const [formOpen, setFormOpen] = useState(false);
+    const [record, setRecord] = useState(() => defaultPlanRecord());
 
     useEffect(() => {
         loadPlans();
@@ -501,97 +831,136 @@ export default function PlansManager({ variant = "settings" }) {
     }
 
     const handleCancel = () => {
-        setRecord({
-            id: undefined,
-            name: '',
-            users: 0,
-            connections: 0,
-            queues: 0,
-            value: 0,
-            useCampaigns: true,
-            useSchedules: true,
-            useInternalChat: true,
-            useExternalApi: true,
-            useKanban: true,
-            useOpenAi: true,
-            useIntegrations: true
-        })
-    }
+        setRecord(defaultPlanRecord());
+        if (variant === "platform") {
+            setFormOpen(false);
+        }
+    };
+
+    const handleNewPlan = () => {
+        setRecord(defaultPlanRecord());
+        setFormOpen(true);
+    };
 
     const handleSelect = (data) => {
-
-        let useCampaigns = data.useCampaigns === false ? false : true
-        let useSchedules = data.useSchedules === false ? false : true
-        let useInternalChat = data.useInternalChat === false ? false : true
-        let useExternalApi = data.useExternalApi === false ? false : true
-        let useKanban = data.useKanban === false ? false : true
-        let useOpenAi = data.useOpenAi === false ? false : true
-        let useIntegrations = data.useIntegrations === false ? false : true
+        let useCampaigns = data.useCampaigns === false ? false : true;
+        let useSchedules = data.useSchedules === false ? false : true;
+        let useInternalChat = data.useInternalChat === false ? false : true;
+        let useExternalApi = data.useExternalApi === false ? false : true;
+        let useKanban = data.useKanban === false ? false : true;
+        let useOpenAi = data.useOpenAi === false ? false : true;
+        let useIntegrations = data.useIntegrations === false ? false : true;
 
         setRecord({
             id: data.id,
-            name: data.name || '',
+            name: data.name || "",
             users: data.users || 0,
             connections: data.connections || 0,
             queues: data.queues || 0,
-            value: data.value?.toLocaleString('pt-br', { minimumFractionDigits: 0 }) || 0,
+            value:
+                data.value?.toLocaleString("pt-br", {
+                    minimumFractionDigits: 0,
+                }) || 0,
             useCampaigns,
             useSchedules,
             useInternalChat,
             useExternalApi,
             useKanban,
             useOpenAi,
-            useIntegrations
-        })
-    }
+            useIntegrations,
+        });
+        if (variant === "platform") {
+            setFormOpen(true);
+        }
+    };
 
     const formBlock = (
-                    <PlanManagerForm
-                        initialValue={record}
-                        onDelete={handleOpenDeleteDialog}
-                        onSubmit={handleSubmitRequest}
-                        onCancel={handleCancel}
-                        loading={loading}
-                    />
+        <PlanManagerForm
+            initialValue={record}
+            onDelete={handleOpenDeleteDialog}
+            onSubmit={handleSubmitRequest}
+            onCancel={handleCancel}
+            loading={loading}
+        />
     );
 
     const gridBlock = (
-                    <PlansManagerGrid
-                        records={records}
-                        onSelect={handleSelect}
-                        variant={variant}
-                    />
+        <PlansManagerGrid
+            records={records}
+            onSelect={handleSelect}
+            variant={variant}
+            onNewPlan={variant === "platform" ? handleNewPlan : undefined}
+            selectedId={variant === "platform" && formOpen ? record.id : undefined}
+            loading={loading}
+        />
     );
 
-    return (
-        <Paper
-            className={variant === "platform" ? classes.platformRoot : classes.mainPaper}
-            elevation={0}
-        >
-            <Grid spacing={variant === "platform" ? 3 : 2} container>
-                <Grid xs={12} item>
-                    {variant === "platform" ? (
+    if (variant === "platform") {
+        return (
+            <Box className={classes.pageStack}>
+                {gridBlock}
+                {formOpen ? (
+                    <>
+                        {record.id !== undefined ? (
+                            <Box className={classes.editingBanner}>
+                                <Typography
+                                    className={classes.editingBannerTitle}
+                                    component="p"
+                                >
+                                    {i18n.t("platform.plans.editingBanner", {
+                                        name: record.name || "—",
+                                    })}
+                                </Typography>
+                                <Typography
+                                    variant="body2"
+                                    color="textSecondary"
+                                    className={classes.editingBannerHint}
+                                    component="p"
+                                >
+                                    {i18n.t("platform.plans.editingContextHint")}
+                                </Typography>
+                            </Box>
+                        ) : null}
                         <AppSectionCard>
-                            <Typography className={classes.platformSectionTitle} component="h2">
+                            <Typography
+                                className={classes.platformSectionTitle}
+                                component="h2"
+                            >
                                 {i18n.t("platform.plans.formSectionTitle")}
                             </Typography>
                             {formBlock}
                         </AppSectionCard>
-                    ) : (
-                        formBlock
-                    )}
+                    </>
+                ) : null}
+                <ConfirmationModal
+                    title={i18n.t("plans.confirm.title")}
+                    open={showConfirmDialog}
+                    onClose={() => setShowConfirmDialog(false)}
+                    onConfirm={() => handleDelete()}
+                >
+                    {i18n.t("plans.confirm.message")}
+                </ConfirmationModal>
+                <PlanModuleSaveDialog
+                    open={planSaveDialog.open}
+                    onClose={() =>
+                        setPlanSaveDialog({ open: false, data: null, diff: [] })
+                    }
+                    diff={planSaveDialog.diff || []}
+                    loading={loading}
+                    onChoose={handlePlanSavePropagation}
+                />
+            </Box>
+        );
+    }
+
+    return (
+        <Paper className={classes.mainPaper} elevation={0}>
+            <Grid spacing={2} container>
+                <Grid xs={12} item>
+                    {formBlock}
                 </Grid>
                 <Grid xs={12} item>
-                    {variant === "platform" ? (
-                        <AppSectionCard>
-                            <Typography className={classes.platformSectionTitle} component="h2">
-                                {i18n.t("platform.plans.listSectionTitle")}
-                            </Typography>
-                            {gridBlock}
-                        </AppSectionCard>
-                    ) : (
-                        gridBlock
-                    )}
+                    {gridBlock}
                 </Grid>
             </Grid>
             <ConfirmationModal
@@ -612,5 +981,5 @@ export default function PlansManager({ variant = "settings" }) {
                 onChoose={handlePlanSavePropagation}
             />
         </Paper>
-    )
+    );
 }

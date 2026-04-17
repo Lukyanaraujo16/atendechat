@@ -1208,6 +1208,22 @@ const messages = {
 						"These plans are the platform defaults. Companies can still have module overrides individually (Super Admin → Companies).",
 					formSectionTitle: "Create or edit plan",
 					listSectionTitle: "Plan catalog",
+					newPlan: "New plan",
+					registeredListTitle: "Registered plans",
+					registeredListSubtitle:
+						"Select a plan to edit or create a new one. Modules are only configured when creating or editing.",
+					listRowHint: "Click a row or the edit icon to open the form.",
+					searchPlaceholder: "Search by plan name…",
+					sortLabel: "Sort",
+					sortByName: "Name (A–Z)",
+					sortByValue: "Price (low → high)",
+					editingBanner: "Editing: {{name}}",
+					editingContextHint:
+						"Changes to limits and modules apply to this plan; propagation to companies follows the existing rules when you save.",
+					emptyListTitle: "No plans in the catalog",
+					emptyListSubtitle: "Create the first plan or adjust your search.",
+					noSearchResults: "No plans match your search.",
+					listLoading: "Loading plans…",
 					moduleSave: {
 						title: "Plan module changes",
 						summaryIntro:

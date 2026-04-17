@@ -1208,6 +1208,22 @@ const messages = {
             "Estos planes son el modelo por defecto de la plataforma. Las empresas pueden tener permisos de módulos sobrescritos (Super Admin → Empresas).",
           formSectionTitle: "Crear o editar plan",
           listSectionTitle: "Catálogo de planes",
+          newPlan: "Nuevo plan",
+          registeredListTitle: "Planes registrados",
+          registeredListSubtitle:
+            "Seleccione un plan para editar o cree uno nuevo. Los módulos solo se configuran al crear o editar.",
+          listRowHint: "Haga clic en una fila o en el icono de edición para abrir el formulario.",
+          searchPlaceholder: "Buscar por nombre del plan…",
+          sortLabel: "Ordenar",
+          sortByName: "Nombre (A–Z)",
+          sortByValue: "Precio (menor → mayor)",
+          editingBanner: "Editando: {{name}}",
+          editingContextHint:
+            "Los cambios en límites y módulos aplican a este plan; la propagación a empresas sigue las reglas existentes al guardar.",
+          emptyListTitle: "No hay planes en el catálogo",
+          emptyListSubtitle: "Cree el primer plan o ajuste la búsqueda.",
+          noSearchResults: "Ningún plan coincide con la búsqueda.",
+          listLoading: "Cargando planes…",
           moduleSave: {
             title: "Cambio de módulos del plan",
             summaryIntro:
