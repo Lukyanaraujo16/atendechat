@@ -54,6 +54,7 @@ function usePlanFlags() {
     useSchedules: false,
     useExternalApi: false,
     useGroups: true,
+    useInternalChat: true,
     loaded: false,
   });
 
@@ -79,6 +80,7 @@ function usePlanFlags() {
             useSchedules: false,
             useExternalApi: false,
             useGroups: true,
+            useInternalChat: false,
             loaded: true,
           });
           return;
@@ -93,6 +95,10 @@ function usePlanFlags() {
             useSchedules: !!eff.useSchedules,
             useExternalApi: !!eff.useExternalApi,
             useGroups: eff.useGroups !== false,
+            useInternalChat:
+              eff.useInternalChat !== undefined
+                ? !!eff.useInternalChat
+                : p.useInternalChat !== false,
             loaded: true,
           });
         } else {
@@ -105,6 +111,7 @@ function usePlanFlags() {
             useSchedules: !!p.useSchedules,
             useExternalApi: !!p.useExternalApi,
             useGroups: true,
+            useInternalChat: p.useInternalChat !== false,
             loaded: true,
           });
         }
@@ -393,8 +400,38 @@ export default function LoggedInRoutesContent() {
         render={() => <AtendimentoModule planFlags={planFlags} isAdmin={isAdmin} />}
       />
 
-      <Route exact path="/chats" component={Chat} />
-      <Route exact path="/chats/:id" component={Chat} />
+      <Route
+        exact
+        path="/chats"
+        render={() => {
+          if (!planFlags.loaded) {
+            return (
+              <Box display="flex" justifyContent="center" alignItems="center" minHeight={240} width="100%">
+                <CircularProgress size={36} />
+              </Box>
+            );
+          }
+          return planFlags.useInternalChat ? <Chat /> : <Redirect to="/tickets" />;
+        }}
+      />
+      <Route
+        exact
+        path="/chats/:id"
+        render={(routeProps) => {
+          if (!planFlags.loaded) {
+            return (
+              <Box display="flex" justifyContent="center" alignItems="center" minHeight={240} width="100%">
+                <CircularProgress size={36} />
+              </Box>
+            );
+          }
+          return planFlags.useInternalChat ? (
+            <Chat {...routeProps} />
+          ) : (
+            <Redirect to="/tickets" />
+          );
+        }}
+      />
 
       <Route exact path="/todolist" component={ToDoList} />
       <Route

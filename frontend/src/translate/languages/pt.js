@@ -251,6 +251,11 @@ const messages = {
           queues: "Setores",
           value: "Valor",
           internalChat: "Chat Interno",
+          internalChatHelp:
+            "Mensagens internas entre utilizadores da mesma empresa (fora do WhatsApp).",
+          modulesSectionTitle: "Módulos do plano",
+          modulesSectionHint:
+            "Estes interruptores definem o que o plano permite por defeito. As empresas herdam estes valores e podem ajustar em Plataforma → Empresas.",
           externalApi: "API Externa",
           kanban: "Kanban",
           integrations: "Integrações",
@@ -441,7 +446,7 @@ const messages = {
           intro: "Não é necessário API paga. A conexão é por QR Code (como WhatsApp Web).",
           step1: "Clique em \"Adicionar WhatsApp\", dê um nome e salve.",
           step2: "Na lista, clique no botão \"Ver QR Code\" quando o status estiver como \"Aguardando QR\".",
-          step3: "No celular: WhatsApp → Menu (⋮) ou Configurações → Dispositivos conectados → Conectar dispositivo.",
+          step3: "No celular: abra o WhatsApp → Aparelhos conectados (ou Dispositivos ligados) → Conectar dispositivo.",
           step4: "Aponte a câmera para o QR Code na tela. Quando conectar, o status ficará verde \"Conectado\".",
         },
         statusLabel: {
@@ -451,6 +456,7 @@ const messages = {
           DISCONNECTED: "Desconectado",
           TIMEOUT: "Sem conexão",
           PAIRING: "Emparelhando",
+          PENDING: "Pendente",
         },
         toasts: {
           deleted: "Conexão com o WhatsApp excluída com sucesso!",
@@ -498,6 +504,8 @@ const messages = {
           default: "Padrão",
           actions: "Ações",
           session: "Sessão",
+          emptyTitle: "Nenhuma conexão ainda",
+          emptyHint: "Adicione um WhatsApp para gerar o QR Code e começar o atendimento.",
         },
       },
       whatsappModal: {
@@ -613,6 +621,7 @@ const messages = {
           deleteRow: "Excluir contato",
         },
         table: {
+          contact: "Contato",
           name: "Nome",
           number: "Número",
           whatsapp: "WhatsApp",
@@ -623,6 +632,7 @@ const messages = {
           actions: "Ações",
         },
         filters: {
+          sectionLabel: "Filtros",
           tag: "Tag",
           allTags: "Todas",
           dateFrom: "Atualizado de",
@@ -823,6 +833,7 @@ const messages = {
           name: "Nome",
           number: "Número do Whatsapp",
           email: "Email",
+          emailPlaceholder: "nome@empresa.com",
           notes: "Notas",
           tags: "Tags",
           addTag: "Adicionar tag",
@@ -1269,6 +1280,24 @@ const messages = {
             "Estes planos são o modelo padrão da plataforma. As empresas podem ter o campo de módulos sobrescrito individualmente (Super Admin → Empresas).",
           formSectionTitle: "Criar ou editar plano",
           listSectionTitle: "Catálogo de planos",
+          moduleSave: {
+            title: "Alteração de módulos do plano",
+            summaryIntro:
+              "Resumo das alterações de módulos em relação ao estado anterior deste plano:",
+            lineOn: "{{module}} — ativado",
+            lineOff: "{{module}} — desativado",
+            choosePropagation:
+              "Como pretende aplicar isto às empresas que usam este plano?",
+            applyNone: "Só guardar o plano",
+            applyNoOverride: "Guardar e preparar: aplicar só onde não há override",
+            applyAll: "Guardar e preparar: aplicar a todas as empresas",
+            propagationPending:
+              "O plano foi guardado. A propagação automática para empresas ainda será ligada no backend.",
+            propagationSuccess:
+              "Plano guardado. {{count}} empresa(s) tiveram módulos alinhados conforme o modo escolhido.",
+            propagationNoCompaniesUpdated:
+              "Plano guardado. Nenhuma empresa precisou de alteração ao JSON de módulos (ou todas tinham overrides preservados).",
+          },
         },
         dashboard: {
           title: "Dashboard da plataforma",
@@ -1302,6 +1331,22 @@ const messages = {
           actionBranding: "Branding",
           footerHint: "Precisa de detalhes ou edição?",
           openCompanies: "Abrir empresas",
+        },
+        moduleSettings: {
+          planChange: {
+            title: "Alterar plano da empresa",
+            message:
+              "Alterar o plano pode mudar os módulos desta empresa. Escolha se mantém as permissões atuais ou alinha aos módulos predefinidos do novo plano.",
+            keepModules: "Manter configurações atuais",
+            applyPlanModules: "Aplicar módulos do plano",
+          },
+          origin: {
+            inherited: "Liberado pelo plano (empresa sem bloqueio)",
+            disabledOverride: "Desativado nesta empresa",
+            blockedByPlan: "Indisponível neste plano",
+            companyOnly: "Controlado só na empresa (sem coluna no plano)",
+            noPlan: "Selecione um plano para editar estes módulos",
+          },
         },
         companies: {
           title: "Empresas",
@@ -2553,6 +2598,8 @@ const messages = {
             modulesSectionTitle: "Módulos liberados (empresa)",
             modulesSectionHint:
               "Complementa o plano: desligar aqui oculta o módulo e bloqueia o uso, quando o plano permitir o recurso.",
+            modulesSectionHintV2:
+              "Ao escolher um plano, os módulos alinhados ao plano são carregados automaticamente. Pode depois ativar ou desativar por empresa; a etiqueta indica se coincide com o plano ou é um ajuste local.",
             modules: {
               useKanban: "Kanban",
               useKanbanHelp: "Quadro kanban no atendimento.",

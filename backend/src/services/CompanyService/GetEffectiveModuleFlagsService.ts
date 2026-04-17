@@ -12,6 +12,7 @@ export type EffectiveModuleFlags = {
   useExternalApi: boolean;
   useIntegrations: boolean;
   useGroups: boolean;
+  useInternalChat: boolean;
 };
 
 const asBool = (v: unknown): boolean => v === true || v === "true";
@@ -20,6 +21,7 @@ const asBool = (v: unknown): boolean => v === true || v === "true";
  * Regra: cada módulo do plano deve estar true; a empresa pode desativar com false explícito em modulePermissions.
  * useFlowbuilders exige plano com useCampaigns (fluxos fazem parte do ecossistema de campanhas).
  * useGroups não existe no plano: default liberado; false em modulePermissions bloqueia.
+ * useInternalChat: coluna no plano + override opcional em modulePermissions (mesmo padrão dos outros gated).
  */
 const GetEffectiveModuleFlags = (
   plan: Plan | null | undefined,
@@ -43,7 +45,8 @@ const GetEffectiveModuleFlags = (
     useSchedules: gated("useSchedules", "useSchedules"),
     useExternalApi: gated("useExternalApi", "useExternalApi"),
     useIntegrations: gated("useIntegrations", "useIntegrations"),
-    useGroups: m.useGroups !== false
+    useGroups: m.useGroups !== false,
+    useInternalChat: gated("useInternalChat", "useInternalChat")
   };
 };
 

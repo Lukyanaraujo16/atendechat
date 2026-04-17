@@ -167,6 +167,7 @@ const MainListItems = (props) => {
   const [showSchedules, setShowSchedules] = useState(false);
   const [showExternalApi, setShowExternalApi] = useState(false);
   const [showGroups, setShowGroups] = useState(true);
+  const [showInternalChat, setShowInternalChat] = useState(true);
 
   const [invisible, setInvisible] = useState(true);
   const [pageNumber, setPageNumber] = useState(1);
@@ -210,6 +211,11 @@ const MainListItems = (props) => {
           setShowSchedules(!!eff.useSchedules);
           setShowExternalApi(!!eff.useExternalApi);
           setShowGroups(eff.useGroups !== false);
+          setShowInternalChat(
+            eff.useInternalChat !== undefined
+              ? !!eff.useInternalChat
+              : plan?.useInternalChat !== false
+          );
         } else if (plan) {
           setShowCampaigns(!!plan.useCampaigns);
           setShowFlowbuilders(!!plan.useCampaigns);
@@ -219,6 +225,7 @@ const MainListItems = (props) => {
           setShowSchedules(!!plan.useSchedules);
           setShowExternalApi(!!plan.useExternalApi);
           setShowGroups(true);
+          setShowInternalChat(plan.useInternalChat !== false);
         }
       } catch (e) {
         toastError(e);
@@ -451,19 +458,21 @@ const MainListItems = (props) => {
         selected={selAtendimento}
       />
 
-      <ListItemLink
-        to="/chats"
-        primary={i18n.t("mainDrawer.sections.chatInterno")}
-        icon={
-          <Badge color="secondary" variant="dot" invisible={invisible}>
-            <ForumIcon />
-          </Badge>
-        }
-        listItemClassName={classes.listItem}
-        listItemIconClassName={classes.listItemIcon}
-        listItemTextClassName={classes.listItemText}
-        selected={selChatInterno}
-      />
+      {showInternalChat ? (
+        <ListItemLink
+          to="/chats"
+          primary={i18n.t("mainDrawer.sections.chatInterno")}
+          icon={
+            <Badge color="secondary" variant="dot" invisible={invisible}>
+              <ForumIcon />
+            </Badge>
+          }
+          listItemClassName={classes.listItem}
+          listItemIconClassName={classes.listItemIcon}
+          listItemTextClassName={classes.listItemText}
+          selected={selChatInterno}
+        />
+      ) : null}
 
       <ListItemLink
         to={toAutomacao}

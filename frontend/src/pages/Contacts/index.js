@@ -152,9 +152,61 @@ const useStyles = makeStyles((theme) => ({
 		flexDirection: "column",
 		gap: theme.spacing(2),
 	},
+	filtersSectionTitle: {
+		fontWeight: 600,
+		fontSize: "0.8125rem",
+		textTransform: "uppercase",
+		letterSpacing: "0.06em",
+		color: theme.palette.text.secondary,
+		marginBottom: theme.spacing(0.25),
+	},
 	tableCard: {
 		flex: 1,
 		minHeight: 0,
+	},
+	tableHeadCell: {
+		fontWeight: 600,
+		fontSize: "0.8125rem",
+		backgroundColor:
+			theme.palette.type === "light"
+				? "rgba(0,0,0,0.02)"
+				: "rgba(255,255,255,0.04)",
+		borderBottom: `1px solid ${theme.palette.divider}`,
+		paddingTop: theme.spacing(1.5),
+		paddingBottom: theme.spacing(1.5),
+	},
+	dataRow: {
+		"&:hover": {
+			backgroundColor: alpha(theme.palette.primary.main, 0.045),
+		},
+		cursor: "default",
+		"& td": {
+			paddingTop: theme.spacing(1.75),
+			paddingBottom: theme.spacing(1.75),
+		},
+	},
+	contactCell: {
+		cursor: "pointer",
+		minWidth: 0,
+		maxWidth: 320,
+		display: "flex",
+		flexDirection: "column",
+		alignItems: "flex-start",
+		gap: theme.spacing(0.25),
+	},
+	contactName: {
+		fontWeight: 600,
+		lineHeight: 1.3,
+		width: "100%",
+	},
+	contactLine2: {
+		fontSize: "0.8125rem",
+		lineHeight: 1.35,
+		width: "100%",
+	},
+	contactEmail: {
+		opacity: 0.9,
+		maxWidth: "100%",
 	},
 	chipWrap: {
 		display: "flex",
@@ -176,9 +228,7 @@ const useStyles = makeStyles((theme) => ({
 	avatarCell: {
 		paddingRight: theme.spacing(1),
 		width: 56,
-	},
-	nameCell: {
-		cursor: "pointer",
+		verticalAlign: "middle",
 	},
 	lastInteractionBox: {
 		display: "inline-flex",
@@ -232,11 +282,17 @@ const useStyles = makeStyles((theme) => ({
 	interactionPrimary: {},
 	actionButtons: {
 		display: "inline-flex",
-		flexWrap: "wrap",
+		flexWrap: "nowrap",
 		alignItems: "center",
 		justifyContent: "center",
-		gap: theme.spacing(0.5),
-		maxWidth: 280,
+		gap: theme.spacing(0.25),
+		maxWidth: 300,
+	},
+	actionIconBtn: {
+		padding: theme.spacing(0.75),
+		"&:hover": {
+			backgroundColor: alpha(theme.palette.primary.main, 0.1),
+		},
 	},
 	csvLink: {
 		textDecoration: "none",
@@ -356,7 +412,7 @@ const Contacts = () => {
 		}
 	};
 
-	const hadleEditContact = (contactId) => {
+	const handleEditContact = (contactId) => {
 		setSelectedContactId(contactId);
 		setContactModalOpen(true);
 	};
@@ -536,7 +592,7 @@ const Contacts = () => {
 						? `${i18n.t("contacts.confirmationModal.deleteTitle")} ${
 								deletingContact.name
 						  }?`
-						: `${i18n.t("contacts.confirmationModal.importTitlte")}`
+						: `${i18n.t("contacts.confirmationModal.importTitle")}`
 				}
 				open={confirmOpen}
 				onClose={setConfirmOpen}
@@ -608,6 +664,12 @@ const Contacts = () => {
 
 			<AppSectionCard dense variant="outlined">
 				<Box className={classes.filterStack}>
+					<Typography
+						component="h2"
+						className={classes.filtersSectionTitle}
+					>
+						{i18n.t("contacts.filters.sectionLabel")}
+					</Typography>
 					<AppActionBar className={classes.filtersBar}>
 						<TextField
 							className={classes.searchField}
@@ -696,24 +758,25 @@ const Contacts = () => {
 					</AppEmptyState>
 				) : (
 					<AppTableContainer nested>
-						<Table size="small">
+						<Table size="medium">
 							<TableHead>
 								<TableRow>
-									<TableCell padding="checkbox" />
-									<TableCell>{i18n.t("contacts.table.name")}</TableCell>
-									<TableCell>{i18n.t("contacts.table.number")}</TableCell>
-									<TableCell>
+									<TableCell padding="checkbox" className={classes.tableHeadCell} />
+									<TableCell className={classes.tableHeadCell}>
+										{i18n.t("contacts.table.contact")}
+									</TableCell>
+									<TableCell className={classes.tableHeadCell}>
 										<Tooltip title={i18n.t("contacts.tagsColumnHint")}>
 											<span>{i18n.t("contacts.table.tags")}</span>
 										</Tooltip>
 									</TableCell>
-									<TableCell align="center">
+									<TableCell align="center" className={classes.tableHeadCell}>
 										{i18n.t("contacts.table.lastInteraction")}
 									</TableCell>
-									<TableCell align="center">
+									<TableCell align="center" className={classes.tableHeadCell}>
 										{i18n.t("contacts.table.createdAt")}
 									</TableCell>
-									<TableCell align="center">
+									<TableCell align="center" className={classes.tableHeadCell}>
 										{i18n.t("contacts.table.actions")}
 									</TableCell>
 								</TableRow>
@@ -721,22 +784,53 @@ const Contacts = () => {
 							<TableBody>
 								<>
 									{contacts.map((contact) => (
-										<TableRow key={contact.id} hover>
+										<TableRow key={contact.id} hover className={classes.dataRow}>
 											<TableCell className={classes.avatarCell}>
 												<Avatar src={contact.profilePicUrl} />
 											</TableCell>
-											<TableCell
-												className={classes.nameCell}
-												onClick={() => hadleEditContact(contact.id)}
-											>
-												<Typography variant="subtitle1" component="span">
-													<strong>{contact.name}</strong>
-												</Typography>
-											</TableCell>
-											<TableCell>
-												<Typography variant="caption" color="textSecondary">
-													{contact.number}
-												</Typography>
+											<TableCell align="left">
+												<Box
+													className={classes.contactCell}
+													onClick={() => handleEditContact(contact.id)}
+												>
+													<Tooltip title={contact.name} placement="top-start">
+														<Typography
+															variant="subtitle1"
+															component="div"
+															className={classes.contactName}
+															noWrap
+														>
+															{contact.name}
+														</Typography>
+													</Tooltip>
+													<Tooltip
+														title={contact.number || ""}
+														placement="top-start"
+														disableHoverListener={!contact.number}
+													>
+														<Typography
+															variant="body2"
+															color="textSecondary"
+															className={classes.contactLine2}
+															noWrap
+														>
+															{contact.number || "—"}
+														</Typography>
+													</Tooltip>
+													{contact.email ? (
+														<Tooltip title={contact.email} placement="top-start">
+															<Typography
+																variant="caption"
+																color="textSecondary"
+																className={classes.contactEmail}
+																noWrap
+																display="block"
+															>
+																{contact.email}
+															</Typography>
+														</Tooltip>
+													) : null}
+												</Box>
 											</TableCell>
 											<TableCell>
 												<div className={classes.chipWrap}>
@@ -783,6 +877,7 @@ const Contacts = () => {
 														<IconButton
 															size="small"
 															color="primary"
+															className={classes.actionIconBtn}
 															aria-label={i18n.t("contacts.openAttendance")}
 															onClick={() => {
 																setContactTicket(contact);
@@ -796,6 +891,7 @@ const Contacts = () => {
 														<IconButton
 															size="small"
 															color="primary"
+															className={classes.actionIconBtn}
 															aria-label={i18n.t("contacts.scheduleMessage")}
 															onClick={() => handleOpenScheduleModal(contact.id)}
 														>
@@ -805,8 +901,9 @@ const Contacts = () => {
 													<Tooltip title={i18n.t("contacts.buttons.edit")}>
 														<IconButton
 															size="small"
+															className={classes.actionIconBtn}
 															aria-label={i18n.t("contacts.buttons.edit")}
-															onClick={() => hadleEditContact(contact.id)}
+															onClick={() => handleEditContact(contact.id)}
 														>
 															<EditIcon fontSize="small" />
 														</IconButton>

@@ -105,6 +105,27 @@ const UpdateWhatsAppService = async ({
 
   const whatsapp = await ShowWhatsAppService(whatsappId, companyId);
 
+  if (
+    name !== undefined &&
+    name !== whatsapp.name &&
+    typeof name === "string"
+  ) {
+    const duplicateName = await Whatsapp.findOne({
+      where: {
+        name,
+        companyId,
+        id: { [Op.not]: whatsappId }
+      }
+    });
+    if (duplicateName) {
+      throw new AppError(
+        "ERR_WAPP_NAME_ALREADY_EXISTS",
+        400,
+        "Já existe uma conexão com este nome nesta empresa."
+      );
+    }
+  }
+
   const updateData: any = {
     name,
     status,

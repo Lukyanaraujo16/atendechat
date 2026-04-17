@@ -10,11 +10,8 @@ import {
     TableCell,
     TableRow,
     IconButton,
-    FormControl,
-    InputLabel,
-    MenuItem,
-    Select,
     Typography,
+    Box,
 } from "@material-ui/core";
 import { Formik, Form, Field } from 'formik';
 import ButtonWithSpinner from "../ButtonWithSpinner";
@@ -26,6 +23,12 @@ import { toast } from "react-toastify";
 import usePlans from "../../hooks/usePlans";
 import { i18n } from "../../translate/i18n";
 import { AppSectionCard, AppTableContainer } from "../../ui";
+import ModuleToggleCard from "../ModuleSettings/ModuleToggleCard";
+import PlanModuleSaveDialog from "../ModuleSettings/PlanModuleSaveDialog";
+import {
+  PLAN_FORM_MODULE_KEYS,
+  diffPlanModuleFlags,
+} from "../ModuleSettings/moduleSync";
 
 
 const useStyles = makeStyles(theme => ({
@@ -62,7 +65,33 @@ const useStyles = makeStyles(theme => ({
     buttonContainer: {
         textAlign: 'right',
         padding: theme.spacing(1)
-    }
+    },
+    platformRoot: {
+        width: "100%",
+        padding: theme.spacing(0),
+        backgroundColor: "transparent",
+    },
+    platformSectionTitle: {
+        fontWeight: 600,
+        fontSize: "1.125rem",
+        marginBottom: theme.spacing(1),
+    },
+    modulesSectionTitle: {
+        fontWeight: 600,
+        fontSize: "1rem",
+        marginTop: theme.spacing(2),
+        marginBottom: theme.spacing(0.75),
+    },
+    modulesSectionHint: {
+        marginBottom: theme.spacing(2),
+        lineHeight: 1.55,
+        maxWidth: 720,
+    },
+    modulesWrap: {
+        marginTop: theme.spacing(2),
+        paddingTop: theme.spacing(2),
+        borderTop: `1px solid ${theme.palette.divider}`,
+    },
 }));
 
 export function PlanManagerForm(props) {
@@ -88,26 +117,32 @@ export function PlanManagerForm(props) {
         setRecord(initialValue)
     }, [initialValue])
 
-    const handleSubmit = async (data) => {
-        onSubmit(data)
-    }
+    const planModuleTitle = (key) =>
+        key === "useInternalChat"
+            ? i18n.t("plans.form.internalChat")
+            : i18n.t(`settings.company.form.modules.${key}`);
+
+    const planModuleDescription = (key) =>
+        key === "useInternalChat"
+            ? i18n.t("plans.form.internalChatHelp")
+            : i18n.t(`settings.company.form.modules.${key}Help`);
 
     return (
         <Formik
             enableReinitialize
             className={classes.fullWidth}
             initialValues={record}
-            onSubmit={(values, { resetForm }) =>
-                setTimeout(() => {
-                    handleSubmit(values)
-                    resetForm()
-                }, 500)
-            }
+            onSubmit={async (values, { setSubmitting }) => {
+                try {
+                    await onSubmit(values);
+                } finally {
+                    setSubmitting(false);
+                }
+            }}
         >
-            {(values) => (
+            {() => (
                 <Form className={classes.fullWidth}>
                     <Grid spacing={1} justifyContent="flex-start" container>
-                        {/* NOME */}
                         <Grid xs={12} sm={6} md={2} item>
                             <Field
                                 as={TextField}
@@ -118,8 +153,6 @@ export function PlanManagerForm(props) {
                                 margin="dense"
                             />
                         </Grid>
-
-                        {/* USUARIOS */}
                         <Grid xs={12} sm={6} md={1} item>
                             <Field
                                 as={TextField}
@@ -131,8 +164,6 @@ export function PlanManagerForm(props) {
                                 type="number"
                             />
                         </Grid>
-
-                        {/* CONEXOES */}
                         <Grid xs={12} sm={6} md={1} item>
                             <Field
                                 as={TextField}
@@ -144,8 +175,6 @@ export function PlanManagerForm(props) {
                                 type="number"
                             />
                         </Grid>
-
-                        {/* FILAS */}
                         <Grid xs={12} sm={6} md={1} item>
                             <Field
                                 as={TextField}
@@ -157,8 +186,6 @@ export function PlanManagerForm(props) {
                                 type="number"
                             />
                         </Grid>
-
-                        {/* VALOR */}
                         <Grid xs={12} sm={6} md={1} item>
                             <Field
                                 as={TextField}
@@ -170,135 +197,48 @@ export function PlanManagerForm(props) {
                                 type="text"
                             />
                         </Grid>
-
-                        {/* CAMPANHAS */}
-                        <Grid xs={12} sm={6} md={2} item>
-                            <FormControl margin="dense" variant="outlined" fullWidth>
-                                <InputLabel htmlFor="useCampaigns-selection">{i18n.t("plans.form.campaigns")}</InputLabel>
-                                <Field
-                                    as={Select}
-                                    id="useCampaigns-selection"
-                                    label={i18n.t("plans.form.campaigns")}
-                                    labelId="useCampaigns-selection-label"
-                                    name="useCampaigns"
-                                    margin="dense"
-                                >
-                                    <MenuItem value={true}>{i18n.t("plans.form.enabled")}</MenuItem>
-                                    <MenuItem value={false}>{i18n.t("plans.form.disabled")}</MenuItem>
-                                </Field>
-                            </FormControl>
-                        </Grid>
-
-                        {/* AGENDAMENTOS */}
-                        <Grid xs={12} sm={8} md={2} item>
-                            <FormControl margin="dense" variant="outlined" fullWidth>
-                                <InputLabel htmlFor="useSchedules-selection">{i18n.t("plans.form.schedules")}</InputLabel>
-                                <Field
-                                    as={Select}
-                                    id="useSchedules-selection"
-                                    label={i18n.t("plans.form.schedules")}
-                                    labelId="useSchedules-selection-label"
-                                    name="useSchedules"
-                                    margin="dense"
-                                >
-                                    <MenuItem value={true}>{i18n.t("plans.form.enabled")}</MenuItem>
-                                    <MenuItem value={false}>{i18n.t("plans.form.disabled")}</MenuItem>
-                                </Field>
-                            </FormControl>
-                        </Grid>
-
-                        {/* CHAT INTERNO */}
-                        <Grid xs={12} sm={8} md={2} item>
-                            <FormControl margin="dense" variant="outlined" fullWidth>
-                                <InputLabel htmlFor="useInternalChat-selection">{i18n.t("plans.form.internalChat")}</InputLabel>
-                                <Field
-                                    as={Select}
-                                    id="useInternalChat-selection"
-                                    label={i18n.t("plans.form.internalChat")}
-                                    labelId="useInternalChat-selection-label"
-                                    name="useInternalChat"
-                                    margin="dense"
-                                >
-                                    <MenuItem value={true}>{i18n.t("plans.form.enabled")}</MenuItem>
-                                    <MenuItem value={false}>{i18n.t("plans.form.disabled")}</MenuItem>
-                                </Field>
-                            </FormControl>
-                        </Grid>
-
-                        {/* API Externa */}
-                        <Grid xs={12} sm={8} md={4} item>
-                            <FormControl margin="dense" variant="outlined" fullWidth>
-                                <InputLabel htmlFor="useExternalApi-selection">{i18n.t("plans.form.externalApi")}</InputLabel>
-                                <Field
-                                    as={Select}
-                                    id="useExternalApi-selection"
-                                    label={i18n.t("plans.form.externalApi")}
-                                    labelId="useExternalApi-selection-label"
-                                    name="useExternalApi"
-                                    margin="dense"
-                                >
-                                    <MenuItem value={true}>{i18n.t("plans.form.enabled")}</MenuItem>
-                                    <MenuItem value={false}>{i18n.t("plans.form.disabled")}</MenuItem>
-                                </Field>
-                            </FormControl>
-                        </Grid>
-
-                        {/* KANBAN */}
-                        <Grid xs={12} sm={8} md={2} item>
-                            <FormControl margin="dense" variant="outlined" fullWidth>
-                                <InputLabel htmlFor="useKanban-selection">{i18n.t("plans.form.kanban")}</InputLabel>
-                                <Field
-                                    as={Select}
-                                    id="useKanban-selection"
-                                    label={i18n.t("plans.form.kanban")}
-                                    labelId="useKanban-selection-label"
-                                    name="useKanban"
-                                    margin="dense"
-                                >
-                                    <MenuItem value={true}>{i18n.t("plans.form.enabled")}</MenuItem>
-                                    <MenuItem value={false}>{i18n.t("plans.form.disabled")}</MenuItem>
-                                </Field>
-                            </FormControl>
-                        </Grid>
-
-                        {/* OPENAI */}
-                        <Grid xs={12} sm={8} md={2} item>
-                            <FormControl margin="dense" variant="outlined" fullWidth>
-                                <InputLabel htmlFor="useOpenAi-selection">Open.Ai</InputLabel>
-                                <Field
-                                    as={Select}
-                                    id="useOpenAi-selection"
-                                    label="Talk.Ai"
-                                    labelId="useOpenAi-selection-label"
-                                    name="useOpenAi"
-                                    margin="dense"
-                                >
-                                    <MenuItem value={true}>{i18n.t("plans.form.enabled")}</MenuItem>
-                                    <MenuItem value={false}>{i18n.t("plans.form.disabled")}</MenuItem>
-                                </Field>
-                            </FormControl>
-                        </Grid>
-
-                        {/* INTEGRACOES */}
-                        <Grid xs={12} sm={8} md={2} item>
-                            <FormControl margin="dense" variant="outlined" fullWidth>
-                                <InputLabel htmlFor="useIntegrations-selection">
-                                    {i18n.t("plans.form.integrations")}
-                                </InputLabel>
-                                <Field
-                                    as={Select}
-                                    id="useIntegrations-selection"
-                                    label={i18n.t("plans.form.integrations")}
-                                    labelId="useIntegrations-selection-label"
-                                    name="useIntegrations"
-                                    margin="dense"
-                                >
-                                    <MenuItem value={true}>{i18n.t("plans.form.enabled")}</MenuItem>
-                                    <MenuItem value={false}>{i18n.t("plans.form.disabled")}</MenuItem>
-                                </Field>
-                            </FormControl>
-                        </Grid>
                     </Grid>
+
+                    <Box className={classes.modulesWrap}>
+                        <Typography
+                            component="h3"
+                            className={classes.modulesSectionTitle}
+                        >
+                            {i18n.t("plans.form.modulesSectionTitle")}
+                        </Typography>
+                        <Typography
+                            variant="body2"
+                            color="textSecondary"
+                            className={classes.modulesSectionHint}
+                        >
+                            {i18n.t("plans.form.modulesSectionHint")}
+                        </Typography>
+                        <Grid container spacing={2}>
+                            {PLAN_FORM_MODULE_KEYS.map((key) => (
+                                <Grid item xs={12} md={6} key={key}>
+                                    <Field name={key}>
+                                        {({ field, form }) => (
+                                            <ModuleToggleCard
+                                                title={planModuleTitle(key)}
+                                                description={planModuleDescription(key)}
+                                                checked={field.value !== false}
+                                                onChange={(e) =>
+                                                    form.setFieldValue(
+                                                        field.name,
+                                                        e.target.checked
+                                                    )
+                                                }
+                                                inputProps={{
+                                                    "aria-label": planModuleTitle(key),
+                                                }}
+                                            />
+                                        )}
+                                    </Field>
+                                </Grid>
+                            ))}
+                        </Grid>
+                    </Box>
+
                     <Grid spacing={2} justifyContent="flex-end" container>
 
                         <Grid sm={3} md={2} item>
@@ -422,6 +362,11 @@ export default function PlansManager({ variant = "settings" }) {
     const classes = useStyles();
     const { list, save, update, remove } = usePlans();
 
+    const [planSaveDialog, setPlanSaveDialog] = useState({
+        open: false,
+        data: null,
+        diff: [],
+    });
     const [showConfirmDialog, setShowConfirmDialog] = useState(false)
     const [loading, setLoading] = useState(false)
     const [records, setRecords] = useState([])
@@ -456,21 +401,86 @@ export default function PlansManager({ variant = "settings" }) {
         setLoading(false)
     }
 
-    const handleSubmit = async (data) => {
+    const PROP_MODE_API = {
+        none: "none",
+        respectOverride: "respect_overrides",
+        forceAll: "force_all",
+    };
+
+    const toApiPropagationMode = (pmUi) => {
+        if (pmUi === undefined || pmUi === null) return "none";
+        if (Object.prototype.hasOwnProperty.call(PROP_MODE_API, pmUi)) {
+            return PROP_MODE_API[pmUi];
+        }
+        if (
+            pmUi === "none" ||
+            pmUi === "respect_overrides" ||
+            pmUi === "force_all"
+        ) {
+            return pmUi;
+        }
+        return "none";
+    };
+
+    const executePlanSave = async (data) => {
         setLoading(true)
         try {
+            let response;
             if (data.id !== undefined) {
-                await update(data)
+                const { propagationMode: pmUi, ...planFields } = data;
+                response = await update({
+                    ...planFields,
+                    propagationMode: toApiPropagationMode(pmUi),
+                });
             } else {
-                await save(data)
+                const { propagationMode: _ignored, ...createData } = data;
+                response = await save(createData);
             }
             await loadPlans()
             handleCancel()
-            toast.success(i18n.t("plans.toasts.success"))
+            const prop = response?.propagation;
+            if (prop?.applied) {
+                if (prop.companiesUpdated > 0) {
+                    toast.success(
+                        i18n.t("platform.plans.moduleSave.propagationSuccess", {
+                            count: prop.companiesUpdated,
+                        })
+                    );
+                } else {
+                    toast.success(
+                        i18n.t("platform.plans.moduleSave.propagationNoCompaniesUpdated")
+                    );
+                }
+            } else {
+                toast.success(i18n.t("plans.toasts.success"));
+            }
         } catch (e) {
             toast.error(i18n.t("plans.toasts.error"))
         }
         setLoading(false)
+    }
+
+    const handleSubmitRequest = async (data) => {
+        const diff = diffPlanModuleFlags(record, data, PLAN_FORM_MODULE_KEYS)
+        if (data.id !== undefined && diff.length > 0) {
+            setPlanSaveDialog({ open: true, data, diff })
+            return
+        }
+        await executePlanSave(data)
+    }
+
+    const handlePlanSavePropagation = async (mode) => {
+        const payload = planSaveDialog.data
+        if (!payload) {
+            setPlanSaveDialog({ open: false, data: null, diff: [] })
+            return
+        }
+        setPlanSaveDialog({ open: false, data: null, diff: [] })
+        const propagationMode =
+            mode === "respectOverride" || mode === "forceAll" || mode === "none"
+                ? mode
+                : "none";
+        await executePlanSave({ ...payload, propagationMode })
     }
 
     const handleDelete = async () => {
@@ -539,7 +549,7 @@ export default function PlansManager({ variant = "settings" }) {
                     <PlanManagerForm
                         initialValue={record}
                         onDelete={handleOpenDeleteDialog}
-                        onSubmit={handleSubmit}
+                        onSubmit={handleSubmitRequest}
                         onCancel={handleCancel}
                         loading={loading}
                     />
@@ -592,6 +602,15 @@ export default function PlansManager({ variant = "settings" }) {
             >
                 {i18n.t("plans.confirm.message")}
             </ConfirmationModal>
+            <PlanModuleSaveDialog
+                open={planSaveDialog.open}
+                onClose={() =>
+                    setPlanSaveDialog({ open: false, data: null, diff: [] })
+                }
+                diff={planSaveDialog.diff || []}
+                loading={loading}
+                onChoose={handlePlanSavePropagation}
+            />
         </Paper>
     )
 }

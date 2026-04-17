@@ -69,7 +69,7 @@ export const initWASocket = async (whatsapp: Whatsapp): Promise<Session> => {
         const io = getIO();
 
         const whatsappUpdate = await Whatsapp.findOne({
-          where: { id: whatsapp.id }
+          where: { id: whatsapp.id, companyId: whatsapp.companyId }
         });
 
         if (!whatsappUpdate) return;
@@ -81,7 +81,9 @@ export const initWASocket = async (whatsapp: Whatsapp): Promise<Session> => {
 
         logger.info(`using WA v${version.join(".")}, isLatest: ${isLatest}`);
         logger.info(`isLegacy: ${isLegacy}`);
-        logger.info(`Starting session ${name}`);
+        logger.info(
+          `[Connection] event=init_socket name=${name} whatsappId=${id} companyId=${whatsapp.companyId}`
+        );
         let retriesQrCode = 0;
 
         let wsocket: Session = null;
@@ -176,6 +178,9 @@ export const initWASocket = async (whatsapp: Whatsapp): Promise<Session> => {
             }
 
             if (connection === "open") {
+              logger.info(
+                `[Connection] event=connected whatsappId=${id} companyId=${whatsapp.companyId} name=${name}`
+              );
               await whatsapp.update({
                 status: "CONNECTED",
                 qrcode: "",
@@ -214,7 +219,9 @@ export const initWASocket = async (whatsapp: Whatsapp): Promise<Session> => {
                 wsocket = null;
                 retriesQrCodeMap.delete(id);
               } else {
-                logger.info(`Session QRCode Generate ${name}`);
+                logger.info(
+                  `[Connection] event=qr_generated whatsappId=${id} companyId=${whatsapp.companyId} name=${name}`
+                );
                 retriesQrCodeMap.set(id, (retriesQrCode += 1));
 
                 await whatsapp.update({

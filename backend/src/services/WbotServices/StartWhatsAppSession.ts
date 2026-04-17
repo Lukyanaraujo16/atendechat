@@ -5,11 +5,29 @@ import { getIO } from "../../libs/socket";
 import wbotMonitor from "./wbotMonitor";
 import { logger } from "../../utils/logger";
 import * as Sentry from "@sentry/node";
+import AppError from "../../errors/AppError";
 
 export const StartWhatsAppSession = async (
   whatsapp: Whatsapp,
   companyId: number
 ): Promise<void> => {
+  if (Number(whatsapp.companyId) !== Number(companyId)) {
+    logger.warn(
+      `[Connection] event=company_mismatch whatsappId=${whatsapp.id} wCompany=${whatsapp.companyId} reqCompany=${companyId}`
+    );
+    throw new AppError("ERR_FORBIDDEN", 403);
+  }
+
+  console.info(
+    "[Connection]",
+    JSON.stringify({
+      event: "session_start",
+      companyId,
+      whatsappId: whatsapp.id,
+      name: whatsapp.name
+    })
+  );
+
   await whatsapp.update({ status: "OPENING" });
 
   const io = getIO();

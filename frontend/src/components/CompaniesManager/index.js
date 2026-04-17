@@ -14,7 +14,6 @@ import {
   TableCell,
   TableRow,
   Select,
-  Switch,
   Typography,
   CircularProgress,
   Chip,
@@ -52,33 +51,17 @@ import {
   AppNeutralButton,
 } from "../../ui";
 import AppTableContainer from "../../ui/components/AppTableContainer";
-
-const defaultModulePermissions = () => ({
-  useKanban: true,
-  useCampaigns: true,
-  useFlowbuilders: true,
-  useOpenAi: true,
-  useSchedules: true,
-  useExternalApi: true,
-  useIntegrations: true,
-  useGroups: true,
-});
-
-const mergeModulePermissions = (raw) => ({
-  ...defaultModulePermissions(),
-  ...(raw && typeof raw === "object" ? raw : {}),
-});
-
-const MODULE_TOGGLE_KEYS = [
-  "useKanban",
-  "useCampaigns",
-  "useFlowbuilders",
-  "useOpenAi",
-  "useSchedules",
-  "useExternalApi",
-  "useIntegrations",
-  "useGroups",
-];
+import ModuleToggleCard from "../ModuleSettings/ModuleToggleCard";
+import CompanyPlanChangeDialog from "../ModuleSettings/CompanyPlanChangeDialog";
+import {
+  MODULE_TOGGLE_KEYS,
+  defaultModulePermissions,
+  mergeModulePermissions,
+  mergeModulePermissionsFromPlan,
+  getCompanyModuleEffectiveEnabled,
+  getCompanyModuleOriginKey,
+  planBlocksCompanyModule,
+} from "../ModuleSettings/moduleSync";
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -115,50 +98,6 @@ const useStyles = makeStyles((theme) => ({
     marginBottom: theme.spacing(2.5),
     lineHeight: 1.6,
     maxWidth: 720,
-  },
-  moduleCard: {
-    height: "100%",
-    padding: theme.spacing(2, 2, 2, 2),
-    borderRadius: theme.shape.borderRadius,
-    border: `1px solid ${theme.palette.divider}`,
-    backgroundColor:
-      theme.palette.type === "dark"
-        ? "rgba(255,255,255,0.04)"
-        : theme.palette.grey[50],
-    transition: theme.transitions.create(["box-shadow", "border-color"], {
-      duration: 200,
-    }),
-    "&:hover": {
-      borderColor: alpha(theme.palette.primary.main, 0.35),
-      boxShadow:
-        theme.palette.type === "light"
-          ? "0 1px 8px rgba(15, 23, 42, 0.06)"
-          : "none",
-    },
-  },
-  moduleRowInner: {
-    display: "flex",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: theme.spacing(2),
-    width: "100%",
-  },
-  moduleRowText: {
-    flex: 1,
-    minWidth: 0,
-    paddingRight: theme.spacing(0.5),
-  },
-  moduleTitle: {
-    fontWeight: 600,
-    fontSize: "0.9375rem",
-    lineHeight: 1.4,
-    marginBottom: theme.spacing(0.5),
-  },
-  moduleDescription: {
-    fontSize: "0.75rem",
-    lineHeight: 1.5,
-    color: theme.palette.text.secondary,
-    opacity: 0.92,
   },
   usersScroll: {
     maxHeight: 280,
@@ -314,6 +253,7 @@ export function CompanyForm(props) {
   const [firstUser, setFirstUser] = useState({});
   const [companyUsers, setCompanyUsers] = useState([]);
   const [usersLoading, setUsersLoading] = useState(false);
+  const [planChangeCtx, setPlanChangeCtx] = useState(null);
 
   const [record, setRecord] = useState(() => ({
     name: "",
@@ -482,7 +422,8 @@ export function CompanyForm(props) {
           }, 500)
         }
       >
-        {() => (
+        {(formik) => (
+          <>
           <Form className={classes.fullWidth}>
             <Box className={classes.formStack}>
               {/* Bloco 1 — Dados da empresa */}
@@ -566,20 +507,41 @@ export function CompanyForm(props) {
                       <InputLabel htmlFor="plan-selection">
                         {i18n.t("settings.company.form.plan")}
                       </InputLabel>
-                      <Field
-                        as={Select}
-                        id="plan-selection"
-                        label={i18n.t("settings.company.form.plan")}
-                        labelId="plan-selection-label"
-                        name="planId"
-                        margin="dense"
-                        required
-                      >
-                        {plans.map((plan, key) => (
-                          <MenuItem key={key} value={plan.id}>
-                            {plan.name}
-                          </MenuItem>
-                        ))}
+                      <Field name="planId">
+                        {({ field, form }) => (
+                          <Select
+                            id="plan-selection"
+                            label={i18n.t("settings.company.form.plan")}
+                            labelId="plan-selection-label"
+                            margin="dense"
+                            required
+                            value={field.value === "" ? "" : field.value}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              const prevId = field.value;
+                              const modulesBefore = mergeModulePermissions(
+                                form.values.modulePermissions
+                              );
+                              field.onChange(e);
+                              if (String(prevId) === String(v)) return;
+                              const newPlan = plans.find(
+                                (pl) => String(pl.id) === String(v)
+                              );
+                              if (!newPlan) return;
+                              setPlanChangeCtx({
+                                prevPlanId: prevId,
+                                modulesBefore,
+                                newPlan,
+                              });
+                            }}
+                          >
+                            {plans.map((plan) => (
+                              <MenuItem key={plan.id} value={plan.id}>
+                                {plan.name}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        )}
                       </Field>
                     </FormControl>
                   </Grid>
@@ -664,45 +626,68 @@ export function CompanyForm(props) {
                   color="textSecondary"
                   className={classes.sectionSubtitle}
                 >
-                  {i18n.t("settings.company.form.modulesSectionHint")}
+                  {i18n.t("settings.company.form.modulesSectionHintV2")}
                 </Typography>
                 <Grid container spacing={2}>
                   {MODULE_TOGGLE_KEYS.map((key) => (
                     <Grid item xs={12} md={6} key={key}>
-                      <Box className={classes.moduleCard}>
-                        <Field name={`modulePermissions.${key}`}>
-                          {({ field, form }) => (
-                            <Box className={classes.moduleRowInner}>
-                              <Box className={classes.moduleRowText}>
-                                <Typography
-                                  component="div"
-                                  className={classes.moduleTitle}
-                                >
-                                  {i18n.t(`settings.company.form.modules.${key}`)}
-                                </Typography>
-                                <Typography
-                                  component="div"
-                                  className={classes.moduleDescription}
-                                >
-                                  {i18n.t(`settings.company.form.modules.${key}Help`)}
-                                </Typography>
-                              </Box>
-                              <Box pt={0.25} flexShrink={0}>
-                                <Switch
-                                  color="primary"
-                                  checked={field.value !== false}
-                                  onChange={(e) =>
-                                    form.setFieldValue(field.name, e.target.checked)
-                                  }
-                                  inputProps={{
-                                    "aria-label": i18n.t(`settings.company.form.modules.${key}`),
-                                  }}
-                                />
-                              </Box>
-                            </Box>
-                          )}
-                        </Field>
-                      </Box>
+                      <Field name={`modulePermissions.${key}`}>
+                        {({ field, form }) => {
+                          const selectedPlan = plans.find(
+                            (p) =>
+                              String(p.id) === String(form.values.planId)
+                          );
+                          const noPlan =
+                            !form.values.planId ||
+                            form.values.planId === "" ||
+                            !selectedPlan;
+                          const isGroups = key === "useGroups";
+                          const blocked = planBlocksCompanyModule(
+                            key,
+                            selectedPlan
+                          );
+                          const toggleDisabled =
+                            blocked || (!isGroups && noPlan);
+                          const originKey = getCompanyModuleOriginKey(
+                            key,
+                            form.values.modulePermissions,
+                            selectedPlan
+                          );
+                          const originLabel = i18n.t(
+                            `platform.moduleSettings.origin.${originKey}`
+                          );
+                          const effectiveOn = getCompanyModuleEffectiveEnabled(
+                            key,
+                            form.values.modulePermissions,
+                            selectedPlan
+                          );
+                          return (
+                            <ModuleToggleCard
+                              title={i18n.t(
+                                `settings.company.form.modules.${key}`
+                              )}
+                              description={i18n.t(
+                                `settings.company.form.modules.${key}Help`
+                              )}
+                              originLabel={originLabel}
+                              checked={effectiveOn}
+                              disabled={toggleDisabled}
+                              onChange={(e) => {
+                                if (toggleDisabled) return;
+                                form.setFieldValue(
+                                  field.name,
+                                  e.target.checked
+                                );
+                              }}
+                              inputProps={{
+                                "aria-label": i18n.t(
+                                  `settings.company.form.modules.${key}`
+                                ),
+                              }}
+                            />
+                          );
+                        }}
+                      </Field>
                     </Grid>
                   ))}
                 </Grid>
@@ -822,6 +807,34 @@ export function CompanyForm(props) {
               </Box>
             </Box>
           </Form>
+          <CompanyPlanChangeDialog
+            open={Boolean(planChangeCtx)}
+            onClose={() => {
+              if (!planChangeCtx) return;
+              formik.setFieldValue("planId", planChangeCtx.prevPlanId);
+              setPlanChangeCtx(null);
+            }}
+            onKeepModules={() => {
+              if (!planChangeCtx) return;
+              formik.setFieldValue(
+                "modulePermissions",
+                planChangeCtx.modulesBefore
+              );
+              setPlanChangeCtx(null);
+            }}
+            onApplyPlanModules={() => {
+              if (!planChangeCtx) return;
+              formik.setFieldValue(
+                "modulePermissions",
+                mergeModulePermissionsFromPlan(
+                  planChangeCtx.newPlan,
+                  planChangeCtx.modulesBefore
+                )
+              );
+              setPlanChangeCtx(null);
+            }}
+          />
+        </>
         )}
       </Formik>
     </>

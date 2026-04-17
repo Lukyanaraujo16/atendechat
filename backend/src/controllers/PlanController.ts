@@ -2,7 +2,6 @@ import * as Yup from "yup";
 import { Request, Response } from "express";
 // import { getIO } from "../libs/socket";
 import AppError from "../errors/AppError";
-import Plan from "../models/Plan";
 
 import ListPlansService from "../services/PlanService/ListPlansService";
 import CreatePlanService from "../services/PlanService/CreatePlanService";
@@ -46,6 +45,8 @@ type UpdatePlanData = {
   useKanban?: boolean;
   useOpenAi?: boolean;
   useIntegrations?: boolean;
+  /** none | respect_overrides | force_all — propagação de módulos às empresas do plano */
+  propagationMode?: string;
 };
 
 export const index = async (req: Request, res: Response): Promise<Response> => {
@@ -101,7 +102,10 @@ export const update = async (
   req: Request,
   res: Response
 ): Promise<Response> => {
-  const planData: UpdatePlanData = req.body;
+  const planData: UpdatePlanData = {
+    ...req.body,
+    id: req.body?.id ?? req.params?.id
+  };
 
   const schema = Yup.object().shape({
     name: Yup.string()

@@ -449,7 +449,9 @@ const ContactModal = ({
 											name="email"
 											error={touched.email && Boolean(errors.email)}
 											helperText={touched.email && errors.email}
-											placeholder="Email address"
+											placeholder={i18n.t(
+												"contactModal.form.emailPlaceholder"
+											)}
 											fullWidth
 											margin="dense"
 											variant="outlined"

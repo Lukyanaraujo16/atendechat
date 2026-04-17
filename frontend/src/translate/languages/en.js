@@ -194,6 +194,11 @@ const messages = {
 					queues: "Queues",
 					value: "Value",
 					internalChat: "Internal Chat",
+					internalChatHelp:
+						"Internal messaging between users of the same company (outside WhatsApp).",
+					modulesSectionTitle: "Plan modules",
+					modulesSectionHint:
+						"These switches define what the plan allows by default. Companies inherit these values and can override them under Platform → Companies.",
 					externalApi: "External API",
 					kanban: "Kanban",
 					integrations: "Integrations",
@@ -391,6 +396,7 @@ const messages = {
 					DISCONNECTED: "Disconnected",
 					TIMEOUT: "No connection",
 					PAIRING: "Pairing",
+					PENDING: "Pending",
 				},
 				toasts: {
 					deleted: "WhatsApp connection deleted successfully!",
@@ -434,6 +440,8 @@ const messages = {
 					default: "Default",
 					actions: "Actions",
 					session: "Session",
+					emptyTitle: "No connections yet",
+					emptyHint: "Add a WhatsApp to generate a QR code and start service.",
 				},
 			},
 			whatsappModal: {
@@ -544,6 +552,7 @@ const messages = {
 					deleteRow: "Delete contact",
 				},
 				table: {
+					contact: "Contact",
 					name: "Name",
 					number: "Number",
 					whatsapp: "WhatsApp",
@@ -554,6 +563,7 @@ const messages = {
 					actions: "Actions",
 				},
 				filters: {
+					sectionLabel: "Filters",
 					tag: "Tag",
 					allTags: "All",
 					dateFrom: "Updated from",
@@ -754,6 +764,7 @@ const messages = {
 					name: "Name",
 					number: "WhatsApp Number",
 					email: "Email",
+					emailPlaceholder: "name@company.com",
 					notes: "Notes",
 					tags: "Tags",
 					addTag: "Add tag",
@@ -1197,6 +1208,24 @@ const messages = {
 						"These plans are the platform defaults. Companies can still have module overrides individually (Super Admin → Companies).",
 					formSectionTitle: "Create or edit plan",
 					listSectionTitle: "Plan catalog",
+					moduleSave: {
+						title: "Plan module changes",
+						summaryIntro:
+							"Summary of module changes compared to the previous state of this plan:",
+						lineOn: "{{module}} — enabled",
+						lineOff: "{{module}} — disabled",
+						choosePropagation:
+							"How should this apply to companies on this plan?",
+						applyNone: "Save plan only",
+						applyNoOverride: "Save and queue: apply only where there is no override",
+						applyAll: "Save and queue: apply to all companies",
+						propagationPending:
+							"Plan saved. Automatic propagation to companies will be wired in the backend next.",
+						propagationSuccess:
+							"Plan saved. {{count}} company/companies had module permissions updated as requested.",
+						propagationNoCompaniesUpdated:
+							"Plan saved. No company JSON changes were needed (or all overrides were preserved).",
+					},
 				},
 				dashboard: {
 					title: "Platform dashboard",
@@ -1230,6 +1259,22 @@ const messages = {
 					actionBranding: "Branding",
 					footerHint: "Need more detail or edits?",
 					openCompanies: "Open companies",
+				},
+				moduleSettings: {
+					planChange: {
+						title: "Change company plan",
+						message:
+							"Changing the plan may change this company’s modules. Keep current permissions or align to the new plan’s defaults.",
+						keepModules: "Keep current settings",
+						applyPlanModules: "Apply plan modules",
+					},
+					origin: {
+						inherited: "Allowed by plan (no company block)",
+						disabledOverride: "Turned off for this company",
+						blockedByPlan: "Not available on this plan",
+						companyOnly: "Company-only (no column on plan)",
+						noPlan: "Select a plan to edit these modules",
+					},
 				},
 				companies: {
 					title: "Companies",
@@ -2446,6 +2491,8 @@ const messages = {
 						modulesSectionTitle: "Enabled modules (company)",
 						modulesSectionHint:
 							"Complements the plan: turning off hides the module and blocks use when the plan allows the feature.",
+						modulesSectionHintV2:
+							"When you pick a plan, modules that mirror the plan are loaded automatically. You can then enable or disable per company; the label shows whether it matches the plan or is a local override.",
 						modules: {
 							useKanban: "Kanban",
 							useKanbanHelp: "Kanban board in customer service.",

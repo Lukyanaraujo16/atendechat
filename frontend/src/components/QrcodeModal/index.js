@@ -15,6 +15,7 @@ import {
 import { i18n } from "../../translate/i18n";
 import api from "../../services/api";
 import { SocketContext } from "../../context/Socket/SocketContext";
+import { AuthContext } from "../../context/Auth/AuthContext";
 
 const QrcodeModal = ({ open, onClose, whatsAppId }) => {
   const [qrCode, setQrCode] = useState("");
@@ -22,6 +23,8 @@ const QrcodeModal = ({ open, onClose, whatsAppId }) => {
   const [loadingNewQr, setLoadingNewQr] = useState(false);
 
   const socketManager = useContext(SocketContext);
+  const { user } = useContext(AuthContext);
+  const authCompanyId = user?.companyId;
 
   useEffect(() => {
     if (!open) {
@@ -46,12 +49,24 @@ const QrcodeModal = ({ open, onClose, whatsAppId }) => {
 
   useEffect(() => {
     if (!whatsAppId) return;
-    const companyId = localStorage.getItem("companyId");
+    const companyId =
+      authCompanyId != null
+        ? String(authCompanyId)
+        : localStorage.getItem("companyId");
+    if (!companyId) return;
     const socket = socketManager.getSocket(companyId);
     const event = `company-${companyId}-whatsappSession`;
 
     const handler = (data) => {
       if (data.action !== "update" || data.session?.id !== whatsAppId) return;
+      const sid = data.session?.companyId;
+      if (
+        sid != null &&
+        authCompanyId != null &&
+        Number(sid) !== Number(authCompanyId)
+      ) {
+        return;
+      }
       const newQr = data.session?.qrcode ?? "";
       setQrCode(newQr);
       if (newQr === "") {
@@ -65,7 +80,7 @@ const QrcodeModal = ({ open, onClose, whatsAppId }) => {
     return () => {
       socket.off(event, handler);
     };
-  }, [whatsAppId, onClose, socketManager]);
+  }, [whatsAppId, onClose, socketManager, authCompanyId]);
 
   const handleRequestNewQr = async () => {
     if (!whatsAppId) return;

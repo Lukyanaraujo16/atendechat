@@ -17,6 +17,7 @@ import {
 	Typography,
 	CircularProgress,
 	Box,
+	Chip,
 } from "@material-ui/core";
 import {
 	Edit,
@@ -44,6 +45,7 @@ import toastError from "../../errors/toastError";
 
 import { AuthContext } from "../../context/Auth/AuthContext";
 import { Can } from "../../components/Can";
+import { AppTableContainer, AppEmptyState } from "../../ui";
 
 const useStyles = makeStyles(theme => ({
 	mainPaper: {
@@ -90,6 +92,14 @@ const useStyles = makeStyles(theme => ({
 	},
 	buttonProgress: {
 		color: green[500],
+	},
+	connectionName: {
+		fontWeight: 600,
+		textAlign: "left",
+	},
+	tableHeadCell: {
+		fontWeight: 600,
+		backgroundColor: "rgba(0,0,0,0.02)",
 	},
 }));
 
@@ -233,7 +243,8 @@ const Connections = () => {
 						{i18n.t("connections.buttons.qrcode")}
 					</Button>
 				)}
-				{whatsApp.status === "DISCONNECTED" && (
+				{(whatsApp.status === "DISCONNECTED" ||
+					whatsApp.status === "PENDING") && (
 					<>
 						<Button
 							size="small"
@@ -282,46 +293,91 @@ const Connections = () => {
 		return typeof label === "string" && !label.startsWith("connections.") ? label : status;
 	};
 
+	const statusChipProps = status => {
+		switch (status) {
+			case "CONNECTED":
+				return {
+					variant: "default",
+					style: { backgroundColor: green[100], color: green[900], fontWeight: 600 },
+				};
+			case "qrcode":
+				return { color: "primary", variant: "outlined" };
+			case "OPENING":
+				return { color: "default", variant: "outlined" };
+			case "DISCONNECTED":
+			case "PENDING":
+				return { color: "default", variant: "outlined" };
+			case "TIMEOUT":
+			case "PAIRING":
+				return { color: "secondary", variant: "outlined" };
+			default:
+				return { color: "default", variant: "outlined" };
+		}
+	};
+
+	const statusTooltip = status => {
+		switch (status) {
+			case "DISCONNECTED":
+			case "PENDING":
+				return {
+					title: i18n.t("connections.toolTips.disconnected.title"),
+					content: i18n.t("connections.toolTips.disconnected.content"),
+				};
+			case "qrcode":
+				return {
+					title: i18n.t("connections.toolTips.qrcode.title"),
+					content: i18n.t("connections.toolTips.qrcode.content"),
+				};
+			case "CONNECTED":
+				return {
+					title: i18n.t("connections.toolTips.connected.title"),
+					content: null,
+				};
+			case "TIMEOUT":
+			case "PAIRING":
+				return {
+					title: i18n.t("connections.toolTips.timeout.title"),
+					content: i18n.t("connections.toolTips.timeout.content"),
+				};
+			default:
+				return { title: getStatusLabel(status), content: null };
+		}
+	};
+
 	const renderStatusToolTips = whatsApp => {
 		const statusLabel = getStatusLabel(whatsApp.status);
-		const isConnected = whatsApp.status === "CONNECTED";
+		const chip = statusChipProps(whatsApp.status);
+		const tip = statusTooltip(whatsApp.status);
+		const iconBefore =
+			whatsApp.status === "OPENING" ? (
+				<CircularProgress size={20} className={classes.buttonProgress} />
+			) : whatsApp.status === "qrcode" ? (
+				<CropFree fontSize="small" color="primary" />
+			) : whatsApp.status === "CONNECTED" ? (
+				<SignalCellular4Bar style={{ color: green[600] }} fontSize="small" />
+			) : whatsApp.status === "DISCONNECTED" ||
+			  whatsApp.status === "PENDING" ? (
+				<SignalCellularConnectedNoInternet0Bar color="secondary" fontSize="small" />
+			) : whatsApp.status === "TIMEOUT" || whatsApp.status === "PAIRING" ? (
+				<SignalCellularConnectedNoInternet2Bar color="secondary" fontSize="small" />
+			) : null;
+
+		const chipEl = (
+			<Chip size="small" label={statusLabel} {...chip} />
+		);
+
 		return (
 			<div className={classes.statusCell}>
-				{whatsApp.status === "DISCONNECTED" && (
-					<CustomToolTip
-						title={i18n.t("connections.toolTips.disconnected.title")}
-						content={i18n.t("connections.toolTips.disconnected.content")}
-					>
-						<SignalCellularConnectedNoInternet0Bar color="secondary" />
+				{iconBefore}
+				{tip.content ? (
+					<CustomToolTip title={tip.title} content={tip.content}>
+						<span>{chipEl}</span>
 					</CustomToolTip>
+				) : (
+					<Tooltip title={tip.title} arrow>
+						<span>{chipEl}</span>
+					</Tooltip>
 				)}
-				{whatsApp.status === "OPENING" && (
-					<CircularProgress size={24} className={classes.buttonProgress} />
-				)}
-				{whatsApp.status === "qrcode" && (
-					<CustomToolTip
-						title={i18n.t("connections.toolTips.qrcode.title")}
-						content={i18n.t("connections.toolTips.qrcode.content")}
-					>
-						<CropFree />
-					</CustomToolTip>
-				)}
-				{whatsApp.status === "CONNECTED" && (
-					<CustomToolTip title={i18n.t("connections.toolTips.connected.title")}>
-						<SignalCellular4Bar style={{ color: green[500] }} />
-					</CustomToolTip>
-				)}
-				{(whatsApp.status === "TIMEOUT" || whatsApp.status === "PAIRING") && (
-					<CustomToolTip
-						title={i18n.t("connections.toolTips.timeout.title")}
-						content={i18n.t("connections.toolTips.timeout.content")}
-					>
-						<SignalCellularConnectedNoInternet2Bar color="secondary" />
-					</CustomToolTip>
-				)}
-				<Typography variant="body2" style={{ color: isConnected ? green[600] : undefined }}>
-					{statusLabel}
-				</Typography>
 			</div>
 		);
 	};
@@ -385,35 +441,36 @@ const Connections = () => {
 						4. {i18n.t("connections.guide.step4")}
 					</Typography>
 				</Box>
-				<Table size="small">
+				<AppTableContainer nested>
+					<Table size="small" stickyHeader>
 					<TableHead>
 						<TableRow>
-							<TableCell align="center">
+							<TableCell align="left" className={classes.tableHeadCell}>
 								{i18n.t("connections.table.name")}
 							</TableCell>
-							<TableCell align="center">
+							<TableCell align="center" className={classes.tableHeadCell}>
 								{i18n.t("connections.table.status")}
 							</TableCell>
 							<Can
 								role={user.profile}
 								perform="connections-page:actionButtons"
 								yes={() => (
-									<TableCell align="center">
+									<TableCell align="center" className={classes.tableHeadCell}>
 										{i18n.t("connections.table.session")}
 									</TableCell>
 								)}
 							/>
-							<TableCell align="center">
+							<TableCell align="center" className={classes.tableHeadCell}>
 								{i18n.t("connections.table.lastUpdate")}
 							</TableCell>
-							<TableCell align="center">
+							<TableCell align="center" className={classes.tableHeadCell}>
 								{i18n.t("connections.table.default")}
 							</TableCell>
 							<Can
 								role={user.profile}
 								perform="connections-page:editOrDeleteConnection"
 								yes={() => (
-									<TableCell align="center">
+									<TableCell align="center" className={classes.tableHeadCell}>
 										{i18n.t("connections.table.actions")}
 									</TableCell>
 								)}
@@ -423,12 +480,22 @@ const Connections = () => {
 					<TableBody>
 						{loading ? (
 							<TableRowSkeleton />
+						) : !whatsApps?.length ? (
+							<TableRow>
+								<TableCell colSpan={6} style={{ border: "none" }}>
+									<AppEmptyState
+										title={i18n.t("connections.table.emptyTitle")}
+										description={i18n.t("connections.table.emptyHint")}
+									/>
+								</TableCell>
+							</TableRow>
 						) : (
 							<>
-								{whatsApps?.length > 0 &&
-									whatsApps.map(whatsApp => (
-										<TableRow key={whatsApp.id}>
-											<TableCell align="center">{whatsApp.name}</TableCell>
+								{whatsApps.map(whatsApp => (
+										<TableRow key={whatsApp.id} hover>
+											<TableCell align="left" className={classes.connectionName}>
+												{whatsApp.name}
+											</TableCell>
 											<TableCell align="center">
 												{renderStatusToolTips(whatsApp)}
 											</TableCell>
@@ -479,7 +546,8 @@ const Connections = () => {
 							</>
 						)}
 					</TableBody>
-				</Table>
+					</Table>
+				</AppTableContainer>
 			</Paper>
 		</MainContainer>
 	);

@@ -1,6 +1,5 @@
 import * as Yup from "yup";
 import crypto from "crypto";
-
 import AppError from "../../errors/AppError";
 import Whatsapp from "../../models/Whatsapp";
 import Company from "../../models/Company";
@@ -95,7 +94,7 @@ const CreateWhatsAppService = async ({
         async value => {
           if (!value) return false;
           const nameExists = await Whatsapp.findOne({
-            where: { name: value }
+            where: { name: value, companyId }
           });
           return !nameExists;
         }
@@ -156,6 +155,15 @@ const CreateWhatsAppService = async ({
       throw new AppError(err.message);
     }
   }
+
+  console.info(
+    "[Connection]",
+    JSON.stringify({
+      event: "whatsapp_create",
+      companyId,
+      name
+    })
+  );
 
   const whatsapp = await Whatsapp.create(
     {
