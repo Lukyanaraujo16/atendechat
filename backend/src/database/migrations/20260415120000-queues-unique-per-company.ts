@@ -1,19 +1,32 @@
 import { QueryInterface } from "sequelize";
 
 /**
- * Queues tinham UNIQUE só em `name` e `color` (globais), o que impede duas empresas
- * usarem o mesmo nome de setor. Passa a unicidade composta (companyId, name) e
- * (companyId, color). Antes, deduplica linhas na mesma empresa com mesmo nome/cor.
+ * Queues tinham UNIQUE só em `name` e `color` (globais). Passa a unicidade
+ * composta (companyId, name) e (companyId, color). Deduplica antes.
  *
- * Sem transação única: em PostgreSQL, um erro (ex.: DROP CONSTRAINT inexistente) aborta
- * toda a transação; usar DROP IF EXISTS em SQL cru evita isso.
+ * Usa CREATE UNIQUE INDEX em SQL cru (evita falhas do addConstraint do Sequelize 5
+ * em alguns Postgres) e DROP INDEX/CONSTRAINT IF EXISTS para reexecução segura.
  */
+async function runStep(
+  label: string,
+  fn: () => PromiseLike<unknown>
+): Promise<void> {
+  try {
+    await fn();
+  } catch (err: unknown) {
+    const e = err as Error;
+    e.message = `[20260415120000-queues-unique-per-company: ${label}] ${e.message}`;
+    throw e;
+  }
+}
+
 module.exports = {
   up: async (queryInterface: QueryInterface) => {
     const sequelize = queryInterface.sequelize;
 
-    // 1) Mesmo nome na mesma empresa (case-insensitive): mantém o menor id, renomeia os outros
-    await sequelize.query(`
+    // 1) Mesmo nome na mesma empresa (case-insensitive)
+    await runStep("dedupe-names", () =>
+      sequelize.query(`
       UPDATE "Queues" q
       SET name = LEFT(COALESCE(TRIM(q.name), '') || ' (' || q.id::text || ')', 255)
       FROM (
@@ -30,10 +43,12 @@ module.exports = {
         WHERE t.rn > 1
       ) d
       WHERE q.id = d.id
-    `);
+    `)
+    );
 
     // 2) Mesma cor na mesma empresa
-    await sequelize.query(`
+    await runStep("dedupe-colors", () =>
+      sequelize.query(`
       UPDATE "Queues" q
       SET color = '#' || SUBSTRING(MD5(q.id::text || COALESCE(q.color, '')) FROM 1 FOR 6)
       FROM (
@@ -50,53 +65,73 @@ module.exports = {
         WHERE t.rn > 1
       ) d
       WHERE q.id = d.id
-    `);
-
-    // 3) Remove unicidades globais — IF EXISTS não aborta a sessão
-    await sequelize.query(
-      `ALTER TABLE "Queues" DROP CONSTRAINT IF EXISTS "Queues_name_key";`
-    );
-    await sequelize.query(
-      `ALTER TABLE "Queues" DROP CONSTRAINT IF EXISTS "Queues_color_key";`
+    `)
     );
 
-    // Nomes alternativos que o Sequelize/Postgres podem ter gerado
-    await sequelize.query(
-      `ALTER TABLE "Queues" DROP CONSTRAINT IF EXISTS "Queues_name_key1";`
-    );
-    await sequelize.query(
-      `ALTER TABLE "Queues" DROP CONSTRAINT IF EXISTS "Queues_color_key1";`
-    );
-
-    // 4) Unicidade por empresa (sem { transaction } — commit imediato por comando)
-    await queryInterface.addConstraint("Queues", ["companyId", "name"], {
-      type: "unique",
-      name: "Queues_companyId_name_key"
+    // 3) Remove unicidades globais e índices/constraints compostos antigos (re-run seguro)
+    await runStep("drop-old-globals", async () => {
+      for (const sql of [
+        `ALTER TABLE "Queues" DROP CONSTRAINT IF EXISTS "Queues_name_key";`,
+        `ALTER TABLE "Queues" DROP CONSTRAINT IF EXISTS "Queues_color_key";`,
+        `ALTER TABLE "Queues" DROP CONSTRAINT IF EXISTS "Queues_name_key1";`,
+        `ALTER TABLE "Queues" DROP CONSTRAINT IF EXISTS "Queues_color_key1";`
+      ]) {
+        await sequelize.query(sql);
+      }
     });
 
-    await queryInterface.addConstraint("Queues", ["companyId", "color"], {
-      type: "unique",
-      name: "Queues_companyId_color_key"
+    await runStep("drop-composite-if-any", async () => {
+      for (const sql of [
+        `ALTER TABLE "Queues" DROP CONSTRAINT IF EXISTS "Queues_companyId_name_key";`,
+        `ALTER TABLE "Queues" DROP CONSTRAINT IF EXISTS "Queues_companyId_color_key";`,
+        `DROP INDEX IF EXISTS "Queues_companyId_name_key";`,
+        `DROP INDEX IF EXISTS "Queues_companyId_color_key";`
+      ]) {
+        await sequelize.query(sql);
+      }
     });
+
+    // 4) Unicidade por empresa (índice único explícito — mesmo nome do modelo Sequelize)
+    await runStep("create-unique-companyId-name", () =>
+      sequelize.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS "Queues_companyId_name_key"
+        ON "Queues" ("companyId", "name");
+    `)
+    );
+
+    await runStep("create-unique-companyId-color", () =>
+      sequelize.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS "Queues_companyId_color_key"
+        ON "Queues" ("companyId", "color");
+    `)
+    );
   },
 
   down: async (queryInterface: QueryInterface) => {
     const sequelize = queryInterface.sequelize;
 
-    await sequelize.query(
-      `ALTER TABLE "Queues" DROP CONSTRAINT IF EXISTS "Queues_companyId_name_key";`
-    );
-    await sequelize.query(
-      `ALTER TABLE "Queues" DROP CONSTRAINT IF EXISTS "Queues_companyId_color_key";`
-    );
+    await runStep("down-drop-composite-indexes", async () => {
+      for (const sql of [
+        `DROP INDEX IF EXISTS "Queues_companyId_name_key";`,
+        `DROP INDEX IF EXISTS "Queues_companyId_color_key";`,
+        `ALTER TABLE "Queues" DROP CONSTRAINT IF EXISTS "Queues_companyId_name_key";`,
+        `ALTER TABLE "Queues" DROP CONSTRAINT IF EXISTS "Queues_companyId_color_key";`
+      ]) {
+        await sequelize.query(sql);
+      }
+    });
 
-    await queryInterface.addConstraint("Queues", ["name"], {
-      type: "unique",
-      name: "Queues_name_key"
-    });
-    await queryInterface.addConstraint("Queues", ["color"], {
-      type: "unique",
-      name: "Queues_color_key"
-    });
+    await runStep("down-add-global-uniques", () =>
+      Promise.all([
+        queryInterface.addConstraint("Queues", ["name"], {
+          type: "unique",
+          name: "Queues_name_key"
+        }),
+        queryInterface.addConstraint("Queues", ["color"], {
+          type: "unique",
+          name: "Queues_color_key"
+        })
+      ])
+    );
   }
 };
