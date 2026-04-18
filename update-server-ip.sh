@@ -114,6 +114,18 @@ if [ ! -f "${PROJETO_DIR}/backend/dist/server.js" ]; then
   exit 1
 fi
 
+if [ -f "${PROJETO_DIR}/scripts/ensure-postgres-app-ownership.sh" ]; then
+  # shellcheck source=/dev/null
+  # shellcheck disable=SC1091
+  . "${PROJETO_DIR}/scripts/ensure-postgres-app-ownership.sh"
+  echo ""
+  echo "==> PostgreSQL: alinhar ownership ao DB_USER (migrações)"
+  ensure_postgres_app_ownership || {
+    echo ">> ERRO: Falha ao alinhar dono da base/tabelas ao utilizador da app. Confira backend/.env (DB_NAME, DB_USER) e PostgreSQL."
+    exit 1
+  }
+fi
+
 echo ""
 echo "==> Backend: sequelize db:migrate"
 npx sequelize db:migrate

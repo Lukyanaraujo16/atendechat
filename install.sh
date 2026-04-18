@@ -15,6 +15,8 @@
 #   • Backup/restauro (Super Admin): requer no servidor pg_dump e psql (PostgreSQL;
 #     este script instala postgresql + cliente). Se mudar DB_DIALECT para mysql,
 #     instale mysqldump/mysql à parte.
+#   • PostgreSQL: antes de sequelize db:migrate, scripts/ensure-postgres-app-ownership.sh
+#     alinha o dono da base/schema/tabelas ao DB_USER (evita "must be owner of table").
 #   • Firewall: portas 22, 80, API_PORT abertas (ufw)
 #
 # Variáveis opcionais (antes de executar):
@@ -199,6 +201,13 @@ echo ">>> Diretório do projeto: ${PROJETO_DIR}"
 if [[ ! -d "${PROJETO_DIR}/backend" || ! -d "${PROJETO_DIR}/frontend" ]]; then
   _inst_error_block "" "Validar estrutura do repositório" "Esperadas as pastas ${PROJETO_DIR}/backend e ${PROJETO_DIR}/frontend." "Defina PROJETO_DIR para a raiz do clone Git ou execute install.sh a partir da raiz do projecto."
   exit 1
+fi
+
+if [[ -f "${PROJETO_DIR}/scripts/ensure-postgres-app-ownership.sh" ]]; then
+  # shellcheck source=/dev/null
+  source "${PROJETO_DIR}/scripts/ensure-postgres-app-ownership.sh"
+else
+  ensure_postgres_app_ownership() { return 0; }
 fi
 
 merge_postgres_from_existing_env
@@ -613,6 +622,8 @@ if [[ "${MINIMAL_UPDATE}" == "1" ]]; then
   _inst_item "Backend: npm install e build"
   npm install --production=false || { _inst_error_block "-" "npm install no backend (MINIMAL_UPDATE)" "O comando npm terminou com código de erro (ver saída acima)." "Verifique rede, espaço em disco e permissões em ${PROJETO_DIR}/backend; corrija e execute MINIMAL_UPDATE=1 ./install.sh de novo."; exit 1; }
   npm run build || { _inst_error_block "-" "Build do backend — npm run build (MINIMAL_UPDATE)" "Compilação TypeScript/webpack falhou." "Corrija os erros npm/TypeScript indicados acima e volte a executar MINIMAL_UPDATE=1 ./install.sh."; exit 1; }
+  _inst_item "PostgreSQL: ownership da base/schema (utilizador da app = dono das tabelas)"
+  ensure_postgres_app_ownership || { _inst_error_block "-" "PostgreSQL — ownership (MINIMAL_UPDATE)" "Não foi possível alinhar o dono da base/tabelas ao DB_USER (ALTER DATABASE / REASSIGN OWNED)." "Execute como root com PostgreSQL local; confira sudo -u postgres psql e DB_* em backend/.env."; exit 1; }
   _inst_item "Migrations (Sequelize)"
   npx sequelize db:migrate || { _inst_error_block "-" "Migrations Sequelize (MINIMAL_UPDATE)" "db:migrate retornou erro (PostgreSQL ou schema)." "Confirme que o PostgreSQL está activo e que DB_* em backend/.env estão correctos; volte a executar."; exit 1; }
   _inst_item "Frontend: build"
@@ -725,6 +736,8 @@ if [[ ! -f dist/server.js ]]; then
   exit 1
 fi
 
+_inst_item "PostgreSQL: ownership da base/schema (utilizador da app = dono das tabelas)"
+ensure_postgres_app_ownership || { _inst_error_block "3" "PostgreSQL — ownership" "Não foi possível alinhar o dono da base/tabelas ao DB_USER (ALTER DATABASE / REASSIGN OWNED)." "Execute o instalador como root; confira PostgreSQL activo e DB_* em backend/.env."; exit 1; }
 _inst_item "Migrations e seeds (Sequelize)"
 npx sequelize db:migrate || { _inst_error_block "3" "Migrations Sequelize (db:migrate)" "O comando sequelize db:migrate falhou." "Garanta PostgreSQL activo, base e utilizador criados, e credenciais DB_* correctas em backend/.env."; exit 1; }
 if npx sequelize db:seed:all; then

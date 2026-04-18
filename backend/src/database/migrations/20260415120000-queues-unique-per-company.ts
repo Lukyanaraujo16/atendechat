@@ -6,6 +6,10 @@ import { QueryInterface } from "sequelize";
  *
  * Usa CREATE UNIQUE INDEX em SQL cru (evita falhas do addConstraint do Sequelize 5
  * em alguns Postgres) e DROP INDEX/CONSTRAINT IF EXISTS para reexecução segura.
+ *
+ * PostgreSQL: DROP/ALTER em constraints exige ser **dono da tabela**. O utilizador
+ * em DB_USER tem de ser owner de `Queues` (ou migrar como superuser). Se aparecer
+ * "must be owner of table Queues", ver DEPLOY-UBUNTU.md (migrações / ownership).
  */
 async function runStep(
   label: string,
@@ -15,7 +19,12 @@ async function runStep(
     await fn();
   } catch (err: unknown) {
     const e = err as Error;
-    e.message = `[20260415120000-queues-unique-per-company: ${label}] ${e.message}`;
+    let hint = "";
+    if (/must be owner of table/i.test(e.message)) {
+      hint =
+        " [PostgreSQL: o utilizador do .env (DB_USER) precisa ser dono da tabela. Como postgres: ALTER TABLE \"Queues\" OWNER TO \"SEU_DB_USER\"; — ver DEPLOY-UBUNTU.md]";
+    }
+    e.message = `[20260415120000-queues-unique-per-company: ${label}] ${e.message}${hint}`;
     throw e;
   }
 }

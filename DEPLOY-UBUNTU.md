@@ -211,6 +211,35 @@ npx sequelize db:seed:all
 
 Se der erro de conexão, confira usuário/senha/banco do PostgreSQL no `.env`.
 
+Instalação automática com **`./install.sh`** (raiz do repositório): antes de `db:migrate`, o script corre **`scripts/ensure-postgres-app-ownership.sh`** como utilizador `postgres`, alinhando o dono da base, do schema `public` e das tabelas ao **DB_USER** do `backend/.env`, para as migrações Sequelize não falharem por falta de permissão. Instalação só com os passos manuais desta secção: use o bloco SQL abaixo se aparecer o erro de ownership.
+
+**Erro `must be owner of table Queues` (ou outra tabela) nas migrações:** no PostgreSQL, comandos como `ALTER TABLE ... DROP CONSTRAINT` só podem ser executados pelo **dono da tabela** (ou por um superuser). Se o banco foi criado/restaurado com outro utilizador (por exemplo `postgres`) e o `.env` usa `atendechat`, as tabelas podem continuar com dono errado. Corrija **uma vez** como `postgres`, trocando o nome do banco e o utilizador do seu `.env`:
+
+```bash
+sudo -u postgres psql -d NOME_DO_BANCO -c 'ALTER TABLE "Queues" OWNER TO "UTILIZADOR_DO_ENV";'
+```
+
+Se várias tabelas estiverem com dono incorreto, pode transferir todas no `public` para o utilizador da aplicação (ajuste o nome do role no final do bloco):
+
+```bash
+sudo -u postgres psql -d NOME_DO_BANCO <<'SQL'
+DO $$
+DECLARE r RECORD;
+BEGIN
+  FOR r IN (
+    SELECT c.relname AS t
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public' AND c.relkind = 'r'
+  ) LOOP
+    EXECUTE format('ALTER TABLE public.%I OWNER TO "UTILIZADOR_DO_ENV"', r.t);
+  END LOOP;
+END $$;
+SQL
+```
+
+Depois volte a `cd backend && npm run build && npx sequelize db:migrate`.
+
 ---
 
 ## 10. Configurar o frontend (.env) e build
