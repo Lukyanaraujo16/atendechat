@@ -26,10 +26,30 @@ app.set("queues", {
 const bodyparser = require('body-parser');
 app.use(bodyParser.json({ limit: '10mb' }));
 
+/** Origens CORS: FRONTEND_URL e CORS_EXTRA_ORIGINS (várias separadas por vírgula). Sem barra final. */
+function getCorsAllowedOrigins(): string[] {
+  const raw = [process.env.FRONTEND_URL || "", process.env.CORS_EXTRA_ORIGINS || ""].join(",");
+  const parts = raw
+    .split(",")
+    .map((s) => s.trim().replace(/\/$/, ""))
+    .filter(Boolean);
+  return [...new Set(parts)];
+}
+
 app.use(
   cors({
     credentials: true,
-    origin: process.env.FRONTEND_URL
+    origin: (origin, callback) => {
+      const allowed = getCorsAllowedOrigins();
+      if (!origin) {
+        return callback(null, true);
+      }
+      const normalized = origin.replace(/\/$/, "");
+      if (allowed.length === 0) {
+        return callback(null, process.env.NODE_ENV !== "production");
+      }
+      callback(null, allowed.includes(normalized));
+    }
   })
 );
 app.use(cookieParser());
