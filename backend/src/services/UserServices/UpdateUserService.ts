@@ -24,6 +24,8 @@ interface Request {
   userId: string | number;
   companyId: number;
   requestUserId: number;
+  /** Super Admin em modo suporte a editar o próprio perfil: o alvo não pertence ao companyId do JWT */
+  skipCompanyScopeForShow?: boolean;
 }
 
 interface Response {
@@ -37,9 +39,13 @@ const UpdateUserService = async ({
   userData,
   userId,
   companyId,
-  requestUserId
+  requestUserId,
+  skipCompanyScopeForShow
 }: Request): Promise<Response | undefined> => {
-  const user = await ShowUserService(userId, companyId);
+  const user = await ShowUserService(
+    userId,
+    skipCompanyScopeForShow ? undefined : companyId
+  );
 
   const requestUser = await User.findByPk(requestUserId);
 

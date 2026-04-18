@@ -90,9 +90,16 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
 
 export const show = async (req: Request, res: Response): Promise<Response> => {
   const { userId } = req.params;
-  const { companyId } = req.user;
+  const { companyId, supportMode, id } = req.user;
 
-  const user = await ShowUserService(userId, companyId);
+  /** Modo suporte: JWT.companyId é o tenant visitado; o próprio utilizador (super admin) pertence a outra empresa */
+  const isSupportSelf =
+    supportMode === true && Number(userId) === Number(id);
+
+  const user = await ShowUserService(
+    userId,
+    isSupportSelf ? undefined : companyId
+  );
 
   return res.status(200).json(user);
 };
@@ -101,19 +108,23 @@ export const update = async (
   req: Request,
   res: Response
 ): Promise<Response> => {
-  if (req.user.profile !== "admin") {
-    throw new AppError("ERR_NO_PERMISSION", 403);
-  }
-
-  const { id: requestUserId, companyId } = req.user;
+  const { id: requestUserId, companyId, supportMode } = req.user;
   const { userId } = req.params;
   const userData = req.body;
+
+  const isSupportSelf =
+    supportMode === true && Number(userId) === Number(requestUserId);
+
+  if (req.user.profile !== "admin" && !isSupportSelf) {
+    throw new AppError("ERR_NO_PERMISSION", 403);
+  }
 
   const user = await UpdateUserService({
     userData,
     userId,
     companyId,
-    requestUserId: +requestUserId
+    requestUserId: +requestUserId,
+    skipCompanyScopeForShow: isSupportSelf
   });
 
   const io = getIO();
