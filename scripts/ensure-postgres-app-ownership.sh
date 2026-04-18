@@ -12,6 +12,11 @@ _pg_ident() {
   printf '"%s"' "${1//\"/\"\"}"
 }
 
+# Escapa para uso como literal entre aspas simples em SQL (p.ex. comparação em -c)
+_pg_escape_literal() {
+  printf '%s' "$1" | sed "s/'/''/g"
+}
+
 _read_env_key() {
   local file="$1" key="$2"
   local line raw
@@ -68,23 +73,56 @@ ensure_postgres_app_ownership() {
     return 0
   fi
 
+  local lit
+  lit="$(_pg_escape_literal "${DB_USER}")"
+
   echo ">> PostgreSQL: alinhar dono da base \"${DB_NAME}\" e objectos em public → \"${DB_USER}\" (Sequelize/migrações)..."
 
   sudo -u postgres psql -v ON_ERROR_STOP=1 -c "ALTER DATABASE $(_pg_ident "${DB_NAME}") OWNER TO $(_pg_ident "${DB_USER}");" || return 1
   sudo -u postgres psql -d "${DB_NAME}" -v ON_ERROR_STOP=1 -c "ALTER SCHEMA public OWNER TO $(_pg_ident "${DB_USER}");" || return 1
 
+  # Força dono em todas as tabelas/sequências/views (evita falhas se REASSIGN ou :'app' do psql falharem em silêncio)
+  if ! sudo -u postgres psql -d "${DB_NAME}" -v ON_ERROR_STOP=1 <<EOSQL
+DO \$\$
+DECLARE
+  r RECORD;
+  app text := '${lit}';
+BEGIN
+  FOR r IN SELECT tablename AS rel FROM pg_tables WHERE schemaname = 'public'
+  LOOP
+    EXECUTE format('ALTER TABLE public.%I OWNER TO %I', r.rel, app);
+  END LOOP;
+  FOR r IN SELECT sequence_name AS rel FROM information_schema.sequences WHERE sequence_schema = 'public'
+  LOOP
+    EXECUTE format('ALTER SEQUENCE public.%I OWNER TO %I', r.rel, app);
+  END LOOP;
+  FOR r IN SELECT table_name AS rel FROM information_schema.views WHERE table_schema = 'public'
+  LOOP
+    EXECUTE format('ALTER VIEW public.%I OWNER TO %I', r.rel, app);
+  END LOOP;
+  FOR r IN SELECT matviewname AS rel FROM pg_matviews WHERE schemaname = 'public'
+  LOOP
+    EXECUTE format('ALTER MATERIALIZED VIEW public.%I OWNER TO %I', r.rel, app);
+  END LOOP;
+END \$\$;
+EOSQL
+  then
+    return 1
+  fi
+
+  # Reatribui objectos ainda associados a outros roles
   local owners
   owners="$(
-    sudo -u postgres psql -d "${DB_NAME}" -v "app=${DB_USER}" -Atq -c "
+    sudo -u postgres psql -d "${DB_NAME}" -Atq -c "
       SELECT DISTINCT pg_get_userbyid(c.relowner)
       FROM pg_class c
       JOIN pg_namespace n ON n.oid = c.relnamespace
       WHERE n.nspname = 'public'
         AND c.relkind IN ('r','p','v','m','S','f')
-        AND pg_get_userbyid(c.relowner) <> :'app'
+        AND pg_get_userbyid(c.relowner) <> '${lit}'
       ORDER BY 1
-    " 2>/dev/null || true
-  )"
+    "
+  )" || return 1
 
   local old
   while IFS= read -r old; do
