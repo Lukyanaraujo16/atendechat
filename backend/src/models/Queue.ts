@@ -7,7 +7,6 @@ import {
   PrimaryKey,
   AutoIncrement,
   AllowNull,
-  Unique,
   BelongsToMany,
   BelongsTo,
   ForeignKey,
@@ -25,7 +24,20 @@ import QueueOption from "./QueueOption";
 import Prompt from "./Prompt";
 import QueueIntegrations from "./QueueIntegrations";
 
-@Table
+@Table({
+  indexes: [
+    {
+      unique: true,
+      name: "Queues_companyId_name_key",
+      fields: ["companyId", "name"]
+    },
+    {
+      unique: true,
+      name: "Queues_companyId_color_key",
+      fields: ["companyId", "color"]
+    }
+  ]
+})
 class Queue extends Model<Queue> {
   @PrimaryKey
   @AutoIncrement
@@ -33,12 +45,10 @@ class Queue extends Model<Queue> {
   id: number;
 
   @AllowNull(false)
-  @Unique
   @Column
   name: string;
 
   @AllowNull(false)
-  @Unique
   @Column
   color: string;
 

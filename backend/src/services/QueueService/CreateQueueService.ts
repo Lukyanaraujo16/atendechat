@@ -4,6 +4,7 @@ import AppError from "../../errors/AppError";
 import Queue from "../../models/Queue";
 import Company from "../../models/Company";
 import Plan from "../../models/Plan";
+import { rethrowIfQueueUniqueConstraint } from "./queueUniqueErrors";
 
 interface QueueData {
   name: string;
@@ -87,17 +88,21 @@ const CreateQueueService = async (queueData: QueueData): Promise<Queue> => {
 
   if (duplicateName) {
     throw new AppError(
-      "Já existe um setor com este nome nesta empresa.",
-      400
+      "ERR_QUEUE_DUPLICATE_NAME",
+      409,
+      "Já existe um setor com este nome nesta empresa."
     );
   }
 
-  const queue = await Queue.create({
-    ...queueData,
-    name: trimmed
-  });
-
-  return queue;
+  try {
+    const queue = await Queue.create({
+      ...queueData,
+      name: trimmed
+    });
+    return queue;
+  } catch (err) {
+    rethrowIfQueueUniqueConstraint(err);
+  }
 };
 
 export default CreateQueueService;

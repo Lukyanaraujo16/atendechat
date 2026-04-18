@@ -2866,6 +2866,10 @@ const messages = {
             "Erro ao buscar a mensagem no WhtasApp, talvez ela seja muito antiga.",
         ERR_QUEUE_COLOR_ALREADY_EXISTS:
             "Esta cor já está em uso, escolha outra.",
+        ERR_QUEUE_DUPLICATE_NAME:
+            "Já existe um setor com este nome nesta empresa.",
+        ERR_QUEUE_DUPLICATE:
+            "Este setor já existe ou conflita com outro registo na empresa.",
         ERR_WAPP_GREETING_REQUIRED:
             "A mensagem de saudação é obrigatória quando há mais de um setor.",
         ERR_CAMPAIGN_NOT_FOUND: "Campanha não encontrada.",

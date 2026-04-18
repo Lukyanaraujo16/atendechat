@@ -2745,6 +2745,10 @@ const messages = {
 				ERR_CREATING_TICKET: "Error creating ticket in database.",
 				ERR_FETCH_WAPP_MSG: "Error fetching WhatsApp message, it might be too old.",
 				ERR_QUEUE_COLOR_ALREADY_EXISTS: "This color is already in use, choose another.",
+				ERR_QUEUE_DUPLICATE_NAME:
+					"A queue with this name already exists for this company.",
+				ERR_QUEUE_DUPLICATE:
+					"This queue already exists or conflicts with another record in the company.",
 				ERR_WAPP_GREETING_REQUIRED: "Greeting message is required when there is more than one queue.",
 				ERR_CAMPAIGN_NOT_FOUND: "Campaign not found.",
 				ERR_CAMPAIGN_INVALID_STATUS:

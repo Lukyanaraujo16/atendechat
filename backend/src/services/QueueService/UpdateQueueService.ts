@@ -2,6 +2,7 @@ import { Op, Sequelize } from "sequelize";
 import AppError from "../../errors/AppError";
 import Queue from "../../models/Queue";
 import ShowQueueService from "./ShowQueueService";
+import { rethrowIfQueueUniqueConstraint } from "./queueUniqueErrors";
 
 interface QueueData {
   name?: string;
@@ -48,8 +49,9 @@ const UpdateQueueService = async (
 
     if (duplicateName) {
       throw new AppError(
-        "Já existe um setor com este nome nesta empresa.",
-        400
+        "ERR_QUEUE_DUPLICATE_NAME",
+        409,
+        "Já existe um setor com este nome nesta empresa."
       );
     }
   }
@@ -68,7 +70,11 @@ const UpdateQueueService = async (
     });
 
     if (duplicateColor) {
-      throw new AppError("ERR_QUEUE_COLOR_ALREADY_EXISTS");
+      throw new AppError(
+        "ERR_QUEUE_COLOR_ALREADY_EXISTS",
+        409,
+        "Esta cor já está em uso nesta empresa. Escolha outra."
+      );
     }
   }
 
@@ -77,7 +83,11 @@ const UpdateQueueService = async (
     ...(name !== undefined && { name: name.trim() })
   };
 
-  await queue.update(payload);
+  try {
+    await queue.update(payload);
+  } catch (err) {
+    rethrowIfQueueUniqueConstraint(err);
+  }
 
   return queue;
 };
