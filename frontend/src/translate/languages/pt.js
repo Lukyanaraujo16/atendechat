@@ -298,18 +298,27 @@ const messages = {
         loading: "Carregando quadro…",
         quickActions: {
           menuAria: "Ações do ticket",
+          transferTooltip: "Transferir conversa",
+          transferConversation: "Transferir conversa",
           assign: "Atribuir atendente",
           unassign: "Remover atendente",
           changeQueue: "Alterar setor",
           tags: "Tags",
           close: "Fechar ticket",
           selectUser: "Atendente",
+          selectUserOptional: "Atendente (opcional)",
+          keepCurrentAttendant: "Manter atendente atual",
           selectQueue: "Setor",
           tagsPlaceholder: "Selecione as tags",
           confirmClose:
             "Fechar este ticket? O atendimento será encerrado conforme as regras já configuradas (mensagens automáticas, pesquisa, etc.).",
+          confirmTransferUser:
+            "Deseja realmente transferir este atendimento para outro atendente?",
           cancel: "Cancelar",
           save: "Salvar",
+          confirm: "Confirmar",
+          noAttendantsForQueue:
+            "Nenhum atendente disponível para este setor. Pode transferir só o setor.",
         },
       },
       invoices: {

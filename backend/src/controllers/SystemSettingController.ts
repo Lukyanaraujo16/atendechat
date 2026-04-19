@@ -31,6 +31,32 @@ export const publicBranding = async (
   return res.json(branding);
 };
 
+/**
+ * Script executado antes do bundle React: define window.__BOOTSTRAP_BRANDING__, título, favicon
+ * e preload das imagens de branding a partir da BD (primeiro paint alinhado à plataforma).
+ */
+export const publicBrandingBootstrapScript = async (
+  _req: Request,
+  res: Response
+): Promise<Response> => {
+  const branding = await GetPublicBrandingService();
+  const backendUrl =
+    process.env.BACKEND_URL ||
+    `http://127.0.0.1:${process.env.PORT || "8080"}`;
+  let apiOrigin: string;
+  try {
+    apiOrigin = new URL(backendUrl).origin;
+  } catch {
+    apiOrigin = "http://127.0.0.1:8080";
+  }
+  const payload = JSON.stringify(branding);
+  const originJson = JSON.stringify(apiOrigin);
+  const js = `!function(){"use strict";var b=${payload},o=${originJson};window.__BOOTSTRAP_BRANDING__=b;function abs(u){if(!u)return"";if(/^https?:\\/\\//i.test(u))return u;var x=o.replace(/\\/$/,"");return x+(u.charAt(0)==="/"?u:"/"+u)}var t=String(b.systemName||"").trim();if(t)document.title=t;var fav=abs(b.faviconUrl);if(fav){["icon","shortcut icon","apple-touch-icon"].forEach(function(r){var e=document.querySelector('link[rel="'+r+'"]');if(!e){e=document.createElement("link");e.setAttribute("rel",r);document.head.appendChild(e)}e.setAttribute("href",fav)})}[abs(b.loginLogoUrl),abs(b.menuLogoUrl)].forEach(function(h){if(h){var p=document.createElement("link");p.rel="preload";p.as="image";p.href=h;document.head.appendChild(p)}})}();`;
+  res.setHeader("Content-Type", "application/javascript; charset=utf-8");
+  res.setHeader("Cache-Control", "private, max-age=120");
+  return res.status(200).send(js);
+};
+
 export const index = async (req: Request, res: Response): Promise<Response> => {
   const rows = await SystemSetting.findAll({ order: [["key", "ASC"]] });
   const settings: Record<string, string> = {};

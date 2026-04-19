@@ -1200,21 +1200,18 @@ const FlowBuilderConfig = () => {
               }}
             >
               <Controls />
-              <MiniMap />
+              {/* MiniMap no canto superior direito do canvas — evita sobrepor o FAB "Testar fluxo" (fixo inferior direito) */}
+              <MiniMap
+                style={{
+                  left: "auto",
+                  right: 12,
+                  top: 12,
+                  bottom: "auto",
+                }}
+              />
               <Background variant="dots" gap={12} size={-1} />
             </ReactFlow>
 
-            <Stack
-              style={{
-                backgroundColor: "#FAFAFA",
-                height: "20px",
-                width: "58px",
-                position: "absolute",
-                bottom: 0,
-                right: 0,
-                zIndex: 1111,
-              }}
-            />
             {/* <Stack
                   style={{
                     backgroundColor: "#1B1B1B",

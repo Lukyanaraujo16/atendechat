@@ -403,12 +403,17 @@ export default function FlowBuilderTestPanel({
       anchor="right"
       open={open}
       onClose={onClose}
+      sx={{
+        zIndex: (theme) => theme.zIndex.modal,
+      }}
       PaperProps={{
         sx: {
           width: { xs: "100%", sm: 440 },
           maxWidth: "100%",
           display: "flex",
           flexDirection: "column",
+          top: 50,
+          height: "calc(100vh - 50px)",
         },
       }}
     >
@@ -450,22 +455,24 @@ export default function FlowBuilderTestPanel({
             </Typography>
           </Stack>
         </Box>
-        <Stack direction="row" spacing={0.5} alignItems="center">
+        <Stack direction="row" spacing={0.5} alignItems="center" flexShrink={0}>
           <Button
             variant="contained"
             size="small"
             color="inherit"
             startIcon={<RestartAltIcon />}
             onClick={resetAndStart}
+            aria-label={t("restartFull")}
             sx={{
               color: "primary.main",
               bgcolor: "background.paper",
               fontWeight: 700,
               "&:hover": { bgcolor: alpha(theme.palette.common.white, 0.92) },
-              display: { xs: "none", sm: "inline-flex" },
+              whiteSpace: "nowrap",
+              px: { xs: 1, sm: 1.5 },
             }}
           >
-            {t("restart")}
+            {t("restartFull")}
           </Button>
           <IconButton
             size="small"
@@ -488,7 +495,7 @@ export default function FlowBuilderTestPanel({
         }}
       >
         <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1}>
-          <Typography variant="caption" color="text.secondary">
+          <Typography variant="caption" color="text.secondary" sx={{ flex: 1, minWidth: 0 }}>
             {stepTypeLabel ? (
               <>
                 {t("currentStep")}: <strong>{stepTypeLabel}</strong>
@@ -500,15 +507,6 @@ export default function FlowBuilderTestPanel({
               t("noStepYet")
             )}
           </Typography>
-          <Button
-            variant="outlined"
-            size="small"
-            startIcon={<RestartAltIcon />}
-            onClick={resetAndStart}
-            sx={{ display: { xs: "inline-flex", sm: "none" }, fontWeight: 600 }}
-          >
-            {t("restart")}
-          </Button>
         </Stack>
       </Box>
 
@@ -594,24 +592,6 @@ export default function FlowBuilderTestPanel({
         </IconButton>
       </Box>
 
-      <Box
-        sx={{
-          px: 2,
-          pb: 2,
-          display: { xs: "flex", sm: "none" },
-          justifyContent: "center",
-        }}
-      >
-        <Button
-          startIcon={<RestartAltIcon />}
-          size="small"
-          variant="outlined"
-          onClick={resetAndStart}
-          sx={{ fontWeight: 600 }}
-        >
-          {t("restartFull")}
-        </Button>
-      </Box>
     </Drawer>
   );
 }

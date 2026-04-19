@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { makeStyles } from "@material-ui/core/styles";
 import IconButton from "@material-ui/core/IconButton";
+import Tooltip from "@material-ui/core/Tooltip";
 import Menu from "@material-ui/core/Menu";
 import MenuItem from "@material-ui/core/MenuItem";
 import ListItemIcon from "@material-ui/core/ListItemIcon";
@@ -11,14 +12,14 @@ import DialogContent from "@material-ui/core/DialogContent";
 import DialogActions from "@material-ui/core/DialogActions";
 import Button from "@material-ui/core/Button";
 import FormControl from "@material-ui/core/FormControl";
+import FormHelperText from "@material-ui/core/FormHelperText";
 import InputLabel from "@material-ui/core/InputLabel";
 import Select from "@material-ui/core/Select";
 import TextField from "@material-ui/core/TextField";
 import Autocomplete from "@material-ui/lab/Autocomplete";
 import MoreVertIcon from "@material-ui/icons/MoreVert";
-import PersonOutlineIcon from "@material-ui/icons/PersonOutline";
+import SwapHorizIcon from "@material-ui/icons/SwapHoriz";
 import PersonAddDisabledOutlinedIcon from "@material-ui/icons/PersonAddDisabledOutlined";
-import AccountTreeOutlinedIcon from "@material-ui/icons/AccountTreeOutlined";
 import LocalOfferOutlinedIcon from "@material-ui/icons/LocalOfferOutlined";
 import DoneOutlinedIcon from "@material-ui/icons/DoneOutlined";
 
@@ -37,6 +38,18 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
+/** Utilizadores vinculados ao setor via associação User.queues (ListUsersService inclui `queues`). */
+function userHasQueueMembership(user, queueId) {
+  const q = Number(queueId);
+  if (!queueId || Number.isNaN(q)) return false;
+  return Array.isArray(user?.queues) && user.queues.some((x) => Number(x.id) === q);
+}
+
+function filterUsersByQueue(usersList, queueId) {
+  if (!queueId || !Array.isArray(usersList)) return [];
+  return usersList.filter((u) => userHasQueueMembership(u, queueId));
+}
+
 function buildUpdateBody(ticket, overrides) {
   return {
     status: overrides.status !== undefined ? overrides.status : ticket.status,
@@ -52,17 +65,35 @@ function buildUpdateBody(ticket, overrides) {
 /**
  * Menu discreto + diálogos para ações rápidas no card do Kanban.
  */
-const KanbanTicketQuickMenu = ({ ticket, authUser, usersList, queuesList, onTicketUpdated }) => {
+const KanbanTicketQuickMenu = ({
+  ticket,
+  authUser,
+  usersList,
+  queuesList,
+  onTicketUpdated,
+  canTransfer = true,
+}) => {
   const classes = useStyles();
   const [anchorEl, setAnchorEl] = useState(null);
   const [dialog, setDialog] = useState(null);
   const [saving, setSaving] = useState(false);
   const [tagOptions, setTagOptions] = useState([]);
-  const [assignUserId, setAssignUserId] = useState("");
-  const [queueId, setQueueId] = useState("");
+  const [transferQueueId, setTransferQueueId] = useState("");
+  const [transferUserId, setTransferUserId] = useState("");
   const [tagsSelection, setTagsSelection] = useState([]);
 
   const menuOpen = Boolean(anchorEl);
+
+  const attendantsForSelectedQueue = useMemo(
+    () => filterUsersByQueue(usersList, transferQueueId ? Number(transferQueueId) : null),
+    [usersList, transferQueueId]
+  );
+
+  useEffect(() => {
+    if (dialog !== "transfer" || !transferQueueId || !transferUserId) return;
+    const allowed = attendantsForSelectedQueue.some((u) => String(u.id) === transferUserId);
+    if (!allowed) setTransferUserId("");
+  }, [dialog, transferQueueId, transferUserId, attendantsForSelectedQueue]);
 
   useEffect(() => {
     const load = async () => {
@@ -87,11 +118,9 @@ const KanbanTicketQuickMenu = ({ ticket, authUser, usersList, queuesList, onTick
 
   const openDialog = (type) => {
     closeMenu();
-    if (type === "assign") {
-      setAssignUserId(ticket.userId ? String(ticket.userId) : "");
-    }
-    if (type === "queue") {
-      setQueueId(ticket.queueId ? String(ticket.queueId) : "");
+    if (type === "transfer") {
+      setTransferQueueId(ticket.queueId ? String(ticket.queueId) : "");
+      setTransferUserId("");
     }
     if (type === "tags") {
       setTagsSelection(Array.isArray(ticket.tags) ? [...ticket.tags] : []);
@@ -104,17 +133,12 @@ const KanbanTicketQuickMenu = ({ ticket, authUser, usersList, queuesList, onTick
     try {
       const { data } = await api.put(`/tickets/${ticket.id}`, body);
       if (data) onTicketUpdated(data);
+      setDialog(null);
     } catch (err) {
       toastError(err);
     } finally {
       setSaving(false);
-      setDialog(null);
     }
-  };
-
-  const handleAssignSave = () => {
-    if (!assignUserId) return;
-    putTicket(buildUpdateBody(ticket, { userId: Number(assignUserId) }));
   };
 
   const handleUnassign = () => {
@@ -122,9 +146,18 @@ const KanbanTicketQuickMenu = ({ ticket, authUser, usersList, queuesList, onTick
     putTicket(buildUpdateBody(ticket, { userId: null }));
   };
 
-  const handleQueueSave = () => {
-    if (!queueId) return;
-    putTicket(buildUpdateBody(ticket, { queueId: Number(queueId) }));
+  const handleTransferSave = () => {
+    if (!transferQueueId) return;
+    const newQueueId = Number(transferQueueId);
+    const overrides = { queueId: newQueueId };
+    if (transferUserId) {
+      const newUserId = Number(transferUserId);
+      if (ticket.userId != null && newUserId !== ticket.userId) {
+        if (!window.confirm(i18n.t("kanban.quickActions.confirmTransferUser"))) return;
+      }
+      overrides.userId = newUserId;
+    }
+    putTicket(buildUpdateBody(ticket, overrides));
   };
 
   const handleTagsSave = async () => {
@@ -141,11 +174,11 @@ const KanbanTicketQuickMenu = ({ ticket, authUser, usersList, queuesList, onTick
         ...ticket,
         tags: tagsPayload,
       });
+      setDialog(null);
     } catch (err) {
       toastError(err);
     } finally {
       setSaving(false);
-      setDialog(null);
     }
   };
 
@@ -170,6 +203,10 @@ const KanbanTicketQuickMenu = ({ ticket, authUser, usersList, queuesList, onTick
   }, [ticket, authUser, onTicketUpdated]);
 
   const isClosed = ticket.status === "closed";
+  const transferAllowed = Boolean(canTransfer);
+  const iconTooltip = transferAllowed
+    ? i18n.t("kanban.quickActions.transferTooltip")
+    : i18n.t("kanban.quickActions.menuAria");
 
   return (
     <>
@@ -178,14 +215,16 @@ const KanbanTicketQuickMenu = ({ ticket, authUser, usersList, queuesList, onTick
         onClick={(e) => e.stopPropagation()}
         draggable={false}
       >
-        <IconButton
-          className={classes.iconBtn}
-          size="small"
-          aria-label={i18n.t("kanban.quickActions.menuAria")}
-          onClick={handleOpenMenu}
-        >
-          <MoreVertIcon fontSize="small" />
-        </IconButton>
+        <Tooltip title={iconTooltip}>
+          <IconButton
+            className={classes.iconBtn}
+            size="small"
+            aria-label={i18n.t("kanban.quickActions.menuAria")}
+            onClick={handleOpenMenu}
+          >
+            <MoreVertIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
       </span>
 
       <Menu
@@ -197,36 +236,24 @@ const KanbanTicketQuickMenu = ({ ticket, authUser, usersList, queuesList, onTick
         transformOrigin={{ vertical: "top", horizontal: "right" }}
         classes={{ paper: classes.menuPaper }}
       >
-        {!isClosed && (
+        {!isClosed && transferAllowed && (
           <MenuItem
             onClick={() => {
-              openDialog("assign");
+              openDialog("transfer");
             }}
           >
             <ListItemIcon>
-              <PersonOutlineIcon fontSize="small" />
+              <SwapHorizIcon fontSize="small" />
             </ListItemIcon>
-            <ListItemText primary={i18n.t("kanban.quickActions.assign")} />
+            <ListItemText primary={i18n.t("kanban.quickActions.transferConversation")} />
           </MenuItem>
         )}
-        {!isClosed && ticket.userId && (
+        {!isClosed && transferAllowed && ticket.userId && (
           <MenuItem onClick={handleUnassign}>
             <ListItemIcon>
               <PersonAddDisabledOutlinedIcon fontSize="small" />
             </ListItemIcon>
             <ListItemText primary={i18n.t("kanban.quickActions.unassign")} />
-          </MenuItem>
-        )}
-        {!isClosed && (
-          <MenuItem
-            onClick={() => {
-              openDialog("queue");
-            }}
-          >
-            <ListItemIcon>
-              <AccountTreeOutlinedIcon fontSize="small" />
-            </ListItemIcon>
-            <ListItemText primary={i18n.t("kanban.quickActions.changeQueue")} />
           </MenuItem>
         )}
         <MenuItem
@@ -249,43 +276,15 @@ const KanbanTicketQuickMenu = ({ ticket, authUser, usersList, queuesList, onTick
         )}
       </Menu>
 
-      <Dialog open={dialog === "assign"} onClose={() => !saving && setDialog(null)} maxWidth="xs" fullWidth>
-        <DialogTitle>{i18n.t("kanban.quickActions.assign")}</DialogTitle>
+      <Dialog open={dialog === "transfer"} onClose={() => !saving && setDialog(null)} maxWidth="xs" fullWidth>
+        <DialogTitle>{i18n.t("kanban.quickActions.transferConversation")}</DialogTitle>
         <DialogContent>
-          <FormControl variant="outlined" margin="normal" fullWidth size="small">
-            <InputLabel>{i18n.t("kanban.quickActions.selectUser")}</InputLabel>
-            <Select
-              label={i18n.t("kanban.quickActions.selectUser")}
-              value={assignUserId}
-              onChange={(e) => setAssignUserId(e.target.value)}
-            >
-              {(usersList || []).map((u) => (
-                <MenuItem key={u.id} value={String(u.id)}>
-                  {u.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDialog(null)} disabled={saving}>
-            {i18n.t("kanban.quickActions.cancel")}
-          </Button>
-          <Button color="primary" variant="contained" disabled={saving || !assignUserId} onClick={handleAssignSave}>
-            {i18n.t("kanban.quickActions.save")}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <Dialog open={dialog === "queue"} onClose={() => !saving && setDialog(null)} maxWidth="xs" fullWidth>
-        <DialogTitle>{i18n.t("kanban.quickActions.changeQueue")}</DialogTitle>
-        <DialogContent>
-          <FormControl variant="outlined" margin="normal" fullWidth size="small">
+          <FormControl variant="outlined" margin="normal" fullWidth size="small" required>
             <InputLabel>{i18n.t("kanban.quickActions.selectQueue")}</InputLabel>
             <Select
               label={i18n.t("kanban.quickActions.selectQueue")}
-              value={queueId}
-              onChange={(e) => setQueueId(e.target.value)}
+              value={transferQueueId}
+              onChange={(e) => setTransferQueueId(e.target.value)}
             >
               {(queuesList || []).map((q) => (
                 <MenuItem key={q.id} value={String(q.id)}>
@@ -294,13 +293,46 @@ const KanbanTicketQuickMenu = ({ ticket, authUser, usersList, queuesList, onTick
               ))}
             </Select>
           </FormControl>
+          <FormControl
+            variant="outlined"
+            margin="normal"
+            fullWidth
+            size="small"
+            disabled={!transferQueueId}
+          >
+            <InputLabel>{i18n.t("kanban.quickActions.selectUserOptional")}</InputLabel>
+            <Select
+              label={i18n.t("kanban.quickActions.selectUserOptional")}
+              value={transferUserId}
+              onChange={(e) => setTransferUserId(e.target.value)}
+              displayEmpty
+              disabled={!transferQueueId}
+            >
+              <MenuItem value="">
+                <em>{i18n.t("kanban.quickActions.keepCurrentAttendant")}</em>
+              </MenuItem>
+              {attendantsForSelectedQueue.map((u) => (
+                <MenuItem key={u.id} value={String(u.id)}>
+                  {u.name}
+                </MenuItem>
+              ))}
+            </Select>
+            {transferQueueId && attendantsForSelectedQueue.length === 0 ? (
+              <FormHelperText>{i18n.t("kanban.quickActions.noAttendantsForQueue")}</FormHelperText>
+            ) : null}
+          </FormControl>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDialog(null)} disabled={saving}>
             {i18n.t("kanban.quickActions.cancel")}
           </Button>
-          <Button color="primary" variant="contained" disabled={saving || !queueId} onClick={handleQueueSave}>
-            {i18n.t("kanban.quickActions.save")}
+          <Button
+            color="primary"
+            variant="contained"
+            disabled={saving || !transferQueueId}
+            onClick={handleTransferSave}
+          >
+            {i18n.t("kanban.quickActions.confirm")}
           </Button>
         </DialogActions>
       </Dialog>

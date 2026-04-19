@@ -1,7 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { openApi } from "../../services/api";
 import { getApiUrl } from "../../config/backendUrl";
-import { nomeEmpresa as packageName } from "../../../package.json";
 import defaultLogo from "../../assets/logo.png";
 
 function resolveStoredLogoUrl(raw) {
@@ -18,56 +17,77 @@ function defaultFaviconAbsoluteHref() {
   return `${window.location.origin}${base}/favicon.ico`;
 }
 
-const defaultBranding = {
-  systemName: packageName || "CoreFlow",
+/** Estado base quando não há bootstrap nem API (sem nome de marca embutido). */
+const emptyBranding = {
+  systemName: "",
   loginLogoUrl: "",
   menuLogoUrl: "",
   faviconUrl: "",
   publicWhatsAppNumber: "",
-  publicWhatsAppMessage: "",
+  publicWhatsAppMessage: ""
 };
 
+function readBootstrapBranding() {
+  if (typeof window === "undefined" || !window.__BOOTSTRAP_BRANDING__) {
+    return null;
+  }
+  const w = window.__BOOTSTRAP_BRANDING__;
+  return {
+    systemName: w.systemName != null ? String(w.systemName) : "",
+    loginLogoUrl: w.loginLogoUrl != null ? String(w.loginLogoUrl) : "",
+    menuLogoUrl: w.menuLogoUrl != null ? String(w.menuLogoUrl) : "",
+    faviconUrl: w.faviconUrl != null ? String(w.faviconUrl) : "",
+    publicWhatsAppNumber: w.publicWhatsAppNumber != null ? String(w.publicWhatsAppNumber) : "",
+    publicWhatsAppMessage: w.publicWhatsAppMessage != null ? String(w.publicWhatsAppMessage) : ""
+  };
+}
+
 const BrandingContext = createContext({
-  branding: defaultBranding,
+  branding: emptyBranding,
   loading: true,
   error: null,
   refreshBranding: async () => {},
   resolveLoginLogo: () => defaultLogo,
   resolveMenuLogo: () => defaultLogo,
-  resolveFavicon: () => defaultFaviconAbsoluteHref(),
+  resolveFavicon: () => defaultFaviconAbsoluteHref()
 });
 
 export function BrandingProvider({ children }) {
-  const [branding, setBranding] = useState(defaultBranding);
-  const [loading, setLoading] = useState(true);
+  const [bootstrapSnapshot] = useState(() => readBootstrapBranding());
+  const [branding, setBranding] = useState(() =>
+    bootstrapSnapshot ? { ...emptyBranding, ...bootstrapSnapshot } : emptyBranding
+  );
+  const [loading, setLoading] = useState(() => !bootstrapSnapshot);
   const [error, setError] = useState(null);
 
   const fetchBranding = useCallback(async () => {
     try {
       const { data } = await openApi.get("/system-settings/branding");
       setBranding({
-        systemName: data?.systemName || defaultBranding.systemName,
+        systemName: data?.systemName != null ? String(data.systemName) : "",
         loginLogoUrl: data?.loginLogoUrl ?? "",
         menuLogoUrl: data?.menuLogoUrl ?? "",
         faviconUrl: data?.faviconUrl ?? "",
         publicWhatsAppNumber: data?.publicWhatsAppNumber ?? "",
-        publicWhatsAppMessage: data?.publicWhatsAppMessage ?? "",
+        publicWhatsAppMessage: data?.publicWhatsAppMessage ?? ""
       });
       setError(null);
     } catch (e) {
       setError(e);
-      setBranding(defaultBranding);
+      if (!bootstrapSnapshot) {
+        setBranding(emptyBranding);
+      }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [bootstrapSnapshot]);
 
   useEffect(() => {
     fetchBranding();
   }, [fetchBranding]);
 
   useEffect(() => {
-    const name = branding.systemName || defaultBranding.systemName;
+    const name = (branding.systemName || "").trim();
     if (typeof document !== "undefined") {
       document.title = name;
     }
@@ -107,7 +127,7 @@ export function BrandingProvider({ children }) {
       refreshBranding: fetchBranding,
       resolveLoginLogo,
       resolveMenuLogo,
-      resolveFavicon,
+      resolveFavicon
     }),
     [branding, loading, error, fetchBranding, resolveLoginLogo, resolveMenuLogo, resolveFavicon]
   );

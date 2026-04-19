@@ -758,6 +758,7 @@ const Kanban = () => {
                                   usersList={usersList}
                                   queuesList={Array.isArray(queues) ? queues : []}
                                   onTicketUpdated={handleTicketUpdatedFromQuickAction}
+                                  canTransfer={isAdmin || queuesList.length > 0}
                                 />
                               </div>
                               <div className={classes.cardChipsRow}>

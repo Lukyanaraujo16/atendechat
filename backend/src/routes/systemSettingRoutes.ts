@@ -12,6 +12,11 @@ systemSettingRoutes.get(
 );
 
 systemSettingRoutes.get(
+  "/system-settings/branding-bootstrap.js",
+  SystemSettingController.publicBrandingBootstrapScript
+);
+
+systemSettingRoutes.get(
   "/system-settings",
   isAuth,
   isSuper,

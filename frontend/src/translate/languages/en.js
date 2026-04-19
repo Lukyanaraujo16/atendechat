@@ -241,18 +241,27 @@ const messages = {
 				loading: "Loading board…",
 				quickActions: {
 					menuAria: "Ticket actions",
+					transferTooltip: "Transfer conversation",
+					transferConversation: "Transfer conversation",
 					assign: "Assign agent",
 					unassign: "Unassign agent",
 					changeQueue: "Change queue",
 					tags: "Tags",
 					close: "Close ticket",
 					selectUser: "Agent",
+					selectUserOptional: "Agent (optional)",
+					keepCurrentAttendant: "Keep current agent",
 					selectQueue: "Queue",
 					tagsPlaceholder: "Select tags",
 					confirmClose:
 						"Close this ticket? The conversation will end according to your existing rules (auto messages, survey, etc.).",
+					confirmTransferUser:
+						"Transfer this ticket to another agent?",
 					cancel: "Cancel",
 					save: "Save",
+					confirm: "Confirm",
+					noAttendantsForQueue:
+						"No agents available for this queue. You can still transfer the queue only.",
 				},
 			},
 			invoices: {

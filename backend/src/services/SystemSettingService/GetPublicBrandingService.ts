@@ -10,8 +10,9 @@ export const BRANDING_KEYS = {
   publicWhatsAppMessage: "publicWhatsAppMessage"
 } as const;
 
+/** Valores quando ainda não há registo na BD (evitar “CoreFlow” como marca implícita). */
 export const DEFAULT_BRANDING = {
-  systemName: "CoreFlow",
+  systemName: "",
   loginLogoUrl: "",
   menuLogoUrl: "",
   faviconUrl: "",
@@ -51,15 +52,27 @@ const GetPublicBrandingService = async (): Promise<PublicBranding> => {
     map[r.key] = r.value ?? "";
   });
 
+  const hasKey = (k: string) => Object.prototype.hasOwnProperty.call(map, k);
+
   return {
-    systemName: map[BRANDING_KEYS.systemName] || DEFAULT_BRANDING.systemName,
-    loginLogoUrl: map[BRANDING_KEYS.loginLogoUrl] ?? DEFAULT_BRANDING.loginLogoUrl,
-    menuLogoUrl: map[BRANDING_KEYS.menuLogoUrl] ?? DEFAULT_BRANDING.menuLogoUrl,
-    faviconUrl: map[BRANDING_KEYS.faviconUrl] ?? DEFAULT_BRANDING.faviconUrl,
-    publicWhatsAppNumber:
-      map[BRANDING_KEYS.publicWhatsAppNumber] ?? DEFAULT_BRANDING.publicWhatsAppNumber,
-    publicWhatsAppMessage:
-      map[BRANDING_KEYS.publicWhatsAppMessage] ?? DEFAULT_BRANDING.publicWhatsAppMessage
+    systemName: hasKey(BRANDING_KEYS.systemName)
+      ? String(map[BRANDING_KEYS.systemName] ?? "")
+      : DEFAULT_BRANDING.systemName,
+    loginLogoUrl: hasKey(BRANDING_KEYS.loginLogoUrl)
+      ? String(map[BRANDING_KEYS.loginLogoUrl] ?? "")
+      : DEFAULT_BRANDING.loginLogoUrl,
+    menuLogoUrl: hasKey(BRANDING_KEYS.menuLogoUrl)
+      ? String(map[BRANDING_KEYS.menuLogoUrl] ?? "")
+      : DEFAULT_BRANDING.menuLogoUrl,
+    faviconUrl: hasKey(BRANDING_KEYS.faviconUrl)
+      ? String(map[BRANDING_KEYS.faviconUrl] ?? "")
+      : DEFAULT_BRANDING.faviconUrl,
+    publicWhatsAppNumber: hasKey(BRANDING_KEYS.publicWhatsAppNumber)
+      ? String(map[BRANDING_KEYS.publicWhatsAppNumber] ?? "")
+      : DEFAULT_BRANDING.publicWhatsAppNumber,
+    publicWhatsAppMessage: hasKey(BRANDING_KEYS.publicWhatsAppMessage)
+      ? String(map[BRANDING_KEYS.publicWhatsAppMessage] ?? "")
+      : DEFAULT_BRANDING.publicWhatsAppMessage
   };
 };
 

@@ -242,18 +242,27 @@ const messages = {
         loading: "Cargando tablero…",
         quickActions: {
           menuAria: "Acciones del ticket",
+          transferTooltip: "Transferir conversación",
+          transferConversation: "Transferir conversación",
           assign: "Asignar agente",
           unassign: "Quitar agente",
           changeQueue: "Cambiar sector",
           tags: "Etiquetas",
           close: "Cerrar ticket",
           selectUser: "Agente",
+          selectUserOptional: "Agente (opcional)",
+          keepCurrentAttendant: "Mantener agente actual",
           selectQueue: "Cola",
           tagsPlaceholder: "Seleccione etiquetas",
           confirmClose:
             "¿Cerrar este ticket? El atención finalizará según las reglas configuradas (mensajes automáticos, encuesta, etc.).",
+          confirmTransferUser:
+            "¿Transferir este atendimiento a otro agente?",
           cancel: "Cancelar",
           save: "Guardar",
+          confirm: "Confirmar",
+          noAttendantsForQueue:
+            "Ningún agente disponible para este sector. Aún puede transferir solo el sector.",
         },
       },
       invoices: {
