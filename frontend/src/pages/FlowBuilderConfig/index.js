@@ -102,6 +102,7 @@ import { Add } from "@mui/icons-material";
 
 import { useNodeStorage } from "../../stores/useNodeStorage";
 import { ConfirmationNumber } from "@material-ui/icons";
+import { FlowBuilderFlowContext } from "./FlowBuilderFlowContext";
 
 const useStyles = makeStyles((theme) => ({
   mainPaper: {
@@ -291,6 +292,9 @@ const FlowBuilderConfig = () => {
             data: {
               message: data.message,
               arrayOption: data.arrayOption,
+              invalidOptionMessage: data.invalidOptionMessage ?? "",
+              timeoutMessage: data.timeoutMessage ?? "",
+              menuTimeoutSeconds: data.menuTimeoutSeconds ?? 0,
             },
             type: "menu",
           },
@@ -948,6 +952,7 @@ const FlowBuilderConfig = () => {
   }, [storageItems.action]);
 
   return (
+    <FlowBuilderFlowContext.Provider value={{ edges }}>
     <Stack sx={{ height: "100vh" }}>
       <FlowBuilderAddTextModal
         open={modalAddText}
@@ -969,6 +974,7 @@ const FlowBuilderConfig = () => {
         data={dataNode}
         onUpdate={updateNode}
         close={setModalAddMenu}
+        edges={edges}
       />
       <FlowBuilderAddImgModal
         open={modalAddImg}
@@ -1444,6 +1450,7 @@ const FlowBuilderConfig = () => {
         flowName={flowDisplayName}
       />
     </Stack>
+    </FlowBuilderFlowContext.Provider>
   );
 };
 

@@ -2581,6 +2581,8 @@ const messages = {
         ended: "— Fin de la simulación —",
         noWaitHint:
           "Fuera de los pasos que esperan mensaje, use Reiniciar para una nueva prueba.",
+        menuPlaceholder:
+          "Número de opción o texto inválido para probar la rama roja…",
         simulatedActionBadge: "Acción simulada",
         notExecutedPreview: "No ejecutado en la vista previa · sin llamadas externas",
         actionHttp: "Petición HTTP",
@@ -2620,6 +2622,33 @@ const messages = {
           flowUp: "Flujo superior",
           openai: "OpenAI",
           typebot: "Typebot",
+        },
+      },
+      flowBuilderMenu: {
+        createHint:
+          "Tras añadir el nodo, conecte la salida roja (opción inválida) y, si usa tiempo de espera, la naranja (sin respuesta), para evitar conversaciones bloqueadas en el bot.",
+        warningsHeader: "Avisos (no bloquean guardar)",
+        warnings: {
+          missing_invalid: {
+            short: "Sin rama inválida",
+            detail:
+              "La salida roja «Opción inválida» no está conectada. Si el cliente responde fuera del menú, el flujo puede detenerse sin derivar.",
+          },
+          timeout_no_edge: {
+            short: "Timeout sin salida",
+            detail:
+              "Definió tiempo de espera (> 0 s) pero la salida naranja «Sin respuesta» no está conectada. El timeout no tendrá destino.",
+          },
+          timeout_edge_no_time: {
+            short: "Salida timeout sin tiempo",
+            detail:
+              "La salida naranja «Sin respuesta» está conectada pero el tiempo es 0. Defina segundos o quite la arista para evitar incoherencia.",
+          },
+          no_option_edges: {
+            short: "Opciones sin conexión",
+            detail:
+              "Hay opciones en el menú pero ninguna salida numerada (azul) está conectada. El cliente no podrá avanzar con una opción válida.",
+          },
         },
       },
       errors: {

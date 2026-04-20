@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 
 import * as Yup from "yup";
 import { Formik, FieldArray, Form, Field } from "formik";
@@ -29,6 +29,8 @@ import {
   Stack
 } from "@mui/material";
 import { AddCircle, Delete } from "@mui/icons-material";
+import Alert from "@material-ui/lab/Alert";
+import { getMenuNodeWarningIds } from "../../pages/FlowBuilderConfig/flowMenuWarnings";
 
 const useStyles = makeStyles(theme => ({
   root: {
@@ -86,7 +88,14 @@ const ContactSchema = Yup.object().shape({
     .required("Digite uma mensagem!")
 });
 
-const FlowBuilderMenuModal = ({ open, onSave, onUpdate, data, close }) => {
+const FlowBuilderMenuModal = ({
+  open,
+  onSave,
+  onUpdate,
+  data,
+  close,
+  edges = []
+}) => {
   const classes = useStyles();
   const isMounted = useRef(true);
 
@@ -97,6 +106,30 @@ const FlowBuilderMenuModal = ({ open, onSave, onUpdate, data, close }) => {
   const [textDig, setTextDig] = useState();
 
   const [arrayOption, setArrayOption] = useState([]);
+  const [invalidOptionMessage, setInvalidOptionMessage] = useState("");
+  const [timeoutMessage, setTimeoutMessage] = useState("");
+  const [menuTimeoutSeconds, setMenuTimeoutSeconds] = useState(0);
+
+  const menuWarningIds = useMemo(() => {
+    if (!activeModal || open !== "edit" || !data?.id) return [];
+    const syntheticData = {
+      ...(data.data || {}),
+      arrayOption,
+      menuTimeoutSeconds,
+      invalidOptionMessage,
+      timeoutMessage
+    };
+    return getMenuNodeWarningIds(data.id, edges, syntheticData);
+  }, [
+    activeModal,
+    open,
+    data,
+    edges,
+    arrayOption,
+    menuTimeoutSeconds,
+    invalidOptionMessage,
+    timeoutMessage
+  ]);
 
   const [labels, setLabels] = useState({
     title: "Adicionar menu ao fluxo",
@@ -111,6 +144,11 @@ const FlowBuilderMenuModal = ({ open, onSave, onUpdate, data, close }) => {
       });
       setTextDig(data.data.message);
       setArrayOption(data.data.arrayOption);
+      setInvalidOptionMessage(data.data.invalidOptionMessage || "");
+      setTimeoutMessage(data.data.timeoutMessage || "");
+      setMenuTimeoutSeconds(
+        Math.max(0, parseInt(String(data.data.menuTimeoutSeconds || 0), 10) || 0)
+      );
       setActiveModal(true);
     } else if (open === "create") {
       setLabels({
@@ -119,6 +157,9 @@ const FlowBuilderMenuModal = ({ open, onSave, onUpdate, data, close }) => {
       });
       setTextDig();
       setArrayOption([]);
+      setInvalidOptionMessage("");
+      setTimeoutMessage("");
+      setMenuTimeoutSeconds(0);
       setActiveModal(true);
     } else {
       setActiveModal(false);
@@ -141,14 +182,29 @@ const FlowBuilderMenuModal = ({ open, onSave, onUpdate, data, close }) => {
       handleClose();
       onUpdate({
         ...data,
-        data: { message: textDig, arrayOption: arrayOption }
+        data: {
+          message: textDig,
+          arrayOption: arrayOption,
+          invalidOptionMessage: invalidOptionMessage || "",
+          timeoutMessage: timeoutMessage || "",
+          menuTimeoutSeconds: Math.max(
+            0,
+            parseInt(String(menuTimeoutSeconds), 10) || 0
+          )
+        }
       });
       return;
     } else if (open === "create") {
       handleClose();
       onSave({
         message: textDig,
-        arrayOption: arrayOption
+        arrayOption: arrayOption,
+        invalidOptionMessage: invalidOptionMessage || "",
+        timeoutMessage: timeoutMessage || "",
+        menuTimeoutSeconds: Math.max(
+          0,
+          parseInt(String(menuTimeoutSeconds), 10) || 0
+        )
       });
     }
   };
@@ -167,6 +223,27 @@ const FlowBuilderMenuModal = ({ open, onSave, onUpdate, data, close }) => {
       >
         <DialogTitle id="form-dialog-title">{labels.title}</DialogTitle>
         <Stack>
+          {open === "create" && activeModal ? (
+            <Alert severity="info" style={{ margin: "0 16px 8px" }}>
+              {i18n.t("flowBuilderMenu.createHint")}
+            </Alert>
+          ) : null}
+          {open === "edit" && activeModal && menuWarningIds.length > 0 ? (
+            <Alert severity="warning" style={{ margin: "0 16px 8px" }}>
+              <Typography variant="subtitle2" gutterBottom>
+                {i18n.t("flowBuilderMenu.warningsHeader")}
+              </Typography>
+              <ul style={{ margin: 0, paddingLeft: 18 }}>
+                {menuWarningIds.map(wid => (
+                  <li key={wid}>
+                    <Typography variant="body2" component="span">
+                      {i18n.t(`flowBuilderMenu.warnings.${wid}.detail`)}
+                    </Typography>
+                  </li>
+                ))}
+              </ul>
+            </Alert>
+          ) : null}
           <Stack dividers style={{ gap: "8px", padding: "16px" }}>
             <TextField
               label={"Mensagem de explicação do menu"}
@@ -219,6 +296,52 @@ const FlowBuilderMenuModal = ({ open, onSave, onUpdate, data, close }) => {
                 </Stack>
               </Stack>
             ))}
+            <Typography variant="subtitle2" color="textSecondary">
+              Ramo &quot;Opção inválida&quot; (vermelho no nó): mensagem opcional
+              enviada ao cliente antes de seguir esse ramo.
+            </Typography>
+            <TextField
+              label="Mensagem — opção inválida"
+              rows={2}
+              name="invalidOptionMessage"
+              multiline
+              variant="outlined"
+              value={invalidOptionMessage}
+              onChange={e => setInvalidOptionMessage(e.target.value)}
+              className={classes.textField}
+              style={{ width: "100%" }}
+              placeholder="Ex.: Não entendi. Escolha uma das opções acima."
+            />
+            <Typography variant="subtitle2" color="textSecondary" style={{ marginTop: 8 }}>
+              Ramo &quot;Sem resposta&quot; (laranja): tempo em segundos sem
+              mensagem do cliente. 0 = desligado. Conecte a saída laranja no
+              fluxo.
+            </Typography>
+            <TextField
+              label="Tempo máximo de espera (segundos)"
+              type="number"
+              inputProps={{ min: 0, max: 86400 }}
+              variant="outlined"
+              value={menuTimeoutSeconds}
+              onChange={e =>
+                setMenuTimeoutSeconds(
+                  Math.max(0, parseInt(e.target.value, 10) || 0)
+                )
+              }
+              className={classes.textField}
+              style={{ width: "100%" }}
+            />
+            <TextField
+              label="Mensagem — sem resposta (opcional)"
+              rows={2}
+              name="timeoutMessage"
+              multiline
+              variant="outlined"
+              value={timeoutMessage}
+              onChange={e => setTimeoutMessage(e.target.value)}
+              className={classes.textField}
+              style={{ width: "100%" }}
+            />
           </Stack>
           <DialogActions>
             <Button onClick={handleClose} color="secondary" variant="outlined">

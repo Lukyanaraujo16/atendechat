@@ -272,6 +272,48 @@ export default function FlowBuilderTestPanel({
     if (!trimmed) return;
     setInput("");
 
+    if (wait?.kind === "menu" && wait.payload?.menuNodeId) {
+      const opts = Array.isArray(wait.payload.options) ? wait.payload.options : [];
+      const validSet = new Set(opts.map((o) => String(o.number)));
+      let matched = validSet.has(trimmed) ? trimmed : null;
+      if (!matched) {
+        const m = trimmed.match(/\d+/);
+        if (m && validSet.has(m[0])) matched = m[0];
+      }
+      if (matched) {
+        handleMenuPick(matched);
+        return;
+      }
+
+      setLines((prev) => [...prev, { id: uid(), from: "user", text: trimmed }]);
+      const menuNodeId = wait.payload.menuNodeId;
+      const nextCtx = {
+        ...ctx,
+        lastUserMessage: trimmed,
+        messageCount: ctx.messageCount + 1,
+      };
+      setCtx(nextCtx);
+      setWait(null);
+      const nextId = pickNextNode(edgesRef.current, menuNodeId, "invalid");
+      if (nextId) {
+        const result = runSimulationStep(
+          nodesRef.current,
+          edgesRef.current,
+          nextId,
+          nextCtx
+        );
+        appendBotLines(result.messages);
+        applyStepFromResult(result);
+        if (result.wait) {
+          setWait({ kind: result.wait, payload: result.payload });
+        }
+      } else {
+        appendBotLines([{ from: "bot", text: t("ended") }]);
+        setStepInfo(null);
+      }
+      return;
+    }
+
     setLines((prev) => [...prev, { id: uid(), from: "user", text: trimmed }]);
 
     const nextCtx = {
@@ -571,7 +613,9 @@ export default function FlowBuilderTestPanel({
           size="small"
           multiline
           maxRows={3}
-          placeholder={t("placeholder")}
+          placeholder={
+            wait?.kind === "menu" ? t("menuPlaceholder") : t("placeholder")
+          }
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
@@ -580,12 +624,12 @@ export default function FlowBuilderTestPanel({
               handleSend();
             }
           }}
-          disabled={wait?.kind === "menu" || wait?.kind === "condition"}
+          disabled={wait?.kind === "condition"}
         />
         <IconButton
           color="primary"
           onClick={handleSend}
-          disabled={wait?.kind === "menu" || wait?.kind === "condition"}
+          disabled={wait?.kind === "condition"}
           aria-label={t("send")}
         >
           <SendIcon />

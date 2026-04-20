@@ -32,6 +32,7 @@ import FilesOptions from './models/FilesOptions';
 import { addSeconds, differenceInSeconds } from "date-fns";
 import formatBody from "./helpers/Mustache";
 import { ClosedAllOpenTickets } from "./services/WbotServices/wbotClosedTickets";
+import { flowMenuTimeoutQueue } from "./libs/flowMenuTimeoutQueue";
 
 /** Retries de conexão (AGUARDANDO_CONEXAO), não antecipação de horário. */
 const SCHEDULE_RETRY_BACKOFF_MINUTES = 2;
@@ -1368,6 +1369,13 @@ export async function startQueueProcess() {
   logger.info("[🏁] - Iniciando processamento de filas");
 
   messageQueue.process("SendMessage", handleSendMessage);
+
+  flowMenuTimeoutQueue.process(async job => {
+    const { processFlowMenuTimeout } = await import(
+      "./services/FlowBuilderService/ProcessFlowMenuTimeout"
+    );
+    return processFlowMenuTimeout(job);
+  });
 
   scheduleMonitor.process("Verify", handleVerifySchedules);
 

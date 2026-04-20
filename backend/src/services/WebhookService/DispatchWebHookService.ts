@@ -38,6 +38,12 @@ export interface INodes {
     sec?: string
     message?: string
     arrayOption?: IArrayOption[]
+    /** Texto opcional antes de seguir a aresta `invalid` do nó menu */
+    invalidOptionMessage?: string
+    /** Segundos até disparar aresta `timeout` (0 = desligado) */
+    menuTimeoutSeconds?: number
+    /** Texto opcional antes de seguir a aresta `timeout` */
+    timeoutMessage?: string
     typebotIntegration?: QueueIntegrations
   };
   type: string;

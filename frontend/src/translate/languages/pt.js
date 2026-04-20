@@ -2790,6 +2790,8 @@ const messages = {
         ended: "— Fim da simulação —",
         noWaitHint:
           "Fora dos pontos em que o fluxo pede mensagem, use Reiniciar para um novo teste.",
+        menuPlaceholder:
+          "Opção (número) ou texto inválido para testar o ramo vermelho…",
         simulatedActionBadge: "Ação simulada",
         notExecutedPreview: "Não executado no preview · sem chamadas externas",
         actionHttp: "Pedido HTTP",
@@ -2829,6 +2831,33 @@ const messages = {
           flowUp: "Fluxo superior",
           openai: "OpenAI",
           typebot: "Typebot",
+        },
+      },
+      flowBuilderMenu: {
+        createHint:
+          "Depois de adicionar o nó, ligue a saída vermelha (opção inválida) e, se usar tempo de espera, a laranja (sem resposta), para evitar conversas presas no bot.",
+        warningsHeader: "Avisos (não bloqueiam salvar)",
+        warnings: {
+          missing_invalid: {
+            short: "Sem ramo inválido",
+            detail:
+              "A saída vermelha «Opção inválida» não está ligada. Se o cliente responder fora do menu, o fluxo pode parar sem encaminhar.",
+          },
+          timeout_no_edge: {
+            short: "Timeout sem saída",
+            detail:
+              "Definiu tempo de espera (> 0 s) mas a saída laranja «Sem resposta» não está ligada. O timeout não terá para onde seguir.",
+          },
+          timeout_edge_no_time: {
+            short: "Saída timeout sem tempo",
+            detail:
+              "A saída laranja «Sem resposta» está ligada, mas o tempo está em 0. Defina os segundos ou desligue a aresta para evitar configuração incoerente.",
+          },
+          no_option_edges: {
+            short: "Opções sem ligação",
+            detail:
+              "Há opções no menu, mas nenhuma saída numerada (azul) está ligada. O cliente não conseguirá avançar por nenhuma escolha válida.",
+          },
         },
       },
       errors: {

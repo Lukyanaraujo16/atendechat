@@ -2680,6 +2680,8 @@ const messages = {
 				ended: "— End of simulation —",
 				noWaitHint:
 					"Outside steps that wait for input, use Restart for a new test.",
+				menuPlaceholder:
+					"Option number or invalid text to test the red branch…",
 				simulatedActionBadge: "Simulated action",
 				notExecutedPreview: "Not run in preview · no external calls",
 				actionHttp: "HTTP request",
@@ -2719,6 +2721,33 @@ const messages = {
 					flowUp: "Parent flow",
 					openai: "OpenAI",
 					typebot: "Typebot",
+				},
+			},
+			flowBuilderMenu: {
+				createHint:
+					"After adding the node, connect the red output (invalid option) and, if you use a wait time, the orange one (no reply), to avoid conversations stuck in the bot.",
+				warningsHeader: "Warnings (do not block saving)",
+				warnings: {
+					missing_invalid: {
+						short: "No invalid branch",
+						detail:
+							"The red “Invalid option” output is not connected. If the customer replies outside the menu, the flow may stop without routing.",
+					},
+					timeout_no_edge: {
+						short: "Timeout without output",
+						detail:
+							"You set a wait time (> 0 s) but the orange “No reply” output is not connected. The timeout will have nowhere to go.",
+					},
+					timeout_edge_no_time: {
+						short: "Timeout wire but no time",
+						detail:
+							"The orange “No reply” output is connected but the time is 0. Set seconds or remove the edge to avoid an inconsistent setup.",
+					},
+					no_option_edges: {
+						short: "Options not wired",
+						detail:
+							"The menu has options but none of the numbered (blue) outputs are connected. The customer cannot proceed on any valid choice.",
+					},
 				},
 			},
 			errors: {

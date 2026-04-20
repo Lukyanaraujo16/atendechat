@@ -61,6 +61,10 @@ import {
 import AddContactToContactListFromTicketService from "../FlowBuilderService/AddContactToContactListFromTicketService";
 import { isFlowBuilderDebugEnabled } from "../../utils/flowBuilderDebug";
 import { createFlowExecutionLogIfTicket } from "../FlowBuilderService/FlowExecutionLogService";
+import {
+  cancelFlowMenuTimeout,
+  scheduleFlowMenuTimeout
+} from "../FlowBuilderService/flowMenuTimeoutScheduler";
 
 interface IAddContact {
   companyId: number;
@@ -86,6 +90,14 @@ export const ActionsWebhookService = async (
   msg?: proto.IWebMessageInfo
 ): Promise<string> => {
   try {
+    if (
+      idTicket &&
+      pressKey != null &&
+      String(pressKey).trim() !== "" &&
+      pressKey !== "999"
+    ) {
+      await cancelFlowMenuTimeout(idTicket).catch(() => undefined);
+    }
     const io = getIO();
     const originalWhatsAppMsg = msg;
     let next = nextStage;
@@ -285,9 +297,7 @@ export const ActionsWebhookService = async (
         }
 
         if (execFn === "") {
-          nodeSelected = {
-            type: "menu"
-          };
+          nodeSelected = nodes.filter(node => node.id === next)[0];
         } else {
           nodeSelected = nodes.filter(node => node.id === execFn)[0];
         }
@@ -1446,29 +1456,77 @@ export const ActionsWebhookService = async (
         await intervalWhats("1");
       }
 
-      let isMenu: boolean;
+      let isMenu = false;
 
       if (nodeSelected.type === "menu") {
         if (pressKey) {
-          const filterOne = connectStatic.filter(
-            confil => confil.source === next
+          const menuData = (nodeSelected.data || {}) as Record<string, any>;
+          const optionsArr = Array.isArray(menuData.arrayOption)
+            ? menuData.arrayOption
+            : [];
+          const validNumbers = new Set(
+            optionsArr.map((o: { number: number | string }) => String(o.number))
           );
-          let filterTwo = filterOne.filter(
-            filt2 => filt2.sourceHandle === "a" + pressKey
-          );
+
+          const filterOne = connectStatic.filter(confil => confil.source === next);
+
+          const pickEdgesForHandle = (suffix: string) =>
+            filterOne.filter(filt2 => filt2.sourceHandle === "a" + suffix);
+
+          let filterTwo = pickEdgesForHandle(String(pressKey));
           if (filterTwo.length === 0 && pressKey !== "") {
             const n = Number(pressKey);
             if (!Number.isNaN(n)) {
-              filterTwo = filterOne.filter(
-                filt2 => filt2.sourceHandle === "a" + String(n)
-              );
+              filterTwo = pickEdgesForHandle(String(n));
             }
           }
-          if (filterTwo.length > 0) {
-            execFn = filterTwo[0].target;
-          } else {
-            execFn = undefined;
+          if (filterTwo.length === 0) {
+            const m = String(pressKey).match(/\d+/);
+            if (m && validNumbers.has(m[0])) {
+              filterTwo = pickEdgesForHandle(m[0]);
+            }
           }
+
+          if (filterTwo.length > 0 && validNumbers.size > 0) {
+            const h = String(filterTwo[0].sourceHandle || "");
+            const numFromHandle = h.startsWith("a") ? h.slice(1) : h;
+            if (!validNumbers.has(numFromHandle)) {
+              filterTwo = [];
+            }
+          }
+
+          let chosenTarget: string | undefined;
+          let usedInvalidBranch = false;
+
+          if (filterTwo.length > 0) {
+            chosenTarget = filterTwo[0].target;
+          } else {
+            const invalidEdge = filterOne.find(
+              f => String(f.sourceHandle || "") === "invalid"
+            );
+            if (invalidEdge) {
+              chosenTarget = invalidEdge.target;
+              usedInvalidBranch = true;
+              const invMsg = String(menuData.invalidOptionMessage || "").trim();
+              if (invMsg && ticket && idTicket) {
+                const ticketDetails = await ShowTicketService(ticket.id, companyId);
+                const body = interpolateFlowMessage(
+                  invMsg,
+                  ticket,
+                  ticketDetails.contact
+                );
+                await SendWhatsAppMessage({
+                  body,
+                  ticket: ticketDetails,
+                  quotedMsg: null
+                });
+                await intervalWhats("1");
+              }
+            }
+          }
+
+          execFn = chosenTarget ?? "";
+
           if (isFlowBuilderDebugEnabled()) {
             logger.info(
               {
@@ -1480,12 +1538,14 @@ export const ActionsWebhookService = async (
                   target: e.target
                 })),
                 matchedHandle: filterTwo[0]?.sourceHandle,
-                nextNodeId: execFn
+                nextNodeId: execFn || null,
+                usedInvalidBranch
               },
               "[FlowBuilder][debug] menu: resposta do cliente e edge escolhida"
             );
           }
-          if (execFn === undefined) {
+
+          if (!execFn) {
             await createFlowExecutionLogIfTicket(
               idTicket,
               companyId,
@@ -1495,17 +1555,18 @@ export const ActionsWebhookService = async (
               "flow_error",
               "error",
               {
-                reason: "no_edge_for_option",
+                reason: "no_edge_for_option_or_invalid",
                 clientReply: pressKey,
                 menuNodeId: next
               }
             );
             logger.warn(
               { flowBuilderMenu: true, menuNodeId: next, clientReply: pressKey },
-              "[FlowBuilder] menu: nenhuma edge com sourceHandle a{opção}"
+              "[FlowBuilder] menu: sem aresta para a opção nem ramo \"invalid\""
             );
             break;
           }
+
           pressKey = "999";
 
           const isNodeExist = nodes.filter(item => item.id === execFn);
@@ -1526,7 +1587,10 @@ export const ActionsWebhookService = async (
           }
         } else {
           let optionsMenu = "";
-          nodeSelected.data.arrayOption.map(item => {
+          const optList = Array.isArray(nodeSelected.data?.arrayOption)
+            ? nodeSelected.data.arrayOption
+            : [];
+          optList.map((item: { number: number | string; value: string }) => {
             optionsMenu += `[${item.number}] ${item.value}\n`;
           });
 
@@ -1626,6 +1690,30 @@ export const ActionsWebhookService = async (
               hashFlowId: hashWebhookId,
               flowStopped: idFlowDb.toString()
             });
+
+            const menuCfg = (nodeSelected.data || {}) as Record<string, any>;
+            const timeoutRaw = Number(menuCfg.menuTimeoutSeconds);
+            const timeoutSec = Math.min(
+              86400,
+              Math.max(
+                0,
+                Number.isFinite(timeoutRaw) && timeoutRaw > 0
+                  ? Math.floor(timeoutRaw)
+                  : 0
+              )
+            );
+            if (timeoutSec > 0 && idTicket) {
+              await scheduleFlowMenuTimeout(
+                {
+                  ticketId: idTicket,
+                  companyId,
+                  whatsappId,
+                  idFlowDb,
+                  menuNodeId: String(nodeSelected.id)
+                },
+                timeoutSec * 1000
+              );
+            }
           }
 
           break;
@@ -1829,15 +1917,15 @@ const getFlowVariablesFromTicket = (
  * 1) Substitui placeholders do FlowBuilder: {{chave}} usando dataWebhook.variables
  * 2) Depois aplica Mustache do contato: {{name}}, {{firstName}}, {{protocol}}, etc.
  */
-const interpolateFlowMessage = (
+export function interpolateFlowMessage(
   raw: string,
   ticket: Ticket | null,
   contact: Contact | undefined | null
-): string => {
+): string {
   const vars = getFlowVariablesFromTicket(ticket);
   const afterFlow = replaceMessages(vars, raw);
   return formatBody(afterFlow, contact as Contact);
-};
+}
 
 const replaceMessages = (
   variables: Record<string, unknown>,
