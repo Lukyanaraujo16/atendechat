@@ -16,6 +16,7 @@ interface CompanyData {
   dueDate?: string;
   recurrence?: string;
   modulePermissions?: Record<string, boolean> | null;
+  internalNotes?: string | null;
 }
 
 const CreateCompanyService = async (
@@ -31,7 +32,8 @@ const CreateCompanyService = async (
     dueDate,
     recurrence,
     password,
-    modulePermissions
+    modulePermissions,
+    internalNotes
   } = companyData;
 
   const companySchema = Yup.object().shape({
@@ -60,6 +62,13 @@ const CreateCompanyService = async (
     throw new AppError(err.message);
   }
 
+  const notes =
+    internalNotes === undefined || internalNotes === null
+      ? null
+      : String(internalNotes).trim() === ""
+        ? null
+        : String(internalNotes).trim();
+
   const company = await Company.create({
     name,
     phone,
@@ -68,6 +77,7 @@ const CreateCompanyService = async (
     planId,
     dueDate,
     recurrence,
+    internalNotes: notes,
     ...(modulePermissions && typeof modulePermissions === "object"
       ? { modulePermissions }
       : {})

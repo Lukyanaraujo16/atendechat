@@ -17,6 +17,20 @@ systemSettingRoutes.get(
 );
 
 systemSettingRoutes.get(
+  "/system-settings/billing-automation",
+  isAuth,
+  isSuper,
+  SystemSettingController.getBillingAutomation
+);
+
+systemSettingRoutes.put(
+  "/system-settings/billing-automation",
+  isAuth,
+  isSuper,
+  SystemSettingController.upsertBillingAutomation
+);
+
+systemSettingRoutes.get(
   "/system-settings",
   isAuth,
   isSuper,

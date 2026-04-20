@@ -68,6 +68,13 @@ class Company extends Model<Company> {
   })
   modulePermissions: Record<string, boolean>;
 
+  /** Notas internas (apenas Super Admin; não expor a clientes). */
+  @Column({
+    type: DataType.TEXT,
+    allowNull: true
+  })
+  internalNotes: string | null;
+
   @ForeignKey(() => Plan)
   @Column
   planId: number;

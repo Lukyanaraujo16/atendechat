@@ -384,6 +384,7 @@ export default function LoggedInRoutesContent() {
     "/platform/super-admins",
     "/platform/account",
     "/platform/financeiro",
+    "/platform/billing-automation",
     "/platform/backup",
     "/platform/helps",
     "/platform/informativos",

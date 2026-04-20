@@ -8,6 +8,7 @@ import { startQueueProcess } from "./queues";
 import { TransferTicketQueue } from "./wbotTransferTicketQueue";
 import cron from "node-cron";
 import { startBackupAutoScheduler } from "./jobs/backupAutoScheduler";
+import { startBillingAutomationScheduler } from "./jobs/billingAutomationScheduler";
 
 const server = app.listen(process.env.PORT, async () => {
   const companies = await Company.findAll();
@@ -22,6 +23,7 @@ const server = app.listen(process.env.PORT, async () => {
   });
   logger.info(`Server started on port: ${process.env.PORT}`);
   startBackupAutoScheduler();
+  startBillingAutomationScheduler();
 });
 
 cron.schedule("* * * * *", async () => {

@@ -15,6 +15,7 @@ companyRoutes.put("/companies/:id/timezone", isAuth, CompanyController.updateTim
 companyRoutes.put("/companies/:id/schedules",isAuth,CompanyController.updateSchedules);
 companyRoutes.delete("/companies/:id", isAuth, isSuper, CompanyController.remove);
 companyRoutes.post("/companies/:id/renew", isAuth, isSuper, CompanyController.renewDueDate);
+companyRoutes.get("/companies/:id/logs", isAuth, isSuper, CompanyController.listCompanyLogs);
 companyRoutes.post("/companies/cadastro", CompanyController.store);
 
 // Rota para listar o plano da empresa

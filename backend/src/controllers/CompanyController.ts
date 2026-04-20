@@ -20,6 +20,8 @@ import ShowPlanCompanyService from "../services/CompanyService/ShowPlanCompanySe
 import ListCompaniesPlanService from "../services/CompanyService/ListCompaniesPlanService";
 import GetEffectiveModuleFlags from "../services/CompanyService/GetEffectiveModuleFlagsService";
 import RenewCompanyDueDateService from "../services/CompanyService/RenewCompanyDueDateService";
+import CompanyLog from "../models/CompanyLog";
+import { createCompanyLog } from "../services/CompanyService/CreateCompanyLogService";
 
 type IndexQuery = {
   searchParam: string;
@@ -48,6 +50,7 @@ type UpdateCompanyBody = {
   password?: string;
   modulePermissions?: Record<string, boolean> | null;
   timezone?: string;
+  internalNotes?: string | null;
 };
 
 type CreateCompanyRequest = UpdateCompanyBody & { name: string };
@@ -120,7 +123,16 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
     throw new AppError(err.message);
   }
 
-  const company = await CreateCompanyService(newCompany);
+  const requestUserForStore =
+    req.user?.id != null
+      ? await User.findByPk(req.user.id, { attributes: ["super"] })
+      : null;
+  const payload: CreateCompanyRequest = { ...newCompany };
+  if (!requestUserForStore?.super) {
+    delete payload.internalNotes;
+  }
+
+  const company = await CreateCompanyService(payload);
 
   return res.status(200).json(company);
 };
@@ -137,8 +149,16 @@ export const show = async (req: Request, res: Response): Promise<Response> => {
   }
 
   const company = await ShowCompanyService(id);
+  const requestUser = await User.findByPk(req.user.id, { attributes: ["super"] });
+  const row =
+    typeof (company as any).toJSON === "function"
+      ? (company as any).toJSON()
+      : { ...(company as any) };
+  if (!requestUser?.super) {
+    delete row.internalNotes;
+  }
 
-  return res.status(200).json(company);
+  return res.status(200).json(row);
 };
 
 export const list = async (req: Request, res: Response): Promise<Response> => {
@@ -170,7 +190,8 @@ export const update = async (
     status: Yup.boolean().nullable(),
     planId: Yup.number().nullable(),
     dueDate: Yup.string().nullable(),
-    recurrence: Yup.string().nullable()
+    recurrence: Yup.string().nullable(),
+    internalNotes: Yup.string().nullable().max(65535)
   });
 
   try {
@@ -193,7 +214,22 @@ export const update = async (
     }
   }
 
+  const pre = await Company.findByPk(companyId, { attributes: ["id", "status"] });
+
   const company = await UpdateCompanyService({ id, ...companyData });
+
+  if (
+    companyData.status !== undefined &&
+    pre &&
+    Boolean(pre.status) !== Boolean(companyData.status)
+  ) {
+    await createCompanyLog({
+      companyId,
+      action: companyData.status === false ? "block" : "unblock",
+      userId: req.user.id,
+      metadata: { previousStatus: pre.status, newStatus: companyData.status }
+    });
+  }
 
   return res.status(200).json(company);
 };
@@ -272,7 +308,7 @@ export const remove = async (
     );
   }
 
-  await DeleteCompanyService(id);
+  await DeleteCompanyService(id, req.user.id);
 
   return res.status(200).json({ ok: true });
 };
@@ -282,8 +318,45 @@ export const renewDueDate = async (
   res: Response
 ): Promise<Response> => {
   const { id } = req.params;
-  const company = await RenewCompanyDueDateService(id);
-  return res.status(200).json(company);
+  const { company, autoUnblocked } = await RenewCompanyDueDateService(
+    id,
+    req.user.id
+  );
+  const row =
+    typeof (company as any).toJSON === "function"
+      ? (company as any).toJSON()
+      : { ...(company as any) };
+  return res.status(200).json({ ...row, autoUnblocked });
+};
+
+export const listCompanyLogs = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = Number(req.params.id);
+  if (Number.isNaN(companyId)) {
+    throw new AppError("ERR_NO_COMPANY_FOUND", 404);
+  }
+  const exists = await Company.findByPk(companyId, { attributes: ["id"] });
+  if (!exists) {
+    throw new AppError("ERR_NO_COMPANY_FOUND", 404);
+  }
+
+  const logs = await CompanyLog.findAll({
+    where: { companyId },
+    order: [["createdAt", "DESC"]],
+    limit: 500,
+    include: [
+      {
+        model: User,
+        as: "user",
+        attributes: ["id", "name", "email"],
+        required: false
+      }
+    ]
+  });
+
+  return res.status(200).json(logs);
 };
 
 export const listPlan = async (req: Request, res: Response): Promise<Response> => {

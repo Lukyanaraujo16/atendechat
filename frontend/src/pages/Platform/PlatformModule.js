@@ -15,6 +15,7 @@ import PlatformBackup from "./PlatformBackup";
 import PlatformPlans from "./PlatformPlans";
 import PlatformHelps from "./PlatformHelps";
 import PlatformInformativos from "./PlatformInformativos";
+import BillingAutomationPage from "../BillingAutomation";
 
 export default function PlatformModule() {
   const { user } = useContext(AuthContext);
@@ -25,6 +26,10 @@ export default function PlatformModule() {
       { path: "/platform/companies", label: i18n.t("platform.tabs.companies") },
       { path: "/platform/planos", label: i18n.t("platform.tabs.plans") },
       { path: "/platform/financeiro", label: i18n.t("platform.tabs.financial") },
+      {
+        path: "/platform/billing-automation",
+        label: i18n.t("platform.tabs.billingAutomation"),
+      },
       { path: "/platform/backup", label: i18n.t("platform.tabs.backup") },
       { path: "/platform/branding", label: i18n.t("platform.tabs.branding") },
       { path: "/platform/helps", label: i18n.t("platform.tabs.helps") },
@@ -49,6 +54,7 @@ export default function PlatformModule() {
         <Route exact path="/platform/branding" component={PlatformBranding} />
         <Route exact path="/platform/planos" component={PlatformPlans} />
         <Route exact path="/platform/financeiro" component={PlatformFinance} />
+        <Route exact path="/platform/billing-automation" component={BillingAutomationPage} />
         <Route exact path="/platform/backup" component={PlatformBackup} />
         <Route exact path="/platform/helps" component={PlatformHelps} />
         <Route exact path="/platform/informativos" component={PlatformInformativos} />

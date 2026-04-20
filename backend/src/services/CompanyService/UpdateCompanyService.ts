@@ -16,6 +16,7 @@ interface CompanyData {
   timezone?: string;
   /** Overrides de módulos (apenas Super Admin via API de empresas) */
   modulePermissions?: Record<string, boolean> | null;
+  internalNotes?: string | null;
 }
 
 const UpdateCompanyService = async (
@@ -32,7 +33,8 @@ const UpdateCompanyService = async (
     dueDate,
     recurrence,
     timezone,
-    modulePermissions
+    modulePermissions,
+    internalNotes
   } = companyData;
 
   if (!company) {
@@ -62,6 +64,14 @@ const UpdateCompanyService = async (
       modulePermissions && typeof modulePermissions === "object"
         ? modulePermissions
         : {};
+  }
+  if (internalNotes !== undefined) {
+    if (internalNotes === null) {
+      payload.internalNotes = null;
+    } else {
+      const t = String(internalNotes).trim();
+      payload.internalNotes = t === "" ? null : t;
+    }
   }
 
   if (Object.keys(payload).length > 0) {

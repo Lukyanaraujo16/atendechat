@@ -86,6 +86,14 @@ const useCompanies = () => {
     return responseData;
   }, []);
 
+  const fetchCompanyLogs = useCallback(async (id) => {
+    const { data } = await api.request({
+      url: `/companies/${id}/logs`,
+      method: "GET",
+    });
+    return data;
+  }, []);
+
   return {
     save,
     update,
@@ -97,6 +105,7 @@ const useCompanies = () => {
     updateSchedules,
     updateTimezone,
     renewDueDate,
+    fetchCompanyLogs,
   };
 };
 

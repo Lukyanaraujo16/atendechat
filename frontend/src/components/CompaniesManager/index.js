@@ -21,13 +21,13 @@ import {
   Button,
   Tooltip,
   IconButton,
-  Menu,
 } from "@material-ui/core";
 import { useTheme, alpha } from "@material-ui/core/styles";
 import SearchIcon from "@material-ui/icons/Search";
 import EditOutlined from "@material-ui/icons/EditOutlined";
 import DeleteOutline from "@material-ui/icons/DeleteOutline";
 import HeadsetMic from "@material-ui/icons/HeadsetMic";
+import ChatBubbleOutline from "@material-ui/icons/ChatBubbleOutline";
 import { Formik, Form, Field } from "formik";
 import ConfirmationModal from "../ConfirmationModal";
 
@@ -46,13 +46,13 @@ import Dialog from "@material-ui/core/Dialog";
 import DialogTitle from "@material-ui/core/DialogTitle";
 import DialogContent from "@material-ui/core/DialogContent";
 import DialogActions from "@material-ui/core/DialogActions";
-import ListItemIcon from "@material-ui/core/ListItemIcon";
-import ListItemText from "@material-ui/core/ListItemText";
-import MoreVert from "@material-ui/icons/MoreVert";
 import LockOutlined from "@material-ui/icons/LockOutlined";
 import LockOpen from "@material-ui/icons/LockOpen";
-import EventAvailable from "@material-ui/icons/EventAvailable";
+import Autorenew from "@material-ui/icons/Autorenew";
 import DeleteForever from "@material-ui/icons/DeleteForever";
+import NoteOutlined from "@material-ui/icons/NoteOutlined";
+import History from "@material-ui/icons/History";
+import Warning from "@material-ui/icons/Warning";
 import { AuthContext } from "../../context/Auth/AuthContext";
 import { getIanaTimezones } from "../../utils/ianaTimezones";
 
@@ -110,6 +110,284 @@ function previewRenewedDueDate(row) {
   }
 }
 
+/**
+ * Contexto para automação futura (avisos / bloqueio por inadimplência / desbloqueio pós-renovação).
+ * Buckets estáveis: expired | today | soon | ok | neutral — usar estes nomes em jobs e regras.
+ */
+function getDueCategory(row) {
+  if (!row?.dueDate || !moment(row.dueDate).isValid()) {
+    return { category: "neutral", diff: null };
+  }
+  const dueDay = moment(row.dueDate).startOf("day");
+  const today = moment().startOf("day");
+  const diff = dueDay.diff(today, "days");
+  if (diff < 0) return { category: "expired", diff };
+  if (diff === 0) return { category: "today", diff };
+  if (diff <= 3) return { category: "soon", diff };
+  return { category: "ok", diff };
+}
+
+/** Vencido → vermelho; hoje → laranja; 1–3 dias → amarelo; em dia → verde. */
+function getDueDisplayMeta(row, dateToClient) {
+  const { category, diff } = getDueCategory(row);
+  if (category === "neutral") {
+    return {
+      category,
+      tone: "neutral",
+      dateLabel: "—",
+      shortLabel: "",
+      recurrence: row?.recurrence || "",
+      tooltip: i18n.t("platform.companies.dueTooltipNoDate"),
+      dueClassKey: "dueDateNeutral",
+    };
+  }
+  const dateLabel = dateToClient(row.dueDate);
+  const fullDateLine = moment(row.dueDate).isValid()
+    ? moment(row.dueDate).format("dddd, DD/MM/YYYY")
+    : dateLabel;
+  let dueClassKey;
+  let shortLabel;
+  let tooltip;
+  if (category === "expired") {
+    dueClassKey = "dueDateExpired";
+    const days = Math.abs(diff);
+    shortLabel = i18n.t("platform.companies.dueShortExpired", { days });
+    tooltip = i18n.t("platform.companies.dueTooltipFullExpired", {
+      date: dateLabel,
+      longDate: fullDateLine,
+      days,
+    });
+  } else if (category === "today") {
+    dueClassKey = "dueDateToday";
+    shortLabel = i18n.t("platform.companies.dueShortToday");
+    tooltip = i18n.t("platform.companies.dueTooltipFullToday", {
+      date: dateLabel,
+      longDate: fullDateLine,
+    });
+  } else if (category === "soon") {
+    dueClassKey = "dueDateSoon";
+    shortLabel = i18n.t("platform.companies.dueShortSoon", { days: diff });
+    tooltip = i18n.t("platform.companies.dueTooltipFullSoon", {
+      date: dateLabel,
+      longDate: fullDateLine,
+      days: diff,
+    });
+  } else {
+    dueClassKey = "dueDateOk";
+    shortLabel = i18n.t("platform.companies.dueShortOk");
+    tooltip = i18n.t("platform.companies.dueTooltipFullOk", {
+      date: dateLabel,
+      longDate: fullDateLine,
+      days: diff,
+    });
+  }
+  return {
+    category,
+    tone: category,
+    dateLabel,
+    shortLabel,
+    recurrence: row.recurrence || "",
+    tooltip,
+    dueClassKey,
+  };
+}
+
+function planNameForSort(row) {
+  return row?.planId != null && row?.plan?.name ? String(row.plan.name) : "";
+}
+
+/** Ordenação: vencidos → hoje → próximos → em dia → sem data; desempate por dias e nome. */
+function comparePriorityDue(a, b) {
+  const ca = getDueCategory(a);
+  const cb = getDueCategory(b);
+  const rank = (c) => {
+    if (c.category === "expired") return 0;
+    if (c.category === "today") return 1;
+    if (c.category === "soon") return 2;
+    if (c.category === "ok") return 3;
+    return 4;
+  };
+  const ra = rank(ca);
+  const rb = rank(cb);
+  if (ra !== rb) return ra - rb;
+  if (ca.category === "expired" && cb.category === "expired") {
+    if ((ca.diff ?? 0) !== (cb.diff ?? 0)) return (ca.diff ?? 0) - (cb.diff ?? 0);
+  }
+  if (ca.category === "soon" && cb.category === "soon") {
+    if ((ca.diff ?? 0) !== (cb.diff ?? 0)) return (ca.diff ?? 0) - (cb.diff ?? 0);
+  }
+  if (ca.category === "ok" && cb.category === "ok") {
+    if ((ca.diff ?? 0) !== (cb.diff ?? 0)) return (ca.diff ?? 0) - (cb.diff ?? 0);
+  }
+  const blockRank = (x) => (x.status === false ? 0 : 1);
+  if (blockRank(a) !== blockRank(b)) return blockRank(a) - blockRank(b);
+  return (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base" });
+}
+
+function buildBillingReminderMessage(row, dateToClientFn) {
+  const name = row?.name || i18n.t("platform.companies.billingMessageFallbackName");
+  let dateStr = i18n.t("platform.companies.billingMessageNoDue");
+  if (row?.dueDate && moment(row.dueDate).isValid()) {
+    dateStr = dateToClientFn(row.dueDate);
+  }
+  const plan =
+    row?.planId != null && row?.plan?.name
+      ? row.plan.name
+      : i18n.t("platform.companies.billingMessageNoPlan");
+  return i18n.t("platform.companies.billingMessageTemplate", {
+    name,
+    date: dateStr,
+    plan,
+  });
+}
+
+function formatPlanValueDiscrete(value) {
+  if (value === undefined || value === null || value === "") return null;
+  const n = Number(value);
+  if (Number.isNaN(n)) return null;
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    maximumFractionDigits: 2,
+  }).format(n);
+}
+
+function digitsForWhatsApp(phone) {
+  if (!phone || typeof phone !== "string") return "";
+  const d = phone.replace(/\D/g, "");
+  return d.length >= 10 ? d : "";
+}
+
+function getFinanceStateLabel(category) {
+  switch (category) {
+    case "expired":
+      return i18n.t("platform.companies.financeStateOverdue");
+    case "today":
+      return i18n.t("platform.companies.financeStateToday");
+    case "soon":
+      return i18n.t("platform.companies.financeStateSoon");
+    case "ok":
+      return i18n.t("platform.companies.financeStateOk");
+    default:
+      return i18n.t("platform.companies.financeStateNoDue");
+  }
+}
+
+function dueDateSortKey(row) {
+  if (!row?.dueDate || !moment(row.dueDate).isValid()) return Number.POSITIVE_INFINITY;
+  return moment(row.dueDate).startOf("day").valueOf();
+}
+
+function compareByDueDateAsc(a, b) {
+  const ka = dueDateSortKey(a);
+  const kb = dueDateSortKey(b);
+  if (ka !== kb) return ka - kb;
+  return (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base" });
+}
+
+function compareByStatusBlockedFirst(a, b) {
+  const ra = a.status === false ? 0 : 1;
+  const rb = b.status === false ? 0 : 1;
+  if (ra !== rb) return ra - rb;
+  return (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base" });
+}
+
+function formatCompanyLogEntry(log, dateToClient, datetimeToClient) {
+  const meta =
+    log?.metadata && typeof log.metadata === "object" ? log.metadata : {};
+  const actionKey = `platform.companies.companyLogActions.${log.action}`;
+  let title = i18n.t(actionKey);
+  if (title === actionKey) {
+    title = log.action || "—";
+  }
+  let detail = "";
+  switch (log.action) {
+    case "renew":
+      detail = i18n.t("platform.companies.logDetailRenew", {
+        from: meta.previousDueDate ? dateToClient(meta.previousDueDate) : "—",
+        to: meta.newDueDate ? dateToClient(meta.newDueDate) : "—",
+      });
+      break;
+    case "block":
+      detail = i18n.t("platform.companies.logDetailBlock");
+      break;
+    case "unblock":
+      detail = i18n.t("platform.companies.logDetailUnblock");
+      break;
+    case "delete":
+      detail = i18n.t("platform.companies.logDetailDelete", {
+        name: meta.name != null ? String(meta.name) : "—",
+      });
+      break;
+    case "warning_before_due":
+      detail = i18n.t("platform.companies.logDetailWarningBefore", {
+        date: meta.dueDate ? dateToClient(meta.dueDate) : "—",
+        days: meta.daysUntilDue != null ? String(meta.daysUntilDue) : "—",
+      });
+      break;
+    case "warning_after_due":
+      detail = i18n.t("platform.companies.logDetailWarningAfter", {
+        date: meta.dueDate ? dateToClient(meta.dueDate) : "—",
+        days: meta.daysLate != null ? String(meta.daysLate) : "—",
+      });
+      break;
+    case "auto_block":
+      detail = i18n.t("platform.companies.logDetailAutoBlock", {
+        date: meta.dueDate ? dateToClient(meta.dueDate) : "—",
+        days: meta.daysLate != null ? String(meta.daysLate) : "—",
+      });
+      break;
+    case "auto_unblock_after_renew":
+      detail = i18n.t("platform.companies.logDetailAutoUnblockAfterRenew", {
+        from: meta.previousDueDate ? dateToClient(meta.previousDueDate) : "—",
+        to: meta.newDueDate ? dateToClient(meta.newDueDate) : "—",
+      });
+      break;
+    default:
+      detail = "";
+  }
+  const isAutomated = meta.kind === "automated";
+  const actor =
+    log.user && (log.user.name || log.user.email)
+      ? i18n.t("platform.companies.logActor", {
+          name: log.user.name || log.user.email,
+        })
+      : isAutomated
+        ? i18n.t("platform.companies.logActorSystem")
+        : "";
+  let whatsappLine = "";
+  if (meta.whatsapp && typeof meta.whatsapp === "object" && meta.whatsapp.channel === "whatsapp") {
+    const w = meta.whatsapp;
+    if (w.sent === true) {
+      whatsappLine = i18n.t("platform.companies.logWhatsappSent", {
+        last4: w.destinationLast4 != null ? String(w.destinationLast4) : "—",
+      });
+    } else if (w.attempted === true || w.error || w.skippedReason) {
+      whatsappLine = i18n.t("platform.companies.logWhatsappNotSent", {
+        reason: String(w.error || w.skippedReason || "—"),
+      });
+    }
+  }
+  const parts = [detail, actor, whatsappLine].filter(Boolean);
+  return {
+    whenLabel: datetimeToClient(log.createdAt),
+    title,
+    subtitle: parts.length ? parts.join(" · ") : "",
+  };
+}
+
+function campaignsLabelForRow(row) {
+  if (has(row, "settings") && isArray(row.settings) && row.settings.length > 0) {
+    const setting = row.settings.find((s) => s.key === "campaignsEnabled");
+    if (setting) {
+      return setting.value === "true"
+        ? i18n.t("settings.company.form.enabled")
+        : i18n.t("settings.company.form.disabled");
+    }
+  }
+  return i18n.t("settings.company.form.disabled");
+}
+
 const useStyles = makeStyles((theme) => ({
   root: {
     width: "100%",
@@ -165,25 +443,156 @@ const useStyles = makeStyles((theme) => ({
   },
   tableRow: {
     cursor: "pointer",
-    transition: theme.transitions.create("background-color", { duration: 150 }),
+    transition: theme.transitions.create(["background-color", "box-shadow"], { duration: 180 }),
     "&:hover": {
       backgroundColor:
         theme.palette.type === "dark"
-          ? "rgba(255,255,255,0.05)"
-          : theme.palette.action.hover,
+          ? alpha(theme.palette.common.white, 0.06)
+          : alpha(theme.palette.primary.main, 0.06),
+      boxShadow:
+        theme.palette.type === "dark"
+          ? `inset 0 0 0 1px ${alpha(theme.palette.common.white, 0.08)}`
+          : `inset 0 0 0 1px ${alpha(theme.palette.primary.main, 0.14)}`,
     },
   },
   tableRowSelected: {
     backgroundColor:
       theme.palette.type === "dark"
-        ? "rgba(25, 118, 210, 0.16)"
-        : theme.palette.action.selected,
+        ? alpha(theme.palette.primary.main, 0.2)
+        : alpha(theme.palette.primary.main, 0.1),
+    boxShadow: `inset 3px 0 0 ${theme.palette.primary.main}`,
     "&:hover": {
       backgroundColor:
         theme.palette.type === "dark"
-          ? "rgba(25, 118, 210, 0.22)"
-          : theme.palette.action.selected,
+          ? alpha(theme.palette.primary.main, 0.26)
+          : alpha(theme.palette.primary.main, 0.14),
     },
+  },
+  companyCell: {
+    maxWidth: 0,
+    minWidth: 200,
+  },
+  companyNameLine: {
+    fontWeight: 600,
+    fontSize: "0.9375rem",
+    lineHeight: 1.35,
+    color: theme.palette.text.primary,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  companyAdminLine: {
+    fontSize: "0.8125rem",
+    lineHeight: 1.4,
+    color: theme.palette.text.secondary,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    marginTop: 2,
+  },
+  companyEmailLine: {
+    fontSize: "0.75rem",
+    lineHeight: 1.35,
+    color: theme.palette.text.hint,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    marginTop: 1,
+  },
+  planCell: {
+    maxWidth: 0,
+    minWidth: 120,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  planRecurrenceCaption: {
+    fontSize: "0.7rem",
+    lineHeight: 1.35,
+    color: theme.palette.text.secondary,
+    marginTop: 2,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  financeCell: {
+    maxWidth: 0,
+    minWidth: 128,
+  },
+  financeValueMuted: {
+    fontSize: "0.68rem",
+    color: theme.palette.text.secondary,
+    marginTop: 2,
+    opacity: 0.92,
+  },
+  billingMessageField: {
+    fontFamily: "inherit",
+    fontSize: "0.8125rem",
+    lineHeight: 1.5,
+  },
+  dueCell: {
+    maxWidth: 0,
+    minWidth: 160,
+  },
+  dueShortLabel: {
+    fontSize: "0.7rem",
+    lineHeight: 1.35,
+    fontWeight: 500,
+    marginTop: 2,
+  },
+  filterChipsRow: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: theme.spacing(1),
+    marginBottom: theme.spacing(2),
+  },
+  dueDatePrimary: {
+    fontWeight: 600,
+    fontSize: "0.875rem",
+    lineHeight: 1.35,
+  },
+  dueDateExpired: {
+    color: theme.palette.error.main,
+  },
+  dueDateToday: {
+    color:
+      theme.palette.type === "dark"
+        ? "#ffb74d"
+        : "#e65100",
+  },
+  dueDateSoon: {
+    color:
+      theme.palette.type === "dark"
+        ? "#ffee58"
+        : "#f9a825",
+  },
+  dueDateOk: {
+    color:
+      theme.palette.type === "dark"
+        ? theme.palette.success.light
+        : theme.palette.success.dark,
+  },
+  dueDateNeutral: {
+    color: theme.palette.text.secondary,
+    fontWeight: 500,
+  },
+  tooltipDetailLabel: {
+    fontWeight: 600,
+    fontSize: "0.7rem",
+    textTransform: "uppercase",
+    letterSpacing: "0.04em",
+    color: theme.palette.common.white,
+    opacity: 0.85,
+    marginTop: theme.spacing(0.75),
+    marginBottom: 2,
+  },
+  tooltipDetailValue: {
+    fontSize: "0.8125rem",
+    lineHeight: 1.45,
+    color: theme.palette.common.white,
+    whiteSpace: "pre-wrap",
+    wordBreak: "break-word",
   },
   actionBar: {
     display: "flex",
@@ -263,14 +672,20 @@ const useStyles = makeStyles((theme) => ({
   },
   statusChipActive: {
     fontWeight: 600,
-    backgroundColor: alpha(theme.palette.success.main, 0.16),
-    color: theme.palette.success.dark,
+    backgroundColor: alpha(theme.palette.success.main, 0.18),
+    color:
+      theme.palette.type === "dark"
+        ? theme.palette.success.light
+        : theme.palette.success.dark,
     border: "none",
   },
   statusChipInactive: {
     fontWeight: 600,
-    backgroundColor: alpha(theme.palette.grey[600], 0.12),
-    color: theme.palette.text.secondary,
+    backgroundColor: alpha(theme.palette.error.main, 0.12),
+    color:
+      theme.palette.type === "dark"
+        ? theme.palette.error.light
+        : theme.palette.error.dark,
     border: "none",
   },
   userOnlineDot: {
@@ -899,13 +1314,49 @@ export function CompaniesManagerGrid(props) {
     onToggleCompanyStatus,
     onOpenRenewDialog,
     onOpenDeleteDialog,
+    onOpenInternalNotes,
+    onOpenCompanyHistory,
   } = props;
   const classes = useStyles();
   const theme = useTheme();
   const { dateToClient } = useDate();
   const [search, setSearch] = useState("");
-  const [sortBy, setSortBy] = useState("name");
-  const [actionMenu, setActionMenu] = useState(null);
+  const [sortBy, setSortBy] = useState("priority");
+  const [dueFilter, setDueFilter] = useState("all");
+  const [billingDialogRow, setBillingDialogRow] = useState(null);
+
+  const gridOpsEnabled =
+    typeof onToggleCompanyStatus === "function" &&
+    typeof onOpenRenewDialog === "function" &&
+    typeof onOpenDeleteDialog === "function";
+
+  const billingMessagePreview = useMemo(
+    () =>
+      billingDialogRow ? buildBillingReminderMessage(billingDialogRow, dateToClient) : "",
+    [billingDialogRow, dateToClient]
+  );
+
+  const billingWhatsAppDigits = billingDialogRow ? digitsForWhatsApp(billingDialogRow.phone) : "";
+
+  const openBillingDialog = (e, row) => {
+    e.stopPropagation();
+    setBillingDialogRow(row);
+  };
+
+  const handleBillingCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(billingMessagePreview);
+      toast.success(i18n.t("platform.companies.billingCopiedToast"));
+    } catch (err) {
+      toastError(err);
+    }
+  };
+
+  const handleBillingWhatsApp = () => {
+    if (!billingWhatsAppDigits) return;
+    const url = `https://wa.me/${billingWhatsAppDigits}?text=${encodeURIComponent(billingMessagePreview)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
 
   const filteredRecords = useMemo(() => {
     let list = Array.isArray(records) ? [...records] : [];
@@ -918,8 +1369,34 @@ export function CompaniesManagerGrid(props) {
           (row.phone || "").toLowerCase().includes(q)
       );
     }
-    if (sortBy === "name") {
+    if (dueFilter === "expired") {
+      list = list.filter((row) => getDueCategory(row).category === "expired");
+    } else if (dueFilter === "today") {
+      list = list.filter((row) => getDueCategory(row).category === "today");
+    } else if (dueFilter === "soon3") {
+      list = list.filter((row) => getDueCategory(row).category === "soon");
+    } else if (dueFilter === "ok") {
+      list = list.filter((row) => {
+        const c = getDueCategory(row).category;
+        return c === "ok" || c === "neutral";
+      });
+    } else if (dueFilter === "blocked") {
+      list = list.filter((row) => row.status === false);
+    } else if (dueFilter === "active") {
+      list = list.filter((row) => row.status !== false);
+    }
+    if (sortBy === "priority") {
+      list.sort(comparePriorityDue);
+    } else if (sortBy === "name") {
       list.sort((a, b) => (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base" }));
+    } else if (sortBy === "dueDate") {
+      list.sort(compareByDueDateAsc);
+    } else if (sortBy === "plan") {
+      list.sort((a, b) =>
+        planNameForSort(a).localeCompare(planNameForSort(b), undefined, { sensitivity: "base" })
+      );
+    } else if (sortBy === "status") {
+      list.sort(compareByStatusBlockedFirst);
     } else if (sortBy === "createdAt") {
       list.sort(
         (a, b) =>
@@ -927,44 +1404,77 @@ export function CompaniesManagerGrid(props) {
       );
     }
     return list;
-  }, [records, search, sortBy]);
+  }, [records, search, sortBy, dueFilter]);
+
+  const dueFilterCounts = useMemo(() => {
+    const base = Array.isArray(records) ? records : [];
+    let expired = 0;
+    let today = 0;
+    let soon3 = 0;
+    let ok = 0;
+    let blocked = 0;
+    let active = 0;
+    base.forEach((row) => {
+      const c = getDueCategory(row).category;
+      if (c === "expired") expired += 1;
+      else if (c === "today") today += 1;
+      else if (c === "soon") soon3 += 1;
+      else ok += 1;
+      if (row.status === false) blocked += 1;
+      else active += 1;
+    });
+    return { all: base.length, expired, today, soon3, ok, blocked, active };
+  }, [records]);
 
   const renderPlan = (row) => {
-    return row.planId !== null ? row.plan.name : "-";
+    return row.planId !== null ? row.plan.name : "—";
   };
 
-  const renderCampaignsStatus = (row) => {
-    if (
-      has(row, "settings") &&
-      isArray(row.settings) &&
-      row.settings.length > 0
-    ) {
-      const setting = row.settings.find((s) => s.key === "campaignsEnabled");
-      if (setting) {
-        return setting.value === "true"
-          ? i18n.t("settings.company.form.enabled")
-          : i18n.t("settings.company.form.disabled");
-      }
-    }
-    return i18n.t("settings.company.form.disabled");
-  };
-
-  const rowStyle = (record) => {
-    if (moment(record.dueDate).isValid()) {
-      const now = moment();
-      const dueDate = moment(record.dueDate);
-      const diff = dueDate.diff(now, "days");
-      if (diff === 5) {
-        return { backgroundColor: "#fffead" };
-      }
-      if (diff >= -3 && diff <= 4) {
-        return { backgroundColor: "#f7cc8f" };
-      }
-      if (diff === -4) {
-        return { backgroundColor: "#fa8c8c" };
-      }
-    }
-    return {};
+  const renderCompanyTooltip = (row) => {
+    const adminName = row.primaryAdmin?.name || i18n.t("settings.company.form.noPrimaryAdmin");
+    const adminEmail = row.primaryAdmin?.email || "—";
+    const companyEmail = row.email || "—";
+    const phone = row.phone || "—";
+    const created = row.createdAt ? dateToClient(row.createdAt) : "—";
+    const campaigns = campaignsLabelForRow(row);
+    return (
+      <Box maxWidth={320}>
+        <Typography variant="subtitle2" className={classes.tooltipDetailValue} component="p">
+          {row.name || "—"}
+        </Typography>
+        <Typography className={classes.tooltipDetailLabel} component="p">
+          {i18n.t("settings.company.form.primaryAdmin")}
+        </Typography>
+        <Typography className={classes.tooltipDetailValue} component="p">
+          {adminName}
+          {adminEmail && adminEmail !== "—" ? `\n${adminEmail}` : ""}
+        </Typography>
+        <Typography className={classes.tooltipDetailLabel} component="p">
+          {i18n.t("settings.company.form.email")}
+        </Typography>
+        <Typography className={classes.tooltipDetailValue} component="p">
+          {companyEmail}
+        </Typography>
+        <Typography className={classes.tooltipDetailLabel} component="p">
+          {i18n.t("settings.company.form.phone")}
+        </Typography>
+        <Typography className={classes.tooltipDetailValue} component="p">
+          {phone}
+        </Typography>
+        <Typography className={classes.tooltipDetailLabel} component="p">
+          {i18n.t("settings.company.form.campanhas")}
+        </Typography>
+        <Typography className={classes.tooltipDetailValue} component="p">
+          {campaigns}
+        </Typography>
+        <Typography className={classes.tooltipDetailLabel} component="p">
+          {i18n.t("settings.company.form.createdAt")}
+        </Typography>
+        <Typography className={classes.tooltipDetailValue} component="p">
+          {created}
+        </Typography>
+      </Box>
+    );
   };
 
   return (
@@ -982,6 +1492,64 @@ export function CompaniesManagerGrid(props) {
       <Typography variant="caption" color="textSecondary" display="block" style={{ marginBottom: 16 }}>
         {i18n.t("platform.companies.listRowHint")}
       </Typography>
+      <Box className={classes.filterChipsRow}>
+        <Chip
+          size="small"
+          label={i18n.t("platform.companies.filterAll", { count: dueFilterCounts.all })}
+          clickable
+          color={dueFilter === "all" ? "primary" : "default"}
+          variant={dueFilter === "all" ? "default" : "outlined"}
+          onClick={() => setDueFilter("all")}
+        />
+        <Chip
+          size="small"
+          label={i18n.t("platform.companies.filterExpired", { count: dueFilterCounts.expired })}
+          clickable
+          color={dueFilter === "expired" ? "primary" : "default"}
+          variant={dueFilter === "expired" ? "default" : "outlined"}
+          onClick={() => setDueFilter("expired")}
+        />
+        <Chip
+          size="small"
+          label={i18n.t("platform.companies.filterToday", { count: dueFilterCounts.today })}
+          clickable
+          color={dueFilter === "today" ? "primary" : "default"}
+          variant={dueFilter === "today" ? "default" : "outlined"}
+          onClick={() => setDueFilter("today")}
+        />
+        <Chip
+          size="small"
+          label={i18n.t("platform.companies.filterNext3Days", { count: dueFilterCounts.soon3 })}
+          clickable
+          color={dueFilter === "soon3" ? "primary" : "default"}
+          variant={dueFilter === "soon3" ? "default" : "outlined"}
+          onClick={() => setDueFilter("soon3")}
+        />
+        <Chip
+          size="small"
+          label={i18n.t("platform.companies.filterOk", { count: dueFilterCounts.ok })}
+          clickable
+          color={dueFilter === "ok" ? "primary" : "default"}
+          variant={dueFilter === "ok" ? "default" : "outlined"}
+          onClick={() => setDueFilter("ok")}
+        />
+        <Chip
+          size="small"
+          label={i18n.t("platform.companies.filterBlocked", { count: dueFilterCounts.blocked })}
+          clickable
+          color={dueFilter === "blocked" ? "primary" : "default"}
+          variant={dueFilter === "blocked" ? "default" : "outlined"}
+          onClick={() => setDueFilter("blocked")}
+        />
+        <Chip
+          size="small"
+          label={i18n.t("platform.companies.filterActive", { count: dueFilterCounts.active })}
+          clickable
+          color={dueFilter === "active" ? "primary" : "default"}
+          variant={dueFilter === "active" ? "default" : "outlined"}
+          onClick={() => setDueFilter("active")}
+        />
+      </Box>
       <Box className={classes.tableToolbar}>
         {typeof onNewCompany === "function" ? (
           <AppPrimaryButton
@@ -1007,7 +1575,7 @@ export function CompaniesManagerGrid(props) {
           }}
           style={{ minWidth: 220, flex: "1 1 200px" }}
         />
-        <FormControl variant="outlined" size="small" style={{ minWidth: 200 }}>
+        <FormControl variant="outlined" size="small" style={{ minWidth: 228 }}>
           <InputLabel id="companies-sort-label">{i18n.t("platform.companies.sortLabel")}</InputLabel>
           <Select
             labelId="companies-sort-label"
@@ -1015,64 +1583,62 @@ export function CompaniesManagerGrid(props) {
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
           >
+            <MenuItem value="priority">{i18n.t("platform.companies.sortByPriority")}</MenuItem>
             <MenuItem value="name">{i18n.t("platform.companies.sortByName")}</MenuItem>
+            <MenuItem value="dueDate">{i18n.t("platform.companies.sortByDueDate")}</MenuItem>
+            <MenuItem value="plan">{i18n.t("platform.companies.sortByPlan")}</MenuItem>
+            <MenuItem value="status">{i18n.t("platform.companies.sortByStatus")}</MenuItem>
             <MenuItem value="createdAt">{i18n.t("platform.companies.sortByDate")}</MenuItem>
           </Select>
         </FormControl>
       </Box>
       <AppTableContainer className={classes.tableContainer} nested>
-        <Table className={classes.fullWidth} size="small" aria-label="companies">
+        <Table
+          className={classes.fullWidth}
+          size="small"
+          aria-label="companies"
+          style={{ tableLayout: "fixed", width: "100%" }}
+        >
           <TableHead>
             <TableRow>
-              <TableCell align="center" className={classes.tableHeadCell} style={{ minWidth: 100 }}>
+              <TableCell
+                align="center"
+                className={classes.tableHeadCell}
+                style={{ width: 252, minWidth: 252 }}
+              >
                 {i18n.t("platform.companies.actionsColumn")}
               </TableCell>
-              <TableCell align="left" className={classes.tableHeadCell}>
-                {i18n.t("settings.company.form.name")}
+              <TableCell align="left" className={classes.tableHeadCell} style={{ width: "28%" }}>
+                {i18n.t("platform.companies.columnCompany")}
               </TableCell>
-              <TableCell align="left" className={classes.tableHeadCell}>
-                {i18n.t("settings.company.form.primaryAdmin")}
-              </TableCell>
-              <TableCell align="left" className={classes.tableHeadCell}>
-                {i18n.t("settings.company.form.email")}
-              </TableCell>
-              <TableCell align="left" className={classes.tableHeadCell}>
-                {i18n.t("settings.company.form.phone")}
-              </TableCell>
-              <TableCell align="left" className={classes.tableHeadCell}>
+              <TableCell align="left" className={classes.tableHeadCell} style={{ width: "16%" }}>
                 {i18n.t("settings.company.form.plan")}
               </TableCell>
-              <TableCell align="left" className={classes.tableHeadCell}>
-                {i18n.t("settings.company.form.campanhas")}
-              </TableCell>
-              <TableCell align="left" className={classes.tableHeadCell}>
+              <TableCell align="left" className={classes.tableHeadCell} style={{ width: 108 }}>
                 {i18n.t("settings.company.form.status")}
               </TableCell>
-              <TableCell align="left" className={classes.tableHeadCell}>
-                {i18n.t("settings.company.form.createdAt")}
-              </TableCell>
-              <TableCell align="left" className={classes.tableHeadCell}>
+              <TableCell align="left" className={classes.tableHeadCell} style={{ width: 168 }}>
                 {i18n.t("settings.company.form.expire")}
+              </TableCell>
+              <TableCell align="left" className={classes.tableHeadCell} style={{ width: 132 }}>
+                {i18n.t("platform.companies.columnFinance")}
               </TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {filteredRecords.map((row) => {
-              const dueStyle = rowStyle(row);
               const isSelected = selectedId != null && row.id === selectedId;
-              const rowMergedStyle = {
-                ...dueStyle,
-                ...(isSelected
-                  ? {
-                      boxShadow: `inset 4px 0 0 ${theme.palette.primary.main}`,
-                    }
-                  : {}),
-              };
+              const dueMeta = getDueDisplayMeta(row, dateToClient);
+              const financeLabel = getFinanceStateLabel(dueMeta.category);
+              const planValueStr = formatPlanValueDiscrete(row.plan?.value);
+              const adminName = row.primaryAdmin?.name || i18n.t("settings.company.form.noPrimaryAdmin");
+              const adminEmail = row.primaryAdmin?.email || "";
+              const planTitle = renderPlan(row);
+              const recurrenceLine = row.recurrence ? String(row.recurrence) : "";
               return (
                 <TableRow
                   key={row.id}
                   className={`${classes.tableRow} ${isSelected ? classes.tableRowSelected : ""}`}
-                  style={rowMergedStyle}
                   onClick={() => onSelect(row)}
                   selected={isSelected}
                 >
@@ -1100,33 +1666,148 @@ export function CompaniesManagerGrid(props) {
                           <EditOutlined fontSize="small" />
                         </IconButton>
                       </Tooltip>
-                      {typeof onToggleCompanyStatus === "function" &&
-                      typeof onOpenRenewDialog === "function" &&
-                      typeof onOpenDeleteDialog === "function" ? (
-                        <Tooltip title={i18n.t("platform.companies.moreActions")} arrow enterDelay={300}>
+                      {typeof onOpenInternalNotes === "function" ? (
+                        <Tooltip
+                          title={i18n.t("platform.companies.internalNotesTooltip")}
+                          arrow
+                          enterDelay={300}
+                        >
                           <IconButton
                             size="small"
-                            onClick={(e) => {
-                              setActionMenu({ anchorEl: e.currentTarget, row });
-                            }}
-                            aria-label={i18n.t("platform.companies.moreActions")}
+                            onClick={() => onOpenInternalNotes(row)}
+                            aria-label={i18n.t("platform.companies.internalNotesTooltip")}
                           >
-                            <MoreVert fontSize="small" />
+                            <NoteOutlined fontSize="small" />
                           </IconButton>
                         </Tooltip>
                       ) : null}
+                      {typeof onOpenCompanyHistory === "function" ? (
+                        <Tooltip
+                          title={i18n.t("platform.companies.companyHistoryTooltip")}
+                          arrow
+                          enterDelay={300}
+                        >
+                          <IconButton
+                            size="small"
+                            onClick={() => onOpenCompanyHistory(row)}
+                            aria-label={i18n.t("platform.companies.companyHistoryTooltip")}
+                          >
+                            <History fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      ) : null}
+                      {gridOpsEnabled ? (
+                        <>
+                          <Tooltip
+                            title={
+                              row.status === false
+                                ? i18n.t("platform.companies.unblockCompany")
+                                : i18n.t("platform.companies.blockCompany")
+                            }
+                            arrow
+                            enterDelay={300}
+                          >
+                            <span>
+                              <IconButton
+                                size="small"
+                                onClick={() => onToggleCompanyStatus(row)}
+                                disabled={row.id === currentUserCompanyId}
+                                aria-label={
+                                  row.status === false
+                                    ? i18n.t("platform.companies.unblockCompany")
+                                    : i18n.t("platform.companies.blockCompany")
+                                }
+                              >
+                                {row.status === false ? (
+                                  <LockOpen fontSize="small" />
+                                ) : (
+                                  <LockOutlined fontSize="small" />
+                                )}
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                          <Tooltip title={i18n.t("platform.companies.renewCompany")} arrow enterDelay={300}>
+                            <span>
+                              <IconButton
+                                size="small"
+                                onClick={() => onOpenRenewDialog(row)}
+                                disabled={!previewRenewedDueDate(row)}
+                                aria-label={i18n.t("platform.companies.renewCompany")}
+                              >
+                                <Autorenew fontSize="small" />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                          <Tooltip title={i18n.t("platform.companies.billingActionTooltip")} arrow enterDelay={300}>
+                            <IconButton
+                              size="small"
+                              onClick={(e) => openBillingDialog(e, row)}
+                              aria-label={i18n.t("platform.companies.billingActionTooltip")}
+                            >
+                              <ChatBubbleOutline fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title={i18n.t("platform.companies.deleteCompanyAction")} arrow enterDelay={300}>
+                            <span>
+                              <IconButton
+                                size="small"
+                                onClick={() => onOpenDeleteDialog(row)}
+                                disabled={row.id === currentUserCompanyId}
+                                aria-label={i18n.t("platform.companies.deleteCompanyAction")}
+                                style={{ color: theme.palette.error.main }}
+                              >
+                                <DeleteForever fontSize="small" />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                        </>
+                      ) : null}
                     </Box>
                   </TableCell>
-                  <TableCell align="left">{row.name || "-"}</TableCell>
-                  <TableCell align="left">
-                    {row.primaryAdmin
-                      ? `${row.primaryAdmin.name || "-"} (${row.primaryAdmin.email || "-"})`
-                      : i18n.t("settings.company.form.noPrimaryAdmin")}
+                  <TableCell align="left" className={classes.companyCell}>
+                    <Tooltip
+                      title={renderCompanyTooltip(row)}
+                      arrow
+                      interactive
+                      enterDelay={400}
+                      leaveDelay={200}
+                    >
+                      <Box minWidth={0}>
+                        <Typography className={classes.companyNameLine} component="div">
+                          {row.name || "—"}
+                        </Typography>
+                        <Typography className={classes.companyAdminLine} component="div">
+                          {adminName}
+                        </Typography>
+                        {adminEmail ? (
+                          <Typography className={classes.companyEmailLine} component="div">
+                            {adminEmail}
+                          </Typography>
+                        ) : null}
+                      </Box>
+                    </Tooltip>
                   </TableCell>
-                  <TableCell align="left">{row.email || "-"}</TableCell>
-                  <TableCell align="left">{row.phone || "-"}</TableCell>
-                  <TableCell align="left">{renderPlan(row)}</TableCell>
-                  <TableCell align="left">{renderCampaignsStatus(row)}</TableCell>
+                  <TableCell align="left">
+                    <Tooltip
+                      title={recurrenceLine ? `${planTitle} · ${recurrenceLine}` : planTitle}
+                      arrow
+                      disableHoverListener={
+                        planTitle.length < 28 && (recurrenceLine || "").length < 20
+                      }
+                      enterDelay={400}
+                    >
+                      <Box minWidth={0}>
+                        <Typography variant="body2" className={classes.planCell} component="div">
+                          {planTitle}
+                        </Typography>
+                        {recurrenceLine ? (
+                          <Typography component="div" className={classes.planRecurrenceCaption}>
+                            {recurrenceLine}
+                          </Typography>
+                        ) : null}
+                      </Box>
+                    </Tooltip>
+                  </TableCell>
                   <TableCell align="left">
                     <Chip
                       size="small"
@@ -1143,107 +1824,170 @@ export function CompaniesManagerGrid(props) {
                       }}
                     />
                   </TableCell>
-                  <TableCell align="left">{dateToClient(row.createdAt)}</TableCell>
-                  <TableCell align="left">
-                    {dateToClient(row.dueDate)}
-                    <br />
-                    <Typography variant="caption" color="textSecondary" component="span">
-                      {row.recurrence}
-                    </Typography>
+                  <TableCell align="left" className={classes.dueCell}>
+                    <Tooltip
+                      title={<span style={{ whiteSpace: "pre-line" }}>{dueMeta.tooltip}</span>}
+                      arrow
+                      enterDelay={300}
+                    >
+                      <Box display="flex" alignItems="flex-start" minWidth={0}>
+                        {(dueMeta.tone === "expired" || dueMeta.tone === "soon") ? (
+                          <Tooltip
+                            title={
+                              dueMeta.tone === "expired"
+                                ? i18n.t("platform.companies.dueAlertExpiredTooltip")
+                                : i18n.t("platform.companies.dueAlertSoonTooltip")
+                            }
+                            arrow
+                            enterDelay={400}
+                          >
+                            <Warning
+                              fontSize="small"
+                              style={{
+                                flexShrink: 0,
+                                marginRight: 6,
+                                marginTop: 2,
+                                color:
+                                  dueMeta.tone === "expired"
+                                    ? theme.palette.error.main
+                                    : theme.palette.type === "dark"
+                                      ? "#ffee58"
+                                      : "#f9a825",
+                              }}
+                              aria-hidden
+                            />
+                          </Tooltip>
+                        ) : null}
+                        <Box minWidth={0} flex={1}>
+                        <Typography
+                          component="div"
+                          className={`${classes.dueDatePrimary} ${classes[dueMeta.dueClassKey]}`}
+                        >
+                          {dueMeta.dateLabel}
+                        </Typography>
+                        {dueMeta.shortLabel ? (
+                          <Typography
+                            component="div"
+                            className={`${classes.dueShortLabel} ${classes[dueMeta.dueClassKey]}`}
+                          >
+                            {dueMeta.shortLabel}
+                          </Typography>
+                        ) : null}
+                        {dueMeta.recurrence ? (
+                          <Typography
+                            variant="caption"
+                            component="div"
+                            style={{ color: theme.palette.text.secondary, marginTop: 2 }}
+                          >
+                            {dueMeta.recurrence}
+                          </Typography>
+                        ) : null}
+                        </Box>
+                      </Box>
+                    </Tooltip>
+                  </TableCell>
+                  <TableCell align="left" className={classes.financeCell}>
+                    <Tooltip
+                      title={
+                        <span style={{ whiteSpace: "pre-line" }}>
+                          {`${financeLabel}\n${dueMeta.tooltip}`}
+                        </span>
+                      }
+                      arrow
+                      enterDelay={280}
+                    >
+                      <Box minWidth={0}>
+                        <Typography
+                          component="div"
+                          className={`${classes.dueDatePrimary} ${classes[dueMeta.dueClassKey]}`}
+                          style={{ fontSize: "0.8125rem" }}
+                        >
+                          {financeLabel}
+                        </Typography>
+                        {planValueStr ? (
+                          <Typography className={classes.financeValueMuted} component="div">
+                            {planValueStr}
+                          </Typography>
+                        ) : null}
+                      </Box>
+                    </Tooltip>
                   </TableCell>
                 </TableRow>
               );
             })}
           </TableBody>
         </Table>
-        <Menu
-          anchorEl={actionMenu?.anchorEl}
-          keepMounted
-          open={Boolean(actionMenu?.anchorEl)}
-          onClose={() => setActionMenu(null)}
-          getContentAnchorEl={null}
-          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-          transformOrigin={{ vertical: "top", horizontal: "right" }}
-        >
-          {actionMenu?.row &&
-          typeof onToggleCompanyStatus === "function" &&
-          typeof onOpenRenewDialog === "function" &&
-          typeof onOpenDeleteDialog === "function" ? (
-            <>
-              <MenuItem
-                dense
-                disabled={actionMenu.row.id === currentUserCompanyId}
-                onClick={() => {
-                  const r = actionMenu.row;
-                  setActionMenu(null);
-                  onToggleCompanyStatus(r);
-                }}
-              >
-                <ListItemIcon style={{ minWidth: 36 }}>
-                  {actionMenu.row.status === false ? (
-                    <LockOpen fontSize="small" />
-                  ) : (
-                    <LockOutlined fontSize="small" />
-                  )}
-                </ListItemIcon>
-                <ListItemText
-                  primary={
-                    actionMenu.row.status === false
-                      ? i18n.t("platform.companies.unblockCompany")
-                      : i18n.t("platform.companies.blockCompany")
-                  }
-                />
-              </MenuItem>
-              <MenuItem
-                dense
-                disabled={!previewRenewedDueDate(actionMenu.row)}
-                onClick={() => {
-                  const r = actionMenu.row;
-                  setActionMenu(null);
-                  onOpenRenewDialog(r);
-                }}
-              >
-                <ListItemIcon style={{ minWidth: 36 }}>
-                  <EventAvailable fontSize="small" />
-                </ListItemIcon>
-                <ListItemText primary={i18n.t("platform.companies.renewCompany")} />
-              </MenuItem>
-              <MenuItem
-                dense
-                disabled={actionMenu.row.id === currentUserCompanyId}
-                onClick={() => {
-                  const r = actionMenu.row;
-                  setActionMenu(null);
-                  onOpenDeleteDialog(r);
-                }}
-              >
-                <ListItemIcon style={{ minWidth: 36 }}>
-                  <DeleteForever fontSize="small" color="error" />
-                </ListItemIcon>
-                <ListItemText
-                  primary={i18n.t("platform.companies.deleteCompanyAction")}
-                  primaryTypographyProps={{ color: "error" }}
-                />
-              </MenuItem>
-            </>
-          ) : null}
-        </Menu>
       </AppTableContainer>
+
+      <Dialog
+        open={Boolean(billingDialogRow)}
+        onClose={() => setBillingDialogRow(null)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>{i18n.t("platform.companies.billingDialogTitle")}</DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="caption" color="textSecondary" display="block" paragraph>
+            {billingDialogRow
+              ? `${billingDialogRow.name || "—"} · ${dateToClient(billingDialogRow.dueDate) || "—"}`
+              : ""}
+          </Typography>
+          <TextField
+            fullWidth
+            multiline
+            minRows={5}
+            variant="outlined"
+            size="small"
+            value={billingMessagePreview}
+            InputProps={{
+              readOnly: true,
+              className: classes.billingMessageField,
+            }}
+          />
+          {!billingWhatsAppDigits ? (
+            <Typography variant="caption" color="textSecondary" display="block" style={{ marginTop: 8 }}>
+              {i18n.t("platform.companies.billingPhoneMissingHint")}
+            </Typography>
+          ) : null}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setBillingDialogRow(null)} color="primary">
+            {i18n.t("confirmationModal.buttons.cancel")}
+          </Button>
+          <Button onClick={handleBillingCopy} color="primary">
+            {i18n.t("platform.companies.billingCopyButton")}
+          </Button>
+          <Button
+            onClick={handleBillingWhatsApp}
+            color="primary"
+            variant="contained"
+            disabled={!billingWhatsAppDigits}
+          >
+            {i18n.t("platform.companies.billingOpenWhatsApp")}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </AppSectionCard>
   );
 }
 
 export default function CompaniesManager() {
   const classes = useStyles();
-  const { list, save, update, remove, renewDueDate } = useCompanies();
+  const { list, save, update, remove, renewDueDate, fetchCompanyLogs } = useCompanies();
   const { user, enterSupportMode } = useContext(AuthContext);
-  const { dateToClient } = useDate();
+  const { dateToClient, datetimeToClient } = useDate();
 
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [blockDialogRow, setBlockDialogRow] = useState(null);
   const [renewDialogRow, setRenewDialogRow] = useState(null);
   const [gridDeleteRow, setGridDeleteRow] = useState(null);
   const [gridDeleteNameInput, setGridDeleteNameInput] = useState("");
+  const [internalNotesRow, setInternalNotesRow] = useState(null);
+  const [internalNotesDraft, setInternalNotesDraft] = useState("");
+  const [internalNotesSaving, setInternalNotesSaving] = useState(false);
+  const [historyRow, setHistoryRow] = useState(null);
+  const [historyItems, setHistoryItems] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [records, setRecords] = useState([]);
@@ -1418,10 +2162,14 @@ export default function CompaniesManager() {
     const row = renewDialogRow;
     if (!row) return;
     try {
-      await renewDueDate(row.id);
+      const data = await renewDueDate(row.id);
       setRenewDialogRow(null);
       await loadPlans();
-      toast.success(i18n.t("platform.companies.renewSuccess"));
+      toast.success(
+        data?.autoUnblocked
+          ? i18n.t("platform.companies.renewSuccessReactivated")
+          : i18n.t("platform.companies.renewSuccess")
+      );
     } catch (e) {
       toastError(e);
     }
@@ -1443,11 +2191,47 @@ export default function CompaniesManager() {
     }
   };
 
+  const handleSaveInternalNotes = async () => {
+    if (!internalNotesRow) return;
+    setInternalNotesSaving(true);
+    try {
+      await update({
+        id: internalNotesRow.id,
+        internalNotes: internalNotesDraft,
+      });
+      await loadPlans();
+      toast.success(i18n.t("platform.companies.internalNotesSaved"));
+      setInternalNotesRow(null);
+    } catch (e) {
+      toastError(e);
+    } finally {
+      setInternalNotesSaving(false);
+    }
+  };
+
+  const openCompanyHistory = async (row) => {
+    setHistoryRow(row);
+    setHistoryItems([]);
+    setHistoryLoading(true);
+    try {
+      const items = await fetchCompanyLogs(row.id);
+      setHistoryItems(Array.isArray(items) ? items : []);
+    } catch (e) {
+      toastError(e);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
   const gridOpsEnabled = Boolean(user?.super);
   const renewPreviewDate =
     renewDialogRow && previewRenewedDueDate(renewDialogRow)
       ? dateToClient(previewRenewedDueDate(renewDialogRow))
       : null;
+  const renewBaseUsesCurrentDue =
+    renewDialogRow?.dueDate &&
+    moment(renewDialogRow.dueDate).isValid() &&
+    moment(renewDialogRow.dueDate).startOf("day").isSameOrAfter(moment().startOf("day"));
 
   return (
     <Box className={classes.pageStack}>
@@ -1463,6 +2247,15 @@ export default function CompaniesManager() {
         onToggleCompanyStatus={gridOpsEnabled ? (r) => setBlockDialogRow(r) : undefined}
         onOpenRenewDialog={gridOpsEnabled ? (r) => setRenewDialogRow(r) : undefined}
         onOpenDeleteDialog={gridOpsEnabled ? openGridDeleteDialog : undefined}
+        onOpenInternalNotes={
+          gridOpsEnabled
+            ? (r) => {
+                setInternalNotesRow(r);
+                setInternalNotesDraft(r.internalNotes || "");
+              }
+            : undefined
+        }
+        onOpenCompanyHistory={gridOpsEnabled ? openCompanyHistory : undefined}
       />
       {formOpen ? (
         <>
@@ -1526,17 +2319,35 @@ export default function CompaniesManager() {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={Boolean(renewDialogRow)} onClose={() => setRenewDialogRow(null)} maxWidth="xs" fullWidth>
+      <Dialog open={Boolean(renewDialogRow)} onClose={() => setRenewDialogRow(null)} maxWidth="sm" fullWidth>
         <DialogTitle>{i18n.t("platform.companies.renewDialogTitle")}</DialogTitle>
         <DialogContent dividers>
           {renewDialogRow && renewPreviewDate ? (
-            <Typography variant="body2" component="p">
-              {i18n.t("platform.companies.renewDialogMessage", {
-                name: renewDialogRow.name || "—",
-                date: renewPreviewDate,
-                recurrence: renewDialogRow.recurrence || "—",
-              })}
-            </Typography>
+            <Box display="flex" flexDirection="column" style={{ gap: 10 }}>
+              <Typography variant="subtitle1" component="p" style={{ fontWeight: 600 }}>
+                {renewDialogRow.name || "—"}
+              </Typography>
+              <Typography variant="body2" color="textSecondary" component="p">
+                <strong>{i18n.t("settings.company.form.plan")}:</strong>{" "}
+                {renewDialogRow.plan?.name || "—"}
+              </Typography>
+              <Typography variant="body2" color="textSecondary" component="p">
+                <strong>{i18n.t("settings.company.form.expire")}:</strong>{" "}
+                {renewDialogRow.dueDate ? dateToClient(renewDialogRow.dueDate) : "—"}
+              </Typography>
+              <Typography variant="body2" color="textSecondary" component="p">
+                <strong>{i18n.t("platform.companies.renewDialogRecurrence")}:</strong>{" "}
+                {renewDialogRow.recurrence || "—"}
+              </Typography>
+              <Typography variant="body2" component="p">
+                <strong>{i18n.t("platform.companies.renewDialogNewDue")}:</strong> {renewPreviewDate}
+              </Typography>
+              <Typography variant="caption" color="textSecondary" component="p">
+                {renewBaseUsesCurrentDue
+                  ? i18n.t("platform.companies.renewBaseFromCurrentDue")
+                  : i18n.t("platform.companies.renewBaseFromToday")}
+              </Typography>
+            </Box>
           ) : (
             <Typography variant="body2" color="error" component="p">
               {i18n.t("platform.companies.renewInvalidRecurrence")}
@@ -1554,6 +2365,107 @@ export default function CompaniesManager() {
             disabled={!renewPreviewDate}
           >
             {i18n.t("platform.companies.renewConfirm")}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(internalNotesRow)}
+        onClose={() => !internalNotesSaving && setInternalNotesRow(null)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>{i18n.t("platform.companies.internalNotesDialogTitle")}</DialogTitle>
+        <DialogContent dividers>
+          {internalNotesRow ? (
+            <Box display="flex" flexDirection="column" style={{ gap: 12 }}>
+              <Typography variant="body2" color="textSecondary" component="p">
+                {i18n.t("platform.companies.internalNotesHint")}
+              </Typography>
+              <Typography variant="subtitle2" component="p" style={{ fontWeight: 600 }}>
+                {internalNotesRow.name || "—"}
+              </Typography>
+              <TextField
+                multiline
+                minRows={6}
+                fullWidth
+                variant="outlined"
+                size="small"
+                value={internalNotesDraft}
+                onChange={(e) => setInternalNotesDraft(e.target.value)}
+                placeholder={i18n.t("platform.companies.internalNotesPlaceholder")}
+                disabled={internalNotesSaving}
+                inputProps={{ "aria-label": i18n.t("platform.companies.internalNotesPlaceholder") }}
+              />
+            </Box>
+          ) : null}
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setInternalNotesRow(null)}
+            color="primary"
+            disabled={internalNotesSaving}
+          >
+            {i18n.t("confirmationModal.buttons.cancel")}
+          </Button>
+          <Button
+            onClick={handleSaveInternalNotes}
+            color="primary"
+            variant="contained"
+            disabled={internalNotesSaving}
+          >
+            {i18n.t("platform.companies.internalNotesSave")}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(historyRow)}
+        onClose={() => setHistoryRow(null)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>{i18n.t("platform.companies.companyHistoryTitle")}</DialogTitle>
+        <DialogContent dividers>
+          {historyRow ? (
+            <Typography variant="subtitle2" component="p" style={{ fontWeight: 600, marginBottom: 12 }}>
+              {historyRow.name || "—"}
+            </Typography>
+          ) : null}
+          {historyLoading ? (
+            <Box display="flex" justifyContent="center" py={2}>
+              <CircularProgress size={28} />
+            </Box>
+          ) : !historyItems.length ? (
+            <Typography variant="body2" color="textSecondary" component="p">
+              {i18n.t("platform.companies.companyHistoryEmpty")}
+            </Typography>
+          ) : (
+            <Box display="flex" flexDirection="column" style={{ gap: 16 }}>
+              {historyItems.map((log) => {
+                const entry = formatCompanyLogEntry(log, dateToClient, datetimeToClient);
+                return (
+                  <Box key={log.id} data-log-id={log.id}>
+                    <Typography variant="caption" color="textSecondary" component="p">
+                      {entry.whenLabel}
+                    </Typography>
+                    <Typography variant="body2" style={{ fontWeight: 600 }} component="p">
+                      {entry.title}
+                    </Typography>
+                    {entry.subtitle ? (
+                      <Typography variant="body2" color="textSecondary" component="p">
+                        {entry.subtitle}
+                      </Typography>
+                    ) : null}
+                  </Box>
+                );
+              })}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setHistoryRow(null)} color="primary">
+            {i18n.t("confirmationModal.buttons.cancel")}
           </Button>
         </DialogActions>
       </Dialog>

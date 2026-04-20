@@ -9,6 +9,10 @@ import GetPublicBrandingService, {
 } from "../services/SystemSettingService/GetPublicBrandingService";
 import UpsertBrandingService from "../services/SystemSettingService/UpsertBrandingService";
 import SystemSetting from "../models/SystemSetting";
+import GetSystemBillingSettingsService from "../services/SystemSettingService/GetSystemBillingSettingsService";
+import UpsertSystemBillingSettingsService, {
+  UpsertSystemBillingSettingsInput
+} from "../services/SystemSettingService/UpsertSystemBillingSettingsService";
 
 function unlinkPublicAsset(publicPath: string): void {
   if (!publicPath?.startsWith("/public/")) return;
@@ -55,6 +59,47 @@ export const publicBrandingBootstrapScript = async (
   res.setHeader("Content-Type", "application/javascript; charset=utf-8");
   res.setHeader("Cache-Control", "private, max-age=120");
   return res.status(200).send(js);
+};
+
+export const getBillingAutomation = async (
+  _req: Request,
+  res: Response
+): Promise<Response> => {
+  const billing = await GetSystemBillingSettingsService();
+  return res.json(billing);
+};
+
+export const upsertBillingAutomation = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const body = req.body as Record<string, unknown>;
+  const partial: UpsertSystemBillingSettingsInput = {};
+
+  if (body.daysBeforeDueWarning !== undefined) {
+    partial.daysBeforeDueWarning = Number(body.daysBeforeDueWarning);
+  }
+  if (body.daysAfterDueWarning !== undefined) {
+    partial.daysAfterDueWarning = Number(body.daysAfterDueWarning);
+  }
+  if (body.daysAfterDueBlock !== undefined) {
+    partial.daysAfterDueBlock = Number(body.daysAfterDueBlock);
+  }
+  if (body.enableAutoBlock !== undefined) {
+    partial.enableAutoBlock = Boolean(body.enableAutoBlock);
+  }
+  if (body.enableAutoWarning !== undefined) {
+    partial.enableAutoWarning = Boolean(body.enableAutoWarning);
+  }
+  if (body.enableAutoWhatsAppWarning !== undefined) {
+    partial.enableAutoWhatsAppWarning = Boolean(body.enableAutoWhatsAppWarning);
+  }
+  if (body.whatsappSenderCompanyId !== undefined) {
+    partial.whatsappSenderCompanyId = Number(body.whatsappSenderCompanyId);
+  }
+
+  const billing = await UpsertSystemBillingSettingsService(partial);
+  return res.json(billing);
 };
 
 export const index = async (req: Request, res: Response): Promise<Response> => {
