@@ -495,6 +495,9 @@ const messages = {
 					tokenCopied: "Token copied!",
 					tokenCreatedTitle: "API Token created",
 					tokenCreatedMessage: "Save this token in a safe place. Use it on the Messages API page to send messages through this connection.",
+					autoReadMessages: "Automatically mark messages as read",
+					autoReadMessagesHint:
+						"When enabled, after each inbound message is stored, the system sends a read receipt to WhatsApp — fewer unread badges on the phone linked to this session.",
 				},
 				buttons: {
 					okAdd: "Add",
@@ -1320,6 +1323,32 @@ const messages = {
 					registeredListSubtitle:
 						"Main list — search, sort, and pick a row to edit, or add a new account.",
 					accessCompany: "Open company (support mode)",
+					moreActions: "More actions",
+					blockCompany: "Block company",
+					unblockCompany: "Unblock company",
+					renewCompany: "Renew due date",
+					deleteCompanyAction: "Delete company",
+					confirmBlockTitle: "Block company?",
+					confirmBlockMessage:
+						"“{{name}}” will not be able to access the system until unblocked. Continue?",
+					confirmUnblockTitle: "Unblock company?",
+					confirmUnblockMessage:
+						"“{{name}}” will be able to access the system again. Continue?",
+					statusUpdateSuccess: "Company status updated.",
+					renewDialogTitle: "Renew due date",
+					renewDialogMessage:
+						"Renew “{{name}}” using recurrence {{recurrence}}. New due date: {{date}}.",
+					renewInvalidRecurrence:
+						"Could not calculate renewal. Set a valid recurrence on the company (MENSAL, BIMESTRAL, TRIMESTRAL, SEMESTRAL, ANUAL).",
+					renewConfirm: "Renew",
+					renewSuccess: "Due date renewed successfully.",
+					deleteGridTitle: "Delete company",
+					deleteGridMessage:
+						"This permanently deletes “{{name}}” and related data. To confirm, type the exact company name below.",
+					deleteGridNameLabel: "Company name to confirm",
+					deleteGridHint: "The button enables only when the name matches exactly.",
+					deleteGridConfirm: "Delete permanently",
+					deleteGridSuccess: "Company deleted.",
 				},
 				support: {
 					entered: "Support mode enabled.",
@@ -2816,6 +2845,14 @@ const messages = {
 				ERR_COMPANY_DELINQUENT:
 					"Payment overdue: this action is paused until you settle in Billing (PIX).",
 				ERR_NO_COMPANY_FOUND: "Company not found.",
+				ERR_CANNOT_BLOCK_OWN_COMPANY:
+					"You cannot block the company you are signed into.",
+				ERR_CANNOT_DELETE_OWN_COMPANY:
+					"You cannot delete the company you are signed into.",
+				ERR_CANNOT_DELETE_COMPANY_WITH_SUPER:
+					"You cannot delete a company that has a super admin user. Reassign or remove those users first.",
+				ERR_INVALID_RECURRENCE:
+					"Invalid or missing recurrence. Set MONTHLY, BIMONTHLY, QUARTERLY, SEMIANNUAL, or YEARLY on the company.",
 				ERR_LAST_SUPER_ADMIN:
 					"You cannot remove the last platform super administrator. Promote another user first.",
 				ERR_EMAIL_IN_USE: "This email is already in use by another account.",

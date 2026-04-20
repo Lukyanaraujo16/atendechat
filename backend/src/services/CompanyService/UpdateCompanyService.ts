@@ -4,7 +4,7 @@ import Company from "../../models/Company";
 import Setting from "../../models/Setting";
 
 interface CompanyData {
-  name: string;
+  name?: string;
   id?: number | string;
   phone?: string;
   email?: string;
@@ -46,24 +46,27 @@ const UpdateCompanyService = async (
     }
   }
 
-  await company.update({
-    name,
-    phone,
-    email,
-    status,
-    planId,
-    dueDate,
-    recurrence,
-    ...(timezone !== undefined ? { timezone: String(timezone).trim() } : {}),
-    ...(modulePermissions !== undefined
-      ? {
-          modulePermissions:
-            modulePermissions && typeof modulePermissions === "object"
-              ? modulePermissions
-              : {}
-        }
-      : {})
-  });
+  const payload: Record<string, unknown> = {};
+  if (name !== undefined) payload.name = name;
+  if (phone !== undefined) payload.phone = phone;
+  if (email !== undefined) payload.email = email;
+  if (status !== undefined) payload.status = status;
+  if (planId !== undefined) payload.planId = planId;
+  if (dueDate !== undefined) payload.dueDate = dueDate;
+  if (recurrence !== undefined) payload.recurrence = recurrence;
+  if (timezone !== undefined) {
+    payload.timezone = String(timezone).trim();
+  }
+  if (modulePermissions !== undefined) {
+    payload.modulePermissions =
+      modulePermissions && typeof modulePermissions === "object"
+        ? modulePermissions
+        : {};
+  }
+
+  if (Object.keys(payload).length > 0) {
+    await company.update(payload);
+  }
 
   if (companyData.campaignsEnabled !== undefined) {
     const [setting, created] = await Setting.findOrCreate({

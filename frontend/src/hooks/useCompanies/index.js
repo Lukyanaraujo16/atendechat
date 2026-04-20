@@ -78,6 +78,14 @@ const useCompanies = () => {
     return responseData;
   }, []);
 
+  const renewDueDate = useCallback(async (id) => {
+    const { data: responseData } = await api.request({
+      url: `/companies/${id}/renew`,
+      method: "POST",
+    });
+    return responseData;
+  }, []);
+
   return {
     save,
     update,
@@ -88,6 +96,7 @@ const useCompanies = () => {
     findAll,
     updateSchedules,
     updateTimezone,
+    renewDueDate,
   };
 };
 

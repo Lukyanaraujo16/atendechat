@@ -76,6 +76,7 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
     outOfHoursMessage: "",
     ratingMessage: "",
     isDefault: false,
+    autoReadMessages: true,
     token: "",
     provider: "beta",
     //timeSendQueue: 0,
@@ -299,6 +300,22 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
                         }
                         label={i18n.t("whatsappModal.form.default")}
                       />
+                    </Grid>
+                    <Grid item xs={12}>
+                      <FormControlLabel
+                        control={
+                          <Field
+                            as={Switch}
+                            color="primary"
+                            name="autoReadMessages"
+                            checked={values.autoReadMessages !== false}
+                          />
+                        }
+                        label={i18n.t("whatsappModal.form.autoReadMessages")}
+                      />
+                      <Typography variant="caption" color="textSecondary" display="block">
+                        {i18n.t("whatsappModal.form.autoReadMessagesHint")}
+                      </Typography>
                     </Grid>
                   </Grid>
                 </div>

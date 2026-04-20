@@ -19,6 +19,7 @@ import User from "../models/User";
 import ShowPlanCompanyService from "../services/CompanyService/ShowPlanCompanyService";
 import ListCompaniesPlanService from "../services/CompanyService/ListCompaniesPlanService";
 import GetEffectiveModuleFlags from "../services/CompanyService/GetEffectiveModuleFlagsService";
+import RenewCompanyDueDateService from "../services/CompanyService/RenewCompanyDueDateService";
 
 type IndexQuery = {
   searchParam: string;
@@ -34,8 +35,8 @@ interface TokenPayload {
   exp: number;
 }
 
-type CompanyData = {
-  name: string;
+type UpdateCompanyBody = {
+  name?: string;
   id?: number;
   phone?: string;
   email?: string;
@@ -46,7 +47,10 @@ type CompanyData = {
   recurrence?: string;
   password?: string;
   modulePermissions?: Record<string, boolean> | null;
+  timezone?: string;
 };
+
+type CreateCompanyRequest = UpdateCompanyBody & { name: string };
 
 type SchedulesData = {
   schedules: [];
@@ -104,7 +108,7 @@ export const index = async (req: Request, res: Response): Promise<Response> => {
 };
 
 export const store = async (req: Request, res: Response): Promise<Response> => {
-  const newCompany: CompanyData = req.body;
+  const newCompany = req.body as CreateCompanyRequest;
 
   const schema = Yup.object().shape({
     name: Yup.string().required()
@@ -157,19 +161,37 @@ export const update = async (
   req: Request,
   res: Response
 ): Promise<Response> => {
-  const companyData: CompanyData = req.body;
+  const companyData: UpdateCompanyBody = req.body;
 
-  const schema = Yup.object().shape({
-    name: Yup.string()
+  const schema = Yup.object({
+    name: Yup.string().nullable(),
+    phone: Yup.string().nullable(),
+    email: Yup.string().nullable(),
+    status: Yup.boolean().nullable(),
+    planId: Yup.number().nullable(),
+    dueDate: Yup.string().nullable(),
+    recurrence: Yup.string().nullable()
   });
 
   try {
-    await schema.validate(companyData);
+    await schema.validate(companyData, { abortEarly: false });
   } catch (err: any) {
     throw new AppError(err.message);
   }
 
   const { id } = req.params;
+  const companyId = Number(id);
+
+  if (companyData.status === false) {
+    const me = await User.findByPk(req.user.id, { attributes: ["companyId"] });
+    if (me?.companyId === companyId) {
+      throw new AppError(
+        "ERR_CANNOT_BLOCK_OWN_COMPANY",
+        403,
+        "Não é possível bloquear a empresa à qual a sua conta pertence."
+      );
+    }
+  }
 
   const company = await UpdateCompanyService({ id, ...companyData });
 
@@ -228,9 +250,39 @@ export const remove = async (
   res: Response
 ): Promise<Response> => {
   const { id } = req.params;
+  const companyId = Number(id);
 
-  const company = await DeleteCompanyService(id);
+  const me = await User.findByPk(req.user.id, { attributes: ["companyId"] });
+  if (me?.companyId === companyId) {
+    throw new AppError(
+      "ERR_CANNOT_DELETE_OWN_COMPANY",
+      403,
+      "Não é possível excluir a empresa à qual a sua conta pertence."
+    );
+  }
 
+  const superInCompany = await User.findOne({
+    where: { companyId, super: true }
+  });
+  if (superInCompany) {
+    throw new AppError(
+      "ERR_CANNOT_DELETE_COMPANY_WITH_SUPER",
+      400,
+      "Não é possível excluir uma empresa que contenha super administradores. Remova ou transfira esses utilizadores primeiro."
+    );
+  }
+
+  await DeleteCompanyService(id);
+
+  return res.status(200).json({ ok: true });
+};
+
+export const renewDueDate = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const { id } = req.params;
+  const company = await RenewCompanyDueDateService(id);
   return res.status(200).json(company);
 };
 

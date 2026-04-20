@@ -81,6 +81,11 @@ class Whatsapp extends Model<Whatsapp> {
   @Column
   isDefault: boolean;
 
+  /** Se true, após persistir mensagem recebida, envia read receipt ao WhatsApp (sincroniza “lido” no telefone). */
+  @Default(true)
+  @Column
+  autoReadMessages: boolean;
+
   @CreatedAt
   createdAt: Date;
 

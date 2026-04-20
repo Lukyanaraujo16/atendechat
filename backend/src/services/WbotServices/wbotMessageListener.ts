@@ -80,6 +80,7 @@ import { WebhookModel } from "../../models/Webhook";
 
 import {differenceInMilliseconds} from "date-fns";
 import Whatsapp from "../../models/Whatsapp";
+import tryAutoMarkIncomingWhatsAppRead from "../../helpers/TryAutoMarkIncomingWhatsAppRead";
 
 const request = require("request");
 
@@ -979,7 +980,8 @@ export const verifyMediaMessage = async (
   ticketTraking: TicketTraking = null,
   isForwarded: boolean = false,
   isPrivate: boolean = false,
-  wbot: Session = null
+  wbot: Session = null,
+  readReceiptOpts?: { autoReadMessages?: boolean }
 ): Promise<Message> => {
   const io = getIO();
   const quotedMsg = await verifyQuotedMessage(msg);
@@ -1063,6 +1065,15 @@ export const verifyMediaMessage = async (
       });
   }
 
+  if (!msg.key.fromMe && wbot) {
+    await tryAutoMarkIncomingWhatsAppRead({
+      msg,
+      ticket,
+      wbot,
+      autoReadMessages: readReceiptOpts?.autoReadMessages
+    });
+  }
+
   return newMessage;
 };
 
@@ -1081,7 +1092,8 @@ export const verifyMessage = async (
   msg: proto.IWebMessageInfo,
   ticket: Ticket,
   contact: Contact,
-  bodyOverride?: string
+  bodyOverride?: string,
+  readReceiptOpts?: { wbot?: Session | null; autoReadMessages?: boolean }
 ) => {
   const io = getIO();
   const quotedMsg = await verifyQuotedMessage(msg);
@@ -1143,6 +1155,15 @@ export const verifyMessage = async (
         ticket,
         ticketId: ticket.id
       });
+  }
+
+  if (!msg.key.fromMe && readReceiptOpts?.wbot) {
+    await tryAutoMarkIncomingWhatsAppRead({
+      msg,
+      ticket,
+      wbot: readReceiptOpts.wbot,
+      autoReadMessages: readReceiptOpts.autoReadMessages
+    });
   }
 };
 
@@ -2787,10 +2808,24 @@ const handleMessage = async (
       console.log(e);
     }
 
+    const readReceiptOpts = {
+      wbot,
+      autoReadMessages: whatsapp.autoReadMessages !== false
+    };
+
     if (hasMedia) {
-      mediaSent = await verifyMediaMessage(msg, ticket, contact);
+      mediaSent = await verifyMediaMessage(
+        msg,
+        ticket,
+        contact,
+        null,
+        false,
+        false,
+        wbot,
+        readReceiptOpts
+      );
     } else {
-      await verifyMessage(msg, ticket, contact);
+      await verifyMessage(msg, ticket, contact, undefined, readReceiptOpts);
     }
 
     if (ticket.isGroup) {

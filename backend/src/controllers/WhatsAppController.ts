@@ -33,6 +33,7 @@ interface WhatsappData {
   integrationId?: number;
   flowIdWelcome?: number;
   flowIdNotPhrase?: number;
+  autoReadMessages?: boolean;
 }
 
 interface QueryParams {
@@ -68,7 +69,8 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
     expiresInactiveMessage,
     integrationId,
     flowIdWelcome,
-    flowIdNotPhrase
+    flowIdNotPhrase,
+    autoReadMessages
   }: WhatsappData = req.body;
   const { companyId } = req.user;
 
@@ -93,7 +95,8 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
     expiresInactiveMessage,
     integrationId,
     flowIdWelcome,
-    flowIdNotPhrase
+    flowIdNotPhrase,
+    autoReadMessages
   });
 
   StartWhatsAppSession(whatsapp, companyId);

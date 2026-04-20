@@ -500,6 +500,9 @@ const messages = {
           tokenCopied: "¡Token copiado!",
           tokenCreatedTitle: "Token de API creado",
           tokenCreatedMessage: "Guarde este token en un lugar seguro. Úselo en la página Messages API para enviar mensajes por esta conexión.",
+          autoReadMessages: "Marcar mensajes como leídos automáticamente",
+          autoReadMessagesHint:
+            "Si está activo, tras guardar cada mensaje entrante el sistema envía la lectura a WhatsApp — menos mensajes sin leer en el teléfono vinculado a la sesión.",
         },
         buttons: {
           okAdd: "Agregar",
@@ -1321,6 +1324,32 @@ const messages = {
           registeredListSubtitle:
             "Lista principal: busque, ordene y elija una fila para editar, o cree una cuenta nueva.",
           accessCompany: "Abrir empresa (modo soporte)",
+          moreActions: "Más acciones",
+          blockCompany: "Bloquear empresa",
+          unblockCompany: "Desbloquear empresa",
+          renewCompany: "Renovar vencimiento",
+          deleteCompanyAction: "Eliminar empresa",
+          confirmBlockTitle: "¿Bloquear empresa?",
+          confirmBlockMessage:
+            "«{{name}}» no podrá acceder al sistema hasta que se desbloquee. ¿Continuar?",
+          confirmUnblockTitle: "¿Desbloquear empresa?",
+          confirmUnblockMessage:
+            "«{{name}}» volverá a poder acceder al sistema. ¿Continuar?",
+          statusUpdateSuccess: "Estado de la empresa actualizado.",
+          renewDialogTitle: "Renovar vencimiento",
+          renewDialogMessage:
+            "Renovar «{{name}}» según la recurrencia {{recurrence}}. Nuevo vencimiento previsto: {{date}}.",
+          renewInvalidRecurrence:
+            "No se pudo calcular la renovación. Defina una recurrencia válida en la empresa (MENSUAL, BIMESTRAL, etc.).",
+          renewConfirm: "Renovar",
+          renewSuccess: "Vencimiento renovado correctamente.",
+          deleteGridTitle: "Eliminar empresa",
+          deleteGridMessage:
+            "Esta acción elimina «{{name}}» y datos relacionados. No se puede deshacer. Para confirmar, escriba el nombre exacto abajo.",
+          deleteGridNameLabel: "Nombre de la empresa para confirmar",
+          deleteGridHint: "El botón solo se habilita cuando el nombre coincide exactamente.",
+          deleteGridConfirm: "Eliminar definitivamente",
+          deleteGridSuccess: "Empresa eliminada.",
         },
         support: {
           entered: "Modo soporte activado.",
@@ -2717,6 +2746,14 @@ const messages = {
         ERR_COMPANY_DELINQUENT:
             "Pago atrasado: esta acción está suspendida hasta regularizar en Facturación (PIX).",
         ERR_NO_COMPANY_FOUND: "Empresa no encontrada.",
+        ERR_CANNOT_BLOCK_OWN_COMPANY:
+            "No puede bloquear la empresa en la que tiene sesión iniciada.",
+        ERR_CANNOT_DELETE_OWN_COMPANY:
+            "No puede eliminar la empresa en la que tiene sesión iniciada.",
+        ERR_CANNOT_DELETE_COMPANY_WITH_SUPER:
+            "No puede eliminar una empresa que tenga un usuario super administrador. Reasigne o elimine esos usuarios primero.",
+        ERR_INVALID_RECURRENCE:
+            "Recurrencia inválida o ausente. Defina MENSAL, BIMESTRAL, TRIMESTRAL, SEMESTRAL o ANUAL en la empresa.",
         ERR_LAST_SUPER_ADMIN:
             "No puede quitarse el último superadministrador de la plataforma. Promueva a otro usuario primero.",
         ERR_EMAIL_IN_USE: "Este correo ya está en uso por otra cuenta.",

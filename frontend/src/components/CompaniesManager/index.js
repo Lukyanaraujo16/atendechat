@@ -21,6 +21,7 @@ import {
   Button,
   Tooltip,
   IconButton,
+  Menu,
 } from "@material-ui/core";
 import { useTheme, alpha } from "@material-ui/core/styles";
 import SearchIcon from "@material-ui/icons/Search";
@@ -38,8 +39,20 @@ import api from "../../services/api";
 import { head, isArray, has } from "lodash";
 import { useDate } from "../../hooks/useDate";
 
-import moment from "moment";
+import moment from "moment-timezone";
 import { i18n } from "../../translate/i18n";
+import toastError from "../../errors/toastError";
+import Dialog from "@material-ui/core/Dialog";
+import DialogTitle from "@material-ui/core/DialogTitle";
+import DialogContent from "@material-ui/core/DialogContent";
+import DialogActions from "@material-ui/core/DialogActions";
+import ListItemIcon from "@material-ui/core/ListItemIcon";
+import ListItemText from "@material-ui/core/ListItemText";
+import MoreVert from "@material-ui/icons/MoreVert";
+import LockOutlined from "@material-ui/icons/LockOutlined";
+import LockOpen from "@material-ui/icons/LockOpen";
+import EventAvailable from "@material-ui/icons/EventAvailable";
+import DeleteForever from "@material-ui/icons/DeleteForever";
 import { AuthContext } from "../../context/Auth/AuthContext";
 import { getIanaTimezones } from "../../utils/ianaTimezones";
 
@@ -62,6 +75,40 @@ import {
   getCompanyModuleOriginKey,
   planBlocksCompanyModule,
 } from "../ModuleSettings/moduleSync";
+
+const REC_MONTHS = {
+  MENSAL: 1,
+  BIMESTRAL: 2,
+  TRIMESTRAL: 3,
+  SEMESTRAL: 6,
+  ANUAL: 12,
+};
+
+/** Pré-visualização alinhada ao backend RenewCompanyDueDateService. */
+function previewRenewedDueDate(row) {
+  if (!row) return null;
+  const rec = String(row.recurrence || "").toUpperCase();
+  const months = REC_MONTHS[rec];
+  if (!months) return null;
+  const tz =
+    row.timezone && typeof row.timezone === "string"
+      ? row.timezone
+      : "America/Sao_Paulo";
+  try {
+    if (!moment.tz.zone(tz)) return null;
+    const now = moment.tz(tz).startOf("day");
+    let base = now;
+    if (row.dueDate) {
+      const due = moment.tz(row.dueDate, tz).startOf("day");
+      if (due.isValid() && due.isSameOrAfter(now)) {
+        base = due;
+      }
+    }
+    return base.clone().add(months, "months").format("YYYY-MM-DD");
+  } catch (e) {
+    return null;
+  }
+}
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -842,12 +889,23 @@ export function CompanyForm(props) {
 }
 
 export function CompaniesManagerGrid(props) {
-  const { records, onSelect, selectedId, onNewCompany, onAccessCompany } = props;
+  const {
+    records,
+    onSelect,
+    selectedId,
+    onNewCompany,
+    onAccessCompany,
+    currentUserCompanyId,
+    onToggleCompanyStatus,
+    onOpenRenewDialog,
+    onOpenDeleteDialog,
+  } = props;
   const classes = useStyles();
   const theme = useTheme();
   const { dateToClient } = useDate();
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("name");
+  const [actionMenu, setActionMenu] = useState(null);
 
   const filteredRecords = useMemo(() => {
     let list = Array.isArray(records) ? [...records] : [];
@@ -1042,6 +1100,21 @@ export function CompaniesManagerGrid(props) {
                           <EditOutlined fontSize="small" />
                         </IconButton>
                       </Tooltip>
+                      {typeof onToggleCompanyStatus === "function" &&
+                      typeof onOpenRenewDialog === "function" &&
+                      typeof onOpenDeleteDialog === "function" ? (
+                        <Tooltip title={i18n.t("platform.companies.moreActions")} arrow enterDelay={300}>
+                          <IconButton
+                            size="small"
+                            onClick={(e) => {
+                              setActionMenu({ anchorEl: e.currentTarget, row });
+                            }}
+                            aria-label={i18n.t("platform.companies.moreActions")}
+                          >
+                            <MoreVert fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      ) : null}
                     </Box>
                   </TableCell>
                   <TableCell align="left">{row.name || "-"}</TableCell>
@@ -1083,6 +1156,78 @@ export function CompaniesManagerGrid(props) {
             })}
           </TableBody>
         </Table>
+        <Menu
+          anchorEl={actionMenu?.anchorEl}
+          keepMounted
+          open={Boolean(actionMenu?.anchorEl)}
+          onClose={() => setActionMenu(null)}
+          getContentAnchorEl={null}
+          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+          transformOrigin={{ vertical: "top", horizontal: "right" }}
+        >
+          {actionMenu?.row &&
+          typeof onToggleCompanyStatus === "function" &&
+          typeof onOpenRenewDialog === "function" &&
+          typeof onOpenDeleteDialog === "function" ? (
+            <>
+              <MenuItem
+                dense
+                disabled={actionMenu.row.id === currentUserCompanyId}
+                onClick={() => {
+                  const r = actionMenu.row;
+                  setActionMenu(null);
+                  onToggleCompanyStatus(r);
+                }}
+              >
+                <ListItemIcon style={{ minWidth: 36 }}>
+                  {actionMenu.row.status === false ? (
+                    <LockOpen fontSize="small" />
+                  ) : (
+                    <LockOutlined fontSize="small" />
+                  )}
+                </ListItemIcon>
+                <ListItemText
+                  primary={
+                    actionMenu.row.status === false
+                      ? i18n.t("platform.companies.unblockCompany")
+                      : i18n.t("platform.companies.blockCompany")
+                  }
+                />
+              </MenuItem>
+              <MenuItem
+                dense
+                disabled={!previewRenewedDueDate(actionMenu.row)}
+                onClick={() => {
+                  const r = actionMenu.row;
+                  setActionMenu(null);
+                  onOpenRenewDialog(r);
+                }}
+              >
+                <ListItemIcon style={{ minWidth: 36 }}>
+                  <EventAvailable fontSize="small" />
+                </ListItemIcon>
+                <ListItemText primary={i18n.t("platform.companies.renewCompany")} />
+              </MenuItem>
+              <MenuItem
+                dense
+                disabled={actionMenu.row.id === currentUserCompanyId}
+                onClick={() => {
+                  const r = actionMenu.row;
+                  setActionMenu(null);
+                  onOpenDeleteDialog(r);
+                }}
+              >
+                <ListItemIcon style={{ minWidth: 36 }}>
+                  <DeleteForever fontSize="small" color="error" />
+                </ListItemIcon>
+                <ListItemText
+                  primary={i18n.t("platform.companies.deleteCompanyAction")}
+                  primaryTypographyProps={{ color: "error" }}
+                />
+              </MenuItem>
+            </>
+          ) : null}
+        </Menu>
       </AppTableContainer>
     </AppSectionCard>
   );
@@ -1090,10 +1235,15 @@ export function CompaniesManagerGrid(props) {
 
 export default function CompaniesManager() {
   const classes = useStyles();
-  const { list, save, update, remove } = useCompanies();
+  const { list, save, update, remove, renewDueDate } = useCompanies();
   const { user, enterSupportMode } = useContext(AuthContext);
+  const { dateToClient } = useDate();
 
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [blockDialogRow, setBlockDialogRow] = useState(null);
+  const [renewDialogRow, setRenewDialogRow] = useState(null);
+  const [gridDeleteRow, setGridDeleteRow] = useState(null);
+  const [gridDeleteNameInput, setGridDeleteNameInput] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [records, setRecords] = useState([]);
@@ -1246,6 +1396,59 @@ export default function CompaniesManager() {
     history.replace({ pathname: "/platform/companies" });
   }, [location.search, records, history]);
 
+  const openGridDeleteDialog = (row) => {
+    setGridDeleteRow(row);
+    setGridDeleteNameInput("");
+  };
+
+  const handleConfirmBlockToggle = async () => {
+    const row = blockDialogRow;
+    if (!row) return;
+    setBlockDialogRow(null);
+    try {
+      await update({ id: row.id, status: row.status === false ? true : false });
+      await loadPlans();
+      toast.success(i18n.t("platform.companies.statusUpdateSuccess"));
+    } catch (e) {
+      toastError(e);
+    }
+  };
+
+  const handleConfirmRenew = async () => {
+    const row = renewDialogRow;
+    if (!row) return;
+    try {
+      await renewDueDate(row.id);
+      setRenewDialogRow(null);
+      await loadPlans();
+      toast.success(i18n.t("platform.companies.renewSuccess"));
+    } catch (e) {
+      toastError(e);
+    }
+  };
+
+  const handleConfirmGridDelete = async () => {
+    const row = gridDeleteRow;
+    if (!row) return;
+    const expected = (row.name || "").trim();
+    if (gridDeleteNameInput.trim() !== expected) return;
+    try {
+      await remove(row.id);
+      setGridDeleteRow(null);
+      setGridDeleteNameInput("");
+      await loadPlans();
+      toast.success(i18n.t("platform.companies.deleteGridSuccess"));
+    } catch (e) {
+      toastError(e);
+    }
+  };
+
+  const gridOpsEnabled = Boolean(user?.super);
+  const renewPreviewDate =
+    renewDialogRow && previewRenewedDueDate(renewDialogRow)
+      ? dateToClient(previewRenewedDueDate(renewDialogRow))
+      : null;
+
   return (
     <Box className={classes.pageStack}>
       <CompaniesManagerGrid
@@ -1256,6 +1459,10 @@ export default function CompaniesManager() {
         onAccessCompany={
           user?.super && !user?.supportMode ? (row) => enterSupportMode(row.id) : undefined
         }
+        currentUserCompanyId={user?.companyId}
+        onToggleCompanyStatus={gridOpsEnabled ? (r) => setBlockDialogRow(r) : undefined}
+        onOpenRenewDialog={gridOpsEnabled ? (r) => setRenewDialogRow(r) : undefined}
+        onOpenDeleteDialog={gridOpsEnabled ? openGridDeleteDialog : undefined}
       />
       {formOpen ? (
         <>
@@ -1291,6 +1498,103 @@ export default function CompaniesManager() {
       >
         {i18n.t("settings.company.confirmModal.confirm")}
       </ConfirmationModal>
+
+      <Dialog open={Boolean(blockDialogRow)} onClose={() => setBlockDialogRow(null)} maxWidth="xs" fullWidth>
+        <DialogTitle>
+          {blockDialogRow?.status === false
+            ? i18n.t("platform.companies.confirmUnblockTitle")
+            : i18n.t("platform.companies.confirmBlockTitle")}
+        </DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body2" component="p">
+            {blockDialogRow?.status === false
+              ? i18n.t("platform.companies.confirmUnblockMessage", {
+                  name: blockDialogRow?.name || "—",
+                })
+              : i18n.t("platform.companies.confirmBlockMessage", {
+                  name: blockDialogRow?.name || "—",
+                })}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setBlockDialogRow(null)} color="primary">
+            {i18n.t("confirmationModal.buttons.cancel")}
+          </Button>
+          <Button onClick={handleConfirmBlockToggle} color="primary" variant="contained">
+            {i18n.t("confirmationModal.buttons.confirm")}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={Boolean(renewDialogRow)} onClose={() => setRenewDialogRow(null)} maxWidth="xs" fullWidth>
+        <DialogTitle>{i18n.t("platform.companies.renewDialogTitle")}</DialogTitle>
+        <DialogContent dividers>
+          {renewDialogRow && renewPreviewDate ? (
+            <Typography variant="body2" component="p">
+              {i18n.t("platform.companies.renewDialogMessage", {
+                name: renewDialogRow.name || "—",
+                date: renewPreviewDate,
+                recurrence: renewDialogRow.recurrence || "—",
+              })}
+            </Typography>
+          ) : (
+            <Typography variant="body2" color="error" component="p">
+              {i18n.t("platform.companies.renewInvalidRecurrence")}
+            </Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRenewDialogRow(null)} color="primary">
+            {i18n.t("confirmationModal.buttons.cancel")}
+          </Button>
+          <Button
+            onClick={handleConfirmRenew}
+            color="primary"
+            variant="contained"
+            disabled={!renewPreviewDate}
+          >
+            {i18n.t("platform.companies.renewConfirm")}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={Boolean(gridDeleteRow)} onClose={() => setGridDeleteRow(null)} maxWidth="sm" fullWidth>
+        <DialogTitle>{i18n.t("platform.companies.deleteGridTitle")}</DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body2" component="p" paragraph>
+            {i18n.t("platform.companies.deleteGridMessage", { name: gridDeleteRow?.name || "—" })}
+          </Typography>
+          <TextField
+            fullWidth
+            variant="outlined"
+            size="small"
+            label={i18n.t("platform.companies.deleteGridNameLabel")}
+            placeholder={gridDeleteRow?.name || ""}
+            value={gridDeleteNameInput}
+            onChange={(e) => setGridDeleteNameInput(e.target.value)}
+            autoComplete="off"
+          />
+          <Typography variant="caption" color="textSecondary" display="block" style={{ marginTop: 8 }}>
+            {i18n.t("platform.companies.deleteGridHint")}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setGridDeleteRow(null)} color="primary">
+            {i18n.t("confirmationModal.buttons.cancel")}
+          </Button>
+          <Button
+            onClick={handleConfirmGridDelete}
+            color="secondary"
+            variant="contained"
+            disabled={
+              !gridDeleteRow ||
+              gridDeleteNameInput.trim() !== (gridDeleteRow.name || "").trim()
+            }
+          >
+            {i18n.t("platform.companies.deleteGridConfirm")}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

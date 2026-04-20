@@ -29,6 +29,7 @@ interface WhatsappData {
   integrationId?: number;
   flowIdWelcome?: number;
   flowIdNotPhrase?: number;
+  autoReadMessages?: boolean;
 }
 
 interface Request {
@@ -75,7 +76,8 @@ const UpdateWhatsAppService = async ({
     expiresInactiveMessage,
     integrationId,
     flowIdWelcome,
-    flowIdNotPhrase
+    flowIdNotPhrase,
+    autoReadMessages
   } = whatsappData;
 
   try {
@@ -159,6 +161,9 @@ const UpdateWhatsAppService = async ({
   }
   if (flowIdNotPhrase !== undefined) {
     updateData.flowIdNotPhrase = flowIdNotPhrase;
+  }
+  if (autoReadMessages !== undefined) {
+    updateData.autoReadMessages = autoReadMessages;
   }
 
   await whatsapp.update(updateData);

@@ -30,6 +30,7 @@ interface Request {
   integrationId?: number;
   flowIdWelcome?: number;
   flowIdNotPhrase?: number;
+  autoReadMessages?: boolean;
 }
 
 interface Response {
@@ -60,7 +61,8 @@ const CreateWhatsAppService = async ({
   expiresInactiveMessage = "",
   integrationId = null,
   flowIdWelcome = null,
-  flowIdNotPhrase = null
+  flowIdNotPhrase = null,
+  autoReadMessages = true
 }: Request): Promise<Response> => {
 
   const company = await Company.findOne({
@@ -188,7 +190,8 @@ const CreateWhatsAppService = async ({
       expiresInactiveMessage,
       integrationId,
       flowIdWelcome,
-      flowIdNotPhrase
+      flowIdNotPhrase,
+      autoReadMessages
     },
     { include: ["queues"] }
   );
