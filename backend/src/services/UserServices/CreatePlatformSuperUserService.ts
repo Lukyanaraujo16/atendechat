@@ -5,8 +5,16 @@ import User from "../../models/User";
 import Company from "../../models/Company";
 import Plan from "../../models/Plan";
 import { SerializeUser } from "../../helpers/SerializeUser";
+import { parseSuperFlagBody } from "../../utils/parseSuperFlag";
 
 const ALLOWED_PROFILES = ["admin", "user", "supervisor"];
+
+function parseSuperFlagForCreate(body: { super?: unknown }): boolean {
+  if (body.super === undefined || body.super === null) {
+    return true;
+  }
+  return parseSuperFlagBody({ super: body.super });
+}
 
 export type CreatePlatformSuperUserBody = {
   name: string;
@@ -40,7 +48,7 @@ function parseCompanyIdForCreate(
       );
     }
     const n = typeof raw === "number" ? raw : parseInt(String(raw), 10);
-    if (!Number.isFinite(n)) {
+    if (!Number.isFinite(n) || n < 1) {
       throw new AppError("ERR_INVALID_COMPANY_ID", 400);
     }
     return n;
@@ -56,7 +64,7 @@ function parseCompanyIdForCreate(
     return null;
   }
   const n = typeof raw === "number" ? raw : parseInt(String(raw), 10);
-  if (!Number.isFinite(n)) {
+  if (!Number.isFinite(n) || n < 1) {
     throw new AppError("ERR_INVALID_COMPANY_ID", 400);
   }
   return n;
@@ -69,10 +77,7 @@ function parseCompanyIdForCreate(
  */
 const CreatePlatformSuperUserService = async (body: CreatePlatformSuperUserBody) => {
   const profile = body.profile ?? "admin";
-  const superFlag =
-    body.super !== undefined && body.super !== null
-      ? Boolean(body.super)
-      : true;
+  const superFlag = parseSuperFlagForCreate(body);
 
   if (!ALLOWED_PROFILES.includes(profile)) {
     throw new AppError("ERR_INVALID_PROFILE", 400);
@@ -137,7 +142,7 @@ const CreatePlatformSuperUserService = async (body: CreatePlatformSuperUserBody)
     include: [{ model: Company, required: false }, "queues"]
   });
 
-  return SerializeUser(user);
+  return await SerializeUser(user);
 };
 
 export default CreatePlatformSuperUserService;

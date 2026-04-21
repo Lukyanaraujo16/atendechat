@@ -142,9 +142,10 @@ export default function PlatformSuperAdmins() {
       toast.error(i18n.t("platform.superAdmins.toastCompanyRequiredNonSuper"));
       return;
     }
+    /** String vazia garante a chave no JSON (alguns proxies/libs removem `null`). */
     const companyIdPayload = createForm.super
       ? createForm.companyId === "" || createForm.companyId == null
-        ? null
+        ? ""
         : Number(createForm.companyId)
       : Number(createForm.companyId);
     try {
@@ -197,7 +198,7 @@ export default function PlatformSuperAdmins() {
 
     const companyIdPayload = form.super
       ? form.companyId === "" || form.companyId == null
-        ? null
+        ? ""
         : Number(form.companyId)
       : Number(form.companyId);
 

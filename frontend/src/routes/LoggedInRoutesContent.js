@@ -40,47 +40,6 @@ import FlowBuilder from "../pages/FlowBuilder";
 import FlowBuilderConfig from "../pages/FlowBuilderConfig";
 import Evaluation from "../pages/Evaluation";
 import Reports from "../pages/Reports";
-import PlatformModule from "../pages/Platform/PlatformModule";
-
-/** Redireciona URLs antigas /platform/* para /saas/* (rotas canónicas do módulo Super Admin). */
-function legacyPlatformPathToSaas(pathname) {
-  const normalized =
-    pathname.length > 1 && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
-  const exact = {
-    "/platform": "/saas",
-    "/platform/companies": "/saas/companies",
-    "/platform/planos": "/saas/plans",
-    "/platform/financeiro": "/saas/finance",
-    "/platform/billing-automation": "/saas/billing-automation",
-    "/platform/backup": "/saas/backup",
-    "/platform/branding": "/saas/branding",
-    "/platform/helps": "/saas/helps",
-    "/platform/informativos": "/saas/announcements",
-    "/platform/super-admins": "/saas/admins",
-    "/platform/account": "/saas/account",
-  };
-  if (exact[normalized]) {
-    return exact[normalized];
-  }
-  if (normalized.startsWith("/platform")) {
-    const rest = normalized.replace(/^\/platform/, "") || "/";
-    return rest === "/" ? "/saas" : `/saas${rest}`;
-  }
-  return "/saas";
-}
-
-function LegacyPlatformRedirect({ location }) {
-  return (
-    <Redirect
-      to={{
-        pathname: legacyPlatformPathToSaas(location.pathname),
-        search: location.search,
-        hash: location.hash,
-      }}
-    />
-  );
-}
-
 function usePlanFlags() {
   const { user } = useContext(AuthContext);
   const { getPlanCompany } = usePlans();
@@ -418,10 +377,6 @@ export default function LoggedInRoutesContent() {
   return (
     <Switch>
       <Route exact path={["/", "/relatorios"]} component={DashboardRouteGuard} />
-
-      <Route path="/platform" render={(props) => <LegacyPlatformRedirect {...props} />} />
-
-      <Route path="/saas" component={PlatformModule} />
 
       <Route
         path={atendimentoPaths}

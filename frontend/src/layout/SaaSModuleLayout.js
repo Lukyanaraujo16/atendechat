@@ -29,10 +29,12 @@ const DRAWER_WIDTH = 268;
 
 const useStyles = makeStyles((theme) => ({
   root: {
+    flex: 1,
     display: "flex",
     width: "100%",
+    minHeight: 0,
     alignItems: "stretch",
-    minHeight: "min(100%, calc(100vh - 96px))",
+    overflow: "hidden",
     boxSizing: "border-box",
   },
   nav: {
@@ -82,8 +84,11 @@ const useStyles = makeStyles((theme) => ({
   main: {
     flex: 1,
     minWidth: 0,
+    minHeight: 0,
     padding: theme.spacing(1.5, 2, 2),
     boxSizing: "border-box",
+    overflow: "auto",
+    WebkitOverflowScrolling: "touch",
   },
   footer: {
     padding: theme.spacing(1, 1.5, 1.5),

@@ -121,7 +121,7 @@ const UpdatePlatformProfileService = async (
     ]
   });
 
-  return SerializeUser(user);
+  return await SerializeUser(user);
 };
 
 export default UpdatePlatformProfileService;

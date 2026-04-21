@@ -6,6 +6,7 @@ import User from "../../models/User";
 import Company from "../../models/Company";
 import Setting from "../../models/Setting";
 import { SerializeUser } from "../../helpers/SerializeUser";
+import { parseOptionalSuperFlag } from "../../utils/parseSuperFlag";
 
 const ALLOWED_PROFILES = ["admin", "user", "supervisor"];
 
@@ -46,8 +47,8 @@ const UpdatePlatformSuperUserService = async ({
     throw new AppError("ERR_NO_USER_FOUND", 404);
   }
 
-  const { email, password, profile, name, super: superFlag, companyId: bodyCompanyId } =
-    userData;
+  const { email, password, profile, name, companyId: bodyCompanyId } = userData;
+  const superFlagPatch = parseOptionalSuperFlag(userData);
   const hasCompanyIdInBody = Object.prototype.hasOwnProperty.call(
     userData,
     "companyId"
@@ -90,7 +91,7 @@ const UpdatePlatformSuperUserService = async ({
 
   const superCount = await User.count({ where: { super: true } });
 
-  if (user.super && superFlag === false) {
+  if (user.super && superFlagPatch === false) {
     if (superCount <= 1) {
       throw new AppError(
         "ERR_LAST_SUPER_ADMIN",
@@ -101,7 +102,7 @@ const UpdatePlatformSuperUserService = async ({
   }
 
   const willBeSuper =
-    superFlag !== undefined ? Boolean(superFlag) : user.super;
+    superFlagPatch !== undefined ? superFlagPatch : user.super;
 
   let normalizedCompanyId: number | null | undefined = undefined;
   if (hasCompanyIdInBody) {
@@ -116,7 +117,7 @@ const UpdatePlatformSuperUserService = async ({
         typeof bodyCompanyId === "number"
           ? bodyCompanyId
           : parseInt(String(bodyCompanyId), 10);
-      if (!Number.isFinite(n)) {
+      if (!Number.isFinite(n) || n < 1) {
         throw new AppError("ERR_INVALID_COMPANY_ID", 400);
       }
       normalizedCompanyId = n;
@@ -136,7 +137,7 @@ const UpdatePlatformSuperUserService = async ({
     }
   }
 
-  if (superFlag === false && !hasCompanyIdInBody) {
+  if (superFlagPatch === false && !hasCompanyIdInBody) {
     const effectiveCid = user.companyId;
     if (effectiveCid == null) {
       throw new AppError(
@@ -178,8 +179,8 @@ const UpdatePlatformSuperUserService = async ({
   if (profile !== undefined) {
     updates.profile = profile;
   }
-  if (superFlag !== undefined) {
-    updates.super = Boolean(superFlag);
+  if (superFlagPatch !== undefined) {
+    updates.super = superFlagPatch;
   }
   if (
     password !== undefined &&
@@ -189,12 +190,12 @@ const UpdatePlatformSuperUserService = async ({
     updates.password = password;
   }
 
-  if (hasCompanyIdInBody && normalizedCompanyId !== undefined) {
-    updates.companyId = normalizedCompanyId;
+  if (hasCompanyIdInBody) {
+    updates.companyId = normalizedCompanyId as number | null;
   }
 
   const finalSuper =
-    superFlag !== undefined ? Boolean(superFlag) : user.super;
+    superFlagPatch !== undefined ? superFlagPatch : user.super;
   const finalCompanyId =
     updates.companyId !== undefined
       ? (updates.companyId as number | null)
@@ -222,7 +223,7 @@ const UpdatePlatformSuperUserService = async ({
     ]
   });
 
-  return SerializeUser(user);
+  return await SerializeUser(user);
 };
 
 export default UpdatePlatformSuperUserService;
