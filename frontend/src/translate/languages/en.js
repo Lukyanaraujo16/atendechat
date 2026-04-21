@@ -495,9 +495,9 @@ const messages = {
 					tokenCopied: "Token copied!",
 					tokenCreatedTitle: "API Token created",
 					tokenCreatedMessage: "Save this token in a safe place. Use it on the Messages API page to send messages through this connection.",
-					autoReadMessages: "Automatically mark messages as read",
+					autoReadMessages: "Send WhatsApp read receipt when viewing the chat in the panel",
 					autoReadMessagesHint:
-						"When enabled, after each inbound message is stored, the system sends a read receipt to WhatsApp — fewer unread badges on the phone linked to this session.",
+						"When enabled, loading the ticket message list in the panel (human view) sends a read receipt to WhatsApp. Automations and the messages API do not trigger it. When disabled, local unread counts still clear, but the customer will not see blue ticks from this session.",
 				},
 				buttons: {
 					okAdd: "Add",
@@ -1128,7 +1128,7 @@ const messages = {
 				},
 				listItems: {
 					dashboard: "Dashboard",
-					platform: "Platform",
+					platform: "SaaS management",
 					connections: "Connections",
 					tickets: "Tickets",
 					quickMessages: "Quick replies",
@@ -1184,6 +1184,15 @@ const messages = {
 					roleSuperAdmin: "Super Admin",
 					roleAdmin: "Administrator",
 					roleUser: "User",
+				},
+			},
+			saas: {
+				shell: {
+					moduleTitle: "SaaS management",
+					moduleSubtitle:
+						"Platform administration. Ticket and WhatsApp operations use the rest of the menu.",
+					navAria: "SaaS management navigation",
+					backToProduct: "Back to product",
 				},
 			},
 			platform: {
@@ -1681,7 +1690,9 @@ const messages = {
 				superAdmins: {
 					title: "Super Admins",
 					subtitle:
-						"Users with global administrative access to the platform. Promote, edit details, and reset passwords safely.",
+						"Users with global administrative access. Company link is optional: without it, the account is SaaS-only (/saas).",
+					createAction: "New Super Admin",
+					createTitle: "Create user (SaaS panel)",
 					promoteAction: "Promote user",
 					tableTitle: "Super administrators",
 					colName: "Name",
@@ -1699,13 +1710,26 @@ const messages = {
 					fieldEmail: "Email",
 					fieldProfile: "Profile",
 					fieldSuper: "Platform super administrator",
+					fieldCompany: "Linked company (optional for Super Admin)",
+					companyHintSuper:
+						"Optional for super admins. Choose “No company” for SaaS-only access (no tenant operations).",
+					companyHintNonSuper: "Required: users who are not super admins must belong to a company.",
+					companyNoneOption: "No company (SaaS management only)",
+					companySelectPlaceholder: "Select a company…",
+					companySaaSOnly: "SaaS only",
+					toastCompanyRequiredNonSuper: "Select a company. Non–super admin users must be linked to one.",
 					fieldPassword: "New password (optional)",
+					fieldPasswordCreate: "Initial password",
 					passwordHint: "Leave blank to keep the current password.",
+					passwordCreateHint: "At least 5 characters. The user can change it after login.",
 					cancel: "Cancel",
 					save: "Save",
+					createSave: "Create user",
+					createNonSuperNote:
+						"Users who are not super admins do not appear in this list — manage them under that company’s Users.",
 					promoteTitle: "Promote to super admin",
 					promoteHint:
-						"Search by name or email (at least 2 characters). The user will gain access to the Platform panel.",
+						"Search by name or email (at least 2 characters). The user will access SaaS management. To clear the company link later, use Edit.",
 					searchPlaceholder: "Search user…",
 					alreadySuper: "Already a super admin",
 					promote: "Promote",
@@ -1713,7 +1737,9 @@ const messages = {
 					confirmDemoteSelf:
 						"Are you sure you want to remove your own super admin privilege? You may lose access to the Platform panel.",
 					toastSaved: "Changes saved.",
+					toastCreated: "User created successfully.",
 					toastPromoted: "User promoted to super admin.",
+					toastCreateValidation: "Fill in name, email and password (min. 5 characters).",
 				},
 				myAccount: {
 					title: "My account",

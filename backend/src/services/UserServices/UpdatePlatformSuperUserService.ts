@@ -15,6 +15,8 @@ interface UserData {
   name?: string;
   profile?: string;
   super?: boolean;
+  /** Quando omitido, mantém o vínculo atual. `null` = sem empresa (apenas permitido com `super: true`). */
+  companyId?: number | string | null;
 }
 
 interface Params {
@@ -23,8 +25,8 @@ interface Params {
 }
 
 /**
- * Atualização global de utilizador por super admin (nome, email, perfil, super, senha).
- * Não altera companyId nesta fase (ver notas no controller).
+ * Atualização global de utilizador por super admin (nome, email, perfil, super, senha, empresa).
+ * `companyId: null` só é válido quando o utilizador permanece super administrador.
  */
 const UpdatePlatformSuperUserService = async ({
   targetUserId,
@@ -44,7 +46,12 @@ const UpdatePlatformSuperUserService = async ({
     throw new AppError("ERR_NO_USER_FOUND", 404);
   }
 
-  const { email, password, profile, name, super: superFlag } = userData;
+  const { email, password, profile, name, super: superFlag, companyId: bodyCompanyId } =
+    userData;
+  const hasCompanyIdInBody = Object.prototype.hasOwnProperty.call(
+    userData,
+    "companyId"
+  );
 
   const schema = Yup.object().shape({
     email: Yup.string()
@@ -93,6 +100,53 @@ const UpdatePlatformSuperUserService = async ({
     }
   }
 
+  const willBeSuper =
+    superFlag !== undefined ? Boolean(superFlag) : user.super;
+
+  let normalizedCompanyId: number | null | undefined = undefined;
+  if (hasCompanyIdInBody) {
+    if (
+      bodyCompanyId === null ||
+      bodyCompanyId === "" ||
+      bodyCompanyId === "null"
+    ) {
+      normalizedCompanyId = null;
+    } else {
+      const n =
+        typeof bodyCompanyId === "number"
+          ? bodyCompanyId
+          : parseInt(String(bodyCompanyId), 10);
+      if (!Number.isFinite(n)) {
+        throw new AppError("ERR_INVALID_COMPANY_ID", 400);
+      }
+      normalizedCompanyId = n;
+    }
+    if (normalizedCompanyId === null && !willBeSuper) {
+      throw new AppError(
+        "ERR_COMPANY_REQUIRED",
+        400,
+        "Utilizador sem privilégio super deve estar vinculado a uma empresa."
+      );
+    }
+    if (normalizedCompanyId !== null && normalizedCompanyId !== undefined) {
+      const company = await Company.findByPk(normalizedCompanyId);
+      if (!company) {
+        throw new AppError("ERR_NO_COMPANY_FOUND", 404);
+      }
+    }
+  }
+
+  if (superFlag === false && !hasCompanyIdInBody) {
+    const effectiveCid = user.companyId;
+    if (effectiveCid == null) {
+      throw new AppError(
+        "ERR_COMPANY_REQUIRED",
+        400,
+        "Selecione uma empresa antes de remover o privilégio de super administrador."
+      );
+    }
+  }
+
   const emailNorm =
     email !== undefined && email !== null && String(email).trim() !== ""
       ? String(email).trim().toLowerCase()
@@ -133,6 +187,25 @@ const UpdatePlatformSuperUserService = async ({
     String(password).trim().length > 0
   ) {
     updates.password = password;
+  }
+
+  if (hasCompanyIdInBody && normalizedCompanyId !== undefined) {
+    updates.companyId = normalizedCompanyId;
+  }
+
+  const finalSuper =
+    superFlag !== undefined ? Boolean(superFlag) : user.super;
+  const finalCompanyId =
+    updates.companyId !== undefined
+      ? (updates.companyId as number | null)
+      : user.companyId;
+
+  if (!finalSuper && finalCompanyId == null) {
+    throw new AppError(
+      "ERR_COMPANY_REQUIRED",
+      400,
+      "Utilizador sem privilégio super deve estar vinculado a uma empresa."
+    );
   }
 
   if (Object.keys(updates).length > 0) {

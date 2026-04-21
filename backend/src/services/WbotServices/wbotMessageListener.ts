@@ -80,7 +80,6 @@ import { WebhookModel } from "../../models/Webhook";
 
 import {differenceInMilliseconds} from "date-fns";
 import Whatsapp from "../../models/Whatsapp";
-import tryAutoMarkIncomingWhatsAppRead from "../../helpers/TryAutoMarkIncomingWhatsAppRead";
 
 const request = require("request");
 
@@ -979,9 +978,7 @@ export const verifyMediaMessage = async (
   contact: Contact,
   ticketTraking: TicketTraking = null,
   isForwarded: boolean = false,
-  isPrivate: boolean = false,
-  wbot: Session = null,
-  readReceiptOpts?: { autoReadMessages?: boolean }
+  isPrivate: boolean = false
 ): Promise<Message> => {
   const io = getIO();
   const quotedMsg = await verifyQuotedMessage(msg);
@@ -1065,15 +1062,6 @@ export const verifyMediaMessage = async (
       });
   }
 
-  if (!msg.key.fromMe && wbot) {
-    await tryAutoMarkIncomingWhatsAppRead({
-      msg,
-      ticket,
-      wbot,
-      autoReadMessages: readReceiptOpts?.autoReadMessages
-    });
-  }
-
   return newMessage;
 };
 
@@ -1092,8 +1080,7 @@ export const verifyMessage = async (
   msg: proto.IWebMessageInfo,
   ticket: Ticket,
   contact: Contact,
-  bodyOverride?: string,
-  readReceiptOpts?: { wbot?: Session | null; autoReadMessages?: boolean }
+  bodyOverride?: string
 ) => {
   const io = getIO();
   const quotedMsg = await verifyQuotedMessage(msg);
@@ -1157,14 +1144,6 @@ export const verifyMessage = async (
       });
   }
 
-  if (!msg.key.fromMe && readReceiptOpts?.wbot) {
-    await tryAutoMarkIncomingWhatsAppRead({
-      msg,
-      ticket,
-      wbot: readReceiptOpts.wbot,
-      autoReadMessages: readReceiptOpts.autoReadMessages
-    });
-  }
 };
 
 const isValidMsg = (msg: proto.IWebMessageInfo): boolean => {
@@ -2808,11 +2787,6 @@ const handleMessage = async (
       console.log(e);
     }
 
-    const readReceiptOpts = {
-      wbot,
-      autoReadMessages: whatsapp.autoReadMessages !== false
-    };
-
     if (hasMedia) {
       mediaSent = await verifyMediaMessage(
         msg,
@@ -2820,12 +2794,10 @@ const handleMessage = async (
         contact,
         null,
         false,
-        false,
-        wbot,
-        readReceiptOpts
+        false
       );
     } else {
-      await verifyMessage(msg, ticket, contact, undefined, readReceiptOpts);
+      await verifyMessage(msg, ticket, contact);
     }
 
     if (ticket.isGroup) {
@@ -3584,8 +3556,6 @@ const wbotMessageListener = async (
     wbot.ev.on("messages.update", (messageUpdate: WAMessageUpdate[]) => {
       if (messageUpdate.length === 0) return;
       messageUpdate.forEach(async (message: WAMessageUpdate) => {
-        (wbot as WASocket)!.readMessages([message.key]);
-
         handleMsgAck(message, message.update.status);
       });
     });

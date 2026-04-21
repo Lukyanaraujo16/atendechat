@@ -15,7 +15,7 @@ interface SerializedUser {
   email: string;
   profile: string;
   queues: Queue[];
-  companyId: number;
+  companyId: number | null;
 }
 
 interface Request {

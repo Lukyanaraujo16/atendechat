@@ -2137,7 +2137,7 @@ export default function CompaniesManager() {
     const row = records.find((r) => r.id === id);
     if (!row) return;
     handleSelectRef.current(row);
-    history.replace({ pathname: "/platform/companies" });
+    history.replace({ pathname: "/saas/companies" });
   }, [location.search, records, history]);
 
   const openGridDeleteDialog = (row) => {

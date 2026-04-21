@@ -6,9 +6,9 @@ declare global {
       user: {
         id: string;
         profile: string;
-        companyId: number;
+        companyId: number | null;
         supportMode?: boolean;
-        supportHomeCompanyId?: number;
+        supportHomeCompanyId?: number | null;
       };
       apiWhatsapp?: Whatsapp;
     }

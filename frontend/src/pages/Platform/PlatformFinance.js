@@ -506,7 +506,7 @@ export default function PlatformFinance() {
                         <TableCell>{financeChip(row)}</TableCell>
                         <TableCell>{companyChip(row)}</TableCell>
                         <TableCell align="right">
-                          <AppSecondaryButton size="small" component={Link} to={`/platform/companies?focus=${row.id}`}>
+                          <AppSecondaryButton size="small" component={Link} to={`/saas/companies?focus=${row.id}`}>
                             {i18n.t("platform.finance.actionEdit")}
                           </AppSecondaryButton>
                         </TableCell>

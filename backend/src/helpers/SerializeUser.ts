@@ -9,7 +9,7 @@ interface SerializedUser {
   name: string;
   email: string;
   profile: string;
-  companyId: number;
+  companyId: number | null;
   company: Company | null;
   super: boolean;
   queues: Queue[];
@@ -17,7 +17,7 @@ interface SerializedUser {
   finance: CompanyFinanceFlags;
   /** Modo suporte: sessão atua no tenant `companyId`; casa em `supportHomeCompanyId`. */
   supportMode?: boolean;
-  supportHomeCompanyId?: number;
+  supportHomeCompanyId?: number | null;
 }
 
 export const SerializeUser = async (user: User): Promise<SerializedUser> => {
@@ -47,10 +47,13 @@ export const SerializeUser = async (user: User): Promise<SerializedUser> => {
  */
 export const serializeUserForSession = async (
   user: User,
-  effectiveCompanyId: number
+  effectiveCompanyId: number | null
 ): Promise<SerializedUser> => {
   const base = await SerializeUser(user);
-  if (effectiveCompanyId === user.companyId) {
+  if (
+    effectiveCompanyId == null ||
+    effectiveCompanyId === user.companyId
+  ) {
     return base;
   }
   const target = await Company.findByPk(effectiveCompanyId, {
@@ -65,6 +68,6 @@ export const serializeUserForSession = async (
     company: target,
     finance: getCompanyFinanceFlags(target),
     supportMode: true,
-    supportHomeCompanyId: user.companyId
+    supportHomeCompanyId: user.companyId ?? null
   };
 };

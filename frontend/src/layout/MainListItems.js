@@ -197,7 +197,13 @@ const MainListItems = (props) => {
 
   useEffect(() => {
     async function fetchData() {
+      if (user?.super && (user?.companyId == null || user?.companyId === "")) {
+        return;
+      }
       const companyId = user.companyId;
+      if (companyId == null || companyId === "") {
+        return;
+      }
       try {
         const planConfigs = await getPlanCompany(undefined, companyId);
         const plan = planConfigs?.plan;
@@ -231,9 +237,11 @@ const MainListItems = (props) => {
         toastError(e);
       }
     }
-    fetchData();
+    if (user?.id) {
+      fetchData();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [user?.id, user?.companyId, user?.super]);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
@@ -338,11 +346,12 @@ const MainListItems = (props) => {
   const selTarefas = path === "/todolist";
   const selAgendamentos = path === "/schedules";
   const selAvaliacao = path === "/avaliacao";
-  const selInformativos = path === "/announcements" || path.startsWith("/platform/informativos");
+  const selInformativos =
+    path === "/announcements" || path.startsWith("/saas/announcements");
   const selArquivos = path === "/files";
   const selTags = path === "/tags";
   const selAjuda = path === "/helps";
-  const selPlatform = path.startsWith("/platform");
+  const selSaaS = path.startsWith("/saas") || path.startsWith("/platform");
 
   const toAutomacao = defaultAutomacaoPath(planFlags, isAdmin);
 
@@ -397,7 +406,7 @@ const MainListItems = (props) => {
       />
       {user.super && (
         <ListItemLink
-          to="/platform/informativos"
+          to="/saas/announcements"
           primary={i18n.t("mainDrawer.listItems.annoucements")}
           icon={<AnnouncementIcon />}
           listItemClassName={classes.listItem}
@@ -438,13 +447,13 @@ const MainListItems = (props) => {
 
       {user.super && (
         <ListItemLink
-          to="/platform"
+          to="/saas"
           primary={i18n.t("mainDrawer.listItems.platform")}
           icon={<BusinessCenter />}
           listItemClassName={classes.listItem}
           listItemIconClassName={classes.listItemIcon}
           listItemTextClassName={classes.listItemText}
-          selected={selPlatform}
+          selected={selSaaS}
         />
       )}
 

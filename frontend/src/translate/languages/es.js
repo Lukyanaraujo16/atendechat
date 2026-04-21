@@ -500,9 +500,9 @@ const messages = {
           tokenCopied: "¡Token copiado!",
           tokenCreatedTitle: "Token de API creado",
           tokenCreatedMessage: "Guarde este token en un lugar seguro. Úselo en la página Messages API para enviar mensajes por esta conexión.",
-          autoReadMessages: "Marcar mensajes como leídos automáticamente",
+          autoReadMessages: "Enviar lectura en WhatsApp al ver el chat en el panel",
           autoReadMessagesHint:
-            "Si está activo, tras guardar cada mensaje entrante el sistema envía la lectura a WhatsApp — menos mensajes sin leer en el teléfono vinculado a la sesión.",
+            "Si está activo, al cargar la lista de mensajes del ticket en el panel (vista humana), el sistema envía la lectura a WhatsApp. Automatizaciones y la API de mensajes no la disparan. Si está desactivado, los no leídos locales se reinician, pero el cliente no verá las dobles azules desde esta sesión.",
         },
         buttons: {
           okAdd: "Agregar",
@@ -1128,7 +1128,7 @@ const messages = {
         },
         listItems: {
           dashboard: "Dashboard",
-          platform: "Plataforma",
+          platform: "Gestión SaaS",
           connections: "Conexiones",
           tickets: "Atenciones",
           quickMessages: "Respuestas rápidas",
@@ -1184,6 +1184,15 @@ const messages = {
           roleSuperAdmin: "Super Admin",
           roleAdmin: "Administrador",
           roleUser: "Usuario",
+        },
+      },
+      saas: {
+        shell: {
+          moduleTitle: "Gestión SaaS",
+          moduleSubtitle:
+            "Administración de la plataforma. La operación de tickets y WhatsApp está en el resto del menú.",
+          navAria: "Navegación de gestión SaaS",
+          backToProduct: "Volver al producto",
         },
       },
       platform: {
@@ -1682,7 +1691,9 @@ const messages = {
         superAdmins: {
           title: "Super Admins",
           subtitle:
-            "Usuarios con acceso administrativo global a la plataforma. Promueva, edite datos y restablezca contraseñas con seguridad.",
+            "Usuarios con acceso administrativo global. El vínculo a empresa es opcional: sin él, la cuenta es solo SaaS (/saas).",
+          createAction: "Nuevo Super Admin",
+          createTitle: "Crear usuario (panel SaaS)",
           promoteAction: "Promover usuario",
           tableTitle: "Superadministradores",
           colName: "Nombre",
@@ -1700,13 +1711,26 @@ const messages = {
           fieldEmail: "Correo",
           fieldProfile: "Perfil",
           fieldSuper: "Superadministrador de la plataforma",
+          fieldCompany: "Empresa vinculada (opcional para Super Admin)",
+          companyHintSuper:
+            "Opcional para super admin. Elija \"Sin empresa\" para cuenta solo SaaS (sin operación de tenant).",
+          companyHintNonSuper: "Obligatorio: los usuarios que no son super admin deben pertenecer a una empresa.",
+          companyNoneOption: "Sin empresa (solo gestión SaaS)",
+          companySelectPlaceholder: "Seleccione una empresa…",
+          companySaaSOnly: "Solo SaaS",
+          toastCompanyRequiredNonSuper: "Seleccione una empresa. Los usuarios sin privilegio super deben estar vinculados.",
           fieldPassword: "Nueva contraseña (opcional)",
+          fieldPasswordCreate: "Contraseña inicial",
           passwordHint: "Deje en blanco para mantener la contraseña actual.",
+          passwordCreateHint: "Mínimo 5 caracteres. El usuario puede cambiarla tras iniciar sesión.",
           cancel: "Cancelar",
           save: "Guardar",
+          createSave: "Crear usuario",
+          createNonSuperNote:
+            "Quien no sea super admin no aparece en esta lista — gestiónelo en Usuarios de la empresa elegida.",
           promoteTitle: "Promover a super admin",
           promoteHint:
-            "Busque por nombre o correo (mínimo 2 caracteres). El usuario accederá al panel Plataforma.",
+            "Busque por nombre o correo (mínimo 2 caracteres). El usuario accederá a la gestión SaaS. Para quitar la empresa después, use Editar.",
           searchPlaceholder: "Buscar usuario…",
           alreadySuper: "Ya es super admin",
           promote: "Promover",
@@ -1714,7 +1738,9 @@ const messages = {
           confirmDemoteSelf:
             "¿Seguro que desea quitarse el privilegio de super admin? Podría perder el acceso al panel Plataforma.",
           toastSaved: "Cambios guardados.",
+          toastCreated: "Usuario creado correctamente.",
           toastPromoted: "Usuario promovido a super admin.",
+          toastCreateValidation: "Complete nombre, correo y contraseña (mín. 5 caracteres).",
         },
         myAccount: {
           title: "Mi cuenta",

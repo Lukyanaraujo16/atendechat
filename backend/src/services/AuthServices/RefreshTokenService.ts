@@ -13,7 +13,7 @@ import { serializeUserForSession } from "../../helpers/SerializeUser";
 interface RefreshTokenPayload {
   id: string;
   tokenVersion: number;
-  companyId: number;
+  companyId: number | null;
   supportTargetCompanyId?: number;
 }
 
@@ -39,7 +39,16 @@ export const RefreshTokenService = async (
       throw new AppError("ERR_SESSION_EXPIRED", 401);
     }
 
-    if (Number(homeInToken) !== user.companyId) {
+    const normalizeHome = (v: unknown): number | null => {
+      if (v === undefined || v === null || v === "") {
+        return null;
+      }
+      const n = Number(v);
+      return Number.isNaN(n) ? null : n;
+    };
+    const tokenHome = normalizeHome(homeInToken);
+    const userHome = user.companyId ?? null;
+    if (tokenHome !== userHome) {
       res.clearCookie("jrt");
       throw new AppError("ERR_SESSION_EXPIRED", 401);
     }
@@ -47,7 +56,7 @@ export const RefreshTokenService = async (
     const effectiveCompanyId =
       supportTargetCompanyId !== undefined && supportTargetCompanyId !== null
         ? supportTargetCompanyId
-        : user.companyId;
+        : user.companyId ?? null;
 
     const newToken =
       supportTargetCompanyId !== undefined && supportTargetCompanyId !== null

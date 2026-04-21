@@ -17,15 +17,15 @@ export const createAccessToken = (
     options?.supportTargetCompanyId !== undefined &&
     options.supportTargetCompanyId !== null
       ? options.supportTargetCompanyId
-      : user.companyId;
+      : user.companyId ?? null;
 
   const payload: {
     usarname: string;
     profile: string;
     id: number;
-    companyId: number;
+    companyId: number | null;
     supportMode?: boolean;
-    supportHomeCompanyId?: number;
+    supportHomeCompanyId?: number | null;
   } = {
     usarname: user.name,
     profile: user.profile,
@@ -38,7 +38,7 @@ export const createAccessToken = (
     options.supportTargetCompanyId !== user.companyId
   ) {
     payload.supportMode = true;
-    payload.supportHomeCompanyId = user.companyId;
+    payload.supportHomeCompanyId = user.companyId ?? null;
   }
 
   return sign(payload, secret, {
@@ -59,12 +59,12 @@ export const createRefreshToken = (
   const payload: {
     id: number;
     tokenVersion: number;
-    companyId: number;
+    companyId: number | null;
     supportTargetCompanyId?: number;
   } = {
     id: user.id,
     tokenVersion: user.tokenVersion,
-    companyId: user.companyId
+    companyId: user.companyId ?? null
   };
 
   if (options?.supportTargetCompanyId != null) {

@@ -42,6 +42,45 @@ import Evaluation from "../pages/Evaluation";
 import Reports from "../pages/Reports";
 import PlatformModule from "../pages/Platform/PlatformModule";
 
+/** Redireciona URLs antigas /platform/* para /saas/* (rotas canónicas do módulo Super Admin). */
+function legacyPlatformPathToSaas(pathname) {
+  const normalized =
+    pathname.length > 1 && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
+  const exact = {
+    "/platform": "/saas",
+    "/platform/companies": "/saas/companies",
+    "/platform/planos": "/saas/plans",
+    "/platform/financeiro": "/saas/finance",
+    "/platform/billing-automation": "/saas/billing-automation",
+    "/platform/backup": "/saas/backup",
+    "/platform/branding": "/saas/branding",
+    "/platform/helps": "/saas/helps",
+    "/platform/informativos": "/saas/announcements",
+    "/platform/super-admins": "/saas/admins",
+    "/platform/account": "/saas/account",
+  };
+  if (exact[normalized]) {
+    return exact[normalized];
+  }
+  if (normalized.startsWith("/platform")) {
+    const rest = normalized.replace(/^\/platform/, "") || "/";
+    return rest === "/" ? "/saas" : `/saas${rest}`;
+  }
+  return "/saas";
+}
+
+function LegacyPlatformRedirect({ location }) {
+  return (
+    <Redirect
+      to={{
+        pathname: legacyPlatformPathToSaas(location.pathname),
+        search: location.search,
+        hash: location.hash,
+      }}
+    />
+  );
+}
+
 function usePlanFlags() {
   const { user } = useContext(AuthContext);
   const { getPlanCompany } = usePlans();
@@ -376,25 +415,13 @@ export default function LoggedInRoutesContent() {
 
   const configPaths = ["/connections", "/messages-api", "/settings"];
 
-  const platformPaths = [
-    "/platform",
-    "/platform/companies",
-    "/platform/planos",
-    "/platform/branding",
-    "/platform/super-admins",
-    "/platform/account",
-    "/platform/financeiro",
-    "/platform/billing-automation",
-    "/platform/backup",
-    "/platform/helps",
-    "/platform/informativos",
-  ];
-
   return (
     <Switch>
       <Route exact path={["/", "/relatorios"]} component={DashboardRouteGuard} />
 
-      <Route exact path={platformPaths} component={PlatformModule} />
+      <Route path="/platform" render={(props) => <LegacyPlatformRedirect {...props} />} />
+
+      <Route path="/saas" component={PlatformModule} />
 
       <Route
         path={atendimentoPaths}
@@ -487,7 +514,7 @@ export default function LoggedInRoutesContent() {
       <Route
         exact
         path="/announcements"
-        render={() => <Redirect to="/platform/informativos" />}
+        render={() => <Redirect to="/saas/announcements" />}
       />
       <Route exact path="/subscription" component={Subscription} />
 

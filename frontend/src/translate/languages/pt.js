@@ -562,9 +562,9 @@ const messages = {
           tokenCopied: "Token copiado!",
           tokenCreatedTitle: "Token da API criado",
           tokenCreatedMessage: "Guarde este token em local seguro. Use-o na página Messages API para enviar mensagens por esta conexão.",
-          autoReadMessages: "Marcar mensagens como lidas automaticamente",
+          autoReadMessages: "Enviar visto no WhatsApp ao visualizar a conversa no painel",
           autoReadMessagesHint:
-            "Quando ativo, após o sistema receber e guardar cada mensagem do cliente, envia confirmação de leitura ao WhatsApp — reduz o acúmulo de não lidas no telefone ligado à sessão.",
+            "Quando ativo, ao carregar a lista de mensagens do ticket no painel (visualização humana), o sistema envia confirmação de leitura ao WhatsApp. Automações e API não disparam o visto. Desligado: o painel continua zerando não lidas localmente, mas o cliente não recebe os dois risquinhos azuis.",
         },
         buttons: {
           okAdd: "Adicionar",
@@ -1200,7 +1200,7 @@ const messages = {
         },
         listItems: {
           dashboard: "Dashboard",
-          platform: "Plataforma",
+          platform: "Gestão SaaS",
           connections: "Conexões",
           tickets: "Atendimentos",
           quickMessages: "Respostas rápidas",
@@ -1256,6 +1256,15 @@ const messages = {
           roleSuperAdmin: "Super Admin",
           roleAdmin: "Administrador",
           roleUser: "Usuário",
+        },
+      },
+      saas: {
+        shell: {
+          moduleTitle: "Gestão SaaS",
+          moduleSubtitle:
+            "Administração da plataforma. Operação de tickets e WhatsApp fica no restante do menu.",
+          navAria: "Navegação da gestão SaaS",
+          backToProduct: "Voltar ao produto",
         },
       },
       platform: {
@@ -1752,7 +1761,9 @@ const messages = {
         superAdmins: {
           title: "Super Admins",
           subtitle:
-            "Utilizadores com acesso administrativo global à plataforma. Promova, edite dados e redefina senhas com segurança.",
+            "Utilizadores com acesso administrativo global. Pode vincular ou não a uma empresa: sem vínculo, a conta serve apenas para gestão SaaS (/saas).",
+          createAction: "Novo Super Admin",
+          createTitle: "Criar utilizador (painel SaaS)",
           promoteAction: "Promover utilizador",
           tableTitle: "Super administradores",
           colName: "Nome",
@@ -1770,13 +1781,26 @@ const messages = {
           fieldEmail: "E-mail",
           fieldProfile: "Perfil",
           fieldSuper: "Super administrador da plataforma",
+          fieldCompany: "Empresa vinculada (opcional para Super Admin)",
+          companyHintSuper:
+            "Opcional para super admin. Escolha \"Sem empresa\" para conta só SaaS (sem operação de tenant).",
+          companyHintNonSuper: "Obrigatório: utilizadores que não são super admin devem pertencer a uma empresa.",
+          companyNoneOption: "Sem empresa (só gestão SaaS)",
+          companySelectPlaceholder: "Selecione uma empresa…",
+          companySaaSOnly: "Só SaaS",
+          toastCompanyRequiredNonSuper: "Selecione uma empresa. Utilizadores sem privilégio super devem estar vinculados.",
           fieldPassword: "Nova senha (opcional)",
+          fieldPasswordCreate: "Senha inicial",
           passwordHint: "Deixe em branco para manter a senha atual.",
+          passwordCreateHint: "Mínimo 5 caracteres. O utilizador pode alterar depois do login.",
           cancel: "Cancelar",
           save: "Guardar",
+          createSave: "Criar utilizador",
+          createNonSuperNote:
+            "Quem não for super admin não aparece nesta lista — faça a gestão em Utilizadores da empresa escolhida.",
           promoteTitle: "Promover a super admin",
           promoteHint:
-            "Pesquise por nome ou e-mail (mínimo 2 caracteres). O utilizador passa a aceder ao painel Plataforma.",
+            "Pesquise por nome ou e-mail (mínimo 2 caracteres). O utilizador passa a aceder à Gestão SaaS. Para remover a empresa depois, use Editar.",
           searchPlaceholder: "Pesquisar utilizador…",
           alreadySuper: "Já é super admin",
           promote: "Promover",
@@ -1784,7 +1808,9 @@ const messages = {
           confirmDemoteSelf:
             "Tem a certeza de que quer remover o seu próprio privilégio de super admin? Pode perder o acesso ao painel Plataforma.",
           toastSaved: "Alterações guardadas.",
+          toastCreated: "Utilizador criado com sucesso.",
           toastPromoted: "Utilizador promovido a super admin.",
+          toastCreateValidation: "Preencha nome, e-mail e senha (mín. 5 caracteres).",
         },
         myAccount: {
           title: "Minha conta",

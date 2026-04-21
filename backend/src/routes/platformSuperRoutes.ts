@@ -19,6 +19,13 @@ platformSuperRoutes.get(
   PlatformSuperAdminController.searchUsers
 );
 
+platformSuperRoutes.post(
+  "/platform/super-admins",
+  isAuth,
+  isSuper,
+  PlatformSuperAdminController.createSuperUser
+);
+
 platformSuperRoutes.put(
   "/platform/super-admins/:userId",
   isAuth,

@@ -197,8 +197,7 @@ export const handleOpenAi = async (
             contact,
             ticketTraking,
             false,
-            false,
-            wbot
+            false
           );
           deleteFileSync(`${publicFolder}/${fileNameWithOutExtension}.mp3`);
           deleteFileSync(`${publicFolder}/${fileNameWithOutExtension}.wav`);
@@ -326,8 +325,7 @@ export const handleOpenAi = async (
             contact,
             ticketTraking,
             false,
-            false,
-            wbot
+            false
           );
           deleteFileSync(`${publicFolder}/${fileNameWithOutExtension}.mp3`);
           deleteFileSync(`${publicFolder}/${fileNameWithOutExtension}.wav`);

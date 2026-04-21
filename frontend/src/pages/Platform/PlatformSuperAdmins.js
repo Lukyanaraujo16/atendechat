@@ -43,18 +43,41 @@ export default function PlatformSuperAdmins() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editOpen, setEditOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
   const [promoteOpen, setPromoteOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [companies, setCompanies] = useState([]);
   const [form, setForm] = useState({
     name: "",
     email: "",
     profile: "admin",
     super: true,
     password: "",
+    companyId: "",
   });
+
+  const initialCreateForm = () => ({
+    name: "",
+    email: "",
+    profile: "admin",
+    super: true,
+    password: "",
+    companyId: "",
+  });
+  const [createForm, setCreateForm] = useState(initialCreateForm);
+
+  const loadCompanies = useCallback(async () => {
+    try {
+      const { data } = await api.get("/companies/list");
+      setCompanies(Array.isArray(data) ? data : []);
+    } catch (e) {
+      toastError(e);
+      setCompanies([]);
+    }
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -72,6 +95,10 @@ export default function PlatformSuperAdmins() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    loadCompanies();
+  }, [loadCompanies]);
 
   const runSearch = async (q) => {
     const t = q.trim();
@@ -96,6 +123,48 @@ export default function PlatformSuperAdmins() {
     return () => clearTimeout(id);
   }, [search]);
 
+  const openCreate = () => {
+    setCreateForm(initialCreateForm());
+    setCreateOpen(true);
+  };
+
+  const saveCreate = async () => {
+    const pwd = createForm.password?.trim() || "";
+    if (
+      !createForm.name?.trim() ||
+      !createForm.email?.trim() ||
+      pwd.length < 5
+    ) {
+      toast.error(i18n.t("platform.superAdmins.toastCreateValidation"));
+      return;
+    }
+    if (!createForm.super && (createForm.companyId === "" || createForm.companyId == null)) {
+      toast.error(i18n.t("platform.superAdmins.toastCompanyRequiredNonSuper"));
+      return;
+    }
+    const companyIdPayload = createForm.super
+      ? createForm.companyId === "" || createForm.companyId == null
+        ? null
+        : Number(createForm.companyId)
+      : Number(createForm.companyId);
+    try {
+      await api.post("/platform/super-admins", {
+        name: createForm.name.trim(),
+        email: createForm.email.trim(),
+        password: pwd,
+        profile: createForm.profile,
+        super: createForm.super,
+        companyId: companyIdPayload,
+      });
+      toast.success(i18n.t("platform.superAdmins.toastCreated"));
+      setCreateOpen(false);
+      setCreateForm(initialCreateForm());
+      await load();
+    } catch (e) {
+      toastError(e);
+    }
+  };
+
   const openEdit = (row) => {
     setEditing(row);
     setForm({
@@ -104,6 +173,10 @@ export default function PlatformSuperAdmins() {
       profile: row.profile || "admin",
       super: row.super !== false,
       password: "",
+      companyId:
+        row.companyId != null && row.companyId !== ""
+          ? String(row.companyId)
+          : "",
     });
     setEditOpen(true);
   };
@@ -117,12 +190,24 @@ export default function PlatformSuperAdmins() {
     ) {
       return;
     }
+    if (!form.super && (form.companyId === "" || form.companyId == null)) {
+      toast.error(i18n.t("platform.superAdmins.toastCompanyRequiredNonSuper"));
+      return;
+    }
+
+    const companyIdPayload = form.super
+      ? form.companyId === "" || form.companyId == null
+        ? null
+        : Number(form.companyId)
+      : Number(form.companyId);
+
     try {
       await api.put(`/platform/super-admins/${editing.id}`, {
         name: form.name,
         email: form.email,
         profile: form.profile,
         super: form.super,
+        companyId: companyIdPayload,
         ...(form.password?.trim() ? { password: form.password.trim() } : {}),
       });
       toast.success(i18n.t("platform.superAdmins.toastSaved"));
@@ -179,9 +264,14 @@ export default function PlatformSuperAdmins() {
           title={header}
           subtitle={subtitle}
           actions={
-            <AppPrimaryButton onClick={() => setPromoteOpen(true)}>
-              {i18n.t("platform.superAdmins.promoteAction")}
-            </AppPrimaryButton>
+            <Box display="flex" alignItems="center" style={{ gap: 8, flexWrap: "wrap" }}>
+              <AppSecondaryButton onClick={openCreate}>
+                {i18n.t("platform.superAdmins.createAction")}
+              </AppSecondaryButton>
+              <AppPrimaryButton onClick={() => setPromoteOpen(true)}>
+                {i18n.t("platform.superAdmins.promoteAction")}
+              </AppPrimaryButton>
+            </Box>
           }
         />
 
@@ -220,7 +310,11 @@ export default function PlatformSuperAdmins() {
                         color={row.super ? "primary" : "default"}
                       />
                     </TableCell>
-                    <TableCell>{row.company?.name || "—"}</TableCell>
+                    <TableCell>
+                      {row.super && (row.companyId == null || row.companyId === "")
+                        ? i18n.t("platform.superAdmins.companySaaSOnly")
+                        : row.company?.name || "—"}
+                    </TableCell>
                     <TableCell>{row.profile || "—"}</TableCell>
                     <TableCell>{row.online ? i18n.t("users.online.yes") : i18n.t("users.online.no")}</TableCell>
                     <TableCell align="right">
@@ -235,6 +329,131 @@ export default function PlatformSuperAdmins() {
           </Table>
         </AppSectionCard>
       </Box>
+
+      <Dialog open={createOpen} onClose={() => setCreateOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>{i18n.t("platform.superAdmins.createTitle")}</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="textSecondary" style={{ marginTop: 4 }}>
+            {i18n.t("platform.superAdmins.subtitle")}
+          </Typography>
+          <Grid container spacing={2} style={{ marginTop: 8 }}>
+            <Grid item xs={12}>
+              <TextField
+                label={i18n.t("platform.superAdmins.fieldName")}
+                value={createForm.name}
+                onChange={(e) => setCreateForm((f) => ({ ...f, name: e.target.value }))}
+                fullWidth
+                variant="outlined"
+                margin="dense"
+                required
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                label={i18n.t("platform.superAdmins.fieldEmail")}
+                value={createForm.email}
+                onChange={(e) => setCreateForm((f) => ({ ...f, email: e.target.value }))}
+                fullWidth
+                variant="outlined"
+                margin="dense"
+                required
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                select
+                label={i18n.t("platform.superAdmins.fieldProfile")}
+                value={createForm.profile}
+                onChange={(e) => setCreateForm((f) => ({ ...f, profile: e.target.value }))}
+                fullWidth
+                variant="outlined"
+                margin="dense"
+              >
+                <MenuItem value="admin">admin</MenuItem>
+                <MenuItem value="user">user</MenuItem>
+                <MenuItem value="supervisor">supervisor</MenuItem>
+              </TextField>
+            </Grid>
+            <Grid item xs={12}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={createForm.super}
+                    onChange={(e) =>
+                      setCreateForm((f) => ({ ...f, super: e.target.checked }))
+                    }
+                    color="primary"
+                  />
+                }
+                label={i18n.t("platform.superAdmins.fieldSuper")}
+              />
+              {!createForm.super ? (
+                <Typography variant="caption" color="textSecondary" display="block" style={{ marginTop: 4 }}>
+                  {i18n.t("platform.superAdmins.createNonSuperNote")}
+                </Typography>
+              ) : null}
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                select
+                label={i18n.t("platform.superAdmins.fieldCompany")}
+                value={createForm.companyId}
+                onChange={(e) =>
+                  setCreateForm((f) => ({ ...f, companyId: e.target.value }))
+                }
+                fullWidth
+                variant="outlined"
+                margin="dense"
+                required={!createForm.super}
+                disabled={!companies.length}
+                helperText={
+                  createForm.super
+                    ? i18n.t("platform.superAdmins.companyHintSuper")
+                    : i18n.t("platform.superAdmins.companyHintNonSuper")
+                }
+              >
+                {createForm.super ? (
+                  <MenuItem value="">
+                    <em>{i18n.t("platform.superAdmins.companyNoneOption")}</em>
+                  </MenuItem>
+                ) : (
+                  <MenuItem value="">
+                    <em>{i18n.t("platform.superAdmins.companySelectPlaceholder")}</em>
+                  </MenuItem>
+                )}
+                {companies.map((c) => (
+                  <MenuItem key={c.id} value={String(c.id)}>
+                    {c.name}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                label={i18n.t("platform.superAdmins.fieldPasswordCreate")}
+                value={createForm.password}
+                onChange={(e) =>
+                  setCreateForm((f) => ({ ...f, password: e.target.value }))
+                }
+                fullWidth
+                variant="outlined"
+                margin="dense"
+                type="password"
+                required
+                helperText={i18n.t("platform.superAdmins.passwordCreateHint")}
+              />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <AppNeutralButton onClick={() => setCreateOpen(false)}>
+            {i18n.t("platform.superAdmins.cancel")}
+          </AppNeutralButton>
+          <AppPrimaryButton onClick={saveCreate}>
+            {i18n.t("platform.superAdmins.createSave")}
+          </AppPrimaryButton>
+        </DialogActions>
+      </Dialog>
 
       <Dialog open={editOpen} onClose={() => setEditOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>{i18n.t("platform.superAdmins.editTitle")}</DialogTitle>
@@ -280,12 +499,47 @@ export default function PlatformSuperAdmins() {
                 control={
                   <Switch
                     checked={form.super}
-                    onChange={(e) => setForm((f) => ({ ...f, super: e.target.checked }))}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, super: e.target.checked }))
+                    }
                     color="primary"
                   />
                 }
                 label={i18n.t("platform.superAdmins.fieldSuper")}
               />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                select
+                label={i18n.t("platform.superAdmins.fieldCompany")}
+                value={form.companyId}
+                onChange={(e) => setForm((f) => ({ ...f, companyId: e.target.value }))}
+                fullWidth
+                variant="outlined"
+                margin="dense"
+                required={!form.super}
+                disabled={!companies.length}
+                helperText={
+                  form.super
+                    ? i18n.t("platform.superAdmins.companyHintSuper")
+                    : i18n.t("platform.superAdmins.companyHintNonSuper")
+                }
+              >
+                {form.super ? (
+                  <MenuItem value="">
+                    <em>{i18n.t("platform.superAdmins.companyNoneOption")}</em>
+                  </MenuItem>
+                ) : (
+                  <MenuItem value="">
+                    <em>{i18n.t("platform.superAdmins.companySelectPlaceholder")}</em>
+                  </MenuItem>
+                )}
+                {companies.map((c) => (
+                  <MenuItem key={c.id} value={String(c.id)}>
+                    {c.name}
+                  </MenuItem>
+                ))}
+              </TextField>
             </Grid>
             <Grid item xs={12}>
               <TextField

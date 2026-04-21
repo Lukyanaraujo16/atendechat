@@ -66,8 +66,8 @@ class User extends Model<User> {
   updatedAt: Date;
 
   @ForeignKey(() => Company)
-  @Column
-  companyId: number;
+  @Column({ allowNull: true })
+  companyId: number | null;
 
   @BelongsTo(() => Company)
   company: Company;

@@ -21,10 +21,10 @@ import OnlyForSuperUser from "../../components/OnlyForSuperUser";
 import CompanyTimezoneSettings from "../../components/CompanyTimezoneSettings";
 
 const PLATFORM_QUICK_LINKS = [
-  { to: "/platform/companies", labelKey: "platform.tabs.companies" },
-  { to: "/platform/planos", labelKey: "platform.tabs.plans" },
-  { to: "/platform/helps", labelKey: "platform.tabs.helps" },
-  { to: "/platform/informativos", labelKey: "platform.tabs.announcements" },
+  { to: "/saas/companies", labelKey: "platform.tabs.companies" },
+  { to: "/saas/plans", labelKey: "platform.tabs.plans" },
+  { to: "/saas/helps", labelKey: "platform.tabs.helps" },
+  { to: "/saas/announcements", labelKey: "platform.tabs.announcements" },
 ];
 
 const useStyles = makeStyles((theme) => ({

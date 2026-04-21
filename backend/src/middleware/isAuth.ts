@@ -7,9 +7,9 @@ interface TokenPayload {
   id: string;
   username: string;
   profile: string;
-  companyId: number;
+  companyId: number | null;
   supportMode?: boolean;
-  supportHomeCompanyId?: number;
+  supportHomeCompanyId?: number | null;
   iat: number;
   exp: number;
 }

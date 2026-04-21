@@ -4,6 +4,7 @@ import ListSuperAdminsService from "../services/UserServices/ListSuperAdminsServ
 import SearchUsersPlatformService from "../services/UserServices/SearchUsersPlatformService";
 import UpdatePlatformSuperUserService from "../services/UserServices/UpdatePlatformSuperUserService";
 import UpdatePlatformProfileService from "../services/UserServices/UpdatePlatformProfileService";
+import CreatePlatformSuperUserService from "../services/UserServices/CreatePlatformSuperUserService";
 
 export const listSuperAdmins = async (
   req: Request,
@@ -26,6 +27,14 @@ export const searchUsers = async (
     typeof (u as any).toJSON === "function" ? (u as any).toJSON() : u
   );
   return res.status(200).json(rows);
+};
+
+export const createSuperUser = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const user = await CreatePlatformSuperUserService(req.body);
+  return res.status(201).json(user);
 };
 
 export const updateSuperUser = async (

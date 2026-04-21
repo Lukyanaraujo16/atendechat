@@ -3,37 +3,79 @@ import { proto, WASocket } from "@whiskeysockets/baileys";
 import { getIO } from "../libs/socket";
 import Message from "../models/Message";
 import Ticket from "../models/Ticket";
+import Whatsapp from "../models/Whatsapp";
 import { logger } from "../utils/logger";
 import GetTicketWbot from "./GetTicketWbot";
 
-const SetTicketMessagesAsRead = async (ticket: Ticket): Promise<void> => {
+/**
+ * Opções para {@link SetTicketMessagesAsRead}.
+ *
+ * `syncWhatsAppReadReceipt: true` só deve ser usado quando um atendente humano
+ * está visualizando a conversa no painel (ex.: GET da lista paginada de mensagens do ticket).
+ * Fluxos automáticos (webhook, fila, API de mensagens, etc.) devem omitir ou passar `false`.
+ */
+export type SetTicketMessagesAsReadOptions = {
+  syncWhatsAppReadReceipt?: boolean;
+};
+
+/** Confirmação de leitura no WhatsApp: usar apenas no fluxo de visualização humana no painel. */
+export const HUMAN_PANEL_CONVERSATION_VIEW_WHATSAPP_READ: SetTicketMessagesAsReadOptions =
+  {
+    syncWhatsAppReadReceipt: true
+  };
+
+/**
+ * Zera não lidas no ticket, marca mensagens como lidas no banco e notifica o socket.
+ * Opcionalmente envia `chatModify(markRead)` ao WhatsApp — apenas quando
+ * `syncWhatsAppReadReceipt` for true e a conexão tiver `autoReadMessages` ativo.
+ */
+const SetTicketMessagesAsRead = async (
+  ticket: Ticket,
+  options: SetTicketMessagesAsReadOptions = {}
+): Promise<void> => {
+  const { syncWhatsAppReadReceipt = false } = options;
+
   await ticket.update({ unreadMessages: 0 });
   // await cacheLayer.set(`contacts:${ticket.contactId}:unreads`, "0");
 
   try {
-    const wbot = await GetTicketWbot(ticket);
+    if (syncWhatsAppReadReceipt) {
+      const pendingInbound = await Message.findAll({
+        where: {
+          ticketId: ticket.id,
+          fromMe: false,
+          read: false
+        },
+        order: [["createdAt", "DESC"]]
+      });
 
-    const getJsonMessage = await Message.findAll({
-      where: {
-        ticketId: ticket.id,
-        fromMe: false,
-        read: false
-      },
-      order: [["createdAt", "DESC"]]
-    });
+      if (pendingInbound.length > 0) {
+        const whatsapp = await Whatsapp.findByPk(ticket.whatsappId, {
+          attributes: ["autoReadMessages"]
+        });
+        const allowWhatsAppReceipt =
+          whatsapp ? whatsapp.autoReadMessages !== false : true;
 
-    if (getJsonMessage.length > 0) {
-      const lastMessages: proto.IWebMessageInfo = JSON.parse(
-        JSON.stringify(getJsonMessage[0].dataJson)
-      );
+        if (allowWhatsAppReceipt) {
+          const wbot = await GetTicketWbot(ticket);
+          if (wbot && typeof (wbot as WASocket).chatModify === "function") {
+            const lastMessages: proto.IWebMessageInfo = JSON.parse(
+              JSON.stringify(pendingInbound[0].dataJson)
+            );
 
-      if ((lastMessages as any).key && (lastMessages as any).key.fromMe === false) {
-        await (wbot as WASocket).chatModify(
-          { markRead: true, lastMessages: [lastMessages as any] },
-          `${ticket.contact.number}@${
-            ticket.isGroup ? "g.us" : "s.whatsapp.net"
-          }`
-        );
+            if (
+              (lastMessages as any).key &&
+              (lastMessages as any).key.fromMe === false
+            ) {
+              await (wbot as WASocket).chatModify(
+                { markRead: true, lastMessages: [lastMessages as any] },
+                `${ticket.contact.number}@${
+                  ticket.isGroup ? "g.us" : "s.whatsapp.net"
+                }`
+              );
+            }
+          }
+        }
       }
     }
 

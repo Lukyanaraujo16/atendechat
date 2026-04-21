@@ -1,7 +1,9 @@
 import { Request, Response } from "express";
 import AppError from "../errors/AppError";
 
-import SetTicketMessagesAsRead from "../helpers/SetTicketMessagesAsRead";
+import SetTicketMessagesAsRead, {
+  HUMAN_PANEL_CONVERSATION_VIEW_WHATSAPP_READ
+} from "../helpers/SetTicketMessagesAsRead";
 import { getIO } from "../libs/socket";
 import Message from "../models/Message";
 import Queue from "../models/Queue";
@@ -57,7 +59,7 @@ export const index = async (req: Request, res: Response): Promise<Response> => {
     queues
   });
 
-  SetTicketMessagesAsRead(ticket);
+  await SetTicketMessagesAsRead(ticket, HUMAN_PANEL_CONVERSATION_VIEW_WHATSAPP_READ);
 
   return res.json({ count, messages, ticket, hasMore });
 };

@@ -230,13 +230,13 @@ export default function PlatformDashboard() {
 
   const actions = (
     <>
-      <AppSecondaryButton component={Link} to="/platform/companies">
+      <AppSecondaryButton component={Link} to="/saas/companies">
         {i18n.t("platform.dashboard.actionNewCompany")}
       </AppSecondaryButton>
-      <AppSecondaryButton component={Link} to="/platform/planos">
+      <AppSecondaryButton component={Link} to="/saas/plans">
         {i18n.t("platform.dashboard.actionPlans")}
       </AppSecondaryButton>
-      <AppPrimaryButton component={Link} to="/platform/branding">
+      <AppPrimaryButton component={Link} to="/saas/branding">
         {i18n.t("platform.dashboard.actionBranding")}
       </AppPrimaryButton>
     </>
@@ -413,7 +413,7 @@ export default function PlatformDashboard() {
           <Typography variant="caption" color="textSecondary">
             {i18n.t("platform.dashboard.footerHint")}
           </Typography>
-          <AppSecondaryButton component={Link} size="small" to="/platform/companies">
+          <AppSecondaryButton component={Link} size="small" to="/saas/companies">
             {i18n.t("platform.dashboard.openCompanies")}
           </AppSecondaryButton>
         </Box>

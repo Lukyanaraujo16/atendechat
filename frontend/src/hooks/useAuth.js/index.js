@@ -188,10 +188,10 @@ const useAuth = () => {
     try {
       const { data } = await api.post("/auth/login", userData);
       const {
-        user: { companyId, id, company },
+        user: { companyId, id, company, super: isSuperAdmin },
       } = data;
 
-      if (has(company, "settings") && isArray(company.settings)) {
+      if (company && has(company, "settings") && isArray(company.settings)) {
         const setting = company.settings.find(
           (s) => s.key === "campaignsEnabled"
         );
@@ -205,7 +205,11 @@ const useAuth = () => {
       const vencimento = dueDate ? moment(dueDate).format("DD/MM/yyyy") : null;
 
       localStorage.setItem("token", JSON.stringify(data.token));
-      localStorage.setItem("companyId", companyId);
+      if (companyId != null && companyId !== "") {
+        localStorage.setItem("companyId", String(companyId));
+      } else {
+        localStorage.removeItem("companyId");
+      }
       localStorage.setItem("userId", id);
       if (vencimento) {
         localStorage.setItem("companyDueDate", vencimento);
@@ -231,7 +235,11 @@ const useAuth = () => {
         toast.warn(i18n.t("finance.login.delinquentWarning"), { autoClose: 10000 });
       }
 
-      history.push("/tickets");
+      if (isSuperAdmin && (companyId == null || companyId === "")) {
+        history.push("/saas");
+      } else {
+        history.push("/tickets");
+      }
       setLoading(false);
 
     } catch (err) {
@@ -292,12 +300,16 @@ const useAuth = () => {
     try {
       const { data } = await api.post("/auth/support/stop");
       localStorage.setItem("token", JSON.stringify(data.token));
-      localStorage.setItem("companyId", data.user.companyId);
+      if (data.user.companyId != null && data.user.companyId !== "") {
+        localStorage.setItem("companyId", String(data.user.companyId));
+      } else {
+        localStorage.removeItem("companyId");
+      }
       api.defaults.headers.Authorization = `Bearer ${data.token}`;
       setUser(data.user);
       setIsAuth(true);
       toast.success(i18n.t("platform.support.exited"));
-      history.push("/platform");
+      history.push("/saas");
     } catch (err) {
       toastError(err);
     } finally {
