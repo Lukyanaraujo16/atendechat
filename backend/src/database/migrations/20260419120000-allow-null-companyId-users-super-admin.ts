@@ -1,19 +1,53 @@
-import { QueryInterface } from "sequelize";
+import { QueryInterface, DataTypes } from "sequelize";
 
 /**
  * Permite Super Admin sem empresa operacional (companyId nulo).
- * Requer que utilizadores sem empresa não acedam a rotas que dependem de tenant.
+ * Sintaxe SQL difere entre PostgreSQL e MySQL/MariaDB.
  */
 module.exports = {
-  up: (queryInterface: QueryInterface) => {
-    return queryInterface.sequelize.query(
-      "ALTER TABLE Users MODIFY COLUMN companyId INT NULL"
-    );
+  up: async (queryInterface: QueryInterface) => {
+    const dialect = queryInterface.sequelize.getDialect();
+
+    if (dialect === "postgres") {
+      await queryInterface.sequelize.query(
+        'ALTER TABLE "Users" ALTER COLUMN "companyId" DROP NOT NULL'
+      );
+      return;
+    }
+
+    if (dialect === "mysql" || dialect === "mariadb") {
+      await queryInterface.sequelize.query(
+        "ALTER TABLE `Users` MODIFY `companyId` INT NULL"
+      );
+      return;
+    }
+
+    await queryInterface.changeColumn("Users", "companyId", {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    });
   },
 
-  down: (queryInterface: QueryInterface) => {
-    return queryInterface.sequelize.query(
-      "ALTER TABLE Users MODIFY COLUMN companyId INT NOT NULL"
-    );
+  down: async (queryInterface: QueryInterface) => {
+    const dialect = queryInterface.sequelize.getDialect();
+
+    if (dialect === "postgres") {
+      await queryInterface.sequelize.query(
+        'ALTER TABLE "Users" ALTER COLUMN "companyId" SET NOT NULL'
+      );
+      return;
+    }
+
+    if (dialect === "mysql" || dialect === "mariadb") {
+      await queryInterface.sequelize.query(
+        "ALTER TABLE `Users` MODIFY `companyId` INT NOT NULL"
+      );
+      return;
+    }
+
+    await queryInterface.changeColumn("Users", "companyId", {
+      type: DataTypes.INTEGER,
+      allowNull: false
+    });
   }
 };
