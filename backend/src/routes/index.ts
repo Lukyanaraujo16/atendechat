@@ -44,6 +44,8 @@ const routes = Router();
 
 routes.use(systemSettingRoutes);
 routes.use(platformSuperRoutes);
+/** Alias para proxies/Nginx que montam a API em `/api` (ex.: POST /api/platform/super-admins). */
+routes.use("/api", platformSuperRoutes);
 routes.use(backupRoutes);
 
 routes.use(userRoutes);

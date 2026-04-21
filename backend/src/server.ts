@@ -22,6 +22,11 @@ const server = app.listen(process.env.PORT, async () => {
     startQueueProcess();
   });
   logger.info(`Server started on port: ${process.env.PORT}`);
+  logger.info(
+    "Super Admin API: GET/POST /platform/super-admins · PUT /platform/super-admins/:userId " +
+      "(e o mesmo sob prefixo /api, ex. POST /api/platform/super-admins). " +
+      "Se aparecer «Cannot POST /platform/super-admins», faça «npm run build» e reinicie o Node com este código."
+  );
   startBackupAutoScheduler();
   startBillingAutomationScheduler();
 });
