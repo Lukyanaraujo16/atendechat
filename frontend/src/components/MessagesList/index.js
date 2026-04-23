@@ -329,7 +329,6 @@ const MessagesList = ({ ticket, ticketId, isGroup }) => {
   const [anchorEl, setAnchorEl] = useState(null);
   const messageOptionsMenuOpen = Boolean(anchorEl);
   const currentTicketId = useRef(ticketId);
-  const whatsappReadSyncTimerRef = useRef(null);
 
   const socketManager = useContext(SocketContext);
 
@@ -382,28 +381,18 @@ const MessagesList = ({ ticket, ticketId, isGroup }) => {
 
     socket.on("ready", joinRoom);
 
-    const scheduleWhatsAppReadSync = () => {
-      if (whatsappReadSyncTimerRef.current) {
-        clearTimeout(whatsappReadSyncTimerRef.current);
-      }
-      whatsappReadSyncTimerRef.current = setTimeout(() => {
-        whatsappReadSyncTimerRef.current = null;
-        const tid = currentTicketId.current;
-        if (!tid) return;
-        api.post(`/messages/${tid}/whatsapp-read-sync`).catch(() => {});
-      }, 400);
-    };
+    const sameOpenTicket = (msgTicketId) =>
+      msgTicketId != null &&
+      currentTicketId.current != null &&
+      Number(msgTicketId) === Number(currentTicketId.current);
 
     const handleAppMessage = (data) => {
-      if (data.action === "create" && data.message.ticketId === currentTicketId.current) {
+      if (data.action === "create" && sameOpenTicket(data.message.ticketId)) {
         dispatch({ type: "ADD_MESSAGE", payload: data.message });
-        if (!data.message.fromMe) {
-          scheduleWhatsAppReadSync();
-        }
         scrollToBottom();
       }
 
-      if (data.action === "update" && data.message.ticketId === currentTicketId.current) {
+      if (data.action === "update" && sameOpenTicket(data.message.ticketId)) {
         dispatch({ type: "UPDATE_MESSAGE", payload: data.message });
       }
     };
@@ -411,10 +400,6 @@ const MessagesList = ({ ticket, ticketId, isGroup }) => {
     socket.on(`company-${companyId}-appMessage`, handleAppMessage);
 
     return () => {
-      if (whatsappReadSyncTimerRef.current) {
-        clearTimeout(whatsappReadSyncTimerRef.current);
-        whatsappReadSyncTimerRef.current = null;
-      }
       socket.disconnect();
     };
   }, [ticketId, socketManager]);

@@ -12,16 +12,26 @@ import GetTicketWbot from "./GetTicketWbot";
 const READ_LOG_PREFIX = "[ReadReceipt]";
 
 /**
- * Se true (default), envia recibo `read` visível ao interlocutor via `sendReceipts`,
- * para o telefone do cliente deixar de acumular não lidas. Isto ignora o modo
- * `read-self` que o Baileys aplica quando a privacidade de confirmações de leitura
- * da conta ligada não está em "todos".
+ * Por omissão usamos `readMessages` (menos agressivo no ecossistema multi-device):
+ * reduz o efeito de “já li noutro dispositivo ligado”, que costuma **silenciar
+ * notificações push no telefone** da mesma conta.
  *
- * Defina `WHATSAPP_READ_RECEIPT_RESPECT_PRIVACY=true` para usar só `readMessages`
- * (comportamento alinhado às definições de privacidade do WhatsApp ligado).
+ * Para voltar ao comportamento anterior (recibo `read` explícito ao interlocutor),
+ * defina `WHATSAPP_READ_RECEIPT_PEER_VISIBLE=true` — usa `sendReceipts(keys, "read")`
+ * quando disponível.
+ *
+ * `WHATSAPP_READ_RECEIPT_RESPECT_PRIVACY=true` continua a forçar apenas `readMessages`
+ * (ignora PEER_VISIBLE).
  */
-function usePrivacyAlignedReadReceipt(): boolean {
+function forcePrivacyOnlyReadReceipt(): boolean {
   return process.env.WHATSAPP_READ_RECEIPT_RESPECT_PRIVACY === "true";
+}
+
+function wantsPeerVisibleReadReceipt(): boolean {
+  if (forcePrivacyOnlyReadReceipt()) {
+    return false;
+  }
+  return process.env.WHATSAPP_READ_RECEIPT_PEER_VISIBLE === "true";
 }
 
 /**
@@ -136,20 +146,9 @@ async function sendWhatsAppReadReceipts(
     participant: k.participant || null
   }));
 
-  const respectPrivacy = usePrivacyAlignedReadReceipt();
+  const peerVisible = wantsPeerVisibleReadReceipt();
 
-  if (respectPrivacy && typeof wbot.readMessages === "function") {
-    logger.info(
-      `${READ_LOG_PREFIX} strategy=readMessages(privacy-aligned) companyId=${meta.companyId} whatsappId=${meta.whatsappId} ticketId=${meta.ticketId} keyCount=${keys.length} sample=${JSON.stringify(sample)}`
-    );
-    await wbot.readMessages(keys);
-    logger.info(
-      `${READ_LOG_PREFIX} success strategy=readMessages companyId=${meta.companyId} whatsappId=${meta.whatsappId} ticketId=${meta.ticketId}`
-    );
-    return;
-  }
-
-  if (typeof wbot.sendReceipts === "function") {
+  if (peerVisible && typeof wbot.sendReceipts === "function") {
     logger.info(
       `${READ_LOG_PREFIX} strategy=sendReceipts(read) companyId=${meta.companyId} whatsappId=${meta.whatsappId} ticketId=${meta.ticketId} keyCount=${keys.length} sample=${JSON.stringify(sample)}`
     );
@@ -161,12 +160,23 @@ async function sendWhatsAppReadReceipts(
   }
 
   if (typeof wbot.readMessages === "function") {
-    logger.warn(
-      `${READ_LOG_PREFIX} sendReceipts missing; fallback readMessages companyId=${meta.companyId} whatsappId=${meta.whatsappId} ticketId=${meta.ticketId}`
+    logger.info(
+      `${READ_LOG_PREFIX} strategy=readMessages(default) companyId=${meta.companyId} whatsappId=${meta.whatsappId} ticketId=${meta.ticketId} keyCount=${keys.length} peerVisible=${peerVisible} sample=${JSON.stringify(sample)}`
     );
     await wbot.readMessages(keys);
     logger.info(
-      `${READ_LOG_PREFIX} success strategy=readMessages(fallback) companyId=${meta.companyId} whatsappId=${meta.whatsappId} ticketId=${meta.ticketId}`
+      `${READ_LOG_PREFIX} success strategy=readMessages companyId=${meta.companyId} whatsappId=${meta.whatsappId} ticketId=${meta.ticketId}`
+    );
+    return;
+  }
+
+  if (typeof wbot.sendReceipts === "function") {
+    logger.warn(
+      `${READ_LOG_PREFIX} readMessages missing; fallback sendReceipts(read) companyId=${meta.companyId} whatsappId=${meta.whatsappId} ticketId=${meta.ticketId}`
+    );
+    await wbot.sendReceipts(keys, "read");
+    logger.info(
+      `${READ_LOG_PREFIX} success strategy=sendReceipts(fallback) companyId=${meta.companyId} whatsappId=${meta.whatsappId} ticketId=${meta.ticketId}`
     );
   }
 }
@@ -176,9 +186,9 @@ async function sendWhatsAppReadReceipts(
  * Opcionalmente envia recibos de leitura ao WhatsApp — apenas quando
  * `syncWhatsAppReadReceipt` for true e a conexão tiver `autoReadMessages` ativo.
  *
- * Baileys v7: `chatModify({ markRead })` costuma não refletir no telefone do cliente;
- * usamos `sendReceipts(keys, 'read')` (visível ao par) por omissão — ver env
- * `WHATSAPP_READ_RECEIPT_RESPECT_PRIVACY`.
+ * Baileys v7: `chatModify({ markRead })` costuma não refletir bem no telefone.
+ * Por omissão: `readMessages`; recibo visível ao cliente só com
+ * `WHATSAPP_READ_RECEIPT_PEER_VISIBLE=true`.
  */
 const SetTicketMessagesAsRead = async (
   ticket: Ticket,

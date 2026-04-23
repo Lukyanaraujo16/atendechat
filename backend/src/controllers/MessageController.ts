@@ -130,23 +130,6 @@ export const remove = async (
   return res.send();
 };
 
-/**
- * Com a conversa aberta no painel, mensagens novas costumam chegar só via socket (sem novo GET).
- * Este endpoint reutiliza a mesma regra do carregamento da lista: recibo de leitura no WhatsApp
- * quando `autoReadMessages` e o fluxo humano do painel estão ativos.
- */
-export const syncWhatsAppRead = async (
-  req: Request,
-  res: Response
-): Promise<Response> => {
-  const { ticketId } = req.params;
-  const { companyId } = req.user;
-
-  const ticket = await ShowTicketService(ticketId, companyId);
-  await SetTicketMessagesAsRead(ticket, HUMAN_PANEL_CONVERSATION_VIEW_WHATSAPP_READ);
-  return res.status(204).send();
-};
-
 export const send = async (req: Request, res: Response): Promise<Response> => {
   const { whatsappId } = req.params as unknown as { whatsappId: number };
   const messageData: MessageData = req.body;
