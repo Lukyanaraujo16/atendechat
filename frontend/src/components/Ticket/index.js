@@ -212,7 +212,6 @@ const Ticket = () => {
   return (
     <div className={classes.root} id="drawer-container">
       <Paper
-        variant="outlined"
         elevation={0}
         className={clsx(classes.mainWrapper, {
           [classes.mainWrapperShift]: drawerOpen,

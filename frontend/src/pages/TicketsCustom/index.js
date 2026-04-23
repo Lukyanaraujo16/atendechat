@@ -19,7 +19,7 @@ const useStyles = makeStyles(theme => ({
 		overflow: "hidden",
 		display: "flex",
 		flexDirection: "column",
-		backgroundColor: "#f4f4f4",
+		backgroundColor: theme.palette.background.default,
 	},
 
 	chatPapper: {
@@ -50,7 +50,7 @@ const useStyles = makeStyles(theme => ({
 		overflow: "hidden",
 	},
 	welcomeMsg: {
-		backgroundColor: theme.palette.boxticket || "#fff",
+		backgroundColor: theme.palette.boxticket || theme.palette.background.paper,
 		display: "flex",
 		flexDirection: "column",
 		justifyContent: "center",

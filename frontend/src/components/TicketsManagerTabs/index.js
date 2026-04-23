@@ -747,7 +747,7 @@ const TicketsManagerTabs = () => {
       showAll={showAllTickets}
       inboxUiActive={tab === "open"}
     >
-    <Paper elevation={0} variant="outlined" className={classes.ticketsRoot}>
+    <Paper elevation={0} className={classes.ticketsRoot}>
       <NewTicketModal
         modalOpen={newTicketModalOpen}
         onClose={(ticket) => handleCloseOrOpenTicket(ticket)}
