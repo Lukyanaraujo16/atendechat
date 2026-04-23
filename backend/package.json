@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build": "tsc",
+    "build": "node -e \"const fs=require('fs'); if(fs.existsSync('dist')) fs.rmSync('dist',{recursive:true});\" && tsc",
     "watch": "tsc -w",
     "start": "nodemon dist/server.js",
     "start:prod": "node dist/server.js",
