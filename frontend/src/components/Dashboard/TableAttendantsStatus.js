@@ -10,7 +10,6 @@ import TableRow from '@material-ui/core/TableRow';
 import Skeleton from "@material-ui/lab/Skeleton";
 
 import { makeStyles } from "@material-ui/core/styles";
-import { green, red } from '@material-ui/core/colors';
 
 import CheckCircleIcon from '@material-ui/icons/CheckCircle';
 import ErrorIcon from '@material-ui/icons/Error';
@@ -21,16 +20,37 @@ import { i18n } from "../../translate/i18n";
 
 const useStyles = makeStyles(theme => ({
 	on: {
-		color: green[600],
+		color: theme.palette.success.main,
 		fontSize: '20px'
 	},
 	off: {
-		color: red[600],
+		color: theme.palette.error.main,
 		fontSize: '20px'
 	},
     pointer: {
         cursor: "pointer"
-    }
+    },
+	tableHeadCell: {
+		backgroundColor: theme.palette.action.hover,
+		color: theme.palette.text.primary,
+		fontWeight: 600,
+		fontSize: "0.8125rem",
+		borderBottom: `1px solid ${theme.palette.divider}`,
+	},
+	tableCell: {
+		fontSize: "0.8125rem",
+		color: theme.palette.text.primary,
+		borderColor: theme.palette.divider,
+	},
+	tableRowHover: {
+		"&:hover": {
+			backgroundColor: theme.palette.action.hover,
+		},
+	},
+	tableContainer: {
+		backgroundColor: theme.palette.background.paper,
+		boxShadow: "none",
+	},
 }));
 
 export function RatingBox ({ rating }) {
@@ -48,13 +68,13 @@ export default function TableAttendantsStatus(props) {
 
     function renderList () {
         return attendants.map((a, k) => (
-            <TableRow key={k}>
-                <TableCell>{a.name}</TableCell>
-                <TableCell align="center" title={i18n.t("dashboard.onlineTable.ratingLabel")} className={classes.pointer}>
+            <TableRow key={k} className={classes.tableRowHover}>
+                <TableCell className={classes.tableCell}>{a.name}</TableCell>
+                <TableCell align="center" title={i18n.t("dashboard.onlineTable.ratingLabel")} className={`${classes.pointer} ${classes.tableCell}`}>
                     <RatingBox rating={a.rating} />
                 </TableCell>
-                <TableCell align="center">{formatTime(a.avgSupportTime, 2)}</TableCell>
-                <TableCell align="center">
+                <TableCell align="center" className={classes.tableCell}>{formatTime(a.avgSupportTime, 2)}</TableCell>
+                <TableCell align="center" className={classes.tableCell}>
                     { a.online ?
                         <CheckCircleIcon className={classes.on} />
                         : <ErrorIcon className={classes.off} />
@@ -69,14 +89,14 @@ export default function TableAttendantsStatus(props) {
 	}
 
     return ( !loading ?
-        <TableContainer component={Paper}>
+        <TableContainer component={Paper} className={classes.tableContainer}>
             <Table>
                 <TableHead>
                     <TableRow>
-                        <TableCell>{i18n.t("dashboard.onlineTable.name")}</TableCell>
-                        <TableCell align="center">{i18n.t("dashboard.onlineTable.ratings")}</TableCell>
-                        <TableCell align="center">{i18n.t("dashboard.onlineTable.avgSupportTime")}</TableCell>
-                        <TableCell align="center">{i18n.t("dashboard.onlineTable.status")}</TableCell>
+                        <TableCell className={classes.tableHeadCell}>{i18n.t("dashboard.onlineTable.name")}</TableCell>
+                        <TableCell align="center" className={classes.tableHeadCell}>{i18n.t("dashboard.onlineTable.ratings")}</TableCell>
+                        <TableCell align="center" className={classes.tableHeadCell}>{i18n.t("dashboard.onlineTable.avgSupportTime")}</TableCell>
+                        <TableCell align="center" className={classes.tableHeadCell}>{i18n.t("dashboard.onlineTable.status")}</TableCell>
                     </TableRow>
                 </TableHead>
                 <TableBody>

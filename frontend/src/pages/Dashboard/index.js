@@ -23,7 +23,8 @@ import ChatBubbleOutlinedIcon from "@material-ui/icons/ChatBubbleOutlined";
 import PeopleOutlinedIcon from "@material-ui/icons/PeopleOutlined";
 import AssessmentOutlinedIcon from "@material-ui/icons/AssessmentOutlined";
 
-import { makeStyles } from "@material-ui/core/styles";
+import { makeStyles, useTheme } from "@material-ui/core/styles";
+import { fade } from "@material-ui/core/styles/colorManipulator";
 import {
   AreaChart,
   Area,
@@ -70,12 +71,13 @@ const useStyles = makeStyles((theme) => ({
   card: {
     padding: theme.spacing(2.5),
     borderRadius: 12,
-    boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+    boxShadow: theme.shadows[1],
+    border: `1px solid ${theme.palette.divider}`,
     height: "100%",
     display: "flex",
     flexDirection: "column",
     overflow: "hidden",
-    backgroundColor: "#fff",
+    backgroundColor: theme.palette.background.paper,
   },
   cardHeader: {
     display: "flex",
@@ -100,24 +102,24 @@ const useStyles = makeStyles((theme) => ({
     },
   },
   iconBlue: {
-    backgroundColor: "rgba(33, 150, 243, 0.12)",
-    color: "#2196f3",
+    backgroundColor: fade(theme.palette.info.main, 0.12),
+    color: theme.palette.info.main,
   },
   iconOrange: {
-    backgroundColor: "rgba(255, 152, 0, 0.12)",
-    color: "#ff9800",
+    backgroundColor: fade(theme.palette.warning.main, 0.12),
+    color: theme.palette.warning.main,
   },
   iconGreen: {
-    backgroundColor: "rgba(76, 175, 80, 0.12)",
-    color: "#4caf50",
+    backgroundColor: fade(theme.palette.success.main, 0.12),
+    color: theme.palette.success.main,
   },
   iconPurple: {
-    backgroundColor: "rgba(156, 39, 176, 0.12)",
-    color: "#9c27b0",
+    backgroundColor: fade(theme.palette.secondary.main, 0.12),
+    color: theme.palette.secondary.main,
   },
   iconRed: {
-    backgroundColor: "rgba(244, 67, 54, 0.12)",
-    color: "#f44336",
+    backgroundColor: fade(theme.palette.error.main, 0.12),
+    color: theme.palette.error.main,
   },
   cardValue: {
     fontSize: "1.75rem",
@@ -154,23 +156,45 @@ const useStyles = makeStyles((theme) => ({
   },
   badgeGreen: {
     display: "inline-block",
-    backgroundColor: "rgba(76, 175, 80, 0.15)",
-    color: "#4caf50",
+    backgroundColor: fade(theme.palette.success.main, 0.15),
+    color: theme.palette.success.main,
     fontSize: "0.75rem",
     fontWeight: 600,
     padding: "2px 8px",
     borderRadius: 6,
     marginRight: theme.spacing(1),
   },
+  statusBadgeOnline: {
+    backgroundColor: fade(theme.palette.success.main, 0.15),
+    color: theme.palette.success.main,
+    padding: "2px 8px",
+    borderRadius: 6,
+    fontSize: "0.75rem",
+    fontWeight: 600,
+  },
+  statusBadgeOffline: {
+    backgroundColor: fade(theme.palette.error.main, 0.15),
+    color: theme.palette.error.main,
+    padding: "2px 8px",
+    borderRadius: 6,
+    fontSize: "0.75rem",
+    fontWeight: 600,
+  },
   performanceTable: {
     "& .MuiTableHead-root .MuiTableRow-root th": {
-      backgroundColor: "#1a1a1a",
-      color: "#fff",
+      backgroundColor: theme.palette.action.hover,
+      color: theme.palette.text.primary,
       fontWeight: 600,
       fontSize: "0.8125rem",
+      borderBottom: `1px solid ${theme.palette.divider}`,
     },
     "& .MuiTableCell-root": {
       fontSize: "0.8125rem",
+      color: theme.palette.text.primary,
+      borderColor: theme.palette.divider,
+    },
+    "& .MuiTableBody-root .MuiTableRow-root:hover": {
+      backgroundColor: theme.palette.action.hover,
     },
   },
   emptyRow: {
@@ -180,8 +204,16 @@ const useStyles = makeStyles((theme) => ({
     padding: theme.spacing(4, 2),
   },
   dashboardBg: {
-    backgroundColor: "#f4f4f4",
+    backgroundColor: theme.palette.background.default,
     minHeight: "100%",
+  },
+  tableSectionPaper: {
+    borderRadius: 12,
+    overflow: "hidden",
+    marginBottom: theme.spacing(3),
+    backgroundColor: theme.palette.background.paper,
+    border: `1px solid ${theme.palette.divider}`,
+    boxShadow: theme.shadows[1],
   },
 }));
 
@@ -199,6 +231,12 @@ function seriesToSparkData(series, valueKey, fallbackValue = 0) {
 
 const Dashboard = () => {
   const classes = useStyles();
+  const theme = useTheme();
+  const chartInfo = theme.palette.info.main;
+  const chartWarning = theme.palette.warning.main;
+  const chartSuccess = theme.palette.success.main;
+  const chartSecondary = theme.palette.secondary.main;
+  const chartError = theme.palette.error.main;
   const [counters, setCounters] = useState({});
   const [attendants, setAttendants] = useState([]);
   const [series, setSeries] = useState([]);
@@ -396,11 +434,11 @@ const Dashboard = () => {
                   <AreaChart data={sparkTotal} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
                     <defs>
                       <linearGradient id="areaBlue" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#2196f3" stopOpacity={0.4} />
-                        <stop offset="100%" stopColor="#2196f3" stopOpacity={0} />
+                        <stop offset="0%" stopColor={chartInfo} stopOpacity={0.4} />
+                        <stop offset="100%" stopColor={chartInfo} stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <Area type="monotone" dataKey="value" stroke="#2196f3" fill="url(#areaBlue)" strokeWidth={1.5} />
+                    <Area type="monotone" dataKey="value" stroke={chartInfo} fill="url(#areaBlue)" strokeWidth={1.5} />
                     <XAxis dataKey="name" hide />
                     <YAxis hide domain={["auto", "auto"]} />
                   </AreaChart>
@@ -432,11 +470,11 @@ const Dashboard = () => {
                   <AreaChart data={sparkPendentes} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
                     <defs>
                       <linearGradient id="areaOrange" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#ff9800" stopOpacity={0.4} />
-                        <stop offset="100%" stopColor="#ff9800" stopOpacity={0} />
+                        <stop offset="0%" stopColor={chartWarning} stopOpacity={0.4} />
+                        <stop offset="100%" stopColor={chartWarning} stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <Area type="monotone" dataKey="value" stroke="#ff9800" fill="url(#areaOrange)" strokeWidth={1.5} />
+                    <Area type="monotone" dataKey="value" stroke={chartWarning} fill="url(#areaOrange)" strokeWidth={1.5} />
                     <XAxis dataKey="name" hide />
                     <YAxis hide domain={["auto", "auto"]} />
                   </AreaChart>
@@ -471,11 +509,11 @@ const Dashboard = () => {
                   <AreaChart data={sparkFechados} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
                     <defs>
                       <linearGradient id="areaGreen" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#4caf50" stopOpacity={0.4} />
-                        <stop offset="100%" stopColor="#4caf50" stopOpacity={0} />
+                        <stop offset="0%" stopColor={chartSuccess} stopOpacity={0.4} />
+                        <stop offset="100%" stopColor={chartSuccess} stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <Area type="monotone" dataKey="value" stroke="#4caf50" fill="url(#areaGreen)" strokeWidth={1.5} />
+                    <Area type="monotone" dataKey="value" stroke={chartSuccess} fill="url(#areaGreen)" strokeWidth={1.5} />
                     <XAxis dataKey="name" hide />
                     <YAxis hide domain={["auto", "auto"]} />
                   </AreaChart>
@@ -507,11 +545,11 @@ const Dashboard = () => {
                   <AreaChart data={sparkWait} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
                     <defs>
                       <linearGradient id="areaBlue2" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#2196f3" stopOpacity={0.4} />
-                        <stop offset="100%" stopColor="#2196f3" stopOpacity={0} />
+                        <stop offset="0%" stopColor={chartInfo} stopOpacity={0.4} />
+                        <stop offset="100%" stopColor={chartInfo} stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <Area type="monotone" dataKey="value" stroke="#2196f3" fill="url(#areaBlue2)" strokeWidth={1.5} />
+                    <Area type="monotone" dataKey="value" stroke={chartInfo} fill="url(#areaBlue2)" strokeWidth={1.5} />
                     <XAxis dataKey="name" hide />
                     <YAxis hide domain={["auto", "auto"]} />
                   </AreaChart>
@@ -543,11 +581,11 @@ const Dashboard = () => {
                   <AreaChart data={sparkSupport} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
                     <defs>
                       <linearGradient id="areaOrange2" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#ff9800" stopOpacity={0.4} />
-                        <stop offset="100%" stopColor="#ff9800" stopOpacity={0} />
+                        <stop offset="0%" stopColor={chartWarning} stopOpacity={0.4} />
+                        <stop offset="100%" stopColor={chartWarning} stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <Area type="monotone" dataKey="value" stroke="#ff9800" fill="url(#areaOrange2)" strokeWidth={1.5} />
+                    <Area type="monotone" dataKey="value" stroke={chartWarning} fill="url(#areaOrange2)" strokeWidth={1.5} />
                     <XAxis dataKey="name" hide />
                     <YAxis hide domain={["auto", "auto"]} />
                   </AreaChart>
@@ -579,11 +617,11 @@ const Dashboard = () => {
                   <AreaChart data={sparkMsg} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
                     <defs>
                       <linearGradient id="areaBlue3" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#2196f3" stopOpacity={0.4} />
-                        <stop offset="100%" stopColor="#2196f3" stopOpacity={0} />
+                        <stop offset="0%" stopColor={chartInfo} stopOpacity={0.4} />
+                        <stop offset="100%" stopColor={chartInfo} stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <Area type="monotone" dataKey="value" stroke="#2196f3" fill="url(#areaBlue3)" strokeWidth={1.5} />
+                    <Area type="monotone" dataKey="value" stroke={chartInfo} fill="url(#areaBlue3)" strokeWidth={1.5} />
                     <XAxis dataKey="name" hide />
                     <YAxis hide domain={["auto", "auto"]} />
                   </AreaChart>
@@ -609,11 +647,11 @@ const Dashboard = () => {
                   <AreaChart data={sparkContacts} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
                     <defs>
                       <linearGradient id="areaPurple" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#9c27b0" stopOpacity={0.4} />
-                        <stop offset="100%" stopColor="#9c27b0" stopOpacity={0} />
+                        <stop offset="0%" stopColor={chartSecondary} stopOpacity={0.4} />
+                        <stop offset="100%" stopColor={chartSecondary} stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <Area type="monotone" dataKey="value" stroke="#9c27b0" fill="url(#areaPurple)" strokeWidth={1.5} />
+                    <Area type="monotone" dataKey="value" stroke={chartSecondary} fill="url(#areaPurple)" strokeWidth={1.5} />
                     <XAxis dataKey="name" hide />
                     <YAxis hide domain={["auto", "auto"]} />
                   </AreaChart>
@@ -639,11 +677,11 @@ const Dashboard = () => {
                   <AreaChart data={sparkOnline} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
                     <defs>
                       <linearGradient id="areaPurple2" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#9c27b0" stopOpacity={0.4} />
-                        <stop offset="100%" stopColor="#9c27b0" stopOpacity={0} />
+                        <stop offset="0%" stopColor={chartSecondary} stopOpacity={0.4} />
+                        <stop offset="100%" stopColor={chartSecondary} stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <Area type="monotone" dataKey="value" stroke="#9c27b0" fill="url(#areaPurple2)" strokeWidth={1.5} />
+                    <Area type="monotone" dataKey="value" stroke={chartSecondary} fill="url(#areaPurple2)" strokeWidth={1.5} />
                     <XAxis dataKey="name" hide />
                     <YAxis hide domain={["auto", "auto"]} />
                   </AreaChart>
@@ -680,11 +718,11 @@ const Dashboard = () => {
                   <AreaChart data={sparkRating} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
                     <defs>
                       <linearGradient id="areaRed" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#f44336" stopOpacity={0.4} />
-                        <stop offset="100%" stopColor="#f44336" stopOpacity={0} />
+                        <stop offset="0%" stopColor={chartError} stopOpacity={0.4} />
+                        <stop offset="100%" stopColor={chartError} stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <Area type="monotone" dataKey="value" stroke="#f44336" fill="url(#areaRed)" strokeWidth={1.5} />
+                    <Area type="monotone" dataKey="value" stroke={chartError} fill="url(#areaRed)" strokeWidth={1.5} />
                     <XAxis dataKey="name" hide />
                     <YAxis hide domain={[0, 3]} />
                   </AreaChart>
@@ -699,7 +737,7 @@ const Dashboard = () => {
           Performance de Usuários
         </Typography>
         {attendants.length > 0 ? (
-          <Paper elevation={0} style={{ borderRadius: 12, overflow: "hidden", marginBottom: 24 }}>
+          <Paper elevation={0} className={classes.tableSectionPaper}>
             <TableContainer>
               <Table size="small" className={classes.performanceTable}>
                 <TableHead>
@@ -716,14 +754,7 @@ const Dashboard = () => {
                     <TableRow key={k}>
                       <TableCell>{a.name}</TableCell>
                       <TableCell align="center">
-                        <span style={{
-                          backgroundColor: a.online ? "rgba(76, 175, 80, 0.15)" : "rgba(244, 67, 54, 0.15)",
-                          color: a.online ? "#4caf50" : "#f44336",
-                          padding: "2px 8px",
-                          borderRadius: 6,
-                          fontSize: "0.75rem",
-                          fontWeight: 600,
-                        }}>
+                        <span className={a.online ? classes.statusBadgeOnline : classes.statusBadgeOffline}>
                           {a.online ? "Online" : "Offline"}
                         </span>
                       </TableCell>
@@ -737,7 +768,7 @@ const Dashboard = () => {
             </TableContainer>
           </Paper>
         ) : (
-          <Paper elevation={0} style={{ borderRadius: 12, overflow: "hidden", marginBottom: 24 }}>
+          <Paper elevation={0} className={classes.tableSectionPaper}>
             <TableContainer>
               <Table size="small" className={classes.performanceTable}>
                 <TableHead>
@@ -760,7 +791,7 @@ const Dashboard = () => {
         <Typography className={classes.sectionTitle}>
           Performance de Filas
         </Typography>
-        <Paper elevation={0} style={{ borderRadius: 12, overflow: "hidden", marginBottom: 24 }}>
+        <Paper elevation={0} className={classes.tableSectionPaper}>
           <TableContainer>
             <Table size="small" className={classes.performanceTable}>
               <TableHead>
@@ -781,7 +812,7 @@ const Dashboard = () => {
         <Typography className={classes.sectionTitle}>
           Performance de Conexões
         </Typography>
-        <Paper elevation={0} style={{ borderRadius: 12, overflow: "hidden", marginBottom: 24 }}>
+        <Paper elevation={0} className={classes.tableSectionPaper}>
           <TableContainer>
             <Table size="small" className={classes.performanceTable}>
               <TableHead>
@@ -818,7 +849,7 @@ const Dashboard = () => {
           </Grid>
           <Grid item xs={12} md={6}>
             {attendants.length > 0 ? (
-              <Paper elevation={0} variant="outlined" style={{ borderRadius: 12, overflow: "hidden", height: "100%" }}>
+              <Paper elevation={0} className={classes.tableSectionPaper} style={{ marginBottom: 0, height: "100%" }}>
                 <TableAttendantsStatus attendants={attendants} loading={loading} />
               </Paper>
             ) : null}

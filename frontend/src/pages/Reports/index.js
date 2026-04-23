@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import {
   makeStyles,
+  useTheme,
   Paper,
   Typography,
   Grid,
@@ -48,6 +49,7 @@ import api from "../../services/api";
 import useDashboard from "../../hooks/useDashboard";
 import { i18n } from "../../translate/i18n";
 import toastError from "../../errors/toastError";
+import { fade } from "@material-ui/core/styles/colorManipulator";
 
 const REPORT_TYPES = {
   RESUMO: "resumo",
@@ -58,17 +60,17 @@ const REPORT_TYPES = {
 
 const useStyles = makeStyles((theme) => ({
   pageRoot: {
-    backgroundColor: "#f8fafc",
+    backgroundColor: theme.palette.background.default,
     minHeight: "100%",
     paddingBottom: theme.spacing(4),
   },
   headerPaper: {
     padding: theme.spacing(3),
     marginBottom: theme.spacing(3),
-    background: "linear-gradient(135deg, #1e293b 0%, #334155 100%)",
-    color: "#fff",
+    background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 100%)`,
+    color: theme.palette.primary.contrastText,
     borderRadius: 12,
-    boxShadow: "0 4px 20px rgba(30, 41, 59, 0.15)",
+    boxShadow: theme.shadows[4],
   },
   headerTitle: {
     fontWeight: 700,
@@ -87,15 +89,17 @@ const useStyles = makeStyles((theme) => ({
     transition: "all 0.2s ease",
     borderRadius: 12,
     border: "2px solid transparent",
+    backgroundColor: theme.palette.background.paper,
+    boxShadow: theme.shadows[1],
     "&:hover": {
       transform: "translateY(-2px)",
-      boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
+      boxShadow: theme.shadows[4],
       borderColor: theme.palette.primary.main,
     },
   },
   reportCardSelected: {
     borderColor: theme.palette.primary.main,
-    backgroundColor: "rgba(99, 102, 241, 0.04)",
+    backgroundColor: fade(theme.palette.primary.main, 0.08),
   },
   reportCardIcon: {
     width: 48,
@@ -111,6 +115,7 @@ const useStyles = makeStyles((theme) => ({
     fontWeight: 600,
     fontSize: "1rem",
     marginBottom: theme.spacing(0.5),
+    color: theme.palette.text.primary,
   },
   reportCardDesc: {
     fontSize: "0.8125rem",
@@ -121,20 +126,23 @@ const useStyles = makeStyles((theme) => ({
     padding: theme.spacing(2.5),
     borderRadius: 12,
     marginBottom: theme.spacing(3),
-    backgroundColor: "#fff",
-    boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+    backgroundColor: theme.palette.background.paper,
+    boxShadow: theme.shadows[1],
+    border: `1px solid ${theme.palette.divider}`,
   },
   reportContent: {
     padding: theme.spacing(3),
     borderRadius: 12,
-    backgroundColor: "#fff",
-    boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+    backgroundColor: theme.palette.background.paper,
+    boxShadow: theme.shadows[1],
+    border: `1px solid ${theme.palette.divider}`,
   },
   statCard: {
     padding: theme.spacing(2),
     borderRadius: 10,
     height: "100%",
-    border: "1px solid rgba(0,0,0,0.06)",
+    border: `1px solid ${theme.palette.divider}`,
+    backgroundColor: theme.palette.background.paper,
   },
   statValue: {
     fontSize: "1.75rem",
@@ -150,10 +158,61 @@ const useStyles = makeStyles((theme) => ({
     textTransform: "none",
     fontWeight: 600,
   },
+  contentSectionTitle: {
+    fontWeight: 600,
+    color: theme.palette.text.primary,
+  },
+  tableHeadRow: {
+    backgroundColor: theme.palette.action.hover,
+  },
+  tableHeadCell: {
+    fontWeight: 600,
+    color: theme.palette.text.primary,
+    borderColor: theme.palette.divider,
+  },
+  tableBodyCell: {
+    color: theme.palette.text.primary,
+    borderColor: theme.palette.divider,
+  },
+  statusBadgeOnline: {
+    backgroundColor: fade(theme.palette.success.main, 0.12),
+    color: theme.palette.success.main,
+    padding: "2px 8px",
+    borderRadius: 6,
+    fontSize: "0.75rem",
+    fontWeight: 600,
+  },
+  statusBadgeOffline: {
+    backgroundColor: fade(theme.palette.error.main, 0.12),
+    color: theme.palette.error.main,
+    padding: "2px 8px",
+    borderRadius: 6,
+    fontSize: "0.75rem",
+    fontWeight: 600,
+  },
+  generatedAtCaption: {
+    marginTop: 16,
+    color: theme.palette.text.secondary,
+  },
+  subsectionTitle: {
+    fontWeight: 600,
+    marginTop: 24,
+    marginBottom: 12,
+    color: theme.palette.text.primary,
+  },
+  headerDocIcon: {
+    fontSize: 32,
+    marginRight: 12,
+    opacity: 0.9,
+    color: theme.palette.primary.contrastText,
+  },
 }));
 
 const Reports = () => {
   const classes = useStyles();
+  const theme = useTheme();
+  const chartGridStroke = theme.palette.divider;
+  const chartTickColor = theme.palette.text.secondary;
   const { find } = useDashboard();
   const [reportType, setReportType] = useState(REPORT_TYPES.RESUMO);
   const [period, setPeriod] = useState(7);
@@ -261,33 +320,47 @@ const Reports = () => {
       title: i18n.t("dashboard.reports.types.summary", "Resumo Geral"),
       desc: i18n.t("dashboard.reports.types.summaryDesc", "Visão consolidada de atendimentos, tempos e indicadores"),
       icon: <AssessmentOutlined />,
-      color: "#6366f1",
+      color: theme.palette.primary.main,
     },
     {
       id: REPORT_TYPES.ATENDIMENTOS,
       title: i18n.t("dashboard.reports.types.attendances", "Atendimentos por Período"),
       desc: i18n.t("dashboard.reports.types.attendancesDesc", "Distribuição de tickets por data e horário"),
       icon: <AssignmentOutlined />,
-      color: "#0ea5e9",
+      color: theme.palette.info.main,
     },
     {
       id: REPORT_TYPES.USUARIOS,
       title: i18n.t("dashboard.reports.types.users", "Performance de Usuários"),
       desc: i18n.t("dashboard.reports.types.usersDesc", "Atendimentos por atendente no período"),
       icon: <PeopleOutlined />,
-      color: "#10b981",
+      color: theme.palette.success.main,
     },
     {
       id: REPORT_TYPES.MENSAGENS,
       title: i18n.t("dashboard.reports.types.messages", "Relatório de Mensagens"),
       desc: i18n.t("dashboard.reports.types.messagesDesc", "Volume de mensagens enviadas e recebidas"),
       icon: <ChatBubbleOutlined />,
-      color: "#f59e0b",
+      color: theme.palette.warning.main,
     },
   ];
 
-  const chartColorsDate = ["#6366f1", "#8b5cf6", "#a855f7", "#c084fc", "#d8b4fe", "#e9d5ff"];
-  const chartColorsUser = ["#0ea5e9", "#06b6d4", "#14b8a6", "#22c55e", "#84cc16", "#eab308"];
+  const chartColorsDate = [
+    theme.palette.primary.main,
+    theme.palette.secondary.main,
+    theme.palette.info.main,
+    theme.palette.success.main,
+    theme.palette.warning.main,
+    theme.palette.error.main,
+  ];
+  const chartColorsUser = [
+    theme.palette.info.main,
+    theme.palette.primary.main,
+    theme.palette.secondary.main,
+    theme.palette.success.main,
+    theme.palette.warning.main,
+    theme.palette.error.main,
+  ];
 
   const chartDataDay =
     Array.isArray(ticketsDay?.data) && ticketsDay.data.length > 0
@@ -310,7 +383,7 @@ const Reports = () => {
       return (
         <div className={`${classes.reportContent} report-print-area`}>
           <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-            <Typography variant="h6" style={{ fontWeight: 600 }}>
+            <Typography variant="h6" className={classes.contentSectionTitle}>
               {i18n.t("dashboard.reports.summary.title", "Resumo do Período")}
             </Typography>
             <Button
@@ -398,41 +471,32 @@ const Reports = () => {
           </Grid>
           {(attendants.length > 0) && (
             <>
-              <Typography variant="subtitle1" style={{ fontWeight: 600, marginTop: 24, marginBottom: 12 }}>
+              <Typography variant="subtitle1" className={classes.subsectionTitle}>
                 {i18n.t("dashboard.reports.summary.byUser", "Por Usuário")}
               </Typography>
-              <TableContainer component={Paper} elevation={0} style={{ borderRadius: 8 }}>
+              <TableContainer component={Paper} elevation={0} style={{ borderRadius: 8, border: `1px solid ${theme.palette.divider}` }}>
                 <Table size="small">
                   <TableHead>
-                    <TableRow style={{ backgroundColor: "#f8fafc" }}>
-                      <TableCell style={{ fontWeight: 600 }}>Usuário</TableCell>
-                      <TableCell align="center" style={{ fontWeight: 600 }}>Status</TableCell>
-                      <TableCell align="center" style={{ fontWeight: 600 }}>Total</TableCell>
-                      <TableCell align="center" style={{ fontWeight: 600 }}>Tempo Médio</TableCell>
-                      <TableCell align="center" style={{ fontWeight: 600 }}>Avaliação</TableCell>
+                    <TableRow className={classes.tableHeadRow}>
+                      <TableCell className={classes.tableHeadCell}>Usuário</TableCell>
+                      <TableCell align="center" className={classes.tableHeadCell}>Status</TableCell>
+                      <TableCell align="center" className={classes.tableHeadCell}>Total</TableCell>
+                      <TableCell align="center" className={classes.tableHeadCell}>Tempo Médio</TableCell>
+                      <TableCell align="center" className={classes.tableHeadCell}>Avaliação</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {(Array.isArray(attendants) ? attendants : []).map((a, k) => (
                       <TableRow key={k}>
-                        <TableCell>{a.name}</TableCell>
-                        <TableCell align="center">
-                          <span
-                            style={{
-                              backgroundColor: a.online ? "rgba(16, 185, 129, 0.12)" : "rgba(239, 68, 68, 0.12)",
-                              color: a.online ? "#10b981" : "#ef4444",
-                              padding: "2px 8px",
-                              borderRadius: 6,
-                              fontSize: "0.75rem",
-                              fontWeight: 600,
-                            }}
-                          >
+                        <TableCell className={classes.tableBodyCell}>{a.name}</TableCell>
+                        <TableCell align="center" className={classes.tableBodyCell}>
+                          <span className={a.online ? classes.statusBadgeOnline : classes.statusBadgeOffline}>
                             {a.online ? "Online" : "Offline"}
                           </span>
                         </TableCell>
-                        <TableCell align="center">{a.total != null ? a.total : "-"}</TableCell>
-                        <TableCell align="center">{a.avgSupportTime != null ? formatTime(a.avgSupportTime) : "-"}</TableCell>
-                        <TableCell align="center">{a.rating != null ? Number(a.rating).toFixed(1) : "-"}</TableCell>
+                        <TableCell align="center" className={classes.tableBodyCell}>{a.total != null ? a.total : "-"}</TableCell>
+                        <TableCell align="center" className={classes.tableBodyCell}>{a.avgSupportTime != null ? formatTime(a.avgSupportTime) : "-"}</TableCell>
+                        <TableCell align="center" className={classes.tableBodyCell}>{a.rating != null ? Number(a.rating).toFixed(1) : "-"}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -440,7 +504,7 @@ const Reports = () => {
               </TableContainer>
             </>
           )}
-          <Typography variant="caption" display="block" style={{ marginTop: 16, color: "#64748b" }}>
+          <Typography variant="caption" display="block" className={classes.generatedAtCaption}>
             {i18n.t("dashboard.reports.generatedAt", "Gerado em")}: {format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
           </Typography>
         </div>
@@ -451,7 +515,7 @@ const Reports = () => {
       return (
         <div className={`${classes.reportContent} report-print-area`}>
           <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-            <Typography variant="h6" style={{ fontWeight: 600 }}>
+            <Typography variant="h6" className={classes.contentSectionTitle}>
               {i18n.t("dashboard.reports.attendances.title", "Atendimentos por Período")}
             </Typography>
             <Button startIcon={<PrintOutlined />} variant="outlined" color="primary" onClick={handlePrint} className={classes.printBtn}>
@@ -462,9 +526,9 @@ const Reports = () => {
           <Box height={360}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartDataDay} margin={{ top: 12, right: 12, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
-                <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke={chartGridStroke} />
+                <XAxis dataKey="name" tick={{ fontSize: 12, fill: chartTickColor }} stroke={chartTickColor} />
+                <YAxis tick={{ fontSize: 12, fill: chartTickColor }} stroke={chartTickColor} allowDecimals={false} />
                 <Tooltip />
                 <Bar dataKey="total" radius={[6, 6, 0, 0]} name={i18n.t("dashboard.reports.attendances.tickets", "Atendimentos")}>
                   {chartDataDay.map((_, i) => (
@@ -474,7 +538,7 @@ const Reports = () => {
               </BarChart>
             </ResponsiveContainer>
           </Box>
-          <Typography variant="caption" display="block" style={{ marginTop: 16, color: "#64748b" }}>
+          <Typography variant="caption" display="block" className={classes.generatedAtCaption}>
             {i18n.t("dashboard.reports.generatedAt", "Gerado em")}: {format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
           </Typography>
         </div>
@@ -485,7 +549,7 @@ const Reports = () => {
       return (
         <div className={`${classes.reportContent} report-print-area`}>
           <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-            <Typography variant="h6" style={{ fontWeight: 600 }}>
+            <Typography variant="h6" className={classes.contentSectionTitle}>
               {i18n.t("dashboard.reports.users.title", "Performance de Usuários")}
             </Typography>
             <Button startIcon={<PrintOutlined />} variant="outlined" color="primary" onClick={handlePrint} className={classes.printBtn}>
@@ -496,9 +560,9 @@ const Reports = () => {
           <Box height={Math.max(320, chartDataUsers.length * 40)}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartDataUsers} layout="vertical" margin={{ top: 8, right: 24, left: 100, bottom: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
-                <XAxis type="number" tick={{ fontSize: 12 }} allowDecimals={false} />
-                <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 12 }} />
+                <CartesianGrid strokeDasharray="3 3" stroke={chartGridStroke} />
+                <XAxis type="number" tick={{ fontSize: 12, fill: chartTickColor }} stroke={chartTickColor} allowDecimals={false} />
+                <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 12, fill: chartTickColor }} stroke={chartTickColor} />
                 <Tooltip />
                 <Bar dataKey="quantidade" radius={[0, 4, 4, 0]} name={i18n.t("dashboard.reports.users.tickets", "Atendimentos")}>
                   {chartDataUsers.map((_, i) => (
@@ -508,7 +572,7 @@ const Reports = () => {
               </BarChart>
             </ResponsiveContainer>
           </Box>
-          <Typography variant="caption" display="block" style={{ marginTop: 16, color: "#64748b" }}>
+          <Typography variant="caption" display="block" className={classes.generatedAtCaption}>
             {i18n.t("dashboard.reports.generatedAt", "Gerado em")}: {format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
           </Typography>
         </div>
@@ -519,7 +583,7 @@ const Reports = () => {
       return (
         <div className={`${classes.reportContent} report-print-area`}>
           <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-            <Typography variant="h6" style={{ fontWeight: 600 }}>
+            <Typography variant="h6" className={classes.contentSectionTitle}>
               {i18n.t("dashboard.reports.messages.title", "Relatório de Mensagens")}
             </Typography>
             <Button startIcon={<PrintOutlined />} variant="outlined" color="primary" onClick={handlePrint} className={classes.printBtn}>
@@ -555,7 +619,7 @@ const Reports = () => {
               </Paper>
             </Grid>
           </Grid>
-          <Typography variant="caption" display="block" style={{ marginTop: 16, color: "#64748b" }}>
+          <Typography variant="caption" display="block" className={classes.generatedAtCaption}>
             {i18n.t("dashboard.reports.generatedAt", "Gerado em")}: {format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
           </Typography>
         </div>
@@ -570,7 +634,7 @@ const Reports = () => {
       <div className={classes.pageRoot}>
         <Paper className={`${classes.headerPaper} report-no-print`} elevation={0}>
           <Box display="flex" alignItems="center" mb={1}>
-            <DescriptionOutlined style={{ fontSize: 32, marginRight: 12, opacity: 0.9 }} />
+            <DescriptionOutlined className={classes.headerDocIcon} />
             <div>
               <Typography className={classes.headerTitle}>
                 {i18n.t("dashboard.reports.title", "Relatórios")}
@@ -652,7 +716,10 @@ const Reports = () => {
                 elevation={0}
                 onClick={() => setReportType(card.id)}
               >
-                <div className={classes.reportCardIcon} style={{ backgroundColor: `${card.color}20`, color: card.color }}>
+                <div
+                  className={classes.reportCardIcon}
+                  style={{ backgroundColor: fade(card.color, 0.12), color: card.color }}
+                >
                   {card.icon}
                 </div>
                 <Typography className={classes.reportCardTitle}>{card.title}</Typography>

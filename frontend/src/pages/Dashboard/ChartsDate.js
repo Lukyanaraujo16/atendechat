@@ -13,14 +13,32 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import brLocale from 'date-fns/locale/pt-BR';
 import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { Button, Stack, TextField, Paper, Typography, Box } from '@mui/material';
+import { useTheme } from '@material-ui/core/styles';
 import api from '../../services/api';
 import { format } from 'date-fns';
 import { toast } from 'react-toastify';
 import { i18n } from '../../translate/i18n';
 
-const CHART_COLORS = ['#6366f1', '#8b5cf6', '#a855f7', '#c084fc', '#d8b4fe', '#e9d5ff'];
-
 export const ChartsDate = () => {
+  const theme = useTheme();
+  const chartColors = [
+    theme.palette.primary.main,
+    theme.palette.secondary.main,
+    theme.palette.info.main,
+    theme.palette.success.main,
+    theme.palette.warning.main,
+    theme.palette.error.main,
+  ];
+  const gridStroke = theme.palette.divider;
+  const axisStroke = theme.palette.text.secondary;
+  const paperSx = {
+    p: 3,
+    borderRadius: 3,
+    height: '100%',
+    bgcolor: theme.palette.background.paper,
+    border: `1px solid ${theme.palette.divider}`,
+    boxShadow: theme.shadows[1],
+  };
   const [initialDate, setInitialDate] = useState(new Date());
   const [finalDate, setFinalDate] = useState(new Date());
   const [ticketsData, setTicketsData] = useState({ data: [], count: 0 });
@@ -63,7 +81,7 @@ export const ChartsDate = () => {
     if (!active || !payload?.length) return null;
     const item = chartData.find((d) => d.name === label);
     return (
-      <Paper elevation={2} sx={{ p: 1.5, minWidth: 140 }}>
+      <Paper elevation={2} sx={{ p: 1.5, minWidth: 140, bgcolor: theme.palette.background.paper }}>
         <Typography variant="body2" color="textSecondary">
           {item?.fullLabel || label}
         </Typography>
@@ -75,7 +93,7 @@ export const ChartsDate = () => {
   };
 
   return (
-    <Paper elevation={0} sx={{ p: 3, borderRadius: 3, height: '100%' }}>
+    <Paper elevation={0} sx={paperSx}>
       <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 2, mb: 3 }}>
         <Typography variant="h6" style={{ fontWeight: 600 }} color="text.primary">
           {i18n.t('dashboard.charts.date.title')} ({ticketsData?.count ?? 0})
@@ -108,13 +126,13 @@ export const ChartsDate = () => {
       <Box sx={{ width: '100%', height: 320 }}>
         <ResponsiveContainer>
           <BarChart data={chartData} margin={{ top: 12, right: 12, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
-            <XAxis dataKey="name" tick={{ fontSize: 12 }} stroke="rgba(0,0,0,0.4)" />
-            <YAxis tick={{ fontSize: 12 }} stroke="rgba(0,0,0,0.4)" allowDecimals={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
+            <XAxis dataKey="name" tick={{ fontSize: 12, fill: axisStroke }} stroke={axisStroke} />
+            <YAxis tick={{ fontSize: 12, fill: axisStroke }} stroke={axisStroke} allowDecimals={false} />
             <Tooltip content={<CustomTooltip />} />
             <Bar dataKey="total" radius={[6, 6, 0, 0]} maxBarSize={48}>
               {chartData.map((_, index) => (
-                <Cell key={index} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                <Cell key={index} fill={chartColors[index % chartColors.length]} />
               ))}
             </Bar>
           </BarChart>
