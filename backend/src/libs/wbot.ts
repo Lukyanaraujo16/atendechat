@@ -24,9 +24,11 @@ import DeleteBaileysService from "../services/BaileysServices/DeleteBaileysServi
 import NodeCache from 'node-cache';
 import {
   clearUnavailablePresenceHeartbeat,
-  isForceUnavailablePresenceEnabled,
+  logWhatsAppPresenceSocketConfig,
   sendGlobalUnavailablePresence,
   shouldMarkOnlineOnConnect,
+  shouldRunUnavailableHeartbeat,
+  shouldSendUnavailableOnConnect,
   startUnavailablePresenceHeartbeat
 } from "../helpers/whatsappUnavailablePresence";
 
@@ -103,6 +105,13 @@ export const initWASocket = async (whatsapp: Whatsapp): Promise<Session> => {
 
         const msgRetryCounterCache = new NodeCache();
         const userDevicesCache: CacheStore = new NodeCache();
+
+        logWhatsAppPresenceSocketConfig({
+          whatsappId: id,
+          companyId: whatsapp.companyId,
+          sessionName: name,
+          phase: "makeWASocket"
+        });
 
         wsocket = makeWASocket({
           logger: loggerBaileys,
@@ -186,6 +195,12 @@ export const initWASocket = async (whatsapp: Whatsapp): Promise<Session> => {
             }
 
             if (connection === "open") {
+              logWhatsAppPresenceSocketConfig({
+                whatsappId: id,
+                companyId: whatsapp.companyId,
+                sessionName: name,
+                phase: "connection_open"
+              });
               logger.info(
                 `[Connection] event=connected whatsappId=${id} companyId=${whatsapp.companyId} name=${name}`
               );
@@ -208,12 +223,14 @@ export const initWASocket = async (whatsapp: Whatsapp): Promise<Session> => {
                 sessions.push(wsocket);
               }
 
-              if (isForceUnavailablePresenceEnabled()) {
+              if (shouldSendUnavailableOnConnect()) {
                 await sendGlobalUnavailablePresence(wsocket, {
                   whatsappId: id,
                   companyId: whatsapp.companyId,
                   sessionName: name
                 }, "connect");
+              }
+              if (shouldRunUnavailableHeartbeat()) {
                 startUnavailablePresenceHeartbeat(wsocket, {
                   whatsappId: id,
                   companyId: whatsapp.companyId,

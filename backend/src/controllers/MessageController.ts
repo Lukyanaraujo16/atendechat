@@ -2,7 +2,8 @@ import { Request, Response } from "express";
 import AppError from "../errors/AppError";
 
 import SetTicketMessagesAsRead, {
-  HUMAN_PANEL_CONVERSATION_VIEW_WHATSAPP_READ
+  HUMAN_PANEL_LIST_MESSAGES,
+  HUMAN_PANEL_SEND_MESSAGE
 } from "../helpers/SetTicketMessagesAsRead";
 import { getIO } from "../libs/socket";
 import Message from "../models/Message";
@@ -59,7 +60,7 @@ export const index = async (req: Request, res: Response): Promise<Response> => {
     queues
   });
 
-  await SetTicketMessagesAsRead(ticket, HUMAN_PANEL_CONVERSATION_VIEW_WHATSAPP_READ);
+  await SetTicketMessagesAsRead(ticket, HUMAN_PANEL_LIST_MESSAGES);
 
   return res.json({ count, messages, ticket, hasMore });
 };
@@ -74,7 +75,7 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
   const ticket = await ShowTicketService(ticketId, companyId);
 
   /** Mesma regra do GET da conversa: atendente humano no painel ao enviar resposta. */
-  await SetTicketMessagesAsRead(ticket, HUMAN_PANEL_CONVERSATION_VIEW_WHATSAPP_READ);
+  await SetTicketMessagesAsRead(ticket, HUMAN_PANEL_SEND_MESSAGE);
 
   if (medias) {
     await Promise.all(

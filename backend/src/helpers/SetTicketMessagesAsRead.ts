@@ -43,12 +43,30 @@ function wantsPeerVisibleReadReceipt(): boolean {
  */
 export type SetTicketMessagesAsReadOptions = {
   syncWhatsAppReadReceipt?: boolean;
+  /** Só para logs [ReadReceipt]: motivo da tentativa de sync com o WhatsApp. */
+  readReceiptReason?: string;
 };
 
-/** Confirmação de leitura no WhatsApp: usar apenas no fluxo de visualização humana no painel. */
+/** GET `/messages/:ticketId` — atendente abriu/carregou a conversa no painel. */
+export const HUMAN_PANEL_LIST_MESSAGES: SetTicketMessagesAsReadOptions = {
+  syncWhatsAppReadReceipt: true,
+  readReceiptReason: "panel_GET_messages_list"
+};
+
+/** POST `/messages/:ticketId` — atendente enviou mensagem pelo painel. */
+export const HUMAN_PANEL_SEND_MESSAGE: SetTicketMessagesAsReadOptions = {
+  syncWhatsAppReadReceipt: true,
+  readReceiptReason: "panel_POST_send_message"
+};
+
+/**
+ * @deprecated Preferir {@link HUMAN_PANEL_LIST_MESSAGES} ou {@link HUMAN_PANEL_SEND_MESSAGE}
+ * para logs com motivo explícito.
+ */
 export const HUMAN_PANEL_CONVERSATION_VIEW_WHATSAPP_READ: SetTicketMessagesAsReadOptions =
   {
-    syncWhatsAppReadReceipt: true
+    syncWhatsAppReadReceipt: true,
+    readReceiptReason: "panel_unspecified"
   };
 
 /** `Messages.dataJson` é TEXT com JSON stringificado; normaliza para IWebMessageInfo. */
@@ -135,6 +153,7 @@ async function sendWhatsAppReadReceipts(
     companyId: number;
     whatsappId: number;
     ticketId: number;
+    readReceiptReason: string;
   }
 ): Promise<void> {
   if (keys.length === 0) return;
@@ -150,33 +169,33 @@ async function sendWhatsAppReadReceipts(
 
   if (peerVisible && typeof wbot.sendReceipts === "function") {
     logger.info(
-      `${READ_LOG_PREFIX} strategy=sendReceipts(read) companyId=${meta.companyId} whatsappId=${meta.whatsappId} ticketId=${meta.ticketId} keyCount=${keys.length} sample=${JSON.stringify(sample)}`
+      `${READ_LOG_PREFIX} whatsapp_send reason=${meta.readReceiptReason} strategy=sendReceipts(read) companyId=${meta.companyId} whatsappId=${meta.whatsappId} ticketId=${meta.ticketId} keyCount=${keys.length} sample=${JSON.stringify(sample)}`
     );
     await wbot.sendReceipts(keys, "read");
     logger.info(
-      `${READ_LOG_PREFIX} success strategy=sendReceipts(read) companyId=${meta.companyId} whatsappId=${meta.whatsappId} ticketId=${meta.ticketId}`
+      `${READ_LOG_PREFIX} success reason=${meta.readReceiptReason} strategy=sendReceipts(read) companyId=${meta.companyId} whatsappId=${meta.whatsappId} ticketId=${meta.ticketId}`
     );
     return;
   }
 
   if (typeof wbot.readMessages === "function") {
     logger.info(
-      `${READ_LOG_PREFIX} strategy=readMessages(default) companyId=${meta.companyId} whatsappId=${meta.whatsappId} ticketId=${meta.ticketId} keyCount=${keys.length} peerVisible=${peerVisible} sample=${JSON.stringify(sample)}`
+      `${READ_LOG_PREFIX} whatsapp_send reason=${meta.readReceiptReason} strategy=readMessages companyId=${meta.companyId} whatsappId=${meta.whatsappId} ticketId=${meta.ticketId} keyCount=${keys.length} peerVisibleEnv=${peerVisible} sample=${JSON.stringify(sample)}`
     );
     await wbot.readMessages(keys);
     logger.info(
-      `${READ_LOG_PREFIX} success strategy=readMessages companyId=${meta.companyId} whatsappId=${meta.whatsappId} ticketId=${meta.ticketId}`
+      `${READ_LOG_PREFIX} success reason=${meta.readReceiptReason} strategy=readMessages companyId=${meta.companyId} whatsappId=${meta.whatsappId} ticketId=${meta.ticketId}`
     );
     return;
   }
 
   if (typeof wbot.sendReceipts === "function") {
     logger.warn(
-      `${READ_LOG_PREFIX} readMessages missing; fallback sendReceipts(read) companyId=${meta.companyId} whatsappId=${meta.whatsappId} ticketId=${meta.ticketId}`
+      `${READ_LOG_PREFIX} whatsapp_send reason=${meta.readReceiptReason} readMessages missing; fallback sendReceipts(read) companyId=${meta.companyId} whatsappId=${meta.whatsappId} ticketId=${meta.ticketId}`
     );
     await wbot.sendReceipts(keys, "read");
     logger.info(
-      `${READ_LOG_PREFIX} success strategy=sendReceipts(fallback) companyId=${meta.companyId} whatsappId=${meta.whatsappId} ticketId=${meta.ticketId}`
+      `${READ_LOG_PREFIX} success reason=${meta.readReceiptReason} strategy=sendReceipts(fallback) companyId=${meta.companyId} whatsappId=${meta.whatsappId} ticketId=${meta.ticketId}`
     );
   }
 }
@@ -194,13 +213,18 @@ const SetTicketMessagesAsRead = async (
   ticket: Ticket,
   options: SetTicketMessagesAsReadOptions = {}
 ): Promise<void> => {
-  const { syncWhatsAppReadReceipt = false } = options;
+  const { syncWhatsAppReadReceipt = false, readReceiptReason } = options;
+  const receiptReason = readReceiptReason ?? "unspecified";
 
   await ticket.update({ unreadMessages: 0 });
   // await cacheLayer.set(`contacts:${ticket.contactId}:unreads`, "0");
 
   try {
     if (syncWhatsAppReadReceipt) {
+      logger.info(
+        `${READ_LOG_PREFIX} intent reason=${receiptReason} ticketId=${ticket.id} companyId=${ticket.companyId} whatsappId=${ticket.whatsappId} (syncWhatsAppReadReceipt=true; só envia ao WA se houver pendentes e autoReadMessages)`
+      );
+
       const pendingInbound = await Message.findAll({
         where: {
           ticketId: ticket.id,
@@ -211,7 +235,11 @@ const SetTicketMessagesAsRead = async (
         order: [["createdAt", "ASC"]]
       });
 
-      if (pendingInbound.length > 0) {
+      if (pendingInbound.length === 0) {
+        logger.info(
+          `${READ_LOG_PREFIX} skip reason=${receiptReason} cause=no_pending_inbound_unread ticketId=${ticket.id} whatsappId=${ticket.whatsappId}`
+        );
+      } else {
         const whatsapp = await Whatsapp.findByPk(ticket.whatsappId, {
           attributes: ["autoReadMessages"]
         });
@@ -224,31 +252,32 @@ const SetTicketMessagesAsRead = async (
 
           if (keys.length === 0) {
             logger.warn(
-              `${READ_LOG_PREFIX} skip=no_valid_keys ticketId=${ticket.id} companyId=${ticket.companyId} whatsappId=${ticket.whatsappId} pendingRows=${pendingInbound.length} (dataJson/remoteJid/id em falta)`
+              `${READ_LOG_PREFIX} skip reason=${receiptReason} cause=no_valid_keys ticketId=${ticket.id} companyId=${ticket.companyId} whatsappId=${ticket.whatsappId} pendingRows=${pendingInbound.length}`
             );
           } else {
             const wbot = await GetTicketWbot(ticket);
             if (!wbot) {
               logger.warn(
-                `${READ_LOG_PREFIX} skip=no_wbot ticketId=${ticket.id} whatsappId=${ticket.whatsappId}`
+                `${READ_LOG_PREFIX} skip reason=${receiptReason} cause=no_wbot ticketId=${ticket.id} whatsappId=${ticket.whatsappId}`
               );
             } else {
               try {
                 await sendWhatsAppReadReceipts(wbot as WbotReceipts, keys, {
                   companyId: ticket.companyId,
                   whatsappId: ticket.whatsappId,
-                  ticketId: ticket.id
+                  ticketId: ticket.id,
+                  readReceiptReason: receiptReason
                 });
               } catch (receiptErr) {
                 logger.warn(
-                  `${READ_LOG_PREFIX} error ticketId=${ticket.id} companyId=${ticket.companyId} whatsappId=${ticket.whatsappId} err=${receiptErr instanceof Error ? receiptErr.message : String(receiptErr)}`
+                  `${READ_LOG_PREFIX} error reason=${receiptReason} ticketId=${ticket.id} companyId=${ticket.companyId} whatsappId=${ticket.whatsappId} err=${receiptErr instanceof Error ? receiptErr.message : String(receiptErr)}`
                 );
               }
             }
           }
         } else {
           logger.info(
-            `${READ_LOG_PREFIX} skip=autoReadMessages_disabled ticketId=${ticket.id} whatsappId=${ticket.whatsappId}`
+            `${READ_LOG_PREFIX} skip reason=${receiptReason} cause=autoReadMessages_disabled ticketId=${ticket.id} whatsappId=${ticket.whatsappId}`
           );
         }
       }

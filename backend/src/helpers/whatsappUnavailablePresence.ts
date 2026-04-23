@@ -5,13 +5,51 @@ const LOG_PREFIX = "[WhatsAppPresence]";
 
 const heartbeatTimers = new Map<number, NodeJS.Timeout>();
 
-/** Liga envio periódico de presença global `unavailable` (recomendado para não suprimir push no telefone). */
-export function isForceUnavailablePresenceEnabled(): boolean {
-  const v = process.env.WHATSAPP_FORCE_UNAVAILABLE_PRESENCE;
-  if (v === undefined || v === "") {
-    return true;
+export type WhatsAppPresenceMode = "legacy" | "unavailable" | "passive";
+
+/**
+ * - legacy: igual ao comportamento antigo do projeto (`markOnlineOnConnect: true`, sem unavailable global nem heartbeat).
+ * - unavailable: `markOnlineOnConnect: false` + `sendPresenceUpdate("unavailable")` ao abrir + heartbeat periódico.
+ * - passive: `markOnlineOnConnect: false`, sem envio global de unavailable nem heartbeat (útil para testes A/B).
+ *
+ * Omissão ou valor inválido → legacy (maximiza chance de recuperar push como antes).
+ *
+ * Compat: `WHATSAPP_FORCE_UNAVAILABLE_PRESENCE=true` mapeia para `unavailable`; `false` para `legacy`, se `WHATSAPP_PRESENCE_MODE` não estiver definido.
+ */
+export function getPresenceMode(): WhatsAppPresenceMode {
+  const raw = (process.env.WHATSAPP_PRESENCE_MODE || "").trim().toLowerCase();
+  if (raw === "legacy" || raw === "unavailable" || raw === "passive") {
+    return raw;
   }
-  return v === "true" || v === "1" || v === "yes";
+
+  const legacyForce = process.env.WHATSAPP_FORCE_UNAVAILABLE_PRESENCE;
+  if (legacyForce === "true" || legacyForce === "1" || legacyForce === "yes") {
+    return "unavailable";
+  }
+  if (
+    legacyForce === "false" ||
+    legacyForce === "0" ||
+    legacyForce === "no"
+  ) {
+    return "legacy";
+  }
+
+  return "legacy";
+}
+
+/** Comportamento antigo: online ao ligar. */
+export function shouldMarkOnlineOnConnect(): boolean {
+  return getPresenceMode() === "legacy";
+}
+
+/** Só no modo `unavailable`: um disparo ao conectar. */
+export function shouldSendUnavailableOnConnect(): boolean {
+  return getPresenceMode() === "unavailable";
+}
+
+/** Só no modo `unavailable`: intervalo periódico. */
+export function shouldRunUnavailableHeartbeat(): boolean {
+  return getPresenceMode() === "unavailable";
 }
 
 /** Intervalo mínimo 10s para evitar spam ao servidor. */
@@ -27,11 +65,17 @@ export function getUnavailablePresenceIntervalMs(): number {
   return n;
 }
 
-/**
- * Quando forçamos `unavailable`, não marcamos online na ligação (evita janela inicial “online”).
- */
-export function shouldMarkOnlineOnConnect(): boolean {
-  return !isForceUnavailablePresenceEnabled();
+/** Log da política efetiva (comparar com logs em produção). */
+export function logWhatsAppPresenceSocketConfig(meta: {
+  whatsappId: number;
+  companyId: number;
+  sessionName?: string;
+  phase: "makeWASocket" | "connection_open";
+}): void {
+  const mode = getPresenceMode();
+  logger.info(
+    `${LOG_PREFIX} phase=${meta.phase} mode=${mode} markOnlineOnConnect=${shouldMarkOnlineOnConnect()} sendUnavailableOnConnect=${shouldSendUnavailableOnConnect()} heartbeatEnabled=${shouldRunUnavailableHeartbeat()} intervalMs=${getUnavailablePresenceIntervalMs()} whatsappId=${meta.whatsappId} companyId=${meta.companyId} name=${meta.sessionName ?? "-"}`
+  );
 }
 
 export async function sendGlobalUnavailablePresence(
@@ -48,11 +92,11 @@ export async function sendGlobalUnavailablePresence(
     }
     await wbot.sendPresenceUpdate("unavailable");
     logger.info(
-      `${LOG_PREFIX} sent presence=unavailable reason=${reason} whatsappId=${meta.whatsappId} companyId=${meta.companyId} name=${meta.sessionName ?? "-"}`
+      `${LOG_PREFIX} sent presence=unavailable reason=${reason} mode=${getPresenceMode()} whatsappId=${meta.whatsappId} companyId=${meta.companyId} name=${meta.sessionName ?? "-"}`
     );
   } catch (err) {
     logger.warn(
-      `${LOG_PREFIX} error reason=${reason} whatsappId=${meta.whatsappId} companyId=${meta.companyId} err=${err instanceof Error ? err.message : String(err)}`
+      `${LOG_PREFIX} error reason=${reason} mode=${getPresenceMode()} whatsappId=${meta.whatsappId} companyId=${meta.companyId} err=${err instanceof Error ? err.message : String(err)}`
     );
   }
 }
@@ -61,7 +105,7 @@ export function startUnavailablePresenceHeartbeat(
   wbot: WASocket,
   meta: { whatsappId: number; companyId: number; sessionName?: string }
 ): void {
-  if (!isForceUnavailablePresenceEnabled()) {
+  if (!shouldRunUnavailableHeartbeat()) {
     return;
   }
   clearUnavailablePresenceHeartbeat(meta.whatsappId);
@@ -73,7 +117,7 @@ export function startUnavailablePresenceHeartbeat(
 
   heartbeatTimers.set(meta.whatsappId, timer);
   logger.info(
-    `${LOG_PREFIX} heartbeat started whatsappId=${meta.whatsappId} companyId=${meta.companyId} intervalMs=${ms}`
+    `${LOG_PREFIX} heartbeat started mode=${getPresenceMode()} whatsappId=${meta.whatsappId} companyId=${meta.companyId} intervalMs=${ms}`
   );
 }
 
@@ -84,5 +128,7 @@ export function clearUnavailablePresenceHeartbeat(whatsappId: number): void {
   }
   clearInterval(timer);
   heartbeatTimers.delete(whatsappId);
-  logger.info(`${LOG_PREFIX} heartbeat cleared whatsappId=${whatsappId}`);
+  logger.info(
+    `${LOG_PREFIX} heartbeat cleared whatsappId=${whatsappId} mode=${getPresenceMode()}`
+  );
 }
