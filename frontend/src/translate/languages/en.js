@@ -1682,10 +1682,24 @@ const messages = {
 				branding: {
 					title: "Global branding",
 					subtitle:
-						"Name and logos shown on login and in the internal menu for all users.",
+						"Name and logos (light and dark theme) on login and in the internal menu for all users.",
 					systemName: "System name",
-					loginLogo: "Login page logo",
-					menuLogo: "Internal menu logo",
+					loginLogo: "Login page logos",
+					loginLogoThemeLight: "Logo for light theme (default).",
+					menuLogo: "Internal menu logos",
+					menuLogoThemeLight: "Logo for light theme (default).",
+					previewLight: "Preview (light background)",
+					previewDark: "Preview (dark background)",
+					loginLogoDark: "Logo for dark theme (optional)",
+					loginLogoDarkHint:
+						"If omitted, the light logo is used in every theme. Prefer a light/high-contrast asset for dark backgrounds.",
+					menuLogoDark: "Menu logo for dark theme (optional)",
+					menuLogoDarkHint:
+						"If omitted, the light menu logo is used in every theme.",
+					chooseFileLight: "Choose image (light)",
+					chooseFileDark: "Choose image (dark)",
+					restoreDefaultLight: "Reset light logo",
+					restoreDefaultDark: "Reset dark logo",
 					uploadHint:
 						"PNG, JPG, WebP, GIF or SVG up to 2 MB. Without a new file, the current logo is kept.",
 					loginLogoHint:

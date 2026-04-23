@@ -3,35 +3,54 @@ import TextField from "@material-ui/core/TextField";
 import Button from "@material-ui/core/Button";
 import Box from "@material-ui/core/Box";
 import Typography from "@material-ui/core/Typography";
+import { useTheme } from "@material-ui/core/styles";
 import { toast } from "react-toastify";
 
 import MainContainer from "../../components/MainContainer";
 import api from "../../services/api";
+import { getApiUrl } from "../../config/backendUrl";
+import defaultLogo from "../../assets/logo.png";
 import { useBranding } from "../../context/Branding/BrandingContext";
 import toastError from "../../errors/toastError";
 import { i18n } from "../../translate/i18n";
 import PlatformPageHeader from "./PlatformPageHeader";
+
+function storedLogoOrNull(raw) {
+  const u = raw?.trim();
+  if (!u) return null;
+  if (u.startsWith("http://") || u.startsWith("https://")) return u;
+  if (u.startsWith("/")) return getApiUrl(u);
+  return u;
+}
 
 const ACCEPT_IMAGES = "image/png,image/jpeg,image/jpg,image/webp,image/gif,image/svg+xml,.svg";
 const ACCEPT_FAVICON =
   "image/png,image/jpeg,image/jpg,image/x-icon,image/vnd.microsoft.icon,.ico,.png,.jpg,.jpeg,.svg,image/svg+xml";
 
 export default function PlatformBranding() {
-  const { branding, refreshBranding, resolveLoginLogo, resolveMenuLogo, resolveFavicon } = useBranding();
+  const theme = useTheme();
+  const { branding, refreshBranding, resolveFavicon } = useBranding();
   const [systemName, setSystemName] = useState("");
   const [publicWhatsAppNumber, setPublicWhatsAppNumber] = useState("");
   const [publicWhatsAppMessage, setPublicWhatsAppMessage] = useState("");
   const [loginFile, setLoginFile] = useState(null);
+  const [loginDarkFile, setLoginDarkFile] = useState(null);
   const [menuFile, setMenuFile] = useState(null);
+  const [menuDarkFile, setMenuDarkFile] = useState(null);
   const [faviconFile, setFaviconFile] = useState(null);
   const [loginPreviewUrl, setLoginPreviewUrl] = useState(null);
+  const [loginDarkPreviewUrl, setLoginDarkPreviewUrl] = useState(null);
   const [menuPreviewUrl, setMenuPreviewUrl] = useState(null);
+  const [menuDarkPreviewUrl, setMenuDarkPreviewUrl] = useState(null);
   const [faviconPreviewUrl, setFaviconPreviewUrl] = useState(null);
   const [saving, setSaving] = useState(false);
 
   const loginInputRef = useRef(null);
+  const loginDarkInputRef = useRef(null);
   const menuInputRef = useRef(null);
+  const menuDarkInputRef = useRef(null);
   const faviconInputRef = useRef(null);
+  const previewImgBorder = `1px solid ${theme.palette.divider}`;
 
   useEffect(() => {
     setSystemName(branding.systemName || "");
@@ -63,6 +82,26 @@ export default function PlatformBranding() {
   }, [menuFile]);
 
   useEffect(() => {
+    if (!loginDarkFile) {
+      setLoginDarkPreviewUrl(null);
+      return undefined;
+    }
+    const url = URL.createObjectURL(loginDarkFile);
+    setLoginDarkPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [loginDarkFile]);
+
+  useEffect(() => {
+    if (!menuDarkFile) {
+      setMenuDarkPreviewUrl(null);
+      return undefined;
+    }
+    const url = URL.createObjectURL(menuDarkFile);
+    setMenuDarkPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [menuDarkFile]);
+
+  useEffect(() => {
     if (!faviconFile) {
       setFaviconPreviewUrl(null);
       return undefined;
@@ -72,8 +111,18 @@ export default function PlatformBranding() {
     return () => URL.revokeObjectURL(url);
   }, [faviconFile]);
 
-  const loginImgSrc = loginPreviewUrl || resolveLoginLogo();
-  const menuImgSrc = menuPreviewUrl || resolveMenuLogo();
+  const loginLightSrc =
+    loginPreviewUrl || storedLogoOrNull(branding.loginLogoUrl) || defaultLogo;
+  const loginDarkSrc =
+    loginDarkPreviewUrl ||
+    storedLogoOrNull(branding.loginLogoDarkUrl) ||
+    loginLightSrc;
+  const menuLightSrc =
+    menuPreviewUrl || storedLogoOrNull(branding.menuLogoUrl) || defaultLogo;
+  const menuDarkSrc =
+    menuDarkPreviewUrl ||
+    storedLogoOrNull(branding.menuLogoDarkUrl) ||
+    menuLightSrc;
   const faviconImgSrc = faviconPreviewUrl || resolveFavicon();
 
   const handleSave = async () => {
@@ -84,11 +133,15 @@ export default function PlatformBranding() {
       fd.append("publicWhatsAppNumber", String(publicWhatsAppNumber).replace(/\D/g, ""));
       fd.append("publicWhatsAppMessage", String(publicWhatsAppMessage).trim());
       if (loginFile) fd.append("loginLogo", loginFile);
+      if (loginDarkFile) fd.append("loginLogoDark", loginDarkFile);
       if (menuFile) fd.append("menuLogo", menuFile);
+      if (menuDarkFile) fd.append("menuLogoDark", menuDarkFile);
       if (faviconFile) fd.append("favicon", faviconFile);
       await api.post("/system-settings/branding", fd);
       setLoginFile(null);
+      setLoginDarkFile(null);
       setMenuFile(null);
+      setMenuDarkFile(null);
       setFaviconFile(null);
       await refreshBranding();
       toast.success(i18n.t("platform.branding.saved"));
@@ -114,6 +167,28 @@ export default function PlatformBranding() {
     try {
       await api.post("/system-settings", { branding: { menuLogoUrl: "" } });
       setMenuFile(null);
+      await refreshBranding();
+      toast.success(i18n.t("platform.branding.saved"));
+    } catch (e) {
+      toastError(e);
+    }
+  };
+
+  const restoreLoginDarkDefault = async () => {
+    try {
+      await api.post("/system-settings", { branding: { loginLogoDarkUrl: "" } });
+      setLoginDarkFile(null);
+      await refreshBranding();
+      toast.success(i18n.t("platform.branding.saved"));
+    } catch (e) {
+      toastError(e);
+    }
+  };
+
+  const restoreMenuDarkDefault = async () => {
+    try {
+      await api.post("/system-settings", { branding: { menuLogoDarkUrl: "" } });
+      setMenuDarkFile(null);
       await refreshBranding();
       toast.success(i18n.t("platform.branding.saved"));
     } catch (e) {
@@ -154,14 +229,50 @@ export default function PlatformBranding() {
             {i18n.t("platform.branding.loginLogo")}
           </Typography>
           <Typography variant="caption" color="textSecondary" display="block" gutterBottom>
+            {i18n.t("platform.branding.loginLogoThemeLight")}
+          </Typography>
+          <Typography variant="caption" color="textSecondary" display="block" gutterBottom>
             {i18n.t("platform.branding.uploadHint")}
           </Typography>
+          <Box display="flex" alignItems="flex-start" flexWrap="wrap" mt={1} style={{ gap: 16 }}>
+            <Box>
+              <Typography variant="caption" color="textSecondary" display="block" gutterBottom>
+                {i18n.t("platform.branding.previewLight")}
+              </Typography>
+              <img
+                src={loginLightSrc}
+                alt=""
+                style={{
+                  maxHeight: 72,
+                  maxWidth: 220,
+                  objectFit: "contain",
+                  border: previewImgBorder,
+                  borderRadius: 4,
+                  backgroundColor: theme.palette.background.paper,
+                }}
+              />
+            </Box>
+            <Box>
+              <Typography variant="caption" color="textSecondary" display="block" gutterBottom>
+                {i18n.t("platform.branding.previewDark")}
+              </Typography>
+              <Box
+                style={{
+                  padding: 8,
+                  borderRadius: 4,
+                  backgroundColor: theme.palette.grey[900],
+                  display: "inline-block",
+                }}
+              >
+                <img
+                  src={loginDarkSrc}
+                  alt=""
+                  style={{ maxHeight: 72, maxWidth: 220, objectFit: "contain", display: "block" }}
+                />
+              </Box>
+            </Box>
+          </Box>
           <Box display="flex" alignItems="center" flexWrap="wrap" mt={1} style={{ gap: 8 }}>
-            <img
-              src={loginImgSrc}
-              alt=""
-              style={{ maxHeight: 72, maxWidth: 220, objectFit: "contain", border: "1px solid #eee", borderRadius: 4 }}
-            />
             <input
               ref={loginInputRef}
               type="file"
@@ -174,10 +285,35 @@ export default function PlatformBranding() {
               }}
             />
             <Button size="small" variant="outlined" onClick={() => loginInputRef.current?.click()}>
-              {i18n.t("platform.branding.chooseFile")}
+              {i18n.t("platform.branding.chooseFileLight")}
             </Button>
             <Button size="small" onClick={restoreLoginDefault}>
-              {i18n.t("platform.branding.restoreDefault")}
+              {i18n.t("platform.branding.restoreDefaultLight")}
+            </Button>
+          </Box>
+          <Typography variant="caption" color="textSecondary" display="block" style={{ marginTop: 12 }}>
+            {i18n.t("platform.branding.loginLogoDark")}
+          </Typography>
+          <Typography variant="caption" color="textSecondary" display="block" gutterBottom>
+            {i18n.t("platform.branding.loginLogoDarkHint")}
+          </Typography>
+          <Box display="flex" alignItems="center" flexWrap="wrap" mt={1} style={{ gap: 8 }}>
+            <input
+              ref={loginDarkInputRef}
+              type="file"
+              accept={ACCEPT_IMAGES}
+              hidden
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                setLoginDarkFile(f || null);
+                e.target.value = "";
+              }}
+            />
+            <Button size="small" variant="outlined" onClick={() => loginDarkInputRef.current?.click()}>
+              {i18n.t("platform.branding.chooseFileDark")}
+            </Button>
+            <Button size="small" onClick={restoreLoginDarkDefault}>
+              {i18n.t("platform.branding.restoreDefaultDark")}
             </Button>
           </Box>
           <Typography
@@ -195,14 +331,50 @@ export default function PlatformBranding() {
             {i18n.t("platform.branding.menuLogo")}
           </Typography>
           <Typography variant="caption" color="textSecondary" display="block" gutterBottom>
+            {i18n.t("platform.branding.menuLogoThemeLight")}
+          </Typography>
+          <Typography variant="caption" color="textSecondary" display="block" gutterBottom>
             {i18n.t("platform.branding.uploadHint")}
           </Typography>
+          <Box display="flex" alignItems="flex-start" flexWrap="wrap" mt={1} style={{ gap: 16 }}>
+            <Box>
+              <Typography variant="caption" color="textSecondary" display="block" gutterBottom>
+                {i18n.t("platform.branding.previewLight")}
+              </Typography>
+              <img
+                src={menuLightSrc}
+                alt=""
+                style={{
+                  maxHeight: 72,
+                  maxWidth: 220,
+                  objectFit: "contain",
+                  border: previewImgBorder,
+                  borderRadius: 4,
+                  backgroundColor: theme.palette.background.paper,
+                }}
+              />
+            </Box>
+            <Box>
+              <Typography variant="caption" color="textSecondary" display="block" gutterBottom>
+                {i18n.t("platform.branding.previewDark")}
+              </Typography>
+              <Box
+                style={{
+                  padding: 8,
+                  borderRadius: 4,
+                  backgroundColor: theme.palette.grey[900],
+                  display: "inline-block",
+                }}
+              >
+                <img
+                  src={menuDarkSrc}
+                  alt=""
+                  style={{ maxHeight: 72, maxWidth: 220, objectFit: "contain", display: "block" }}
+                />
+              </Box>
+            </Box>
+          </Box>
           <Box display="flex" alignItems="center" flexWrap="wrap" mt={1} style={{ gap: 8 }}>
-            <img
-              src={menuImgSrc}
-              alt=""
-              style={{ maxHeight: 72, maxWidth: 220, objectFit: "contain", border: "1px solid #eee", borderRadius: 4 }}
-            />
             <input
               ref={menuInputRef}
               type="file"
@@ -215,10 +387,35 @@ export default function PlatformBranding() {
               }}
             />
             <Button size="small" variant="outlined" onClick={() => menuInputRef.current?.click()}>
-              {i18n.t("platform.branding.chooseFile")}
+              {i18n.t("platform.branding.chooseFileLight")}
             </Button>
             <Button size="small" onClick={restoreMenuDefault}>
-              {i18n.t("platform.branding.restoreDefault")}
+              {i18n.t("platform.branding.restoreDefaultLight")}
+            </Button>
+          </Box>
+          <Typography variant="caption" color="textSecondary" display="block" style={{ marginTop: 12 }}>
+            {i18n.t("platform.branding.menuLogoDark")}
+          </Typography>
+          <Typography variant="caption" color="textSecondary" display="block" gutterBottom>
+            {i18n.t("platform.branding.menuLogoDarkHint")}
+          </Typography>
+          <Box display="flex" alignItems="center" flexWrap="wrap" mt={1} style={{ gap: 8 }}>
+            <input
+              ref={menuDarkInputRef}
+              type="file"
+              accept={ACCEPT_IMAGES}
+              hidden
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                setMenuDarkFile(f || null);
+                e.target.value = "";
+              }}
+            />
+            <Button size="small" variant="outlined" onClick={() => menuDarkInputRef.current?.click()}>
+              {i18n.t("platform.branding.chooseFileDark")}
+            </Button>
+            <Button size="small" onClick={restoreMenuDarkDefault}>
+              {i18n.t("platform.branding.restoreDefaultDark")}
             </Button>
           </Box>
           <Typography
@@ -284,7 +481,7 @@ export default function PlatformBranding() {
                 width: 32,
                 height: 32,
                 objectFit: "contain",
-                border: "1px solid #eee",
+                border: previewImgBorder,
                 borderRadius: 4,
                 flexShrink: 0,
               }}

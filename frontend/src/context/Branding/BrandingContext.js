@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { useTheme } from "@material-ui/core/styles";
 import { openApi } from "../../services/api";
 import { getApiUrl } from "../../config/backendUrl";
 import defaultLogo from "../../assets/logo.png";
@@ -21,7 +22,9 @@ function defaultFaviconAbsoluteHref() {
 const emptyBranding = {
   systemName: "",
   loginLogoUrl: "",
+  loginLogoDarkUrl: "",
   menuLogoUrl: "",
+  menuLogoDarkUrl: "",
   faviconUrl: "",
   publicWhatsAppNumber: "",
   publicWhatsAppMessage: ""
@@ -35,7 +38,9 @@ function readBootstrapBranding() {
   return {
     systemName: w.systemName != null ? String(w.systemName) : "",
     loginLogoUrl: w.loginLogoUrl != null ? String(w.loginLogoUrl) : "",
+    loginLogoDarkUrl: w.loginLogoDarkUrl != null ? String(w.loginLogoDarkUrl) : "",
     menuLogoUrl: w.menuLogoUrl != null ? String(w.menuLogoUrl) : "",
+    menuLogoDarkUrl: w.menuLogoDarkUrl != null ? String(w.menuLogoDarkUrl) : "",
     faviconUrl: w.faviconUrl != null ? String(w.faviconUrl) : "",
     publicWhatsAppNumber: w.publicWhatsAppNumber != null ? String(w.publicWhatsAppNumber) : "",
     publicWhatsAppMessage: w.publicWhatsAppMessage != null ? String(w.publicWhatsAppMessage) : ""
@@ -53,6 +58,8 @@ const BrandingContext = createContext({
 });
 
 export function BrandingProvider({ children }) {
+  const theme = useTheme();
+  const isDarkMode = theme.palette.type === "dark";
   const [bootstrapSnapshot] = useState(() => readBootstrapBranding());
   const [branding, setBranding] = useState(() =>
     bootstrapSnapshot ? { ...emptyBranding, ...bootstrapSnapshot } : emptyBranding
@@ -66,7 +73,9 @@ export function BrandingProvider({ children }) {
       setBranding({
         systemName: data?.systemName != null ? String(data.systemName) : "",
         loginLogoUrl: data?.loginLogoUrl ?? "",
+        loginLogoDarkUrl: data?.loginLogoDarkUrl ?? "",
         menuLogoUrl: data?.menuLogoUrl ?? "",
+        menuLogoDarkUrl: data?.menuLogoDarkUrl ?? "",
         faviconUrl: data?.faviconUrl ?? "",
         publicWhatsAppNumber: data?.publicWhatsAppNumber ?? "",
         publicWhatsAppMessage: data?.publicWhatsAppMessage ?? ""
@@ -94,12 +103,18 @@ export function BrandingProvider({ children }) {
   }, [branding.systemName]);
 
   const resolveLoginLogo = useCallback(() => {
-    return resolveStoredLogoUrl(branding.loginLogoUrl) || defaultLogo;
-  }, [branding.loginLogoUrl]);
+    const light = resolveStoredLogoUrl(branding.loginLogoUrl);
+    const dark = resolveStoredLogoUrl(branding.loginLogoDarkUrl);
+    if (isDarkMode && dark) return dark;
+    return light || defaultLogo;
+  }, [branding.loginLogoUrl, branding.loginLogoDarkUrl, isDarkMode]);
 
   const resolveMenuLogo = useCallback(() => {
-    return resolveStoredLogoUrl(branding.menuLogoUrl) || defaultLogo;
-  }, [branding.menuLogoUrl]);
+    const light = resolveStoredLogoUrl(branding.menuLogoUrl);
+    const dark = resolveStoredLogoUrl(branding.menuLogoDarkUrl);
+    if (isDarkMode && dark) return dark;
+    return light || defaultLogo;
+  }, [branding.menuLogoUrl, branding.menuLogoDarkUrl, isDarkMode]);
 
   const resolveFavicon = useCallback(() => {
     return resolveStoredLogoUrl(branding.faviconUrl) || defaultFaviconAbsoluteHref();

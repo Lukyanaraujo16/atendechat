@@ -55,7 +55,7 @@ export const publicBrandingBootstrapScript = async (
   }
   const payload = JSON.stringify(branding);
   const originJson = JSON.stringify(apiOrigin);
-  const js = `!function(){"use strict";var b=${payload},o=${originJson};window.__BOOTSTRAP_BRANDING__=b;function abs(u){if(!u)return"";if(/^https?:\\/\\//i.test(u))return u;var x=o.replace(/\\/$/,"");return x+(u.charAt(0)==="/"?u:"/"+u)}var t=String(b.systemName||"").trim();if(t)document.title=t;var fav=abs(b.faviconUrl);if(fav){["icon","shortcut icon","apple-touch-icon"].forEach(function(r){var e=document.querySelector('link[rel="'+r+'"]');if(!e){e=document.createElement("link");e.setAttribute("rel",r);document.head.appendChild(e)}e.setAttribute("href",fav)})}[abs(b.loginLogoUrl),abs(b.menuLogoUrl)].forEach(function(h){if(h){var p=document.createElement("link");p.rel="preload";p.as="image";p.href=h;document.head.appendChild(p)}})}();`;
+  const js = `!function(){"use strict";var b=${payload},o=${originJson};window.__BOOTSTRAP_BRANDING__=b;function abs(u){if(!u)return"";if(/^https?:\\/\\//i.test(u))return u;var x=o.replace(/\\/$/,"");return x+(u.charAt(0)==="/"?u:"/"+u)}var t=String(b.systemName||"").trim();if(t)document.title=t;var fav=abs(b.faviconUrl);if(fav){["icon","shortcut icon","apple-touch-icon"].forEach(function(r){var e=document.querySelector('link[rel="'+r+'"]');if(!e){e=document.createElement("link");e.setAttribute("rel",r);document.head.appendChild(e)}e.setAttribute("href",fav)})}var S={},P=function(u){var h=abs(u);if(!h||S[h])return;S[h]=1;var p=document.createElement("link");p.rel="preload";p.as="image";p.href=h;document.head.appendChild(p)};[b.loginLogoUrl,b.loginLogoDarkUrl,b.menuLogoUrl,b.menuLogoDarkUrl].forEach(P)}();`;
   res.setHeader("Content-Type", "application/javascript; charset=utf-8");
   res.setHeader("Cache-Control", "private, max-age=120");
   return res.status(200).send(js);
@@ -155,7 +155,9 @@ export const updateBrandingMultipart = async (
   }
 
   const login = files?.loginLogo?.[0];
+  const loginDark = files?.loginLogoDark?.[0];
   const menu = files?.menuLogo?.[0];
+  const menuDark = files?.menuLogoDark?.[0];
   const favicon = files?.favicon?.[0];
 
   const before = await GetPublicBrandingService();
@@ -166,11 +168,23 @@ export const updateBrandingMultipart = async (
     }
     partial.loginLogoUrl = `/public/branding/${login.filename}`;
   }
+  if (loginDark) {
+    if (before.loginLogoDarkUrl?.startsWith("/public/branding/")) {
+      unlinkPublicAsset(before.loginLogoDarkUrl);
+    }
+    partial.loginLogoDarkUrl = `/public/branding/${loginDark.filename}`;
+  }
   if (menu) {
     if (before.menuLogoUrl?.startsWith("/public/branding/")) {
       unlinkPublicAsset(before.menuLogoUrl);
     }
     partial.menuLogoUrl = `/public/branding/${menu.filename}`;
+  }
+  if (menuDark) {
+    if (before.menuLogoDarkUrl?.startsWith("/public/branding/")) {
+      unlinkPublicAsset(before.menuLogoDarkUrl);
+    }
+    partial.menuLogoDarkUrl = `/public/branding/${menuDark.filename}`;
   }
   if (favicon) {
     if (favicon.size > FAVICON_MAX_BYTES) {

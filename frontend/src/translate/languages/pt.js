@@ -1755,10 +1755,24 @@ const messages = {
         branding: {
           title: "Branding global",
           subtitle:
-            "Nome e logos exibidos no login e no menu interno para todos os utilizadores.",
+            "Nome e logos (tema claro e escuro) no login e no menu interno para todos os utilizadores.",
           systemName: "Nome do sistema",
-          loginLogo: "Logo da página de login",
-          menuLogo: "Logo do menu interno",
+          loginLogo: "Logos da página de login",
+          loginLogoThemeLight: "Logo para tema claro (predefinida).",
+          menuLogo: "Logos do menu interno",
+          menuLogoThemeLight: "Logo para tema claro (predefinida).",
+          previewLight: "Pré-visualização (fundo claro)",
+          previewDark: "Pré-visualização (fundo escuro)",
+          loginLogoDark: "Logo para tema escuro (opcional)",
+          loginLogoDarkHint:
+            "Se não enviar, utiliza-se a logo clara em todos os temas. Recomendada variante clara/alta para fundo escuro.",
+          menuLogoDark: "Logo do menu para tema escuro (opcional)",
+          menuLogoDarkHint:
+            "Se não enviar, utiliza-se a logo clara no menu em todos os temas.",
+          chooseFileLight: "Escolher imagem (claro)",
+          chooseFileDark: "Escolher imagem (escuro)",
+          restoreDefaultLight: "Repor logo clara",
+          restoreDefaultDark: "Repor logo escura",
           uploadHint:
             "PNG, JPG, WebP, GIF ou SVG até 2 MB. Sem novo ficheiro, mantém-se o logo atual.",
           loginLogoHint:

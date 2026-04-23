@@ -9,8 +9,14 @@ const UpsertBrandingService = async (data: Partial<PublicBranding>): Promise<voi
   if (data.loginLogoUrl !== undefined) {
     entries.push([BRANDING_KEYS.loginLogoUrl, String(data.loginLogoUrl).trim()]);
   }
+  if (data.loginLogoDarkUrl !== undefined) {
+    entries.push([BRANDING_KEYS.loginLogoDarkUrl, String(data.loginLogoDarkUrl).trim()]);
+  }
   if (data.menuLogoUrl !== undefined) {
     entries.push([BRANDING_KEYS.menuLogoUrl, String(data.menuLogoUrl).trim()]);
+  }
+  if (data.menuLogoDarkUrl !== undefined) {
+    entries.push([BRANDING_KEYS.menuLogoDarkUrl, String(data.menuLogoDarkUrl).trim()]);
   }
   if (data.faviconUrl !== undefined) {
     entries.push([BRANDING_KEYS.faviconUrl, String(data.faviconUrl).trim()]);
