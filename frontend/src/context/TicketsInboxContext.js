@@ -132,15 +132,16 @@ export function TicketsInboxProvider({
     setTickets((prev) => mergeLoadBatch(prev, pendingFetch.tickets));
   }, [fetchEnabled, pendingFetch.tickets]);
 
+  const userId = user?.id;
   const shouldShowTicket = useCallback(
     (ticket) => {
       if (!ticket) return false;
       return (
-        (!ticket.userId || ticket.userId === user?.id || showAll) &&
+        (!ticket.userId || ticket.userId === userId || showAll) &&
         (!ticket.queueId || (selectedQueueIds || []).indexOf(ticket.queueId) > -1)
       );
     },
-    [user?.id, showAll, selectedQueueIds]
+    [userId, showAll, selectedQueueIds]
   );
 
   const upsertTicket = useCallback((ticket) => {

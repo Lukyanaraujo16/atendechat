@@ -102,6 +102,15 @@ cd frontend/
 npm install --force
 ```
 
+Opcional (remove o aviso *caniuse-lite is outdated* no build do frontend):
+
+```
+cd frontend/
+npm run browserslist:update
+```
+
+O `npm run build` do frontend define `CI=false` para que **avisos de ESLint** não interrompam o build em pipelines que exportam `CI=true`; o bundle continua a ser gerado normalmente. Corrija os avisos no código quando possível.
+
 ### Rodando localmente
 ```
 cd backend/
@@ -150,7 +159,6 @@ cd /home/deploy/${empresa_atualizar}/backend
 npm install
 npm update -f
 npm install @types/fs-extra
-rm -rf dist 
 npm run build
 npx sequelize db:migrate
 npx sequelize db:migrate

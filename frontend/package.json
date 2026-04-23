@@ -75,7 +75,8 @@
   },
   "scripts": {
     "start": "cross-env NODE_OPTIONS=--openssl-legacy-provider react-scripts start",
-    "build": "cross-env NODE_OPTIONS=--openssl-legacy-provider GENERATE_SOURCEMAP=false react-scripts build && node scripts/patch-index-html-branding.js",
+    "browserslist:update": "npx update-browserslist-db@latest",
+    "build": "cross-env CI=false NODE_OPTIONS=--openssl-legacy-provider GENERATE_SOURCEMAP=false react-scripts build && node scripts/patch-index-html-branding.js",
     "build:debug": "cross-env NODE_OPTIONS=--openssl-legacy-provider GENERATE_SOURCEMAP=true react-scripts build",
     "builddev": "react-scripts build",
     "test": "react-scripts test",
