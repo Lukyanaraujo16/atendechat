@@ -22,6 +22,13 @@ import { Store } from "./store";
 import { StartWhatsAppSession } from "../services/WbotServices/StartWhatsAppSession";
 import DeleteBaileysService from "../services/BaileysServices/DeleteBaileysService";
 import NodeCache from 'node-cache';
+import {
+  clearUnavailablePresenceHeartbeat,
+  isForceUnavailablePresenceEnabled,
+  sendGlobalUnavailablePresence,
+  shouldMarkOnlineOnConnect,
+  startUnavailablePresenceHeartbeat
+} from "../helpers/whatsappUnavailablePresence";
 
 const loggerBaileys = P({ level: "error" });
 
@@ -48,6 +55,7 @@ export const removeWbot = async (
   isLogout = true
 ): Promise<void> => {
   try {
+    clearUnavailablePresenceHeartbeat(whatsappId);
     const sessionIndex = sessions.findIndex(s => s.id === whatsappId);
     if (sessionIndex !== -1) {
       if (isLogout) {
@@ -105,7 +113,7 @@ export const initWASocket = async (whatsapp: Whatsapp): Promise<Session> => {
             keys: makeCacheableSignalKeyStore(state.keys, logger),
           },
           version,
-          markOnlineOnConnect: true,
+          markOnlineOnConnect: shouldMarkOnlineOnConnect(),
           syncFullHistory: true,
           msgRetryCounterCache,
           shouldIgnoreJid: jid => isJidBroadcast(jid),
@@ -198,6 +206,19 @@ export const initWASocket = async (whatsapp: Whatsapp): Promise<Session> => {
               if (sessionIndex === -1) {
                 wsocket.id = whatsapp.id;
                 sessions.push(wsocket);
+              }
+
+              if (isForceUnavailablePresenceEnabled()) {
+                await sendGlobalUnavailablePresence(wsocket, {
+                  whatsappId: id,
+                  companyId: whatsapp.companyId,
+                  sessionName: name
+                }, "connect");
+                startUnavailablePresenceHeartbeat(wsocket, {
+                  whatsappId: id,
+                  companyId: whatsapp.companyId,
+                  sessionName: name
+                });
               }
 
               resolve(wsocket);
