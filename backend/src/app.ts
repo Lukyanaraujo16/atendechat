@@ -4,6 +4,7 @@ import "express-async-errors";
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import multer from "multer";
 import * as Sentry from "@sentry/node";
 
 import "./database";
@@ -67,6 +68,20 @@ app.use(async (err: Error, req: Request, res: Response, _: NextFunction) => {
     return res.status(err.statusCode).json({
       error: err.message,
       ...(err.clientMessage ? { message: err.clientMessage } : {})
+    });
+  }
+
+  if (err instanceof multer.MulterError) {
+    logger.warn({ multerCode: err.code, field: err.field, msg: err.message });
+    const pathStr = req.originalUrl || req.url || "";
+    const hint =
+      err.code === "LIMIT_UNEXPECTED_FILE" && pathStr.includes("/system-settings/branding")
+        ? "Campo de ficheiro não aceite pelo servidor. Reconstrua e reinicie o backend (rotas branding com loginLogoDark/menuLogoDark) ou alinhe o nome do campo ao multer.fields."
+        : undefined;
+    return res.status(400).json({
+      error: err.code,
+      message: err.message,
+      ...(hint ? { hint } : {})
     });
   }
 

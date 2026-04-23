@@ -32,7 +32,12 @@ const UpsertBrandingService = async (data: Partial<PublicBranding>): Promise<voi
   }
 
   for (const [key, value] of entries) {
-    await SystemSetting.upsert({ key, value });
+    const existing = await SystemSetting.findOne({ where: { key } });
+    if (existing) {
+      await existing.update({ value });
+    } else {
+      await SystemSetting.create({ key, value });
+    }
   }
 };
 
