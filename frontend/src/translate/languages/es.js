@@ -2,18 +2,24 @@ const messages = {
   es: {
     translations: {
       selectLanguage: "Seleccione un idioma",
+      passwordPolicy: {
+        requirements:
+          "La contraseña debe tener al menos 8 caracteres, incluyendo una letra mayúscula, una minúscula y un número.",
+      },
       signup: {
         title: "Regístrate",
         toasts: {
-          success: "¡Usuario creado con éxito! ¡Inicia sesión!!!",
-          fail: "Error al crear usuario. Verifica los datos ingresados.",
+          success:
+            "¡Solicitud enviada! Un administrador revisará su registro. Tras la aprobación, recibirá un correo para definir la contraseña y acceder.",
+          fail: "No se pudo enviar la solicitud. Revise los datos.",
         },
         form: {
           name: "Nombre de la empresa",
+          adminName: "Nombre del responsable",
           email: "Correo electrónico",
           phone: "Teléfono con (código de área)",
           plan: "Plan",
-          password: "Contraseña",
+          notes: "Observaciones (opcional)",
         },
         formErrors: {
           name: {
@@ -21,7 +27,16 @@ const messages = {
             short: "Nombre demasiado corto",
             long: "Nombre demasiado largo",
           },
+          adminName: {
+            required: "El nombre del responsable es obligatorio",
+            short: "Nombre demasiado corto",
+            long: "Nombre demasiado largo",
+          },
+          notes: {
+            long: "Texto demasiado largo",
+          },
           password: {
+            required: "La contraseña es obligatoria",
             short: "Contraseña demasiado corta",
             long: "Contraseña demasiado larga",
           },
@@ -29,9 +44,16 @@ const messages = {
             required: "El correo electrónico es obligatorio",
             invalid: "Correo electrónico inválido",
           },
+          acceptTerms:
+            "Debe aceptar la política de privacidad y los términos de uso.",
+        },
+        legal: {
+          iAgree: "He leído y acepto la",
+          and: "y los",
         },
         buttons: {
           submit: "Registrar",
+          submitRequest: "Enviar solicitud de registro",
           login: "¿Ya tienes una cuenta? ¡Inicia sesión!",
         },
         plan: {
@@ -54,18 +76,72 @@ const messages = {
           badge: "Soporte disponible",
           ariaLabel: "Abrir WhatsApp",
         },
+        links: {
+          forgotPassword: "Olvidé mi contraseña",
+          signup: "¿No tienes cuenta? ¡Regístrate!",
+        },
+        footer: {
+          privacy: "Política de privacidad",
+          terms: "Términos de uso",
+        },
+      },
+      legal: {
+        updated: "Última actualización: abril de 2026.",
+        privacy: {
+          title: "Política de privacidad",
+          intro:
+            "Esta política describe cómo tratamos los datos personales en StreamHUB Chat / AtendeChat.",
+          collectTitle: "1. Datos que recopilamos",
+          collectBody:
+            "Podemos recopilar nombre, correo, teléfono, datos de la empresa, contenidos de conversaciones necesarios para el servicio, registros técnicos y datos de uso.",
+          useTitle: "2. Finalidad y uso",
+          useBody:
+            "Los datos se utilizan para crear y gestionar la cuenta, soporte, facturación, seguridad, mejora del producto y cumplimiento legal.",
+          securityTitle: "3. Seguridad y conservación",
+          securityBody:
+            "Aplicamos medidas técnicas y organizativas adecuadas. Conservamos los datos el tiempo necesario o exigido por ley.",
+          rightsTitle: "4. Sus derechos",
+          rightsBody:
+            "Puede solicitar acceso, rectificación, supresión u oposición según la legislación aplicable contactando al responsable del servicio.",
+          contactTitle: "5. Contacto",
+          contactBody:
+            "Para privacidad, use los canales de soporte del sitio o la aplicación.",
+        },
+        terms: {
+          title: "Términos de uso",
+          intro: "Al usar el servicio acepta estos términos. Léalos con atención.",
+          useTitle: "1. Uso del servicio",
+          useBody:
+            "El servicio es para uso profesional legítimo. Está prohibido spam, contenido ilícito o que viole derechos de terceros.",
+          accountTitle: "2. Cuenta y credenciales",
+          accountBody:
+            "Usted es responsable de la contraseña y de la actividad de su cuenta. Notifíquenos ante uso no autorizado.",
+          liabilityTitle: "3. Limitación de responsabilidad",
+          liabilityBody:
+            "El servicio se ofrece «tal cual». No nos hacemos responsables de daños indirectos, lucro cesante o indisponibilidad fuera de lo razonablemente controlable.",
+          changesTitle: "4. Cambios",
+          changesBody:
+            "Podemos actualizar estos términos; la versión vigente estará en esta página.",
+        },
       },
       resetPassword: {
-        title: "Restablecer Contraseña",
+        title: "Recuperar contraseña",
+        subtitleRequest:
+          "Indique el correo de su cuenta. Si existe, recibirá un código y un enlace (válido 1 hora).",
+        subtitleReset: "Introduzca el código del correo y defina la nueva contraseña.",
         toasts: {
-          emailSent: "¡Correo enviado con éxito!",
+          emailSent:
+            "Si el correo está registrado, enviamos instrucciones. Revise la bandeja y el spam.",
           emailNotFound: "¡Correo electrónico no encontrado!",
-          passwordUpdated: "¡Contraseña actualizada con éxito!",
+          passwordUpdated: "Contraseña actualizada. Ya puede iniciar sesión.",
         },
         formErrors: {
           email: {
             required: "El correo electrónico es obligatorio",
             invalid: "Correo electrónico inválido",
+          },
+          token: {
+            required: "El código de verificación es obligatorio",
           },
           newPassword: {
             required: "La nueva contraseña es obligatoria",
@@ -84,9 +160,12 @@ const messages = {
           confirmPassword: "Confirmar nueva contraseña",
         },
         buttons: {
-          submitEmail: "Enviar correo",
-          submitPassword: "Restablecer contraseña",
-          back: "¿No tienes una cuenta? ¡Regístrate!",
+          submitEmail: "Enviar instrucciones",
+          submitPassword: "Guardar nueva contraseña",
+          goSignup: "¿No tienes cuenta? ¡Regístrate!",
+          goLogin: "Volver al inicio de sesión",
+          alreadyHaveCode: "Ya tengo el código",
+          backToRequest: "Solicitar un nuevo código por correo",
         },
       },
       dashboard: {
@@ -867,7 +946,8 @@ const messages = {
           allTicketDesabled: "Deshabilitado",
         },
         hints: {
-          passwordCreate: "Use una contraseña de al menos 5 caracteres.",
+          passwordCreate:
+            "Use al menos 8 caracteres con mayúscula, minúscula y número.",
         },
         formErrors: {
           name: {
@@ -1202,6 +1282,7 @@ const messages = {
         tabs: {
           dashboard: "Panel de la plataforma",
           companies: "Empresas",
+          signupRequests: "Solicitudes de registro",
           plans: "Planes",
           superAdmins: "Super Admins",
           myAccount: "Mi cuenta",
@@ -1211,6 +1292,114 @@ const messages = {
           backup: "Copia de seguridad",
           helps: "Ayuda (contenidos)",
           announcements: "Informativos",
+        },
+        signupRequests: {
+          title: "Onboarding de nuevos clientes",
+          subtitle:
+            "Centro operativo: registros públicos, aprobación, invitaciones y activación. Los avisos ayudan a priorizar.",
+          filterLabel: "Filtrar",
+          filterNew: "Nuevos",
+          filterCritical: "Críticos",
+          filterPending: "Pendientes",
+          filterApproved: "Solo aprobadas",
+          filterInvited: "Invitación enviada",
+          filterNotActivated: "Sin activar",
+          filterActivated: "Activadas",
+          filterRejected: "Rechazadas",
+          filterAll: "Todas",
+          searchPlaceholder: "Buscar empresa, responsable o correo…",
+          searchHint:
+            "Mínimo 2 caracteres. La búsqueda filtra la lista; los contadores son globales (todas las solicitudes).",
+          summaryIntro: "Resumen — pulse para aplicar el filtro correspondiente.",
+          summaryNew: "Nuevos",
+          summaryPending: "Pendientes",
+          summaryAwaiting: "Pendientes de activación",
+          summaryCritical: "Críticos",
+          summaryRejected: "Rechazados",
+          loading: "Cargando…",
+          empty: "Ninguna solicitud coincide con este filtro o búsqueda.",
+          colCompany: "Empresa",
+          colAdmin: "Responsable",
+          colEmail: "Correo",
+          colPhone: "Teléfono",
+          colPlan: "Plan",
+          colStatus: "Estado",
+          colAlerts: "Alertas",
+          colDate: "Fecha de solicitud",
+          colActions: "Acciones",
+          badgeNew: "Nuevo",
+          pendingSince: "Hace {{days}} d. sin revisión",
+          statusPending: "Pendiente",
+          statusApproved: "Aprobado",
+          statusInvited: "Invitación enviada",
+          statusActivated: "Activado",
+          statusRejected: "Rechazado",
+          approve: "Aprobar",
+          reject: "Rechazar",
+          tooltipDetails: "Ver detalles",
+          tooltipApprove: "Aprobar solicitud",
+          tooltipReject: "Rechazar solicitud",
+          detailsTitle: "Detalles de la solicitud",
+          detailPlan: "Plan solicitado",
+          detailNotes: "Observaciones",
+          detailRejectReason: "Motivo del rechazo",
+          detailReviewedAt: "Fecha de decisión (legado)",
+          detailApprovedAt: "Aprobación",
+          detailRejectedAt: "Rechazo",
+          detailFirstLoginAt: "Primer inicio de sesión",
+          detailOnboardingStage: "Etapa actual",
+          detailAlerts: "Alertas operativas",
+          stagePending: "En espera de revisión",
+          stageApprovedNoInvite: "Aprobada — invitación por confirmar",
+          stageInvited: "Invitación enviada — pendiente de activación",
+          stageActivated: "Cliente activo",
+          stageRejected: "Solicitud rechazada",
+          detailFirstInvitationSentAt: "Primera invitación enviada el",
+          detailInvitationSentAt: "Última invitación enviada el",
+          detailInvitationResentCount: "Reenvíos registrados (acción Super Admin)",
+          detailInvitationResentNever: "Aún sin reenvíos desde este centro.",
+          detailInvitationResentHistory: "Historial de reenvíos (últimos)",
+          resendInviteTooltip: "Reenviar invitación por correo",
+          resendInviteDialogTitle: "Reenviar invitación de acceso",
+          resendInviteDialogIntro:
+            "Se generará un nuevo código y enlace (72 horas). El enlace anterior dejará de funcionar. El correo se envía al responsable de esta solicitud.",
+          resendInviteConfirm: "Enviar nueva invitación",
+          toastResendInviteOk: "Nueva invitación enviada y registro actualizado.",
+          socketToastNew: "Nueva solicitud de registro: {{company}}",
+          socketToastCriticalOne: "Onboarding: la solicitud #{{id}} pasó a estado crítico.",
+          socketToastCriticalMany:
+            "Onboarding: {{count}} solicitudes pasaron a estado crítico. Revise el centro.",
+          detailActivatedAt: "Activación (contraseña definida en el enlace)",
+          alertNEW_SIGNUP: "Registro muy reciente",
+          alertPENDING_STALE: "Pendiente muchos días sin revisión",
+          alertAPPROVED_INVITE_PENDING: "Empresa creada — envío de invitación no confirmado",
+          alertAWAITING_ACTIVATION: "Pendiente definir contraseña o primer acceso",
+          alertINVITE_STALE: "Invitación hace varios días sin activación",
+          alertINVITE_LIKELY_EXPIRED: "Enlace de invitación probablemente caducado (72h)",
+          detailApprovedHint:
+            "Empresa creada, pero no se pudo confirmar el envío del correo de invitación. Revise registros o reenvíe la invitación si aplica.",
+          detailCompanyId: "Empresa creada (ID)",
+          close: "Cerrar",
+          approveDialogTitle: "Confirmar aprobación",
+          approveDialogIntro: "Al confirmar, el sistema:",
+          approveDialogBullet1: "Creará la empresa y el usuario administrador con los datos de esta solicitud.",
+          approveDialogBullet2: "Dejará la cuenta admin sin contraseña inicial (modelo seguro).",
+          approveDialogBullet3: "Enviará al correo del responsable una invitación para definir la contraseña (enlace válido 72 horas).",
+          confirmApproveAction: "Aprobar y crear",
+          rejectTitle: "Rechazar solicitud",
+          rejectReason: "Motivo",
+          rejectReasonPlaceholder: "Ej.: datos incompletos, duplicado…",
+          rejectReasonHelper:
+            "Recomendamos un motivo breve. Queda guardado y visible en los detalles.",
+          rejectWithoutReasonConfirm:
+            "¿Rechazar sin motivo? Puede dejar el campo vacío, pero el historial no tendrá explicación.",
+          cancel: "Cancelar",
+          confirmReject: "Confirmar rechazo",
+          toastApproved: "Solicitud procesada y empresa creada.",
+          toastApprovedInviteSent: "Solicitud aprobada. Empresa creada e invitación enviada por correo.",
+          toastApprovedInvitePending:
+            "Empresa creada, pero el envío de la invitación pudo fallar. Revise el estado en la lista o los registros.",
+          toastRejected: "Solicitud rechazada.",
         },
         announcements: {
           title: "Informativos globales",
@@ -1721,8 +1910,10 @@ const messages = {
           toastCompanyRequiredNonSuper: "Seleccione una empresa. Los usuarios sin privilegio super deben estar vinculados.",
           fieldPassword: "Nueva contraseña (opcional)",
           fieldPasswordCreate: "Contraseña inicial",
-          passwordHint: "Deje en blanco para mantener la contraseña actual.",
-          passwordCreateHint: "Mínimo 5 caracteres. El usuario puede cambiarla tras iniciar sesión.",
+          passwordHint:
+            "Deje en blanco para mantener la contraseña actual. Si indica una nueva: mínimo 8 caracteres, mayúscula, minúscula y número.",
+          passwordCreateHint:
+            "Mínimo 8 caracteres, con mayúscula, minúscula y número. El usuario puede cambiarla tras iniciar sesión.",
           cancel: "Cancelar",
           save: "Guardar",
           createSave: "Crear usuario",
@@ -1740,7 +1931,8 @@ const messages = {
           toastSaved: "Cambios guardados.",
           toastCreated: "Usuario creado correctamente.",
           toastPromoted: "Usuario promovido a super admin.",
-          toastCreateValidation: "Complete nombre, correo y contraseña (mín. 5 caracteres).",
+          toastCreateValidation:
+            "Complete nombre, correo y una contraseña que cumpla los requisitos de seguridad.",
         },
         myAccount: {
           title: "Mi cuenta",
@@ -1749,7 +1941,8 @@ const messages = {
           fieldName: "Nombre",
           fieldEmail: "Correo",
           fieldPassword: "Nueva contraseña (opcional)",
-          passwordHint: "Deje en blanco para mantener la contraseña actual.",
+          passwordHint:
+            "Deje en blanco para mantener la contraseña actual. Si indica una nueva: mínimo 8 caracteres, mayúscula, minúscula y número.",
           save: "Guardar cambios",
           toastSaved: "Datos actualizados correctamente.",
         },
@@ -2911,6 +3104,31 @@ const messages = {
         ERR_EMAIL_IN_USE: "Este correo ya está en uso por otra cuenta.",
         FAVICON_TOO_LARGE: "Favicon: tamaño máximo 1 MB.",
         INVALID_FAVICON_TYPE: "Favicon: use PNG, JPG, ICO o SVG.",
+        ERR_RESET_INVALID:
+          "Código o correo inválido. Verifique los datos o solicite un nuevo correo.",
+        ERR_RESET_EXPIRED: "Código caducado. Solicite recuperación de nuevo.",
+        ERR_PASSWORD_TOO_SHORT: "La contraseña debe tener al menos 8 caracteres.",
+        ERR_PASSWORD_TOO_LONG: "Contraseña demasiado larga.",
+        ERR_PASSWORD_POLICY:
+          "La contraseña debe tener al menos 8 caracteres, incluyendo una letra mayúscula, una minúscula y un número.",
+        ERR_PASSWORD_REQUIRED: "La contraseña es obligatoria.",
+        ERR_INVALID_PASSWORD: "Contraseña inválida. Revise los requisitos.",
+        ERR_SIGNUP_PENDING_EXISTS:
+          "Ya existe una solicitud pendiente para este correo. Espere la revisión o contacte al soporte.",
+        ERR_SIGNUP_REQUEST_NOT_FOUND: "Solicitud de registro no encontrada.",
+        ERR_MAIL_NOT_CONFIGURED:
+          "Correo no configurado (MAIL_*). Configure el SMTP de la plataforma para reenviar invitaciones.",
+        ERR_SIGNUP_INVITE_RESEND_NOT_ALLOWED:
+          "No se puede reenviar la invitación en este estado (ya activada, pendiente o rechazada).",
+        ERR_SIGNUP_PRIMARY_ADMIN_NOT_FOUND:
+          "No se encontró el usuario administrador de la solicitud en la empresa creada.",
+        ERR_SIGNUP_INVITE_EMAIL_FAILED:
+          "Error al enviar el correo de invitación. Revise el servicio de correo e inténtelo de nuevo.",
+        ERR_SIGNUP_REQUEST_NOT_PENDING: "Esta solicitud ya fue procesada.",
+        ERR_SIGNUP_COMPANY_NAME_REQUIRED: "Indique el nombre de la empresa (mínimo 2 caracteres).",
+        ERR_COMPANY_EMAIL_REQUIRED: "La empresa necesita un correo para crear la cuenta de administrador.",
+        ERR_INVALID_ID: "Identificador inválido.",
+        ERR_INVALID_PLAN: "Plan inválido o inexistente.",
       },
     }
   }

@@ -63,8 +63,18 @@ export const initIO = (httpServer: Server): SocketIO => {
         ? Number(jwtPayload.companyId)
         : user.companyId;
 
-    socket.join(`company-${effectiveCompanyIdForSocket}-mainchannel`);
     socket.join(`user-${user.id}`);
+    if (user.super) {
+      socket.join("platform-super-admins");
+    }
+    const effCompany = effectiveCompanyIdForSocket;
+    if (
+      effCompany !== undefined &&
+      effCompany !== null &&
+      !Number.isNaN(Number(effCompany))
+    ) {
+      socket.join(`company-${effCompany}-mainchannel`);
+    }
 
     socket.on("joinChatBox", async (ticketId: string) => {
       if (!ticketId || ticketId === "undefined") {

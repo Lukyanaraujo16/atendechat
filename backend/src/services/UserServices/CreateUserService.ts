@@ -1,6 +1,7 @@
 import * as Yup from "yup";
 
 import AppError from "../../errors/AppError";
+import { getFirstYupErrorMessage, requiredPasswordSchema } from "../../utils/passwordPolicy";
 import { SerializeUser } from "../../helpers/SerializeUser";
 import User from "../../models/User";
 import Plan from "../../models/Plan";
@@ -84,7 +85,7 @@ const CreateUserService = async ({
           return !emailExists;
         }
       ),
-    password: Yup.string().required().min(5).max(128)
+    password: requiredPasswordSchema
   });
 
   try {
@@ -93,8 +94,8 @@ const CreateUserService = async ({
       password,
       name: name.trim()
     });
-  } catch (err: any) {
-    throw new AppError(err.message);
+  } catch (err: unknown) {
+    throw new AppError(getFirstYupErrorMessage(err));
   }
 
   const user = await User.create(

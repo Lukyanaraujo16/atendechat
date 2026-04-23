@@ -12,6 +12,7 @@ import { AppPageHeader, AppSectionCard, AppPrimaryButton } from "../../ui";
 import { AuthContext } from "../../context/Auth/AuthContext";
 import { toast } from "react-toastify";
 import toastError from "../../errors/toastError";
+import { passwordMeetsPolicy } from "../../validators/passwordPolicy";
 
 const useStyles = makeStyles((theme) => ({
   heading: { fontWeight: 600, fontSize: "1.0625rem", marginBottom: theme.spacing(2) },
@@ -31,12 +32,17 @@ export default function PlatformMyAccount() {
   }, [user?.name, user?.email]);
 
   const handleSave = async () => {
+    const pwdTrim = password.trim();
+    if (pwdTrim && !passwordMeetsPolicy(pwdTrim)) {
+      toast.error(i18n.t("passwordPolicy.requirements"));
+      return;
+    }
     setSaving(true);
     try {
       await api.put("/platform/me", {
         name,
         email,
-        ...(password.trim() ? { password: password.trim() } : {}),
+        ...(pwdTrim ? { password: pwdTrim } : {}),
       });
       toast.success(i18n.t("platform.myAccount.toastSaved"));
       setPassword("");

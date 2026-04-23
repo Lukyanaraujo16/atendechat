@@ -8,6 +8,7 @@ import authConfig from "../config/auth";
 
 import ListCompaniesService from "../services/CompanyService/ListCompaniesService";
 import CreateCompanyService from "../services/CompanyService/CreateCompanyService";
+import CreatePublicSignupRequestService from "../services/CompanySignupRequest/CreatePublicSignupRequestService";
 import UpdateCompanyService from "../services/CompanyService/UpdateCompanyService";
 import ShowCompanyService from "../services/CompanyService/ShowCompanyService";
 import UpdateSchedulesService from "../services/CompanyService/UpdateSchedulesService";
@@ -110,6 +111,17 @@ export const index = async (req: Request, res: Response): Promise<Response> => {
   return res.json({ companies: enriched, count, hasMore });
 };
 
+/**
+ * Cadastro público: cria pedido pendente (aprovação por Super Admin). Não cria empresa nem utilizador.
+ */
+export const createSignupRequest = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const row = await CreatePublicSignupRequestService(req.body);
+  return res.status(201).json(row);
+};
+
 export const store = async (req: Request, res: Response): Promise<Response> => {
   const newCompany = req.body as CreateCompanyRequest;
 
@@ -132,7 +144,7 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
     delete payload.internalNotes;
   }
 
-  const company = await CreateCompanyService(payload);
+  const { company } = await CreateCompanyService(payload);
 
   return res.status(200).json(company);
 };

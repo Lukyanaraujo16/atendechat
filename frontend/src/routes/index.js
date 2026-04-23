@@ -7,6 +7,8 @@ import SaaSRootLayout from "../layout/SaaSRootLayout";
 import Signup from "../pages/Signup/";
 import Login from "../pages/Login/";
 import ForgetPassword from "../pages/ForgetPassWord/";
+import PrivacyPolicy from "../pages/Legal/PrivacyPolicy";
+import TermsOfService from "../pages/Legal/TermsOfService";
 import PlatformModule from "../pages/Platform/PlatformModule";
 import { AuthProvider } from "../context/Auth/AuthContext";
 import { TicketsContextProvider } from "../context/Tickets/TicketsContext";
@@ -24,6 +26,8 @@ const Routes = () => {
             <Route exact path="/login" component={Login} />
             <Route exact path="/signup" component={Signup} />
             <Route exact path="/forgetpsw" component={ForgetPassword} />
+            <Route exact path="/privacy-policy" component={PrivacyPolicy} />
+            <Route exact path="/terms-of-service" component={TermsOfService} />
             <Route
               isPrivate
               path="/saas"

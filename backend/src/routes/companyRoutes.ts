@@ -16,7 +16,8 @@ companyRoutes.put("/companies/:id/schedules",isAuth,CompanyController.updateSche
 companyRoutes.delete("/companies/:id", isAuth, isSuper, CompanyController.remove);
 companyRoutes.post("/companies/:id/renew", isAuth, isSuper, CompanyController.renewDueDate);
 companyRoutes.get("/companies/:id/logs", isAuth, isSuper, CompanyController.listCompanyLogs);
-companyRoutes.post("/companies/cadastro", CompanyController.store);
+companyRoutes.post("/companies/cadastro", CompanyController.createSignupRequest);
+companyRoutes.post("/companies/signup-requests", CompanyController.createSignupRequest);
 
 // Rota para listar o plano da empresa
 companyRoutes.get("/companies/listPlan/:id", isAuth, CompanyController.listPlan);

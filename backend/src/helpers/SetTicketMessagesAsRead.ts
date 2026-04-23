@@ -24,6 +24,23 @@ export const HUMAN_PANEL_CONVERSATION_VIEW_WHATSAPP_READ: SetTicketMessagesAsRea
     syncWhatsAppReadReceipt: true
   };
 
+/** `Messages.dataJson` é TEXT com JSON stringificado; normaliza para IWebMessageInfo. */
+function parseInboundWebMessageInfo(
+  raw: string | null | undefined
+): proto.IWebMessageInfo | null {
+  if (raw == null || raw === "") {
+    return null;
+  }
+  try {
+    if (typeof raw === "string") {
+      return JSON.parse(raw) as proto.IWebMessageInfo;
+    }
+    return JSON.parse(JSON.stringify(raw)) as proto.IWebMessageInfo;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Zera não lidas no ticket, marca mensagens como lidas no banco e notifica o socket.
  * Opcionalmente envia `chatModify(markRead)` ao WhatsApp — apenas quando
@@ -59,19 +76,29 @@ const SetTicketMessagesAsRead = async (
         if (allowWhatsAppReceipt) {
           const wbot = await GetTicketWbot(ticket);
           if (wbot && typeof (wbot as WASocket).chatModify === "function") {
-            const lastMessages: proto.IWebMessageInfo = JSON.parse(
-              JSON.stringify(pendingInbound[0].dataJson)
-            );
+            let webForRead: proto.IWebMessageInfo | null = null;
+            for (const row of pendingInbound) {
+              const parsed = parseInboundWebMessageInfo(row.dataJson);
+              if (
+                parsed &&
+                (parsed as any).key &&
+                (parsed as any).key.fromMe === false
+              ) {
+                webForRead = parsed;
+                break;
+              }
+            }
 
-            if (
-              (lastMessages as any).key &&
-              (lastMessages as any).key.fromMe === false
-            ) {
+            if (webForRead) {
               await (wbot as WASocket).chatModify(
-                { markRead: true, lastMessages: [lastMessages as any] },
+                { markRead: true, lastMessages: [webForRead as any] },
                 `${ticket.contact.number}@${
                   ticket.isGroup ? "g.us" : "s.whatsapp.net"
                 }`
+              );
+            } else if (pendingInbound.length > 0) {
+              logger.warn(
+                `[SetTicketMessagesAsRead] syncWhatsAppReadReceipt: ticket ${ticket.id} tem ${pendingInbound.length} inbound não lidas mas nenhuma com dataJson válido para markRead no WhatsApp`
               );
             }
           }

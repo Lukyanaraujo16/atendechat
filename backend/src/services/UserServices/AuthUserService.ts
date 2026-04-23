@@ -8,6 +8,7 @@ import { SerializeUser } from "../../helpers/SerializeUser";
 import Queue from "../../models/Queue";
 import Company from "../../models/Company";
 import Setting from "../../models/Setting";
+import MarkSignupRequestActivatedForUserService from "../CompanySignupRequest/MarkSignupRequestActivatedForUserService";
 
 interface SerializedUser {
   id: number;
@@ -45,6 +46,8 @@ const AuthUserService = async ({
   if (!(await user.checkPassword(password))) {
     throw new AppError("ERR_INVALID_CREDENTIALS", 401);
   }
+
+  await MarkSignupRequestActivatedForUserService(user, "login");
 
   const token = createAccessToken(user);
   const refreshToken = createRefreshToken(user);

@@ -2,18 +2,24 @@ const messages = {
   pt: {
     translations: {
       selectLanguage: "Selecione um idioma",
+      passwordPolicy: {
+        requirements:
+          "A senha deve ter no mínimo 8 caracteres, incluindo letra maiúscula, letra minúscula e número.",
+      },
       signup: {
         title: "Cadastre-se",
         toasts: {
-          success: "Usuário criado com sucesso! Faça seu login!!!.",
-          fail: "Erro ao criar usuário. Verifique os dados informados.",
+          success:
+            "Pedido enviado! Um administrador irá analisar o seu cadastro. Após aprovação, receberá um e-mail para definir a palavra-passe e aceder à conta.",
+          fail: "Não foi possível enviar o pedido. Verifique os dados.",
         },
         form: {
           name: "Nome da empresa",
+          adminName: "Nome do responsável",
           email: "Email",
           phone: "Telefone com (DDD)",
           plan: "Plano",
-          password: "Senha",
+          notes: "Observações (opcional)",
         },
         formErrors: {
           name: {
@@ -21,7 +27,16 @@ const messages = {
             short: "Nome muito curto",
             long: "Nome muito longo",
           },
+          adminName: {
+            required: "Nome do responsável é obrigatório",
+            short: "Nome muito curto",
+            long: "Nome muito longo",
+          },
+          notes: {
+            long: "Texto demasiado longo",
+          },
           password: {
+            required: "Senha é obrigatória",
             short: "Senha muito curta",
             long: "Senha muito longa",
           },
@@ -29,9 +44,15 @@ const messages = {
             required: "Email é obrigatório",
             invalid: "Email inválido",
           },
+          acceptTerms: "É necessário aceitar a política de privacidade e os termos de uso.",
+        },
+        legal: {
+          iAgree: "Li e aceito a",
+          and: "e os",
         },
         buttons: {
           submit: "Cadastrar",
+          submitRequest: "Enviar pedido de cadastro",
           login: "Já tem uma conta? Entre!",
         },
         plan: {
@@ -54,18 +75,73 @@ const messages = {
           badge: "Suporte disponível",
           ariaLabel: "Abrir WhatsApp",
         },
+        links: {
+          forgotPassword: "Esqueci minha senha",
+          signup: "Não tem uma conta? Cadastre-se!",
+        },
+        footer: {
+          privacy: "Política de Privacidade",
+          terms: "Termos de Uso",
+        },
+      },
+      legal: {
+        updated: "Última atualização: abril de 2026.",
+        privacy: {
+          title: "Política de Privacidade",
+          intro:
+            "Esta política descreve como tratamos dados pessoais no âmbito do serviço StreamHUB Chat / AtendeChat.",
+          collectTitle: "1. Dados que recolhemos",
+          collectBody:
+            "Podemos recolher nome, e-mail, telefone, dados da empresa, conteúdos de conversas necessários à prestação do serviço, registos técnicos (logs) e dados de utilização da plataforma.",
+          useTitle: "2. Finalidade e uso",
+          useBody:
+            "Os dados são utilizados para criar e gerir a conta, prestar suporte, faturação, segurança, melhoria do produto e cumprimento de obrigações legais.",
+          securityTitle: "3. Segurança e retenção",
+          securityBody:
+            "Aplicamos medidas técnicas e organizativas adequadas. Conservamos os dados pelo tempo necessário às finalidades descritas ou exigido por lei.",
+          rightsTitle: "4. Os seus direitos",
+          rightsBody:
+            "Pode solicitar acesso, retificação, eliminação ou oposição ao tratamento, conforme a legislação aplicável, contactando o responsável pelo serviço.",
+          contactTitle: "5. Contacto",
+          contactBody:
+            "Para questões sobre privacidade, utilize os canais de suporte indicados no site ou na aplicação.",
+        },
+        terms: {
+          title: "Termos de Uso",
+          intro:
+            "Ao utilizar o serviço, aceita estes termos. Leia-os com atenção antes de continuar.",
+          useTitle: "1. Uso do serviço",
+          useBody:
+            "O serviço destina-se a uso profissional legítimo. É proibido utilizar a plataforma para spam, conteúdo ilícito ou que viole direitos de terceiros.",
+          accountTitle: "2. Conta e credenciais",
+          accountBody:
+            "É responsável pela confidencialidade da palavra-passe e pelas atividades realizadas na sua conta. Notifique-nos em caso de uso não autorizado.",
+          liabilityTitle: "3. Limitação de responsabilidade",
+          liabilityBody:
+            "O serviço é fornecido «como está». Não nos responsabilizamos por danos indiretos, perda de lucros ou indisponibilidades além do razoavelmente controlável.",
+          changesTitle: "4. Alterações",
+          changesBody:
+            "Podemos atualizar estes termos; a versão vigente estará sempre disponível nesta página.",
+        },
       },
       resetPassword: {
-        title: "Redefinir Senha",
+        title: "Recuperar senha",
+        subtitleRequest:
+          "Indique o e-mail da sua conta. Se existir registo, receberá um código e um link por e-mail (válido por 1 hora).",
+        subtitleReset: "Introduza o código recebido por e-mail e defina a nova palavra-passe.",
         toasts: {
-          emailSent: "Email enviado com sucesso!",
+          emailSent:
+            "Se o e-mail estiver registado, enviámos instruções. Verifique a caixa de entrada e o spam.",
           emailNotFound: "Email não encontrado!",
-          passwordUpdated: "Senha atualizada com sucesso!",
+          passwordUpdated: "Palavra-passe atualizada com sucesso. Já pode iniciar sessão.",
         },
         formErrors: {
           email: {
             required: "Email é obrigatório",
             invalid: "Email inválido",
+          },
+          token: {
+            required: "O código de verificação é obrigatório",
           },
           newPassword: {
             required: "Nova senha é obrigatória",
@@ -84,9 +160,12 @@ const messages = {
           confirmPassword: "Confirme a nova senha",
         },
         buttons: {
-          submitEmail: "Enviar email",
-          submitPassword: "Redefinir senha",
-          back: "Não tem uma conta? Cadastre-se!",
+          submitEmail: "Enviar instruções",
+          submitPassword: "Guardar nova palavra-passe",
+          goSignup: "Não tem uma conta? Cadastre-se!",
+          goLogin: "Voltar ao login",
+          alreadyHaveCode: "Já tenho o código",
+          backToRequest: "Solicitar novo código por e-mail",
         },
       },
       dashboard: {
@@ -933,7 +1012,8 @@ const messages = {
           allTicketDesabled: "Desabilitado",
         },
         hints: {
-          passwordCreate: "Use uma senha com pelo menos 5 caracteres.",
+          passwordCreate:
+            "Use no mínimo 8 caracteres, com letra maiúscula, minúscula e número.",
         },
         formErrors: {
           name: {
@@ -1274,6 +1354,7 @@ const messages = {
         tabs: {
           dashboard: "Dashboard da plataforma",
           companies: "Empresas",
+          signupRequests: "Pedidos de cadastro",
           plans: "Planos",
           superAdmins: "Super Admins",
           myAccount: "Minha conta",
@@ -1283,6 +1364,114 @@ const messages = {
           backup: "Backup",
           helps: "Ajuda (conteúdos)",
           announcements: "Informativos",
+        },
+        signupRequests: {
+          title: "Onboarding de novos clientes",
+          subtitle:
+            "Central operacional: pedidos públicos, aprovação, convites e ativação. Use os alertas para priorizar o que precisa de ação.",
+          filterLabel: "Filtrar",
+          filterNew: "Novos",
+          filterCritical: "Críticos",
+          filterPending: "Pendentes",
+          filterApproved: "Só aprovados",
+          filterInvited: "Convite enviado",
+          filterNotActivated: "Não ativados",
+          filterActivated: "Ativados",
+          filterRejected: "Rejeitados",
+          filterAll: "Todos",
+          searchPlaceholder: "Pesquisar empresa, responsável ou e-mail…",
+          searchHint:
+            "Mínimo 2 caracteres. A pesquisa filtra a lista abaixo; os contadores são globais (todos os pedidos).",
+          summaryIntro: "Visão geral — clique para aplicar o filtro correspondente.",
+          summaryNew: "Novos",
+          summaryPending: "Pendentes",
+          summaryAwaiting: "Aguardam ativação",
+          summaryCritical: "Críticos",
+          summaryRejected: "Rejeitados",
+          loading: "A carregar…",
+          empty: "Nenhum pedido corresponde a este filtro ou pesquisa.",
+          colCompany: "Empresa",
+          colAdmin: "Responsável",
+          colEmail: "E-mail",
+          colPhone: "Telefone",
+          colPlan: "Plano",
+          colStatus: "Estado",
+          colAlerts: "Alertas",
+          colDate: "Data do pedido",
+          colActions: "Ações",
+          badgeNew: "Novo",
+          pendingSince: "Há {{days}} d. sem análise",
+          statusPending: "Pendente",
+          statusApproved: "Aprovado",
+          statusInvited: "Convite enviado",
+          statusActivated: "Ativado",
+          statusRejected: "Rejeitado",
+          approve: "Aprovar",
+          reject: "Rejeitar",
+          tooltipDetails: "Ver detalhes",
+          tooltipApprove: "Aprovar pedido",
+          tooltipReject: "Rejeitar pedido",
+          detailsTitle: "Detalhes do pedido",
+          detailPlan: "Plano solicitado",
+          detailNotes: "Observações",
+          detailRejectReason: "Motivo da rejeição",
+          detailReviewedAt: "Data de decisão (legado)",
+          detailApprovedAt: "Aprovação",
+          detailRejectedAt: "Rejeição",
+          detailFirstLoginAt: "Primeiro login",
+          detailOnboardingStage: "Etapa atual",
+          detailAlerts: "Alertas operacionais",
+          stagePending: "Aguardando análise",
+          stageApprovedNoInvite: "Aprovado — convite por confirmar",
+          stageInvited: "Convite enviado — aguardando ativação",
+          stageActivated: "Cliente ativo",
+          stageRejected: "Pedido rejeitado",
+          detailFirstInvitationSentAt: "Primeiro convite enviado em",
+          detailInvitationSentAt: "Último convite enviado em",
+          detailInvitationResentCount: "Reenvios registados (ação Super Admin)",
+          detailInvitationResentNever: "Ainda sem reenvios por esta central.",
+          detailInvitationResentHistory: "Histórico de reenvios (últimos)",
+          resendInviteTooltip: "Reenviar convite por e-mail",
+          resendInviteDialogTitle: "Reenviar convite de acesso",
+          resendInviteDialogIntro:
+            "Será gerado um novo código e link (72 horas). O link anterior deixa de funcionar. O e-mail será enviado para o endereço do responsável deste pedido.",
+          resendInviteConfirm: "Enviar novo convite",
+          toastResendInviteOk: "Novo convite enviado e registo atualizado.",
+          socketToastNew: "Novo pedido de cadastro: {{company}}",
+          socketToastCriticalOne: "Onboarding: pedido #{{id}} entrou em estado crítico.",
+          socketToastCriticalMany:
+            "Onboarding: {{count}} pedidos entraram em estado crítico. Revista a central.",
+          detailActivatedAt: "Ativação (senha definida no link)",
+          alertNEW_SIGNUP: "Cadastro muito recente",
+          alertPENDING_STALE: "Pendente há muitos dias sem análise",
+          alertAPPROVED_INVITE_PENDING: "Empresa criada — envio do convite não confirmado",
+          alertAWAITING_ACTIVATION: "Aguardando definição de senha ou primeiro acesso",
+          alertINVITE_STALE: "Convite há vários dias sem ativação",
+          alertINVITE_LIKELY_EXPIRED: "Link do convite provavelmente expirado (72h)",
+          detailApprovedHint:
+            "Empresa criada, mas o envio do e-mail de convite não foi confirmado. Verifique notificações ou reenvie o convite ao admin, se necessário.",
+          detailCompanyId: "Empresa criada (ID)",
+          close: "Fechar",
+          approveDialogTitle: "Confirmar aprovação",
+          approveDialogIntro: "Ao confirmar, o sistema irá:",
+          approveDialogBullet1: "Criar a empresa e o utilizador administrador com os dados deste pedido.",
+          approveDialogBullet2: "Configurar a conta de admin sem palavra-passe inicial (modelo seguro).",
+          approveDialogBullet3: "Enviar ao e-mail do responsável um convite para definir a palavra-passe (link válido 72 horas).",
+          confirmApproveAction: "Aprovar e criar",
+          rejectTitle: "Rejeitar pedido",
+          rejectReason: "Motivo",
+          rejectReasonPlaceholder: "Ex.: dados incompletos, duplicado, fora do perfil…",
+          rejectReasonHelper:
+            "Recomendamos indicar um motivo breve. Fica registado e visível nos detalhes do pedido.",
+          rejectWithoutReasonConfirm:
+            "Rejeitar sem motivo? Pode deixar o campo vazio, mas o histórico ficará sem explicação.",
+          cancel: "Cancelar",
+          confirmReject: "Confirmar rejeição",
+          toastApproved: "Pedido processado e empresa criada.",
+          toastApprovedInviteSent: "Pedido aprovado. Empresa criada e convite enviado por e-mail.",
+          toastApprovedInvitePending:
+            "Empresa criada, mas o envio do convite pode ter falhado. Confira o estado na lista ou os logs.",
+          toastRejected: "Pedido rejeitado.",
         },
         announcements: {
           title: "Informativos globais",
@@ -1791,8 +1980,10 @@ const messages = {
           toastCompanyRequiredNonSuper: "Selecione uma empresa. Utilizadores sem privilégio super devem estar vinculados.",
           fieldPassword: "Nova senha (opcional)",
           fieldPasswordCreate: "Senha inicial",
-          passwordHint: "Deixe em branco para manter a senha atual.",
-          passwordCreateHint: "Mínimo 5 caracteres. O utilizador pode alterar depois do login.",
+          passwordHint:
+            "Deixe em branco para manter a senha atual. Se definir uma nova: mínimo 8 caracteres, maiúscula, minúscula e número.",
+          passwordCreateHint:
+            "Mínimo 8 caracteres, com maiúscula, minúscula e número. O utilizador pode alterar depois do login.",
           cancel: "Cancelar",
           save: "Guardar",
           createSave: "Criar utilizador",
@@ -1810,7 +2001,8 @@ const messages = {
           toastSaved: "Alterações guardadas.",
           toastCreated: "Utilizador criado com sucesso.",
           toastPromoted: "Utilizador promovido a super admin.",
-          toastCreateValidation: "Preencha nome, e-mail e senha (mín. 5 caracteres).",
+          toastCreateValidation:
+            "Preencha nome, e-mail e uma senha que cumpra os requisitos de segurança.",
         },
         myAccount: {
           title: "Minha conta",
@@ -1819,7 +2011,8 @@ const messages = {
           fieldName: "Nome",
           fieldEmail: "E-mail",
           fieldPassword: "Nova senha (opcional)",
-          passwordHint: "Deixe em branco para manter a senha atual.",
+          passwordHint:
+            "Deixe em branco para manter a senha atual. Se definir uma nova: mínimo 8 caracteres, maiúscula, minúscula e número.",
           save: "Guardar alterações",
           toastSaved: "Dados atualizados com sucesso.",
         },
@@ -3132,6 +3325,30 @@ const messages = {
         ERR_EMAIL_IN_USE: "Este e-mail já está em uso por outra conta.",
         FAVICON_TOO_LARGE: "Favicon: tamanho máximo 1 MB.",
         INVALID_FAVICON_TYPE: "Favicon: use PNG, JPG, ICO ou SVG.",
+        ERR_RESET_INVALID: "Código inválido ou e-mail incorreto. Verifique os dados ou solicite um novo e-mail.",
+        ERR_RESET_EXPIRED: "Código expirado. Solicite nova recuperação de senha.",
+        ERR_PASSWORD_TOO_SHORT: "A senha deve ter pelo menos 8 caracteres.",
+        ERR_PASSWORD_TOO_LONG: "Senha muito longa.",
+        ERR_PASSWORD_POLICY:
+            "A senha deve ter no mínimo 8 caracteres, incluindo letra maiúscula, letra minúscula e número.",
+        ERR_PASSWORD_REQUIRED: "Senha é obrigatória.",
+        ERR_INVALID_PASSWORD: "Senha inválida. Verifique os requisitos.",
+        ERR_SIGNUP_PENDING_EXISTS:
+          "Já existe um pedido pendente para este e-mail. Aguarde a análise ou contacte o suporte.",
+        ERR_SIGNUP_REQUEST_NOT_FOUND: "Pedido de cadastro não encontrado.",
+        ERR_MAIL_NOT_CONFIGURED:
+          "Envio de e-mail não configurado (MAIL_*). Configure o SMTP da plataforma para reenviar convites.",
+        ERR_SIGNUP_INVITE_RESEND_NOT_ALLOWED:
+          "Não é possível reenviar o convite neste estado do pedido (já ativado, pendente ou rejeitado).",
+        ERR_SIGNUP_PRIMARY_ADMIN_NOT_FOUND:
+          "Utilizador administrador do pedido não encontrado na empresa criada.",
+        ERR_SIGNUP_INVITE_EMAIL_FAILED:
+          "Falha ao enviar o e-mail de convite. Verifique o serviço de correio e tente novamente.",
+        ERR_SIGNUP_REQUEST_NOT_PENDING: "Este pedido já foi tratado.",
+        ERR_SIGNUP_COMPANY_NAME_REQUIRED: "Indique o nome da empresa (mínimo 2 caracteres).",
+        ERR_COMPANY_EMAIL_REQUIRED: "A empresa precisa de um e-mail para criar o administrador.",
+        ERR_INVALID_ID: "Identificador inválido.",
+        ERR_INVALID_PLAN: "Plano inválido ou inexistente.",
       },
     },
   },

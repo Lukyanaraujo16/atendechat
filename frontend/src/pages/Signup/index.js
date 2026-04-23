@@ -14,6 +14,10 @@ import TextField from "@material-ui/core/TextField";
 import Link from "@material-ui/core/Link";
 import Grid from "@material-ui/core/Grid";
 import Box from "@material-ui/core/Box";
+import FormControlLabel from "@material-ui/core/FormControlLabel";
+import Checkbox from "@material-ui/core/Checkbox";
+import Typography from "@material-ui/core/Typography";
+import CircularProgress from "@material-ui/core/CircularProgress";
 import InputMask from 'react-input-mask';
 import {
 	FormControl,
@@ -22,7 +26,6 @@ import {
 	Select,
 } from "@material-ui/core";
 import LockOutlinedIcon from "@material-ui/icons/LockOutlined";
-import Typography from "@material-ui/core/Typography";
 import { makeStyles } from "@material-ui/core/styles";
 import Container from "@material-ui/core/Container";
 import { i18n } from "../../translate/i18n";
@@ -69,8 +72,14 @@ const UserSchema = Yup.object().shape({
 		.min(2, i18n.t("signup.formErrors.name.short"))
 		.max(50, i18n.t("signup.formErrors.name.long"))
 		.required(i18n.t("signup.formErrors.name.required")),
-	password: Yup.string().min(5, i18n.t("signup.formErrors.password.short")).max(50, i18n.t("signup.formErrors.password.long")),
+	adminName: Yup.string()
+		.min(2, i18n.t("signup.formErrors.adminName.short"))
+		.max(120, i18n.t("signup.formErrors.adminName.long"))
+		.required(i18n.t("signup.formErrors.adminName.required")),
 	email: Yup.string().email(i18n.t("signup.formErrors.email.invalid")).required(i18n.t("signup.formErrors.email.required")),
+	notes: Yup.string().max(2000, i18n.t("signup.formErrors.notes.long")),
+	acceptTerms: Yup.boolean()
+		.oneOf([true], i18n.t("signup.formErrors.acceptTerms")),
 });
 
 const SignUp = () => {
@@ -84,21 +93,39 @@ const SignUp = () => {
 		companyId = params.companyId
 	}
 
-	const initialState = { name: "", email: "", phone: "", password: "", planId: "", };
+	const initialState = {
+		name: "",
+		adminName: "",
+		email: "",
+		phone: "",
+		planId: "",
+		notes: "",
+		acceptTerms: false,
+	};
 
 	const [user] = useState(initialState);
 	const dueDate = moment().add(3, "day").format();
 	const handleSignUp = async values => {
-		Object.assign(values, { recurrence: "MENSAL" });
-		Object.assign(values, { dueDate: dueDate });
-		Object.assign(values, { status: "t" });
-		Object.assign(values, { campaignsEnabled: true });
+		const { acceptTerms: _acceptTerms, name, adminName, email, phone, planId, notes } = values;
+		const payload = {
+			companyName: name,
+			adminName,
+			email,
+			phone,
+			planId,
+			notes: notes || undefined,
+			recurrence: "MENSAL",
+			dueDate,
+			campaignsEnabled: true,
+		};
+		if (companyId != null) {
+			payload.companyId = companyId;
+		}
 		try {
-			await openApi.post("/companies/cadastro", values);
+			await openApi.post("/companies/signup-requests", payload);
 			toast.success(i18n.t("signup.toasts.success"));
 			history.push("/login");
 		} catch (err) {
-			console.log(err);
 			toastError(err);
 		}
 	};
@@ -136,20 +163,21 @@ const SignUp = () => {
 					initialValues={user}
 					enableReinitialize={true}
 					validationSchema={UserSchema}
-					onSubmit={(values, actions) => {
-						setTimeout(() => {
-							handleSignUp(values);
+					onSubmit={async (values, actions) => {
+						try {
+							await handleSignUp(values);
+						} finally {
 							actions.setSubmitting(false);
-						}, 400);
+						}
 					}}
 				>
-					{({ touched, errors, isSubmitting }) => (
+					{({ touched, errors, isSubmitting, values, setFieldValue }) => (
 						<Form className={classes.form}>
 							<Grid container spacing={2}>
 								<Grid item xs={12}>
 									<Field
 										as={TextField}
-										autoComplete="name"
+										autoComplete="organization"
 										name="name"
 										error={touched.name && Boolean(errors.name)}
 										helperText={touched.name && errors.name}
@@ -157,6 +185,19 @@ const SignUp = () => {
 										fullWidth
 										id="name"
 										label={i18n.t("signup.form.name")}
+									/>
+								</Grid>
+								<Grid item xs={12}>
+									<Field
+										as={TextField}
+										autoComplete="name"
+										name="adminName"
+										error={touched.adminName && Boolean(errors.adminName)}
+										helperText={touched.adminName && errors.adminName}
+										variant="outlined"
+										fullWidth
+										id="adminName"
+										label={i18n.t("signup.form.adminName")}
 									/>
 								</Grid>
 
@@ -204,15 +245,43 @@ const SignUp = () => {
 										as={TextField}
 										variant="outlined"
 										fullWidth
-										name="password"
-										error={touched.password && Boolean(errors.password)}
-										helperText={touched.password && errors.password}
-										label={i18n.t("signup.form.password")}
-										type="password"
-										id="password"
-										autoComplete="current-password"
-										required
+										name="notes"
+										error={touched.notes && Boolean(errors.notes)}
+										helperText={touched.notes && errors.notes}
+										label={i18n.t("signup.form.notes")}
+										id="notes"
+										multiline
+										minRows={2}
 									/>
+								</Grid>
+								<Grid item xs={12}>
+									<FormControlLabel
+										control={
+											<Checkbox
+												checked={Boolean(values.acceptTerms)}
+												onChange={e => setFieldValue("acceptTerms", e.target.checked)}
+												color="primary"
+											/>
+										}
+										label={
+											<Typography component="span" variant="body2" color="textSecondary">
+												{i18n.t("signup.legal.iAgree")}{" "}
+												<Link component={RouterLink} to="/privacy-policy" color="primary">
+													{i18n.t("login.footer.privacy")}
+												</Link>
+												{" "}{i18n.t("signup.legal.and")}{" "}
+												<Link component={RouterLink} to="/terms-of-service" color="primary">
+													{i18n.t("login.footer.terms")}
+												</Link>
+												.
+											</Typography>
+										}
+									/>
+									{touched.acceptTerms && errors.acceptTerms ? (
+										<Typography variant="caption" color="error" display="block">
+											{errors.acceptTerms}
+										</Typography>
+									) : null}
 								</Grid>
 								<Grid item xs={12}>
 									<InputLabel htmlFor="plan-selection">Plano</InputLabel>
@@ -239,10 +308,15 @@ const SignUp = () => {
 								variant="contained"
 								color="primary"
 								className={classes.submit}
+								disabled={isSubmitting}
 							>
-								{i18n.t("signup.buttons.submit")}
+								{isSubmitting ? (
+									<CircularProgress size={22} color="inherit" />
+								) : (
+									i18n.t("signup.buttons.submitRequest")
+								)}
 							</Button>
-							<Grid container justify="flex-end">
+							<Grid container justifyContent="flex-end">
 								<Grid item>
 									<Link
 										href="#"

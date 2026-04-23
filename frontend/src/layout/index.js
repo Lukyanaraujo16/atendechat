@@ -57,16 +57,24 @@ const useStyles = makeStyles((theme) => ({
     [theme.breakpoints.down("sm")]: {
       height: "calc(100vh - 56px)",
     },
-    backgroundColor: theme.palette.fancyBackground,
+    backgroundColor: theme.palette.background.default,
     '& .MuiButton-outlinedPrimary': {
-      color: theme.mode === 'light' ? '#FFF' : '#FFF',
-	  //backgroundColor: theme.mode === 'light' ? '#682ee2' : '#682ee2',
-	backgroundColor: theme.mode === 'light' ? theme.palette.primary.main : '#1c1c1c',
-      //border: theme.mode === 'light' ? '1px solid rgba(0 124 102)' : '1px solid rgba(255, 255, 255, 0.5)',
+      color: theme.palette.primary.contrastText,
+      backgroundColor:
+        theme.palette.type === "light"
+          ? theme.palette.primary.main
+          : theme.palette.background.paper,
+      borderColor: theme.palette.primary.main,
+      "&:hover": {
+        backgroundColor:
+          theme.palette.type === "light"
+            ? theme.palette.primary.dark
+            : theme.palette.action.hover,
+      },
     },
     '& .MuiTab-textColorPrimary.Mui-selected': {
-      color: theme.mode === 'light' ? 'Primary' : '#FFF',
-    }
+      color: theme.palette.primary.main,
+    },
   },
   avatar: {
     width: "100%",
@@ -75,14 +83,14 @@ const useStyles = makeStyles((theme) => ({
     paddingRight: 24,
     minHeight: 50,
     height: 50,
-    color: "rgba(0, 0, 0, 0.87)",
-    backgroundColor: "#ffffff",
-    borderBottom: "1px solid rgba(0, 0, 0, 0.08)",
+    color: theme.palette.text.primary,
+    backgroundColor: theme.palette.background.paper,
+    borderBottom: `1px solid ${theme.palette.divider}`,
     "& .MuiIconButton-root": {
-      color: "rgba(0, 0, 0, 0.54) !important",
+      color: `${theme.palette.action.active} !important`,
     },
     "& .MuiIconButton-root:hover": {
-      backgroundColor: "rgba(0, 0, 0, 0.04)",
+      backgroundColor: theme.palette.action.hover,
     },
   },
   /** Topo do drawer: logo centrada, altura fixa, sem empurrar a lista */
@@ -112,10 +120,10 @@ const useStyles = makeStyles((theme) => ({
   },
   appBar: {
     zIndex: theme.zIndex.drawer + 1,
-    backgroundColor: "#ffffff",
-    color: "rgba(0, 0, 0, 0.87)",
+    backgroundColor: theme.palette.background.paper,
+    color: theme.palette.text.primary,
     boxShadow: "none",
-    borderBottom: "1px solid rgba(0, 0, 0, 0.08)",
+    borderBottom: `1px solid ${theme.palette.divider}`,
     transition: theme.transitions.create(["width", "margin"], {
       easing: theme.transitions.easing.sharp,
       duration: theme.transitions.duration.leavingScreen,
@@ -141,15 +149,15 @@ const useStyles = makeStyles((theme) => ({
   title: {
     flexGrow: 1,
     fontSize: 14,
-    color: "rgba(0, 0, 0, 0.87)",
+    color: theme.palette.text.primary,
   },
   drawerPaper: {
     position: "relative",
     whiteSpace: "nowrap",
     width: drawerWidth,
     height: "100%",
-    backgroundColor: "#ffffff",
-    borderRight: "1px solid rgba(0, 0, 0, 0.08)",
+    backgroundColor: theme.palette.background.paper,
+    borderRight: `1px solid ${theme.palette.divider}`,
     overflowX: "hidden",
     transition: theme.transitions.create("width", {
       easing: theme.transitions.easing.sharp,
@@ -162,13 +170,13 @@ const useStyles = makeStyles((theme) => ({
   },
   drawerToolbar: {
     "& .MuiIconButton-root": {
-      color: "rgba(0, 0, 0, 0.54)",
+      color: theme.palette.action.active,
     },
   },
   drawerPaperClose: {
     overflowX: "hidden",
-    backgroundColor: "#ffffff",
-    borderRight: "1px solid rgba(0, 0, 0, 0.08)",
+    backgroundColor: theme.palette.background.paper,
+    borderRight: `1px solid ${theme.palette.divider}`,
     transition: theme.transitions.create("width", {
       easing: theme.transitions.easing.sharp,
       duration: theme.transitions.duration.leavingScreen,
@@ -192,6 +200,8 @@ const useStyles = makeStyles((theme) => ({
     overflowX: "hidden",
     minHeight: 0,
     WebkitOverflowScrolling: "touch",
+    backgroundColor: theme.palette.background.default,
+    color: theme.palette.text.primary,
   },
   /** Atendimentos: encadear altura para scroll só na lista/conversa (não no documento) */
   contentTicketsFocus: {
@@ -227,14 +237,27 @@ const useStyles = makeStyles((theme) => ({
   drawerFooter: {
     flexShrink: 0,
     padding: theme.spacing(1.25, 2),
-    borderTop: "1px solid rgba(0, 0, 0, 0.06)",
-    backgroundColor: "transparent",
+    borderTop: `1px solid ${theme.palette.divider}`,
+    backgroundColor: theme.palette.background.paper,
   },
   drawerFooterUser: {
     display: "flex",
     alignItems: "center",
     gap: theme.spacing(1.25),
     marginBottom: theme.spacing(0.5),
+  },
+  drawerFooterName: {
+    fontWeight: 600,
+    color: theme.palette.text.primary,
+  },
+  drawerAvatar: {
+    width: 36,
+    height: 36,
+    backgroundColor: theme.palette.primary.main,
+  },
+  attendanceLabel: {
+    fontSize: 12,
+    color: theme.palette.text.secondary,
   },
   drawerFooterRole: {
     fontSize: "0.75rem",
@@ -249,6 +272,28 @@ const useStyles = makeStyles((theme) => ({
   },
   NotificationsPopOver: {
     // color: theme.barraSuperior.secondary.main,
+  },
+  supportAlert: {
+    margin: theme.spacing(0, 2, 2),
+    alignItems: "center",
+  },
+  supportExitButton: {
+    fontWeight: 600,
+    backgroundColor:
+      theme.palette.type === "light"
+        ? theme.palette.common.white
+        : "rgba(255, 255, 255, 0.92)",
+    color: "#0d47a1",
+    "&:hover": {
+      backgroundColor:
+        theme.palette.type === "light"
+          ? theme.palette.grey[100]
+          : "rgba(255, 255, 255, 1)",
+    },
+  },
+  financeAlert: {
+    margin: theme.spacing(0, 2, 2),
+    alignItems: "center",
   },
 }));
 
@@ -453,10 +498,10 @@ const LoggedInLayout = ({ children, themeToggle }) => {
           {drawerOpen && (
             <div className={classes.drawerFooter}>
               <div className={classes.drawerFooterUser}>
-                <Avatar style={{ width: 36, height: 36, backgroundColor: "#24c776" }}>
+                <Avatar className={classes.drawerAvatar}>
                   {user?.name ? user.name.charAt(0).toUpperCase() : "?"}
                 </Avatar>
-                <Typography variant="body2" style={{ fontWeight: 600 }} noWrap>
+                <Typography variant="body2" className={classes.drawerFooterName} noWrap>
                   {user?.name || "-"}
                 </Typography>
               </div>
@@ -506,7 +551,6 @@ const LoggedInLayout = ({ children, themeToggle }) => {
               localStorage.setItem("drawerOpen", String(next));
             }}
             className={classes.menuButton}
-            style={{ color: "rgba(0, 0, 0, 0.54)" }}
           >
             <MenuIcon />
           </IconButton>
@@ -515,7 +559,7 @@ const LoggedInLayout = ({ children, themeToggle }) => {
 
           <LanguageControl />
 
-          <IconButton onClick={toggleColorMode} style={{ color: "rgba(0, 0, 0, 0.54)" }}>
+          <IconButton onClick={toggleColorMode}>
             {theme.mode === 'dark' ? <Brightness7Icon /> : <Brightness4Icon />}
           </IconButton>
 
@@ -531,7 +575,7 @@ const LoggedInLayout = ({ children, themeToggle }) => {
           <ChatPopover />
 
           <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            <Typography variant="body2" style={{ fontSize: 12, color: "rgba(0,0,0,0.6)" }}>
+            <Typography variant="body2" className={classes.attendanceLabel}>
               {attendancePaused ? "Pausado" : "Ativo"}
             </Typography>
             <Switch
@@ -548,7 +592,6 @@ const LoggedInLayout = ({ children, themeToggle }) => {
               aria-controls="menu-appbar"
               aria-haspopup="true"
               onClick={handleMenu}
-              style={{ color: "rgba(0, 0, 0, 0.54)" }}
             >
               <AccountCircle />
             </IconButton>
@@ -586,12 +629,7 @@ const LoggedInLayout = ({ children, themeToggle }) => {
           <Alert
             severity="info"
             variant="filled"
-            style={{
-              margin: "0 16px 16px",
-              alignItems: "center",
-              backgroundColor: "#0d47a1",
-              color: "#fff",
-            }}
+            className={classes.supportAlert}
             icon={false}
           >
             <div
@@ -611,7 +649,7 @@ const LoggedInLayout = ({ children, themeToggle }) => {
                 variant="contained"
                 size="small"
                 onClick={() => exitSupportMode()}
-                style={{ backgroundColor: "#fff", color: "#0d47a1", fontWeight: 600 }}
+                className={classes.supportExitButton}
               >
                 {i18n.t("platform.support.exitButton")}
               </Button>
@@ -623,7 +661,7 @@ const LoggedInLayout = ({ children, themeToggle }) => {
           <Alert
             severity="warning"
             variant="outlined"
-            style={{ margin: "0 16px 16px", alignItems: "center" }}
+            className={classes.financeAlert}
           >
             <div
               style={{

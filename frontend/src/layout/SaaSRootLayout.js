@@ -26,7 +26,7 @@ const useStyles = makeStyles((theme) => ({
     flexDirection: "column",
     height: "100vh",
     overflow: "hidden",
-    backgroundColor: theme.palette.fancyBackground || theme.palette.background.default,
+    backgroundColor: theme.palette.background.default,
   },
   appBar: {
     backgroundColor: theme.palette.background.paper,
@@ -36,7 +36,7 @@ const useStyles = makeStyles((theme) => ({
     flexShrink: 0,
   },
   iconButton: {
-    color: theme.palette.text.secondary,
+    color: theme.palette.action.active,
   },
   toolbar: {
     minHeight: 50,
@@ -63,6 +63,20 @@ const useStyles = makeStyles((theme) => ({
     flexShrink: 0,
     padding: theme.spacing(0, 2),
     paddingTop: theme.spacing(1.5),
+  },
+  supportExitButton: {
+    fontWeight: 600,
+    backgroundColor:
+      theme.palette.type === "light"
+        ? theme.palette.common.white
+        : "rgba(255, 255, 255, 0.92)",
+    color: "#0d47a1",
+    "&:hover": {
+      backgroundColor:
+        theme.palette.type === "light"
+          ? theme.palette.grey[100]
+          : "rgba(255, 255, 255, 1)",
+    },
   },
 }));
 
@@ -137,16 +151,7 @@ export default function SaaSRootLayout({ children }) {
 
       {user?.supportMode && user?.company?.name ? (
         <Box className={classes.alertWrap}>
-          <Alert
-            severity="info"
-            variant="filled"
-            style={{
-              alignItems: "center",
-              backgroundColor: "#0d47a1",
-              color: "#fff",
-            }}
-            icon={false}
-          >
+          <Alert severity="info" variant="filled" icon={false}>
             <div
               style={{
                 display: "flex",
@@ -164,7 +169,7 @@ export default function SaaSRootLayout({ children }) {
                 variant="contained"
                 size="small"
                 onClick={() => exitSupportMode()}
-                style={{ backgroundColor: "#fff", color: "#0d47a1", fontWeight: 600 }}
+                className={classes.supportExitButton}
               >
                 {i18n.t("platform.support.exitButton")}
               </Button>

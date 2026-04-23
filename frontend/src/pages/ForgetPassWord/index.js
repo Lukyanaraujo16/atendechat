@@ -1,358 +1,406 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import qs from "query-string";
-import IconButton from "@material-ui/core/IconButton";
-import VisibilityIcon from "@material-ui/icons/Visibility";
-import VisibilityOffIcon from "@material-ui/icons/VisibilityOff";
-import InputAdornment from "@material-ui/core/InputAdornment";
+import { useHistory, useLocation, Link as RouterLink } from "react-router-dom";
 import * as Yup from "yup";
-import { useHistory } from "react-router-dom";
-import { Link as RouterLink } from "react-router-dom";
 import { Formik, Form, Field } from "formik";
 import Button from "@material-ui/core/Button";
-import CssBaseline from "@material-ui/core/CssBaseline";
 import TextField from "@material-ui/core/TextField";
 import Link from "@material-ui/core/Link";
 import Grid from "@material-ui/core/Grid";
-import Box from "@material-ui/core/Box";
 import Typography from "@material-ui/core/Typography";
+import IconButton from "@material-ui/core/IconButton";
+import InputAdornment from "@material-ui/core/InputAdornment";
+import Box from "@material-ui/core/Box";
+import CircularProgress from "@material-ui/core/CircularProgress";
+import VisibilityIcon from "@material-ui/icons/Visibility";
+import VisibilityOffIcon from "@material-ui/icons/VisibilityOff";
 import { makeStyles } from "@material-ui/core/styles";
-import Container from "@material-ui/core/Container";
+import { toast } from "react-toastify";
+
 import api from "../../services/api";
 import { i18n } from "../../translate/i18n";
-import moment from "moment";
 import { useBranding } from "../../context/Branding/BrandingContext";
-import { toast } from 'react-toastify'; 
-import toastError from '../../errors/toastError';
-import { getBackendBaseURL } from "../../config/backendUrl";
-import 'react-toastify/dist/ReactToastify.css';
-import { BrowserRouter as Router, Route, Switch } from "react-router-dom";
+import toastError from "../../errors/toastError";
+import { PASSWORD_REGEX } from "../../validators/passwordPolicy";
 
 const useStyles = makeStyles((theme) => ({
   root: {
     width: "100vw",
-    height: "100vh",
-    background: "black", //Cor de fundo
-    backgroundRepeat: "no-repeat",
-    backgroundSize: "100% 100%",
-    backgroundPosition: "center",
+    minHeight: "100vh",
     display: "flex",
-    flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
-    textAlign: "center",
+    backgroundColor: theme.palette.background.default,
+    color: theme.palette.text.primary,
+    padding: theme.spacing(2),
+    boxSizing: "border-box",
   },
-  paper: {
-    backgroundColor: "white",
+  card: {
+    width: "100%",
+    maxWidth: 420,
+    backgroundColor: theme.palette.background.paper,
+    borderRadius: 8,
+    border: `1px solid ${theme.palette.divider}`,
+    boxShadow:
+      theme.palette.type === "dark"
+        ? "0 8px 32px rgba(0,0,0,0.55)"
+        : "0 8px 24px rgba(0,0,0,0.12)",
+    padding: theme.spacing(4, 3),
+  },
+  logo: {
+    display: "block",
+    margin: "0 auto",
+    maxHeight: 72,
+    width: "100%",
+    maxWidth: 260,
+    objectFit: "contain",
+    marginBottom: theme.spacing(2),
+  },
+  form: {
+    width: "100%",
+    marginTop: theme.spacing(1),
+  },
+  actions: {
+    marginTop: theme.spacing(2),
+    display: "flex",
+    flexDirection: "column",
+    gap: theme.spacing(1),
+  },
+  secondaryActions: {
+    marginTop: theme.spacing(2),
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    padding: "55px 30px",
-    borderRadius: "12.5px",
+    gap: theme.spacing(0.5),
   },
-  avatar: {
-    margin: theme.spacing(1),
-    backgroundColor: theme.palette.secondary.main,
-  },
-  form: {
-    width: "100%", // Fix IE 11 issue.
-    marginTop: theme.spacing(1),
-  },
-  submit: {
-    margin: theme.spacing(3, 0, 2),
-  },
-  powered: {
-    color: "white",
+  input: {
+    "& .MuiOutlinedInput-root": {
+      borderRadius: 4,
+      backgroundColor:
+        theme.palette.type === "dark"
+          ? "rgba(255,255,255,0.06)"
+          : theme.palette.grey[50],
+    },
+    "& .MuiOutlinedInput-notchedOutline": {
+      borderColor: theme.palette.divider,
+    },
+    "& .MuiInputLabel-outlined": {
+      color: theme.palette.text.secondary,
+    },
+    "& .MuiOutlinedInput-input": {
+      color: theme.palette.text.primary,
+    },
+    "& .MuiIconButton-root": {
+      color: theme.palette.action.active,
+    },
   },
 }));
 
-const passwordRegex = /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}$/;
-
-const ForgetPassword = () => {
+export default function ForgetPassword() {
   const classes = useStyles();
   const history = useHistory();
+  const location = useLocation();
   const { branding, resolveLoginLogo } = useBranding();
-  let companyId = null;
-  const [showAdditionalFields, setShowAdditionalFields] = useState(false);
-  const [showResetPasswordButton, setShowResetPasswordButton] = useState(false);
+
+  const [mode, setMode] = useState("request");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [error, setError] = useState(""); // Estado para mensagens de erro
+  const [loadingRequest, setLoadingRequest] = useState(false);
+  const [loadingReset, setLoadingReset] = useState(false);
 
-  const togglePasswordVisibility = () => {
-    setShowPassword(!showPassword);
-  };
-
-  const toggleConfirmPasswordVisibility = () => {
-    setShowConfirmPassword(!showConfirmPassword);
-  };
-
-  const toggleAdditionalFields = () => {
-    setShowAdditionalFields(!showAdditionalFields);
-    if (showAdditionalFields) {
-      setShowResetPasswordButton(false);
-    } else {
-      setShowResetPasswordButton(true);
+  const applyQuery = useCallback(() => {
+    const q = qs.parse(location.search);
+    const emailQ = typeof q.email === "string" ? q.email : "";
+    const tokenQ = typeof q.token === "string" ? q.token : "";
+    if (emailQ && tokenQ) {
+      setMode("reset");
+      return { email: emailQ, token: tokenQ };
     }
-  };
+    return { email: emailQ, token: "" };
+  }, [location.search]);
 
-  const params = qs.parse(window.location.search);
-  if (params.companyId !== undefined) {
-    companyId = params.companyId;
-  }
+  const [initialFromQuery, setInitialFromQuery] = useState(() =>
+    applyQuery()
+  );
 
-  const initialState = { email: "" };
+  useEffect(() => {
+    setInitialFromQuery(applyQuery());
+  }, [applyQuery]);
 
-  const [user] = useState(initialState);
-  const dueDate = moment().add(3, "day").format();
-
-const handleSendEmail = async (values) => {
-  const email = values.email;
-  try {
-    const response = await api.post(
-      `${getBackendBaseURL()}/forgetpassword/${email}`
-    );
-    console.log("API Response:", response.data);
-
-    if (response.data.status === 404) {
-      toast.error(i18n.t("resetPassword.toasts.emailNotFound"));
-    } else {
-      toast.success(i18n.t("resetPassword.toasts.emailSent"));
-    }
-  } catch (err) {
-    console.log("API Error:", err);
-    toastError(err);
-  }
-};
-
-  const handleResetPassword = async (values) => {
-    const email = values.email;
-    const token = values.token;
-    const newPassword = values.newPassword;
-    const confirmPassword = values.confirmPassword;
-
-    if (newPassword === confirmPassword) {
-      try {
-        await api.post(
-          `${getBackendBaseURL()}/resetpasswords/${email}/${token}/${newPassword}`
-        );
-        setError(""); // Limpe o erro se não houver erro
-        toast.success(i18n.t("resetPassword.toasts.passwordUpdated"));
-        history.push("/login");
-      } catch (err) {
-        console.log(err);
-      }
-    }
-  };
-
-  const isResetPasswordButtonClicked = showResetPasswordButton;
-  const UserSchema = Yup.object().shape({
-    email: Yup.string().email(i18n.t("resetPassword.formErrors.email.invalid")).required(i18n.t("resetPassword.formErrors.email.required")),
-    newPassword: isResetPasswordButtonClicked
-      ? Yup.string()
-          .required(i18n.t("resetPassword.formErrors.newPassword.required"))
-          .matches(
-            passwordRegex,
-            i18n.t("resetPassword.formErrors.newPassword.matches")
-          )
-      : Yup.string(), // Sem validação se não for redefinição de senha
-    confirmPassword: Yup.string().when("newPassword", {
-      is: (newPassword) => isResetPasswordButtonClicked && newPassword,
-      then: Yup.string()
-        .oneOf([Yup.ref("newPassword"), null], i18n.t("resetPassword.formErrors.confirmPassword.matches"))
-        .required(i18n.t("resetPassword.formErrors.confirmPassword.required")),
-      otherwise: Yup.string(), // Sem validação se não for redefinição de senha
-    }),
+  const requestSchema = Yup.object().shape({
+    email: Yup.string()
+      .email(i18n.t("resetPassword.formErrors.email.invalid"))
+      .required(i18n.t("resetPassword.formErrors.email.required")),
   });
+
+  const resetSchema = Yup.object().shape({
+    email: Yup.string()
+      .email(i18n.t("resetPassword.formErrors.email.invalid"))
+      .required(i18n.t("resetPassword.formErrors.email.required")),
+    token: Yup.string().required(
+      i18n.t("resetPassword.formErrors.token.required")
+    ),
+    newPassword: Yup.string()
+      .required(i18n.t("resetPassword.formErrors.newPassword.required"))
+      .matches(PASSWORD_REGEX, i18n.t("passwordPolicy.requirements")),
+    confirmPassword: Yup.string()
+      .oneOf(
+        [Yup.ref("newPassword"), null],
+        i18n.t("resetPassword.formErrors.confirmPassword.matches")
+      )
+      .required(i18n.t("resetPassword.formErrors.confirmPassword.required")),
+  });
+
+  const handleRequest = async (values) => {
+    setLoadingRequest(true);
+    try {
+      await api.post("/auth/forgot-password", {
+        email: values.email.trim().toLowerCase(),
+      });
+      toast.success(i18n.t("resetPassword.toasts.emailSent"));
+      setMode("reset");
+    } catch (err) {
+      toastError(err);
+    } finally {
+      setLoadingRequest(false);
+    }
+  };
+
+  const handleReset = async (values) => {
+    setLoadingReset(true);
+    try {
+      await api.post("/auth/reset-password", {
+        email: values.email.trim().toLowerCase(),
+        token: values.token.trim(),
+        password: values.newPassword,
+      });
+      toast.success(i18n.t("resetPassword.toasts.passwordUpdated"));
+      history.push("/login");
+    } catch (err) {
+      toastError(err);
+    } finally {
+      setLoadingReset(false);
+    }
+  };
+
+  const initialValues =
+    mode === "reset"
+      ? {
+          email: initialFromQuery.email || "",
+          token: initialFromQuery.token || "",
+          newPassword: "",
+          confirmPassword: "",
+        }
+      : {
+          email: initialFromQuery.email || "",
+          token: "",
+          newPassword: "",
+          confirmPassword: "",
+        };
 
   return (
     <div className={classes.root}>
-      <Container component="main" maxWidth="xs">
-        <CssBaseline />
-        <div className={classes.paper}>
-          <div>
-            <img
-              style={{ margin: "0 auto", height: "80px", width: "100%" }}
-              src={resolveLoginLogo()}
-              alt={branding.systemName || ""}
-            />
-          </div>
-          <Typography component="h1" variant="h5">
-            {i18n.t("resetPassword.title")}
-          </Typography>
+      <div className={classes.card}>
+        <img
+          className={classes.logo}
+          src={resolveLoginLogo()}
+          alt={branding.systemName || ""}
+        />
+        <Typography component="h1" variant="h5" align="center" gutterBottom>
+          {i18n.t("resetPassword.title")}
+        </Typography>
+        <Typography variant="body2" color="textSecondary" align="center" paragraph>
+          {mode === "request"
+            ? i18n.t("resetPassword.subtitleRequest")
+            : i18n.t("resetPassword.subtitleReset")}
+        </Typography>
+
+        {mode === "request" ? (
           <Formik
-            initialValues={{
-              email: "",
-              token: "",
-              newPassword: "",
-              confirmPassword: "",
-            }}
-            enableReinitialize={true}
-            validationSchema={UserSchema}
-            onSubmit={(values, actions) => {
-              setTimeout(() => {
-                if (showResetPasswordButton) {
-                  handleResetPassword(values);
-                } else {
-                  handleSendEmail(values);
-                }
-                actions.setSubmitting(false);
-                toggleAdditionalFields();
-              }, 400);
-            }}
+            key="request"
+            initialValues={{ email: initialValues.email }}
+            validationSchema={requestSchema}
+            onSubmit={handleRequest}
+            enableReinitialize
           >
-            {({ touched, errors, isSubmitting }) => (
+            {({ errors, touched, isValid, dirty }) => (
+              <Form className={classes.form}>
+                <Field
+                  as={TextField}
+                  className={classes.input}
+                  name="email"
+                  variant="outlined"
+                  fullWidth
+                  label={i18n.t("resetPassword.form.email")}
+                  error={touched.email && Boolean(errors.email)}
+                  helperText={touched.email && errors.email}
+                  autoComplete="email"
+                />
+                <div className={classes.actions}>
+                  <Button
+                    type="submit"
+                    fullWidth
+                    variant="contained"
+                    color="primary"
+                    disabled={!dirty || !isValid || loadingRequest}
+                  >
+                    {loadingRequest ? (
+                      <CircularProgress size={22} color="inherit" />
+                    ) : (
+                      i18n.t("resetPassword.buttons.submitEmail")
+                    )}
+                  </Button>
+                </div>
+                <div className={classes.secondaryActions}>
+                  <Link
+                    component="button"
+                    type="button"
+                    variant="body2"
+                    onClick={() => setMode("reset")}
+                  >
+                    {i18n.t("resetPassword.buttons.alreadyHaveCode")}
+                  </Link>
+                  <Link component={RouterLink} to="/login" variant="body2">
+                    {i18n.t("resetPassword.buttons.goLogin")}
+                  </Link>
+                  <Link component={RouterLink} to="/signup" variant="body2">
+                    {i18n.t("resetPassword.buttons.goSignup")}
+                  </Link>
+                </div>
+              </Form>
+            )}
+          </Formik>
+        ) : (
+          <Formik
+            key="reset"
+            initialValues={initialValues}
+            validationSchema={resetSchema}
+            onSubmit={handleReset}
+            enableReinitialize
+          >
+            {({ errors, touched, isValid, dirty }) => (
               <Form className={classes.form}>
                 <Grid container spacing={2}>
                   <Grid item xs={12}>
                     <Field
                       as={TextField}
+                      className={classes.input}
+                      name="email"
                       variant="outlined"
                       fullWidth
-                      id="email"
                       label={i18n.t("resetPassword.form.email")}
-                      name="email"
                       error={touched.email && Boolean(errors.email)}
                       helperText={touched.email && errors.email}
                       autoComplete="email"
-                      required
                     />
                   </Grid>
-                  {showAdditionalFields && (
-                    <>
-                      <Grid item xs={12}>
-                        <Field
-                          as={TextField}
-                          variant="outlined"
-                          fullWidth
-                          id="token"
-                          label={i18n.t("resetPassword.form.verificationCode")}
-                          name="token"
-                          error={touched.token && Boolean(errors.token)}
-                          helperText={touched.token && errors.token}
-                          autoComplete="off"
-                          required
-                        />
-                      </Grid>
-                      <Grid item xs={12}>
-                        <Field
-                          as={TextField}
-                          variant="outlined"
-                          fullWidth
-                          type={showPassword ? "text" : "password"}
-                          id="newPassword"
-                          label={i18n.t("resetPassword.form.newPassword")}
-                          name="newPassword"
-                          error={
-                            touched.newPassword &&
-                            Boolean(errors.newPassword)
-                          }
-                          helperText={
-                            touched.newPassword && errors.newPassword
-                          }
-                          autoComplete="off"
-                          required
-                          InputProps={{
-                            endAdornment: (
-                              <InputAdornment position="end">
-                                <IconButton
-                                  onClick={togglePasswordVisibility}
-                                >
-                                  {showPassword ? (
-                                    <VisibilityIcon />
-                                  ) : (
-                                    <VisibilityOffIcon />
-                                  )}
-                                </IconButton>
-                              </InputAdornment>
-                            ),
-                          }}
-                        />
-                      </Grid>
-                      <Grid item xs={12}>
-                        <Field
-                          as={TextField}
-                          variant="outlined"
-                          fullWidth
-                          type={showConfirmPassword ? "text" : "password"}
-                          id="confirmPassword"
-                          label={i18n.t("resetPassword.form.confirmPassword")}
-                          name="confirmPassword"
-                          error={
-                            touched.confirmPassword &&
-                            Boolean(errors.confirmPassword)
-                          }
-                          helperText={
-                            touched.confirmPassword &&
-                            errors.confirmPassword
-                          }
-                          autoComplete="off"
-                          required
-                          InputProps={{
-                            endAdornment: (
-                              <InputAdornment position="end">
-                                <IconButton
-                                  onClick={toggleConfirmPasswordVisibility}
-                                >
-                                  {showConfirmPassword ? (
-                                    <VisibilityIcon />
-                                  ) : (
-                                    <VisibilityOffIcon />
-                                  )}
-                                </IconButton>
-                              </InputAdornment>
-                            ),
-                          }}
-                        />
-                      </Grid>
-                    </>
-                  )}
-                </Grid>
-                {showResetPasswordButton ? (
-                  <Button
-                    type="submit"
-                    fullWidth
-                    variant="contained"
-                    color="primary"
-                    className={classes.submit}
-                  >
-                    {i18n.t("resetPassword.buttons.submitPassword")}
-                  </Button>
-                ) : (
-                  <Button
-                    type="submit"
-                    fullWidth
-                    variant="contained"
-                    color="primary"
-                    className={classes.submit}
-                  >
-{                    i18n.t("resetPassword.buttons.submitEmail")}
-                  </Button>
-                )}
-                <Grid container justifyContent="flex-end">
-                  <Grid item>
-                    <Link
-                      href="#"
-                      variant="body2"
-                      component={RouterLink}
-                      to="/signup"
-                    >
-                      {i18n.t("resetPassword.buttons.back")}
-                    </Link>
+                  <Grid item xs={12}>
+                    <Field
+                      as={TextField}
+                      className={classes.input}
+                      name="token"
+                      variant="outlined"
+                      fullWidth
+                      label={i18n.t("resetPassword.form.verificationCode")}
+                      error={touched.token && Boolean(errors.token)}
+                      helperText={touched.token && errors.token}
+                      autoComplete="one-time-code"
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Field
+                      as={TextField}
+                      className={classes.input}
+                      name="newPassword"
+                      variant="outlined"
+                      fullWidth
+                      type={showPassword ? "text" : "password"}
+                      label={i18n.t("resetPassword.form.newPassword")}
+                      error={touched.newPassword && Boolean(errors.newPassword)}
+                      helperText={touched.newPassword && errors.newPassword}
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <IconButton
+                              edge="end"
+                              onClick={() => setShowPassword((v) => !v)}
+                              aria-label="toggle password"
+                            >
+                              {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                            </IconButton>
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Field
+                      as={TextField}
+                      className={classes.input}
+                      name="confirmPassword"
+                      variant="outlined"
+                      fullWidth
+                      type={showConfirmPassword ? "text" : "password"}
+                      label={i18n.t("resetPassword.form.confirmPassword")}
+                      error={
+                        touched.confirmPassword && Boolean(errors.confirmPassword)
+                      }
+                      helperText={
+                        touched.confirmPassword && errors.confirmPassword
+                      }
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <IconButton
+                              edge="end"
+                              onClick={() => setShowConfirmPassword((v) => !v)}
+                              aria-label="toggle confirm password"
+                            >
+                              {showConfirmPassword ? (
+                                <VisibilityOffIcon />
+                              ) : (
+                                <VisibilityIcon />
+                              )}
+                            </IconButton>
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
                   </Grid>
                 </Grid>
-                {error && (
-                  <Typography variant="body2" color="error">
-                    {error}
-                  </Typography>
-                )}
+                <Box className={classes.actions}>
+                  <Button
+                    type="submit"
+                    fullWidth
+                    variant="contained"
+                    color="primary"
+                    disabled={!dirty || !isValid || loadingReset}
+                  >
+                    {loadingReset ? (
+                      <CircularProgress size={22} color="inherit" />
+                    ) : (
+                      i18n.t("resetPassword.buttons.submitPassword")
+                    )}
+                  </Button>
+                </Box>
+                <div className={classes.secondaryActions}>
+                  <Link
+                    component="button"
+                    type="button"
+                    variant="body2"
+                    onClick={() => setMode("request")}
+                  >
+                    {i18n.t("resetPassword.buttons.backToRequest")}
+                  </Link>
+                  <Link component={RouterLink} to="/login" variant="body2">
+                    {i18n.t("resetPassword.buttons.goLogin")}
+                  </Link>
+                </div>
               </Form>
             )}
           </Formik>
-        </div>
-        <Box mt={5} />
-      </Container>
+        )}
+      </div>
     </div>
   );
-};
-
-export default ForgetPassword;
+}

@@ -23,6 +23,7 @@ import { i18n } from "../../translate/i18n";
 
 import api from "../../services/api";
 import toastError from "../../errors/toastError";
+import { yupPasswordOptional, yupPasswordRequired } from "../../validators/passwordPolicy";
 import QueueSelect from "../QueueSelect";
 import { AuthContext } from "../../context/Auth/AuthContext";
 import { Can } from "../Can";
@@ -119,15 +120,11 @@ const UserModal = ({ open, onClose, userId, reload }) => {
 					.required(),
 				allTicket: Yup.string().oneOf(["enabled", "desabled"]).required(),
 				password: userId
-					? Yup.string()
-							.transform(v => (v === "" || v === undefined ? undefined : v))
-							.min(5, i18n.t("userModal.formErrors.password.short"))
-							.max(50, i18n.t("userModal.formErrors.password.long"))
-							.notRequired()
-					: Yup.string()
-							.min(5, i18n.t("userModal.formErrors.password.short"))
-							.max(50, i18n.t("userModal.formErrors.password.long"))
-							.required(i18n.t("userModal.formErrors.password.required")),
+					? yupPasswordOptional(i18n.t("passwordPolicy.requirements"))
+					: yupPasswordRequired(
+							i18n.t("passwordPolicy.requirements"),
+							i18n.t("userModal.formErrors.password.required")
+					  ),
 			}),
 		[userId]
 	);

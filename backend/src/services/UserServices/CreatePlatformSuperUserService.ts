@@ -1,6 +1,7 @@
 import * as Yup from "yup";
 
 import AppError from "../../errors/AppError";
+import { getFirstYupErrorMessage, requiredPasswordSchema } from "../../utils/passwordPolicy";
 import User from "../../models/User";
 import Company from "../../models/Company";
 import Plan from "../../models/Plan";
@@ -90,7 +91,7 @@ const CreatePlatformSuperUserService = async (body: CreatePlatformSuperUserBody)
   const schema = Yup.object().shape({
     name: Yup.string().required().min(2).max(120),
     email: Yup.string().email().required(),
-    password: Yup.string().required().min(5).max(128)
+    password: requiredPasswordSchema
   });
 
   try {
@@ -98,8 +99,8 @@ const CreatePlatformSuperUserService = async (body: CreatePlatformSuperUserBody)
       { name, email: emailRaw, password },
       { abortEarly: false }
     );
-  } catch (err: any) {
-    throw new AppError(err.message);
+  } catch (err: unknown) {
+    throw new AppError(getFirstYupErrorMessage(err));
   }
 
   const emailNorm = String(emailRaw).trim().toLowerCase();

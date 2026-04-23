@@ -14,6 +14,7 @@ import PlatformBackup from "./PlatformBackup";
 import PlatformPlans from "./PlatformPlans";
 import PlatformHelps from "./PlatformHelps";
 import PlatformInformativos from "./PlatformInformativos";
+import PlatformSignupRequests from "./PlatformSignupRequests";
 import BillingAutomationPage from "../BillingAutomation";
 
 /**
@@ -31,6 +32,7 @@ export default function PlatformModule() {
       <Switch>
         <Route exact path="/saas" component={PlatformDashboard} />
         <Route exact path="/saas/companies" component={PlatformCompanies} />
+        <Route exact path="/saas/signup-requests" component={PlatformSignupRequests} />
         <Route exact path="/saas/admins" component={PlatformSuperAdmins} />
         <Route exact path="/saas/account" component={PlatformMyAccount} />
         <Route exact path="/saas/branding" component={PlatformBranding} />

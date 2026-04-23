@@ -20,14 +20,22 @@ const useTickets = ({
   queueIds,
   withUnreadMessages,
   isGroup,
+  /** Quando false, não busca (ex.: inbox inativa na guia principal). */
+  enabled = true,
 }) => {
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(false);
   const [tickets, setTickets] = useState([]);
 
   useEffect(() => {
+    if (!enabled) {
+      setLoading(false);
+      return undefined;
+    }
+
     let cancelled = false;
     setLoading(true);
+    setTickets([]);
 
     const fetchTickets = async () => {
       try {
@@ -63,6 +71,7 @@ const useTickets = ({
       cancelled = true;
     };
   }, [
+    enabled,
     searchParam,
     tags,
     users,

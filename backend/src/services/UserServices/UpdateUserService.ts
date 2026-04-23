@@ -2,6 +2,7 @@ import * as Yup from "yup";
 import { Op } from "sequelize";
 
 import AppError from "../../errors/AppError";
+import { getFirstYupErrorMessage, optionalPasswordSchema } from "../../utils/passwordPolicy";
 import ShowUserService from "./ShowUserService";
 import Company from "../../models/Company";
 import User from "../../models/User";
@@ -72,24 +73,14 @@ const UpdateUserService = async ({
       .transform(v => (v === "" || v === undefined ? undefined : v))
       .email()
       .nullable(),
-    password: Yup.mixed().test(
-      "pwd",
-      "Senha deve ter entre 5 e 128 caracteres.",
-      val =>
-        val === undefined ||
-        val === null ||
-        val === "" ||
-        (typeof val === "string" &&
-          String(val).trim().length >= 5 &&
-          String(val).trim().length <= 128)
-    ),
+    password: optionalPasswordSchema,
     allTicket: Yup.mixed().nullable()
   });
 
   try {
     await schema.validate({ email, password, allTicket });
-  } catch (err: any) {
-    throw new AppError(err.message);
+  } catch (err: unknown) {
+    throw new AppError(getFirstYupErrorMessage(err));
   }
 
   if (name !== undefined) {

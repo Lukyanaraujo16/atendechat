@@ -49,6 +49,7 @@ import OpenAiUsage from "../models/OpenAiUsage";
 import SystemSetting from "../models/SystemSetting";
 import SupportAccessLog from "../models/SupportAccessLog";
 import CompanyLog from "../models/CompanyLog";
+import CompanySignupRequest from "../models/CompanySignupRequest";
 
 // eslint-disable-next-line
 const dbConfig = require("../config/database");
@@ -107,6 +108,7 @@ const models = [
   SystemSetting,
   SupportAccessLog,
   CompanyLog,
+  CompanySignupRequest,
 ];
 
 sequelize.addModels(models);

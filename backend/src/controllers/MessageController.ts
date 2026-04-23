@@ -73,7 +73,8 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
 
   const ticket = await ShowTicketService(ticketId, companyId);
 
-  SetTicketMessagesAsRead(ticket);
+  /** Mesma regra do GET da conversa: atendente humano no painel ao enviar resposta. */
+  await SetTicketMessagesAsRead(ticket, HUMAN_PANEL_CONVERSATION_VIEW_WHATSAPP_READ);
 
   if (medias) {
     await Promise.all(

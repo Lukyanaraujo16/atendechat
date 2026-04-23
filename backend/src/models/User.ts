@@ -69,6 +69,14 @@ class User extends Model<User> {
   @Column({ allowNull: true })
   companyId: number | null;
 
+  /** Token único enviado por e-mail (recuperação de senha). */
+  @Column({ allowNull: true })
+  resetPassword: string | null;
+
+  /** Expiração do token de recuperação (null = sem pedido pendente). */
+  @Column({ type: DataType.DATE, allowNull: true })
+  passwordResetExpires: Date | null;
+
   @BelongsTo(() => Company)
   company: Company;
 

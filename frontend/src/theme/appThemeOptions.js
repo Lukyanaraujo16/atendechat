@@ -10,8 +10,12 @@ export const BRAND_PRIMARY = "#24c776";
 export function getThemeOptions(mode) {
   const isLight = mode === "light";
   const primaryMain = BRAND_PRIMARY;
+  const bgDefault = isLight ? "#fafafa" : "#121212";
+  const bgPaper = isLight ? "#ffffff" : "#1e1e1e";
   const textOnSurface = isLight ? "rgba(0, 0, 0, 0.87)" : "#ffffff";
+  const textSecondary = isLight ? "rgba(0, 0, 0, 0.54)" : "rgba(255, 255, 255, 0.7)";
   const borderNeutral = isLight ? "rgba(0, 0, 0, 0.23)" : "rgba(255, 255, 255, 0.23)";
+  const dividerColor = isLight ? "rgba(0, 0, 0, 0.12)" : "rgba(255, 255, 255, 0.12)";
   /** Separadores de modal (título / corpo / ações). */
   const dialogDivider = isLight ? "rgba(0, 0, 0, 0.08)" : "rgba(255, 255, 255, 0.12)";
   const errorMain = isLight ? "#d32f2f" : "#f44336";
@@ -52,11 +56,28 @@ export function getThemeOptions(mode) {
         width: "8px",
       },
       "&::-webkit-scrollbar-thumb": {
-        backgroundColor: mode === "light" ? "#F3F3F3" : "#333333",
+        backgroundColor: isLight ? "rgba(0, 0, 0, 0.2)" : "rgba(255, 255, 255, 0.2)",
       },
     },
     palette: {
       type: mode,
+      background: {
+        default: bgDefault,
+        paper: bgPaper,
+      },
+      divider: dividerColor,
+      text: {
+        primary: textOnSurface,
+        secondary: textSecondary,
+        disabled: isLight ? "rgba(0, 0, 0, 0.38)" : "rgba(255, 255, 255, 0.5)",
+      },
+      action: {
+        active: isLight ? "rgba(0, 0, 0, 0.54)" : "rgba(255, 255, 255, 0.56)",
+        hover: isLight ? "rgba(0, 0, 0, 0.04)" : "rgba(255, 255, 255, 0.08)",
+        selected: isLight ? "rgba(0, 0, 0, 0.08)" : "rgba(255, 255, 255, 0.16)",
+        disabled: isLight ? "rgba(0, 0, 0, 0.26)" : "rgba(255, 255, 255, 0.3)",
+        disabledBackground: isLight ? "rgba(0, 0, 0, 0.12)" : "rgba(255, 255, 255, 0.12)",
+      },
       primary: {
         main: primaryMain,
         contrastText: "#ffffff",
@@ -69,30 +90,49 @@ export function getThemeOptions(mode) {
       borderPrimary: isLight ? BRAND_PRIMARY : BRAND_PRIMARY,
       dark: { main: isLight ? "#333333" : "#F3F3F3" },
       light: { main: isLight ? "#F3F3F3" : "#333333" },
-      tabHeaderBackground: isLight ? "#EEE" : "#666",
-      optionsBackground: isLight ? "#fafafa" : "#333",
-      options: isLight ? "#fafafa" : "#666",
+      tabHeaderBackground: isLight ? "#EEE" : "#2a2a2a",
+      optionsBackground: isLight ? "#fafafa" : "#2a2a2a",
+      options: isLight ? "#fafafa" : "#3a3a3a",
       fontecor: isLight ? "#128c7e" : "#fff",
-      fancyBackground: isLight ? "#fafafa" : "#333",
-      bordabox: isLight ? "#eee" : "#333",
-      newmessagebox: isLight ? "#eee" : "#333",
-      inputdigita: isLight ? "#fff" : "#666",
-      contactdrawer: isLight ? "#fff" : "#666",
-      announcements: isLight ? "#ededed" : "#333",
+      fancyBackground: bgDefault,
+      bordabox: isLight ? "#eee" : dividerColor,
+      newmessagebox: isLight ? "#eee" : "#2a2a2a",
+      inputdigita: isLight ? "#fff" : "#2a2a2a",
+      contactdrawer: isLight ? "#fff" : bgPaper,
+      announcements: isLight ? "#ededed" : "#2a2a2a",
       login: isLight ? "#fff" : "#1C1C1C",
-      announcementspopover: isLight ? "#fff" : "#666",
-      chatlist: isLight ? "#eee" : "#666",
-      boxlist: isLight ? "#ededed" : "#666",
-      boxchatlist: isLight ? "#ededed" : "#333",
-      total: isLight ? "#fff" : "#222",
+      announcementspopover: isLight ? "#fff" : bgPaper,
+      chatlist: isLight ? "#eee" : "#2a2a2a",
+      boxlist: isLight ? "#ededed" : "#2a2a2a",
+      boxchatlist: isLight ? "#ededed" : "#2a2a2a",
+      total: isLight ? "#fff" : bgDefault,
       messageIcons: isLight ? "grey" : "#F3F3F3",
-      inputBackground: isLight ? "#FFFFFF" : "#333",
+      inputBackground: isLight ? "#FFFFFF" : "#2a2a2a",
       barraSuperior: isLight ? "#2c3145" : "#2c3145",
-      boxticket: isLight ? "#EEE" : "#666",
-      campaigntab: isLight ? "#ededed" : "#666",
+      boxticket: isLight ? "#EEE" : "#3a3a3a",
+      campaigntab: isLight ? "#ededed" : "#2a2a2a",
       mediainput: isLight ? "#ededed" : "#1c1c1c",
     },
     overrides: {
+      MuiCssBaseline: {
+        "@global": {
+          body: {
+            backgroundColor: bgDefault,
+          },
+        },
+      },
+      MuiAppBar: {
+        colorDefault: {
+          backgroundColor: bgPaper,
+          color: textOnSurface,
+        },
+      },
+      MuiDrawer: {
+        paper: {
+          backgroundColor: bgPaper,
+          backgroundImage: "none",
+        },
+      },
       MuiDialog: {
         paper: {
           borderRadius: 12,
@@ -221,6 +261,9 @@ export function getThemeOptions(mode) {
         },
       },
       MuiPaper: {
+        root: {
+          backgroundImage: "none",
+        },
         rounded: {
           borderRadius: 18,
           transition: `box-shadow ${interactionMs}ms ${ease}`,

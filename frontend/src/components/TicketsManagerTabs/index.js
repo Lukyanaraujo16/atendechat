@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useRef, useState } from "react";
+import React, { useContext, useEffect, useMemo, useRef, useState, memo } from "react";
 import { useHistory, useLocation } from "react-router-dom";
 import clsx from "clsx";
 
@@ -58,6 +58,13 @@ import FilterListIcon from "@material-ui/icons/FilterList";
 import ViewCompactOutlined from "@material-ui/icons/ViewCompactOutlined";
 
 import useTicketsKeyboardShortcuts from "../../hooks/useTicketsKeyboardShortcuts";
+import {
+  TicketsInboxProvider,
+  useTicketsInboxMetrics,
+  useTicketsInboxOpenColumn,
+  useTicketsInboxPendingColumn,
+  useTicketsInboxChatbotColumn,
+} from "../../context/TicketsInboxContext";
 
 /**
  * Atendimentos (desktop): abas, busca, filtros e lista.
@@ -429,6 +436,163 @@ const useStyles = makeStyles(theme => ({
 	},
 }));
 
+const InboxSubTabsPills = memo(function InboxSubTabsPills({ tabOpen, setTabOpen, classes }) {
+  const { openCount, pendingCount, chatbotCount } = useTicketsInboxMetrics();
+  return (
+    <div className={classes.statusPillsRow}>
+      <ButtonBase
+        className={`${classes.statusPill} ${classes.statusPillBtn} ${classes.statusPillGreen} ${
+          tabOpen === "open" ? classes.statusPillGreenActive : ""
+        }`}
+        onClick={() => setTabOpen("open")}
+      >
+        <span className={classes.statusCountGreen}>{openCount}</span>
+        <FolderOpenIcon className={clsx(classes.statusPillIcon, classes.statusIconGreen)} />
+        <span
+          className={
+            tabOpen === "open" ? classes.statusPillTextActive : classes.statusPillText
+          }
+        >
+          ATENDENDO
+        </span>
+      </ButtonBase>
+
+      <ButtonBase
+        className={`${classes.statusPill} ${classes.statusPillBtn} ${classes.statusPillPink} ${
+          tabOpen === "pending" ? classes.statusPillPinkActive : ""
+        }`}
+        onClick={() => setTabOpen("pending")}
+      >
+        <span className={classes.statusCountPink}>{pendingCount}</span>
+        <PersonIcon className={clsx(classes.statusPillIcon, classes.statusIconPink)} />
+        <span
+          className={
+            tabOpen === "pending" ? classes.statusPillTextActive : classes.statusPillText
+          }
+        >
+          AGUARDANDO
+        </span>
+      </ButtonBase>
+
+      <ButtonBase
+        className={`${classes.statusPill} ${classes.statusPillBtn} ${classes.statusPillGreen} ${
+          tabOpen === "chatbot" ? classes.statusPillGreenActive : ""
+        }`}
+        onClick={() => setTabOpen("chatbot")}
+      >
+        <span className={classes.statusCountGreen}>{chatbotCount}</span>
+        <AndroidIcon className={clsx(classes.statusPillIcon, classes.statusIconGreen)} />
+        <span
+          className={
+            tabOpen === "chatbot" ? classes.statusPillTextActive : classes.statusPillText
+          }
+        >
+          CHATBOT
+        </span>
+      </ButtonBase>
+    </div>
+  );
+});
+
+const InboxOpenListPanel = memo(function InboxOpenListPanel({
+  compactList,
+  style,
+  showAllTickets,
+  selectedQueueIds,
+}) {
+  const { tickets, loading, hasMore, loadMore } = useTicketsInboxOpenColumn();
+  return (
+    <TicketsList
+      status="open"
+      showAll={showAllTickets}
+      selectedQueueIds={selectedQueueIds}
+      controlledTickets={tickets}
+      controlledLoading={loading}
+      controlledHasMore={hasMore}
+      onControlledLoadMore={loadMore}
+      compact={compactList}
+      style={style}
+    />
+  );
+});
+
+const InboxPendingListPanel = memo(function InboxPendingListPanel({
+  compactList,
+  style,
+  selectedQueueIds,
+}) {
+  const { tickets, loading, hasMore, loadMore } = useTicketsInboxPendingColumn();
+  return (
+    <TicketsList
+      status="pending"
+      selectedQueueIds={selectedQueueIds}
+      controlledTickets={tickets}
+      controlledLoading={loading}
+      controlledHasMore={hasMore}
+      onControlledLoadMore={loadMore}
+      compact={compactList}
+      style={style}
+    />
+  );
+});
+
+const InboxChatbotListPanel = memo(function InboxChatbotListPanel({
+  compactList,
+  style,
+  selectedQueueIds,
+}) {
+  const { tickets, loading, hasMore, loadMore } = useTicketsInboxChatbotColumn();
+  return (
+    <TicketsList
+      status="pending"
+      selectedQueueIds={selectedQueueIds}
+      chatbotOnly
+      controlledTickets={tickets}
+      controlledLoading={loading}
+      controlledHasMore={hasMore}
+      onControlledLoadMore={loadMore}
+      compact={compactList}
+      style={style}
+    />
+  );
+});
+
+function OpenInboxTicketLists({ tabOpen, compactList, selectedQueueIds, showAllTickets }) {
+  const styleOpen = useMemo(
+    () => ({ display: tabOpen === "open" ? "flex" : "none" }),
+    [tabOpen]
+  );
+  const stylePending = useMemo(
+    () => ({ display: tabOpen === "pending" ? "flex" : "none" }),
+    [tabOpen]
+  );
+  const styleChatbot = useMemo(
+    () => ({ display: tabOpen === "chatbot" ? "flex" : "none" }),
+    [tabOpen]
+  );
+
+  return (
+    <>
+      <InboxOpenListPanel
+        compactList={compactList}
+        style={styleOpen}
+        showAllTickets={showAllTickets}
+        selectedQueueIds={selectedQueueIds}
+      />
+      <InboxPendingListPanel
+        compactList={compactList}
+        style={stylePending}
+        selectedQueueIds={selectedQueueIds}
+      />
+      <InboxChatbotListPanel
+        compactList={compactList}
+        style={styleChatbot}
+        selectedQueueIds={selectedQueueIds}
+      />
+    </>
+  );
+}
+
 const TicketsManagerTabs = () => {
   const classes = useStyles();
   const history = useHistory();
@@ -453,10 +617,6 @@ const TicketsManagerTabs = () => {
   const { user } = useContext(AuthContext);
   const { whatsApps } = useContext(WhatsAppsContext);
   const { profile } = user;
-
-  const [openCount, setOpenCount] = useState(0);
-  const [pendingCount, setPendingCount] = useState(0);
-  const [chatbotCount, setChatbotCount] = useState(0);
 
   const userQueueIds = Array.isArray(user?.queues) ? user.queues.map((q) => q.id) : [];
   const [selectedQueueIds, setSelectedQueueIds] = useState(userQueueIds || []);
@@ -582,6 +742,11 @@ const TicketsManagerTabs = () => {
   };
 
   return (
+    <TicketsInboxProvider
+      selectedQueueIds={selectedQueueIds}
+      showAll={showAllTickets}
+      inboxUiActive={tab === "open"}
+    >
     <Paper elevation={0} variant="outlined" className={classes.ticketsRoot}>
       <NewTicketModal
         modalOpen={newTicketModalOpen}
@@ -699,58 +864,7 @@ const TicketsManagerTabs = () => {
       </Paper>
 
       {tab === "open" && (
-        <div className={classes.statusPillsRow}>
-          <ButtonBase
-            className={`${classes.statusPill} ${classes.statusPillBtn} ${classes.statusPillGreen} ${
-              tabOpen === "open" ? classes.statusPillGreenActive : ""
-            }`}
-            onClick={() => setTabOpen("open")}
-          >
-            <span className={classes.statusCountGreen}>{openCount}</span>
-            <FolderOpenIcon className={clsx(classes.statusPillIcon, classes.statusIconGreen)} />
-            <span
-              className={
-                tabOpen === "open" ? classes.statusPillTextActive : classes.statusPillText
-              }
-            >
-              ATENDENDO
-            </span>
-          </ButtonBase>
-
-          <ButtonBase
-            className={`${classes.statusPill} ${classes.statusPillBtn} ${classes.statusPillPink} ${
-              tabOpen === "pending" ? classes.statusPillPinkActive : ""
-            }`}
-            onClick={() => setTabOpen("pending")}
-          >
-            <span className={classes.statusCountPink}>{pendingCount}</span>
-            <PersonIcon className={clsx(classes.statusPillIcon, classes.statusIconPink)} />
-            <span
-              className={
-                tabOpen === "pending" ? classes.statusPillTextActive : classes.statusPillText
-              }
-            >
-              AGUARDANDO
-            </span>
-          </ButtonBase>
-
-          <ButtonBase
-            className={`${classes.statusPill} ${classes.statusPillBtn} ${classes.statusPillGreen} ${
-              tabOpen === "chatbot" ? classes.statusPillGreenActive : ""
-            }`}
-            onClick={() => setTabOpen("chatbot")}
-          >
-            <span className={classes.statusCountGreen}>{chatbotCount}</span>
-            <AndroidIcon className={clsx(classes.statusPillIcon, classes.statusIconGreen)} />
-            <span
-              className={
-                tabOpen === "chatbot" ? classes.statusPillTextActive : classes.statusPillText
-              }
-            >
-              CHATBOT
-            </span>
-          </ButtonBase>
-        </div>
+        <InboxSubTabsPills tabOpen={tabOpen} setTabOpen={setTabOpen} classes={classes} />
       )}
 
       <div className={classes.searchRow}>
@@ -841,31 +955,11 @@ const TicketsManagerTabs = () => {
 
       <TabPanel value={tab} name="open" className={classes.ticketsWrapper}>
         <Paper className={classes.ticketsWrapper} style={{ position: "relative" }}>
-          <TicketsList
-            status="open"
-            showAll={showAllTickets}
+          <OpenInboxTicketLists
+            tabOpen={tabOpen}
+            compactList={compactList}
             selectedQueueIds={selectedQueueIds}
-            updateCount={(val) => setOpenCount(val)}
-            socketActive={tabOpen === "open"}
-            compact={compactList}
-            style={{ display: tabOpen === "open" ? "flex" : "none" }}
-          />
-          <TicketsList
-            status="pending"
-            selectedQueueIds={selectedQueueIds}
-            updateCount={(val) => setPendingCount(val)}
-            socketActive={tabOpen === "pending"}
-            compact={compactList}
-            style={{ display: tabOpen === "pending" ? "flex" : "none" }}
-          />
-          <TicketsList
-            status="pending"
-            selectedQueueIds={selectedQueueIds}
-            chatbotOnly
-            updateCount={(val) => setChatbotCount(val)}
-            socketActive={tabOpen === "chatbot"}
-            compact={compactList}
-            style={{ display: tabOpen === "chatbot" ? "flex" : "none" }}
+            showAllTickets={showAllTickets}
           />
         </Paper>
       </TabPanel>
@@ -951,6 +1045,7 @@ const TicketsManagerTabs = () => {
         </Menu>
       </div>
     </Paper>
+    </TicketsInboxProvider>
   );
 };
 

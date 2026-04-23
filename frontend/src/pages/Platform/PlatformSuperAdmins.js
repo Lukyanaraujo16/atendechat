@@ -25,6 +25,7 @@ import { AppPageHeader, AppSectionCard, AppPrimaryButton, AppSecondaryButton, Ap
 import { AuthContext } from "../../context/Auth/AuthContext";
 import { toast } from "react-toastify";
 import toastError from "../../errors/toastError";
+import { passwordMeetsPolicy } from "../../validators/passwordPolicy";
 
 const useStyles = makeStyles((theme) => ({
   heading: { fontWeight: 600, fontSize: "1.0625rem", marginBottom: theme.spacing(1) },
@@ -130,11 +131,7 @@ export default function PlatformSuperAdmins() {
 
   const saveCreate = async () => {
     const pwd = createForm.password?.trim() || "";
-    if (
-      !createForm.name?.trim() ||
-      !createForm.email?.trim() ||
-      pwd.length < 5
-    ) {
+    if (!createForm.name?.trim() || !createForm.email?.trim() || !passwordMeetsPolicy(pwd)) {
       toast.error(i18n.t("platform.superAdmins.toastCreateValidation"));
       return;
     }
@@ -193,6 +190,12 @@ export default function PlatformSuperAdmins() {
     }
     if (!form.super && (form.companyId === "" || form.companyId == null)) {
       toast.error(i18n.t("platform.superAdmins.toastCompanyRequiredNonSuper"));
+      return;
+    }
+
+    const pwdEdit = form.password?.trim() || "";
+    if (pwdEdit && !passwordMeetsPolicy(pwdEdit)) {
+      toast.error(i18n.t("passwordPolicy.requirements"));
       return;
     }
 

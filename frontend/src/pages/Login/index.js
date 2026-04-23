@@ -19,6 +19,7 @@ import {
 } from "@material-ui/icons";
 import {
 	Checkbox,
+	CircularProgress,
 	Fab,
 	FormControlLabel,
 	IconButton,
@@ -29,20 +30,20 @@ import {
 import LanguageControl from "../../components/LanguageControl";
 
 
-const Copyright = ({ brandName }) => {
+const Copyright = ({ brandName, classes }) => {
 	return (
-		<Typography variant="body2" style={{ color: "rgba(0,0,0,0.55)" }} align="center">
+		<Typography variant="body2" className={classes.copyrightText} align="center">
 			{"Copyright "}
-			<Link style={{ color: "rgba(0,0,0,0.7)" }} href="#">
+			<Link className={classes.copyrightLink} href="#">
 				{brandName} - v {versionSystem}
 			</Link>{" "}
 			{new Date().getFullYear()}
 			{"."}
- 		</Typography>
- 	);
- };
+		</Typography>
+	);
+};
 
-const useStyles = makeStyles(theme => ({
+const useStyles = makeStyles((theme) => ({
 	root: {
 		width: "100vw",
 		height: "100vh",
@@ -50,7 +51,8 @@ const useStyles = makeStyles(theme => ({
 		alignItems: "center",
 		justifyContent: "center",
 		position: "relative",
-		backgroundColor: "#ffffff",
+		backgroundColor: theme.palette.background.default,
+		color: theme.palette.text.primary,
 		[theme.breakpoints.down("sm")]: {
 			padding: theme.spacing(2),
 		},
@@ -58,9 +60,13 @@ const useStyles = makeStyles(theme => ({
 	card: {
 		width: "100%",
 		maxWidth: 420,
-		backgroundColor: "#fff",
+		backgroundColor: theme.palette.background.paper,
 		borderRadius: 8,
-		boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
+		border: `1px solid ${theme.palette.divider}`,
+		boxShadow:
+			theme.palette.type === "dark"
+				? "0 8px 32px rgba(0,0,0,0.55)"
+				: "0 8px 24px rgba(0,0,0,0.12)",
 		padding: theme.spacing(4, 4, 3),
 		display: "flex",
 		flexDirection: "column",
@@ -89,10 +95,31 @@ const useStyles = makeStyles(theme => ({
 	input: {
 		"& .MuiOutlinedInput-root": {
 			borderRadius: 4,
-			backgroundColor: "#fff",
+			backgroundColor:
+				theme.palette.type === "dark"
+					? "rgba(255,255,255,0.06)"
+					: theme.palette.grey[50],
 		},
 		"& .MuiOutlinedInput-notchedOutline": {
-			borderColor: "rgba(0,0,0,0.20)",
+			borderColor: theme.palette.divider,
+		},
+		"& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline": {
+			borderColor: theme.palette.text.secondary,
+		},
+		"& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline": {
+			borderColor: theme.palette.primary.main,
+		},
+		"& .MuiInputLabel-outlined": {
+			color: theme.palette.text.secondary,
+		},
+		"& .MuiInputLabel-outlined.Mui-focused": {
+			color: theme.palette.primary.main,
+		},
+		"& .MuiOutlinedInput-input": {
+			color: theme.palette.text.primary,
+		},
+		"& .MuiIconButton-root": {
+			color: theme.palette.action.active,
 		},
 	},
 	submit: {
@@ -100,11 +127,14 @@ const useStyles = makeStyles(theme => ({
 		borderRadius: 4,
 		fontWeight: 700,
 		padding: "10px 0",
-		background: "linear-gradient(180deg, #111 0%, #000 100%)",
-		color: "#fff",
-		boxShadow: "0 8px 14px rgba(0,0,0,0.25)",
+		backgroundColor: theme.palette.primary.main,
+		color: theme.palette.primary.contrastText,
+		boxShadow:
+			theme.palette.type === "dark"
+				? "0 8px 20px rgba(36, 199, 118, 0.35)"
+				: "0 8px 14px rgba(36, 199, 118, 0.35)",
 		"&:hover": {
-			background: "linear-gradient(180deg, #222 0%, #000 100%)",
+			backgroundColor: theme.palette.primary.dark,
 		},
 	},
 	linksWrap: {
@@ -118,12 +148,12 @@ const useStyles = makeStyles(theme => ({
 		display: "flex",
 		alignItems: "center",
 		gap: theme.spacing(1),
-		color: "rgba(0,0,0,0.7)",
+		color: theme.palette.primary.main,
 		textDecoration: "none",
 		fontSize: 13,
 		fontWeight: 500,
 		"&:hover": {
-			color: "rgba(0,0,0,0.9)",
+			color: theme.palette.primary.dark,
 			textDecoration: "underline",
 		},
 	},
@@ -137,8 +167,11 @@ const useStyles = makeStyles(theme => ({
 	rememberLabel: {
 		"& .MuiFormControlLabel-label": {
 			fontSize: 12.5,
-			color: "rgba(0,0,0,0.7)",
+			color: theme.palette.text.secondary,
 		},
+	},
+	languageIcon: {
+		color: theme.palette.action.active,
 	},
 	languageControl: {
 		position: "absolute",
@@ -166,13 +199,28 @@ const useStyles = makeStyles(theme => ({
 		alignItems: "center",
 		gap: theme.spacing(1),
 		fontSize: 12.5,
-		color: "rgba(0,0,0,0.55)",
+		color: theme.palette.text.secondary,
 		"& a": {
-			color: "rgba(0,0,0,0.65)",
+			color: theme.palette.text.secondary,
 			textDecoration: "none",
 		},
 		"& a:hover": {
+			color: theme.palette.primary.main,
 			textDecoration: "underline",
+		},
+		"& span": {
+			color: theme.palette.text.disabled,
+			userSelect: "none",
+		},
+	},
+	copyrightText: {
+		color: theme.palette.text.secondary,
+	},
+	copyrightLink: {
+		color: theme.palette.primary.main,
+		fontWeight: 600,
+		"&:hover": {
+			color: theme.palette.primary.dark,
 		},
 	},
 	supportWrap: {
@@ -185,13 +233,16 @@ const useStyles = makeStyles(theme => ({
 		zIndex: 1500,
 	},
 	supportBadge: {
-		background: "#fff",
+		backgroundColor: theme.palette.background.paper,
 		borderRadius: 4,
 		padding: "6px 10px",
-		boxShadow: "0 6px 14px rgba(0,0,0,0.18)",
-		border: "1px solid rgba(0,0,0,0.08)",
+		boxShadow:
+			theme.palette.type === "dark"
+				? "0 6px 16px rgba(0,0,0,0.5)"
+				: "0 6px 14px rgba(0,0,0,0.12)",
+		border: `1px solid ${theme.palette.divider}`,
 		fontSize: 12.5,
-		color: "rgba(0,0,0,0.7)",
+		color: theme.palette.text.primary,
 		whiteSpace: "nowrap",
 	},
 	whatsFab: {
@@ -214,7 +265,7 @@ const Login = () => {
 	const [anchorElLanguage, setAnchorElLanguage] = useState(null);
 	const [menuLanguageOpen, setMenuLanguageOpen] = useState(false);
 
-	const { handleLogin } = useContext(AuthContext);
+	const { handleLogin, loading: authLoading } = useContext(AuthContext);
 	const { branding, resolveLoginLogo } = useBranding();
 	const displayName = branding.systemName;
 	const loginLogoSrc = resolveLoginLogo();
@@ -274,7 +325,7 @@ const Login = () => {
 	return (
 		<div className={classes.root}>
 			<div className={classes.languageControl}>
-				<IconButton edge="start" onClick={handlemenuLanguage} style={{ color: "rgba(0,0,0,0.55)" }}>
+				<IconButton edge="start" onClick={handlemenuLanguage} className={classes.languageIcon}>
 					<LanguageOutlined aria-label="Idioma" />
 				</IconButton>
 				<Menu
@@ -355,8 +406,18 @@ const Login = () => {
 						/>
 					</div>
 
-					<Button type="submit" fullWidth variant="contained" className={classes.submit}>
-						{i18n.t("login.buttons.submit")}
+					<Button
+						type="submit"
+						fullWidth
+						variant="contained"
+						className={classes.submit}
+						disabled={authLoading}
+					>
+						{authLoading ? (
+							<CircularProgress size={22} color="inherit" />
+						) : (
+							i18n.t("login.buttons.submit")
+						)}
 					</Button>
 
 					<div className={classes.linksWrap}>
@@ -364,14 +425,14 @@ const Login = () => {
 							<span role="img" aria-label="key">
 								🔑
 							</span>
-							Esqueci minha senha
+							{i18n.t("login.links.forgotPassword")}
 						</Link>
 
 						<Link component={RouterLink} to="/signup" className={classes.linkRow}>
 							<span role="img" aria-label="pen">
 								📝
 							</span>
-							Não tem uma conta? Cadastre-se!
+							{i18n.t("login.links.signup")}
 						</Link>
 					</div>
 				</form>
@@ -379,15 +440,15 @@ const Login = () => {
 
 			<div className={classes.footer}>
 				<div className={classes.footerLinks}>
-					<a href="#" onClick={e => e.preventDefault()}>
-						Política de Privacidade
-					</a>
+					<Link component={RouterLink} to="/privacy-policy" color="inherit">
+						{i18n.t("login.footer.privacy")}
+					</Link>
 					<span>|</span>
-					<a href="#" onClick={e => e.preventDefault()}>
-						Termos de Uso
-					</a>
+					<Link component={RouterLink} to="/terms-of-service" color="inherit">
+						{i18n.t("login.footer.terms")}
+					</Link>
 				</div>
-				<Copyright brandName={displayName} />
+				<Copyright brandName={displayName} classes={classes} />
 			</div>
 
 			{whatsAppHref ? (

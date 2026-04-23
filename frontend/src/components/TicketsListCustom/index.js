@@ -161,6 +161,11 @@ const TicketsListCustom = (props) => {
     compact = false,
     // false: não registra socket (ex.: lista oculta na mesma aba com outras instâncias)
     socketActive = true,
+    /** Inbox: tickets vindos do TicketsInboxContext (sem reducer/socket local). */
+    controlledTickets,
+    controlledLoading = false,
+    controlledHasMore = false,
+    onControlledLoadMore,
   } = props;
   const classes = useStyles();
   const { ticketId: routeTicketId } = useParams();
@@ -172,12 +177,16 @@ const TicketsListCustom = (props) => {
 
   const socketManager = useContext(SocketContext);
 
+  const isControlled = Array.isArray(controlledTickets);
+
   useEffect(() => {
+    if (isControlled) return;
     dispatch({ type: "RESET" });
     setPageNumber(1);
-  }, [status, searchParam, dispatch, showAll, tags, users, selectedQueueIds, groupsOnly]);
+  }, [isControlled, status, searchParam, dispatch, showAll, tags, users, selectedQueueIds, groupsOnly]);
 
   const { tickets, hasMore, loading } = useTickets({
+    enabled: !isControlled,
     pageNumber,
     searchParam,
     status: groupsOnly ? undefined : status,
@@ -189,6 +198,7 @@ const TicketsListCustom = (props) => {
   });
 
   useEffect(() => {
+    if (isControlled) return;
     const queueIds = safeQueues.map((q) => q.id);
     const filteredTickets = tickets.filter(
       (t) => queueIds.indexOf(t.queueId) > -1
@@ -214,10 +224,14 @@ const TicketsListCustom = (props) => {
       type: "LOAD_TICKETS",
       payload: applyPendingChatbotSplit(base),
     });
-  }, [tickets, status, searchParam, safeQueues, profile, chatbotOnly, groupsOnly]);
+  }, [isControlled, tickets, status, searchParam, safeQueues, profile, chatbotOnly, groupsOnly]);
+
+  const displayTickets = isControlled ? controlledTickets : ticketsList;
+  const displayLoading = isControlled ? controlledLoading : loading;
+  const displayHasMore = isControlled ? controlledHasMore : hasMore;
 
   useEffect(() => {
-    if (!socketActive) return undefined;
+    if (isControlled || !socketActive) return undefined;
 
     const companyId = localStorage.getItem("companyId");
     const socket = socketManager.getSocket(companyId);
@@ -228,9 +242,6 @@ const TicketsListCustom = (props) => {
       (groupsOnly ||
         !ticket.queueId ||
         selectedQueueIds.indexOf(ticket.queueId) > -1);
-
-    const notBelongsToUserQueues = (ticket) =>
-      ticket.queueId && selectedQueueIds.indexOf(ticket.queueId) === -1;
 
     /** Mesma regra da lista inicial: em pending, Chatbot vs Aguardando são mutuamente exclusivos */
     const matchesPendingChatbotTab = (ticket) => {
@@ -244,6 +255,10 @@ const TicketsListCustom = (props) => {
           ticket.isGroup &&
           ticket.status !== "closed"
         );
+      }
+      /** Busca (sem status): aceita qualquer status, alinhado ao handler antigo de appMessage */
+      if (status === undefined || status === null) {
+        return true;
       }
       return ticket.status === status;
     };
@@ -259,8 +274,17 @@ const TicketsListCustom = (props) => {
       }
     });
 
+    const ticketFitsThisList = (ticket) => {
+      if (!ticket) return false;
+      if (groupsOnly) {
+        return ticket.isGroup && ticket.status !== "closed";
+      }
+      if (!shouldUpdateTicket(ticket) || ticket.isGroup) return false;
+      if (!matchesTabStatus(ticket) || !matchesPendingChatbotTab(ticket)) return false;
+      return true;
+    };
+
     socket.on(`company-${companyId}-ticket`, (data) => {
-      
       if (data.action === "updateUnread") {
         dispatch({
           type: "RESET_UNREAD",
@@ -268,38 +292,29 @@ const TicketsListCustom = (props) => {
         });
       }
 
-      if (
-        data.action === "update" &&
-        shouldUpdateTicket(data.ticket) &&
-        matchesTabStatus(data.ticket) &&
-        (groupsOnly ? data.ticket.isGroup : !data.ticket.isGroup)
-      ) {
-        if (!matchesPendingChatbotTab(data.ticket)) {
-          dispatch({ type: "DELETE_TICKET", payload: data.ticket.id });
-          return;
-        }
-        if (process.env.NODE_ENV === "development") {
-          // eslint-disable-next-line no-console
-          console.debug("[ticketsList pending split]", {
-            ticketId: data.ticket?.id,
-            status: data.ticket?.status,
-            chatbot: data.ticket?.chatbot,
-            queueId: data.ticket?.queueId,
-            chatbotOnly,
+      if (data.action === "update" && data.ticket) {
+        if (ticketFitsThisList(data.ticket)) {
+          if (process.env.NODE_ENV === "development") {
+            // eslint-disable-next-line no-console
+            console.debug("[ticketsList pending split]", {
+              ticketId: data.ticket?.id,
+              status: data.ticket?.status,
+              chatbot: data.ticket?.chatbot,
+              queueId: data.ticket?.queueId,
+              chatbotOnly,
+            });
+          }
+          dispatch({
+            type: "UPDATE_TICKET",
+            payload: data.ticket,
           });
+        } else if (
+          (groupsOnly && data.ticket.isGroup) ||
+          (!groupsOnly && !data.ticket.isGroup)
+        ) {
+          /** Saiu desta aba (status/chatbot/fila) ou deixou de ser visível — remove sem F5 */
+          dispatch({ type: "DELETE_TICKET", payload: data.ticket.id });
         }
-        dispatch({
-          type: "UPDATE_TICKET",
-          payload: data.ticket,
-        });
-      }
-
-      if (
-        data.action === "update" &&
-        !groupsOnly &&
-        notBelongsToUserQueues(data.ticket)
-      ) {
-        dispatch({ type: "DELETE_TICKET", payload: data.ticket.id });
       }
 
       if (data.action === "delete") {
@@ -318,21 +333,18 @@ const TicketsListCustom = (props) => {
         return;
       }
 
-      if (
-        data.action === "create" &&
-        shouldUpdateTicket(data.ticket) &&
-        (groupsOnly
-          ? data.ticket.isGroup && data.ticket.status !== "closed"
-          : status === undefined || data.ticket.status === status) &&
-        (groupsOnly ? data.ticket.isGroup : !data.ticket.isGroup)
-      ) {
-        if (!matchesPendingChatbotTab(data.ticket)) {
-          return;
+      if (data.action === "create" && data.ticket) {
+        if (ticketFitsThisList(data.ticket)) {
+          dispatch({
+            type: "UPDATE_TICKET_UNREAD_MESSAGES",
+            payload: data.ticket,
+          });
+        } else if (
+          (groupsOnly && data.ticket.isGroup) ||
+          (!groupsOnly && !data.ticket.isGroup)
+        ) {
+          dispatch({ type: "DELETE_TICKET", payload: data.ticket.id });
         }
-        dispatch({
-          type: "UPDATE_TICKET_UNREAD_MESSAGES",
-          payload: data.ticket,
-        });
       }
     });
 
@@ -349,6 +361,7 @@ const TicketsListCustom = (props) => {
       socket.disconnect();
     };
   }, [
+    isControlled,
     socketActive,
     status,
     showAll,
@@ -364,19 +377,24 @@ const TicketsListCustom = (props) => {
   ]);
 
   useEffect(() => {
-    if (typeof updateCount === "function") {
-      updateCount(ticketsList.length);
-    }
+    if (isControlled || typeof updateCount !== "function") return;
+    updateCount(ticketsList.length);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ticketsList]);
+  }, [isControlled, ticketsList]);
 
   const loadMore = useCallback(() => {
+    if (isControlled) {
+      if (typeof onControlledLoadMore === "function") {
+        onControlledLoadMore();
+      }
+      return;
+    }
     setPageNumber((prevState) => prevState + 1);
-  }, []);
+  }, [isControlled, onControlledLoadMore]);
 
   const handleScroll = useCallback(
     (e) => {
-      if (!hasMore || loading) return;
+      if (!displayHasMore || displayLoading) return;
 
       const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
 
@@ -384,7 +402,7 @@ const TicketsListCustom = (props) => {
         loadMore();
       }
     },
-    [hasMore, loading, loadMore]
+    [displayHasMore, displayLoading, loadMore]
   );
 
   const isRowSelected = useMemo(() => {
@@ -403,7 +421,7 @@ const TicketsListCustom = (props) => {
         onScroll={handleScroll}
       >
         <List style={{ paddingTop: 0, height: "100%" }}>
-          {ticketsList.length === 0 && !loading ? (
+          {displayTickets.length === 0 && !displayLoading ? (
             <AppEmptyState
               title={i18n.t("ticketsList.emptyStateTitle")}
               description={i18n.t("ticketsList.emptyStateMessage")}
@@ -411,7 +429,7 @@ const TicketsListCustom = (props) => {
             />
           ) : (
             <>
-              {ticketsList.map((ticket) => (
+              {displayTickets.map((ticket) => (
                 <TicketListItem
                   ticket={ticket}
                   key={ticket.id}
@@ -421,7 +439,7 @@ const TicketsListCustom = (props) => {
               ))}
             </>
           )}
-          {loading && <TicketsListSkeleton />}
+          {displayLoading && <TicketsListSkeleton />}
         </List>
       </Paper>
     </Paper>

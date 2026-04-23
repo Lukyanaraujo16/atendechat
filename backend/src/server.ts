@@ -9,6 +9,7 @@ import { TransferTicketQueue } from "./wbotTransferTicketQueue";
 import cron from "node-cron";
 import { startBackupAutoScheduler } from "./jobs/backupAutoScheduler";
 import { startBillingAutomationScheduler } from "./jobs/billingAutomationScheduler";
+import { startSignupCriticalSocketScheduler } from "./jobs/signupCriticalSocketScheduler";
 
 const server = app.listen(process.env.PORT, async () => {
   const companies = await Company.findAll();
@@ -29,6 +30,7 @@ const server = app.listen(process.env.PORT, async () => {
   );
   startBackupAutoScheduler();
   startBillingAutomationScheduler();
+  startSignupCriticalSocketScheduler();
 });
 
 cron.schedule("* * * * *", async () => {

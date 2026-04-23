@@ -2,18 +2,24 @@ const messages = {
 	en: {
 		translations: {
 			selectLanguage: "Select Language",
+			passwordPolicy: {
+				requirements:
+					"Password must be at least 8 characters and include an uppercase letter, a lowercase letter, and a number.",
+			},
 			signup: {
 				title: "Sign Up",
 				toasts: {
-					success: "User created successfully! Please login!!!",
-					fail: "Error creating user. Please check the provided information.",
+					success:
+						"Request submitted! An administrator will review your signup. After approval, you will receive an email to set your password and access the account.",
+					fail: "Could not submit the request. Please check your details.",
 				},
 				form: {
 					name: "Company Name",
+					adminName: "Contact person name",
 					email: "Email",
 					phone: "Phone Number (with Area Code)",
 					plan: "Plan",
-					password: "Password",
+					notes: "Notes (optional)",
 				},
 				formErrors: {
 					name: {
@@ -21,7 +27,16 @@ const messages = {
 						short: "Name is too short",
 						long: "Name is too long",
 					},
+					adminName: {
+						required: "Contact name is required",
+						short: "Name is too short",
+						long: "Name is too long",
+					},
+					notes: {
+						long: "Text is too long",
+					},
 					password: {
+						required: "Password is required",
 						short: "Password is too short",
 						long: "Password is too long",
 					},
@@ -29,9 +44,15 @@ const messages = {
 						required: "Email is required",
 						invalid: "Invalid email",
 					},
+					acceptTerms: "You must accept the privacy policy and terms of service.",
+				},
+				legal: {
+					iAgree: "I have read and accept the",
+					and: "and the",
 				},
 				buttons: {
 					submit: "Register",
+					submitRequest: "Submit signup request",
 					login: "Already have an account? Login!",
 				},
 				plan: {
@@ -54,18 +75,72 @@ const messages = {
 					badge: "Support available",
 					ariaLabel: "Open WhatsApp",
 				},
+				links: {
+					forgotPassword: "Forgot password",
+					signup: "Don't have an account? Sign up!",
+				},
+				footer: {
+					privacy: "Privacy Policy",
+					terms: "Terms of Service",
+				},
+			},
+			legal: {
+				updated: "Last updated: April 2026.",
+				privacy: {
+					title: "Privacy Policy",
+					intro:
+						"This policy describes how we process personal data for StreamHUB Chat / AtendeChat.",
+					collectTitle: "1. Data we collect",
+					collectBody:
+						"We may collect name, email, phone, company data, conversation content required to provide the service, technical logs and product usage data.",
+					useTitle: "2. Purpose and use",
+					useBody:
+						"Data is used to create and manage your account, provide support, billing, security, product improvement and legal compliance.",
+					securityTitle: "3. Security and retention",
+					securityBody:
+						"We apply appropriate technical and organizational measures. Data is kept as long as needed for these purposes or as required by law.",
+					rightsTitle: "4. Your rights",
+					rightsBody:
+						"You may request access, rectification, erasure or object to processing under applicable law by contacting the service operator.",
+					contactTitle: "5. Contact",
+					contactBody:
+						"For privacy questions, use the support channels shown on the website or in the app.",
+				},
+				terms: {
+					title: "Terms of Service",
+					intro: "By using the service you accept these terms. Please read them carefully.",
+					useTitle: "1. Use of the service",
+					useBody:
+						"The service is for legitimate professional use. Spam, illegal content or infringement of third-party rights is prohibited.",
+					accountTitle: "2. Account and credentials",
+					accountBody:
+						"You are responsible for password confidentiality and activity on your account. Notify us of unauthorized use.",
+					liabilityTitle: "3. Limitation of liability",
+					liabilityBody:
+						"The service is provided “as is”. We are not liable for indirect damages, lost profits or downtime beyond reasonable control.",
+					changesTitle: "4. Changes",
+					changesBody:
+						"We may update these terms; the current version will always be available on this page.",
+				},
 			},
 			resetPassword: {
-				title: "Reset Password",
+				title: "Recover password",
+				subtitleRequest:
+					"Enter your account email. If it exists, you will receive a code and link by email (valid for 1 hour).",
+				subtitleReset: "Enter the code from your email and set a new password.",
 				toasts: {
-					emailSent: "Email sent successfully!",
+					emailSent:
+						"If the email is registered, we sent instructions. Check your inbox and spam folder.",
 					emailNotFound: "Email not found!",
-					passwordUpdated: "Password updated successfully!",
+					passwordUpdated: "Password updated successfully. You can sign in now.",
 				},
 				formErrors: {
 					email: {
 						required: "Email is required",
 						invalid: "Invalid email",
+					},
+					token: {
+						required: "Verification code is required",
 					},
 					newPassword: {
 						required: "New password is required",
@@ -83,9 +158,12 @@ const messages = {
 					confirmPassword: "Confirm New Password",
 				},
 				buttons: {
-					submitEmail: "Send Email",
-					submitPassword: "Reset Password",
-					back: "Don't have an account? Sign up!",
+					submitEmail: "Send instructions",
+					submitPassword: "Save new password",
+					goSignup: "Don't have an account? Sign up!",
+					goLogin: "Back to login",
+					alreadyHaveCode: "I already have the code",
+					backToRequest: "Request a new code by email",
 				},
 			},
 			dashboard: {
@@ -863,7 +941,8 @@ const messages = {
 					allTicketDesabled: "Disabled",
 				},
 				hints: {
-					passwordCreate: "Use a password with at least 5 characters.",
+					passwordCreate:
+						"Use at least 8 characters with an uppercase letter, a lowercase letter, and a number.",
 				},
 				formErrors: {
 					name: {
@@ -1202,6 +1281,7 @@ const messages = {
 				tabs: {
 					dashboard: "Platform dashboard",
 					companies: "Companies",
+					signupRequests: "Signup requests",
 					plans: "Plans",
 					superAdmins: "Super Admins",
 					myAccount: "My account",
@@ -1211,6 +1291,114 @@ const messages = {
 					backup: "Backup",
 					helps: "Help content",
 					announcements: "Announcements",
+				},
+				signupRequests: {
+					title: "New customer onboarding",
+					subtitle:
+						"Operational hub: public signups, approvals, invites and activation. Alerts help you prioritize follow-ups.",
+					filterLabel: "Filter",
+					filterNew: "New",
+					filterCritical: "Critical",
+					filterPending: "Pending",
+					filterApproved: "Approved only",
+					filterInvited: "Invite sent",
+					filterNotActivated: "Not activated",
+					filterActivated: "Activated",
+					filterRejected: "Rejected",
+					filterAll: "All",
+					searchPlaceholder: "Search company, contact or email…",
+					searchHint:
+						"At least 2 characters. Search filters the list below; counters are global (all requests).",
+					summaryIntro: "Overview — click to apply the matching filter.",
+					summaryNew: "New",
+					summaryPending: "Pending",
+					summaryAwaiting: "Awaiting activation",
+					summaryCritical: "Critical",
+					summaryRejected: "Rejected",
+					loading: "Loading…",
+					empty: "No requests match this filter or search.",
+					colCompany: "Company",
+					colAdmin: "Contact",
+					colEmail: "Email",
+					colPhone: "Phone",
+					colPlan: "Plan",
+					colStatus: "Status",
+					colAlerts: "Alerts",
+					colDate: "Request date",
+					colActions: "Actions",
+					badgeNew: "New",
+					pendingSince: "Waiting {{days}} d for review",
+					statusPending: "Pending",
+					statusApproved: "Approved",
+					statusInvited: "Invite sent",
+					statusActivated: "Activated",
+					statusRejected: "Rejected",
+					approve: "Approve",
+					reject: "Reject",
+					tooltipDetails: "View details",
+					tooltipApprove: "Approve request",
+					tooltipReject: "Reject request",
+					detailsTitle: "Request details",
+					detailPlan: "Requested plan",
+					detailNotes: "Notes",
+					detailRejectReason: "Rejection reason",
+					detailReviewedAt: "Decision date (legacy)",
+					detailApprovedAt: "Approved at",
+					detailRejectedAt: "Rejected at",
+					detailFirstLoginAt: "First login",
+					detailOnboardingStage: "Current stage",
+					detailAlerts: "Operational alerts",
+					stagePending: "Awaiting review",
+					stageApprovedNoInvite: "Approved — invite not confirmed",
+					stageInvited: "Invite sent — awaiting activation",
+					stageActivated: "Customer active",
+					stageRejected: "Request rejected",
+					detailFirstInvitationSentAt: "First invite sent at",
+					detailInvitationSentAt: "Last invite sent at",
+					detailInvitationResentCount: "Resends logged (Super Admin action)",
+					detailInvitationResentNever: "No resends from this hub yet.",
+					detailInvitationResentHistory: "Resend history (latest)",
+					resendInviteTooltip: "Resend invite email",
+					resendInviteDialogTitle: "Resend access invite",
+					resendInviteDialogIntro:
+						"A new code and link will be generated (72 hours). The previous link stops working. Email goes to this request’s contact address.",
+					resendInviteConfirm: "Send new invite",
+					toastResendInviteOk: "New invite sent and record updated.",
+					socketToastNew: "New signup request: {{company}}",
+					socketToastCriticalOne: "Onboarding: request #{{id}} is now critical.",
+					socketToastCriticalMany:
+						"Onboarding: {{count}} requests became critical. Check the hub.",
+					detailActivatedAt: "Activation (password set via link)",
+					alertNEW_SIGNUP: "Very recent signup",
+					alertPENDING_STALE: "Pending for many days without review",
+					alertAPPROVED_INVITE_PENDING: "Company created — invite email not confirmed",
+					alertAWAITING_ACTIVATION: "Awaiting password setup or first login",
+					alertINVITE_STALE: "Invite sent several days ago, still not activated",
+					alertINVITE_LIKELY_EXPIRED: "Invite link likely expired (72h)",
+					detailApprovedHint:
+						"Company was created, but the invite email could not be confirmed as sent. Check logs or resend the invite if needed.",
+					detailCompanyId: "Created company (ID)",
+					close: "Close",
+					approveDialogTitle: "Confirm approval",
+					approveDialogIntro: "When you confirm, the system will:",
+					approveDialogBullet1: "Create the company and admin user from this request.",
+					approveDialogBullet2: "Provision the admin without an initial password (secure default).",
+					approveDialogBullet3: "Email the contact an invitation to set a password (link valid 72 hours).",
+					confirmApproveAction: "Approve and create",
+					rejectTitle: "Reject request",
+					rejectReason: "Reason",
+					rejectReasonPlaceholder: "E.g. incomplete data, duplicate, not a fit…",
+					rejectReasonHelper:
+						"We recommend a short reason. It is stored and shown in the request details.",
+					rejectWithoutReasonConfirm:
+						"Reject without a reason? You can leave it blank, but the history will have no explanation.",
+					cancel: "Cancel",
+					confirmReject: "Confirm rejection",
+					toastApproved: "Request processed and company created.",
+					toastApprovedInviteSent: "Request approved. Company created and invite email sent.",
+					toastApprovedInvitePending:
+						"Company created, but the invite email may have failed. Check the list status or server logs.",
+					toastRejected: "Request rejected.",
 				},
 				announcements: {
 					title: "Global announcements",
@@ -1720,8 +1908,10 @@ const messages = {
 					toastCompanyRequiredNonSuper: "Select a company. Non–super admin users must be linked to one.",
 					fieldPassword: "New password (optional)",
 					fieldPasswordCreate: "Initial password",
-					passwordHint: "Leave blank to keep the current password.",
-					passwordCreateHint: "At least 5 characters. The user can change it after login.",
+					passwordHint:
+						"Leave blank to keep the current password. If setting a new one: at least 8 characters, uppercase, lowercase and a number.",
+					passwordCreateHint:
+						"At least 8 characters, with uppercase, lowercase and a number. The user can change it after login.",
 					cancel: "Cancel",
 					save: "Save",
 					createSave: "Create user",
@@ -1739,7 +1929,8 @@ const messages = {
 					toastSaved: "Changes saved.",
 					toastCreated: "User created successfully.",
 					toastPromoted: "User promoted to super admin.",
-					toastCreateValidation: "Fill in name, email and password (min. 5 characters).",
+					toastCreateValidation:
+						"Fill in name, email and a password that meets the security requirements.",
 				},
 				myAccount: {
 					title: "My account",
@@ -1748,7 +1939,8 @@ const messages = {
 					fieldName: "Name",
 					fieldEmail: "Email",
 					fieldPassword: "New password (optional)",
-					passwordHint: "Leave blank to keep the current password.",
+					passwordHint:
+						"Leave blank to keep the current password. If you set one: at least 8 characters, uppercase, lowercase and a number.",
 					save: "Save changes",
 					toastSaved: "Profile updated successfully.",
 				},
@@ -3010,6 +3202,31 @@ const messages = {
 				ERR_EMAIL_IN_USE: "This email is already in use by another account.",
 				FAVICON_TOO_LARGE: "Favicon: maximum size is 1 MB.",
 				INVALID_FAVICON_TYPE: "Favicon: use PNG, JPG, ICO or SVG.",
+				ERR_RESET_INVALID:
+					"Invalid code or email. Check your details or request a new email.",
+				ERR_RESET_EXPIRED: "Code expired. Request password recovery again.",
+				ERR_PASSWORD_TOO_SHORT: "Password must be at least 8 characters.",
+				ERR_PASSWORD_TOO_LONG: "Password is too long.",
+				ERR_PASSWORD_POLICY:
+					"Password must be at least 8 characters and include an uppercase letter, a lowercase letter, and a number.",
+				ERR_PASSWORD_REQUIRED: "Password is required.",
+				ERR_INVALID_PASSWORD: "Invalid password. Check the requirements.",
+				ERR_SIGNUP_PENDING_EXISTS:
+					"A pending signup request already exists for this email. Wait for review or contact support.",
+				ERR_SIGNUP_REQUEST_NOT_FOUND: "Signup request not found.",
+				ERR_MAIL_NOT_CONFIGURED:
+					"Email is not configured (MAIL_*). Set up platform SMTP to resend invites.",
+				ERR_SIGNUP_INVITE_RESEND_NOT_ALLOWED:
+					"Cannot resend the invite in this request state (already activated, pending, or rejected).",
+				ERR_SIGNUP_PRIMARY_ADMIN_NOT_FOUND:
+					"Administrator user for this request was not found on the created company.",
+				ERR_SIGNUP_INVITE_EMAIL_FAILED:
+					"Failed to send the invite email. Check your mail service and try again.",
+				ERR_SIGNUP_REQUEST_NOT_PENDING: "This request has already been processed.",
+				ERR_SIGNUP_COMPANY_NAME_REQUIRED: "Enter the company name (at least 2 characters).",
+				ERR_COMPANY_EMAIL_REQUIRED: "The company needs an email to create the administrator account.",
+				ERR_INVALID_ID: "Invalid identifier.",
+				ERR_INVALID_PLAN: "Invalid or unknown plan.",
 			},
 		}
 	},

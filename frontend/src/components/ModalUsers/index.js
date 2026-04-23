@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useMemo } from "react";
 
 import * as Yup from "yup";
 import { Formik, Form, Field } from "formik";
@@ -25,6 +25,7 @@ import toastError from "../../errors/toastError";
 import QueueSelectCustom from "../QueueSelectCustom";
 import { AuthContext } from "../../context/Auth/AuthContext";
 import { Can } from "../Can";
+import { yupPasswordOptional, yupPasswordRequired } from "../../validators/passwordPolicy";
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -56,17 +57,26 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
-const UserSchema = Yup.object().shape({
-  name: Yup.string()
-    .min(2, "Too Short!")
-    .max(50, "Too Long!")
-    .required("Required"),
-  password: Yup.string().min(5, "Too Short!").max(50, "Too Long!"),
-  email: Yup.string().email("Invalid email").required("Required"),
-});
-
 const ModalUsers = ({ open, onClose, userId, companyId }) => {
   const classes = useStyles();
+
+  const validationSchema = useMemo(
+    () =>
+      Yup.object().shape({
+        name: Yup.string()
+          .min(2, "Too Short!")
+          .max(50, "Too Long!")
+          .required("Required"),
+        password: userId
+          ? yupPasswordOptional(i18n.t("passwordPolicy.requirements"))
+          : yupPasswordRequired(
+              i18n.t("passwordPolicy.requirements"),
+              i18n.t("userModal.formErrors.password.required")
+            ),
+        email: Yup.string().email("Invalid email").required("Required"),
+      }),
+    [userId]
+  );
 
   const initialState = {
     name: "",
@@ -137,7 +147,7 @@ const ModalUsers = ({ open, onClose, userId, companyId }) => {
         <Formik
           initialValues={user}
           enableReinitialize={true}
-          validationSchema={UserSchema}
+          validationSchema={validationSchema}
           onSubmit={(values, actions) => {
             setTimeout(() => {
               handleSaveUser(values);

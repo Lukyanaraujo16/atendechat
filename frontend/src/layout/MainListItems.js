@@ -28,42 +28,49 @@ import { SocketContext } from "../context/Socket/SocketContext";
 import { isArray } from "lodash";
 import api from "../services/api";
 import toastError from "../errors/toastError";
-import { makeStyles } from "@material-ui/core/styles";
+import { makeStyles, alpha } from "@material-ui/core/styles";
 import usePlans from "../hooks/usePlans";
 
-const SIDEBAR_GREEN = "#24c776";
-
-const useStyles = makeStyles((theme) => ({
-  listItemIcon: {
-    color: SIDEBAR_GREEN,
-    minWidth: 40,
-  },
-  listItemText: {
-    color: "rgba(0, 0, 0, 0.87)",
-    minWidth: 0,
-    "&.MuiListItemText-primary": {
-      fontWeight: 500,
+const useStyles = makeStyles((theme) => {
+  const brand = theme.palette.primary.main;
+  return {
+    listItemIcon: {
+      color: brand,
+      minWidth: 40,
     },
-    "& .MuiTypography-root": {
-      overflow: "hidden",
-      textOverflow: "ellipsis",
-      whiteSpace: "nowrap",
-    },
-  },
-  listItem: {
-    minWidth: 0,
-    "&:hover": {
-      backgroundColor: "rgba(36, 199, 118, 0.08)",
-    },
-    "&.Mui-selected": {
-      backgroundColor: "rgba(36, 199, 118, 0.12)",
-      borderLeft: `3px solid ${SIDEBAR_GREEN}`,
-      "& .MuiListItemIcon-root": {
-        color: SIDEBAR_GREEN,
+    listItemText: {
+      color: theme.palette.text.primary,
+      minWidth: 0,
+      "&.MuiListItemText-primary": {
+        fontWeight: 500,
+      },
+      "& .MuiTypography-root": {
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap",
       },
     },
-  },
-}));
+    listItem: {
+      minWidth: 0,
+      "&:hover": {
+        backgroundColor: alpha(brand, 0.1),
+      },
+      "&.Mui-selected": {
+        backgroundColor:
+          theme.palette.type === "dark"
+            ? alpha(brand, 0.2)
+            : alpha(brand, 0.12),
+        borderLeft: `3px solid ${brand}`,
+        "& .MuiListItemIcon-root": {
+          color: brand,
+        },
+        "& .MuiTypography-root": {
+          color: theme.palette.text.primary,
+        },
+      },
+    },
+  };
+});
 
 function ListItemLink(props) {
   const {
