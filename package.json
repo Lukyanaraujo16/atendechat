@@ -1,4 +1,11 @@
 {
+  "name": "atendechat",
+  "private": true,
+  "scripts": {
+    "build": "npm run build --prefix backend && npm run build --prefix frontend",
+    "build:backend": "npm run build --prefix backend",
+    "build:frontend": "npm run build --prefix frontend"
+  },
   "devDependencies": {
     "nodemon": "^3.1.7",
     "ts-node": "^10.9.2"

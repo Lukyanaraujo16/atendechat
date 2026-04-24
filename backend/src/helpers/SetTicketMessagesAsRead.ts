@@ -8,6 +8,7 @@ import Ticket from "../models/Ticket";
 import Whatsapp from "../models/Whatsapp";
 import { logger } from "../utils/logger";
 import GetTicketWbot from "./GetTicketWbot";
+import { isWhatsAppDisableAllReadAndPresenceSideEffects } from "./whatsappUnavailablePresence";
 
 const READ_LOG_PREFIX = "[ReadReceipt]";
 
@@ -221,64 +222,70 @@ const SetTicketMessagesAsRead = async (
 
   try {
     if (syncWhatsAppReadReceipt) {
-      logger.info(
-        `${READ_LOG_PREFIX} intent reason=${receiptReason} ticketId=${ticket.id} companyId=${ticket.companyId} whatsappId=${ticket.whatsappId} (syncWhatsAppReadReceipt=true; só envia ao WA se houver pendentes e autoReadMessages)`
-      );
-
-      const pendingInbound = await Message.findAll({
-        where: {
-          ticketId: ticket.id,
-          fromMe: false,
-          read: false
-        },
-        attributes: ["id", "dataJson", "remoteJid", "participant"],
-        order: [["createdAt", "ASC"]]
-      });
-
-      if (pendingInbound.length === 0) {
+      if (isWhatsAppDisableAllReadAndPresenceSideEffects()) {
         logger.info(
-          `${READ_LOG_PREFIX} skip reason=${receiptReason} cause=no_pending_inbound_unread ticketId=${ticket.id} whatsappId=${ticket.whatsappId}`
+          `${READ_LOG_PREFIX} skip_whatsapp_sync reason=${receiptReason} cause=WHATSAPP_DISABLE_ALL_READ_AND_PRESENCE_SIDE_EFFECTS ticketId=${ticket.id} companyId=${ticket.companyId} whatsappId=${ticket.whatsappId} (DB continua a marcar read abaixo; sem readMessages/sendReceipts)`
         );
       } else {
-        const whatsapp = await Whatsapp.findByPk(ticket.whatsappId, {
-          attributes: ["autoReadMessages"]
+        logger.info(
+          `${READ_LOG_PREFIX} intent reason=${receiptReason} ticketId=${ticket.id} companyId=${ticket.companyId} whatsappId=${ticket.whatsappId} (syncWhatsAppReadReceipt=true; só envia ao WA se houver pendentes e autoReadMessages)`
+        );
+
+        const pendingInbound = await Message.findAll({
+          where: {
+            ticketId: ticket.id,
+            fromMe: false,
+            read: false
+          },
+          attributes: ["id", "dataJson", "remoteJid", "participant"],
+          order: [["createdAt", "ASC"]]
         });
-        const allowWhatsAppReceipt =
-          whatsapp ? whatsapp.autoReadMessages !== false : true;
 
-        if (allowWhatsAppReceipt) {
-          const ticketScoped = await ensureTicketWithContact(ticket);
-          const keys = buildReadKeysFromRows(pendingInbound, ticketScoped);
+        if (pendingInbound.length === 0) {
+          logger.info(
+            `${READ_LOG_PREFIX} skip reason=${receiptReason} cause=no_pending_inbound_unread ticketId=${ticket.id} whatsappId=${ticket.whatsappId}`
+          );
+        } else {
+          const whatsapp = await Whatsapp.findByPk(ticket.whatsappId, {
+            attributes: ["autoReadMessages"]
+          });
+          const allowWhatsAppReceipt =
+            whatsapp ? whatsapp.autoReadMessages !== false : true;
 
-          if (keys.length === 0) {
-            logger.warn(
-              `${READ_LOG_PREFIX} skip reason=${receiptReason} cause=no_valid_keys ticketId=${ticket.id} companyId=${ticket.companyId} whatsappId=${ticket.whatsappId} pendingRows=${pendingInbound.length}`
-            );
-          } else {
-            const wbot = await GetTicketWbot(ticket);
-            if (!wbot) {
+          if (allowWhatsAppReceipt) {
+            const ticketScoped = await ensureTicketWithContact(ticket);
+            const keys = buildReadKeysFromRows(pendingInbound, ticketScoped);
+
+            if (keys.length === 0) {
               logger.warn(
-                `${READ_LOG_PREFIX} skip reason=${receiptReason} cause=no_wbot ticketId=${ticket.id} whatsappId=${ticket.whatsappId}`
+                `${READ_LOG_PREFIX} skip reason=${receiptReason} cause=no_valid_keys ticketId=${ticket.id} companyId=${ticket.companyId} whatsappId=${ticket.whatsappId} pendingRows=${pendingInbound.length}`
               );
             } else {
-              try {
-                await sendWhatsAppReadReceipts(wbot as WbotReceipts, keys, {
-                  companyId: ticket.companyId,
-                  whatsappId: ticket.whatsappId,
-                  ticketId: ticket.id,
-                  readReceiptReason: receiptReason
-                });
-              } catch (receiptErr) {
+              const wbot = await GetTicketWbot(ticket);
+              if (!wbot) {
                 logger.warn(
-                  `${READ_LOG_PREFIX} error reason=${receiptReason} ticketId=${ticket.id} companyId=${ticket.companyId} whatsappId=${ticket.whatsappId} err=${receiptErr instanceof Error ? receiptErr.message : String(receiptErr)}`
+                  `${READ_LOG_PREFIX} skip reason=${receiptReason} cause=no_wbot ticketId=${ticket.id} whatsappId=${ticket.whatsappId}`
                 );
+              } else {
+                try {
+                  await sendWhatsAppReadReceipts(wbot as WbotReceipts, keys, {
+                    companyId: ticket.companyId,
+                    whatsappId: ticket.whatsappId,
+                    ticketId: ticket.id,
+                    readReceiptReason: receiptReason
+                  });
+                } catch (receiptErr) {
+                  logger.warn(
+                    `${READ_LOG_PREFIX} error reason=${receiptReason} ticketId=${ticket.id} companyId=${ticket.companyId} whatsappId=${ticket.whatsappId} err=${receiptErr instanceof Error ? receiptErr.message : String(receiptErr)}`
+                  );
+                }
               }
             }
+          } else {
+            logger.info(
+              `${READ_LOG_PREFIX} skip reason=${receiptReason} cause=autoReadMessages_disabled ticketId=${ticket.id} whatsappId=${ticket.whatsappId}`
+            );
           }
-        } else {
-          logger.info(
-            `${READ_LOG_PREFIX} skip reason=${receiptReason} cause=autoReadMessages_disabled ticketId=${ticket.id} whatsappId=${ticket.whatsappId}`
-          );
         }
       }
     }

@@ -6,6 +6,23 @@ import { getBodyMessage } from "../WbotServices/wbotMessageListener";
 import { logger } from "../../utils/logger";
 import { isNil } from "lodash";
 import UpdateTicketService from "../TicketServices/UpdateTicketService";
+import { isWhatsAppDisableAllReadAndPresenceSideEffects } from "../../helpers/whatsappUnavailablePresence";
+
+async function runTypebotTypingSimulation(
+    wbot: Session,
+    remoteJid: string,
+    typebotDelayMessage: number,
+    label: string
+): Promise<void> {
+    if (isWhatsAppDisableAllReadAndPresenceSideEffects()) {
+        logger.info(`[WhatsAppPresence] suppressed context=${label} reason=WHATSAPP_DISABLE_ALL_READ_AND_PRESENCE_SIDE_EFFECTS`);
+        return;
+    }
+    await wbot.presenceSubscribe(remoteJid);
+    await wbot.sendPresenceUpdate("composing", remoteJid);
+    await delay(typebotDelayMessage);
+    await wbot.sendPresenceUpdate("paused", remoteJid);
+}
 
 
 type Session = WASocket & {
@@ -284,22 +301,14 @@ const typebotListener = async ({
                             }
                         }
 
-                        await wbot.presenceSubscribe(msg.key.remoteJid)
-                        //await delay(2000)
-                        await wbot.sendPresenceUpdate('composing', msg.key.remoteJid)
-                        await delay(typebotDelayMessage)
-                        await wbot.sendPresenceUpdate('paused', msg.key.remoteJid)
+                        await runTypebotTypingSimulation(wbot, msg.key.remoteJid!, typebotDelayMessage, "typebot:text_reply");
 
 
                         await wbot.sendMessage(msg.key.remoteJid, { text: formattedText });
                     }
 
                     if (message.type === 'audio') {
-                        await wbot.presenceSubscribe(msg.key.remoteJid)
-                        //await delay(2000)
-                        await wbot.sendPresenceUpdate('composing', msg.key.remoteJid)
-                        await delay(typebotDelayMessage)
-                        await wbot.sendPresenceUpdate('paused', msg.key.remoteJid)
+                        await runTypebotTypingSimulation(wbot, msg.key.remoteJid!, typebotDelayMessage, "typebot:audio");
                         const media = {
                             audio: {
                                 url: message.content.url,
@@ -328,11 +337,7 @@ const typebotListener = async ({
                     // }
 
                     if (message.type === 'image') {
-                        await wbot.presenceSubscribe(msg.key.remoteJid)
-                        //await delay(2000)
-                        await wbot.sendPresenceUpdate('composing', msg.key.remoteJid)
-                        await delay(typebotDelayMessage)
-                        await wbot.sendPresenceUpdate('paused', msg.key.remoteJid)
+                        await runTypebotTypingSimulation(wbot, msg.key.remoteJid!, typebotDelayMessage, "typebot:image");
                         const media = {
                             image: {
                                 url: message.content.url,
@@ -365,11 +370,7 @@ const typebotListener = async ({
                             formattedText += `▶️ ${item.content}\n`;
                         }
                         formattedText = formattedText.replace(/\n$/, '');
-                        await wbot.presenceSubscribe(msg.key.remoteJid)
-                        //await delay(2000)
-                        await wbot.sendPresenceUpdate('composing', msg.key.remoteJid)
-                        await delay(typebotDelayMessage)
-                        await wbot.sendPresenceUpdate('paused', msg.key.remoteJid)
+                        await runTypebotTypingSimulation(wbot, msg.key.remoteJid!, typebotDelayMessage, "typebot:choice_input");
                         await wbot.sendMessage(msg.key.remoteJid, { text: formattedText });
 
                     }

@@ -10,6 +10,7 @@ import cron from "node-cron";
 import { startBackupAutoScheduler } from "./jobs/backupAutoScheduler";
 import { startBillingAutomationScheduler } from "./jobs/billingAutomationScheduler";
 import { startSignupCriticalSocketScheduler } from "./jobs/signupCriticalSocketScheduler";
+import { logWhatsAppPolicyAtProcessBoot } from "./helpers/whatsappUnavailablePresence";
 
 const server = app.listen(process.env.PORT, async () => {
   const companies = await Company.findAll();
@@ -23,6 +24,7 @@ const server = app.listen(process.env.PORT, async () => {
     startQueueProcess();
   });
   logger.info(`Server started on port: ${process.env.PORT}`);
+  logWhatsAppPolicyAtProcessBoot();
   logger.info(
     "Super Admin API: GET/POST /platform/super-admins · PUT /platform/super-admins/:userId " +
       "(e o mesmo sob prefixo /api, ex. POST /api/platform/super-admins). " +

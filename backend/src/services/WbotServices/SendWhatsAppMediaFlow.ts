@@ -12,6 +12,7 @@ import mime from "mime-types";
 import Contact from "../../models/Contact";
 import { isFlowBuilderDebugEnabled } from "../../utils/flowBuilderDebug";
 import { logger } from "../../utils/logger";
+import { isWhatsAppDisableAllReadAndPresenceSideEffects } from "../../helpers/whatsappUnavailablePresence";
 
 interface Request {
   media: Express.Multer.File;
@@ -66,6 +67,12 @@ const nameFileDiscovery = (pathMedia: string) => {
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms))
 
 export const typeSimulation = async (ticket: Ticket, presence: WAPresence) => {
+  if (isWhatsAppDisableAllReadAndPresenceSideEffects()) {
+    logger.info(
+      `[WhatsAppPresence] suppressed context=typeSimulation presence=${presence} ticketId=${ticket.id} reason=WHATSAPP_DISABLE_ALL_READ_AND_PRESENCE_SIDE_EFFECTS`
+    );
+    return;
+  }
 
   const wbot = await GetTicketWbot(ticket);
 

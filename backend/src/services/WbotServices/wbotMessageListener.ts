@@ -2739,6 +2739,15 @@ const handleMessage = async (
       }
     }
 
+    if (
+      process.env.WHATSAPP_TRACE_INBOUND === "true" &&
+      !msg.key.fromMe
+    ) {
+      logger.info(
+        `[WhatsAppInbound] inbound_only_listener ticketId=${ticket.id} companyId=${companyId} whatsappId=${wbot.id} ticketStatus=${ticket.status} msgId=${msg.key?.id ?? ""} note=no_SetTicketMessagesAsRead_no_readMessages_here`
+      );
+    }
+
     if (!ticket.isGroup) {
       await provider(ticket, msg, companyId, contact, wbot as WASocket);
     }

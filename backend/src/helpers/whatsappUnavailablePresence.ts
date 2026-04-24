@@ -1,9 +1,63 @@
 import type { WASocket } from "@whiskeysockets/baileys";
+import fs from "fs";
+import path from "path";
 import { logger } from "../utils/logger";
 
 const LOG_PREFIX = "[WhatsAppPresence]";
+const STARTUP_PREFIX = "[WhatsAppStartup]";
 
 const heartbeatTimers = new Map<number, NodeJS.Timeout>();
+
+/**
+ * Diagnóstico extremo: não chamar readMessages/sendReceipts (ver SetTicketMessagesAsRead),
+ * não enviar presença (unavailable/composing/…) — ver typebot, typeSimulation, sendGlobalUnavailablePresence.
+ * `markOnlineOnConnect` forçado para `true` para aproximar sessão “antiga”.
+ */
+export function isWhatsAppDisableAllReadAndPresenceSideEffects(): boolean {
+  return process.env.WHATSAPP_DISABLE_ALL_READ_AND_PRESENCE_SIDE_EFFECTS === "true";
+}
+
+function readBackendPackageVersion(): string {
+  const candidates = [
+    path.join(__dirname, "..", "..", "package.json"),
+    path.join(process.cwd(), "package.json")
+  ];
+  for (const p of candidates) {
+    try {
+      const v = JSON.parse(fs.readFileSync(p, "utf8")) as { version?: string };
+      if (v?.version) return v.version;
+    } catch {
+      /* next */
+    }
+  }
+  return "unknown";
+}
+
+/** Uma linha inequívoca no arranque: provar build/env em produção. */
+export function logWhatsAppPolicyAtProcessBoot(): void {
+  const version = readBackendPackageVersion();
+  const buildStamp = process.env.BACKEND_BUILD_STAMP || process.env.GIT_SHA || "(unset)";
+  const modeRaw = process.env.WHATSAPP_PRESENCE_MODE ?? "(unset)";
+  const forceOld = process.env.WHATSAPP_FORCE_UNAVAILABLE_PRESENCE ?? "(unset)";
+  const intervalRaw =
+    process.env.WHATSAPP_UNAVAILABLE_PRESENCE_INTERVAL_MS ?? "(unset)";
+  const diag = isWhatsAppDisableAllReadAndPresenceSideEffects();
+
+  logger.info(
+    `${STARTUP_PREFIX} backendPackageVersion=${version} buildStamp=${buildStamp} cwd=${process.cwd()} NODE_ENV=${process.env.NODE_ENV ?? "(unset)"}`
+  );
+  logger.info(
+    `${STARTUP_PREFIX} env_raw WHATSAPP_PRESENCE_MODE=${modeRaw} WHATSAPP_FORCE_UNAVAILABLE_PRESENCE=${forceOld} WHATSAPP_UNAVAILABLE_PRESENCE_INTERVAL_MS=${intervalRaw}`
+  );
+  logger.info(
+    `${STARTUP_PREFIX} env_raw WHATSAPP_DISABLE_ALL_READ_AND_PRESENCE_SIDE_EFFECTS=${diag} WHATSAPP_TRACE_INBOUND=${process.env.WHATSAPP_TRACE_INBOUND ?? "(unset)"} WHATSAPP_READ_RECEIPT_PEER_VISIBLE=${process.env.WHATSAPP_READ_RECEIPT_PEER_VISIBLE ?? "(unset)"} WHATSAPP_READ_RECEIPT_RESPECT_PRIVACY=${process.env.WHATSAPP_READ_RECEIPT_RESPECT_PRIVACY ?? "(unset)"}`
+  );
+
+  const mode = getPresenceMode();
+  logger.info(
+    `${STARTUP_PREFIX} effective presenceMode=${mode} markOnlineOnConnect=${shouldMarkOnlineOnConnect()} sendUnavailableOnConnect=${shouldSendUnavailableOnConnect()} heartbeatEnabled=${shouldRunUnavailableHeartbeat()} intervalMs=${getUnavailablePresenceIntervalMs()} diagnosticSuppress=${diag}`
+  );
+}
 
 export type WhatsAppPresenceMode = "legacy" | "unavailable" | "passive";
 
@@ -37,18 +91,27 @@ export function getPresenceMode(): WhatsAppPresenceMode {
   return "legacy";
 }
 
-/** Comportamento antigo: online ao ligar. */
+/** Comportamento antigo: online ao ligar (`legacy`). Em diagnóstico, força `true`. */
 export function shouldMarkOnlineOnConnect(): boolean {
+  if (isWhatsAppDisableAllReadAndPresenceSideEffects()) {
+    return true;
+  }
   return getPresenceMode() === "legacy";
 }
 
 /** Só no modo `unavailable`: um disparo ao conectar. */
 export function shouldSendUnavailableOnConnect(): boolean {
+  if (isWhatsAppDisableAllReadAndPresenceSideEffects()) {
+    return false;
+  }
   return getPresenceMode() === "unavailable";
 }
 
 /** Só no modo `unavailable`: intervalo periódico. */
 export function shouldRunUnavailableHeartbeat(): boolean {
+  if (isWhatsAppDisableAllReadAndPresenceSideEffects()) {
+    return false;
+  }
   return getPresenceMode() === "unavailable";
 }
 
@@ -73,8 +136,9 @@ export function logWhatsAppPresenceSocketConfig(meta: {
   phase: "makeWASocket" | "connection_open";
 }): void {
   const mode = getPresenceMode();
+  const pkgV = readBackendPackageVersion();
   logger.info(
-    `${LOG_PREFIX} phase=${meta.phase} mode=${mode} markOnlineOnConnect=${shouldMarkOnlineOnConnect()} sendUnavailableOnConnect=${shouldSendUnavailableOnConnect()} heartbeatEnabled=${shouldRunUnavailableHeartbeat()} intervalMs=${getUnavailablePresenceIntervalMs()} whatsappId=${meta.whatsappId} companyId=${meta.companyId} name=${meta.sessionName ?? "-"}`
+    `${LOG_PREFIX} phase=${meta.phase} backendPackageVersion=${pkgV} WHATSAPP_PRESENCE_MODE_raw=${process.env.WHATSAPP_PRESENCE_MODE ?? "(unset)"} mode_effective=${mode} markOnlineOnConnect_effective=${shouldMarkOnlineOnConnect()} sendUnavailableOnConnect=${shouldSendUnavailableOnConnect()} heartbeatEnabled=${shouldRunUnavailableHeartbeat()} intervalMs=${getUnavailablePresenceIntervalMs()} diagnosticSuppress=${isWhatsAppDisableAllReadAndPresenceSideEffects()} whatsappId=${meta.whatsappId} companyId=${meta.companyId} name=${meta.sessionName ?? "-"}`
   );
 }
 
@@ -83,6 +147,12 @@ export async function sendGlobalUnavailablePresence(
   meta: { whatsappId: number; companyId: number; sessionName?: string },
   reason: "connect" | "interval"
 ): Promise<void> {
+  if (isWhatsAppDisableAllReadAndPresenceSideEffects()) {
+    logger.info(
+      `${LOG_PREFIX} skip presence=unavailable reason=${reason} cause=WHATSAPP_DISABLE_ALL_READ_AND_PRESENCE_SIDE_EFFECTS whatsappId=${meta.whatsappId}`
+    );
+    return;
+  }
   try {
     if (typeof wbot.sendPresenceUpdate !== "function") {
       logger.warn(
