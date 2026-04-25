@@ -10,12 +10,14 @@ const ShowAppointmentService = async (
   viewerId: number
 ): Promise<Appointment> => {
   const appointment = await Appointment.findOne({
+    subQuery: false,
     where: { id, companyId },
     include: [
       {
         model: AppointmentParticipant,
         as: "participants",
         required: false,
+        separate: true,
         include: [{ model: User, as: "user", attributes: ["id", "name", "email"] }]
       },
       { model: User, as: "creator", attributes: ["id", "name", "email"] }

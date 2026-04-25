@@ -113,11 +113,13 @@ const CreateAppointmentService = async (data: Data): Promise<Appointment> => {
     }
 
     fullRecord = await Appointment.findByPk(appointment.id, {
+      subQuery: false,
       include: [
         {
           model: AppointmentParticipant,
           as: "participants",
           required: false,
+          separate: true,
           include: [{ model: User, as: "user", attributes: ["id", "name", "email"] }]
         },
         { model: User, as: "creator", attributes: ["id", "name", "email"] }
