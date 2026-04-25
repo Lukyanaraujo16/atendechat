@@ -32,13 +32,18 @@ const ListAppointmentsService = async ({
     andParts.push({ createdBy: Number(createdByFilter) });
   }
 
+  // `separate: true` no hasMany: sem isto, o Sequelize aplica a cláusula de acesso
+  // (literal) dentro de subqueries/joins a `User` e `UserQueues`, o que no MySQL
+  // gera 500 (coluna/alias inexistente ou subquery inválida).
   return Appointment.findAll({
+    subQuery: false,
     where: { [Op.and]: andParts },
     include: [
       {
         model: AppointmentParticipant,
         as: "participants",
         required: false,
+        separate: true,
         include: [
           { model: User, as: "user", attributes: ["id", "name", "email"] }
         ]
