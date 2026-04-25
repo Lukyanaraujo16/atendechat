@@ -37,6 +37,7 @@ import flowCampaignRoutes from "./flowCampaignRoutes";
 import userRatingRoutes from "./userRatingRoutes";
 import ratingTemplateRoutes from "./ratingTemplateRoutes";
 import groupRoutes from "./groupRoutes";
+import appointmentRoutes from "./appointmentRoutes";
 import systemSettingRoutes from "./systemSettingRoutes";
 import platformSuperRoutes from "./platformSuperRoutes";
 import backupRoutes from "./backupRoutes";
@@ -86,5 +87,6 @@ routes.use(flowCampaignRoutes);
 routes.use(userRatingRoutes);
 routes.use(ratingTemplateRoutes);
 routes.use(groupRoutes);
+routes.use(appointmentRoutes);
 
 export default routes;

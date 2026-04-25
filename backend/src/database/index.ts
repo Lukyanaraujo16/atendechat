@@ -50,6 +50,8 @@ import SystemSetting from "../models/SystemSetting";
 import SupportAccessLog from "../models/SupportAccessLog";
 import CompanyLog from "../models/CompanyLog";
 import CompanySignupRequest from "../models/CompanySignupRequest";
+import Appointment from "../models/Appointment";
+import AppointmentParticipant from "../models/AppointmentParticipant";
 
 // eslint-disable-next-line
 const dbConfig = require("../config/database");
@@ -109,6 +111,8 @@ const models = [
   SupportAccessLog,
   CompanyLog,
   CompanySignupRequest,
+  Appointment,
+  AppointmentParticipant
 ];
 
 sequelize.addModels(models);

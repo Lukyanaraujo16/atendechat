@@ -31,6 +31,7 @@ import CampaignsConfig from "../pages/CampaignsConfig";
 import CampaignReport from "../pages/CampaignReport";
 import Chat from "../pages/Chat";
 import ToDoList from "../pages/ToDoList/";
+import Agenda from "../pages/Agenda";
 import Subscription from "../pages/Subscription/";
 import Files from "../pages/Files/";
 import Prompts from "../pages/Prompts";
@@ -417,6 +418,7 @@ export default function LoggedInRoutesContent() {
       />
 
       <Route exact path="/todolist" component={ToDoList} />
+      <Route exact path="/agenda" component={Agenda} />
       <Route
         exact
         path="/schedules"

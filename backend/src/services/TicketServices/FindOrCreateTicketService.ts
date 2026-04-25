@@ -1,18 +1,43 @@
 import { subHours } from "date-fns";
+import moment from "moment";
 import { Op } from "sequelize";
 import Contact from "../../models/Contact";
 import Ticket from "../../models/Ticket";
 import ShowTicketService from "./ShowTicketService";
 import FindOrCreateATicketTrakingService from "./FindOrCreateATicketTrakingService";
-import Setting from "../../models/Setting";
 import Whatsapp from "../../models/Whatsapp";
 import { isFlowBuilderDebugEnabled } from "../../utils/flowBuilderDebug";
 import { logger } from "../../utils/logger";
+import { parseTicketDataWebhook } from "../../helpers/GetTicketRemoteJid";
 
-interface TicketData {
-  status?: string;
-  companyId?: number;
-  unreadMessages?: number;
+export interface FindOrCreateTicketOptions {
+  /** Somente conversas 1:1; não usar em grupos. */
+  newTicketStatus?: "pending" | "open";
+  startedOutsideSystem?: boolean;
+  externalStartLog?: {
+    remoteJid?: string;
+    messageId?: string;
+  };
+}
+
+function mergeStartedOutsideIntoDataWebhook(
+  current: unknown
+): Record<string, unknown> {
+  const base = parseTicketDataWebhook(current);
+  return { ...base, startedOutsideSystem: true };
+}
+
+function logExternalStart(
+  companyId: number,
+  whatsappId: number,
+  contactId: number,
+  ticketId: number,
+  remoteJid: string | undefined,
+  messageId: string | undefined
+): void {
+  logger.info(
+    `[TicketExternalStart] created_from_outbound_whatsapp companyId=${companyId} whatsappId=${whatsappId} contactId=${contactId} ticketId=${ticketId} remoteJid=${remoteJid ?? ""} messageId=${messageId ?? ""}`
+  );
 }
 
 const FindOrCreateTicketService = async (
@@ -20,7 +45,8 @@ const FindOrCreateTicketService = async (
   whatsappId: number,
   unreadMessages: number,
   companyId: number,
-  groupContact?: Contact
+  groupContact?: Contact,
+  options?: FindOrCreateTicketOptions
 ): Promise<Ticket> => {
   let ticket = await Ticket.findOne({
     where: {
@@ -81,11 +107,6 @@ const FindOrCreateTicketService = async (
         userId: ticket.userId
       });
     }
-    const msgIsGroupBlock = await Setting.findOne({
-      where: { key: "timeCreateNewTicket" }
-    });
-
-    const value = msgIsGroupBlock ? parseInt(msgIsGroupBlock.value, 10) : 7200;
   }
 
   if (!ticket && !groupContact) {
@@ -102,23 +123,48 @@ const FindOrCreateTicketService = async (
     });
 
     if (ticket) {
+      const reopenOpen =
+        options?.startedOutsideSystem && options?.newTicketStatus === "open";
       await ticket.update({
-        status: "pending",
+        status: reopenOpen ? "open" : "pending",
         userId: null,
         unreadMessages,
         queueId: null,
-        companyId
+        companyId,
+        ...(reopenOpen
+          ? {
+              chatbot: false,
+              useIntegration: false,
+              integrationId: null,
+              promptId: null,
+              queueOptionId: null,
+              dataWebhook: mergeStartedOutsideIntoDataWebhook(ticket.dataWebhook) as any
+            }
+          : {})
       });
-      await FindOrCreateATicketTrakingService({
+      const ticketTraking = await FindOrCreateATicketTrakingService({
         ticketId: ticket.id,
         companyId,
         whatsappId: ticket.whatsappId,
         userId: ticket.userId
       });
+      if (reopenOpen) {
+        await ticketTraking.update({ startedAt: moment().toDate() });
+      }
+      if (options?.startedOutsideSystem) {
+        logExternalStart(
+          companyId,
+          whatsappId,
+          contact.id,
+          ticket.id,
+          options.externalStartLog?.remoteJid,
+          options.externalStartLog?.messageId
+        );
+      }
     }
   }
 
-    const whatsapp = await Whatsapp.findOne({
+  const whatsapp = await Whatsapp.findOne({
     where: { id: whatsappId }
   });
 
@@ -136,25 +182,92 @@ const FindOrCreateTicketService = async (
         "[FlowBuilder][debug] FindOrCreateTicketService: novo ticket criado no banco"
       );
     }
-    ticket = await Ticket.create({
-      contactId: groupContact ? groupContact.id : contact.id,
-      status: "pending",
-      isGroup: !!groupContact,
-      ...(groupContact ? { chatbot: false } : {}),
-      unreadMessages,
-      whatsappId,
-      whatsapp,
-      companyId
-    });
-    await FindOrCreateATicketTrakingService({
+
+    const initialStatus = groupContact
+      ? "pending"
+      : options?.newTicketStatus ?? "pending";
+
+    const outboundMeta =
+      !groupContact &&
+      options?.startedOutsideSystem &&
+      initialStatus === "open";
+
+    try {
+      ticket = await Ticket.create({
+        contactId: groupContact ? groupContact.id : contact.id,
+        status: initialStatus,
+        isGroup: !!groupContact,
+        ...(groupContact ? { chatbot: false } : {}),
+        ...(outboundMeta
+          ? {
+              chatbot: false,
+              useIntegration: false,
+              integrationId: null,
+              promptId: null,
+              queueId: null as any,
+              userId: null as any,
+              queueOptionId: null as any,
+              dataWebhook: { startedOutsideSystem: true } as any
+            }
+          : {}),
+        unreadMessages,
+        whatsappId,
+        whatsapp,
+        companyId
+      });
+    } catch (err) {
+      logger.error(
+        {
+          err,
+          stack: err instanceof Error ? err.stack : undefined,
+          companyId,
+          whatsappId,
+          contactId: groupContact ? groupContact.id : contact.id
+        },
+        `[WhatsAppInbound] error_processing context=FindOrCreateTicketService.Ticket.create`
+      );
+      throw err;
+    }
+
+    logger.info(
+      `[WhatsAppInbound] ticket_created ticketId=${ticket.id} companyId=${companyId} contactId=${groupContact ? groupContact.id : contact.id} whatsappId=${whatsappId} status=${initialStatus}`
+    );
+
+    const ticketTraking = await FindOrCreateATicketTrakingService({
       ticketId: ticket.id,
       companyId,
       whatsappId,
       userId: ticket.userId
     });
+    if (initialStatus === "open") {
+      await ticketTraking.update({ startedAt: moment().toDate() });
+    }
+    if (outboundMeta) {
+      logExternalStart(
+        companyId,
+        whatsappId,
+        contact.id,
+        ticket.id,
+        options.externalStartLog?.remoteJid,
+        options.externalStartLog?.messageId
+      );
+    }
   }
 
-  ticket = await ShowTicketService(ticket.id, companyId);
+  try {
+    ticket = await ShowTicketService(ticket.id, companyId);
+  } catch (err) {
+    logger.error(
+      {
+        err,
+        stack: err instanceof Error ? err.stack : undefined,
+        ticketId: ticket.id,
+        companyId
+      },
+      `[WhatsAppInbound] error_processing context=FindOrCreateTicketService.ShowTicketService`
+    );
+    throw err;
+  }
 
   return ticket;
 };

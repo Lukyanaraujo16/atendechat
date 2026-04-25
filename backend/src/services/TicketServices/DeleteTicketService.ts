@@ -1,9 +1,12 @@
 import Ticket from "../../models/Ticket";
 import AppError from "../../errors/AppError";
 
-const DeleteTicketService = async (id: string): Promise<Ticket> => {
+const DeleteTicketService = async (
+  id: string,
+  companyId: number
+): Promise<Ticket> => {
   const ticket = await Ticket.findOne({
-    where: { id }
+    where: { id, companyId }
   });
 
   if (!ticket) {

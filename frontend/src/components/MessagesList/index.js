@@ -492,11 +492,7 @@ const MessagesList = ({ ticket, ticketId, isGroup }) => {
     else if (message.mediaType === "image" || message.mediaType === "sticker") {
       return <ModalImageCors imageUrl={message.mediaUrl} />;
     } else if (message.mediaType === "audio") {
-      return (
-        <audio controls>
-          <source src={message.mediaUrl} type="audio/ogg"></source>
-        </audio>
-      );
+      return <audio controls src={message.mediaUrl} preload="metadata" />;
     } else if (message.mediaType === "video") {
       return (
         <video
@@ -641,9 +637,11 @@ const MessagesList = ({ ticket, ticketId, isGroup }) => {
           {message.quotedMsg.mediaType === "audio"
             && (
               <div className={classes.downloadMedia}>
-                <audio controls>
-                  <source src={message.quotedMsg.mediaUrl} type="audio/ogg"></source>
-                </audio>
+                <audio
+                  controls
+                  src={message.quotedMsg.mediaUrl}
+                  preload="metadata"
+                />
               </div>
             )
           }

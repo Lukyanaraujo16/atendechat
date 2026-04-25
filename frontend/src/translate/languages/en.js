@@ -1165,6 +1165,22 @@ const messages = {
 					closed: "Finish",
 					reopen: "Reopen",
 				},
+				orphanConnectionWarning:
+					"This ticket's WhatsApp connection no longer exists. Accept, close, and delete still work; assign a connection again to send messages.",
+				startedOutsideSystemHint: "Conversation started outside the app",
+				orphanReassign: {
+					button: "Reassign connection",
+					title: "Reassign connection",
+					description:
+						"Choose an active connection to restore sending messages in this ticket.",
+					connectionLabel: "WhatsApp connection",
+					confirm: "Confirm",
+					cancel: "Cancel",
+					loading: "Loading connections…",
+					noConnections:
+						"No connections available. Create or connect a WhatsApp before reassigning.",
+					success: "Connection reassigned successfully.",
+				},
 			},
 			ticketsListItem: {
 				ariaTicketRow: "Ticket",
@@ -1212,6 +1228,7 @@ const messages = {
 					tickets: "Tickets",
 					quickMessages: "Quick replies",
 					tasks: "Tasks",
+					agenda: "Agenda",
 					contacts: "Contacts",
 					queues: "Queues & Chatbot",
 					sectors: "Queues",
@@ -2113,6 +2130,61 @@ const messages = {
 				title: "Notifications",
 				noTickets: "No notifications.",
 			},
+			agenda: {
+				title: "Agenda",
+				noCompany: "An active company is required to use the calendar.",
+				newEvent: "New event",
+				emptyState: "No events in this period.",
+				deleteConfirmTitle: "Delete this event?",
+				deleteConfirmMessage: "This action cannot be undone.",
+				deleteConfirmAction: "Delete",
+				toasts: {
+					readOnly: "You cannot edit this event.",
+					created: "Event created.",
+					updated: "Event updated.",
+					deleted: "Event removed.",
+					inviteReceived: "New calendar invitation.",
+				},
+				legend: {
+					individual: "Individual",
+					collective: "Team / company",
+					mine: "Created by me",
+				},
+				calendar: {
+					next: "Next",
+					prev: "Back",
+					today: "Today",
+					month: "Month",
+					week: "Week",
+					day: "Day",
+					agenda: "Agenda",
+					date: "Date",
+					time: "Time",
+					event: "Event",
+					showMore: "+{{count}} more",
+				},
+				form: {
+					create: "New appointment",
+					edit: "Edit appointment",
+					title: "Title",
+					titleRequired: "Title is required.",
+					description: "Description",
+					start: "Start",
+					end: "End",
+					allDay: "All day",
+					collective: "Collective event",
+					visibility: "Visibility",
+					visPrivate: "Private (invited participants only)",
+					visTeam: "Team (same queues as the creator)",
+					visCompany: "Company (everyone)",
+					participants: "Participants",
+					cancel: "Cancel",
+					save: "Save",
+					endAfterStart: "End must be after start.",
+					invalidDate: "Invalid date or time. Check start and end.",
+					participantsRequired: "Add at least one participant for a private collective event.",
+				},
+			},
 			quickMessages: {
 				title: "Quick Responses",
 				searchPlaceholder: "Search by shortcut or message text…",
@@ -2173,6 +2245,23 @@ const messages = {
 					createdAt: "Created",
 					updatedAt: "Updated",
 					status: "Status",
+				},
+				chat: {
+					title: "Quick replies",
+					hintSlash:
+						"Tip: type / in the message field to search and insert by shortcut.",
+					variablesHint:
+						"Variables: {nome}, {primeiro_nome}, {empresa}, {atendente} (and legacy {{name}}, {{firstName}}, etc.). Missing values become empty.",
+					loadingList: "Loading…",
+					emptyFilter: "Refine the search or create a new reply below.",
+					newReply: "+ New reply",
+					backToList: "Back to list",
+					categoryAll: "All",
+					sectionsFavorites: "Favorites",
+					sectionsRecents: "Recent",
+					sectionsAll: "All replies",
+					favoriteToggle: "Toggle favorite",
+					greetingDefault: "Hello",
 				},
 			},
 			messageVariablesPicker: {
@@ -2963,6 +3052,7 @@ const messages = {
 						accept: "Accept",
 						download: "Download",
 						flowHistory: "Flow history",
+						quickReplies: "Quick replies",
 					},
 				},
 				lostCall: "Missed voice/video call at",
@@ -2976,6 +3066,25 @@ const messages = {
 				signMessage: "Sign",
 				sticker: "Send sticker (WebP)",
 				stickerOnlyWebp: "Sticker must be a .webp file",
+				audioRecorder: {
+					generic:
+						"Could not access or start the microphone. Check the browser’s permissions and try again.",
+					permissionDenied:
+						"The microphone is blocked. In the site settings (lock or permissions icon), allow the microphone and try again.",
+					noDevice:
+						"No microphone was found. Connect a microphone or select an input device and try again.",
+					deviceInUse:
+						"The microphone is in use by another app. Close the other app and try again.",
+					notSupported:
+						"Your browser does not support audio recording. Update the browser or use a recent Chrome, Edge, or Firefox.",
+					formatNotSupported:
+						"Your browser does not support this audio format. Update the browser or use an up-to-date Chrome or Edge.",
+					constraints:
+						"Could not use the microphone with the requested settings. Try another device or site permissions.",
+					invalidState: "Invalid recording state. Cancel and try again.",
+					recorderStartFailed: "Could not start recording. Please try again.",
+					blobOrUploadFailed: "Failed to process or send the audio. Please try again.",
+				},
 			},
 			contactDrawer: {
 				header: "Contact Information",
@@ -3241,6 +3350,11 @@ const messages = {
 				ERR_COMPANY_EMAIL_REQUIRED: "The company needs an email to create the administrator account.",
 				ERR_INVALID_ID: "Invalid identifier.",
 				ERR_INVALID_PLAN: "Invalid or unknown plan.",
+				ERR_INVALID_BODY: "Invalid data. Check and try again.",
+				ERR_TICKET_NOT_ORPHAN:
+					"This ticket already has an active link. Reassignment is only allowed for orphan tickets.",
+				ERR_WAPP_NOT_CONNECTED:
+					"The selected connection is not connected. Choose an active session.",
 			},
 		}
 	},

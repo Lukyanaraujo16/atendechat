@@ -12,6 +12,7 @@ import TicketTag from "../../models/TicketTag";
 import { intersection } from "lodash";
 import Whatsapp from "../../models/Whatsapp";
 import { parseTruthyQuery } from "../../utils/parseQueryBoolean";
+import { attachTicketIsOrphanFlag } from "../../helpers/ticketOrphan";
 
 interface Request {
   searchParam?: string;
@@ -243,6 +244,8 @@ const ListTicketsService = async ({
   });
 
   const hasMore = count > offset + tickets.length;
+
+  attachTicketIsOrphanFlag(tickets);
 
   return {
     tickets,

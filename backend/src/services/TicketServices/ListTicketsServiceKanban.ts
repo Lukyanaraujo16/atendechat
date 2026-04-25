@@ -11,6 +11,7 @@ import Tag from "../../models/Tag";
 import TicketTag from "../../models/TicketTag";
 import { intersection } from "lodash";
 import Whatsapp from "../../models/Whatsapp";
+import { attachTicketIsOrphanFlag } from "../../helpers/ticketOrphan";
 import { parseTruthyQuery } from "../../utils/parseQueryBoolean";
 
 interface Request {
@@ -261,6 +262,8 @@ const ListTicketsServiceKanban = async ({
     order: [["updatedAt", "DESC"]],
     subQuery: false
   });
+
+  attachTicketIsOrphanFlag(tickets);
 
   return {
     tickets,

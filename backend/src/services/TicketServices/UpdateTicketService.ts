@@ -7,7 +7,6 @@ import Ticket from "../../models/Ticket";
 import Setting from "../../models/Setting";
 import Queue from "../../models/Queue";
 import ShowTicketService from "./ShowTicketService";
-import ShowWhatsAppService from "../WhatsappService/ShowWhatsAppService";
 import SendWhatsAppMessage from "../WbotServices/SendWhatsAppMessage";
 import FindOrCreateATicketTrakingService from "./FindOrCreateATicketTrakingService";
 import GetTicketWbot from "../../helpers/GetTicketWbot";
@@ -80,8 +79,20 @@ const UpdateTicketService = async ({
     });
 
     if (isNil(whatsappId)) {
-      whatsappId = ticket.whatsappId.toString();
+      whatsappId =
+        ticket.whatsappId != null && ticket.whatsappId !== undefined
+          ? String(ticket.whatsappId)
+          : undefined;
     }
+
+    const trakingWhatsappId =
+      whatsappId != null && `${whatsappId}` !== ""
+        ? whatsappId
+        : ticket.whatsappId;
+    const whatsappIdForDb =
+      !isNil(ticketData.whatsappId) && `${ticketData.whatsappId}` !== ""
+        ? ticketData.whatsappId
+        : ticket.whatsappId;
 
     await SetTicketMessagesAsRead(ticket);
 
@@ -115,47 +126,71 @@ const UpdateTicketService = async ({
     }
 
     if (status !== undefined && ["closed"].indexOf(status) > -1) {
-      try {
-        const { complationMessage, ratingMessage } = await ShowWhatsAppService(
-          ticket.whatsappId,
-          companyId
-        );
+      const whatsappConfig =
+        ticket.whatsappId != null
+          ? await Whatsapp.findOne({
+              where: { id: ticket.whatsappId, companyId },
+              attributes: ["complationMessage", "ratingMessage"]
+            })
+          : null;
+      const complationMessage = whatsappConfig?.complationMessage ?? null;
+      const ratingMessage = whatsappConfig?.ratingMessage ?? null;
 
+      try {
         if (setting?.value === "enabled") {
           if (ticketTraking.ratingAt == null) {
             const ratingTxt = ratingMessage || "";
             let bodyRatingMessage = `\u200e${ratingTxt}\n\n`;
             bodyRatingMessage +=
               "Digite de 1 à 3 para qualificar nosso atendimento:\n*1* - _Insatisfeito_\n*2* - _Satisfeito_\n*3* - _Muito Satisfeito_\n\n";
-            await SendWhatsAppMessage({ body: bodyRatingMessage, ticket });
+            let ratingSent = false;
+            try {
+              await SendWhatsAppMessage({ body: bodyRatingMessage, ticket });
+              ratingSent = true;
+            } catch (sendErr) {
+              logger.warn(
+                `UpdateTicketService: não foi possível enviar pedido de avaliação (ticket ${ticketId}). Fechamento segue sem avaliação. Err: ${sendErr instanceof Error ? sendErr.message : String(sendErr)}`
+              );
+            }
 
-            await ticketTraking.update({
-              ratingAt: moment().toDate(),
-              userId: actionUserId
-            });
-
-            io.to(`company-${ticket.companyId}-open`)
-              .to(`queue-${ticket.queueId}-open`)
-              .to(`company-${companyId}-mainchannel`)
-              .to(ticketId.toString())
-              .emit(`company-${ticket.companyId}-ticket`, {
-                action: "delete",
-                ticketId: ticket.id
+            if (ratingSent) {
+              await ticketTraking.update({
+                ratingAt: moment().toDate(),
+                userId: actionUserId
               });
 
-            return { ticket, oldStatus, oldUserId };
+              io.to(`company-${ticket.companyId}-open`)
+                .to(`queue-${ticket.queueId}-open`)
+                .to(`company-${companyId}-mainchannel`)
+                .to(ticketId.toString())
+                .emit(`company-${ticket.companyId}-ticket`, {
+                  action: "delete",
+                  ticketId: ticket.id
+                });
+
+              return { ticket, oldStatus, oldUserId };
+            }
+          } else {
+            ticketTraking.ratingAt = moment().toDate();
+            ticketTraking.rated = false;
           }
-          ticketTraking.ratingAt = moment().toDate();
-          ticketTraking.rated = false;
         }
 
         if (!isNil(complationMessage) && complationMessage !== "") {
-          const body = `\u200e${complationMessage}`;
-          await SendWhatsAppMessage({ body, ticket });
+          try {
+            await SendWhatsAppMessage({
+              body: `\u200e${complationMessage}`,
+              ticket
+            });
+          } catch (sendErr) {
+            logger.warn(
+              `UpdateTicketService: não foi possível enviar mensagem de conclusão (ticket ${ticketId}). Err: ${sendErr instanceof Error ? sendErr.message : String(sendErr)}`
+            );
+          }
         }
       } catch (err) {
         logger.warn(
-          `UpdateTicketService: WhatsApp desconectado ao fechar ticket ${ticketId}. Ticket será atualizado mesmo assim. Err: ${err?.message || err}`
+          `UpdateTicketService: erro ao processar mensagens de fechamento (ticket ${ticketId}). Ticket será atualizado mesmo assim. Err: ${err instanceof Error ? err.message : String(err)}`
         );
       }
       await ticket.update({
@@ -258,7 +293,7 @@ const UpdateTicketService = async ({
       status,
       queueId,
       userId,
-      whatsappId,
+      whatsappId: whatsappIdForDb,
       chatbot,
       queueOptionId
     });
@@ -267,7 +302,7 @@ const UpdateTicketService = async ({
 
     if (status !== undefined && ["pending"].indexOf(status) > -1) {
       ticketTraking.update({
-        whatsappId,
+        whatsappId: trakingWhatsappId,
         queuedAt: moment().toDate(),
         startedAt: null,
         userId: null
@@ -279,7 +314,7 @@ const UpdateTicketService = async ({
         startedAt: moment().toDate(),
         ratingAt: null,
         rated: false,
-        whatsappId,
+        whatsappId: trakingWhatsappId,
         userId: ticketForEmit.userId
       });
     }

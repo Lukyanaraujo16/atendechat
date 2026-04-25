@@ -11,6 +11,7 @@ import UpdateTicketService from "../services/TicketServices/UpdateTicketService"
 import ListTicketsServiceKanban from "../services/TicketServices/ListTicketsServiceKanban";
 import ListTicketsWithoutConnectionService from "../services/TicketServices/ListTicketsWithoutConnectionService";
 import BulkAssignTicketsWhatsappService from "../services/TicketServices/BulkAssignTicketsWhatsappService";
+import ReassignOrphanTicketWhatsappService from "../services/TicketServices/ReassignOrphanTicketWhatsappService";
 
 type IndexQuery = {
   searchParam: string;
@@ -182,6 +183,28 @@ export const showFromUUID = async (
   return res.status(200).json(ticket);
 };
 
+export const reassignWhatsapp = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const { ticketId } = req.params;
+  const { whatsappId } = req.body as { whatsappId?: number | string };
+  const { companyId, id } = req.user;
+
+  if (whatsappId === undefined || whatsappId === null || `${whatsappId}`.trim() === "") {
+    return res.status(400).json({ error: "ERR_INVALID_BODY" });
+  }
+
+  const ticket = await ReassignOrphanTicketWhatsappService({
+    ticketId: Number(ticketId),
+    companyId,
+    newWhatsappId: Number(whatsappId),
+    actionUserId: id
+  });
+
+  return res.status(200).json(ticket);
+};
+
 export const update = async (
   req: Request,
   res: Response
@@ -210,7 +233,7 @@ export const remove = async (
 
   await ShowTicketService(ticketId, companyId);
 
-  const ticket = await DeleteTicketService(ticketId);
+  const ticket = await DeleteTicketService(ticketId, companyId);
 
   const io = getIO();
   io.to(ticketId)

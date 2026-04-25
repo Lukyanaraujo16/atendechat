@@ -30,6 +30,12 @@ ticketRoutes.get("/tickets/u/:uuid", isAuth, TicketController.showFromUUID);
 
 ticketRoutes.post("/tickets", isAuth, TicketController.store);
 
+ticketRoutes.put(
+  "/tickets/:ticketId/reassign-whatsapp",
+  isAuth,
+  TicketController.reassignWhatsapp
+);
+
 ticketRoutes.put("/tickets/:ticketId", isAuth, TicketController.update);
 
 ticketRoutes.delete("/tickets/:ticketId", isAuth, TicketController.remove);

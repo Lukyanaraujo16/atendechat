@@ -32,7 +32,7 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
-const TicketActionButtonsCustom = ({ ticket }) => {
+const TicketActionButtonsCustom = ({ ticket, onOpenQuickReplies }) => {
   const classes = useStyles();
   const history = useHistory();
   const [loading, setLoading] = useState(false);
@@ -91,6 +91,7 @@ const TicketActionButtonsCustom = ({ ticket }) => {
               onScheduleClick={openSchedule}
               onTransferClick={openTransfer}
               onDeleteClick={openDelete}
+              onQuickRepliesClick={onOpenQuickReplies}
             />
           )}
         </TicketActionModals>

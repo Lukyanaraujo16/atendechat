@@ -11,6 +11,7 @@ import ContactDrawer from "../ContactDrawer";
 import MessageInput from "../MessageInputCustom/";
 import TicketHeader from "../TicketHeader";
 import TicketInfo from "../TicketInfo";
+import ReassignOrphanWhatsappModal from "../ReassignOrphanWhatsappModal";
 import TicketActionButtons from "../TicketActionButtonsCustom";
 import MessagesList from "../MessagesList";
 import api from "../../services/api";
@@ -20,6 +21,7 @@ import { AuthContext } from "../../context/Auth/AuthContext";
 import { TagsContainer } from "../TagsContainer";
 import { SocketContext } from "../../context/Socket/SocketContext";
 import { i18n } from "../../translate/i18n";
+import QuickMessageChatModal from "../QuickMessageChatModal";
 
 const drawerWidth = 320;
 
@@ -91,6 +93,9 @@ const Ticket = () => {
   userRef.current = user;
 
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [reassignModalOpen, setReassignModalOpen] = useState(false);
+  const [quickRepliesOpen, setQuickRepliesOpen] = useState(false);
+  const chatInputControllerRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [contact, setContact] = useState({});
   const [ticket, setTicket] = useState({});
@@ -189,6 +194,9 @@ const Ticket = () => {
           contact={contact}
           ticket={ticket}
           onClick={handleDrawerOpen}
+          onReassignConnection={
+            ticket.isOrphan ? () => setReassignModalOpen(true) : undefined
+          }
         />
       );
     }
@@ -203,7 +211,13 @@ const Ticket = () => {
           isGroup={ticket.isGroup}
         />
         <div className={classes.messageInputFooter}>
-          <MessageInput ticketId={ticket.id} ticketStatus={ticket.status} />
+          <MessageInput
+            ticketId={ticket.id}
+            ticketStatus={ticket.status}
+            contact={contact}
+            ticket={ticket}
+            chatInputControllerRef={chatInputControllerRef}
+          />
         </div>
       </>
     );
@@ -220,7 +234,10 @@ const Ticket = () => {
       >
         <TicketHeader loading={loading}>
           {renderTicketInfo()}
-          <TicketActionButtons ticket={ticket} />
+          <TicketActionButtons
+            ticket={ticket}
+            onOpenQuickReplies={() => setQuickRepliesOpen(true)}
+          />
         </TicketHeader>
         {ticket?.id && (
           <ErrorBoundary>
@@ -240,6 +257,19 @@ const Ticket = () => {
         handleDrawerClose={handleDrawerClose}
         contact={contact}
         loading={loading}
+        ticket={ticket}
+      />
+      <ReassignOrphanWhatsappModal
+        open={reassignModalOpen}
+        onClose={() => setReassignModalOpen(false)}
+        ticketId={ticket.id}
+        onSuccess={(updated) => setTicket(updated)}
+      />
+      <QuickMessageChatModal
+        open={quickRepliesOpen}
+        onClose={() => setQuickRepliesOpen(false)}
+        chatInputControllerRef={chatInputControllerRef}
+        contact={contact}
         ticket={ticket}
       />
     </div>

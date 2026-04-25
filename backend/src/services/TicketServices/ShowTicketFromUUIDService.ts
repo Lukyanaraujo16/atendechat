@@ -5,6 +5,10 @@ import User from "../../models/User";
 import Queue from "../../models/Queue";
 import Tag from "../../models/Tag";
 import Whatsapp from "../../models/Whatsapp";
+import {
+  setIsOrphanOnTicket,
+  setStartedOutsideSystemOnTicket
+} from "../../helpers/ticketOrphan";
 
 const ShowTicketUUIDService = async (uuid: string): Promise<Ticket> => {
   const ticket = await Ticket.findOne({
@@ -44,6 +48,9 @@ const ShowTicketUUIDService = async (uuid: string): Promise<Ticket> => {
   if (!ticket) {
     throw new AppError("ERR_NO_TICKET_FOUND", 404);
   }
+
+  setIsOrphanOnTicket(ticket);
+  setStartedOutsideSystemOnTicket(ticket);
 
   return ticket;
 };

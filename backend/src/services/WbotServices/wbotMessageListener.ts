@@ -109,9 +109,47 @@ export const isNumeric = (value: string) => /^-?\d+$/.test(value);
 
 const writeFileAsync = promisify(writeFile);
 
+/** Desembrulha ephemeral/viewOnce/documentWithCaption para o tipo real (evita perda por tipo “vazio”). */
+function unwrapMessageContent(
+  message: proto.IMessage | null | undefined,
+  depth = 0
+): proto.IMessage | null | undefined {
+  if (!message || depth > 8) return message || undefined;
+  const m = message as proto.IMessage & {
+    ephemeralMessage?: { message?: proto.IMessage };
+    viewOnceMessage?: { message?: proto.IMessage };
+    viewOnceMessageV2?: { message?: proto.IMessage };
+  };
+  const next =
+    m.ephemeralMessage?.message ||
+    m.viewOnceMessage?.message ||
+    m.viewOnceMessageV2?.message ||
+    m.documentWithCaptionMessage?.message;
+  if (next) {
+    return unwrapMessageContent(next, depth + 1) || next;
+  }
+  return message;
+}
+
 const getTypeMessage = (msg: proto.IWebMessageInfo): string => {
-  return getContentType(msg.message);
+  const base = unwrapMessageContent(msg.message);
+  return getContentType(base);
 };
+
+/** Log único de entrada — sempre que o Baileys entrega mensagem no upsert. */
+function logInboundReceived(
+  msg: proto.IWebMessageInfo,
+  companyId: number,
+  whatsappId: number,
+  extra?: string
+): void {
+  const messageType = msg.message
+    ? getContentType(unwrapMessageContent(msg.message))
+    : "(no-message)";
+  logger.info(
+    `[WhatsAppInbound] received messageId=${msg.key?.id ?? ""} remoteJid=${msg.key?.remoteJid ?? ""} fromMe=${!!msg.key?.fromMe} messageType=${messageType} companyId=${companyId} whatsappId=${whatsappId}${extra ? ` ${extra}` : ""}`
+  );
+}
 
 function hasCaption(title: string, fileName: string) {
   if(!title || !fileName) return false;
@@ -409,18 +447,31 @@ export const getBodyMessage = (msg: proto.IWebMessageInfo): string | null => {
     const objKey = Object.keys(types).find(key => key === type);
 
     if (!objKey) {
-      logger.warn(`#### Nao achou o type 152: ${type}
-${JSON.stringify(msg)}`);
+      logger.warn(
+        `[WhatsAppInbound] unsupported_body_extract type=${type || "unknown"} messageId=${msg.key?.id ?? ""} remoteJid=${msg.key?.remoteJid ?? ""}`
+      );
       Sentry.setExtra("Mensagem", { BodyMsg: msg.message, msg, type });
       Sentry.captureException(
-        new Error("Novo Tipo de Mensagem em getTypeMessage")
+        new Error("Novo Tipo de Mensagem em getBodyMessage")
       );
+      return `[Conteúdo: ${type || "mensagem"}]`;
     }
-    return types[type];
+    const raw = types[type];
+    if (raw === undefined || raw === null) {
+      logger.warn(
+        `[WhatsAppInbound] unsupported_body_extract type=${type} messageId=${msg.key?.id ?? ""} (campo vazio)`
+      );
+      return `[Conteúdo: ${type}]`;
+    }
+    return raw;
   } catch (error) {
     Sentry.setExtra("Error getTypeMessage", { msg, BodyMsg: msg.message });
     Sentry.captureException(error);
-    console.log(error);
+    logger.error(
+      { err: error, stack: error instanceof Error ? error.stack : undefined },
+      `[WhatsAppInbound] error_processing context=getBodyMessage`
+    );
+    return "[Erro ao ler o conteúdo da mensagem]";
   }
 };
 
@@ -979,13 +1030,24 @@ export const verifyMediaMessage = async (
   ticketTraking: TicketTraking = null,
   isForwarded: boolean = false,
   isPrivate: boolean = false
-): Promise<Message> => {
+): Promise<Message | undefined> => {
   const io = getIO();
+  try {
   const quotedMsg = await verifyQuotedMessage(msg);
   const media = await downloadMedia(msg);
 
   if (!media) {
-    throw new Error("ERR_WAPP_DOWNLOAD_MEDIA");
+    logger.warn(
+      { ticketId: ticket.id, messageId: msg.key?.id },
+      `[WhatsAppInbound] error_processing context=download_media_failed fallback=verifyMessage_stub`
+    );
+    await verifyMessage(
+      msg,
+      ticket,
+      contact,
+      "[Mídia: não foi possível baixar o arquivo]"
+    );
+    return undefined;
   }
 
   if (!media.filename) {
@@ -1008,8 +1070,13 @@ export const verifyMediaMessage = async (
   const hasCap = hasCaption(body, media.filename);
   const bodyMessage = body ? hasCap ? formatBody(body, ticket.contact) : "-" : "-";
 
+  const safeMessageId =
+    msg.key.id != null && String(msg.key.id).length > 0
+      ? String(msg.key.id)
+      : `fallback-${ticket.id}-${Date.now()}`;
+
   const messageData = {
-    id: msg.key.id,
+    id: safeMessageId,
     ticketId: ticket.id,
     contactId: msg.key.fromMe ? undefined : contact.id,
     body: bodyMessage,
@@ -1033,6 +1100,9 @@ export const verifyMediaMessage = async (
     messageData,
     companyId: ticket.companyId
   });
+  logger.info(
+    `[WhatsAppInbound] message_saved ticketId=${ticket.id} messageId=${safeMessageId} mediaType=${messageData.mediaType} fromMe=${messageData.fromMe}`
+  );
 
   if (!msg.key.fromMe && ticket.status === "closed") {
     await ticket.update({ status: "pending" });
@@ -1063,6 +1133,19 @@ export const verifyMediaMessage = async (
   }
 
   return newMessage;
+  } catch (err) {
+    logger.error(
+      {
+        err,
+        stack: err instanceof Error ? err.stack : undefined,
+        ticketId: ticket.id,
+        messageId: msg.key?.id
+      },
+      `[WhatsAppInbound] error_processing context=verifyMediaMessage`
+    );
+    Sentry.captureException(err);
+    throw err;
+  }
 };
 
 /** Texto de "stub" que o WhatsApp envia quando a mensagem ainda está pendente; não usar para salvar. */
@@ -1083,20 +1166,33 @@ export const verifyMessage = async (
   bodyOverride?: string
 ) => {
   const io = getIO();
+  try {
   const quotedMsg = await verifyQuotedMessage(msg);
   const extractedBody = getBodyMessage(msg);
   const fromMe = msg.key?.fromMe ?? Boolean(bodyOverride);
-  const body = bodyOverride ?? extractedBody;
+  let body: string | null = bodyOverride ?? extractedBody;
+  if (body == null || body === "") {
+    body = `[${getTypeMessage(msg)}]`;
+  }
   const isEdited = getTypeMessage(msg) == "editedMessage";
 
   if (fromMe && !bodyOverride && isWhatsAppPendingStub(extractedBody)) {
+    logger.info(
+      `[WhatsAppInbound] ignored reason=whatsapp_pending_stub messageId=${msg.key?.id ?? ""} ticketId=${ticket.id}`
+    );
     return;
   }
 
+  const rawId = isEdited
+    ? msg?.message?.editedMessage?.message?.protocolMessage?.key?.id
+    : msg.key.id;
+  const safeMessageId =
+    rawId != null && String(rawId).length > 0
+      ? String(rawId)
+      : `fallback-${ticket.id}-${Date.now()}`;
+
   const messageData = {
-    id: isEdited
-      ? msg?.message?.editedMessage?.message?.protocolMessage?.key?.id
-      : msg.key.id,
+    id: safeMessageId,
     ticketId: ticket.id,
     contactId: msg.key.fromMe ? undefined : contact.id,
     body,
@@ -1116,6 +1212,9 @@ export const verifyMessage = async (
   });
 
   await CreateMessageService({ messageData, companyId: ticket.companyId });
+  logger.info(
+    `[WhatsAppInbound] message_saved ticketId=${ticket.id} messageId=${safeMessageId} mediaType=${messageData.mediaType} fromMe=${fromMe}`
+  );
 
   if (!msg.key.fromMe && ticket.status === "closed") {
     await ticket.update({ status: "pending" });
@@ -1143,15 +1242,33 @@ export const verifyMessage = async (
         ticketId: ticket.id
       });
   }
+  } catch (err) {
+    logger.error(
+      {
+        err,
+        stack: err instanceof Error ? err.stack : undefined,
+        ticketId: ticket.id,
+        messageId: msg.key?.id
+      },
+      `[WhatsAppInbound] error_processing context=verifyMessage`
+    );
+    Sentry.captureException(err);
+    throw err;
+  }
 
 };
 
 const isValidMsg = (msg: proto.IWebMessageInfo): boolean => {
-  if (msg.key.remoteJid === "status@broadcast") return false;
+  if (msg.key.remoteJid === "status@broadcast") {
+    return false;
+  }
   try {
     const msgType = getTypeMessage(msg);
     if (!msgType) {
-      return;
+      logger.info(
+        `[WhatsAppInbound] ignored reason=empty_message_type messageId=${msg.key?.id ?? ""} remoteJid=${msg.key?.remoteJid ?? ""}`
+      );
+      return false;
     }
 
     const ifType =
@@ -1166,6 +1283,7 @@ const isValidMsg = (msg: proto.IWebMessageInfo): boolean => {
       msgType === "stickerMessage" ||
       msgType === "buttonsResponseMessage" ||
       msgType === "buttonsMessage" ||
+      msgType === "templateButtonReplyMessage" ||
       msgType === "messageContextInfo" ||
       msgType === "locationMessage" ||
       msgType === "liveLocationMessage" ||
@@ -1181,8 +1299,9 @@ const isValidMsg = (msg: proto.IWebMessageInfo): boolean => {
       msgType === "viewOnceMessage";
 
     if (!ifType) {
-      logger.warn(`#### Nao achou o type em isValidMsg: ${msgType}
-${JSON.stringify(msg?.message)}`);
+      logger.warn(
+        `[WhatsAppInbound] ignored reason=unsupported_type type=${msgType} messageId=${msg.key?.id ?? ""} remoteJid=${msg.key?.remoteJid ?? ""}`
+      );
       Sentry.setExtra("Mensagem", { BodyMsg: msg.message, msg, msgType });
       Sentry.captureException(new Error("Novo Tipo de Mensagem em isValidMsg"));
     }
@@ -1191,6 +1310,11 @@ ${JSON.stringify(msg?.message)}`);
   } catch (error) {
     Sentry.setExtra("Error isValidMsg", { msg });
     Sentry.captureException(error);
+    logger.error(
+      { err: error, stack: error instanceof Error ? error.stack : undefined },
+      `[WhatsAppInbound] error_processing context=isValidMsg`
+    );
+    return false;
   }
 };
 
@@ -2573,9 +2697,11 @@ const handleMessage = async (
 ): Promise<void> => {
   let mediaSent: Message | undefined;
 
-  if (!isValidMsg(msg)) return;
-
   try {
+    if (!isValidMsg(msg)) {
+      return;
+    }
+
     let msgContact: IMe;
     let groupContact: Contact | undefined;
 
@@ -2591,29 +2717,45 @@ const handleMessage = async (
     const bodyMessage = getBodyMessage(msg);
     const msgType = getTypeMessage(msg);
 
-    const hasMedia =
-      msg.message?.audioMessage ||
-      msg.message?.imageMessage ||
-      msg.message?.videoMessage ||
-      msg.message?.documentMessage ||
-      msg.message?.documentWithCaptionMessage ||
-      msg.message.stickerMessage;
+    const effectiveForMedia = unwrapMessageContent(msg.message);
+    const hasMedia = !!(
+      effectiveForMedia?.audioMessage ||
+      effectiveForMedia?.imageMessage ||
+      effectiveForMedia?.videoMessage ||
+      effectiveForMedia?.documentMessage ||
+      effectiveForMedia?.documentWithCaptionMessage ||
+      effectiveForMedia?.stickerMessage
+    );
     if (msg.key.fromMe) {
-      if (/\u200e/.test(bodyMessage)) return;
+      if (/\u200e/.test(bodyMessage || "")) {
+        logger.info(
+          `[WhatsAppInbound] ignored reason=fromMe_bidi_mark messageId=${msg.key?.id ?? ""}`
+        );
+        return;
+      }
 
       if (
         !hasMedia &&
         msgType !== "conversation" &&
         msgType !== "extendedTextMessage" &&
-        msgType !== "vcard"
-      )
+        msgType !== "contactMessage"
+      ) {
+        logger.info(
+          `[WhatsAppInbound] ignored reason=fromMe_non_inbox_type type=${msgType} messageId=${msg.key?.id ?? ""}`
+        );
         return;
+      }
       msgContact = await getContactMessage(msg, wbot);
     } else {
       msgContact = await getContactMessage(msg, wbot);
     }
 
-    if (msgIsGroupBlock?.value === "enabled" && isGroup) return;
+    if (msgIsGroupBlock?.value === "enabled" && isGroup) {
+      logger.info(
+        `[WhatsAppInbound] ignored reason=group_messages_disabled messageId=${msg.key?.id ?? ""}`
+      );
+      return;
+    }
 
     // Nunca criar/atualizar ticket para o próprio número (evita resposta ir para "si mesmo")
     if (!isGroup && msg.key.remoteJid) {
@@ -2622,7 +2764,12 @@ const handleMessage = async (
         const contactJid = getContactJidForChat(msg);
         const remoteNumber = contactJid.replace(/\D/g, "");
         const myNumber = jidNormalizedUser(myId).replace(/\D/g, "");
-        if (remoteNumber && myNumber && remoteNumber === myNumber) return;
+        if (remoteNumber && myNumber && remoteNumber === myNumber) {
+          logger.info(
+            `[WhatsAppInbound] ignored reason=self_chat messageId=${msg.key?.id ?? ""}`
+          );
+          return;
+        }
       }
     }
 
@@ -2692,8 +2839,11 @@ const handleMessage = async (
       unreadMessages === 0 &&
       whatsapp.complationMessage &&
       formatBody(whatsapp.complationMessage, contact).trim().toLowerCase() ===
-        lastMessage?.body.trim().toLowerCase()
+        (lastMessage?.body || "").trim().toLowerCase()
     ) {
+      logger.info(
+        `[WhatsAppInbound] ignored reason=completion_message_echo messageId=${msg.key?.id ?? ""} contactId=${contact.id}`
+      );
       return;
     }
 
@@ -2703,12 +2853,28 @@ const handleMessage = async (
       ticket = ticketFromEcho;
       await ticket.update({ unreadMessages });
     } else {
+      const outboundPhoneFirst =
+        msg.key.fromMe &&
+        !isGroup &&
+        !groupContact &&
+        !ticketFromEcho;
+
       ticket = await FindOrCreateTicketService(
         contact,
         wbot.id!,
         unreadMessages,
         companyId,
-        groupContact
+        groupContact,
+        outboundPhoneFirst
+          ? {
+              newTicketStatus: "open",
+              startedOutsideSystem: true,
+              externalStartLog: {
+                remoteJid: msg.key.remoteJid || undefined,
+                messageId: msg.key.id != null ? String(msg.key.id) : undefined
+              }
+            }
+          : undefined
       );
     }
 
@@ -3449,9 +3615,18 @@ const handleMessage = async (
     }
 
   } catch (err) {
-    console.log(err);
+    logger.error(
+      {
+        err,
+        stack: err instanceof Error ? err.stack : undefined,
+        messageId: msg.key?.id,
+        remoteJid: msg.key?.remoteJid,
+        fromMe: msg.key?.fromMe
+      },
+      `[WhatsAppInbound] error_processing context=handleMessage`
+    );
     Sentry.captureException(err);
-    logger.error(`Error handling whatsapp message: Err: ${err}`);
+    throw err;
   }
 };
 
@@ -3522,7 +3697,7 @@ const verifyCampaignMessageAndCloseTicket = async (
   }
 };
 
-const filterMessages = (msg: WAMessage): boolean => {
+const filterMessages = (msg: proto.IWebMessageInfo): boolean => {
   if (msg.message?.protocolMessage) return false;
 
   if (
@@ -3538,26 +3713,100 @@ const filterMessages = (msg: WAMessage): boolean => {
   return true;
 };
 
+/** Uma nova tentativa de processamento (ex.: falha transitória de DB). */
+const processInboundWithRetry = async (
+  message: proto.IWebMessageInfo,
+  wbot: Session,
+  companyId: number
+): Promise<void> => {
+  const ctx = {
+    messageId: message.key?.id,
+    remoteJid: message.key?.remoteJid
+  };
+  try {
+    await handleMessage(message, wbot, companyId);
+  } catch (err) {
+    logger.error(
+      { err, stack: err instanceof Error ? err.stack : undefined, ...ctx },
+      `[WhatsAppInbound] error_processing attempt=1 will_retry`
+    );
+    if (message.key?.id != null) {
+      const alreadySaved = await Message.count({
+        where: { id: message.key.id, companyId }
+      });
+      if (alreadySaved) {
+        logger.info(
+          `[WhatsAppInbound] retry_skipped reason=message_already_persisted messageId=${message.key.id} companyId=${companyId}`
+        );
+        return;
+      }
+    }
+    try {
+      await handleMessage(message, wbot, companyId);
+    } catch (err2) {
+      logger.error(
+        { err: err2, stack: err2 instanceof Error ? err2.stack : undefined, ...ctx },
+        `[WhatsAppInbound] error_processing attempt=2 fatal`
+      );
+      Sentry.captureException(err2);
+    }
+  }
+};
+
 const wbotMessageListener = async (
   wbot: Session,
   companyId: number
 ): Promise<void> => {
   try {
+    const whatsappId = wbot.id ?? 0;
+    logger.info(
+      `[WhatsAppInbound] listener_registered companyId=${companyId} whatsappId=${whatsappId}`
+    );
+
     wbot.ev.on("messages.upsert", async (messageUpsert: ImessageUpsert) => {
-      const messages = messageUpsert.messages
-        .filter(filterMessages)
-        .map(msg => msg);
+      const rawList = messageUpsert.messages || [];
 
-      if (!messages) return;
+      for (const message of rawList) {
+        logInboundReceived(message, companyId, whatsappId);
 
-      for (const message of messages) {
-        const messageExists = await Message.count({
-          where: { id: message.key.id!, companyId }
-        });
+        if (!filterMessages(message)) {
+          logger.info(
+            `[WhatsAppInbound] ignored reason=pre_filter_stub_or_protocol messageId=${message.key?.id ?? ""} remoteJid=${message.key?.remoteJid ?? ""} stubType=${message.messageStubType ?? ""}`
+          );
+          continue;
+        }
 
-        if (!messageExists) {
-          await handleMessage(message, wbot, companyId);
+        try {
+          if (message.key?.id == null || `${message.key.id}`.length === 0) {
+            logger.warn(
+              `[WhatsAppInbound] ignored reason=missing_message_id remoteJid=${message.key?.remoteJid ?? ""} companyId=${companyId}`
+            );
+            continue;
+          }
+          const mid = message.key.id;
+          const messageExists = await Message.count({
+            where: { id: mid, companyId }
+          });
+
+          if (messageExists) {
+            logger.info(
+              `[WhatsAppInbound] ignored reason=duplicate_message_id messageId=${mid} companyId=${companyId}`
+            );
+            continue;
+          }
+
+          await processInboundWithRetry(message, wbot, companyId);
           await verifyCampaignMessageAndCloseTicket(message, companyId);
+        } catch (loopErr) {
+          logger.error(
+            {
+              err: loopErr,
+              stack: loopErr instanceof Error ? loopErr.stack : undefined,
+              messageId: message.key?.id
+            },
+            `[WhatsAppInbound] error_processing context=messages.upsert_loop`
+          );
+          Sentry.captureException(loopErr);
         }
       }
     });

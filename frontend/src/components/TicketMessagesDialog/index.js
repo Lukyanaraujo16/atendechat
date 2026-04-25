@@ -17,6 +17,7 @@ import MessagesList from "../MessagesList";
 import { ReplyMessageProvider } from "../../context/ReplyingMessage/ReplyingMessageContext";
 import TicketHeader from "../TicketHeader";
 import TicketInfo from "../TicketInfo";
+import ReassignOrphanWhatsappModal from "../ReassignOrphanWhatsappModal";
 import { SocketContext } from "../../context/Socket/SocketContext";
 
 const drawerWidth = 320;
@@ -66,6 +67,7 @@ export default function TicketMessagesDialog({ open, handleClose, ticketId }) {
   const [loading, setLoading] = useState(true);
   const [contact, setContact] = useState({});
   const [ticket, setTicket] = useState({});
+  const [reassignModalOpen, setReassignModalOpen] = useState(false);
 
   const socketManager = useContext(SocketContext);
 
@@ -154,6 +156,9 @@ export default function TicketMessagesDialog({ open, handleClose, ticketId }) {
           contact={contact}
           ticket={ticket}
           onClick={handleDrawerOpen}
+          onReassignConnection={
+            ticket.isOrphan ? () => setReassignModalOpen(true) : undefined
+          }
         />
       );
     }
@@ -175,6 +180,12 @@ export default function TicketMessagesDialog({ open, handleClose, ticketId }) {
     <Dialog maxWidth="md" onClose={handleClose} open={open}>
       <TicketHeader loading={loading}>{renderTicketInfo()}</TicketHeader>
       <ReplyMessageProvider>{renderMessagesList()}</ReplyMessageProvider>
+      <ReassignOrphanWhatsappModal
+        open={reassignModalOpen}
+        onClose={() => setReassignModalOpen(false)}
+        ticketId={ticket.id}
+        onSuccess={(updated) => setTicket(updated)}
+      />
       <DialogActions>
         <Button onClick={handleClose} color="primary">
           Fechar

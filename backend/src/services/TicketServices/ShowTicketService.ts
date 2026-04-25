@@ -6,6 +6,10 @@ import Queue from "../../models/Queue";
 import Tag from "../../models/Tag";
 import Whatsapp from "../../models/Whatsapp";
 import Prompt from "../../models/Prompt";
+import {
+  setIsOrphanOnTicket,
+  setStartedOutsideSystemOnTicket
+} from "../../helpers/ticketOrphan";
 
 const ShowTicketService = async (
   id: string | number,
@@ -43,13 +47,16 @@ const ShowTicketService = async (
     ]
   });
 
-  if (ticket?.companyId !== companyId) {
-    throw new AppError("Não é possível consultar registros de outra empresa");
-  }
-
   if (!ticket) {
     throw new AppError("ERR_NO_TICKET_FOUND", 404);
   }
+
+  if (ticket.companyId !== companyId) {
+    throw new AppError("Não é possível consultar registros de outra empresa");
+  }
+
+  setIsOrphanOnTicket(ticket);
+  setStartedOutsideSystemOnTicket(ticket);
 
   return ticket;
 };

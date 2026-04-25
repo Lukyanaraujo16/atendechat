@@ -2,7 +2,6 @@ import React, { useState, useEffect, useContext, useRef, useCallback } from "rea
 import withWidth, { isWidthUp } from "@material-ui/core/withWidth";
 import "emoji-mart/css/emoji-mart.css";
 import { Picker } from "emoji-mart";
-import MicRecorder from "mic-recorder-to-mp3";
 import clsx from "clsx";
 import { isNil } from "lodash";
 
@@ -37,8 +36,9 @@ import toastError from "../../errors/toastError";
 
 import useQuickMessages from "../../hooks/useQuickMessages";
 import { SocketContext } from "../../context/Socket/SocketContext";
-
-const Mp3Recorder = new MicRecorder({ bitRate: 128 });
+import { useWhatsAppPanelRecorder } from "../../hooks/useWhatsAppPanelRecorder";
+import resolveQuickMessageTemplate from "../../utils/resolveQuickMessageTemplate";
+import { recordRecentUse } from "../../utils/quickMessageChatStorage";
 
 const useStyles = makeStyles((theme) => ({
   mainWrapper: {
@@ -346,6 +346,8 @@ const CustomInput = (props) => {
     handleInputPaste,
     disableOption,
     handleQuickAnswersClick,
+    resolveMessageTemplate,
+    onQuickMessageUsed,
   } = props;
   const classes = useStyles();
   const [quickMessages, setQuickMessages] = useState([]);
@@ -368,6 +370,7 @@ const CustomInput = (props) => {
       }
       const cat = m.category ? ` · ${m.category}` : "";
       return {
+        id: m.id,
         value: m.message,
         label: `/${m.shortcode} - ${truncatedMessage}${cat}`,
         shortcode: m.shortcode,
@@ -463,9 +466,15 @@ const CustomInput = (props) => {
           }
         }}
         onChange={(event, opt) => {
-         
+          if (isObject(opt) && has(opt, "value") && opt.id && onQuickMessageUsed) {
+            onQuickMessageUsed(opt.id);
+          }
           if (isObject(opt) && has(opt, "value") && isNil(opt.mediaPath)) {
-            setInputMessage(opt.value);
+            setInputMessage(
+              resolveMessageTemplate
+                ? resolveMessageTemplate(opt.value)
+                : opt.value
+            );
             setTimeout(() => {
               inputRef.current.scrollTop = inputRef.current.scrollHeight;
             }, 200);
@@ -506,14 +515,13 @@ const CustomInput = (props) => {
 };
 
 const MessageInputCustom = (props) => {
-  const { ticketStatus, ticketId } = props;
+  const { ticketStatus, ticketId, chatInputControllerRef, contact, ticket } = props;
   const classes = useStyles();
 
   const [medias, setMedias] = useState([]);
   const [inputMessage, setInputMessage] = useState("");
   const [showEmoji, setShowEmoji] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [recording, setRecording] = useState(false);
   const inputRef = useRef();
   const uploadAsStickerRef = useRef(false);
   const { setReplyingMessage, replyingMessage } =
@@ -521,6 +529,29 @@ const MessageInputCustom = (props) => {
   const { user } = useContext(AuthContext);
 
   const [signMessage, setSignMessage] = useLocalStorage("signOption", true);
+
+  const resolveMessageTemplate = useCallback(
+    (text) =>
+      resolveQuickMessageTemplate(text, {
+        contact,
+        ticket,
+        user,
+        greeting: i18n.t("quickMessages.chat.greetingDefault"),
+      }),
+    [contact, ticket, user]
+  );
+
+  const onQuickMessageUsed = useCallback(
+    (messageId) => {
+      if (user?.id && messageId) {
+        recordRecentUse(user.id, messageId, 10);
+      }
+    },
+    [user?.id]
+  );
+
+  const { recording, handleStartRecording, handleUploadAudio, handleCancelAudio } =
+    useWhatsAppPanelRecorder({ ticketId, setLoading });
 
   useEffect(() => {
     inputRef.current.focus();
@@ -579,11 +610,12 @@ const MessageInputCustom = (props) => {
     setLoading(true);
     try {
       const extension = blob.type.split("/")[1];
+      const body = resolveMessageTemplate(String(message || ""));
 
       const formData = new FormData();
       const filename = `${new Date().getTime()}.${extension}`;
       formData.append("medias", blob, filename);
-      formData.append("body",  message);
+      formData.append("body",  body);
       formData.append("fromMe", true);
 
       await api.post(`/messages/${ticketId}`, formData);
@@ -611,8 +643,61 @@ const MessageInputCustom = (props) => {
     }
 
     setInputMessage("");
-    setInputMessage(value.value);
+    setInputMessage(resolveMessageTemplate(value.value));
   };
+
+  const quickApplyFromModalRef = useRef();
+  quickApplyFromModalRef.current = (row) => {
+    if (!row) return;
+    if (row.id) {
+      onQuickMessageUsed(row.id);
+    }
+    if (row.mediaPath) {
+      handleQuickAnswersClick({
+        id: row.id,
+        value: row.message,
+        shortcode: row.shortcode,
+        mediaPath: row.mediaPath,
+        label: `/${row.shortcode}`,
+      });
+    } else {
+      setInputMessage(resolveMessageTemplate(row.message || ""));
+      setTimeout(() => {
+        if (inputRef.current && inputRef.current.focus) {
+          inputRef.current.focus();
+        }
+      }, 0);
+    }
+  };
+
+  useEffect(() => {
+    if (!chatInputControllerRef) return;
+    chatInputControllerRef.current = {
+      setDraft: (t) => {
+        setInputMessage(
+          resolveMessageTemplate
+            ? resolveMessageTemplate(t)
+            : t
+        );
+        setTimeout(() => {
+          if (inputRef.current && inputRef.current.focus) {
+            inputRef.current.focus();
+          }
+        }, 0);
+      },
+      focus: () => {
+        if (inputRef.current && inputRef.current.focus) {
+          inputRef.current.focus();
+        }
+      },
+      applyQuick: (row) => quickApplyFromModalRef.current?.(row),
+    };
+    return () => {
+      if (chatInputControllerRef) {
+        chatInputControllerRef.current = null;
+      }
+    };
+  }, [chatInputControllerRef, resolveMessageTemplate]);
 
   const handleUploadMedia = async (e) => {
     setLoading(true);
@@ -662,53 +747,6 @@ const MessageInputCustom = (props) => {
     setShowEmoji(false);
     setLoading(false);
     setReplyingMessage(null);
-  };
-
-  const handleStartRecording = async () => {
-    setLoading(true);
-    try {
-      await navigator.mediaDevices.getUserMedia({ audio: true });
-      await Mp3Recorder.start();
-      setRecording(true);
-      setLoading(false);
-    } catch (err) {
-      toastError(err);
-      setLoading(false);
-    }
-  };
-
-  const handleUploadAudio = async () => {
-    setLoading(true);
-    try {
-      const [, blob] = await Mp3Recorder.stop().getMp3();
-      if (blob.size < 10000) {
-        setLoading(false);
-        setRecording(false);
-        return;
-      }
-
-      const formData = new FormData();
-      const filename = `audio-record-site-${new Date().getTime()}.mp3`;
-      formData.append("medias", blob, filename);
-      formData.append("body", filename);
-      formData.append("fromMe", true);
-
-      await api.post(`/messages/${ticketId}`, formData);
-    } catch (err) {
-      toastError(err);
-    }
-
-    setRecording(false);
-    setLoading(false);
-  };
-
-  const handleCancelAudio = async () => {
-    try {
-      await Mp3Recorder.stop().getMp3();
-      setRecording(false);
-    } catch (err) {
-      toastError(err);
-    }
   };
 
   const disableOption = () => {
@@ -811,6 +849,8 @@ const MessageInputCustom = (props) => {
             handleInputPaste={handleInputPaste}
             disableOption={disableOption}
             handleQuickAnswersClick={handleQuickAnswersClick}
+            resolveMessageTemplate={resolveMessageTemplate}
+            onQuickMessageUsed={onQuickMessageUsed}
           />
 
           <ActionButtons

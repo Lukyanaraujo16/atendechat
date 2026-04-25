@@ -14,6 +14,7 @@ import LocalAtmIcon from "@material-ui/icons/LocalAtm";
 import ForumIcon from "@material-ui/icons/Forum";
 import BorderColorIcon from "@material-ui/icons/BorderColor";
 import EventIcon from "@material-ui/icons/Event";
+import CalendarTodayIcon from "@material-ui/icons/CalendarToday";
 import AnnouncementIcon from "@material-ui/icons/Announcement";
 import AttachFile from "@material-ui/icons/AttachFile";
 import LocalOfferIcon from "@material-ui/icons/LocalOffer";
@@ -351,6 +352,7 @@ const MainListItems = (props) => {
   const selFinanceiro = path === "/financeiro";
 
   const selTarefas = path === "/todolist";
+  const selAgenda = path === "/agenda";
   const selAgendamentos = path === "/schedules";
   const selAvaliacao = path === "/avaliacao";
   const selInformativos =
@@ -372,6 +374,15 @@ const MainListItems = (props) => {
         listItemIconClassName={classes.listItemIcon}
         listItemTextClassName={classes.listItemText}
         selected={selTarefas}
+      />
+      <ListItemLink
+        to="/agenda"
+        primary={i18n.t("mainDrawer.listItems.agenda")}
+        icon={<CalendarTodayIcon />}
+        listItemClassName={classes.listItem}
+        listItemIconClassName={classes.listItemIcon}
+        listItemTextClassName={classes.listItemText}
+        selected={selAgenda}
       />
       {showSchedules && (
         <ListItemLink

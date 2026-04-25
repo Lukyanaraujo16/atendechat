@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 
-import { Avatar, CardHeader } from "@material-ui/core";
-import { makeStyles } from "@material-ui/core/styles";
+import { Avatar, Button, CardHeader } from "@material-ui/core";
+import { makeStyles, useTheme } from "@material-ui/core/styles";
 
 import { i18n } from "../../translate/i18n";
 
@@ -38,8 +38,9 @@ const useStyles = makeStyles((theme) => ({
 	},
 }));
 
-const TicketInfo = ({ contact, ticket, onClick }) => {
+const TicketInfo = ({ contact, ticket, onClick, onReassignConnection }) => {
 	const classes = useStyles();
+	const theme = useTheme();
 	const { user } = ticket;
 	const [userName, setUserName] = useState("");
 	const [contactName, setContactName] = useState("");
@@ -62,8 +63,7 @@ const TicketInfo = ({ contact, ticket, onClick }) => {
 				setUserName(`${user.name}`);
 			}
 		}
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, []);
+	}, [ticket, contact]);
 
 	return (
 		<CardHeader
@@ -78,7 +78,57 @@ const TicketInfo = ({ contact, ticket, onClick }) => {
 			subheaderTypographyProps={{ noWrap: true, component: "span" }}
 			avatar={<Avatar src={contact.profilePicUrl} alt="contact_image" />}
 			title={`${contactName} #${ticket.id}`}
-			subheader={ticket.user && `${userName}`}
+			subheader={
+				<span>
+					{ticket.user && `${userName}`}
+					{ticket.startedOutsideSystem && (
+						<span
+							style={{
+								display: "block",
+								marginTop: 4,
+								fontSize: "0.75rem",
+								lineHeight: 1.35,
+								color: theme.palette.text.secondary,
+							}}
+						>
+							{i18n.t("ticketsList.startedOutsideSystemHint")}
+						</span>
+					)}
+					{ticket.isOrphan && (
+						<span style={{ display: "block", marginTop: 4 }}>
+							<span
+								style={{
+									display: "block",
+									fontSize: "0.75rem",
+									lineHeight: 1.35,
+									color: theme.palette.warning.main,
+								}}
+							>
+								{i18n.t("ticketsList.orphanConnectionWarning")}
+							</span>
+							{onReassignConnection && (
+								<Button
+									size="small"
+									color="primary"
+									style={{
+										marginTop: 6,
+										padding: 0,
+										minWidth: 0,
+										textTransform: "none",
+										fontSize: "0.8125rem",
+									}}
+									onClick={(e) => {
+										e.stopPropagation();
+										onReassignConnection();
+									}}
+								>
+									{i18n.t("ticketsList.orphanReassign.button")}
+								</Button>
+							)}
+						</span>
+					)}
+				</span>
+			}
 		/>
 	);
 };

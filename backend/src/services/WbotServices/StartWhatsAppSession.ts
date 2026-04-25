@@ -38,6 +38,9 @@ export const StartWhatsAppSession = async (
 
   try {
     const wbot = await initWASocket(whatsapp);
+    logger.info(
+      `[WhatsAppInbound] session_listener_attaching whatsappId=${whatsapp.id} companyId=${companyId} (reconexão reancora messages.upsert no novo socket)`
+    );
     wbotMessageListener(wbot, companyId);
     wbotMonitor(wbot, whatsapp, companyId);
   } catch (err) {

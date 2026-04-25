@@ -15,6 +15,7 @@ import EventIcon from "@material-ui/icons/Event";
 import UndoRoundedIcon from "@material-ui/icons/UndoRounded";
 import DeleteOutlineIcon from "@material-ui/icons/DeleteOutline";
 import AccountTreeIcon from "@material-ui/icons/AccountTree";
+import FlashOnIcon from "@material-ui/icons/FlashOn";
 
 import { i18n } from "../../translate/i18n";
 import ButtonWithSpinner from "../ButtonWithSpinner";
@@ -101,6 +102,7 @@ const TicketConversationActionBar = ({
   onScheduleClick,
   onTransferClick,
   onDeleteClick,
+  onQuickRepliesClick,
   ticketId,
 }) => {
   const classes = useStyles();
@@ -145,6 +147,21 @@ const TicketConversationActionBar = ({
               </Tooltip>
             )}
           />
+        ) : null}
+
+        {typeof onQuickRepliesClick === "function" ? (
+          <Tooltip title={i18n.t("messagesList.header.buttons.quickReplies")}>
+            <span>
+              <IconButton
+                size="small"
+                onClick={onQuickRepliesClick}
+                disabled={loading}
+                aria-label={i18n.t("messagesList.header.buttons.quickReplies")}
+              >
+                <FlashOnIcon fontSize="small" />
+              </IconButton>
+            </span>
+          </Tooltip>
         ) : null}
 
         <Tooltip title={i18n.t("ticketOptionsMenu.schedule")}>

@@ -2,7 +2,6 @@ import React, { useState, useEffect, useContext, useRef } from "react";
 import "emoji-mart/css/emoji-mart.css";
 import { useParams } from "react-router-dom";
 import { Picker } from "emoji-mart";
-import MicRecorder from "mic-recorder-to-mp3";
 import clsx from "clsx";
 
 import { makeStyles } from "@material-ui/core/styles";
@@ -29,8 +28,7 @@ import { ReplyMessageContext } from "../../context/ReplyingMessage/ReplyingMessa
 import { AuthContext } from "../../context/Auth/AuthContext";
 import { useLocalStorage } from "../../hooks/useLocalStorage";
 import toastError from "../../errors/toastError";
-
-const Mp3Recorder = new MicRecorder({ bitRate: 128 });
+import { useWhatsAppPanelRecorder } from "../../hooks/useWhatsAppPanelRecorder";
 
 const useStyles = makeStyles(theme => ({
 	mainWrapper: {
@@ -172,7 +170,6 @@ const MessageInput = ({ ticketStatus }) => {
 	const [inputMessage, setInputMessage] = useState("");
 	const [showEmoji, setShowEmoji] = useState(false);
 	const [loading, setLoading] = useState(false);
-	const [recording, setRecording] = useState(false);
 	const inputRef = useRef();
 	const uploadAsStickerRef = useRef(false);
 	const { setReplyingMessage, replyingMessage } = useContext(
@@ -181,6 +178,9 @@ const MessageInput = ({ ticketStatus }) => {
 	const { user } = useContext(AuthContext);
 
 	const [signMessage, setSignMessage] = useLocalStorage("signOption", true);
+
+	const { recording, handleStartRecording, handleUploadAudio, handleCancelAudio } =
+		useWhatsAppPanelRecorder({ ticketId, setLoading });
 
 	useEffect(() => {
 		inputRef.current.focus();
@@ -279,53 +279,6 @@ const MessageInput = ({ ticketStatus }) => {
 		setShowEmoji(false);
 		setLoading(false);
 		setReplyingMessage(null);
-	};
-
-	const handleStartRecording = async () => {
-		setLoading(true);
-		try {
-			await navigator.mediaDevices.getUserMedia({ audio: true });
-			await Mp3Recorder.start();
-			setRecording(true);
-			setLoading(false);
-		} catch (err) {
-			toastError(err);
-			setLoading(false);
-		}
-	};
-
-	const handleUploadAudio = async () => {
-		setLoading(true);
-		try {
-			const [, blob] = await Mp3Recorder.stop().getMp3();
-			if (blob.size < 10000) {
-				setLoading(false);
-				setRecording(false);
-				return;
-			}
-
-			const formData = new FormData();
-			const filename = `${new Date().getTime()}.mp3`;
-			formData.append("medias", blob, filename);
-			formData.append("body", filename);
-			formData.append("fromMe", true);
-
-			await api.post(`/messages/${ticketId}`, formData);
-		} catch (err) {
-			toastError(err);
-		}
-
-		setRecording(false);
-		setLoading(false);
-	};
-
-	const handleCancelAudio = async () => {
-		try {
-			await Mp3Recorder.stop().getMp3();
-			setRecording(false);
-		} catch (err) {
-			toastError(err);
-		}
 	};
 
 	const renderReplyingMessage = message => {

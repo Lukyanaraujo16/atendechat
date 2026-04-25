@@ -1165,6 +1165,22 @@ const messages = {
           closed: "Finalizar",
           reopen: "Reabrir",
         },
+        orphanConnectionWarning:
+          "La conexión de WhatsApp de este ticket ya no existe. Aceptar, finalizar y eliminar siguen disponibles; asigne de nuevo una conexión para enviar mensajes.",
+        startedOutsideSystemHint: "Conversación iniciada fuera del sistema",
+        orphanReassign: {
+          button: "Reasignar conexión",
+          title: "Reasignar conexión",
+          description:
+            "Elija una conexión activa para recuperar el envío de mensajes en esta atención.",
+          connectionLabel: "Conexión WhatsApp",
+          confirm: "Confirmar",
+          cancel: "Cancelar",
+          loading: "Cargando conexiones…",
+          noConnections:
+            "No hay conexiones disponibles. Cree o conecte un WhatsApp antes de reasignar.",
+          success: "Conexión reasignada correctamente.",
+        },
       },
       ticketsListItem: {
         ariaTicketRow: "Atención",
@@ -1213,6 +1229,7 @@ const messages = {
           tickets: "Atenciones",
           quickMessages: "Respuestas rápidas",
           tasks: "Tareas",
+          agenda: "Agenda",
           contacts: "Contactos",
           queues: "Colas & Chatbot",
           sectors: "Sectores",
@@ -2116,6 +2133,61 @@ const messages = {
         title: "Notificaciones",
         noTickets: "Ninguna notificación.",
       },
+      agenda: {
+        title: "Agenda",
+        noCompany: "Se requiere una empresa activa para usar la agenda.",
+        newEvent: "Nuevo evento",
+        emptyState: "Ningún evento en este período.",
+        deleteConfirmTitle: "¿Eliminar evento?",
+        deleteConfirmMessage: "Esta acción no se puede deshacer.",
+        deleteConfirmAction: "Eliminar",
+        toasts: {
+          readOnly: "No puede editar este evento.",
+          created: "Evento creado.",
+          updated: "Evento actualizado.",
+          deleted: "Evento eliminado.",
+          inviteReceived: "Nueva invitación en la agenda.",
+        },
+        legend: {
+          individual: "Individual",
+          collective: "Colectivo",
+          mine: "Creado por mí",
+        },
+        calendar: {
+          next: "Siguiente",
+          prev: "Anterior",
+          today: "Hoy",
+          month: "Mes",
+          week: "Semana",
+          day: "Día",
+          agenda: "Lista",
+          date: "Fecha",
+          time: "Hora",
+          event: "Evento",
+          showMore: "+{{count}} más",
+        },
+        form: {
+          create: "Nuevo compromiso",
+          edit: "Editar compromiso",
+          title: "Título",
+          titleRequired: "Indique el título.",
+          description: "Descripción",
+          start: "Inicio",
+          end: "Fin",
+          allDay: "Todo el día",
+          collective: "Evento colectivo",
+          visibility: "Visibilidad",
+          visPrivate: "Privado (solo participantes invitados)",
+          visTeam: "Equipo (mismas colas que el creador)",
+          visCompany: "Empresa (todos)",
+          participants: "Participantes",
+          cancel: "Cancelar",
+          save: "Guardar",
+          endAfterStart: "El fin debe ser después del inicio.",
+          invalidDate: "Fecha u hora no válida. Revise inicio y fin.",
+          participantsRequired: "Añada al menos un participante para evento colectivo privado.",
+        },
+      },
       quickMessages: {
         title: "Respuestas Rápidas",
         searchPlaceholder: "Buscar por atajo o texto…",
@@ -2176,6 +2248,23 @@ const messages = {
           createdAt: "Creado",
           updatedAt: "Actualizado",
           status: "Estado",
+        },
+        chat: {
+          title: "Respuestas rápidas",
+          hintSlash:
+            "Consejo: escriba / en el campo de mensaje para buscar e insertar por atajo.",
+          variablesHint:
+            "Variables: {nome}, {primeiro_nome}, {empresa}, {atendente} (y el legado {{name}}, {{firstName}}, etc.). Los datos faltantes quedan vacíos.",
+          loadingList: "Cargando…",
+          emptyFilter: "Ajuste la búsqueda o cree una respuesta nueva abajo.",
+          newReply: "+ Nueva respuesta",
+          backToList: "Volver a la lista",
+          categoryAll: "Todas",
+          sectionsFavorites: "Favoritas",
+          sectionsRecents: "Recientes",
+          sectionsAll: "Todas las respuestas",
+          favoriteToggle: "Favorita",
+          greetingDefault: "Hola",
         },
       },
       messageVariablesPicker: {
@@ -2864,6 +2953,7 @@ const messages = {
             accept: "Aceptar",
             download: "Descargar",
             flowHistory: "Historial de flujo",
+            quickReplies: "Respuestas rápidas",
           },
         },
         lostCall: "Llamada de voz/video perdida a las",
@@ -2877,6 +2967,25 @@ const messages = {
         signMessage: "Firmar",
         sticker: "Enviar sticker (WebP)",
         stickerOnlyWebp: "El sticker debe ser un archivo .webp",
+        audioRecorder: {
+          generic:
+            "No se pudo acceder o iniciar el micrófono. Compruebe los permisos del navegador e inténtelo de nuevo.",
+          permissionDenied:
+            "El micrófono está bloqueado. En la configuración del sitio (candado o permisos), permita el micrófono e inténtelo de nuevo.",
+          noDevice:
+            "No se encontró ningún micrófono. Conecte un micrófono o seleccione un dispositivo de entrada e inténtelo de nuevo.",
+          deviceInUse:
+            "El micrófono está en uso por otra aplicación. Cierre la otra app e inténtelo de nuevo.",
+          notSupported:
+            "Su navegador no admite grabación de audio. Actualice el navegador o use Chrome, Edge o Firefox reciente.",
+          formatNotSupported:
+            "Su navegador no admite la grabación en este formato. Actualice el navegador o use Chrome/Edge reciente.",
+          constraints:
+            "No se pudo usar el micrófono con la configuración solicitada. Pruebe otro dispositivo o los permisos del sitio.",
+          invalidState: "Estado de grabación no válido. Cancele e inténtelo de nuevo.",
+          recorderStartFailed: "No se pudo iniciar la grabación. Inténtelo de nuevo.",
+          blobOrUploadFailed: "Error al procesar o enviar el audio. Inténtelo de nuevo.",
+        },
       },
       contactDrawer: {
         header: "Datos del contacto",
@@ -3143,6 +3252,11 @@ const messages = {
         ERR_COMPANY_EMAIL_REQUIRED: "La empresa necesita un correo para crear la cuenta de administrador.",
         ERR_INVALID_ID: "Identificador inválido.",
         ERR_INVALID_PLAN: "Plan inválido o inexistente.",
+        ERR_INVALID_BODY: "Datos inválidos. Verifique e intente de nuevo.",
+        ERR_TICKET_NOT_ORPHAN:
+          "Este ticket ya tiene un vínculo activo. La reasignación solo está permitida en tickets huérfanos.",
+        ERR_WAPP_NOT_CONNECTED:
+          "La conexión elegida no está conectada. Seleccione una sesión activa.",
       },
     }
   }
