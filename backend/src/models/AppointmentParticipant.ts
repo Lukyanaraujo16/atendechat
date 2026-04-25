@@ -15,7 +15,11 @@ import User from "./User";
 
 export type ParticipantStatus = "pending" | "accepted" | "declined";
 
-@Table({ tableName: "AppointmentParticipants" })
+@Table({
+  tableName: "AppointmentParticipants",
+  /* Migração só cria "createdAt"; sem esta flag o Sequelize (PG/MySQL) pede "updatedAt" e falha. */
+  updatedAt: false
+})
 class AppointmentParticipant extends Model<AppointmentParticipant> {
   @PrimaryKey
   @AutoIncrement
