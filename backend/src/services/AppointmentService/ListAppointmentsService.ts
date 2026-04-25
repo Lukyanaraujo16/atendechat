@@ -2,6 +2,7 @@ import { Op, Sequelize } from "sequelize";
 import Appointment from "../../models/Appointment";
 import AppointmentParticipant from "../../models/AppointmentParticipant";
 import User from "../../models/User";
+import { buildAppointmentListAccessSqlLiteral } from "../../utils/sqlIdentifier";
 
 type Params = {
   companyId: number;
@@ -10,31 +11,6 @@ type Params = {
   end: Date;
   /** Só admin/supervisor: restringe a compromissos criados por este usuário */
   createdByFilter?: number;
-};
-
-/** Alias Sequelize: FROM "Appointments" AS "Appointment" */
-const buildAccessLiteral = (viewerId: number) => {
-  const v = Number(viewerId);
-  return `(
-    "Appointment"."createdBy" = ${v}
-    OR "Appointment"."visibility" = 'company'
-    OR (
-      "Appointment"."visibility" = 'team'
-      AND EXISTS (
-        SELECT 1 FROM "UserQueues" uq1
-        INNER JOIN "UserQueues" uq2 ON uq1."queueId" = uq2."queueId"
-        WHERE uq1."userId" = ${v} AND uq2."userId" = "Appointment"."createdBy"
-      )
-    )
-    OR (
-      "Appointment"."visibility" = 'private'
-      AND "Appointment"."isCollective" = true
-      AND EXISTS (
-        SELECT 1 FROM "AppointmentParticipants" ap
-        WHERE ap."appointmentId" = "Appointment"."id" AND ap."userId" = ${v}
-      )
-    )
-  )`;
 };
 
 const ListAppointmentsService = async ({
@@ -49,7 +25,7 @@ const ListAppointmentsService = async ({
     { companyId: cId },
     { startAt: { [Op.lt]: end } },
     { endAt: { [Op.gt]: start } },
-    Sequelize.literal(buildAccessLiteral(userId))
+    Sequelize.literal(buildAppointmentListAccessSqlLiteral(userId))
   ];
 
   if (createdByFilter != null) {
