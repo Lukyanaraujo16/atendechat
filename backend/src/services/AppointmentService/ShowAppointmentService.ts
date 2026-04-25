@@ -1,28 +1,14 @@
 import AppError from "../../errors/AppError";
 import Appointment from "../../models/Appointment";
-import AppointmentParticipant from "../../models/AppointmentParticipant";
-import User from "../../models/User";
 import userCanViewAppointment from "./appointmentAccess";
+import { findAppointmentForApi } from "./loadAppointmentForApi";
 
 const ShowAppointmentService = async (
   id: number,
   companyId: number,
   viewerId: number
 ): Promise<Appointment> => {
-  const appointment = await Appointment.findOne({
-    subQuery: false,
-    where: { id, companyId },
-    include: [
-      {
-        model: AppointmentParticipant,
-        as: "participants",
-        required: false,
-        separate: true,
-        include: [{ model: User, as: "user", attributes: ["id", "name", "email"] }]
-      },
-      { model: User, as: "creator", attributes: ["id", "name", "email"] }
-    ]
-  });
+  const appointment = await findAppointmentForApi(id, { companyId });
   if (!appointment) {
     throw new AppError("Compromisso não encontrado.", 404);
   }

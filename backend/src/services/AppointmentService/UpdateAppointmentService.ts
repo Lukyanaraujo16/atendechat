@@ -11,6 +11,7 @@ import {
 } from "./appointmentValidation";
 import sequelize from "../../database";
 import { getIO } from "../../libs/socket";
+import { findAppointmentForApi } from "./loadAppointmentForApi";
 
 type Data = {
   id: number;
@@ -92,26 +93,16 @@ const UpdateAppointmentService = async (data: Data): Promise<Appointment> => {
       }
     }
 
-    const full = await Appointment.findByPk(appointment.id, {
-      subQuery: false,
-      include: [
-        {
-          model: AppointmentParticipant,
-          as: "participants",
-          required: false,
-          separate: true,
-          include: [{ model: User, as: "user", attributes: ["id", "name", "email"] }]
-        },
-        { model: User, as: "creator", attributes: ["id", "name", "email"] }
-      ],
-      transaction: t
-    });
+    const full = await findAppointmentForApi(appointment.id, { transaction: t });
+    if (!full) {
+      throw new AppError("Compromisso não encontrado após atualizar.", 500);
+    }
 
     const io = getIO();
     const payload = { action: "updated", record: full };
     io.to(`company-${companyId}-mainchannel`).emit(`company-${companyId}-appointment`, payload);
 
-    return full as Appointment;
+    return full;
   });
 };
 

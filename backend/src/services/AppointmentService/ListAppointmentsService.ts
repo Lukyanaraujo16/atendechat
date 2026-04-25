@@ -32,26 +32,42 @@ const ListAppointmentsService = async ({
     andParts.push({ createdBy: Number(createdByFilter) });
   }
 
-  // `separate: true` no hasMany: sem isto, o Sequelize aplica a cláusula de acesso
-  // (literal) dentro de subqueries/joins a `User` e `UserQueues`, o que no MySQL
-  // gera 500 (coluna/alias inexistente ou subquery inválida).
-  return Appointment.findAll({
-    subQuery: false,
+  // Sequelize 5 (este projeto) não suporta `separate: true` — includes aninhados
+  // (hasMany + user) com MySQL resultam muitas vezes em 500. Criador em JOIN; participantes
+  // numa segunda query e anexados ao modelo.
+  const rows = await Appointment.findAll({
     where: { [Op.and]: andParts },
     include: [
-      {
-        model: AppointmentParticipant,
-        as: "participants",
-        required: false,
-        separate: true,
-        include: [
-          { model: User, as: "user", attributes: ["id", "name", "email"] }
-        ]
-      },
       { model: User, as: "creator", attributes: ["id", "name", "email"] }
     ],
     order: [["startAt", "ASC"]]
   });
+
+  const appointmentIds = rows.map(r => r.id);
+  if (appointmentIds.length === 0) {
+    return rows;
+  }
+
+  const participants = await AppointmentParticipant.findAll({
+    where: { appointmentId: { [Op.in]: appointmentIds } },
+    include: [
+      { model: User, as: "user", attributes: ["id", "name", "email"] }
+    ],
+    order: [
+      ["appointmentId", "ASC"],
+      ["id", "ASC"]
+    ]
+  });
+  const byAppt = new Map<number, AppointmentParticipant[]>();
+  for (const p of participants) {
+    const list = byAppt.get(p.appointmentId) || [];
+    list.push(p);
+    byAppt.set(p.appointmentId, list);
+  }
+  for (const a of rows) {
+    a.setDataValue("participants", byAppt.get(a.id) || []);
+  }
+  return rows;
 };
 
 export default ListAppointmentsService;
