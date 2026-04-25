@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import AppError from "../errors/AppError";
 import CreateAppointmentService from "../services/AppointmentService/CreateAppointmentService";
 import ListAppointmentsService from "../services/AppointmentService/ListAppointmentsService";
 import ShowAppointmentService from "../services/AppointmentService/ShowAppointmentService";
@@ -13,8 +14,21 @@ import {
 } from "../services/AppointmentService/appointmentValidation";
 import { ParticipantStatus } from "../models/AppointmentParticipant";
 
+/** JWT sem `companyId` → Number(null) = 0 e insere com FK inválida (500). */
+const requireActiveCompanyId = (req: Request): number => {
+  const raw = (req.user as { companyId?: number | null }).companyId;
+  if (raw == null || !Number.isFinite(Number(raw)) || Number(raw) < 1) {
+    throw new AppError(
+      "Sessão sem empresa ativa. Selecione uma empresa ou faça login novamente.",
+      400
+    );
+  }
+  return Number(raw);
+};
+
 export const index = async (req: Request, res: Response): Promise<Response> => {
-  const { id: userId, companyId, profile } = req.user;
+  const companyId = requireActiveCompanyId(req);
+  const { id: userId, profile } = req.user;
   const { start, end, createdBy: createdByQ } = req.query;
   if (start == null || String(start) === "" || end == null || String(end) === "") {
     return res.status(400).json({ error: "Parâmetros start e end (ISO) são obrigatórios." });
@@ -33,7 +47,7 @@ export const index = async (req: Request, res: Response): Promise<Response> => {
     }
   }
   const records = await ListAppointmentsService({
-    companyId: Number(companyId),
+    companyId,
     userId: Number(userId),
     start: startD,
     end: endD,
@@ -43,7 +57,8 @@ export const index = async (req: Request, res: Response): Promise<Response> => {
 };
 
 export const store = async (req: Request, res: Response): Promise<Response> => {
-  const { id: userId, companyId, profile } = req.user;
+  const companyId = requireActiveCompanyId(req);
+  const { id: userId, profile } = req.user;
   const b = req.body;
   const startAt = parseAppointmentInputDate(b.startAt, "startAt");
   const endAt = parseAppointmentInputDate(b.endAt, "endAt");
@@ -57,7 +72,7 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
   }
 
   const record = await CreateAppointmentService({
-    companyId: Number(companyId),
+    companyId,
     userId: Number(userId),
     profile,
     title: b.title,
@@ -73,19 +88,21 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
 };
 
 export const show = async (req: Request, res: Response): Promise<Response> => {
-  const { id: userId, companyId } = req.user;
+  const companyId = requireActiveCompanyId(req);
+  const { id: userId } = req.user;
   const { id } = req.params;
-  const record = await ShowAppointmentService(Number(id), Number(companyId), Number(userId));
+  const record = await ShowAppointmentService(Number(id), companyId, Number(userId));
   return res.json(record);
 };
 
 export const update = async (req: Request, res: Response): Promise<Response> => {
-  const { id: userId, companyId, profile } = req.user;
+  const companyId = requireActiveCompanyId(req);
+  const { id: userId, profile } = req.user;
   const { id } = req.params;
   const b = req.body;
   const data: any = {
     id: Number(id),
-    companyId: Number(companyId),
+    companyId,
     userId: Number(userId),
     profile,
     title: b.title,
@@ -109,19 +126,21 @@ export const update = async (req: Request, res: Response): Promise<Response> => 
 };
 
 export const remove = async (req: Request, res: Response): Promise<Response> => {
-  const { id: userId, companyId, profile } = req.user;
+  const companyId = requireActiveCompanyId(req);
+  const { id: userId, profile } = req.user;
   const { id } = req.params;
-  await DeleteAppointmentService(Number(id), Number(companyId), Number(userId), profile);
+  await DeleteAppointmentService(Number(id), companyId, Number(userId), profile);
   return res.status(200).json({ message: "OK" });
 };
 
 export const respond = async (req: Request, res: Response): Promise<Response> => {
-  const { id: userId, companyId } = req.user;
+  const companyId = requireActiveCompanyId(req);
+  const { id: userId } = req.user;
   const { id } = req.params;
   const status = String(req.body?.status) as ParticipantStatus;
   const record = await RespondAppointmentService(
     Number(id),
-    Number(companyId),
+    companyId,
     Number(userId),
     status
   );

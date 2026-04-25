@@ -10,7 +10,8 @@ import {
 } from "./appointmentValidation";
 import sequelize from "../../database";
 import { getIO } from "../../libs/socket";
-import { findAppointmentForApi } from "./loadAppointmentForApi";
+import { buildAppointmentResponse } from "./loadAppointmentForApi";
+import { logger } from "../../utils/logger";
 
 type Visibility = "private" | "team" | "company";
 
@@ -28,7 +29,9 @@ type Data = {
   participantUserIds?: number[];
 };
 
-const CreateAppointmentService = async (data: Data): Promise<Appointment> => {
+const CreateAppointmentService = async (
+  data: Data
+): Promise<Record<string, unknown>> => {
   const {
     companyId,
     userId,
@@ -71,7 +74,7 @@ const CreateAppointmentService = async (data: Data): Promise<Appointment> => {
 
   const uniqueParticipantIds = normalizeParticipantUserIds(participantUserIds, userId);
 
-  let fullRecord: Appointment | null = null;
+  let fullRecord: Record<string, unknown> | null = null;
 
   await sequelize.transaction(async (t: Transaction) => {
     if (uniqueParticipantIds.length > 0) {
@@ -113,23 +116,28 @@ const CreateAppointmentService = async (data: Data): Promise<Appointment> => {
       }
     }
 
-    fullRecord = await findAppointmentForApi(appointment.id, { transaction: t });
+    const built = await buildAppointmentResponse(appointment.id, { transaction: t });
+    fullRecord = built;
   });
 
   if (!fullRecord) {
     throw new AppError("Erro ao criar compromisso.", 500);
   }
 
-  const io = getIO();
-  const payload = {
-    action: "created",
-    record: fullRecord
-  };
-  io.to(`company-${companyId}-mainchannel`).emit(`company-${companyId}-appointment`, payload);
-  if (isCollective && uniqueParticipantIds.length > 0) {
-    for (const pid of uniqueParticipantIds) {
-      io.to(`user-${pid}`).emit(`company-${companyId}-appointment`, payload);
+  const payload = { action: "created", record: fullRecord };
+  try {
+    const io = getIO();
+    io.to(`company-${companyId}-mainchannel`).emit(`company-${companyId}-appointment`, payload);
+    if (isCollective && uniqueParticipantIds.length > 0) {
+      for (const pid of uniqueParticipantIds) {
+        io.to(`user-${pid}`).emit(`company-${companyId}-appointment`, payload);
+      }
     }
+  } catch (e) {
+    logger.warn(
+      { err: e, companyId, appointmentId: (fullRecord as { id?: number }).id },
+      "CreateAppointment: socket emit falhou; compromisso já gravado."
+    );
   }
 
   return fullRecord;

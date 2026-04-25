@@ -32,14 +32,10 @@ const ListAppointmentsService = async ({
     andParts.push({ createdBy: Number(createdByFilter) });
   }
 
-  // Sequelize 5 (este projeto) não suporta `separate: true` — includes aninhados
-  // (hasMany + user) com MySQL resultam muitas vezes em 500. Criador em JOIN; participantes
-  // numa segunda query e anexados ao modelo.
+  // Sem includes/JOINs: só tabela Appointments; criador e participantes em queries com IN
+  // (Sequelize 5 + MySQL gera 500 com BelongsTo/hasMany incluídos no mesmo list).
   const rows = await Appointment.findAll({
     where: { [Op.and]: andParts },
-    include: [
-      { model: User, as: "creator", attributes: ["id", "name", "email"] }
-    ],
     order: [["startAt", "ASC"]]
   });
 
@@ -48,24 +44,52 @@ const ListAppointmentsService = async ({
     return rows;
   }
 
-  const participants = await AppointmentParticipant.findAll({
+  const rawParts = await AppointmentParticipant.findAll({
     where: { appointmentId: { [Op.in]: appointmentIds } },
-    include: [
-      { model: User, as: "user", attributes: ["id", "name", "email"] }
-    ],
     order: [
       ["appointmentId", "ASC"],
       ["id", "ASC"]
     ]
   });
-  const byAppt = new Map<number, AppointmentParticipant[]>();
-  for (const p of participants) {
-    const list = byAppt.get(p.appointmentId) || [];
-    list.push(p);
-    byAppt.set(p.appointmentId, list);
+  const uids = [...new Set(rawParts.map(p => p.userId))];
+  const users = uids.length
+    ? await User.findAll({
+        where: { id: { [Op.in]: uids } },
+        attributes: ["id", "name", "email"]
+      })
+    : [];
+  const umap = new Map<number, Record<string, unknown>>(
+    users.map(u => {
+      const pl = u.get({ plain: true }) as Record<string, unknown> & { id: number };
+      return [pl.id, pl];
+    })
+  );
+  const withUser: Array<Record<string, unknown>> = rawParts.map(p => {
+    const plain = p.get({ plain: true }) as Record<string, unknown>;
+    return { ...plain, user: umap.get(p.userId) ?? null };
+  });
+  const byAppt = new Map<number, Array<Record<string, unknown>>>();
+  for (const p of withUser) {
+    const aid = p.appointmentId as number;
+    if (!byAppt.has(aid)) byAppt.set(aid, []);
+    byAppt.get(aid)!.push(p);
   }
+  const creatorIds = [...new Set(rows.map(r => r.createdBy))];
+  const creators = creatorIds.length
+    ? await User.findAll({
+        where: { id: { [Op.in]: creatorIds } },
+        attributes: ["id", "name", "email"]
+      })
+    : [];
+  const creatormap = new Map<number, Record<string, unknown>>(
+    creators.map(c => {
+      const pl = c.get({ plain: true }) as Record<string, unknown> & { id: number };
+      return [pl.id, pl];
+    })
+  );
   for (const a of rows) {
-    a.setDataValue("participants", byAppt.get(a.id) || []);
+    a.setDataValue("participants", (byAppt.get(a.id) || []) as any);
+    a.setDataValue("creator", (creatormap.get(a.createdBy) ?? null) as any);
   }
   return rows;
 };

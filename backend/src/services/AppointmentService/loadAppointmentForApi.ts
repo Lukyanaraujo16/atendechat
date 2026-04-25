@@ -1,61 +1,61 @@
-import { Transaction } from "sequelize";
+import { Op, Transaction } from "sequelize";
 import Appointment from "../../models/Appointment";
 import AppointmentParticipant from "../../models/AppointmentParticipant";
 import User from "../../models/User";
 
-const creatorInclude = {
-  model: User,
-  as: "creator" as const,
-  attributes: ["id", "name", "email"]
-};
-
-const userOnParticipant = {
-  model: User,
-  as: "user" as const,
-  attributes: ["id", "name", "email"]
-};
-
 /**
- * Sequelize 5.x (este projeto) não suporta `separate: true` em includes. O efeito
- * costuma ser 500 (SQL inválido) em findByPk/findOne com hasMany+BelongsTo aninhados
- * (MySQL). Aqui: duas consultas previsíveis e junção no modelo.
+ * Constrói o JSON de compromisso com criador e participantes **sem nenhum include/JOIN
+ * do Sequelize** (apenas findByPk + findAll com IN). Evita 500 em MySQL/Sequelize 5
+ * (includes aninhados + alias).
  */
-export const attachParticipantsToAppointment = async (
-  appointment: Appointment,
-  options: { transaction?: Transaction } = {}
-): Promise<Appointment> => {
-  const rows = await AppointmentParticipant.findAll({
-    where: { appointmentId: appointment.id },
-    include: [userOnParticipant],
-    order: [["id", "ASC"]],
-    ...options
-  });
-  (appointment as any).setDataValue("participants", rows);
-  return appointment;
-};
-
-type FindOpts = { transaction?: Transaction; companyId?: number };
-
-/**
- * Carrega um compromisso com criador + participantes (e user de cada participante).
- * Preferir isto a findByPk com include aninhado em MySQL/Sequelize 5.
- */
-export const findAppointmentForApi = async (
+export const buildAppointmentResponse = async (
   id: number,
-  options: FindOpts = {}
-): Promise<Appointment | null> => {
+  options: { transaction?: Transaction; companyId?: number } = {}
+): Promise<Record<string, unknown> | null> => {
   const { transaction, companyId } = options;
-  const where: { id: number; companyId?: number } = { id };
-  if (companyId !== undefined) {
-    where.companyId = companyId;
-  }
-  const a = await Appointment.findOne({
-    where,
-    include: [creatorInclude],
-    transaction
-  });
+  const a = await Appointment.findByPk(id, { transaction });
   if (!a) {
     return null;
   }
-  return attachParticipantsToAppointment(a, { transaction });
+  if (companyId !== undefined && a.companyId !== companyId) {
+    return null;
+  }
+
+  const [creator, rows] = await Promise.all([
+    User.findByPk(a.createdBy, {
+      attributes: ["id", "name", "email"],
+      transaction
+    }),
+    AppointmentParticipant.findAll({
+      where: { appointmentId: id },
+      order: [["id", "ASC"]],
+      transaction
+    })
+  ]);
+
+  const userIds = [...new Set(rows.map(r => r.userId))];
+  const users = userIds.length
+    ? await User.findAll({
+        where: { id: { [Op.in]: userIds } },
+        attributes: ["id", "name", "email"],
+        transaction
+      })
+    : [];
+  const umap = new Map<number, Record<string, unknown>>(
+    users.map(u => {
+      const p = u.get({ plain: true }) as Record<string, unknown> & { id: number };
+      return [p.id, p];
+    })
+  );
+
+  const participants = rows.map(r => {
+    const plain = r.get({ plain: true });
+    return { ...plain, user: umap.get(r.userId) ?? null };
+  });
+
+  return {
+    ...a.get({ plain: true }),
+    creator: creator ? creator.get({ plain: true }) : null,
+    participants
+  };
 };

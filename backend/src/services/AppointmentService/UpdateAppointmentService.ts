@@ -11,7 +11,8 @@ import {
 } from "./appointmentValidation";
 import sequelize from "../../database";
 import { getIO } from "../../libs/socket";
-import { findAppointmentForApi } from "./loadAppointmentForApi";
+import { buildAppointmentResponse } from "./loadAppointmentForApi";
+import { logger } from "../../utils/logger";
 
 type Data = {
   id: number;
@@ -32,7 +33,9 @@ const canEdit = (a: Appointment, userId: number, profile: string) => {
   return false;
 };
 
-const UpdateAppointmentService = async (data: Data): Promise<Appointment> => {
+const UpdateAppointmentService = async (
+  data: Data
+): Promise<Record<string, unknown>> => {
   const { id, companyId, userId, profile, participantUserIds } = data;
   const appointment = await Appointment.findByPk(id);
   if (!appointment || appointment.companyId !== companyId) {
@@ -93,14 +96,21 @@ const UpdateAppointmentService = async (data: Data): Promise<Appointment> => {
       }
     }
 
-    const full = await findAppointmentForApi(appointment.id, { transaction: t });
+    const full = await buildAppointmentResponse(appointment.id, { transaction: t });
     if (!full) {
       throw new AppError("Compromisso não encontrado após atualizar.", 500);
     }
 
-    const io = getIO();
     const payload = { action: "updated", record: full };
-    io.to(`company-${companyId}-mainchannel`).emit(`company-${companyId}-appointment`, payload);
+    try {
+      const io = getIO();
+      io.to(`company-${companyId}-mainchannel`).emit(`company-${companyId}-appointment`, payload);
+    } catch (e) {
+      logger.warn(
+        { err: e, companyId, appointmentId: appointment.id },
+        "UpdateAppointment: socket emit falhou; compromisso já atualizado."
+      );
+    }
 
     return full;
   });
