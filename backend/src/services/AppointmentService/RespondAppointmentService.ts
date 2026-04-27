@@ -2,6 +2,8 @@ import AppError from "../../errors/AppError";
 import AppointmentParticipant, { ParticipantStatus } from "../../models/AppointmentParticipant";
 import userCanViewAppointment from "./appointmentAccess";
 import Appointment from "../../models/Appointment";
+import User from "../../models/User";
+import { notifyAppointmentCreatorOfResponse } from "./appointmentInAppNotifications";
 
 const RespondAppointmentService = async (
   appointmentId: number,
@@ -27,6 +29,22 @@ const RespondAppointmentService = async (
   }
   p.status = status;
   await p.save();
+
+  const responder = await User.findByPk(userId, { attributes: ["name"] });
+  const responderName =
+    responder?.name != null && String(responder.name).trim() !== ""
+      ? String(responder.name).trim()
+      : `Utilizador #${userId}`;
+  await notifyAppointmentCreatorOfResponse({
+    companyId,
+    appointmentId,
+    appointmentTitle: appointment.title,
+    creatorUserId: appointment.createdBy,
+    responderUserId: userId,
+    responderName,
+    status: status as "accepted" | "declined"
+  });
+
   return p;
 };
 

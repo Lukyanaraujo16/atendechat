@@ -844,13 +844,7 @@ export const ActionsWebhookService = async (
           "ok",
           {}
         );
-        ticket = await Ticket.findOne({
-          where: { id: idTicket, companyId }
-        });
-        io.of(String(companyId)).emit(`company-${companyId}-ticket`, {
-          action: "delete",
-          ticketId: idTicket
-        });
+        /** Socket já emitido por UpdateTicketService; evitar `io.of(companyId)` (namespace inexistente para os clientes). */
         await intervalWhats("1");
       }
 
@@ -1813,13 +1807,13 @@ export const ActionsWebhookService = async (
       });
 
       if (ticket.status === "closed") {
-        io.of(String(companyId))
-          // .to(oldStatus)
-          // .to(ticketId.toString())
-          .emit(`company-${ticket.companyId}-ticket`, {
+        io.to(`company-${ticket.companyId}-mainchannel`).emit(
+          `company-${ticket.companyId}-ticket`,
+          {
             action: "delete",
             ticketId: ticket.id
-          });
+          }
+        );
       }
 
       const lastFlowIdToSave = nodeSelected?.id ?? next;

@@ -19,6 +19,7 @@ import { Op } from "sequelize";
 import AppError from "../../errors/AppError";
 import Company from "../../models/Company";
 import { logger } from "../../utils/logger";
+import notifyTicketAfterUpdate from "../OneSignalPush/notifyTicketAfterUpdate";
 
 interface TicketData {
   status?: string;
@@ -347,6 +348,14 @@ const UpdateTicketService = async ({
         action: "update",
         ticket: ticketForEmit
       });
+
+    void notifyTicketAfterUpdate({
+      companyId,
+      ticket: ticketForEmit,
+      oldStatus,
+      oldQueueId,
+      oldUserId
+    });
 
     return { ticket: ticketForEmit, oldStatus, oldUserId };
   } catch (err) {

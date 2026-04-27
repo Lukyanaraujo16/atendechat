@@ -1,5 +1,6 @@
 import { Op } from "sequelize";
 import { getIO } from "../../libs/socket";
+import { toCompanyTicketAudience } from "../../helpers/companyTicketSocket";
 import AppError from "../../errors/AppError";
 import Ticket from "../../models/Ticket";
 import Whatsapp from "../../models/Whatsapp";
@@ -89,17 +90,15 @@ const ReassignOrphanTicketWhatsappService = async ({
   const ticketForEmit = await ShowTicketService(ticketId, companyId);
   const io = getIO();
 
-  io.to(`company-${companyId}-${ticketForEmit.status}`)
-    .to(`company-${companyId}-notification`)
-    .to(`company-${companyId}-mainchannel`)
-    .to(`queue-${ticketForEmit.queueId}-${ticketForEmit.status}`)
-    .to(`queue-${ticketForEmit.queueId}-notification`)
-    .to(String(ticketId))
-    .to(`user-${ticketForEmit?.userId}`)
-    .emit(`company-${companyId}-ticket`, {
-      action: "update",
-      ticket: ticketForEmit
-    });
+  toCompanyTicketAudience(io, companyId, {
+    id: ticketForEmit.id,
+    status: ticketForEmit.status,
+    queueId: ticketForEmit.queueId,
+    userId: ticketForEmit.userId
+  }).emit(`company-${companyId}-ticket`, {
+    action: "update",
+    ticket: ticketForEmit
+  });
 
   return ticketForEmit;
 };

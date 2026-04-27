@@ -1,6 +1,9 @@
 import { Request, Response } from "express";
 import { getIO } from "../libs/socket";
 import Ticket from "../models/Ticket";
+import AppError from "../errors/AppError";
+import { refreshActiveTicketView } from "../libs/cache";
+import { logger } from "../utils/logger";
 
 import CreateTicketService from "../services/TicketServices/CreateTicketService";
 import DeleteTicketService from "../services/TicketServices/DeleteTicketService";
@@ -12,6 +15,10 @@ import ListTicketsServiceKanban from "../services/TicketServices/ListTicketsServ
 import ListTicketsWithoutConnectionService from "../services/TicketServices/ListTicketsWithoutConnectionService";
 import BulkAssignTicketsWhatsappService from "../services/TicketServices/BulkAssignTicketsWhatsappService";
 import ReassignOrphanTicketWhatsappService from "../services/TicketServices/ReassignOrphanTicketWhatsappService";
+import {
+  toCompanyTicketAudience,
+  toCompanyTicketDeleteAudience
+} from "../helpers/companyTicketSocket";
 
 type IndexQuery = {
   searchParam: string;
@@ -104,7 +111,12 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
   });
 
   const io = getIO();
-  io.to(ticket.status).emit(`company-${companyId}-ticket`, {
+  toCompanyTicketAudience(io, companyId, {
+    id: ticket.id,
+    status: ticket.status,
+    queueId: ticket.queueId,
+    userId: ticket.userId
+  }).emit(`company-${companyId}-ticket`, {
     action: "update",
     ticket
   });
@@ -236,15 +248,14 @@ export const remove = async (
   const ticket = await DeleteTicketService(ticketId, companyId);
 
   const io = getIO();
-  io.to(ticketId)
-    .to(`company-${companyId}-${ticket.status}`)
-    .to(`company-${companyId}-notification`)
-    .to(`queue-${ticket.queueId}-${ticket.status}`)
-    .to(`queue-${ticket.queueId}-notification`)
-    .emit(`company-${companyId}-ticket`, {
-      action: "delete",
-      ticketId: +ticketId
-    });
+  toCompanyTicketDeleteAudience(io, companyId, {
+    id: +ticketId,
+    status: ticket.status,
+    queueId: ticket.queueId
+  }).emit(`company-${companyId}-ticket`, {
+    action: "delete",
+    ticketId: +ticketId
+  });
 
   return res.status(200).json({ message: "ticket deleted" });
 };
@@ -268,4 +279,35 @@ export const bulkAssignConnection = async (req: Request, res: Response): Promise
     actionUserId: id
   });
   return res.status(200).json({ updated });
+};
+
+/** Heartbeat: utilizador com ticket aberto e visível (Fase 4 — filtro de push). */
+export const registerActiveView = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const { ticketId } = req.params;
+  const companyId = req.user.companyId;
+  if (companyId == null || Number.isNaN(Number(companyId))) {
+    throw new AppError("ERR_NO_COMPANY_CONTEXT", 400);
+  }
+  const tid = Number(ticketId);
+  if (Number.isNaN(tid) || tid < 1) {
+    throw new AppError("ERR_INVALID_TICKET_ID", 400);
+  }
+  const ticket = await Ticket.findByPk(tid, {
+    attributes: ["id", "companyId"]
+  });
+  if (!ticket || ticket.companyId !== companyId) {
+    throw new AppError("ERR_NO_TICKET_FOUND", 404);
+  }
+  try {
+    await refreshActiveTicketView(companyId, tid, Number(req.user.id), 55);
+  } catch (err) {
+    logger.warn(
+      { err, companyId, ticketId: tid },
+      "[OneSignalPush] active_view_refresh_failed"
+    );
+  }
+  return res.status(204).send();
 };

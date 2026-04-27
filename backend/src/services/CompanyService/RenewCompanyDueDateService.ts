@@ -3,6 +3,11 @@ import AppError from "../../errors/AppError";
 import Company from "../../models/Company";
 import sequelize from "../../database";
 import { createCompanyLog } from "./CreateCompanyLogService";
+import { logger } from "../../utils/logger";
+import {
+  notifySuperAdminsBillingReactivated,
+  notifySuperAdminsBillingRenewal
+} from "./notifySuperAdminsBilling";
 
 /** Alinhado ao formulário de empresas (CompaniesManager). */
 const MONTHS_BY_RECURRENCE: Record<string, number> = {
@@ -95,6 +100,18 @@ const RenewCompanyDueDateService = async (
           kind: "automated_after_renew"
         }
       });
+    }
+
+    try {
+      await notifySuperAdminsBillingRenewal(company, previousDueDate, newDue);
+      if (wasBlocked) {
+        await notifySuperAdminsBillingReactivated(company, newDue);
+      }
+    } catch (err) {
+      logger.warn(
+        { err, companyId: company.id },
+        "[UserNotification] billing_renew_notify_hook_failed"
+      );
     }
   }
 

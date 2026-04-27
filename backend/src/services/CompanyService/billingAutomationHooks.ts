@@ -8,6 +8,7 @@ import {
   templateWarningBeforeDue
 } from "./billingWhatsAppTemplates";
 import { trySendBillingWhatsAppWarning } from "./SendBillingWhatsAppWarningService";
+import { notifySuperAdminsBillingWhatsAppFailed } from "./notifySuperAdminsBilling";
 
 export type BillingAutomationHookEvent =
   | {
@@ -99,6 +100,20 @@ export async function dispatchBillingAutomationEvent(
       destinationPhone: company.phone,
       body
     });
+
+    if (!result.sent && result.skippedReason === "send_failed") {
+      try {
+        await notifySuperAdminsBillingWhatsAppFailed(
+          company,
+          result.error != null ? String(result.error) : undefined
+        );
+      } catch (notifyErr) {
+        logger.warn(
+          { err: notifyErr, companyId: company.id },
+          "[UserNotification] billing_whatsapp_failed_notify_hook_failed"
+        );
+      }
+    }
 
     await mergeWhatsAppIntoCompanyLog(event.logId, {
       channel: "whatsapp",

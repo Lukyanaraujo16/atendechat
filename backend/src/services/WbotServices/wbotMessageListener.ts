@@ -2123,18 +2123,7 @@ const flowbuilderIntegration = async (
       ticketId: ticket.id,
       companyId
     });
-
-    io.of(String(companyId)).emit(`company-${companyId}-ticket`, {
-      action: "delete",
-      ticket,
-      ticketId: ticket.id
-    });
-
-    io.to(ticket.status).emit(`company-${companyId}-ticket`, {
-      action: "update",
-      ticket,
-      ticketId: ticket.id
-    });
+    /** Emissão já feita em UpdateTicketService (salas corretas). Evita duplicar e evita salas legadas `io.of(companyId)` / `io.to("pending")`. */
   }
 
   if (msg.key.fromMe) {

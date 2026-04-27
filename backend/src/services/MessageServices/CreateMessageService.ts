@@ -2,6 +2,7 @@ import { getIO } from "../../libs/socket";
 import Message from "../../models/Message";
 import Ticket from "../../models/Ticket";
 import Whatsapp from "../../models/Whatsapp";
+import notifyTicketInboundMessage from "../OneSignalPush/notifyTicketInboundMessage";
 
 export interface MessageData {
   id: string;
@@ -73,6 +74,10 @@ const CreateMessageService = async ({
       ticket: message.ticket,
       contact: message.ticket.contact
     });
+
+  if (message.fromMe !== true) {
+    void notifyTicketInboundMessage({ message, companyId });
+  }
 
   return message;
 };

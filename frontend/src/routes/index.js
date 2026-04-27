@@ -11,6 +11,7 @@ import PrivacyPolicy from "../pages/Legal/PrivacyPolicy";
 import TermsOfService from "../pages/Legal/TermsOfService";
 import PlatformModule from "../pages/Platform/PlatformModule";
 import { AuthProvider } from "../context/Auth/AuthContext";
+import OneSignalIntegration from "../components/OneSignalIntegration";
 import { TicketsContextProvider } from "../context/Tickets/TicketsContext";
 import { WhatsAppsProvider } from "../context/WhatsApp/WhatsAppsContext";
 import Route from "./Route";
@@ -21,6 +22,7 @@ const Routes = () => {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <OneSignalIntegration />
         <TicketsContextProvider>
           <Switch>
             <Route exact path="/login" component={Login} />

@@ -21,6 +21,7 @@ import GetWhatsappWbot from "./helpers/GetWhatsappWbot";
 import sequelize from "./database";
 import { getMessageOptions } from "./services/WbotServices/SendWhatsAppMedia";
 import { getIO } from "./libs/socket";
+import { toCompanyTicketAudience } from "./helpers/companyTicketSocket";
 import path from "path";
 import User from "./models/User";
 import Company from "./models/Company";
@@ -219,14 +220,16 @@ async function handleSendMessage(job) {
                   await ticket.reload();
 
                   const io = getIO();
-                  io.to(ticket.status)
-                    .to("notification")
-                    .to(ticket.id.toString())
-                    .emit(`company-${companyId}-ticket`, {
-                      action: "update",
-                      ticket,
-                      ticketId: ticket.id
-                    });
+                  toCompanyTicketAudience(io, companyId, {
+                    id: ticket.id,
+                    status: ticket.status,
+                    queueId: ticket.queueId,
+                    userId: ticket.userId
+                  }).emit(`company-${companyId}-ticket`, {
+                    action: "update",
+                    ticket,
+                    ticketId: ticket.id
+                  });
 
                   // io.to("pending").emit(`company-${companyId}-ticket`, {
                   //   action: "update",

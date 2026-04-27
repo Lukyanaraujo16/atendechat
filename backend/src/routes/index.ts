@@ -38,6 +38,7 @@ import userRatingRoutes from "./userRatingRoutes";
 import ratingTemplateRoutes from "./ratingTemplateRoutes";
 import groupRoutes from "./groupRoutes";
 import appointmentRoutes from "./appointmentRoutes";
+import notificationRoutes from "./notificationRoutes";
 import systemSettingRoutes from "./systemSettingRoutes";
 import platformSuperRoutes from "./platformSuperRoutes";
 import backupRoutes from "./backupRoutes";
@@ -50,6 +51,7 @@ routes.use("/api", platformSuperRoutes);
 routes.use(backupRoutes);
 
 routes.use(userRoutes);
+routes.use(notificationRoutes);
 routes.use("/auth", authRoutes);
 routes.use(settingRoutes);
 routes.use(contactRoutes);

@@ -12,6 +12,7 @@ import sequelize from "../../database";
 import { getIO } from "../../libs/socket";
 import { buildAppointmentResponse } from "./loadAppointmentForApi";
 import { logger } from "../../utils/logger";
+import { notifyAppointmentCollectiveInvites } from "./appointmentInAppNotifications";
 
 type Visibility = "private" | "team" | "company";
 
@@ -138,6 +139,19 @@ const CreateAppointmentService = async (
       { err: e, companyId, appointmentId: (fullRecord as { id?: number }).id },
       "CreateAppointment: socket emit falhou; compromisso já gravado."
     );
+  }
+
+  if (isCollective && uniqueParticipantIds.length > 0) {
+    const aid = (fullRecord as { id?: number }).id;
+    if (aid != null) {
+      await notifyAppointmentCollectiveInvites({
+        companyId,
+        appointmentId: aid,
+        title: String(title).trim(),
+        inviteeUserIds: uniqueParticipantIds,
+        createdByUserId: userId
+      });
+    }
   }
 
   return fullRecord;

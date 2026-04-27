@@ -2,8 +2,20 @@ import { Router } from "express";
 
 import isAuth from "../middleware/isAuth";
 import * as UserController from "../controllers/UserController";
+import * as NotificationPreferencesController from "../controllers/NotificationPreferencesController";
 
 const userRoutes = Router();
+
+userRoutes.get(
+  "/users/me/notification-preferences",
+  isAuth,
+  NotificationPreferencesController.showMine
+);
+userRoutes.put(
+  "/users/me/notification-preferences",
+  isAuth,
+  NotificationPreferencesController.updateMine
+);
 
 userRoutes.get("/users", isAuth, UserController.index);
 

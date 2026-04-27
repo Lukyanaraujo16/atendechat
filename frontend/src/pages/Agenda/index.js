@@ -1,31 +1,23 @@
-import React, { useState, useEffect, useCallback, useContext, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useContext, useMemo, useRef } from "react";
+import { useLocation, useHistory } from "react-router-dom";
 import { Calendar, momentLocalizer } from "react-big-calendar";
 import moment from "moment";
 import "moment/locale/pt-br";
+import "moment/locale/es";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import { toast } from "react-toastify";
 
-import { makeStyles } from "@material-ui/core/styles";
+import { makeStyles, useTheme, alpha } from "@material-ui/core/styles";
 import Paper from "@material-ui/core/Paper";
 import Button from "@material-ui/core/Button";
-import Dialog from "@material-ui/core/Dialog";
-import DialogTitle from "@material-ui/core/DialogTitle";
-import DialogContent from "@material-ui/core/DialogContent";
-import DialogActions from "@material-ui/core/DialogActions";
-import TextField from "@material-ui/core/TextField";
-import FormControl from "@material-ui/core/FormControl";
-import FormControlLabel from "@material-ui/core/FormControlLabel";
-import FormLabel from "@material-ui/core/FormLabel";
-import RadioGroup from "@material-ui/core/RadioGroup";
-import Radio from "@material-ui/core/Radio";
-import Switch from "@material-ui/core/Switch";
-import Autocomplete from "@material-ui/lab/Autocomplete";
-import Chip from "@material-ui/core/Chip";
 import Box from "@material-ui/core/Box";
 import Typography from "@material-ui/core/Typography";
 import CircularProgress from "@material-ui/core/CircularProgress";
-import DeleteOutlineIcon from "@material-ui/icons/DeleteOutline";
 import AddIcon from "@material-ui/icons/Add";
+import CalendarTodayOutlinedIcon from "@material-ui/icons/CalendarTodayOutlined";
+import ViewListIcon from "@material-ui/icons/ViewList";
+import ToggleButton from "@material-ui/lab/ToggleButton";
+import ToggleButtonGroup from "@material-ui/lab/ToggleButtonGroup";
 
 import MainContainer from "../../components/MainContainer";
 import MainHeader from "../../components/MainHeader";
@@ -37,37 +29,23 @@ import toastError from "../../errors/toastError";
 import { AuthContext } from "../../context/Auth/AuthContext";
 import { SocketContext } from "../../context/Socket/SocketContext";
 import { isArray } from "lodash";
-import IconButton from "@material-ui/core/IconButton";
 import ConfirmationModal from "../../components/ConfirmationModal";
 
-const localizer = momentLocalizer(moment);
+import AgendaCalendarToolbar from "./AgendaCalendarToolbar";
+import AgendaListView from "./AgendaListView";
+import AgendaEventModal from "./AgendaEventModal";
+import AgendaFilters from "./AgendaFilters";
+import AgendaStats from "./AgendaStats";
+import {
+  canEditAppointment,
+  QUICK_FILTERS,
+  applyQuickFilter,
+  matchesSearchText,
+  groupAppointmentsByStartDay,
+  countOverlappingToday,
+} from "./agendaUtils";
 
-const useStyles = makeStyles((theme) => ({
-  root: { flex: 1, minHeight: 0, display: "flex", flexDirection: "column" },
-  calendarWrap: {
-    position: "relative",
-    height: "calc(100vh - 220px)",
-    minHeight: 480,
-    padding: theme.spacing(0, 0, 2, 0),
-  },
-  loadingOverlay: {
-    position: "absolute",
-    inset: 0,
-    zIndex: 2,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.6)",
-  },
-  legend: { display: "flex", gap: theme.spacing(2), flexWrap: "wrap", marginBottom: theme.spacing(1) },
-  dot: {
-    width: 10,
-    height: 10,
-    borderRadius: "50%",
-    display: "inline-block",
-    marginRight: theme.spacing(0.5),
-  },
-}));
+const localizer = momentLocalizer(moment);
 
 const isElevated = (profile) => profile === "admin" || profile === "supervisor";
 
@@ -83,18 +61,158 @@ function toCalendarEvents(list, myId) {
   }));
 }
 
+const useStyles = makeStyles((theme) => ({
+  root: { flex: 1, minHeight: 0, display: "flex", flexDirection: "column" },
+  pageCard: {
+    borderRadius: theme.shape.borderRadius,
+    border: `1px solid ${theme.palette.divider}`,
+    overflow: "hidden",
+    backgroundColor: theme.palette.background.paper,
+    flex: 1,
+    minHeight: 0,
+    display: "flex",
+    flexDirection: "column",
+    boxShadow:
+      theme.palette.type === "dark"
+        ? "0 4px 24px rgba(0,0,0,0.35)"
+        : "0 4px 24px rgba(0,0,0,0.06)",
+  },
+  pageCardHeader: {
+    padding: theme.spacing(2, 2, 1.5),
+    borderBottom: `1px solid ${theme.palette.divider}`,
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: theme.spacing(2),
+    justifyContent: "space-between",
+  },
+  legend: {
+    display: "flex",
+    gap: theme.spacing(2),
+    flexWrap: "wrap",
+    alignItems: "center",
+    padding: theme.spacing(0, 2, 1.5),
+  },
+  legendItem: {
+    display: "inline-flex",
+    alignItems: "center",
+    fontSize: "0.8125rem",
+    color: theme.palette.text.secondary,
+  },
+  dot: {
+    width: 10,
+    height: 10,
+    borderRadius: "50%",
+    marginRight: theme.spacing(0.75),
+    flexShrink: 0,
+  },
+  calendarShell: {
+    position: "relative",
+    flex: 1,
+    minHeight: 480,
+    padding: theme.spacing(0, 0, 1, 0),
+    "& .rbc-calendar": {
+      fontFamily: theme.typography.fontFamily,
+      color: theme.palette.text.primary,
+    },
+    "& .rbc-header": {
+      borderBottom: `1px solid ${theme.palette.divider}`,
+      color: theme.palette.text.secondary,
+      fontWeight: 600,
+      fontSize: "0.75rem",
+      textTransform: "uppercase",
+      letterSpacing: "0.04em",
+      padding: theme.spacing(1, 0),
+    },
+    "& .rbc-today": {
+      backgroundColor:
+        theme.palette.type === "dark"
+          ? alpha(theme.palette.primary.main, 0.18)
+          : theme.palette.action.selected,
+      boxShadow:
+        theme.palette.type === "dark"
+          ? `inset 0 0 0 1px ${alpha(theme.palette.primary.main, 0.45)}`
+          : "none",
+    },
+    "& .rbc-off-range-bg": {
+      background: theme.palette.action.hover,
+    },
+    "& .rbc-month-view, & .rbc-time-view, & .rbc-day-view": {
+      borderColor: theme.palette.divider,
+    },
+    "& .rbc-day-bg + .rbc-day-bg, & .rbc-month-row + .rbc-month-row": {
+      borderColor: theme.palette.divider,
+    },
+    "& .rbc-time-slot": {
+      borderColor: theme.palette.divider,
+    },
+    "& .rbc-time-header-content": {
+      borderColor: theme.palette.divider,
+    },
+    "& .rbc-current-time-indicator": {
+      backgroundColor: theme.palette.primary.main,
+    },
+    "& .rbc-show-more": {
+      color: theme.palette.primary.main,
+      fontWeight: 600,
+    },
+  },
+  loadingOverlay: {
+    position: "absolute",
+    inset: 0,
+    zIndex: 2,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor:
+      theme.palette.type === "dark" ? "rgba(0,0,0,0.45)" : "rgba(255,255,255,0.72)",
+    backdropFilter: "blur(2px)",
+  },
+  periodHint: {
+    padding: theme.spacing(0, 2, 1),
+    color: theme.palette.text.secondary,
+    fontSize: "0.8125rem",
+  },
+  toggle: {
+    borderRadius: theme.shape.borderRadius,
+  },
+  errorBanner: {
+    margin: theme.spacing(0, 2, 1),
+    padding: theme.spacing(1.5, 2),
+    borderRadius: theme.shape.borderRadius,
+    backgroundColor: theme.palette.error.dark + "22",
+    border: `1px solid ${theme.palette.error.main}44`,
+    color: theme.palette.error.main,
+  },
+}));
+
 const Agenda = () => {
   const classes = useStyles();
+  const theme = useTheme();
+  const location = useLocation();
+  const history = useHistory();
+  const openedFromUrlRef = useRef(false);
   const { user } = useContext(AuthContext);
   const socketManager = useContext(SocketContext);
   const elevated = isElevated(user?.profile);
-  const [events, setEvents] = useState([]);
+
+  const [appointmentsRaw, setAppointmentsRaw] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [users, setUsers] = useState([]);
   const [range, setRange] = useState(null);
+  const [viewMode, setViewMode] = useState("calendar");
+  const [calendarView, setCalendarView] = useState("month");
+  const [calendarDate, setCalendarDate] = useState(() => new Date());
+
   const [open, setOpen] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [editing, setEditing] = useState(null);
+  const [responding, setResponding] = useState(false);
+  const [quickFilter, setQuickFilter] = useState(QUICK_FILTERS.ALL);
+  const [searchQuery, setSearchQuery] = useState("");
+
   const [form, setForm] = useState({
     title: "",
     description: "",
@@ -105,6 +223,9 @@ const Agenda = () => {
     visibility: "private",
     participantUserIds: [],
   });
+
+  const lang = i18n.language || "pt";
+  const localeForFormat = lang.startsWith("en") ? "en" : lang.startsWith("es") ? "es" : "pt";
 
   const loadUsers = useCallback(async () => {
     try {
@@ -120,6 +241,7 @@ const Agenda = () => {
     async (start, end) => {
       if (!user?.companyId) return;
       setLoading(true);
+      setLoadError(false);
       try {
         const { data } = await api.get("/appointments", {
           params: {
@@ -127,10 +249,12 @@ const Agenda = () => {
             end: end.toISOString(),
           },
         });
-        setEvents(toCalendarEvents(data, user.id));
+        const list = isArray(data) ? data : [];
+        setAppointmentsRaw(list);
       } catch (e) {
         toastError(e);
-        setEvents([]);
+        setAppointmentsRaw([]);
+        setLoadError(true);
       } finally {
         setLoading(false);
       }
@@ -143,8 +267,10 @@ const Agenda = () => {
   }, [loadUsers]);
 
   useEffect(() => {
-    moment.locale(i18n.language === "en" ? "en" : "pt-br");
-  }, [i18n.language]);
+    if (lang.startsWith("en")) moment.locale("en");
+    else if (lang.startsWith("es")) moment.locale("es");
+    else moment.locale("pt-br");
+  }, [lang]);
 
   const onRangeChange = useCallback(
     (r) => {
@@ -184,16 +310,22 @@ const Agenda = () => {
     };
   }, [socketManager, range, fetchEvents, user.id]);
 
+  const primaryGreen = theme.palette.primary.main;
+  const collectiveBlue = theme.palette.type === "dark" ? "#42a5f5" : "#1976d2";
+
   const eventStyleGetter = (ev) => {
     const r = ev.resource;
     const collective = r?.isCollective;
     const mine = r?.isMine;
     return {
       style: {
-        backgroundColor: collective ? "#1976d2" : "#2e7d32",
-        border: mine ? "2px solid #ffc107" : "none",
-        borderRadius: 4,
+        backgroundColor: collective ? collectiveBlue : primaryGreen,
+        border: mine ? `2px solid ${theme.palette.warning.main}` : "none",
+        borderRadius: 8,
         color: "#fff",
+        fontWeight: 500,
+        fontSize: "0.8125rem",
+        boxShadow: "0 2px 6px rgba(0,0,0,0.12)",
       },
     };
   };
@@ -218,30 +350,62 @@ const Agenda = () => {
     setOpen(true);
   };
 
-  const openEdit = (calEvent) => {
-    const a = calEvent.resource;
-    if (!a) return;
-    const can =
-      Number(a.createdBy) === Number(user.id) || (elevated && a.isCollective);
-    if (!can) {
-      toast.info(i18n.t("agenda.toasts.readOnly"));
+  const openEvent = useCallback(
+    (calEventOrRaw) => {
+      const a = calEventOrRaw?.resource || calEventOrRaw;
+      if (!a) return;
+      setEditing(a);
+      setForm({
+        title: a.title || "",
+        description: a.description || "",
+        startAt: moment(a.startAt).format("YYYY-MM-DDTHH:mm"),
+        endAt: moment(a.endAt).format("YYYY-MM-DDTHH:mm"),
+        allDay: Boolean(a.allDay),
+        isCollective: Boolean(a.isCollective),
+        visibility: a.visibility || "private",
+        participantUserIds: (a.participants || [])
+          .map((p) => p.userId)
+          .filter((id) => Number(id) !== Number(user.id)),
+      });
+      setOpen(true);
+    },
+    [user?.id]
+  );
+
+  const onSelectEvent = (calEvent) => {
+    openEvent(calEvent);
+  };
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (!params.get("event")) {
+      openedFromUrlRef.current = false;
+    }
+  }, [location.search]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const raw = params.get("event");
+    const id = raw != null ? Number(raw) : NaN;
+    if (!Number.isFinite(id) || id < 1) {
       return;
     }
-    setEditing(a);
-    setForm({
-      title: a.title || "",
-      description: a.description || "",
-      startAt: moment(a.startAt).format("YYYY-MM-DDTHH:mm"),
-      endAt: moment(a.endAt).format("YYYY-MM-DDTHH:mm"),
-      allDay: Boolean(a.allDay),
-      isCollective: Boolean(a.isCollective),
-      visibility: a.visibility || "private",
-      participantUserIds: (a.participants || [])
-        .map((p) => p.userId)
-        .filter((id) => id !== user.id),
+    if (openedFromUrlRef.current) {
+      return;
+    }
+    const a = appointmentsRaw.find((x) => Number(x.id) === id);
+    if (!a) {
+      return;
+    }
+    openedFromUrlRef.current = true;
+    openEvent(a);
+    params.delete("event");
+    const next = params.toString();
+    history.replace({
+      pathname: location.pathname,
+      search: next ? `?${next}` : "",
     });
-    setOpen(true);
-  };
+  }, [appointmentsRaw, location.search, location.pathname, history, openEvent]);
 
   const save = async () => {
     if (!form.title.trim()) {
@@ -261,7 +425,10 @@ const Agenda = () => {
       visibility: elevated && form.isCollective ? form.visibility : "private",
       participantUserIds: elevated && form.isCollective ? pid : [],
     };
-    if (Number.isNaN(new Date(payload.startAt).getTime()) || Number.isNaN(new Date(payload.endAt).getTime())) {
+    if (
+      Number.isNaN(new Date(payload.startAt).getTime()) ||
+      Number.isNaN(new Date(payload.endAt).getTime())
+    ) {
       toast.error(i18n.t("agenda.form.invalidDate"));
       return;
     }
@@ -269,7 +436,11 @@ const Agenda = () => {
       toast.error(i18n.t("agenda.form.endAfterStart"));
       return;
     }
-    if (payload.isCollective && payload.visibility === "private" && (!payload.participantUserIds || payload.participantUserIds.length === 0)) {
+    if (
+      payload.isCollective &&
+      payload.visibility === "private" &&
+      (!payload.participantUserIds || payload.participantUserIds.length === 0)
+    ) {
       toast.error(i18n.t("agenda.form.participantsRequired"));
       return;
     }
@@ -292,6 +463,7 @@ const Agenda = () => {
         toast.success(i18n.t("agenda.toasts.created"));
       }
       setOpen(false);
+      setEditing(null);
       if (range?.start && range?.end) fetchEvents(range.start, range.end);
     } catch (e) {
       toastError(e);
@@ -299,15 +471,44 @@ const Agenda = () => {
   };
 
   const runDelete = async () => {
-    if (!editing?.id) return;
+    const id = deleteTarget?.id || editing?.id;
+    if (!id) return;
     try {
-      await api.delete(`/appointments/${editing.id}`);
+      await api.delete(`/appointments/${id}`);
       toast.success(i18n.t("agenda.toasts.deleted"));
       setOpen(false);
+      setEditing(null);
       setConfirmDeleteOpen(false);
+      setDeleteTarget(null);
       if (range?.start && range?.end) fetchEvents(range.start, range.end);
     } catch (e) {
       toastError(e);
+    }
+  };
+
+  const requestDeleteFromModal = () => {
+    setDeleteTarget(editing);
+    setConfirmDeleteOpen(true);
+  };
+
+  const requestDeleteFromList = (a) => {
+    setDeleteTarget(a);
+    setConfirmDeleteOpen(true);
+  };
+
+  const handleRespond = async (status) => {
+    if (!editing?.id) return;
+    setResponding(true);
+    try {
+      await api.put(`/appointments/${editing.id}/respond`, { status });
+      toast.success(i18n.t("agenda.respond.success"));
+      if (range?.start && range?.end) fetchEvents(range.start, range.end);
+      setOpen(false);
+      setEditing(null);
+    } catch (e) {
+      toastError(e);
+    } finally {
+      setResponding(false);
     }
   };
 
@@ -319,6 +520,49 @@ const Agenda = () => {
       })),
     [users]
   );
+
+  const filteredAfterQuick = useMemo(
+    () => applyQuickFilter(appointmentsRaw, quickFilter, user?.id),
+    [appointmentsRaw, quickFilter, user?.id]
+  );
+
+  const filteredAppointments = useMemo(
+    () => filteredAfterQuick.filter((a) => matchesSearchText(a, searchQuery)),
+    [filteredAfterQuick, searchQuery]
+  );
+
+  const filteredEvents = useMemo(
+    () => toCalendarEvents(filteredAppointments, user?.id),
+    [filteredAppointments, user?.id]
+  );
+
+  const listGroups = useMemo(
+    () => groupAppointmentsByStartDay(filteredAppointments),
+    [filteredAppointments]
+  );
+
+  const todayInFiltered = useMemo(
+    () => countOverlappingToday(filteredAppointments),
+    [filteredAppointments]
+  );
+
+  const filtersActive = useMemo(
+    () => quickFilter !== QUICK_FILTERS.ALL || !!String(searchQuery).trim(),
+    [quickFilter, searchQuery]
+  );
+
+  const clearFilters = useCallback(() => {
+    setQuickFilter(QUICK_FILTERS.ALL);
+    setSearchQuery("");
+  }, []);
+
+  const periodLabel =
+    range?.start && range?.end
+      ? `${moment(range.start).format("LL")} — ${moment(range.end).format("LL")}`
+      : "";
+
+  const canEditCurrent =
+    editing && canEditAppointment(editing, user?.id, elevated);
 
   if (!user?.companyId) {
     return (
@@ -345,201 +589,198 @@ const Agenda = () => {
         </MainHeaderButtonsWrapper>
       </MainHeader>
 
-      <div className={classes.legend}>
-        <span>
-          <i className={classes.dot} style={{ backgroundColor: "#2e7d32" }} />
-          {i18n.t("agenda.legend.individual")}
-        </span>
-        <span>
-          <i className={classes.dot} style={{ backgroundColor: "#1976d2" }} />
-          {i18n.t("agenda.legend.collective")}
-        </span>
-        <span>
-          <i
-            className={classes.dot}
-            style={{ border: "2px solid #ffc107", backgroundColor: "transparent" }}
-          />
-          {i18n.t("agenda.legend.mine")}
-        </span>
-      </div>
-
-      {!loading && events.length === 0 && (
-        <Box py={1} textAlign="center" color="textSecondary">
-          <Typography variant="body2">{i18n.t("agenda.emptyState")}</Typography>
+      <Paper className={classes.pageCard} elevation={0}>
+        <Box className={classes.pageCardHeader}>
+          <ToggleButtonGroup
+            value={viewMode}
+            exclusive
+            onChange={(_, v) => v && setViewMode(v)}
+            size="small"
+            className={classes.toggle}
+          >
+            <ToggleButton value="calendar" aria-label="calendar">
+              <CalendarTodayOutlinedIcon style={{ marginRight: 8, fontSize: 20 }} />
+              {i18n.t("agenda.view.calendar")}
+            </ToggleButton>
+            <ToggleButton value="list" aria-label="list">
+              <ViewListIcon style={{ marginRight: 8, fontSize: 20 }} />
+              {i18n.t("agenda.view.list")}
+            </ToggleButton>
+          </ToggleButtonGroup>
+          {periodLabel ? (
+            <Typography variant="body2" color="textSecondary">
+              {i18n.t("agenda.periodLabel")}: {periodLabel}
+            </Typography>
+          ) : null}
         </Box>
-      )}
 
-      <Paper className={classes.calendarWrap} elevation={0}>
-        {loading && (
-          <Box className={classes.loadingOverlay}>
-            <CircularProgress size={40} />
+        <Box className={classes.legend}>
+          <span className={classes.legendItem}>
+            <i className={classes.dot} style={{ backgroundColor: primaryGreen }} />
+            {i18n.t("agenda.legend.individual")}
+          </span>
+          <span className={classes.legendItem}>
+            <i className={classes.dot} style={{ backgroundColor: collectiveBlue }} />
+            {i18n.t("agenda.legend.collective")}
+          </span>
+          <span className={classes.legendItem}>
+            <i
+              className={classes.dot}
+              style={{
+                border: `2px solid ${theme.palette.warning.main}`,
+                backgroundColor: "transparent",
+              }}
+            />
+            {i18n.t("agenda.legend.mine")}
+          </span>
+        </Box>
+
+        {!loadError && (
+          <>
+            <AgendaFilters
+              quickFilter={quickFilter}
+              onQuickFilter={setQuickFilter}
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              onClear={clearFilters}
+            />
+            <AgendaStats
+              periodTotal={appointmentsRaw.length}
+              filteredCount={filteredAppointments.length}
+              todayInFiltered={todayInFiltered}
+              filtersActive={filtersActive}
+            />
+          </>
+        )}
+
+        {loadError && (
+          <Box className={classes.errorBanner}>
+            {i18n.t("agenda.loadError")}
           </Box>
         )}
-        <Calendar
-          localizer={localizer}
-          culture={i18n.language === "en" ? "en" : "pt-BR"}
-          defaultView="month"
-          events={events}
-          startAccessor="start"
-          endAccessor="end"
-          style={{ height: "100%" }}
-          onRangeChange={onRangeChange}
-          onSelectSlot={openNew}
-          onSelectEvent={openEdit}
-          selectable
-          eventPropGetter={eventStyleGetter}
-          popup
-          messages={{
-            next: i18n.t("agenda.calendar.next"),
-            previous: i18n.t("agenda.calendar.prev"),
-            today: i18n.t("agenda.calendar.today"),
-            month: i18n.t("agenda.calendar.month"),
-            week: i18n.t("agenda.calendar.week"),
-            day: i18n.t("agenda.calendar.day"),
-            agenda: i18n.t("agenda.calendar.agenda"),
-            date: i18n.t("agenda.calendar.date"),
-            time: i18n.t("agenda.calendar.time"),
-            event: i18n.t("agenda.calendar.event"),
-            showMore: (n) => i18n.t("agenda.calendar.showMore", { count: n }),
-          }}
-        />
+
+        {viewMode === "calendar" &&
+          !loading &&
+          filteredEvents.length === 0 &&
+          appointmentsRaw.length > 0 &&
+          !loadError && (
+            <Box className={classes.periodHint}>
+              <Typography variant="subtitle2" color="textPrimary" gutterBottom>
+                {i18n.t("agenda.filters.emptyFilteredTitle")}
+              </Typography>
+              <Typography variant="body2" color="textSecondary">
+                {i18n.t("agenda.filters.emptyFilteredSubtitle")}
+              </Typography>
+            </Box>
+          )}
+
+        {viewMode === "calendar" &&
+          !loading &&
+          appointmentsRaw.length === 0 &&
+          !loadError && (
+            <Box className={classes.periodHint}>
+              <Typography variant="body2" color="textSecondary">
+                {i18n.t("agenda.emptyState")}
+              </Typography>
+            </Box>
+          )}
+
+        {viewMode === "calendar" ? (
+          <Box className={classes.calendarShell}>
+            {loading && (
+              <Box className={classes.loadingOverlay}>
+                <CircularProgress size={44} />
+              </Box>
+            )}
+            <Calendar
+              localizer={localizer}
+              culture={
+                lang.startsWith("en") ? "en-US" : lang.startsWith("es") ? "es" : "pt-BR"
+              }
+              date={calendarDate}
+              onNavigate={(d) => setCalendarDate(d)}
+              view={calendarView}
+              onView={(v) => setCalendarView(v)}
+              views={["month", "week", "day"]}
+              defaultView="month"
+              events={filteredEvents}
+              startAccessor="start"
+              endAccessor="end"
+              style={{ height: "100%" }}
+              onRangeChange={onRangeChange}
+              onSelectSlot={openNew}
+              onSelectEvent={onSelectEvent}
+              selectable
+              eventPropGetter={eventStyleGetter}
+              popup
+              components={{
+                toolbar: AgendaCalendarToolbar,
+              }}
+              messages={{
+                next: i18n.t("agenda.calendar.next"),
+                previous: i18n.t("agenda.calendar.prev"),
+                today: i18n.t("agenda.calendar.today"),
+                month: i18n.t("agenda.calendar.month"),
+                week: i18n.t("agenda.calendar.week"),
+                day: i18n.t("agenda.calendar.day"),
+                agenda: i18n.t("agenda.calendar.agenda"),
+                date: i18n.t("agenda.calendar.date"),
+                time: i18n.t("agenda.calendar.time"),
+                event: i18n.t("agenda.calendar.event"),
+                showMore: (n) => i18n.t("agenda.calendar.showMore", { count: n }),
+              }}
+            />
+          </Box>
+        ) : (
+          <AgendaListView
+            listGroups={listGroups}
+            loading={loading}
+            user={user}
+            elevated={elevated}
+            onOpenEvent={openEvent}
+            onDeleteRequest={requestDeleteFromList}
+            onCreateClick={() => openNew({ start: new Date(), end: new Date() })}
+            locale={localeForFormat}
+            hasRawAppointments={appointmentsRaw.length > 0}
+          />
+        )}
       </Paper>
 
-      <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="sm" scroll="body">
-        <DialogTitle>
-          {editing ? i18n.t("agenda.form.edit") : i18n.t("agenda.form.create")}
-        </DialogTitle>
-        <DialogContent>
-          <TextField
-            fullWidth
-            margin="normal"
-            label={i18n.t("agenda.form.title")}
-            value={form.title}
-            onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-            required
-          />
-          <TextField
-            fullWidth
-            margin="normal"
-            label={i18n.t("agenda.form.description")}
-            value={form.description}
-            onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-            multiline
-            minRows={2}
-          />
-          <TextField
-            fullWidth
-            margin="normal"
-            type="datetime-local"
-            label={i18n.t("agenda.form.start")}
-            value={form.startAt}
-            onChange={(e) => setForm((f) => ({ ...f, startAt: e.target.value }))}
-            InputLabelProps={{ shrink: true }}
-            disabled={form.allDay}
-          />
-          <TextField
-            fullWidth
-            margin="normal"
-            type="datetime-local"
-            label={i18n.t("agenda.form.end")}
-            value={form.endAt}
-            onChange={(e) => setForm((f) => ({ ...f, endAt: e.target.value }))}
-            InputLabelProps={{ shrink: true }}
-            disabled={form.allDay}
-          />
-          <FormControlLabel
-            control={
-              <Switch
-                checked={form.allDay}
-                onChange={(e) => setForm((f) => ({ ...f, allDay: e.target.checked }))}
-                color="primary"
-              />
-            }
-            label={i18n.t("agenda.form.allDay")}
-          />
-          {elevated && (!editing || editing.isCollective) && (
-            <>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={form.isCollective}
-                    onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        isCollective: e.target.checked,
-                        visibility: e.target.checked ? f.visibility : "private",
-                      }))
-                    }
-                    color="primary"
-                  />
-                }
-                label={i18n.t("agenda.form.collective")}
-              />
-              {form.isCollective && (
-                <FormControl component="fieldset" margin="normal" fullWidth>
-                  <FormLabel component="legend">{i18n.t("agenda.form.visibility")}</FormLabel>
-                  <RadioGroup
-                    value={form.visibility}
-                    onChange={(e) => setForm((f) => ({ ...f, visibility: e.target.value }))}
-                  >
-                    <FormControlLabel value="private" control={<Radio color="primary" />} label={i18n.t("agenda.form.visPrivate")} />
-                    <FormControlLabel value="team" control={<Radio color="primary" />} label={i18n.t("agenda.form.visTeam")} />
-                    <FormControlLabel value="company" control={<Radio color="primary" />} label={i18n.t("agenda.form.visCompany")} />
-                  </RadioGroup>
-                </FormControl>
-              )}
-              {form.isCollective && (
-                <Autocomplete
-                  multiple
-                  options={participantOptions}
-                  getOptionLabel={(o) => o.label}
-                  value={participantOptions.filter((o) => form.participantUserIds.includes(o.id))}
-                  onChange={(_, v) =>
-                    setForm((f) => ({ ...f, participantUserIds: (v || []).map((x) => x.id) }))
-                  }
-                  renderTags={(value, getTagProps) =>
-                    value.map((option, index) => (
-                      <Chip label={option.label} {...getTagProps({ index })} size="small" />
-                    ))
-                  }
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      margin="normal"
-                      label={i18n.t("agenda.form.participants")}
-                    />
-                  )}
-                />
-              )}
-            </>
-          )}
-        </DialogContent>
-        <DialogActions>
-          {editing && (Number(editing.createdBy) === Number(user.id) || (elevated && editing.isCollective)) && (
-            <IconButton
-              onClick={() => setConfirmDeleteOpen(true)}
-              aria-label="delete"
-              edge="start"
-            >
-              <DeleteOutlineIcon />
-            </IconButton>
-          )}
-          <Button onClick={() => setOpen(false)}>{i18n.t("agenda.form.cancel")}</Button>
-          <Button color="primary" variant="contained" onClick={save}>
-            {i18n.t("agenda.form.save")}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <AgendaEventModal
+        open={open}
+        onClose={() => {
+          setOpen(false);
+          setEditing(null);
+        }}
+        editing={editing}
+        form={form}
+        setForm={setForm}
+        user={user}
+        elevated={elevated}
+        participantOptions={participantOptions}
+        canEdit={Boolean(!editing || canEditCurrent)}
+        isCreate={!editing}
+        locale={localeForFormat}
+        onSave={save}
+        onDeleteClick={requestDeleteFromModal}
+        onRespond={handleRespond}
+        responding={responding}
+      />
 
       <ConfirmationModal
         open={confirmDeleteOpen}
         title={i18n.t("agenda.deleteConfirmTitle")}
-        onClose={setConfirmDeleteOpen}
+        onClose={(v) => {
+          setConfirmDeleteOpen(v);
+          if (v === false) setDeleteTarget(null);
+        }}
         onConfirm={runDelete}
         confirmText={i18n.t("agenda.deleteConfirmAction")}
         destructive
       >
-        {i18n.t("agenda.deleteConfirmMessage")}
+        {deleteTarget?.title
+          ? `${i18n.t("agenda.deleteConfirmMessage")} (${deleteTarget.title})`
+          : i18n.t("agenda.deleteConfirmMessage")}
       </ConfirmationModal>
     </MainContainer>
   );

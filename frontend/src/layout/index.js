@@ -26,6 +26,7 @@ import AccountCircle from "@material-ui/icons/AccountCircle";
 
 import MainListItems from "./MainListItems";
 import NotificationsPopOver from "../components/NotificationsPopOver";
+import UserNotificationCenter from "../components/UserNotificationCenter";
 import NotificationsVolume from "../components/NotificationsVolume";
 import UserModal from "../components/UserModal";
 import { AuthContext } from "../context/Auth/AuthContext";
@@ -34,6 +35,7 @@ import DarkMode from "../components/DarkMode";
 import { i18n } from "../translate/i18n";
 import toastError from "../errors/toastError";
 import AnnouncementsPopover from "../components/AnnouncementsPopover";
+import PushNotificationOptInBanner from "../components/PushNotificationOptInBanner";
 
 import { useBranding } from "../context/Branding/BrandingContext";
 import { SocketContext } from "../context/Socket/SocketContext";
@@ -570,6 +572,8 @@ const LoggedInLayout = ({ children, themeToggle }) => {
 
           {user.id && <NotificationsPopOver volume={volume} />}
 
+          {user.id && <UserNotificationCenter />}
+
           <AnnouncementsPopover />
 
           <ChatPopover />
@@ -656,6 +660,8 @@ const LoggedInLayout = ({ children, themeToggle }) => {
             </div>
           </Alert>
         ) : null}
+
+        <PushNotificationOptInBanner />
 
         {user?.finance?.delinquent && (
           <Alert

@@ -22,6 +22,7 @@ import AssignmentTurnedInIcon from "@material-ui/icons/AssignmentTurnedIn";
 import BackupIcon from "@material-ui/icons/Backup";
 import HelpOutlineIcon from "@material-ui/icons/HelpOutline";
 import AnnouncementIcon from "@material-ui/icons/Announcement";
+import NotificationsActiveIcon from "@material-ui/icons/NotificationsActive";
 import AccountCircleOutlinedIcon from "@material-ui/icons/AccountCircleOutlined";
 
 import { toast } from "react-toastify";
@@ -140,6 +141,11 @@ function navItems() {
       icon: AutorenewIcon,
     },
     { path: "/saas/branding", label: i18n.t("platform.tabs.branding"), icon: PaletteOutlinedIcon },
+    {
+      path: "/saas/push-settings",
+      label: i18n.t("platform.tabs.pushNotifications"),
+      icon: NotificationsActiveIcon,
+    },
     { path: "/saas/admins", label: i18n.t("platform.tabs.superAdmins"), icon: SecurityIcon },
     { path: "/saas/backup", label: i18n.t("platform.tabs.backup"), icon: BackupIcon },
     { path: "/saas/helps", label: i18n.t("platform.tabs.helps"), icon: HelpOutlineIcon },

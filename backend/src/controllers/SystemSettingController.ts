@@ -13,6 +13,8 @@ import GetSystemBillingSettingsService from "../services/SystemSettingService/Ge
 import UpsertSystemBillingSettingsService, {
   UpsertSystemBillingSettingsInput
 } from "../services/SystemSettingService/UpsertSystemBillingSettingsService";
+import GetPublicPushConfigService from "../services/SystemSettingService/GetPublicPushConfigService";
+import UpsertOneSignalSettingsService from "../services/SystemSettingService/UpsertOneSignalSettingsService";
 
 function unlinkPublicAsset(publicPath: string): void {
   if (!publicPath?.startsWith("/public/")) return;
@@ -35,6 +37,15 @@ export const publicBranding = async (
   return res.json(branding);
 };
 
+/** Configuração pública para o cliente Web (sem segredos). */
+export const publicPushConfig = async (
+  _req: Request,
+  res: Response
+): Promise<Response> => {
+  const config = await GetPublicPushConfigService();
+  return res.status(200).json(config);
+};
+
 /**
  * Script executado antes do bundle React: define window.__BOOTSTRAP_BRANDING__, título, favicon
  * e preload das imagens de branding a partir da BD (primeiro paint alinhado à plataforma).
@@ -55,7 +66,7 @@ export const publicBrandingBootstrapScript = async (
   }
   const payload = JSON.stringify(branding);
   const originJson = JSON.stringify(apiOrigin);
-  const js = `!function(){"use strict";var b=${payload},o=${originJson};window.__BOOTSTRAP_BRANDING__=b;function abs(u){if(!u)return"";if(/^https?:\\/\\//i.test(u))return u;var x=o.replace(/\\/$/,"");return x+(u.charAt(0)==="/"?u:"/"+u)}var t=String(b.systemName||"").trim();if(t)document.title=t;var fav=abs(b.faviconUrl);if(fav){["icon","shortcut icon","apple-touch-icon"].forEach(function(r){var e=document.querySelector('link[rel="'+r+'"]');if(!e){e=document.createElement("link");e.setAttribute("rel",r);document.head.appendChild(e)}e.setAttribute("href",fav)})}var S={},P=function(u){var h=abs(u);if(!h||S[h])return;S[h]=1;var p=document.createElement("link");p.rel="preload";p.as="image";p.href=h;document.head.appendChild(p)};[b.loginLogoUrl,b.loginLogoDarkUrl,b.menuLogoUrl,b.menuLogoDarkUrl].forEach(P)}();`;
+  const js = `!function(){"use strict";var b=${payload},o=${originJson};window.__BOOTSTRAP_BRANDING__=b;function abs(u){if(!u)return"";if(/^https?:\\/\\//i.test(u))return u;var x=o.replace(/\\/$/,"");return x+(u.charAt(0)==="/"?u:"/"+u)}var t=String(b.systemName||"").trim();if(t){document.title=t;["apple-mobile-web-app-title","application-name"].forEach(function(n){var m=document.querySelector('meta[name="'+n+'"]');if(m)m.setAttribute("content",t)})}var fav=abs(b.faviconUrl);if(fav){["icon","shortcut icon","apple-touch-icon"].forEach(function(r){var e=document.querySelector('link[rel="'+r+'"]');if(!e){e=document.createElement("link");e.setAttribute("rel",r);document.head.appendChild(e)}e.setAttribute("href",fav)})}var S={},P=function(u){var h=abs(u);if(!h||S[h])return;S[h]=1;var p=document.createElement("link");p.rel="preload";p.as="image";p.href=h;document.head.appendChild(p)};[b.loginLogoUrl,b.loginLogoDarkUrl,b.menuLogoUrl,b.menuLogoDarkUrl].forEach(P)}();`;
   res.setHeader("Content-Type", "application/javascript; charset=utf-8");
   res.setHeader("Cache-Control", "private, max-age=120");
   return res.status(200).send(js);
@@ -113,9 +124,25 @@ export const index = async (req: Request, res: Response): Promise<Response> => {
 };
 
 export const upsert = async (req: Request, res: Response): Promise<Response> => {
-  const body = req.body as { branding?: Partial<PublicBranding> };
+  const body = req.body as {
+    branding?: Partial<PublicBranding>;
+    onesignal?: {
+      appId?: string;
+      restApiKey?: string | null;
+      enabled?: boolean;
+      environment?: "production" | "development";
+    };
+  };
   if (body.branding && typeof body.branding === "object") {
     await UpsertBrandingService(body.branding);
+  }
+  if (body.onesignal && typeof body.onesignal === "object") {
+    await UpsertOneSignalSettingsService({
+      appId: body.onesignal.appId,
+      restApiKey: body.onesignal.restApiKey,
+      enabled: body.onesignal.enabled,
+      environment: body.onesignal.environment
+    });
   }
   const branding = await GetPublicBrandingService();
   return res.json(branding);

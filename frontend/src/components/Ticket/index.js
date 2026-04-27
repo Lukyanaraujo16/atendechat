@@ -135,6 +135,42 @@ const Ticket = () => {
     return () => clearTimeout(delayDebounceFn);
   }, [ticketId, history]);
 
+  /** Heartbeat Fase 4: não enviar push enquanto o ticket está aberto e visível. */
+  useEffect(() => {
+    const numericId = ticket?.id;
+    if (!numericId) {
+      return undefined;
+    }
+    const companyId = localStorage.getItem("companyId");
+    if (!companyId) {
+      return undefined;
+    }
+
+    const INTERVAL_MS = 18000;
+
+    const ping = () => {
+      if (document.visibilityState !== "visible") {
+        return;
+      }
+      api.post(`/tickets/${numericId}/active-view`).catch(() => {});
+    };
+
+    ping();
+    const intervalId = setInterval(ping, INTERVAL_MS);
+
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        ping();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [ticket?.id]);
+
   useEffect(() => {
     const companyId = localStorage.getItem("companyId");
     const socket = socketManager.getSocket(companyId);

@@ -5,6 +5,11 @@ import { createCompanyLog } from "./CreateCompanyLogService";
 import { hasCompanyBillingWarningLog } from "./BillingAutomationDedupeService";
 import { dispatchBillingAutomationEvent } from "./billingAutomationHooks";
 import { logger } from "../../utils/logger";
+import {
+  notifySuperAdminsBillingAutoBlock,
+  notifySuperAdminsBillingOverdue,
+  notifySuperAdminsBillingWarningBefore
+} from "./notifySuperAdminsBilling";
 
 /**
  * Avalia empresas ativas com dueDate, regista avisos (uma vez por vencimento) e bloqueia após atraso configurável.
@@ -62,6 +67,14 @@ export async function runBillingAutomationJob(): Promise<void> {
               daysUntilDue,
               logId
             });
+            try {
+              await notifySuperAdminsBillingWarningBefore(company, dueRaw);
+            } catch (e) {
+              logger.warn(
+                { err: e, companyId: company.id },
+                "[UserNotification] billing_notify_hook_failed"
+              );
+            }
           }
         }
 
@@ -91,6 +104,14 @@ export async function runBillingAutomationJob(): Promise<void> {
               daysLate,
               logId
             });
+            try {
+              await notifySuperAdminsBillingOverdue(company, dueRaw);
+            } catch (e) {
+              logger.warn(
+                { err: e, companyId: company.id },
+                "[UserNotification] billing_notify_hook_failed"
+              );
+            }
           }
         }
       }
@@ -123,6 +144,14 @@ export async function runBillingAutomationJob(): Promise<void> {
             daysLate,
             logId
           });
+          try {
+            await notifySuperAdminsBillingAutoBlock(company, dueRaw);
+          } catch (e) {
+            logger.warn(
+              { err: e, companyId: company.id },
+              "[UserNotification] billing_notify_hook_failed"
+            );
+          }
         }
       }
     } catch (err) {

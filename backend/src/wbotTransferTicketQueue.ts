@@ -7,6 +7,7 @@ import Whatsapp from "./models/Whatsapp";
 import { getIO } from "./libs/socket";
 import { logger } from "./utils/logger";
 import ShowTicketService from "./services/TicketServices/ShowTicketService";
+import { toCompanyTicketAudience } from "./helpers/companyTicketSocket";
 
 
 export const TransferTicketQueue = async (): Promise<void> => {
@@ -62,14 +63,16 @@ export const TransferTicketQueue = async (): Promise<void> => {
 
       const currentTicket = await ShowTicketService(ticket.id, ticket.companyId);
 
-      io.to(ticket.status)
-        .to("notification")
-        .to(ticket.id.toString())
-        .emit(`company-${ticket.companyId}-ticket`, {
-          action: "update",
-          ticket: currentTicket,
-          traking: "created ticket 33"
-        });
+      toCompanyTicketAudience(io, ticket.companyId, {
+        id: currentTicket.id,
+        status: currentTicket.status,
+        queueId: currentTicket.queueId,
+        userId: currentTicket.userId
+      }).emit(`company-${ticket.companyId}-ticket`, {
+        action: "update",
+        ticket: currentTicket,
+        traking: "created ticket 33"
+      });
 
       logger.info(`Transferencia de ticket automatica ticket id ${ticket.id} para a fila ${wpp.transferQueueId}`);
 

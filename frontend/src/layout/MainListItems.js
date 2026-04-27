@@ -19,6 +19,7 @@ import AnnouncementIcon from "@material-ui/icons/Announcement";
 import AttachFile from "@material-ui/icons/AttachFile";
 import LocalOfferIcon from "@material-ui/icons/LocalOffer";
 import HelpOutlineIcon from "@material-ui/icons/HelpOutline";
+import NotificationsIcon from "@material-ui/icons/Notifications";
 import AssessmentOutlinedIcon from "@material-ui/icons/AssessmentOutlined";
 import { AccountTree, BusinessCenter } from "@material-ui/icons";
 import { i18n } from "../translate/i18n";
@@ -360,6 +361,7 @@ const MainListItems = (props) => {
   const selArquivos = path === "/files";
   const selTags = path === "/tags";
   const selAjuda = path === "/helps";
+  const selNotifications = path === "/notifications";
   const selSaaS = path.startsWith("/saas") || path.startsWith("/platform");
 
   const toAutomacao = defaultAutomacaoPath(planFlags, isAdmin);
@@ -484,6 +486,20 @@ const MainListItems = (props) => {
         listItemTextClassName={classes.listItemText}
         selected={selAtendimento}
       />
+
+      {user?.companyId != null &&
+        user?.companyId !== "" &&
+        !user?.super && (
+          <ListItemLink
+            to="/notifications"
+            primary={i18n.t("mainDrawer.listItems.notificationCenter")}
+            icon={<NotificationsIcon />}
+            listItemClassName={classes.listItem}
+            listItemIconClassName={classes.listItemIcon}
+            listItemTextClassName={classes.listItemText}
+            selected={selNotifications}
+          />
+        )}
 
       {showInternalChat ? (
         <ListItemLink

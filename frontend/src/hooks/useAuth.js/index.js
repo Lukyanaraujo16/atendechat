@@ -10,6 +10,7 @@ import toastError from "../../errors/toastError";
 import { SocketContext } from "../../context/Socket/SocketContext";
 import moment from "moment";
 import { computeFinanceFromDueDate } from "../../helpers/financeFlags";
+import { oneSignalLogout } from "../../services/oneSignalService";
 
 const BUSINESS_FORBIDDEN = [
   "ERR_COMPANY_DELINQUENT",
@@ -252,6 +253,7 @@ const useAuth = () => {
     setLoading(true);
 
     try {
+      await oneSignalLogout();
       await api.delete("/auth/logout");
       setIsAuth(false);
       setUser({});

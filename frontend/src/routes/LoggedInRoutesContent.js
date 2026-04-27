@@ -41,6 +41,7 @@ import FlowBuilder from "../pages/FlowBuilder";
 import FlowBuilderConfig from "../pages/FlowBuilderConfig";
 import Evaluation from "../pages/Evaluation";
 import Reports from "../pages/Reports";
+import UserNotifications from "../pages/UserNotifications";
 function usePlanFlags() {
   const { user } = useContext(AuthContext);
   const { getPlanCompany } = usePlans();
@@ -416,6 +417,8 @@ export default function LoggedInRoutesContent() {
           );
         }}
       />
+
+      <Route exact path="/notifications" component={UserNotifications} />
 
       <Route exact path="/todolist" component={ToDoList} />
       <Route exact path="/agenda" component={Agenda} />

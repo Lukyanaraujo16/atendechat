@@ -17,6 +17,11 @@ systemSettingRoutes.get(
 );
 
 systemSettingRoutes.get(
+  "/system-settings/public/push-config",
+  SystemSettingController.publicPushConfig
+);
+
+systemSettingRoutes.get(
   "/system-settings/billing-automation",
   isAuth,
   isSuper,

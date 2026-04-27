@@ -8,6 +8,7 @@ import moment from "moment";
 import ShowTicketService from "../TicketServices/ShowTicketService";
 import { verifyMessage } from "./wbotMessageListener";
 import TicketTraking from "../../models/TicketTraking";
+import { toCompanyTicketDeleteAudience } from "../../helpers/companyTicketSocket";
 
 export const ClosedAllOpenTickets = async (companyId: number): Promise<void> => {
 
@@ -101,7 +102,11 @@ export const ClosedAllOpenTickets = async (companyId: number): Promise<void> => 
               userId: ticket.userId,
             })
 
-            io.to("open").emit(`company-${companyId}-ticket`, {
+            toCompanyTicketDeleteAudience(io, companyId, {
+              id: showTicket.id,
+              status: "open",
+              queueId: showTicket.queueId
+            }).emit(`company-${companyId}-ticket`, {
               action: "delete",
               ticketId: showTicket.id
             });

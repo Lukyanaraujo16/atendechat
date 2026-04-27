@@ -360,11 +360,10 @@ export const toggleDisableBot = async (req: Request, res: Response): Promise<Res
   const contact = await ToggleDisableBotContactService({ contactId });
 
   const io = getIO();
-  io.of(String(companyId))
-    .emit(`company-${companyId}-contact`, {
-      action: "update",
-      contact
-    });
+  io.to(`company-${companyId}-mainchannel`).emit(`company-${companyId}-contact`, {
+    action: "update",
+    contact
+  });
 
   return res.status(200).json(contact);
 };

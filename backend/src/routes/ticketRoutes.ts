@@ -11,6 +11,12 @@ ticketRoutes.get("/tickets", isAuth, TicketController.index);
 ticketRoutes.get("/tickets/without-connection", isAuth, TicketController.listWithoutConnection);
 ticketRoutes.post("/tickets/bulk-assign-connection", isAuth, TicketController.bulkAssignConnection);
 
+ticketRoutes.post(
+  "/tickets/:ticketId/active-view",
+  isAuth,
+  TicketController.registerActiveView
+);
+
 ticketRoutes.get("/tickets/:ticketId", isAuth, TicketController.show);
 
 ticketRoutes.get(

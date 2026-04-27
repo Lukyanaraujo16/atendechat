@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useContext } from "react";
+import React, { useState, useRef, useEffect, useContext, useCallback } from "react";
 
 import { useHistory } from "react-router-dom";
 import { format } from "date-fns";
@@ -58,7 +58,7 @@ const NotificationsPopOver = ({ volume }) => {
 		const fetchSettings = async () => {
 			try {
 
-				if (user.allTicket === "enable") {
+				if (user?.allTicket === "enabled") {
 					setShowPendingTickets(true);
 				}
 			} catch (err) {
@@ -67,7 +67,7 @@ const NotificationsPopOver = ({ volume }) => {
 		}
 	  
 		fetchSettings();
-	}, []);
+	}, [user?.id, user?.allTicket]);
 
 	useEffect(() => {
 		soundAlertRef.current = play;
@@ -75,6 +75,7 @@ const NotificationsPopOver = ({ volume }) => {
 		if (!("Notification" in window)) {
 			console.log("This browser doesn't support notifications");
 		} else {
+			/* Pedido imediato ao montar: pode ser agressivo (prompt sem contexto). Fase posterior: UX explícita. */
 			Notification.requestPermission();
 		}
 	}, [play]);
@@ -91,18 +92,62 @@ const NotificationsPopOver = ({ volume }) => {
 		}
 
 		processNotifications();
-	}, [tickets]);
+	}, [tickets, showPendingTickets]);
 
 	useEffect(() => {
 		ticketIdRef.current = ticketIdUrl;
 	}, [ticketIdUrl]);
 
 	useEffect(() => {
+		historyRef.current = history;
+	}, [history]);
+
+	const handleNotifications = useCallback(data => {
+		const { message, contact, ticket } = data;
+
+		const options = {
+			body: `${message.body} - ${format(new Date(), "HH:mm")}`,
+			icon: contact.urlPicture,
+			tag: ticket.id,
+			renotify: true,
+		};
+
+		const notification = new Notification(
+			`${i18n.t("tickets.notification.message")} ${contact.name}`,
+			options
+		);
+
+		notification.onclick = e => {
+			e.preventDefault();
+			window.focus();
+			historyRef.current.push(`/tickets/${ticket.uuid}`);
+		};
+
+		setDesktopNotifications(prevState => {
+			const notfiticationIndex = prevState.findIndex(
+				n => n.tag === notification.tag
+			);
+			if (notfiticationIndex !== -1) {
+				prevState[notfiticationIndex] = notification;
+				return [...prevState];
+			}
+			return [notification, ...prevState];
+		});
+
+		soundAlertRef.current();
+	}, []);
+
+	useEffect(() => {
+		if (!user?.companyId) {
+			return undefined;
+		}
+
     const socket = socketManager.getSocket(user.companyId);
+		const companyId = user.companyId;
 
-		socket.on("ready", () => socket.emit("joinNotification"));
+		const onReadyJoin = () => socket.emit("joinNotification");
 
-		socket.on(`company-${user.companyId}-ticket`, data => {
+		const onTicket = data => {
 			if (data.action === "updateUnread" || data.action === "delete") {
 				setNotifications(prevState => {
 					const ticketIndex = prevState.findIndex(t => t.id === data.ticketId);
@@ -125,9 +170,9 @@ const NotificationsPopOver = ({ volume }) => {
 					return prevState;
 				});
 			}
-		});
+		};
 
-		socket.on(`company-${user.companyId}-appMessage`, data => {
+		const onAppMessage = data => {
 			if (
 				data.action === "create" && !data.message.fromMe && 
 				(data.ticket.status !== "pending" ) &&
@@ -154,48 +199,18 @@ const NotificationsPopOver = ({ volume }) => {
 
 				handleNotifications(data);
 			}
-		});
+		};
+
+		socket.on("ready", onReadyJoin);
+		socket.on(`company-${companyId}-ticket`, onTicket);
+		socket.on(`company-${companyId}-appMessage`, onAppMessage);
 
 		return () => {
-			socket.disconnect();
+			socket.off("ready", onReadyJoin);
+			socket.off(`company-${companyId}-ticket`, onTicket);
+			socket.off(`company-${companyId}-appMessage`, onAppMessage);
 		};
-	}, [user, showPendingTickets, socketManager]);
-
-	const handleNotifications = data => {
-		const { message, contact, ticket } = data;
-
-		const options = {
-			body: `${message.body} - ${format(new Date(), "HH:mm")}`,
-			icon: contact.urlPicture,
-			tag: ticket.id,
-			renotify: true,
-		};
-
-		const notification = new Notification(
-			`${i18n.t("tickets.notification.message")} ${contact.name}`,
-			options
-		);
-
-		notification.onclick = e => {
-			e.preventDefault();
-			window.focus();
-			historyRef.current.push(`/tickets/${ticket.uuid}`);
-			// handleChangeTab(null, ticket.isGroup? "group" : "open");
-		};
-
-		setDesktopNotifications(prevState => {
-			const notfiticationIndex = prevState.findIndex(
-				n => n.tag === notification.tag
-			);
-			if (notfiticationIndex !== -1) {
-				prevState[notfiticationIndex] = notification;
-				return [...prevState];
-			}
-			return [notification, ...prevState];
-		});
-
-		soundAlertRef.current();
-	};
+	}, [user?.companyId, user?.id, user?.queues, socketManager, handleNotifications]);
 
 	const handleClick = () => {
 		setIsOpen(prevState => !prevState);

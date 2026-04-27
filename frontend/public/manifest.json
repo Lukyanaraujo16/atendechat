@@ -1,20 +1,40 @@
 {
-	"short_name": " ",
-	"name": " ",
+	"name": "Central de atendimento",
+	"short_name": "Atendimento",
+	"description": "Plataforma de atendimento e gestão de conversas. O nome e ícones no ecrã podem ser personalizados pelo administrador.",
+	"lang": "pt-BR",
+	"dir": "ltr",
+	"start_url": ".",
+	"scope": ".",
+	"display": "standalone",
+	"orientation": "any",
+	"background_color": "#ffffff",
+	"theme_color": "#1565c0",
+	"categories": ["business", "productivity"],
 	"icons": [
 		{
 			"src": "favicon.ico",
-			"sizes": "64x64 32x32 24x24 16x16",
-			"type": "image/x-icon"
+			"sizes": "48x48 32x32 16x16",
+			"type": "image/x-icon",
+			"purpose": "any"
 		},
 		{
-			"src": "/android-chrome-192x192.png",
+			"src": "android-chrome-192x192.png",
 			"sizes": "192x192",
-			"type": "image/png"
+			"type": "image/png",
+			"purpose": "any"
+		},
+		{
+			"src": "android-chrome-512x512.png",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "any"
+		},
+		{
+			"src": "icon-maskable-512x512.png",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "maskable"
 		}
-	],
-	"start_url": ".",
-	"display": "standalone",
-	"theme_color": "#000000",
-	"background_color": "#ffffff"
+	]
 }

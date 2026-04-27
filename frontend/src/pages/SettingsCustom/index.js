@@ -19,6 +19,7 @@ import useSettings from "../../hooks/useSettings";
 
 import OnlyForSuperUser from "../../components/OnlyForSuperUser";
 import CompanyTimezoneSettings from "../../components/CompanyTimezoneSettings";
+import PushNotificationPreferences from "../../components/PushNotificationPreferences";
 
 const PLATFORM_QUICK_LINKS = [
   { to: "/saas/companies", labelKey: "platform.tabs.companies" },
@@ -145,7 +146,7 @@ const SettingsCustom = () => {
     const params = new URLSearchParams(location.search);
     const t = params.get("tab");
     if (!t) return;
-    const allowed = ["options", "schedules"];
+    const allowed = ["options", "schedules", "notifications"];
     if (!allowed.includes(t)) return;
     setTab(t);
   }, [location.search]);
@@ -267,6 +268,9 @@ const SettingsCustom = () => {
         >
           <Tab label={i18n.t("settings.tabs.options")} value={"options"} />
           {schedulesEnabled && <Tab label={i18n.t("settings.tabs.schedules")} value={"schedules"} />}
+          {(currentUser?.super || currentUser?.companyId) && (
+            <Tab label={i18n.t("settings.tabs.notifications")} value={"notifications"} />
+          )}
         </Tabs>
         <Paper className={classes.paper} elevation={0}>
           <TabPanel
@@ -287,6 +291,13 @@ const SettingsCustom = () => {
                 setSchedulesEnabled(value === "company")
               }
             />
+          </TabPanel>
+          <TabPanel
+            className={classes.container}
+            value={tab}
+            name={"notifications"}
+          >
+            <PushNotificationPreferences />
           </TabPanel>
         </Paper>
       </Paper>
