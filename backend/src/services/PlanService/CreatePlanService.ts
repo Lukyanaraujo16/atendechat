@@ -1,6 +1,7 @@
 import * as Yup from "yup";
 import AppError from "../../errors/AppError";
 import Plan from "../../models/Plan";
+import { normalizePlanValueForCreate } from "../../utils/normalizeMonetaryInput";
 
 interface PlanData {
   name: string;
@@ -46,7 +47,12 @@ const CreatePlanService = async (planData: PlanData): Promise<Plan> => {
     throw new AppError(err.message);
   }
 
-  const plan = await Plan.create(planData);
+  const payload = {
+    ...planData,
+    value: normalizePlanValueForCreate(planData.value as unknown)
+  };
+
+  const plan = await Plan.create(payload);
 
   return plan;
 };

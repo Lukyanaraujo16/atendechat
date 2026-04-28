@@ -290,6 +290,10 @@ const messages = {
 					yes: "Yes",
 					no: "No",
 					money: "$",
+					nameRequired: "Enter the plan name",
+					valueRequired: "Enter the plan price",
+					valueInvalid:
+						"Invalid amount. Examples: 99.90 · 1,299.90 · $ 99.90 · 99,90 (BR format)",
 				},
 				table: {
 					companies: "Companies",

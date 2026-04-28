@@ -292,6 +292,10 @@ const messages = {
           yes: "Sí",
           no: "No",
           money: "$",
+          nameRequired: "Indique el nombre del plan",
+          valueRequired: "Indique el valor del plan",
+          valueInvalid:
+            "Valor no válido. Ej.: 99,90 · 1.299,90 · 99.90",
         },
         table: {
           companies: "Empresas",

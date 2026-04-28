@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import * as Yup from "yup";
 import {
     makeStyles,
     useTheme,
@@ -44,6 +45,11 @@ import {
   PLAN_FORM_MODULE_KEYS,
   diffPlanModuleFlags,
 } from "../ModuleSettings/moduleSync";
+import {
+  parseBrazilianCurrencyToNumber,
+  formatPlanValueForInput,
+  formatCurrencyBRL,
+} from "../../utils/brazilianCurrency";
 
 
 const useStyles = makeStyles(theme => ({
@@ -194,7 +200,7 @@ export function PlanManagerForm(props) {
         users: 0,
         connections: 0,
         queues: 0,
-        value: 0,
+        value: '',
         useCampaigns: true,
         useSchedules: true,
         useInternalChat: true,
@@ -218,14 +224,52 @@ export function PlanManagerForm(props) {
             ? i18n.t("plans.form.internalChatHelp")
             : i18n.t(`settings.company.form.modules.${key}Help`);
 
+    const validationSchema = useMemo(
+        () =>
+            Yup.object({
+                name: Yup.string()
+                    .trim()
+                    .required(i18n.t("plans.form.nameRequired")),
+                value: Yup.mixed().test(
+                    "plan-value",
+                    i18n.t("plans.form.valueInvalid"),
+                    function planValueTest(val) {
+                        if (val === null || val === undefined) {
+                            return this.createError({
+                                message: i18n.t("plans.form.valueRequired"),
+                            });
+                        }
+                        if (typeof val === "string" && val.trim() === "") {
+                            return this.createError({
+                                message: i18n.t("plans.form.valueRequired"),
+                            });
+                        }
+                        const n = parseBrazilianCurrencyToNumber(val);
+                        if (n === null || n < 0) {
+                            return this.createError({
+                                message: i18n.t("plans.form.valueInvalid"),
+                            });
+                        }
+                        return true;
+                    }
+                ),
+            }),
+        []
+    );
+
     return (
         <Formik
             enableReinitialize
             className={classes.fullWidth}
             initialValues={record}
+            validationSchema={validationSchema}
             onSubmit={async (values, { setSubmitting }) => {
                 try {
-                    await onSubmit(values);
+                    const valueNum = parseBrazilianCurrencyToNumber(values.value);
+                    await onSubmit({
+                        ...values,
+                        value: valueNum === null ? 0 : valueNum,
+                    });
                 } finally {
                     setSubmitting(false);
                 }
@@ -542,12 +586,7 @@ export function PlansManagerGrid(props) {
                             </TableCell>
                             <TableCell align="center">{row.queues || "-"}</TableCell>
                             <TableCell align="center">
-                                {i18n.t("plans.form.money")}{" "}
-                                {row.value
-                                    ? row.value.toLocaleString("pt-br", {
-                                          minimumFractionDigits: 2,
-                                      })
-                                    : "00.00"}
+                                {formatCurrencyBRL(row.value)}
                             </TableCell>
                             <TableCell align="center">
                                 {renderCampaigns(row)}
@@ -690,7 +729,7 @@ const defaultPlanRecord = () => ({
     users: 0,
     connections: 0,
     queues: 0,
-    value: 0,
+    value: "",
     useCampaigns: true,
     useSchedules: true,
     useInternalChat: true,
@@ -857,10 +896,7 @@ export default function PlansManager({ variant = "settings" }) {
             users: data.users || 0,
             connections: data.connections || 0,
             queues: data.queues || 0,
-            value:
-                data.value?.toLocaleString("pt-br", {
-                    minimumFractionDigits: 0,
-                }) || 0,
+            value: formatPlanValueForInput(data.value),
             useCampaigns,
             useSchedules,
             useInternalChat,

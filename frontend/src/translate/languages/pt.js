@@ -348,6 +348,10 @@ const messages = {
           yes: "Sim",
           no: "Não",
           money: "R$",
+          nameRequired: "Informe o nome do plano",
+          valueRequired: "Informe o valor do plano",
+          valueInvalid:
+            "Valor inválido. Ex.: 99,90 · 1.299,90 · R$ 99,90",
         },
         table: {
           companies: "Empresas",

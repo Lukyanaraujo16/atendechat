@@ -10,6 +10,7 @@ import {
   PLAN_PROPAGATION_MODULE_KEYS,
   PlanPropagationMode
 } from "./PlanModulePropagation";
+import { normalizePlanValueIfPresent } from "../../utils/normalizeMonetaryInput";
 
 interface PlanData {
   name?: string;
@@ -70,6 +71,7 @@ const UpdatePlanService = async (
   }
 
   const incomingRecord = incoming as Record<string, unknown>;
+  normalizePlanValueIfPresent(incomingRecord);
   const updatePayload = pickPlanUpdatePayload(incomingRecord);
 
   const result = await sequelize.transaction(async (t: Transaction) => {
