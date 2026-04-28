@@ -26,6 +26,7 @@ type Data = {
   endAt?: Date;
   allDay?: boolean;
   participantUserIds?: number[] | null;
+  color?: string | null;
 };
 
 const canEdit = (a: Appointment, userId: number, profile: string) => {
@@ -37,7 +38,7 @@ const canEdit = (a: Appointment, userId: number, profile: string) => {
 const UpdateAppointmentService = async (
   data: Data
 ): Promise<Record<string, unknown>> => {
-  const { id, companyId, userId, profile, participantUserIds } = data;
+  const { id, companyId, userId, profile, participantUserIds, color } = data;
   const appointment = await Appointment.findByPk(id);
   if (!appointment || appointment.companyId !== companyId) {
     throw new AppError("Compromisso não encontrado.", 404);
@@ -60,6 +61,9 @@ const UpdateAppointmentService = async (
     if (data.startAt) appointment.startAt = data.startAt;
     if (data.endAt) appointment.endAt = data.endAt;
     if (data.allDay !== undefined) appointment.allDay = Boolean(data.allDay);
+    if (color !== undefined) {
+      appointment.color = color;
+    }
     if (data.startAt != null || data.endAt != null) {
       assertEventDateOrder(appointment.startAt, appointment.endAt);
     }

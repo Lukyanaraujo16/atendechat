@@ -10,6 +10,27 @@ export const MAX_EVENT_DURATION_MS = 366 * 24 * 60 * 60 * 1000;
  * Datas vêm do cliente em ISO 8601 (UTC ou offset). O Node interpreta e o
  * Sequelize grava em UTC no típico TIMESTAMP WITH TIME ZONE.
  */
+const APPOINTMENT_HEX_COLOR = /^#([0-9A-Fa-f]{6})$/;
+
+/**
+ * Cor opcional do compromisso (#rrggbb). `undefined` = não alterar; `null`/"" = limpar.
+ */
+export const parseAppointmentColor = (
+  value: unknown
+): string | null | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === null || value === "") {
+    return null;
+  }
+  const s = String(value).trim();
+  if (!APPOINTMENT_HEX_COLOR.test(s)) {
+    throw new AppError("Cor inválida. Use formato hexadecimal (#rrggbb).", 400);
+  }
+  return s.toLowerCase();
+};
+
 export const parseAppointmentInputDate = (value: unknown, field: string): Date => {
   if (value == null || value === "") {
     throw new AppError(`Campo ${field} é obrigatório.`, 400);

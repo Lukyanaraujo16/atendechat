@@ -2302,8 +2302,13 @@ const messages = {
         },
         stats: {
           inPeriod: "compromissos no período",
+          inVisibleRange: "no intervalo visível (filtros aplicados)",
           shown: "exibidos",
           todayCount: "hoje",
+        },
+        calendarEvent: {
+          collectiveTag: "Coletivo",
+          allDayShort: "Dia inteiro",
         },
         list: {
           emptyTitle: "Nenhum compromisso neste período",
@@ -2342,8 +2347,16 @@ const messages = {
           readOnly: "Sem permissão de edição deste evento.",
           created: "Evento criado.",
           updated: "Evento atualizado.",
+          scheduleUpdated: "Compromisso atualizado.",
+          undo: "Desfazer",
+          undoFailed: "Não foi possível desfazer. Atualize a agenda.",
           deleted: "Evento removido.",
           inviteReceived: "Novo convite de agenda.",
+        },
+        duplicate: {
+          action: "Duplicar",
+          titlePrefix: "Cópia de {{title}}",
+          untitled: "Evento sem título",
         },
         legend: {
           individual: "Individual",
@@ -2383,6 +2396,18 @@ const messages = {
           endAfterStart: "O fim deve ser após o início.",
           invalidDate: "Data ou hora inválida. Verifique início e fim.",
           participantsRequired: "Inclua ao menos um participante para evento coletivo privado.",
+          color: "Cor do evento",
+          colorHint:
+            "Opcional. Se usar o padrão, a cor segue o tipo (individual / coletivo) e destaca eventos criados por si.",
+          colorClear: "Cor padrão",
+          palette: {
+            blue: "Azul",
+            green: "Verde",
+            yellow: "Amarelo",
+            red: "Vermelho",
+            purple: "Roxo",
+            gray: "Cinza",
+          },
         },
       },
       quickMessages: {

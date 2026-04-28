@@ -6,6 +6,7 @@ import Button from "@material-ui/core/Button";
 import IconButton from "@material-ui/core/IconButton";
 import ChevronLeft from "@material-ui/icons/ChevronLeft";
 import ChevronRight from "@material-ui/icons/ChevronRight";
+import AddIcon from "@material-ui/icons/Add";
 import Box from "@material-ui/core/Box";
 import { i18n } from "../../translate/i18n";
 
@@ -54,7 +55,7 @@ const useStyles = makeStyles((theme) => ({
  */
 const AgendaCalendarToolbar = (props) => {
   const classes = useStyles();
-  const { label, onNavigate, onView, view, views } = props;
+  const { label, onNavigate, onView, view, views, onNewEvent } = props;
   const viewKeys = Array.isArray(views)
     ? views
     : views && typeof views === "object"
@@ -92,6 +93,18 @@ const AgendaCalendarToolbar = (props) => {
         {label}
       </Typography>
       <Box className={classes.viewGroup}>
+        {typeof onNewEvent === "function" && (
+          <Button
+            size="small"
+            variant="contained"
+            color="primary"
+            className={classes.navBtn}
+            startIcon={<AddIcon />}
+            onClick={onNewEvent}
+          >
+            {i18n.t("agenda.newEvent")}
+          </Button>
+        )}
         {allowed.map((v) => (
           <Button
             key={v}

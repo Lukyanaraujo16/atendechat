@@ -16,7 +16,13 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
-const AgendaStats = ({ periodTotal, filteredCount, todayInFiltered, filtersActive }) => {
+const AgendaStats = ({
+  periodTotal,
+  filteredCount,
+  todayInFiltered,
+  filtersActive,
+  inVisibleRange,
+}) => {
   const classes = useStyles();
 
   return (
@@ -24,6 +30,13 @@ const AgendaStats = ({ periodTotal, filteredCount, todayInFiltered, filtersActiv
       <Typography variant="body2" component="div">
         <span className={classes.strong}>{periodTotal}</span>
         {` ${i18n.t("agenda.stats.inPeriod")}`}
+        {typeof inVisibleRange === "number" ? (
+          <>
+            {" · "}
+            <span className={classes.strong}>{inVisibleRange}</span>
+            {` ${i18n.t("agenda.stats.inVisibleRange")}`}
+          </>
+        ) : null}
         {filtersActive ? (
           <>
             {" · "}

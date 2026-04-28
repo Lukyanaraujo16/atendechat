@@ -10,7 +10,8 @@ import { isElevatedProfile } from "../services/AppointmentService/appointmentPer
 import {
   assertListDateRange,
   assertEventDateOrder,
-  parseAppointmentInputDate
+  parseAppointmentInputDate,
+  parseAppointmentColor
 } from "../services/AppointmentService/appointmentValidation";
 import { ParticipantStatus } from "../models/AppointmentParticipant";
 
@@ -71,6 +72,12 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
     visibility = "private";
   }
 
+  let color: string | null = null;
+  if (b.color != null && String(b.color).trim() !== "") {
+    const parsed = parseAppointmentColor(b.color);
+    color = parsed === undefined ? null : parsed;
+  }
+
   const record = await CreateAppointmentService({
     companyId,
     userId: Number(userId),
@@ -82,7 +89,8 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
     allDay: Boolean(b.allDay),
     isCollective,
     visibility,
-    participantUserIds: Array.isArray(b.participantUserIds) ? b.participantUserIds : []
+    participantUserIds: Array.isArray(b.participantUserIds) ? b.participantUserIds : [],
+    color
   });
   return res.status(201).json(record);
 };
@@ -115,6 +123,9 @@ export const update = async (req: Request, res: Response): Promise<Response> => 
     data.endAt = parseAppointmentInputDate(b.endAt, "endAt");
   }
   if (b.allDay !== undefined) data.allDay = b.allDay;
+  if (b.color !== undefined) {
+    data.color = parseAppointmentColor(b.color);
+  }
   if (b.participantUserIds !== undefined) {
     if (!Array.isArray(b.participantUserIds)) {
       return res.status(400).json({ error: "participantUserIds deve ser um array." });

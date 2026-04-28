@@ -19,6 +19,7 @@ import LanguageControl from "../components/LanguageControl";
 import UserModal from "../components/UserModal";
 import { useBranding } from "../context/Branding/BrandingContext";
 import { i18n } from "../translate/i18n";
+import { APP_HEADER_HEIGHT } from "./layoutConstants";
 
 const useStyles = makeStyles((theme) => ({
   shell: {
@@ -39,12 +40,22 @@ const useStyles = makeStyles((theme) => ({
     color: theme.palette.action.active,
   },
   toolbar: {
-    minHeight: 50,
+    minHeight: APP_HEADER_HEIGHT,
+    height: APP_HEADER_HEIGHT,
+    boxSizing: "border-box",
+    display: "flex",
+    alignItems: "center",
     gap: theme.spacing(1),
+    paddingLeft: theme.spacing(2),
+    paddingRight: theme.spacing(2),
   },
   logo: {
     maxHeight: 32,
+    maxWidth: 150,
     width: "auto",
+    height: "auto",
+    objectFit: "contain",
+    flexShrink: 0,
     marginRight: theme.spacing(1.5),
   },
   title: {

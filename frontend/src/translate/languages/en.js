@@ -2229,8 +2229,13 @@ const messages = {
 				},
 				stats: {
 					inPeriod: "appointments in range",
+					inVisibleRange: "in visible range (filters applied)",
 					shown: "shown",
 					todayCount: "today",
+				},
+				calendarEvent: {
+					collectiveTag: "Group",
+					allDayShort: "All day",
 				},
 				list: {
 					emptyTitle: "No appointments in this range",
@@ -2269,8 +2274,16 @@ const messages = {
 					readOnly: "You cannot edit this event.",
 					created: "Event created.",
 					updated: "Event updated.",
+					scheduleUpdated: "Appointment updated.",
+					undo: "Undo",
+					undoFailed: "Could not undo. Refresh the calendar.",
 					deleted: "Event removed.",
 					inviteReceived: "New calendar invitation.",
+				},
+				duplicate: {
+					action: "Duplicate",
+					titlePrefix: "Copy of {{title}}",
+					untitled: "Untitled event",
 				},
 				legend: {
 					individual: "Individual",
@@ -2310,6 +2323,18 @@ const messages = {
 					endAfterStart: "End must be after start.",
 					invalidDate: "Invalid date or time. Check start and end.",
 					participantsRequired: "Add at least one participant for a private collective event.",
+					color: "Event color",
+					colorHint:
+						"Optional. Default colors follow event type (individual / collective) and highlight events you created.",
+					colorClear: "Default color",
+					palette: {
+						blue: "Blue",
+						green: "Green",
+						yellow: "Yellow",
+						red: "Red",
+						purple: "Purple",
+						gray: "Gray",
+					},
 				},
 			},
 			quickMessages: {

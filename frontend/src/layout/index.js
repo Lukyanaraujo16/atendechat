@@ -49,6 +49,7 @@ import Brightness7Icon from '@material-ui/icons/Brightness7';
 import LanguageControl from "../components/LanguageControl";
 import ConfirmationModal from "../components/ConfirmationModal";
 import { versionSystem } from "../../package.json";
+import { APP_HEADER_HEIGHT } from "./layoutConstants";
 
 const drawerWidth = 299;
 
@@ -83,8 +84,12 @@ const useStyles = makeStyles((theme) => ({
   },
   toolbar: {
     paddingRight: 24,
-    minHeight: 50,
-    height: 50,
+    paddingLeft: theme.spacing(1),
+    minHeight: APP_HEADER_HEIGHT,
+    height: APP_HEADER_HEIGHT,
+    boxSizing: "border-box",
+    display: "flex",
+    alignItems: "center",
     color: theme.palette.text.primary,
     backgroundColor: theme.palette.background.paper,
     borderBottom: `1px solid ${theme.palette.divider}`,
@@ -95,30 +100,37 @@ const useStyles = makeStyles((theme) => ({
       backgroundColor: theme.palette.action.hover,
     },
   },
-  /** Topo do drawer: logo centrada, altura fixa, sem empurrar a lista */
+  /** Topo do drawer: mesma altura que a AppBar; logo centrada verticalmente */
   drawerLogoContainer: {
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
     width: "100%",
-    minHeight: 68,
-    maxHeight: 72,
+    height: APP_HEADER_HEIGHT,
+    minHeight: APP_HEADER_HEIGHT,
+    maxHeight: APP_HEADER_HEIGHT,
     boxSizing: "border-box",
-    padding: theme.spacing(1.25, 1.5),
+    padding: theme.spacing(0, 2),
     flexShrink: 0,
     [theme.breakpoints.down("sm")]: {
-      minHeight: 64,
-      maxHeight: 68,
-      padding: theme.spacing(1, 1),
+      padding: theme.spacing(0, 1.5),
     },
   },
+  /** Drawer colapsado: menos padding horizontal, logo não estoura */
+  drawerLogoContainerCompact: {
+    padding: theme.spacing(0, 1),
+  },
   menuLogoImage: {
-    maxHeight: 40,
+    maxHeight: 32,
+    maxWidth: 150,
     width: "auto",
-    maxWidth: "100%",
     height: "auto",
     objectFit: "contain",
     display: "block",
+  },
+  menuLogoImageCompact: {
+    maxHeight: 28,
+    maxWidth: "100%",
   },
   appBar: {
     zIndex: theme.zIndex.drawer + 1,
@@ -192,7 +204,9 @@ const useStyles = makeStyles((theme) => ({
     }
   },
   appBarSpacer: {
-    minHeight: 50,
+    minHeight: APP_HEADER_HEIGHT,
+    height: APP_HEADER_HEIGHT,
+    flexShrink: 0,
   },
   content: {
     flex: 1,
@@ -486,10 +500,18 @@ const LoggedInLayout = ({ children, themeToggle }) => {
         open={drawerOpen}
       >
         <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
-          <div className={classes.drawerLogoContainer}>
+          <div
+            className={clsx(
+              classes.drawerLogoContainer,
+              !drawerOpen && classes.drawerLogoContainerCompact
+            )}
+          >
             <img
               src={menuLogoSrc}
-              className={classes.menuLogoImage}
+              className={clsx(
+                classes.menuLogoImage,
+                !drawerOpen && classes.menuLogoImageCompact
+              )}
               alt={branding.systemName || "logo"}
             />
           </div>

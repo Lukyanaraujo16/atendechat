@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useContext, useMemo, useRef } from "react";
 import { useLocation, useHistory } from "react-router-dom";
-import { Calendar, momentLocalizer } from "react-big-calendar";
-import moment from "moment";
+import { momentLocalizer } from "react-big-calendar";
+import moment from "moment-timezone";
 import "moment/locale/pt-br";
 import "moment/locale/es";
 import "react-big-calendar/lib/css/react-big-calendar.css";
@@ -31,7 +31,9 @@ import { SocketContext } from "../../context/Socket/SocketContext";
 import { isArray } from "lodash";
 import ConfirmationModal from "../../components/ConfirmationModal";
 
+import AgendaCalendarDnD from "./AgendaCalendarDnD";
 import AgendaCalendarToolbar from "./AgendaCalendarToolbar";
+import AgendaCalendarEvent from "./AgendaCalendarEvent";
 import AgendaListView from "./AgendaListView";
 import AgendaEventModal from "./AgendaEventModal";
 import AgendaFilters from "./AgendaFilters";
@@ -43,22 +45,39 @@ import {
   matchesSearchText,
   groupAppointmentsByStartDay,
   countOverlappingToday,
+  normalizeReactBigCalendarFetchRange,
+  toCalendarEventsForRbc,
+  appointmentOverlapsRange,
+  normalizeHexColor,
 } from "./agendaUtils";
+import {
+  resolveAgendaTimezone,
+  wallDateTimeToUtcIso,
+  wallDateStartToUtcIso,
+  wallDateEndToUtcIso,
+  utcIsoToDatetimeLocal,
+  rbcInteractionToApiUtc,
+} from "./agendaTimezone";
+import {
+  AGENDA_SNAP_MINUTES,
+  snapDatetimeLocalPair,
+  snapInteractionDates,
+  snapOpenNewMoments,
+} from "./agendaSnap";
 
 const localizer = momentLocalizer(moment);
 
 const isElevated = (profile) => profile === "admin" || profile === "supervisor";
 
-function toCalendarEvents(list, myId) {
-  if (!isArray(list)) return [];
-  return list.map((a) => ({
-    id: a.id,
-    title: a.title,
-    start: new Date(a.startAt),
-    end: new Date(a.endAt),
-    allDay: Boolean(a.allDay),
-    resource: { ...a, isMine: Number(a.createdBy) === Number(myId) },
-  }));
+function isTypingInField(target) {
+  if (!target || !target.tagName) return false;
+  const t = String(target.tagName).toLowerCase();
+  if (t === "input" || t === "textarea" || t === "select") return true;
+  if (target.isContentEditable) return true;
+  if (typeof target.closest === "function" && target.closest('[contenteditable="true"]')) {
+    return true;
+  }
+  return false;
 }
 
 const useStyles = makeStyles((theme) => ({
@@ -109,52 +128,104 @@ const useStyles = makeStyles((theme) => ({
   calendarShell: {
     position: "relative",
     flex: 1,
-    minHeight: 480,
+    minHeight: 560,
     padding: theme.spacing(0, 0, 1, 0),
+    backgroundColor:
+      theme.palette.type === "dark"
+        ? alpha(theme.palette.background.paper, 0.5)
+        : theme.palette.background.default,
     "& .rbc-calendar": {
       fontFamily: theme.typography.fontFamily,
       color: theme.palette.text.primary,
+      minHeight: 520,
     },
     "& .rbc-header": {
-      borderBottom: `1px solid ${theme.palette.divider}`,
+      borderBottom: `1px solid ${alpha(theme.palette.divider, 0.55)}`,
       color: theme.palette.text.secondary,
       fontWeight: 600,
-      fontSize: "0.75rem",
+      fontSize: "0.72rem",
       textTransform: "uppercase",
-      letterSpacing: "0.04em",
-      padding: theme.spacing(1, 0),
+      letterSpacing: "0.05em",
+      padding: theme.spacing(0.75, 0),
+      backgroundColor: "transparent",
     },
     "& .rbc-today": {
       backgroundColor:
         theme.palette.type === "dark"
-          ? alpha(theme.palette.primary.main, 0.18)
-          : theme.palette.action.selected,
-      boxShadow:
-        theme.palette.type === "dark"
-          ? `inset 0 0 0 1px ${alpha(theme.palette.primary.main, 0.45)}`
-          : "none",
+          ? alpha(theme.palette.primary.main, 0.12)
+          : alpha(theme.palette.primary.main, 0.06),
+      boxShadow: `inset 0 0 0 1px ${alpha(theme.palette.primary.main, theme.palette.type === "dark" ? 0.35 : 0.25)}`,
     },
     "& .rbc-off-range-bg": {
-      background: theme.palette.action.hover,
+      background: alpha(theme.palette.action.hover, theme.palette.type === "dark" ? 0.35 : 0.5),
     },
     "& .rbc-month-view, & .rbc-time-view, & .rbc-day-view": {
-      borderColor: theme.palette.divider,
+      borderColor: alpha(theme.palette.divider, 0.65),
+      borderRadius: theme.shape.borderRadius,
+      overflow: "hidden",
     },
     "& .rbc-day-bg + .rbc-day-bg, & .rbc-month-row + .rbc-month-row": {
-      borderColor: theme.palette.divider,
+      borderColor: alpha(theme.palette.divider, 0.45),
     },
     "& .rbc-time-slot": {
-      borderColor: theme.palette.divider,
+      borderColor: alpha(theme.palette.divider, 0.35),
     },
     "& .rbc-time-header-content": {
-      borderColor: theme.palette.divider,
+      borderColor: alpha(theme.palette.divider, 0.55),
+    },
+    "& .rbc-time-content": {
+      borderTop: `1px solid ${alpha(theme.palette.divider, 0.45)}`,
+    },
+    "& .rbc-day-slot .rbc-time-slot": {
+      borderColor: alpha(theme.palette.divider, 0.25),
     },
     "& .rbc-current-time-indicator": {
-      backgroundColor: theme.palette.primary.main,
+      backgroundColor: theme.palette.error.main,
+      height: 2,
     },
     "& .rbc-show-more": {
       color: theme.palette.primary.main,
       fontWeight: 600,
+      fontSize: "0.72rem",
+    },
+    "& .rbc-addons-dnd-drag-preview": {
+      opacity: 0.93,
+      filter: theme.palette.type === "dark" ? "brightness(1.08)" : "none",
+      outline: `2px dashed ${alpha(theme.palette.primary.main, 0.95)}`,
+      outlineOffset: 1,
+      borderRadius: 8,
+      boxShadow:
+        theme.palette.type === "dark"
+          ? "0 4px 18px rgba(0,0,0,0.55)"
+          : "0 4px 14px rgba(60,64,67,0.35)",
+    },
+    "& .rbc-addons-dnd-is-dragging .rbc-event:not(.rbc-addons-dnd-drag-preview)": {
+      opacity: 0.42,
+    },
+    "& .rbc-addons-dnd-over": {
+      backgroundColor:
+        theme.palette.type === "dark"
+          ? "rgba(138, 180, 248, 0.26)"
+          : "rgba(26, 115, 232, 0.16)",
+      boxShadow: `inset 0 0 0 2px ${alpha(theme.palette.primary.main, 0.35)}`,
+    },
+    "& .rbc-event": {
+      padding: 0,
+      border: "none",
+      backgroundColor: "transparent",
+      boxShadow: "none",
+    },
+    "& .rbc-event-label": {
+      fontSize: "0.65rem",
+    },
+    "& .rbc-event-content": {
+      height: "100%",
+    },
+    "& .rbc-month-row": {
+      borderColor: alpha(theme.palette.divider, 0.45),
+    },
+    "& .rbc-date-cell": {
+      padding: theme.spacing(0.25, 0.5),
     },
   },
   loadingOverlay: {
@@ -222,10 +293,20 @@ const Agenda = () => {
     isCollective: false,
     visibility: "private",
     participantUserIds: [],
+    color: "",
   });
 
   const lang = i18n.language || "pt";
   const localeForFormat = lang.startsWith("en") ? "en" : lang.startsWith("es") ? "es" : "pt";
+
+  const agendaTz = useMemo(() => resolveAgendaTimezone(user), [user]);
+
+  useEffect(() => {
+    moment.tz.setDefault(agendaTz);
+    return () => {
+      moment.tz.setDefault();
+    };
+  }, [agendaTz]);
 
   const loadUsers = useCallback(async () => {
     try {
@@ -273,21 +354,22 @@ const Agenda = () => {
   }, [lang]);
 
   const onRangeChange = useCallback(
-    (r) => {
-      const start = r?.start || r?.[0] || moment().startOf("month").toDate();
-      const end = r?.end || r?.[1] || moment().endOf("month").toDate();
-      setRange({ start, end });
-      fetchEvents(start, end);
+    (rangeInput) => {
+      const normalized = normalizeReactBigCalendarFetchRange(rangeInput, agendaTz);
+      if (!normalized) return;
+      setRange(normalized);
+      fetchEvents(normalized.start, normalized.end);
     },
-    [fetchEvents]
+    [fetchEvents, agendaTz]
   );
 
   useEffect(() => {
-    const start = moment().startOf("month").toDate();
-    const end = moment().endOf("month").toDate();
+    if (!user?.companyId) return;
+    const start = moment.tz(agendaTz).startOf("month").toDate();
+    const end = moment.tz(agendaTz).endOf("month").toDate();
     setRange({ start, end });
     fetchEvents(start, end);
-  }, [fetchEvents]);
+  }, [user?.companyId, agendaTz, fetchEvents]);
 
   useEffect(() => {
     const companyId = localStorage.getItem("companyId");
@@ -310,45 +392,54 @@ const Agenda = () => {
     };
   }, [socketManager, range, fetchEvents, user.id]);
 
-  const primaryGreen = theme.palette.primary.main;
-  const collectiveBlue = theme.palette.type === "dark" ? "#42a5f5" : "#1976d2";
+  const primaryGreen = theme.palette.type === "dark" ? "#81c995" : "#0f9d58";
+  const collectiveBlue = theme.palette.type === "dark" ? "#8ab4f8" : "#1a73e8";
 
-  const eventStyleGetter = (ev) => {
-    const r = ev.resource;
-    const collective = r?.isCollective;
-    const mine = r?.isMine;
-    return {
-      style: {
-        backgroundColor: collective ? collectiveBlue : primaryGreen,
-        border: mine ? `2px solid ${theme.palette.warning.main}` : "none",
-        borderRadius: 8,
-        color: "#fff",
-        fontWeight: 500,
-        fontSize: "0.8125rem",
-        boxShadow: "0 2px 6px rgba(0,0,0,0.12)",
-      },
-    };
-  };
+  /** Estilo mínimo: o conteúdo visual fica no componente AgendaCalendarEvent. */
+  const eventStyleGetter = () => ({
+    style: {
+      backgroundColor: "transparent",
+      border: "none",
+      boxShadow: "none",
+      padding: 0,
+      overflow: "visible",
+    },
+  });
 
-  const openNew = (slot) => {
-    setEditing(null);
-    const s = moment(slot.start);
-    const e = moment(slot.end);
-    if (s.isSame(e, "day") && s.format("HH:mm") === e.format("HH:mm")) {
-      e.add(1, "hour");
-    }
-    setForm({
-      title: "",
-      description: "",
-      startAt: s.format("YYYY-MM-DDTHH:mm"),
-      endAt: e.format("YYYY-MM-DDTHH:mm"),
-      allDay: false,
-      isCollective: false,
-      visibility: "private",
-      participantUserIds: [],
-    });
-    setOpen(true);
-  };
+  const openNew = useCallback(
+    (slot) => {
+      setEditing(null);
+      let startM;
+      let endM;
+      if (calendarView === "month") {
+        const day = moment.tz(slot.start, agendaTz).startOf("day");
+        startM = day.clone().hour(9).minute(0).second(0);
+        endM = day.clone().hour(10).minute(0).second(0);
+      } else {
+        startM = moment.tz(slot.start, agendaTz);
+        endM = moment.tz(slot.end, agendaTz);
+        if (startM.isSame(endM, "minute")) {
+          endM = startM.clone().add(1, "hour");
+        }
+        const snapped = snapOpenNewMoments(startM, endM, AGENDA_SNAP_MINUTES);
+        startM = snapped.startM;
+        endM = snapped.endM;
+      }
+      setForm({
+        title: "",
+        description: "",
+        startAt: startM.format("YYYY-MM-DDTHH:mm"),
+        endAt: endM.format("YYYY-MM-DDTHH:mm"),
+        allDay: false,
+        isCollective: false,
+        visibility: "private",
+        participantUserIds: [],
+        color: "",
+      });
+      setOpen(true);
+    },
+    [agendaTz, calendarView]
+  );
 
   const openEvent = useCallback(
     (calEventOrRaw) => {
@@ -358,18 +449,178 @@ const Agenda = () => {
       setForm({
         title: a.title || "",
         description: a.description || "",
-        startAt: moment(a.startAt).format("YYYY-MM-DDTHH:mm"),
-        endAt: moment(a.endAt).format("YYYY-MM-DDTHH:mm"),
+        startAt: utcIsoToDatetimeLocal(a.startAt, agendaTz),
+        endAt: utcIsoToDatetimeLocal(a.endAt, agendaTz),
         allDay: Boolean(a.allDay),
         isCollective: Boolean(a.isCollective),
         visibility: a.visibility || "private",
         participantUserIds: (a.participants || [])
           .map((p) => p.userId)
           .filter((id) => Number(id) !== Number(user.id)),
+        color: normalizeHexColor(a.color) || "",
       });
       setOpen(true);
     },
-    [user?.id]
+    [user?.id, agendaTz]
+  );
+
+  const openDuplicate = useCallback(
+    (a) => {
+      if (!a) return;
+      const baseTitle = (a.title || "").trim() || i18n.t("agenda.duplicate.untitled");
+      setEditing(null);
+      setForm({
+        title: i18n.t("agenda.duplicate.titlePrefix", { title: baseTitle }),
+        description: a.description || "",
+        startAt: utcIsoToDatetimeLocal(a.startAt, agendaTz),
+        endAt: utcIsoToDatetimeLocal(a.endAt, agendaTz),
+        allDay: Boolean(a.allDay),
+        isCollective: Boolean(a.isCollective),
+        visibility: a.visibility || "private",
+        participantUserIds: (a.participants || [])
+          .map((p) => p.userId)
+          .filter((id) => Number(id) !== Number(user.id)),
+        color: normalizeHexColor(a.color) || "",
+      });
+      setOpen(true);
+    },
+    [agendaTz, user?.id]
+  );
+
+  const eventCanEditDnd = useCallback(
+    (calEvent) => {
+      const a = calEvent?.resource;
+      if (!a) return false;
+      return canEditAppointment(a, user?.id, elevated);
+    },
+    [user?.id, elevated]
+  );
+
+  const applyScheduleFromRbcInteraction = useCallback(
+    async (info, mode) => {
+      const calEvent = info?.event;
+      if (!calEvent) return;
+      const raw = calEvent.resource;
+      if (!raw || !raw.id) return;
+      if (!canEditAppointment(raw, user?.id, elevated)) return;
+
+      const allDay =
+        info.isAllDay !== undefined && info.isAllDay !== null
+          ? Boolean(info.isAllDay)
+          : Boolean(calEvent.allDay);
+
+      const snapped = snapInteractionDates(
+        { start: info.start, end: info.end, allDay, mode },
+        agendaTz,
+        AGENDA_SNAP_MINUTES
+      );
+
+      const converted = rbcInteractionToApiUtc(
+        { start: snapped.start, end: snapped.end, allDay },
+        agendaTz
+      );
+      if (!converted) {
+        toast.error(i18n.t("agenda.form.invalidDate"));
+        return;
+      }
+
+      const id = Number(raw.id);
+      const previous = appointmentsRaw.find((a) => Number(a.id) === id);
+      if (!previous) return;
+
+      const optimistic = {
+        ...previous,
+        startAt: converted.startAt,
+        endAt: converted.endAt,
+        allDay: converted.allDay,
+      };
+
+      setAppointmentsRaw((prev) =>
+        prev.map((a) => (Number(a.id) === id ? optimistic : a))
+      );
+
+      try {
+        await api.put(`/appointments/${id}`, {
+          startAt: converted.startAt,
+          endAt: converted.endAt,
+          allDay: converted.allDay,
+        });
+        const prevSnapshot = {
+          startAt: previous.startAt,
+          endAt: previous.endAt,
+          allDay: Boolean(previous.allDay),
+        };
+        toast(
+          ({ closeToast }) => (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                flexWrap: "wrap",
+              }}
+            >
+              <span style={{ flex: 1, minWidth: 0 }}>
+                {i18n.t("agenda.toasts.scheduleUpdated")}
+              </span>
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await api.put(`/appointments/${id}`, {
+                      startAt: prevSnapshot.startAt,
+                      endAt: prevSnapshot.endAt,
+                      allDay: prevSnapshot.allDay,
+                    });
+                    setAppointmentsRaw((prev) =>
+                      prev.map((a) =>
+                        Number(a.id) === id ? { ...previous } : a
+                      )
+                    );
+                    closeToast();
+                  } catch (err) {
+                    toast.error(i18n.t("agenda.toasts.undoFailed"));
+                    toastError(err);
+                  }
+                }}
+                style={{
+                  border: "none",
+                  borderRadius: 4,
+                  padding: "6px 12px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  background: "rgba(255,255,255,0.22)",
+                  color: "inherit",
+                }}
+              >
+                {i18n.t("agenda.toasts.undo")}
+              </button>
+            </div>
+          ),
+          { closeOnClick: false, autoClose: 9000 }
+        );
+      } catch (e) {
+        setAppointmentsRaw((prev) =>
+          prev.map((a) => (Number(a.id) === id ? previous : a))
+        );
+        toastError(e);
+      }
+    },
+    [agendaTz, appointmentsRaw, user?.id, elevated]
+  );
+
+  const onEventDrop = useCallback(
+    (interaction) => {
+      applyScheduleFromRbcInteraction(interaction, "move");
+    },
+    [applyScheduleFromRbcInteraction]
+  );
+
+  const onEventResize = useCallback(
+    (interaction) => {
+      applyScheduleFromRbcInteraction(interaction, "resize");
+    },
+    [applyScheduleFromRbcInteraction]
   );
 
   const onSelectEvent = (calEvent) => {
@@ -415,15 +666,37 @@ const Agenda = () => {
     const pid = (form.participantUserIds || []).filter(
       (id) => Number(id) !== Number(user.id) && Number(id) > 0
     );
+    let startAt;
+    let endAt;
+    if (form.allDay) {
+      const d = (form.startAt || "").split("T")[0];
+      startAt = wallDateStartToUtcIso(d, agendaTz);
+      endAt = wallDateEndToUtcIso(d, agendaTz);
+    } else {
+      const snapped = snapDatetimeLocalPair(
+        form.startAt,
+        form.endAt,
+        agendaTz,
+        AGENDA_SNAP_MINUTES
+      );
+      startAt = wallDateTimeToUtcIso(snapped.startStr, agendaTz);
+      endAt = wallDateTimeToUtcIso(snapped.endStr, agendaTz);
+    }
+    if (!startAt || !endAt) {
+      toast.error(i18n.t("agenda.form.invalidDate"));
+      return;
+    }
+    const colorPayload = normalizeHexColor(form.color);
     const payload = {
       title: form.title.trim(),
       description: form.description || null,
-      startAt: new Date(form.startAt).toISOString(),
-      endAt: new Date(form.endAt).toISOString(),
+      startAt,
+      endAt,
       allDay: form.allDay,
       isCollective: elevated && form.isCollective,
       visibility: elevated && form.isCollective ? form.visibility : "private",
       participantUserIds: elevated && form.isCollective ? pid : [],
+      color: colorPayload,
     };
     if (
       Number.isNaN(new Date(payload.startAt).getTime()) ||
@@ -452,6 +725,7 @@ const Agenda = () => {
           startAt: payload.startAt,
           endAt: payload.endAt,
           allDay: payload.allDay,
+          color: colorPayload,
         };
         if (elevated && editing.isCollective) {
           body.participantUserIds = pid;
@@ -512,6 +786,53 @@ const Agenda = () => {
     }
   };
 
+  const handleDuplicateFromModal = useCallback(() => {
+    if (!editing) return;
+    const src = editing;
+    setOpen(false);
+    setEditing(null);
+    openDuplicate(src);
+  }, [editing, openDuplicate]);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (isTypingInField(e.target)) return;
+      if (e.key === "Escape") {
+        if (confirmDeleteOpen) return;
+        if (open) {
+          setOpen(false);
+          setEditing(null);
+        }
+        return;
+      }
+      if ((e.key === "n" || e.key === "N") && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        if (open) return;
+        if (!user?.companyId) return;
+        e.preventDefault();
+        const n = moment.tz(agendaTz);
+        openNew({ start: n.toDate(), end: n.clone().add(1, "hour").toDate() });
+        return;
+      }
+      if (e.key === "Delete" || e.key === "Backspace") {
+        if (!open || !editing?.id || confirmDeleteOpen) return;
+        if (!canEditAppointment(editing, user?.id, elevated)) return;
+        e.preventDefault();
+        requestDeleteFromModal();
+      }
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [
+    open,
+    confirmDeleteOpen,
+    editing,
+    elevated,
+    user?.companyId,
+    user?.id,
+    agendaTz,
+    openNew,
+  ]);
+
   const participantOptions = useMemo(
     () =>
       users.map((u) => ({
@@ -522,8 +843,8 @@ const Agenda = () => {
   );
 
   const filteredAfterQuick = useMemo(
-    () => applyQuickFilter(appointmentsRaw, quickFilter, user?.id),
-    [appointmentsRaw, quickFilter, user?.id]
+    () => applyQuickFilter(appointmentsRaw, quickFilter, user?.id, agendaTz),
+    [appointmentsRaw, quickFilter, user?.id, agendaTz]
   );
 
   const filteredAppointments = useMemo(
@@ -532,18 +853,25 @@ const Agenda = () => {
   );
 
   const filteredEvents = useMemo(
-    () => toCalendarEvents(filteredAppointments, user?.id),
-    [filteredAppointments, user?.id]
+    () => toCalendarEventsForRbc(filteredAppointments, user?.id, agendaTz),
+    [filteredAppointments, user?.id, agendaTz]
   );
 
+  const filteredInVisibleRange = useMemo(() => {
+    if (!range?.start || !range?.end) return filteredAppointments.length;
+    return filteredAppointments.filter((a) =>
+      appointmentOverlapsRange(a, range.start, range.end)
+    ).length;
+  }, [filteredAppointments, range]);
+
   const listGroups = useMemo(
-    () => groupAppointmentsByStartDay(filteredAppointments),
-    [filteredAppointments]
+    () => groupAppointmentsByStartDay(filteredAppointments, agendaTz),
+    [filteredAppointments, agendaTz]
   );
 
   const todayInFiltered = useMemo(
-    () => countOverlappingToday(filteredAppointments),
-    [filteredAppointments]
+    () => countOverlappingToday(filteredAppointments, agendaTz),
+    [filteredAppointments, agendaTz]
   );
 
   const filtersActive = useMemo(
@@ -558,8 +886,15 @@ const Agenda = () => {
 
   const periodLabel =
     range?.start && range?.end
-      ? `${moment(range.start).format("LL")} — ${moment(range.end).format("LL")}`
+      ? `${moment.tz(range.start, agendaTz).format("LL")} — ${moment
+          .tz(range.end, agendaTz)
+          .format("LL")}`
       : "";
+
+  const scrollToTime = useMemo(
+    () => moment.tz(agendaTz).hour(8).minute(0).second(0).millisecond(0).toDate(),
+    [agendaTz]
+  );
 
   const canEditCurrent =
     editing && canEditAppointment(editing, user?.id, elevated);
@@ -577,16 +912,21 @@ const Agenda = () => {
     <MainContainer className={classes.root}>
       <MainHeader>
         <Title>{i18n.t("agenda.title")}</Title>
-        <MainHeaderButtonsWrapper>
-          <Button
-            color="primary"
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => openNew({ start: new Date(), end: new Date() })}
-          >
-            {i18n.t("agenda.newEvent")}
-          </Button>
-        </MainHeaderButtonsWrapper>
+        {viewMode === "list" && (
+          <MainHeaderButtonsWrapper>
+            <Button
+              color="primary"
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => {
+                const n = moment.tz(agendaTz);
+                openNew({ start: n.toDate(), end: n.clone().add(1, "hour").toDate() });
+              }}
+            >
+              {i18n.t("agenda.newEvent")}
+            </Button>
+          </MainHeaderButtonsWrapper>
+        )}
       </MainHeader>
 
       <Paper className={classes.pageCard} elevation={0}>
@@ -649,6 +989,7 @@ const Agenda = () => {
               filteredCount={filteredAppointments.length}
               todayInFiltered={todayInFiltered}
               filtersActive={filtersActive}
+              inVisibleRange={filteredInVisibleRange}
             />
           </>
         )}
@@ -692,7 +1033,7 @@ const Agenda = () => {
                 <CircularProgress size={44} />
               </Box>
             )}
-            <Calendar
+            <AgendaCalendarDnD
               localizer={localizer}
               culture={
                 lang.startsWith("en") ? "en-US" : lang.startsWith("es") ? "es" : "pt-BR"
@@ -706,15 +1047,36 @@ const Agenda = () => {
               events={filteredEvents}
               startAccessor="start"
               endAccessor="end"
-              style={{ height: "100%" }}
+              style={{ minHeight: 520, height: "100%" }}
               onRangeChange={onRangeChange}
               onSelectSlot={openNew}
               onSelectEvent={onSelectEvent}
               selectable
+              resizable
+              draggableAccessor={eventCanEditDnd}
+              resizableAccessor={eventCanEditDnd}
+              onEventDrop={onEventDrop}
+              onEventResize={onEventResize}
+              scrollToTime={scrollToTime}
               eventPropGetter={eventStyleGetter}
               popup
+              step={30}
+              timeslots={2}
+              showMultiDayTimes
               components={{
-                toolbar: AgendaCalendarToolbar,
+                toolbar: (tbProps) => (
+                  <AgendaCalendarToolbar
+                    {...tbProps}
+                    onNewEvent={() => {
+                      const n = moment.tz(agendaTz);
+                      openNew({
+                        start: n.toDate(),
+                        end: n.clone().add(1, "hour").toDate(),
+                      });
+                    }}
+                  />
+                ),
+                event: AgendaCalendarEvent,
               }}
               messages={{
                 next: i18n.t("agenda.calendar.next"),
@@ -739,8 +1101,13 @@ const Agenda = () => {
             elevated={elevated}
             onOpenEvent={openEvent}
             onDeleteRequest={requestDeleteFromList}
-            onCreateClick={() => openNew({ start: new Date(), end: new Date() })}
+            onDuplicateRequest={openDuplicate}
+            onCreateClick={() => {
+              const n = moment.tz(agendaTz);
+              openNew({ start: n.toDate(), end: n.clone().add(1, "hour").toDate() });
+            }}
             locale={localeForFormat}
+            timezone={agendaTz}
             hasRawAppointments={appointmentsRaw.length > 0}
           />
         )}
@@ -761,8 +1128,10 @@ const Agenda = () => {
         canEdit={Boolean(!editing || canEditCurrent)}
         isCreate={!editing}
         locale={localeForFormat}
+        timezone={agendaTz}
         onSave={save}
         onDeleteClick={requestDeleteFromModal}
+        onDuplicateClick={handleDuplicateFromModal}
         onRespond={handleRespond}
         responding={responding}
       />

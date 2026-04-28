@@ -1,4 +1,5 @@
 import React from "react";
+import moment from "moment-timezone";
 import { makeStyles } from "@material-ui/core/styles";
 import Dialog from "@material-ui/core/Dialog";
 import DialogTitle from "@material-ui/core/DialogTitle";
@@ -19,6 +20,7 @@ import Typography from "@material-ui/core/Typography";
 import Divider from "@material-ui/core/Divider";
 import IconButton from "@material-ui/core/IconButton";
 import DeleteOutlineIcon from "@material-ui/icons/DeleteOutline";
+import FileCopyOutlinedIcon from "@material-ui/icons/FileCopyOutlined";
 import CheckIcon from "@material-ui/icons/Check";
 import CloseIcon from "@material-ui/icons/Close";
 import { i18n } from "../../translate/i18n";
@@ -26,6 +28,8 @@ import {
   formatEventWhen,
   visibilityLabelKey,
   participantStatusKey,
+  GOOGLE_CALENDAR_PALETTE,
+  normalizeHexColor,
 } from "./agendaUtils";
 
 const useStyles = makeStyles((theme) => ({
@@ -67,6 +71,30 @@ const useStyles = makeStyles((theme) => ({
     borderBottom: `1px solid ${theme.palette.divider}`,
     "&:last-child": { borderBottom: "none" },
   },
+  colorRow: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: theme.spacing(0.75),
+    marginTop: theme.spacing(1),
+    marginBottom: theme.spacing(0.5),
+    alignItems: "center",
+  },
+  colorSwatch: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    border: `2px solid ${theme.palette.divider}`,
+    cursor: "pointer",
+    padding: 0,
+    flexShrink: 0,
+    transition: theme.transitions.create(["transform", "box-shadow"], {
+      duration: theme.transitions.duration.short,
+    }),
+    "&:hover": {
+      transform: "scale(1.06)",
+      boxShadow: theme.shadows[2],
+    },
+  },
 }));
 
 const AgendaEventModal = ({
@@ -81,8 +109,10 @@ const AgendaEventModal = ({
   canEdit,
   isCreate,
   locale,
+  timezone,
   onSave,
   onDeleteClick,
+  onDuplicateClick,
   onRespond,
   responding,
 }) => {
@@ -106,14 +136,26 @@ const AgendaEventModal = ({
             {isCreate ? i18n.t("agenda.form.create") : i18n.t("agenda.form.edit")}
           </Typography>
           {!isCreate && canEdit && (
-            <IconButton
-              size="small"
-              onClick={onDeleteClick}
-              aria-label="delete"
-              color="secondary"
-            >
-              <DeleteOutlineIcon />
-            </IconButton>
+            <>
+              {typeof onDuplicateClick === "function" && (
+                <IconButton
+                  size="small"
+                  onClick={onDuplicateClick}
+                  aria-label="duplicate"
+                  title={i18n.t("agenda.duplicate.action")}
+                >
+                  <FileCopyOutlinedIcon />
+                </IconButton>
+              )}
+              <IconButton
+                size="small"
+                onClick={onDeleteClick}
+                aria-label="delete"
+                color="secondary"
+              >
+                <DeleteOutlineIcon />
+              </IconButton>
+            </>
           )}
         </Box>
       </DialogTitle>
@@ -127,7 +169,7 @@ const AgendaEventModal = ({
               {editing.title}
             </Typography>
             <Typography variant="body2" color="textSecondary" style={{ marginTop: 8 }}>
-              {formatEventWhen(editing, locale)}
+              {formatEventWhen(editing, locale, timezone)}
             </Typography>
             {editing.description ? (
               <Typography variant="body2" style={{ marginTop: 12 }}>
@@ -254,12 +296,64 @@ const AgendaEventModal = ({
               control={
                 <Switch
                   checked={form.allDay}
-                  onChange={(e) => setForm((f) => ({ ...f, allDay: e.target.checked }))}
+                  onChange={(e) => {
+                    const on = e.target.checked;
+                    setForm((f) => {
+                      if (on) {
+                        const base =
+                          f.startAt ||
+                          moment.tz(timezone || "America/Sao_Paulo").format("YYYY-MM-DDTHH:mm");
+                        const d = base.split("T")[0];
+                        return {
+                          ...f,
+                          allDay: true,
+                          startAt: `${d}T00:00`,
+                          endAt: `${d}T23:59`,
+                        };
+                      }
+                      return { ...f, allDay: false };
+                    });
+                  }}
                   color="primary"
                 />
               }
               label={i18n.t("agenda.form.allDay")}
             />
+            {(canEdit || isCreate) && (
+              <Box>
+                <Typography className={classes.detailLabel} style={{ marginTop: 8 }}>
+                  {i18n.t("agenda.form.color")}
+                </Typography>
+                <Typography variant="caption" color="textSecondary" display="block">
+                  {i18n.t("agenda.form.colorHint")}
+                </Typography>
+                <Box className={classes.colorRow}>
+                  {GOOGLE_CALENDAR_PALETTE.map((p) => {
+                    const active = normalizeHexColor(form.color) === p.hex;
+                    return (
+                      <button
+                        key={p.key}
+                        type="button"
+                        className={classes.colorSwatch}
+                        style={{
+                          backgroundColor: p.hex,
+                          boxShadow: active ? `0 0 0 2px ${p.hex}, 0 0 0 4px #fff` : undefined,
+                        }}
+                        title={i18n.t(`agenda.form.palette.${p.key}`)}
+                        aria-label={i18n.t(`agenda.form.palette.${p.key}`)}
+                        onClick={() => setForm((f) => ({ ...f, color: p.hex }))}
+                      />
+                    );
+                  })}
+                  <Button
+                    size="small"
+                    onClick={() => setForm((f) => ({ ...f, color: "" }))}
+                  >
+                    {i18n.t("agenda.form.colorClear")}
+                  </Button>
+                </Box>
+              </Box>
+            )}
             {elevated && (!editing || editing.isCollective) && (
               <>
                 <FormControlLabel

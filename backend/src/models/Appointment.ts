@@ -57,6 +57,10 @@ class Appointment extends Model<Appointment> {
   @Column(DataType.STRING(32))
   visibility: AppointmentVisibility;
 
+  /** Cor do evento na agenda (hex #rrggbb), opcional */
+  @Column(DataType.STRING(16))
+  color: string | null;
+
   @BelongsTo(() => Company)
   company: Company;
 

@@ -12,6 +12,7 @@ import Divider from "@material-ui/core/Divider";
 import CircularProgress from "@material-ui/core/CircularProgress";
 import EditOutlinedIcon from "@material-ui/icons/EditOutlined";
 import DeleteOutlineIcon from "@material-ui/icons/DeleteOutline";
+import FileCopyOutlinedIcon from "@material-ui/icons/FileCopyOutlined";
 import EventIcon from "@material-ui/icons/Event";
 import FilterListIcon from "@material-ui/icons/FilterList";
 import { i18n } from "../../translate/i18n";
@@ -21,6 +22,7 @@ import {
   visibilityLabelKey,
   participantStatusKey,
   appointmentOverlapsToday,
+  normalizeHexColor,
 } from "./agendaUtils";
 
 const useStyles = makeStyles((theme) => ({
@@ -109,11 +111,23 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
-const renderCard = (a, classes, user, elevated, locale, onOpenEvent, onDeleteRequest) => {
+const renderCard = (
+  a,
+  classes,
+  user,
+  elevated,
+  locale,
+  timezone,
+  onOpenEvent,
+  onDeleteRequest,
+  onDuplicateRequest
+) => {
   const canEdit = canEditAppointment(a, user?.id, elevated);
   const isMine = Number(a.createdBy) === Number(user?.id);
   const creatorName = a.creator?.name || a.creator?.email || `#${a.createdBy}`;
-  const todayOverlap = appointmentOverlapsToday(a);
+  const todayOverlap = appointmentOverlapsToday(a, timezone);
+  const barColor =
+    normalizeHexColor(a.color) || (a.isCollective ? "#1a73e8" : "#0f9d58");
 
   return (
     <Card
@@ -125,6 +139,16 @@ const renderCard = (a, classes, user, elevated, locale, onOpenEvent, onDeleteReq
         <Box className={classes.cardHeader}>
           <Box flex={1} minWidth={0}>
             <Box display="flex" alignItems="center" flexWrap="wrap" gap={0.75}>
+              <Box
+                aria-hidden
+                style={{
+                  width: 5,
+                  height: 22,
+                  borderRadius: 3,
+                  backgroundColor: barColor,
+                  flexShrink: 0,
+                }}
+              />
               <Typography variant="subtitle1" style={{ fontWeight: 600 }}>
                 {a.title || "—"}
               </Typography>
@@ -132,12 +156,24 @@ const renderCard = (a, classes, user, elevated, locale, onOpenEvent, onDeleteReq
                 <Chip size="small" label={i18n.t("agenda.list.todayBadge")} color="primary" />
               ) : null}
             </Box>
-            <Typography className={classes.meta}>{formatEventWhen(a, locale)}</Typography>
+            <Typography className={classes.meta}>
+              {formatEventWhen(a, locale, timezone)}
+            </Typography>
           </Box>
           <Box display="flex" gap={0.5}>
             {canEdit && (
               <IconButton size="small" aria-label="edit" onClick={() => onOpenEvent(a)}>
                 <EditOutlinedIcon fontSize="small" />
+              </IconButton>
+            )}
+            {canEdit && typeof onDuplicateRequest === "function" && (
+              <IconButton
+                size="small"
+                aria-label="duplicate"
+                title={i18n.t("agenda.duplicate.action")}
+                onClick={() => onDuplicateRequest(a)}
+              >
+                <FileCopyOutlinedIcon fontSize="small" />
               </IconButton>
             )}
             {canEdit && (
@@ -211,8 +247,10 @@ const AgendaListView = ({
   elevated,
   onOpenEvent,
   onDeleteRequest,
+  onDuplicateRequest,
   onCreateClick,
   locale,
+  timezone,
   hasRawAppointments,
 }) => {
   const classes = useStyles();
@@ -272,7 +310,17 @@ const AgendaListView = ({
             {i18n.t(`agenda.list.group.${group.id}`)}
           </Typography>
           {group.items.map((a) =>
-            renderCard(a, classes, user, elevated, locale, onOpenEvent, onDeleteRequest)
+            renderCard(
+              a,
+              classes,
+              user,
+              elevated,
+              locale,
+              timezone,
+              onOpenEvent,
+              onDeleteRequest,
+              onDuplicateRequest
+            )
           )}
         </Box>
       ))}

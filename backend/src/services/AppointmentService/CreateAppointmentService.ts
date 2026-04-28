@@ -28,6 +28,7 @@ type Data = {
   isCollective: boolean;
   visibility: Visibility;
   participantUserIds?: number[];
+  color?: string | null;
 };
 
 const CreateAppointmentService = async (
@@ -44,7 +45,8 @@ const CreateAppointmentService = async (
     allDay = false,
     isCollective,
     visibility,
-    participantUserIds = []
+    participantUserIds = [],
+    color = null
   } = data;
 
   if (!title || String(title).trim() === "") {
@@ -99,7 +101,8 @@ const CreateAppointmentService = async (
         companyId,
         createdBy: userId,
         isCollective,
-        visibility
+        visibility,
+        color: color != null ? String(color).trim().toLowerCase() : null
       },
       { transaction: t }
     );
