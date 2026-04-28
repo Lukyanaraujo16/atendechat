@@ -96,8 +96,8 @@ export default function UserNotificationCenter() {
 
   const canUse =
     Boolean(user?.id) &&
-    (Boolean(user?.super) ||
-      (user?.companyId != null && user?.companyId !== ""));
+    user?.companyId != null &&
+    user?.companyId !== "";
 
   const fetchUnread = useCallback(async () => {
     if (!canUse) return;
@@ -131,8 +131,10 @@ export default function UserNotificationCenter() {
   }, [fetchUnread]);
 
   useEffect(() => {
-    if (!canUse || !user?.id) return undefined;
-    const companyId = localStorage.getItem("companyId");
+    if (!canUse || !user?.id || user?.companyId == null || user?.companyId === "") {
+      return undefined;
+    }
+    const companyId = String(user.companyId);
     const socket = socketManager.getSocket(companyId);
     const ev = `user-${user.id}-notification`;
     const onCreate = (payload) => {

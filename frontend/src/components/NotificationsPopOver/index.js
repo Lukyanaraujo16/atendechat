@@ -45,7 +45,10 @@ const NotificationsPopOver = ({ volume }) => {
 
 	const [, setDesktopNotifications] = useState([]);
 
-	const { tickets } = useTickets({ withUnreadMessages: "true" });
+	const { tickets } = useTickets({
+		withUnreadMessages: "true",
+		enabled: Boolean(user?.companyId),
+	});
 
 	const [play] = useSound(alertSound, { volume: volume ?? 1 });
 	const soundAlertRef = useRef();

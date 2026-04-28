@@ -114,6 +114,12 @@ const SocketManager = {
         return new DummySocket();
       }
 
+      if (!companyId) {
+        this.currentCompanyId = -1;
+        this.currentUserId = userId;
+        return new DummySocket();
+      }
+
       const decoded = jwt.decode(token);
       const exp = decoded?.exp;
       if (exp && Date.now() >= exp * 1000) {

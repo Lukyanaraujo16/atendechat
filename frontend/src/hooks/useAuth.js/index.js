@@ -11,6 +11,7 @@ import { SocketContext } from "../../context/Socket/SocketContext";
 import moment from "moment";
 import { computeFinanceFromDueDate } from "../../helpers/financeFlags";
 import { oneSignalLogout } from "../../services/oneSignalService";
+import { canAccessSaasPlatform } from "../../utils/platformUser";
 
 const BUSINESS_FORBIDDEN = [
   "ERR_COMPANY_DELINQUENT",
@@ -127,7 +128,16 @@ const useAuth = () => {
           }
           api.defaults.headers.Authorization = `Bearer ${data?.token || JSON.parse(token)}`;
           setIsAuth(true);
-          setUser(data?.user || {});
+          if (data?.user) {
+            if (data.user.companyId != null && data.user.companyId !== "") {
+              localStorage.setItem("companyId", String(data.user.companyId));
+            } else {
+              localStorage.removeItem("companyId");
+            }
+            setUser(data.user);
+          } else {
+            setUser({});
+          }
         } catch (err) {
           if (err?.response?.status === 401 || err?.response?.status === 403) {
             localStorage.removeItem("token");
@@ -145,25 +155,28 @@ const useAuth = () => {
   }, []);
 
   useEffect(() => {
-    const companyId = localStorage.getItem("companyId");
-    if (companyId) {
-      const socket = socketManager.getSocket(companyId);
-
-      socket.on(`company-${companyId}-user`, (data) => {
-        if (data.action === "update" && data.user.id === user.id) {
-          setUser(data.user);
-        }
-      });
-
-      return () => {
-        socket.disconnect();
-      };
+    if (user?.companyId == null || user?.companyId === "") {
+      return undefined;
     }
-  }, [socketManager, user]);
+    const companyId = String(user.companyId);
+    const socket = socketManager.getSocket(companyId);
+
+    socket.on(`company-${companyId}-user`, (data) => {
+      if (data.action === "update" && data.user.id === user.id) {
+        setUser(data.user);
+      }
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [socketManager, user?.id, user?.companyId]);
 
   useEffect(() => {
-    const companyId = localStorage.getItem("companyId");
-    if (!companyId) return;
+    if (user?.companyId == null || user?.companyId === "") {
+      return undefined;
+    }
+    const companyId = String(user.companyId);
     const socket = socketManager.getSocket(companyId);
     const handler = (data) => {
       if (data.action !== "CONCLUIDA" || !data.company) return;
@@ -181,7 +194,7 @@ const useAuth = () => {
     return () => {
       socket.off(`company-${companyId}-payment`, handler);
     };
-  }, [socketManager]);
+  }, [socketManager, user?.companyId]);
 
   const handleLogin = async (userData) => {
     setLoading(true);
@@ -189,7 +202,7 @@ const useAuth = () => {
     try {
       const { data } = await api.post("/auth/login", userData);
       const {
-        user: { companyId, id, company, super: isSuperAdmin },
+        user: { companyId, id, company },
       } = data;
 
       if (company && has(company, "settings") && isArray(company.settings)) {
@@ -236,7 +249,7 @@ const useAuth = () => {
         toast.warn(i18n.t("finance.login.delinquentWarning"), { autoClose: 10000 });
       }
 
-      if (isSuperAdmin && (companyId == null || companyId === "")) {
+      if (canAccessSaasPlatform(data.user)) {
         history.push("/saas");
       } else {
         history.push("/tickets");

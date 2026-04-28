@@ -402,7 +402,10 @@ const LoggedInLayout = ({ children, themeToggle }) => {
   }, [drawerOpen]);
 
   useEffect(() => {
-    const companyId = localStorage.getItem("companyId");
+    if (user?.companyId == null || user?.companyId === "") {
+      return undefined;
+    }
+    const companyId = String(user.companyId);
     const userId = localStorage.getItem("userId");
 
     const socket = socketManager.getSocket(companyId);
@@ -426,7 +429,7 @@ const LoggedInLayout = ({ children, themeToggle }) => {
       socket.disconnect();
       clearInterval(interval);
     };
-  }, [socketManager]);
+  }, [socketManager, user?.companyId]);
 
   const handleMenu = (event) => {
     setAnchorEl(event.currentTarget);

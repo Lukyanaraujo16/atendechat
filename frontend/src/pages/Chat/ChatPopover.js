@@ -99,6 +99,8 @@ export default function ChatPopover() {
   const classes = useStyles();
 
   const { user } = useContext(AuthContext);
+  const hasTenant =
+    user?.companyId != null && user?.companyId !== "";
 
   const [loading, setLoading] = useState(false);
   const [anchorEl, setAnchorEl] = useState(null);
@@ -129,16 +131,22 @@ export default function ChatPopover() {
   }, [searchParam]);
 
   useEffect(() => {
+    if (!hasTenant) {
+      return undefined;
+    }
     setLoading(true);
     const delayDebounceFn = setTimeout(() => {
       fetchChats();
     }, 500);
     return () => clearTimeout(delayDebounceFn);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParam, pageNumber]);
+  }, [searchParam, pageNumber, hasTenant]);
 
   useEffect(() => {
-    const companyId = localStorage.getItem("companyId");
+    if (!hasTenant || !user?.id) {
+      return undefined;
+    }
+    const companyId = String(user.companyId);
     const socket = socketManager.getSocket(companyId);
     if (!socket) {
       return () => {};
@@ -166,7 +174,7 @@ export default function ChatPopover() {
     return () => {
       socket.off(eventName, onCompanyChat);
     };
-  }, [socketManager, user.id]);
+  }, [socketManager, user.id, user?.companyId, hasTenant]);
 
   useEffect(() => {
     let unreadsCount = 0;
@@ -226,6 +234,10 @@ export default function ChatPopover() {
 
   const open = Boolean(anchorEl);
   const id = open ? "simple-popover" : undefined;
+
+  if (!hasTenant) {
+    return null;
+  }
 
   return (
     <div>

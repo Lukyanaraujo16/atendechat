@@ -3,6 +3,7 @@ import { Redirect, Switch, Route } from "react-router-dom";
 
 import { AuthContext } from "../../context/Auth/AuthContext";
 import SaaSModuleLayout from "../../layout/SaaSModuleLayout";
+import { canAccessSaasPlatform } from "../../utils/platformUser";
 
 import PlatformDashboard from "./PlatformDashboard";
 import PlatformCompanies from "./PlatformCompanies";
@@ -24,7 +25,7 @@ import PlatformPushSettings from "./PlatformPushSettings";
 export default function PlatformModule() {
   const { user } = useContext(AuthContext);
 
-  if (!user?.super) {
+  if (!canAccessSaasPlatform(user)) {
     return <Redirect to="/tickets" />;
   }
 

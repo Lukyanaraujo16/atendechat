@@ -2,7 +2,6 @@ import React from "react";
 import { BrowserRouter, Switch } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 
-import LoggedInLayout from "../layout";
 import SaaSRootLayout from "../layout/SaaSRootLayout";
 import Signup from "../pages/Signup/";
 import Login from "../pages/Login/";
@@ -17,6 +16,7 @@ import { WhatsAppsProvider } from "../context/WhatsApp/WhatsAppsContext";
 import Route from "./Route";
 import LoggedInRoutesContent from "./LoggedInRoutesContent";
 import { LegacyPlatformRedirect } from "./saasRouteUtils";
+import TenantAppShell from "./TenantAppShell";
 
 const Routes = () => {
   return (
@@ -54,9 +54,9 @@ const Routes = () => {
               isPrivate
               render={() => (
                 <WhatsAppsProvider>
-                  <LoggedInLayout>
+                  <TenantAppShell>
                     <LoggedInRoutesContent />
-                  </LoggedInLayout>
+                  </TenantAppShell>
                 </WhatsAppsProvider>
               )}
             />
