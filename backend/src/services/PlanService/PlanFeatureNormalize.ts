@@ -1,8 +1,16 @@
 import { getAllFeatureKeys } from "../../config/features";
+import Plan from "../../models/Plan";
+import {
+  legacyPlanFeatureValue
+} from "../../config/planFeatureLegacy";
 
-/** Converte input da API (objeto parcial ou completo) em mapa completo de chaves. */
+/** Converte input da API (objeto parcial ou completo) em mapa completo de chaves.
+ * Chaves omitidas usam o legado do plano (colunas + baseline), não `false` —
+ * evita gravar PlanFeatures com false em massa por payload parcial.
+ */
 export function normalizePlanFeaturesInput(
-  raw: unknown
+  raw: unknown,
+  plan?: Plan | Record<string, unknown> | null
 ): Record<string, boolean> {
   const keys = getAllFeatureKeys();
   const out: Record<string, boolean> = {};
@@ -11,7 +19,11 @@ export function normalizePlanFeaturesInput(
       ? (raw as Record<string, unknown>)
       : undefined;
   for (const k of keys) {
-    out[k] = src ? src[k] === true : false;
+    if (src && Object.prototype.hasOwnProperty.call(src, k)) {
+      out[k] = src[k] === true;
+    } else {
+      out[k] = legacyPlanFeatureValue(plan ?? null, k);
+    }
   }
   return out;
 }

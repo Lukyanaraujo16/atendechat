@@ -3,11 +3,25 @@ import { getAllFeatureKeys } from "./features";
 
 const asBool = (v: unknown): boolean => v === true || v === "true";
 
+/** Lê coluna do plano (instância Sequelize ou objeto plain vindo de `toJSON()`). */
+export function readPlanColumn(plan: Plan | Record<string, unknown> | null | undefined, key: string): unknown {
+  if (!plan || typeof plan !== "object") return undefined;
+  const anyPlan = plan as Plan & Record<string, unknown>;
+  if (typeof anyPlan.getDataValue === "function") {
+    try {
+      return anyPlan.getDataValue(key as keyof Plan);
+    } catch {
+      return undefined;
+    }
+  }
+  return anyPlan[key];
+}
+
 /**
  * Valor efetivo vindo só das colunas legadas do Plan (quando não há linha em PlanFeatures).
  */
 export function legacyPlanFeatureValue(
-  plan: Plan | null | undefined,
+  plan: Plan | Record<string, unknown> | null | undefined,
   featureKey: string
 ): boolean {
   if (!plan) return false;
@@ -27,24 +41,24 @@ export function legacyPlanFeatureValue(
     case "finance.invoices":
       return true;
     case "attendance.kanban":
-      return asBool(plan.getDataValue("useKanban"));
+      return asBool(readPlanColumn(plan, "useKanban"));
     case "attendance.internal_chat":
-      return asBool(plan.getDataValue("useInternalChat"));
+      return asBool(readPlanColumn(plan, "useInternalChat"));
     case "automation.openai":
-      return asBool(plan.getDataValue("useOpenAi"));
+      return asBool(readPlanColumn(plan, "useOpenAi"));
     case "automation.integrations":
-      return asBool(plan.getDataValue("useIntegrations"));
+      return asBool(readPlanColumn(plan, "useIntegrations"));
     case "agenda.appointments":
     case "attendance.schedules":
-      return asBool(plan.getDataValue("useSchedules"));
+      return asBool(readPlanColumn(plan, "useSchedules"));
     case "settings.api":
-      return asBool(plan.getDataValue("useExternalApi"));
+      return asBool(readPlanColumn(plan, "useExternalApi"));
     case "campaigns.sends":
     case "campaigns.lists":
     case "automation.chatbot":
     case "automation.keywords":
     case "automation.quick_replies":
-      return asBool(plan.getDataValue("useCampaigns"));
+      return asBool(readPlanColumn(plan, "useCampaigns"));
     default:
       return true;
   }
@@ -77,7 +91,7 @@ export function deriveLegacyPlanColumnsFromFeatures(
 
 /** Mapa inicial (todos os keys) a partir do plano legado — usado ao migrar UI / resposta API. */
 export function buildDefaultFeatureMapFromPlan(
-  plan: Plan | null | undefined
+  plan: Plan | Record<string, unknown> | null | undefined
 ): Record<string, boolean> {
   const keys = getAllFeatureKeys();
   const out: Record<string, boolean> = {};
@@ -85,4 +99,23 @@ export function buildDefaultFeatureMapFromPlan(
     out[k] = legacyPlanFeatureValue(plan, k);
   }
   return out;
+}
+
+/**
+ * Indica plano “completo” ao nível das colunas legadas — usado para detetar
+ * tabela PlanFeatures inconsistente (ex.: chaves omitidas no payload gravadas como false).
+ */
+export function planLegacyColumnsIndicateFullAccess(
+  plan: Plan | Record<string, unknown> | null | undefined
+): boolean {
+  if (!plan) return false;
+  return (
+    asBool(readPlanColumn(plan, "useKanban")) &&
+    asBool(readPlanColumn(plan, "useCampaigns")) &&
+    asBool(readPlanColumn(plan, "useSchedules")) &&
+    asBool(readPlanColumn(plan, "useInternalChat")) &&
+    asBool(readPlanColumn(plan, "useExternalApi")) &&
+    asBool(readPlanColumn(plan, "useOpenAi")) &&
+    asBool(readPlanColumn(plan, "useIntegrations"))
+  );
 }

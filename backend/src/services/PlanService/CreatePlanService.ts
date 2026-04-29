@@ -72,7 +72,7 @@ const CreatePlanService = async (planData: PlanData): Promise<Plan> => {
     Object.keys(pfInput).length > 0;
 
   const map = hasExplicitPlanFeatures
-    ? normalizePlanFeaturesInput(pfInput)
+    ? normalizePlanFeaturesInput(pfInput, plan)
     : buildDefaultFeatureMapFromPlan(plan);
 
   await ReplacePlanFeaturesService(plan.id, planFeatureMapToEntries(map));

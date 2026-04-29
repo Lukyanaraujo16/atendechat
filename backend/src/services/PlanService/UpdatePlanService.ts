@@ -86,7 +86,11 @@ const UpdatePlanService = async (
     const rawPf = incomingRecord.planFeatures;
     delete incomingRecord.planFeatures;
     if (rawPf !== undefined) {
-      const map = normalizePlanFeaturesInput(rawPf);
+      const planForNormalize = await Plan.findByPk(id);
+      if (!planForNormalize) {
+        throw new AppError("ERR_NO_PLAN_FOUND", 404);
+      }
+      const map = normalizePlanFeaturesInput(rawPf, planForNormalize);
       Object.assign(
         incomingRecord,
         deriveLegacyPlanColumnsFromFeatures(map)

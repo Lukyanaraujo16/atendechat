@@ -1,7 +1,10 @@
 import Plan from "../../models/Plan";
 import PlanFeature from "../../models/PlanFeature";
 import { getAllFeatureKeys } from "../../config/features";
-import { legacyPlanFeatureValue } from "../../config/planFeatureLegacy";
+import {
+  legacyPlanFeatureValue,
+  planLegacyColumnsIndicateFullAccess
+} from "../../config/planFeatureLegacy";
 
 export type PersistedPlanFeatureMap = Record<string, boolean>;
 
@@ -58,7 +61,7 @@ function applyLegacyModulePermissionGates(
 
 /** Valor efetivo: PlanFeatures → senão legado; depois override false na empresa. */
 export function resolvePlanFeature(
-  plan: Plan | null | undefined,
+  plan: Plan | Record<string, unknown> | null | undefined,
   persistedMap: PersistedPlanFeatureMap,
   modulePermissions: Record<string, boolean> | null | undefined,
   featureKey: string
@@ -75,14 +78,25 @@ export function resolvePlanFeature(
 }
 
 export function getEffectivePlanFeaturesMap(
-  plan: Plan | null | undefined,
+  plan: Plan | Record<string, unknown> | null | undefined,
   persistedMap: PersistedPlanFeatureMap,
   modulePermissions: Record<string, boolean> | null | undefined
 ): Record<string, boolean> {
   const keys = getAllFeatureKeys();
+  const nPersist = Object.keys(persistedMap).length;
+  const nTruePersist = Object.values(persistedMap).filter((x) => x === true).length;
+  const trueRatio = nPersist > 0 ? nTruePersist / nPersist : 0;
+  const corruptedPersisted =
+    Boolean(plan) &&
+    planLegacyColumnsIndicateFullAccess(plan) &&
+    nPersist > 0 &&
+    trueRatio < 0.12;
+
+  const effectivePersisted = corruptedPersisted ? {} : persistedMap;
+
   const out: Record<string, boolean> = {};
   for (const k of keys) {
-    out[k] = resolvePlanFeature(plan, persistedMap, modulePermissions, k);
+    out[k] = resolvePlanFeature(plan, effectivePersisted, modulePermissions, k);
   }
   return out;
 }
