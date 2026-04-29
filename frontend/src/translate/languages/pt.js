@@ -6,6 +6,11 @@ const messages = {
         requirements:
           "A senha deve ter no mínimo 8 caracteres, incluindo letra maiúscula, letra minúscula e número.",
       },
+      planFeature: {
+        blockedTitle: "Recurso indisponível",
+        blockedBody:
+          "Este recurso não está disponível no seu plano. Contacte o administrador da plataforma para mais opções.",
+      },
       signup: {
         title: "Cadastre-se",
         toasts: {
@@ -335,6 +340,9 @@ const messages = {
           modulesSectionTitle: "Módulos do plano",
           modulesSectionHint:
             "Estes interruptores definem o que o plano permite por defeito. As empresas herdam estes valores e podem ajustar em Plataforma → Empresas.",
+          featuresSectionTitle: "Módulos e funcionalidades",
+          featuresSectionHint:
+            "Marque cada recurso permitido pelo plano. Os itens são independentes (filho não exige pai). Novas funcionalidades são registadas em config/features sem novas colunas na tabela de planos.",
           externalApi: "API Externa",
           kanban: "Kanban",
           integrations: "Integrações",
@@ -356,6 +364,20 @@ const messages = {
         table: {
           companies: "Empresas",
           aria: "Tabela de planos",
+          featureSummary: "Recursos",
+          activeModulesCount: "{{count}} módulos ativos",
+          featureSummaryEmpty: "Nenhum extra",
+        },
+        featureGroups: {
+          dashboard: "Dashboard",
+          attendance: "Atendimento",
+          automation: "Automação",
+          agenda: "Agenda",
+          team: "Equipe",
+          finance: "Financeiro",
+          campaigns: "Campanhas",
+          contacts: "Contactos",
+          settings: "Configurações",
         },
       },
       kanban: {
@@ -1652,11 +1674,11 @@ const messages = {
             applyPlanModules: "Aplicar módulos do plano",
           },
           origin: {
-            inherited: "Liberado pelo plano (empresa sem bloqueio)",
-            disabledOverride: "Desativado nesta empresa",
-            blockedByPlan: "Indisponível neste plano",
-            companyOnly: "Controlado só na empresa (sem coluna no plano)",
-            noPlan: "Selecione um plano para editar estes módulos",
+            inherited: "Permitido pelo plano; empresa pode desligar",
+            disabledOverride: "Desativado nesta empresa (override)",
+            blockedByPlan: "O plano não inclui este recurso — o backend recusará com ERR_PLAN_FEATURE_DISABLED",
+            companyOnly: "Sem plano: ajuste só vale após associar um plano com a feature correspondente",
+            noPlan: "Selecione um plano para alinhar estes módulos ao catálogo de funcionalidades",
           },
         },
         companies: {
@@ -3284,24 +3306,24 @@ const messages = {
             modulesSectionHint:
               "Complementa o plano: desligar aqui oculta o módulo e bloqueia o uso, quando o plano permitir o recurso.",
             modulesSectionHintV2:
-              "Ao escolher um plano, os módulos alinhados ao plano são carregados automaticamente. Pode depois ativar ou desativar por empresa; a etiqueta indica se coincide com o plano ou é um ajuste local.",
+              "Cada interruptor corresponde a funcionalidades do plano (PlanFeatures). O que o plano não inclui fica desligado e bloqueado — igual ao backend. Chatbot, OpenAI, campanhas, API e grupos são avaliados de forma independente. O calendário da agenda (compromissos) depende só do plano, não deste formulário.",
             modules: {
               useKanban: "Kanban",
-              useKanbanHelp: "Quadro kanban no atendimento.",
+              useKanbanHelp: "Quadro kanban (feature attendance.kanban).",
               useCampaigns: "Campanhas",
-              useCampaignsHelp: "Listas, disparos e relatórios de campanha.",
+              useCampaignsHelp: "Disparos e listas (campaigns.sends / campaigns.lists). Independentes do chatbot.",
               useFlowbuilders: "Fluxos (chatbot)",
-              useFlowbuildersHelp: "Flowbuilder, gatilhos e fluxos vinculados ao WhatsApp.",
+              useFlowbuildersHelp: "Flowbuilder (automation.chatbot). Não exige campanhas no plano.",
               useOpenAi: "OpenAI / Prompts",
-              useOpenAiHelp: "Prompts e recursos de IA configurados no sistema.",
-              useSchedules: "Agendamentos",
-              useSchedulesHelp: "Agendamento de mensagens e recorrências.",
+              useOpenAiHelp: "Prompts (automation.openai). Independente do chatbot.",
+              useSchedules: "Agendamentos de envio",
+              useSchedulesHelp: "Horários de envio / schedules (agenda.appointments e attendance.schedules). O calendário de compromissos é agenda.calendar no plano.",
               useExternalApi: "API WhatsApp (envio externo)",
-              useExternalApiHelp: "Token HTTP para envio de mensagens por API.",
+              useExternalApiHelp: "Token HTTP (settings.api).",
               useIntegrations: "Integrações por setor",
-              useIntegrationsHelp: "Webhooks, N8N, Typebot e automações por setor.",
+              useIntegrationsHelp: "Integrações de fila (automation.integrations).",
               useGroups: "Grupos WhatsApp",
-              useGroupsHelp: "Gestão de grupos no atendimento.",
+              useGroupsHelp: "Grupos no atendimento (team.groups); o plano pode desactivar.",
             },
           },
           buttons: {
@@ -3575,6 +3597,8 @@ const messages = {
         ERR_NO_PERMISSION: "Você não tem permissão para acessar este recurso.",
         ERR_MODULE_NOT_ALLOWED:
           "Este módulo não está liberado para a sua empresa (plano ou configuração da plataforma).",
+        ERR_PLAN_FEATURE_DISABLED:
+          "Este recurso não está disponível no seu plano.",
         ERR_DUPLICATED_CONTACT: "Já existe um contato com este número.",
         ERR_NO_SETTING_FOUND: "Nenhuma configuração encontrada com este ID.",
         ERR_NO_CONTACT_FOUND: "Nenhum contato encontrado com este ID.",

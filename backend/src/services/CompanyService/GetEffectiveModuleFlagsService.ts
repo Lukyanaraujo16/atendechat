@@ -1,4 +1,5 @@
 import Plan from "../../models/Plan";
+import { buildDefaultFeatureMapFromPlan } from "../../config/planFeatureLegacy";
 
 export type ModulePermissionsMap = Record<string, boolean | undefined> | null | undefined;
 
@@ -15,39 +16,42 @@ export type EffectiveModuleFlags = {
   useInternalChat: boolean;
 };
 
-const asBool = (v: unknown): boolean => v === true || v === "true";
+/**
+ * Flags “legadas” derivadas do mapa granular (plano + PlanFeatures + overrides).
+ * - useCampaigns: só disparos/listas (não inclui chatbot isolado).
+ * - useFlowbuilders: automation.chatbot respeitando override useFlowbuilders.
+ */
+export function buildEffectiveModuleFlagsFromFeatureMap(
+  featureMap: Record<string, boolean>,
+  modulePermissions: ModulePermissionsMap
+): EffectiveModuleFlags {
+  const m = modulePermissions || {};
+  return {
+    useKanban: featureMap["attendance.kanban"] === true,
+    useCampaigns:
+      featureMap["campaigns.sends"] === true || featureMap["campaigns.lists"] === true,
+    useFlowbuilders:
+      featureMap["automation.chatbot"] === true && m.useFlowbuilders !== false,
+    useOpenAi: featureMap["automation.openai"] === true,
+    useSchedules:
+      featureMap["agenda.appointments"] === true ||
+      featureMap["attendance.schedules"] === true,
+    useExternalApi: featureMap["settings.api"] === true,
+    useIntegrations: featureMap["automation.integrations"] === true,
+    useGroups: featureMap["team.groups"] === true && m.useGroups !== false,
+    useInternalChat: featureMap["attendance.internal_chat"] === true
+  };
+}
 
 /**
- * Regra: cada módulo do plano deve estar true; a empresa pode desativar com false explícito em modulePermissions.
- * useFlowbuilders exige plano com useCampaigns (fluxos fazem parte do ecossistema de campanhas).
- * useGroups não existe no plano: default liberado; false em modulePermissions bloqueia.
- * useInternalChat: coluna no plano + override opcional em modulePermissions (mesmo padrão dos outros gated).
+ * Sem linhas PlanFeatures no pedido: reconstrói o mapa só a partir das colunas do Plan (legado).
  */
 const GetEffectiveModuleFlags = (
   plan: Plan | null | undefined,
   modulePermissions: ModulePermissionsMap
 ): EffectiveModuleFlags => {
-  const m = modulePermissions || {};
-  const p = (plan as unknown) as Record<string, unknown> | null | undefined;
-
-  const planOn = (key: string) => asBool(p?.[key]);
-
-  const gated = (planKey: string, permKey: string) =>
-    planOn(planKey) && m[permKey] !== false;
-
-  const flowOk = planOn("useCampaigns") && m.useFlowbuilders !== false;
-
-  return {
-    useKanban: gated("useKanban", "useKanban"),
-    useCampaigns: gated("useCampaigns", "useCampaigns"),
-    useFlowbuilders: flowOk,
-    useOpenAi: gated("useOpenAi", "useOpenAi"),
-    useSchedules: gated("useSchedules", "useSchedules"),
-    useExternalApi: gated("useExternalApi", "useExternalApi"),
-    useIntegrations: gated("useIntegrations", "useIntegrations"),
-    useGroups: m.useGroups !== false,
-    useInternalChat: gated("useInternalChat", "useInternalChat")
-  };
+  const featureMap = buildDefaultFeatureMapFromPlan(plan);
+  return buildEffectiveModuleFlagsFromFeatureMap(featureMap, modulePermissions);
 };
 
 export default GetEffectiveModuleFlags;

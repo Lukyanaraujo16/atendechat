@@ -31,7 +31,7 @@ import { isArray } from "lodash";
 import api from "../services/api";
 import toastError from "../errors/toastError";
 import { makeStyles, alpha } from "@material-ui/core/styles";
-import usePlans from "../hooks/usePlans";
+import usePlanFlags from "../hooks/usePlanFlags";
 
 const useStyles = makeStyles((theme) => {
   const brand = theme.palette.primary.main;
@@ -154,12 +154,17 @@ const reducer = (state, action) => {
   }
 };
 
-function defaultAutomacaoPath(flags, isAdmin) {
+function defaultAutomacaoPath(planFlags, isAdmin) {
   if (!isAdmin) return "/quick-messages";
-  if (flags.useFlowbuilders) return "/flowbuilders";
-  if (flags.useIntegrations) return "/queue-integration";
-  if (flags.useOpenAi) return "/prompts";
-  return "/quick-messages";
+  const fx = planFlags.effectiveFeatures || {};
+  if (fx["automation.chatbot"] === true) return "/flowbuilders";
+  if (fx["automation.keywords"] === true) return "/phrase-lists";
+  if (planFlags.useIntegrations || fx["automation.integrations"] === true) {
+    return "/queue-integration";
+  }
+  if (planFlags.useOpenAi || fx["automation.openai"] === true) return "/prompts";
+  if (fx["automation.quick_replies"] === true) return "/quick-messages";
+  return "/tickets";
 }
 
 const MainListItems = (props) => {
@@ -168,36 +173,32 @@ const MainListItems = (props) => {
   const { whatsApps } = useContext(WhatsAppsContext);
   const { user } = useContext(AuthContext);
   const [connectionWarning, setConnectionWarning] = useState(false);
-  const [showCampaigns, setShowCampaigns] = useState(false);
-  const [showFlowbuilders, setShowFlowbuilders] = useState(false);
-  const [showKanban, setShowKanban] = useState(false);
-  const [showOpenAi, setShowOpenAi] = useState(false);
-  const [showIntegrations, setShowIntegrations] = useState(false);
-  const [showSchedules, setShowSchedules] = useState(false);
-  const [showExternalApi, setShowExternalApi] = useState(false);
-  const [showGroups, setShowGroups] = useState(true);
-  const [showInternalChat, setShowInternalChat] = useState(true);
 
   const [invisible, setInvisible] = useState(true);
   const [pageNumber, setPageNumber] = useState(1);
   const [searchParam] = useState("");
   const [chats, dispatch] = useReducer(reducer, []);
-  const { getPlanCompany } = usePlans();
+  const planFlags = usePlanFlags();
   const location = useLocation();
 
   const socketManager = useContext(SocketContext);
 
   const isAdmin = user?.profile === "admin";
-  const planFlags = {
-    useCampaigns: showCampaigns,
-    useFlowbuilders: showFlowbuilders,
-    useKanban: showKanban,
-    useOpenAi: showOpenAi,
-    useIntegrations: showIntegrations,
-    useSchedules: showSchedules,
-    useExternalApi: showExternalApi,
-    useGroups: showGroups,
-  };
+  const fx = planFlags.effectiveFeatures || {};
+  const showCampaigns = planFlags.useCampaigns;
+  const showKanban = planFlags.useKanban;
+  const showSchedules = planFlags.useSchedules;
+  const showInternalChat = planFlags.useInternalChat;
+  const showDashboardNav =
+    fx["dashboard.main"] === true || fx["dashboard.reports"] === true;
+  const showAgendaNav = fx["agenda.calendar"] === true;
+  const showFinanceNav =
+    fx["finance.subscription"] === true || fx["finance.invoices"] === true;
+  const showEvalNav = fx["team.ratings"] === true;
+  const showTagsNav = fx["contacts.crm"] === true;
+  const showFilesNav = fx["contacts.files"] === true;
+  const showTeamUsersNav =
+    fx["team.users"] === true || fx["team.queues"] === true;
 
   useEffect(() => {
     dispatch({ type: "RESET" });
@@ -205,60 +206,12 @@ const MainListItems = (props) => {
   }, [searchParam]);
 
   useEffect(() => {
-    async function fetchData() {
-      if (user?.super && (user?.companyId == null || user?.companyId === "")) {
-        return;
-      }
-      const companyId = user.companyId;
-      if (companyId == null || companyId === "") {
-        return;
-      }
-      try {
-        const planConfigs = await getPlanCompany(undefined, companyId);
-        const plan = planConfigs?.plan;
-        const eff = planConfigs?.effectiveModules;
-        if (eff) {
-          setShowCampaigns(!!eff.useCampaigns);
-          setShowFlowbuilders(!!eff.useFlowbuilders);
-          setShowKanban(!!eff.useKanban);
-          setShowOpenAi(!!eff.useOpenAi);
-          setShowIntegrations(!!eff.useIntegrations);
-          setShowSchedules(!!eff.useSchedules);
-          setShowExternalApi(!!eff.useExternalApi);
-          setShowGroups(eff.useGroups !== false);
-          setShowInternalChat(
-            eff.useInternalChat !== undefined
-              ? !!eff.useInternalChat
-              : plan?.useInternalChat !== false
-          );
-        } else if (plan) {
-          setShowCampaigns(!!plan.useCampaigns);
-          setShowFlowbuilders(!!plan.useCampaigns);
-          setShowKanban(!!plan.useKanban);
-          setShowOpenAi(!!plan.useOpenAi);
-          setShowIntegrations(!!plan.useIntegrations);
-          setShowSchedules(!!plan.useSchedules);
-          setShowExternalApi(!!plan.useExternalApi);
-          setShowGroups(true);
-          setShowInternalChat(plan.useInternalChat !== false);
-        }
-      } catch (e) {
-        toastError(e);
-      }
-    }
-    if (user?.id) {
-      fetchData();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, user?.companyId, user?.super]);
-
-  useEffect(() => {
+    if (!planFlags.loaded || !showInternalChat) return undefined;
     const delayDebounceFn = setTimeout(() => {
       fetchChats();
     }, 500);
     return () => clearTimeout(delayDebounceFn);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParam, pageNumber]);
+  }, [searchParam, pageNumber, planFlags.loaded, showInternalChat]);
 
   useEffect(() => {
     const companyId = localStorage.getItem("companyId");
@@ -286,13 +239,6 @@ const MainListItems = (props) => {
     }
     setInvisible(unreadsCount === 0);
   }, [chats, user.id]);
-
-  useEffect(() => {
-    if (localStorage.getItem("cshow")) {
-      setShowCampaigns(true);
-      setShowFlowbuilders(true);
-    }
-  }, []);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
@@ -365,6 +311,13 @@ const MainListItems = (props) => {
   const selSaaS = path.startsWith("/saas") || path.startsWith("/platform");
 
   const toAutomacao = defaultAutomacaoPath(planFlags, isAdmin);
+  const automacaoVisible =
+    isAdmin &&
+    (fx["automation.chatbot"] === true ||
+      fx["automation.keywords"] === true ||
+      fx["automation.integrations"] === true ||
+      fx["automation.openai"] === true ||
+      fx["automation.quick_replies"] === true);
 
   const standaloneAfterConfig = (
     <>
@@ -377,15 +330,17 @@ const MainListItems = (props) => {
         listItemTextClassName={classes.listItemText}
         selected={selTarefas}
       />
-      <ListItemLink
-        to="/agenda"
-        primary={i18n.t("mainDrawer.listItems.agenda")}
-        icon={<CalendarTodayIcon />}
-        listItemClassName={classes.listItem}
-        listItemIconClassName={classes.listItemIcon}
-        listItemTextClassName={classes.listItemText}
-        selected={selAgenda}
-      />
+      {showAgendaNav && (
+        <ListItemLink
+          to="/agenda"
+          primary={i18n.t("mainDrawer.listItems.agenda")}
+          icon={<CalendarTodayIcon />}
+          listItemClassName={classes.listItem}
+          listItemIconClassName={classes.listItemIcon}
+          listItemTextClassName={classes.listItemText}
+          selected={selAgenda}
+        />
+      )}
       {showSchedules && (
         <ListItemLink
           to="/schedules"
@@ -397,33 +352,39 @@ const MainListItems = (props) => {
           selected={selAgendamentos}
         />
       )}
-      <ListItemLink
-        to="/avaliacao"
-        primary={i18n.t("mainDrawer.listItems.evaluation")}
-        icon={<AssessmentOutlinedIcon />}
-        listItemClassName={classes.listItem}
-        listItemIconClassName={classes.listItemIcon}
-        listItemTextClassName={classes.listItemText}
-        selected={selAvaliacao}
-      />
-      <ListItemLink
-        to="/tags"
-        primary={i18n.t("mainDrawer.listItems.tags")}
-        icon={<LocalOfferIcon />}
-        listItemClassName={classes.listItem}
-        listItemIconClassName={classes.listItemIcon}
-        listItemTextClassName={classes.listItemText}
-        selected={selTags}
-      />
-      <ListItemLink
-        to="/files"
-        primary={i18n.t("mainDrawer.listItems.files")}
-        icon={<AttachFile />}
-        listItemClassName={classes.listItem}
-        listItemIconClassName={classes.listItemIcon}
-        listItemTextClassName={classes.listItemText}
-        selected={selArquivos}
-      />
+      {showEvalNav && (
+        <ListItemLink
+          to="/avaliacao"
+          primary={i18n.t("mainDrawer.listItems.evaluation")}
+          icon={<AssessmentOutlinedIcon />}
+          listItemClassName={classes.listItem}
+          listItemIconClassName={classes.listItemIcon}
+          listItemTextClassName={classes.listItemText}
+          selected={selAvaliacao}
+        />
+      )}
+      {showTagsNav && (
+        <ListItemLink
+          to="/tags"
+          primary={i18n.t("mainDrawer.listItems.tags")}
+          icon={<LocalOfferIcon />}
+          listItemClassName={classes.listItem}
+          listItemIconClassName={classes.listItemIcon}
+          listItemTextClassName={classes.listItemText}
+          selected={selTags}
+        />
+      )}
+      {showFilesNav && (
+        <ListItemLink
+          to="/files"
+          primary={i18n.t("mainDrawer.listItems.files")}
+          icon={<AttachFile />}
+          listItemClassName={classes.listItem}
+          listItemIconClassName={classes.listItemIcon}
+          listItemTextClassName={classes.listItemText}
+          selected={selArquivos}
+        />
+      )}
       {user.super && (
         <ListItemLink
           to="/saas/announcements"
@@ -452,17 +413,19 @@ const MainListItems = (props) => {
       <Can
         role={user.profile}
         perform="dashboard:view"
-        yes={() => (
-          <ListItemLink
-            to="/"
-            primary={i18n.t("mainDrawer.sections.dashboard")}
-            icon={<DashboardOutlinedIcon />}
-            listItemClassName={classes.listItem}
-            listItemIconClassName={classes.listItemIcon}
-            listItemTextClassName={classes.listItemText}
-            selected={selDashboard}
-          />
-        )}
+        yes={() =>
+          planFlags.loaded && showDashboardNav ? (
+            <ListItemLink
+              to="/"
+              primary={i18n.t("mainDrawer.sections.dashboard")}
+              icon={<DashboardOutlinedIcon />}
+              listItemClassName={classes.listItem}
+              listItemIconClassName={classes.listItemIcon}
+              listItemTextClassName={classes.listItemText}
+              selected={selDashboard}
+            />
+          ) : null
+        }
       />
 
       {user.super && (
@@ -517,15 +480,17 @@ const MainListItems = (props) => {
         />
       ) : null}
 
-      <ListItemLink
-        to={toAutomacao}
-        primary={i18n.t("mainDrawer.sections.automacao")}
-        icon={<AccountTree />}
-        listItemClassName={classes.listItem}
-        listItemIconClassName={classes.listItemIcon}
-        listItemTextClassName={classes.listItemText}
-        selected={selAutomacao}
-      />
+      {planFlags.loaded && automacaoVisible ? (
+        <ListItemLink
+          to={toAutomacao}
+          primary={i18n.t("mainDrawer.sections.automacao")}
+          icon={<AccountTree />}
+          listItemClassName={classes.listItem}
+          listItemIconClassName={classes.listItemIcon}
+          listItemTextClassName={classes.listItemText}
+          selected={selAutomacao}
+        />
+      ) : null}
 
       {isAdmin && (
         <>
@@ -541,25 +506,29 @@ const MainListItems = (props) => {
             />
           )}
 
-          <ListItemLink
-            to="/users"
-            primary={i18n.t("mainDrawer.sections.equipe")}
-            icon={<PeopleAltOutlinedIcon />}
-            listItemClassName={classes.listItem}
-            listItemIconClassName={classes.listItemIcon}
-            listItemTextClassName={classes.listItemText}
-            selected={selEquipe}
-          />
+          {planFlags.loaded && showTeamUsersNav ? (
+            <ListItemLink
+              to="/users"
+              primary={i18n.t("mainDrawer.sections.equipe")}
+              icon={<PeopleAltOutlinedIcon />}
+              listItemClassName={classes.listItem}
+              listItemIconClassName={classes.listItemIcon}
+              listItemTextClassName={classes.listItemText}
+              selected={selEquipe}
+            />
+          ) : null}
 
-          <ListItemLink
-            to="/financeiro"
-            primary={i18n.t("mainDrawer.sections.financeiro")}
-            icon={<LocalAtmIcon />}
-            listItemClassName={classes.listItem}
-            listItemIconClassName={classes.listItemIcon}
-            listItemTextClassName={classes.listItemText}
-            selected={selFinanceiro}
-          />
+          {planFlags.loaded && showFinanceNav ? (
+            <ListItemLink
+              to="/financeiro"
+              primary={i18n.t("mainDrawer.sections.financeiro")}
+              icon={<LocalAtmIcon />}
+              listItemClassName={classes.listItem}
+              listItemIconClassName={classes.listItemIcon}
+              listItemTextClassName={classes.listItemText}
+              selected={selFinanceiro}
+            />
+          ) : null}
 
           <ListItemLink
             to="/connections"

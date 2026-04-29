@@ -20,6 +20,7 @@ import {
     Select,
     InputAdornment,
     Tooltip,
+    Chip,
 } from "@material-ui/core";
 import { alpha } from "@material-ui/core/styles";
 import SearchIcon from "@material-ui/icons/Search";
@@ -39,17 +40,47 @@ import {
     AppEmptyState,
     AppLoadingState,
 } from "../../ui";
-import ModuleToggleCard from "../ModuleSettings/ModuleToggleCard";
 import PlanModuleSaveDialog from "../ModuleSettings/PlanModuleSaveDialog";
-import {
-  PLAN_FORM_MODULE_KEYS,
-  diffPlanModuleFlags,
-} from "../ModuleSettings/moduleSync";
+import { diffPlanFeatureMaps } from "../ModuleSettings/planFeatureSync";
+import PlanFeaturesTree from "./PlanFeaturesTree";
 import {
   parseBrazilianCurrencyToNumber,
   formatPlanValueForInput,
   formatCurrencyBRL,
 } from "../../utils/brazilianCurrency";
+import { getAllFeatureKeys } from "../../config/features";
+
+const defaultPlanFeaturesAllOn = () =>
+  Object.fromEntries(getAllFeatureKeys().map((k) => [k, true]));
+
+const FEATURE_GROUP_ORDER = [
+  "dashboard",
+  "attendance",
+  "automation",
+  "agenda",
+  "team",
+  "finance",
+  "campaigns",
+  "contacts",
+  "settings",
+];
+
+/** Resumo para grelha: total de folhas ativas + grupos com pelo menos uma folha ON. */
+function summarizePlanFeatures(planFeatures) {
+  if (!planFeatures || typeof planFeatures !== "object") {
+    return { count: 0, groups: [] };
+  }
+  const byRoot = {};
+  let count = 0;
+  Object.entries(planFeatures).forEach(([key, on]) => {
+    if (on !== true) return;
+    count += 1;
+    const root = key.split(".")[0];
+    byRoot[root] = true;
+  });
+  const groups = FEATURE_GROUP_ORDER.filter((g) => byRoot[g]);
+  return { count, groups };
+}
 
 
 const useStyles = makeStyles(theme => ({
@@ -201,28 +232,12 @@ export function PlanManagerForm(props) {
         connections: 0,
         queues: 0,
         value: '',
-        useCampaigns: true,
-        useSchedules: true,
-        useInternalChat: true,
-        useExternalApi: true,
-        useKanban: true,
-        useOpenAi: true,
-        useIntegrations: true,
+        planFeatures: defaultPlanFeaturesAllOn(),
     });
 
     useEffect(() => {
         setRecord(initialValue)
     }, [initialValue])
-
-    const planModuleTitle = (key) =>
-        key === "useInternalChat"
-            ? i18n.t("plans.form.internalChat")
-            : i18n.t(`settings.company.form.modules.${key}`);
-
-    const planModuleDescription = (key) =>
-        key === "useInternalChat"
-            ? i18n.t("plans.form.internalChatHelp")
-            : i18n.t(`settings.company.form.modules.${key}Help`);
 
     const validationSchema = useMemo(
         () =>
@@ -267,8 +282,13 @@ export function PlanManagerForm(props) {
                 try {
                     const valueNum = parseBrazilianCurrencyToNumber(values.value);
                     await onSubmit({
-                        ...values,
+                        name: values.name,
+                        users: Number(values.users) || 0,
+                        connections: Number(values.connections) || 0,
+                        queues: Number(values.queues) || 0,
                         value: valueNum === null ? 0 : valueNum,
+                        planFeatures: values.planFeatures || {},
+                        id: values.id,
                     });
                 } finally {
                     setSubmitting(false);
@@ -339,39 +359,25 @@ export function PlanManagerForm(props) {
                             component="h3"
                             className={classes.modulesSectionTitle}
                         >
-                            {i18n.t("plans.form.modulesSectionTitle")}
+                            {i18n.t("plans.form.featuresSectionTitle")}
                         </Typography>
                         <Typography
                             variant="body2"
                             color="textSecondary"
                             className={classes.modulesSectionHint}
                         >
-                            {i18n.t("plans.form.modulesSectionHint")}
+                            {i18n.t("plans.form.featuresSectionHint")}
                         </Typography>
-                        <Grid container spacing={2}>
-                            {PLAN_FORM_MODULE_KEYS.map((key) => (
-                                <Grid item xs={12} md={6} key={key}>
-                                    <Field name={key}>
-                                        {({ field, form }) => (
-                                            <ModuleToggleCard
-                                                title={planModuleTitle(key)}
-                                                description={planModuleDescription(key)}
-                                                checked={field.value !== false}
-                                                onChange={(e) =>
-                                                    form.setFieldValue(
-                                                        field.name,
-                                                        e.target.checked
-                                                    )
-                                                }
-                                                inputProps={{
-                                                    "aria-label": planModuleTitle(key),
-                                                }}
-                                            />
-                                        )}
-                                    </Field>
-                                </Grid>
-                            ))}
-                        </Grid>
+                        <Field name="planFeatures">
+                            {({ field, form }) => (
+                                <PlanFeaturesTree
+                                    value={field.value || {}}
+                                    onChange={(next) =>
+                                        form.setFieldValue("planFeatures", next)
+                                    }
+                                />
+                            )}
+                        </Field>
                     </Box>
 
                     <Grid spacing={2} justifyContent="flex-end" container>
@@ -437,34 +443,6 @@ export function PlansManagerGrid(props) {
         return list;
     }, [records, search, sortBy]);
 
-    const renderCampaigns = (row) => {
-        return row.useCampaigns === false ? `${i18n.t("plans.form.no")}` : `${i18n.t("plans.form.yes")}`;
-    };
-
-    const renderSchedules = (row) => {
-        return row.useSchedules === false ? `${i18n.t("plans.form.no")}` : `${i18n.t("plans.form.yes")}`;
-    };
-
-    const renderInternalChat = (row) => {
-        return row.useInternalChat === false ? `${i18n.t("plans.form.no")}` : `${i18n.t("plans.form.yes")}`;
-    };
-
-    const renderExternalApi = (row) => {
-        return row.useExternalApi === false ? `${i18n.t("plans.form.no")}` : `${i18n.t("plans.form.yes")}`;
-    };
-
-    const renderKanban = (row) => {
-        return row.useKanban === false ? `${i18n.t("plans.form.no")}` : `${i18n.t("plans.form.yes")}`;
-    };
-
-    const renderOpenAi = (row) => {
-        return row.useOpenAi === false ? `${i18n.t("plans.form.no")}` : `${i18n.t("plans.form.yes")}`;
-    };
-
-    const renderIntegrations = (row) => {
-        return row.useIntegrations === false ? `${i18n.t("plans.form.no")}` : `${i18n.t("plans.form.yes")}`;
-    };
-
     const isPlatform = variant === "platform";
     const headCls = isPlatform ? classes.tableHeadCell : undefined;
 
@@ -498,26 +476,8 @@ export function PlansManagerGrid(props) {
                     <TableCell align="center" className={headCls}>
                         {i18n.t("plans.form.value")}
                     </TableCell>
-                    <TableCell align="center" className={headCls}>
-                        {i18n.t("plans.form.campaigns")}
-                    </TableCell>
-                    <TableCell align="center" className={headCls}>
-                        {i18n.t("plans.form.schedules")}
-                    </TableCell>
-                    <TableCell align="center" className={headCls}>
-                        {i18n.t("plans.form.internalChat")}
-                    </TableCell>
-                    <TableCell align="center" className={headCls}>
-                        {i18n.t("plans.form.externalApi")}
-                    </TableCell>
-                    <TableCell align="center" className={headCls}>
-                        {i18n.t("plans.form.kanban")}
-                    </TableCell>
-                    <TableCell align="center" className={headCls}>
-                        Open.Ai
-                    </TableCell>
-                    <TableCell align="center" className={headCls}>
-                        {i18n.t("plans.form.integrations")}
+                    <TableCell align="left" className={headCls}>
+                        {i18n.t("plans.table.featureSummary")}
                     </TableCell>
                 </TableRow>
             </TableHead>
@@ -588,22 +548,41 @@ export function PlansManagerGrid(props) {
                             <TableCell align="center">
                                 {formatCurrencyBRL(row.value)}
                             </TableCell>
-                            <TableCell align="center">
-                                {renderCampaigns(row)}
-                            </TableCell>
-                            <TableCell align="center">
-                                {renderSchedules(row)}
-                            </TableCell>
-                            <TableCell align="center">
-                                {renderInternalChat(row)}
-                            </TableCell>
-                            <TableCell align="center">
-                                {renderExternalApi(row)}
-                            </TableCell>
-                            <TableCell align="center">{renderKanban(row)}</TableCell>
-                            <TableCell align="center">{renderOpenAi(row)}</TableCell>
-                            <TableCell align="center">
-                                {renderIntegrations(row)}
+                            <TableCell align="left">
+                                {(() => {
+                                    const { count, groups } = summarizePlanFeatures(
+                                        row.planFeatures
+                                    );
+                                    if (!count) {
+                                        return (
+                                            <Typography variant="body2" color="textSecondary">
+                                                {i18n.t("plans.table.featureSummaryEmpty")}
+                                            </Typography>
+                                        );
+                                    }
+                                    return (
+                                        <Box>
+                                            <Typography variant="body2" component="span">
+                                                {i18n.t("plans.table.activeModulesCount", {
+                                                    count,
+                                                })}
+                                            </Typography>
+                                            <Box
+                                                display="flex"
+                                                flexWrap="wrap"
+                                                style={{ marginTop: 6, gap: 4 }}
+                                            >
+                                                {groups.map((g) => (
+                                                    <Chip
+                                                        key={g}
+                                                        size="small"
+                                                        label={i18n.t(`plans.featureGroups.${g}`)}
+                                                    />
+                                                ))}
+                                            </Box>
+                                        </Box>
+                                    );
+                                })()}
                             </TableCell>
                         </TableRow>
                     );
@@ -730,13 +709,7 @@ const defaultPlanRecord = () => ({
     connections: 0,
     queues: 0,
     value: "",
-    useCampaigns: true,
-    useSchedules: true,
-    useInternalChat: true,
-    useExternalApi: true,
-    useKanban: true,
-    useOpenAi: true,
-    useIntegrations: true,
+    planFeatures: defaultPlanFeaturesAllOn(),
 });
 
 export default function PlansManager({ variant = "settings" }) {
@@ -830,7 +803,10 @@ export default function PlansManager({ variant = "settings" }) {
     }
 
     const handleSubmitRequest = async (data) => {
-        const diff = diffPlanModuleFlags(record, data, PLAN_FORM_MODULE_KEYS)
+        const diff = diffPlanFeatureMaps(
+            record.planFeatures || {},
+            data.planFeatures || {}
+        );
         if (data.id !== undefined && diff.length > 0) {
             setPlanSaveDialog({ open: true, data, diff })
             return
@@ -882,14 +858,6 @@ export default function PlansManager({ variant = "settings" }) {
     };
 
     const handleSelect = (data) => {
-        let useCampaigns = data.useCampaigns === false ? false : true;
-        let useSchedules = data.useSchedules === false ? false : true;
-        let useInternalChat = data.useInternalChat === false ? false : true;
-        let useExternalApi = data.useExternalApi === false ? false : true;
-        let useKanban = data.useKanban === false ? false : true;
-        let useOpenAi = data.useOpenAi === false ? false : true;
-        let useIntegrations = data.useIntegrations === false ? false : true;
-
         setRecord({
             id: data.id,
             name: data.name || "",
@@ -897,13 +865,10 @@ export default function PlansManager({ variant = "settings" }) {
             connections: data.connections || 0,
             queues: data.queues || 0,
             value: formatPlanValueForInput(data.value),
-            useCampaigns,
-            useSchedules,
-            useInternalChat,
-            useExternalApi,
-            useKanban,
-            useOpenAi,
-            useIntegrations,
+            planFeatures:
+                data.planFeatures && typeof data.planFeatures === "object"
+                    ? { ...data.planFeatures }
+                    : {},
         });
         if (variant === "platform") {
             setFormOpen(true);

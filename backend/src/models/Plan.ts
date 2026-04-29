@@ -7,8 +7,10 @@ import {
   PrimaryKey,
   AutoIncrement,
   AllowNull,
-  Unique
+  Unique,
+  HasMany
 } from "sequelize-typescript";
+import PlanFeature from "./PlanFeature";
 
 @Table
 class Plan extends Model<Plan> {
@@ -60,6 +62,9 @@ class Plan extends Model<Plan> {
 
   @Column
   useIntegrations: boolean;
+
+  @HasMany(() => PlanFeature)
+  planFeatures: PlanFeature[];
 }
 
 export default Plan;

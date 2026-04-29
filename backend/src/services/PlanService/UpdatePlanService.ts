@@ -11,6 +11,14 @@ import {
   PlanPropagationMode
 } from "./PlanModulePropagation";
 import { normalizePlanValueIfPresent } from "../../utils/normalizeMonetaryInput";
+import ReplacePlanFeaturesService from "./ReplacePlanFeaturesService";
+import {
+  normalizePlanFeaturesInput,
+  planFeatureMapToEntries
+} from "./PlanFeatureNormalize";
+import { deriveLegacyPlanColumnsFromFeatures } from "../../config/planFeatureLegacy";
+import PlanFeature from "../../models/PlanFeature";
+import { mergePlanPersistedWithLegacy } from "./GetEffectivePlanFeaturesService";
 
 interface PlanData {
   name?: string;
@@ -70,8 +78,23 @@ const UpdatePlanService = async (
     throw new AppError("ERR_PLAN_ID_REQUIRED", 400);
   }
 
-  const incomingRecord = incoming as Record<string, unknown>;
+  const incomingRecord = { ...(incoming as Record<string, unknown>) };
   normalizePlanValueIfPresent(incomingRecord);
+
+  let featureEntries: ReturnType<typeof planFeatureMapToEntries> | null = null;
+  if (Object.prototype.hasOwnProperty.call(incomingRecord, "planFeatures")) {
+    const rawPf = incomingRecord.planFeatures;
+    delete incomingRecord.planFeatures;
+    if (rawPf !== undefined) {
+      const map = normalizePlanFeaturesInput(rawPf);
+      Object.assign(
+        incomingRecord,
+        deriveLegacyPlanColumnsFromFeatures(map)
+      );
+      featureEntries = planFeatureMapToEntries(map);
+    }
+  }
+
   const updatePayload = pickPlanUpdatePayload(incomingRecord);
 
   const result = await sequelize.transaction(async (t: Transaction) => {
@@ -87,6 +110,14 @@ const UpdatePlanService = async (
     const changed = getChangedPropagationKeys(planBefore, incomingRecord);
 
     await planBefore.update(updatePayload, { transaction: t });
+
+    if (featureEntries) {
+      await ReplacePlanFeaturesService(
+        planBefore.id as number,
+        featureEntries,
+        t
+      );
+    }
 
     let companiesUpdated = 0;
 
@@ -157,9 +188,19 @@ const UpdatePlanService = async (
           propagationMode === "force_all")
     };
 
+    await planBefore.reload({ transaction: t });
+    const featRows = await PlanFeature.findAll({
+      where: { planId: planBefore.id },
+      transaction: t
+    });
+    const planFeaturesMerged = mergePlanPersistedWithLegacy(
+      planBefore,
+      featRows
+    );
     const json = planBefore.toJSON() as Record<string, unknown>;
     return {
       ...json,
+      planFeatures: planFeaturesMerged,
       propagation
     };
   });

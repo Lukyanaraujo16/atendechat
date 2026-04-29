@@ -1,6 +1,7 @@
 import { Router } from "express";
 
 import isAuth from "../middleware/isAuth";
+import requireAnyPlanFeature from "../middleware/requirePlanFeature";
 import * as UserController from "../controllers/UserController";
 import * as NotificationPreferencesController from "../controllers/NotificationPreferencesController";
 
@@ -21,14 +22,33 @@ userRoutes.get("/users", isAuth, UserController.index);
 
 userRoutes.get("/users/list", isAuth, UserController.list);
 
-userRoutes.post("/users", isAuth, UserController.store);
+userRoutes.post(
+  "/users",
+  isAuth,
+  requireAnyPlanFeature("team.users"),
+  UserController.store
+);
 
-userRoutes.put("/users/:userId", isAuth, UserController.update);
+userRoutes.put(
+  "/users/:userId",
+  isAuth,
+  requireAnyPlanFeature("team.users"),
+  UserController.update
+);
 
 userRoutes.get("/users/:userId", isAuth, UserController.show);
 
-userRoutes.delete("/users/:userId", isAuth, UserController.remove);
+userRoutes.delete(
+  "/users/:userId",
+  isAuth,
+  requireAnyPlanFeature("team.users"),
+  UserController.remove
+);
 
-userRoutes.post("/users/set-language/:newLanguage", isAuth, UserController.setLanguage)
+userRoutes.post(
+  "/users/set-language/:newLanguage",
+  isAuth,
+  UserController.setLanguage
+);
 
 export default userRoutes;

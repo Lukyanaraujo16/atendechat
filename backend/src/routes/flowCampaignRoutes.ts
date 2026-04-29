@@ -1,6 +1,6 @@
 import express from "express";
 import isAuth from "../middleware/isAuth";
-import requireEffectiveModule from "../middleware/requireEffectiveModule";
+import requireAnyPlanFeature from "../middleware/requirePlanFeature";
 import requireCompanyNotDelinquent from "../middleware/requireCompanyNotDelinquent";
 import multer from "multer";
 import uploadConfig from "../config/uploadExt";
@@ -13,21 +13,21 @@ const flowCampaignRoutes = express.Router();
 flowCampaignRoutes.post(
   "/flowcampaign",
   isAuth,
-  requireEffectiveModule("useFlowbuilders"),
+  requireAnyPlanFeature("automation.keywords"),
   requireCompanyNotDelinquent,
   FlowCampaignController.createFlowCampaign
 );
 
 flowCampaignRoutes.get("/flowcampaign", isAuth,
-  requireEffectiveModule("useFlowbuilders"), FlowCampaignController.flowCampaigns);
+  requireAnyPlanFeature("automation.keywords"), FlowCampaignController.flowCampaigns);
 
 flowCampaignRoutes.get("/flowcampaign/:idFlow", isAuth,
-  requireEffectiveModule("useFlowbuilders"), FlowCampaignController.flowCampaign);
+  requireAnyPlanFeature("automation.keywords"), FlowCampaignController.flowCampaign);
 
 flowCampaignRoutes.put(
   "/flowcampaign",
   isAuth,
-  requireEffectiveModule("useFlowbuilders"),
+  requireAnyPlanFeature("automation.keywords"),
   requireCompanyNotDelinquent,
   FlowCampaignController.updateFlowCampaign
 );
@@ -35,7 +35,7 @@ flowCampaignRoutes.put(
 flowCampaignRoutes.delete(
   "/flowcampaign/:idFlow",
   isAuth,
-  requireEffectiveModule("useFlowbuilders"),
+  requireAnyPlanFeature("automation.keywords"),
   FlowCampaignController.deleteFlowCampaign
 );
 

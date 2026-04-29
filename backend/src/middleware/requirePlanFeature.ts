@@ -1,27 +1,24 @@
 import { Request, Response, NextFunction } from "express";
 
 import AppError from "../errors/AppError";
-import { EffectiveModuleFlags } from "../services/CompanyService/GetEffectiveModuleFlagsService";
 import { loadCompanyPlanContext } from "./loadCompanyEffectiveFeatures";
 
 const PLAN_FEATURE_DISABLED_MSG =
   "Este recurso não está disponível no seu plano.";
 
 /**
- * Exige que o módulo legado esteja liberado (derivado do mapa granular + overrides).
+ * Exige pelo menos uma das chaves de feature ativa (plano + PlanFeatures + overrides).
  */
-const requireEffectiveModule = (key: keyof EffectiveModuleFlags) => {
-  return async (
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> => {
+const requireAnyPlanFeature =
+  (...featureKeys: string[]) =>
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const ctx = await loadCompanyPlanContext(req);
       if (!ctx) {
         return next(new AppError("ERR_NO_PERMISSION", 403));
       }
-      if (!ctx.effectiveModules[key]) {
+      const ok = featureKeys.some((k) => ctx.featureMap[k] === true);
+      if (!ok) {
         return next(
           new AppError(
             "ERR_PLAN_FEATURE_DISABLED",
@@ -35,6 +32,5 @@ const requireEffectiveModule = (key: keyof EffectiveModuleFlags) => {
       return next(err);
     }
   };
-};
 
-export default requireEffectiveModule;
+export default requireAnyPlanFeature;

@@ -1,6 +1,7 @@
 import React from "react";
 import { Box, Typography } from "@material-ui/core";
 import { i18n } from "../../translate/i18n";
+import { getFeatureLabel } from "../../config/features";
 import {
   AppDialog,
   AppDialogTitle,
@@ -10,6 +11,9 @@ import {
   AppNeutralButton,
 } from "../../ui";
 function moduleLabel(key) {
+  if (key && String(key).includes(".")) {
+    return getFeatureLabel(key);
+  }
   if (key === "useInternalChat") {
     return i18n.t("plans.form.internalChat");
   }

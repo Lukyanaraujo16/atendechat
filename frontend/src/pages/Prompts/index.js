@@ -30,7 +30,7 @@ import PromptModal from "../../components/PromptModal";
 import { toast } from "react-toastify";
 import ConfirmationModal from "../../components/ConfirmationModal";
 import { AuthContext } from "../../context/Auth/AuthContext";
-import usePlans from "../../hooks/usePlans";
+import useFeature from "../../hooks/useFeature";
 import { useHistory } from "react-router-dom";
 import { SocketContext } from "../../context/Socket/SocketContext";
 
@@ -113,28 +113,25 @@ const Prompts = () => {
   const [selectedPrompt, setSelectedPrompt] = useState(null);
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
   const { user } = useContext(AuthContext);
-  const { getPlanCompany } = usePlans();
+  const { enabled: openAiEnabled, loaded: openAiFeatureLoaded } = useFeature(
+    "automation.openai"
+  );
   const history = useHistory();
   const companyId = user.companyId;
 
   const socketManager = useContext(SocketContext);
 
   useEffect(() => {
-    async function fetchData() {
-      const planConfigs = await getPlanCompany(undefined, companyId);
-      const openOk = planConfigs.effectiveModules
-        ? planConfigs.effectiveModules.useOpenAi
-        : planConfigs.plan?.useOpenAi;
-      if (!openOk) {
-        toast.error("Esta empresa não possui permissão para acessar essa página! Estamos lhe redirecionando.");
-        setTimeout(() => {
-          history.push(`/`)
-        }, 1000);
-      }
+    if (!user?.companyId || !openAiFeatureLoaded) return;
+    if (!openAiEnabled) {
+      toast.error(
+        "Esta empresa não possui permissão para acessar essa página! Estamos lhe redirecionando."
+      );
+      setTimeout(() => {
+        history.push(`/`);
+      }, 1000);
     }
-    fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [user?.companyId, openAiFeatureLoaded, openAiEnabled, history]);
 
   useEffect(() => {
     (async () => {

@@ -6,6 +6,11 @@ const messages = {
 				requirements:
 					"Password must be at least 8 characters and include an uppercase letter, a lowercase letter, and a number.",
 			},
+			planFeature: {
+				blockedTitle: "Feature unavailable",
+				blockedBody:
+					"This feature is not included in your plan. Contact your platform administrator for upgrade options.",
+			},
 			signup: {
 				title: "Sign Up",
 				toasts: {
@@ -277,6 +282,9 @@ const messages = {
 					modulesSectionTitle: "Plan modules",
 					modulesSectionHint:
 						"These switches define what the plan allows by default. Companies inherit these values and can override them under Platform → Companies.",
+					featuresSectionTitle: "Modules and features",
+					featuresSectionHint:
+						"Enable each capability included in the plan. Items are independent (children do not require the parent). Add new capabilities in config/features without new Plan table columns.",
 					externalApi: "External API",
 					kanban: "Kanban",
 					integrations: "Integrations",
@@ -298,6 +306,20 @@ const messages = {
 				table: {
 					companies: "Companies",
 					aria: "Plans table",
+					featureSummary: "Features",
+					activeModulesCount: "{{count}} active modules",
+					featureSummaryEmpty: "No extras",
+				},
+				featureGroups: {
+					dashboard: "Dashboard",
+					attendance: "Support",
+					automation: "Automation",
+					agenda: "Calendar",
+					team: "Team",
+					finance: "Billing",
+					campaigns: "Campaigns",
+					contacts: "Contacts",
+					settings: "Settings",
 				},
 			},
 			kanban: {
@@ -1579,11 +1601,11 @@ const messages = {
 						applyPlanModules: "Apply plan modules",
 					},
 					origin: {
-						inherited: "Allowed by plan (no company block)",
-						disabledOverride: "Turned off for this company",
-						blockedByPlan: "Not available on this plan",
-						companyOnly: "Company-only (no column on plan)",
-						noPlan: "Select a plan to edit these modules",
+						inherited: "Allowed by plan; company may turn off",
+						disabledOverride: "Turned off for this company (override)",
+						blockedByPlan: "Not included in the plan — backend returns ERR_PLAN_FEATURE_DISABLED",
+						companyOnly: "No plan: setting applies once a plan grants the matching feature",
+						noPlan: "Select a plan to align modules with the feature catalog",
 					},
 				},
 				companies: {
@@ -3176,24 +3198,24 @@ const messages = {
 						modulesSectionHint:
 							"Complements the plan: turning off hides the module and blocks use when the plan allows the feature.",
 						modulesSectionHintV2:
-							"When you pick a plan, modules that mirror the plan are loaded automatically. You can then enable or disable per company; the label shows whether it matches the plan or is a local override.",
+							"Each switch maps to plan features (PlanFeatures). Anything the plan does not include stays off and locked — same as the backend. Chatbot, OpenAI, campaigns, API, and groups are evaluated independently. The appointment calendar follows agenda.calendar on the plan only, not this form.",
 						modules: {
 							useKanban: "Kanban",
-							useKanbanHelp: "Kanban board in customer service.",
+							useKanbanHelp: "Kanban board (attendance.kanban).",
 							useCampaigns: "Campaigns",
-							useCampaignsHelp: "Lists, broadcasts and campaign reports.",
+							useCampaignsHelp: "Sends and lists (campaigns.sends / campaigns.lists). Independent of chatbot.",
 							useFlowbuilders: "Flows (chatbot)",
-							useFlowbuildersHelp: "Flow builder, triggers and WhatsApp-linked flows.",
+							useFlowbuildersHelp: "Flow builder (automation.chatbot). Does not require campaigns on the plan.",
 							useOpenAi: "OpenAI / Prompts",
-							useOpenAiHelp: "Prompts and AI features.",
-							useSchedules: "Schedules",
-							useSchedulesHelp: "Scheduled messages and recurrence.",
+							useOpenAiHelp: "Prompts (automation.openai). Independent of chatbot.",
+							useSchedules: "Send schedules",
+							useSchedulesHelp: "Send schedules (agenda.appointments and attendance.schedules). Calendar events use agenda.calendar on the plan.",
 							useExternalApi: "WhatsApp API (external send)",
-							useExternalApiHelp: "HTTP token for sending messages via API.",
+							useExternalApiHelp: "HTTP token (settings.api).",
 							useIntegrations: "Queue integrations",
-							useIntegrationsHelp: "Webhooks, N8N, Typebot and queue automations.",
+							useIntegrationsHelp: "Queue integrations (automation.integrations).",
 							useGroups: "WhatsApp groups",
-							useGroupsHelp: "Group management in customer service.",
+							useGroupsHelp: "Groups in support (team.groups); the plan may disable this.",
 						},
 					},
 					buttons: {
@@ -3452,6 +3474,7 @@ const messages = {
 				ERR_NO_PERMISSION: "You don't have permission to access this resource.",
 				ERR_MODULE_NOT_ALLOWED:
 					"This module is not enabled for your company (plan or platform settings).",
+				ERR_PLAN_FEATURE_DISABLED: "This feature is not included in your plan.",
 				ERR_DUPLICATED_CONTACT: "A contact with this number already exists.",
 				ERR_NO_SETTING_FOUND: "No settings found with this ID.",
 				ERR_NO_CONTACT_FOUND: "No contact found with this ID.",

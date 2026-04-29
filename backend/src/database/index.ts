@@ -13,6 +13,7 @@ import WhatsappQueue from "../models/WhatsappQueue";
 import UserQueue from "../models/UserQueue";
 import Company from "../models/Company";
 import Plan from "../models/Plan";
+import PlanFeature from "../models/PlanFeature";
 import TicketNote from "../models/TicketNote";
 import QuickMessage from "../models/QuickMessage";
 import Help from "../models/Help";
@@ -76,6 +77,7 @@ const models = [
   WhatsappQueue,
   UserQueue,
   Plan,
+  PlanFeature,
   TicketNote,
   QuickMessage,
   Help,

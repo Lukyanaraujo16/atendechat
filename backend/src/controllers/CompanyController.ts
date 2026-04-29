@@ -19,7 +19,11 @@ import { verify } from "jsonwebtoken";
 import User from "../models/User";
 import ShowPlanCompanyService from "../services/CompanyService/ShowPlanCompanyService";
 import ListCompaniesPlanService from "../services/CompanyService/ListCompaniesPlanService";
-import GetEffectiveModuleFlags from "../services/CompanyService/GetEffectiveModuleFlagsService";
+import { buildEffectiveModuleFlagsFromFeatureMap } from "../services/CompanyService/GetEffectiveModuleFlagsService";
+import {
+  loadPersistedPlanFeatureMap,
+  getEffectivePlanFeaturesMap
+} from "../services/PlanService/GetEffectivePlanFeaturesService";
 import RenewCompanyDueDateService from "../services/CompanyService/RenewCompanyDueDateService";
 import CompanyLog from "../models/CompanyLog";
 import { createCompanyLog } from "../services/CompanyService/CreateCompanyLogService";
@@ -390,11 +394,17 @@ export const listPlan = async (req: Request, res: Response): Promise<Response> =
       plan?: unknown;
       modulePermissions?: Record<string, boolean>;
     };
-    const effectiveModules = GetEffectiveModuleFlags(
+    const persisted = await loadPersistedPlanFeatureMap(company.planId);
+    const effectiveFeatures = getEffectivePlanFeaturesMap(
       j.plan as any,
+      persisted,
       j.modulePermissions
     );
-    return res.status(200).json({ ...j, effectiveModules });
+    const effectiveModules = buildEffectiveModuleFlagsFromFeatureMap(
+      effectiveFeatures,
+      j.modulePermissions
+    );
+    return res.status(200).json({ ...j, effectiveModules, effectiveFeatures });
   }
   if (companyId.toString() !== id) {
     return res.status(400).json({ error: "Você não possui permissão para acessar este recurso!" });
@@ -404,11 +414,17 @@ export const listPlan = async (req: Request, res: Response): Promise<Response> =
     plan?: unknown;
     modulePermissions?: Record<string, boolean>;
   };
-  const effectiveModules = GetEffectiveModuleFlags(
+  const persisted = await loadPersistedPlanFeatureMap(company.planId);
+  const effectiveFeatures = getEffectivePlanFeaturesMap(
     j.plan as any,
+    persisted,
     j.modulePermissions
   );
-  return res.status(200).json({ ...j, effectiveModules });
+  const effectiveModules = buildEffectiveModuleFlagsFromFeatureMap(
+    effectiveFeatures,
+    j.modulePermissions
+  );
+  return res.status(200).json({ ...j, effectiveModules, effectiveFeatures });
 };
 
 export const indexPlan = async (req: Request, res: Response): Promise<Response> => {

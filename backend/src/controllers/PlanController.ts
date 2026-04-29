@@ -9,6 +9,8 @@ import UpdatePlanService from "../services/PlanService/UpdatePlanService";
 import ShowPlanService from "../services/PlanService/ShowPlanService";
 import FindAllPlanService from "../services/PlanService/FindAllPlanService";
 import DeletePlanService from "../services/PlanService/DeletePlanService";
+import PlanFeature from "../models/PlanFeature";
+import { mergePlanPersistedWithLegacy } from "../services/PlanService/GetEffectivePlanFeaturesService";
 
 type IndexQuery = {
   searchParam: string;
@@ -29,10 +31,11 @@ type StorePlanData = {
   useKanban?: boolean;
   useOpenAi?: boolean;
   useIntegrations?: boolean;
+  planFeatures?: Record<string, boolean>;
 };
 
 type UpdatePlanData = {
-  name: string;
+  name?: string;
   id?: number | string;
   users?: number;
   connections?: number;
@@ -47,6 +50,7 @@ type UpdatePlanData = {
   useIntegrations?: boolean;
   /** none | respect_overrides | force_all — propagação de módulos às empresas do plano */
   propagationMode?: string;
+  planFeatures?: Record<string, boolean>;
 };
 
 export const index = async (req: Request, res: Response): Promise<Response> => {
@@ -94,8 +98,12 @@ export const show = async (req: Request, res: Response): Promise<Response> => {
   const { id } = req.params;
 
   const plan = await ShowPlanService(id);
+  const rows = await PlanFeature.findAll({ where: { planId: plan.id } });
 
-  return res.status(200).json(plan);
+  return res.status(200).json({
+    ...(plan.toJSON() as Record<string, unknown>),
+    planFeatures: mergePlanPersistedWithLegacy(plan, rows)
+  });
 };
 
 export const update = async (
