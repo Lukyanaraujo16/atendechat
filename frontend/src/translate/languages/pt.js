@@ -1812,6 +1812,7 @@ const messages = {
             auto_block: "Bloqueio automático por atraso",
             auto_unblock_after_renew: "Reativação automática após renovação",
             contracted_value_change: "Valor contratado atualizado",
+            plan_change: "Plano da empresa alterado",
           },
           logDetailRenew: "Vencimento: {{from}} → {{to}}",
           logDetailBlock: "Conta inativa (bloqueio operacional).",
@@ -1827,6 +1828,7 @@ const messages = {
             "Renovação: vencimento {{from}} → {{to}}; conta reativada automaticamente.",
           logDetailContractedValueChange:
             "Anterior: {{from}} → novo: {{to}} (valor de catálogo do plano: {{planBase}}).",
+          logDetailPlanChange: "Plano (id): {{from}} → {{to}}.",
           logActor: "Por {{name}}",
           logActorSystem: "Automático (job de faturação)",
           logWhatsappSent: "WhatsApp enviado (final ••{{last4}})",

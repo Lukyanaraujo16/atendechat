@@ -10,7 +10,8 @@ export type CompanyLogAction =
   | "warning_after_due"
   | "auto_block"
   | "auto_unblock_after_renew"
-  | "contracted_value_change";
+  | "contracted_value_change"
+  | "plan_change";
 
 export interface CreateCompanyLogParams {
   companyId: number;

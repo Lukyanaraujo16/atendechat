@@ -366,6 +366,18 @@ function formatCompanyLogEntry(log, dateToClient, datetimeToClient) {
         planBase: formatPlanValueDiscrete(meta.planValue ?? 0),
       });
       break;
+    case "plan_change":
+      detail = i18n.t("platform.companies.logDetailPlanChange", {
+        from:
+          meta.previousPlanId != null && meta.previousPlanId !== ""
+            ? String(meta.previousPlanId)
+            : "—",
+        to:
+          meta.newPlanId != null && meta.newPlanId !== ""
+            ? String(meta.newPlanId)
+            : "—",
+      });
+      break;
     default:
       detail = "";
   }
@@ -813,7 +825,6 @@ export function CompanyForm(props) {
       outgoing.dueDate = null;
     }
     onSubmit(outgoing);
-    setRecord({ ...initialValue, dueDate: "" });
   };
 
   const handleOpenModalUsers = async () => {
@@ -928,12 +939,9 @@ export function CompanyForm(props) {
         enableReinitialize
         className={classes.fullWidth}
         initialValues={record}
-        onSubmit={(values, { resetForm }) =>
-          setTimeout(() => {
-            handleSubmit(values);
-            resetForm();
-          }, 500)
-        }
+        onSubmit={(values) => {
+          handleSubmit(values);
+        }}
       >
         {(formik) => (
           <>
@@ -1423,21 +1431,32 @@ export function CompanyForm(props) {
           </Form>
           <CompanyPlanChangeDialog
             open={Boolean(planChangeCtx)}
-            onClose={() => {
-              if (!planChangeCtx) return;
-              formik.setFieldValue("planId", planChangeCtx.prevPlanId);
-              setPlanChangeCtx(null);
+            onClose={(event, reason) => {
+              if (reason !== "backdropClick" && reason !== "escapeKeyDown") {
+                return;
+              }
+              setPlanChangeCtx((ctx) => {
+                if (ctx) {
+                  formik.setFieldValue("planId", ctx.prevPlanId);
+                }
+                return null;
+              });
             }}
             onKeepModules={() => {
               if (!planChangeCtx) return;
+              const nextPlanId = planChangeCtx.newPlan?.id;
               formik.setFieldValue(
                 "modulePermissions",
                 planChangeCtx.modulesBefore
               );
+              if (nextPlanId != null && nextPlanId !== "") {
+                formik.setFieldValue("planId", nextPlanId);
+              }
               setPlanChangeCtx(null);
             }}
             onApplyPlanModules={() => {
               if (!planChangeCtx) return;
+              const nextPlanId = planChangeCtx.newPlan?.id;
               formik.setFieldValue(
                 "modulePermissions",
                 mergeModulePermissionsFromPlan(
@@ -1445,6 +1464,9 @@ export function CompanyForm(props) {
                   planChangeCtx.modulesBefore
                 )
               );
+              if (nextPlanId != null && nextPlanId !== "") {
+                formik.setFieldValue("planId", nextPlanId);
+              }
               setPlanChangeCtx(null);
             }}
           />

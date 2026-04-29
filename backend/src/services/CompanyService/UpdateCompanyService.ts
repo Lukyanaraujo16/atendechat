@@ -55,7 +55,18 @@ const UpdateCompanyService = async (
   if (phone !== undefined) payload.phone = phone;
   if (email !== undefined) payload.email = email;
   if (status !== undefined) payload.status = status;
-  if (planId !== undefined) payload.planId = planId;
+  if (planId !== undefined) {
+    const raw = planId as unknown;
+    if (raw === null || raw === "") {
+      payload.planId = null as unknown as number;
+    } else {
+      const n = Number(raw);
+      if (Number.isNaN(n)) {
+        throw new AppError("Plano inválido", 400);
+      }
+      payload.planId = n;
+    }
+  }
   if (dueDate !== undefined) payload.dueDate = dueDate;
   if (recurrence !== undefined) payload.recurrence = recurrence;
   if (timezone !== undefined) {

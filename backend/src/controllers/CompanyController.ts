@@ -305,7 +305,7 @@ export const update = async (
   }
 
   const pre = await Company.findByPk(companyId, {
-    attributes: ["id", "status", "contractedPlanValue"],
+    attributes: ["id", "status", "contractedPlanValue", "planId"],
     include: [
       { model: Plan, as: "plan", attributes: ["value"], required: false }
     ]
@@ -318,6 +318,33 @@ export const update = async (
       ? { contractedPlanValue: contractedNormalized }
       : {})
   } as Parameters<typeof UpdateCompanyService>[0]);
+
+  if (
+    requestUserUpdate?.super &&
+    Object.prototype.hasOwnProperty.call(req.body as object, "planId") &&
+    pre
+  ) {
+    const rawIncoming = companyDataRaw.planId as unknown;
+    const nextPlanNum =
+      rawIncoming === null || rawIncoming === "" ? null : Number(rawIncoming);
+    const prevPlanNum =
+      pre.planId === null || pre.planId === undefined ? null : Number(pre.planId);
+    const comparableNext =
+      nextPlanNum !== null && !Number.isNaN(nextPlanNum) ? nextPlanNum : null;
+    const comparablePrev =
+      prevPlanNum !== null && !Number.isNaN(prevPlanNum) ? prevPlanNum : null;
+    if (comparableNext !== comparablePrev) {
+      await createCompanyLog({
+        companyId,
+        action: "plan_change",
+        userId: req.user.id,
+        metadata: {
+          previousPlanId: comparablePrev,
+          newPlanId: comparableNext
+        }
+      });
+    }
+  }
 
   if (
     companyDataRaw.status !== undefined &&

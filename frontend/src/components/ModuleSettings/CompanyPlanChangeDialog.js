@@ -33,10 +33,10 @@ export default function CompanyPlanChangeDialog({
         </Typography>
       </AppDialogContent>
       <AppDialogActions>
-        <AppNeutralButton onClick={onKeepModules}>
+        <AppNeutralButton type="button" onClick={onKeepModules}>
           {i18n.t("platform.moduleSettings.planChange.keepModules")}
         </AppNeutralButton>
-        <AppPrimaryButton onClick={onApplyPlanModules}>
+        <AppPrimaryButton type="button" onClick={onApplyPlanModules}>
           {i18n.t("platform.moduleSettings.planChange.applyPlanModules")}
         </AppPrimaryButton>
       </AppDialogActions>

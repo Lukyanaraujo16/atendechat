@@ -1739,6 +1739,7 @@ const messages = {
 						auto_block: "Automatic block — overdue",
 						auto_unblock_after_renew: "Automatic reactivation after renewal",
 						contracted_value_change: "Contracted price updated",
+						plan_change: "Company plan changed",
 					},
 					logDetailRenew: "Due date: {{from}} → {{to}}",
 					logDetailBlock: "Account inactive (operational block).",
@@ -1754,6 +1755,7 @@ const messages = {
 						"Renewal: due date {{from}} → {{to}}; account reactivated automatically.",
 					logDetailContractedValueChange:
 						"Previous: {{from}} → new: {{to}} (plan catalog rate: {{planBase}}).",
+					logDetailPlanChange: "Plan (id): {{from}} → {{to}}.",
 					logActor: "By {{name}}",
 					logActorSystem: "Automatic (billing job)",
 					logWhatsappSent: "WhatsApp sent (ending ••{{last4}})",
