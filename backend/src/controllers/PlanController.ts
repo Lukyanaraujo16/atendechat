@@ -11,6 +11,7 @@ import FindAllPlanService from "../services/PlanService/FindAllPlanService";
 import DeletePlanService from "../services/PlanService/DeletePlanService";
 import PlanFeature from "../models/PlanFeature";
 import { mergePlanPersistedWithLegacy } from "../services/PlanService/GetEffectivePlanFeaturesService";
+import { resolvePlanIdForQuery } from "../services/PlanService/planIdResolve";
 
 type IndexQuery = {
   searchParam: string;
@@ -98,7 +99,11 @@ export const show = async (req: Request, res: Response): Promise<Response> => {
   const { id } = req.params;
 
   const plan = await ShowPlanService(id);
-  const rows = await PlanFeature.findAll({ where: { planId: plan.id } });
+  const pid = resolvePlanIdForQuery(plan.id);
+  const rows =
+    pid != null
+      ? await PlanFeature.findAll({ where: { planId: pid } })
+      : [];
 
   return res.status(200).json({
     ...(plan.toJSON() as Record<string, unknown>),

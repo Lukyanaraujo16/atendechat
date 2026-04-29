@@ -5,6 +5,7 @@ import {
   loadPersistedPlanFeatureMap,
   resolvePlanFeature
 } from "../services/PlanService/GetEffectivePlanFeaturesService";
+import { getPlanIdFromContext } from "../services/PlanService/planIdResolve";
 
 const PLAN_FEATURE_DISABLED_MSG =
   "Este recurso não está disponível no seu plano.";
@@ -29,11 +30,15 @@ const externalApiPlanAuth = async (
       modulePermissions?: Record<string, boolean> | null;
     };
     const plan = company?.plan;
-    if (!plan?.id) {
+    if (!plan || typeof plan !== "object") {
+      return next(new AppError("ERR_INVALID_API_TOKEN", 401));
+    }
+    const planIdResolved = getPlanIdFromContext(plan);
+    if (planIdResolved == null) {
       return next(new AppError("ERR_INVALID_API_TOKEN", 401));
     }
 
-    const persisted = await loadPersistedPlanFeatureMap(plan.id);
+    const persisted = await loadPersistedPlanFeatureMap(planIdResolved);
     const allowed = resolvePlanFeature(
       plan as any,
       persisted,

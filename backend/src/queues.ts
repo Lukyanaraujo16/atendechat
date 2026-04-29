@@ -35,6 +35,7 @@ import formatBody from "./helpers/Mustache";
 import { ClosedAllOpenTickets } from "./services/WbotServices/wbotClosedTickets";
 import { flowMenuTimeoutQueue } from "./libs/flowMenuTimeoutQueue";
 import { getCompanyEffectivePlanValue } from "./helpers/getCompanyEffectivePlanValue";
+import { resolvePlanIdForQuery } from "./services/PlanService/planIdResolve";
 
 /** Retries de conexão (AGUARDANDO_CONEXAO), não antecipação de horário. */
 const SCHEDULE_RETRY_BACKOFF_MINUTES = 2;
@@ -1293,7 +1294,11 @@ async function handleInvoiceCreate() {
       var dias = moment.duration(diff).asDays();
 
       if (dias < 20) {
-        const plan = await Plan.findByPk(c.planId);
+        const planPid = resolvePlanIdForQuery(c.planId);
+        if (planPid == null) {
+          return;
+        }
+        const plan = await Plan.findByPk(planPid);
         if (!plan) {
           return;
         }

@@ -12,6 +12,7 @@ const ShowPlanCompanyService = async (id: string | number): Promise<Company> => 
           "dueDate",
           "createdAt",
           "phone",
+          "planId",
           "modulePermissions",
           "contractedPlanValue"
         ],

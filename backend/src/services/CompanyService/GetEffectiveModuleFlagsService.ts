@@ -1,5 +1,6 @@
 import Plan from "../../models/Plan";
 import { buildDefaultFeatureMapFromPlan } from "../../config/planFeatureLegacy";
+import { coerceModulePermissionsFromRow } from "../PlanService/GetEffectivePlanFeaturesService";
 
 export type ModulePermissionsMap = Record<string, boolean | undefined> | null | undefined;
 
@@ -23,9 +24,9 @@ export type EffectiveModuleFlags = {
  */
 export function buildEffectiveModuleFlagsFromFeatureMap(
   featureMap: Record<string, boolean>,
-  modulePermissions: ModulePermissionsMap
+  modulePermissions: ModulePermissionsMap | unknown
 ): EffectiveModuleFlags {
-  const m = modulePermissions || {};
+  const m = coerceModulePermissionsFromRow(modulePermissions) || {};
   return {
     useKanban: featureMap["attendance.kanban"] === true,
     useCampaigns:

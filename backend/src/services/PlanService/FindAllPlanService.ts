@@ -2,6 +2,7 @@ import Plan from "../../models/Plan";
 import Company from "../../models/Company";
 import PlanFeature from "../../models/PlanFeature";
 import { mergePlanPersistedWithLegacy } from "./GetEffectivePlanFeaturesService";
+import { resolvePlanIdForQuery } from "./planIdResolve";
 
 /** Lista planos com `companiesCount` (empresas com `planId` igual). */
 const FindAllPlanService = async (): Promise<Array<Record<string, unknown>>> => {
@@ -11,12 +12,15 @@ const FindAllPlanService = async (): Promise<Array<Record<string, unknown>>> => 
 
   const withCounts = await Promise.all(
     plans.map(async (plan) => {
-      const companiesCount = await Company.count({
-        where: { planId: plan.id }
-      });
-      const rows = await PlanFeature.findAll({
-        where: { planId: plan.id }
-      });
+      const pid = resolvePlanIdForQuery(plan.id);
+      const companiesCount =
+        pid != null ? await Company.count({ where: { planId: pid } }) : 0;
+      const rows =
+        pid != null
+          ? await PlanFeature.findAll({
+              where: { planId: pid }
+            })
+          : [];
       return {
         ...plan.toJSON(),
         companiesCount,

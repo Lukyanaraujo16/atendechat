@@ -23,12 +23,32 @@ import ListCompaniesPlanService from "../services/CompanyService/ListCompaniesPl
 import { buildEffectiveModuleFlagsFromFeatureMap } from "../services/CompanyService/GetEffectiveModuleFlagsService";
 import {
   loadPersistedPlanFeatureMap,
-  getEffectivePlanFeaturesMap
+  getEffectivePlanFeaturesMap,
+  coerceModulePermissionsFromRow
 } from "../services/PlanService/GetEffectivePlanFeaturesService";
+import type { PersistedPlanFeatureMap } from "../services/PlanService/GetEffectivePlanFeaturesService";
+import {
+  getPlanIdFromContext,
+  resolvePlanIdForQuery,
+  logPlanFeaturesWarn,
+  logPlanFeaturesInfo
+} from "../services/PlanService/planIdResolve";
 import RenewCompanyDueDateService from "../services/CompanyService/RenewCompanyDueDateService";
 import CompanyLog from "../models/CompanyLog";
 import { createCompanyLog } from "../services/CompanyService/CreateCompanyLogService";
 import { normalizeNullableContractedPlanValue } from "../utils/normalizeMonetaryInput";
+import { logger } from "../utils/logger";
+
+function parseListPlanAuthToken(req: Request): string | null {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || typeof authHeader !== "string") return null;
+  if (authHeader.startsWith("Bearer ")) {
+    const t = authHeader.slice(7).trim();
+    return t || null;
+  }
+  const parts = authHeader.split(" ");
+  return parts.length > 1 && parts[1] ? parts[1] : null;
+}
 
 type IndexQuery = {
   searchParam: string;
@@ -188,7 +208,11 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
     contractedOnCreate !== undefined &&
     contractedPlanSnapshotChanged(null, contractedOnCreate)
   ) {
-    const planRow = await Plan.findByPk(company.planId, { attributes: ["value"] });
+    const planPid = resolvePlanIdForQuery(company.planId);
+    const planRow =
+      planPid != null
+        ? await Plan.findByPk(planPid, { attributes: ["value"] })
+        : null;
     await createCompanyLog({
       companyId: company.id,
       action: "contracted_value_change",
@@ -508,54 +532,111 @@ export const listCompanyLogs = async (
 export const listPlan = async (req: Request, res: Response): Promise<Response> => {
   const { id } = req.params;
 
-  const authHeader = req.headers.authorization;
-  const [, token] = authHeader.split(" ");
-  const decoded = verify(token, authConfig.secret);
-  const { id: requestUserId, profile, companyId } = decoded as TokenPayload;
-  const requestUser = await User.findByPk(requestUserId);
+  try {
+    const token = parseListPlanAuthToken(req);
+    if (!token) {
+      return res.status(401).json({ error: "Token não informado" });
+    }
 
-  const company = await ShowPlanCompanyService(id);
-  if (!company) {
-    return res.status(404).json({ error: "Empresa não encontrada" });
-  }
+    const decoded = verify(token, authConfig.secret) as TokenPayload;
+    const { id: requestUserId, companyId: tokenCompanyId } = decoded;
+    const requestUser = await User.findByPk(requestUserId);
 
-  if (requestUser?.super === true) {
+    const company = await ShowPlanCompanyService(id);
+    if (!company) {
+      return res.status(404).json({ error: "Empresa não encontrada" });
+    }
+
     const j = company.toJSON() as Record<string, unknown> & {
       plan?: unknown;
       modulePermissions?: Record<string, boolean>;
     };
-    const persisted = await loadPersistedPlanFeatureMap(company.planId);
-    const effectiveFeatures = getEffectivePlanFeaturesMap(
-      j.plan as any,
-      persisted,
-      j.modulePermissions
-    );
-    const effectiveModules = buildEffectiveModuleFlagsFromFeatureMap(
-      effectiveFeatures,
-      j.modulePermissions
-    );
-    return res.status(200).json({ ...j, effectiveModules, effectiveFeatures });
-  }
-  if (companyId.toString() !== id) {
-    return res.status(400).json({ error: "Você não possui permissão para acessar este recurso!" });
-  }
+    const modulePermissions = coerceModulePermissionsFromRow(j.modulePermissions);
+    const plan = j.plan as Plan | Record<string, unknown> | null | undefined;
+    const resolvedPlanId = getPlanIdFromContext(company) ?? getPlanIdFromContext(j);
 
-  const j = company.toJSON() as Record<string, unknown> & {
-    plan?: unknown;
-    modulePermissions?: Record<string, boolean>;
-  };
-  const persisted = await loadPersistedPlanFeatureMap(company.planId);
-  const effectiveFeatures = getEffectivePlanFeaturesMap(
-    j.plan as any,
-    persisted,
-    j.modulePermissions
-  );
-  const effectiveModules = buildEffectiveModuleFlagsFromFeatureMap(
-    effectiveFeatures,
-    j.modulePermissions
-  );
-  delete j.contractedPlanValue;
-  return res.status(200).json({ ...j, effectiveModules, effectiveFeatures });
+    const modulePermissionsFalseKeys = modulePermissions
+      ? Object.entries(modulePermissions)
+          .filter(([, v]) => v === false)
+          .map(([k]) => k)
+      : [];
+
+    let persisted: PersistedPlanFeatureMap;
+    let effectiveFeatures: Record<string, boolean>;
+    let effectiveModules: ReturnType<typeof buildEffectiveModuleFlagsFromFeatureMap>;
+    try {
+      persisted = await loadPersistedPlanFeatureMap(resolvedPlanId);
+      effectiveFeatures = getEffectivePlanFeaturesMap(
+        plan ?? null,
+        persisted,
+        modulePermissions
+      );
+      effectiveModules = buildEffectiveModuleFlagsFromFeatureMap(
+        effectiveFeatures,
+        modulePermissions
+      );
+    } catch (planFeatErr: unknown) {
+      logPlanFeaturesWarn("listPlan: fallback after plan/features computation error", {
+        err: planFeatErr instanceof Error ? planFeatErr.message : String(planFeatErr),
+        companyIdParam: String(id),
+        resolvedPlanId
+      });
+      persisted = {};
+      effectiveFeatures = getEffectivePlanFeaturesMap(
+        plan ?? null,
+        {},
+        modulePermissions
+      );
+      effectiveModules = buildEffectiveModuleFlagsFromFeatureMap(
+        effectiveFeatures,
+        modulePermissions
+      );
+    }
+
+    logPlanFeaturesInfo("listPlan computed effective map", {
+      companyIdParam: String(id),
+      companyPlanIdRaw: j.planId,
+      planNestedId:
+        plan && typeof plan === "object" ? (plan as Record<string, unknown>).id : undefined,
+      resolvedPlanId,
+      planFeaturesCount: Object.keys(persisted).length,
+      effectiveFeaturesTrueCount: Object.values(effectiveFeatures).filter((v) => v === true).length,
+      modulePermissionsFalseKeys,
+      hasPlan: Boolean(plan)
+    });
+
+    if (requestUser?.super === true) {
+      return res.status(200).json({
+        ...j,
+        effectiveModules,
+        effectiveFeatures
+      });
+    }
+
+    const tenantId =
+      tokenCompanyId != null && !Number.isNaN(Number(tokenCompanyId))
+        ? String(tokenCompanyId)
+        : "";
+    if (tenantId !== String(id)) {
+      return res.status(400).json({ error: "Você não possui permissão para acessar este recurso!" });
+    }
+
+    delete j.contractedPlanValue;
+    return res.status(200).json({ ...j, effectiveModules, effectiveFeatures });
+  } catch (err: unknown) {
+    logger.error(
+      {
+        err,
+        companyIdParam: id,
+        message: err instanceof Error ? err.message : String(err)
+      },
+      "CompanyController.listPlan failed"
+    );
+    return res.status(500).json({
+      error: "Não foi possível carregar o plano da empresa",
+      code: "LIST_PLAN_FAILED"
+    });
+  }
 };
 
 export const indexPlan = async (req: Request, res: Response): Promise<Response> => {

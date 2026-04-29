@@ -5,14 +5,58 @@ import {
   legacyPlanFeatureValue,
   planLegacyColumnsIndicateFullAccess
 } from "../../config/planFeatureLegacy";
+import { resolvePlanIdForQuery, logPlanFeaturesWarn } from "./planIdResolve";
 
 export type PersistedPlanFeatureMap = Record<string, boolean>;
 
+export {
+  resolvePlanIdForQuery,
+  getPlanIdFromContext,
+  PLAN_FEATURES_LOG_TAG,
+  logPlanFeaturesWarn,
+  logPlanFeaturesInfo,
+  resolvePlanIdForFeatures,
+  getPlanIdFromAny
+} from "./planIdResolve";
+
+/** Garante objeto para overrides vindos de JSONB / string JSON. */
+export function coerceModulePermissionsFromRow(
+  raw: unknown
+): Record<string, boolean> | undefined {
+  if (raw == null) return undefined;
+  if (typeof raw === "string") {
+    const t = raw.trim();
+    if (t === "" || t === "null") return undefined;
+    try {
+      const p = JSON.parse(t) as unknown;
+      if (p && typeof p === "object" && !Array.isArray(p)) {
+        return p as Record<string, boolean>;
+      }
+    } catch {
+      return undefined;
+    }
+    return undefined;
+  }
+  if (typeof raw === "object" && !Array.isArray(raw)) {
+    return raw as Record<string, boolean>;
+  }
+  return undefined;
+}
+
 export async function loadPersistedPlanFeatureMap(
-  planId: number
+  planId: number | string | null | undefined
 ): Promise<PersistedPlanFeatureMap> {
+  const resolved = resolvePlanIdForQuery(planId);
+  if (resolved == null) {
+    logPlanFeaturesWarn("skip load: missing or invalid planId (no query)", {
+      planIdRaw: planId,
+      resolved: null
+    });
+    return {};
+  }
+
   const rows = await PlanFeature.findAll({
-    where: { planId },
+    where: { planId: resolved },
     attributes: ["featureKey", "enabled"]
   });
   const persisted: PersistedPlanFeatureMap = {};
@@ -23,7 +67,7 @@ export async function loadPersistedPlanFeatureMap(
 }
 
 function applyLegacyModulePermissionGates(
-  modulePermissions: Record<string, boolean> | null | undefined,
+  modulePermissions: Record<string, boolean | undefined>,
   featureKey: string,
   base: boolean
 ): boolean {
@@ -63,24 +107,24 @@ function applyLegacyModulePermissionGates(
 export function resolvePlanFeature(
   plan: Plan | Record<string, unknown> | null | undefined,
   persistedMap: PersistedPlanFeatureMap,
-  modulePermissions: Record<string, boolean> | null | undefined,
+  modulePermissions: unknown,
   featureKey: string
 ): boolean {
-  const m = modulePermissions || {};
-  if (m[featureKey] === false) return false;
+  const perms = coerceModulePermissionsFromRow(modulePermissions) ?? {};
+  if (perms[featureKey] === false) return false;
   let v: boolean;
   if (Object.prototype.hasOwnProperty.call(persistedMap, featureKey)) {
     v = persistedMap[featureKey] === true;
   } else {
     v = legacyPlanFeatureValue(plan, featureKey);
   }
-  return applyLegacyModulePermissionGates(modulePermissions, featureKey, v);
+  return applyLegacyModulePermissionGates(perms, featureKey, v);
 }
 
 export function getEffectivePlanFeaturesMap(
   plan: Plan | Record<string, unknown> | null | undefined,
   persistedMap: PersistedPlanFeatureMap,
-  modulePermissions: Record<string, boolean> | null | undefined
+  modulePermissions: unknown
 ): Record<string, boolean> {
   const keys = getAllFeatureKeys();
   const nPersist = Object.keys(persistedMap).length;

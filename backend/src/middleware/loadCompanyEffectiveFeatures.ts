@@ -6,6 +6,7 @@ import {
   loadPersistedPlanFeatureMap,
   getEffectivePlanFeaturesMap
 } from "../services/PlanService/GetEffectivePlanFeaturesService";
+import { getPlanIdFromContext } from "../services/PlanService/planIdResolve";
 import {
   buildEffectiveModuleFlagsFromFeatureMap,
   EffectiveModuleFlags
@@ -28,7 +29,7 @@ export async function loadCompanyPlanContext(
   });
   if (!company?.plan) return null;
 
-  const persisted = await loadPersistedPlanFeatureMap(company.planId);
+  const persisted = await loadPersistedPlanFeatureMap(getPlanIdFromContext(company));
   const featureMap = getEffectivePlanFeaturesMap(
     company.plan,
     persisted,

@@ -19,6 +19,7 @@ import {
 import { deriveLegacyPlanColumnsFromFeatures } from "../../config/planFeatureLegacy";
 import PlanFeature from "../../models/PlanFeature";
 import { mergePlanPersistedWithLegacy } from "./GetEffectivePlanFeaturesService";
+import { resolvePlanIdForQuery } from "./planIdResolve";
 
 interface PlanData {
   name?: string;
@@ -116,23 +117,21 @@ const UpdatePlanService = async (
     await planBefore.update(updatePayload, { transaction: t });
 
     if (featureEntries) {
-      await ReplacePlanFeaturesService(
-        planBefore.id as number,
-        featureEntries,
-        t
-      );
+      await ReplacePlanFeaturesService(planBefore.id, featureEntries, t);
     }
 
     let companiesUpdated = 0;
+    const propagationPlanId = resolvePlanIdForQuery(planBefore.id);
 
     if (
+      propagationPlanId != null &&
       propagationMode !== "none" &&
       Object.keys(changed).length > 0 &&
       (propagationMode === "respect_overrides" ||
         propagationMode === "force_all")
     ) {
       const companies = await Company.findAll({
-        where: { planId: planBefore.id },
+        where: { planId: propagationPlanId },
         transaction: t
       });
 
@@ -160,7 +159,7 @@ const UpdatePlanService = async (
         "[PlanModulePropagation]",
         JSON.stringify({
           event: "plan_module_propagation",
-          planId: planBefore.id,
+          planId: propagationPlanId,
           planName: planBefore.name,
           propagationMode,
           moduleKeysChanged: Object.keys(changed),
@@ -173,7 +172,7 @@ const UpdatePlanService = async (
         "[PlanModulePropagation]",
         JSON.stringify({
           event: "plan_modules_changed_no_company_push",
-          planId: planBefore.id,
+          planId: propagationPlanId,
           planName: planBefore.name,
           propagationMode,
           moduleKeysChanged: Object.keys(changed)
@@ -193,10 +192,14 @@ const UpdatePlanService = async (
     };
 
     await planBefore.reload({ transaction: t });
-    const featRows = await PlanFeature.findAll({
-      where: { planId: planBefore.id },
-      transaction: t
-    });
+    const pid = resolvePlanIdForQuery(planBefore.id);
+    const featRows =
+      pid != null
+        ? await PlanFeature.findAll({
+            where: { planId: pid },
+            transaction: t
+          })
+        : [];
     const planFeaturesMerged = mergePlanPersistedWithLegacy(
       planBefore,
       featRows
