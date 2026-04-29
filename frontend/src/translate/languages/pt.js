@@ -359,7 +359,14 @@ const messages = {
           nameRequired: "Informe o nome do plano",
           valueRequired: "Informe o valor do plano",
           valueInvalid:
-            "Valor inválido. Ex.: 99,90 · 1.299,90 · R$ 99,90",
+              "Valor inválido. Ex.: 99,90 · 1.299,90 · R$ 99,90",
+          limitsSectionTitle: "Limites do plano",
+          featuresProgressSummary: "{{active}} de {{total}} funcionalidades ativas",
+          featureGroupCount: "{{active}}/{{total}} ativos",
+          expandModule: "Expandir módulo",
+          collapseModule: "Recolher módulo",
+          selectAllFeatures: "Marcar todos",
+          clearAllFeatures: "Desmarcar todos",
         },
         table: {
           companies: "Empresas",
@@ -367,6 +374,9 @@ const messages = {
           featureSummary: "Recursos",
           activeModulesCount: "{{count}} módulos ativos",
           featureSummaryEmpty: "Nenhum extra",
+          activeFeaturesCount: "{{count}} funcionalidades ativas",
+          moreFeatureGroups: "+{{count}}",
+          featureTooltipIntro: "Outros módulos com funcionalidades ativas:",
         },
         featureGroups: {
           dashboard: "Dashboard",

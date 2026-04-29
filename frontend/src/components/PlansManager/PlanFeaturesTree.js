@@ -1,64 +1,36 @@
-import React from "react";
-import { Box, Checkbox, FormControlLabel, Typography } from "@material-ui/core";
+import React, { useState, useCallback } from "react";
+import { Box, Grid } from "@material-ui/core";
 import { FEATURES } from "../../config/features";
-
-function isBranch(n) {
-  return n && typeof n.children === "object";
-}
-
-function Group({ path, node, value, onToggle }) {
-  const v = value || {};
-  if (isBranch(node)) {
-    return (
-      <Box key={path} marginBottom={1.5} marginLeft={path ? 1 : 0}>
-        <Typography variant="subtitle2" style={{ fontWeight: 600, marginBottom: 8 }}>
-          {node.label}
-        </Typography>
-        <Box display="flex" flexDirection="column" gap={0.25}>
-          {Object.entries(node.children).map(([childKey, child]) => (
-            <Group
-              key={`${path}.${childKey}`}
-              path={path ? `${path}.${childKey}` : childKey}
-              node={child}
-              value={v}
-              onToggle={onToggle}
-            />
-          ))}
-        </Box>
-      </Box>
-    );
-  }
-
-  return (
-    <FormControlLabel
-      key={path}
-      control={
-        <Checkbox
-          color="primary"
-          size="small"
-          checked={v[path] === true}
-          onChange={(e) => onToggle(path, e.target.checked)}
-        />
-      }
-      label={<Typography variant="body2">{node.label}</Typography>}
-    />
-  );
-}
+import PlanFeatureGroupCard from "./PlanFeatureGroupCard";
+import { FEATURE_GROUP_ORDER } from "./planFeatureUiUtils";
 
 /**
- * @param {Record<string, boolean>} value mapa featureKey -> ativo
- * @param {(path: string, checked: boolean) => void} onChange
+ * Grelha de cartões por categoria. Mantém o mesmo contrato: value = mapa featureKey → boolean, onChange recebe o mapa completo.
  */
 export default function PlanFeaturesTree({ value, onChange }) {
-  const onToggle = (path, checked) => {
-    onChange({ ...value, [path]: checked });
-  };
+  const [expanded, setExpanded] = useState({});
+
+  const toggleExpanded = useCallback((rootKey) => {
+    setExpanded((prev) => ({
+      ...prev,
+      [rootKey]: !prev[rootKey],
+    }));
+  }, []);
 
   return (
-    <Box>
-      {Object.entries(FEATURES).map(([rootKey, node]) => (
-        <Group key={rootKey} path={rootKey} node={node} value={value} onToggle={onToggle} />
+    <Grid container spacing={2}>
+      {FEATURE_GROUP_ORDER.filter((k) => FEATURES[k]).map((rootKey) => (
+        <Grid item xs={12} sm={6} md={4} key={rootKey}>
+          <PlanFeatureGroupCard
+            rootKey={rootKey}
+            node={FEATURES[rootKey]}
+            value={value || {}}
+            onChange={onChange}
+            expanded={Boolean(expanded[rootKey])}
+            onToggleExpand={() => toggleExpanded(rootKey)}
+          />
+        </Grid>
       ))}
-    </Box>
+    </Grid>
   );
 }

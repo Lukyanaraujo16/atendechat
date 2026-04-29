@@ -302,6 +302,13 @@ const messages = {
 					valueRequired: "Enter the plan price",
 					valueInvalid:
 						"Invalid amount. Examples: 99.90 · 1,299.90 · $ 99.90 · 99,90 (BR format)",
+					limitsSectionTitle: "Plan limits",
+					featuresProgressSummary: "{{active}} of {{total}} features enabled",
+					featureGroupCount: "{{active}}/{{total}} enabled",
+					expandModule: "Expand module",
+					collapseModule: "Collapse module",
+					selectAllFeatures: "Select all",
+					clearAllFeatures: "Clear all",
 				},
 				table: {
 					companies: "Companies",
@@ -309,6 +316,9 @@ const messages = {
 					featureSummary: "Features",
 					activeModulesCount: "{{count}} active modules",
 					featureSummaryEmpty: "No extras",
+					activeFeaturesCount: "{{count}} features enabled",
+					moreFeatureGroups: "+{{count}}",
+					featureTooltipIntro: "Other modules with enabled features:",
 				},
 				featureGroups: {
 					dashboard: "Dashboard",

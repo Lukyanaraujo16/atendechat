@@ -304,6 +304,13 @@ const messages = {
           valueRequired: "Indique el valor del plan",
           valueInvalid:
             "Valor no válido. Ej.: 99,90 · 1.299,90 · 99.90",
+          limitsSectionTitle: "Límites del plan",
+          featuresProgressSummary: "{{active}} de {{total}} funciones activas",
+          featureGroupCount: "{{active}}/{{total}} activos",
+          expandModule: "Expandir módulo",
+          collapseModule: "Contraer módulo",
+          selectAllFeatures: "Marcar todos",
+          clearAllFeatures: "Desmarcar todos",
         },
         table: {
           companies: "Empresas",
@@ -311,6 +318,9 @@ const messages = {
           featureSummary: "Recursos",
           activeModulesCount: "{{count}} módulos activos",
           featureSummaryEmpty: "Sin extras",
+          activeFeaturesCount: "{{count}} funciones activas",
+          moreFeatureGroups: "+{{count}}",
+          featureTooltipIntro: "Otros módulos con funciones activas:",
         },
         featureGroups: {
           dashboard: "Panel",

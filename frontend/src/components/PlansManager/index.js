@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo } from "react";
 import * as Yup from "yup";
 import {
     makeStyles,
-    useTheme,
     Paper,
     Grid,
     TextField,
@@ -20,7 +19,8 @@ import {
     Select,
     InputAdornment,
     Tooltip,
-    Chip,
+    LinearProgress,
+    Divider,
 } from "@material-ui/core";
 import { alpha } from "@material-ui/core/styles";
 import SearchIcon from "@material-ui/icons/Search";
@@ -43,6 +43,7 @@ import {
 import PlanModuleSaveDialog from "../ModuleSettings/PlanModuleSaveDialog";
 import { diffPlanFeatureMaps } from "../ModuleSettings/planFeatureSync";
 import PlanFeaturesTree from "./PlanFeaturesTree";
+import PlanFeatureSummaryChips from "./PlanFeatureSummaryChips";
 import {
   parseBrazilianCurrencyToNumber,
   formatPlanValueForInput,
@@ -52,35 +53,6 @@ import { getAllFeatureKeys } from "../../config/features";
 
 const defaultPlanFeaturesAllOn = () =>
   Object.fromEntries(getAllFeatureKeys().map((k) => [k, true]));
-
-const FEATURE_GROUP_ORDER = [
-  "dashboard",
-  "attendance",
-  "automation",
-  "agenda",
-  "team",
-  "finance",
-  "campaigns",
-  "contacts",
-  "settings",
-];
-
-/** Resumo para grelha: total de folhas ativas + grupos com pelo menos uma folha ON. */
-function summarizePlanFeatures(planFeatures) {
-  if (!planFeatures || typeof planFeatures !== "object") {
-    return { count: 0, groups: [] };
-  }
-  const byRoot = {};
-  let count = 0;
-  Object.entries(planFeatures).forEach(([key, on]) => {
-    if (on !== true) return;
-    count += 1;
-    const root = key.split(".")[0];
-    byRoot[root] = true;
-  });
-  const groups = FEATURE_GROUP_ORDER.filter((g) => byRoot[g]);
-  return { count, groups };
-}
 
 
 const useStyles = makeStyles(theme => ({
@@ -123,21 +95,63 @@ const useStyles = makeStyles(theme => ({
         fontSize: "1.125rem",
         marginBottom: theme.spacing(1),
     },
-    modulesSectionTitle: {
+    modulesWrap: {
+        marginTop: theme.spacing(2.5),
+        paddingTop: theme.spacing(2.5),
+        borderTop: `1px solid ${theme.palette.divider}`,
+    },
+    limitsSection: {
+        padding: theme.spacing(2),
+        borderRadius: theme.shape.borderRadius,
+        border: `1px solid ${alpha(theme.palette.divider, 0.85)}`,
+        backgroundColor:
+            theme.palette.type === "dark"
+                ? alpha(theme.palette.background.paper, 0.45)
+                : alpha(theme.palette.background.default, 0.65),
+        marginBottom: theme.spacing(0.5),
+    },
+    limitsSectionLabel: {
         fontWeight: 600,
-        fontSize: "1rem",
-        marginTop: theme.spacing(2),
+        fontSize: "0.8125rem",
+        textTransform: "uppercase",
+        letterSpacing: "0.07em",
+        color: theme.palette.text.secondary,
+        marginBottom: theme.spacing(1.5),
+    },
+    featuresHero: {
+        marginBottom: theme.spacing(2),
+    },
+    featuresTitle: {
+        fontWeight: 700,
+        fontSize: "1.125rem",
+        letterSpacing: "-0.02em",
+        color: theme.palette.text.primary,
         marginBottom: theme.spacing(0.75),
     },
-    modulesSectionHint: {
-        marginBottom: theme.spacing(2),
+    featuresHint: {
         lineHeight: 1.55,
         maxWidth: 720,
+        fontSize: "0.875rem",
     },
-    modulesWrap: {
-        marginTop: theme.spacing(2),
-        paddingTop: theme.spacing(2),
-        borderTop: `1px solid ${theme.palette.divider}`,
+    featuresProgressLabel: {
+        fontSize: "0.8125rem",
+        fontWeight: 600,
+        color: theme.palette.text.secondary,
+        marginBottom: theme.spacing(0.75),
+    },
+    featuresProgressTrack: {
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: alpha(theme.palette.success.main, 0.15),
+        "& .MuiLinearProgress-bar": {
+            borderRadius: 3,
+            backgroundColor: theme.palette.success.main,
+        },
+    },
+    valueField: {
+        "& .MuiOutlinedInput-input": {
+            fontWeight: 600,
+        },
     },
     pageStack: {
         display: "flex",
@@ -175,26 +189,27 @@ const useStyles = makeStyles(theme => ({
     },
     tableRow: {
         cursor: "pointer",
-        transition: theme.transitions.create("background-color", {
+        transition: theme.transitions.create(["background-color", "box-shadow"], {
             duration: 150,
         }),
         "&:hover": {
             backgroundColor:
                 theme.palette.type === "dark"
-                    ? "rgba(255,255,255,0.05)"
-                    : theme.palette.action.hover,
+                    ? alpha(theme.palette.common.white, 0.04)
+                    : alpha(theme.palette.action.hover, 0.9),
         },
     },
     tableRowSelected: {
         backgroundColor:
             theme.palette.type === "dark"
-                ? "rgba(25, 118, 210, 0.16)"
-                : theme.palette.action.selected,
+                ? alpha(theme.palette.success.main, 0.07)
+                : alpha(theme.palette.success.main, 0.06),
+        boxShadow: `inset 3px 0 0 ${theme.palette.success.main}`,
         "&:hover": {
             backgroundColor:
                 theme.palette.type === "dark"
-                    ? "rgba(25, 118, 210, 0.22)"
-                    : theme.palette.action.selected,
+                    ? alpha(theme.palette.success.main, 0.1)
+                    : alpha(theme.palette.success.main, 0.09),
         },
     },
     editingBanner: {
@@ -295,10 +310,23 @@ export function PlanManagerForm(props) {
                 }
             }}
         >
-            {() => (
+            {(formik) => {
+                const { values, isSubmitting } = formik;
+                const featureKeys = getAllFeatureKeys();
+                const totalFeat = featureKeys.length;
+                const activeFeat = featureKeys.filter(
+                    (k) => values.planFeatures && values.planFeatures[k] === true
+                ).length;
+                const featPct = totalFeat ? Math.round((activeFeat / totalFeat) * 100) : 0;
+
+                return (
                 <Form className={classes.fullWidth}>
-                    <Grid spacing={1} justifyContent="flex-start" container>
-                        <Grid xs={12} sm={6} md={2} item>
+                    <Box className={classes.limitsSection}>
+                        <Typography className={classes.limitsSectionLabel} component="h3">
+                            {i18n.t("plans.form.limitsSectionTitle")}
+                        </Typography>
+                        <Grid spacing={2} justifyContent="flex-start" container>
+                        <Grid item xs={12} sm={6} md={4} lg={3}>
                             <Field
                                 as={TextField}
                                 label={i18n.t("plans.form.name")}
@@ -308,7 +336,7 @@ export function PlanManagerForm(props) {
                                 margin="dense"
                             />
                         </Grid>
-                        <Grid xs={12} sm={6} md={1} item>
+                        <Grid item xs={6} sm={3} md={2}>
                             <Field
                                 as={TextField}
                                 label={i18n.t("plans.form.users")}
@@ -319,7 +347,7 @@ export function PlanManagerForm(props) {
                                 type="number"
                             />
                         </Grid>
-                        <Grid xs={12} sm={6} md={1} item>
+                        <Grid item xs={6} sm={3} md={2}>
                             <Field
                                 as={TextField}
                                 label={i18n.t("plans.form.connections")}
@@ -330,7 +358,7 @@ export function PlanManagerForm(props) {
                                 type="number"
                             />
                         </Grid>
-                        <Grid xs={12} sm={6} md={1} item>
+                        <Grid item xs={6} sm={3} md={2}>
                             <Field
                                 as={TextField}
                                 label={i18n.t("plans.form.queues")}
@@ -341,33 +369,50 @@ export function PlanManagerForm(props) {
                                 type="number"
                             />
                         </Grid>
-                        <Grid xs={12} sm={6} md={1} item>
+                        <Grid item xs={6} sm={3} md={2}>
                             <Field
                                 as={TextField}
                                 label={i18n.t("plans.form.value")}
                                 name="value"
                                 variant="outlined"
-                                className={classes.fullWidth}
+                                className={`${classes.fullWidth} ${classes.valueField}`}
                                 margin="dense"
                                 type="text"
                             />
                         </Grid>
                     </Grid>
+                    </Box>
+
+                    <Divider style={{ margin: "8px 0 20px" }} />
 
                     <Box className={classes.modulesWrap}>
+                        <Box className={classes.featuresHero}>
                         <Typography
                             component="h3"
-                            className={classes.modulesSectionTitle}
+                            className={classes.featuresTitle}
                         >
                             {i18n.t("plans.form.featuresSectionTitle")}
                         </Typography>
                         <Typography
                             variant="body2"
                             color="textSecondary"
-                            className={classes.modulesSectionHint}
+                            className={classes.featuresHint}
                         >
                             {i18n.t("plans.form.featuresSectionHint")}
                         </Typography>
+                        <Typography className={classes.featuresProgressLabel} style={{ marginTop: 16 }}>
+                            {i18n.t("plans.form.featuresProgressSummary", {
+                                active: activeFeat,
+                                total: totalFeat,
+                            })}
+                        </Typography>
+                        <LinearProgress
+                            variant="determinate"
+                            value={featPct}
+                            className={classes.featuresProgressTrack}
+                            color="primary"
+                        />
+                        </Box>
                         <Field name="planFeatures">
                             {({ field, form }) => (
                                 <PlanFeaturesTree
@@ -380,7 +425,7 @@ export function PlanManagerForm(props) {
                         </Field>
                     </Box>
 
-                    <Grid spacing={2} justifyContent="flex-end" container>
+                    <Grid spacing={2} justifyContent="flex-end" container style={{ marginTop: 16 }}>
 
                         <Grid sm={3} md={2} item>
                             <ButtonWithSpinner className={classes.fullWidth} loading={loading} onClick={() => onCancel()} variant="contained">
@@ -395,13 +440,14 @@ export function PlanManagerForm(props) {
                             </Grid>
                         ) : null}
                         <Grid sm={3} md={2} item>
-                            <ButtonWithSpinner className={classes.fullWidth} loading={loading} type="submit" variant="contained" color="primary">
+                            <ButtonWithSpinner className={classes.fullWidth} loading={loading || isSubmitting} type="submit" variant="contained" color="primary">
                                 {i18n.t("plans.form.save")}
                             </ButtonWithSpinner>
                         </Grid>
                     </Grid>
                 </Form>
-            )}
+                );
+            }}
         </Formik>
     )
 }
@@ -416,7 +462,6 @@ export function PlansManagerGrid(props) {
         loading,
     } = props;
     const classes = useStyles();
-    const theme = useTheme();
     const [search, setSearch] = useState("");
     const [sortBy, setSortBy] = useState("name");
 
@@ -487,12 +532,6 @@ export function PlansManagerGrid(props) {
                         isPlatform &&
                         selectedId != null &&
                         row.id === selectedId;
-                    const rowStyle =
-                        isPlatform && isSelected
-                            ? {
-                                  boxShadow: `inset 4px 0 0 ${theme.palette.primary.main}`,
-                              }
-                            : undefined;
                     return (
                         <TableRow
                             key={row.id}
@@ -504,8 +543,6 @@ export function PlansManagerGrid(props) {
                                     : undefined
                             }
                             onClick={isPlatform ? () => onSelect(row) : undefined}
-                            selected={Boolean(isSelected)}
-                            style={rowStyle}
                         >
                             <TableCell
                                 align="center"
@@ -549,40 +586,10 @@ export function PlansManagerGrid(props) {
                                 {formatCurrencyBRL(row.value)}
                             </TableCell>
                             <TableCell align="left">
-                                {(() => {
-                                    const { count, groups } = summarizePlanFeatures(
-                                        row.planFeatures
-                                    );
-                                    if (!count) {
-                                        return (
-                                            <Typography variant="body2" color="textSecondary">
-                                                {i18n.t("plans.table.featureSummaryEmpty")}
-                                            </Typography>
-                                        );
-                                    }
-                                    return (
-                                        <Box>
-                                            <Typography variant="body2" component="span">
-                                                {i18n.t("plans.table.activeModulesCount", {
-                                                    count,
-                                                })}
-                                            </Typography>
-                                            <Box
-                                                display="flex"
-                                                flexWrap="wrap"
-                                                style={{ marginTop: 6, gap: 4 }}
-                                            >
-                                                {groups.map((g) => (
-                                                    <Chip
-                                                        key={g}
-                                                        size="small"
-                                                        label={i18n.t(`plans.featureGroups.${g}`)}
-                                                    />
-                                                ))}
-                                            </Box>
-                                        </Box>
-                                    );
-                                })()}
+                                <PlanFeatureSummaryChips
+                                  planFeatures={row.planFeatures}
+                                  maxChips={4}
+                                />
                             </TableCell>
                         </TableRow>
                     );
