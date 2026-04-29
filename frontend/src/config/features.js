@@ -57,11 +57,11 @@ export const FEATURES = {
     label: "Campanhas",
     children: {
       sends: { label: "Disparos" },
-      lists: { label: "Listas de contactos" },
+      lists: { label: "Listas de contatos" },
     },
   },
   contacts: {
-    label: "Contactos",
+    label: "Contatos",
     children: {
       crm: { label: "CRM / etiquetas" },
       files: { label: "Lista de ficheiros" },

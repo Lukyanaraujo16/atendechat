@@ -107,7 +107,7 @@ const messages = {
           rightsTitle: "4. Os seus direitos",
           rightsBody:
             "Pode solicitar acesso, retificação, eliminação ou oposição ao tratamento, conforme a legislação aplicável, contactando o responsável pelo serviço.",
-          contactTitle: "5. Contacto",
+          contactTitle: "5. Contato",
           contactBody:
             "Para questões sobre privacidade, utilize os canais de suporte indicados no site ou na aplicação.",
         },
@@ -386,7 +386,7 @@ const messages = {
           team: "Equipe",
           finance: "Financeiro",
           campaigns: "Campanhas",
-          contacts: "Contactos",
+          contacts: "Contatos",
           settings: "Configurações",
         },
       },
@@ -3289,7 +3289,7 @@ const messages = {
             phone: "Telefone",
             sectionCompanyData: "Dados da empresa",
             sectionCompanyDataHint:
-              "Dados principais de identificação e contacto — incluindo o administrador principal associado a esta empresa.",
+              "Dados principais de identificação e contato — incluindo o administrador principal associado a esta empresa.",
             sectionPlanOperation: "Plano e operação",
             sectionPlanOperationHint:
               "Definições contratuais e operacionais: plano, estado da conta, fuso horário e ciclo de vencimento.",
