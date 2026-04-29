@@ -145,7 +145,7 @@ export default memo(({ data, isConnectable, id }) => {
               alignSelf: "end"
             }}
           >
-            {`[${option.number}] ${option.value}`}
+            {`${option.number} - ${option.value}`}
           </div>
           <Handle
             type="source"

@@ -576,7 +576,7 @@ export default function FlowBuilderTestPanel({
             <Chip
               key={opt.number}
               size="small"
-              label={`[${opt.number}] ${opt.value || ""}`}
+              label={`${opt.number} - ${opt.value || ""}`}
               onClick={() => handleMenuPick(opt.number)}
               sx={{ cursor: "pointer" }}
             />
