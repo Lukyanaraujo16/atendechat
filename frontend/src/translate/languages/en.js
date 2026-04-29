@@ -1664,6 +1664,9 @@ const messages = {
 					dueTooltipToday: "Due today.",
 					dueTooltipSoon: "Due in {{days}} day(s) (today through the next 3 days).",
 					dueTooltipOk: "On track — {{days}} days until {{date}}.",
+					contractedBadge: "Custom price",
+					contractedComparedToPlan: "Catalog plan amount: {{value}}",
+					contractedFallbackDefault: "default plan rate",
 					billingActionTooltip: "Bill customer (message / WhatsApp)",
 					billingDialogTitle: "Billing — ready message",
 					billingCopyButton: "Copy text",
@@ -1676,7 +1679,7 @@ const messages = {
 					billingMessageNoDue: "date to be confirmed",
 					billingMessageNoPlan: "plan not set",
 					billingMessageTemplate:
-						"Hello, {{name}}. Regarding plan {{plan}}, the due date is {{date}}. Please renew to keep the service active. Thank you.",
+						"Hello, {{name}}. Regarding plan {{plan}} (monthly fee {{amount}}), the due date is {{date}}. Please settle to keep the service active. Thank you.",
 					renewDialogRecurrence: "Recurrence",
 					renewDialogNewDue: "New due date (preview)",
 					renewBaseFromCurrentDue:
@@ -1735,6 +1738,7 @@ const messages = {
 						warning_after_due: "Automatic notice — after due date",
 						auto_block: "Automatic block — overdue",
 						auto_unblock_after_renew: "Automatic reactivation after renewal",
+						contracted_value_change: "Contracted price updated",
 					},
 					logDetailRenew: "Due date: {{from}} → {{to}}",
 					logDetailBlock: "Account inactive (operational block).",
@@ -1748,6 +1752,8 @@ const messages = {
 						"Due {{date}} — {{days}} day(s) overdue; account deactivated automatically.",
 					logDetailAutoUnblockAfterRenew:
 						"Renewal: due date {{from}} → {{to}}; account reactivated automatically.",
+					logDetailContractedValueChange:
+						"Previous: {{from}} → new: {{to}} (plan catalog rate: {{planBase}}).",
 					logActor: "By {{name}}",
 					logActorSystem: "Automatic (billing job)",
 					logWhatsappSent: "WhatsApp sent (ending ••{{last4}})",
@@ -1821,7 +1827,8 @@ const messages = {
 					kpiSoonHint: "Due in the next 30 days",
 					kpiInactive: "Inactive",
 					kpiRevenue: "Forecast revenue",
-					kpiRevenueHint: "Estimate: sum of plan amounts for active companies.",
+					kpiRevenueHint:
+						"Estimate: sum of effective monthly amounts for active companies (contracted rate when set, otherwise plan catalogue price).",
 					tableSection: "Company portfolio",
 					searchLabel: "Search",
 					searchPlaceholder: "Name or email…",
@@ -3209,6 +3216,17 @@ const messages = {
 							"Complements the plan: turning off hides the module and blocks use when the plan allows the feature.",
 						modulesSectionHintV2:
 							"Each switch maps to plan features (PlanFeatures). Anything the plan does not include stays off and locked — same as the backend. Chatbot, OpenAI, campaigns, API, and groups are evaluated independently. The appointment calendar follows agenda.calendar on the plan only, not this form.",
+						contractedPlanSection: "Contracted price",
+						contractedPlanHint:
+							"Leave blank to use the plan’s default catalogue price. You may set discounts or premiums vs the catalogue.",
+						contractedPlanLabel: "Custom monthly contracted price",
+						contractedPlanBaseline: "Plan catalogue price: {{value}}",
+						contractedPlanNoPlanSelected: "Select a plan to compare with the catalogue.",
+						contractedPlanEffective: "Effective amount: {{value}}",
+						contractedPlanDiscountLabel: "Discount vs plan: {{value}}",
+						contractedPlanSurchargeLabel: "Premium vs plan: {{value}}",
+						contractedPlanClear: "Clear custom price",
+						contractedPlanValueInvalid: "Invalid price. Use a currency format (e.g. 150.00).",
 						modules: {
 							useKanban: "Kanban",
 							useKanbanHelp: "Kanban board (attendance.kanban).",

@@ -1666,6 +1666,9 @@ const messages = {
           dueTooltipToday: "Vence hoy.",
           dueTooltipSoon: "Vence en {{days}} día(s) (hoy y los próximos 3 días).",
           dueTooltipOk: "Al día — faltan {{days}} días para {{date}}.",
+          contractedBadge: "Precio personalizado",
+          contractedComparedToPlan: "Plan (catálogo): {{value}}",
+          contractedFallbackDefault: "tarifa estándar del plan",
           billingActionTooltip: "Cobrar cliente (mensaje / WhatsApp)",
           billingDialogTitle: "Cobro — mensaje listo",
           billingCopyButton: "Copiar texto",
@@ -1678,7 +1681,7 @@ const messages = {
           billingMessageNoDue: "fecha por definir",
           billingMessageNoPlan: "plan no informado",
           billingMessageTemplate:
-            "Hola, {{name}}. Referente al plan {{plan}}, el vencimiento es el {{date}}. Por favor regularice para mantener el servicio activo. Gracias.",
+            "Hola, {{name}}. Referente al plan {{plan}} (mensualidad {{amount}}), el vencimiento es el {{date}}. Por favor regularice para mantener el servicio activo. Gracias.",
           renewDialogRecurrence: "Recurrencia",
           renewDialogNewDue: "Nuevo vencimiento previsto",
           renewBaseFromCurrentDue:
@@ -1737,6 +1740,7 @@ const messages = {
             warning_after_due: "Aviso automático — después del vencimiento",
             auto_block: "Bloqueo automático por mora",
             auto_unblock_after_renew: "Reactivación automática tras renovación",
+            contracted_value_change: "Precio contratado actualizado",
           },
           logDetailRenew: "Vencimiento: {{from}} → {{to}}",
           logDetailBlock: "Cuenta inactiva (bloqueo operacional).",
@@ -1750,6 +1754,8 @@ const messages = {
             "Vencimiento {{date}} — {{days}} día(s) de retraso; cuenta desactivada automáticamente.",
           logDetailAutoUnblockAfterRenew:
             "Renovación: vencimiento {{from}} → {{to}}; cuenta reactivada automáticamente.",
+          logDetailContractedValueChange:
+            "Anterior: {{from}} → nuevo: {{to}} (tarifa catálogo del plan: {{planBase}}).",
           logActor: "Por {{name}}",
           logActorSystem: "Automático (tarea de facturación)",
           logWhatsappSent: "WhatsApp enviado (termina ••{{last4}})",
@@ -1823,7 +1829,8 @@ const messages = {
           kpiSoonHint: "Vencimiento en los próximos 30 días",
           kpiInactive: "Inactivas",
           kpiRevenue: "Ingreso previsto",
-          kpiRevenueHint: "Estimación: suma de los importes de plan de empresas activas.",
+          kpiRevenueHint:
+            "Estimación: suma de las mensualidades efectivas de empresas activas (contratadas si existen, si no el catálogo).",
           tableSection: "Cartera de empresas",
           searchLabel: "Búsqueda",
           searchPlaceholder: "Nombre o correo…",
@@ -3110,6 +3117,17 @@ const messages = {
               "Complementa el plan: desactivar aquí oculta el módulo y bloquea el uso cuando el plan permita el recurso.",
             modulesSectionHintV2:
               "Cada interruptor corresponde a funcionalidades del plan (PlanFeatures). Lo que el plan no incluye queda apagado y bloqueado — igual que el backend. Chatbot, OpenAI, campañas, API y grupos se evalúan por separado. El calendario de citas depende solo de agenda.calendar en el plan, no de este formulario.",
+            contractedPlanSection: "Valor contratado",
+            contractedPlanHint:
+              "Déjelo vacío para usar la tarifa del catálogo. Puede establecer descuentos o recargos sobre el catálogo.",
+            contractedPlanLabel: "Mensualidad contratada personalizada",
+            contractedPlanBaseline: "Valor del catálogo del plan: {{value}}",
+            contractedPlanNoPlanSelected: "Seleccione un plan para compararlo con el catálogo.",
+            contractedPlanEffective: "Importe efectivo: {{value}}",
+            contractedPlanDiscountLabel: "Descuento frente al plan: {{value}}",
+            contractedPlanSurchargeLabel: "Recargo frente al plan: {{value}}",
+            contractedPlanClear: "Borrar valor personalizado",
+            contractedPlanValueInvalid: "Importe inválido. Utilice formato moneda (ej.: 150,00).",
             modules: {
               useKanban: "Kanban",
               useKanbanHelp: "Tablero kanban (attendance.kanban).",

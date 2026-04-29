@@ -17,6 +17,7 @@ interface CompanyData {
   /** Overrides de módulos (apenas Super Admin via API de empresas) */
   modulePermissions?: Record<string, boolean> | null;
   internalNotes?: string | null;
+  contractedPlanValue?: number | null;
 }
 
 const UpdateCompanyService = async (
@@ -34,7 +35,8 @@ const UpdateCompanyService = async (
     recurrence,
     timezone,
     modulePermissions,
-    internalNotes
+    internalNotes,
+    contractedPlanValue
   } = companyData;
 
   if (!company) {
@@ -72,6 +74,9 @@ const UpdateCompanyService = async (
       const t = String(internalNotes).trim();
       payload.internalNotes = t === "" ? null : t;
     }
+  }
+  if (contractedPlanValue !== undefined) {
+    payload.contractedPlanValue = contractedPlanValue;
   }
 
   if (Object.keys(payload).length > 0) {

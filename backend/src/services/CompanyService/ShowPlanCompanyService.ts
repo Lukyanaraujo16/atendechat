@@ -12,7 +12,8 @@ const ShowPlanCompanyService = async (id: string | number): Promise<Company> => 
           "dueDate",
           "createdAt",
           "phone",
-          "modulePermissions"
+          "modulePermissions",
+          "contractedPlanValue"
         ],
         order: [["name", "ASC"]],
         include: [

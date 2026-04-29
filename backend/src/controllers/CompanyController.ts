@@ -4,6 +4,7 @@ import { Op } from "sequelize";
 // import { getIO } from "../libs/socket";
 import AppError from "../errors/AppError";
 import Company from "../models/Company";
+import Plan from "../models/Plan";
 import authConfig from "../config/auth";
 
 import ListCompaniesService from "../services/CompanyService/ListCompaniesService";
@@ -27,6 +28,7 @@ import {
 import RenewCompanyDueDateService from "../services/CompanyService/RenewCompanyDueDateService";
 import CompanyLog from "../models/CompanyLog";
 import { createCompanyLog } from "../services/CompanyService/CreateCompanyLogService";
+import { normalizeNullableContractedPlanValue } from "../utils/normalizeMonetaryInput";
 
 type IndexQuery = {
   searchParam: string;
@@ -56,6 +58,7 @@ type UpdateCompanyBody = {
   modulePermissions?: Record<string, boolean> | null;
   timezone?: string;
   internalNotes?: string | null;
+  contractedPlanValue?: unknown;
 };
 
 type CreateCompanyRequest = UpdateCompanyBody & { name: string };
@@ -91,6 +94,23 @@ async function buildPrimaryAdminMap(
     }
   }
   return primaryByCompany;
+}
+
+/** Compara valores monetários (2 casas) para auditoria do valor contratado. */
+function snapshotNullableMoney(v: unknown): number | null {
+  if (v === null || v === undefined || v === "") return null;
+  const n = typeof v === "string" ? parseFloat(v) : Number(v);
+  return Number.isNaN(n) ? null : n;
+}
+
+function contractedPlanSnapshotChanged(
+  prev: unknown,
+  next: number | null
+): boolean {
+  const a = snapshotNullableMoney(prev);
+  if (a === null && next === null) return false;
+  if (a === null || next === null) return true;
+  return Math.round(a * 100) !== Math.round(next * 100);
 }
 
 export const index = async (req: Request, res: Response): Promise<Response> => {
@@ -146,9 +166,40 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
   const payload: CreateCompanyRequest = { ...newCompany };
   if (!requestUserForStore?.super) {
     delete payload.internalNotes;
+    delete (payload as Record<string, unknown>).contractedPlanValue;
   }
 
-  const { company } = await CreateCompanyService(payload);
+  let contractedOnCreate: number | null | undefined;
+  if (requestUserForStore?.super) {
+    if (Object.prototype.hasOwnProperty.call(newCompany as object, "contractedPlanValue")) {
+      contractedOnCreate = normalizeNullableContractedPlanValue(newCompany.contractedPlanValue);
+    }
+    delete (payload as Record<string, unknown>).contractedPlanValue;
+  }
+
+  const { company } = await CreateCompanyService({
+    ...payload,
+    ...(requestUserForStore?.super && contractedOnCreate !== undefined
+      ? { contractedPlanValue: contractedOnCreate }
+      : {})
+  } as Parameters<typeof CreateCompanyService>[0]);
+
+  if (
+    contractedOnCreate !== undefined &&
+    contractedPlanSnapshotChanged(null, contractedOnCreate)
+  ) {
+    const planRow = await Plan.findByPk(company.planId, { attributes: ["value"] });
+    await createCompanyLog({
+      companyId: company.id,
+      action: "contracted_value_change",
+      userId: req.user?.id ?? null,
+      metadata: {
+        previousValue: null,
+        newValue: contractedOnCreate,
+        planValue: Number(planRow?.value ?? 0)
+      }
+    });
+  }
 
   return res.status(200).json(company);
 };
@@ -172,6 +223,7 @@ export const show = async (req: Request, res: Response): Promise<Response> => {
       : { ...(company as any) };
   if (!requestUser?.super) {
     delete row.internalNotes;
+    delete row.contractedPlanValue;
   }
 
   return res.status(200).json(row);
@@ -197,7 +249,7 @@ export const update = async (
   req: Request,
   res: Response
 ): Promise<Response> => {
-  const companyData: UpdateCompanyBody = req.body;
+  const companyDataRaw: UpdateCompanyBody = req.body;
 
   const schema = Yup.object({
     name: Yup.string().nullable(),
@@ -207,11 +259,12 @@ export const update = async (
     planId: Yup.number().nullable(),
     dueDate: Yup.string().nullable(),
     recurrence: Yup.string().nullable(),
-    internalNotes: Yup.string().nullable().max(65535)
+    internalNotes: Yup.string().nullable().max(65535),
+    contractedPlanValue: Yup.mixed().nullable()
   });
 
   try {
-    await schema.validate(companyData, { abortEarly: false });
+    await schema.validate(companyDataRaw, { abortEarly: false });
   } catch (err: any) {
     throw new AppError(err.message);
   }
@@ -219,7 +272,7 @@ export const update = async (
   const { id } = req.params;
   const companyId = Number(id);
 
-  if (companyData.status === false) {
+  if (companyDataRaw.status === false) {
     const me = await User.findByPk(req.user.id, { attributes: ["companyId"] });
     if (me?.companyId === companyId) {
       throw new AppError(
@@ -230,20 +283,70 @@ export const update = async (
     }
   }
 
-  const pre = await Company.findByPk(companyId, { attributes: ["id", "status"] });
+  const requestUserUpdate =
+    req.user?.id != null
+      ? await User.findByPk(req.user.id, { attributes: ["super"] })
+      : null;
 
-  const company = await UpdateCompanyService({ id, ...companyData });
+  const stripped: Record<string, unknown> = { ...companyDataRaw };
+  if (!requestUserUpdate?.super) {
+    delete stripped.contractedPlanValue;
+  }
+
+  let contractedNormalized: number | null | undefined;
+  if (
+    requestUserUpdate?.super &&
+    Object.prototype.hasOwnProperty.call(req.body as object, "contractedPlanValue")
+  ) {
+    contractedNormalized = normalizeNullableContractedPlanValue(
+      companyDataRaw.contractedPlanValue
+    );
+    delete stripped.contractedPlanValue;
+  }
+
+  const pre = await Company.findByPk(companyId, {
+    attributes: ["id", "status", "contractedPlanValue"],
+    include: [
+      { model: Plan, as: "plan", attributes: ["value"], required: false }
+    ]
+  });
+
+  const company = await UpdateCompanyService({
+    id,
+    ...(stripped as UpdateCompanyBody),
+    ...(contractedNormalized !== undefined
+      ? { contractedPlanValue: contractedNormalized }
+      : {})
+  } as Parameters<typeof UpdateCompanyService>[0]);
 
   if (
-    companyData.status !== undefined &&
+    companyDataRaw.status !== undefined &&
     pre &&
-    Boolean(pre.status) !== Boolean(companyData.status)
+    Boolean(pre.status) !== Boolean(companyDataRaw.status)
   ) {
     await createCompanyLog({
       companyId,
-      action: companyData.status === false ? "block" : "unblock",
+      action: companyDataRaw.status === false ? "block" : "unblock",
       userId: req.user.id,
-      metadata: { previousStatus: pre.status, newStatus: companyData.status }
+      metadata: { previousStatus: pre.status, newStatus: companyDataRaw.status }
+    });
+  }
+
+  if (
+    requestUserUpdate?.super &&
+    contractedNormalized !== undefined &&
+    pre &&
+    contractedPlanSnapshotChanged(pre.contractedPlanValue, contractedNormalized)
+  ) {
+    await createCompanyLog({
+      companyId,
+      action: "contracted_value_change",
+      userId: req.user.id,
+      metadata: {
+        previousValue: snapshotNullableMoney(pre.contractedPlanValue),
+        newValue: contractedNormalized,
+        planValue: Number(pre.plan?.value ?? 0)
+      }
     });
   }
 
@@ -424,6 +527,7 @@ export const listPlan = async (req: Request, res: Response): Promise<Response> =
     effectiveFeatures,
     j.modulePermissions
   );
+  delete j.contractedPlanValue;
   return res.status(200).json({ ...j, effectiveModules, effectiveFeatures });
 };
 

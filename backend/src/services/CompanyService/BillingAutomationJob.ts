@@ -1,5 +1,6 @@
 import moment from "moment-timezone";
 import Company from "../../models/Company";
+import Plan from "../../models/Plan";
 import GetSystemBillingSettingsService from "../SystemSettingService/GetSystemBillingSettingsService";
 import { createCompanyLog } from "./CreateCompanyLogService";
 import { hasCompanyBillingWarningLog } from "./BillingAutomationDedupeService";
@@ -10,6 +11,8 @@ import {
   notifySuperAdminsBillingOverdue,
   notifySuperAdminsBillingWarningBefore
 } from "./notifySuperAdminsBilling";
+import { getCompanyEffectivePlanValue } from "../../helpers/getCompanyEffectivePlanValue";
+import { formatBillingAmountBrl } from "./billingWhatsAppTemplates";
 
 /**
  * Avalia empresas ativas com dueDate, regista avisos (uma vez por vencimento) e bloqueia após atraso configurável.
@@ -19,7 +22,17 @@ export async function runBillingAutomationJob(): Promise<void> {
 
   const companies = await Company.findAll({
     where: { status: true },
-    attributes: ["id", "dueDate", "status", "timezone", "name", "phone"]
+    attributes: [
+      "id",
+      "dueDate",
+      "status",
+      "timezone",
+      "name",
+      "phone",
+      "contractedPlanValue",
+      "planId"
+    ],
+    include: [{ model: Plan, as: "plan", attributes: ["value"], required: false }]
   });
 
   for (const company of companies) {
@@ -40,6 +53,12 @@ export async function runBillingAutomationJob(): Promise<void> {
       const daysUntilDue = due.diff(today, "days");
       const daysLate = today.diff(due, "days");
 
+      const effectiveAmount = getCompanyEffectivePlanValue({
+        contractedPlanValue: company.contractedPlanValue,
+        plan: company.plan
+      });
+      const amountBrl = formatBillingAmountBrl(effectiveAmount);
+
       if (settings.enableAutoWarning) {
         if (daysUntilDue === settings.daysBeforeDueWarning) {
           const exists = await hasCompanyBillingWarningLog(
@@ -56,7 +75,9 @@ export async function runBillingAutomationJob(): Promise<void> {
                 dueDate: dueRaw,
                 currentDate: currentDateStr,
                 daysUntilDue,
-                kind: "automated"
+                kind: "automated",
+                effectiveAmount,
+                amountBrl
               }
             });
             await dispatchBillingAutomationEvent({
@@ -93,7 +114,9 @@ export async function runBillingAutomationJob(): Promise<void> {
                 dueDate: dueRaw,
                 currentDate: currentDateStr,
                 daysLate,
-                kind: "automated"
+                kind: "automated",
+                effectiveAmount,
+                amountBrl
               }
             });
             await dispatchBillingAutomationEvent({

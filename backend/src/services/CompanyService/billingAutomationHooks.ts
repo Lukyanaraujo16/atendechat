@@ -1,9 +1,12 @@
 import moment from "moment";
 import Company from "../../models/Company";
+import Plan from "../../models/Plan";
 import CompanyLog from "../../models/CompanyLog";
 import GetSystemBillingSettingsService from "../SystemSettingService/GetSystemBillingSettingsService";
+import { getCompanyEffectivePlanValue } from "../../helpers/getCompanyEffectivePlanValue";
 import { logger } from "../../utils/logger";
 import {
+  formatBillingAmountBrl,
   templateWarningAfterDue,
   templateWarningBeforeDue
 } from "./billingWhatsAppTemplates";
@@ -85,15 +88,24 @@ export async function dispatchBillingAutomationEvent(
     }
 
     const company = await Company.findByPk(event.companyId, {
-      attributes: ["id", "name", "phone"]
+      attributes: ["id", "name", "phone", "contractedPlanValue", "planId"],
+      include: [
+        { model: Plan, as: "plan", attributes: ["value"], required: false }
+      ]
     });
     if (!company) return;
+
+    const effectiveAmount = getCompanyEffectivePlanValue({
+      contractedPlanValue: company.contractedPlanValue,
+      plan: company.plan
+    });
+    const amountBrl = formatBillingAmountBrl(effectiveAmount);
 
     const dueLabel = dueDateDisplayLabel(event.dueDate);
     const body =
       event.type === "warning_before_due"
-        ? templateWarningBeforeDue(dueLabel)
-        : templateWarningAfterDue(dueLabel);
+        ? templateWarningBeforeDue(dueLabel, amountBrl)
+        : templateWarningAfterDue(dueLabel, amountBrl);
 
     const result = await trySendBillingWhatsAppWarning({
       senderCompanyId: settings.whatsappSenderCompanyId,
@@ -117,6 +129,8 @@ export async function dispatchBillingAutomationEvent(
 
     await mergeWhatsAppIntoCompanyLog(event.logId, {
       channel: "whatsapp",
+      amountBrl,
+      effectiveAmount,
       attempted: true,
       sent: result.sent,
       ...(result.error ? { error: result.error } : {}),

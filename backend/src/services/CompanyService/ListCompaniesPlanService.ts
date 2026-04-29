@@ -3,7 +3,7 @@ import Plan from "../../models/Plan";
 
 const ListCompaniesPlanService = async (): Promise<Company[]> => {
   const companies = await Company.findAll({
-    attributes: ["id", "name", "email", "status", "dueDate", "createdAt", "phone"],
+    attributes: ["id", "name", "email", "status", "dueDate", "createdAt", "phone", "contractedPlanValue"],
     order: [["name", "ASC"]],
     include: [
       {

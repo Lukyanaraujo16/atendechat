@@ -32,6 +32,7 @@ import {
   AppLoadingState,
 } from "../../ui";
 import AppTableContainer from "../../ui/components/AppTableContainer";
+import { getCompanyEffectivePlanValue } from "../../utils/companyPlanValue";
 
 const NEAR_DAYS = 30;
 
@@ -272,7 +273,7 @@ export default function PlatformFinance() {
         inativas += 1;
         return;
       }
-      const planVal = Number(c.plan?.value);
+      const planVal = Number(getCompanyEffectivePlanValue(c));
       if (!Number.isNaN(planVal) && c.status !== false) {
         receita += planVal;
       }
@@ -499,7 +500,7 @@ export default function PlatformFinance() {
                         </TableCell>
                         <TableCell>{row.plan?.name || "—"}</TableCell>
                         <TableCell align="right" style={{ fontVariantNumeric: "tabular-nums" }}>
-                          {formatBrl(row.plan?.value)}
+                          {formatBrl(getCompanyEffectivePlanValue(row))}
                         </TableCell>
                         <TableCell>{row.dueDate ? dateToClient(row.dueDate) : "—"}</TableCell>
                         <TableCell>{row.recurrence || "—"}</TableCell>

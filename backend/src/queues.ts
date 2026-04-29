@@ -34,6 +34,7 @@ import { addSeconds, differenceInSeconds } from "date-fns";
 import formatBody from "./helpers/Mustache";
 import { ClosedAllOpenTickets } from "./services/WbotServices/wbotClosedTickets";
 import { flowMenuTimeoutQueue } from "./libs/flowMenuTimeoutQueue";
+import { getCompanyEffectivePlanValue } from "./helpers/getCompanyEffectivePlanValue";
 
 /** Retries de conexão (AGUARDANDO_CONEXAO), não antecipação de horário. */
 const SCHEDULE_RETRY_BACKOFF_MINUTES = 2;
@@ -1297,6 +1298,11 @@ async function handleInvoiceCreate() {
           return;
         }
 
+        const billValue = getCompanyEffectivePlanValue({
+          contractedPlanValue: (c as { contractedPlanValue?: unknown }).contractedPlanValue,
+          plan
+        });
+
         const datePrefix = moment(dueDate).format("YYYY-MM-DD");
         const likePattern = `${datePrefix}%`;
         const existingCount = await Invoices.count({
@@ -1316,7 +1322,7 @@ async function handleInvoiceCreate() {
           await Invoices.create({
             detail: plan.name,
             status: "open",
-            value: Number(plan.value),
+            value: billValue,
             dueDate: date,
             companyId: c.id
           });
@@ -1336,7 +1342,7 @@ async function handleInvoiceCreate() {
                       html: `Olá ${c.name} esté é um email sobre sua fatura!<br>
           <br>
           Vencimento: ${vencimento}<br>
-          Valor: ${plan.value}<br>
+          Valor: ${billValue}<br>
           Link: ${process.env.FRONTEND_URL}/financeiro<br>
           <br>
           Qualquer duvida estamos a disposição!

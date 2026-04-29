@@ -89,3 +89,18 @@ export function normalizePlanValueIfPresent(
   const v = normalizePlanValueField(data.value);
   data.value = v;
 }
+
+/**
+ * Valor contratado por empresa: vazio → null (usa plano); 0 explícito é permitido.
+ */
+export function normalizeNullableContractedPlanValue(raw: unknown): number | null {
+  if (raw === undefined || raw === null || raw === "") return null;
+  const n = parseBrazilianCurrencyToNumber(raw);
+  if (n === null || Number.isNaN(n)) {
+    throw new AppError("ERR_CONTRACTED_PLAN_VALUE_INVALID", 400);
+  }
+  if (n < 0) {
+    throw new AppError("ERR_CONTRACTED_PLAN_VALUE_INVALID", 400);
+  }
+  return n;
+}

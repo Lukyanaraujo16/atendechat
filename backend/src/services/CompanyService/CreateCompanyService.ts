@@ -19,6 +19,8 @@ interface CompanyData {
   recurrence?: string;
   modulePermissions?: Record<string, boolean> | null;
   internalNotes?: string | null;
+  /** Valor mensal negociado (opcional); null omitido usa plano */
+  contractedPlanValue?: number | null;
 }
 
 export interface CreateCompanyOptions {
@@ -47,7 +49,8 @@ const CreateCompanyService = async (
     recurrence,
     password,
     modulePermissions,
-    internalNotes
+    internalNotes,
+    contractedPlanValue
   } = companyData;
 
   const companySchema = Yup.object().shape({
@@ -93,6 +96,9 @@ const CreateCompanyService = async (
       dueDate,
       recurrence,
       internalNotes: notes,
+      ...(contractedPlanValue === undefined
+        ? {}
+        : { contractedPlanValue }),
       ...(modulePermissions && typeof modulePermissions === "object"
         ? { modulePermissions }
         : {})

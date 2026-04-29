@@ -75,6 +75,13 @@ class Company extends Model<Company> {
   })
   internalNotes: string | null;
 
+  /** Valor mensal negociado (override sobre plan.value); null = usar plano padrão. */
+  @Column({
+    type: DataType.DECIMAL(10, 2),
+    allowNull: true
+  })
+  contractedPlanValue: string | number | null;
+
   @ForeignKey(() => Plan)
   @Column
   planId: number;

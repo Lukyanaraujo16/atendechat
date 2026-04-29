@@ -55,6 +55,14 @@ import History from "@material-ui/icons/History";
 import Warning from "@material-ui/icons/Warning";
 import { AuthContext } from "../../context/Auth/AuthContext";
 import { getIanaTimezones } from "../../utils/ianaTimezones";
+import {
+  parseBrazilianCurrencyToNumber,
+  formatPlanValueForInput,
+} from "../../utils/brazilianCurrency";
+import {
+  getCompanyEffectivePlanValue,
+  formatBrlBrief,
+} from "../../utils/companyPlanValue";
 
 import {
   AppSectionCard,
@@ -234,10 +242,12 @@ function buildBillingReminderMessage(row, dateToClientFn) {
     row?.planId != null && row?.plan?.name
       ? row.plan.name
       : i18n.t("platform.companies.billingMessageNoPlan");
+  const amount = formatBrlBrief(getCompanyEffectivePlanValue(row));
   return i18n.t("platform.companies.billingMessageTemplate", {
     name,
     date: dateStr,
     plan,
+    amount,
   });
 }
 
@@ -341,6 +351,19 @@ function formatCompanyLogEntry(log, dateToClient, datetimeToClient) {
       detail = i18n.t("platform.companies.logDetailAutoUnblockAfterRenew", {
         from: meta.previousDueDate ? dateToClient(meta.previousDueDate) : "—",
         to: meta.newDueDate ? dateToClient(meta.newDueDate) : "—",
+      });
+      break;
+    case "contracted_value_change":
+      detail = i18n.t("platform.companies.logDetailContractedValueChange", {
+        from:
+          meta.previousValue != null
+            ? formatPlanValueDiscrete(meta.previousValue)
+            : i18n.t("platform.companies.contractedFallbackDefault"),
+        to:
+          meta.newValue != null
+            ? formatPlanValueDiscrete(meta.newValue)
+            : i18n.t("platform.companies.contractedFallbackDefault"),
+        planBase: formatPlanValueDiscrete(meta.planValue ?? 0),
       });
       break;
     default:
@@ -708,6 +731,7 @@ const useStyles = makeStyles((theme) => ({
 
 export function CompanyForm(props) {
   const { onSubmit, onDelete, onCancel, initialValue, loading } = props;
+  const { user } = useContext(AuthContext);
   const classes = useStyles();
   const theme = useTheme();
   const [plans, setPlans] = useState([]);
@@ -727,7 +751,12 @@ export function CompanyForm(props) {
     dueDate: "",
     recurrence: "",
     timezone: "America/Sao_Paulo",
+    contractedPlanValueStr: "",
     ...initialValue,
+    contractedPlanValueStr:
+      initialValue?.contractedPlanValue != null && initialValue?.contractedPlanValue !== ""
+        ? formatPlanValueForInput(initialValue.contractedPlanValue)
+        : "",
     modulePermissions: mergeModulePermissions(initialValue?.modulePermissions),
   }));
 
@@ -752,16 +781,38 @@ export function CompanyForm(props) {
       return {
         ...prev,
         ...initialValue,
+        contractedPlanValueStr:
+          initialValue?.contractedPlanValue != null && initialValue?.contractedPlanValue !== ""
+            ? formatPlanValueForInput(initialValue.contractedPlanValue)
+            : "",
         modulePermissions: mergeModulePermissions(initialValue?.modulePermissions),
       };
     });
   }, [initialValue]);
 
   const handleSubmit = async (data) => {
-    if (data.dueDate === "" || moment(data.dueDate).isValid() === false) {
-      data.dueDate = null;
+    const outgoing = { ...data };
+    if (user?.super && Object.prototype.hasOwnProperty.call(outgoing, "contractedPlanValueStr")) {
+      const trimmed = String(outgoing.contractedPlanValueStr ?? "").trim();
+      let contractedPlanValue;
+      if (!trimmed) contractedPlanValue = null;
+      else {
+        const n = parseBrazilianCurrencyToNumber(trimmed);
+        if (n === null || Number.isNaN(n)) {
+          toast.error(i18n.t("settings.company.form.contractedPlanValueInvalid"));
+          return;
+        }
+        contractedPlanValue = n;
+      }
+      delete outgoing.contractedPlanValueStr;
+      outgoing.contractedPlanValue = contractedPlanValue;
+    } else if (!user?.super) {
+      delete outgoing.contractedPlanValueStr;
     }
-    onSubmit(data);
+    if (outgoing.dueDate === "" || moment(outgoing.dueDate).isValid() === false) {
+      outgoing.dueDate = null;
+    }
+    onSubmit(outgoing);
     setRecord({ ...initialValue, dueDate: "" });
   };
 
@@ -1075,6 +1126,107 @@ export function CompanyForm(props) {
                       </Field>
                     </FormControl>
                   </Grid>
+                  {user?.super ? (
+                    <>
+                      <Grid item xs={12}>
+                        <Typography variant="subtitle2" style={{ fontWeight: 600, marginBottom: 8 }}>
+                          {i18n.t("settings.company.form.contractedPlanSection")}
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          color="textSecondary"
+                          paragraph
+                          style={{ marginBottom: 12 }}
+                        >
+                          {i18n.t("settings.company.form.contractedPlanHint")}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={12} sm={12} md={8}>
+                        <Field name="contractedPlanValueStr">
+                          {({ field, form }) => {
+                            const selectedPlan = plans.find(
+                              (p) => String(p.id) === String(form.values.planId)
+                            );
+                            const planBaseline = Number(selectedPlan?.value);
+                            const hasPlan = Boolean(selectedPlan);
+                            const raw = String(field.value ?? "").trim();
+                            let parsedContr = raw ? parseBrazilianCurrencyToNumber(raw) : null;
+                            if (parsedContr !== null && Number.isNaN(parsedContr))
+                              parsedContr = null;
+                            const effective = hasPlan
+                              ? parsedContr !== null
+                                ? parsedContr
+                                : planBaseline
+                              : parsedContr ?? 0;
+                            let deltaLine = "";
+                            if (hasPlan && !Number.isNaN(planBaseline) && parsedContr !== null) {
+                              const delta = parsedContr - planBaseline;
+                              if (Math.round(delta * 100) !== 0) {
+                                deltaLine =
+                                  delta < 0
+                                    ? i18n.t("settings.company.form.contractedPlanDiscountLabel", {
+                                        value: formatBrlBrief(Math.abs(delta)),
+                                      })
+                                    : i18n.t("settings.company.form.contractedPlanSurchargeLabel", {
+                                        value: formatBrlBrief(delta),
+                                      });
+                              }
+                            }
+                            return (
+                              <>
+                                <TextField
+                                  {...field}
+                                  fullWidth
+                                  margin="dense"
+                                  variant="outlined"
+                                  label={i18n.t("settings.company.form.contractedPlanLabel")}
+                                  placeholder={
+                                    selectedPlan ? formatPlanValueForInput(selectedPlan.value) : ""
+                                  }
+                                />
+                                <Box mt={1} display="flex" flexWrap="wrap" alignItems="center">
+                                  <Typography
+                                    variant="caption"
+                                    color="textSecondary"
+                                    component="span"
+                                    style={{ marginRight: theme.spacing(1) }}
+                                  >
+                                    {selectedPlan
+                                      ? i18n.t("settings.company.form.contractedPlanBaseline", {
+                                          value: formatPlanValueForInput(selectedPlan.value),
+                                        })
+                                      : i18n.t("settings.company.form.contractedPlanNoPlanSelected")}
+                                  </Typography>
+                                  <Typography variant="caption" color="textPrimary" component="span">
+                                    {hasPlan || parsedContr !== null
+                                      ? i18n.t("settings.company.form.contractedPlanEffective", {
+                                          value: formatBrlBrief(effective),
+                                        })
+                                      : null}
+                                  </Typography>
+                                </Box>
+                                {deltaLine ? (
+                                  <Typography variant="caption" color="secondary" component="div" style={{ marginTop: 6 }}>
+                                    {deltaLine}
+                                  </Typography>
+                                ) : null}
+                                <Box mt={1.5}>
+                                  <AppNeutralButton
+                                    type="button"
+                                    size="small"
+                                    disabled={loading}
+                                    onClick={() => form.setFieldValue("contractedPlanValueStr", "")}
+                                  >
+                                    {i18n.t("settings.company.form.contractedPlanClear")}
+                                  </AppNeutralButton>
+                                </Box>
+                              </>
+                            );
+                          }}
+                        </Field>
+                      </Grid>
+                    </>
+                  ) : null}
                 </Grid>
               </AppSectionCard>
 
@@ -1630,7 +1782,14 @@ export function CompaniesManagerGrid(props) {
               const isSelected = selectedId != null && row.id === selectedId;
               const dueMeta = getDueDisplayMeta(row, dateToClient);
               const financeLabel = getFinanceStateLabel(dueMeta.category);
-              const planValueStr = formatPlanValueDiscrete(row.plan?.value);
+              const effectiveAmount = getCompanyEffectivePlanValue(row);
+              const planValueStr = formatPlanValueDiscrete(effectiveAmount);
+              const contractedCustom =
+                row.contractedPlanValue != null && row.contractedPlanValue !== "";
+              const catalogStr =
+                row.plan?.value !== undefined && row.plan?.value !== null
+                  ? formatPlanValueDiscrete(row.plan.value)
+                  : null;
               const adminName = row.primaryAdmin?.name || i18n.t("settings.company.form.noPrimaryAdmin");
               const adminEmail = row.primaryAdmin?.email || "";
               const planTitle = renderPlan(row);
@@ -1905,9 +2064,29 @@ export function CompaniesManagerGrid(props) {
                           {financeLabel}
                         </Typography>
                         {planValueStr ? (
-                          <Typography className={classes.financeValueMuted} component="div">
-                            {planValueStr}
-                          </Typography>
+                          <>
+                            <Typography className={classes.financeValueMuted} component="div">
+                              {planValueStr}
+                            </Typography>
+                            {contractedCustom && catalogStr ? (
+                              <Box mt={0.5}>
+                                <Chip
+                                  size="small"
+                                  variant="outlined"
+                                  label={i18n.t("platform.companies.contractedBadge")}
+                                  style={{
+                                    height: 22,
+                                    marginBottom: 4,
+                                  }}
+                                />
+                                <Typography variant="caption" component="div" color="textSecondary">
+                                  {i18n.t("platform.companies.contractedComparedToPlan", {
+                                    value: catalogStr,
+                                  })}
+                                </Typography>
+                              </Box>
+                            ) : null}
+                          </>
                         ) : null}
                       </Box>
                     </Tooltip>
@@ -2001,6 +2180,7 @@ export default function CompaniesManager() {
     dueDate: "",
     recurrence: "",
     timezone: "America/Sao_Paulo",
+    contractedPlanValueStr: "",
     modulePermissions: defaultModulePermissions(),
     primaryAdmin: null,
   });
@@ -2072,6 +2252,7 @@ export default function CompaniesManager() {
       dueDate: "",
       recurrence: "",
       timezone: "America/Sao_Paulo",
+      contractedPlanValueStr: "",
       modulePermissions: defaultModulePermissions(),
       primaryAdmin: null,
     }));
@@ -2088,6 +2269,7 @@ export default function CompaniesManager() {
       dueDate: "",
       recurrence: "",
       timezone: "America/Sao_Paulo",
+      contractedPlanValueStr: "",
       modulePermissions: defaultModulePermissions(),
       primaryAdmin: null,
     });
@@ -2117,6 +2299,10 @@ export default function CompaniesManager() {
       dueDate: data.dueDate || "",
       recurrence: data.recurrence || "",
       timezone: data.timezone || "America/Sao_Paulo",
+      contractedPlanValueStr:
+        data.contractedPlanValue != null && data.contractedPlanValue !== ""
+          ? formatPlanValueForInput(data.contractedPlanValue)
+          : "",
       modulePermissions: mergeModulePermissions(data.modulePermissions),
       primaryAdmin: data.primaryAdmin ?? null,
     }));
