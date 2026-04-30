@@ -1473,6 +1473,22 @@ const messages = {
             tagsTitle: "Variáveis disponíveis",
             tagsIntro: "Clique numa etiqueta para copiar.",
             tagCopy: "Copiado: {{tag}}",
+            tagsEmptyHint:
+              "As variáveis ausentes no envio real serão substituídas por vazio.",
+            actionsCard: "Ações",
+            testsExplainer:
+              "Os testes enviam um e-mail com dados de exemplo (abaixo) para o destinatário que indicar.",
+            sampleDataTitle: "Dados usados no teste",
+            sampleLineName: "Nome: João da Silva",
+            sampleLineCompany: "Empresa: Empresa Exemplo LTDA",
+            sampleLineEmail: "E-mail: joao@exemplo.com.br",
+            sampleLinePassword: "Senha provisória: ********",
+            sampleLineLoginUrl: "URL de login: https://app.streamhubchat.com.br",
+            sampleLineReset:
+              "Link de redefinição: https://app.streamhubchat.com.br/forgetpsw?…",
+            cancelEdit: "Cancelar alterações",
+            footerHint:
+              "Cancelar repõe os campos com os valores guardados no servidor (alterações não guardadas perdem-se).",
             save: "Guardar modelos",
             saved: "Modelos guardados.",
             restore: "Restaurar padrão do sistema na base de dados",

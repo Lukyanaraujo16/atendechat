@@ -9,7 +9,6 @@ import Button from "@material-ui/core/Button";
 import Divider from "@material-ui/core/Divider";
 import Tabs from "@material-ui/core/Tabs";
 import Tab from "@material-ui/core/Tab";
-import Chip from "@material-ui/core/Chip";
 import Grid from "@material-ui/core/Grid";
 import { makeStyles } from "@material-ui/core/styles";
 import { toast } from "react-toastify";
@@ -38,51 +37,206 @@ const useStyles = makeStyles((theme) => ({
     flexDirection: "column",
     gap: theme.spacing(2),
     width: "100%",
-    maxWidth: 980,
+    maxWidth: "100%",
+    boxSizing: "border-box",
+    minWidth: 0,
   },
-  card: {
-    padding: theme.spacing(2.5),
-    borderRadius: theme.shape.borderRadius,
+  pageSmtpNarrow: {
+    maxWidth: 640,
+  },
+  templatesRoot: {
+    width: "100%",
+    maxWidth: 1320,
+    alignSelf: "stretch",
+    boxSizing: "border-box",
+    minWidth: 0,
   },
   hint: {
     fontSize: "0.8125rem",
     color: theme.palette.text.secondary,
     lineHeight: 1.55,
+    maxWidth: "100%",
+    overflowWrap: "break-word",
+    wordBreak: "break-word",
+  },
+  tabPanel: {
+    marginTop: theme.spacing(1),
+    minWidth: 0,
+    maxWidth: "100%",
+  },
+  smtpCard: {
+    padding: theme.spacing(2.5),
+    borderRadius: 12,
+    overflow: "hidden",
+    border: `1px solid ${theme.palette.divider}`,
+    backgroundColor: theme.palette.background.paper,
+    boxSizing: "border-box",
+    maxWidth: "100%",
+  },
+  templateCard: {
+    padding: theme.spacing(2.5),
+    borderRadius: 12,
+    overflow: "hidden",
+    border: `1px solid ${theme.palette.divider}`,
+    backgroundColor: theme.palette.background.paper,
+    boxSizing: "border-box",
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
+  },
+  gridCol: {
+    minWidth: 0,
+    maxWidth: "100%",
+    boxSizing: "border-box",
   },
   fields: {
     display: "flex",
     flexDirection: "column",
     gap: theme.spacing(2),
     marginTop: theme.spacing(1),
+    minWidth: 0,
+    maxWidth: "100%",
+  },
+  fieldFull: {
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
+    boxSizing: "border-box",
+  },
+  multilineInput: {
+    width: "100% !important",
+    maxWidth: "100% !important",
+    boxSizing: "border-box !important",
+    whiteSpace: "pre-wrap",
+    overflowWrap: "break-word",
+    wordBreak: "break-word",
+    resize: "vertical",
+  },
+  /** Evita label outlined a sobrepor a 1.ª linha em TextField multilinha (MUI v4). */
+  multilineOutlinedRoot: {
+    alignItems: "flex-start",
+    maxWidth: "100%",
   },
   testRow: {
     display: "flex",
     flexDirection: "column",
     gap: theme.spacing(1.5),
     marginTop: theme.spacing(1),
+    minWidth: 0,
   },
   testActions: {
     display: "flex",
-    flexWrap: "wrap",
+    flexDirection: "column",
     gap: theme.spacing(1),
+    alignItems: "stretch",
+    "& > *": {
+      width: "100%",
+    },
+  },
+  templateFooter: {
+    display: "flex",
+    flexWrap: "wrap",
     alignItems: "center",
-  },
-  tagChips: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: theme.spacing(0.75),
-    marginTop: theme.spacing(0.5),
-  },
-  tabPanel: {
-    marginTop: theme.spacing(1),
-  },
-  templateActions: {
-    marginTop: theme.spacing(2),
-    display: "flex",
-    flexWrap: "wrap",
+    justifyContent: "flex-end",
     gap: theme.spacing(1),
+    marginTop: theme.spacing(2),
+    paddingTop: theme.spacing(2),
+    borderTop: `1px solid ${theme.palette.divider}`,
+    backgroundColor: theme.palette.background.paper,
+  },
+  infoBox: {
+    marginTop: theme.spacing(1.5),
+    padding: theme.spacing(1.25),
+    borderRadius: 8,
+    backgroundColor:
+      theme.palette.type === "dark"
+        ? "rgba(36, 199, 118, 0.12)"
+        : "rgba(36, 199, 118, 0.08)",
+    border: `1px solid ${theme.palette.divider}`,
+    maxWidth: "100%",
+  },
+  sampleBox: {
+    marginTop: theme.spacing(1.5),
+    padding: theme.spacing(1.5),
+    borderRadius: 8,
+    backgroundColor:
+      theme.palette.type === "dark"
+        ? theme.palette.background.default
+        : theme.palette.grey[50],
+    border: `1px solid ${theme.palette.divider}`,
+    maxWidth: "100%",
+    overflow: "hidden",
+  },
+  sampleLine: {
+    fontSize: "0.75rem",
+    fontFamily: "ui-monospace, monospace",
+    lineHeight: 1.5,
+    color: theme.palette.text.secondary,
+    overflowWrap: "break-word",
+    wordBreak: "break-word",
+    marginBottom: theme.spacing(0.5),
+  },
+  varPill: {
+    display: "block",
+    width: "100%",
+    maxWidth: "100%",
+    boxSizing: "border-box",
+    padding: theme.spacing(1, 1.25),
+    marginBottom: theme.spacing(1),
+    borderRadius: 8,
+    border: `1px solid ${theme.palette.divider}`,
+    cursor: "pointer",
+    textAlign: "left",
+    font: "inherit",
+    color: "inherit",
+    backgroundColor: theme.palette.background.paper,
+    appearance: "none",
+    WebkitAppearance: "none",
+    transition: theme.transitions.create(["background-color", "border-color"], {
+      duration: theme.transitions.duration.shortest,
+    }),
+    "&:hover": {
+      backgroundColor:
+        theme.palette.type === "dark"
+          ? "rgba(255,255,255,0.06)"
+          : theme.palette.action.hover,
+      borderColor: theme.palette.primary.main,
+    },
+  },
+  varToken: {
+    fontFamily: "ui-monospace, monospace",
+    fontSize: "0.75rem",
+    fontWeight: 600,
+    color: theme.palette.primary.main,
+    wordBreak: "break-all",
+    display: "block",
+    marginBottom: 4,
+  },
+  varDesc: {
+    fontSize: "0.75rem",
+    lineHeight: 1.35,
+    color: theme.palette.text.secondary,
+    overflowWrap: "break-word",
+    wordBreak: "break-word",
+    display: "block",
   },
 }));
+
+const templateLabelProps = { shrink: true };
+
+const multilineFieldProps = (classes) => ({
+  fullWidth: true,
+  variant: "outlined",
+  multiline: true,
+  minRows: 10,
+  InputLabelProps: templateLabelProps,
+  InputProps: {
+    classes: {
+      root: classes.multilineOutlinedRoot,
+      input: classes.multilineInput,
+    },
+  },
+});
 
 export default function PlatformEmailSettings() {
   const classes = useStyles();
@@ -113,6 +267,21 @@ export default function PlatformEmailSettings() {
   const [passwordResetSubject, setPasswordResetSubject] = useState("");
   const [passwordResetBody, setPasswordResetBody] = useState("");
   const [templateTestTo, setTemplateTestTo] = useState("");
+
+  const reloadTemplatesOnly = useCallback(async () => {
+    try {
+      const { data } = await api.get("/system-settings/email-templates");
+      const t = data || {};
+      setSupportEmail(String(t.supportEmail || ""));
+      setLoginUrl(String(t.loginUrl || ""));
+      setWelcomeSubject(String(t.welcomeSubject || ""));
+      setWelcomeBody(String(t.welcomeBody || ""));
+      setPasswordResetSubject(String(t.passwordResetSubject || ""));
+      setPasswordResetBody(String(t.passwordResetBody || ""));
+    } catch (e) {
+      toastError(e);
+    }
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -270,6 +439,10 @@ export default function PlatformEmailSettings() {
     }
   };
 
+  const cancelTemplateEdits = async () => {
+    await reloadTemplatesOnly();
+  };
+
   const sendTemplateTest = async (kind) => {
     const to = templateTestTo.trim().toLowerCase();
     if (!to) {
@@ -308,6 +481,8 @@ export default function PlatformEmailSettings() {
     }
   };
 
+  const mProps = multilineFieldProps(classes);
+
   if (loading) {
     return (
       <MainContainer>
@@ -318,7 +493,9 @@ export default function PlatformEmailSettings() {
 
   return (
     <MainContainer>
-      <Box className={classes.page}>
+      <Box
+        className={`${classes.page} ${tab === 0 ? classes.pageSmtpNarrow : ""}`.trim()}
+      >
         <PlatformPageHeader
           titleKey="platform.emailSettings.title"
           subtitleKey="platform.emailSettings.subtitle"
@@ -339,7 +516,7 @@ export default function PlatformEmailSettings() {
 
         {tab === 0 && (
           <div className={classes.tabPanel}>
-            <Paper elevation={2} className={classes.card}>
+            <Paper elevation={2} className={classes.smtpCard}>
               <Typography variant="subtitle2" color="textSecondary" gutterBottom>
                 {i18n.t("platform.emailSettings.sectionConnection")}
               </Typography>
@@ -361,6 +538,7 @@ export default function PlatformEmailSettings() {
                   variant="outlined"
                   fullWidth
                   required
+                  className={classes.fieldFull}
                 />
                 <TextField
                   label={i18n.t("platform.emailSettings.port")}
@@ -370,6 +548,7 @@ export default function PlatformEmailSettings() {
                   fullWidth
                   type="number"
                   required
+                  className={classes.fieldFull}
                   inputProps={{ min: 1, max: 65535 }}
                 />
                 <TextField
@@ -378,6 +557,7 @@ export default function PlatformEmailSettings() {
                   onChange={(e) => setUser(e.target.value)}
                   variant="outlined"
                   fullWidth
+                  className={classes.fieldFull}
                 />
                 <TextField
                   label={i18n.t("platform.emailSettings.password")}
@@ -385,6 +565,7 @@ export default function PlatformEmailSettings() {
                   onChange={(e) => setPasswordInput(e.target.value)}
                   variant="outlined"
                   fullWidth
+                  className={classes.fieldFull}
                   type="password"
                   autoComplete="new-password"
                   placeholder={
@@ -437,6 +618,7 @@ export default function PlatformEmailSettings() {
                   onChange={(e) => setFromName(e.target.value)}
                   variant="outlined"
                   fullWidth
+                  className={classes.fieldFull}
                 />
                 <TextField
                   label={i18n.t("platform.emailSettings.fromEmail")}
@@ -445,6 +627,7 @@ export default function PlatformEmailSettings() {
                   variant="outlined"
                   fullWidth
                   required
+                  className={classes.fieldFull}
                 />
                 <TextField
                   label={i18n.t("platform.emailSettings.replyTo")}
@@ -452,15 +635,16 @@ export default function PlatformEmailSettings() {
                   onChange={(e) => setReplyTo(e.target.value)}
                   variant="outlined"
                   fullWidth
+                  className={classes.fieldFull}
                 />
               </div>
 
-              <AppPrimaryButton onClick={saveSmtp} disabled={saving}>
+              <AppPrimaryButton onClick={saveSmtp} disabled={saving} style={{ marginTop: 16 }}>
                 {i18n.t("platform.emailSettings.save")}
               </AppPrimaryButton>
             </Paper>
 
-            <Paper elevation={1} className={classes.card}>
+            <Paper elevation={1} className={classes.smtpCard} style={{ marginTop: 16 }}>
               <Typography variant="subtitle1" gutterBottom>
                 {i18n.t("platform.emailSettings.testTitle")}
               </Typography>
@@ -474,178 +658,247 @@ export default function PlatformEmailSettings() {
                   onChange={(e) => setTestTo(e.target.value)}
                   variant="outlined"
                   fullWidth
+                  className={classes.fieldFull}
                 />
-                <div className={classes.testActions}>
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    disabled={testing}
-                    onClick={sendSmtpTest}
-                  >
-                    {i18n.t("platform.emailSettings.testSend")}
-                  </Button>
-                </div>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  disabled={testing}
+                  onClick={sendSmtpTest}
+                >
+                  {i18n.t("platform.emailSettings.testSend")}
+                </Button>
               </div>
             </Paper>
           </div>
         )}
 
         {tab === 1 && (
-          <div className={classes.tabPanel}>
-            <Typography variant="body2" color="textSecondary" className={classes.hint}>
-              {i18n.t("platform.emailSettings.templates.usageHint")}
-            </Typography>
+          <Box className={classes.templatesRoot}>
+            <div className={classes.tabPanel}>
+              <Typography variant="body2" color="textSecondary" className={classes.hint}>
+                {i18n.t("platform.emailSettings.templates.usageHint")}
+              </Typography>
 
-            <Grid container spacing={2}>
-              <Grid item xs={12} md={4}>
-                <Paper elevation={1} className={classes.card}>
-                  <Typography variant="subtitle2" gutterBottom>
-                    {i18n.t("platform.emailSettings.templates.tagsTitle")}
-                  </Typography>
-                  <Typography variant="caption" color="textSecondary" display="block">
-                    {i18n.t("platform.emailSettings.templates.tagsIntro")}
-                  </Typography>
-                  <div className={classes.tagChips}>
-                    {EMAIL_TAG_KEYS.map((k) => (
-                      <Chip
-                        key={k}
-                        size="small"
-                        label={`{{${k}}} — ${i18n.t(
-                          `platform.emailSettings.templates.tags.${k}`
-                        )}`}
-                        onClick={() => copyTag(k)}
+              <Grid container spacing={2} className={classes.gridCol}>
+                <Grid item xs={12} md={3} zeroMinWidth className={classes.gridCol}>
+                  <Paper elevation={2} className={classes.templateCard}>
+                    <Typography variant="subtitle1" gutterBottom>
+                      {i18n.t("platform.emailSettings.templates.tagsTitle")}
+                    </Typography>
+                    <Typography variant="caption" color="textSecondary" display="block">
+                      {i18n.t("platform.emailSettings.templates.tagsIntro")}
+                    </Typography>
+                    <Box mt={1.5}>
+                      {EMAIL_TAG_KEYS.map((k) => (
+                        <Box
+                          key={k}
+                          component="button"
+                          type="button"
+                          className={classes.varPill}
+                          onClick={() => copyTag(k)}
+                        >
+                          <span className={classes.varToken}>{`{{${k}}}`}</span>
+                          <span className={classes.varDesc}>
+                            {i18n.t(`platform.emailSettings.templates.tags.${k}`)}
+                          </span>
+                        </Box>
+                      ))}
+                    </Box>
+                    <Box className={classes.infoBox}>
+                      <Typography variant="caption" color="textSecondary" display="block">
+                        {i18n.t("platform.emailSettings.templates.tagsEmptyHint")}
+                      </Typography>
+                    </Box>
+                  </Paper>
+                </Grid>
+
+                <Grid item xs={12} md={6} zeroMinWidth className={classes.gridCol}>
+                  <Paper elevation={2} className={classes.templateCard}>
+                    <Typography variant="subtitle2" color="textSecondary" gutterBottom>
+                      {i18n.t("platform.emailSettings.templates.sectionGlobal")}
+                    </Typography>
+                    <Grid container spacing={2}>
+                      <Grid item xs={12} sm={6} zeroMinWidth className={classes.gridCol}>
+                        <TextField
+                          label={i18n.t("platform.emailSettings.templates.supportEmail")}
+                          value={supportEmail}
+                          onChange={(e) => setSupportEmail(e.target.value)}
+                          variant="outlined"
+                          fullWidth
+                          className={classes.fieldFull}
+                          InputLabelProps={templateLabelProps}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6} zeroMinWidth className={classes.gridCol}>
+                        <TextField
+                          label={i18n.t("platform.emailSettings.templates.loginUrl")}
+                          value={loginUrl}
+                          onChange={(e) => setLoginUrl(e.target.value)}
+                          variant="outlined"
+                          fullWidth
+                          className={classes.fieldFull}
+                          placeholder="https://"
+                          InputLabelProps={templateLabelProps}
+                          helperText={i18n.t(
+                            "platform.emailSettings.templates.loginUrlHint"
+                          )}
+                        />
+                      </Grid>
+                    </Grid>
+
+                    <Divider style={{ margin: "20px 0" }} />
+
+                    <Typography variant="subtitle1" gutterBottom>
+                      {i18n.t("platform.emailSettings.templates.welcomeCard")}
+                    </Typography>
+                    <div className={classes.fields}>
+                      <TextField
+                        label={i18n.t("platform.emailSettings.templates.subject")}
+                        value={welcomeSubject}
+                        onChange={(e) => setWelcomeSubject(e.target.value)}
                         variant="outlined"
-                        color="primary"
+                        fullWidth
+                        className={classes.fieldFull}
+                        InputLabelProps={templateLabelProps}
                       />
-                    ))}
-                  </div>
-                </Paper>
-              </Grid>
-
-              <Grid item xs={12} md={8}>
-                <Paper elevation={2} className={classes.card}>
-                  <Typography variant="subtitle2" color="textSecondary" gutterBottom>
-                    {i18n.t("platform.emailSettings.templates.sectionGlobal")}
-                  </Typography>
-                  <div className={classes.fields}>
-                    <TextField
-                      label={i18n.t("platform.emailSettings.templates.supportEmail")}
-                      value={supportEmail}
-                      onChange={(e) => setSupportEmail(e.target.value)}
-                      variant="outlined"
-                      fullWidth
-                    />
-                    <TextField
-                      label={i18n.t("platform.emailSettings.templates.loginUrl")}
-                      value={loginUrl}
-                      onChange={(e) => setLoginUrl(e.target.value)}
-                      variant="outlined"
-                      fullWidth
-                      placeholder="https://"
-                      helperText={i18n.t("platform.emailSettings.templates.loginUrlHint")}
-                    />
-                  </div>
-
-                  <Divider style={{ margin: "20px 0" }} />
-
-                  <Typography variant="subtitle1" gutterBottom>
-                    {i18n.t("platform.emailSettings.templates.welcomeCard")}
-                  </Typography>
-                  <div className={classes.fields}>
-                    <TextField
-                      label={i18n.t("platform.emailSettings.templates.subject")}
-                      value={welcomeSubject}
-                      onChange={(e) => setWelcomeSubject(e.target.value)}
-                      variant="outlined"
-                      fullWidth
-                    />
-                    <TextField
-                      label={i18n.t("platform.emailSettings.templates.body")}
-                      value={welcomeBody}
-                      onChange={(e) => setWelcomeBody(e.target.value)}
-                      variant="outlined"
-                      fullWidth
-                      multiline
-                      minRows={12}
-                      helperText={i18n.t("platform.emailSettings.templates.bodyHelper")}
-                    />
-                  </div>
-
-                  <Divider style={{ margin: "20px 0" }} />
-
-                  <Typography variant="subtitle1" gutterBottom>
-                    {i18n.t("platform.emailSettings.templates.resetCard")}
-                  </Typography>
-                  <div className={classes.fields}>
-                    <TextField
-                      label={i18n.t("platform.emailSettings.templates.subject")}
-                      value={passwordResetSubject}
-                      onChange={(e) => setPasswordResetSubject(e.target.value)}
-                      variant="outlined"
-                      fullWidth
-                    />
-                    <TextField
-                      label={i18n.t("platform.emailSettings.templates.body")}
-                      value={passwordResetBody}
-                      onChange={(e) => setPasswordResetBody(e.target.value)}
-                      variant="outlined"
-                      fullWidth
-                      multiline
-                      minRows={10}
-                      helperText={i18n.t("platform.emailSettings.templates.bodyHelper")}
-                    />
-                  </div>
-
-                  <div className={classes.templateActions}>
-                    <AppPrimaryButton onClick={saveTemplates} disabled={savingTemplates}>
-                      {i18n.t("platform.emailSettings.templates.save")}
-                    </AppPrimaryButton>
-                    <Button
-                      variant="outlined"
-                      color="secondary"
-                      disabled={savingTemplates}
-                      onClick={persistRestoreDefaults}
-                    >
-                      {i18n.t("platform.emailSettings.templates.restore")}
-                    </Button>
-                  </div>
-                </Paper>
-
-                <Paper elevation={1} className={classes.card} style={{ marginTop: 16 }}>
-                  <Typography variant="subtitle1" gutterBottom>
-                    {i18n.t("platform.emailSettings.testTitle")}
-                  </Typography>
-                  <div className={classes.testRow}>
-                    <TextField
-                      label={i18n.t("platform.emailSettings.templates.testToLabel")}
-                      value={templateTestTo}
-                      onChange={(e) => setTemplateTestTo(e.target.value)}
-                      variant="outlined"
-                      fullWidth
-                    />
-                    <div className={classes.testActions}>
-                      <Button
-                        variant="contained"
-                        color="primary"
-                        disabled={testingKind !== null}
-                        onClick={() => sendTemplateTest("welcome")}
-                      >
-                        {i18n.t("platform.emailSettings.templates.testWelcome")}
-                      </Button>
-                      <Button
-                        variant="contained"
-                        color="default"
-                        disabled={testingKind !== null}
-                        onClick={() => sendTemplateTest("passwordReset")}
-                      >
-                        {i18n.t("platform.emailSettings.templates.testReset")}
-                      </Button>
+                      <TextField
+                        label={i18n.t("platform.emailSettings.templates.body")}
+                        value={welcomeBody}
+                        onChange={(e) => setWelcomeBody(e.target.value)}
+                        helperText={i18n.t(
+                          "platform.emailSettings.templates.bodyHelper"
+                        )}
+                        className={classes.fieldFull}
+                        {...mProps}
+                      />
                     </div>
-                  </div>
-                </Paper>
+
+                    <Divider style={{ margin: "20px 0" }} />
+
+                    <Typography variant="subtitle1" gutterBottom>
+                      {i18n.t("platform.emailSettings.templates.resetCard")}
+                    </Typography>
+                    <div className={classes.fields}>
+                      <TextField
+                        label={i18n.t("platform.emailSettings.templates.subject")}
+                        value={passwordResetSubject}
+                        onChange={(e) => setPasswordResetSubject(e.target.value)}
+                        variant="outlined"
+                        fullWidth
+                        className={classes.fieldFull}
+                        InputLabelProps={templateLabelProps}
+                      />
+                      <TextField
+                        label={i18n.t("platform.emailSettings.templates.body")}
+                        value={passwordResetBody}
+                        onChange={(e) => setPasswordResetBody(e.target.value)}
+                        helperText={i18n.t(
+                          "platform.emailSettings.templates.bodyHelper"
+                        )}
+                        className={classes.fieldFull}
+                        {...mProps}
+                      />
+                    </div>
+
+                    <Box className={classes.templateFooter}>
+                      <Typography
+                        variant="caption"
+                        color="textSecondary"
+                        style={{ flex: "1 1 200px", marginRight: 8 }}
+                      >
+                        {i18n.t("platform.emailSettings.templates.footerHint")}
+                      </Typography>
+                      <Button
+                        variant="outlined"
+                        disabled={savingTemplates}
+                        onClick={cancelTemplateEdits}
+                      >
+                        {i18n.t("platform.emailSettings.templates.cancelEdit")}
+                      </Button>
+                      <AppPrimaryButton onClick={saveTemplates} disabled={savingTemplates}>
+                        {i18n.t("platform.emailSettings.templates.save")}
+                      </AppPrimaryButton>
+                    </Box>
+                  </Paper>
+                </Grid>
+
+                <Grid item xs={12} md={3} zeroMinWidth className={classes.gridCol}>
+                  <Paper elevation={2} className={classes.templateCard} style={{ marginBottom: 16 }}>
+                    <Typography variant="subtitle1" gutterBottom>
+                      {i18n.t("platform.emailSettings.templates.actionsCard")}
+                    </Typography>
+                    <Typography variant="caption" color="textSecondary" display="block" paragraph>
+                      {i18n.t("platform.emailSettings.templates.testsExplainer")}
+                    </Typography>
+                    <div className={classes.testRow}>
+                      <TextField
+                        label={i18n.t("platform.emailSettings.templates.testToLabel")}
+                        value={templateTestTo}
+                        onChange={(e) => setTemplateTestTo(e.target.value)}
+                        variant="outlined"
+                        fullWidth
+                        className={classes.fieldFull}
+                        InputLabelProps={templateLabelProps}
+                      />
+                      <div className={classes.testActions}>
+                        <Button
+                          variant="contained"
+                          color="primary"
+                          disabled={testingKind !== null}
+                          onClick={() => sendTemplateTest("welcome")}
+                        >
+                          {i18n.t("platform.emailSettings.templates.testWelcome")}
+                        </Button>
+                        <Button
+                          variant="contained"
+                          color="default"
+                          disabled={testingKind !== null}
+                          onClick={() => sendTemplateTest("passwordReset")}
+                        >
+                          {i18n.t("platform.emailSettings.templates.testReset")}
+                        </Button>
+                        <Button
+                          variant="outlined"
+                          color="secondary"
+                          disabled={savingTemplates}
+                          onClick={persistRestoreDefaults}
+                        >
+                          {i18n.t("platform.emailSettings.templates.restore")}
+                        </Button>
+                      </div>
+                    </div>
+                  </Paper>
+
+                  <Paper elevation={1} className={classes.templateCard}>
+                    <Typography variant="subtitle2" gutterBottom>
+                      {i18n.t("platform.emailSettings.templates.sampleDataTitle")}
+                    </Typography>
+                    <Box className={classes.sampleBox}>
+                      <Typography className={classes.sampleLine} component="div">
+                        {i18n.t("platform.emailSettings.templates.sampleLineName")}
+                      </Typography>
+                      <Typography className={classes.sampleLine} component="div">
+                        {i18n.t("platform.emailSettings.templates.sampleLineCompany")}
+                      </Typography>
+                      <Typography className={classes.sampleLine} component="div">
+                        {i18n.t("platform.emailSettings.templates.sampleLineEmail")}
+                      </Typography>
+                      <Typography className={classes.sampleLine} component="div">
+                        {i18n.t("platform.emailSettings.templates.sampleLinePassword")}
+                      </Typography>
+                      <Typography className={classes.sampleLine} component="div">
+                        {i18n.t("platform.emailSettings.templates.sampleLineLoginUrl")}
+                      </Typography>
+                      <Typography className={classes.sampleLine} component="div">
+                        {i18n.t("platform.emailSettings.templates.sampleLineReset")}
+                      </Typography>
+                    </Box>
+                  </Paper>
+                </Grid>
               </Grid>
-            </Grid>
-          </div>
+            </div>
+          </Box>
         )}
       </Box>
     </MainContainer>

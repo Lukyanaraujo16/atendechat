@@ -1401,6 +1401,22 @@ const messages = {
             tagsTitle: "Variables disponibles",
             tagsIntro: "Pulse una etiqueta para copiar.",
             tagCopy: "Copiado: {{tag}}",
+            tagsEmptyHint:
+              "Las variables ausentes en un envío real se sustituyen por vacío.",
+            actionsCard: "Acciones",
+            testsExplainer:
+              "Las pruebas envían un correo con datos de ejemplo (abajo) al destinatario indicado.",
+            sampleDataTitle: "Datos usados en la prueba",
+            sampleLineName: "Nombre: Juan Pérez",
+            sampleLineCompany: "Empresa: Empresa Ejemplo SA",
+            sampleLineEmail: "Correo: juan@ejemplo.com",
+            sampleLinePassword: "Contraseña temporal: ********",
+            sampleLineLoginUrl: "URL de acceso: https://app.ejemplo.com",
+            sampleLineReset:
+              "Enlace de restablecimiento: https://app.ejemplo.com/forgetpsw?…",
+            cancelEdit: "Descartar cambios",
+            footerHint:
+              "Descartar vuelve a cargar los valores del servidor (se pierden cambios sin guardar).",
             save: "Guardar plantillas",
             saved: "Plantillas guardadas.",
             restore: "Restaurar valores predeterminados en la base de datos",

@@ -1398,6 +1398,22 @@ const messages = {
 						tagsTitle: "Available variables",
 						tagsIntro: "Click a chip to copy.",
 						tagCopy: "Copied: {{tag}}",
+						tagsEmptyHint:
+							"Missing variables in a real send are replaced with empty text.",
+						actionsCard: "Actions",
+						testsExplainer:
+							"Tests send an email with sample data (below) to the recipient you enter.",
+						sampleDataTitle: "Sample data used in tests",
+						sampleLineName: "Name: John Smith",
+						sampleLineCompany: "Company: Example Company Inc.",
+						sampleLineEmail: "Email: john@example.com",
+						sampleLinePassword: "Temporary password: ********",
+						sampleLineLoginUrl: "Login URL: https://app.example.com",
+						sampleLineReset:
+							"Reset link: https://app.example.com/forgetpsw?…",
+						cancelEdit: "Discard changes",
+						footerHint:
+							"Discard reloads fields from the server (unsaved edits are lost).",
 						save: "Save templates",
 						saved: "Templates saved.",
 						restore: "Restore built-in defaults in database",
