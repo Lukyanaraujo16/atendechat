@@ -502,6 +502,8 @@ const messages = {
         },
       },
       auth: {
+        mustChangePasswordBanner:
+          "Por seguridad, cambie su contraseña: use el menú de la cuenta (perfil) → editar usuario y defina una nueva contraseña.",
         toasts: {
           success: "¡Inicio de sesión realizado con éxito!",
         },
@@ -1347,6 +1349,44 @@ const messages = {
           helps: "Ayuda (contenidos)",
           announcements: "Informativos",
           pushNotifications: "Notificaciones push",
+          emailSmtp: "Correo / SMTP",
+        },
+        emailSettings: {
+          title: "Correo / SMTP",
+          subtitle:
+            "Servidor de salida usado por la plataforma para mensajes transaccionales.",
+          usageHint:
+            "Esta configuración se usa para invitaciones de administrador, recuperación y restablecimiento de contraseña. La contraseña SMTP no se muestra después de guardarla.",
+          sectionConnection: "Servidor",
+          sectionSender: "Remitente",
+          enabled: "SMTP activo (usar estos datos además de solo variables de entorno)",
+          host: "Host SMTP",
+          port: "Puerto",
+          user: "Usuario",
+          password: "Contraseña SMTP",
+          passwordPlaceholderKeep: "Deje en blanco para mantener la contraseña actual",
+          passwordPlaceholderEmpty: "Obligatoria si el servidor requiere autenticación",
+          passwordHelp:
+            "Nunca la devuelve la API. Guarde de nuevo solo si desea cambiarla.",
+          removePassword: "Eliminar contraseña guardada",
+          secureSsl: "SSL directo (p. ej. puerto 465)",
+          requireTls: "Exigir TLS (STARTTLS, p. ej. puerto 587)",
+          fromName: "Nombre del remitente",
+          fromEmail: "Correo del remitente",
+          replyTo: "Reply-To (opcional)",
+          save: "Guardar",
+          saved: "Configuración SMTP guardada.",
+          passwordRemoved: "Contraseña SMTP eliminada.",
+          testTitle: "Prueba de envío",
+          testHint:
+            "Usa la misma configuración efectiva que invitaciones y recuperación (base de datos o MAIL_*).",
+          testToLabel: "Enviar prueba a",
+          testSend: "Enviar correo de prueba",
+          testSent: "Correo de prueba enviado. Revise la bandeja de entrada.",
+          validation: {
+            fromEmail: "Indique el correo del remitente.",
+            testTo: "Indique el destinatario de la prueba.",
+          },
         },
         pushSettings: {
           title: "Notificaciones push (OneSignal)",
@@ -1465,9 +1505,14 @@ const messages = {
           approveDialogTitle: "Confirmar aprobación",
           approveDialogIntro: "Al confirmar, el sistema:",
           approveDialogBullet1: "Creará la empresa y el usuario administrador con los datos de esta solicitud.",
-          approveDialogBullet2: "Dejará la cuenta admin sin contraseña inicial (modelo seguro).",
-          approveDialogBullet3: "Enviará al correo del responsable una invitación para definir la contraseña (enlace válido 72 horas).",
+          approveDialogBullet2:
+            "Generará una contraseña temporal segura y exigirá cambio de contraseña en el primer acceso.",
+          approveDialogBullet3:
+            "Enviará al correo del responsable una invitación con enlace para definir la contraseña (72 horas), si el servidor tiene correo (SMTP) configurado.",
           confirmApproveAction: "Aprobar y crear",
+          credentialsDialogTitle: "Credenciales del administrador",
+          credentialsDialogIntro:
+            "No se envió el correo de invitación (SMTP no disponible o error). Entregue estos datos al cliente por un canal seguro. En el primer inicio se pedirá cambiar la contraseña.",
           rejectTitle: "Rechazar solicitud",
           rejectReason: "Motivo",
           rejectReasonPlaceholder: "Ej.: datos incompletos, duplicado…",
@@ -1626,6 +1671,15 @@ const messages = {
             "Gestione empresas, permisos y configuración de la plataforma.",
           registeredListTitle: "Empresas registradas",
           newCompany: "Nueva empresa",
+          primaryAdminDialogTitle: "Administrador de la empresa creado",
+          primaryAdminDialogIntro:
+            "Se creó un usuario administrador con el correo principal de la empresa. Guarde la contraseña provisional en un lugar seguro o pida al cliente que use el enlace enviado por correo.",
+          primaryAdminInviteSent:
+            "Se envió un correo con un enlace para definir la contraseña. También puede usar la contraseña provisional abajo para el primer acceso.",
+          primaryAdminEmail: "Correo del administrador",
+          primaryAdminTempPassword: "Contraseña provisional",
+          primaryAdminMustChange:
+            "En el primer inicio de sesión se pedirá cambiar la contraseña.",
           searchPlaceholder: "Buscar por nombre o correo…",
           sortByName: "Nombre (A–Z)",
           sortByDate: "Fecha de registro",
@@ -3477,7 +3531,11 @@ const messages = {
           "Ya existe una solicitud pendiente para este correo. Espere la revisión o contacte al soporte.",
         ERR_SIGNUP_REQUEST_NOT_FOUND: "Solicitud de registro no encontrada.",
         ERR_MAIL_NOT_CONFIGURED:
-          "Correo no configurado (MAIL_*). Configure el SMTP de la plataforma para reenviar invitaciones.",
+          "Correo no configurado. Configure SMTP en Gestión SaaS → Correo / SMTP o variables MAIL_*.",
+        ERR_SMTP_NOT_CONFIGURED:
+          "SMTP no configurado o incompleto. Complete los campos, active el SMTP o defina MAIL_* en el servidor.",
+        ERR_SMTP_INVALID_PORT: "Puerto SMTP inválido.",
+        ERR_SMTP_INVALID_TEST_EMAIL: "Dirección de correo de prueba inválida.",
         ERR_SIGNUP_INVITE_RESEND_NOT_ALLOWED:
           "No se puede reenviar la invitación en este estado (ya activada, pendiente o rechazada).",
         ERR_SIGNUP_PRIMARY_ADMIN_NOT_FOUND:
@@ -3487,6 +3545,8 @@ const messages = {
         ERR_SIGNUP_REQUEST_NOT_PENDING: "Esta solicitud ya fue procesada.",
         ERR_SIGNUP_COMPANY_NAME_REQUIRED: "Indique el nombre de la empresa (mínimo 2 caracteres).",
         ERR_COMPANY_EMAIL_REQUIRED: "La empresa necesita un correo para crear la cuenta de administrador.",
+        ERR_EMAIL_ALREADY_IN_USE:
+          "Este correo ya está en uso por otro usuario. Use otro correo principal o reutilice la cuenta existente.",
         ERR_INVALID_ID: "Identificador inválido.",
         ERR_INVALID_PLAN: "Plan inválido o inexistente.",
         ERR_INVALID_BODY: "Datos inválidos. Verifique e intente de nuevo.",

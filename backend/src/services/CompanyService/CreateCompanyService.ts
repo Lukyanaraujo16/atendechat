@@ -1,6 +1,7 @@
 import * as Yup from "yup";
 import { Transaction } from "sequelize";
 import AppError from "../../errors/AppError";
+import sequelize from "../../database";
 import Company from "../../models/Company";
 import Setting from "../../models/Setting";
 import provisionPrimaryAdminForCompany from "./provisionPrimaryAdminForCompany";
@@ -31,13 +32,19 @@ export interface CreateCompanyResult {
   company: Company;
   /** Resultado do convite por e-mail ao admin (quando a senha não é definida na criação). */
   primaryAdminInviteEmailSent?: boolean;
+  primaryAdmin: {
+    email: string;
+    name: string;
+    mustChangePassword: boolean;
+    temporaryPassword?: string;
+    inviteEmailSent?: boolean;
+  };
 }
 
 const CreateCompanyService = async (
   companyData: CompanyData,
   createOpts?: CreateCompanyOptions
 ): Promise<CreateCompanyResult> => {
-  const transaction = createOpts?.transaction;
   const {
     name,
     phone,
@@ -86,25 +93,28 @@ const CreateCompanyService = async (
         ? null
         : String(internalNotes).trim();
 
-  const company = await Company.create(
-    {
-      name,
-      phone,
-      email,
-      status,
-      planId,
-      dueDate,
-      recurrence,
-      internalNotes: notes,
-      ...(contractedPlanValue === undefined
-        ? {}
-        : { contractedPlanValue }),
-      ...(modulePermissions && typeof modulePermissions === "object"
-        ? { modulePermissions }
-        : {})
-    },
-    { transaction }
-  );
+  const body = async (
+    transaction: Transaction
+  ): Promise<CreateCompanyResult> => {
+    const company = await Company.create(
+      {
+        name,
+        phone,
+        email,
+        status,
+        planId,
+        dueDate,
+        recurrence,
+        internalNotes: notes,
+        ...(contractedPlanValue === undefined
+          ? {}
+          : { contractedPlanValue }),
+        ...(modulePermissions && typeof modulePermissions === "object"
+          ? { modulePermissions }
+          : {})
+      },
+      { transaction }
+    );
 
   await Setting.findOrCreate({
     transaction,
@@ -382,8 +392,21 @@ const CreateCompanyService = async (
 
   return {
     company,
-    primaryAdminInviteEmailSent: provisionResult.inviteEmailSent
+    primaryAdminInviteEmailSent: provisionResult.inviteEmailSent,
+    primaryAdmin: {
+      email: provisionResult.email,
+      name: provisionResult.name,
+      temporaryPassword: provisionResult.temporaryPassword,
+      inviteEmailSent: provisionResult.inviteEmailSent,
+      mustChangePassword: provisionResult.mustChangePassword
+    }
   };
+  };
+
+  if (createOpts?.transaction) {
+    return body(createOpts.transaction);
+  }
+  return sequelize.transaction(t => body(t));
 };
 
 export default CreateCompanyService;

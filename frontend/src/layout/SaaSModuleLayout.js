@@ -23,6 +23,7 @@ import BackupIcon from "@material-ui/icons/Backup";
 import HelpOutlineIcon from "@material-ui/icons/HelpOutline";
 import AnnouncementIcon from "@material-ui/icons/Announcement";
 import NotificationsActiveIcon from "@material-ui/icons/NotificationsActive";
+import EmailOutlinedIcon from "@material-ui/icons/EmailOutlined";
 import AccountCircleOutlinedIcon from "@material-ui/icons/AccountCircleOutlined";
 
 import { toast } from "react-toastify";
@@ -145,6 +146,11 @@ function navItems() {
       path: "/saas/push-settings",
       label: i18n.t("platform.tabs.pushNotifications"),
       icon: NotificationsActiveIcon,
+    },
+    {
+      path: "/saas/email-settings",
+      label: i18n.t("platform.tabs.emailSmtp"),
+      icon: EmailOutlinedIcon,
     },
     { path: "/saas/admins", label: i18n.t("platform.tabs.superAdmins"), icon: SecurityIcon },
     { path: "/saas/backup", label: i18n.t("platform.tabs.backup"), icon: BackupIcon },

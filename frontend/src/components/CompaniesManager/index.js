@@ -30,6 +30,7 @@ import HeadsetMic from "@material-ui/icons/HeadsetMic";
 import ChatBubbleOutline from "@material-ui/icons/ChatBubbleOutline";
 import { Formik, Form, Field } from "formik";
 import ConfirmationModal from "../ConfirmationModal";
+import Alert from "@material-ui/lab/Alert";
 
 import { toast } from "react-toastify";
 import useCompanies from "../../hooks/useCompanies";
@@ -2189,6 +2190,7 @@ export default function CompaniesManager() {
   const [historyRow, setHistoryRow] = useState(null);
   const [historyItems, setHistoryItems] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [primaryAdminSetupDialog, setPrimaryAdminSetupDialog] = useState(null);
   const [formOpen, setFormOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [records, setRecords] = useState([]);
@@ -2229,7 +2231,13 @@ export default function CompaniesManager() {
       if (data.id !== 0 && data.id !== undefined) {
         await update(data);
       } else {
-        await save(data);
+        const created = await save(data);
+        if (created?.primaryAdminSetup) {
+          const s = created.primaryAdminSetup;
+          if (s.temporaryPassword || s.inviteEmailSent !== true) {
+            setPrimaryAdminSetupDialog(s);
+          }
+        }
       }
 
       await loadPlans();
@@ -2499,6 +2507,53 @@ export default function CompaniesManager() {
       >
         {i18n.t("settings.company.confirmModal.confirm")}
       </ConfirmationModal>
+
+      <Dialog
+        open={Boolean(primaryAdminSetupDialog)}
+        onClose={() => setPrimaryAdminSetupDialog(null)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>{i18n.t("platform.companies.primaryAdminDialogTitle")}</DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body2" paragraph>
+            {i18n.t("platform.companies.primaryAdminDialogIntro")}
+          </Typography>
+          {primaryAdminSetupDialog?.inviteEmailSent ? (
+            <Alert severity="info" style={{ marginBottom: 12 }}>
+              {i18n.t("platform.companies.primaryAdminInviteSent")}
+            </Alert>
+          ) : null}
+          <TextField
+            fullWidth
+            margin="dense"
+            label={i18n.t("platform.companies.primaryAdminEmail")}
+            value={primaryAdminSetupDialog?.email || ""}
+            InputProps={{ readOnly: true }}
+            variant="outlined"
+          />
+          {primaryAdminSetupDialog?.temporaryPassword ? (
+            <TextField
+              fullWidth
+              margin="dense"
+              label={i18n.t("platform.companies.primaryAdminTempPassword")}
+              value={primaryAdminSetupDialog.temporaryPassword}
+              InputProps={{ readOnly: true }}
+              variant="outlined"
+              helperText={i18n.t("platform.companies.primaryAdminMustChange")}
+            />
+          ) : null}
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setPrimaryAdminSetupDialog(null)}
+            color="primary"
+            variant="contained"
+          >
+            {i18n.t("confirmationModal.buttons.confirm")}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog open={Boolean(blockDialogRow)} onClose={() => setBlockDialogRow(null)} maxWidth="xs" fullWidth>
         <DialogTitle>

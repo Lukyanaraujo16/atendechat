@@ -1,4 +1,5 @@
 import * as Yup from "yup";
+import { randomBytes } from "crypto";
 
 /** Alinhado ao fluxo de reset de senha (mín. 8, maiúscula, minúscula, número). */
 export const PASSWORD_MAX_LENGTH = 128;
@@ -41,4 +42,24 @@ export function getFirstYupErrorMessage(err: unknown): string {
   if (yErr?.errors?.length) return yErr.errors[0];
   if (typeof (err as Error)?.message === "string") return (err as Error).message;
   return "ERR_PASSWORD_POLICY";
+}
+
+/**
+ * Senha provisória aleatória que cumpre {@link strongPasswordSchema} (admin criado pelo SaaS).
+ */
+export function generateTemporaryPassword(): string {
+  const lower = "abcdefghjkmnpqrstuvwxyz";
+  const upper = "ABCDEFGHJKMNPQRSTUVWXYZ";
+  const digits = "23456789";
+  const all = lower + upper + digits;
+  const buf = randomBytes(24);
+  let out = "";
+  out += lower[buf[0] % lower.length];
+  out += upper[buf[1] % upper.length];
+  out += digits[buf[2] % digits.length];
+  for (let i = 3; i < 16; i++) {
+    out += all[buf[i] % all.length];
+  }
+  strongPasswordSchema.validateSync(out);
+  return out;
 }

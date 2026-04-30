@@ -24,9 +24,17 @@ export const approve = async (req: Request, res: Response): Promise<Response> =>
     return res.status(400).json({ error: "ERR_INVALID_ID" });
   }
   const reviewerId = Number(req.user!.id);
-  const row = await ApproveCompanySignupRequestService(id, reviewerId);
+  const { signupRequest, primaryAdminCredentials } =
+    await ApproveCompanySignupRequestService(id, reviewerId);
   void emitPlatformSignupToSuperAdmins({ action: "signup_updated" });
-  return res.json(row);
+  const base =
+    typeof signupRequest.toJSON === "function"
+      ? signupRequest.toJSON()
+      : { ...(signupRequest as object) };
+  return res.json({
+    ...base,
+    ...(primaryAdminCredentials ? { primaryAdminCredentials } : {})
+  });
 };
 
 export const reject = async (req: Request, res: Response): Promise<Response> => {

@@ -1,10 +1,16 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 	<head>
-		<!-- Branding real (título, favicon, metas PWA abaixo quando há systemName) vem do script gerado pelo backend — antes do bundle React -->
-		<script src="__BRANDING_BOOTSTRAP_SRC__"></script>
 		<meta charset="utf-8" />
 		<title></title>
+		<!--
+			Fallback do favicon / ícone iOS (PWA) antes do bootstrap.
+			Com faviconUrl em Branding, branding-bootstrap.js remove estes links e injeta o URL da API + ?v=assetRevision.
+		-->
+		<link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+		<link rel="apple-touch-icon" href="%PUBLIC_URL%/android-chrome-192x192.png" />
+		<!-- Título, favicon dinâmico e preload de logos: script gerado pelo backend -->
+		<script src="__BRANDING_BOOTSTRAP_SRC__"></script>
 		<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" />
 		<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" />
 		<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" />
@@ -15,8 +21,6 @@
 		<meta name="apple-mobile-web-app-status-bar-style" content="default" />
 		<meta name="apple-mobile-web-app-title" content="Atendimento" />
 		<meta name="mobile-web-app-capable" content="yes" />
-		<link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
-		<link rel="apple-touch-icon" href="%PUBLIC_URL%/android-chrome-192x192.png" />
 		<meta
 			name="viewport"
 			content="minimum-scale=1, initial-scale=1, width=device-width, viewport-fit=cover"

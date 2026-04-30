@@ -18,6 +18,7 @@ import PlatformInformativos from "./PlatformInformativos";
 import PlatformSignupRequests from "./PlatformSignupRequests";
 import BillingAutomationPage from "../BillingAutomation";
 import PlatformPushSettings from "./PlatformPushSettings";
+import PlatformEmailSettings from "./PlatformEmailSettings";
 
 /**
  * Módulo de gestão SaaS (Super Admin). Navegação lateral em /saas/* — sem tabs horizontais.
@@ -39,6 +40,7 @@ export default function PlatformModule() {
         <Route exact path="/saas/account" component={PlatformMyAccount} />
         <Route exact path="/saas/branding" component={PlatformBranding} />
         <Route exact path="/saas/push-settings" component={PlatformPushSettings} />
+        <Route exact path="/saas/email-settings" component={PlatformEmailSettings} />
         <Route exact path="/saas/plans" component={PlatformPlans} />
         <Route exact path="/saas/finance" component={PlatformFinance} />
         <Route exact path="/saas/billing-automation" component={BillingAutomationPage} />

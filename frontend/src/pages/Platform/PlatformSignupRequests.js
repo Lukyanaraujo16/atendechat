@@ -373,6 +373,9 @@ export default function PlatformSignupRequests() {
   const [resendRow, setResendRow] = useState(null);
   const [resendSubmitting, setResendSubmitting] = useState(false);
 
+  const [credentialsOpen, setCredentialsOpen] = useState(false);
+  const [credentialsPayload, setCredentialsPayload] = useState(null);
+
   const realtimeReloadTimerRef = useRef(null);
 
   useEffect(() => {
@@ -452,6 +455,10 @@ export default function PlatformSignupRequests() {
         toast.info(i18n.t("platform.signupRequests.toastApprovedInvitePending"));
       } else {
         toast.success(i18n.t("platform.signupRequests.toastApproved"));
+      }
+      if (data?.primaryAdminCredentials) {
+        setCredentialsPayload(data.primaryAdminCredentials);
+        setCredentialsOpen(true);
       }
       setApproveOpen(false);
       setApproveRow(null);
@@ -958,6 +965,42 @@ export default function PlatformSignupRequests() {
           </AppSecondaryButton>
           <AppPrimaryButton loading={approveSubmitting} onClick={confirmApprove}>
             {i18n.t("platform.signupRequests.confirmApproveAction")}
+          </AppPrimaryButton>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={credentialsOpen}
+        onClose={() => setCredentialsOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>{i18n.t("platform.signupRequests.credentialsDialogTitle")}</DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body2" paragraph>
+            {i18n.t("platform.signupRequests.credentialsDialogIntro")}
+          </Typography>
+          <TextField
+            fullWidth
+            margin="dense"
+            label={i18n.t("platform.companies.primaryAdminEmail")}
+            value={credentialsPayload?.email || ""}
+            InputProps={{ readOnly: true }}
+            variant="outlined"
+          />
+          <TextField
+            fullWidth
+            margin="dense"
+            label={i18n.t("platform.companies.primaryAdminTempPassword")}
+            value={credentialsPayload?.temporaryPassword || ""}
+            InputProps={{ readOnly: true }}
+            variant="outlined"
+            helperText={i18n.t("platform.companies.primaryAdminMustChange")}
+          />
+        </DialogContent>
+        <DialogActions>
+          <AppPrimaryButton onClick={() => setCredentialsOpen(false)}>
+            {i18n.t("confirmationModal.buttons.confirm")}
           </AppPrimaryButton>
         </DialogActions>
       </Dialog>

@@ -21,7 +21,9 @@ export const DEFAULT_BRANDING = {
   menuLogoDarkUrl: "",
   faviconUrl: "",
   publicWhatsAppNumber: "",
-  publicWhatsAppMessage: ""
+  publicWhatsAppMessage: "",
+  /** Unix ms — max(updatedAt) das chaves de branding; cache-buster estável do favicon. */
+  assetRevision: "0"
 };
 
 export type PublicBranding = {
@@ -37,6 +39,11 @@ export type PublicBranding = {
   publicWhatsAppNumber: string;
   /** Optional prefilled message for wa.me link. */
   publicWhatsAppMessage: string;
+  /**
+   * Revisão derivada de `updatedAt` na BD (não é chave gravável).
+   * Usada em scripts/bootstrap para `?v=` no favicon sem depender de Date.now().
+   */
+  assetRevision: string;
 };
 
 const GetPublicBrandingService = async (): Promise<PublicBranding> => {
@@ -58,8 +65,15 @@ const GetPublicBrandingService = async (): Promise<PublicBranding> => {
   });
 
   const map: Record<string, string> = {};
+  let assetRevisionMs = 0;
   rows.forEach((r) => {
     map[r.key] = r.value ?? "";
+    if (r.updatedAt) {
+      const t = new Date(r.updatedAt).getTime();
+      if (Number.isFinite(t) && t > assetRevisionMs) {
+        assetRevisionMs = t;
+      }
+    }
   });
 
   const hasKey = (k: string) => Object.prototype.hasOwnProperty.call(map, k);
@@ -88,7 +102,8 @@ const GetPublicBrandingService = async (): Promise<PublicBranding> => {
       : DEFAULT_BRANDING.publicWhatsAppNumber,
     publicWhatsAppMessage: hasKey(BRANDING_KEYS.publicWhatsAppMessage)
       ? String(map[BRANDING_KEYS.publicWhatsAppMessage] ?? "")
-      : DEFAULT_BRANDING.publicWhatsAppMessage
+      : DEFAULT_BRANDING.publicWhatsAppMessage,
+    assetRevision: assetRevisionMs > 0 ? String(assetRevisionMs) : DEFAULT_BRANDING.assetRevision
   };
 };
 

@@ -55,6 +55,7 @@ const ConfirmPasswordResetService = async (
   user.password = password;
   user.resetPassword = null;
   user.passwordResetExpires = null;
+  user.mustChangePassword = false;
   await user.save();
 
   await MarkSignupRequestActivatedForUserService(user, "password_reset");

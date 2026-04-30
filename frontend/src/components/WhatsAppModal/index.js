@@ -31,6 +31,8 @@ import api from "../../services/api";
 import { i18n } from "../../translate/i18n";
 import toastError from "../../errors/toastError";
 import QueueSelect from "../QueueSelect";
+import useFeature from "../../hooks/useFeature";
+import Alert from "@material-ui/lab/Alert";
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -69,6 +71,9 @@ const SessionSchema = Yup.object().shape({
 const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
 
   const classes = useStyles();
+  const { enabled: openAiEnabled, loaded: openAiLoaded } = useFeature(
+    "automation.openai"
+  );
   const initialState = {
     name: "",
     greetingMessage: "",
@@ -152,22 +157,49 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
     }, [whatsAppId]);
 
   useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: dataIntegration } = await api.get("/queueIntegration");
+        if (!cancelled) {
+          setIntegrations(dataIntegration?.queueIntegrations ?? []);
+        }
+        const { data: dataFlows } = await api.get("/flowbuilder");
+        if (!cancelled) {
+          setFlows(dataFlows?.flows ?? []);
+        }
+      } catch (err) {
+        if (!cancelled) toastError(err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) {
+      setPrompts([]);
+      return;
+    }
+    if (!openAiEnabled) {
+      setPrompts([]);
+      return;
+    }
+    let cancelled = false;
     (async () => {
       try {
         const { data } = await api.get("/prompt");
-        setPrompts(data?.prompts ?? []);
-
-        const { data: dataIntegration } = await api.get("/queueIntegration");
-        setIntegrations(dataIntegration?.queueIntegrations ?? []);
-
-        const { data: dataFlows } = await api.get("/flowbuilder");
-        setFlows(dataFlows?.flows ?? []);
-
+        if (!cancelled) setPrompts(data?.prompts ?? []);
       } catch (err) {
-        toastError(err);
+        if (!cancelled) toastError(err);
       }
     })();
-  }, [whatsAppId]);
+    return () => {
+      cancelled = true;
+    };
+  }, [open, openAiEnabled]);
 
   useEffect(() => {
     (async () => {
@@ -183,7 +215,11 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
   const handleSaveWhatsApp = async (values) => {
     const whatsappData = {
       ...values, queueIds: selectedQueueIds, transferQueueId: selectedQueueId,
-      promptId: selectedPrompt ? selectedPrompt : null,
+      promptId: openAiEnabled
+        ? (selectedPrompt != null && selectedPrompt !== ""
+            ? selectedPrompt
+            : null)
+        : (whatsAppId && whatsApp?.promptId != null ? whatsApp.promptId : null),
       integrationId: selectedIntegration,
       flowIdWelcome: selectedFlowWelcome || null,
       flowIdNotPhrase: selectedFlowNotPhrase || null
@@ -442,6 +478,12 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
                   selectedQueueIds={selectedQueueIds}
                   onChange={(selectedIds) => handleChangeQueue(selectedIds)}
                 />
+                {openAiLoaded && !openAiEnabled && (
+                  <Alert severity="info" style={{ marginTop: 8 }}>
+                    {i18n.t("backendErrors.ERR_PLAN_FEATURE_DISABLED")}
+                  </Alert>
+                )}
+                {openAiEnabled && (
                 <FormControl
                   margin="dense"
                   variant="outlined"
@@ -480,6 +522,7 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
                     ))}
                   </Select>
                 </FormControl>
+                )}
                 <FormControl
                   margin="dense"
                   variant="outlined"

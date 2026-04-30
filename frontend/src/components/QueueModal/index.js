@@ -22,6 +22,8 @@ import { i18n } from "../../translate/i18n";
 import api from "../../services/api";
 import toastError from "../../errors/toastError";
 import ColorPicker from "../ColorPicker";
+import useFeature from "../../hooks/useFeature";
+import Alert from "@material-ui/lab/Alert";
 import {
   FormControl,
   Grid,
@@ -105,6 +107,9 @@ const DEFAULT_QUEUE_COLOR = "#2196F3";
 
 const QueueModal = ({ open, onClose, queueId, reload }) => {
   const classes = useStyles();
+  const { enabled: openAiEnabled, loaded: openAiLoaded } = useFeature(
+    "automation.openai"
+  );
 
   const initialState = {
     name: "",
@@ -171,15 +176,29 @@ const QueueModal = ({ open, onClose, queueId, reload }) => {
   const [prompts, setPrompts] = useState([]);
 
   useEffect(() => {
+    if (!open) {
+      setPrompts([]);
+      return;
+    }
+    if (!openAiEnabled) {
+      setPrompts([]);
+      return;
+    }
+    let cancelled = false;
     (async () => {
       try {
         const { data } = await api.get("/prompt");
-        setPrompts(Array.isArray(data?.prompts) ? data.prompts : []);
+        if (!cancelled) {
+          setPrompts(Array.isArray(data?.prompts) ? data.prompts : []);
+        }
       } catch (err) {
-        toastError(err);
+        if (!cancelled) toastError(err);
       }
     })();
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [open, openAiEnabled]);
 
   useEffect(() => {
     api.get(`/settings`).then(({ data }) => {
@@ -240,17 +259,22 @@ const QueueModal = ({ open, onClose, queueId, reload }) => {
 
   const handleSaveQueue = async (values) => {
     try {
+      const promptIdPayload = openAiEnabled
+        ? (selectedPrompt != null && selectedPrompt !== "" ? selectedPrompt : null)
+        : (queueId && queue?.promptId != null && queue.promptId !== ""
+            ? queue.promptId
+            : null);
       if (queueId) {
         await api.put(`/queue/${queueId}`, {
           ...values,
           schedules,
-          promptId: selectedPrompt ? selectedPrompt : null,
+          promptId: promptIdPayload,
         });
       } else {
         await api.post("/queue", {
           ...values,
           schedules,
-          promptId: selectedPrompt ? selectedPrompt : null,
+          promptId: promptIdPayload,
         });
       }
       toast.success(i18n.t("queueModal.toasts.success"));
@@ -434,6 +458,12 @@ const QueueModal = ({ open, onClose, queueId, reload }) => {
                           ))}
                         </Field>
                       </FormControl>
+                      {openAiLoaded && !openAiEnabled && (
+                        <Alert severity="info" style={{ marginTop: 8 }}>
+                          {i18n.t("backendErrors.ERR_PLAN_FEATURE_DISABLED")}
+                        </Alert>
+                      )}
+                      {openAiEnabled && (
                       <FormControl margin="dense" variant="outlined" fullWidth>
                         <InputLabel>
                           {i18n.t("whatsappModal.form.prompt")}
@@ -465,6 +495,7 @@ const QueueModal = ({ open, onClose, queueId, reload }) => {
                           ))}
                         </Select>
                       </FormControl>
+                      )}
                     </div>
                     <div style={{ marginTop: 5 }}>
                       <Field

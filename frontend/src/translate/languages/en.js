@@ -497,6 +497,8 @@ const messages = {
 				},
 			},
 			auth: {
+				mustChangePasswordBanner:
+					"For security, please change your password: use the account menu (profile) → edit user and set a new password.",
 				toasts: {
 					success: "Login successful!",
 				},
@@ -1346,6 +1348,42 @@ const messages = {
 					helps: "Help content",
 					announcements: "Announcements",
 					pushNotifications: "Push notifications",
+					emailSmtp: "Email / SMTP",
+				},
+				emailSettings: {
+					title: "Email / SMTP",
+					subtitle: "Outbound mail server used for transactional messages.",
+					usageHint:
+						"These settings are used for admin invites, password recovery and password reset. The SMTP password is never shown after saving.",
+					sectionConnection: "Server",
+					sectionSender: "Sender",
+					enabled: "SMTP enabled (use these settings instead of environment variables only)",
+					host: "SMTP host",
+					port: "Port",
+					user: "Username",
+					password: "SMTP password",
+					passwordPlaceholderKeep: "Leave blank to keep the current password",
+					passwordPlaceholderEmpty: "Required if your server needs authentication",
+					passwordHelp: "Never returned by the API. Save again only to change it.",
+					removePassword: "Remove stored password",
+					secureSsl: "Direct SSL (e.g. port 465)",
+					requireTls: "Require TLS (STARTTLS, e.g. port 587)",
+					fromName: "From name",
+					fromEmail: "From email",
+					replyTo: "Reply-To (optional)",
+					save: "Save",
+					saved: "SMTP settings saved.",
+					passwordRemoved: "SMTP password removed.",
+					testTitle: "Send test",
+					testHint:
+						"Uses the same effective configuration as invites and recovery (database or MAIL_*).",
+					testToLabel: "Send test to",
+					testSend: "Send test email",
+					testSent: "Test email sent. Check the inbox.",
+					validation: {
+						fromEmail: "Enter the sender email.",
+						testTo: "Enter the test recipient.",
+					},
 				},
 				pushSettings: {
 					title: "Push notifications (OneSignal)",
@@ -1464,9 +1502,14 @@ const messages = {
 					approveDialogTitle: "Confirm approval",
 					approveDialogIntro: "When you confirm, the system will:",
 					approveDialogBullet1: "Create the company and admin user from this request.",
-					approveDialogBullet2: "Provision the admin without an initial password (secure default).",
-					approveDialogBullet3: "Email the contact an invitation to set a password (link valid 72 hours).",
+					approveDialogBullet2:
+						"Generate a secure temporary password and require a password change on first login.",
+					approveDialogBullet3:
+						"Email the contact an invitation with a link to set a password (72 hours), when SMTP is configured on the server.",
 					confirmApproveAction: "Approve and create",
+					credentialsDialogTitle: "Administrator credentials",
+					credentialsDialogIntro:
+						"The invite email was not sent (SMTP unavailable or error). Share these details with the customer over a secure channel. They will be prompted to change the password on first login.",
 					rejectTitle: "Reject request",
 					rejectReason: "Reason",
 					rejectReasonPlaceholder: "E.g. incomplete data, duplicate, not a fit…",
@@ -1624,6 +1667,14 @@ const messages = {
 						"Manage companies, permissions, and platform settings.",
 					registeredListTitle: "Registered companies",
 					newCompany: "New company",
+					primaryAdminDialogTitle: "Company administrator created",
+					primaryAdminDialogIntro:
+						"An administrator user was created with the company's main email. Save the temporary password securely, or ask the customer to use the link sent by email.",
+					primaryAdminInviteSent:
+						"An email was sent with a link to set the password. You can also use the temporary password below for first sign-in.",
+					primaryAdminEmail: "Administrator email",
+					primaryAdminTempPassword: "Temporary password",
+					primaryAdminMustChange: "You will be asked to change your password on first login.",
 					searchPlaceholder: "Search by name or email…",
 					sortByName: "Name (A–Z)",
 					sortByDate: "Created date",
@@ -3574,7 +3625,11 @@ const messages = {
 					"A pending signup request already exists for this email. Wait for review or contact support.",
 				ERR_SIGNUP_REQUEST_NOT_FOUND: "Signup request not found.",
 				ERR_MAIL_NOT_CONFIGURED:
-					"Email is not configured (MAIL_*). Set up platform SMTP to resend invites.",
+					"Email is not configured. Set up SMTP under SaaS management → Email / SMTP or MAIL_* environment variables.",
+				ERR_SMTP_NOT_CONFIGURED:
+					"SMTP is not configured or is incomplete. Fill in the fields, enable SMTP, or set MAIL_* on the server.",
+				ERR_SMTP_INVALID_PORT: "Invalid SMTP port.",
+				ERR_SMTP_INVALID_TEST_EMAIL: "Invalid test email address.",
 				ERR_SIGNUP_INVITE_RESEND_NOT_ALLOWED:
 					"Cannot resend the invite in this request state (already activated, pending, or rejected).",
 				ERR_SIGNUP_PRIMARY_ADMIN_NOT_FOUND:
@@ -3584,6 +3639,8 @@ const messages = {
 				ERR_SIGNUP_REQUEST_NOT_PENDING: "This request has already been processed.",
 				ERR_SIGNUP_COMPANY_NAME_REQUIRED: "Enter the company name (at least 2 characters).",
 				ERR_COMPANY_EMAIL_REQUIRED: "The company needs an email to create the administrator account.",
+				ERR_EMAIL_ALREADY_IN_USE:
+					"This email is already in use by another user. Use a different company email or reuse the existing account.",
 				ERR_INVALID_ID: "Invalid identifier.",
 				ERR_INVALID_PLAN: "Invalid or unknown plan.",
 				ERR_INVALID_BODY: "Invalid data. Check and try again.",

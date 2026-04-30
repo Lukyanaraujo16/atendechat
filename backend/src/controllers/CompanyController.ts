@@ -197,12 +197,16 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
     delete (payload as Record<string, unknown>).contractedPlanValue;
   }
 
-  const { company } = await CreateCompanyService({
-    ...payload,
-    ...(requestUserForStore?.super && contractedOnCreate !== undefined
-      ? { contractedPlanValue: contractedOnCreate }
-      : {})
-  } as Parameters<typeof CreateCompanyService>[0]);
+  const result = await CreateCompanyService(
+    {
+      ...payload,
+      ...(requestUserForStore?.super && contractedOnCreate !== undefined
+        ? { contractedPlanValue: contractedOnCreate }
+        : {})
+    } as Parameters<typeof CreateCompanyService>[0]
+  );
+
+  const { company } = result;
 
   if (
     contractedOnCreate !== undefined &&
@@ -225,7 +229,24 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
     });
   }
 
-  return res.status(200).json(company);
+  const companyJson =
+    typeof company.toJSON === "function"
+      ? company.toJSON()
+      : { ...(company as object) };
+
+  const setup = result.primaryAdmin;
+  const primaryAdminSetup = setup
+    ? {
+        ...setup,
+        temporaryPassword:
+          setup.inviteEmailSent === true ? undefined : setup.temporaryPassword
+      }
+    : undefined;
+
+  return res.status(200).json({
+    ...companyJson,
+    ...(primaryAdminSetup ? { primaryAdminSetup } : {})
+  });
 };
 
 export const show = async (req: Request, res: Response): Promise<Response> => {

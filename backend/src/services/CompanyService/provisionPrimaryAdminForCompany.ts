@@ -1,14 +1,16 @@
 import { randomBytes } from "crypto";
-import { hash } from "bcryptjs";
-import { Transaction } from "sequelize";
+import { Transaction, UniqueConstraintError } from "sequelize";
 import Company from "../../models/Company";
 import User from "../../models/User";
 import AppError from "../../errors/AppError";
 import {
   getFirstYupErrorMessage,
-  strongPasswordSchema
+  strongPasswordSchema,
+  generateTemporaryPassword
 } from "../../utils/passwordPolicy";
-import sendPasswordResetEmail from "../PasswordReset/sendPasswordResetEmail";
+import sendPasswordResetEmail, {
+  isPasswordResetMailConfigured
+} from "../PasswordReset/sendPasswordResetEmail";
 import { PRIMARY_ADMIN_INVITE_TTL_MS } from "../../constants/onboarding";
 
 type ProvisionOpts = {
@@ -20,14 +22,19 @@ type ProvisionOpts = {
 };
 
 export type ProvisionPrimaryAdminResult = {
-  /** true = e-mail de convite enviado; false = falha; undefined = fluxo com senha na criação */
+  email: string;
+  name: string;
+  mustChangePassword: boolean;
+  /** Só quando a senha é gerada automaticamente (SaaS / aprovação sem senha explícita). */
+  temporaryPassword?: string;
+  /** E-mail de convite com link para /forgetpsw (token). */
   inviteEmailSent?: boolean;
 };
 
 /**
- * Cria o utilizador admin da empresa: com senha forte ou, se não houver senha,
- * com hash placeholder + token (e-mail de convite com link para /forgetpsw).
- * Substitui o antigo fallback "123456".
+ * Garante um utilizador `admin` para a empresa.
+ * — Com `passwordPlain`: valida política e cria utilizador (troca de senha não forçada).
+ * — Sem senha: gera palavra-passe provisória + `mustChangePassword`, envia convite por e-mail quando SMTP disponível.
  */
 const provisionPrimaryAdminForCompany = async (
   opts: ProvisionOpts
@@ -49,54 +56,83 @@ const provisionPrimaryAdminForCompany = async (
 
   const tx = opts.transaction;
 
+  const createUser = async (fields: Partial<User>) => {
+    try {
+      await User.create(fields as User, { transaction: tx });
+    } catch (err) {
+      if (err instanceof UniqueConstraintError) {
+        throw new AppError(
+          "ERR_EMAIL_ALREADY_IN_USE",
+          400,
+          "Este e-mail já está associado a outro utilizador."
+        );
+      }
+      throw err;
+    }
+  };
+
   if (pwdTrim.length > 0) {
     try {
       await strongPasswordSchema.validate(pwdTrim);
     } catch (err: unknown) {
       throw new AppError(getFirstYupErrorMessage(err), 400);
     }
-    await User.create(
-      {
-        name: adminName,
-        email,
-        password: pwdTrim,
-        profile: "admin",
-        companyId: opts.company.id
-      },
-      { transaction: tx }
-    );
-    return {};
-  }
-
-  const token = randomBytes(32).toString("hex");
-  const placeholder = randomBytes(32).toString("hex");
-  const passwordHash = await hash(placeholder, 8);
-
-  await User.create(
-    {
+    await createUser({
       name: adminName,
       email,
-      passwordHash,
+      password: pwdTrim,
       profile: "admin",
       companyId: opts.company.id,
-      resetPassword: token,
-      passwordResetExpires: new Date(Date.now() + PRIMARY_ADMIN_INVITE_TTL_MS)
-    },
-    { transaction: tx }
-  );
-
-  try {
-    await sendPasswordResetEmail({
-      to: email,
-      token,
-      userName: adminName,
-      kind: "invite"
+      mustChangePassword: false
     });
-    return { inviteEmailSent: true };
-  } catch (err) {
-    console.error("[provisionPrimaryAdmin] Falha ao enviar e-mail de convite:", err);
-    return { inviteEmailSent: false };
+    return {
+      email,
+      name: adminName,
+      mustChangePassword: false
+    };
   }
+
+  const temporaryPassword = generateTemporaryPassword();
+  const token = randomBytes(32).toString("hex");
+
+  await createUser({
+    name: adminName,
+    email,
+    password: temporaryPassword,
+    profile: "admin",
+    companyId: opts.company.id,
+    mustChangePassword: true,
+    resetPassword: token,
+    passwordResetExpires: new Date(Date.now() + PRIMARY_ADMIN_INVITE_TTL_MS)
+  });
+
+  let inviteEmailSent = false;
+  if (await isPasswordResetMailConfigured()) {
+    try {
+      await sendPasswordResetEmail({
+        to: email,
+        token,
+        userName: adminName,
+        kind: "invite"
+      });
+      inviteEmailSent = true;
+    } catch (err) {
+      console.error("[provisionPrimaryAdmin] Falha ao enviar e-mail de convite:", err);
+      inviteEmailSent = false;
+    }
+  } else {
+    console.warn(
+      "[provisionPrimaryAdmin] SMTP não configurado — convite por e-mail não enviado; use credenciais devolvidas à API."
+    );
+  }
+
+  return {
+    email,
+    name: adminName,
+    mustChangePassword: true,
+    temporaryPassword,
+    inviteEmailSent
+  };
 };
 
 export default provisionPrimaryAdminForCompany;

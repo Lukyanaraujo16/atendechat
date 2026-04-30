@@ -18,6 +18,63 @@ function defaultFaviconAbsoluteHref() {
   return `${window.location.origin}${base}/favicon.ico`;
 }
 
+function defaultAppleTouchAbsoluteHref() {
+  if (typeof window === "undefined") return "/android-chrome-192x192.png";
+  const base = process.env.PUBLIC_URL || "";
+  return `${window.location.origin}${base}/android-chrome-192x192.png`;
+}
+
+function guessIconMime(absHref) {
+  const pure = String(absHref).split("?")[0].toLowerCase();
+  if (pure.endsWith(".svg")) return "image/svg+xml";
+  if (pure.endsWith(".png")) return "image/png";
+  if (pure.endsWith(".ico")) return "image/x-icon";
+  if (pure.endsWith(".jpg") || pure.endsWith(".jpeg")) return "image/jpeg";
+  return "";
+}
+
+function removeAllTabIconLinks() {
+  document
+    .querySelectorAll(
+      'link[rel="mask-icon"],link[rel="icon"],link[rel="shortcut icon"],link[rel="apple-touch-icon"],link[rel="apple-touch-icon-precomposed"]'
+    )
+    .forEach((el) => el.remove());
+}
+
+function appendIconLink(rel, href, mime) {
+  const link = document.createElement("link");
+  link.setAttribute("rel", rel);
+  link.setAttribute("href", href);
+  if (mime && rel === "icon") link.setAttribute("type", mime);
+  document.head.appendChild(link);
+}
+
+/**
+ * Alinha ao branding-bootstrap.js: favicon de Branding ganha da aba; senão repõe o fallback PWA do index.html.
+ */
+function applyTabIconsFromBranding(faviconUrlRaw, assetRevision) {
+  if (typeof document === "undefined") return;
+  const rev =
+    assetRevision != null && String(assetRevision).trim() !== "" ? String(assetRevision) : "0";
+  const customRaw = String(faviconUrlRaw || "").trim();
+  removeAllTabIconLinks();
+  if (customRaw) {
+    const fav = resolveStoredLogoUrl(customRaw);
+    if (!fav) return;
+    const sep = fav.includes("?") ? "&" : "?";
+    const href = `${fav}${sep}v=${encodeURIComponent(rev)}`;
+    const ty = guessIconMime(fav);
+    ["icon", "shortcut icon", "apple-touch-icon"].forEach((rel) => appendIconLink(rel, href, ty));
+    return;
+  }
+  const icon = defaultFaviconAbsoluteHref();
+  const apple = defaultAppleTouchAbsoluteHref();
+  const iconTy = guessIconMime(icon);
+  appendIconLink("icon", icon, iconTy);
+  appendIconLink("shortcut icon", icon, iconTy);
+  appendIconLink("apple-touch-icon", apple, "image/png");
+}
+
 /** Estado base quando não há bootstrap nem API (sem nome de marca embutido). */
 const emptyBranding = {
   systemName: "",
@@ -27,7 +84,8 @@ const emptyBranding = {
   menuLogoDarkUrl: "",
   faviconUrl: "",
   publicWhatsAppNumber: "",
-  publicWhatsAppMessage: ""
+  publicWhatsAppMessage: "",
+  assetRevision: "0"
 };
 
 function readBootstrapBranding() {
@@ -43,7 +101,8 @@ function readBootstrapBranding() {
     menuLogoDarkUrl: w.menuLogoDarkUrl != null ? String(w.menuLogoDarkUrl) : "",
     faviconUrl: w.faviconUrl != null ? String(w.faviconUrl) : "",
     publicWhatsAppNumber: w.publicWhatsAppNumber != null ? String(w.publicWhatsAppNumber) : "",
-    publicWhatsAppMessage: w.publicWhatsAppMessage != null ? String(w.publicWhatsAppMessage) : ""
+    publicWhatsAppMessage: w.publicWhatsAppMessage != null ? String(w.publicWhatsAppMessage) : "",
+    assetRevision: w.assetRevision != null ? String(w.assetRevision) : "0"
   };
 }
 
@@ -78,7 +137,11 @@ export function BrandingProvider({ children }) {
         menuLogoDarkUrl: data?.menuLogoDarkUrl ?? "",
         faviconUrl: data?.faviconUrl ?? "",
         publicWhatsAppNumber: data?.publicWhatsAppNumber ?? "",
-        publicWhatsAppMessage: data?.publicWhatsAppMessage ?? ""
+        publicWhatsAppMessage: data?.publicWhatsAppMessage ?? "",
+        assetRevision:
+          data?.assetRevision != null && String(data.assetRevision).trim() !== ""
+            ? String(data.assetRevision)
+            : "0"
       });
       setError(null);
     } catch (e) {
@@ -117,22 +180,18 @@ export function BrandingProvider({ children }) {
   }, [branding.menuLogoUrl, branding.menuLogoDarkUrl, isDarkMode]);
 
   const resolveFavicon = useCallback(() => {
-    return resolveStoredLogoUrl(branding.faviconUrl) || defaultFaviconAbsoluteHref();
-  }, [branding.faviconUrl]);
+    const raw = resolveStoredLogoUrl(branding.faviconUrl);
+    const fallback = defaultFaviconAbsoluteHref();
+    const base = raw || fallback;
+    if (!raw) return base;
+    const rev = branding.assetRevision || "0";
+    const sep = base.includes("?") ? "&" : "?";
+    return `${base}${sep}v=${encodeURIComponent(rev)}`;
+  }, [branding.faviconUrl, branding.assetRevision]);
 
   useEffect(() => {
-    if (typeof document === "undefined") return;
-    const href = resolveFavicon();
-    ["icon", "shortcut icon"].forEach((rel) => {
-      let link = document.querySelector(`link[rel="${rel}"]`);
-      if (!link) {
-        link = document.createElement("link");
-        link.setAttribute("rel", rel);
-        document.head.appendChild(link);
-      }
-      link.setAttribute("href", href);
-    });
-  }, [resolveFavicon]);
+    applyTabIconsFromBranding(branding.faviconUrl, branding.assetRevision);
+  }, [branding.faviconUrl, branding.assetRevision]);
 
   const value = useMemo(
     () => ({

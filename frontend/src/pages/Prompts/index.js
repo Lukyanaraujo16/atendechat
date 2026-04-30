@@ -137,15 +137,19 @@ const Prompts = () => {
     (async () => {
       setLoading(true);
       try {
-        getPrompts(  );
-
-        setLoading(false);
+        if (!openAiFeatureLoaded) return;
+        if (!openAiEnabled) {
+          setLoading(false);
+          return;
+        }
+        await getPrompts();
       } catch (err) {
         toastError(err);
+      } finally {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [openAiFeatureLoaded, openAiEnabled]);
 
   useEffect(() => {
     const socket = socketManager.getSocket(companyId);

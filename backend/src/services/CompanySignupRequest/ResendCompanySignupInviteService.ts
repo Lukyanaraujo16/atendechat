@@ -28,11 +28,11 @@ const ResendCompanySignupInviteService = async (
   requestId: number,
   actorUserId: number
 ): Promise<Record<string, unknown>> => {
-  if (!isPasswordResetMailConfigured()) {
+  if (!(await isPasswordResetMailConfigured())) {
     throw new AppError(
       "ERR_MAIL_NOT_CONFIGURED",
       503,
-      "E-mail da plataforma não configurado. Configure MAIL_* para reenviar convites."
+      "E-mail da plataforma não configurado. Configure SMTP em Gestão SaaS → E-mail / SMTP ou variáveis MAIL_*."
     );
   }
 

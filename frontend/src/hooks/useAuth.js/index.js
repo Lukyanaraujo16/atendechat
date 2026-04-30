@@ -17,6 +17,8 @@ const BUSINESS_FORBIDDEN = [
   "ERR_COMPANY_DELINQUENT",
   "ERR_EXTERNAL_API_NOT_ALLOWED",
   "ERR_NO_PERMISSION",
+  /** Plano / feature: não é falha de sessão — não tentar refresh nem logout */
+  "ERR_PLAN_FEATURE_DISABLED",
 ];
 
 const useAuth = () => {

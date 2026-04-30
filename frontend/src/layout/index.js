@@ -688,6 +688,12 @@ const LoggedInLayout = ({ children, themeToggle }) => {
 
         <PushNotificationOptInBanner />
 
+        {user?.mustChangePassword === true && !user?.super ? (
+          <Alert severity="warning" variant="outlined" className={classes.financeAlert}>
+            {i18n.t("auth.mustChangePasswordBanner")}
+          </Alert>
+        ) : null}
+
         {user?.finance?.delinquent && (
           <Alert
             severity="warning"

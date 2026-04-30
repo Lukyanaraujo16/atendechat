@@ -1,4 +1,8 @@
-import nodemailer from "nodemailer";
+import resolveSmtpSendConfig, {
+  isSmtpSendConfigured
+} from "../Mail/resolveSmtpSendConfig";
+import createMailTransportFromResolved from "../Mail/createMailTransportFromResolved";
+import { redactSmtpHints } from "../Mail/smtpClientSafeMessage";
 
 export type PasswordResetMailParams = {
   to: string;
@@ -8,13 +12,9 @@ export type PasswordResetMailParams = {
   kind?: "reset" | "invite";
 };
 
-/** Indica se o envio SMTP está configurado (convites e reset dependem disto). */
-export function isPasswordResetMailConfigured(): boolean {
-  const host = process.env.MAIL_HOST;
-  const user = process.env.MAIL_USER;
-  const pass = process.env.MAIL_PASS;
-  const from = process.env.MAIL_FROM || user;
-  return !!(host && user && pass && from);
+/** Indica se o envio SMTP está disponível (BD ativa com `smtp_enabled` ou variáveis MAIL_*). */
+export async function isPasswordResetMailConfigured(): Promise<boolean> {
+  return isSmtpSendConfigured();
 }
 
 function buildResetLink(email: string, token: string): string {
@@ -31,20 +31,15 @@ function buildResetLink(email: string, token: string): string {
 
 /**
  * Envia e-mail com link e código de recuperação (nodemailer).
- * Falha em silêncio no caller se MAIL_* não estiver configurado (regista em log).
+ * Usa SystemSettings SMTP quando ativo; caso contrário MAIL_*.
  */
 export default async function sendPasswordResetEmail(
   params: PasswordResetMailParams
 ): Promise<void> {
-  const host = process.env.MAIL_HOST;
-  const user = process.env.MAIL_USER;
-  const pass = process.env.MAIL_PASS;
-  const from = process.env.MAIL_FROM || user;
-  const port = Number(process.env.MAIL_PORT || "465");
-
-  if (!host || !user || !pass || !from) {
+  const cfg = await resolveSmtpSendConfig();
+  if (!cfg) {
     console.warn(
-      "[PasswordReset] MAIL_HOST/MAIL_USER/MAIL_PASS/MAIL_FROM não configurados — e-mail não enviado."
+      "[PasswordReset] SMTP não configurado (Gestão SaaS → E-mail ou MAIL_*) — e-mail não enviado."
     );
     return;
   }
@@ -56,12 +51,7 @@ export default async function sendPasswordResetEmail(
     ? `${appName} — Conta aprovada: defina a sua palavra-passe`
     : `${appName} — Recuperação de palavra-passe`;
 
-  const transporter = nodemailer.createTransport({
-    host,
-    port,
-    secure: port === 465,
-    auth: { user, pass }
-  });
+  const transporter = createMailTransportFromResolved(cfg);
 
   const html = isInvite
     ? `
@@ -95,11 +85,20 @@ export default async function sendPasswordResetEmail(
     ? `Conta aprovada em ${appName}. Código: ${params.token}\nLink: ${link}`
     : `Código: ${params.token}\nLink: ${link}`;
 
-  await transporter.sendMail({
-    from,
-    to: params.to,
-    subject,
-    text,
-    html
-  });
+  try {
+    await transporter.sendMail({
+      from: cfg.fromAddress,
+      to: params.to,
+      subject,
+      text,
+      html,
+      ...(cfg.replyTo ? { replyTo: cfg.replyTo } : {})
+    });
+  } catch (err) {
+    console.error(
+      "[PasswordReset] Falha ao enviar:",
+      redactSmtpHints(err instanceof Error ? err.message : String(err))
+    );
+    throw err;
+  }
 }

@@ -15,6 +15,8 @@ interface SerializedUser {
   queues: Queue[];
   allTicket: string;
   finance: CompanyFinanceFlags;
+  /** Primeiro acesso: o frontend deve pedir alteração de palavra-passe. */
+  mustChangePassword?: boolean;
   /** Modo suporte: sessão atua no tenant `companyId`; casa em `supportHomeCompanyId`. */
   supportMode?: boolean;
   supportHomeCompanyId?: number | null;
@@ -31,6 +33,7 @@ export const SerializeUser = async (user: User): Promise<SerializedUser> => {
     super: user.super,
     queues: user.queues,
     allTicket: user.allTicket,
+    mustChangePassword: user.mustChangePassword === true,
     finance: user.company
       ? getCompanyFinanceFlags(user.company)
       : {

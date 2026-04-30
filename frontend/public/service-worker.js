@@ -1,18 +1,18 @@
 /**
  * Service worker mínimo (Fase 1 PWA).
  *
- * - Não usa cache de fetch: todas as requisições seguem o comportamento normal da rede.
+ * - Não intercepta nem cacheia `fetch` — o browser mantém o comportamento normal de rede.
+ *   • Isto inclui favicons e ficheiros em `/public/branding/` (ícone da aba vem de <link rel="icon">).
  * - Não armazena dados sensíveis.
  * - Atualização: novo deploy substitui este ficheiro; o browser deteta e ativa nova versão.
  *
- * Fase OneSignal (seguinte):
- * - A documentação OneSignal para Web costuma usar um ficheiro raiz `OneSignalSDKWorker.js`
- *   que faz `importScripts("https://cdn.onesignal.com/...")` e pode importar também este ficheiro
- *   ou fundir a lógica. Evite dois registos independentes de SW no mesmo scope.
- * - Planear um único SW de entrada (ex.: `OneSignalSDKWorker.js`) que importe o SDK e, se necessário,
- *   `importScripts("./service-worker-base.js")` com os listeners abaixo.
+ * CACHE_VERSION: incrementar em deploy se for necessário forçar reciclagem de SW antigo nos clientes.
+ *
+ * OneSignal / SW único: evite dois service workers no mesmo scope; ver documentação do plugin.
  */
 /* eslint-disable no-restricted-globals */
+// eslint-disable-next-line no-unused-vars
+const CACHE_VERSION = "2026-04-22-branding-favicon";
 self.addEventListener("install", (event) => {
   self.skipWaiting();
 });

@@ -36,6 +36,27 @@ systemSettingRoutes.put(
 );
 
 systemSettingRoutes.get(
+  "/system-settings/smtp",
+  isAuth,
+  isSuper,
+  SystemSettingController.getSmtpSettings
+);
+
+systemSettingRoutes.put(
+  "/system-settings/smtp",
+  isAuth,
+  isSuper,
+  SystemSettingController.upsertSmtpSettings
+);
+
+systemSettingRoutes.post(
+  "/system-settings/smtp/test",
+  isAuth,
+  isSuper,
+  SystemSettingController.postSmtpTestEmail
+);
+
+systemSettingRoutes.get(
   "/system-settings",
   isAuth,
   isSuper,

@@ -138,6 +138,7 @@ const UpdateUserService = async ({
     String(password).trim().length > 0
   ) {
     updates.password = password;
+    updates.mustChangePassword = false;
   }
 
   if (Object.keys(updates).length > 0) {

@@ -69,6 +69,11 @@ class User extends Model<User> {
   @Column({ allowNull: true })
   companyId: number | null;
 
+  /** Primeiro login: obrigar alteração de palavra-passe (ex.: admin criado pelo SaaS com senha provisória). */
+  @Default(false)
+  @Column
+  mustChangePassword: boolean;
+
   /** Token único enviado por e-mail (recuperação de senha). */
   @Column({ allowNull: true })
   resetPassword: string | null;
