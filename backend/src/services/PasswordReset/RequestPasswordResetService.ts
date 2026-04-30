@@ -1,5 +1,6 @@
 import { randomBytes } from "crypto";
 import User from "../../models/User";
+import Company from "../../models/Company";
 import sendPasswordResetEmail from "./sendPasswordResetEmail";
 
 const TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hora
@@ -16,7 +17,10 @@ const RequestPasswordResetService = async (emailRaw: string): Promise<void> => {
     return;
   }
 
-  const user = await User.findOne({ where: { email } });
+  const user = await User.findOne({
+    where: { email },
+    include: [{ model: Company, required: false, attributes: ["name"] }]
+  });
   if (!user) {
     return;
   }
@@ -26,11 +30,18 @@ const RequestPasswordResetService = async (emailRaw: string): Promise<void> => {
   user.passwordResetExpires = new Date(Date.now() + TOKEN_TTL_MS);
   await user.save();
 
+  const companyName =
+    user.company && user.company.name != null
+      ? String(user.company.name)
+      : "";
+
   try {
     await sendPasswordResetEmail({
       to: email,
       token,
-      userName: user.name || ""
+      userName: user.name || "",
+      kind: "reset",
+      companyName
     });
   } catch (err) {
     console.error("[PasswordReset] Falha ao enviar e-mail:", err);

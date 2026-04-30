@@ -3,13 +3,22 @@ import resolveSmtpSendConfig, {
 } from "../Mail/resolveSmtpSendConfig";
 import createMailTransportFromResolved from "../Mail/createMailTransportFromResolved";
 import { redactSmtpHints } from "../Mail/smtpClientSafeMessage";
+import {
+  composeTemplatedEmailBodies,
+  renderEmailTemplate
+} from "../Mail/renderEmailTemplate";
+import GetEmailTemplatesService from "../SystemSettingService/GetEmailTemplatesService";
+import GetPublicBrandingService from "../SystemSettingService/GetPublicBrandingService";
 
 export type PasswordResetMailParams = {
   to: string;
   token: string;
   userName: string;
-  /** `invite` = conta aprovada; mesmo link `/forgetpsw` para definir palavra-passe. */
+  /** `invite` = conta aprovada / primeiro acesso; usa modelo boas-vindas. */
   kind?: "reset" | "invite";
+  companyName?: string;
+  /** Só no fluxo com senha provisória; pode ser omitido (tag fica vazia). */
+  temporaryPassword?: string;
 };
 
 /** Indica se o envio SMTP está disponível (BD ativa com `smtp_enabled` ou variáveis MAIL_*). */
@@ -17,11 +26,8 @@ export async function isPasswordResetMailConfigured(): Promise<boolean> {
   return isSmtpSendConfigured();
 }
 
-function buildResetLink(email: string, token: string): string {
-  const base = (process.env.FRONTEND_URL || "http://localhost:3000").replace(
-    /\/$/,
-    ""
-  );
+function buildResetLink(email: string, token: string, baseRaw: string): string {
+  const base = baseRaw.replace(/\/$/, "");
   const q = new URLSearchParams({
     email,
     token
@@ -29,9 +35,15 @@ function buildResetLink(email: string, token: string): string {
   return `${base}/forgetpsw?${q.toString()}`;
 }
 
+function defaultFrontendBase(templatesLoginUrl: string): string {
+  const fromTpl = String(templatesLoginUrl || "").trim();
+  if (fromTpl) return fromTpl.replace(/\/$/, "");
+  return (process.env.FRONTEND_URL || "http://localhost:3000").replace(/\/$/, "");
+}
+
 /**
- * Envia e-mail com link e código de recuperação (nodemailer).
- * Usa SystemSettings SMTP quando ativo; caso contrário MAIL_*.
+ * Envia e-mail (convite/boas-vindas ou recuperação de senha).
+ * Modelos em SystemSettings; fallback embutido se chaves vazias.
  */
 export default async function sendPasswordResetEmail(
   params: PasswordResetMailParams
@@ -44,46 +56,40 @@ export default async function sendPasswordResetEmail(
     return;
   }
 
-  const link = buildResetLink(params.to, params.token);
-  const appName = process.env.SYSTEM_NAME || "AtendeChat";
+  const templates = await GetEmailTemplatesService();
+  const branding = await GetPublicBrandingService();
+  const systemName =
+    String(branding.systemName || "").trim() ||
+    process.env.SYSTEM_NAME ||
+    "AtendeChat";
+  const base = defaultFrontendBase(templates.loginUrl);
+  const resetLink = buildResetLink(params.to, params.token, base);
   const isInvite = params.kind === "invite";
-  const subject = isInvite
-    ? `${appName} — Conta aprovada: defina a sua palavra-passe`
-    : `${appName} — Recuperação de palavra-passe`;
+
+  const vars: Record<string, string> = {
+    companyName: String(params.companyName ?? "").trim(),
+    userName: String(params.userName ?? "").trim(),
+    userEmail: params.to,
+    temporaryPassword: String(params.temporaryPassword ?? ""),
+    resetLink,
+    loginUrl: base,
+    systemName,
+    supportEmail: templates.supportEmail
+  };
+
+  const subjectTpl = isInvite
+    ? templates.welcomeSubject
+    : templates.passwordResetSubject;
+  const bodyTpl = isInvite ? templates.welcomeBody : templates.passwordResetBody;
+
+  const subject = renderEmailTemplate(subjectTpl, vars, {
+    escapeValues: true
+  })
+    .replace(/\s+/g, " ")
+    .trim();
+  const { html, text } = composeTemplatedEmailBodies(bodyTpl, vars);
 
   const transporter = createMailTransportFromResolved(cfg);
-
-  const html = isInvite
-    ? `
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8" /></head>
-<body style="font-family: system-ui, sans-serif; line-height: 1.5; color: #222;">
-  <p>Olá${params.userName ? `, ${params.userName}` : ""},</p>
-  <p>O seu pedido de registo em <strong>${appName}</strong> foi <strong>aprovado</strong>.</p>
-  <p>Para ativar a conta do administrador, defina a sua palavra-passe com o código abaixo ou pelo link (válido 72 horas):</p>
-  <p><strong>Código:</strong> <code style="font-size:16px;">${params.token}</code></p>
-  <p><a href="${link}">${link}</a></p>
-  <p>Se não esperava este e-mail, ignore-o.</p>
-</body>
-</html>`
-    : `
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8" /></head>
-<body style="font-family: system-ui, sans-serif; line-height: 1.5; color: #222;">
-  <p>Olá${params.userName ? `, ${params.userName}` : ""},</p>
-  <p>Recebemos um pedido para redefinir a palavra-passe da sua conta em <strong>${appName}</strong>.</p>
-  <p><strong>Código de verificação:</strong> <code style="font-size:16px;">${params.token}</code></p>
-  <p>Ou abra o link (válido por 1 hora):<br/>
-  <a href="${link}">${link}</a></p>
-  <p>Se não foi você, ignore este e-mail.</p>
-</body>
-</html>`;
-
-  const text = isInvite
-    ? `Conta aprovada em ${appName}. Código: ${params.token}\nLink: ${link}`
-    : `Código: ${params.token}\nLink: ${link}`;
 
   try {
     await transporter.sendMail({

@@ -21,6 +21,13 @@ import UpsertSmtpSettingsService, {
 } from "../services/SystemSettingService/UpsertSmtpSettingsService";
 import SendSmtpTestEmailService from "../services/SystemSettingService/SendSmtpTestEmailService";
 import { SMTP_SETTING_KEYS } from "../services/SystemSettingService/smtpSettingKeys";
+import GetEmailTemplatesService from "../services/SystemSettingService/GetEmailTemplatesService";
+import UpsertEmailTemplatesService, {
+  UpsertEmailTemplatesInput
+} from "../services/SystemSettingService/UpsertEmailTemplatesService";
+import SendEmailTemplateTestService, {
+  EmailTemplateTestKind
+} from "../services/SystemSettingService/SendEmailTemplateTestService";
 
 function unlinkPublicAsset(publicPath: string): void {
   if (!publicPath?.startsWith("/public/")) return;
@@ -184,6 +191,58 @@ export const postSmtpTestEmail = async (
   const to = String(req.body?.to ?? "").trim();
   await SendSmtpTestEmailService(to);
   return res.status(200).json({ ok: true, code: "SMTP_TEST_SENT" });
+};
+
+export const getEmailTemplates = async (
+  _req: Request,
+  res: Response
+): Promise<Response> => {
+  const templates = await GetEmailTemplatesService();
+  return res.json(templates);
+};
+
+export const upsertEmailTemplates = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const body = req.body as Record<string, unknown>;
+  const partial: UpsertEmailTemplatesInput = {};
+
+  if (body.welcomeSubject !== undefined) {
+    partial.welcomeSubject = String(body.welcomeSubject ?? "");
+  }
+  if (body.welcomeBody !== undefined) {
+    partial.welcomeBody = String(body.welcomeBody ?? "");
+  }
+  if (body.passwordResetSubject !== undefined) {
+    partial.passwordResetSubject = String(body.passwordResetSubject ?? "");
+  }
+  if (body.passwordResetBody !== undefined) {
+    partial.passwordResetBody = String(body.passwordResetBody ?? "");
+  }
+  if (body.supportEmail !== undefined) {
+    partial.supportEmail = String(body.supportEmail ?? "");
+  }
+  if (body.loginUrl !== undefined) {
+    partial.loginUrl = String(body.loginUrl ?? "");
+  }
+
+  const templates = await UpsertEmailTemplatesService(partial);
+  return res.json(templates);
+};
+
+export const postEmailTemplateTest = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const to = String(req.body?.to ?? "").trim();
+  const kindRaw = String(req.body?.kind ?? "welcome").toLowerCase();
+  const kind: EmailTemplateTestKind =
+    kindRaw === "passwordreset" || kindRaw === "password_reset"
+      ? "passwordReset"
+      : "welcome";
+  await SendEmailTemplateTestService(to, kind);
+  return res.status(200).json({ ok: true, code: "EMAIL_TEMPLATE_TEST_SENT" });
 };
 
 export const index = async (req: Request, res: Response): Promise<Response> => {

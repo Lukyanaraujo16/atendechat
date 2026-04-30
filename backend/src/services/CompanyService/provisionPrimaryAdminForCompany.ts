@@ -113,7 +113,9 @@ const provisionPrimaryAdminForCompany = async (
         to: email,
         token,
         userName: adminName,
-        kind: "invite"
+        kind: "invite",
+        companyName: String(opts.company.name || "").trim(),
+        temporaryPassword
       });
       inviteEmailSent = true;
     } catch (err) {

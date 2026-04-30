@@ -57,6 +57,27 @@ systemSettingRoutes.post(
 );
 
 systemSettingRoutes.get(
+  "/system-settings/email-templates",
+  isAuth,
+  isSuper,
+  SystemSettingController.getEmailTemplates
+);
+
+systemSettingRoutes.put(
+  "/system-settings/email-templates",
+  isAuth,
+  isSuper,
+  SystemSettingController.upsertEmailTemplates
+);
+
+systemSettingRoutes.post(
+  "/system-settings/email-templates/test",
+  isAuth,
+  isSuper,
+  SystemSettingController.postEmailTemplateTest
+);
+
+systemSettingRoutes.get(
   "/system-settings",
   isAuth,
   isSuper,

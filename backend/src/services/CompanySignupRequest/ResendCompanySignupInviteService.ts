@@ -4,6 +4,7 @@ import AppError from "../../errors/AppError";
 import sequelize from "../../database";
 import CompanySignupRequest from "../../models/CompanySignupRequest";
 import User from "../../models/User";
+import Company from "../../models/Company";
 import Plan from "../../models/Plan";
 import { PRIMARY_ADMIN_INVITE_TTL_MS } from "../../constants/onboarding";
 import sendPasswordResetEmail, {
@@ -77,12 +78,21 @@ const ResendCompanySignupInviteService = async (
     user.passwordResetExpires = expires;
     await user.save({ transaction });
 
+    const company = signup.createdCompanyId
+      ? await Company.findByPk(signup.createdCompanyId, {
+          attributes: ["name"],
+          transaction
+        })
+      : null;
+    const companyName = company?.name != null ? String(company.name) : "";
+
     try {
       await sendPasswordResetEmail({
         to: emailNorm,
         token,
         userName: signup.adminName,
-        kind: "invite"
+        kind: "invite",
+        companyName
       });
     } catch (err) {
       console.error("[ResendCompanySignupInvite] Falha ao enviar e-mail:", err);
