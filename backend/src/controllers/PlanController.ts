@@ -33,6 +33,7 @@ type StorePlanData = {
   useOpenAi?: boolean;
   useIntegrations?: boolean;
   planFeatures?: Record<string, boolean>;
+  storageLimitGb?: unknown;
 };
 
 type UpdatePlanData = {
@@ -52,6 +53,7 @@ type UpdatePlanData = {
   /** none | respect_overrides | force_all — propagação de módulos às empresas do plano */
   propagationMode?: string;
   planFeatures?: Record<string, boolean>;
+  storageLimitGb?: unknown;
 };
 
 export const index = async (req: Request, res: Response): Promise<Response> => {

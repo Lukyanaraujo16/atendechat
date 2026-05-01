@@ -15,6 +15,11 @@ import FindService from "../services/AnnouncementService/FindService";
 import Announcement from "../models/Announcement";
 
 import AppError from "../errors/AppError";
+import {
+  incrementCompanyStorageUsage,
+  decrementCompanyStorageUsage,
+  tryStatFileBytes
+} from "../services/CompanyService/adjustCompanyStorageUsage";
 
 type IndexQuery = {
   searchParam: string;
@@ -160,6 +165,10 @@ export const mediaUpload = async (
     });
     await announcement.reload();
 
+    if (file.size > 0 && announcement.companyId) {
+      void incrementCompanyStorageUsage(announcement.companyId, file.size);
+    }
+
     const io = getIO();
     io.emit(`company-announcement`, {
       action: "update",
@@ -183,6 +192,10 @@ export const deleteMedia = async (
     const filePath = path.resolve("public", announcement.mediaPath);
     const fileExists = fs.existsSync(filePath);
     if (fileExists) {
+      const sz = tryStatFileBytes(filePath);
+      if (announcement.companyId) {
+        void decrementCompanyStorageUsage(announcement.companyId, sz);
+      }
       fs.unlinkSync(filePath);
     }
 

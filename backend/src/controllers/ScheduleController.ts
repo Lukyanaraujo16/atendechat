@@ -13,6 +13,11 @@ import path from "path";
 import fs from "fs";
 import { head } from "lodash";
 import { logger } from "../utils/logger";
+import {
+  incrementCompanyStorageUsage,
+  decrementCompanyStorageUsage,
+  tryStatFileBytes
+} from "../services/CompanyService/adjustCompanyStorageUsage";
 
 type IndexQuery = {
   searchParam?: string;
@@ -168,6 +173,9 @@ export const mediaUpload = async (
     schedule.mediaName = file.originalname;
 
     await schedule.save();
+    if (file.size > 0) {
+      void incrementCompanyStorageUsage(companyId, file.size);
+    }
     return res.send({ mensagem: "Arquivo Anexado" });
     } catch (err: any) {
       throw new AppError(err.message);
@@ -191,6 +199,8 @@ export const deleteMedia = async (
     const filePath = path.resolve("public", schedule.mediaPath);
     const fileExists = fs.existsSync(filePath);
     if (fileExists) {
+      const sz = tryStatFileBytes(filePath);
+      void decrementCompanyStorageUsage(companyId, sz);
       fs.unlinkSync(filePath);
     }
     schedule.mediaPath = null;

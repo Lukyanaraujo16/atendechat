@@ -6,6 +6,25 @@ import * as CompanyController from "../controllers/CompanyController";
 
 const companyRoutes = express.Router();
 
+companyRoutes.get("/companies/storage", isAuth, CompanyController.getMyCompanyStorage);
+companyRoutes.get(
+  "/companies/storage/snapshots",
+  isAuth,
+  CompanyController.getMyCompanyStorageSnapshots
+);
+companyRoutes.get(
+  "/companies/:id/storage-snapshots",
+  isAuth,
+  isSuper,
+  CompanyController.getCompanyStorageSnapshots
+);
+companyRoutes.post(
+  "/companies/:id/recalculate-storage",
+  isAuth,
+  isSuper,
+  CompanyController.recalculateCompanyStorage
+);
+
 companyRoutes.get("/companies/list", isAuth, isSuper, CompanyController.list);
 companyRoutes.get("/companies", isAuth, isSuper, CompanyController.index);
 companyRoutes.get("/companies/:id", isAuth, CompanyController.show);

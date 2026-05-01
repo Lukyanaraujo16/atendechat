@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useContext } from "react";
+import React, { useState, useEffect, useMemo, useRef, useContext, useCallback } from "react";
 import { useHistory, useLocation } from "react-router-dom";
 import {
   makeStyles,
@@ -117,6 +117,41 @@ function previewRenewedDueDate(row) {
   } catch (e) {
     return null;
   }
+}
+
+/** Exibe GB no input (vírgula decimal). */
+function formatGbInputFromApi(gb) {
+  if (gb == null || gb === "") return "";
+  return String(gb).replace(".", ",");
+}
+
+function companyStorageBarColor(percent, palette) {
+  if (percent == null) return palette.primary.main;
+  if (percent >= 100) return palette.error.main;
+  if (percent >= 90) return palette.error.main;
+  if (percent >= 80) return palette.warning.main;
+  return palette.success.main;
+}
+
+function companyStorageStatusLabel(alertLevel) {
+  const lev = alertLevel && typeof alertLevel === "string" ? alertLevel : "ok";
+  const key =
+    lev === "attention"
+      ? "storageStatusAttention"
+      : lev === "critical"
+        ? "storageStatusCritical"
+        : lev === "exceeded"
+          ? "storageStatusExceeded"
+          : "storageStatusNormal";
+  return i18n.t(`platform.companies.${key}`);
+}
+
+function formatStorageBytesBrief(n) {
+  const x = Number(n) || 0;
+  if (x >= 1073741824) return `${(x / 1073741824).toFixed(2)} GB`;
+  if (x >= 1048576) return `${(x / 1048576).toFixed(1)} MB`;
+  if (x >= 1024) return `${(x / 1024).toFixed(1)} KB`;
+  return `${x} B`;
 }
 
 /**
@@ -743,7 +778,15 @@ const useStyles = makeStyles((theme) => ({
 }));
 
 export function CompanyForm(props) {
-  const { onSubmit, onDelete, onCancel, initialValue, loading } = props;
+  const {
+    onSubmit,
+    onDelete,
+    onCancel,
+    initialValue,
+    loading,
+    reloadCompanySnapshot,
+    storageSnapshots = [],
+  } = props;
   const { user } = useContext(AuthContext);
   const classes = useStyles();
   const theme = useTheme();
@@ -765,11 +808,25 @@ export function CompanyForm(props) {
     recurrence: "",
     timezone: "America/Sao_Paulo",
     contractedPlanValueStr: "",
+    storageLimitGbStr: "",
+    storageUsedFormatted: null,
+    storageLimitFormatted: null,
+    storageUsagePercent: null,
+    storageCalculatedAt: null,
     ...initialValue,
     contractedPlanValueStr:
       initialValue?.contractedPlanValue != null && initialValue?.contractedPlanValue !== ""
         ? formatPlanValueForInput(initialValue.contractedPlanValue)
         : "",
+    storageLimitGbStr: formatGbInputFromApi(initialValue?.storageLimitGb),
+    storageUsedFormatted: initialValue?.storageUsedFormatted ?? null,
+    storageLimitFormatted: initialValue?.storageLimitFormatted ?? null,
+    storageUsagePercent:
+      initialValue?.storageUsagePercent != null
+        ? Number(initialValue.storageUsagePercent)
+        : null,
+    storageCalculatedAt: initialValue?.storageCalculatedAt ?? null,
+    storageAlertLevel: initialValue?.storageAlertLevel ?? "ok",
     modulePermissions: mergeModulePermissions(initialValue?.modulePermissions),
   }));
 
@@ -798,6 +855,15 @@ export function CompanyForm(props) {
           initialValue?.contractedPlanValue != null && initialValue?.contractedPlanValue !== ""
             ? formatPlanValueForInput(initialValue.contractedPlanValue)
             : "",
+        storageLimitGbStr: formatGbInputFromApi(initialValue?.storageLimitGb),
+        storageUsedFormatted: initialValue?.storageUsedFormatted ?? null,
+        storageLimitFormatted: initialValue?.storageLimitFormatted ?? null,
+        storageUsagePercent:
+          initialValue?.storageUsagePercent != null
+            ? Number(initialValue.storageUsagePercent)
+            : null,
+        storageCalculatedAt: initialValue?.storageCalculatedAt ?? null,
+        storageAlertLevel: initialValue?.storageAlertLevel ?? "ok",
         modulePermissions: mergeModulePermissions(initialValue?.modulePermissions),
       };
     });
@@ -825,6 +891,35 @@ export function CompanyForm(props) {
     if (outgoing.dueDate === "" || moment(outgoing.dueDate).isValid() === false) {
       outgoing.dueDate = null;
     }
+
+    if (user?.super && Object.prototype.hasOwnProperty.call(outgoing, "storageLimitGbStr")) {
+      const trimmed = String(outgoing.storageLimitGbStr ?? "").trim();
+      let storageLimitGb;
+      if (!trimmed) storageLimitGb = null;
+      else {
+        const n = parseBrazilianCurrencyToNumber(trimmed);
+        if (n === null || Number.isNaN(n)) {
+          toast.error(i18n.t("platform.companies.storageLimitInvalid"));
+          return;
+        }
+        storageLimitGb = n;
+      }
+      delete outgoing.storageLimitGbStr;
+      outgoing.storageLimitGb = storageLimitGb;
+      delete outgoing.storageUsedFormatted;
+      delete outgoing.storageLimitFormatted;
+      delete outgoing.storageUsagePercent;
+      delete outgoing.storageCalculatedAt;
+      delete outgoing.storageAlertLevel;
+    } else if (!user?.super) {
+      delete outgoing.storageLimitGbStr;
+      delete outgoing.storageUsedFormatted;
+      delete outgoing.storageLimitFormatted;
+      delete outgoing.storageUsagePercent;
+      delete outgoing.storageCalculatedAt;
+      delete outgoing.storageAlertLevel;
+    }
+
     onSubmit(outgoing);
   };
 
@@ -1234,6 +1329,111 @@ export function CompanyForm(props) {
                           }}
                         </Field>
                       </Grid>
+                      <Grid item xs={12}>
+                        <Typography variant="subtitle2" style={{ fontWeight: 600, marginBottom: 8 }}>
+                          {i18n.t("platform.companies.storageSectionTitle")}
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          color="textSecondary"
+                          paragraph
+                          style={{ marginBottom: 8 }}
+                        >
+                          {i18n.t("platform.companies.storageSectionHint")}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={12} sm={8}>
+                        <Field name="storageLimitGbStr">
+                          {({ field }) => (
+                            <TextField
+                              {...field}
+                              fullWidth
+                              margin="dense"
+                              variant="outlined"
+                              label={i18n.t("platform.companies.storageLimitLabel")}
+                              helperText={i18n.t("platform.companies.storageLimitHelper")}
+                            />
+                          )}
+                        </Field>
+                      </Grid>
+                      <Grid item xs={12}>
+                        <Field name="storageLimitGbStr">
+                          {({ form }) => {
+                            const selectedPlan = plans.find(
+                              (p) => String(p.id) === String(form.values.planId)
+                            );
+                            const planGb =
+                              selectedPlan?.storageLimitGb != null &&
+                              selectedPlan?.storageLimitGb !== ""
+                                ? String(selectedPlan.storageLimitGb).replace(".", ",")
+                                : null;
+                            return (
+                              <Typography variant="caption" color="textSecondary" component="div">
+                                <div style={{ marginBottom: 4 }}>
+                                  {i18n.t("platform.companies.storagePreviewPlan", {
+                                    value: planGb ? `${planGb} GB` : i18n.t("platform.companies.storageNoPlanLimit"),
+                                  })}
+                                </div>
+                                <div style={{ marginBottom: 4 }}>
+                                  {i18n.t("platform.companies.storagePreviewUsage", {
+                                    used: form.values.storageUsedFormatted || "—",
+                                    limit:
+                                      form.values.storageLimitFormatted ||
+                                      i18n.t("platform.companies.storageUnlimitedLabel"),
+                                  })}
+                                </div>
+                              </Typography>
+                            );
+                          }}
+                        </Field>
+                      </Grid>
+                      {initialValue?.id ? (
+                        <>
+                          <Grid item xs={12}>
+                            <AppSecondaryButton
+                              type="button"
+                              startIcon={<Autorenew />}
+                              disabled={loading}
+                              onClick={async () => {
+                                try {
+                                  await api.post(
+                                    `/companies/${initialValue.id}/recalculate-storage`
+                                  );
+                                  toast.success(i18n.t("platform.companies.storageRecalculated"));
+                                  if (typeof reloadCompanySnapshot === "function") {
+                                    await reloadCompanySnapshot();
+                                  }
+                                } catch (e) {
+                                  toastError(e);
+                                }
+                              }}
+                            >
+                              {i18n.t("platform.companies.storageRecalculate")}
+                            </AppSecondaryButton>
+                          </Grid>
+                          {storageSnapshots.length > 0 ? (
+                            <Grid item xs={12}>
+                              <Typography variant="subtitle2" style={{ fontWeight: 600, marginBottom: 6 }}>
+                                {i18n.t("platform.companies.storageHistoryTitle")}
+                              </Typography>
+                              <Box component="ul" style={{ paddingLeft: 18, margin: 0 }}>
+                                {storageSnapshots.slice(0, 12).map((s) => (
+                                  <li key={s.id} style={{ marginBottom: 4 }}>
+                                    <Typography variant="caption" component="span" color="textSecondary">
+                                      {moment(s.createdAt).format("DD/MM/YYYY HH:mm")} —{" "}
+                                      {i18n.t(`platform.companies.storageSnapshotReason.${s.reason}`)} —{" "}
+                                      {formatStorageBytesBrief(s.usedBytes)}
+                                      {s.usagePercent != null && Number(s.limitBytes) > 0
+                                        ? ` (${Number(s.usagePercent).toFixed(1)}%)`
+                                        : ""}
+                                    </Typography>
+                                  </li>
+                                ))}
+                              </Box>
+                            </Grid>
+                          ) : null}
+                        </>
+                      ) : null}
                     </>
                   ) : null}
                 </Grid>
@@ -1494,7 +1694,7 @@ export function CompaniesManagerGrid(props) {
   } = props;
   const classes = useStyles();
   const theme = useTheme();
-  const { dateToClient } = useDate();
+  const { dateToClient, datetimeToClient } = useDate();
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("priority");
   const [dueFilter, setDueFilter] = useState("all");
@@ -1795,6 +1995,9 @@ export function CompaniesManagerGrid(props) {
               <TableCell align="left" className={classes.tableHeadCell} style={{ width: 168 }}>
                 {i18n.t("settings.company.form.expire")}
               </TableCell>
+              <TableCell align="left" className={classes.tableHeadCell} style={{ width: 160 }}>
+                {i18n.t("platform.companies.columnStorage")}
+              </TableCell>
               <TableCell align="left" className={classes.tableHeadCell} style={{ width: 132 }}>
                 {i18n.t("platform.companies.columnFinance")}
               </TableCell>
@@ -2068,6 +2271,63 @@ export function CompaniesManagerGrid(props) {
                       </Box>
                     </Tooltip>
                   </TableCell>
+                  <TableCell align="left" style={{ verticalAlign: "top" }}>
+                    <Tooltip
+                      title={
+                        <span style={{ whiteSpace: "pre-line" }}>
+                          {`${companyStorageStatusLabel(row.storageAlertLevel)}\n${
+                            row.storageCalculatedAt
+                              ? i18n.t("platform.companies.storageUpdatedTooltip", {
+                                  date: datetimeToClient(row.storageCalculatedAt),
+                                })
+                              : i18n.t("platform.companies.storageUpdatedUnknown")
+                          }`}
+                        </span>
+                      }
+                      arrow
+                      enterDelay={320}
+                    >
+                      <Box minWidth={0}>
+                        <Typography
+                          variant="caption"
+                          display="block"
+                          style={{ lineHeight: 1.35, wordBreak: "break-word" }}
+                        >
+                          {row.storageLimitFormatted != null
+                            ? `${row.storageUsedFormatted || "—"} / ${row.storageLimitFormatted}`
+                            : i18n.t("platform.companies.storageListUnlimited", {
+                                used: row.storageUsedFormatted || "—",
+                              })}
+                        </Typography>
+                        <Typography variant="caption" color="textSecondary" display="block" style={{ marginTop: 2 }}>
+                          {companyStorageStatusLabel(row.storageAlertLevel)}
+                        </Typography>
+                        {row.storageUsagePercent != null ? (
+                          <Box
+                            style={{
+                              marginTop: 6,
+                              height: 6,
+                              borderRadius: 3,
+                              overflow: "hidden",
+                              backgroundColor: theme.palette.action.hover,
+                            }}
+                          >
+                            <Box
+                              style={{
+                                width: `${Math.min(100, Number(row.storageUsagePercent) || 0)}%`,
+                                height: "100%",
+                                backgroundColor: companyStorageBarColor(
+                                  Number(row.storageUsagePercent),
+                                  theme.palette
+                                ),
+                                transition: "width 0.25s ease",
+                              }}
+                            />
+                          </Box>
+                        ) : null}
+                      </Box>
+                    </Tooltip>
+                  </TableCell>
                   <TableCell align="left" className={classes.financeCell}>
                     <Tooltip
                       title={
@@ -2175,7 +2435,7 @@ export function CompaniesManagerGrid(props) {
 
 export default function CompaniesManager() {
   const classes = useStyles();
-  const { list, save, update, remove, renewDueDate, fetchCompanyLogs } = useCompanies();
+  const { list, save, update, remove, renewDueDate, fetchCompanyLogs, finding } = useCompanies();
   const { user, enterSupportMode } = useContext(AuthContext);
   const { dateToClient, datetimeToClient } = useDate();
 
@@ -2190,6 +2450,7 @@ export default function CompaniesManager() {
   const [historyRow, setHistoryRow] = useState(null);
   const [historyItems, setHistoryItems] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [storageSnapshots, setStorageSnapshots] = useState([]);
   const [primaryAdminSetupDialog, setPrimaryAdminSetupDialog] = useState(null);
   const [formOpen, setFormOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -2205,6 +2466,12 @@ export default function CompaniesManager() {
     recurrence: "",
     timezone: "America/Sao_Paulo",
     contractedPlanValueStr: "",
+    storageLimitGbStr: "",
+    storageUsedFormatted: null,
+    storageLimitFormatted: null,
+    storageUsagePercent: null,
+    storageCalculatedAt: null,
+    storageAlertLevel: "ok",
     modulePermissions: defaultModulePermissions(),
     primaryAdmin: null,
   });
@@ -2224,6 +2491,45 @@ export default function CompaniesManager() {
     }
     setLoading(false);
   };
+
+  const loadStorageSnapshotsForCompany = useCallback(async (companyId) => {
+    if (!companyId) {
+      setStorageSnapshots([]);
+      return;
+    }
+    try {
+      const { data } = await api.get(`/companies/${companyId}/storage-snapshots`);
+      setStorageSnapshots(Array.isArray(data) ? data : []);
+    } catch (e) {
+      setStorageSnapshots([]);
+    }
+  }, []);
+
+  const reloadCompanySnapshot = useCallback(async () => {
+    if (!record.id) return;
+    try {
+      const data = await finding(record.id);
+      setRecord((prev) => ({
+        ...prev,
+        ...data,
+        contractedPlanValueStr:
+          data.contractedPlanValue != null && data.contractedPlanValue !== ""
+            ? formatPlanValueForInput(data.contractedPlanValue)
+            : "",
+        storageLimitGbStr: formatGbInputFromApi(data.storageLimitGb),
+        storageUsedFormatted: data.storageUsedFormatted ?? null,
+        storageLimitFormatted: data.storageLimitFormatted ?? null,
+        storageUsagePercent:
+          data.storageUsagePercent != null ? Number(data.storageUsagePercent) : null,
+        storageCalculatedAt: data.storageCalculatedAt ?? null,
+        storageAlertLevel: data.storageAlertLevel ?? "ok",
+        modulePermissions: mergeModulePermissions(data.modulePermissions),
+      }));
+      await loadStorageSnapshotsForCompany(record.id);
+    } catch (e) {
+      toastError(e);
+    }
+  }, [record.id, finding, loadStorageSnapshotsForCompany]);
 
   const handleSubmit = async (data) => {
     setLoading(true);
@@ -2270,6 +2576,7 @@ export default function CompaniesManager() {
 
   const handleCancel = () => {
     setFormOpen(false);
+    setStorageSnapshots([]);
     setRecord((prev) => ({
       ...prev,
       id: undefined,
@@ -2283,12 +2590,19 @@ export default function CompaniesManager() {
       recurrence: "",
       timezone: "America/Sao_Paulo",
       contractedPlanValueStr: "",
+      storageLimitGbStr: "",
+      storageUsedFormatted: null,
+      storageLimitFormatted: null,
+      storageUsagePercent: null,
+      storageCalculatedAt: null,
+      storageAlertLevel: "ok",
       modulePermissions: defaultModulePermissions(),
       primaryAdmin: null,
     }));
   };
 
   const handleNewCompany = () => {
+    setStorageSnapshots([]);
     setRecord({
       name: "",
       email: "",
@@ -2300,6 +2614,12 @@ export default function CompaniesManager() {
       recurrence: "",
       timezone: "America/Sao_Paulo",
       contractedPlanValueStr: "",
+      storageLimitGbStr: "",
+      storageUsedFormatted: null,
+      storageLimitFormatted: null,
+      storageUsagePercent: null,
+      storageCalculatedAt: null,
+      storageAlertLevel: "ok",
       modulePermissions: defaultModulePermissions(),
       primaryAdmin: null,
     });
@@ -2333,10 +2653,18 @@ export default function CompaniesManager() {
         data.contractedPlanValue != null && data.contractedPlanValue !== ""
           ? formatPlanValueForInput(data.contractedPlanValue)
           : "",
+      storageLimitGbStr: formatGbInputFromApi(data.storageLimitGb),
+      storageUsedFormatted: data.storageUsedFormatted ?? null,
+      storageLimitFormatted: data.storageLimitFormatted ?? null,
+      storageUsagePercent:
+        data.storageUsagePercent != null ? Number(data.storageUsagePercent) : null,
+      storageCalculatedAt: data.storageCalculatedAt ?? null,
+      storageAlertLevel: data.storageAlertLevel ?? "ok",
       modulePermissions: mergeModulePermissions(data.modulePermissions),
       primaryAdmin: data.primaryAdmin ?? null,
     }));
     setFormOpen(true);
+    loadStorageSnapshotsForCompany(data.id);
   };
 
   const history = useHistory();
@@ -2496,6 +2824,8 @@ export default function CompaniesManager() {
             onSubmit={handleSubmit}
             onCancel={handleCancel}
             loading={loading}
+            reloadCompanySnapshot={reloadCompanySnapshot}
+            storageSnapshots={storageSnapshots}
           />
         </>
       ) : null}

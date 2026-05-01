@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import Paper from "@material-ui/core/Paper";
 import Container from "@material-ui/core/Container";
 import Grid from "@material-ui/core/Grid";
@@ -42,6 +42,8 @@ import { isEmpty } from "lodash";
 import moment from "moment";
 import { ChartsDate } from "./ChartsDate";
 import { i18n } from "../../translate/i18n";
+import CompanyStorageUsageCard from "../../components/CompanyStorageUsageCard";
+import { AuthContext } from "../../context/Auth/AuthContext";
 
 const useStyles = makeStyles((theme) => ({
   container: {
@@ -232,6 +234,7 @@ function seriesToSparkData(series, valueKey, fallbackValue = 0) {
 const Dashboard = () => {
   const classes = useStyles();
   const theme = useTheme();
+  const { user } = useContext(AuthContext);
   const chartInfo = theme.palette.info.main;
   const chartWarning = theme.palette.warning.main;
   const chartSuccess = theme.palette.success.main;
@@ -246,6 +249,8 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(false);
   const [messageStats, setMessageStats] = useState({ sent: 0, received: 0 });
   const [contactsCount, setContactsCount] = useState(0);
+  const [companyStorage, setCompanyStorage] = useState(null);
+  const [companyStorageLoading, setCompanyStorageLoading] = useState(false);
   const { find } = useDashboard();
 
   useEffect(() => {
@@ -269,6 +274,29 @@ const Dashboard = () => {
       setContactsCount(r.data?.count ?? 0);
     }).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (user?.profile !== "admin") {
+      setCompanyStorage(null);
+      return undefined;
+    }
+    let cancelled = false;
+    setCompanyStorageLoading(true);
+    api
+      .get("/companies/storage")
+      .then(({ data }) => {
+        if (!cancelled) setCompanyStorage(data);
+      })
+      .catch(() => {
+        if (!cancelled) setCompanyStorage(null);
+      })
+      .finally(() => {
+        if (!cancelled) setCompanyStorageLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.profile]);
 
   const handlePeriodChange = (value) => {
     setPeriod(Number(value));
@@ -411,6 +439,11 @@ const Dashboard = () => {
 
         {/* Cards */}
         <Grid container spacing={3}>
+          {user?.profile === "admin" ? (
+            <Grid item xs={12} sm={6} md={4}>
+              <CompanyStorageUsageCard data={companyStorage} loading={companyStorageLoading} />
+            </Grid>
+          ) : null}
           {/* 1. Total de Atendimentos */}
           <Grid item xs={12} sm={6} md={4}>
             <Paper className={classes.card} elevation={0}>

@@ -94,6 +94,14 @@ const useCompanies = () => {
     return data;
   }, []);
 
+  const recalculateStorage = useCallback(async (id) => {
+    const { data } = await api.request({
+      url: `/companies/${id}/recalculate-storage`,
+      method: "POST",
+    });
+    return data;
+  }, []);
+
   return {
     save,
     update,
@@ -106,6 +114,7 @@ const useCompanies = () => {
     updateTimezone,
     renewDueDate,
     fetchCompanyLogs,
+    recalculateStorage,
   };
 };
 

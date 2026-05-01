@@ -8,7 +8,8 @@ import {
   AutoIncrement,
   AllowNull,
   Unique,
-  HasMany
+  HasMany,
+  DataType
 } from "sequelize-typescript";
 import PlanFeature from "./PlanFeature";
 
@@ -35,6 +36,10 @@ class Plan extends Model<Plan> {
 
   @Column
   value: number;
+
+  /** Limite de armazenamento do plano (GB). null = ilimitado na aplicação. */
+  @Column({ type: DataType.DECIMAL(10, 2), allowNull: true })
+  storageLimitGb: string | number | null;
 
   @CreatedAt
   createdAt: Date;

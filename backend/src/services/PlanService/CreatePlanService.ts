@@ -1,7 +1,7 @@
 import * as Yup from "yup";
 import AppError from "../../errors/AppError";
 import Plan from "../../models/Plan";
-import { normalizePlanValueForCreate } from "../../utils/normalizeMonetaryInput";
+import { normalizePlanValueForCreate, normalizeNullableStorageLimitGb } from "../../utils/normalizeMonetaryInput";
 import ReplacePlanFeaturesService from "./ReplacePlanFeaturesService";
 import {
   normalizePlanFeaturesInput,
@@ -26,6 +26,7 @@ interface PlanData {
   useOpenAi?: boolean;
   useIntegrations?: boolean;
   planFeatures?: Record<string, boolean>;
+  storageLimitGb?: unknown;
 }
 
 const CreatePlanService = async (planData: PlanData): Promise<Plan> => {
@@ -57,13 +58,20 @@ const CreatePlanService = async (planData: PlanData): Promise<Plan> => {
     throw new AppError(err.message);
   }
 
-  const { planFeatures: pfInput, ...rest } = planData as PlanData;
-  const payload = {
-    ...rest,
+  const { planFeatures: pfInput, ...restWithMaybeStorage } = planData as PlanData;
+  const payload: Record<string, unknown> = {
+    ...restWithMaybeStorage,
     value: normalizePlanValueForCreate(planData.value as unknown)
   };
+  if (Object.prototype.hasOwnProperty.call(planData as object, "storageLimitGb")) {
+    payload.storageLimitGb = normalizeNullableStorageLimitGb(
+      (planData as { storageLimitGb?: unknown }).storageLimitGb
+    );
+  } else {
+    delete payload.storageLimitGb;
+  }
 
-  const plan = await Plan.create(payload);
+  const plan = await Plan.create(payload as any);
 
   const hasExplicitPlanFeatures =
     pfInput !== undefined &&

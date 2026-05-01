@@ -10,7 +10,10 @@ import {
   PLAN_PROPAGATION_MODULE_KEYS,
   PlanPropagationMode
 } from "./PlanModulePropagation";
-import { normalizePlanValueIfPresent } from "../../utils/normalizeMonetaryInput";
+import {
+  normalizePlanValueIfPresent,
+  normalizeNullableStorageLimitGb
+} from "../../utils/normalizeMonetaryInput";
 import ReplacePlanFeaturesService from "./ReplacePlanFeaturesService";
 import {
   normalizePlanFeaturesInput,
@@ -36,6 +39,7 @@ interface PlanData {
   useOpenAi?: boolean;
   useIntegrations?: boolean;
   propagationMode?: unknown;
+  storageLimitGb?: unknown;
 }
 
 const PLAN_UPDATE_FIELDS = [
@@ -44,6 +48,7 @@ const PLAN_UPDATE_FIELDS = [
   "connections",
   "queues",
   "value",
+  "storageLimitGb",
   ...PLAN_PROPAGATION_MODULE_KEYS
 ] as const;
 
@@ -81,6 +86,12 @@ const UpdatePlanService = async (
 
   const incomingRecord = { ...(incoming as Record<string, unknown>) };
   normalizePlanValueIfPresent(incomingRecord);
+
+  if (Object.prototype.hasOwnProperty.call(incomingRecord, "storageLimitGb")) {
+    incomingRecord.storageLimitGb = normalizeNullableStorageLimitGb(
+      incomingRecord.storageLimitGb
+    );
+  }
 
   let featureEntries: ReturnType<typeof planFeatureMapToEntries> | null = null;
   if (Object.prototype.hasOwnProperty.call(incomingRecord, "planFeatures")) {

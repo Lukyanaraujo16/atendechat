@@ -3,6 +3,10 @@ import path from "path";
 
 import AppError from "../../errors/AppError";
 import Campaign from "../../models/Campaign";
+import {
+  decrementCompanyStorageUsage,
+  tryStatFileBytes
+} from "../CompanyService/adjustCompanyStorageUsage";
 
 const DeleteMediaService = async (
   id: string | number,
@@ -19,6 +23,8 @@ const DeleteMediaService = async (
   if (campaign.mediaPath) {
     const filePath = path.resolve("public", campaign.mediaPath);
     if (fs.existsSync(filePath)) {
+      const sz = tryStatFileBytes(filePath);
+      void decrementCompanyStorageUsage(companyId, sz);
       fs.unlinkSync(filePath);
     }
   }

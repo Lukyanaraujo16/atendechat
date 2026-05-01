@@ -18,6 +18,8 @@ interface CompanyData {
   modulePermissions?: Record<string, boolean> | null;
   internalNotes?: string | null;
   contractedPlanValue?: number | null;
+  /** GB; null = usar plano */
+  storageLimitGb?: number | null;
 }
 
 const UpdateCompanyService = async (
@@ -36,7 +38,8 @@ const UpdateCompanyService = async (
     timezone,
     modulePermissions,
     internalNotes,
-    contractedPlanValue
+    contractedPlanValue,
+    storageLimitGb
   } = companyData;
 
   if (!company) {
@@ -88,6 +91,9 @@ const UpdateCompanyService = async (
   }
   if (contractedPlanValue !== undefined) {
     payload.contractedPlanValue = contractedPlanValue;
+  }
+  if (storageLimitGb !== undefined) {
+    payload.storageLimitGb = storageLimitGb;
   }
 
   if (Object.keys(payload).length > 0) {

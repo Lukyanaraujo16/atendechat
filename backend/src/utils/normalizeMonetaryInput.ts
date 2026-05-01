@@ -104,3 +104,22 @@ export function normalizeNullableContractedPlanValue(raw: unknown): number | nul
   }
   return n;
 }
+
+/** Limite de armazenamento em GB: vazio → null (ilimitado). Aceita formato BR no texto. */
+export function normalizeNullableStorageLimitGb(raw: unknown): number | null {
+  if (raw === undefined || raw === null || raw === "") return null;
+  if (typeof raw === "number") {
+    if (!Number.isFinite(raw) || raw < 0) {
+      throw new AppError("ERR_INVALID_STORAGE_LIMIT_GB", 400);
+    }
+    return raw;
+  }
+  const n = parseBrazilianCurrencyToNumber(raw);
+  if (n === null || Number.isNaN(n)) {
+    throw new AppError("ERR_INVALID_STORAGE_LIMIT_GB", 400);
+  }
+  if (n < 0) {
+    throw new AppError("ERR_INVALID_STORAGE_LIMIT_GB", 400);
+  }
+  return n;
+}

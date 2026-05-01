@@ -247,6 +247,7 @@ export function PlanManagerForm(props) {
         connections: 0,
         queues: 0,
         value: '',
+        storageLimitGb: '',
         planFeatures: defaultPlanFeaturesAllOn(),
     });
 
@@ -296,12 +297,24 @@ export function PlanManagerForm(props) {
             onSubmit={async (values, { setSubmitting }) => {
                 try {
                     const valueNum = parseBrazilianCurrencyToNumber(values.value);
+                    const rawSt = String(values.storageLimitGb ?? "").trim();
+                    let storageLimitGb = null;
+                    if (rawSt) {
+                        const sg = parseBrazilianCurrencyToNumber(rawSt);
+                        if (sg === null || Number.isNaN(sg)) {
+                            toast.error(i18n.t("plans.form.storageLimitInvalid"));
+                            setSubmitting(false);
+                            return;
+                        }
+                        storageLimitGb = sg;
+                    }
                     await onSubmit({
                         name: values.name,
                         users: Number(values.users) || 0,
                         connections: Number(values.connections) || 0,
                         queues: Number(values.queues) || 0,
                         value: valueNum === null ? 0 : valueNum,
+                        storageLimitGb,
                         planFeatures: values.planFeatures || {},
                         id: values.id,
                     });
@@ -367,6 +380,18 @@ export function PlanManagerForm(props) {
                                 className={classes.fullWidth}
                                 margin="dense"
                                 type="number"
+                            />
+                        </Grid>
+                        <Grid item xs={6} sm={3} md={2}>
+                            <Field
+                                as={TextField}
+                                label={i18n.t("plans.form.storageLimitGb")}
+                                name="storageLimitGb"
+                                variant="outlined"
+                                className={classes.fullWidth}
+                                margin="dense"
+                                type="text"
+                                helperText={i18n.t("plans.form.storageLimitGbHelper")}
                             />
                         </Grid>
                         <Grid item xs={6} sm={3} md={2}>
@@ -519,6 +544,9 @@ export function PlansManagerGrid(props) {
                         {i18n.t("plans.form.queues")}
                     </TableCell>
                     <TableCell align="center" className={headCls}>
+                        {i18n.t("plans.form.storageLimitGbShort")}
+                    </TableCell>
+                    <TableCell align="center" className={headCls}>
                         {i18n.t("plans.form.value")}
                     </TableCell>
                     <TableCell align="left" className={headCls}>
@@ -582,6 +610,11 @@ export function PlansManagerGrid(props) {
                                 {row.connections || "-"}
                             </TableCell>
                             <TableCell align="center">{row.queues || "-"}</TableCell>
+                            <TableCell align="center">
+                                {row.storageLimitGb != null && row.storageLimitGb !== ""
+                                    ? String(row.storageLimitGb).replace(".", ",")
+                                    : "—"}
+                            </TableCell>
                             <TableCell align="center">
                                 {formatCurrencyBRL(row.value)}
                             </TableCell>
@@ -716,6 +749,7 @@ const defaultPlanRecord = () => ({
     connections: 0,
     queues: 0,
     value: "",
+    storageLimitGb: "",
     planFeatures: defaultPlanFeaturesAllOn(),
 });
 
@@ -872,6 +906,10 @@ export default function PlansManager({ variant = "settings" }) {
             connections: data.connections || 0,
             queues: data.queues || 0,
             value: formatPlanValueForInput(data.value),
+            storageLimitGb:
+                data.storageLimitGb != null && data.storageLimitGb !== ""
+                    ? String(data.storageLimitGb).replace(".", ",")
+                    : "",
             planFeatures:
                 data.planFeatures && typeof data.planFeatures === "object"
                     ? { ...data.planFeatures }

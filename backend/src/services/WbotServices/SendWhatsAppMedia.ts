@@ -10,6 +10,10 @@ import { getTicketRemoteJid } from "../../helpers/GetTicketRemoteJid";
 import Ticket from "../../models/Ticket";
 import { lookup } from "mime-types";
 import formatBody from "../../helpers/Mustache";
+import {
+  incrementCompanyStorageUsage,
+  tryStatFileBytes
+} from "../CompanyService/adjustCompanyStorageUsage";
 
 interface Request {
   media: Express.Multer.File;
@@ -136,14 +140,17 @@ const SendWhatsAppMedia = async ({
     const pathMedia = media.path;
     const typeMessage = media.mimetype.split("/")[0];
     const isWebp = media.mimetype === "image/webp";
+    let storageAccountPath: string | null = null;
     let options: AnyMessageContent;
     const bodyMessage = formatBody(body, ticket.contact);
 
     if (asSticker && (typeMessage === "image" || isWebp)) {
+      storageAccountPath = pathMedia;
       options = {
         sticker: fs.readFileSync(pathMedia)
       };
     } else if (typeMessage === "video") {
+      storageAccountPath = pathMedia;
       options = {
         video: fs.readFileSync(pathMedia),
         caption: bodyMessage,
@@ -152,21 +159,24 @@ const SendWhatsAppMedia = async ({
       };
     } else if (typeMessage === "audio") {
       const typeAudio = media.originalname.includes("audio-record-site");
+      const convert = typeAudio
+        ? await processAudio(media.path)
+        : await processAudioFile(media.path);
+      storageAccountPath = convert;
       if (typeAudio) {
-        const convert = await processAudio(media.path);
         options = {
           audio: fs.readFileSync(convert),
           mimetype: typeAudio ? "audio/mp4" : media.mimetype,
           ptt: true
         };
       } else {
-        const convert = await processAudioFile(media.path);
         options = {
           audio: fs.readFileSync(convert),
           mimetype: typeAudio ? "audio/mp4" : media.mimetype
         };
       }
     } else if (typeMessage === "document" || typeMessage === "text") {
+      storageAccountPath = pathMedia;
       options = {
         document: fs.readFileSync(pathMedia),
         caption: bodyMessage,
@@ -174,6 +184,7 @@ const SendWhatsAppMedia = async ({
         mimetype: media.mimetype
       };
     } else if (typeMessage === "application") {
+      storageAccountPath = pathMedia;
       options = {
         document: fs.readFileSync(pathMedia),
         caption: bodyMessage,
@@ -181,6 +192,7 @@ const SendWhatsAppMedia = async ({
         mimetype: media.mimetype
       };
     } else {
+      storageAccountPath = pathMedia;
       options = {
         image: fs.readFileSync(pathMedia),
         caption: bodyMessage
@@ -203,6 +215,13 @@ const SendWhatsAppMedia = async ({
     });
 
     await ticket.update({ lastMessage: bodyMessage });
+
+    if (ticket.companyId && storageAccountPath) {
+      const sz = tryStatFileBytes(storageAccountPath);
+      if (sz > 0) {
+        void incrementCompanyStorageUsage(ticket.companyId, sz);
+      }
+    }
 
     return sentMessage;
   } catch (err) {

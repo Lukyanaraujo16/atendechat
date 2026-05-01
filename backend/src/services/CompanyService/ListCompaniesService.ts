@@ -40,7 +40,7 @@ const ListCompaniesService = async ({
     include: [
       {
         model: Plan,
-        attributes: ["id", "name"],
+        attributes: ["id", "name", "storageLimitGb"],
         required: false
       }
     ]

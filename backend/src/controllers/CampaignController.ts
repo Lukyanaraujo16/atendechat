@@ -20,6 +20,7 @@ import { RetryFailedService } from "../services/CampaignService/RetryFailedServi
 
 import AppError from "../errors/AppError";
 import Campaign from "../models/Campaign";
+import { incrementCompanyStorageUsage } from "../services/CompanyService/adjustCompanyStorageUsage";
 import { CancelService } from "../services/CampaignService/CancelService";
 import { RestartService } from "../services/CampaignService/RestartService";
 import TicketTag from "../models/TicketTag";
@@ -350,6 +351,9 @@ export const mediaUpload = async (
       mediaPath: file.filename,
       mediaName: file.originalname
     });
+    if (file.size > 0) {
+      void incrementCompanyStorageUsage(+companyId, file.size);
+    }
     return res.send({ mensagem: "Mensagem enviada" });
   } catch (err: any) {
     if (err instanceof AppError) {

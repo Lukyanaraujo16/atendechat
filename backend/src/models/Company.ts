@@ -82,6 +82,20 @@ class Company extends Model<Company> {
   })
   contractedPlanValue: string | number | null;
 
+  /** Override do limite de armazenamento (GB). null = usar limite do plano. */
+  @Column({ type: DataType.DECIMAL(10, 2), allowNull: true })
+  storageLimitGb: string | number | null;
+
+  @Column({ type: DataType.BIGINT, allowNull: false, defaultValue: 0 })
+  storageUsedBytes: number | string;
+
+  @Column({ type: DataType.DATE, allowNull: true })
+  storageCalculatedAt: Date | null;
+
+  /** Último alerta de threshold enviado: 0 | 80 | 90 | 100 — deduplica notificações ao subir/descer percentual. */
+  @Column({ type: DataType.TINYINT, allowNull: false, defaultValue: 0 })
+  storageAlertWatermark: number;
+
   @ForeignKey(() => Plan)
   @Column
   planId: number;

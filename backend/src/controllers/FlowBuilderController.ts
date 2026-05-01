@@ -12,6 +12,7 @@ import DuplicateFlowBuilderService from "../services/FlowBuilderService/Duplicat
 import UploadAllFlowBuilderService from "../services/FlowBuilderService/UploadAllFlowBuilderService";
 import { isFlowBuilderDebugEnabled } from "../utils/flowBuilderDebug";
 import { logger } from "../utils/logger";
+import { incrementCompanyStorageUsage } from "../services/CompanyService/adjustCompanyStorageUsage";
 // import { handleMessage } from "../services/FacebookServices/facebookMessageListener";
 
 export const createFlow = async (
@@ -172,6 +173,9 @@ export const FlowUploadImg = async (req: Request, res: Response) => {
     if (isFlowBuilderDebugEnabled()) {
       logger.info({ nameFile }, "[FlowBuilder][debug] FlowUploadImg sucesso");
     }
+    if (medias[0].size > 0) {
+      void incrementCompanyStorageUsage(companyId, medias[0].size);
+    }
     return res.status(200).json(img);
   } catch (err) {
     logger.error({ err }, "[FlowUploadImg] erro");
@@ -212,6 +216,9 @@ export const FlowUploadAudio = async (req: Request, res: Response) => {
     });
     if (isFlowBuilderDebugEnabled()) {
       logger.info({ nameFile }, "[FlowBuilder][debug] FlowUploadAudio sucesso");
+    }
+    if (medias[0].size > 0) {
+      void incrementCompanyStorageUsage(companyId, medias[0].size);
     }
     return res.status(200).json(audio);
   } catch (err) {
@@ -264,6 +271,11 @@ export const FlowUploadAll = async (req: Request, res: Response) => {
         },
         "[FlowBuilder][debug] FlowUploadAll sucesso"
       );
+    }
+    for (const m of medias) {
+      if (m.size > 0) {
+        void incrementCompanyStorageUsage(companyId, m.size);
+      }
     }
     return res.status(200).json(items);
   } catch (err) {

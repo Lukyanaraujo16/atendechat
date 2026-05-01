@@ -23,6 +23,7 @@ import Message from "../../models/Message";
 
 import { getIO } from "../../libs/socket";
 import CreateMessageService from "../MessageServices/CreateMessageService";
+import { incrementCompanyStorageUsage } from "../CompanyService/adjustCompanyStorageUsage";
 import { logger } from "../../utils/logger";
 import { isFlowBuilderDebugEnabled } from "../../utils/flowBuilderDebug";
 import CreateOrUpdateContactService from "../ContactServices/CreateOrUpdateContactService";
@@ -1056,10 +1057,12 @@ export const verifyMediaMessage = async (
   }
 
   try {
+    const fileBuf = Buffer.from(media.data, "base64");
     await writeFileAsync(
       join(__dirname, "..", "..", "..", "public", media.filename),
-      Buffer.from(media.data, 'base64')
+      fileBuf
     );
+    void incrementCompanyStorageUsage(ticket.companyId, fileBuf.length);
   } catch (err) {
     Sentry.captureException(err);
     logger.error(err);

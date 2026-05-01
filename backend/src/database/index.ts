@@ -53,6 +53,7 @@ import SystemSetting from "../models/SystemSetting";
 import SupportAccessLog from "../models/SupportAccessLog";
 import CompanyLog from "../models/CompanyLog";
 import CompanySignupRequest from "../models/CompanySignupRequest";
+import CompanyStorageSnapshot from "../models/CompanyStorageSnapshot";
 import Appointment from "../models/Appointment";
 import AppointmentParticipant from "../models/AppointmentParticipant";
 
@@ -117,6 +118,7 @@ const models = [
   SupportAccessLog,
   CompanyLog,
   CompanySignupRequest,
+  CompanyStorageSnapshot,
   Appointment,
   AppointmentParticipant
 ];

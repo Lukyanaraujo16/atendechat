@@ -36,8 +36,15 @@ import {
 import RenewCompanyDueDateService from "../services/CompanyService/RenewCompanyDueDateService";
 import CompanyLog from "../models/CompanyLog";
 import { createCompanyLog } from "../services/CompanyService/CreateCompanyLogService";
-import { normalizeNullableContractedPlanValue } from "../utils/normalizeMonetaryInput";
+import {
+  normalizeNullableContractedPlanValue,
+  normalizeNullableStorageLimitGb
+} from "../utils/normalizeMonetaryInput";
 import { logger } from "../utils/logger";
+import { buildCompanyStorageEnrichmentPayload } from "../helpers/companyStorage";
+import RecalculateCompanyStorageUsageService from "../services/CompanyService/RecalculateCompanyStorageUsageService";
+import GetMyCompanyStorageService from "../services/CompanyService/GetMyCompanyStorageService";
+import ListCompanyStorageSnapshotsService from "../services/CompanyService/ListCompanyStorageSnapshotsService";
 
 function parseListPlanAuthToken(req: Request): string | null {
   const authHeader = req.headers.authorization;
@@ -79,6 +86,7 @@ type UpdateCompanyBody = {
   timezone?: string;
   internalNotes?: string | null;
   contractedPlanValue?: unknown;
+  storageLimitGb?: unknown;
 };
 
 type CreateCompanyRequest = UpdateCompanyBody & { name: string };
@@ -146,9 +154,11 @@ export const index = async (req: Request, res: Response): Promise<Response> => {
 
   const enriched = companies.map((c) => {
     const row = typeof (c as any).toJSON === "function" ? (c as any).toJSON() : c;
+    const plan = row.plan as { storageLimitGb?: unknown } | undefined;
     return {
       ...row,
-      primaryAdmin: primaryByCompany[row.id] ?? null
+      primaryAdmin: primaryByCompany[row.id] ?? null,
+      ...buildCompanyStorageEnrichmentPayload(row as Record<string, unknown>, plan || null)
     };
   });
 
@@ -271,7 +281,14 @@ export const show = async (req: Request, res: Response): Promise<Response> => {
     delete row.contractedPlanValue;
   }
 
-  return res.status(200).json(row);
+  const planRow = row.planId
+    ? await Plan.findByPk(row.planId, { attributes: ["storageLimitGb"] })
+    : null;
+  const planJson = planRow?.toJSON() as { storageLimitGb?: unknown } | null;
+  return res.status(200).json({
+    ...row,
+    ...buildCompanyStorageEnrichmentPayload(row as Record<string, unknown>, planJson)
+  });
 };
 
 export const list = async (req: Request, res: Response): Promise<Response> => {
@@ -282,10 +299,14 @@ export const list = async (req: Request, res: Response): Promise<Response> => {
   const ids = companies.map((row: any) => row.id as number);
   const primaryByCompany = await buildPrimaryAdminMap(ids);
 
-  const enriched = companies.map((row: any) => ({
-    ...row,
-    primaryAdmin: primaryByCompany[row.id] ?? null
-  }));
+  const enriched = companies.map((row: any) => {
+    const plan = row.plan as { storageLimitGb?: unknown } | undefined;
+    return {
+      ...row,
+      primaryAdmin: primaryByCompany[row.id] ?? null,
+      ...buildCompanyStorageEnrichmentPayload(row as Record<string, unknown>, plan || null)
+    };
+  });
 
   return res.status(200).json(enriched);
 };
@@ -305,7 +326,8 @@ export const update = async (
     dueDate: Yup.string().nullable(),
     recurrence: Yup.string().nullable(),
     internalNotes: Yup.string().nullable().max(65535),
-    contractedPlanValue: Yup.mixed().nullable()
+    contractedPlanValue: Yup.mixed().nullable(),
+    storageLimitGb: Yup.mixed().nullable()
   });
 
   try {
@@ -336,6 +358,7 @@ export const update = async (
   const stripped: Record<string, unknown> = { ...companyDataRaw };
   if (!requestUserUpdate?.super) {
     delete stripped.contractedPlanValue;
+    delete stripped.storageLimitGb;
   }
 
   let contractedNormalized: number | null | undefined;
@@ -347,6 +370,17 @@ export const update = async (
       companyDataRaw.contractedPlanValue
     );
     delete stripped.contractedPlanValue;
+  }
+
+  let storageLimitNormalized: number | null | undefined;
+  if (
+    requestUserUpdate?.super &&
+    Object.prototype.hasOwnProperty.call(req.body as object, "storageLimitGb")
+  ) {
+    storageLimitNormalized = normalizeNullableStorageLimitGb(
+      (companyDataRaw as { storageLimitGb?: unknown }).storageLimitGb
+    );
+    delete stripped.storageLimitGb;
   }
 
   const pre = await Company.findByPk(companyId, {
@@ -361,6 +395,9 @@ export const update = async (
     ...(stripped as UpdateCompanyBody),
     ...(contractedNormalized !== undefined
       ? { contractedPlanValue: contractedNormalized }
+      : {}),
+    ...(storageLimitNormalized !== undefined
+      ? { storageLimitGb: storageLimitNormalized }
       : {})
   } as Parameters<typeof UpdateCompanyService>[0]);
 
@@ -422,7 +459,92 @@ export const update = async (
     });
   }
 
-  return res.status(200).json(company);
+  await company.reload({
+    include: [
+      {
+        model: Plan,
+        as: "plan",
+        attributes: ["id", "name", "value", "storageLimitGb"],
+        required: false
+      }
+    ]
+  });
+  const outRow =
+    typeof company.toJSON === "function"
+      ? (company.toJSON() as Record<string, unknown>)
+      : (company as unknown as Record<string, unknown>);
+  const planOut = outRow.plan as { storageLimitGb?: unknown } | undefined;
+  return res.status(200).json({
+    ...outRow,
+    ...buildCompanyStorageEnrichmentPayload(outRow, planOut || null)
+  });
+};
+
+export const getMyCompanyStorage = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const payload = await GetMyCompanyStorageService(req.user.companyId);
+  return res.status(200).json(payload);
+};
+
+export const recalculateCompanyStorage = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = Number(req.params.id);
+  if (!Number.isFinite(companyId)) {
+    throw new AppError("ERR_INVALID_COMPANY_ID", 400);
+  }
+  await RecalculateCompanyStorageUsageService(companyId, {
+    snapshotReason: "manual_recalculate"
+  });
+  const company = await Company.findByPk(companyId, {
+    include: [
+      {
+        model: Plan,
+        as: "plan",
+        attributes: ["id", "name", "storageLimitGb"],
+        required: false
+      }
+    ]
+  });
+  if (!company) {
+    throw new AppError("ERR_NO_COMPANY_FOUND", 404);
+  }
+  const row =
+    typeof company.toJSON === "function"
+      ? (company.toJSON() as Record<string, unknown>)
+      : (company as unknown as Record<string, unknown>);
+  const plan = row.plan as { storageLimitGb?: unknown } | undefined;
+  return res.status(200).json({
+    ...buildCompanyStorageEnrichmentPayload(row, plan || null),
+    recalculated: true
+  });
+};
+
+export const getCompanyStorageSnapshots = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = Number(req.params.id);
+  if (!Number.isFinite(companyId)) {
+    throw new AppError("ERR_INVALID_COMPANY_ID", 400);
+  }
+  const rows = await ListCompanyStorageSnapshotsService(companyId, 30);
+  return res.status(200).json(rows);
+};
+
+export const getMyCompanyStorageSnapshots = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = req.user.companyId;
+  if (!Number.isFinite(Number(companyId))) {
+    throw new AppError("ERR_NO_PERMISSION", 403);
+  }
+  const rows = await ListCompanyStorageSnapshotsService(Number(companyId), 30);
+  return res.status(200).json(rows);
 };
 
 export const updateTimezone = async (

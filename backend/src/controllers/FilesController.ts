@@ -12,6 +12,7 @@ import DeleteService from "../services/FileServices/DeleteService";
 import SimpleListService from "../services/FileServices/SimpleListService";
 import DeleteAllService from "../services/FileServices/DeleteAllService";
 import FilesOptions from "../models/FilesOptions";
+import { incrementCompanyStorageUsage } from "../services/CompanyService/adjustCompanyStorageUsage";
 
 type IndexQuery = {
   searchParam?: string;
@@ -64,6 +65,7 @@ export const uploadMedias = async (req: Request, res: Response): Promise<Respons
   const { fileId, id, mediaType } = req.body;
   const files = req.files as Express.Multer.File[];
   const file = head(files);
+  const { companyId } = req.user;
 
   try {
     
@@ -71,6 +73,9 @@ export const uploadMedias = async (req: Request, res: Response): Promise<Respons
     if (files.length > 0) {
 
       for (const [index, file] of files.entries()) {
+        if (file.size > 0) {
+          void incrementCompanyStorageUsage(companyId, file.size);
+        }
         fileOpt = await FilesOptions.findOne({
           where: {
             fileId,

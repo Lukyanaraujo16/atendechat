@@ -20,6 +20,7 @@ import DeleteWhatsAppMessage from "../services/WbotServices/DeleteWhatsAppMessag
 import SendWhatsAppMedia from "../services/WbotServices/SendWhatsAppMedia";
 import SendWhatsAppMessage from "../services/WbotServices/SendWhatsAppMessage";
 import CreateMessageService from "../services/MessageServices/CreateMessageService";
+import { incrementCompanyStorageUsage } from "../services/CompanyService/adjustCompanyStorageUsage";
 import CheckContactNumber from "../services/WbotServices/CheckNumber";
 import CheckIsValidContact from "../services/WbotServices/CheckIsValidContact";
 import GetProfilePicUrl from "../services/WbotServices/GetProfilePicUrl";
@@ -173,6 +174,9 @@ export const send = async (req: Request, res: Response): Promise<Response> => {
     if (medias) {
       await Promise.all(
         medias.map(async (media: Express.Multer.File) => {
+          if (media.size > 0) {
+            void incrementCompanyStorageUsage(companyId, media.size);
+          }
           await req.app.get("queues").messageQueue.add(
             "SendMessage",
             {
@@ -282,6 +286,9 @@ export const sendMessageFlow = async (
     if (medias) {
       await Promise.all(
         medias.map(async (media: Express.Multer.File) => {
+          if (media.size > 0) {
+            void incrementCompanyStorageUsage(companyId, media.size);
+          }
           await req.app.get("queues").messageQueue.add(
             "SendMessage",
             {
