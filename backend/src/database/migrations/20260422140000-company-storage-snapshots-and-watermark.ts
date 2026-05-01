@@ -1,9 +1,32 @@
 import { QueryInterface, DataTypes } from "sequelize";
 
+function hasColumn(
+  tableDescription: Record<string, unknown> | null | undefined,
+  columnName: string
+): boolean {
+  if (!tableDescription) return false;
+  const lower = columnName.toLowerCase();
+  return Object.keys(tableDescription).some(k => k.toLowerCase() === lower);
+}
+
+function isAlreadyExistsError(err: unknown): boolean {
+  const m = String((err as { message?: string })?.message ?? err);
+  return /already exists/i.test(m) || /duplicate/i.test(m);
+}
+
 module.exports = {
-  up: (queryInterface: QueryInterface) =>
-    queryInterface
-      .createTable("CompanyStorageSnapshots", {
+  up: async (queryInterface: QueryInterface) => {
+    let snapshotsDesc: Record<string, unknown> | null = null;
+    try {
+      snapshotsDesc = (await queryInterface.describeTable(
+        "CompanyStorageSnapshots"
+      )) as Record<string, unknown>;
+    } catch {
+      snapshotsDesc = null;
+    }
+
+    if (!snapshotsDesc) {
+      await queryInterface.createTable("CompanyStorageSnapshots", {
         id: {
           type: DataTypes.INTEGER,
           autoIncrement: true,
@@ -38,23 +61,49 @@ module.exports = {
           type: DataTypes.DATE,
           allowNull: false
         }
-      })
-      .then(() =>
-        queryInterface.addIndex("CompanyStorageSnapshots", ["companyId", "createdAt"], {
-          name: "CompanyStorageSnapshots_company_created"
-        })
-      )
-      .then(() =>
-        queryInterface.addColumn("Companies", "storageAlertWatermark", {
-          // SMALLINT: compatível com PostgreSQL e MySQL (PostgreSQL não tem TINYINT).
-          type: DataTypes.SMALLINT,
-          allowNull: false,
-          defaultValue: 0
-        })
-      ),
+      });
+    }
 
-  down: (queryInterface: QueryInterface) =>
-    queryInterface
-      .removeColumn("Companies", "storageAlertWatermark")
-      .then(() => queryInterface.dropTable("CompanyStorageSnapshots"))
+    try {
+      await queryInterface.addIndex(
+        "CompanyStorageSnapshots",
+        ["companyId", "createdAt"],
+        { name: "CompanyStorageSnapshots_company_created" }
+      );
+    } catch (err) {
+      if (!isAlreadyExistsError(err)) throw err;
+    }
+
+    const companiesDesc = (await queryInterface.describeTable(
+      "Companies"
+    )) as Record<string, unknown>;
+    if (!hasColumn(companiesDesc, "storageAlertWatermark")) {
+      await queryInterface.addColumn("Companies", "storageAlertWatermark", {
+        type: DataTypes.SMALLINT,
+        allowNull: false,
+        defaultValue: 0
+      });
+    }
+  },
+
+  down: async (queryInterface: QueryInterface) => {
+    const companiesDesc = (await queryInterface.describeTable(
+      "Companies"
+    )) as Record<string, unknown>;
+    if (hasColumn(companiesDesc, "storageAlertWatermark")) {
+      await queryInterface.removeColumn("Companies", "storageAlertWatermark");
+    }
+
+    let snapshotsDescDown: Record<string, unknown> | null = null;
+    try {
+      snapshotsDescDown = (await queryInterface.describeTable(
+        "CompanyStorageSnapshots"
+      )) as Record<string, unknown>;
+    } catch {
+      snapshotsDescDown = null;
+    }
+    if (snapshotsDescDown) {
+      await queryInterface.dropTable("CompanyStorageSnapshots");
+    }
+  }
 };
