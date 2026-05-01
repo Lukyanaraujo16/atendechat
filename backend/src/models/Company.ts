@@ -93,7 +93,7 @@ class Company extends Model<Company> {
   storageCalculatedAt: Date | null;
 
   /** Último alerta de threshold enviado: 0 | 80 | 90 | 100 — deduplica notificações ao subir/descer percentual. */
-  @Column({ type: DataType.TINYINT, allowNull: false, defaultValue: 0 })
+  @Column({ type: DataType.SMALLINT, allowNull: false, defaultValue: 0 })
   storageAlertWatermark: number;
 
   @ForeignKey(() => Plan)

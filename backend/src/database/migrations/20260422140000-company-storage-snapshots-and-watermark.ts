@@ -46,7 +46,8 @@ module.exports = {
       )
       .then(() =>
         queryInterface.addColumn("Companies", "storageAlertWatermark", {
-          type: DataTypes.TINYINT,
+          // SMALLINT: compatível com PostgreSQL e MySQL (PostgreSQL não tem TINYINT).
+          type: DataTypes.SMALLINT,
           allowNull: false,
           defaultValue: 0
         })
