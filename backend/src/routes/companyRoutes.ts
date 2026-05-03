@@ -39,6 +39,13 @@ companyRoutes.post("/companies/cadastro", CompanyController.createSignupRequest)
 companyRoutes.post("/companies/signup-requests", CompanyController.createSignupRequest);
 
 // Rota para listar o plano da empresa
+companyRoutes.post(
+  "/companies/:id/crm/bootstrap",
+  isAuth,
+  isSuper,
+  CompanyController.bootstrapCrm
+);
+
 companyRoutes.get("/companies/listPlan/:id", isAuth, CompanyController.listPlan);
 companyRoutes.get("/companiesPlan", isAuth, CompanyController.indexPlan);
 

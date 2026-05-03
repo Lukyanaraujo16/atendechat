@@ -138,5 +138,11 @@ export const FEATURE_ENFORCEMENT_MAP: Array<{
     feature: "contacts.files",
     menu: "Ficheiros",
     frontendRoutes: ["/files"]
+  },
+  {
+    feature: "crm.pipeline",
+    menu: "CRM",
+    frontendRoutes: ["/crm"],
+    backendRoutes: ["/crm/*"]
   }
 ];

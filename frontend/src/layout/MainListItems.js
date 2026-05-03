@@ -197,6 +197,7 @@ const MainListItems = (props) => {
   const showEvalNav = fx["team.ratings"] === true;
   const showTagsNav = fx["contacts.crm"] === true;
   const showFilesNav = fx["contacts.files"] === true;
+  const showCrmNav = fx["crm.pipeline"] === true;
   const showTeamUsersNav =
     fx["team.users"] === true || fx["team.queues"] === true;
 
@@ -301,6 +302,7 @@ const MainListItems = (props) => {
   const selTarefas = path === "/todolist";
   const selAgenda = path === "/agenda";
   const selAgendamentos = path === "/schedules";
+  const selCrm = path === "/crm";
   const selAvaliacao = path === "/avaliacao";
   const selInformativos =
     path === "/announcements" || path.startsWith("/saas/announcements");
@@ -339,6 +341,17 @@ const MainListItems = (props) => {
           listItemIconClassName={classes.listItemIcon}
           listItemTextClassName={classes.listItemText}
           selected={selAgenda}
+        />
+      )}
+      {showCrmNav && (
+        <ListItemLink
+          to="/crm"
+          primary={i18n.t("mainDrawer.listItems.crm")}
+          icon={<BusinessCenter />}
+          listItemClassName={classes.listItem}
+          listItemIconClassName={classes.listItemIcon}
+          listItemTextClassName={classes.listItemText}
+          selected={selCrm}
         />
       )}
       {showSchedules && (

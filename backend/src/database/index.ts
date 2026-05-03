@@ -56,6 +56,9 @@ import CompanySignupRequest from "../models/CompanySignupRequest";
 import CompanyStorageSnapshot from "../models/CompanyStorageSnapshot";
 import Appointment from "../models/Appointment";
 import AppointmentParticipant from "../models/AppointmentParticipant";
+import CrmPipeline from "../models/CrmPipeline";
+import CrmStage from "../models/CrmStage";
+import CrmDeal from "../models/CrmDeal";
 
 // eslint-disable-next-line
 const dbConfig = require("../config/database");
@@ -120,7 +123,10 @@ const models = [
   CompanySignupRequest,
   CompanyStorageSnapshot,
   Appointment,
-  AppointmentParticipant
+  AppointmentParticipant,
+  CrmPipeline,
+  CrmStage,
+  CrmDeal
 ];
 
 sequelize.addModels(models);

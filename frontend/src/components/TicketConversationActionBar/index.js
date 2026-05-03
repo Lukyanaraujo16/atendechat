@@ -104,6 +104,7 @@ const TicketConversationActionBar = ({
   onDeleteClick,
   onQuickRepliesClick,
   ticketId,
+  extraIconActions,
 }) => {
   const classes = useStyles();
   const theme = useTheme();
@@ -163,6 +164,8 @@ const TicketConversationActionBar = ({
             </span>
           </Tooltip>
         ) : null}
+
+        {extraIconActions || null}
 
         <Tooltip title={i18n.t("ticketOptionsMenu.schedule")}>
           <IconButton

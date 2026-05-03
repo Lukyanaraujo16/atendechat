@@ -20,6 +20,8 @@ import { CardHeader } from "@material-ui/core";
 import { ContactForm } from "../ContactForm";
 import ContactModal from "../ContactModal";
 import { ContactNotes } from "../ContactNotes";
+import usePlanFlags from "../../hooks/usePlanFlags";
+import CrmDealFormDialog from "../Crm/CrmDealFormDialog";
 
 const drawerWidth = 320;
 
@@ -87,9 +89,12 @@ const useStyles = makeStyles(theme => ({
 
 const ContactDrawer = ({ open, handleDrawerClose, contact, ticket, loading }) => {
 	const classes = useStyles();
+	const planFlags = usePlanFlags();
+	const fx = planFlags.effectiveFeatures || {};
 
 	const [modalOpen, setModalOpen] = useState(false);
 	const [openForm, setOpenForm] = useState(false);
+	const [crmOpen, setCrmOpen] = useState(false);
 
 	useEffect(() => {
 		setOpenForm(false);
@@ -162,6 +167,16 @@ const ContactDrawer = ({ open, handleDrawerClose, contact, ticket, loading }) =>
 							>
 								{i18n.t("contactDrawer.buttons.edit")}
 							</Button>
+							{contact?.id && fx["crm.pipeline"] === true ? (
+								<Button
+									variant="outlined"
+									color="primary"
+									onClick={() => setCrmOpen(true)}
+									style={{ fontSize: 12, marginTop: 8 }}
+								>
+									{i18n.t("crm.contact.createOpportunity")}
+								</Button>
+							) : null}
 							{(contact.id && openForm) && <ContactForm initialContact={contact} onCancel={() => setOpenForm(false)} />}
 						</Paper>
 						<Paper square variant="outlined" className={classes.contactDetails}>
@@ -196,6 +211,17 @@ const ContactDrawer = ({ open, handleDrawerClose, contact, ticket, loading }) =>
 					</div>
 				)}
 			</Drawer>
+			<CrmDealFormDialog
+				open={crmOpen}
+				onClose={() => setCrmOpen(false)}
+				defaults={{
+					title: contact?.name || "",
+					contactId: contact?.id,
+					ticketId: ticket?.id,
+					source: "whatsapp",
+				}}
+				onSaved={() => setCrmOpen(false)}
+			/>
 		</>
 	);
 };

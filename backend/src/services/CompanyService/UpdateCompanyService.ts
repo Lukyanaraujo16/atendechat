@@ -2,6 +2,7 @@ import moment from "moment-timezone";
 import AppError from "../../errors/AppError";
 import Company from "../../models/Company";
 import Setting from "../../models/Setting";
+import { normalizeBusinessSegment } from "../../config/businessSegment";
 
 interface CompanyData {
   name?: string;
@@ -20,6 +21,7 @@ interface CompanyData {
   contractedPlanValue?: number | null;
   /** GB; null = usar plano */
   storageLimitGb?: number | null;
+  businessSegment?: string | null;
 }
 
 const UpdateCompanyService = async (
@@ -39,7 +41,8 @@ const UpdateCompanyService = async (
     modulePermissions,
     internalNotes,
     contractedPlanValue,
-    storageLimitGb
+    storageLimitGb,
+    businessSegment
   } = companyData;
 
   if (!company) {
@@ -94,6 +97,11 @@ const UpdateCompanyService = async (
   }
   if (storageLimitGb !== undefined) {
     payload.storageLimitGb = storageLimitGb;
+  }
+  if (businessSegment !== undefined) {
+    payload.businessSegment = normalizeBusinessSegment(
+      businessSegment as string | null | undefined
+    );
   }
 
   if (Object.keys(payload).length > 0) {

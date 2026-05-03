@@ -11,6 +11,67 @@ const messages = {
 				blockedBody:
 					"This feature is not included in your plan. Contact your platform administrator for upgrade options.",
 			},
+			crm: {
+				common: { cancel: "Cancel", save: "Save" },
+				summary: {
+					pipeline: "Pipeline",
+					openDeals: "Opportunities (filtered)",
+					totalValue: "Total value",
+				},
+				actions: { newDeal: "New opportunity", edit: "Edit", delete: "Delete" },
+				filters: {
+					search: "Search title or contact",
+					status: "Status",
+					assignee: "Owner",
+					all: "All",
+				},
+				status: { open: "Open", won: "Won", lost: "Lost" },
+				empty: {
+					noPipelineTitle: "No CRM pipeline",
+					noPipelineBody:
+						"Ask an admin to bootstrap CRM or ensure your plan includes CRM.",
+					column: "Drag opportunities here",
+				},
+				deal: {
+					newTitle: "New opportunity",
+					editTitle: "Edit opportunity",
+					fields: {
+						title: "Title",
+						pipeline: "Pipeline",
+						stage: "Stage",
+						contact: "Contact",
+						contactNone: "No contact",
+						value: "Amount",
+						assignee: "Owner",
+						unassigned: "Unassigned",
+						source: "Source",
+						expectedClose: "Expected close",
+						notes: "Notes",
+					},
+					source: {
+						manual: "Manual",
+						whatsapp: "WhatsApp",
+						instagram: "Instagram",
+						other: "Other",
+					},
+				},
+				ticket: { createOpportunity: "Create CRM opportunity" },
+				contact: { createOpportunity: "Create CRM opportunity" },
+				segment: {
+					general: "General",
+					clinic: "Clinic",
+					aesthetic_clinic: "Aesthetic clinic",
+					real_estate: "Real estate",
+					gym: "Gym",
+					school: "School / training",
+					ecommerce: "E‑commerce",
+					automotive: "Automotive",
+					financial: "Financial",
+					legal: "Legal",
+					healthcare: "Healthcare",
+					other: "Other",
+				},
+			},
 			companyStorage: {
 				title: "Storage",
 				loading: "Loading…",
@@ -1285,6 +1346,7 @@ const messages = {
 					quickMessages: "Quick replies",
 					tasks: "Tasks",
 					agenda: "Agenda",
+					crm: "CRM",
 					contacts: "Contacts",
 					queues: "Queues & Chatbot",
 					sectors: "Queues",
@@ -3355,6 +3417,12 @@ const messages = {
 						expire: "Expiration",
 						createdAt: "Created On",
 						timezone: "Company timezone",
+						businessSegment: "Business segment",
+						bootstrapCrm: "Initialize CRM",
+						bootstrapCrmHint:
+							"Creates the default pipeline by segment if missing (legacy companies).",
+						bootstrapCrmOk: "CRM initialized.",
+						bootstrapCrmAlready: "CRM already existed for this company.",
 						timezoneHint:
 							"Schedules and recurrences use this timezone; data is still stored in UTC.",
 						timezoneFooter:

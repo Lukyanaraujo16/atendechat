@@ -92,6 +92,12 @@ export const FEATURES: Record<string, FeatureNode> = {
       connections: { label: "Conexões WhatsApp" },
       api: { label: "API / mensagens externas" }
     }
+  },
+  crm: {
+    label: "CRM",
+    children: {
+      pipeline: { label: "Pipeline / oportunidades" }
+    }
   }
 };
 

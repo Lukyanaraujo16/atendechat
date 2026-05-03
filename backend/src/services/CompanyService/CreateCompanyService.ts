@@ -5,6 +5,8 @@ import sequelize from "../../database";
 import Company from "../../models/Company";
 import Setting from "../../models/Setting";
 import provisionPrimaryAdminForCompany from "./provisionPrimaryAdminForCompany";
+import { normalizeBusinessSegment } from "../../config/businessSegment";
+import BootstrapCrmForCompanyService from "../CrmService/BootstrapCrmForCompanyService";
 
 interface CompanyData {
   name: string;
@@ -22,6 +24,8 @@ interface CompanyData {
   internalNotes?: string | null;
   /** Valor mensal negociado (opcional); null omitido usa plano */
   contractedPlanValue?: number | null;
+  /** Segmento de negócio (templates CRM). */
+  businessSegment?: string | null;
 }
 
 export interface CreateCompanyOptions {
@@ -111,7 +115,8 @@ const CreateCompanyService = async (
           : { contractedPlanValue }),
         ...(modulePermissions && typeof modulePermissions === "object"
           ? { modulePermissions }
-          : {})
+          : {}),
+        businessSegment: normalizeBusinessSegment(companyData.businessSegment)
       },
       { transaction }
     );
@@ -381,6 +386,8 @@ const CreateCompanyService = async (
       await setting.update({ value: `${campaignsEnabled}` }, { transaction });
     }
   }
+
+  await BootstrapCrmForCompanyService(company.id, { transaction });
 
   const provisionResult = await provisionPrimaryAdminForCompany({
     company,

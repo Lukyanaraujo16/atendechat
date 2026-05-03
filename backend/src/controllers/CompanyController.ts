@@ -45,6 +45,11 @@ import { buildCompanyStorageEnrichmentPayload } from "../helpers/companyStorage"
 import RecalculateCompanyStorageUsageService from "../services/CompanyService/RecalculateCompanyStorageUsageService";
 import GetMyCompanyStorageService from "../services/CompanyService/GetMyCompanyStorageService";
 import ListCompanyStorageSnapshotsService from "../services/CompanyService/ListCompanyStorageSnapshotsService";
+import BootstrapCrmForCompanyService from "../services/CrmService/BootstrapCrmForCompanyService";
+import {
+  isValidBusinessSegment,
+  normalizeBusinessSegment
+} from "../config/businessSegment";
 
 function parseListPlanAuthToken(req: Request): string | null {
   const authHeader = req.headers.authorization;
@@ -87,6 +92,7 @@ type UpdateCompanyBody = {
   internalNotes?: string | null;
   contractedPlanValue?: unknown;
   storageLimitGb?: unknown;
+  businessSegment?: string | null;
 };
 
 type CreateCompanyRequest = UpdateCompanyBody & { name: string };
@@ -327,7 +333,17 @@ export const update = async (
     recurrence: Yup.string().nullable(),
     internalNotes: Yup.string().nullable().max(65535),
     contractedPlanValue: Yup.mixed().nullable(),
-    storageLimitGb: Yup.mixed().nullable()
+    storageLimitGb: Yup.mixed().nullable(),
+    businessSegment: Yup.string()
+      .nullable()
+      .test(
+        "seg",
+        "Segmento inválido",
+        (v) =>
+          v == null ||
+          v === "" ||
+          isValidBusinessSegment(String(v))
+      )
   });
 
   try {
@@ -383,6 +399,16 @@ export const update = async (
     delete stripped.storageLimitGb;
   }
 
+  let businessSegmentNormalized: string | undefined;
+  if (
+    Object.prototype.hasOwnProperty.call(companyDataRaw as object, "businessSegment")
+  ) {
+    businessSegmentNormalized = normalizeBusinessSegment(
+      companyDataRaw.businessSegment as string | null | undefined
+    );
+    delete stripped.businessSegment;
+  }
+
   const pre = await Company.findByPk(companyId, {
     attributes: ["id", "status", "contractedPlanValue", "planId"],
     include: [
@@ -398,6 +424,9 @@ export const update = async (
       : {}),
     ...(storageLimitNormalized !== undefined
       ? { storageLimitGb: storageLimitNormalized }
+      : {}),
+    ...(businessSegmentNormalized !== undefined
+      ? { businessSegment: businessSegmentNormalized }
       : {})
   } as Parameters<typeof UpdateCompanyService>[0]);
 
@@ -478,6 +507,22 @@ export const update = async (
     ...outRow,
     ...buildCompanyStorageEnrichmentPayload(outRow, planOut || null)
   });
+};
+
+export const bootstrapCrm = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = Number(req.params.id);
+  if (!Number.isFinite(companyId)) {
+    throw new AppError("ERR_INVALID_COMPANY_ID", 400);
+  }
+  const requestUser = await User.findByPk(req.user.id, { attributes: ["super"] });
+  if (!requestUser?.super) {
+    throw new AppError("ERR_NO_PERMISSION", 403);
+  }
+  const result = await BootstrapCrmForCompanyService(companyId);
+  return res.status(200).json(result);
 };
 
 export const getMyCompanyStorage = async (

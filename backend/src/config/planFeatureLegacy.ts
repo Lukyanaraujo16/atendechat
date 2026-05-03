@@ -40,6 +40,8 @@ export function legacyPlanFeatureValue(
     case "finance.subscription":
     case "finance.invoices":
       return true;
+    case "crm.pipeline":
+      return false;
     case "attendance.kanban":
       return asBool(readPlanColumn(plan, "useKanban"));
     case "attendance.internal_chat":

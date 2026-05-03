@@ -11,6 +11,67 @@ const messages = {
         blockedBody:
           "Este recurso no está incluido en su plan. Contacte al administrador de la plataforma para más opciones.",
       },
+      crm: {
+        common: { cancel: "Cancelar", save: "Guardar" },
+        summary: {
+          pipeline: "Pipeline",
+          openDeals: "Oportunidades (filtradas)",
+          totalValue: "Valor total",
+        },
+        actions: { newDeal: "Nueva oportunidad", edit: "Editar", delete: "Eliminar" },
+        filters: {
+          search: "Buscar título o contacto",
+          status: "Estado",
+          assignee: "Responsable",
+          all: "Todos",
+        },
+        status: { open: "Abierta", won: "Ganada", lost: "Perdida" },
+        empty: {
+          noPipelineTitle: "Sin pipeline CRM",
+          noPipelineBody:
+            "Pida a un administrador que inicialice el CRM o verifique que el plan incluya CRM.",
+          column: "Arrastre oportunidades aquí",
+        },
+        deal: {
+          newTitle: "Nueva oportunidad",
+          editTitle: "Editar oportunidad",
+          fields: {
+            title: "Título",
+            pipeline: "Pipeline",
+            stage: "Etapa",
+            contact: "Contacto",
+            contactNone: "Sin contacto",
+            value: "Valor",
+            assignee: "Responsable",
+            unassigned: "Sin responsable",
+            source: "Origen",
+            expectedClose: "Cierre previsto",
+            notes: "Observaciones",
+          },
+          source: {
+            manual: "Manual",
+            whatsapp: "WhatsApp",
+            instagram: "Instagram",
+            other: "Otro",
+          },
+        },
+        ticket: { createOpportunity: "Crear oportunidad en CRM" },
+        contact: { createOpportunity: "Crear oportunidad en CRM" },
+        segment: {
+          general: "General",
+          clinic: "Clínica",
+          aesthetic_clinic: "Clínica estética",
+          real_estate: "Inmobiliario",
+          gym: "Gimnasio",
+          school: "Escuela / formación",
+          ecommerce: "E‑commerce",
+          automotive: "Automóvil",
+          financial: "Financiero",
+          legal: "Jurídico",
+          healthcare: "Salud",
+          other: "Otro",
+        },
+      },
       companyStorage: {
         title: "Almacenamiento",
         loading: "Cargando…",
@@ -1286,6 +1347,7 @@ const messages = {
           quickMessages: "Respuestas rápidas",
           tasks: "Tareas",
           agenda: "Agenda",
+          crm: "CRM",
           contacts: "Contactos",
           queues: "Colas & Chatbot",
           sectors: "Sectores",
@@ -3259,6 +3321,12 @@ const messages = {
             expire: "Vencimiento",
             createdAt: "Creada En",
             timezone: "Zona horaria de la empresa",
+            businessSegment: "Segmento de negocio",
+            bootstrapCrm: "Inicializar CRM",
+            bootstrapCrmHint:
+              "Crea el pipeline por segmento si aún no existe (empresas antiguas).",
+            bootstrapCrmOk: "CRM inicializado.",
+            bootstrapCrmAlready: "CRM ya existía para esta empresa.",
             timezoneHint:
               "Los agendamientos y recurrencias usan esta zona; el almacenamiento sigue en UTC.",
             timezoneFooter:

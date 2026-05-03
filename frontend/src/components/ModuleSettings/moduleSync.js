@@ -79,6 +79,8 @@ export function legacyPlanFeatureValueFromColumns(plan, featureKey) {
     case "finance.subscription":
     case "finance.invoices":
       return true;
+    case "crm.pipeline":
+      return false;
     case "attendance.kanban":
       return asBool(plan.useKanban);
     case "attendance.internal_chat":

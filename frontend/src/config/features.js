@@ -74,6 +74,12 @@ export const FEATURES = {
       api: { label: "API / mensagens externas" },
     },
   },
+  crm: {
+    label: "CRM",
+    children: {
+      pipeline: { label: "Pipeline / oportunidades" },
+    },
+  },
 };
 
 function isBranch(n) {

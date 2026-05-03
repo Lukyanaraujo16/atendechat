@@ -12,6 +12,8 @@ import toastError from "../../errors/toastError";
 import { AuthContext } from "../../context/Auth/AuthContext";
 import { TicketsSetContext } from "../../context/Tickets/TicketsContext";
 import TicketConversationActionBar from "../TicketConversationActionBar";
+import usePlanFlags from "../../hooks/usePlanFlags";
+import TicketCrmDealButton from "../Crm/TicketCrmDealButton";
 
 const useStyles = makeStyles((theme) => ({
   actionButtons: {
@@ -38,6 +40,8 @@ const TicketActionButtonsCustom = ({ ticket, onOpenQuickReplies }) => {
   const [loading, setLoading] = useState(false);
   const { user } = useContext(AuthContext);
   const setCurrentTicket = useContext(TicketsSetContext);
+  const planFlags = usePlanFlags();
+  const fx = planFlags.effectiveFeatures || {};
 
   const handleUpdateTicketStatus = async (e, status, userId) => {
     setLoading(true);
@@ -92,6 +96,11 @@ const TicketActionButtonsCustom = ({ ticket, onOpenQuickReplies }) => {
               onTransferClick={openTransfer}
               onDeleteClick={openDelete}
               onQuickRepliesClick={onOpenQuickReplies}
+              extraIconActions={
+                fx["crm.pipeline"] === true ? (
+                  <TicketCrmDealButton ticket={ticket} />
+                ) : null
+              }
             />
           )}
         </TicketActionModals>

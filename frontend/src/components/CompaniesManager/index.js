@@ -84,6 +84,7 @@ import {
   getCompanyModuleOriginKey,
   planBlocksCompanyModule,
 } from "../ModuleSettings/moduleSync";
+import { BUSINESS_SEGMENTS } from "../../config/businessSegment.js";
 
 const REC_MONTHS = {
   MENSAL: 1,
@@ -828,6 +829,7 @@ export function CompanyForm(props) {
     storageCalculatedAt: initialValue?.storageCalculatedAt ?? null,
     storageAlertLevel: initialValue?.storageAlertLevel ?? "ok",
     modulePermissions: mergeModulePermissions(initialValue?.modulePermissions),
+    businessSegment: initialValue?.businessSegment || "general",
   }));
 
   const { list: listPlans } = usePlans();
@@ -865,6 +867,7 @@ export function CompanyForm(props) {
         storageCalculatedAt: initialValue?.storageCalculatedAt ?? null,
         storageAlertLevel: initialValue?.storageAlertLevel ?? "ok",
         modulePermissions: mergeModulePermissions(initialValue?.modulePermissions),
+        businessSegment: initialValue?.businessSegment || "general",
       };
     });
   }, [initialValue]);
@@ -1197,6 +1200,68 @@ export function CompanyForm(props) {
                       ))}
                     </Field>
                   </Grid>
+                  {user?.super ? (
+                    <>
+                      <Grid item xs={12} sm={6} md={4}>
+                        <FormControl margin="dense" variant="outlined" fullWidth>
+                          <InputLabel id="biz-seg-lbl">
+                            {i18n.t("settings.company.form.businessSegment")}
+                          </InputLabel>
+                          <Field name="businessSegment">
+                            {({ field }) => (
+                              <Select
+                                labelId="biz-seg-lbl"
+                                label={i18n.t("settings.company.form.businessSegment")}
+                                {...field}
+                                value={field.value || "general"}
+                              >
+                                {BUSINESS_SEGMENTS.map((s) => (
+                                  <MenuItem key={s.value} value={s.value}>
+                                    {i18n.t(s.labelKey)}
+                                  </MenuItem>
+                                ))}
+                              </Select>
+                            )}
+                          </Field>
+                        </FormControl>
+                      </Grid>
+                      <Grid item xs={12} sm={6} md={4}>
+                        {initialValue && initialValue.id ? (
+                          <Box mt={0.5}>
+                            <Typography
+                              variant="caption"
+                              color="textSecondary"
+                              display="block"
+                              style={{ marginBottom: 8 }}
+                            >
+                              {i18n.t("settings.company.form.bootstrapCrmHint")}
+                            </Typography>
+                            <Button
+                              variant="outlined"
+                              color="primary"
+                              size="small"
+                              onClick={async () => {
+                                try {
+                                  const { data } = await api.post(
+                                    `/companies/${initialValue.id}/crm/bootstrap`
+                                  );
+                                  toast.success(
+                                    data.bootstrapped
+                                      ? i18n.t("settings.company.form.bootstrapCrmOk")
+                                      : i18n.t("settings.company.form.bootstrapCrmAlready")
+                                  );
+                                } catch (e) {
+                                  toastError(e);
+                                }
+                              }}
+                            >
+                              {i18n.t("settings.company.form.bootstrapCrm")}
+                            </Button>
+                          </Box>
+                        ) : null}
+                      </Grid>
+                    </>
+                  ) : null}
                   <Grid item xs={12} sm={6} md={4}>
                     <FormControl variant="outlined" fullWidth>
                       <Field
@@ -2474,6 +2539,7 @@ export default function CompaniesManager() {
     storageAlertLevel: "ok",
     modulePermissions: defaultModulePermissions(),
     primaryAdmin: null,
+    businessSegment: "general",
   });
 
   useEffect(() => {
@@ -2524,6 +2590,7 @@ export default function CompaniesManager() {
         storageCalculatedAt: data.storageCalculatedAt ?? null,
         storageAlertLevel: data.storageAlertLevel ?? "ok",
         modulePermissions: mergeModulePermissions(data.modulePermissions),
+        businessSegment: data.businessSegment || "general",
       }));
       await loadStorageSnapshotsForCompany(record.id);
     } catch (e) {

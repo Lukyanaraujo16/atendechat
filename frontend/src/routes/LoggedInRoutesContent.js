@@ -43,6 +43,7 @@ import FlowBuilderConfig from "../pages/FlowBuilderConfig";
 import Evaluation from "../pages/Evaluation";
 import Reports from "../pages/Reports";
 import UserNotifications from "../pages/UserNotifications";
+import CrmBoard from "../pages/CRM";
 
 function DashboardRouteGuard() {
   const { user } = useContext(AuthContext);
@@ -571,6 +572,21 @@ export default function LoggedInRoutesContent() {
           ) : (
             <PlanFeatureBlocked />
           );
+        }}
+      />
+
+      <Route
+        exact
+        path="/crm"
+        render={() => {
+          if (!planFlags.loaded) {
+            return (
+              <Box display="flex" justifyContent="center" alignItems="center" minHeight={240} width="100%">
+                <CircularProgress size={36} />
+              </Box>
+            );
+          }
+          return fx["crm.pipeline"] === true ? <CrmBoard /> : <PlanFeatureBlocked />;
         }}
       />
 

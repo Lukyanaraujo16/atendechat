@@ -9,7 +9,8 @@ import {
   ForeignKey,
   BelongsTo,
   DataType,
-  HasMany
+  HasMany,
+  Default
 } from "sequelize-typescript";
 import Contact from "./Contact";
 import Message from "./Message";
@@ -95,6 +96,11 @@ class Company extends Model<Company> {
   /** Último alerta de threshold enviado: 0 | 80 | 90 | 100 — deduplica notificações ao subir/descer percentual. */
   @Column({ type: DataType.SMALLINT, allowNull: false, defaultValue: 0 })
   storageAlertWatermark: number;
+
+  /** Segmento de negócio (templates de CRM ao criar pipeline padrão). */
+  @Default("general")
+  @Column
+  businessSegment: string;
 
   @ForeignKey(() => Plan)
   @Column
