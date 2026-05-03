@@ -195,7 +195,7 @@ const MainListItems = (props) => {
   const showFinanceNav =
     fx["finance.subscription"] === true || fx["finance.invoices"] === true;
   const showEvalNav = fx["team.ratings"] === true;
-  const showTagsNav = fx["contacts.crm"] === true;
+  const showTagsNav = fx["contacts.tags"] === true;
   const showFilesNav = fx["contacts.files"] === true;
   const showCrmNav = fx["crm.pipeline"] === true;
   const showTeamUsersNav =

@@ -533,7 +533,7 @@ export default function LoggedInRoutesContent() {
               </Box>
             );
           }
-          return fx["contacts.crm"] === true ? <Tags /> : <PlanFeatureBlocked />;
+          return fx["contacts.tags"] === true ? <Tags /> : <PlanFeatureBlocked />;
         }}
       />
       <Route

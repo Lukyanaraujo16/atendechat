@@ -9,6 +9,23 @@ import { resolvePlanIdForQuery, logPlanFeaturesWarn } from "./planIdResolve";
 
 export type PersistedPlanFeatureMap = Record<string, boolean>;
 
+/**
+ * Retrocompat: PlanFeatures antigas usavam `contacts.crm` para Etiquetas.
+ * Passa o valor para `contacts.tags` se esta chave ainda não existir.
+ */
+export function applyPersistedPlanFeatureAliases(
+  persisted: PersistedPlanFeatureMap
+): PersistedPlanFeatureMap {
+  const out = { ...persisted };
+  if (
+    Object.prototype.hasOwnProperty.call(out, "contacts.crm") &&
+    !Object.prototype.hasOwnProperty.call(out, "contacts.tags")
+  ) {
+    out["contacts.tags"] = out["contacts.crm"] === true;
+  }
+  return out;
+}
+
 export {
   resolvePlanIdForQuery,
   getPlanIdFromContext,
@@ -63,7 +80,7 @@ export async function loadPersistedPlanFeatureMap(
   for (const r of rows) {
     persisted[r.featureKey] = r.enabled === true;
   }
-  return persisted;
+  return applyPersistedPlanFeatureAliases(persisted);
 }
 
 function applyLegacyModulePermissionGates(
@@ -112,6 +129,13 @@ export function resolvePlanFeature(
 ): boolean {
   const perms = coerceModulePermissionsFromRow(modulePermissions) ?? {};
   if (perms[featureKey] === false) return false;
+  if (
+    featureKey === "contacts.tags" &&
+    Object.prototype.hasOwnProperty.call(perms, "contacts.crm") &&
+    perms["contacts.crm"] === false
+  ) {
+    return false;
+  }
   let v: boolean;
   if (Object.prototype.hasOwnProperty.call(persistedMap, featureKey)) {
     v = persistedMap[featureKey] === true;
@@ -127,8 +151,9 @@ export function getEffectivePlanFeaturesMap(
   modulePermissions: unknown
 ): Record<string, boolean> {
   const keys = getAllFeatureKeys();
-  const nPersist = Object.keys(persistedMap).length;
-  const nTruePersist = Object.values(persistedMap).filter((x) => x === true).length;
+  const persistedAliased = applyPersistedPlanFeatureAliases(persistedMap);
+  const nPersist = Object.keys(persistedAliased).length;
+  const nTruePersist = Object.values(persistedAliased).filter((x) => x === true).length;
   const trueRatio = nPersist > 0 ? nTruePersist / nPersist : 0;
   const corruptedPersisted =
     Boolean(plan) &&
@@ -136,7 +161,7 @@ export function getEffectivePlanFeaturesMap(
     nPersist > 0 &&
     trueRatio < 0.12;
 
-  const effectivePersisted = corruptedPersisted ? {} : persistedMap;
+  const effectivePersisted = corruptedPersisted ? {} : persistedAliased;
 
   const out: Record<string, boolean> = {};
   for (const k of keys) {
@@ -150,10 +175,11 @@ export function mergePlanPersistedWithLegacy(
   plan: Plan,
   rows: PlanFeature[]
 ): Record<string, boolean> {
-  const persisted: PersistedPlanFeatureMap = {};
+  const persistedRaw: PersistedPlanFeatureMap = {};
   for (const r of rows) {
-    persisted[r.featureKey] = r.enabled === true;
+    persistedRaw[r.featureKey] = r.enabled === true;
   }
+  const persisted = applyPersistedPlanFeatureAliases(persistedRaw);
   const keys = getAllFeatureKeys();
   const out: Record<string, boolean> = {};
   for (const k of keys) {

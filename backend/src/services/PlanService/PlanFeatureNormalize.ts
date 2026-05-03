@@ -4,6 +4,20 @@ import {
   legacyPlanFeatureValue
 } from "../../config/planFeatureLegacy";
 
+function planFeaturesInputWithAliases(
+  raw: unknown
+): Record<string, unknown> | undefined {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  const src = { ...(raw as Record<string, unknown>) };
+  if (
+    Object.prototype.hasOwnProperty.call(src, "contacts.crm") &&
+    !Object.prototype.hasOwnProperty.call(src, "contacts.tags")
+  ) {
+    src["contacts.tags"] = src["contacts.crm"] === true;
+  }
+  return src;
+}
+
 /** Converte input da API (objeto parcial ou completo) em mapa completo de chaves.
  * Chaves omitidas usam o legado do plano (colunas + baseline), não `false` —
  * evita gravar PlanFeatures com false em massa por payload parcial.
@@ -14,10 +28,7 @@ export function normalizePlanFeaturesInput(
 ): Record<string, boolean> {
   const keys = getAllFeatureKeys();
   const out: Record<string, boolean> = {};
-  const src =
-    raw && typeof raw === "object"
-      ? (raw as Record<string, unknown>)
-      : undefined;
+  const src = planFeaturesInputWithAliases(raw);
   for (const k of keys) {
     if (src && Object.prototype.hasOwnProperty.call(src, k)) {
       out[k] = src[k] === true;

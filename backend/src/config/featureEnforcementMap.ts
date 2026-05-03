@@ -130,8 +130,8 @@ export const FEATURE_ENFORCEMENT_MAP: Array<{
     backendRoutes: ["POST /api/messages/send"]
   },
   {
-    feature: "contacts.crm",
-    menu: "Tags",
+    feature: "contacts.tags",
+    menu: "Etiquetas",
     frontendRoutes: ["/tags"]
   },
   {

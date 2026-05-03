@@ -82,8 +82,14 @@ export const FEATURES: Record<string, FeatureNode> = {
   contacts: {
     label: "Contatos",
     children: {
-      crm: { label: "CRM / etiquetas" },
+      tags: { label: "Etiquetas" },
       files: { label: "Lista de ficheiros" }
+    }
+  },
+  crm: {
+    label: "CRM",
+    children: {
+      pipeline: { label: "Pipeline de oportunidades" }
     }
   },
   settings: {
@@ -91,12 +97,6 @@ export const FEATURES: Record<string, FeatureNode> = {
     children: {
       connections: { label: "Conexões WhatsApp" },
       api: { label: "API / mensagens externas" }
-    }
-  },
-  crm: {
-    label: "CRM",
-    children: {
-      pipeline: { label: "Pipeline / oportunidades" }
     }
   }
 };

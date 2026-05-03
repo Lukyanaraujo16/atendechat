@@ -29,7 +29,7 @@ export function legacyPlanFeatureValue(
     case "dashboard.main":
     case "dashboard.reports":
     case "attendance.inbox":
-    case "contacts.crm":
+    case "contacts.tags":
     case "contacts.files":
     case "settings.connections":
     case "agenda.calendar":
