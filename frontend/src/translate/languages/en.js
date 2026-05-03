@@ -408,6 +408,7 @@ const messages = {
 					finance: "Billing",
 					campaigns: "Campaigns",
 					contacts: "Contacts",
+					crm: "CRM",
 					settings: "Settings",
 				},
 			},
