@@ -53,6 +53,7 @@ export const index = async (req: Request, res: Response): Promise<Response> => {
   if (kindQ === "ticket") kind = "ticket";
   else if (kindQ === "appointment") kind = "appointment";
   else if (kindQ === "billing") kind = "billing";
+  else if (kindQ === "crm") kind = "crm";
 
   const search =
     typeof req.query.q === "string"

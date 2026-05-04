@@ -35,7 +35,8 @@ export function mergeDealWhereWithSearch(
     ...base,
     [Op.or]: [
       { title: { [Op.iLike]: t } },
-      { "$contact.name$": { [Op.iLike]: t } }
+      { "$contact.name$": { [Op.iLike]: t } },
+      { "$contact.number$": { [Op.iLike]: t } }
     ]
   };
 }

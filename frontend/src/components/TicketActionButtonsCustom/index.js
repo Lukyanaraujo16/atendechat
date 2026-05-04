@@ -34,7 +34,11 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
-const TicketActionButtonsCustom = ({ ticket, onOpenQuickReplies }) => {
+const TicketActionButtonsCustom = ({
+  ticket,
+  onOpenQuickReplies,
+  onCrmDealSaved,
+}) => {
   const classes = useStyles();
   const history = useHistory();
   const [loading, setLoading] = useState(false);
@@ -98,7 +102,10 @@ const TicketActionButtonsCustom = ({ ticket, onOpenQuickReplies }) => {
               onQuickRepliesClick={onOpenQuickReplies}
               extraIconActions={
                 fx["crm.pipeline"] === true ? (
-                  <TicketCrmDealButton ticket={ticket} />
+                  <TicketCrmDealButton
+                    ticket={ticket}
+                    onCrmDealSaved={onCrmDealSaved}
+                  />
                 ) : null
               }
             />

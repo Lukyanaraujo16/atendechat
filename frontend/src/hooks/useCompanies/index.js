@@ -102,6 +102,15 @@ const useCompanies = () => {
     return data;
   }, []);
 
+  const updateCrmVisibility = useCallback(async (id, crmVisibilityMode) => {
+    const { data: responseData } = await api.request({
+      url: `/companies/${id}/crm-visibility`,
+      method: "PUT",
+      data: { crmVisibilityMode },
+    });
+    return responseData;
+  }, []);
+
   return {
     save,
     update,
@@ -112,6 +121,7 @@ const useCompanies = () => {
     findAll,
     updateSchedules,
     updateTimezone,
+    updateCrmVisibility,
     renewDueDate,
     fetchCompanyLogs,
     recalculateStorage,

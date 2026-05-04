@@ -3,6 +3,7 @@ import AppError from "../../errors/AppError";
 import Company from "../../models/Company";
 import Setting from "../../models/Setting";
 import { normalizeBusinessSegment } from "../../config/businessSegment";
+import { normalizeCrmVisibilityMode } from "../CrmService/crmDealVisibility";
 
 interface CompanyData {
   name?: string;
@@ -22,6 +23,7 @@ interface CompanyData {
   /** GB; null = usar plano */
   storageLimitGb?: number | null;
   businessSegment?: string | null;
+  crmVisibilityMode?: string | null;
 }
 
 const UpdateCompanyService = async (
@@ -42,7 +44,8 @@ const UpdateCompanyService = async (
     internalNotes,
     contractedPlanValue,
     storageLimitGb,
-    businessSegment
+    businessSegment,
+    crmVisibilityMode
   } = companyData;
 
   if (!company) {
@@ -102,6 +105,9 @@ const UpdateCompanyService = async (
     payload.businessSegment = normalizeBusinessSegment(
       businessSegment as string | null | undefined
     );
+  }
+  if (crmVisibilityMode !== undefined) {
+    payload.crmVisibilityMode = normalizeCrmVisibilityMode(crmVisibilityMode);
   }
 
   if (Object.keys(payload).length > 0) {

@@ -26,6 +26,7 @@ import ChatBubbleOutlineIcon from "@material-ui/icons/ChatBubbleOutline";
 import ConfirmationNumberOutlinedIcon from "@material-ui/icons/ConfirmationNumberOutlined";
 import EventOutlinedIcon from "@material-ui/icons/EventOutlined";
 import AttachMoneyOutlinedIcon from "@material-ui/icons/AttachMoneyOutlined";
+import TrackChangesOutlinedIcon from "@material-ui/icons/TrackChangesOutlined";
 
 import MainContainer from "../../components/MainContainer";
 import { AppPageHeader } from "../../ui";
@@ -76,6 +77,7 @@ function TypeIcon({ v }) {
   if (v === "message") return <ChatBubbleOutlineIcon fontSize="small" color="action" />;
   if (v === "appointment") return <EventOutlinedIcon fontSize="small" color="action" />;
   if (v === "billing") return <AttachMoneyOutlinedIcon fontSize="small" color="action" />;
+  if (v === "crm") return <TrackChangesOutlinedIcon fontSize="small" color="action" />;
   return <ConfirmationNumberOutlinedIcon fontSize="small" color="action" />;
 }
 
@@ -125,6 +127,7 @@ export default function UserNotificationsPage() {
       if (kind === "ticket") params.kind = "ticket";
       if (kind === "appointment") params.kind = "appointment";
       if (kind === "billing") params.kind = "billing";
+      if (kind === "crm") params.kind = "crm";
       if (String(searchApplied).trim() !== "") params.q = String(searchApplied).trim();
 
       const { data } = await api.get("/notifications", { params });
@@ -276,6 +279,7 @@ export default function UserNotificationsPage() {
                 {i18n.t("userNotificationCenter.kindAppointment")}
               </MenuItem>
               <MenuItem value="billing">{i18n.t("userNotificationCenter.kindBilling")}</MenuItem>
+              <MenuItem value="crm">{i18n.t("userNotificationCenter.kindCrm")}</MenuItem>
             </Select>
           </FormControl>
           <TextField

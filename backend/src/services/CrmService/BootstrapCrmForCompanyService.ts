@@ -8,6 +8,7 @@ import {
   type BusinessSegment
 } from "../../config/businessSegment";
 import { crmPipelineTemplates } from "../../config/crmPipelineTemplates";
+import { stageWinLostFromName } from "./crmStageWinLost";
 
 const STAGE_COLORS = [
   "#5c6bc0",
@@ -19,22 +20,6 @@ const STAGE_COLORS = [
   "#ffa726",
   "#8d6e63"
 ];
-
-export function stageWinLostFromName(name: string): {
-  isWon: boolean;
-  isLost: boolean;
-} {
-  const n = String(name).trim();
-  if (n === "Perdido") return { isWon: false, isLost: true };
-  if (
-    n === "Fechado" ||
-    n === "Matriculado" ||
-    n === "Pedido fechado"
-  ) {
-    return { isWon: true, isLost: false };
-  }
-  return { isWon: false, isLost: false };
-}
 
 export type BootstrapCrmResult = {
   bootstrapped: boolean;

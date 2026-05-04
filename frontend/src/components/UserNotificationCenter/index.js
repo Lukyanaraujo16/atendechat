@@ -20,6 +20,7 @@ import ChatBubbleOutlineIcon from "@material-ui/icons/ChatBubbleOutline";
 import ConfirmationNumberOutlinedIcon from "@material-ui/icons/ConfirmationNumberOutlined";
 import EventOutlinedIcon from "@material-ui/icons/EventOutlined";
 import AttachMoneyOutlinedIcon from "@material-ui/icons/AttachMoneyOutlined";
+import TrackChangesOutlinedIcon from "@material-ui/icons/TrackChangesOutlined";
 import ArchiveOutlinedIcon from "@material-ui/icons/ArchiveOutlined";
 
 import { AuthContext } from "../../context/Auth/AuthContext";
@@ -79,6 +80,7 @@ function TypeIcon({ v }) {
   if (v === "message") return <ChatBubbleOutlineIcon fontSize="small" color="action" />;
   if (v === "appointment") return <EventOutlinedIcon fontSize="small" color="action" />;
   if (v === "billing") return <AttachMoneyOutlinedIcon fontSize="small" color="action" />;
+  if (v === "crm") return <TrackChangesOutlinedIcon fontSize="small" color="action" />;
   return <ConfirmationNumberOutlinedIcon fontSize="small" color="action" />;
 }
 

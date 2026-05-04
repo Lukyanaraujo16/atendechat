@@ -93,6 +93,7 @@ const Ticket = () => {
   userRef.current = user;
 
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [crmPanelRefreshKey, setCrmPanelRefreshKey] = useState(0);
   const [reassignModalOpen, setReassignModalOpen] = useState(false);
   const [quickRepliesOpen, setQuickRepliesOpen] = useState(false);
   const chatInputControllerRef = useRef(null);
@@ -273,6 +274,7 @@ const Ticket = () => {
           <TicketActionButtons
             ticket={ticket}
             onOpenQuickReplies={() => setQuickRepliesOpen(true)}
+            onCrmDealSaved={() => setCrmPanelRefreshKey((n) => n + 1)}
           />
         </TicketHeader>
         {ticket?.id && (
@@ -294,6 +296,8 @@ const Ticket = () => {
         contact={contact}
         loading={loading}
         ticket={ticket}
+        crmPanelRefreshKey={crmPanelRefreshKey}
+        onCrmPanelDataChanged={() => setCrmPanelRefreshKey((n) => n + 1)}
       />
       <ReassignOrphanWhatsappModal
         open={reassignModalOpen}

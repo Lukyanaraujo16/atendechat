@@ -1,95 +1,130 @@
 import type { BusinessSegment } from "./businessSegment";
 
+/** Vendas / geral — “Outros” reutiliza o mesmo conjunto de etapas. */
+const GENERAL_SALES_STAGES = [
+  "Novo lead",
+  "Contato iniciado",
+  "Qualificado",
+  "Proposta enviada",
+  "Negociação",
+  "Fechado ganho",
+  "Perdido"
+] as const;
+
 /**
- * Estágios padrão por segmento (catálogo). Marcadores “ganho/perda” aplicados no bootstrap
- * com base no nome (Fechado, Matriculado = ganho; Perdido = perda).
+ * Estágios padrão por segmento (catálogo). Marcadores isWon/isLost vêm de crmStageWinLost.
  */
 export const crmPipelineTemplates: Record<BusinessSegment, string[]> = {
-  general: [
-    "Novo lead",
+  general: [...GENERAL_SALES_STAGES],
+  support: [
+    "Novo chamado",
+    "Em triagem",
     "Em atendimento",
-    "Em negociação",
-    "Fechado",
-    "Perdido"
+    "Aguardando cliente",
+    "Resolvido",
+    "Reaberto"
   ],
   clinic: [
-    "Novo lead",
+    "Novo paciente",
     "Triagem",
     "Consulta agendada",
-    "Em negociação",
-    "Fechado",
-    "Perdido"
+    "Consulta realizada",
+    "Tratamento indicado",
+    "Retorno",
+    "Finalizado"
   ],
   aesthetic_clinic: [
     "Novo lead",
     "Avaliação agendada",
+    "Avaliação realizada",
     "Procedimento indicado",
     "Em negociação",
+    "Pós-atendimento",
+    "Retorno",
     "Fechado",
     "Perdido"
   ],
   real_estate: [
     "Novo lead",
     "Interesse identificado",
+    "Imóvel selecionado",
     "Visita agendada",
     "Proposta enviada",
+    "Negociação",
     "Fechado",
     "Perdido"
   ],
   gym: [
     "Novo lead",
+    "Contato iniciado",
     "Aula experimental",
     "Plano apresentado",
     "Matriculado",
     "Perdido"
   ],
   school: [
-    "Novo lead",
-    "Visita à escola",
-    "Matrícula em análise",
-    "Matriculado",
+    "Novo interessado",
+    "Contato iniciado",
+    "Apresentação realizada",
+    "Proposta enviada",
+    "Matrícula realizada",
     "Perdido"
   ],
   ecommerce: [
-    "Novo lead",
-    "Carrinho / interesse",
-    "Negociação",
-    "Pedido fechado",
+    "Novo contato",
+    "Dúvida sobre produto",
+    "Carrinho / intenção",
+    "Pagamento pendente",
+    "Compra concluída",
+    "Pós-venda",
     "Perdido"
   ],
   automotive: [
     "Novo lead",
-    "Test-drive",
-    "Proposta",
-    "Fechado",
-    "Perdido"
-  ],
-  financial: [
-    "Novo lead",
-    "Análise",
-    "Proposta",
-    "Fechado",
+    "Veículo de interesse",
+    "Agendamento de visita",
+    "Proposta enviada",
+    "Negociação",
+    "Venda concluída",
     "Perdido"
   ],
   legal: [
-    "Novo lead",
-    "Consulta inicial",
-    "Contrato / proposta",
-    "Fechado",
+    "Novo contato",
+    "Análise inicial",
+    "Consulta agendada",
+    "Proposta enviada",
+    "Contrato fechado",
+    "Caso em andamento",
+    "Encerrado",
     "Perdido"
   ],
   healthcare: [
-    "Novo lead",
+    "Novo paciente",
     "Triagem",
-    "Atendimento",
-    "Fechado",
+    "Consulta agendada",
+    "Consulta realizada",
+    "Tratamento indicado",
+    "Retorno",
+    "Finalizado"
+  ],
+  financial: [
+    "Novo lead",
+    "Diagnóstico",
+    "Proposta enviada",
+    "Documentação",
+    "Aprovado",
+    "Em andamento",
+    "Finalizado",
     "Perdido"
   ],
-  other: [
-    "Novo lead",
-    "Em atendimento",
-    "Em negociação",
-    "Fechado",
+  service: [
+    "Solicitação recebida",
+    "Orçamento em elaboração",
+    "Orçamento enviado",
+    "Aprovado",
+    "Em execução",
+    "Finalizado",
     "Perdido"
-  ]
+  ],
+  other: [...GENERAL_SALES_STAGES]
 };

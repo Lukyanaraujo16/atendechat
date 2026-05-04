@@ -34,6 +34,7 @@ import Chat from "../pages/Chat";
 import ToDoList from "../pages/ToDoList/";
 import Agenda from "../pages/Agenda";
 import Subscription from "../pages/Subscription/";
+import MediaManager from "../pages/MediaManager";
 import Files from "../pages/Files/";
 import Prompts from "../pages/Prompts";
 import QueueIntegration from "../pages/QueueIntegration";
@@ -44,6 +45,8 @@ import Evaluation from "../pages/Evaluation";
 import Reports from "../pages/Reports";
 import UserNotifications from "../pages/UserNotifications";
 import CrmBoard from "../pages/CRM";
+import CRMReports from "../pages/CRMReports";
+import CrmAutomations from "../pages/CrmAutomations";
 
 function DashboardRouteGuard() {
   const { user } = useContext(AuthContext);
@@ -338,15 +341,18 @@ function EquipeModule({ isAdmin, planFlags }) {
   );
 }
 
-function ConfiguracoesModule({ showExternalApi }) {
+function ConfiguracoesModule({ showExternalApi, showMediaManager }) {
   const tabs = useMemo(() => {
     const t = [{ path: "/connections", label: i18n.t("mainDrawer.listItems.connections") }];
     if (showExternalApi) {
       t.push({ path: "/messages-api", label: i18n.t("mainDrawer.listItems.messagesAPI") });
     }
     t.push({ path: "/settings", label: i18n.t("mainDrawer.listItems.settings") });
+    if (showMediaManager) {
+      t.push({ path: "/settings/media-manager", label: i18n.t("settings.tabs.mediaManager") });
+    }
     return t;
-  }, [showExternalApi, i18n.language]);
+  }, [showExternalApi, showMediaManager, i18n.language]);
 
   return (
     <ModuleTabsLayout tabs={tabs}>
@@ -358,6 +364,11 @@ function ConfiguracoesModule({ showExternalApi }) {
           render={() => (showExternalApi ? <MessagesAPI /> : <PlanFeatureBlocked />)}
         />
         <Route exact path="/settings" component={SettingsCustom} />
+        <Route
+          exact
+          path="/settings/media-manager"
+          render={() => (showMediaManager ? <MediaManager /> : <PlanFeatureBlocked />)}
+        />
       </Switch>
     </ModuleTabsLayout>
   );
@@ -367,6 +378,7 @@ export default function LoggedInRoutesContent() {
   const { user } = useContext(AuthContext);
   const planFlags = usePlanFlags();
   const isAdmin = user?.profile === "admin";
+  const showMediaManager = isAdmin || user?.supportMode === true;
   const fx = planFlags.effectiveFeatures || {};
 
   const atendimentoPaths = ["/tickets/:ticketId?", "/kanban", "/contacts", "/group-manager"];
@@ -390,7 +402,7 @@ export default function LoggedInRoutesContent() {
 
   const equipePaths = ["/users", "/setores", "/queues"];
 
-  const configPaths = ["/connections", "/messages-api", "/settings"];
+  const configPaths = ["/connections", "/messages-api", "/settings", "/settings/media-manager"];
 
   return (
     <Switch>
@@ -487,7 +499,10 @@ export default function LoggedInRoutesContent() {
       <Route
         path={configPaths}
         render={() => (
-          <ConfiguracoesModule showExternalApi={planFlags.useExternalApi} />
+          <ConfiguracoesModule
+            showExternalApi={planFlags.useExternalApi}
+            showMediaManager={showMediaManager}
+          />
         )}
       />
 
@@ -572,6 +587,36 @@ export default function LoggedInRoutesContent() {
           ) : (
             <PlanFeatureBlocked />
           );
+        }}
+      />
+
+      <Route
+        exact
+        path="/crm/reports"
+        render={() => {
+          if (!planFlags.loaded) {
+            return (
+              <Box display="flex" justifyContent="center" alignItems="center" minHeight={240} width="100%">
+                <CircularProgress size={36} />
+              </Box>
+            );
+          }
+          return fx["crm.pipeline"] === true ? <CRMReports /> : <PlanFeatureBlocked />;
+        }}
+      />
+
+      <Route
+        exact
+        path="/crm/automations"
+        render={() => {
+          if (!planFlags.loaded) {
+            return (
+              <Box display="flex" justifyContent="center" alignItems="center" minHeight={240} width="100%">
+                <CircularProgress size={36} />
+              </Box>
+            );
+          }
+          return fx["crm.pipeline"] === true ? <CrmAutomations /> : <PlanFeatureBlocked />;
         }}
       />
 

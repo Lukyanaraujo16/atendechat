@@ -102,6 +102,11 @@ class Company extends Model<Company> {
   @Column
   businessSegment: string;
 
+  /** CRM: todos os utilizadores vs. só deals atribuídos ao próprio (operadores). */
+  @Default("all")
+  @Column(DataType.STRING(16))
+  crmVisibilityMode: string;
+
   @ForeignKey(() => Plan)
   @Column
   planId: number;

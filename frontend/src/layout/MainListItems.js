@@ -296,13 +296,16 @@ const MainListItems = (props) => {
     path === "/queues" ||
     path.startsWith("/queues/");
   const selConfig =
-    path === "/connections" || path === "/messages-api" || path === "/settings";
+    path === "/connections" ||
+    path === "/messages-api" ||
+    path === "/settings" ||
+    path.startsWith("/settings/");
   const selFinanceiro = path === "/financeiro";
 
   const selTarefas = path === "/todolist";
   const selAgenda = path === "/agenda";
   const selAgendamentos = path === "/schedules";
-  const selCrm = path === "/crm";
+  const selCrm = path === "/crm" || path.startsWith("/crm/");
   const selAvaliacao = path === "/avaliacao";
   const selInformativos =
     path === "/announcements" || path.startsWith("/saas/announcements");

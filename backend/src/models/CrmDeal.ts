@@ -21,6 +21,7 @@ import User from "./User";
 
 export type CrmDealStatus = "open" | "won" | "lost";
 export type CrmDealSource = "whatsapp" | "manual" | "instagram" | "other";
+export type CrmDealPriority = "low" | "medium" | "high" | "urgent";
 
 @Table({ tableName: "CrmDeals" })
 class CrmDeal extends Model<CrmDeal> {
@@ -81,6 +82,18 @@ class CrmDeal extends Model<CrmDeal> {
   @Column
   source: CrmDealSource;
 
+  @Default("medium")
+  @Column
+  priority: CrmDealPriority;
+
+  @AllowNull
+  @Column(DataType.JSON)
+  tags: string[] | null;
+
+  @AllowNull
+  @Column(DataType.DATE)
+  lastActivityAt: Date | null;
+
   @AllowNull
   @Column(DataType.DATE)
   expectedCloseAt: Date | null;
@@ -88,6 +101,35 @@ class CrmDeal extends Model<CrmDeal> {
   @AllowNull
   @Column(DataType.TEXT)
   notes: string | null;
+
+  @AllowNull
+  @Column(DataType.DATE)
+  nextFollowUpAt: Date | null;
+
+  @AllowNull
+  @Column(DataType.TEXT)
+  followUpNote: string | null;
+
+  @AllowNull
+  @Column(DataType.DATE)
+  followUpNotifiedAt: Date | null;
+
+  @AllowNull
+  @Column(DataType.DATE)
+  attentionAt: Date | null;
+
+  @AllowNull
+  @Column(DataType.TEXT)
+  attentionReason: string | null;
+
+  @AllowNull
+  @Column(DataType.DATE)
+  attentionNotifiedAt: Date | null;
+
+  /** Última notificação de automação “parado”; limpa quando há atividade no deal. */
+  @AllowNull
+  @Column(DataType.DATE)
+  automationLastStaleNotifyAt: Date | null;
 
   @AllowNull
   @ForeignKey(() => User)
@@ -104,6 +146,10 @@ class CrmDeal extends Model<CrmDeal> {
 
   @BelongsTo(() => User, { foreignKey: "assignedUserId", as: "assignedUser" })
   assignedUser: User;
+
+  @AllowNull
+  @Column(DataType.JSON)
+  customFields: Record<string, unknown> | null;
 
   @CreatedAt
   createdAt: Date;

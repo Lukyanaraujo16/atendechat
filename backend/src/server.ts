@@ -12,6 +12,8 @@ import { startBillingAutomationScheduler } from "./jobs/billingAutomationSchedul
 import { startSignupCriticalSocketScheduler } from "./jobs/signupCriticalSocketScheduler";
 import { startUserNotificationCleanupScheduler } from "./jobs/userNotificationCleanupScheduler";
 import { startCompanyStorageRecalcScheduler } from "./jobs/companyStorageRecalcScheduler";
+import { startCrmFollowUpNotifierScheduler } from "./jobs/crmFollowUpNotifierJob";
+import { startCrmStaleDealAttentionScheduler } from "./jobs/crmStaleDealAttentionJob";
 import { logWhatsAppPolicyAtProcessBoot } from "./helpers/whatsappUnavailablePresence";
 
 const server = app.listen(process.env.PORT, async () => {
@@ -37,6 +39,8 @@ const server = app.listen(process.env.PORT, async () => {
   startSignupCriticalSocketScheduler();
   startUserNotificationCleanupScheduler();
   startCompanyStorageRecalcScheduler();
+  startCrmFollowUpNotifierScheduler();
+  startCrmStaleDealAttentionScheduler();
 });
 
 cron.schedule("* * * * *", async () => {

@@ -1,10 +1,31 @@
 import express from "express";
 import isAuth from "../middleware/isAuth";
 import isSuper from "../middleware/isSuper";
+import requireTenantAdminOrSupport from "../middleware/requireTenantAdminOrSupport";
 
 import * as CompanyController from "../controllers/CompanyController";
+import * as CompanyMediaController from "../controllers/CompanyMediaController";
 
 const companyRoutes = express.Router();
+
+companyRoutes.get(
+  "/company-media",
+  isAuth,
+  requireTenantAdminOrSupport,
+  CompanyMediaController.listCompanyMedia
+);
+companyRoutes.post(
+  "/company-media/delete-batch",
+  isAuth,
+  requireTenantAdminOrSupport,
+  CompanyMediaController.deleteCompanyMediaBatch
+);
+companyRoutes.delete(
+  "/company-media/:source/:sourceId",
+  isAuth,
+  requireTenantAdminOrSupport,
+  CompanyMediaController.deleteCompanyMediaItem
+);
 
 companyRoutes.get("/companies/storage", isAuth, CompanyController.getMyCompanyStorage);
 companyRoutes.get(
@@ -31,6 +52,11 @@ companyRoutes.get("/companies/:id", isAuth, CompanyController.show);
 companyRoutes.post("/companies", isAuth, isSuper, CompanyController.store);
 companyRoutes.put("/companies/:id", isAuth, isSuper, CompanyController.update);
 companyRoutes.put("/companies/:id/timezone", isAuth, CompanyController.updateTimezone);
+companyRoutes.put(
+  "/companies/:id/crm-visibility",
+  isAuth,
+  CompanyController.updateCrmVisibility
+);
 companyRoutes.put("/companies/:id/schedules",isAuth,CompanyController.updateSchedules);
 companyRoutes.delete("/companies/:id", isAuth, isSuper, CompanyController.remove);
 companyRoutes.post("/companies/:id/renew", isAuth, isSuper, CompanyController.renewDueDate);

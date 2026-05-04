@@ -1,27 +1,158 @@
 import express from "express";
 import isAuth from "../middleware/isAuth";
 import requireAnyPlanFeature from "../middleware/requirePlanFeature";
+import requireCrmPipelineAdmin from "../middleware/requireCrmPipelineAdmin";
 import * as CrmController from "../controllers/CrmController";
+import * as CrmAutomationRuleController from "../controllers/CrmAutomationRuleController";
 
 const crmRoutes = express.Router();
 
+crmRoutes.get(
+  "/crm/automation-rules",
+  isAuth,
+  requireAnyPlanFeature("crm.pipeline"),
+  CrmAutomationRuleController.listCrmAutomationRules
+);
+crmRoutes.post(
+  "/crm/automation-rules",
+  isAuth,
+  requireAnyPlanFeature("crm.pipeline"),
+  CrmAutomationRuleController.createCrmAutomationRule
+);
+crmRoutes.put(
+  "/crm/automation-rules/:id",
+  isAuth,
+  requireAnyPlanFeature("crm.pipeline"),
+  CrmAutomationRuleController.updateCrmAutomationRule
+);
+crmRoutes.delete(
+  "/crm/automation-rules/:id",
+  isAuth,
+  requireAnyPlanFeature("crm.pipeline"),
+  CrmAutomationRuleController.deleteCrmAutomationRule
+);
+
+crmRoutes.post(
+  "/crm/bootstrap",
+  isAuth,
+  requireAnyPlanFeature("crm.pipeline"),
+  CrmController.bootstrapTenantCrm
+);
 crmRoutes.get(
   "/crm/pipelines",
   isAuth,
   requireAnyPlanFeature("crm.pipeline"),
   CrmController.listPipelines
 );
+crmRoutes.get(
+  "/crm/reports",
+  isAuth,
+  requireAnyPlanFeature("crm.pipeline"),
+  CrmController.getCrmReports
+);
 crmRoutes.post(
   "/crm/pipelines",
   isAuth,
   requireAnyPlanFeature("crm.pipeline"),
+  requireCrmPipelineAdmin,
   CrmController.createPipeline
 );
 crmRoutes.put(
   "/crm/pipelines/:id",
   isAuth,
   requireAnyPlanFeature("crm.pipeline"),
+  requireCrmPipelineAdmin,
   CrmController.updatePipeline
+);
+
+crmRoutes.get(
+  "/crm/pipelines/:pipelineId/stages",
+  isAuth,
+  requireAnyPlanFeature("crm.pipeline"),
+  requireCrmPipelineAdmin,
+  CrmController.listPipelineStages
+);
+crmRoutes.post(
+  "/crm/pipelines/:pipelineId/stages",
+  isAuth,
+  requireAnyPlanFeature("crm.pipeline"),
+  requireCrmPipelineAdmin,
+  CrmController.createPipelineStage
+);
+
+crmRoutes.put(
+  "/crm/stages/reorder",
+  isAuth,
+  requireAnyPlanFeature("crm.pipeline"),
+  requireCrmPipelineAdmin,
+  CrmController.reorderStages
+);
+crmRoutes.put(
+  "/crm/stages/:stageId",
+  isAuth,
+  requireAnyPlanFeature("crm.pipeline"),
+  requireCrmPipelineAdmin,
+  CrmController.updateStage
+);
+crmRoutes.delete(
+  "/crm/stages/:stageId",
+  isAuth,
+  requireAnyPlanFeature("crm.pipeline"),
+  requireCrmPipelineAdmin,
+  CrmController.deleteStage
+);
+
+crmRoutes.get(
+  "/crm/custom-fields",
+  isAuth,
+  requireAnyPlanFeature("crm.pipeline"),
+  CrmController.listCrmCustomFields
+);
+crmRoutes.post(
+  "/crm/custom-fields",
+  isAuth,
+  requireAnyPlanFeature("crm.pipeline"),
+  requireCrmPipelineAdmin,
+  CrmController.createCrmCustomField
+);
+crmRoutes.put(
+  "/crm/custom-fields/:id",
+  isAuth,
+  requireAnyPlanFeature("crm.pipeline"),
+  requireCrmPipelineAdmin,
+  CrmController.updateCrmCustomField
+);
+crmRoutes.delete(
+  "/crm/custom-fields/:id",
+  isAuth,
+  requireAnyPlanFeature("crm.pipeline"),
+  requireCrmPipelineAdmin,
+  CrmController.deleteCrmCustomField
+);
+
+crmRoutes.get(
+  "/crm/views",
+  isAuth,
+  requireAnyPlanFeature("crm.pipeline"),
+  CrmController.listCrmSavedViews
+);
+crmRoutes.post(
+  "/crm/views",
+  isAuth,
+  requireAnyPlanFeature("crm.pipeline"),
+  CrmController.createCrmSavedView
+);
+crmRoutes.put(
+  "/crm/views/:id",
+  isAuth,
+  requireAnyPlanFeature("crm.pipeline"),
+  CrmController.updateCrmSavedView
+);
+crmRoutes.delete(
+  "/crm/views/:id",
+  isAuth,
+  requireAnyPlanFeature("crm.pipeline"),
+  CrmController.deleteCrmSavedView
 );
 
 crmRoutes.get(
@@ -35,6 +166,24 @@ crmRoutes.post(
   isAuth,
   requireAnyPlanFeature("crm.pipeline"),
   CrmController.storeDeal
+);
+crmRoutes.get(
+  "/crm/deals/by-contact/:contactId",
+  isAuth,
+  requireAnyPlanFeature("crm.pipeline"),
+  CrmController.listDealsByContact
+);
+crmRoutes.get(
+  "/crm/deals/:id/timeline",
+  isAuth,
+  requireAnyPlanFeature("crm.pipeline"),
+  CrmController.showDealTimeline
+);
+crmRoutes.post(
+  "/crm/deals/:id/activities/comment",
+  isAuth,
+  requireAnyPlanFeature("crm.pipeline"),
+  CrmController.commentDeal
 );
 crmRoutes.get(
   "/crm/deals/:id",
@@ -53,6 +202,12 @@ crmRoutes.put(
   isAuth,
   requireAnyPlanFeature("crm.pipeline"),
   CrmController.moveDealStage
+);
+crmRoutes.put(
+  "/crm/deals/:id/resolve-attention",
+  isAuth,
+  requireAnyPlanFeature("crm.pipeline"),
+  CrmController.resolveDealAttention
 );
 crmRoutes.delete(
   "/crm/deals/:id",

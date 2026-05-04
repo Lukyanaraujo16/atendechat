@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useContext, useMemo } from "react";
 
 import { makeStyles } from "@material-ui/core/styles";
 import Typography from "@material-ui/core/Typography";
@@ -22,6 +22,12 @@ import ContactModal from "../ContactModal";
 import { ContactNotes } from "../ContactNotes";
 import usePlanFlags from "../../hooks/usePlanFlags";
 import CrmDealFormDialog from "../Crm/CrmDealFormDialog";
+import CrmOpenDealsChoiceDialog from "../Crm/CrmOpenDealsChoiceDialog";
+import ContactCrmSection from "../ContactCrmSection";
+import api from "../../services/api";
+import toastError from "../../errors/toastError";
+import { AuthContext } from "../../context/Auth/AuthContext";
+import { getCrmTerminology } from "../../utils/crmTerminology";
 
 const drawerWidth = 320;
 
@@ -87,14 +93,56 @@ const useStyles = makeStyles(theme => ({
 	},
 }));
 
-const ContactDrawer = ({ open, handleDrawerClose, contact, ticket, loading }) => {
+const ContactDrawer = ({
+	open,
+	handleDrawerClose,
+	contact,
+	ticket,
+	loading,
+	crmPanelRefreshKey = 0,
+	onCrmPanelDataChanged,
+}) => {
 	const classes = useStyles();
+	const { user } = useContext(AuthContext);
+	const crmTerms = useMemo(
+		() => getCrmTerminology(user?.company?.businessSegment),
+		[user?.company?.businessSegment]
+	);
 	const planFlags = usePlanFlags();
 	const fx = planFlags.effectiveFeatures || {};
 
 	const [modalOpen, setModalOpen] = useState(false);
 	const [openForm, setOpenForm] = useState(false);
-	const [crmOpen, setCrmOpen] = useState(false);
+	const [crmDialogOpen, setCrmDialogOpen] = useState(false);
+	const [crmDialogDealId, setCrmDialogDealId] = useState(null);
+	const [crmDupOpen, setCrmDupOpen] = useState(false);
+	const [crmDupDeals, setCrmDupDeals] = useState([]);
+
+	const handleRequestAddCrm = async () => {
+		if (!contact?.id) return;
+		try {
+			const { data } = await api.get(`/crm/deals/by-contact/${contact.id}`);
+			const openList = (Array.isArray(data) ? data : []).filter((d) => d.status === "open");
+			if (openList.length > 0) {
+				setCrmDupDeals(openList);
+				setCrmDupOpen(true);
+				return;
+			}
+		} catch (e) {
+			toastError(e);
+			return;
+		}
+		setCrmDialogDealId(null);
+		setCrmDialogOpen(true);
+	};
+
+	const handleCrmSaved = () => {
+		setCrmDialogOpen(false);
+		setCrmDialogDealId(null);
+		if (typeof onCrmPanelDataChanged === "function") {
+			onCrmPanelDataChanged();
+		}
+	};
 
 	useEffect(() => {
 		setOpenForm(false);
@@ -171,7 +219,7 @@ const ContactDrawer = ({ open, handleDrawerClose, contact, ticket, loading }) =>
 								<Button
 									variant="outlined"
 									color="primary"
-									onClick={() => setCrmOpen(true)}
+									onClick={handleRequestAddCrm}
 									style={{ fontSize: 12, marginTop: 8 }}
 								>
 									{i18n.t("crm.contact.createOpportunity")}
@@ -179,6 +227,20 @@ const ContactDrawer = ({ open, handleDrawerClose, contact, ticket, loading }) =>
 							) : null}
 							{(contact.id && openForm) && <ContactForm initialContact={contact} onCancel={() => setOpenForm(false)} />}
 						</Paper>
+						{contact?.id && fx["crm.pipeline"] === true ? (
+							<Paper square variant="outlined" className={classes.contactDetails}>
+								<ContactCrmSection
+									contactId={contact.id}
+									refreshKey={crmPanelRefreshKey}
+									terminology={crmTerms}
+									onOpenDealEdit={(id) => {
+										setCrmDialogDealId(id);
+										setCrmDialogOpen(true);
+									}}
+									onCreateCrm={handleRequestAddCrm}
+								/>
+							</Paper>
+						) : null}
 						<Paper square variant="outlined" className={classes.contactDetails}>
 							<Typography variant="subtitle1" style={{marginBottom: 10}}>
 								{i18n.t("ticketOptionsMenu.appointmentsModal.title")}
@@ -212,15 +274,39 @@ const ContactDrawer = ({ open, handleDrawerClose, contact, ticket, loading }) =>
 				)}
 			</Drawer>
 			<CrmDealFormDialog
-				open={crmOpen}
-				onClose={() => setCrmOpen(false)}
-				defaults={{
-					title: contact?.name || "",
-					contactId: contact?.id,
-					ticketId: ticket?.id,
-					source: "whatsapp",
+				open={crmDialogOpen}
+				onClose={() => {
+					setCrmDialogOpen(false);
+					setCrmDialogDealId(null);
 				}}
-				onSaved={() => setCrmOpen(false)}
+				dealId={crmDialogDealId}
+				terminology={crmTerms}
+				defaults={
+					crmDialogDealId
+						? {}
+						: {
+								title: contact?.name || "",
+								contactId: contact?.id,
+								ticketId: ticket?.id,
+								source: "whatsapp",
+						  }
+				}
+				onSaved={handleCrmSaved}
+			/>
+			<CrmOpenDealsChoiceDialog
+				open={crmDupOpen}
+				onClose={() => setCrmDupOpen(false)}
+				deals={crmDupDeals}
+				onSelectDeal={(id) => {
+					setCrmDupOpen(false);
+					setCrmDialogDealId(id);
+					setCrmDialogOpen(true);
+				}}
+				onCreateNew={() => {
+					setCrmDupOpen(false);
+					setCrmDialogDealId(null);
+					setCrmDialogOpen(true);
+				}}
 			/>
 		</>
 	);

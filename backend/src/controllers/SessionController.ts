@@ -107,7 +107,7 @@ export const supportStart = async (
   const user = await User.findByPk(req.user.id, {
     include: [
       { model: Queue, as: "queues", attributes: ["id", "name", "color"] },
-      { model: Company, as: "company", attributes: ["id", "name", "dueDate"] }
+      { model: Company, as: "company", attributes: ["id", "name", "dueDate", "crmVisibilityMode"] }
     ]
   });
 
@@ -159,7 +159,7 @@ export const supportStop = async (
   const user = await User.findByPk(req.user.id, {
     include: [
       { model: Queue, as: "queues", attributes: ["id", "name", "color"] },
-      { model: Company, as: "company", attributes: ["id", "name", "dueDate"] }
+      { model: Company, as: "company", attributes: ["id", "name", "dueDate", "crmVisibilityMode"] }
     ]
   });
 

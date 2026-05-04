@@ -7,6 +7,9 @@ import {
   FormControl,
   InputLabel,
   MenuItem,
+  FormControlLabel,
+  Radio,
+  RadioGroup,
   TextField,
   Table,
   TableHead,
@@ -830,6 +833,7 @@ export function CompanyForm(props) {
     storageAlertLevel: initialValue?.storageAlertLevel ?? "ok",
     modulePermissions: mergeModulePermissions(initialValue?.modulePermissions),
     businessSegment: initialValue?.businessSegment || "general",
+    crmVisibilityMode: initialValue?.crmVisibilityMode || "all",
   }));
 
   const { list: listPlans } = usePlans();
@@ -868,6 +872,7 @@ export function CompanyForm(props) {
         storageAlertLevel: initialValue?.storageAlertLevel ?? "ok",
         modulePermissions: mergeModulePermissions(initialValue?.modulePermissions),
         businessSegment: initialValue?.businessSegment || "general",
+        crmVisibilityMode: initialValue?.crmVisibilityMode || "all",
       };
     });
   }, [initialValue]);
@@ -1221,6 +1226,29 @@ export function CompanyForm(props) {
                                   </MenuItem>
                                 ))}
                               </Select>
+                            )}
+                          </Field>
+                        </FormControl>
+                      </Grid>
+                      <Grid item xs={12}>
+                        <FormControl component="fieldset" margin="dense" fullWidth>
+                          <Typography variant="caption" color="textSecondary" display="block" gutterBottom>
+                            {i18n.t("settings.company.crmVisibility.label")}
+                          </Typography>
+                          <Field name="crmVisibilityMode">
+                            {({ field }) => (
+                              <RadioGroup row {...field} value={field.value || "all"}>
+                                <FormControlLabel
+                                  value="all"
+                                  control={<Radio color="primary" />}
+                                  label={i18n.t("settings.company.crmVisibility.optionAll")}
+                                />
+                                <FormControlLabel
+                                  value="assigned"
+                                  control={<Radio color="primary" />}
+                                  label={i18n.t("settings.company.crmVisibility.optionAssigned")}
+                                />
+                              </RadioGroup>
                             )}
                           </Field>
                         </FormControl>
@@ -2540,6 +2568,7 @@ export default function CompaniesManager() {
     modulePermissions: defaultModulePermissions(),
     primaryAdmin: null,
     businessSegment: "general",
+    crmVisibilityMode: "all",
   });
 
   useEffect(() => {
@@ -2591,6 +2620,7 @@ export default function CompaniesManager() {
         storageAlertLevel: data.storageAlertLevel ?? "ok",
         modulePermissions: mergeModulePermissions(data.modulePermissions),
         businessSegment: data.businessSegment || "general",
+        crmVisibilityMode: data.crmVisibilityMode || "all",
       }));
       await loadStorageSnapshotsForCompany(record.id);
     } catch (e) {

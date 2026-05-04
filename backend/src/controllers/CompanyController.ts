@@ -47,6 +47,9 @@ import GetMyCompanyStorageService from "../services/CompanyService/GetMyCompanyS
 import ListCompanyStorageSnapshotsService from "../services/CompanyService/ListCompanyStorageSnapshotsService";
 import BootstrapCrmForCompanyService from "../services/CrmService/BootstrapCrmForCompanyService";
 import {
+  normalizeCrmVisibilityMode
+} from "../services/CrmService/crmDealVisibility";
+import {
   isValidBusinessSegment,
   normalizeBusinessSegment
 } from "../config/businessSegment";
@@ -93,6 +96,7 @@ type UpdateCompanyBody = {
   contractedPlanValue?: unknown;
   storageLimitGb?: unknown;
   businessSegment?: string | null;
+  crmVisibilityMode?: string | null;
 };
 
 type CreateCompanyRequest = UpdateCompanyBody & { name: string };
@@ -343,7 +347,8 @@ export const update = async (
           v == null ||
           v === "" ||
           isValidBusinessSegment(String(v))
-      )
+      ),
+    crmVisibilityMode: Yup.string().nullable().oneOf(["all", "assigned"])
   });
 
   try {
@@ -409,6 +414,16 @@ export const update = async (
     delete stripped.businessSegment;
   }
 
+  let crmVisibilityModeNormalized: ReturnType<typeof normalizeCrmVisibilityMode> | undefined;
+  if (
+    Object.prototype.hasOwnProperty.call(companyDataRaw as object, "crmVisibilityMode")
+  ) {
+    crmVisibilityModeNormalized = normalizeCrmVisibilityMode(
+      companyDataRaw.crmVisibilityMode
+    );
+    delete stripped.crmVisibilityMode;
+  }
+
   const pre = await Company.findByPk(companyId, {
     attributes: ["id", "status", "contractedPlanValue", "planId"],
     include: [
@@ -427,6 +442,9 @@ export const update = async (
       : {}),
     ...(businessSegmentNormalized !== undefined
       ? { businessSegment: businessSegmentNormalized }
+      : {}),
+    ...(crmVisibilityModeNormalized !== undefined
+      ? { crmVisibilityMode: crmVisibilityModeNormalized }
       : {})
   } as Parameters<typeof UpdateCompanyService>[0]);
 
@@ -590,6 +608,50 @@ export const getMyCompanyStorageSnapshots = async (
   }
   const rows = await ListCompanyStorageSnapshotsService(Number(companyId), 30);
   return res.status(200).json(rows);
+};
+
+export const updateCrmVisibility = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = Number(req.params.id);
+  if (!Number.isFinite(companyId)) {
+    throw new AppError("ERR_INVALID_COMPANY_ID", 400);
+  }
+
+  const schema = Yup.object({
+    crmVisibilityMode: Yup.string().oneOf(["all", "assigned"]).required()
+  });
+  const { crmVisibilityMode } = await schema.validate(req.body, {
+    abortEarly: false
+  });
+
+  const isOwnCompany = Number(companyId) === Number(req.user.companyId);
+  if (!isOwnCompany) {
+    const requestUser = await User.findByPk(req.user.id, { attributes: ["super"] });
+    if (!requestUser?.super && req.user.supportMode !== true) {
+      throw new AppError("ERR_NO_PERMISSION", 403);
+    }
+  } else if (req.user.profile !== "admin" && req.user.supportMode !== true) {
+    throw new AppError("ERR_NO_PERMISSION", 403);
+  }
+
+  const company = await Company.findByPk(companyId);
+  if (!company) throw new AppError("ERR_NO_COMPANY_FOUND", 404);
+
+  await company.update({
+    crmVisibilityMode: normalizeCrmVisibilityMode(crmVisibilityMode)
+  });
+  await company.reload({
+    include: [
+      { model: Plan, as: "plan", attributes: ["id", "name"], required: false }
+    ]
+  });
+  const row =
+    typeof company.toJSON === "function"
+      ? company.toJSON()
+      : (company as unknown as Record<string, unknown>);
+  return res.status(200).json(row);
 };
 
 export const updateTimezone = async (

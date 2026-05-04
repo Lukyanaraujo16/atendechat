@@ -6,7 +6,7 @@ export type NotificationListFilters = {
   /** default = não arquivadas; only = só arquivadas; all = incluir ambas */
   archived?: "default" | "only" | "all";
   search?: string;
-  kind?: "ticket" | "appointment" | "billing";
+  kind?: "ticket" | "appointment" | "billing" | "crm";
 };
 
 export function buildUserNotificationWhere(
@@ -57,6 +57,14 @@ export function buildUserNotificationWhere(
     parts.push({ type: { [Op.like]: "appointment_%" } });
   } else if (filters.kind === "billing") {
     parts.push({ type: { [Op.like]: "company_billing_%" } });
+  } else if (filters.kind === "crm") {
+    parts.push({
+      [Op.or]: [
+        { type: "crm_followup_overdue" },
+        { type: "crm_deal_needs_attention" },
+        { type: "crm_automation_rule" }
+      ]
+    });
   }
 
   if (parts.length === 1) {

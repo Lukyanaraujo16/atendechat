@@ -60,7 +60,14 @@ export const serializeUserForSession = async (
     return base;
   }
   const target = await Company.findByPk(effectiveCompanyId, {
-    attributes: ["id", "name", "dueDate", "timezone"]
+    attributes: [
+      "id",
+      "name",
+      "dueDate",
+      "timezone",
+      "businessSegment",
+      "crmVisibilityMode"
+    ]
   });
   if (!target) {
     return base;

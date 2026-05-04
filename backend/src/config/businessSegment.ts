@@ -1,6 +1,7 @@
 /** Segmentos de negócio (empresa + templates de CRM). */
 export const BUSINESS_SEGMENTS = [
   "general",
+  "support",
   "clinic",
   "aesthetic_clinic",
   "real_estate",
@@ -11,6 +12,7 @@ export const BUSINESS_SEGMENTS = [
   "financial",
   "legal",
   "healthcare",
+  "service",
   "other"
 ] as const;
 

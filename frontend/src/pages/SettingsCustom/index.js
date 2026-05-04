@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from "react";
 import { useLocation, useHistory, Link as RouterLink } from "react-router-dom";
 import MainContainer from "../../components/MainContainer";
 import { Box, Button, makeStyles, Paper, Tabs, Tab, Typography } from "@material-ui/core";
+import PermMediaIcon from "@material-ui/icons/PermMedia";
 import { AppPageHeader, AppSectionCard } from "../../ui";
 import Alert from "@material-ui/lab/Alert";
 
@@ -19,6 +20,7 @@ import useSettings from "../../hooks/useSettings";
 
 import OnlyForSuperUser from "../../components/OnlyForSuperUser";
 import CompanyTimezoneSettings from "../../components/CompanyTimezoneSettings";
+import CompanyCrmVisibilitySettings from "../../components/CompanyCrmVisibilitySettings";
 import PushNotificationPreferences from "../../components/PushNotificationPreferences";
 
 const PLATFORM_QUICK_LINKS = [
@@ -83,6 +85,24 @@ const useStyles = makeStyles((theme) => ({
     fontWeight: 600,
     fontSize: "1rem",
     marginBottom: theme.spacing(0.5),
+  },
+  mediaManagerCard: {
+    display: "flex",
+    gap: theme.spacing(2),
+    alignItems: "flex-start",
+  },
+  mediaManagerIconWrap: {
+    flexShrink: 0,
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.palette.action.hover,
+  },
+  mediaManagerIcon: {
+    fontSize: 28,
   },
 }));
 
@@ -215,6 +235,18 @@ const SettingsCustom = () => {
           company={company}
           onSaved={(c) => setCompany(c)}
         />
+        {(currentUser?.profile === "admin" || currentUser?.supportMode === true) &&
+        company?.id ? (
+          <Box className={classes.pageContextWrap}>
+            <AppSectionCard>
+              <CompanyCrmVisibilitySettings
+                company={company}
+                canEdit
+                onSaved={(c) => setCompany({ ...company, ...c })}
+              />
+            </AppSectionCard>
+          </Box>
+        ) : null}
         <Box className={classes.pageContextWrap}>
           <Alert
             severity="info"
@@ -226,6 +258,38 @@ const SettingsCustom = () => {
             </Typography>
           </Alert>
         </Box>
+
+        {(currentUser?.profile === "admin" || currentUser?.supportMode === true) &&
+        company?.id ? (
+          <Box className={classes.pageContextWrap}>
+            <AppSectionCard>
+              <Box className={classes.mediaManagerCard}>
+                <Box className={classes.mediaManagerIconWrap} aria-hidden>
+                  <PermMediaIcon className={classes.mediaManagerIcon} color="primary" />
+                </Box>
+                <Box flex={1} minWidth={0}>
+                  <Typography className={classes.superCardTitle} component="h2">
+                    {i18n.t("settings.mediaManagerCard.title")}
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    color="textSecondary"
+                    style={{ marginBottom: 12, lineHeight: 1.5 }}
+                  >
+                    {i18n.t("settings.mediaManagerCard.description")}
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={() => history.push("/settings/media-manager")}
+                  >
+                    {i18n.t("settings.mediaManagerCard.openButton")}
+                  </Button>
+                </Box>
+              </Box>
+            </AppSectionCard>
+          </Box>
+        ) : null}
 
         <OnlyForSuperUser
           user={currentUser}

@@ -3,6 +3,17 @@
  */
 export function navigateFromNotificationData(data, history) {
   const d = data || {};
+  const dealIdRaw =
+    (d.type === "crm_followup_overdue" ||
+      d.type === "crm_deal_needs_attention" ||
+      d.type === "crm_automation_rule") &&
+    d.dealId != null
+      ? String(d.dealId).trim()
+      : "";
+  if (dealIdRaw) {
+    history.push(`/crm?dealId=${encodeURIComponent(dealIdRaw)}`);
+    return;
+  }
   if (d.type === "appointment" && d.appointmentId != null) {
     const id = String(d.appointmentId).trim();
     if (id) {
@@ -34,6 +45,16 @@ export function navigateFromNotificationData(data, history) {
 export function notificationVisualType(notification) {
   const t = String(notification?.type || "");
   const d = notification?.data || {};
+  if (
+    t === "crm_followup_overdue" ||
+    d.type === "crm_followup_overdue" ||
+    t === "crm_deal_needs_attention" ||
+    d.type === "crm_deal_needs_attention" ||
+    t === "crm_automation_rule" ||
+    d.type === "crm_automation_rule"
+  ) {
+    return "crm";
+  }
   if (d.type === "company_billing" || t.startsWith("company_billing")) {
     return "billing";
   }

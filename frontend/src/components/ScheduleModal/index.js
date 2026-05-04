@@ -90,7 +90,7 @@ function buildSchema() {
 			then: s => s.required("Obrigatório"),
 			otherwise: s => s.notRequired(),
 		}),
-		recurrenceType: Yup.mixed().when("scheduleType", {
+		recurrenceType: Yup.string().when("scheduleType", {
 			is: "recurring",
 			then: s =>
 				s
@@ -98,24 +98,30 @@ function buildSchema() {
 					.required("Obrigatório"),
 			otherwise: s => s.notRequired(),
 		}),
-		recurrenceDaysOfWeek: Yup.mixed().when(["scheduleType", "recurrenceType"], {
-			is: (st, rt) => st === "recurring" && rt === "weekly",
-			then: s =>
-				s
-					.array()
-					.of(Yup.number())
-					.min(1, "Selecione ao menos um dia"),
-			otherwise: s => s.notRequired(),
-		}),
+		recurrenceDaysOfWeek: Yup.array()
+			.of(
+				Yup.number()
+					.integer()
+					.min(0)
+					.max(6)
+			)
+			.when(["scheduleType", "recurrenceType"], {
+				is: (st, rt) => st === "recurring" && rt === "weekly",
+				then: schema =>
+					schema
+						.min(1, i18n.t("schedules.errors.weekDaysRequired"))
+						.required(),
+				otherwise: schema => schema.notRequired(),
+			}),
 		recurrenceDayOfMonth: Yup.mixed().when(["scheduleType", "recurrenceType"], {
 			is: (st, rt) => st === "recurring" && rt === "monthly",
-			then: s =>
-				s
-					.number()
-					.min(1)
-					.max(31)
-					.required("Obrigatório"),
-			otherwise: s => s.notRequired(),
+			then: Yup.number()
+				.typeError("Obrigatório")
+				.integer()
+				.min(1)
+				.max(31)
+				.required("Obrigatório"),
+			otherwise: Yup.mixed().notRequired(),
 		}),
 		preferredWhatsappId: Yup.mixed().nullable(),
 	});

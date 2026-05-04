@@ -58,7 +58,12 @@ import Appointment from "../models/Appointment";
 import AppointmentParticipant from "../models/AppointmentParticipant";
 import CrmPipeline from "../models/CrmPipeline";
 import CrmStage from "../models/CrmStage";
+import CrmCustomField from "../models/CrmCustomField";
 import CrmDeal from "../models/CrmDeal";
+import CrmAutomationRule from "../models/CrmAutomationRule";
+import CrmDealActivity from "../models/CrmDealActivity";
+import CrmDealStageHistory from "../models/CrmDealStageHistory";
+import CrmSavedView from "../models/CrmSavedView";
 
 // eslint-disable-next-line
 const dbConfig = require("../config/database");
@@ -126,7 +131,12 @@ const models = [
   AppointmentParticipant,
   CrmPipeline,
   CrmStage,
-  CrmDeal
+  CrmDeal,
+  CrmCustomField,
+  CrmAutomationRule,
+  CrmDealActivity,
+  CrmDealStageHistory,
+  CrmSavedView
 ];
 
 sequelize.addModels(models);
