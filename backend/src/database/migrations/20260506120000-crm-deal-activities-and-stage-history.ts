@@ -1,8 +1,47 @@
 import { QueryInterface, DataTypes } from "sequelize";
 
+async function tableExists(queryInterface: QueryInterface, tableName: string): Promise<boolean> {
+  try {
+    await queryInterface.describeTable(tableName);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Permite reexecutar a migration após falha parcial (tabela/índice já criados). */
+async function addIndexIfNotExists(
+  queryInterface: QueryInterface,
+  dialect: string,
+  table: string,
+  columns: string[],
+  indexName: string
+): Promise<void> {
+  if (dialect === "postgres" || dialect === "cockroachdb") {
+    const cols = columns.map((c) => `"${c}"`).join(", ");
+    await queryInterface.sequelize.query(
+      `CREATE INDEX IF NOT EXISTS "${indexName}" ON "${table}" (${cols})`
+    );
+    return;
+  }
+  try {
+    await queryInterface.addIndex(table, columns, { name: indexName });
+  } catch (err: unknown) {
+    const e = err as { message?: string; original?: { code?: string } };
+    const msg = String(e?.message || err || "");
+    if (/exists|duplicate|already/i.test(msg) || e?.original?.code === "ER_DUP_KEYNAME") {
+      return;
+    }
+    throw err;
+  }
+}
+
 module.exports = {
   up: async (queryInterface: QueryInterface) => {
-    await queryInterface.createTable("CrmDealActivities", {
+    const dialect = queryInterface.sequelize.getDialect();
+
+    if (!(await tableExists(queryInterface, "CrmDealActivities"))) {
+      await queryInterface.createTable("CrmDealActivities", {
       id: {
         type: DataTypes.INTEGER,
         autoIncrement: true,
@@ -56,12 +95,18 @@ module.exports = {
         allowNull: false
       }
     });
+    }
 
-    await queryInterface.addIndex("CrmDealActivities", ["companyId", "dealId"], {
-      name: "CrmDealActivities_company_deal"
-    });
+    await addIndexIfNotExists(
+      queryInterface,
+      dialect,
+      "CrmDealActivities",
+      ["companyId", "dealId"],
+      "CrmDealActivities_company_deal"
+    );
 
-    await queryInterface.createTable("CrmDealStageHistory", {
+    if (!(await tableExists(queryInterface, "CrmDealStageHistory"))) {
+      await queryInterface.createTable("CrmDealStageHistory", {
       id: {
         type: DataTypes.INTEGER,
         autoIncrement: true,
@@ -124,15 +169,23 @@ module.exports = {
         allowNull: false
       }
     });
+    }
 
-    await queryInterface.addIndex("CrmDealStageHistory", ["companyId", "dealId"], {
-      name: "CrmDealStageHistory_company_deal"
-    });
-    await queryInterface.addIndex("CrmDealStageHistory", ["dealId", "leftAt"], {
-      name: "CrmDealStageHistory_deal_leftAt"
-    });
+    await addIndexIfNotExists(
+      queryInterface,
+      dialect,
+      "CrmDealStageHistory",
+      ["companyId", "dealId"],
+      "CrmDealStageHistory_company_deal"
+    );
+    await addIndexIfNotExists(
+      queryInterface,
+      dialect,
+      "CrmDealStageHistory",
+      ["dealId", "leftAt"],
+      "CrmDealStageHistory_deal_leftAt"
+    );
 
-    const dialect = queryInterface.sequelize.getDialect();
     if (dialect === "mysql" || dialect === "mariadb") {
       await queryInterface.sequelize.query(`
       INSERT INTO \`CrmDealStageHistory\` (
