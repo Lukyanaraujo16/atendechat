@@ -132,7 +132,9 @@ module.exports = {
       name: "CrmDealStageHistory_deal_leftAt"
     });
 
-    await queryInterface.sequelize.query(`
+    const dialect = queryInterface.sequelize.getDialect();
+    if (dialect === "mysql" || dialect === "mariadb") {
+      await queryInterface.sequelize.query(`
       INSERT INTO \`CrmDealStageHistory\` (
         \`companyId\`, \`dealId\`, \`fromStageId\`, \`toStageId\`,
         \`enteredAt\`, \`leftAt\`, \`durationMs\`, \`changedBy\`,
@@ -155,6 +157,31 @@ module.exports = {
         WHERE h.\`dealId\` = d.\`id\` AND h.\`leftAt\` IS NULL
       )
     `);
+    } else {
+      await queryInterface.sequelize.query(`
+      INSERT INTO "CrmDealStageHistory" (
+        "companyId", "dealId", "fromStageId", "toStageId",
+        "enteredAt", "leftAt", "durationMs", "changedBy",
+        "createdAt", "updatedAt"
+      )
+      SELECT
+        d."companyId",
+        d."id",
+        NULL,
+        d."stageId",
+        COALESCE(d."createdAt", d."updatedAt"),
+        NULL,
+        NULL,
+        d."createdBy",
+        NOW(),
+        NOW()
+      FROM "CrmDeals" d
+      WHERE NOT EXISTS (
+        SELECT 1 FROM "CrmDealStageHistory" h
+        WHERE h."dealId" = d."id" AND h."leftAt" IS NULL
+      )
+    `);
+    }
   },
 
   down: async (queryInterface: QueryInterface) => {
