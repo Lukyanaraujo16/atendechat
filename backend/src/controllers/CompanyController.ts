@@ -561,13 +561,37 @@ export const recalculateMyCompanyStorage = async (
 ): Promise<Response> => {
   const companyId = Number(req.user?.companyId);
   if (!Number.isFinite(companyId)) {
-    throw new AppError("ERR_NO_PERMISSION", 403);
+    throw new AppError("ERR_COMPANY_REQUIRED", 403);
   }
-  await RecalculateCompanyStorageUsageService(companyId, {
-    snapshotReason: "manual_recalculate"
-  });
-  const payload = await GetMyCompanyStorageService(companyId);
-  return res.status(200).json({ ...payload, recalculated: true });
+  logger.info(
+    {
+      companyId,
+      userId: req.user?.id,
+      supportMode: req.user?.supportMode
+    },
+    "[CompanyStorage] recalculate request"
+  );
+  try {
+    await RecalculateCompanyStorageUsageService(companyId, {
+      snapshotReason: "manual_recalculate"
+    });
+    const payload = await GetMyCompanyStorageService(companyId);
+    return res.status(200).json({ ...payload, recalculated: true });
+  } catch (err) {
+    logger.error(
+      {
+        companyId,
+        userId: req.user?.id,
+        supportMode: req.user?.supportMode,
+        err: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined
+      },
+      "[CompanyStorage] recalculate failed"
+    );
+    /** Fallback: não quebrar a UI — devolve o valor actual conhecido (pode estar 0/desactualizado). */
+    const payload = await GetMyCompanyStorageService(companyId);
+    return res.status(200).json({ ...payload, recalculated: false, error: true });
+  }
 };
 
 export const recalculateCompanyStorage = async (

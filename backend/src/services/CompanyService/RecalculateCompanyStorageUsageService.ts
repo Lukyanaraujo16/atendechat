@@ -8,6 +8,7 @@ import {
   setCompanyStorageUsage,
   evaluateCompanyStorageThresholds
 } from "./adjustCompanyStorageUsage";
+import { logger } from "../../utils/logger";
 
 const RecalculateCompanyStorageUsageService = async (
   companyId: number,
@@ -19,16 +20,51 @@ const RecalculateCompanyStorageUsageService = async (
   }
 
   const usedBytes = await CalculateCompanyStorageUsageService(companyId);
-  await setCompanyStorageUsage(companyId, usedBytes);
+  try {
+    await setCompanyStorageUsage(companyId, usedBytes);
+  } catch (err) {
+    logger.error(
+      {
+        companyId,
+        usedBytes,
+        err: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined
+      },
+      "[CompanyStorage] setCompanyStorageUsage_failed"
+    );
+  }
 
   const snapshotReason: CompanyStorageSnapshotReason =
     options?.snapshotReason ?? "manual_recalculate";
-  await CreateCompanyStorageSnapshotService({
-    companyId,
-    reason: snapshotReason
-  });
+  try {
+    await CreateCompanyStorageSnapshotService({
+      companyId,
+      reason: snapshotReason,
+      usedBytes
+    });
+  } catch (err) {
+    logger.warn(
+      {
+        companyId,
+        usedBytes,
+        err: err instanceof Error ? err.message : String(err)
+      },
+      "[CompanyStorage] snapshot_failed"
+    );
+  }
 
-  await evaluateCompanyStorageThresholds(companyId);
+  try {
+    await evaluateCompanyStorageThresholds(companyId);
+  } catch (err) {
+    logger.warn(
+      {
+        companyId,
+        usedBytes,
+        err: err instanceof Error ? err.message : String(err)
+      },
+      "[CompanyStorage] thresholds_failed"
+    );
+  }
 
   const refreshed = await Company.findByPk(companyId, {
     attributes: ["storageCalculatedAt"]
