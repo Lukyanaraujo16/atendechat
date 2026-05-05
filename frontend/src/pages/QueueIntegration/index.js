@@ -180,7 +180,8 @@ const QueueIntegration = () => {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- getPlanCompany muda a cada render (usePlans retorna objeto novo)
+    // getPlanCompany muda a cada render (usePlans retorna objeto novo).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId]);
 
   useEffect(() => {
