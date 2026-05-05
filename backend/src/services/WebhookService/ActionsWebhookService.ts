@@ -1462,7 +1462,9 @@ export const ActionsWebhookService = async (
             optionsArr.map((o: { number: number | string }) => String(o.number))
           );
 
-          const filterOne = connectStatic.filter(confil => confil.source === next);
+          const filterOne = connectStatic.filter(
+            confil => String(confil.source) === String(next)
+          );
 
           const pickEdgesForHandle = (suffix: string) =>
             filterOne.filter(filt2 => filt2.sourceHandle === "a" + suffix);
@@ -1540,6 +1542,9 @@ export const ActionsWebhookService = async (
           }
 
           if (!execFn) {
+            const hasInvalidHandle = filterOne.some(
+              f => String(f.sourceHandle || "") === "invalid"
+            );
             await createFlowExecutionLogIfTicket(
               idTicket,
               companyId,
@@ -1554,10 +1559,21 @@ export const ActionsWebhookService = async (
                 menuNodeId: next
               }
             );
-            logger.warn(
-              { flowBuilderMenu: true, menuNodeId: next, clientReply: pressKey },
-              "[FlowBuilder] menu: sem aresta para a opção nem ramo \"invalid\""
-            );
+            if (filterTwo.length === 0 && !hasInvalidHandle) {
+              logger.warn(
+                {
+                  flowBuilderMenu: true,
+                  menuNodeId: next,
+                  clientReply: pressKey
+                },
+                "[FlowBuilder] invalid option without fallback"
+              );
+            } else {
+              logger.warn(
+                { flowBuilderMenu: true, menuNodeId: next, clientReply: pressKey },
+                "[FlowBuilder] menu: sem aresta para a opção nem ramo \"invalid\""
+              );
+            }
             break;
           }
 

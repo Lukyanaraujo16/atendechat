@@ -125,10 +125,6 @@ const CreateWhatsAppService = async ({
     }
   }
 
-  if (queueIds.length > 1 && !greetingMessage) {
-    throw new AppError("ERR_WAPP_GREETING_REQUIRED");
-  }
-
   const finalToken = token && String(token).trim() !== ""
     ? String(token).trim()
     : crypto.randomBytes(24).toString("hex");
@@ -167,11 +163,16 @@ const CreateWhatsAppService = async ({
     })
   );
 
+  const greetingStored =
+    greetingMessage != null && String(greetingMessage).trim() !== ""
+      ? String(greetingMessage).trim()
+      : null;
+
   const whatsapp = await Whatsapp.create(
     {
       name,
       status,
-      greetingMessage,
+      greetingMessage: greetingStored,
       complationMessage,
       outOfHoursMessage,
       ratingMessage,

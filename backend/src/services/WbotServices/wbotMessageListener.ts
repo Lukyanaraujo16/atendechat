@@ -1393,6 +1393,11 @@ const verifyQueue = async (
   const { queues, greetingMessage, maxUseBotQueues, timeUseBotQueues } =
     whatsappSession;
 
+  const connectionGreetingTrim =
+    greetingMessage != null && String(greetingMessage).trim() !== ""
+      ? String(greetingMessage).trim()
+      : "";
+
   if (queues.length === 1) {
     const sendGreetingMessageOneQueues = await Setting.findOne({
       where: {
@@ -1402,10 +1407,10 @@ const verifyQueue = async (
     });
 
     if (
-      greetingMessage.length > 1 &&
+      connectionGreetingTrim.length > 1 &&
       sendGreetingMessageOneQueues?.value === "enabled"
     ) {
-      const body = formatBody(`${greetingMessage}`, contact);
+      const body = formatBody(`${connectionGreetingTrim}`, contact);
 
       await wbot.sendMessage(
         `${contact.number}@${ticket.isGroup ? "g.us" : "s.whatsapp.net"}`,
@@ -1487,7 +1492,12 @@ const verifyQueue = async (
     });
 
     const textMessage = {
-      text: formatBody(`\u200e${greetingMessage}\n\n${options}`, contact)
+      text: formatBody(
+        connectionGreetingTrim
+          ? `\u200e${connectionGreetingTrim}\n\n${options}`
+          : `\u200e${options}`,
+        contact
+      )
     };
 
     const sendMsg = await wbot.sendMessage(
@@ -2603,12 +2613,10 @@ export const handleMessageIntegration = async (
         isFirstMsg
       );
     } else {
-
-      if (
-        !isNaN(parseInt(ticket.lastMessage)) &&
-        ticket.status !== "open" &&
-        ticket.status !== "closed"
-      ) {
+      // Menu aceita qualquer texto do cliente (número ou não) para o backend
+      // resolver opção válida vs ramo sourceHandle "invalid". Exigir parseInt
+      // em lastMessage bloqueava respostas inválidas não numéricas (silêncio).
+      if (ticket.status !== "open" && ticket.status !== "closed") {
         await flowBuilderQueue(
           ticket,
           msg,
@@ -3570,7 +3578,11 @@ const handleMessage = async (
         order: [["createdAt", "DESC"]]
       });
 
-      if (lastMessage && lastMessage.body.includes(whatsapp.greetingMessage)) {
+      if (
+        lastMessage &&
+        whatsapp.greetingMessage &&
+        lastMessage.body.includes(String(whatsapp.greetingMessage))
+      ) {
         return;
       }
 

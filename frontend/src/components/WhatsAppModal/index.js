@@ -358,7 +358,7 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
                 <div>
                   <Field
                     as={TextField}
-                    label={i18n.t("queueModal.form.greetingMessage")}
+                    label={i18n.t("whatsappModal.form.greetingMessage")}
                     type="greetingMessage"
                     multiline
                     rows={4}
@@ -368,7 +368,8 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
                       touched.greetingMessage && Boolean(errors.greetingMessage)
                     }
                     helperText={
-                      touched.greetingMessage && errors.greetingMessage
+                      (touched.greetingMessage && errors.greetingMessage) ||
+                      i18n.t("whatsappModal.form.greetingMessageHint")
                     }
                     variant="outlined"
                     margin="dense"

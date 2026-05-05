@@ -1195,6 +1195,8 @@ const messages = {
 					expiresTicket: "Close open chats after x minutes",
 					expiresInactiveMessage: "Inactivity closure message",
 					greetingMessage: "Greeting message",
+					greetingMessageHint:
+						"Optional. Only sent when you use this connection's automatic greeting (e.g. multi-queue menu or single-queue greeting setting).",
 					complationMessage: "Completion message",
 					integration: "Integration",
 					token: "API Token",

@@ -6,7 +6,8 @@
 /** @param {import('react-flow-renderer').Edge[]} edges */
 export function pickNextNode(edges, sourceId, sourceHandle) {
   if (!edges || !sourceId) return null;
-  const out = edges.filter((e) => e.source === sourceId);
+  const sid = String(sourceId);
+  const out = edges.filter((e) => String(e.source) === sid);
   if (!out.length) return null;
   const want =
     sourceHandle === undefined || sourceHandle === null

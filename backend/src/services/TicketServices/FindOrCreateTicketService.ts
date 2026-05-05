@@ -70,14 +70,41 @@ const FindOrCreateTicketService = async (
     });
   }
 
+  /**
+   * Ticket fechado reutilizado (unique contactId+companyId+whatsappId não permite novo registro).
+   * Sem limpar flowWebhook/lastFlowId/flowStopped, o handleMessageIntegration não dispara welcome
+   * (`!ticket.flowWebhook`) e o fluxo continua como se o bot já tivesse corrido.
+   */
   if (ticket?.status === "closed") {
+    const dw = parseTicketDataWebhook(ticket.dataWebhook);
+    const preserved: Record<string, unknown> = {};
+    const rj = dw.remoteJid;
+    if (typeof rj === "string" && rj.includes("@")) {
+      preserved.remoteJid = rj;
+    }
+    if (dw.startedOutsideSystem === true) {
+      preserved.startedOutsideSystem = true;
+    }
     await ticket.update({
       queueId: null,
       userId: null,
-      ...(groupContact
-        ? { chatbot: false, useIntegration: false, integrationId: null, promptId: null }
-        : {})
+      chatbot: false,
+      queueOptionId: null,
+      useIntegration: false,
+      integrationId: null,
+      promptId: null,
+      flowStopped: null,
+      lastFlowId: null,
+      hashFlowId: null,
+      flowWebhook: false,
+      amountUsedBotQueues: 0,
+      typebotSessionId: null,
+      typebotStatus: false,
+      dataWebhook: Object.keys(preserved).length > 0 ? (preserved as any) : null
     });
+    logger.info(
+      `[WhatsAppInbound] ticket_reopen_cycle_reset ticketId=${ticket.id} companyId=${companyId} contactId=${groupContact ? groupContact.id : contact.id} whatsappId=${whatsappId}`
+    );
   }
 
   if (!ticket && groupContact) {
@@ -117,7 +144,8 @@ const FindOrCreateTicketService = async (
         },
         contactId: contact.id,
         companyId,
-        whatsappId
+        whatsappId,
+        status: { [Op.in]: ["open", "pending"] }
       },
       order: [["updatedAt", "DESC"]]
     });

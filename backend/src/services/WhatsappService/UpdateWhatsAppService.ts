@@ -86,10 +86,6 @@ const UpdateWhatsAppService = async ({
     throw new AppError(err.message);
   }
 
-  if (queueIds.length > 1 && !greetingMessage) {
-    throw new AppError("ERR_WAPP_GREETING_REQUIRED");
-  }
-
   let oldDefaultWhatsapp: Whatsapp | null = null;
 
   if (isDefault) {
@@ -132,7 +128,12 @@ const UpdateWhatsAppService = async ({
     name,
     status,
     session,
-    greetingMessage,
+    greetingMessage:
+      greetingMessage === undefined
+        ? undefined
+        : greetingMessage != null && String(greetingMessage).trim() !== ""
+          ? String(greetingMessage).trim()
+          : null,
     complationMessage,
     outOfHoursMessage,
     ratingMessage,
