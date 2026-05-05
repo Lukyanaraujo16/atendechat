@@ -154,6 +154,7 @@ export default function MediaManager() {
   const [searchDebounced, setSearchDebounced] = useState("");
   const [storage, setStorage] = useState(null);
   const [storageLoading, setStorageLoading] = useState(false);
+  const [recalculateLoading, setRecalculateLoading] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [batchDialogOpen, setBatchDialogOpen] = useState(false);
   const [selectedMap, setSelectedMap] = useState({});
@@ -173,7 +174,7 @@ export default function MediaManager() {
       const { data } = await api.get("/companies/storage");
       setStorage(data);
     } catch {
-      setStorage(null);
+      setStorage({ usedBytes: 0, usedFormatted: "0 B" });
     } finally {
       setStorageLoading(false);
     }
@@ -202,6 +203,20 @@ export default function MediaManager() {
       setLoading(false);
     }
   }, [page, typeFilter, searchDebounced, sort]);
+
+  const handleRecalculateStorage = useCallback(async () => {
+    setRecalculateLoading(true);
+    try {
+      await api.post("/companies/storage/recalculate");
+      showSuccessToast("companyStorage.toasts.recalculated");
+      await loadStorage();
+      await loadList();
+    } catch (e) {
+      toastError(e);
+    } finally {
+      setRecalculateLoading(false);
+    }
+  }, [loadList, loadStorage]);
 
   useEffect(() => {
     if (!canAccess) return;
@@ -349,7 +364,44 @@ export default function MediaManager() {
         }
       />
 
-      <CompanyStorageUsageCard data={storage} loading={storageLoading} />
+      <Box
+        display="flex"
+        flexWrap="wrap"
+        alignItems="flex-start"
+        style={{ gap: 12 }}
+      >
+        <Box flex="1" minWidth={280}>
+          <CompanyStorageUsageCard data={storage} loading={storageLoading} />
+        </Box>
+        <Box display="flex" flexDirection="column" alignItems="flex-start" style={{ gap: 8 }}>
+          <Button
+            variant="outlined"
+            color="primary"
+            size="small"
+            disabled={recalculateLoading || storageLoading}
+            onClick={handleRecalculateStorage}
+            startIcon={
+              recalculateLoading ? <CircularProgress size={16} color="inherit" /> : null
+            }
+          >
+            {i18n.t("companyStorage.recalculate")}
+          </Button>
+          <Typography variant="caption" color="textSecondary" style={{ maxWidth: 280 }}>
+            {i18n.t("companyStorage.recalculateHint")}
+          </Typography>
+        </Box>
+      </Box>
+
+      {summary &&
+      storage &&
+      Number(summary.totalBytes || 0) !== Number(storage.usedBytes || 0) ? (
+        <Typography variant="caption" color="textSecondary" display="block">
+          {i18n.t("mediaManager.storageSummaryMismatch", {
+            mediaTotal: summary.totalFormatted || "—",
+            dbTotal: storage.usedFormatted || "—",
+          })}
+        </Typography>
+      ) : null}
 
       {summary ? (
         <Grid container spacing={2}>

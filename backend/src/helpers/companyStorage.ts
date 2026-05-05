@@ -31,6 +31,7 @@ export function getCompanyStorageLimitBytes(
 
 export function formatBytesPtBr(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes < 0) return "0 B";
+  if (bytes === 0) return "0 B";
   const units = ["B", "KB", "MB", "GB", "TB"];
   let u = 0;
   let n = bytes;
@@ -38,10 +39,14 @@ export function formatBytesPtBr(bytes: number): string {
     n /= 1024;
     u += 1;
   }
-  const fraction = u >= 2 ? 2 : u === 1 ? 1 : 0;
+  /** B inteiro; KB com mais casas quando &lt; 10 KB; MB+ até 2 casas (ex.: 0,01 MB). */
+  let maxFraction = 0;
+  if (u === 0) maxFraction = 0;
+  else if (u === 1) maxFraction = n < 10 ? 2 : 1;
+  else maxFraction = 2;
   return `${n.toLocaleString("pt-BR", {
     minimumFractionDigits: 0,
-    maximumFractionDigits: fraction
+    maximumFractionDigits: maxFraction
   })} ${units[u]}`;
 }
 

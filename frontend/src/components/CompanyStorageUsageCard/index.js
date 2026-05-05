@@ -6,6 +6,7 @@ import Box from "@material-ui/core/Box";
 import { makeStyles, useTheme } from "@material-ui/core/styles";
 import Alert from "@material-ui/lab/Alert";
 import { i18n } from "../../translate/i18n";
+import { normalizeCompanyStorageForCard } from "../../utils/normalizeCompanyStorageForCard";
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -56,7 +57,10 @@ export default function CompanyStorageUsageCard({ data, loading }) {
   }
   if (!data) return null;
 
-  const { usedFormatted, limitFormatted, remainingFormatted, percent } = data;
+  const normalized = normalizeCompanyStorageForCard(data);
+  if (!normalized) return null;
+
+  const { usedFormatted, limitFormatted, remainingFormatted, percent, calculatedAt } = normalized;
 
   let alertSeverity = "info";
   let alertMsg = null;
@@ -94,10 +98,10 @@ export default function CompanyStorageUsageCard({ data, loading }) {
           {i18n.t("companyStorage.remaining", { value: remainingFormatted })}
         </Typography>
       ) : null}
-      {data.calculatedAt ? (
+      {calculatedAt ? (
         <Typography className={classes.caption} component="div" style={{ marginTop: 4 }}>
           {i18n.t("companyStorage.updatedAt", {
-            date: new Date(data.calculatedAt).toLocaleString(),
+            date: new Date(calculatedAt).toLocaleString(),
           })}
         </Typography>
       ) : null}

@@ -28,6 +28,12 @@ companyRoutes.delete(
 );
 
 companyRoutes.get("/companies/storage", isAuth, CompanyController.getMyCompanyStorage);
+companyRoutes.post(
+  "/companies/storage/recalculate",
+  isAuth,
+  requireTenantAdminOrSupport,
+  CompanyController.recalculateMyCompanyStorage
+);
 companyRoutes.get(
   "/companies/storage/snapshots",
   isAuth,

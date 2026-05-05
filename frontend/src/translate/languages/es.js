@@ -588,6 +588,9 @@ const messages = {
       companyStorage: {
         title: "Almacenamiento",
         loading: "Cargando…",
+        recalculate: "Recalcular almacenamiento",
+        recalculateHint:
+          "Escanea archivos en el servidor y actualiza el contador de la empresa. Úselo si el uso parece desactualizado.",
         usedOfTotal: "{{used}} usados de {{total}}",
         usedUnlimited: "{{used}} usados (sin límite definido)",
         remaining: "{{value}} restantes",
@@ -598,6 +601,9 @@ const messages = {
           "Su empresa alcanzó o superó el límite de almacenamiento (informativo; el envío sigue permitido en esta fase).",
         alertExceeded:
           "Su empresa alcanzó o superó el límite de almacenamiento (informativo; el envío sigue permitido en esta fase).",
+        toasts: {
+          recalculated: "Almacenamiento recalculado a partir de los archivos en el servidor.",
+        },
       },
       signup: {
         title: "Regístrate",
@@ -3664,6 +3670,8 @@ const messages = {
         title: "Gestión de medios",
         subtitle:
           "Archivos del servidor vinculados a la empresa (mensajes, respuestas rápidas, adjuntos, etc.). Solo administradores o soporte pueden eliminar y liberar espacio.",
+        storageSummaryMismatch:
+          "Resumen por tipo (lista): {{mediaTotal}} · Registrado en la empresa: {{dbTotal}}. Si difieren, use «Recalcular almacenamiento».",
         noAccess: "No tiene permiso para acceder a esta área.",
         backToSettings: "Volver a configuración",
         search: "Buscar por nombre…",

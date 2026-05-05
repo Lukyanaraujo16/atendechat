@@ -588,6 +588,9 @@ const messages = {
 			companyStorage: {
 				title: "Storage",
 				loading: "Loading…",
+				recalculate: "Recalculate storage",
+				recalculateHint:
+					"Scans files on the server and updates the company counter. Use if usage looks stale.",
 				usedOfTotal: "{{used}} used of {{total}}",
 				usedUnlimited: "{{used}} used (no limit set)",
 				remaining: "{{value}} remaining",
@@ -598,6 +601,9 @@ const messages = {
 					"Your company has reached or exceeded the storage limit (informational; sending is still allowed in this phase).",
 				alertExceeded:
 					"Your company has reached or exceeded the storage limit (informational; sending is still allowed in this phase).",
+				toasts: {
+					recalculated: "Storage recalculated from files on the server.",
+				},
 			},
 			signup: {
 				title: "Sign Up",
@@ -3760,6 +3766,8 @@ const messages = {
 				title: "Media management",
 				subtitle:
 					"Server files linked to this company (messages, quick replies, attachments, etc.). Only admins or support can delete and free space.",
+				storageSummaryMismatch:
+					"Summary by type (list): {{mediaTotal}} · Company record: {{dbTotal}}. If they differ, use «Recalculate storage».",
 				noAccess: "You do not have access to this area.",
 				backToSettings: "Back to settings",
 				search: "Search by name…",

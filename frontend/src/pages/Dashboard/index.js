@@ -308,7 +308,7 @@ const Dashboard = () => {
   }, []);
 
   useEffect(() => {
-    if (user?.profile !== "admin") {
+    if (user?.profile !== "admin" && user?.supportMode !== true) {
       setCompanyStorage(null);
       return undefined;
     }
@@ -328,7 +328,7 @@ const Dashboard = () => {
     return () => {
       cancelled = true;
     };
-  }, [user?.profile]);
+  }, [user?.profile, user?.supportMode]);
 
   const handlePeriodChange = (value) => {
     setPeriod(Number(value));
@@ -471,7 +471,7 @@ const Dashboard = () => {
 
         {/* Cards */}
         <Grid container spacing={3}>
-          {user?.profile === "admin" ? (
+          {user?.profile === "admin" || user?.supportMode === true ? (
             <Grid item xs={12} sm={6} md={4}>
               <CompanyStorageUsageCard data={companyStorage} loading={companyStorageLoading} />
             </Grid>

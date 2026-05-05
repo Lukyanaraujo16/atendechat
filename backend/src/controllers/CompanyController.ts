@@ -547,8 +547,27 @@ export const getMyCompanyStorage = async (
   req: Request,
   res: Response
 ): Promise<Response> => {
-  const payload = await GetMyCompanyStorageService(req.user.companyId);
+  const companyId = Number(req.user?.companyId);
+  if (!Number.isFinite(companyId)) {
+    throw new AppError("ERR_NO_PERMISSION", 403);
+  }
+  const payload = await GetMyCompanyStorageService(companyId);
   return res.status(200).json(payload);
+};
+
+export const recalculateMyCompanyStorage = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = Number(req.user?.companyId);
+  if (!Number.isFinite(companyId)) {
+    throw new AppError("ERR_NO_PERMISSION", 403);
+  }
+  await RecalculateCompanyStorageUsageService(companyId, {
+    snapshotReason: "manual_recalculate"
+  });
+  const payload = await GetMyCompanyStorageService(companyId);
+  return res.status(200).json({ ...payload, recalculated: true });
 };
 
 export const recalculateCompanyStorage = async (
