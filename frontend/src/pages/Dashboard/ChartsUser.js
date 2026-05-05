@@ -13,14 +13,20 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import brLocale from 'date-fns/locale/pt-BR';
 import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { Button, Stack, TextField, Paper, Typography, Box } from '@mui/material';
-import { useTheme } from '@material-ui/core/styles';
+import { ThemeProvider } from '@mui/material/styles';
+import useMuiV5BridgedTheme from '../../hooks/useMuiV5BridgedTheme';
 import api from '../../services/api';
 import { format } from 'date-fns';
 import { toast } from 'react-toastify';
 import { i18n } from '../../translate/i18n';
 
 export const ChatsUser = () => {
-  const theme = useTheme();
+  const theme = useMuiV5BridgedTheme();
+  const [initialDate, setInitialDate] = useState(new Date());
+  const [finalDate, setFinalDate] = useState(new Date());
+  const [ticketsData, setTicketsData] = useState({ data: [] });
+  const [loading, setLoading] = useState(false);
+
   const chartColors = [
     theme.palette.info.main,
     theme.palette.primary.main,
@@ -39,10 +45,6 @@ export const ChatsUser = () => {
     border: `1px solid ${theme.palette.divider}`,
     boxShadow: theme.shadows[1],
   };
-  const [initialDate, setInitialDate] = useState(new Date());
-  const [finalDate, setFinalDate] = useState(new Date());
-  const [ticketsData, setTicketsData] = useState({ data: [] });
-  const [loading, setLoading] = useState(false);
 
   const companyId = localStorage.getItem('companyId');
 
@@ -86,7 +88,19 @@ export const ChatsUser = () => {
     );
   };
 
+  const dateFieldSx = {
+    width: '18ch',
+    '& .MuiInputBase-input': { color: theme.palette.text.primary },
+    '& .MuiInputLabel-root': { color: theme.palette.text.secondary },
+    '& .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.divider },
+    '& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline': {
+      borderColor: theme.palette.text.secondary,
+    },
+    '& .MuiSvgIcon-root': { color: theme.palette.text.secondary },
+  };
+
   return (
+    <ThemeProvider theme={theme}>
     <Paper elevation={0} sx={paperSx}>
       <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 2, mb: 3 }}>
         <Typography variant="h6" style={{ fontWeight: 600 }} color="text.primary">
@@ -98,13 +112,13 @@ export const ChatsUser = () => {
               value={initialDate}
               onChange={(newValue) => setInitialDate(newValue)}
               label={i18n.t('dashboard.charts.user.start')}
-              renderInput={(params) => <TextField {...params} size="small" sx={{ width: '18ch' }} />}
+              renderInput={(params) => <TextField {...params} size="small" sx={dateFieldSx} />}
             />
             <DatePicker
               value={finalDate}
               onChange={(newValue) => setFinalDate(newValue)}
               label={i18n.t('dashboard.charts.user.end')}
-              renderInput={(params) => <TextField {...params} size="small" sx={{ width: '18ch' }} />}
+              renderInput={(params) => <TextField {...params} size="small" sx={dateFieldSx} />}
             />
           </LocalizationProvider>
           <Button
@@ -137,5 +151,6 @@ export const ChatsUser = () => {
         </ResponsiveContainer>
       </Box>
     </Paper>
+    </ThemeProvider>
   );
 };

@@ -51,9 +51,11 @@ const useStyles = makeStyles((theme) => ({
       fontSize: "0.8125rem",
       lineHeight: 1.25,
       letterSpacing: "0.01em",
+      color: theme.palette.text.secondary,
     },
     "& .MuiTab-textColorPrimary.Mui-selected": {
       fontWeight: 600,
+      color: theme.palette.primary.main,
     },
   },
   contentBelow: {

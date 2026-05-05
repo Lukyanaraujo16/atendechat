@@ -1454,6 +1454,10 @@ const messages = {
 				buttons: {
 					add: "Add Prompt",
 				},
+				empty: {
+					title: "No prompts yet",
+					subtitle: "Create a prompt to link to the WhatsApp connection, sector, or automated flow.",
+				},
 			},
 			contactModal: {
 				title: {
@@ -2808,6 +2812,10 @@ const messages = {
 				confirmationModal: {
 					deleteTitle: "Delete",
 					deleteMessage: "Are you sure? This action cannot be undone! It will be removed from linked queues and connections",
+				},
+				empty: {
+					title: "No integrations yet",
+					subtitle: "Add a queue automation or use the button above to create the first one.",
 				},
 			},
 			files: {

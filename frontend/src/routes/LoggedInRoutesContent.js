@@ -226,16 +226,20 @@ function AutomacaoModule({ planFlags, isAdmin }) {
         ) : (
           <Route exact path="/phrase-lists" render={() => <Redirect to={fallback} />} />
         )}
+        {/*
+          Não usar Fragment aqui: o Switch do react-router v5 só considera filhos
+          diretos com path. Um <> sem path herda match do contexto e "ganha" antes
+          de /queue-integration, /prompts etc., deixando a área em branco.
+        */}
         {showChatbot ? (
-          <>
-            <Route exact path="/flowbuilders" component={FlowBuilder} />
-            <Route exact path="/flowbuilder/:id?" component={FlowBuilderConfig} />
-          </>
+          <Route exact path="/flowbuilders" component={FlowBuilder} />
         ) : (
-          <>
-            <Route exact path="/flowbuilders" render={() => <Redirect to={fallback} />} />
-            <Route exact path="/flowbuilder/:id?" render={() => <Redirect to={fallback} />} />
-          </>
+          <Route exact path="/flowbuilders" render={() => <Redirect to={fallback} />} />
+        )}
+        {showChatbot ? (
+          <Route exact path="/flowbuilder/:id?" component={FlowBuilderConfig} />
+        ) : (
+          <Route exact path="/flowbuilder/:id?" render={() => <Redirect to={fallback} />} />
         )}
         <Route
           exact
@@ -244,7 +248,7 @@ function AutomacaoModule({ planFlags, isAdmin }) {
             isAdmin && showIntegrations ? (
               <QueueIntegration />
             ) : (
-              <Redirect to={fallback} />
+              <PlanFeatureBlocked />
             )
           }
         />
@@ -252,7 +256,7 @@ function AutomacaoModule({ planFlags, isAdmin }) {
           exact
           path="/prompts"
           render={() =>
-            isAdmin && showOpenAi ? <Prompts /> : <Redirect to={fallback} />
+            isAdmin && showOpenAi ? <Prompts /> : <PlanFeatureBlocked />
           }
         />
         {showQuickReplies ? (

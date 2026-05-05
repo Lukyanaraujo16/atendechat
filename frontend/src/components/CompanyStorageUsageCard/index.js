@@ -18,6 +18,7 @@ const useStyles = makeStyles((theme) => ({
   title: {
     fontWeight: 600,
     marginBottom: theme.spacing(1),
+    color: theme.palette.text.primary,
   },
   caption: {
     fontSize: "0.8125rem",

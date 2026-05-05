@@ -13,6 +13,7 @@ import {
   Box,
   Button,
   Chip,
+  CircularProgress,
   IconButton,
   InputAdornment,
   Paper,
@@ -42,13 +43,13 @@ import Title from "../../components/Title";
 import TableRowSkeleton from "../../components/TableRowSkeleton";
 import IntegrationModal from "../../components/QueueIntegrationModal";
 import ConfirmationModal from "../../components/ConfirmationModal";
+import PlanFeatureBlocked from "../../components/PlanFeatureBlocked";
 
 import api from "../../services/api";
 import { i18n } from "../../translate/i18n";
 import toastError from "../../errors/toastError";
 import { AuthContext } from "../../context/Auth/AuthContext";
 import usePlans from "../../hooks/usePlans";
-import { useHistory } from "react-router-dom";
 
 const reducer = (state, action) => {
   if (action.type === "LOAD_INTEGRATIONS") {
@@ -157,26 +158,30 @@ const QueueIntegration = () => {
   const { user } = useContext(AuthContext);
   const { getPlanCompany } = usePlans();
   const companyId = user.companyId;
-  const history = useHistory();
+
+  const [planIntegrationsAllowed, setPlanIntegrationsAllowed] = useState(null);
 
   const socketManager = useContext(SocketContext);
 
   useEffect(() => {
-    async function fetchData() {
-      const planConfigs = await getPlanCompany(undefined, companyId);
-      const intOk = planConfigs.effectiveModules
-        ? planConfigs.effectiveModules.useIntegrations
-        : planConfigs.plan?.useIntegrations;
-      if (!intOk) {
-        toast.error("Esta empresa não possui permissão para acessar essa página! Estamos lhe redirecionando.");
-        setTimeout(() => {
-          history.push(`/`)
-        }, 1000);
+    let cancelled = false;
+    async function fetchPlan() {
+      try {
+        const planConfigs = await getPlanCompany(undefined, companyId);
+        const intOk = planConfigs.effectiveModules
+          ? planConfigs.effectiveModules.useIntegrations
+          : planConfigs.plan?.useIntegrations;
+        if (!cancelled) setPlanIntegrationsAllowed(!!intOk);
+      } catch {
+        if (!cancelled) setPlanIntegrationsAllowed(false);
       }
     }
-    fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (companyId) fetchPlan();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- getPlanCompany muda a cada render (usePlans retorna objeto novo)
+  }, [companyId]);
 
   useEffect(() => {
     dispatch({ type: "RESET" });
@@ -184,6 +189,7 @@ const QueueIntegration = () => {
   }, [searchParam]);
 
   useEffect(() => {
+    if (planIntegrationsAllowed !== true) return;
     setLoading(true);
     const delayDebounceFn = setTimeout(() => {
       const fetchIntegrations = async () => {
@@ -202,7 +208,7 @@ const QueueIntegration = () => {
       fetchIntegrations();
     }, 500);
     return () => clearTimeout(delayDebounceFn);
-  }, [searchParam, pageNumber]);
+  }, [searchParam, pageNumber, planIntegrationsAllowed]);
 
   useEffect(() => {
     const companyId = localStorage.getItem("companyId");
@@ -268,6 +274,27 @@ const QueueIntegration = () => {
     }
   };
 
+  if (planIntegrationsAllowed === null) {
+    return (
+      <MainContainer>
+        <Box display="flex" justifyContent="center" alignItems="center" minHeight={320} width="100%">
+          <CircularProgress />
+        </Box>
+      </MainContainer>
+    );
+  }
+
+  if (!planIntegrationsAllowed) {
+    return (
+      <MainContainer>
+        <MainHeader>
+          <Title>{i18n.t("queueIntegration.title")}</Title>
+        </MainHeader>
+        <PlanFeatureBlocked />
+      </MainContainer>
+    );
+  }
+
   return (
     <MainContainer>
       <ConfirmationModal
@@ -326,6 +353,16 @@ const QueueIntegration = () => {
         variant="outlined"
         onScroll={handleScroll}
       >
+        {!loading && queueIntegration.length === 0 ? (
+          <Box py={8} px={2} textAlign="center">
+            <Typography variant="h6" color="textSecondary" gutterBottom>
+              {i18n.t("queueIntegration.empty.title")}
+            </Typography>
+            <Typography variant="body2" color="textSecondary" component="p">
+              {i18n.t("queueIntegration.empty.subtitle")}
+            </Typography>
+          </Box>
+        ) : (
         <Table size="medium">
           <TableHead>
             <TableRow>
@@ -433,6 +470,7 @@ const QueueIntegration = () => {
             </>
           </TableBody>
         </Table>
+        )}
       </Paper>
     </MainContainer>
   );

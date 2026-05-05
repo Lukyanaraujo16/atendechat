@@ -65,10 +65,42 @@ const useStyles = makeStyles((theme) => ({
   periodSelect: {
     minWidth: 140,
     "& .MuiSelect-root": { paddingTop: 8, paddingBottom: 8 },
+    "& .MuiOutlinedInput-input": {
+      color: theme.palette.text.primary
+    },
+    "& .MuiInputLabel-outlined": {
+      color: theme.palette.text.secondary
+    },
+    "& .MuiOutlinedInput-notchedOutline": {
+      borderColor: theme.palette.divider
+    },
+    "&:hover .MuiOutlinedInput-notchedOutline": {
+      borderColor: theme.palette.text.secondary
+    },
+    "& .MuiSvgIcon-root": {
+      color: theme.palette.text.secondary
+    }
   },
   periodDateField: {
     "& .MuiInputBase-root": { fontSize: "0.875rem" },
-    "& input": { padding: "8px 12px" },
+    "& .MuiOutlinedInput-input, & input": {
+      padding: "8px 12px",
+      color: theme.palette.text.primary
+    },
+    "& .MuiInputLabel-outlined": {
+      color: theme.palette.text.secondary
+    },
+    "& .MuiOutlinedInput-notchedOutline": {
+      borderColor: theme.palette.divider
+    },
+    "&:hover .MuiOutlinedInput-notchedOutline": {
+      borderColor: theme.palette.text.secondary
+    },
+    "& input[type='date']::-webkit-calendar-picker-indicator": {
+      opacity: 0.9,
+      filter: theme.palette.type === "dark" ? "invert(1)" : "none",
+      cursor: "pointer"
+    }
   },
   card: {
     padding: theme.spacing(2.5),
@@ -183,16 +215,16 @@ const useStyles = makeStyles((theme) => ({
     fontWeight: 600,
   },
   performanceTable: {
-    "& .MuiTableHead-root .MuiTableRow-root th": {
-      backgroundColor: theme.palette.action.hover,
+    "& .MuiTableHead-root .MuiTableCell-root": {
+      backgroundColor: theme.palette.background.paper,
       color: theme.palette.text.primary,
       fontWeight: 600,
       fontSize: "0.8125rem",
       borderBottom: `1px solid ${theme.palette.divider}`,
     },
-    "& .MuiTableCell-root": {
+    "& .MuiTableBody-root .MuiTableCell-root": {
       fontSize: "0.8125rem",
-      color: theme.palette.text.primary,
+      color: theme.palette.text.secondary,
       borderColor: theme.palette.divider,
     },
     "& .MuiTableBody-root .MuiTableRow-root:hover": {

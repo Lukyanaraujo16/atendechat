@@ -80,35 +80,42 @@ const Chart = ({ queueTicket }) => {
 						bottom: 5,
 					}}
 				>
-					<CartesianGrid strokeDasharray="3 3" />
+					<CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
 					<XAxis
 						dataKey="time"
 						stroke={theme.palette.text.secondary}
+						tick={{ fill: theme.palette.text.secondary, fontSize: 12 }}
 					/>
 					<YAxis
 						type="number"
 						allowDecimals={false}
 						stroke={theme.palette.text.secondary}
+						tick={{ fill: theme.palette.text.secondary, fontSize: 12 }}
 					>
-						<Tooltip />
-						<Legend />
 						<Label
 							angle={270}
 							position="left"
 							style={{
 								textAnchor: "middle",
-								fill: theme.palette.text.primary,
+								fill: theme.palette.text.secondary,
 							}}
 						>
 							Tickets
 						</Label>
 					</YAxis>
+					<Tooltip
+						contentStyle={{
+							backgroundColor: theme.palette.background.paper,
+							border: `1px solid ${theme.palette.divider}`,
+							color: theme.palette.text.primary,
+						}}
+					/>
+					<Legend wrapperStyle={{ color: theme.palette.text.secondary }} />
 					<Line
 						type="monotone"
 						dataKey="amount"
-						stroke="#8884d8"
+						stroke={theme.palette.primary.main}
 						strokeWidth={2}
-					// fill={theme.palette.primary.main}
 					/>
 				</LineChart>
 			</ResponsiveContainer>

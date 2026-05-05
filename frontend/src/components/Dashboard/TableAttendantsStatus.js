@@ -31,7 +31,7 @@ const useStyles = makeStyles(theme => ({
         cursor: "pointer"
     },
 	tableHeadCell: {
-		backgroundColor: theme.palette.action.hover,
+		backgroundColor: theme.palette.background.paper,
 		color: theme.palette.text.primary,
 		fontWeight: 600,
 		fontSize: "0.8125rem",
@@ -39,8 +39,14 @@ const useStyles = makeStyles(theme => ({
 	},
 	tableCell: {
 		fontSize: "0.8125rem",
-		color: theme.palette.text.primary,
+		color: theme.palette.text.secondary,
 		borderColor: theme.palette.divider,
+	},
+	ratingStars: {
+		color: theme.palette.warning.main,
+		"& .MuiRating-iconEmpty .MuiSvgIcon-root": {
+			color: theme.palette.action.disabled,
+		},
 	},
 	tableRowHover: {
 		"&:hover": {
@@ -54,8 +60,10 @@ const useStyles = makeStyles(theme => ({
 }));
 
 export function RatingBox ({ rating }) {
+    const classes = useStyles();
     const ratingTrunc = rating === null ? 0 : Math.trunc(rating);
     return <Rating
+        className={classes.ratingStars}
         defaultValue={ratingTrunc}
         max={3}
         readOnly

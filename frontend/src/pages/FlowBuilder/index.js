@@ -3,7 +3,9 @@ import React, { useState, useEffect, useReducer } from "react";
 import { toast } from "react-toastify";
 import { useHistory } from "react-router-dom";
 
-import { makeStyles } from "@material-ui/core/styles";
+import { makeStyles, useTheme as useMuiV4Theme } from "@material-ui/core/styles";
+import { ThemeProvider } from "@mui/material/styles";
+import useMuiV5BridgedTheme from "../../hooks/useMuiV5BridgedTheme";
 
 import Paper from "@material-ui/core/Paper";
 import SearchIcon from "@material-ui/icons/Search";
@@ -100,15 +102,27 @@ const useStyles = makeStyles((theme) => ({
     borderRadius: 12,
     padding: theme.spacing(2),
     overflowY: "auto",
+    backgroundColor: theme.palette.background.paper,
+    border: `1px solid ${theme.palette.divider}`,
+    color: theme.palette.text.primary,
     ...theme.scrollbarStyles,
   },
-  actionIcon: {
-    opacity: 0.55,
-    transition: theme.transitions.create("opacity", {
-      duration: theme.transitions.duration.shorter,
-    }),
-    "&:hover": {
+  searchField: {
+    "& .MuiOutlinedInput-input": {
+      color: theme.palette.text.primary,
+    },
+    "& .MuiOutlinedInput-input::placeholder": {
+      color: theme.palette.text.secondary,
       opacity: 1,
+    },
+    "& .MuiOutlinedInput-notchedOutline": {
+      borderColor: theme.palette.divider,
+    },
+    "&:hover .MuiOutlinedInput-notchedOutline": {
+      borderColor: theme.palette.text.secondary,
+    },
+    "& .MuiInputLabel-outlined": {
+      color: theme.palette.text.secondary,
     },
   },
 }));
@@ -128,6 +142,8 @@ function formatFlowSubtitle(flow) {
 
 const FlowBuilder = () => {
   const classes = useStyles();
+  const muiV4Theme = useMuiV4Theme();
+  const muiV5Theme = useMuiV5BridgedTheme();
   const history = useHistory();
 
   const [loading, setLoading] = useState(false);
@@ -261,6 +277,7 @@ const FlowBuilder = () => {
   };
 
   return (
+    <ThemeProvider theme={muiV5Theme}>
     <MainContainer>
       <NewTicketModal
         modalOpen={newTicketModalOpen}
@@ -322,14 +339,17 @@ const FlowBuilder = () => {
         <Title>Fluxos de conversa</Title>
         <MainHeaderButtonsWrapper>
           <TextField
+            className={classes.searchField}
             placeholder={i18n.t("contacts.searchPlaceholder")}
             type="search"
+            variant="outlined"
+            size="small"
             value={searchParam}
             onChange={handleSearch}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <SearchIcon style={{ color: "gray" }} />
+                  <SearchIcon style={{ color: muiV4Theme.palette.text.secondary }} />
                 </InputAdornment>
               ),
             }}
@@ -371,21 +391,55 @@ const FlowBuilder = () => {
             <CircularProgress />
           </Stack>
         ) : (
-          <Table size="medium" sx={{ minWidth: 480 }}>
+          <Table
+            size="medium"
+            sx={{
+              minWidth: 480,
+              borderCollapse: "separate",
+            }}
+          >
             <TableHead>
               <TableRow>
-                <TableCell sx={{ fontWeight: 600, py: 2, fontSize: "0.8125rem" }}>
+                <TableCell
+                  sx={{
+                    fontWeight: 600,
+                    py: 2,
+                    fontSize: "0.8125rem",
+                    color: "text.secondary",
+                    bgcolor: "background.paper",
+                    borderBottom: 1,
+                    borderColor: "divider",
+                  }}
+                >
                   {i18n.t("contacts.table.name")}
                 </TableCell>
                 <TableCell
                   align="center"
-                  sx={{ fontWeight: 600, width: 140, py: 2, fontSize: "0.8125rem" }}
+                  sx={{
+                    fontWeight: 600,
+                    width: 140,
+                    py: 2,
+                    fontSize: "0.8125rem",
+                    color: "text.secondary",
+                    bgcolor: "background.paper",
+                    borderBottom: 1,
+                    borderColor: "divider",
+                  }}
                 >
                   Status
                 </TableCell>
                 <TableCell
                   align="right"
-                  sx={{ fontWeight: 600, width: 216, py: 2, fontSize: "0.8125rem" }}
+                  sx={{
+                    fontWeight: 600,
+                    width: 216,
+                    py: 2,
+                    fontSize: "0.8125rem",
+                    color: "text.secondary",
+                    bgcolor: "background.paper",
+                    borderBottom: 1,
+                    borderColor: "divider",
+                  }}
                 >
                   {i18n.t("contacts.table.actions")}
                 </TableCell>
@@ -402,7 +456,9 @@ const FlowBuilder = () => {
                       "& td": {
                         verticalAlign: "middle",
                         py: 2,
+                        borderBottom: 1,
                         borderColor: "divider",
+                        color: "text.primary",
                       },
                     }}
                   >
@@ -439,6 +495,7 @@ const FlowBuilder = () => {
                               fontWeight: 600,
                               lineHeight: 1.35,
                               textDecoration: "none",
+                              color: "text.primary",
                             }}
                           >
                             {contact.name}
@@ -446,9 +503,8 @@ const FlowBuilder = () => {
                           {subtitle ? (
                             <Typography
                               variant="caption"
-                              color="textSecondary"
                               component="div"
-                              sx={{ display: "block", mt: 0.35 }}
+                              sx={{ display: "block", mt: 0.35, color: "text.secondary" }}
                             >
                               {subtitle}
                             </Typography>
@@ -463,10 +519,15 @@ const FlowBuilder = () => {
                         <Chip
                           label="Inativo"
                           size="small"
+                          variant="outlined"
                           sx={{
-                            bgcolor: "grey.300",
-                            color: "grey.800",
                             fontWeight: 500,
+                            color: "text.secondary",
+                            borderColor: "divider",
+                            bgcolor: (t) =>
+                              t.palette.mode === "dark"
+                                ? "rgba(255,255,255,0.06)"
+                                : t.palette.action.hover,
                           }}
                         />
                       )}
@@ -481,11 +542,17 @@ const FlowBuilder = () => {
                         <Tooltip title="Editar nome">
                           <IconButton
                             size="small"
-                            className={classes.actionIcon}
                             aria-label="Editar nome"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleOpenRenameModal(contact);
+                            }}
+                            sx={{
+                              color: "text.secondary",
+                              "&:hover": {
+                                color: "primary.main",
+                                bgcolor: "action.hover",
+                              },
                             }}
                           >
                             <EditIcon fontSize="small" />
@@ -494,11 +561,17 @@ const FlowBuilder = () => {
                         <Tooltip title="Editar fluxo">
                           <IconButton
                             size="small"
-                            className={classes.actionIcon}
                             aria-label="Editar fluxo"
                             onClick={(e) => {
                               e.stopPropagation();
                               history.push(`/flowbuilder/${contact.id}`);
+                            }}
+                            sx={{
+                              color: "text.secondary",
+                              "&:hover": {
+                                color: "primary.main",
+                                bgcolor: "action.hover",
+                              },
                             }}
                           >
                             <TuneIcon fontSize="small" />
@@ -507,12 +580,18 @@ const FlowBuilder = () => {
                         <Tooltip title="Duplicar">
                           <IconButton
                             size="small"
-                            className={classes.actionIcon}
                             aria-label="Duplicar"
                             onClick={(e) => {
                               e.stopPropagation();
                               setDeletingContact(contact);
                               setConfirmDuplicateOpen(true);
+                            }}
+                            sx={{
+                              color: "text.secondary",
+                              "&:hover": {
+                                color: "primary.main",
+                                bgcolor: "action.hover",
+                              },
                             }}
                           >
                             <ContentCopyIcon fontSize="small" />
@@ -521,7 +600,6 @@ const FlowBuilder = () => {
                         <Tooltip title="Excluir">
                           <IconButton
                             size="small"
-                            className={classes.actionIcon}
                             aria-label="Excluir"
                             onClick={(e) => {
                               e.stopPropagation();
@@ -530,7 +608,7 @@ const FlowBuilder = () => {
                             }}
                             sx={{
                               color: "error.main",
-                              opacity: 0.65,
+                              opacity: (t) => (t.palette.mode === "dark" ? 0.85 : 0.7),
                               "&:hover": {
                                 opacity: 1,
                                 bgcolor: "action.hover",
@@ -550,6 +628,7 @@ const FlowBuilder = () => {
         )}
       </Paper>
     </MainContainer>
+    </ThemeProvider>
   );
 };
 

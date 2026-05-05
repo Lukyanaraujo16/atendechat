@@ -3,6 +3,7 @@ import React, { useContext, useEffect, useReducer, useState } from "react";
 import {
   Box,
   Button,
+  CircularProgress,
   IconButton,
   Paper,
   Table,
@@ -29,9 +30,9 @@ import { DeleteOutline, Edit } from "@material-ui/icons";
 import PromptModal from "../../components/PromptModal";
 import { toast } from "react-toastify";
 import ConfirmationModal from "../../components/ConfirmationModal";
+import PlanFeatureBlocked from "../../components/PlanFeatureBlocked";
 import { AuthContext } from "../../context/Auth/AuthContext";
 import useFeature from "../../hooks/useFeature";
-import { useHistory } from "react-router-dom";
 import { SocketContext } from "../../context/Socket/SocketContext";
 
 const useStyles = makeStyles((theme) => ({
@@ -116,22 +117,9 @@ const Prompts = () => {
   const { enabled: openAiEnabled, loaded: openAiFeatureLoaded } = useFeature(
     "automation.openai"
   );
-  const history = useHistory();
   const companyId = user.companyId;
 
   const socketManager = useContext(SocketContext);
-
-  useEffect(() => {
-    if (!user?.companyId || !openAiFeatureLoaded) return;
-    if (!openAiEnabled) {
-      toast.error(
-        "Esta empresa não possui permissão para acessar essa página! Estamos lhe redirecionando."
-      );
-      setTimeout(() => {
-        history.push(`/`);
-      }, 1000);
-    }
-  }, [user?.companyId, openAiFeatureLoaded, openAiEnabled, history]);
 
   useEffect(() => {
     (async () => {
@@ -210,6 +198,33 @@ const Prompts = () => {
     setSelectedPrompt(null);
   };
 
+  if (!openAiFeatureLoaded) {
+    return (
+      <MainContainer>
+        <Box
+          display="flex"
+          justifyContent="center"
+          alignItems="center"
+          minHeight={320}
+          width="100%"
+        >
+          <CircularProgress />
+        </Box>
+      </MainContainer>
+    );
+  }
+
+  if (!openAiEnabled) {
+    return (
+      <MainContainer>
+        <MainHeader>
+          <Title>{i18n.t("prompts.title")}</Title>
+        </MainHeader>
+        <PlanFeatureBlocked />
+      </MainContainer>
+    );
+  }
+
   return (
     <MainContainer>
       <ConfirmationModal
@@ -248,6 +263,16 @@ const Prompts = () => {
         </Typography>
       </Box>
       <Paper className={classes.mainPaper} variant="outlined">
+        {!loading && prompts.length === 0 ? (
+          <Box py={8} px={2} textAlign="center">
+            <Typography variant="h6" color="textSecondary" gutterBottom>
+              {i18n.t("prompts.empty.title")}
+            </Typography>
+            <Typography variant="body2" color="textSecondary" component="p">
+              {i18n.t("prompts.empty.subtitle")}
+            </Typography>
+          </Box>
+        ) : (
         <Table size="medium">
           <TableHead>
             <TableRow>
@@ -332,6 +357,7 @@ const Prompts = () => {
             </>
           </TableBody>
         </Table>
+        )}
       </Paper>
     </MainContainer>
   );

@@ -1535,6 +1535,10 @@ const messages = {
         buttons: {
           add: "Adicionar Prompt",
         },
+        empty: {
+          title: "Nenhum prompt cadastrado",
+          subtitle: "Crie um prompt para vincular à conexão WhatsApp, ao setor ou ao fluxo automatizado.",
+        },
       },
       contactModal: {
         title: {
@@ -2895,6 +2899,10 @@ const messages = {
           deleteTitle: "Excluir",
           deleteMessage:
               "Você tem certeza? Essa ação não pode ser revertida! e será removida dos setores e conexões vinculadas",
+        },
+        empty: {
+          title: "Nenhuma integração cadastrada",
+          subtitle: "Adicione uma automação por setor ou use o botão acima para criar a primeira.",
         },
       },
       files: {
