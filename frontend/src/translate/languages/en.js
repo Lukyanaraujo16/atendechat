@@ -3766,6 +3766,7 @@ const messages = {
 				resultsCount: "{{count}} record(s) in the current filter (per-source cap applies; refine with search).",
 				open: "Open / view",
 				download: "Download",
+				missingFile: "File not found",
 				deleteMedia: "Delete media",
 				deleteConfirm:
 					"Are you sure you want to delete this media? This removes the file from the server and frees storage. The message or conversation stays, but the media can no longer be opened.",

@@ -3671,6 +3671,7 @@ const messages = {
           "{{count}} registro(s) en el filtro actual (límite por origen; refine con la búsqueda).",
         open: "Abrir / ver",
         download: "Descargar",
+        missingFile: "Archivo no encontrado",
         deleteMedia: "Eliminar medio",
         deleteConfirm:
           "¿Está seguro de que desea eliminar este medio? Esta acción eliminará el archivo del servidor y liberará espacio de almacenamiento. El mensaje o conversación se conservará, pero el medio ya no podrá abrirse.",

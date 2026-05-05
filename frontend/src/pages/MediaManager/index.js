@@ -28,6 +28,7 @@ import {
   TextField,
   Tooltip,
   Typography,
+  Chip,
 } from "@material-ui/core";
 import { makeStyles } from "@material-ui/core/styles";
 import GetAppIcon from "@material-ui/icons/GetApp";
@@ -523,13 +524,30 @@ export default function MediaManager() {
                     />
                   </TableCell>
                   <TableCell>
-                    {row.type === "image" ? (
+                    {row.type === "image" && !row.missing && row.mediaUrl ? (
                       <img className={classes.preview} src={row.mediaUrl} alt="" />
                     ) : (
                       <Box className={classes.previewIcon}>{typeIcon(row.type)}</Box>
                     )}
                   </TableCell>
-                  <TableCell>{row.fileName}</TableCell>
+                  <TableCell>
+                    <Box
+                      display="flex"
+                      alignItems="center"
+                      flexWrap="wrap"
+                      style={{ gap: 6 }}
+                    >
+                      <span>{row.fileName}</span>
+                      {row.missing ? (
+                        <Chip
+                          size="small"
+                          label={i18n.t("mediaManager.missingFile")}
+                          color="default"
+                          variant="outlined"
+                        />
+                      ) : null}
+                    </Box>
+                  </TableCell>
                   <TableCell>{i18n.t(`mediaManager.types.${row.type}`)}</TableCell>
                   <TableCell>{row.sizeFormatted}</TableCell>
                   <TableCell>{i18n.t(`mediaManager.source.${row.source}`)}</TableCell>

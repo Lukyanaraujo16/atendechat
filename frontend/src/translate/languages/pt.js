@@ -3886,6 +3886,7 @@ const messages = {
         resultsCount: "{{count}} registo(s) filtrados (limite por origem; use pesquisa para afinar).",
         open: "Abrir / ver",
         download: "Transferir",
+        missingFile: "Arquivo não encontrado",
         deleteMedia: "Excluir mídia",
         deleteConfirm:
           "Tem certeza que deseja excluir esta mídia? Essa ação removerá o arquivo do servidor e liberará espaço de armazenamento. A mensagem/conversa será mantida, mas a mídia não poderá mais ser aberta.",
