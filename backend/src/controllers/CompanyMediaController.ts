@@ -2,6 +2,8 @@ import { Request, Response } from "express";
 import AppError from "../errors/AppError";
 import { CompanyMediaBucket } from "../helpers/companyMediaTypes";
 import { formatBytesPtBr } from "../helpers/companyStorage";
+import { buildEmptyCompanyMediaListResponse } from "../helpers/companyMediaListFallback";
+import { logger } from "../utils/logger";
 import ListCompanyMediaService from "../services/CompanyMediaService/ListCompanyMediaService";
 import DeleteCompanyMediaItemService, {
   DeleteCompanyMediaSource
@@ -28,10 +30,21 @@ const ALLOWED_SOURCES: DeleteCompanyMediaSource[] = [
   "flowAudio"
 ];
 
+/** Express pode entregar query como string ou string[] — normalizar. */
+function firstQueryString(v: unknown): string | undefined {
+  if (v == null) return undefined;
+  if (Array.isArray(v)) {
+    const x = v[0];
+    return x == null ? undefined : String(x);
+  }
+  return String(v);
+}
+
 function parseTypeFilter(raw: string | undefined): CompanyMediaBucket | "all" {
-  if (!raw || raw === "all") return "all";
-  if (["image", "video", "audio", "document", "other"].includes(raw)) {
-    return raw as CompanyMediaBucket;
+  const s = raw?.trim().toLowerCase() || "";
+  if (!s || s === "all") return "all";
+  if (["image", "video", "audio", "document", "other"].includes(s)) {
+    return s as CompanyMediaBucket;
   }
   return "all";
 }
@@ -44,41 +57,100 @@ const ALLOWED_SORT = [
 ] as const;
 
 function parseSort(raw: string | undefined): (typeof ALLOWED_SORT)[number] {
-  if (raw && (ALLOWED_SORT as readonly string[]).includes(raw)) {
-    return raw as (typeof ALLOWED_SORT)[number];
+  const s = raw?.trim() || "";
+  if (s && (ALLOWED_SORT as readonly string[]).includes(s)) {
+    return s as (typeof ALLOWED_SORT)[number];
   }
   return "createdAt_desc";
+}
+
+function safePageLimit(q: Record<string, unknown>) {
+  const pageRaw = firstQueryString(q.page);
+  const limitRaw = firstQueryString(q.limit);
+  const pageNum = Math.max(1, Number(pageRaw) || 1);
+  const limitNum = Math.min(100, Math.max(1, Number(limitRaw) || 25));
+  return { pageNum, limitNum };
 }
 
 export const listCompanyMedia = async (
   req: Request,
   res: Response
 ): Promise<Response> => {
-  const companyId = companyIdOrThrow(req);
-  const q = req.query as Record<string, string | undefined>;
-  const data = await ListCompanyMediaService({
-    companyId,
-    type: parseTypeFilter(q.type),
-    search: q.search,
-    startDate: q.startDate,
-    endDate: q.endDate,
-    page: q.page ? Number(q.page) : undefined,
-    limit: q.limit ? Number(q.limit) : undefined,
-    sort: parseSort(q.sort)
-  });
+  const q = req.query as Record<string, unknown>;
+  const userSnap = {
+    id: req.user?.id,
+    companyId: req.user?.companyId,
+    profile: req.user?.profile,
+    supportMode: req.user?.supportMode
+  };
 
-  return res.json({
-    ...data,
-    summary: {
-      ...data.summary,
-      totalFormatted: formatBytesPtBr(data.summary.totalBytes),
-      imageFormatted: formatBytesPtBr(data.summary.imageBytes),
-      videoFormatted: formatBytesPtBr(data.summary.videoBytes),
-      audioFormatted: formatBytesPtBr(data.summary.audioBytes),
-      documentFormatted: formatBytesPtBr(data.summary.documentBytes),
-      otherFormatted: formatBytesPtBr(data.summary.otherBytes)
+  try {
+    logger.info({ query: q, user: userSnap }, "[CompanyMedia] list request received");
+  } catch {
+    /* ignore logger failure */
+  }
+
+  try {
+    const companyId = companyIdOrThrow(req);
+    const { pageNum, limitNum } = safePageLimit(q);
+
+    const data = await ListCompanyMediaService({
+      companyId,
+      type: parseTypeFilter(firstQueryString(q.type)),
+      search: firstQueryString(q.search),
+      startDate: firstQueryString(q.startDate),
+      endDate: firstQueryString(q.endDate),
+      page: pageNum,
+      limit: limitNum,
+      sort: parseSort(firstQueryString(q.sort))
+    });
+
+    const items = Array.isArray(data?.items) ? data.items : [];
+    const count = Math.max(0, Number(data?.count) || 0);
+    const hasMore = Boolean(data?.hasMore);
+
+    const summaryNums = {
+      totalBytes: Number(data?.summary?.totalBytes) || 0,
+      imageBytes: Number(data?.summary?.imageBytes) || 0,
+      videoBytes: Number(data?.summary?.videoBytes) || 0,
+      audioBytes: Number(data?.summary?.audioBytes) || 0,
+      documentBytes: Number(data?.summary?.documentBytes) || 0,
+      otherBytes: Number(data?.summary?.otherBytes) || 0
+    };
+
+    return res.json({
+      items,
+      count,
+      hasMore,
+      summary: {
+        ...summaryNums,
+        totalFormatted: formatBytesPtBr(summaryNums.totalBytes),
+        imageFormatted: formatBytesPtBr(summaryNums.imageBytes),
+        videoFormatted: formatBytesPtBr(summaryNums.videoBytes),
+        audioFormatted: formatBytesPtBr(summaryNums.audioBytes),
+        documentFormatted: formatBytesPtBr(summaryNums.documentBytes),
+        otherFormatted: formatBytesPtBr(summaryNums.otherBytes)
+      }
+    });
+  } catch (err) {
+    try {
+      logger.error(
+        {
+          companyId: req.user?.companyId,
+          userId: req.user?.id,
+          query: q,
+          user: userSnap,
+          err: err instanceof Error ? err.message : String(err),
+          stack: err instanceof Error ? err.stack : undefined
+        },
+        "[CompanyMedia] list failed"
+      );
+    } catch {
+      /* evitar falha secundária se o logger falhar em produção */
     }
-  });
+
+    return res.status(200).json(buildEmptyCompanyMediaListResponse({ error: true }));
+  }
 };
 
 export const deleteCompanyMediaItem = async (

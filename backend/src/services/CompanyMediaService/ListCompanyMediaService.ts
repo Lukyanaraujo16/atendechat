@@ -22,7 +22,9 @@ import {
   CompanyMediaSource,
   normalizePublicRelPath
 } from "../../helpers/companyMediaTypes";
-import SummarizeCompanyMediaBucketsService from "./SummarizeCompanyMediaBucketsService";
+import SummarizeCompanyMediaBucketsService, {
+  EMPTY_COMPANY_MEDIA_SUMMARY
+} from "./SummarizeCompanyMediaBucketsService";
 import { logger } from "../../utils/logger";
 
 const MAX_PER_SOURCE = 800;
@@ -653,99 +655,163 @@ const ListCompanyMediaService = async (
     otherBytes: number;
   };
 }> => {
-  const { companyId } = input;
-  const { page, limit, offset } = parsePageLimit(input.page, input.limit);
-  const typeFilter = parseTypeFilter(input);
+  try {
+    const { companyId } = input;
+    const { page, limit, offset } = parsePageLimit(input.page, input.limit);
+    const typeFilter = parseTypeFilter(input);
 
-  const searchTrim = String(input.search || "").trim();
-  let start: Date | null = null;
-  let end: Date | null = null;
-  if (input.startDate) {
-    const t = Date.parse(String(input.startDate));
-    if (!Number.isNaN(t)) start = new Date(t);
+    const searchTrim = String(input.search || "").trim();
+    let start: Date | null = null;
+    let end: Date | null = null;
+    if (input.startDate) {
+      const t = Date.parse(String(input.startDate));
+      if (!Number.isNaN(t)) start = new Date(t);
+    }
+    if (input.endDate) {
+      const t = Date.parse(String(input.endDate));
+      if (!Number.isNaN(t)) {
+        end = new Date(t);
+        end.setHours(23, 59, 59, 999);
+      }
+    }
+
+    const settled = await Promise.allSettled([
+      loadMessageItems(companyId),
+      loadQuickMessageItems(companyId),
+      loadScheduleItems(companyId),
+      loadCampaignItems(companyId),
+      loadAnnouncementItems(companyId),
+      loadFileListItems(companyId),
+      loadChatMessageItems(companyId),
+      loadFlowImageItems(companyId),
+      loadFlowAudioItems(companyId),
+      SummarizeCompanyMediaBucketsService(companyId)
+    ]);
+
+    const loaderNames = [
+      "message",
+      "quickMessage",
+      "schedule",
+      "campaign",
+      "announcement",
+      "fileList",
+      "chatMessage",
+      "flowImage",
+      "flowAudio",
+      "summarize"
+    ] as const;
+
+    settled.forEach((result, i) => {
+      if (result.status === "rejected") {
+        logger.warn(
+          {
+            companyId,
+            loader: loaderNames[i],
+            err:
+              result.reason instanceof Error
+                ? result.reason.message
+                : String(result.reason)
+          },
+          "[CompanyMedia] loader rejected"
+        );
+      }
+    });
+
+    const messageItems =
+      settled[0].status === "fulfilled" ? settled[0].value : [];
+    const quickItems =
+      settled[1].status === "fulfilled" ? settled[1].value : [];
+    const scheduleItems =
+      settled[2].status === "fulfilled" ? settled[2].value : [];
+    const campaignItems =
+      settled[3].status === "fulfilled" ? settled[3].value : [];
+    const announceItems =
+      settled[4].status === "fulfilled" ? settled[4].value : [];
+    const fileItems =
+      settled[5].status === "fulfilled" ? settled[5].value : [];
+    const chatItems =
+      settled[6].status === "fulfilled" ? settled[6].value : [];
+    const fiItems =
+      settled[7].status === "fulfilled" ? settled[7].value : [];
+    const faItems =
+      settled[8].status === "fulfilled" ? settled[8].value : [];
+    const summary =
+      settled[9].status === "fulfilled"
+        ? settled[9].value
+        : { ...EMPTY_COMPANY_MEDIA_SUMMARY };
+
+    const merged = [
+      ...messageItems,
+      ...quickItems,
+      ...scheduleItems,
+      ...campaignItems,
+      ...announceItems,
+      ...fileItems,
+      ...chatItems,
+      ...fiItems,
+      ...faItems
+    ];
+    merged.sort((a, b) => safeTimeMs(b.createdAt) - safeTimeMs(a.createdAt));
+
+    const filtered = merged.filter((it) =>
+      matchesFilters(it, typeFilter, searchTrim, start, end)
+    );
+
+    const sortKey =
+      input.sort &&
+      ["createdAt_desc", "createdAt_asc", "size_desc", "size_asc"].includes(input.sort)
+        ? input.sort
+        : "createdAt_desc";
+    filtered.sort((a, b) => {
+      if (sortKey === "size_desc") {
+        const c = b.sizeBytes - a.sizeBytes;
+        if (c !== 0) return c;
+      }
+      if (sortKey === "size_asc") {
+        const c = a.sizeBytes - b.sizeBytes;
+        if (c !== 0) return c;
+      }
+      if (sortKey === "createdAt_asc") {
+        return safeTimeMs(a.createdAt) - safeTimeMs(b.createdAt);
+      }
+      return safeTimeMs(b.createdAt) - safeTimeMs(a.createdAt);
+    });
+
+    const count = filtered.length;
+    const items = filtered.slice(offset, offset + limit);
+    const hasMore = offset + limit < count;
+
+    const safeSummary = summary || { ...EMPTY_COMPANY_MEDIA_SUMMARY };
+
+    return {
+      items,
+      count,
+      hasMore,
+      summary: {
+        totalBytes: Number(safeSummary.totalBytes) || 0,
+        imageBytes: Number(safeSummary.imageBytes) || 0,
+        videoBytes: Number(safeSummary.videoBytes) || 0,
+        audioBytes: Number(safeSummary.audioBytes) || 0,
+        documentBytes: Number(safeSummary.documentBytes) || 0,
+        otherBytes: Number(safeSummary.otherBytes) || 0
+      }
+    };
+  } catch (err) {
+    logger.error(
+      {
+        companyId: input.companyId,
+        err: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined
+      },
+      "[CompanyMedia] ListCompanyMediaService fatal"
+    );
+    return {
+      items: [],
+      count: 0,
+      hasMore: false,
+      summary: { ...EMPTY_COMPANY_MEDIA_SUMMARY }
+    };
   }
-  if (input.endDate) {
-    const t = Date.parse(String(input.endDate));
-    if (!Number.isNaN(t)) {
-      end = new Date(t);
-      end.setHours(23, 59, 59, 999);
-    }
-  }
-
-  const [
-    messageItems,
-    quickItems,
-    scheduleItems,
-    campaignItems,
-    announceItems,
-    fileItems,
-    chatItems,
-    fiItems,
-    faItems,
-    summary
-  ] = await Promise.all([
-    loadMessageItems(companyId),
-    loadQuickMessageItems(companyId),
-    loadScheduleItems(companyId),
-    loadCampaignItems(companyId),
-    loadAnnouncementItems(companyId),
-    loadFileListItems(companyId),
-    loadChatMessageItems(companyId),
-    loadFlowImageItems(companyId),
-    loadFlowAudioItems(companyId),
-    SummarizeCompanyMediaBucketsService(companyId)
-  ]);
-
-  const merged = [
-    ...messageItems,
-    ...quickItems,
-    ...scheduleItems,
-    ...campaignItems,
-    ...announceItems,
-    ...fileItems,
-    ...chatItems,
-    ...fiItems,
-    ...faItems
-  ];
-  merged.sort((a, b) => safeTimeMs(b.createdAt) - safeTimeMs(a.createdAt));
-
-  const filtered = merged.filter((it) =>
-    matchesFilters(it, typeFilter, searchTrim, start, end)
-  );
-
-  const sortKey = input.sort || "createdAt_desc";
-  filtered.sort((a, b) => {
-    if (sortKey === "size_desc") {
-      const c = b.sizeBytes - a.sizeBytes;
-      if (c !== 0) return c;
-    }
-    if (sortKey === "size_asc") {
-      const c = a.sizeBytes - b.sizeBytes;
-      if (c !== 0) return c;
-    }
-    if (sortKey === "createdAt_asc") {
-      return safeTimeMs(a.createdAt) - safeTimeMs(b.createdAt);
-    }
-    return safeTimeMs(b.createdAt) - safeTimeMs(a.createdAt);
-  });
-
-  const count = filtered.length;
-  const items = filtered.slice(offset, offset + limit);
-  const hasMore = offset + limit < count;
-
-  return {
-    items,
-    count,
-    hasMore,
-    summary: {
-      totalBytes: summary.totalBytes,
-      imageBytes: summary.imageBytes,
-      videoBytes: summary.videoBytes,
-      audioBytes: summary.audioBytes,
-      documentBytes: summary.documentBytes,
-      otherBytes: summary.otherBytes
-    }
-  };
 };
 
 export default ListCompanyMediaService;

@@ -242,10 +242,11 @@ const SummarizeCompanyMediaBucketsService = async (
       otherBytes: Math.round(sums.other)
     };
   } catch (err) {
-    logger.warn(
+    logger.error(
       {
         companyId,
-        err: err instanceof Error ? err.message : String(err)
+        err: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined
       },
       "[CompanyMedia] summary aborted"
     );
