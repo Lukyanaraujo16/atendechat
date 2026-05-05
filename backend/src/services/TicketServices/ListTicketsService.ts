@@ -13,6 +13,10 @@ import { intersection } from "lodash";
 import Whatsapp from "../../models/Whatsapp";
 import { parseTruthyQuery } from "../../utils/parseQueryBoolean";
 import { attachTicketIsOrphanFlag } from "../../helpers/ticketOrphan";
+import {
+  buildNonAdminTicketListWhere,
+  queueInAllowedOrUnassigned
+} from "../../helpers/agentTicketListWhere";
 
 interface Request {
   searchParam?: string;
@@ -52,10 +56,21 @@ const ListTicketsService = async ({
   companyId,
   isGroup
 }: Request): Promise<Response> => {
-  let whereCondition: Filterable["where"] = {
-    [Op.or]: [{ userId }, { status: "pending" }],
-    queueId: { [Op.or]: [queueIds, null] }
-  };
+  let whereCondition: Filterable["where"];
+
+  if (parseTruthyQuery(showAll)) {
+    whereCondition = queueInAllowedOrUnassigned(queueIds);
+  } else {
+    const userRow = await User.findByPk(userId, {
+      attributes: ["allTicket"]
+    });
+    whereCondition = buildNonAdminTicketListWhere(
+      userId,
+      queueIds,
+      userRow?.allTicket === "enabled"
+    );
+  }
+
   let includeCondition: Includeable[];
 
   includeCondition = [
@@ -85,10 +100,6 @@ const ListTicketsService = async ({
       attributes: ["name"]
     },
   ];
-
-  if (parseTruthyQuery(showAll)) {
-    whereCondition = { queueId: { [Op.or]: [queueIds, null] } };
-  }
 
   if (status) {
     whereCondition = {
@@ -164,8 +175,11 @@ const ListTicketsService = async ({
     const userQueueIds = user.queues.map(queue => queue.id);
 
     whereCondition = {
-      [Op.or]: [{ userId }, { status: "pending" }],
-      queueId: { [Op.or]: [userQueueIds, null] },
+      ...buildNonAdminTicketListWhere(
+        userId,
+        userQueueIds,
+        user?.allTicket === "enabled"
+      ),
       unreadMessages: { [Op.gt]: 0 }
     };
   }

@@ -438,18 +438,19 @@ const Kanban = () => {
       if (filterUser && String(t.userId || "") !== String(filterUser)) return false;
       if (filterSetor && String(t.queueId || "") !== String(filterSetor)) return false;
       // Admin vê todas as filas da empresa na API (showAll); não restringir às filas do perfil do usuário.
-      // Usuário comum continua limitado às filas em queueIdsParam (exceto queueId null, já coberto pelo backend).
+      // Usuário comum: filas em queueIdsParam; exceção — ticket atribuído diretamente a si.
       if (
         !isAdmin &&
         queueIdsParam.length &&
         t.queueId &&
-        !queueIdsParam.includes(Number(t.queueId))
+        !queueIdsParam.includes(Number(t.queueId)) &&
+        String(t.userId || "") !== String(user?.id || "")
       ) {
         return false;
       }
       return true;
     },
-    [filterConexao, filterSetor, filterStatus, filterUser, queueIdsParam, isAdmin]
+    [filterConexao, filterSetor, filterStatus, filterUser, queueIdsParam, isAdmin, user?.id]
   );
 
   useEffect(() => {

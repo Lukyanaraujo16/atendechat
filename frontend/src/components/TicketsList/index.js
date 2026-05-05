@@ -234,7 +234,24 @@ const TicketsList = (props) => {
 	useEffect(() => {
 
 		const queueIds = safeQueues.map((q) => q.id);
-		const filteredTickets = tickets.filter((t) => queueIds.indexOf(t.queueId) > -1);
+		const filteredTickets = tickets.filter((t) => {
+			const assigneeRaw = t.userId;
+			const assignee =
+				assigneeRaw != null && assigneeRaw !== ""
+					? Number(assigneeRaw)
+					: null;
+			const myId = Number(user?.id);
+			if (assignee != null && !Number.isNaN(assignee) && assignee === myId) {
+				return true;
+			}
+			if (assignee != null && !Number.isNaN(assignee)) {
+				return false;
+			}
+			if (!t.queueId) {
+				return user.allTicket === "enabled";
+			}
+			return queueIds.indexOf(t.queueId) > -1;
+		});
 		const getSettingValue = key => {
 			const { value } = settings.find(s => s.key === key);
 			return value;
@@ -262,12 +279,30 @@ const TicketsList = (props) => {
       return () => {}; 
     }
 
-		const shouldUpdateTicket = (ticket) =>
-			(!ticket.userId || ticket.userId === user?.id || showAll) &&
-			(!ticket.queueId || selectedQueueIds.indexOf(ticket.queueId) > -1);
+		const shouldUpdateTicket = (ticket) => {
+			const myId = Number(user?.id);
+			if (showAll) return true;
+			const assigneeRaw = ticket?.userId;
+			const assignee =
+				assigneeRaw != null && assigneeRaw !== ""
+					? Number(assigneeRaw)
+					: null;
+			if (assignee != null && !Number.isNaN(assignee) && assignee === myId) {
+				return true;
+			}
+			if (assignee != null && !Number.isNaN(assignee)) {
+				return false;
+			}
+			if (!ticket.queueId) {
+				return user?.allTicket === "enabled";
+			}
+			return selectedQueueIds.indexOf(ticket.queueId) > -1;
+		};
 
 		const notBelongsToUserQueues = (ticket) =>
-			ticket.queueId && selectedQueueIds.indexOf(ticket.queueId) === -1;
+			Number(ticket?.userId) !== Number(user?.id) &&
+			ticket.queueId &&
+			selectedQueueIds.indexOf(ticket.queueId) === -1;
 
 		socket.on("ready", () => {
 			if (status) {

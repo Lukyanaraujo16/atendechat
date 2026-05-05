@@ -20,6 +20,44 @@ import { AuthContext } from "../../context/Auth/AuthContext";
 import { i18n } from "../../translate/i18n";
 import toastError from "../../errors/toastError";
 
+/** Som / notificação desktop só para tickets “do” usuário: atribuído a ele OU sem responsável na fila dele. */
+function shouldNotifyUserAboutTicket(ticket, user) {
+	if (!user?.id || !ticket || ticket.isGroup) return false;
+	const myId = Number(user.id);
+	const rawAssignee = ticket.userId;
+	const hasAssignee =
+		rawAssignee != null &&
+		rawAssignee !== "" &&
+		!Number.isNaN(Number(rawAssignee)) &&
+		Number(rawAssignee) > 0;
+	const assigneeId = hasAssignee ? Number(rawAssignee) : null;
+
+	const queueIds = Array.isArray(user.queues)
+		? user.queues.map(q => Number(q.id))
+		: [];
+	const rawQ = ticket.queueId;
+	const qid =
+		rawQ != null && rawQ !== "" && !Number.isNaN(Number(rawQ))
+			? Number(rawQ)
+			: null;
+
+	if (assigneeId != null && assigneeId !== myId) {
+		return false;
+	}
+	if (assigneeId === myId) {
+		return true;
+	}
+	return qid != null && queueIds.includes(qid);
+}
+
+function isTicketOpenInRoute(ticket, history) {
+	if (!ticket || !history?.location?.pathname) return false;
+	const m = history.location.pathname.match(/^\/tickets\/([^/?#]+)/);
+	const seg = m?.[1];
+	if (!seg) return false;
+	return seg === String(ticket.uuid) || seg === String(ticket.id);
+}
+
 const useStyles = makeStyles(theme => ({
 	popoverPaper: {
 		marginLeft: theme.spacing(2),
@@ -35,8 +73,8 @@ const NotificationsPopOver = ({ volume }) => {
 
 	const history = useHistory();
 	const { user } = useContext(AuthContext);
-	const ticketIdUrl = +history.location.pathname.split("/")[2];
-	const ticketIdRef = useRef(ticketIdUrl);
+	const lastSoundAtRef = useRef(0);
+	const SOUND_DEBOUNCE_MS = 1000;
 	const anchorEl = useRef();
 	const [isOpen, setIsOpen] = useState(false);
 	const [notifications, setNotifications] = useState([]);
@@ -96,10 +134,6 @@ const NotificationsPopOver = ({ volume }) => {
 
 		processNotifications();
 	}, [tickets, showPendingTickets]);
-
-	useEffect(() => {
-		ticketIdRef.current = ticketIdUrl;
-	}, [ticketIdUrl]);
 
 	useEffect(() => {
 		historyRef.current = history;
@@ -176,32 +210,39 @@ const NotificationsPopOver = ({ volume }) => {
 		};
 
 		const onAppMessage = data => {
-			if (
-				data.action === "create" && !data.message.fromMe && 
-				(data.ticket.status !== "pending" ) &&
-				(!data.message.read || data.ticket.status === "pending") &&
-				(data.ticket.userId === user?.id || !data.ticket.userId) &&
-				(user?.queues?.some(queue => (queue.id === data.ticket.queueId)) || !data.ticket.queueId)
-			) {
-				setNotifications(prevState => {
-					const ticketIndex = prevState.findIndex(t => t.id === data.ticket.id);
-					if (ticketIndex !== -1) {
-						prevState[ticketIndex] = data.ticket;
-						return [...prevState];
-					}
-					return [data.ticket, ...prevState];
-				});
-
-				const shouldNotNotificate =
-					(data.message.ticketId === ticketIdRef.current &&
-						document.visibilityState === "visible") ||
-					(data.ticket.userId && data.ticket.userId !== user?.id) ||
-					data.ticket.isGroup;
-
-				if (shouldNotNotificate) return;
-
-				handleNotifications(data);
+			if (data.action !== "create" || data.message.fromMe) {
+				return;
 			}
+			if (
+				!(data.ticket.status !== "pending") ||
+				!(!data.message.read || data.ticket.status === "pending")
+			) {
+				return;
+			}
+			if (!shouldNotifyUserAboutTicket(data.ticket, user)) {
+				return;
+			}
+
+			setNotifications(prevState => {
+				const ticketIndex = prevState.findIndex(t => t.id === data.ticket.id);
+				if (ticketIndex !== -1) {
+					prevState[ticketIndex] = data.ticket;
+					return [...prevState];
+				}
+				return [data.ticket, ...prevState];
+			});
+
+			if (isTicketOpenInRoute(data.ticket, historyRef.current)) {
+				return;
+			}
+
+			const now = Date.now();
+			if (now - lastSoundAtRef.current < SOUND_DEBOUNCE_MS) {
+				return;
+			}
+			lastSoundAtRef.current = now;
+
+			handleNotifications(data);
 		};
 
 		socket.on("ready", onReadyJoin);

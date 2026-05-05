@@ -13,6 +13,7 @@ import { intersection } from "lodash";
 import Whatsapp from "../../models/Whatsapp";
 import { attachTicketIsOrphanFlag } from "../../helpers/ticketOrphan";
 import { parseTruthyQuery } from "../../utils/parseQueryBoolean";
+import { buildNonAdminTicketListWhere } from "../../helpers/agentTicketListWhere";
 
 interface Request {
   searchParam?: string;
@@ -35,16 +36,6 @@ interface Response {
   hasMore: boolean;
 }
 
-/** Fila em uma das filas permitidas OU sem fila (null) — evita Op.or com array bruto (SQL inválido). */
-function queueInAllowedOrUnassigned(queueIds: number[]): Filterable["where"] {
-  if (!queueIds?.length) {
-    return { queueId: null };
-  }
-  return {
-    [Op.or]: [{ queueId: { [Op.in]: queueIds } }, { queueId: null }]
-  };
-}
-
 const ListTicketsServiceKanban = async ({
   searchParam = "",
   pageNumber = "1",
@@ -59,12 +50,7 @@ const ListTicketsServiceKanban = async ({
   withUnreadMessages,
   companyId
 }: Request): Promise<Response> => {
-  let whereCondition: Filterable["where"] = {
-    [Op.and]: [
-      { [Op.or]: [{ userId }, { status: "pending" }] },
-      queueInAllowedOrUnassigned(queueIds)
-    ]
-  };
+  let whereCondition: Filterable["where"];
   let includeCondition: Includeable[];
 
   includeCondition = [
@@ -111,14 +97,16 @@ const ListTicketsServiceKanban = async ({
   if (parseTruthyQuery(showAll)) {
     whereCondition = statusKanbanFilter;
   } else {
+    const userRow = await User.findByPk(userId, {
+      attributes: ["allTicket"]
+    });
     whereCondition = {
       [Op.and]: [
-        {
-          [Op.and]: [
-            { [Op.or]: [{ userId }, { status: "pending" }] },
-            queueInAllowedOrUnassigned(queueIds)
-          ]
-        },
+        buildNonAdminTicketListWhere(
+          userId,
+          queueIds,
+          userRow?.allTicket === "enabled"
+        ),
         statusKanbanFilter
       ]
     };
@@ -191,11 +179,12 @@ const ListTicketsServiceKanban = async ({
     const userQueueIds = user.queues.map(queue => queue.id);
 
     whereCondition = {
-      [Op.and]: [
-        { [Op.or]: [{ userId }, { status: "pending" }] },
-        queueInAllowedOrUnassigned(userQueueIds),
-        { unreadMessages: { [Op.gt]: 0 } }
-      ]
+      ...buildNonAdminTicketListWhere(
+        userId,
+        userQueueIds,
+        user?.allTicket === "enabled"
+      ),
+      unreadMessages: { [Op.gt]: 0 }
     };
   }
 

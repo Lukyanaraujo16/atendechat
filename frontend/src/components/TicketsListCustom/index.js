@@ -199,10 +199,26 @@ const TicketsListCustom = (props) => {
 
   useEffect(() => {
     if (isControlled) return;
-    const queueIds = safeQueues.map((q) => q.id);
-    const filteredTickets = tickets.filter(
-      (t) => queueIds.indexOf(t.queueId) > -1
-    );
+    const qIds = safeQueues.map((q) => q.id);
+    const filteredTickets = tickets.filter((t) => {
+      if (profile !== "user" || groupsOnly) return true;
+      const myId = Number(user?.id);
+      const assigneeRaw = t.userId;
+      const assignee =
+        assigneeRaw != null && assigneeRaw !== ""
+          ? Number(assigneeRaw)
+          : null;
+      if (assignee != null && !Number.isNaN(assignee) && assignee === myId) {
+        return true;
+      }
+      if (assignee != null && !Number.isNaN(assignee)) {
+        return false;
+      }
+      if (!t.queueId) {
+        return user?.allTicket === "enabled";
+      }
+      return qIds.indexOf(t.queueId) > -1;
+    });
 
     let base =
       profile === "user" && !groupsOnly ? filteredTickets : tickets;
@@ -224,7 +240,7 @@ const TicketsListCustom = (props) => {
       type: "LOAD_TICKETS",
       payload: applyPendingChatbotSplit(base),
     });
-  }, [isControlled, tickets, status, searchParam, safeQueues, profile, chatbotOnly, groupsOnly]);
+  }, [isControlled, tickets, status, searchParam, safeQueues, profile, chatbotOnly, groupsOnly, user?.id, user?.allTicket]);
 
   const displayTickets = isControlled ? controlledTickets : ticketsList;
   const displayLoading = isControlled ? controlledLoading : loading;
@@ -236,12 +252,26 @@ const TicketsListCustom = (props) => {
     const companyId = localStorage.getItem("companyId");
     const socket = socketManager.getSocket(companyId);
 
-    const shouldUpdateTicket = (ticket) =>
-      (groupsOnly ||
-        (!ticket.userId || ticket.userId === user?.id || showAll)) &&
-      (groupsOnly ||
-        !ticket.queueId ||
-        selectedQueueIds.indexOf(ticket.queueId) > -1);
+    const shouldUpdateTicket = (ticket) => {
+      if (groupsOnly) return true;
+      const myId = Number(user?.id);
+      if (showAll) return true;
+      const assigneeRaw = ticket?.userId;
+      const assignee =
+        assigneeRaw != null && assigneeRaw !== ""
+          ? Number(assigneeRaw)
+          : null;
+      if (assignee != null && !Number.isNaN(assignee) && assignee === myId) {
+        return true;
+      }
+      if (assignee != null && !Number.isNaN(assignee)) {
+        return false;
+      }
+      if (!ticket.queueId) {
+        return user?.allTicket === "enabled";
+      }
+      return selectedQueueIds.indexOf(ticket.queueId) > -1;
+    };
 
     /** Mesma regra da lista inicial: em pending, Chatbot vs Aguardando são mutuamente exclusivos */
     const matchesPendingChatbotTab = (ticket) => {
@@ -323,14 +353,24 @@ const TicketsListCustom = (props) => {
     });
 
     socket.on(`company-${companyId}-appMessage`, (data) => {
-      const queueIds = safeQueues.map((q) => q.id);
-      if (
-        !groupsOnly &&
-        profile === "user" &&
-        (queueIds.indexOf(data.ticket?.queue?.id) === -1 ||
-          data.ticket.queue === null)
-      ) {
-        return;
+      if (!groupsOnly && profile === "user") {
+        const myId = Number(user?.id);
+        const queueIds = safeQueues.map((q) => q.id);
+        const assigneeRaw = data.ticket?.userId;
+        const assignee =
+          assigneeRaw != null && assigneeRaw !== ""
+            ? Number(assigneeRaw)
+            : null;
+        if (assignee != null && !Number.isNaN(assignee) && assignee > 0) {
+          if (assignee !== myId) return;
+        } else {
+          const qid = data.ticket?.queue?.id;
+          if (qid == null) {
+            if (user?.allTicket !== "enabled") return;
+          } else if (queueIds.indexOf(qid) === -1) {
+            return;
+          }
+        }
       }
 
       if (data.action === "create" && data.ticket) {
@@ -374,6 +414,8 @@ const TicketsListCustom = (props) => {
     socketManager,
     chatbotOnly,
     groupsOnly,
+    user?.allTicket,
+    safeQueues,
   ]);
 
   useEffect(() => {

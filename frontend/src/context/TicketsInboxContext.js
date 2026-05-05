@@ -136,12 +136,29 @@ export function TicketsInboxProvider({
   const shouldShowTicket = useCallback(
     (ticket) => {
       if (!ticket) return false;
-      return (
-        (!ticket.userId || ticket.userId === userId || showAll) &&
-        (!ticket.queueId || (selectedQueueIds || []).indexOf(ticket.queueId) > -1)
-      );
+      if (showAll) return true;
+      const myId = Number(userId);
+      const assigneeRaw = ticket.userId;
+      const assignee =
+        assigneeRaw != null && assigneeRaw !== ""
+          ? Number(assigneeRaw)
+          : null;
+      const selected = Array.isArray(selectedQueueIds) ? selectedQueueIds : [];
+
+      if (assignee != null && !Number.isNaN(assignee) && assignee > 0) {
+        return assignee === myId;
+      }
+      const qidRaw = ticket.queueId;
+      const qid =
+        qidRaw != null && qidRaw !== "" && !Number.isNaN(Number(qidRaw))
+          ? Number(qidRaw)
+          : null;
+      if (qid == null) {
+        return user?.allTicket === "enabled";
+      }
+      return selected.indexOf(qid) > -1;
     },
-    [userId, showAll, selectedQueueIds]
+    [userId, showAll, selectedQueueIds, user?.allTicket]
   );
 
   const upsertTicket = useCallback((ticket) => {
@@ -212,22 +229,35 @@ export function TicketsInboxProvider({
 
     const handleAppMessage = (data) => {
       if (data.action !== "create" || !data.ticket) return;
-      const queueIds = safeQueues.map((q) => q.id);
-      if (
-        profile === "user" &&
-        (queueIds.indexOf(data.ticket?.queue?.id) === -1 || data.ticket.queue === null)
-      ) {
-        return;
-      }
+      const myId = Number(user?.id);
       const t = data.ticket;
-      if (t.isGroup || !shouldShowTicket(t)) {
-        removeTicket(t.id);
+      if (profile === "user") {
+        const queueIds = safeQueues.map((q) => q.id);
+        const assigneeRaw = t?.userId;
+        const assignee =
+          assigneeRaw != null && assigneeRaw !== ""
+            ? Number(assigneeRaw)
+            : null;
+        if (assignee != null && !Number.isNaN(assignee) && assignee > 0) {
+          if (assignee !== myId) return;
+        } else {
+          const qid = t?.queue?.id;
+          if (qid == null) {
+            if (user?.allTicket !== "enabled") return;
+          } else if (queueIds.indexOf(qid) === -1) {
+            return;
+          }
+        }
+      }
+      const t2 = data.ticket;
+      if (t2.isGroup || !shouldShowTicket(t2)) {
+        removeTicket(t2.id);
         return;
       }
-      if (t.status === "open" || t.status === "pending") {
-        upsertTicketMessageActivity(t);
+      if (t2.status === "open" || t2.status === "pending") {
+        upsertTicketMessageActivity(t2);
       } else {
-        removeTicket(t.id);
+        removeTicket(t2.id);
       }
     };
 
@@ -261,16 +291,40 @@ export function TicketsInboxProvider({
     removeTicket,
     updateUnread,
     updateContact,
+    user?.id,
+    user?.allTicket,
   ]);
 
   const afterProfileFilter = useMemo(() => {
     const queueIds = safeQueues.map((q) => q.id);
     let list = tickets.filter((t) => !t.isGroup);
     if (profile === "user") {
-      list = list.filter((t) => queueIds.indexOf(t.queueId) > -1);
+      const myId = Number(user?.id);
+      list = list.filter((t) => {
+        const assigneeRaw = t.userId;
+        const assignee =
+          assigneeRaw != null && assigneeRaw !== ""
+            ? Number(assigneeRaw)
+            : null;
+        if (assignee != null && !Number.isNaN(assignee) && assignee === myId) {
+          return true;
+        }
+        if (assignee != null && !Number.isNaN(assignee)) {
+          return false;
+        }
+        const qidRaw = t.queueId;
+        const qid =
+          qidRaw != null && qidRaw !== "" && !Number.isNaN(Number(qidRaw))
+            ? Number(qidRaw)
+            : null;
+        if (qid == null) {
+          return user?.allTicket === "enabled";
+        }
+        return queueIds.indexOf(qid) > -1;
+      });
     }
     return list;
-  }, [tickets, profile, safeQueues]);
+  }, [tickets, profile, safeQueues, user?.id, user?.allTicket]);
 
   const openTicketsRaw = useMemo(
     () => afterProfileFilter.filter((t) => t.status === "open"),
