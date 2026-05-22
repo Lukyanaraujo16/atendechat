@@ -155,6 +155,8 @@ const Ticket = () => {
 
   useEffect(() => {
     setLoading(true);
+    setTicket({});
+    setContact({});
     const delayDebounceFn = setTimeout(() => {
       const fetchTicket = async () => {
         try {
@@ -274,7 +276,7 @@ const Ticket = () => {
     setDrawerOpen(false);
   };
 
-  const orphanTicket = isOrphanTicket(ticket);
+  const orphanTicket = !loading && isOrphanTicket(ticket);
 
   const renderTicketInfo = () => {
     if (!ticket?.id) {
@@ -362,12 +364,12 @@ const Ticket = () => {
             {i18n.t("ticket.orphan.banner")}
           </Alert>
         )}
-        {ticket?.status === "pending" && (
+        {ticket?.status === "pending" && !orphanTicket && (
           <Alert severity="info" data-ticket-pending-banner className={classes.pendingBanner}>
             {i18n.t("ticket.pendingPreview.banner")}
           </Alert>
         )}
-        {partialEnrichWarning && (
+        {partialEnrichWarning && !orphanTicket && (
           <Alert severity="warning" className={classes.pendingBanner}>
             {i18n.t("ticket.partialEnrichWarning")}
           </Alert>

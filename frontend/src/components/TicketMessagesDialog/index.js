@@ -83,6 +83,8 @@ export default function TicketMessagesDialog({ open, handleClose, ticketId }) {
     let delayDebounceFn = null;
     if (open) {
       setLoading(true);
+      setTicket({});
+      setContact({});
       delayDebounceFn = setTimeout(() => {
         const fetchTicket = async () => {
           try {
@@ -161,7 +163,7 @@ export default function TicketMessagesDialog({ open, handleClose, ticketId }) {
     setDrawerOpen(true);
   };
 
-  const orphanTicket = isOrphanTicket(ticket);
+  const orphanTicket = !loading && isOrphanTicket(ticket);
 
   const renderTicketInfo = () => {
     if (!ticket?.id) {
