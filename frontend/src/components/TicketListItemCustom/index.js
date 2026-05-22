@@ -91,10 +91,9 @@ const useStyles = makeStyles((theme) => {
   listItemRoot: {
     position: "relative",
     alignItems: "center",
-    padding: 14,
+    padding: "12px 14px",
     borderRadius: CARD_RADIUS,
-    marginLeft: 0,
-    marginRight: 0,
+    margin: 0,
     marginBottom: 10,
     width: "100%",
     maxWidth: "100%",
@@ -156,11 +155,12 @@ const useStyles = makeStyles((theme) => {
     pointerEvents: "none",
   },
   listItemCompact: {
-    paddingTop: theme.spacing(0.5),
-    paddingBottom: theme.spacing(0.5),
-    paddingLeft: theme.spacing(1),
-    marginLeft: 0,
-    marginRight: 0,
+    padding: "10px 12px",
+    marginBottom: 8,
+  },
+  listItemBulkSelect: {
+    paddingLeft: 10,
+    paddingRight: 12,
   },
   bulkCheckbox: {
     padding: 4,
@@ -664,6 +664,7 @@ const TicketListItemCustom = ({
         selected={bulkSelectMode ? bulkSelected : selected}
         className={clsx(classes.listItemRoot, {
           [classes.listItemCompact]: compact,
+          [classes.listItemBulkSelect]: bulkSelectMode,
           [classes.listItemSelected]: bulkSelectMode
             ? bulkSelected
             : selected,

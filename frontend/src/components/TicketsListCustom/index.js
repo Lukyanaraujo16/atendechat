@@ -26,7 +26,6 @@ import { TicketsInboxContext } from "../../context/TicketsInboxContext";
 import { SocketContext } from "../../context/Socket/SocketContext";
 import {
   PANEL_RADIUS,
-  LIST_SIDE_PADDING_PX,
   getTicketPanelScrollbarStyles,
 } from "../../theme/ticketPanelStyles";
 import { filterTicketsBySearchParam } from "../../utils/ticketSearchState";
@@ -52,14 +51,19 @@ const useStyles = makeStyles((theme) => ({
     overflowY: "auto",
     overflowX: "hidden",
     WebkitOverflowScrolling: "touch",
-    scrollbarGutter: "stable",
     boxSizing: "border-box",
     ...getTicketPanelScrollbarStyles(theme),
     borderTop: `1px solid ${theme.palette.divider}`,
     backgroundColor: theme.palette.background.default,
-    padding: `0 ${LIST_SIDE_PADDING_PX}px ${LIST_SIDE_PADDING_PX}px ${LIST_SIDE_PADDING_PX}px`,
-    paddingRight: LIST_SIDE_PADDING_PX + 2,
+    padding: "10px 10px 12px",
     borderBottomLeftRadius: PANEL_RADIUS,
+  },
+
+  listRoot: {
+    width: "100%",
+    boxSizing: "border-box",
+    padding: 0,
+    margin: 0,
   },
 
   ticketsListHeader: {
@@ -617,16 +621,7 @@ const TicketsListCustom = (props) => {
         className={classes.ticketsList}
         onScroll={handleScroll}
       >
-        <List
-          style={{
-            paddingTop: 0,
-            paddingLeft: 0,
-            paddingRight: 0,
-            width: "100%",
-            boxSizing: "border-box",
-            height: "100%",
-          }}
-        >
+        <List disablePadding className={classes.listRoot}>
           {displayTickets.length === 0 && !displayLoading ? (
             <Box className={classes.emptyStateWrap}>
               <AppEmptyState
