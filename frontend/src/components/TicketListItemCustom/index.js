@@ -644,11 +644,19 @@ const TicketListItemCustom = ({
         data-ticket-list-item
         tabIndex={-1}
         aria-label={ticket.contact?.name || i18n.t("ticketsListItem.ariaTicketRow")}
-        onClick={() => handleSelectTicket(ticket)}
-        selected={selected || bulkSelected}
+        onClick={() => {
+          if (bulkSelectMode && typeof onBulkToggle === "function") {
+            onBulkToggle(ticket.id);
+            return;
+          }
+          handleSelectTicket(ticket);
+        }}
+        selected={bulkSelectMode ? bulkSelected : selected}
         className={clsx(classes.listItemRoot, {
           [classes.listItemCompact]: compact,
-          [classes.listItemSelected]: selected || bulkSelected,
+          [classes.listItemSelected]: bulkSelectMode
+            ? bulkSelected
+            : selected,
           [classes.listItemBusy]: actionBusy,
         })}
         disabled={actionBusy}
@@ -691,7 +699,9 @@ const TicketListItemCustom = ({
             <Avatar
               className={clsx(classes.avatar, {
                 [classes.avatarCompact]: compact,
-                [classes.avatarSelected]: selected || bulkSelected,
+                [classes.avatarSelected]: bulkSelectMode
+                  ? bulkSelected
+                  : selected,
               })}
               src={ticket?.contact?.profilePicUrl}
             >

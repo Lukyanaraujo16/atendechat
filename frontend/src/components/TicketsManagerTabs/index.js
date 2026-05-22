@@ -59,6 +59,11 @@ import CheckCircleIcon from "@material-ui/icons/CheckCircle";
 import GroupIcon from "@material-ui/icons/Group";
 import FilterListIcon from "@material-ui/icons/FilterList";
 import ViewCompactOutlined from "@material-ui/icons/ViewCompactOutlined";
+import CheckBoxOutlineBlankIcon from "@material-ui/icons/CheckBoxOutlineBlank";
+import CheckBoxIcon from "@material-ui/icons/CheckBox";
+import PlaylistAddCheckIcon from "@material-ui/icons/PlaylistAddCheck";
+import DeleteOutlineIcon from "@material-ui/icons/DeleteOutline";
+import { canDeleteTickets } from "../../utils/canDeleteTickets";
 
 import useTicketsKeyboardShortcuts from "../../hooks/useTicketsKeyboardShortcuts";
 import {
@@ -439,6 +444,14 @@ const useStyles = makeStyles(theme => ({
 		flex: 1,
 		fontSize: "0.9375rem",
 	},
+	bulkSelectButton: {
+		border: `1px solid ${theme.palette.divider}`,
+		borderRadius: 10,
+		width: 36,
+		height: 36,
+		padding: 0,
+		flexShrink: 0,
+	},
 	searchButton: {
 		backgroundColor: theme.palette.primary.main,
 		color: theme.palette.primary.contrastText,
@@ -580,6 +593,9 @@ const InboxOpenListPanel = memo(function InboxOpenListPanel({
   showAllTickets,
   selectedQueueIds,
   searchParam,
+  bulkSelectMode,
+  isBulkListActive,
+  onBulkSelectionApiChange,
 }) {
   const { tickets, loading, hasMore, loadMore } = useTicketsInboxOpenColumn();
   return (
@@ -595,6 +611,10 @@ const InboxOpenListPanel = memo(function InboxOpenListPanel({
       compact={compactList}
       style={style}
       enableBulkDelete
+      bulkSelectMode={bulkSelectMode && isBulkListActive}
+      onBulkSelectionApiChange={
+        isBulkListActive ? onBulkSelectionApiChange : undefined
+      }
     />
   );
 });
@@ -604,6 +624,9 @@ const InboxPendingListPanel = memo(function InboxPendingListPanel({
   style,
   selectedQueueIds,
   searchParam,
+  bulkSelectMode,
+  isBulkListActive,
+  onBulkSelectionApiChange,
 }) {
   const { tickets, loading, hasMore, loadMore } = useTicketsInboxPendingColumn();
   return (
@@ -618,6 +641,10 @@ const InboxPendingListPanel = memo(function InboxPendingListPanel({
       compact={compactList}
       style={style}
       enableBulkDelete
+      bulkSelectMode={bulkSelectMode && isBulkListActive}
+      onBulkSelectionApiChange={
+        isBulkListActive ? onBulkSelectionApiChange : undefined
+      }
     />
   );
 });
@@ -627,6 +654,9 @@ const InboxChatbotListPanel = memo(function InboxChatbotListPanel({
   style,
   selectedQueueIds,
   searchParam,
+  bulkSelectMode,
+  isBulkListActive,
+  onBulkSelectionApiChange,
 }) {
   const { tickets, loading, hasMore, loadMore } = useTicketsInboxChatbotColumn();
   return (
@@ -642,6 +672,10 @@ const InboxChatbotListPanel = memo(function InboxChatbotListPanel({
       compact={compactList}
       style={style}
       enableBulkDelete
+      bulkSelectMode={bulkSelectMode && isBulkListActive}
+      onBulkSelectionApiChange={
+        isBulkListActive ? onBulkSelectionApiChange : undefined
+      }
     />
   );
 });
@@ -653,6 +687,8 @@ function OpenInboxTicketLists({
   showAllTickets,
   showChatbotTab,
   ticketSearch,
+  bulkSelectMode,
+  onBulkSelectionApiChange,
 }) {
   const styleOpen = useMemo(
     () => ({ display: tabOpen === "open" ? "flex" : "none" }),
@@ -675,12 +711,18 @@ function OpenInboxTicketLists({
         showAllTickets={showAllTickets}
         selectedQueueIds={selectedQueueIds}
         searchParam={ticketSearch.open}
+        bulkSelectMode={bulkSelectMode}
+        isBulkListActive={tabOpen === "open"}
+        onBulkSelectionApiChange={onBulkSelectionApiChange}
       />
       <InboxPendingListPanel
         compactList={compactList}
         style={stylePending}
         selectedQueueIds={selectedQueueIds}
         searchParam={ticketSearch.pending}
+        bulkSelectMode={bulkSelectMode}
+        isBulkListActive={tabOpen === "pending"}
+        onBulkSelectionApiChange={onBulkSelectionApiChange}
       />
       {showChatbotTab ? (
         <InboxChatbotListPanel
@@ -688,6 +730,9 @@ function OpenInboxTicketLists({
           style={styleChatbot}
           selectedQueueIds={selectedQueueIds}
           searchParam={ticketSearch.chatbot}
+          bulkSelectMode={bulkSelectMode}
+          isBulkListActive={tabOpen === "chatbot"}
+          onBulkSelectionApiChange={onBulkSelectionApiChange}
         />
       ) : null}
     </>
@@ -721,6 +766,20 @@ const TicketsManagerTabs = () => {
   const { whatsApps } = useContext(WhatsAppsContext);
   const { profile } = user;
   const showChatbotTab = useMemo(() => canSeeChatbotInboxTab(user), [user]);
+  const mayBulkDelete = canDeleteTickets(user);
+  const [bulkSelectMode, setBulkSelectMode] = useState(false);
+  const [bulkListApi, setBulkListApi] = useState(null);
+  const showBulkSelectControl =
+    mayBulkDelete && (tab === "open" || tab === "closed");
+
+  useEffect(() => {
+    setBulkSelectMode(false);
+    setBulkListApi(null);
+  }, [tab, tabOpen]);
+
+  const toggleBulkSelectMode = () => {
+    setBulkSelectMode((prev) => !prev);
+  };
 
   const userQueueIds = Array.isArray(user?.queues) ? user.queues.map((q) => q.id) : [];
   const [selectedQueueIds, setSelectedQueueIds] = useState(userQueueIds || []);
@@ -1084,6 +1143,62 @@ const TicketsManagerTabs = () => {
             <ViewCompactOutlined fontSize="small" color={compactList ? "primary" : "inherit"} />
           </IconButton>
         </Tooltip>
+        {showBulkSelectControl ? (
+          <>
+            <Tooltip
+              title={
+                bulkSelectMode
+                  ? i18n.t("ticketsList.bulkSelectModeOff")
+                  : i18n.t("ticketsList.bulkSelectModeOn")
+              }
+            >
+              <IconButton
+                className={classes.bulkSelectButton}
+                size="small"
+                onClick={toggleBulkSelectMode}
+                aria-pressed={bulkSelectMode}
+                aria-label={i18n.t("ticketsList.bulkSelectModeOn")}
+              >
+                {bulkSelectMode ? (
+                  <CheckBoxIcon fontSize="small" color="primary" />
+                ) : (
+                  <CheckBoxOutlineBlankIcon fontSize="small" />
+                )}
+              </IconButton>
+            </Tooltip>
+            {bulkSelectMode ? (
+              <>
+                <Tooltip title={i18n.t("ticket.delete.selectAll")}>
+                  <IconButton
+                    className={classes.bulkSelectButton}
+                    size="small"
+                    onClick={() => bulkListApi?.selectAll?.()}
+                    aria-label={i18n.t("ticket.delete.selectAll")}
+                  >
+                    <PlaylistAddCheckIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+                {(bulkListApi?.selectedCount ?? 0) > 0 ? (
+                  <Tooltip
+                    title={i18n.t("ticket.delete.bulkSelected", {
+                      count: bulkListApi.selectedCount,
+                    })}
+                  >
+                    <IconButton
+                      className={classes.bulkSelectButton}
+                      size="small"
+                      color="secondary"
+                      onClick={() => bulkListApi?.openDeleteConfirm?.()}
+                      aria-label={i18n.t("ticket.delete.bulkDeleteButton")}
+                    >
+                      <DeleteOutlineIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                ) : null}
+              </>
+            ) : null}
+          </>
+        ) : null}
       </div>
 
       {tab === "filters" && (
@@ -1127,6 +1242,8 @@ const TicketsManagerTabs = () => {
             showAllTickets={showAllTickets}
             showChatbotTab={showChatbotTab}
             ticketSearch={ticketSearch}
+            bulkSelectMode={bulkSelectMode}
+            onBulkSelectionApiChange={setBulkListApi}
           />
         </div>
       </TabPanel>
@@ -1138,6 +1255,10 @@ const TicketsManagerTabs = () => {
           searchParam={ticketSearch.closed}
           compact={compactList}
           enableBulkDelete
+          bulkSelectMode={bulkSelectMode && tab === "closed"}
+          onBulkSelectionApiChange={
+            tab === "closed" ? setBulkListApi : undefined
+          }
         />
       </TabPanel>
       <TabPanel value={tab} name="filters" className={classes.ticketsWrapper}>

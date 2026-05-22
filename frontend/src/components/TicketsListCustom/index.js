@@ -1,13 +1,10 @@
 import React, { useState, useEffect, useReducer, useContext, useCallback, useMemo } from "react";
 import { useParams } from "react-router-dom";
 
-import { alpha, makeStyles } from "@material-ui/core/styles";
+import { makeStyles } from "@material-ui/core/styles";
 import List from "@material-ui/core/List";
 import Paper from "@material-ui/core/Paper";
 import Box from "@material-ui/core/Box";
-import Checkbox from "@material-ui/core/Checkbox";
-import Button from "@material-ui/core/Button";
-import Typography from "@material-ui/core/Typography";
 import { toast } from "react-toastify";
 import { AppEmptyState } from "../../ui";
 import ConfirmationModal from "../ConfirmationModal";
@@ -48,18 +45,6 @@ const useStyles = makeStyles((theme) => ({
     backgroundColor: theme.palette.background.default,
   },
 
-  bulkToolbarHost: {
-    flexShrink: 0,
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "stretch",
-    width: "100%",
-    maxWidth: "none",
-    padding: `${8}px ${LIST_SIDE_PADDING_PX}px 0`,
-    backgroundColor: theme.palette.background.default,
-    boxSizing: "border-box",
-  },
-
   ticketsList: {
     flex: 1,
     minHeight: 0,
@@ -92,34 +77,6 @@ const useStyles = makeStyles((theme) => ({
     color: theme.palette.text.secondary,
     marginLeft: theme.spacing(1),
     fontSize: "0.875rem",
-  },
-
-  bulkToolbar: {
-    display: "flex",
-    alignItems: "center",
-    alignSelf: "stretch",
-    width: "100%",
-    maxWidth: "none",
-    gap: theme.spacing(1),
-    borderRadius: PANEL_RADIUS,
-    backgroundColor: theme.palette.background.paper,
-    padding: "10px 14px",
-    margin: `0 0 ${12}px 0`,
-    minHeight: 52,
-    overflow: "hidden",
-    flexShrink: 0,
-    boxSizing: "border-box",
-    border: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
-    boxShadow: "none",
-  },
-  bulkToolbarLabel: {
-    flex: 1,
-    minWidth: 0,
-    fontSize: "0.8125rem",
-    lineHeight: 1.4,
-    color: theme.palette.text.secondary,
-    display: "flex",
-    alignItems: "center",
   },
 
   emptyStateWrap: {
@@ -237,6 +194,10 @@ const TicketsListCustom = (props) => {
     controlledHasMore = false,
     onControlledLoadMore,
     enableBulkDelete = false,
+    /** Modo seleção ativado pelo botão na barra de busca */
+    bulkSelectMode = false,
+    /** Registra API de seleção em massa para a lista ativa (barra de busca) */
+    onBulkSelectionApiChange,
   } = props;
   const classes = useStyles();
   const { ticketId: routeTicketId } = useParams();
@@ -535,14 +496,58 @@ const TicketsListCustom = (props) => {
       ticket.uuid === routeTicketId || String(ticket.id) === String(routeTicketId);
   }, [routeTicketId]);
 
-  const bulkEnabled = enableBulkDelete && canDeleteTickets(user);
+  const bulkDeleteAllowed = enableBulkDelete && canDeleteTickets(user);
+  const bulkActiveOnCards = bulkDeleteAllowed && bulkSelectMode;
   const selectedCount = selectedIds.size;
   const allVisibleSelected =
     displayTickets.length > 0 && selectedCount === displayTickets.length;
 
+  const handleSelectAllVisible = useCallback(() => {
+    if (allVisibleSelected) {
+      setSelectedIds(new Set());
+      return;
+    }
+    setSelectedIds(new Set(displayTickets.map((t) => t.id)));
+  }, [allVisibleSelected, displayTickets]);
+
+  const clearBulkSelection = useCallback(() => {
+    setSelectedIds(new Set());
+  }, []);
+
+  useEffect(() => {
+    if (typeof onBulkSelectionApiChange !== "function") return undefined;
+    if (!bulkSelectMode || !bulkDeleteAllowed) {
+      onBulkSelectionApiChange(null);
+      return undefined;
+    }
+    onBulkSelectionApiChange({
+      selectedCount,
+      allVisibleSelected,
+      selectAll: handleSelectAllVisible,
+      clearSelection: clearBulkSelection,
+      openDeleteConfirm: () => setBulkConfirmOpen(true),
+    });
+    return () => onBulkSelectionApiChange(null);
+  }, [
+    bulkSelectMode,
+    bulkDeleteAllowed,
+    selectedCount,
+    allVisibleSelected,
+    handleSelectAllVisible,
+    clearBulkSelection,
+    onBulkSelectionApiChange,
+  ]);
+
   useEffect(() => {
     setSelectedIds(new Set());
   }, [status, chatbotOnly, groupsOnly, searchParam, selectedQueueIds]);
+
+  useEffect(() => {
+    if (!bulkSelectMode) {
+      setSelectedIds(new Set());
+      setBulkConfirmOpen(false);
+    }
+  }, [bulkSelectMode]);
 
   const toggleBulkSelect = useCallback((ticketId) => {
     setSelectedIds((prev) => {
@@ -555,14 +560,6 @@ const TicketsListCustom = (props) => {
       return next;
     });
   }, []);
-
-  const handleSelectAllVisible = () => {
-    if (allVisibleSelected) {
-      setSelectedIds(new Set());
-      return;
-    }
-    setSelectedIds(new Set(displayTickets.map((t) => t.id)));
-  };
 
   const handleBulkDelete = async () => {
     const ids = Array.from(selectedIds);
@@ -605,35 +602,6 @@ const TicketsListCustom = (props) => {
 
   return (
     <Paper className={classes.ticketsListWrapper} style={style} data-tickets-list-panel>
-      {bulkEnabled ? (
-        <Box className={classes.bulkToolbarHost}>
-          <Box className={classes.bulkToolbar} data-tickets-bulk-toolbar>
-          <Checkbox
-            color="primary"
-            checked={allVisibleSelected}
-            indeterminate={selectedCount > 0 && !allVisibleSelected}
-            onChange={handleSelectAllVisible}
-            inputProps={{ "aria-label": i18n.t("ticket.delete.selectAll") }}
-          />
-          <Typography className={classes.bulkToolbarLabel}>
-            {selectedCount > 0
-              ? i18n.t("ticket.delete.bulkSelected", { count: selectedCount })
-              : i18n.t("ticket.delete.selectAll")}
-          </Typography>
-          {selectedCount > 0 ? (
-            <Button
-              size="small"
-              color="secondary"
-              variant="contained"
-              disabled={bulkDeleting}
-              onClick={() => setBulkConfirmOpen(true)}
-            >
-              {i18n.t("ticket.delete.bulkDeleteButton")}
-            </Button>
-          ) : null}
-          </Box>
-        </Box>
-      ) : null}
       <ConfirmationModal
         title={i18n.t("ticket.delete.bulkConfirmTitle")}
         open={bulkConfirmOpen}
@@ -675,7 +643,7 @@ const TicketsListCustom = (props) => {
                   key={ticket.id}
                   compact={compact}
                   selected={isRowSelected(ticket)}
-                  bulkSelectMode={bulkEnabled}
+                  bulkSelectMode={bulkActiveOnCards}
                   bulkSelected={selectedIds.has(ticket.id)}
                   onBulkToggle={toggleBulkSelect}
                 />

@@ -2268,6 +2268,8 @@ const messages = {
             "Atalhos: / foca a busca · Alt+1 Abertas · Alt+2 Resolvidos · Alt+3 Filtros · Alt+4 Grupos · setas na lista",
         compactListOn: "Lista compacta",
         compactListOff: "Lista confortável",
+        bulkSelectModeOn: "Modo seleção — selecionar tickets desta aba",
+        bulkSelectModeOff: "Sair do modo seleção",
         buttons: {
           accept: "Aceitar",
           accepting: "Aceitando...",

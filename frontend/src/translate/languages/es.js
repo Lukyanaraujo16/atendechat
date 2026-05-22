@@ -2184,6 +2184,8 @@ const messages = {
             "Atajos: / enfoque búsqueda · Alt+1 Abiertas · Alt+2 Resueltas · Alt+3 Filtros · Alt+4 Grupos · flechas en lista",
         compactListOn: "Lista compacta",
         compactListOff: "Lista cómoda",
+        bulkSelectModeOn: "Modo selección — seleccionar atenciones de esta pestaña",
+        bulkSelectModeOff: "Salir del modo selección",
         buttons: {
           accept: "Aceptar",
           accepting: "Aceptando...",

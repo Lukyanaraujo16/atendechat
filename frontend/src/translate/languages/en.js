@@ -2179,6 +2179,8 @@ const messages = {
 					"Shortcuts: / focus search · Alt+1 Open · Alt+2 Resolved · Alt+3 Filters · Alt+4 Groups · arrows in list",
 				compactListOn: "Compact list",
 				compactListOff: "Comfortable list",
+				bulkSelectModeOn: "Selection mode — select tickets in this tab",
+				bulkSelectModeOff: "Exit selection mode",
 				buttons: {
 					accept: "Accept",
 					accepting: "Accepting...",
