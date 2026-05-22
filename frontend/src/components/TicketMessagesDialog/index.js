@@ -13,16 +13,16 @@ import {
   DialogActions,
   makeStyles,
 } from "@material-ui/core";
-import Alert from "@material-ui/lab/Alert";
 import { useHistory } from "react-router-dom";
 import { AuthContext } from "../../context/Auth/AuthContext";
 import MessagesList from "../MessagesList";
 import { ReplyMessageProvider } from "../../context/ReplyingMessage/ReplyingMessageContext";
 import TicketHeader from "../TicketHeader";
 import TicketInfo from "../TicketInfo";
+import TicketStateBanner from "../TicketStateBanner";
 import ReassignOrphanWhatsappModal from "../ReassignOrphanWhatsappModal";
 import { SocketContext } from "../../context/Socket/SocketContext";
-import { isOrphanTicket } from "../../utils/isOrphanTicket";
+import getTicketViewState from "../../utils/getTicketViewState";
 
 const drawerWidth = 320;
 
@@ -59,9 +59,17 @@ const useStyles = makeStyles((theme) => ({
     }),
     marginRight: 0,
   },
-  orphanBanner: {
-    borderRadius: 0,
-    flexShrink: 0,
+  dialogBody: {
+    display: "flex",
+    flexDirection: "column",
+    flex: 1,
+    minHeight: 0,
+    overflow: "hidden",
+  },
+  messageArea: {
+    flex: 1,
+    minHeight: 0,
+    overflow: "hidden",
   },
 }));
 
@@ -163,7 +171,7 @@ export default function TicketMessagesDialog({ open, handleClose, ticketId }) {
     setDrawerOpen(true);
   };
 
-  const orphanTicket = !loading && isOrphanTicket(ticket);
+  const viewState = getTicketViewState(ticket, { loading });
 
   const renderTicketInfo = () => {
     if (!ticket?.id) {
@@ -192,25 +200,19 @@ export default function TicketMessagesDialog({ open, handleClose, ticketId }) {
 
   return (
     <Dialog maxWidth="md" onClose={handleClose} open={open}>
-      <TicketHeader loading={loading}>{renderTicketInfo()}</TicketHeader>
-      {orphanTicket && (
-        <Alert
-          severity="warning"
-          className={classes.orphanBanner}
-          action={
-            <Button
-              color="inherit"
-              size="small"
-              onClick={() => setReassignModalOpen(true)}
-            >
-              {i18n.t("ticketsList.orphanReassign.button")}
-            </Button>
-          }
-        >
-          {i18n.t("ticket.orphan.banner")}
-        </Alert>
-      )}
-      <ReplyMessageProvider>{renderMessagesList()}</ReplyMessageProvider>
+      <div className={classes.dialogBody}>
+        <TicketHeader loading={loading} compact={viewState === "orphan"}>
+          {renderTicketInfo()}
+        </TicketHeader>
+        <TicketStateBanner
+          viewState={viewState}
+          ticket={ticket}
+          onReassign={() => setReassignModalOpen(true)}
+        />
+        <div className={classes.messageArea}>
+          <ReplyMessageProvider>{renderMessagesList()}</ReplyMessageProvider>
+        </div>
+      </div>
       <ReassignOrphanWhatsappModal
         open={reassignModalOpen}
         onClose={() => setReassignModalOpen(false)}

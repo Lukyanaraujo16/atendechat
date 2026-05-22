@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 
-import { Avatar, Button, CardHeader } from "@material-ui/core";
+import { Avatar, CardHeader } from "@material-ui/core";
 import { makeStyles, useTheme, alpha } from "@material-ui/core/styles";
 
 import { i18n } from "../../translate/i18n";
@@ -51,7 +51,6 @@ const TicketInfo = ({
 	contact,
 	ticket,
 	onClick,
-	onReassignConnection,
 	onLabelsChange,
 }) => {
 	const classes = useStyles();
@@ -126,26 +125,6 @@ const TicketInfo = ({
 						>
 							{i18n.t("ticketsList.startedOutsideSystemHint")}
 						</span>
-					)}
-					{ticket.isOrphan && onReassignConnection && (
-						<Button
-							size="small"
-							color="primary"
-							style={{
-								display: "block",
-								marginTop: 4,
-								padding: 0,
-								minWidth: 0,
-								textTransform: "none",
-								fontSize: "0.8125rem",
-							}}
-							onClick={(e) => {
-								e.stopPropagation();
-								onReassignConnection();
-							}}
-						>
-							{i18n.t("ticketsList.orphanReassign.button")}
-						</Button>
 					)}
 				</span>
 			}

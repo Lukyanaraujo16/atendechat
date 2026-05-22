@@ -1,4 +1,5 @@
 import React from "react";
+import clsx from "clsx";
 
 import { Card } from "@material-ui/core";
 import { makeStyles, alpha } from "@material-ui/core/styles";
@@ -13,10 +14,11 @@ const useStyles = makeStyles((theme) => {
 			flexDirection: "row",
 			alignItems: "center",
 			flexWrap: "nowrap",
+			flexShrink: 0,
+			height: "auto",
 			background: isDark
 				? `linear-gradient(135deg, ${alpha(theme.palette.success.main, 0.08)}, ${theme.palette.background.paper})`
 				: `linear-gradient(135deg, ${alpha(theme.palette.success.main, 0.06)}, ${theme.palette.background.paper})`,
-			flex: "none",
 			minHeight: 56,
 			padding: theme.spacing(0, 0.5, 0, 0),
 			borderBottom: `1px solid ${alpha(theme.palette.divider, 0.85)}`,
@@ -24,16 +26,19 @@ const useStyles = makeStyles((theme) => {
 			borderTopRightRadius: PANEL_RADIUS,
 			borderTopLeftRadius: PANEL_RADIUS,
 			boxShadow: "none",
-			overflow: "visible",
+			overflow: "hidden",
 			[theme.breakpoints.down("sm")]: {
 				flexWrap: "wrap",
 			},
+		},
+		ticketHeaderCompact: {
+			minHeight: 56,
 		},
 	};
 });
 
 
-const TicketHeader = ({ loading, children }) => {
+const TicketHeader = ({ loading, children, compact = false }) => {
 	const classes = useStyles();
 
 	return (
@@ -41,7 +46,13 @@ const TicketHeader = ({ loading, children }) => {
 			{loading ? (
 				<TicketHeaderSkeleton />
 			) : (
-				<Card elevation={0} className={classes.ticketHeader}>
+				<Card
+					elevation={0}
+					className={clsx(classes.ticketHeader, {
+						[classes.ticketHeaderCompact]: compact,
+					})}
+					data-ticket-header
+				>
 					{children}
 				</Card>
 			)}

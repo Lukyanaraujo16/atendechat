@@ -4,8 +4,7 @@ import { useParams, useHistory } from "react-router-dom";
 import { toast } from "react-toastify";
 import clsx from "clsx";
 
-import { Button, Paper, makeStyles } from "@material-ui/core";
-import Alert from "@material-ui/lab/Alert";
+import { Paper, makeStyles } from "@material-ui/core";
 
 import ErrorBoundary from "../ErrorBoundary";
 import ContactDrawer from "../ContactDrawer";
@@ -26,7 +25,12 @@ import { i18n } from "../../translate/i18n";
 import QuickMessageChatModal from "../QuickMessageChatModal";
 import TransferTicketModalCustom from "../TransferTicketModalCustom";
 import { canAccessTicket } from "../../utils/canAccessTicket";
-import { isOrphanTicket } from "../../utils/isOrphanTicket";
+import getTicketViewState, {
+  TICKET_VIEW_STATE,
+} from "../../utils/getTicketViewState";
+import TicketStateBanner from "../TicketStateBanner";
+import TicketOrphanComposer from "../TicketOrphanComposer";
+import { useAcceptTicket } from "../../hooks/useAcceptTicket";
 import {
   PANEL_RADIUS,
   getPanelElevation,
@@ -45,13 +49,13 @@ const useStyles = makeStyles((theme) => ({
     overflow: "hidden",
   },
 
-  mainWrapper: {
+  ticketPanel: {
     flex: 1,
     minHeight: 0,
     height: "100%",
     display: "flex",
     flexDirection: "column",
-    overflow: "visible",
+    overflow: "hidden",
     borderTopLeftRadius: 0,
     borderBottomLeftRadius: 0,
     borderTopRightRadius: PANEL_RADIUS,
@@ -97,22 +101,8 @@ const useStyles = makeStyles((theme) => ({
     borderBottomRightRadius: PANEL_RADIUS,
   },
 
-  pendingBanner: {
-    borderRadius: 0,
+  tagsBar: {
     flexShrink: 0,
-  },
-  orphanBanner: {
-    borderRadius: 0,
-    flexShrink: 0,
-    alignItems: "center",
-    "& .MuiAlert-message": {
-      flex: 1,
-    },
-  },
-  orphanBannerAction: {
-    flexShrink: 0,
-    marginLeft: 8,
-    textTransform: "none",
   },
 }));
 
@@ -135,8 +125,10 @@ const Ticket = () => {
   const [contact, setContact] = useState({});
   const [ticket, setTicket] = useState({});
   const [partialEnrichWarning, setPartialEnrichWarning] = useState(false);
+  const [statusActionLoading, setStatusActionLoading] = useState(false);
 
   const socketManager = useContext(SocketContext);
+  const { completeAcceptTicket } = useAcceptTicket();
   const { markAsReadByTicket } = useGlobalNotifications();
   const ticketRef = useRef(ticket);
   ticketRef.current = ticket;
@@ -276,7 +268,57 @@ const Ticket = () => {
     setDrawerOpen(false);
   };
 
-  const orphanTicket = !loading && isOrphanTicket(ticket);
+  const viewState = getTicketViewState(ticket, { loading });
+  const isOrphanView = viewState === TICKET_VIEW_STATE.ORPHAN;
+
+  const handleFinalizeTicket = async () => {
+    if (!ticket?.id) return;
+    setStatusActionLoading(true);
+    try {
+      await api.put(`/tickets/${ticket.id}`, {
+        status: "closed",
+        userId: user?.id || null,
+        useIntegration: false,
+        promptId: false,
+        integrationId: false,
+      });
+      history.push("/tickets");
+    } catch (err) {
+      toastError(err);
+    } finally {
+      setStatusActionLoading(false);
+    }
+  };
+
+  const handleReopenOrphanTicket = async () => {
+    if (!ticket?.id) return;
+    setStatusActionLoading(true);
+    try {
+      await api.put(`/tickets/${ticket.id}`, {
+        status: "open",
+        userId: user?.id || null,
+      });
+      const { data } = await api.get("/tickets/u/" + ticketId);
+      setTicket(data);
+      setContact(data.contact);
+    } catch (err) {
+      toastError(err);
+    } finally {
+      setStatusActionLoading(false);
+    }
+  };
+
+  const handleAcceptOrphanTicket = async () => {
+    if (!ticket?.id) return;
+    setStatusActionLoading(true);
+    try {
+      await completeAcceptTicket(ticket);
+    } catch (err) {
+      toastError(err);
+    } finally {
+      setStatusActionLoading(false);
+    }
+  };
 
   const renderTicketInfo = () => {
     if (!ticket?.id) {
@@ -300,28 +342,32 @@ const Ticket = () => {
     );
   };
 
-  const renderMessagesList = () => {
+  const renderMessagesList = () => (
+    <MessagesList
+      ticket={ticket}
+      ticketId={ticket.id}
+      isGroup={ticket.isGroup}
+      onPartialEnrichWarning={() => setPartialEnrichWarning(true)}
+      onLoadError={() => setPartialEnrichWarning(true)}
+    />
+  );
+
+  const renderComposer = () => {
+    if (isOrphanView) {
+      return <TicketOrphanComposer />;
+    }
     return (
-      <>
-        <MessagesList
-          ticket={ticket}
+      <div className={classes.messageInputFooter}>
+        <MessageInput
           ticketId={ticket.id}
-          isGroup={ticket.isGroup}
-          onPartialEnrichWarning={() => setPartialEnrichWarning(true)}
-          onLoadError={() => setPartialEnrichWarning(true)}
+          ticketStatus={ticket.status}
+          contact={contact}
+          ticket={ticket}
+          chatInputControllerRef={chatInputControllerRef}
+          transferModalOpen={transferTicketModalOpen}
+          quickRepliesOpen={quickRepliesOpen}
         />
-        <div className={classes.messageInputFooter}>
-          <MessageInput
-            ticketId={ticket.id}
-            ticketStatus={ticket.status}
-            contact={contact}
-            ticket={ticket}
-            chatInputControllerRef={chatInputControllerRef}
-            transferModalOpen={transferTicketModalOpen}
-            quickRepliesOpen={quickRepliesOpen}
-          />
-        </div>
-      </>
+      </div>
     );
   };
 
@@ -329,57 +375,45 @@ const Ticket = () => {
     <div className={classes.root} id="drawer-container">
       <Paper
         elevation={0}
-        className={clsx(classes.mainWrapper, {
+        className={clsx(classes.ticketPanel, {
           [classes.mainWrapperShift]: drawerOpen,
         })}
         data-ticket-chat-panel
       >
-        <TicketHeader loading={loading}>
+        <TicketHeader loading={loading} compact={isOrphanView}>
           {renderTicketInfo()}
-          <TicketActionButtons
-            ticket={ticket}
-            contact={contact}
-            onContactUpdated={(next) => setContact(next)}
-            onOpenQuickReplies={() => setQuickRepliesOpen(true)}
-            onOpenTransfer={() => setTransferTicketModalOpen(true)}
-            onCrmDealSaved={() => setCrmPanelRefreshKey((n) => n + 1)}
-          />
+          {!isOrphanView ? (
+            <TicketActionButtons
+              ticket={ticket}
+              contact={contact}
+              onContactUpdated={(next) => setContact(next)}
+              onOpenQuickReplies={() => setQuickRepliesOpen(true)}
+              onOpenTransfer={() => setTransferTicketModalOpen(true)}
+              onCrmDealSaved={() => setCrmPanelRefreshKey((n) => n + 1)}
+            />
+          ) : null}
         </TicketHeader>
-        {orphanTicket && (
-          <Alert
-            severity="warning"
-            data-ticket-orphan-banner
-            className={classes.orphanBanner}
-            action={
-              <Button
-                color="inherit"
-                size="small"
-                className={classes.orphanBannerAction}
-                onClick={() => setReassignModalOpen(true)}
-              >
-                {i18n.t("ticketsList.orphanReassign.button")}
-              </Button>
-            }
-          >
-            {i18n.t("ticket.orphan.banner")}
-          </Alert>
-        )}
-        {ticket?.status === "pending" && !orphanTicket && (
-          <Alert severity="info" data-ticket-pending-banner className={classes.pendingBanner}>
-            {i18n.t("ticket.pendingPreview.banner")}
-          </Alert>
-        )}
-        {partialEnrichWarning && !orphanTicket && (
-          <Alert severity="warning" className={classes.pendingBanner}>
-            {i18n.t("ticket.partialEnrichWarning")}
-          </Alert>
-        )}
+        <TicketStateBanner
+          viewState={viewState}
+          ticket={ticket}
+          loading={statusActionLoading}
+          partialEnrichWarning={partialEnrichWarning}
+          onReassign={() => setReassignModalOpen(true)}
+          onFinalize={handleFinalizeTicket}
+          onAccept={handleAcceptOrphanTicket}
+          onReopen={handleReopenOrphanTicket}
+        />
         {ticket?.id && (
           <ErrorBoundary>
-            <div className={classes.chatBody}>
-              <TagsContainer ticket={ticket} />
+            <div className={classes.chatBody} data-ticket-message-list>
+              <div className={classes.tagsBar}>
+                <TagsContainer ticket={ticket} />
+              </div>
               <ReplyMessageProvider>
-                <div className={classes.chatBodyMain}>{renderMessagesList()}</div>
+                <div className={classes.chatBodyMain}>
+                  {renderMessagesList()}
+                  {renderComposer()}
+                </div>
               </ReplyMessageProvider>
             </div>
           </ErrorBoundary>
