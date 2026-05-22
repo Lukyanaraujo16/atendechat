@@ -2138,6 +2138,13 @@ const messages = {
 						"This conversation is waiting to be accepted. You can review the history, close or delete it. Accept to reply.",
 					inputHint: "This conversation is waiting. Accept to reply.",
 				},
+				orphan: {
+					banner:
+						"The WhatsApp connection for this ticket no longer exists. Accept, close and delete remain available; reassign a connection to send messages.",
+					inputHint:
+						"This ticket has no active connection. Reassign a connection to reply.",
+					inputPlaceholder: "Reassign a connection to send messages",
+				},
 				partialEnrichWarning:
 					"Some conversation details could not be loaded.",
 				delete: {

@@ -44,6 +44,7 @@ import {
   canAutoFocusMessageInput,
   safeFocusMessageInput,
 } from "../../utils/messageInputFocus";
+import { isOrphanTicket } from "../../utils/isOrphanTicket";
 
 const useStyles = makeStyles((theme) => {
   const isDark = theme.palette.type === "dark";
@@ -326,6 +327,7 @@ const ActionButtons = (props) => {
     loading,
     recording,
     ticketStatus,
+    isOrphan,
     handleSendMessage,
     handleCancelAudio,
     handleUploadAudio,
@@ -379,7 +381,7 @@ const ActionButtons = (props) => {
       <IconButton
         aria-label="showRecorder"
         component="span"
-        disabled={loading || ticketStatus !== "open"}
+        disabled={loading || ticketStatus !== "open" || isOrphan}
         onClick={handleStartRecording}
       >
         <MicIcon className={classes.sendMessageIcons} />
@@ -393,6 +395,7 @@ const CustomInput = (props) => {
     loading,
     inputRef,
     ticketStatus,
+    isOrphan,
     inputMessage,
     setInputMessage,
     handleSendMessage,
@@ -482,12 +485,15 @@ const CustomInput = (props) => {
   };
 
   const onPaste = (e) => {
-    if (ticketStatus === "open") {
+    if (ticketStatus === "open" && !isOrphan) {
       handleInputPaste(e);
     }
   };
 
   const renderPlaceholder = () => {
+    if (isOrphan) {
+      return i18n.t("ticket.orphan.inputPlaceholder");
+    }
     if (ticketStatus === "open") {
       return i18n.t("messagesInput.placeholderOpen");
     }
@@ -577,6 +583,7 @@ const MessageInputCustom = (props) => {
 
   const focusBlockers = { transferModalOpen, quickRepliesOpen };
   const classes = useStyles();
+  const isOrphan = isOrphanTicket(ticket);
 
   const [medias, setMedias] = useState([]);
   const [inputMessage, setInputMessage] = useState("");
@@ -763,6 +770,7 @@ const MessageInputCustom = (props) => {
   ]);
 
   const handleUploadMedia = async (e) => {
+    if (isOrphan) return;
     setLoading(true);
     e.preventDefault();
 
@@ -788,6 +796,7 @@ const MessageInputCustom = (props) => {
   };
 
   const handleSendMessage = async () => {
+    if (isOrphanTicket(ticket)) return;
     if (inputMessage.trim() === "") return;
     setLoading(true);
 
@@ -813,7 +822,7 @@ const MessageInputCustom = (props) => {
   };
 
   const disableOption = () => {
-    return loading || recording || ticketStatus !== "open";
+    return loading || recording || ticketStatus !== "open" || isOrphan;
   };
 
   const renderReplyingMessage = (message) => {
@@ -880,7 +889,12 @@ const MessageInputCustom = (props) => {
   else {
     return (
       <Paper square elevation={0} className={classes.mainWrapper}>
-        {ticketStatus === "pending" && (
+        {isOrphan && (
+          <div className={classes.pendingHint} data-ticket-orphan-input-hint>
+            {i18n.t("ticket.orphan.inputHint")}
+          </div>
+        )}
+        {ticketStatus === "pending" && !isOrphan && (
           <div className={classes.pendingHint} data-ticket-pending-input-hint>
             {i18n.t("ticket.pendingPreview.inputHint")}
           </div>
@@ -910,6 +924,7 @@ const MessageInputCustom = (props) => {
             loading={loading}
             inputRef={inputRef}
             ticketStatus={ticketStatus}
+            isOrphan={isOrphan}
             inputMessage={inputMessage}
             setInputMessage={setInputMessage}
             // handleChangeInput={handleChangeInput}
@@ -926,6 +941,7 @@ const MessageInputCustom = (props) => {
             loading={loading}
             recording={recording}
             ticketStatus={ticketStatus}
+            isOrphan={isOrphan}
             handleSendMessage={handleSendMessage}
             handleCancelAudio={handleCancelAudio}
             handleUploadAudio={handleUploadAudio}

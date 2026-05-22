@@ -127,38 +127,25 @@ const TicketInfo = ({
 							{i18n.t("ticketsList.startedOutsideSystemHint")}
 						</span>
 					)}
-					{ticket.isOrphan && (
-						<span style={{ display: "block", marginTop: 4 }}>
-							<span
-								style={{
-									display: "block",
-									fontSize: "0.75rem",
-									lineHeight: 1.35,
-									color: theme.palette.warning.main,
-								}}
-							>
-								{i18n.t("ticketsList.orphanConnectionWarning")}
-							</span>
-							{onReassignConnection && (
-								<Button
-									size="small"
-									color="primary"
-									style={{
-										marginTop: 6,
-										padding: 0,
-										minWidth: 0,
-										textTransform: "none",
-										fontSize: "0.8125rem",
-									}}
-									onClick={(e) => {
-										e.stopPropagation();
-										onReassignConnection();
-									}}
-								>
-									{i18n.t("ticketsList.orphanReassign.button")}
-								</Button>
-							)}
-						</span>
+					{ticket.isOrphan && onReassignConnection && (
+						<Button
+							size="small"
+							color="primary"
+							style={{
+								display: "block",
+								marginTop: 4,
+								padding: 0,
+								minWidth: 0,
+								textTransform: "none",
+								fontSize: "0.8125rem",
+							}}
+							onClick={(e) => {
+								e.stopPropagation();
+								onReassignConnection();
+							}}
+						>
+							{i18n.t("ticketsList.orphanReassign.button")}
+						</Button>
 					)}
 				</span>
 			}

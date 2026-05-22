@@ -2142,6 +2142,13 @@ const messages = {
           inputHint:
             "Esta atención está en espera. Acepte para responder.",
         },
+        orphan: {
+          banner:
+            "La conexión WhatsApp de esta atención ya no existe. Aceptar, finalizar y eliminar siguen disponibles; reasigne una conexión para enviar mensajes.",
+          inputHint:
+            "Esta atención no tiene conexión activa. Reasigne una conexión para responder.",
+          inputPlaceholder: "Reasigne una conexión para enviar mensajes",
+        },
         partialEnrichWarning:
           "No fue posible cargar algunas informaciones de la conversación.",
         delete: {

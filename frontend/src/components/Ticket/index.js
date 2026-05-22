@@ -4,7 +4,7 @@ import { useParams, useHistory } from "react-router-dom";
 import { toast } from "react-toastify";
 import clsx from "clsx";
 
-import { Paper, makeStyles } from "@material-ui/core";
+import { Button, Paper, makeStyles } from "@material-ui/core";
 import Alert from "@material-ui/lab/Alert";
 
 import ErrorBoundary from "../ErrorBoundary";
@@ -26,6 +26,7 @@ import { i18n } from "../../translate/i18n";
 import QuickMessageChatModal from "../QuickMessageChatModal";
 import TransferTicketModalCustom from "../TransferTicketModalCustom";
 import { canAccessTicket } from "../../utils/canAccessTicket";
+import { isOrphanTicket } from "../../utils/isOrphanTicket";
 import {
   PANEL_RADIUS,
   getPanelElevation,
@@ -99,6 +100,19 @@ const useStyles = makeStyles((theme) => ({
   pendingBanner: {
     borderRadius: 0,
     flexShrink: 0,
+  },
+  orphanBanner: {
+    borderRadius: 0,
+    flexShrink: 0,
+    alignItems: "center",
+    "& .MuiAlert-message": {
+      flex: 1,
+    },
+  },
+  orphanBannerAction: {
+    flexShrink: 0,
+    marginLeft: 8,
+    textTransform: "none",
   },
 }));
 
@@ -246,7 +260,9 @@ const Ticket = () => {
     }
 
     return () => {
-      socket.disconnect();
+      socket.off("ready", joinRoom);
+      socket.off(`company-${companyId}-ticket`, handleTicket);
+      socket.off(`company-${companyId}-contact`, handleContact);
     };
   }, [ticketId, history, socketManager, ticket?.id]);
 
@@ -258,28 +274,28 @@ const Ticket = () => {
     setDrawerOpen(false);
   };
 
+  const orphanTicket = isOrphanTicket(ticket);
+
   const renderTicketInfo = () => {
-    if (ticket.user !== undefined) {
-      return (
-        <TicketInfo
-          contact={contact}
-          ticket={ticket}
-          onClick={handleDrawerOpen}
-          onReassignConnection={
-            ticket.isOrphan ? () => setReassignModalOpen(true) : undefined
-          }
-          onLabelsChange={(labels) => {
-            setContact((prev) => ({ ...prev, labels }));
-            setTicket((prev) => ({
-              ...prev,
-              contact: prev.contact
-                ? { ...prev.contact, labels }
-                : prev.contact,
-            }));
-          }}
-        />
-      );
+    if (!ticket?.id) {
+      return null;
     }
+    return (
+      <TicketInfo
+        contact={contact}
+        ticket={ticket}
+        onClick={handleDrawerOpen}
+        onLabelsChange={(labels) => {
+          setContact((prev) => ({ ...prev, labels }));
+          setTicket((prev) => ({
+            ...prev,
+            contact: prev.contact
+              ? { ...prev.contact, labels }
+              : prev.contact,
+          }));
+        }}
+      />
+    );
   };
 
   const renderMessagesList = () => {
@@ -327,6 +343,25 @@ const Ticket = () => {
             onCrmDealSaved={() => setCrmPanelRefreshKey((n) => n + 1)}
           />
         </TicketHeader>
+        {orphanTicket && (
+          <Alert
+            severity="warning"
+            data-ticket-orphan-banner
+            className={classes.orphanBanner}
+            action={
+              <Button
+                color="inherit"
+                size="small"
+                className={classes.orphanBannerAction}
+                onClick={() => setReassignModalOpen(true)}
+              >
+                {i18n.t("ticketsList.orphanReassign.button")}
+              </Button>
+            }
+          >
+            {i18n.t("ticket.orphan.banner")}
+          </Alert>
+        )}
         {ticket?.status === "pending" && (
           <Alert severity="info" data-ticket-pending-banner className={classes.pendingBanner}>
             {i18n.t("ticket.pendingPreview.banner")}
