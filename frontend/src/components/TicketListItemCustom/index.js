@@ -90,7 +90,7 @@ const useStyles = makeStyles((theme) => {
   return {
   listItemRoot: {
     position: "relative",
-    alignItems: "stretch",
+    alignItems: "center",
     padding: 14,
     borderRadius: CARD_RADIUS,
     marginLeft: 0,
@@ -164,7 +164,7 @@ const useStyles = makeStyles((theme) => {
   },
   bulkCheckbox: {
     padding: 4,
-    marginRight: theme.spacing(0.75),
+    marginRight: theme.spacing(0.5),
     alignSelf: "center",
     flexShrink: 0,
   },
@@ -174,19 +174,28 @@ const useStyles = makeStyles((theme) => {
     alignSelf: "stretch",
     flexShrink: 0,
     borderRadius: 999,
-    marginRight: theme.spacing(1.25),
+    marginRight: theme.spacing(0.75),
     marginTop: 2,
     marginBottom: 2,
-    minHeight: 0,
+    minHeight: 36,
+  },
+  cardBodyRow: {
+    display: "flex",
+    alignItems: "center",
+    flex: 1,
+    minWidth: 0,
+    gap: 11,
   },
   avatarWrap: {
     alignSelf: "center",
     flexShrink: 0,
+    minWidth: "auto",
+    marginRight: 0,
   },
   avatar: {
-    width: 42,
-    height: 42,
-    fontSize: "1rem",
+    width: 48,
+    height: 48,
+    fontSize: "1.125rem",
     fontWeight: 600,
     borderRadius: "50%",
     overflow: "hidden",
@@ -203,8 +212,9 @@ const useStyles = makeStyles((theme) => {
     border: `2px solid ${alpha(theme.palette.success.main, 0.8)}`,
   },
   avatarCompact: {
-    width: 38,
-    height: 38,
+    width: 44,
+    height: 44,
+    fontSize: "1rem",
   },
   unreadBadge: {
     fontSize: "0.65rem",
@@ -675,44 +685,47 @@ const TicketListItemCustom = ({
             }}
           />
         ) : null}
-        <Tooltip
-          arrow
-          placement="right"
-          title={ticket.queue?.name?.toUpperCase() || i18n.t("ticketsListItem.noQueue")}
-        >
-          <Box
-            className={classes.queueBar}
-            style={{ backgroundColor: queueColor }}
-            aria-hidden
-          />
-        </Tooltip>
-
-        <ListItemAvatar className={classes.avatarWrap}>
-          <Badge
-            overlap="circular"
-            anchorOrigin={{ vertical: "top", horizontal: "right" }}
-            badgeContent={ticket.unreadMessages > 0 ? ticket.unreadMessages : null}
-            color="error"
-            invisible={!ticket.unreadMessages}
-            classes={{ badge: classes.unreadBadge }}
+        {bulkSelectMode ? (
+          <Tooltip
+            arrow
+            placement="right"
+            title={ticket.queue?.name?.toUpperCase() || i18n.t("ticketsListItem.noQueue")}
           >
-            <Avatar
-              className={clsx(classes.avatar, {
-                [classes.avatarCompact]: compact,
-                [classes.avatarSelected]: bulkSelectMode
-                  ? bulkSelected
-                  : selected,
-              })}
-              src={ticket?.contact?.profilePicUrl}
-            >
-              {!ticket?.contact?.profilePicUrl && ticket.contact?.name
-                ? ticket.contact.name.charAt(0).toUpperCase()
-                : null}
-            </Avatar>
-          </Badge>
-        </ListItemAvatar>
+            <Box
+              className={classes.queueBar}
+              style={{ backgroundColor: queueColor }}
+              aria-hidden
+            />
+          </Tooltip>
+        ) : null}
 
-        <Box className={classes.mainColumn}>
+        <Box className={classes.cardBodyRow}>
+          <ListItemAvatar className={classes.avatarWrap}>
+            <Badge
+              overlap="circular"
+              anchorOrigin={{ vertical: "top", horizontal: "right" }}
+              badgeContent={ticket.unreadMessages > 0 ? ticket.unreadMessages : null}
+              color="error"
+              invisible={!ticket.unreadMessages}
+              classes={{ badge: classes.unreadBadge }}
+            >
+              <Avatar
+                className={clsx(classes.avatar, {
+                  [classes.avatarCompact]: compact,
+                  [classes.avatarSelected]: bulkSelectMode
+                    ? bulkSelected
+                    : selected,
+                })}
+                src={ticket?.contact?.profilePicUrl}
+              >
+                {!ticket?.contact?.profilePicUrl && ticket.contact?.name
+                  ? ticket.contact.name.charAt(0).toUpperCase()
+                  : null}
+              </Avatar>
+            </Badge>
+          </ListItemAvatar>
+
+          <Box className={classes.mainColumn}>
           <Box className={classes.topRow}>
             <Box className={classes.nameBlock}>
               <Typography
@@ -896,6 +909,7 @@ const TicketListItemCustom = ({
               ) : null}
             </Box>
           )}
+          </Box>
         </Box>
       </ListItem>
     </React.Fragment>
