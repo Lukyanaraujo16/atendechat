@@ -42,6 +42,7 @@ const TicketStateBanner = ({
   onFinalize,
   onAccept,
   onReopen,
+  onDelete,
 }) => {
   const classes = useStyles();
 
@@ -92,6 +93,18 @@ const TicketStateBanner = ({
               >
                 {i18n.t("messagesList.header.buttons.resolve")}
               </ButtonWithSpinner>
+            ) : null}
+            {isPending && onDelete ? (
+              <Button
+                size="small"
+                variant="outlined"
+                color="secondary"
+                disabled={loading}
+                className={classes.actionBtn}
+                onClick={onDelete}
+              >
+                {i18n.t("ticketOptionsMenu.buttons.delete")}
+              </Button>
             ) : null}
             {onReassign ? (
               <Button

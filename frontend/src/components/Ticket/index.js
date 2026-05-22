@@ -13,6 +13,7 @@ import TicketHeader from "../TicketHeader";
 import TicketInfo from "../TicketInfo";
 import ReassignOrphanWhatsappModal from "../ReassignOrphanWhatsappModal";
 import TicketActionButtons from "../TicketActionButtonsCustom";
+import TicketActionModals from "../TicketActionModals";
 import MessagesList from "../MessagesList";
 import api from "../../services/api";
 import { ReplyMessageProvider } from "../../context/ReplyingMessage/ReplyingMessageContext";
@@ -25,6 +26,9 @@ import { i18n } from "../../translate/i18n";
 import QuickMessageChatModal from "../QuickMessageChatModal";
 import TransferTicketModalCustom from "../TransferTicketModalCustom";
 import { canAccessTicket } from "../../utils/canAccessTicket";
+import { canDeleteTickets } from "../../utils/canDeleteTickets";
+import { TicketsSetContext } from "../../context/Tickets/TicketsContext";
+import { TicketsInboxContext } from "../../context/TicketsInboxContext";
 import getTicketViewState, {
   TICKET_VIEW_STATE,
 } from "../../utils/getTicketViewState";
@@ -128,8 +132,11 @@ const Ticket = () => {
   const [statusActionLoading, setStatusActionLoading] = useState(false);
 
   const socketManager = useContext(SocketContext);
+  const setCurrentTicket = useContext(TicketsSetContext);
+  const inbox = useContext(TicketsInboxContext);
   const { completeAcceptTicket } = useAcceptTicket();
   const { markAsReadByTicket } = useGlobalNotifications();
+  const mayDelete = canDeleteTickets(user);
   const ticketRef = useRef(ticket);
   ticketRef.current = ticket;
 
@@ -308,6 +315,14 @@ const Ticket = () => {
     }
   };
 
+  const handleOrphanTicketDeleted = () => {
+    if (typeof inbox?.removeTicket === "function") {
+      inbox.removeTicket(ticket.id);
+    }
+    setCurrentTicket({ id: null, code: null });
+    history.push("/tickets");
+  };
+
   const handleAcceptOrphanTicket = async () => {
     if (!ticket?.id) return;
     setStatusActionLoading(true);
@@ -352,6 +367,25 @@ const Ticket = () => {
     />
   );
 
+  const orphanPendingWithDelete =
+    isOrphanView &&
+    String(ticket?.status || "").toLowerCase() === "pending" &&
+    mayDelete;
+
+  const renderStateBanner = (openDelete) => (
+    <TicketStateBanner
+      viewState={viewState}
+      ticket={ticket}
+      loading={statusActionLoading}
+      partialEnrichWarning={partialEnrichWarning}
+      onReassign={() => setReassignModalOpen(true)}
+      onFinalize={handleFinalizeTicket}
+      onAccept={handleAcceptOrphanTicket}
+      onReopen={handleReopenOrphanTicket}
+      onDelete={openDelete}
+    />
+  );
+
   const renderComposer = () => {
     if (isOrphanView) {
       return <TicketOrphanComposer />;
@@ -393,16 +427,18 @@ const Ticket = () => {
             />
           ) : null}
         </TicketHeader>
-        <TicketStateBanner
-          viewState={viewState}
-          ticket={ticket}
-          loading={statusActionLoading}
-          partialEnrichWarning={partialEnrichWarning}
-          onReassign={() => setReassignModalOpen(true)}
-          onFinalize={handleFinalizeTicket}
-          onAccept={handleAcceptOrphanTicket}
-          onReopen={handleReopenOrphanTicket}
-        />
+        {orphanPendingWithDelete ? (
+          <TicketActionModals
+            ticket={ticket}
+            deleteTitle={i18n.t("ticket.delete.confirmTitle")}
+            deleteMessage={i18n.t("ticket.delete.confirmMessage")}
+            onDeleted={handleOrphanTicketDeleted}
+          >
+            {({ openDelete }) => renderStateBanner(openDelete)}
+          </TicketActionModals>
+        ) : (
+          renderStateBanner()
+        )}
         {ticket?.id && (
           <ErrorBoundary>
             <div className={classes.chatBody} data-ticket-message-list>
