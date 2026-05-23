@@ -25,6 +25,7 @@ import Company from "./Company";
 import QueueOption from "./QueueOption";
 import Tag from "./Tag";
 import TicketTag from "./TicketTag";
+import PinnedTicket from "./PinnedTicket";
 import QueueIntegrations from "./QueueIntegrations";
 import Prompt from "./Prompt";
 
@@ -97,6 +98,9 @@ class Ticket extends Model<Ticket> {
 
   @HasMany(() => TicketTag)
   ticketTags: TicketTag[];
+
+  @HasMany(() => PinnedTicket, { foreignKey: "ticketId", as: "userPin" })
+  userPin: PinnedTicket[];
 
   @BelongsToMany(() => Tag, () => TicketTag)
   tags: Tag[];

@@ -2188,6 +2188,10 @@ const messages = {
 					closed: "Finish",
 					reopen: "Reopen",
 				},
+				pin: {
+					pin: "Pin conversation",
+					unpin: "Unpin conversation",
+				},
 				orphanConnectionWarning:
 					"This ticket's WhatsApp connection no longer exists. Accept, close, and delete still work; assign a connection again to send messages.",
 				startedOutsideSystemHint: "Conversation started outside the app",
@@ -4991,6 +4995,10 @@ const messages = {
 					"One or more labels are invalid or do not belong to your company.",
 				ERR_CONTACT_LABEL_RELATIONS_TABLE_MISSING:
 					"Label assignment is unavailable. Run backend migrations (ContactLabelRelations).",
+				ERR_MAX_PINNED_TICKETS:
+					"You can pin up to 3 conversations. Unpin one to pin another.",
+				ERR_PIN_ONLY_OPEN_TICKETS:
+					"You can only pin conversations in progress (Attending tab).",
 				ERR_NO_TICKET_FOUND: "No ticket found with this ID.",
 				ERR_NO_USER_FOUND: "No user found with this ID.",
 				ERR_NO_WAPP_FOUND: "No WhatsApp found with this ID.",

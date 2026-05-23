@@ -9,6 +9,7 @@ import FlowExecutionLog from "../../models/FlowExecutionLog";
 import OpenAiUsage from "../../models/OpenAiUsage";
 import UserRating from "../../models/UserRating";
 import TicketNote from "../../models/TicketNote";
+import PinnedTicket from "../../models/PinnedTicket";
 import CrmDeal from "../../models/CrmDeal";
 import { logger } from "../../utils/logger";
 import { registerTicketDeletionGuard } from "./TicketDeletionGuardService";
@@ -27,6 +28,7 @@ async function destroyTicketDependents(
   await OpenAiUsage.destroy({ where: { ticketId }, transaction });
   await UserRating.destroy({ where: { ticketId }, transaction });
   await TicketNote.destroy({ where: { ticketId }, transaction });
+  await PinnedTicket.destroy({ where: { ticketId }, transaction });
   await CrmDeal.update(
     { ticketId: null },
     { where: { ticketId }, transaction }

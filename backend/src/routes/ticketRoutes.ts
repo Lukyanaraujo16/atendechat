@@ -21,9 +21,12 @@ ticketRoutes.use(isAuth);
 ticketRoutes.use(requireAnyPlanFeature("attendance.inbox"));
 
 ticketRoutes.get("/tickets", TicketController.index);
+ticketRoutes.get("/tickets/pinned", TicketController.listPinned);
 ticketRoutes.get("/tickets/without-connection", TicketController.listWithoutConnection);
 ticketRoutes.post("/tickets/bulk-assign-connection", TicketController.bulkAssignConnection);
 
+ticketRoutes.post("/tickets/:ticketId/pin", TicketController.pin);
+ticketRoutes.delete("/tickets/:ticketId/pin", TicketController.unpin);
 ticketRoutes.post("/tickets/:ticketId/active-view", TicketController.registerActiveView);
 
 ticketRoutes.get("/tickets/:ticketId", TicketController.show);

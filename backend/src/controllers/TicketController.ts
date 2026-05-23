@@ -25,6 +25,9 @@ import ListTicketsServiceKanban from "../services/TicketServices/ListTicketsServ
 import ListTicketsWithoutConnectionService from "../services/TicketServices/ListTicketsWithoutConnectionService";
 import BulkAssignTicketsWhatsappService from "../services/TicketServices/BulkAssignTicketsWhatsappService";
 import ReassignOrphanTicketWhatsappService from "../services/TicketServices/ReassignOrphanTicketWhatsappService";
+import ListPinnedTicketsService from "../services/PinnedTicketServices/ListPinnedTicketsService";
+import PinTicketService from "../services/PinnedTicketServices/PinTicketService";
+import UnpinTicketService from "../services/PinnedTicketServices/UnpinTicketService";
 import {
   toCompanyTicketAudience,
   toCompanyTicketDeleteAudience
@@ -482,5 +485,58 @@ export const registerActiveView = async (
       "[OneSignalPush] active_view_refresh_failed"
     );
   }
+  return res.status(204).send();
+};
+
+export const listPinned = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const userId = Number(req.user.id);
+  const companyId = Number(req.user.companyId);
+  const pinned = await ListPinnedTicketsService({ userId, companyId });
+  return res.status(200).json({ pinned });
+};
+
+export const pin = async (req: Request, res: Response): Promise<Response> => {
+  const ticketId = Number(req.params.ticketId);
+  if (!Number.isFinite(ticketId) || ticketId <= 0) {
+    throw new AppError("ERR_INVALID_TICKET_ID", 400);
+  }
+  const userId = Number(req.user.id);
+  const companyId = Number(req.user.companyId);
+  const row = await PinTicketService({
+    ticketId,
+    userId,
+    companyId,
+    user: {
+      id: req.user.id,
+      profile: req.user.profile,
+      supportMode: req.user.supportMode
+    }
+  });
+  return res.status(200).json({
+    ticketId: row.ticketId,
+    createdAt: row.createdAt
+  });
+};
+
+export const unpin = async (req: Request, res: Response): Promise<Response> => {
+  const ticketId = Number(req.params.ticketId);
+  if (!Number.isFinite(ticketId) || ticketId <= 0) {
+    throw new AppError("ERR_INVALID_TICKET_ID", 400);
+  }
+  const userId = Number(req.user.id);
+  const companyId = Number(req.user.companyId);
+  await UnpinTicketService({
+    ticketId,
+    userId,
+    companyId,
+    user: {
+      id: req.user.id,
+      profile: req.user.profile,
+      supportMode: req.user.supportMode
+    }
+  });
   return res.status(204).send();
 };

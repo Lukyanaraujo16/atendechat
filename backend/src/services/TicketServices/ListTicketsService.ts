@@ -1,4 +1,4 @@
-import { Op, fn, where, col, Filterable, Includeable } from "sequelize";
+import { Op, fn, where, col, Filterable, Includeable, literal } from "sequelize";
 import { startOfDay, endOfDay, parseISO } from "date-fns";
 
 import Ticket from "../../models/Ticket";
@@ -14,6 +14,8 @@ import { intersection } from "lodash";
 import Whatsapp from "../../models/Whatsapp";
 import { parseTruthyQuery } from "../../utils/parseQueryBoolean";
 import { attachTicketIsOrphanFlag } from "../../helpers/ticketOrphan";
+import { attachTicketPinnedFlags } from "../../helpers/ticketPinned";
+import PinnedTicket from "../../models/PinnedTicket";
 import { logger } from "../../utils/logger";
 import {
   buildNonAdminTicketListWhere,
@@ -283,6 +285,25 @@ const ListTicketsService = async ({
   const limit = 40;
   const offset = limit * (+pageNumber - 1);
 
+  const pinForUser =
+    status === "open" && userId != null && userId !== "";
+
+  if (pinForUser) {
+    includeCondition = [
+      ...includeCondition,
+      {
+        model: PinnedTicket,
+        as: "userPin",
+        required: false,
+        where: {
+          userId: Number(userId),
+          companyId
+        },
+        attributes: ["id", "createdAt"]
+      }
+    ];
+  }
+
   whereCondition = {
     ...whereCondition,
     companyId
@@ -301,19 +322,30 @@ const ListTicketsService = async ({
     };
   }
 
+  const orderClause: Array<string | [unknown, string]> = pinForUser
+    ? [
+        [literal("CASE WHEN `userPin`.`id` IS NOT NULL THEN 0 ELSE 1 END"), "ASC"],
+        [literal("`userPin`.`createdAt`"), "ASC"],
+        ["updatedAt", "DESC"]
+      ]
+    : [["updatedAt", "DESC"]];
+
   const { count, rows: tickets } = await Ticket.findAndCountAll({
     where: whereCondition,
     include: includeCondition,
     distinct: true,
     limit,
     offset,
-    order: [["updatedAt", "DESC"]],
+    order: orderClause as any,
     subQuery: false
   });
 
   const hasMore = count > offset + tickets.length;
 
   attachTicketIsOrphanFlag(tickets);
+  if (pinForUser) {
+    attachTicketPinnedFlags(tickets);
+  }
 
   if (status === "pending") {
     logger.info(

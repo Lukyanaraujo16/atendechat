@@ -20,6 +20,7 @@ import AppError from "../../errors/AppError";
 import Company from "../../models/Company";
 import { logger } from "../../utils/logger";
 import notifyTicketAfterUpdate from "../OneSignalPush/notifyTicketAfterUpdate";
+import RemovePinnedTicketsForTicketService from "../PinnedTicketServices/RemovePinnedTicketsForTicketService";
 
 interface TicketData {
   status?: string;
@@ -298,6 +299,10 @@ const UpdateTicketService = async ({
       chatbot,
       queueOptionId
     });
+
+    if (status !== undefined && status !== "open") {
+      await RemovePinnedTicketsForTicketService(Number(ticketId));
+    }
 
     const ticketForEmit = await ShowTicketService(ticketId, companyId);
 

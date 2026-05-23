@@ -600,7 +600,14 @@ const InboxOpenListPanel = memo(function InboxOpenListPanel({
   isBulkListActive,
   onBulkSelectionApiChange,
 }) {
-  const { tickets, loading, hasMore, loadMore } = useTicketsInboxOpenColumn();
+  const {
+    tickets,
+    loading,
+    hasMore,
+    loadMore,
+    toggleTicketPin,
+    pinActionTicketId,
+  } = useTicketsInboxOpenColumn();
   return (
     <TicketsList
       status="open"
@@ -618,6 +625,9 @@ const InboxOpenListPanel = memo(function InboxOpenListPanel({
       onBulkSelectionApiChange={
         isBulkListActive ? onBulkSelectionApiChange : undefined
       }
+      showPinInboxAction
+      onTogglePin={toggleTicketPin}
+      pinActionTicketId={pinActionTicketId}
     />
   );
 });

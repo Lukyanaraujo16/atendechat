@@ -209,6 +209,9 @@ const TicketsListCustom = (props) => {
     bulkSelectMode = false,
     /** Registra API de seleção em massa para a lista ativa (barra de busca) */
     onBulkSelectionApiChange,
+    showPinInboxAction = false,
+    onTogglePin,
+    pinActionTicketId = null,
   } = props;
   const classes = useStyles();
   const { ticketId: routeTicketId } = useParams();
@@ -648,6 +651,9 @@ const TicketsListCustom = (props) => {
                   bulkSelectMode={bulkActiveOnCards}
                   bulkSelected={selectedIds.has(ticket.id)}
                   onBulkToggle={toggleBulkSelect}
+                  showPinInboxAction={showPinInboxAction}
+                  onTogglePin={onTogglePin}
+                  pinLoading={pinActionTicketId === ticket.id}
                 />
               ))}
             </>

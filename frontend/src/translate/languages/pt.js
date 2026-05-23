@@ -2277,6 +2277,10 @@ const messages = {
           closed: "Finalizar",
           reopen: "Reabrir",
         },
+        pin: {
+          pin: "Fixar conversa",
+          unpin: "Desafixar conversa",
+        },
         orphanConnectionWarning:
           "Conexão WhatsApp deste atendimento não existe mais. Aceitar, finalizar e excluir continuam disponíveis; reatribua uma conexão para enviar mensagens.",
         startedOutsideSystemHint: "Conversa iniciada fora do sistema",
@@ -5153,6 +5157,10 @@ const messages = {
           "Uma ou mais etiquetas são inválidas ou não pertencem à sua empresa.",
         ERR_CONTACT_LABEL_RELATIONS_TABLE_MISSING:
           "Associação de etiquetas indisponível. Execute as migrations do backend (ContactLabelRelations).",
+        ERR_MAX_PINNED_TICKETS:
+          "Você pode fixar no máximo 3 conversas. Desafixe uma conversa para fixar outra.",
+        ERR_PIN_ONLY_OPEN_TICKETS:
+          "Só é possível fixar conversas em atendimento (aba Atendendo).",
         ERR_NO_TICKET_FOUND: "Nenhum tíquete encontrado com este ID.",
         ERR_NO_USER_FOUND: "Nenhum usuário encontrado com este ID.",
         ERR_NO_WAPP_FOUND: "Nenhum WhatsApp encontrado com este ID.",

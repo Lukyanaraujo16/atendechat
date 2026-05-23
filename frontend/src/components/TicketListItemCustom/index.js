@@ -34,6 +34,8 @@ import MarkdownWrapper from "../MarkdownWrapper";
 import AndroidIcon from "@material-ui/icons/Android";
 import VisibilityIcon from "@material-ui/icons/Visibility";
 import DeleteOutlineIcon from "@material-ui/icons/DeleteOutline";
+import PushPinOutlinedIcon from "@material-ui/icons/PushPinOutlined";
+import PushPinIcon from "@material-ui/icons/PushPin";
 import Checkbox from "@material-ui/core/Checkbox";
 import IconButton from "@material-ui/core/IconButton";
 import TicketMessagesDialog from "../TicketMessagesDialog";
@@ -428,6 +430,26 @@ const useStyles = makeStyles((theme) => {
       padding: 6,
     },
   },
+  pinBtn: {
+    padding: 4,
+    flexShrink: 0,
+    color: theme.palette.text.secondary,
+    transition: `all ${MICRO_MS}ms ${MICRO_EASE}`,
+    "&:hover": {
+      color: theme.palette.primary.main,
+      backgroundColor: alpha(theme.palette.primary.main, 0.1),
+    },
+  },
+  pinBtnActive: {
+    color: theme.palette.primary.main,
+  },
+  pinIconNearName: {
+    fontSize: 14,
+    marginRight: 4,
+    color: theme.palette.primary.main,
+    verticalAlign: "middle",
+    opacity: 0.9,
+  },
   peekIcon: {
     color: alpha(theme.palette.success.main, isDark ? 0.9 : 0.85),
     cursor: "pointer",
@@ -447,6 +469,9 @@ const TicketListItemCustom = ({
   bulkSelectMode = false,
   bulkSelected = false,
   onBulkToggle,
+  showPinInboxAction = false,
+  onTogglePin,
+  pinLoading = false,
 }) => {
   const classes = useStyles();
   const theme = useTheme();
@@ -465,6 +490,9 @@ const TicketListItemCustom = ({
   const { profile } = user;
   const mayDelete = canDeleteTickets(user);
   const { completeAcceptTicket } = useAcceptTicket();
+  const isPinned = Boolean(ticket?.isPinned);
+  const canShowPin =
+    showPinInboxAction && ticket.status === "open" && !bulkSelectMode;
 
   useEffect(() => {
     if (ticket.userId && ticket.user) {
@@ -734,6 +762,9 @@ const TicketListItemCustom = ({
           <Box className={classes.mainColumn}>
           <Box className={classes.topRow}>
             <Box className={classes.nameBlock}>
+              {isPinned ? (
+                <PushPinIcon className={classes.pinIconNearName} aria-hidden />
+              ) : null}
               <Typography
                 className={clsx(classes.contactName, { [classes.contactNameCompact]: compact })}
                 component="span"
@@ -897,6 +928,42 @@ const TicketListItemCustom = ({
                   {i18n.t("ticketsList.buttons.reopen")}
                 </ButtonWithSpinner>
               )}
+              {canShowPin ? (
+                <Tooltip
+                  title={
+                    isPinned
+                      ? i18n.t("ticketsList.pin.unpin")
+                      : i18n.t("ticketsList.pin.pin")
+                  }
+                >
+                  <span>
+                    <IconButton
+                      size="small"
+                      className={clsx(classes.pinBtn, {
+                        [classes.pinBtnActive]: isPinned,
+                      })}
+                      disabled={loading || pinLoading}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (typeof onTogglePin === "function") {
+                          onTogglePin(ticket);
+                        }
+                      }}
+                      aria-label={
+                        isPinned
+                          ? i18n.t("ticketsList.pin.unpin")
+                          : i18n.t("ticketsList.pin.pin")
+                      }
+                    >
+                      {isPinned ? (
+                        <PushPinIcon fontSize="small" />
+                      ) : (
+                        <PushPinOutlinedIcon fontSize="small" />
+                      )}
+                    </IconButton>
+                  </span>
+                </Tooltip>
+              ) : null}
               {mayDelete && !bulkSelectMode ? (
                 <Tooltip title={i18n.t("ticketOptionsMenu.delete")}>
                   <IconButton
@@ -927,6 +994,9 @@ function ticketListItemPropsAreEqual(prev, next) {
   if (prev.selected !== next.selected) return false;
   if (prev.bulkSelectMode !== next.bulkSelectMode) return false;
   if (prev.bulkSelected !== next.bulkSelected) return false;
+  if (prev.showPinInboxAction !== next.showPinInboxAction) return false;
+  if (prev.pinLoading !== next.pinLoading) return false;
+  if (prev.onTogglePin !== next.onTogglePin) return false;
   return prev.ticket === next.ticket;
 }
 

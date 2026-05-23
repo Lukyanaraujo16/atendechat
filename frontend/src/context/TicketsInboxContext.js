@@ -10,6 +10,9 @@ import React, {
 import { AuthContext } from "./Auth/AuthContext";
 import { SocketContext } from "./Socket/SocketContext";
 import useTickets from "../hooks/useTickets";
+import api from "../services/api";
+import toastError from "../errors/toastError";
+import sortOpenTicketsWithPins from "../utils/sortOpenTicketsWithPins";
 
 /** Mantém a mesma referência de array se todos os elementos forem === aos anteriores (ordem e tamanho iguais). */
 function stabilizeListByRef(prevList, nextList) {
@@ -108,6 +111,8 @@ export function TicketsInboxProvider({
   const [tickets, setTickets] = useState([]);
   const [openPage, setOpenPage] = useState(1);
   const [pendingPage, setPendingPage] = useState(1);
+  const [pinnedMeta, setPinnedMeta] = useState([]);
+  const [pinActionTicketId, setPinActionTicketId] = useState(null);
   const recentlyDeletedIdsRef = useRef(new Set());
 
   const queueIdsJson = useMemo(
@@ -115,14 +120,38 @@ export function TicketsInboxProvider({
     [selectedQueueIds]
   );
 
+  const fetchEnabled = inboxUiActive !== false;
+
+  const loadPinnedTickets = useCallback(async () => {
+    try {
+      const { data } = await api.get("/tickets/pinned");
+      const list = Array.isArray(data?.pinned) ? data.pinned : [];
+      setPinnedMeta(
+        list
+          .map((row) => ({
+            ticketId: Number(row.ticketId),
+            createdAt: row.createdAt,
+          }))
+          .filter((row) => Number.isFinite(row.ticketId))
+      );
+    } catch (err) {
+      toastError(err);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (fetchEnabled) {
+      loadPinnedTickets();
+    }
+  }, [fetchEnabled, loadPinnedTickets, user?.id, user?.companyId]);
+
   useEffect(() => {
     setTickets([]);
     setOpenPage(1);
     setPendingPage(1);
+    setPinnedMeta([]);
     recentlyDeletedIdsRef.current = new Set();
   }, [queueIdsJson, showAll]);
-
-  const fetchEnabled = inboxUiActive !== false;
 
   const openFetch = useTickets({
     enabled: fetchEnabled,
@@ -212,6 +241,7 @@ export function TicketsInboxProvider({
     if (ticketId == null) return;
     const id = Number(ticketId);
     recentlyDeletedIdsRef.current.add(id);
+    setPinnedMeta((prev) => prev.filter((row) => row.ticketId !== id));
     setTimeout(() => {
       recentlyDeletedIdsRef.current.delete(id);
     }, 120000);
@@ -274,6 +304,66 @@ export function TicketsInboxProvider({
     });
   }, []);
 
+  const pinnedOrderIds = useMemo(
+    () => pinnedMeta.map((row) => row.ticketId),
+    [pinnedMeta]
+  );
+
+  const pinnedIdSet = useMemo(
+    () => new Set(pinnedOrderIds),
+    [pinnedOrderIds]
+  );
+
+  const toggleTicketPin = useCallback(
+    async (ticket) => {
+      if (!ticket?.id || ticket.status !== "open") return;
+      const ticketId = Number(ticket.id);
+      const isPinned = pinnedIdSet.has(ticketId) || ticket.isPinned;
+      setPinActionTicketId(ticketId);
+      try {
+        if (isPinned) {
+          await api.delete(`/tickets/${ticketId}/pin`);
+          setPinnedMeta((prev) =>
+            prev.filter((row) => row.ticketId !== ticketId)
+          );
+          setTickets((prev) =>
+            prev.map((t) =>
+              t.id === ticketId ? { ...t, isPinned: false, pinnedAt: null } : t
+            )
+          );
+        } else {
+          const { data } = await api.post(`/tickets/${ticketId}/pin`);
+          setPinnedMeta((prev) => {
+            const next = prev.filter((row) => row.ticketId !== ticketId);
+            next.push({
+              ticketId,
+              createdAt: data?.createdAt || new Date().toISOString(),
+            });
+            return next.sort(
+              (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
+            );
+          });
+          setTickets((prev) =>
+            prev.map((t) =>
+              t.id === ticketId
+                ? {
+                    ...t,
+                    isPinned: true,
+                    pinnedAt: data?.createdAt || new Date().toISOString(),
+                  }
+                : t
+            )
+          );
+        }
+      } catch (err) {
+        toastError(err);
+      } finally {
+        setPinActionTicketId(null);
+      }
+    },
+    [pinnedIdSet]
+  );
+
   useEffect(() => {
     const companyId = localStorage.getItem("companyId");
     const socket = socketManager.getSocket(companyId);
@@ -301,8 +391,14 @@ export function TicketsInboxProvider({
           return;
         }
         if (t.status === "open" || t.status === "pending") {
-          upsertTicket(t);
+          upsertTicket({
+            ...t,
+            isPinned: pinnedIdSet.has(Number(t.id)),
+          });
         } else {
+          setPinnedMeta((prev) =>
+            prev.filter((row) => row.ticketId !== Number(t.id))
+          );
           removeTicket(t.id);
         }
       }
@@ -337,8 +433,14 @@ export function TicketsInboxProvider({
         return;
       }
       if (t2.status === "open" || t2.status === "pending") {
-        upsertTicketMessageActivity(t2);
+        upsertTicketMessageActivity({
+          ...t2,
+          isPinned: pinnedIdSet.has(Number(t2.id)),
+        });
       } else {
+        setPinnedMeta((prev) =>
+          prev.filter((row) => row.ticketId !== Number(t2.id))
+        );
         removeTicket(t2.id);
       }
     };
@@ -376,6 +478,7 @@ export function TicketsInboxProvider({
     isRecentlyDeleted,
     user?.id,
     user?.allTicket,
+    pinnedIdSet,
   ]);
 
   const afterProfileFilter = useMemo(() => {
@@ -409,10 +512,14 @@ export function TicketsInboxProvider({
     return list;
   }, [tickets, profile, safeQueues, user?.id, user?.allTicket]);
 
-  const openTicketsRaw = useMemo(
-    () => afterProfileFilter.filter((t) => t.status === "open"),
-    [afterProfileFilter]
-  );
+  const openTicketsRaw = useMemo(() => {
+    const openOnly = afterProfileFilter.filter((t) => t.status === "open");
+    const withPinFlag = openOnly.map((t) => ({
+      ...t,
+      isPinned: pinnedIdSet.has(Number(t.id)) || Boolean(t.isPinned),
+    }));
+    return sortOpenTicketsWithPins(withPinFlag, pinnedOrderIds);
+  }, [afterProfileFilter, pinnedOrderIds, pinnedIdSet]);
 
   const pendingAllRaw = useMemo(
     () => afterProfileFilter.filter((t) => t.status === "pending"),
@@ -478,8 +585,19 @@ export function TicketsInboxProvider({
       loading: openFetch.loading,
       hasMore: openFetch.hasMore,
       loadMore: loadMoreOpen,
+      toggleTicketPin,
+      pinActionTicketId,
+      pinnedOrderIds,
     }),
-    [openTickets, openFetch.loading, openFetch.hasMore, loadMoreOpen]
+    [
+      openTickets,
+      openFetch.loading,
+      openFetch.hasMore,
+      loadMoreOpen,
+      toggleTicketPin,
+      pinActionTicketId,
+      pinnedOrderIds,
+    ]
   );
 
   const pendingColumnValue = useMemo(
@@ -521,6 +639,9 @@ export function TicketsInboxProvider({
       removeTicket,
       removeTickets,
       updateUnread,
+      toggleTicketPin,
+      pinActionTicketId,
+      pinnedOrderIds,
     }),
     [
       tickets,
@@ -540,6 +661,9 @@ export function TicketsInboxProvider({
       removeTicket,
       removeTickets,
       updateUnread,
+      toggleTicketPin,
+      pinActionTicketId,
+      pinnedOrderIds,
     ]
   );
 

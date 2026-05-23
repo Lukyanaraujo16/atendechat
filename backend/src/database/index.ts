@@ -6,6 +6,7 @@ import UserNotification from "../models/UserNotification";
 import Setting from "../models/Setting";
 import Contact from "../models/Contact";
 import Ticket from "../models/Ticket";
+import PinnedTicket from "../models/PinnedTicket";
 import TicketDeletionGuard from "../models/TicketDeletionGuard";
 import Whatsapp from "../models/Whatsapp";
 import ContactCustomField from "../models/ContactCustomField";
@@ -89,6 +90,7 @@ const models = [
   UserNotification,
   Contact,
   Ticket,
+  PinnedTicket,
   TicketDeletionGuard,
   Message,
   Whatsapp,
