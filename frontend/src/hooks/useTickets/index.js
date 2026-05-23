@@ -23,6 +23,8 @@ const useTickets = ({
   isGroup,
   chatbot,
   countOnly,
+  /** Incrementar para forçar nova busca (ex.: após exclusão em massa). */
+  reloadToken = 0,
   /** Quando false, não busca (ex.: inbox inativa na guia principal). */
   enabled = true,
 }) => {
@@ -106,6 +108,7 @@ const useTickets = ({
     isGroup,
     chatbot,
     countOnly,
+    reloadToken,
   ]);
 
   return { tickets, loading, hasMore, count };

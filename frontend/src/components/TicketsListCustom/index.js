@@ -216,6 +216,7 @@ const TicketsListCustom = (props) => {
   const classes = useStyles();
   const { ticketId: routeTicketId } = useParams();
   const [pageNumber, setPageNumber] = useState(1);
+  const [listReloadToken, setListReloadToken] = useState(0);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
@@ -235,9 +236,16 @@ const TicketsListCustom = (props) => {
     setPageNumber(1);
   }, [isControlled, status, searchParam, dispatch, showAll, tags, contactLabels, users, selectedQueueIds, groupsOnly]);
 
+  const reloadUncontrolledList = useCallback(() => {
+    dispatch({ type: "RESET" });
+    setPageNumber(1);
+    setListReloadToken((t) => t + 1);
+  }, []);
+
   const { tickets, hasMore, loading } = useTickets({
     enabled: !isControlled,
     pageNumber,
+    reloadToken: listReloadToken,
     searchParam,
     status: groupsOnly ? undefined : status,
     showAll: groupsOnly ? true : showAll,
@@ -589,12 +597,24 @@ const TicketsListCustom = (props) => {
         Array.isArray(data?.deletedIds) && data.deletedIds.length > 0
           ? data.deletedIds
           : ids;
-      if (typeof inbox?.removeTickets === "function") {
+      if (isControlled && typeof inbox?.removeTickets === "function") {
         inbox.removeTickets(removedIds);
+        if (status === "open" && typeof inbox?.reloadOpenList === "function") {
+          inbox.reloadOpenList();
+        } else if (
+          status === "pending" &&
+          typeof inbox?.reloadPendingList === "function"
+        ) {
+          inbox.reloadPendingList();
+        }
       } else if (!isControlled) {
         removedIds.forEach((ticketId) => {
           dispatch({ type: "DELETE_TICKET", payload: ticketId });
         });
+        reloadUncontrolledList();
+      }
+      if (typeof inbox?.refreshTabCounts === "function") {
+        inbox.refreshTabCounts();
       }
       if (deleted === 0 && failed > 0) {
         toast.error(i18n.t("ticket.delete.bulkNoneFailed"));
@@ -654,6 +674,17 @@ const TicketsListCustom = (props) => {
                   showPinInboxAction={showPinInboxAction}
                   onTogglePin={onTogglePin}
                   pinLoading={pinActionTicketId === ticket.id}
+                  onTicketDeleted={
+                    !isControlled
+                      ? (ticketId) => {
+                          dispatch({ type: "DELETE_TICKET", payload: ticketId });
+                          reloadUncontrolledList();
+                          if (typeof inbox?.refreshTabCounts === "function") {
+                            inbox.refreshTabCounts();
+                          }
+                        }
+                      : undefined
+                  }
                 />
               ))}
             </>

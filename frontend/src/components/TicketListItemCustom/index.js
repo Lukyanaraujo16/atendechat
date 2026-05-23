@@ -472,6 +472,7 @@ const TicketListItemCustom = ({
   showPinInboxAction = false,
   onTogglePin,
   pinLoading = false,
+  onTicketDeleted,
 }) => {
   const classes = useStyles();
   const theme = useTheme();
@@ -573,8 +574,21 @@ const TicketListItemCustom = ({
     setDeleteLoading(true);
     try {
       await api.delete(`/tickets/${ticket.id}`);
-      if (typeof inbox?.removeTicket === "function") {
+      if (typeof onTicketDeleted === "function") {
+        onTicketDeleted(ticket.id);
+      } else if (typeof inbox?.removeTicket === "function") {
         inbox.removeTicket(ticket.id);
+        if (ticket.status === "open" && typeof inbox?.reloadOpenList === "function") {
+          inbox.reloadOpenList();
+        } else if (
+          ticket.status === "pending" &&
+          typeof inbox?.reloadPendingList === "function"
+        ) {
+          inbox.reloadPendingList();
+        }
+        if (typeof inbox?.refreshTabCounts === "function") {
+          inbox.refreshTabCounts();
+        }
       }
       toast.success(i18n.t("ticketOptionsMenu.confirmationModal.deleteSuccess"));
       if (selected) {

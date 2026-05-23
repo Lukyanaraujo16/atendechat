@@ -111,6 +111,8 @@ export function TicketsInboxProvider({
   const [tickets, setTickets] = useState([]);
   const [openPage, setOpenPage] = useState(1);
   const [pendingPage, setPendingPage] = useState(1);
+  const [openReloadToken, setOpenReloadToken] = useState(0);
+  const [pendingReloadToken, setPendingReloadToken] = useState(0);
   const [pinnedMeta, setPinnedMeta] = useState([]);
   const [pinActionTicketId, setPinActionTicketId] = useState(null);
   const [tabCounts, setTabCounts] = useState({
@@ -207,9 +209,20 @@ export function TicketsInboxProvider({
     };
   }, [refreshTabCounts]);
 
+  const reloadOpenList = useCallback(() => {
+    setOpenPage(1);
+    setOpenReloadToken((n) => n + 1);
+  }, []);
+
+  const reloadPendingList = useCallback(() => {
+    setPendingPage(1);
+    setPendingReloadToken((n) => n + 1);
+  }, []);
+
   const openFetch = useTickets({
     enabled: fetchEnabled,
     pageNumber: openPage,
+    reloadToken: openReloadToken,
     searchParam: "",
     status: "open",
     showAll,
@@ -222,6 +235,7 @@ export function TicketsInboxProvider({
   const pendingFetch = useTickets({
     enabled: fetchEnabled,
     pageNumber: pendingPage,
+    reloadToken: pendingReloadToken,
     searchParam: "",
     status: "pending",
     showAll,
@@ -335,6 +349,37 @@ export function TicketsInboxProvider({
       setTickets((prev) => upsertTicketInList(prev, ticket, { bumpToTop: false }));
     },
     [isRecentlyDeleted]
+  );
+
+  /** pending → open: remove de outras abas, insere em open abaixo dos fixados. */
+  const acceptTicketInInbox = useCallback(
+    (ticket) => {
+      if (!ticket?.id || isRecentlyDeleted(ticket.id)) return;
+      const normalized = {
+        ...ticket,
+        status: "open",
+        userId: ticket.userId ?? userId,
+        isPinned: pinnedIdSet.has(Number(ticket.id)) || Boolean(ticket.isPinned),
+      };
+      setTickets((prev) => {
+        const rest = prev.filter((t) => t.id !== normalized.id);
+        const openRows = rest.filter((t) => t.status === "open");
+        const otherRows = rest.filter((t) => t.status !== "open");
+        const mergedOpen = sortOpenTicketsWithPins(
+          [...openRows, normalized],
+          pinnedOrderIds
+        );
+        return [...otherRows, ...mergedOpen];
+      });
+      scheduleRefreshTabCounts();
+    },
+    [
+      isRecentlyDeleted,
+      userId,
+      pinnedIdSet,
+      pinnedOrderIds,
+      scheduleRefreshTabCounts,
+    ]
   );
 
   const upsertTicketMessageActivity = useCallback(
@@ -703,6 +748,10 @@ export function TicketsInboxProvider({
       loadMoreOpen,
       loadMorePending,
       upsertTicket,
+      acceptTicketInInbox,
+      reloadOpenList,
+      reloadPendingList,
+      refreshTabCounts,
       removeTicket,
       removeTickets,
       updateUnread,
@@ -725,6 +774,10 @@ export function TicketsInboxProvider({
       loadMoreOpen,
       loadMorePending,
       upsertTicket,
+      acceptTicketInInbox,
+      reloadOpenList,
+      reloadPendingList,
+      refreshTabCounts,
       removeTicket,
       removeTickets,
       updateUnread,

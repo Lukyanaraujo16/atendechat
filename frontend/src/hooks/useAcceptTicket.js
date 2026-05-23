@@ -36,8 +36,18 @@ export function useAcceptTicket() {
         userId: user?.id,
       };
 
-      if (typeof inbox?.upsertTicket === "function") {
+      if (typeof inbox?.acceptTicketInInbox === "function") {
+        inbox.acceptTicketInInbox(updated);
+      } else if (typeof inbox?.upsertTicket === "function") {
         inbox.upsertTicket(updated);
+      }
+
+      if (typeof inbox?.reloadOpenList === "function") {
+        inbox.reloadOpenList();
+      }
+
+      if (typeof inbox?.refreshTabCounts === "function") {
+        inbox.refreshTabCounts();
       }
 
       if (typeof ticketsNav?.setInboxSubTab === "function") {
