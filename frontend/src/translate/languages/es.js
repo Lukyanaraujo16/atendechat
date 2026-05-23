@@ -373,6 +373,7 @@ const messages = {
         },
         ticket: {
           createOpportunity: "Añadir al CRM",
+          loadingCrm: "Cargando CRM...",
           notesHeader: "Creado desde el servicio WhatsApp.",
           notesContact: "Contacto",
           notesNumber: "Número",

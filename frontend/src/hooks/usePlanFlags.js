@@ -1,7 +1,15 @@
-import { useState, useEffect, useContext, useRef } from "react";
+import { useState, useEffect, useContext, useRef, useMemo } from "react";
 import { AuthContext } from "../context/Auth/AuthContext";
 import usePlans from "./usePlans";
 import { buildEffectiveModuleFlagsFromFeatureMap } from "../components/ModuleSettings/moduleSync";
+
+function readUserEffectiveFeatures(user) {
+  const userFx = user?.effectiveUserFeatures;
+  if (userFx && typeof userFx === "object" && Object.keys(userFx).length > 0) {
+    return userFx;
+  }
+  return null;
+}
 
 /** Alinha o override legado `cshow` ao mesmo instante em que o plano fica pronto (evita “saltar” campanhas). */
 function applyCampaignsShowOverride(base) {
@@ -181,11 +189,27 @@ export default function usePlanFlags() {
     getPlanCompany,
   ]);
 
+  const userFxSync = useMemo(() => readUserEffectiveFeatures(user), [
+    user?.effectiveUserFeatures,
+  ]);
+
+  const effectiveFeaturesOut = useMemo(() => {
+    if (flags.loaded) {
+      return flags.effectiveFeatures;
+    }
+    if (userFxSync) {
+      return userFxSync;
+    }
+    return flags.effectiveFeatures;
+  }, [flags.loaded, flags.effectiveFeatures, userFxSync]);
+
+  const ready = flags.loaded || Boolean(userFxSync);
+
   return {
     ...flags,
-    /** Alias explícito: permissões/features do plano já foram carregadas da API. */
-    ready: flags.loaded,
-    /** Igual a `ready` — para o menu aguardar antes de listar módulos. */
-    permissionsReady: flags.loaded,
+    effectiveFeatures: effectiveFeaturesOut,
+    loaded: flags.loaded,
+    ready,
+    permissionsReady: ready,
   };
 }

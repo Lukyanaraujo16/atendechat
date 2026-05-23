@@ -1,6 +1,7 @@
 import React, { useContext, useMemo, useState } from "react";
 import IconButton from "@material-ui/core/IconButton";
 import Tooltip from "@material-ui/core/Tooltip";
+import CircularProgress from "@material-ui/core/CircularProgress";
 import BusinessCenterOutlinedIcon from "@material-ui/icons/BusinessCenterOutlined";
 import moment from "moment";
 
@@ -32,18 +33,45 @@ function buildTicketCrmNotes(ticket) {
   return lines.join("\n");
 }
 
-export default function TicketCrmDealButton({ ticket, onCrmDealSaved }) {
+export default function TicketCrmDealButton({
+  ticket,
+  onCrmDealSaved,
+  disabled = false,
+  featureLoading = false,
+}) {
   const [crmOpen, setCrmOpen] = useState(false);
   const [crmDealId, setCrmDealId] = useState(null);
   const [dupOpen, setDupOpen] = useState(false);
   const [dupDeals, setDupDeals] = useState([]);
+  const [opening, setOpening] = useState(false);
   const { user } = useContext(AuthContext);
   const terminology = useMemo(
     () => getCrmTerminology(user?.company?.businessSegment),
     [user?.company?.businessSegment]
   );
 
-  if (!ticket?.contactId) return null;
+  const isDisabled =
+    disabled || featureLoading || opening || !ticket?.id || !ticket?.contactId;
+
+  const tooltipTitle = featureLoading
+    ? i18n.t("crm.ticket.loadingCrm")
+    : i18n.t("crm.ticket.createOpportunity");
+
+  if (!ticket?.id) {
+    return (
+      <Tooltip title={tooltipTitle}>
+        <span>
+          <IconButton size="small" disabled aria-label={tooltipTitle}>
+            {featureLoading ? (
+              <CircularProgress size={18} />
+            ) : (
+              <BusinessCenterOutlinedIcon fontSize="small" />
+            )}
+          </IconButton>
+        </span>
+      </Tooltip>
+    );
+  }
 
   const contactName = ticket.contact?.name || "";
 
@@ -67,6 +95,8 @@ export default function TicketCrmDealButton({ ticket, onCrmDealSaved }) {
   };
 
   const handleOpenRequest = async () => {
+    if (isDisabled) return;
+    setOpening(true);
     try {
       const { data } = await api.get(`/crm/deals/by-contact/${ticket.contactId}`);
       const openList = (Array.isArray(data) ? data : []).filter(
@@ -80,6 +110,8 @@ export default function TicketCrmDealButton({ ticket, onCrmDealSaved }) {
     } catch (e) {
       toastError(e);
       return;
+    } finally {
+      setOpening(false);
     }
     setCrmDealId(null);
     setCrmOpen(true);
@@ -95,14 +127,21 @@ export default function TicketCrmDealButton({ ticket, onCrmDealSaved }) {
 
   return (
     <>
-      <Tooltip title={i18n.t("crm.ticket.createOpportunity")}>
-        <IconButton
-          size="small"
-          onClick={handleOpenRequest}
-          aria-label={i18n.t("crm.ticket.createOpportunity")}
-        >
-          <BusinessCenterOutlinedIcon fontSize="small" />
-        </IconButton>
+      <Tooltip title={tooltipTitle}>
+        <span>
+          <IconButton
+            size="small"
+            onClick={handleOpenRequest}
+            disabled={isDisabled}
+            aria-label={tooltipTitle}
+          >
+            {featureLoading || opening ? (
+              <CircularProgress size={18} />
+            ) : (
+              <BusinessCenterOutlinedIcon fontSize="small" />
+            )}
+          </IconButton>
+        </span>
       </Tooltip>
       <CrmOpenDealsChoiceDialog
         open={dupOpen}

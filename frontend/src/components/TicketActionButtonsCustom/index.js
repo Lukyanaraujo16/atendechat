@@ -61,6 +61,12 @@ const TicketActionButtonsCustom = ({
   const inbox = useContext(TicketsInboxContext);
   const planFlags = usePlanFlags();
   const fx = planFlags.effectiveFeatures || {};
+  const crmEnabled = fx["crm.pipeline"] === true;
+  const crmDenied =
+    user?.effectiveUserFeatures?.["crm.pipeline"] === false ||
+    (planFlags.ready && !crmEnabled);
+  const showCrmSlot = !crmDenied && (crmEnabled || !planFlags.ready);
+  const crmFeatureLoading = showCrmSlot && !crmEnabled && !planFlags.ready;
   const mayDelete = canDeleteTickets(user);
   const { completeAcceptTicket } = useAcceptTicket();
 
@@ -191,10 +197,12 @@ const TicketActionButtonsCustom = ({
                       </span>
                     </Tooltip>
                   ) : null}
-                  {fx["crm.pipeline"] === true ? (
+                  {showCrmSlot ? (
                     <TicketCrmDealButton
                       ticket={ticket}
                       onCrmDealSaved={onCrmDealSaved}
+                      disabled={loading}
+                      featureLoading={crmFeatureLoading}
                     />
                   ) : null}
                 </>
