@@ -134,20 +134,15 @@ const useStyles = makeStyles((theme) => ({
     minWidth: 28,
     height: 26,
   },
-  columnHeaderClosed: {
-    flexWrap: "wrap",
-    alignItems: "flex-start",
-  },
-  columnHeaderClosedMeta: {
+  columnHeaderClosedActions: {
     display: "flex",
-    flexDirection: "column",
-    flex: "1 1 120px",
-    minWidth: 0,
-    gap: 2,
+    alignItems: "center",
+    gap: theme.spacing(1),
+    flexShrink: 0,
   },
   closedPeriodSelect: {
-    minWidth: 118,
-    maxWidth: 150,
+    minWidth: 108,
+    maxWidth: 140,
     flexShrink: 0,
     "& .MuiOutlinedInput-root": {
       fontSize: "0.75rem",
@@ -156,11 +151,6 @@ const useStyles = makeStyles((theme) => ({
       paddingTop: 6,
       paddingBottom: 6,
     },
-  },
-  closedCountHint: {
-    fontSize: "0.75rem",
-    color: theme.palette.text.secondary,
-    lineHeight: 1.3,
   },
   columnBody: {
     flex: 1,
@@ -722,48 +712,57 @@ const Kanban = () => {
                 className={clsx(classes.column, isDropTarget && classes.columnDropActive)}
               >
                 <Box
-                  className={clsx(
-                    classes.columnHeader,
-                    col.key === "closed" && classes.columnHeaderClosed
-                  )}
+                  className={classes.columnHeader}
                   borderLeft={`4px solid ${headerAccent}`}
                   bgcolor="background.paper"
                 >
                   {col.key === "closed" ? (
                     <>
-                      <Box className={classes.columnHeaderClosedMeta}>
-                        <Typography
-                          className={classes.columnTitle}
-                          component="h2"
-                          color="textPrimary"
-                        >
-                          {i18n.t(col.labelKey)}
-                        </Typography>
-                        <Typography className={classes.closedCountHint} component="span">
-                          {list.length} •{" "}
-                          {i18n.t(`kanban.closedPeriodShort.${closedPeriod}`)}
-                        </Typography>
-                      </Box>
-                      <FormControl
-                        variant="outlined"
-                        size="small"
-                        className={classes.closedPeriodSelect}
+                      <Typography
+                        className={classes.columnTitle}
+                        component="h2"
+                        color="textPrimary"
                       >
-                        <Select
-                          value={closedPeriod}
-                          onChange={handleClosedPeriodChange}
-                          displayEmpty
-                          inputProps={{
-                            "aria-label": i18n.t("kanban.closedPeriod.label"),
+                        {i18n.t(col.labelKey)}
+                      </Typography>
+                      <Box className={classes.columnHeaderClosedActions}>
+                        <Chip
+                          size="small"
+                          label={list.length}
+                          className={classes.countChip}
+                          style={{
+                            backgroundColor:
+                              theme.palette.type === "dark"
+                                ? theme.palette.grey[700]
+                                : theme.palette.grey[300],
+                            color: theme.palette.getContrastText(
+                              theme.palette.type === "dark"
+                                ? theme.palette.grey[700]
+                                : theme.palette.grey[300]
+                            ),
                           }}
+                        />
+                        <FormControl
+                          variant="outlined"
+                          size="small"
+                          className={classes.closedPeriodSelect}
                         >
-                          {KANBAN_CLOSED_PERIOD_OPTIONS.map((opt) => (
-                            <MenuItem key={opt} value={opt} dense>
-                              {i18n.t(`kanban.closedPeriod.${opt}`)}
-                            </MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
+                          <Select
+                            value={closedPeriod}
+                            onChange={handleClosedPeriodChange}
+                            displayEmpty
+                            inputProps={{
+                              "aria-label": i18n.t("kanban.closedPeriod.label"),
+                            }}
+                          >
+                            {KANBAN_CLOSED_PERIOD_OPTIONS.map((opt) => (
+                              <MenuItem key={opt} value={opt} dense>
+                                {i18n.t(`kanban.closedPeriod.${opt}`)}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                      </Box>
                     </>
                   ) : (
                     <>
