@@ -312,9 +312,7 @@ const ListTicketsService = async ({
     };
   }
 
-  const baseOrder: Array<[typeof Ticket, string, string]> = [
-    [Ticket, "updatedAt", "DESC"]
-  ];
+  const baseOrder: Array<[string, string]> = [["updatedAt", "DESC"]];
 
   let pinnedList: PinnedTicketListItem[] = [];
   if (pinForUser) {
