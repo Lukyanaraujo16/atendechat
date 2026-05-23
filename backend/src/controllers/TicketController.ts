@@ -46,6 +46,8 @@ type IndexQuery = {
   contactLabels: string;
   users: string;
   isGroup: string;
+  chatbot: string;
+  countOnly: string;
 };
 
 interface TicketData {
@@ -72,7 +74,9 @@ export const index = async (req: Request, res: Response): Promise<Response> => {
     contactLabels: contactLabelIdsStringified,
     users: userIdsStringified,
     withUnreadMessages,
-    isGroup
+    isGroup,
+    chatbot,
+    countOnly
   } = req.query as IndexQuery;
 
   const userId = req.user.id;
@@ -104,6 +108,8 @@ export const index = async (req: Request, res: Response): Promise<Response> => {
       withUnreadMessages,
       companyId,
       isGroup,
+      chatbot,
+      countOnly,
       userProfile: profile,
       supportMode
     });

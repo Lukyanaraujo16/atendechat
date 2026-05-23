@@ -21,11 +21,14 @@ const useTickets = ({
   queueIds,
   withUnreadMessages,
   isGroup,
+  chatbot,
+  countOnly,
   /** Quando false, não busca (ex.: inbox inativa na guia principal). */
   enabled = true,
 }) => {
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(false);
+  const [count, setCount] = useState(0);
   const [tickets, setTickets] = useState([]);
 
   useEffect(() => {
@@ -36,7 +39,9 @@ const useTickets = ({
 
     let cancelled = false;
     setLoading(true);
-    setTickets([]);
+    if (!countOnly) {
+      setTickets([]);
+    }
 
     const fetchTickets = async () => {
       try {
@@ -52,6 +57,8 @@ const useTickets = ({
         if (showAll != null && showAll !== "") params.showAll = showAll;
         if (withUnreadMessages) params.withUnreadMessages = withUnreadMessages;
         if (isGroup) params.isGroup = isGroup;
+        if (chatbot === "true" || chatbot === "false") params.chatbot = chatbot;
+        if (countOnly) params.countOnly = true;
         if (queueIds != null && queueIds !== "") params.queueIds = queueIds;
         if (tags != null && tags !== "" && tags !== "[]") params.tags = tags;
         if (
@@ -65,8 +72,11 @@ const useTickets = ({
 
         const { data } = await api.get("/tickets", { params });
         if (cancelled) return;
-        setTickets(Array.isArray(data.tickets) ? data.tickets : []);
-        setHasMore(data.hasMore);
+        setCount(typeof data.count === "number" ? data.count : 0);
+        if (!countOnly) {
+          setTickets(Array.isArray(data.tickets) ? data.tickets : []);
+          setHasMore(Boolean(data.hasMore));
+        }
         setLoading(false);
       } catch (err) {
         if (cancelled) return;
@@ -94,9 +104,11 @@ const useTickets = ({
     queueIds,
     withUnreadMessages,
     isGroup,
+    chatbot,
+    countOnly,
   ]);
 
-  return { tickets, loading, hasMore };
+  return { tickets, loading, hasMore, count };
 };
 
 export default useTickets;

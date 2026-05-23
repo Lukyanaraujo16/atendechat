@@ -44,6 +44,10 @@ interface Request {
   companyId: number;
   /** "true" = só tickets de grupo; omitido/"false" = exclui grupos das listas normais */
   isGroup?: string;
+  /** "true" | "false" — filtra coluna chatbot (ex.: abas Aguardando vs Chatbot) */
+  chatbot?: string;
+  /** "true" = só retorna count total, sem carregar tickets */
+  countOnly?: string | boolean;
   userProfile?: string;
   supportMode?: boolean;
 }
@@ -69,6 +73,8 @@ const ListTicketsService = async ({
   withUnreadMessages,
   companyId,
   isGroup,
+  chatbot,
+  countOnly,
   userProfile,
   supportMode
 }: Request): Promise<Response> => {
@@ -310,6 +316,28 @@ const ListTicketsService = async ({
       ...whereCondition,
       isGroup: false
     };
+  }
+
+  if (chatbot === "true") {
+    whereCondition = {
+      ...whereCondition,
+      chatbot: true
+    };
+  } else if (chatbot === "false") {
+    whereCondition = {
+      ...whereCondition,
+      [Op.or]: [{ chatbot: false }, { chatbot: null }]
+    };
+  }
+
+  if (parseTruthyQuery(countOnly)) {
+    const total = await Ticket.count({
+      where: whereCondition,
+      include: includeCondition,
+      distinct: true,
+      col: "id"
+    });
+    return { tickets: [], count: total, hasMore: false };
   }
 
   const baseOrder: Array<[string, string]> = [["updatedAt", "DESC"]];

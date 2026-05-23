@@ -113,7 +113,13 @@ export function TicketsInboxProvider({
   const [pendingPage, setPendingPage] = useState(1);
   const [pinnedMeta, setPinnedMeta] = useState([]);
   const [pinActionTicketId, setPinActionTicketId] = useState(null);
+  const [tabCounts, setTabCounts] = useState({
+    open: 0,
+    pending: 0,
+    chatbot: 0,
+  });
   const recentlyDeletedIdsRef = useRef(new Set());
+  const refreshCountsTimerRef = useRef(null);
 
   const queueIdsJson = useMemo(
     () => JSON.stringify(Array.isArray(selectedQueueIds) ? selectedQueueIds : []),
@@ -150,8 +156,56 @@ export function TicketsInboxProvider({
     setOpenPage(1);
     setPendingPage(1);
     setPinnedMeta([]);
+    setTabCounts({ open: 0, pending: 0, chatbot: 0 });
     recentlyDeletedIdsRef.current = new Set();
   }, [queueIdsJson, showAll]);
+
+  const refreshTabCounts = useCallback(async () => {
+    if (!fetchEnabled) return;
+    try {
+      const baseParams = {
+        pageNumber: 1,
+        countOnly: true,
+        showAll,
+        queueIds: queueIdsJson,
+      };
+      const [openRes, pendingRes, chatbotRes] = await Promise.all([
+        api.get("/tickets", { params: { ...baseParams, status: "open" } }),
+        api.get("/tickets", {
+          params: { ...baseParams, status: "pending", chatbot: "false" },
+        }),
+        api.get("/tickets", {
+          params: { ...baseParams, status: "pending", chatbot: "true" },
+        }),
+      ]);
+      setTabCounts({
+        open: Number(openRes.data?.count) || 0,
+        pending: Number(pendingRes.data?.count) || 0,
+        chatbot: Number(chatbotRes.data?.count) || 0,
+      });
+    } catch (err) {
+      toastError(err);
+    }
+  }, [fetchEnabled, showAll, queueIdsJson]);
+
+  const scheduleRefreshTabCounts = useCallback(() => {
+    if (!fetchEnabled) return;
+    if (refreshCountsTimerRef.current) {
+      clearTimeout(refreshCountsTimerRef.current);
+    }
+    refreshCountsTimerRef.current = setTimeout(() => {
+      refreshTabCounts();
+    }, 400);
+  }, [fetchEnabled, refreshTabCounts]);
+
+  useEffect(() => {
+    refreshTabCounts();
+    return () => {
+      if (refreshCountsTimerRef.current) {
+        clearTimeout(refreshCountsTimerRef.current);
+      }
+    };
+  }, [refreshTabCounts]);
 
   const openFetch = useTickets({
     enabled: fetchEnabled,
@@ -202,6 +256,15 @@ export function TicketsInboxProvider({
       )
     );
   }, [fetchEnabled, pendingFetch.loading, pendingFetch.tickets, pendingPage]);
+
+  useEffect(() => {
+    if (!fetchEnabled || openFetch.loading) return;
+    const nextOpen = Number(openFetch.count);
+    if (!Number.isFinite(nextOpen)) return;
+    setTabCounts((prev) =>
+      prev.open === nextOpen ? prev : { ...prev, open: nextOpen }
+    );
+  }, [fetchEnabled, openFetch.loading, openFetch.count]);
 
   const userId = user?.id;
   const shouldShowTicket = useCallback(
@@ -375,6 +438,7 @@ export function TicketsInboxProvider({
       }
       if (data.action === "delete" && data.ticketId != null) {
         removeTicket(data.ticketId);
+        scheduleRefreshTabCounts();
         return;
       }
       if (data.action === "update" && data.ticket) {
@@ -401,6 +465,7 @@ export function TicketsInboxProvider({
           );
           removeTicket(t.id);
         }
+        scheduleRefreshTabCounts();
       }
     };
 
@@ -443,6 +508,7 @@ export function TicketsInboxProvider({
         );
         removeTicket(t2.id);
       }
+      scheduleRefreshTabCounts();
     };
 
     const handleContact = (data) => {
@@ -479,6 +545,7 @@ export function TicketsInboxProvider({
     user?.id,
     user?.allTicket,
     pinnedIdSet,
+    scheduleRefreshTabCounts,
   ]);
 
   const afterProfileFilter = useMemo(() => {
@@ -558,9 +625,9 @@ export function TicketsInboxProvider({
     return s;
   }, [chatbotTicketsRaw]);
 
-  const openCount = openTickets.length;
-  const pendingCount = pendingTickets.length;
-  const chatbotCount = chatbotTickets.length;
+  const openCount = tabCounts.open;
+  const pendingCount = tabCounts.pending;
+  const chatbotCount = tabCounts.chatbot;
 
   const loadMoreOpen = useCallback(() => {
     setOpenPage((p) => p + 1);
