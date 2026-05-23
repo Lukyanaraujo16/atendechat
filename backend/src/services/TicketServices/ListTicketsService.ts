@@ -1,4 +1,4 @@
-import { Op, fn, where, col, Filterable, Includeable, literal } from "sequelize";
+import { Op, fn, where, col, Filterable, Includeable } from "sequelize";
 import { startOfDay, endOfDay, parseISO } from "date-fns";
 
 import Ticket from "../../models/Ticket";
@@ -14,8 +14,12 @@ import { intersection } from "lodash";
 import Whatsapp from "../../models/Whatsapp";
 import { parseTruthyQuery } from "../../utils/parseQueryBoolean";
 import { attachTicketIsOrphanFlag } from "../../helpers/ticketOrphan";
-import { attachTicketPinnedFlags } from "../../helpers/ticketPinned";
-import PinnedTicket from "../../models/PinnedTicket";
+import {
+  attachTicketPinnedFlagsFromList,
+  buildPinnedTicketOrderClause,
+  isPinnedTicketsTableMissingError,
+  loadPinnedTicketsForUser
+} from "../../helpers/ticketPinned";
 import { logger } from "../../utils/logger";
 import {
   buildNonAdminTicketListWhere,
@@ -288,22 +292,6 @@ const ListTicketsService = async ({
   const pinForUser =
     status === "open" && userId != null && userId !== "";
 
-  if (pinForUser) {
-    includeCondition = [
-      ...includeCondition,
-      {
-        model: PinnedTicket,
-        as: "userPin",
-        required: false,
-        where: {
-          userId: Number(userId),
-          companyId
-        },
-        attributes: ["id", "createdAt"]
-      }
-    ];
-  }
-
   whereCondition = {
     ...whereCondition,
     companyId
@@ -322,29 +310,56 @@ const ListTicketsService = async ({
     };
   }
 
-  const orderClause: Array<string | [unknown, string]> = pinForUser
-    ? [
-        [literal("CASE WHEN `userPin`.`id` IS NOT NULL THEN 0 ELSE 1 END"), "ASC"],
-        [literal("`userPin`.`createdAt`"), "ASC"],
-        ["updatedAt", "DESC"]
-      ]
-    : [["updatedAt", "DESC"]];
+  const baseOrder: Array<[ReturnType<typeof col>, string]> = [
+    [col("Ticket.updatedAt"), "DESC"]
+  ];
 
-  const { count, rows: tickets } = await Ticket.findAndCountAll({
-    where: whereCondition,
-    include: includeCondition,
-    distinct: true,
-    limit,
-    offset,
-    order: orderClause as any,
-    subQuery: false
-  });
+  const runListQuery = async (withPinOrder: boolean) => {
+    const orderClause = withPinOrder
+      ? [
+          ...buildPinnedTicketOrderClause(Number(userId), companyId),
+          ...baseOrder
+        ]
+      : baseOrder;
+
+    return Ticket.findAndCountAll({
+      where: whereCondition,
+      include: includeCondition,
+      distinct: true,
+      limit,
+      offset,
+      order: orderClause as any,
+      subQuery: false
+    });
+  };
+
+  let count: number;
+  let tickets: Ticket[];
+
+  try {
+    ({ count, rows: tickets } = await runListQuery(pinForUser));
+  } catch (err) {
+    if (pinForUser && isPinnedTicketsTableMissingError(err)) {
+      logger.warn(
+        { companyId, userId, status },
+        "[ListTicketsService] PinnedTickets table missing — listing without pin order"
+      );
+      ({ count, rows: tickets } = await runListQuery(false));
+    } else {
+      throw err;
+    }
+  }
 
   const hasMore = count > offset + tickets.length;
 
   attachTicketIsOrphanFlag(tickets);
+
   if (pinForUser) {
-    attachTicketPinnedFlags(tickets);
+    const pinned = await loadPinnedTicketsForUser(
+      Number(userId),
+      companyId
+    );
+    attachTicketPinnedFlagsFromList(tickets, pinned);
   }
 
   if (status === "pending") {
