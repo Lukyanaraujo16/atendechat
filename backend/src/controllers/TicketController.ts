@@ -48,6 +48,7 @@ type IndexQuery = {
   isGroup: string;
   chatbot: string;
   countOnly: string;
+  closedPeriod: string;
 };
 
 interface TicketData {
@@ -201,7 +202,8 @@ export const kanban = async (req: Request, res: Response): Promise<Response> => 
     queueIds: queueIdsStringified,
     tags: tagIdsStringified,
     users: userIdsStringified,
-    withUnreadMessages
+    withUnreadMessages,
+    closedPeriod
   } = req.query as IndexQuery;
 
 
@@ -225,6 +227,7 @@ export const kanban = async (req: Request, res: Response): Promise<Response> => 
     queueIds,
     withUnreadMessages,
     companyId,
+    closedPeriod,
     userProfile: profile,
     supportMode
 

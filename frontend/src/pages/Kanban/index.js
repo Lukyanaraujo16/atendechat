@@ -24,6 +24,12 @@ import { useHistory } from "react-router-dom";
 import useUsers from "../../hooks/useUsers";
 import toastError from "../../errors/toastError";
 import KanbanTicketQuickMenu from "./KanbanTicketQuickMenu";
+import {
+  KANBAN_CLOSED_PERIOD_OPTIONS,
+  readKanbanClosedPeriodFromStorage,
+  ticketMatchesKanbanClosedPeriod,
+  writeKanbanClosedPeriodToStorage,
+} from "../../utils/kanbanClosedPeriod";
 
 const COLUMN_ORDER = [
   { key: "pending", labelKey: "kanban.column.pending", accent: "pending" },
@@ -127,6 +133,34 @@ const useStyles = makeStyles((theme) => ({
     fontWeight: 700,
     minWidth: 28,
     height: 26,
+  },
+  columnHeaderClosed: {
+    flexWrap: "wrap",
+    alignItems: "flex-start",
+  },
+  columnHeaderClosedMeta: {
+    display: "flex",
+    flexDirection: "column",
+    flex: "1 1 120px",
+    minWidth: 0,
+    gap: 2,
+  },
+  closedPeriodSelect: {
+    minWidth: 118,
+    maxWidth: 150,
+    flexShrink: 0,
+    "& .MuiOutlinedInput-root": {
+      fontSize: "0.75rem",
+    },
+    "& .MuiSelect-select": {
+      paddingTop: 6,
+      paddingBottom: 6,
+    },
+  },
+  closedCountHint: {
+    fontSize: "0.75rem",
+    color: theme.palette.text.secondary,
+    lineHeight: 1.3,
   },
   columnBody: {
     flex: 1,
@@ -356,6 +390,15 @@ const Kanban = () => {
   const [filterSetor, setFilterSetor] = useState("");
   const [filterConexao, setFilterConexao] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
+  const [closedPeriod, setClosedPeriod] = useState(() =>
+    readKanbanClosedPeriodFromStorage()
+  );
+
+  const handleClosedPeriodChange = useCallback((e) => {
+    const next = e.target.value;
+    setClosedPeriod(next);
+    writeKanbanClosedPeriodToStorage(next);
+  }, []);
 
   const queueIdsParam = useMemo(
     () =>
@@ -384,6 +427,7 @@ const Kanban = () => {
           queueIds: JSON.stringify(queueIdsParam),
           showAll: isAdmin ? "true" : "false",
           users: JSON.stringify(usersParam),
+          closedPeriod,
           ...(filterStatus ? { status: filterStatus } : {}),
         },
       });
@@ -416,6 +460,7 @@ const Kanban = () => {
     queueIdsParam,
     queuesList.length,
     usersParam,
+    closedPeriod,
   ]);
 
   useEffect(() => {
@@ -437,6 +482,7 @@ const Kanban = () => {
       if (filterStatus && t.status !== filterStatus) return false;
       if (filterUser && String(t.userId || "") !== String(filterUser)) return false;
       if (filterSetor && String(t.queueId || "") !== String(filterSetor)) return false;
+      if (!ticketMatchesKanbanClosedPeriod(t, closedPeriod)) return false;
       // Admin vê todas as filas da empresa na API (showAll); não restringir às filas do perfil do usuário.
       // Usuário comum: filas em queueIdsParam; exceção — ticket atribuído diretamente a si.
       if (
@@ -450,7 +496,16 @@ const Kanban = () => {
       }
       return true;
     },
-    [filterConexao, filterSetor, filterStatus, filterUser, queueIdsParam, isAdmin, user?.id]
+    [
+      filterConexao,
+      filterSetor,
+      filterStatus,
+      filterUser,
+      queueIdsParam,
+      isAdmin,
+      user?.id,
+      closedPeriod,
+    ]
   );
 
   useEffect(() => {
@@ -667,35 +722,76 @@ const Kanban = () => {
                 className={clsx(classes.column, isDropTarget && classes.columnDropActive)}
               >
                 <Box
-                  className={classes.columnHeader}
+                  className={clsx(
+                    classes.columnHeader,
+                    col.key === "closed" && classes.columnHeaderClosed
+                  )}
                   borderLeft={`4px solid ${headerAccent}`}
                   bgcolor="background.paper"
                 >
-                  <Typography className={classes.columnTitle} component="h2" color="textPrimary">
-                    {i18n.t(col.labelKey)}
-                  </Typography>
-                  <Chip
-                    size="small"
-                    label={list.length}
-                    className={classes.countChip}
-                    color={col.accent === "open" ? "primary" : "default"}
-                    style={
-                      col.accent === "pending"
-                        ? {
-                            backgroundColor: theme.palette.warning.light,
-                            color: theme.palette.getContrastText(theme.palette.warning.light),
-                          }
-                        : col.accent === "closed"
-                          ? {
-                              backgroundColor:
-                                theme.palette.type === "dark" ? theme.palette.grey[700] : theme.palette.grey[300],
-                              color: theme.palette.getContrastText(
-                                theme.palette.type === "dark" ? theme.palette.grey[700] : theme.palette.grey[300]
-                              ),
-                            }
-                          : undefined
-                    }
-                  />
+                  {col.key === "closed" ? (
+                    <>
+                      <Box className={classes.columnHeaderClosedMeta}>
+                        <Typography
+                          className={classes.columnTitle}
+                          component="h2"
+                          color="textPrimary"
+                        >
+                          {i18n.t(col.labelKey)}
+                        </Typography>
+                        <Typography className={classes.closedCountHint} component="span">
+                          {list.length} •{" "}
+                          {i18n.t(`kanban.closedPeriodShort.${closedPeriod}`)}
+                        </Typography>
+                      </Box>
+                      <FormControl
+                        variant="outlined"
+                        size="small"
+                        className={classes.closedPeriodSelect}
+                      >
+                        <Select
+                          value={closedPeriod}
+                          onChange={handleClosedPeriodChange}
+                          displayEmpty
+                          inputProps={{
+                            "aria-label": i18n.t("kanban.closedPeriod.label"),
+                          }}
+                        >
+                          {KANBAN_CLOSED_PERIOD_OPTIONS.map((opt) => (
+                            <MenuItem key={opt} value={opt} dense>
+                              {i18n.t(`kanban.closedPeriod.${opt}`)}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </>
+                  ) : (
+                    <>
+                      <Typography
+                        className={classes.columnTitle}
+                        component="h2"
+                        color="textPrimary"
+                      >
+                        {i18n.t(col.labelKey)}
+                      </Typography>
+                      <Chip
+                        size="small"
+                        label={list.length}
+                        className={classes.countChip}
+                        color={col.accent === "open" ? "primary" : "default"}
+                        style={
+                          col.accent === "pending"
+                            ? {
+                                backgroundColor: theme.palette.warning.light,
+                                color: theme.palette.getContrastText(
+                                  theme.palette.warning.light
+                                ),
+                              }
+                            : undefined
+                        }
+                      />
+                    </>
+                  )}
                 </Box>
                 <div
                   className={classes.columnBody}

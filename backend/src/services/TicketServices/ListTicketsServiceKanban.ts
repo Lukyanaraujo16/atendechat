@@ -1,5 +1,5 @@
 import { Op, fn, where, col, Filterable, Includeable } from "sequelize";
-import { startOfDay, endOfDay, parseISO, subDays } from "date-fns";
+import { startOfDay, endOfDay, parseISO } from "date-fns";
 
 import Ticket from "../../models/Ticket";
 import Contact from "../../models/Contact";
@@ -14,6 +14,10 @@ import Whatsapp from "../../models/Whatsapp";
 import { attachTicketIsOrphanFlag } from "../../helpers/ticketOrphan";
 import { parseTruthyQuery } from "../../utils/parseQueryBoolean";
 import { buildNonAdminTicketListWhere } from "../../helpers/agentTicketListWhere";
+import {
+  buildKanbanClosedStatusWhere,
+  parseKanbanClosedPeriod
+} from "../../helpers/kanbanClosedPeriod";
 
 interface Request {
   searchParam?: string;
@@ -28,6 +32,8 @@ interface Request {
   tags: number[];
   users: number[];
   companyId: number;
+  /** today | 7d | 30d | month | year | all — só afeta status closed */
+  closedPeriod?: string;
   userProfile?: string;
   supportMode?: boolean;
 }
@@ -51,6 +57,7 @@ const ListTicketsServiceKanban = async ({
   userId,
   withUnreadMessages,
   companyId,
+  closedPeriod: closedPeriodParam,
   userProfile,
   supportMode
 }: Request): Promise<Response> => {
@@ -99,16 +106,19 @@ const ListTicketsServiceKanban = async ({
     },
   ];
 
-  /** Fechados recentes no Kanban (evita lista infinita; ajustável) */
-  const closedSince = subDays(new Date(), 365);
+  const closedPeriod = parseKanbanClosedPeriod(closedPeriodParam);
+  const closedStatusWhere = buildKanbanClosedStatusWhere(closedPeriod);
+
   const statusKanbanFilter =
     status && ["pending", "open", "closed"].includes(status)
-      ? { status }
+      ? status === "closed"
+        ? closedStatusWhere
+        : { status }
       : {
           [Op.or]: [
             { status: "pending" },
             { status: "open" },
-            { status: "closed", updatedAt: { [Op.gte]: closedSince } }
+            closedStatusWhere
           ]
         };
 
