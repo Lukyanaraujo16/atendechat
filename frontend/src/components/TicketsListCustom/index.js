@@ -42,7 +42,9 @@ const useStyles = makeStyles((theme) => ({
     height: "100%",
     flexDirection: "column",
     overflow: "hidden",
-    borderBottomLeftRadius: PANEL_RADIUS,
+    borderRadius: 0,
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
     backgroundColor: getInboxListSurface(theme),
   },
 
@@ -58,6 +60,9 @@ const useStyles = makeStyles((theme) => ({
     borderTop: getSubtleBorder(theme),
     backgroundColor: getInboxListSurface(theme),
     padding: "10px 10px 12px",
+    borderRadius: 0,
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
     borderBottomLeftRadius: PANEL_RADIUS,
   },
 
@@ -607,7 +612,7 @@ const TicketsListCustom = (props) => {
   };
 
   return (
-    <Paper className={classes.ticketsListWrapper} style={style} data-tickets-list-panel>
+    <Paper square className={classes.ticketsListWrapper} style={style} data-tickets-list-panel>
       <ConfirmationModal
         title={i18n.t("ticket.delete.bulkConfirmTitle")}
         open={bulkConfirmOpen}
