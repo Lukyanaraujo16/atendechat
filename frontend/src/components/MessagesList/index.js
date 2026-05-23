@@ -23,6 +23,7 @@ import {
 } from "@material-ui/icons";
 
 import MarkdownWrapper from "../MarkdownWrapper";
+import { getDisplayableMessageBody } from "../../utils/messages/isTechnicalMediaFallback";
 import ModalImageCors from "../ModalImageCors";
 import MessageOptionsMenu from "../MessageOptionsMenu";
 import whatsBackground from "../../assets/wa-background.png";
@@ -488,6 +489,14 @@ const MessagesList = ({
     setAnchorEl(null);
   };
 
+  const renderMessageBody = (message) => {
+    const displayBody = getDisplayableMessageBody(message);
+    if (displayBody == null) {
+      return null;
+    }
+    return <MarkdownWrapper>{displayBody}</MarkdownWrapper>;
+  };
+
   const checkMessageMedia = (message) => {
 
     if (message.mediaType === "locationMessage" && message.body.split('|').length >= 2) {
@@ -812,7 +821,7 @@ const MessagesList = ({
                 ) && checkMessageMedia(message)}
                 <div className={classes.textContentItem}>
                   {message.quotedMsg && renderQuotedMessage(message)}
-                  <MarkdownWrapper>{message.mediaType === "locationMessage" ? null : message.body}</MarkdownWrapper>
+                  {renderMessageBody(message)}
                   <span className={classes.timestamp}>
 				    {message.isEdited && <span>Editada </span>}
                     {format(parseISO(message.createdAt), "HH:mm")}
@@ -855,7 +864,7 @@ const MessagesList = ({
                     />
                   )}
                   {message.quotedMsg && renderQuotedMessage(message)}
-                  <MarkdownWrapper>{message.mediaType === "locationMessage" ? null : message.body}</MarkdownWrapper>
+                  {renderMessageBody(message)}
                   <span className={classes.timestamp}>
 				    {message.isEdited && <span>{i18n.t("messagesList.edited")}</span>}
                     {format(parseISO(message.createdAt), "HH:mm")}
