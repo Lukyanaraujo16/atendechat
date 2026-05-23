@@ -351,6 +351,16 @@ export function TicketsInboxProvider({
     [isRecentlyDeleted]
   );
 
+  const pinnedOrderIds = useMemo(
+    () => pinnedMeta.map((row) => row.ticketId),
+    [pinnedMeta]
+  );
+
+  const pinnedIdSet = useMemo(
+    () => new Set(pinnedOrderIds),
+    [pinnedOrderIds]
+  );
+
   /** pending → open: remove de outras abas, insere em open abaixo dos fixados. */
   const acceptTicketInInbox = useCallback(
     (ticket) => {
@@ -411,16 +421,6 @@ export function TicketsInboxProvider({
       return next;
     });
   }, []);
-
-  const pinnedOrderIds = useMemo(
-    () => pinnedMeta.map((row) => row.ticketId),
-    [pinnedMeta]
-  );
-
-  const pinnedIdSet = useMemo(
-    () => new Set(pinnedOrderIds),
-    [pinnedOrderIds]
-  );
 
   const toggleTicketPin = useCallback(
     async (ticket) => {
