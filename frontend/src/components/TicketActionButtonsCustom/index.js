@@ -21,6 +21,7 @@ import { TicketsInboxContext } from "../../context/TicketsInboxContext";
 import TicketConversationActionBar from "../TicketConversationActionBar";
 import usePlanFlags from "../../hooks/usePlanFlags";
 import TicketCrmDealButton from "../Crm/TicketCrmDealButton";
+import { TicketTagsButton } from "../TagsContainer";
 import { canDeleteTickets } from "../../utils/canDeleteTickets";
 import { useAcceptTicket } from "../../hooks/useAcceptTicket";
 
@@ -130,6 +131,7 @@ const TicketActionButtonsCustom = ({
     <div className={classes.actionButtons}>
       {ticket.status === "closed" && (
         <div className={classes.legacyCluster}>
+          <TicketTagsButton ticket={ticket} disabled={loading} />
           <ButtonWithSpinner
             loading={loading}
             startIcon={<Replay />}
@@ -158,6 +160,7 @@ const TicketActionButtonsCustom = ({
               onQuickRepliesClick={onOpenQuickReplies}
               extraIconActions={
                 <>
+                  <TicketTagsButton ticket={ticket} disabled={loading} />
                   {contact?.id ? (
                     <Tooltip
                       title={
@@ -215,6 +218,7 @@ const TicketActionButtonsCustom = ({
         >
           {({ openDelete }) => (
             <div className={classes.legacyCluster}>
+              <TicketTagsButton ticket={ticket} disabled={loading} />
               <ButtonWithSpinner
                 loading={loading}
                 size="small"

@@ -20,7 +20,7 @@ import { ReplyMessageProvider } from "../../context/ReplyingMessage/ReplyingMess
 import toastError from "../../errors/toastError";
 import { AuthContext } from "../../context/Auth/AuthContext";
 import { useGlobalNotifications } from "../../context/GlobalNotifications/GlobalNotificationsContext";
-import { TagsContainer } from "../TagsContainer";
+import { TicketTagsButton } from "../TagsContainer";
 import { SocketContext } from "../../context/Socket/SocketContext";
 import { i18n } from "../../translate/i18n";
 import QuickMessageChatModal from "../QuickMessageChatModal";
@@ -105,9 +105,6 @@ const useStyles = makeStyles((theme) => ({
     borderBottomRightRadius: PANEL_RADIUS,
   },
 
-  tagsBar: {
-    flexShrink: 0,
-  },
 }));
 
 const Ticket = () => {
@@ -416,6 +413,9 @@ const Ticket = () => {
       >
         <TicketHeader loading={loading} compact={isOrphanView}>
           {renderTicketInfo()}
+          {isOrphanView && ticket?.id ? (
+            <TicketTagsButton ticket={ticket} />
+          ) : null}
           {!isOrphanView ? (
             <TicketActionButtons
               ticket={ticket}
@@ -442,9 +442,6 @@ const Ticket = () => {
         {ticket?.id && (
           <ErrorBoundary>
             <div className={classes.chatBody} data-ticket-message-list>
-              <div className={classes.tagsBar}>
-                <TagsContainer ticket={ticket} />
-              </div>
               <ReplyMessageProvider>
                 <div className={classes.chatBodyMain}>
                   {renderMessagesList()}

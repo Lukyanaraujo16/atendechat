@@ -4675,6 +4675,8 @@ const messages = {
             download: "Descargar",
             flowHistory: "Historial de flujo",
             quickReplies: "Respuestas rápidas",
+            manageTags: "Gestionar tags",
+            tagsPlaceholder: "Tags",
           },
         },
         lostCall: "Llamada de voz/video perdida a las",

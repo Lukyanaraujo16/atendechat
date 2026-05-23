@@ -4762,6 +4762,8 @@ const messages = {
 						download: "Download",
 						flowHistory: "Flow history",
 						quickReplies: "Quick replies",
+						manageTags: "Manage tags",
+						tagsPlaceholder: "Tags",
 					},
 				},
 				lostCall: "Missed voice/video call at",

@@ -4908,6 +4908,8 @@ const messages = {
             download: "Baixar",
             flowHistory: "Histórico de fluxo",
             quickReplies: "Respostas rápidas",
+            manageTags: "Gerenciar tags",
+            tagsPlaceholder: "Tags",
           },
         },
         lostCall: "Chamada de voz/vídeo perdida às",
