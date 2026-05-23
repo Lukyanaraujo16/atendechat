@@ -643,8 +643,8 @@ const TicketListItemCustom = ({
   }, [ticket.status, ticket.chatbot, theme]);
 
   const lastMessagePreview = useMemo(
-    () => formatTicketLastMessagePreview(ticket.lastMessage),
-    [ticket.lastMessage]
+    () => formatTicketLastMessagePreview(ticket),
+    [ticket.lastMessage, ticket.id]
   );
 
   const actionBusy = loading || deleteLoading;

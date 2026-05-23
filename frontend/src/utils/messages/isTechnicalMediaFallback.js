@@ -3,8 +3,8 @@
  * automáticos — não devem aparecer no balão quando há mídia.
  */
 
-const CONTEUDO_BRACKET_PATTERN =
-  /^\[(?:Conteúdo|Content):\s*.+\]$/i;
+export const CONTEUDO_BRACKET_PATTERN =
+  /^\[(?:Conteúdo|Content):\s*(.+)\]$/i;
 
 /** Tipos WhatsApp crus salvos como body em mensagens antigas. */
 const RAW_WA_TYPE_PATTERN = /^[a-zA-Z]+Message$/;
@@ -92,6 +92,28 @@ export function getDisplayableMessageBody(message) {
   }
 
   return body;
+}
+
+/**
+ * Extrai tipo WhatsApp de fallback técnico (ex.: imageMessage).
+ * @param {string|null|undefined} text
+ * @returns {string|null}
+ */
+export function parseTechnicalFallbackWaType(text) {
+  if (text == null) return null;
+  const trimmed = String(text).trim();
+  if (!trimmed) return null;
+
+  const bracket = trimmed.match(CONTEUDO_BRACKET_PATTERN);
+  if (bracket?.[1]) {
+    return bracket[1].trim();
+  }
+
+  if (RAW_WA_TYPE_PATTERN.test(trimmed) && trimmed !== "contactMessage") {
+    return trimmed;
+  }
+
+  return null;
 }
 
 export default isTechnicalMediaFallback;
