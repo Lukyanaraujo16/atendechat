@@ -2,15 +2,21 @@ import React from "react";
 import { Paper, Typography, makeStyles } from "@material-ui/core";
 
 import { i18n } from "../../translate/i18n";
-import { PANEL_RADIUS } from "../../theme/ticketPanelStyles";
+import {
+  PANEL_RADIUS,
+  getSubtleBorder,
+  getComposerSurface,
+  getComposerTopDivider,
+} from "../../theme/ticketPanelStyles";
 
 const useStyles = makeStyles((theme) => ({
   root: {
     flexShrink: 0,
     width: "100%",
-    borderTop: `1px solid ${theme.palette.divider}`,
+    borderTop: "none",
+    boxShadow: getComposerTopDivider(theme),
     borderBottomRightRadius: PANEL_RADIUS,
-    backgroundColor: theme.palette.background.paper,
+    backgroundColor: getComposerSurface(theme),
     padding: theme.spacing(1.5, 2),
     textAlign: "center",
   },

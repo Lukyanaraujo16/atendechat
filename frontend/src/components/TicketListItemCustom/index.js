@@ -49,7 +49,17 @@ import ContactTag from "../ContactTag";
 import ContactLabelChip from "../ContactLabelChip";
 import { canDeleteTickets } from "../../utils/canDeleteTickets";
 import { formatTicketLastMessagePreview } from "../../utils/formatTicketLastMessagePreview";
-import { getCardListHoverBackground } from "../../theme/ticketPanelStyles";
+import {
+  getSubtleBorder,
+  getSubtleBorderColor,
+  getInboxCardSurface,
+  getInboxCardSurfaceHover,
+  getCardElevation,
+  getCardElevationHover,
+  getCardSelectedBackground,
+  getCardSelectedBorder,
+  getCardSelectedShadow,
+} from "../../theme/ticketPanelStyles";
 import { toast } from "react-toastify";
 
 const MAX_TAGS_VISIBLE = 3;
@@ -98,11 +108,9 @@ const useStyles = makeStyles((theme) => {
     width: "100%",
     maxWidth: "100%",
     boxSizing: "border-box",
-    border: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
-    backgroundColor: theme.palette.background.paper,
-    boxShadow: isDark
-      ? "0 1px 2px rgba(0,0,0,0.25)"
-      : "0 1px 2px rgba(0,0,0,0.04), 0 2px 6px rgba(0,0,0,0.05)",
+    border: getSubtleBorder(theme),
+    backgroundColor: getInboxCardSurface(theme),
+    boxShadow: getCardElevation(theme),
     "&.MuiListItem-root": {
       borderRadius: CARD_RADIUS,
     },
@@ -110,12 +118,9 @@ const useStyles = makeStyles((theme) => {
     cursor: "pointer",
     "@media (hover: hover)": {
       "&:hover:not($listItemSelected):not($listItemBusy)": {
-        backgroundColor: getCardListHoverBackground(theme),
-        border: `1px solid ${alpha(theme.palette.success.main, 0.25)}`,
-        transform: "scale(1.01)",
-        boxShadow: isDark
-          ? "0 2px 8px rgba(0,0,0,0.35), 0 6px 16px rgba(0,0,0,0.3)"
-          : "0 2px 8px rgba(0,0,0,0.06), 0 6px 16px rgba(0,0,0,0.08)",
+        backgroundColor: getInboxCardSurfaceHover(theme),
+        border: `1px solid ${alpha(theme.palette.success.main, 0.14)}`,
+        boxShadow: getCardElevationHover(theme),
       },
     },
     "&$listItemSelected:hover": {
@@ -146,9 +151,9 @@ const useStyles = makeStyles((theme) => {
     },
   },
   listItemSelected: {
-    border: `1px solid ${alpha(theme.palette.success.main, 0.5)}`,
-    background: `linear-gradient(135deg, ${alpha(theme.palette.success.main, 0.18)}, ${alpha(theme.palette.success.main, 0.08)})`,
-    boxShadow: `0 0 0 1px ${alpha(theme.palette.success.main, 0.25)}`,
+    border: getCardSelectedBorder(theme),
+    background: getCardSelectedBackground(theme),
+    boxShadow: getCardSelectedShadow(theme),
   },
   listItemBusy: {
     opacity: 0.6,
@@ -199,8 +204,8 @@ const useStyles = makeStyles((theme) => {
     fontWeight: 600,
     borderRadius: "50%",
     overflow: "hidden",
-    border: `2px solid ${alpha(theme.palette.success.main, 0.25)}`,
-    boxShadow: isDark ? "none" : "0 2px 6px rgba(0,0,0,0.08)",
+    border: `1px solid ${alpha(theme.palette.success.main, 0.18)}`,
+    boxShadow: isDark ? "none" : "0 1px 3px rgba(0,0,0,0.05)",
     "& .MuiAvatar-img": {
       borderRadius: "50%",
       objectFit: "cover",
@@ -209,7 +214,7 @@ const useStyles = makeStyles((theme) => {
     },
   },
   avatarSelected: {
-    border: `2px solid ${alpha(theme.palette.success.main, 0.8)}`,
+    border: `1px solid ${alpha(theme.palette.success.main, 0.55)}`,
   },
   avatarCompact: {
     width: 44,
@@ -374,7 +379,7 @@ const useStyles = makeStyles((theme) => {
     alignItems: "center",
     marginTop: 0,
     paddingTop: 0,
-    borderTop: `1px solid ${theme.palette.divider}`,
+    borderTop: `1px solid ${getSubtleBorderColor(theme)}`,
     borderTopWidth: 0,
     opacity: 0,
     maxHeight: 0,

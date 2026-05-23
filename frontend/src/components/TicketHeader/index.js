@@ -2,12 +2,11 @@ import React from "react";
 import clsx from "clsx";
 
 import { Card } from "@material-ui/core";
-import { makeStyles, alpha } from "@material-ui/core/styles";
+import { makeStyles } from "@material-ui/core/styles";
 import TicketHeaderSkeleton from "../TicketHeaderSkeleton";
-import { PANEL_RADIUS } from "../../theme/ticketPanelStyles";
+import { PANEL_RADIUS, getSubtleBorder, getChatHeaderSurface } from "../../theme/ticketPanelStyles";
 
 const useStyles = makeStyles((theme) => {
-	const isDark = theme.palette.type === "dark";
 	return {
 		ticketHeader: {
 			display: "flex",
@@ -16,12 +15,10 @@ const useStyles = makeStyles((theme) => {
 			flexWrap: "nowrap",
 			flexShrink: 0,
 			height: "auto",
-			background: isDark
-				? `linear-gradient(135deg, ${alpha(theme.palette.success.main, 0.08)}, ${theme.palette.background.paper})`
-				: `linear-gradient(135deg, ${alpha(theme.palette.success.main, 0.06)}, ${theme.palette.background.paper})`,
+			backgroundColor: getChatHeaderSurface(theme),
 			minHeight: 56,
 			padding: theme.spacing(0, 0.5, 0, 0),
-			borderBottom: `1px solid ${alpha(theme.palette.divider, 0.85)}`,
+			borderBottom: getSubtleBorder(theme),
 			borderTop: "none",
 			borderTopRightRadius: PANEL_RADIUS,
 			borderTopLeftRadius: PANEL_RADIUS,

@@ -39,7 +39,7 @@ import { SocketContext } from "../../context/Socket/SocketContext";
 import { useWhatsAppPanelRecorder } from "../../hooks/useWhatsAppPanelRecorder";
 import resolveQuickMessageTemplate from "../../utils/resolveQuickMessageTemplate";
 import { recordRecentUse } from "../../utils/quickMessageChatStorage";
-import { PANEL_RADIUS } from "../../theme/ticketPanelStyles";
+import { PANEL_RADIUS, getSubtleBorderColor, getComposerSurface, getComposerTopDivider } from "../../theme/ticketPanelStyles";
 import {
   canAutoFocusMessageInput,
   safeFocusMessageInput,
@@ -50,14 +50,14 @@ const useStyles = makeStyles((theme) => {
   const isDark = theme.palette.type === "dark";
   return {
   mainWrapper: {
-    backgroundColor: theme.palette.background.paper,
+    backgroundColor: getComposerSurface(theme),
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    borderTop: `1px solid ${alpha(theme.palette.divider, 0.85)}`,
+    borderTop: "none",
+    boxShadow: getComposerTopDivider(theme),
     borderBottomRightRadius: PANEL_RADIUS,
     borderBottomLeftRadius: 0,
-    boxShadow: "none",
   },
   pendingHint: {
     width: "100%",
@@ -65,12 +65,12 @@ const useStyles = makeStyles((theme) => {
     textAlign: "center",
     fontSize: "0.8125rem",
     color: theme.palette.text.secondary,
-    backgroundColor: theme.palette.action.hover,
-    borderBottom: `1px solid ${theme.palette.divider}`,
+    backgroundColor: alpha(theme.palette.action.hover, isDark ? 0.35 : 0.5),
+    borderBottom: `1px solid ${getSubtleBorderColor(theme)}`,
   },
 
   newMessageBox: {
-    backgroundColor: theme.palette.background.paper,
+    backgroundColor: getComposerSurface(theme),
     width: "100%",
     display: "flex",
     padding: theme.spacing(1, 1.25),
@@ -87,7 +87,7 @@ const useStyles = makeStyles((theme) => {
     display: "flex",
     borderRadius: 999,
     flex: 1,
-    border: `1px solid ${theme.palette.divider}`,
+    border: `1px solid ${getSubtleBorderColor(theme)}`,
     transition: theme.transitions.create(["box-shadow", "border-color"], {
       duration: 180,
     }),

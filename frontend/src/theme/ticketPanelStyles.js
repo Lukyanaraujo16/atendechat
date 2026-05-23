@@ -7,6 +7,91 @@ export const PANEL_GAP_PX = 12;
 /** Padding lateral padrão da coluna de lista (busca, bulk, cards). */
 export const LIST_SIDE_PADDING_PX = 12;
 
+/** Cor de borda ultra sutil (preferir superfície em vez de stroke forte). */
+export function getSubtleBorderColor(theme) {
+  return theme.palette.type === "dark"
+    ? "rgba(255,255,255,0.07)"
+    : "rgba(0,0,0,0.06)";
+}
+
+/** Borda 1px sutil para divisores horizontais/verticais. */
+export function getSubtleBorder(theme) {
+  return `1px solid ${getSubtleBorderColor(theme)}`;
+}
+
+/** Superfície da coluna de lista (fundo recuado). */
+export function getInboxListSurface(theme) {
+  return theme.palette.type === "dark" ? "#161616" : "#F6F7F8";
+}
+
+/** Superfície de card/item na lista. */
+export function getInboxCardSurface(theme) {
+  return theme.palette.type === "dark" ? "#191919" : "#FFFFFF";
+}
+
+/** Superfície de card em hover. */
+export function getInboxCardSurfaceHover(theme) {
+  return theme.palette.type === "dark" ? "#1D1D1D" : "#FAFAFA";
+}
+
+/** Header da conversa aberta. */
+export function getChatHeaderSurface(theme) {
+  return theme.palette.type === "dark" ? "#191919" : "#FFFFFF";
+}
+
+/** Área de mensagens (fundo do chat). */
+export function getChatBodySurface(theme) {
+  return theme.palette.type === "dark" ? "#161616" : "#F6F7F8";
+}
+
+/** Composer / rodapé de input. */
+export function getComposerSurface(theme) {
+  return theme.palette.type === "dark" ? "#191919" : "#FFFFFF";
+}
+
+/** Sombra leve para cards da lista. */
+export function getCardElevation(theme) {
+  return theme.palette.type === "dark"
+    ? "0 1px 2px rgba(0,0,0,0.18)"
+    : "0 1px 3px rgba(0,0,0,0.05)";
+}
+
+/** Sombra leve em hover (elevação discreta). */
+export function getCardElevationHover(theme) {
+  return theme.palette.type === "dark"
+    ? "0 2px 6px rgba(0,0,0,0.28)"
+    : "0 2px 8px rgba(0,0,0,0.08)";
+}
+
+/** Realce do card selecionado — fundo + borda mínima, sem contorno grosso. */
+export function getCardSelectedBackground(theme) {
+  const isDark = theme.palette.type === "dark";
+  return isDark
+    ? `linear-gradient(135deg, ${alpha(theme.palette.success.main, 0.14)}, ${alpha(theme.palette.success.main, 0.06)})`
+    : `linear-gradient(135deg, ${alpha(theme.palette.success.main, 0.11)}, ${alpha(theme.palette.success.main, 0.04)})`;
+}
+
+export function getCardSelectedBorder(theme) {
+  return `1px solid ${alpha(
+    theme.palette.success.main,
+    theme.palette.type === "dark" ? 0.2 : 0.16
+  )}`;
+}
+
+export function getCardSelectedShadow(theme) {
+  const isDark = theme.palette.type === "dark";
+  return isDark
+    ? `0 1px 3px rgba(0,0,0,0.22), 0 0 0 1px ${alpha(theme.palette.success.main, 0.1)}`
+    : `0 1px 3px rgba(0,0,0,0.06), 0 0 0 1px ${alpha(theme.palette.success.main, 0.08)}`;
+}
+
+/** Divisor superior do composer (sem borda pesada). */
+export function getComposerTopDivider(theme) {
+  return theme.palette.type === "dark"
+    ? "0 -1px 0 rgba(255,255,255,0.06)"
+    : "0 -1px 0 rgba(0,0,0,0.06)";
+}
+
 /** Sombra padrão dos painéis principais (lista + conversa). */
 export function getPanelElevation(theme) {
   return theme.palette.type === "dark"
@@ -16,15 +101,12 @@ export function getPanelElevation(theme) {
 
 /** Divisão sutil entre lista e conversa (aplicar em um lado apenas). */
 export function getPanelDividerBorder(theme) {
-  return `1px solid ${alpha(theme.palette.divider, 0.6)}`;
+  return getSubtleBorder(theme);
 }
 
 /** Gradiente ultra sutil no painel da conversa. */
 export function getChatPanelBackground(theme) {
-  const paper = theme.palette.background.paper;
-  return theme.palette.type === "dark"
-    ? `linear-gradient(180deg, ${paper} 0%, ${alpha(theme.palette.success.main, 0.03)} 100%)`
-    : `linear-gradient(180deg, ${paper} 0%, ${alpha(theme.palette.success.main, 0.02)} 100%)`;
+  return getChatHeaderSurface(theme);
 }
 
 /** Scrollbar discreta para listas de tickets. */
@@ -45,5 +127,5 @@ export function getTicketPanelScrollbarStyles(theme) {
 }
 
 export function getCardListHoverBackground(theme) {
-  return alpha(theme.palette.action.hover, 0.6);
+  return getInboxCardSurfaceHover(theme);
 }

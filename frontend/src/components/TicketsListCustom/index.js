@@ -27,6 +27,8 @@ import { SocketContext } from "../../context/Socket/SocketContext";
 import {
   PANEL_RADIUS,
   getTicketPanelScrollbarStyles,
+  getSubtleBorder,
+  getInboxListSurface,
 } from "../../theme/ticketPanelStyles";
 import { filterTicketsBySearchParam } from "../../utils/ticketSearchState";
 
@@ -41,7 +43,7 @@ const useStyles = makeStyles((theme) => ({
     flexDirection: "column",
     overflow: "hidden",
     borderBottomLeftRadius: PANEL_RADIUS,
-    backgroundColor: theme.palette.background.default,
+    backgroundColor: getInboxListSurface(theme),
   },
 
   ticketsList: {
@@ -53,8 +55,8 @@ const useStyles = makeStyles((theme) => ({
     WebkitOverflowScrolling: "touch",
     boxSizing: "border-box",
     ...getTicketPanelScrollbarStyles(theme),
-    borderTop: `1px solid ${theme.palette.divider}`,
-    backgroundColor: theme.palette.background.default,
+    borderTop: getSubtleBorder(theme),
+    backgroundColor: getInboxListSurface(theme),
     padding: "10px 10px 12px",
     borderBottomLeftRadius: PANEL_RADIUS,
   },
@@ -70,7 +72,7 @@ const useStyles = makeStyles((theme) => ({
     color: theme.palette.text.primary,
     zIndex: 2,
     backgroundColor: theme.palette.background.paper,
-    borderBottom: `1px solid ${theme.palette.divider}`,
+    borderBottom: getSubtleBorder(theme),
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",

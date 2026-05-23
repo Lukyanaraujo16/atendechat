@@ -39,6 +39,8 @@ import {
   PANEL_RADIUS,
   getPanelElevation,
   getChatPanelBackground,
+  getChatBodySurface,
+  getComposerSurface,
 } from "../../theme/ticketPanelStyles";
 
 const drawerWidth = 320;
@@ -88,7 +90,7 @@ const useStyles = makeStyles((theme) => ({
     display: "flex",
     flexDirection: "column",
     overflow: "hidden",
-    backgroundColor: theme.palette.background.default,
+    backgroundColor: getChatBodySurface(theme),
   },
 
   chatBodyMain: {
@@ -101,7 +103,7 @@ const useStyles = makeStyles((theme) => ({
 
   messageInputFooter: {
     flexShrink: 0,
-    backgroundColor: theme.palette.background.paper,
+    backgroundColor: getComposerSurface(theme),
     borderBottomRightRadius: PANEL_RADIUS,
   },
 

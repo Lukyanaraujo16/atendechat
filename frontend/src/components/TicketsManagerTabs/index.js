@@ -77,6 +77,9 @@ import {
 	PANEL_RADIUS,
 	INBOX_LIST_PANEL_RADIUS,
 	LIST_SIDE_PADDING_PX,
+	getSubtleBorder,
+	getInboxListSurface,
+	getInboxCardSurface,
 } from "../../theme/ticketPanelStyles";
 import { canSeeChatbotInboxTab } from "../../utils/canSeeChatbotInboxTab";
 import {
@@ -102,7 +105,7 @@ const useStyles = makeStyles(theme => ({
 		height: "100%",
 		overflow: "hidden",
 		borderRadius: INBOX_LIST_PANEL_RADIUS,
-		backgroundColor: theme.palette.background.paper,
+		backgroundColor: getInboxListSurface(theme),
 		boxShadow: "none",
 		clipPath: `inset(0 round ${PANEL_RADIUS}px ${PANEL_RADIUS}px 0 ${PANEL_RADIUS}px)`,
 	},
@@ -113,19 +116,19 @@ const useStyles = makeStyles(theme => ({
 		minHeight: 0,
 		flexDirection: "column",
 		overflow: "hidden",
-		backgroundColor: "transparent",
+		backgroundColor: getInboxListSurface(theme),
 		borderBottomLeftRadius: PANEL_RADIUS,
 		boxShadow: "none",
 	},
 
 	tabsHeader: {
 		flex: "none",
-		backgroundColor: theme.palette.background.paper,
+		backgroundColor: getInboxCardSurface(theme),
 		borderRadius: `${PANEL_RADIUS}px ${PANEL_RADIUS}px 0 0`,
 		borderTopLeftRadius: PANEL_RADIUS,
 		borderTopRightRadius: PANEL_RADIUS,
 		overflow: "hidden",
-		borderBottom: `1px solid ${theme.palette.divider}`,
+		borderBottom: getSubtleBorder(theme),
 		padding: 0,
 		margin: 0,
 		boxShadow: "none !important",
@@ -138,7 +141,7 @@ const useStyles = makeStyles(theme => ({
 			boxShadow: "none !important",
 		},
 		"& .MuiTabs-root": {
-			backgroundColor: theme.palette.background.paper,
+			backgroundColor: getInboxCardSurface(theme),
 			minHeight: 48,
 			overflow: "hidden",
 			borderTopLeftRadius: PANEL_RADIUS,
@@ -150,7 +153,7 @@ const useStyles = makeStyles(theme => ({
 			borderTopRightRadius: PANEL_RADIUS,
 		},
 		"& .MuiTabs-flexContainer": {
-			backgroundColor: theme.palette.background.paper,
+			backgroundColor: getInboxCardSurface(theme),
 			borderTopLeftRadius: PANEL_RADIUS,
 			borderTopRightRadius: PANEL_RADIUS,
 		},
@@ -241,9 +244,9 @@ const useStyles = makeStyles(theme => ({
 		alignItems: "center",
 		flexWrap: "wrap",
 		gap: theme.spacing(1),
-		backgroundColor: theme.palette.background.paper,
+		backgroundColor: getInboxCardSurface(theme),
 		padding: theme.spacing(1.25, 1.5),
-		borderBottom: `1px solid ${theme.palette.divider}`,
+		borderBottom: getSubtleBorder(theme),
 		boxShadow: "none",
 	},
 
@@ -320,7 +323,7 @@ const useStyles = makeStyles(theme => ({
 		justifyContent: "center",
 		alignItems: "center",
 		width: "100%",
-		borderBottom: `1px solid ${theme.palette.divider}`,
+		borderBottom: getSubtleBorder(theme),
 	},
 	statusPill: {
 		fontSize: "0.75rem",
@@ -412,7 +415,7 @@ const useStyles = makeStyles(theme => ({
 		flexWrap: "wrap",
 		gap: theme.spacing(1),
 		padding: theme.spacing(1.25, 1.5),
-		borderBottom: `1px solid ${theme.palette.divider}`,
+		borderBottom: getSubtleBorder(theme),
 		backgroundColor: theme.palette.background.paper,
 		[theme.breakpoints.down("xs")]: {
 			padding: theme.spacing(1),
