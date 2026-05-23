@@ -7,10 +7,19 @@ import FormControl from "@material-ui/core/FormControl";
 import InputLabel from "@material-ui/core/InputLabel";
 import Select from "@material-ui/core/Select";
 import MenuItem from "@material-ui/core/MenuItem";
+import TextField from "@material-ui/core/TextField";
+import InputAdornment from "@material-ui/core/InputAdornment";
 import Typography from "@material-ui/core/Typography";
+import Button from "@material-ui/core/Button";
 import Chip from "@material-ui/core/Chip";
+import IconButton from "@material-ui/core/IconButton";
+import Tooltip from "@material-ui/core/Tooltip";
 import Skeleton from "@material-ui/lab/Skeleton";
 import InboxOutlinedIcon from "@material-ui/icons/InboxOutlined";
+import ExpandMoreIcon from "@material-ui/icons/ExpandMore";
+import ChevronRightIcon from "@material-ui/icons/ChevronRight";
+import SearchIcon from "@material-ui/icons/Search";
+import ClearIcon from "@material-ui/icons/Clear";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -30,6 +39,21 @@ import {
   ticketMatchesKanbanClosedPeriod,
   writeKanbanClosedPeriodToStorage,
 } from "../../utils/kanbanClosedPeriod";
+import {
+  getInitialKanbanCollapsedColumns,
+  hasKanbanCollapsedColumnsPreference,
+  shouldDefaultCollapseClosedColumn,
+  writeKanbanCollapsedColumnsToStorage,
+} from "../../utils/kanbanCollapsedColumns";
+import {
+  KANBAN_COLUMN_PAGE_SIZE,
+  getColumnVisibleMeta,
+  getInitialKanbanVisibleLimits,
+  nextVisibleLimit,
+} from "../../utils/kanbanColumnVisibleLimit";
+import { filterTicketsByKanbanSearch } from "../../utils/kanbanSearch";
+
+const KANBAN_SEARCH_DEBOUNCE_MS = 300;
 
 const COLUMN_ORDER = [
   { key: "pending", labelKey: "kanban.column.pending", accent: "pending" },
@@ -77,6 +101,26 @@ const useStyles = makeStyles((theme) => ({
       minWidth: "100%",
     },
   },
+  searchControl: {
+    flex: "1 1 240px",
+    minWidth: 220,
+    [theme.breakpoints.down("xs")]: {
+      flex: "1 1 100%",
+      minWidth: "100%",
+    },
+  },
+  searchField: {
+    "& .MuiOutlinedInput-root": {
+      backgroundColor: theme.palette.background.default,
+    },
+  },
+  filteringHint: {
+    width: "100%",
+    fontSize: "0.75rem",
+    color: theme.palette.text.secondary,
+    marginTop: theme.spacing(-1),
+    marginBottom: theme.spacing(0.5),
+  },
   boardRow: {
     display: "flex",
     flex: 1,
@@ -102,11 +146,21 @@ const useStyles = makeStyles((theme) => ({
     overflow: "hidden",
     boxShadow: "0 1px 6px rgba(0,0,0,0.08)",
     border: "2px solid transparent",
-    transition: "box-shadow 0.2s ease, border-color 0.2s ease, background-color 0.2s ease",
+    transition:
+      "box-shadow 0.2s ease, border-color 0.2s ease, background-color 0.2s ease, flex-basis 0.2s ease, min-width 0.2s ease, max-width 0.2s ease",
     maxHeight: "min(calc(100vh - 200px), 720px)",
     [theme.breakpoints.down("xs")]: {
       minWidth: "min(100%, 320px)",
       flex: "0 0 auto",
+    },
+  },
+  columnCollapsed: {
+    flex: "0 0 152px",
+    minWidth: 152,
+    maxWidth: 168,
+    [theme.breakpoints.down("xs")]: {
+      minWidth: 140,
+      flex: "0 0 140px",
     },
   },
   columnDropActive: {
@@ -123,6 +177,28 @@ const useStyles = makeStyles((theme) => ({
     padding: theme.spacing(1.5, 2),
     borderBottom: `1px solid ${theme.palette.divider}`,
     flexShrink: 0,
+  },
+  columnHeaderCollapsed: {
+    flexDirection: "column",
+    alignItems: "stretch",
+    padding: theme.spacing(1, 1.25),
+    gap: theme.spacing(0.75),
+  },
+  columnHeaderMain: {
+    display: "flex",
+    alignItems: "center",
+    gap: theme.spacing(0.5),
+    minWidth: 0,
+    flex: 1,
+  },
+  collapseButton: {
+    padding: 4,
+    flexShrink: 0,
+  },
+  columnTitleCollapsed: {
+    fontSize: "0.8125rem",
+    lineHeight: 1.25,
+    wordBreak: "break-word",
   },
   columnTitle: {
     fontWeight: 700,
@@ -161,6 +237,38 @@ const useStyles = makeStyles((theme) => ({
     ...theme.scrollbarStyles,
     backgroundColor:
       theme.palette.type === "dark" ? "rgba(0,0,0,0.15)" : "rgba(0,0,0,0.02)",
+  },
+  columnBodyCollapsed: {
+    flex: 1,
+    minHeight: 72,
+    padding: theme.spacing(0.75),
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor:
+      theme.palette.type === "dark" ? "rgba(0,0,0,0.15)" : "rgba(0,0,0,0.02)",
+  },
+  collapsedDropHint: {
+    fontSize: "0.6875rem",
+    textAlign: "center",
+    color: theme.palette.text.secondary,
+    lineHeight: 1.3,
+    padding: theme.spacing(0, 0.5),
+  },
+  columnLoadMore: {
+    flexShrink: 0,
+    padding: theme.spacing(1, 1.5, 1.5),
+    borderTop: `1px solid ${theme.palette.divider}`,
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "stretch",
+    gap: theme.spacing(0.75),
+    backgroundColor: theme.palette.background.paper,
+  },
+  showingCountText: {
+    fontSize: "0.75rem",
+    color: theme.palette.text.secondary,
+    textAlign: "center",
   },
   card: {
     backgroundColor: theme.palette.background.paper,
@@ -380,9 +488,19 @@ const Kanban = () => {
   const [filterSetor, setFilterSetor] = useState("");
   const [filterConexao, setFilterConexao] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [closedPeriod, setClosedPeriod] = useState(() =>
     readKanbanClosedPeriodFromStorage()
   );
+  const [collapsedColumns, setCollapsedColumns] = useState(() =>
+    getInitialKanbanCollapsedColumns()
+  );
+  const [visibleLimits, setVisibleLimits] = useState(() =>
+    getInitialKanbanVisibleLimits()
+  );
+  const collapsedDefaultsAppliedRef = useRef(false);
+  const columnScrollLoadAtRef = useRef({});
 
   const handleClosedPeriodChange = useCallback((e) => {
     const next = e.target.value;
@@ -456,6 +574,25 @@ const Kanban = () => {
   useEffect(() => {
     fetchTickets();
   }, [fetchTickets]);
+
+  useEffect(() => {
+    setVisibleLimits((prev) => ({ ...prev, closed: KANBAN_COLUMN_PAGE_SIZE }));
+  }, [closedPeriod]);
+
+  useEffect(() => {
+    setVisibleLimits(getInitialKanbanVisibleLimits());
+  }, [filterUser, filterSetor, filterConexao, filterStatus]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchInput.trim());
+    }, KANBAN_SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
+  useEffect(() => {
+    setVisibleLimits(getInitialKanbanVisibleLimits());
+  }, [debouncedSearch]);
 
   useEffect(() => {
     const end = () => {
@@ -559,6 +696,14 @@ const Kanban = () => {
     };
   }, [socketManager, user?.companyId, ticketMatchesUiFilters]);
 
+  const toggleColumnCollapsed = useCallback((columnKey) => {
+    setCollapsedColumns((prev) => {
+      const next = { ...prev, [columnKey]: !prev[columnKey] };
+      writeKanbanCollapsedColumnsToStorage(next);
+      return next;
+    });
+  }, []);
+
   const columnsByStatus = useMemo(() => {
     const buckets = emptyColumns();
     tickets.forEach((t) => {
@@ -569,6 +714,59 @@ const Kanban = () => {
     });
     return buckets;
   }, [tickets]);
+
+  const searchActive = debouncedSearch.length > 0;
+
+  const columnsAfterSearch = useMemo(
+    () => ({
+      pending: filterTicketsByKanbanSearch(columnsByStatus.pending, debouncedSearch),
+      open: filterTicketsByKanbanSearch(columnsByStatus.open, debouncedSearch),
+      closed: filterTicketsByKanbanSearch(columnsByStatus.closed, debouncedSearch),
+    }),
+    [columnsByStatus, debouncedSearch]
+  );
+
+  const loadMoreColumn = useCallback(
+    (columnKey) => {
+      setVisibleLimits((prev) => {
+        const total = columnsAfterSearch[columnKey]?.length ?? 0;
+        const nextLimit = nextVisibleLimit(prev[columnKey], total);
+        if (nextLimit === prev[columnKey]) return prev;
+        return { ...prev, [columnKey]: nextLimit };
+      });
+    },
+    [columnsAfterSearch]
+  );
+
+  const handleColumnScroll = useCallback(
+    (columnKey) => (e) => {
+      const el = e.currentTarget;
+      if (!el) return;
+      const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 96;
+      if (!nearBottom) return;
+
+      const now = Date.now();
+      const last = columnScrollLoadAtRef.current[columnKey] || 0;
+      if (now - last < 450) return;
+
+      const total = columnsAfterSearch[columnKey]?.length ?? 0;
+      const current = visibleLimits[columnKey] ?? KANBAN_COLUMN_PAGE_SIZE;
+      if (current >= total) return;
+
+      columnScrollLoadAtRef.current[columnKey] = now;
+      loadMoreColumn(columnKey);
+    },
+    [columnsAfterSearch, visibleLimits, loadMoreColumn]
+  );
+
+  useEffect(() => {
+    if (hasKanbanCollapsedColumnsPreference()) return;
+    if (collapsedDefaultsAppliedRef.current || loading) return;
+    collapsedDefaultsAppliedRef.current = true;
+    if (shouldDefaultCollapseClosedColumn(columnsByStatus.closed.length)) {
+      setCollapsedColumns((prev) => ({ ...prev, closed: true }));
+    }
+  }, [loading, columnsByStatus.closed.length]);
 
   const handleDropOnColumn = useCallback(
     async (e, targetStatus) => {
@@ -686,7 +884,39 @@ const Kanban = () => {
             <MenuItem value="closed">Finalizado</MenuItem>
           </Select>
         </FormControl>
+        <TextField
+          className={clsx(classes.filterControl, classes.searchControl, classes.searchField)}
+          variant="outlined"
+          size="small"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          placeholder={i18n.t("kanban.searchPlaceholder")}
+          inputProps={{ "aria-label": i18n.t("kanban.searchPlaceholder") }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon fontSize="small" color="action" />
+              </InputAdornment>
+            ),
+            endAdornment: searchInput ? (
+              <InputAdornment position="end">
+                <IconButton
+                  size="small"
+                  aria-label={i18n.t("kanban.searchClear")}
+                  onClick={() => setSearchInput("")}
+                >
+                  <ClearIcon fontSize="small" />
+                </IconButton>
+              </InputAdornment>
+            ) : null,
+          }}
+        />
       </Paper>
+      {searchActive ? (
+        <Typography className={classes.filteringHint} component="p">
+          {i18n.t("kanban.filteringBy", { term: debouncedSearch })}
+        </Typography>
+      ) : null}
 
       {!isAdmin && queuesList.length === 0 ? (
         <Paper className={classes.noQueuesPaper} elevation={0}>
@@ -697,7 +927,21 @@ const Kanban = () => {
       ) : (
         <div className={classes.boardRow}>
           {COLUMN_ORDER.map((col) => {
-            const list = columnsByStatus[col.key];
+            const totalInColumn = columnsByStatus[col.key].length;
+            const filteredList = columnsAfterSearch[col.key];
+            const columnVisible = getColumnVisibleMeta(
+              filteredList,
+              visibleLimits[col.key]
+            );
+            const visibleTickets = columnVisible.visibleTickets;
+            const isCollapsed = Boolean(collapsedColumns[col.key]);
+            const countChipLabel =
+              searchActive && filteredList.length !== totalInColumn
+                ? i18n.t("kanban.countFiltered", {
+                    filtered: filteredList.length,
+                    total: totalInColumn,
+                  })
+                : String(totalInColumn);
             const isDropTarget = dragOverColumn === col.key;
             const headerAccent =
               col.accent === "pending"
@@ -705,43 +949,117 @@ const Kanban = () => {
                 : col.accent === "open"
                   ? theme.palette.primary.main
                   : theme.palette.grey[600];
+            const countChipStyle =
+              col.accent === "pending"
+                ? {
+                    backgroundColor: theme.palette.warning.light,
+                    color: theme.palette.getContrastText(theme.palette.warning.light),
+                  }
+                : col.accent === "closed"
+                  ? {
+                      backgroundColor:
+                        theme.palette.type === "dark"
+                          ? theme.palette.grey[700]
+                          : theme.palette.grey[300],
+                      color: theme.palette.getContrastText(
+                        theme.palette.type === "dark"
+                          ? theme.palette.grey[700]
+                          : theme.palette.grey[300]
+                      ),
+                    }
+                  : undefined;
+
+            const countChip = (
+              <Chip
+                size="small"
+                label={countChipLabel}
+                className={classes.countChip}
+                color={col.accent === "open" ? "primary" : "default"}
+                style={countChipStyle}
+                title={
+                  searchActive
+                    ? i18n.t("kanban.countFiltered", {
+                        filtered: filteredList.length,
+                        total: totalInColumn,
+                      })
+                    : undefined
+                }
+              />
+            );
+
+            const collapseControl = (
+              <Tooltip
+                title={
+                  isCollapsed
+                    ? i18n.t("kanban.expandColumn")
+                    : i18n.t("kanban.collapseColumn")
+                }
+              >
+                <IconButton
+                  size="small"
+                  className={classes.collapseButton}
+                  aria-label={
+                    isCollapsed
+                      ? i18n.t("kanban.expandColumn")
+                      : i18n.t("kanban.collapseColumn")
+                  }
+                  aria-expanded={!isCollapsed}
+                  onClick={() => toggleColumnCollapsed(col.key)}
+                >
+                  {isCollapsed ? (
+                    <ChevronRightIcon fontSize="small" />
+                  ) : (
+                    <ExpandMoreIcon fontSize="small" />
+                  )}
+                </IconButton>
+              </Tooltip>
+            );
 
             return (
               <div
                 key={col.key}
-                className={clsx(classes.column, isDropTarget && classes.columnDropActive)}
+                className={clsx(
+                  classes.column,
+                  isCollapsed && classes.columnCollapsed,
+                  isDropTarget && classes.columnDropActive
+                )}
               >
                 <Box
-                  className={classes.columnHeader}
+                  className={clsx(
+                    classes.columnHeader,
+                    isCollapsed && classes.columnHeaderCollapsed
+                  )}
                   borderLeft={`4px solid ${headerAccent}`}
                   bgcolor="background.paper"
                 >
-                  {col.key === "closed" ? (
+                  {isCollapsed ? (
                     <>
-                      <Typography
-                        className={classes.columnTitle}
-                        component="h2"
-                        color="textPrimary"
-                      >
-                        {i18n.t(col.labelKey)}
-                      </Typography>
+                      <Box className={classes.columnHeaderMain}>
+                        {collapseControl}
+                        <Typography
+                          className={clsx(classes.columnTitle, classes.columnTitleCollapsed)}
+                          component="h2"
+                          color="textPrimary"
+                        >
+                          {i18n.t(col.labelKey)}
+                        </Typography>
+                      </Box>
+                      {countChip}
+                    </>
+                  ) : col.key === "closed" ? (
+                    <>
+                      <Box className={classes.columnHeaderMain}>
+                        {collapseControl}
+                        <Typography
+                          className={classes.columnTitle}
+                          component="h2"
+                          color="textPrimary"
+                        >
+                          {i18n.t(col.labelKey)}
+                        </Typography>
+                      </Box>
                       <Box className={classes.columnHeaderClosedActions}>
-                        <Chip
-                          size="small"
-                          label={list.length}
-                          className={classes.countChip}
-                          style={{
-                            backgroundColor:
-                              theme.palette.type === "dark"
-                                ? theme.palette.grey[700]
-                                : theme.palette.grey[300],
-                            color: theme.palette.getContrastText(
-                              theme.palette.type === "dark"
-                                ? theme.palette.grey[700]
-                                : theme.palette.grey[300]
-                            ),
-                          }}
-                        />
+                        {countChip}
                         <FormControl
                           variant="outlined"
                           size="small"
@@ -766,34 +1084,23 @@ const Kanban = () => {
                     </>
                   ) : (
                     <>
-                      <Typography
-                        className={classes.columnTitle}
-                        component="h2"
-                        color="textPrimary"
-                      >
-                        {i18n.t(col.labelKey)}
-                      </Typography>
-                      <Chip
-                        size="small"
-                        label={list.length}
-                        className={classes.countChip}
-                        color={col.accent === "open" ? "primary" : "default"}
-                        style={
-                          col.accent === "pending"
-                            ? {
-                                backgroundColor: theme.palette.warning.light,
-                                color: theme.palette.getContrastText(
-                                  theme.palette.warning.light
-                                ),
-                              }
-                            : undefined
-                        }
-                      />
+                      <Box className={classes.columnHeaderMain}>
+                        {collapseControl}
+                        <Typography
+                          className={classes.columnTitle}
+                          component="h2"
+                          color="textPrimary"
+                        >
+                          {i18n.t(col.labelKey)}
+                        </Typography>
+                      </Box>
+                      {countChip}
                     </>
                   )}
                 </Box>
                 <div
-                  className={classes.columnBody}
+                  className={isCollapsed ? classes.columnBodyCollapsed : classes.columnBody}
+                  onScroll={isCollapsed ? undefined : handleColumnScroll(col.key)}
                   onDragOver={(e) => {
                     e.preventDefault();
                     e.dataTransfer.dropEffect = "move";
@@ -801,18 +1108,26 @@ const Kanban = () => {
                   }}
                   onDrop={(e) => handleDropOnColumn(e, col.key)}
                 >
-                  {list.length === 0 ? (
+                  {isCollapsed ? (
+                    <Typography className={classes.collapsedDropHint} component="p">
+                      {i18n.t("kanban.collapsedDropHint")}
+                    </Typography>
+                  ) : filteredList.length === 0 ? (
                     <div className={classes.emptyHint}>
                       <InboxOutlinedIcon className={classes.emptyIcon} />
                       <Typography variant="subtitle2" gutterBottom>
-                        {i18n.t("kanban.emptyColumnTitle")}
+                        {searchActive && totalInColumn > 0
+                          ? i18n.t("kanban.searchEmptyColumn")
+                          : i18n.t("kanban.emptyColumnTitle")}
                       </Typography>
-                      <Typography variant="body2" color="textSecondary">
-                        {i18n.t("kanban.emptyColumnHint")}
-                      </Typography>
+                      {!searchActive || totalInColumn === 0 ? (
+                        <Typography variant="body2" color="textSecondary">
+                          {i18n.t("kanban.emptyColumnHint")}
+                        </Typography>
+                      ) : null}
                     </div>
                   ) : (
-                    list.map((ticket) => {
+                    visibleTickets.map((ticket) => {
                       const sk = ticket.status;
                       const queueColor = ticket.queue?.color;
 
@@ -916,6 +1231,25 @@ const Kanban = () => {
                     })
                   )}
                 </div>
+                {!isCollapsed && columnVisible.hasMore ? (
+                  <Box className={classes.columnLoadMore}>
+                    <Typography className={classes.showingCountText} component="p">
+                      {i18n.t("kanban.showingCount", {
+                        visible: columnVisible.visibleCount,
+                        total: columnVisible.total,
+                      })}
+                    </Typography>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      color="primary"
+                      fullWidth
+                      onClick={() => loadMoreColumn(col.key)}
+                    >
+                      {i18n.t("kanban.loadMore")}
+                    </Button>
+                  </Box>
+                ) : null}
               </div>
             );
           })}
