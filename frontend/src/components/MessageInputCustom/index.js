@@ -477,11 +477,15 @@ const CustomInput = (props) => {
     }
   }, [inputMessage, quickMessages]);
 
-  const onKeyPress = (e) => {
-    if (loading || e.shiftKey) return;
-    else if (e.key === "Enter") {
-      handleSendMessage();
-    }
+  const onKeyDown = (e) => {
+    if (e.key !== "Enter") return;
+    if (e.shiftKey) return;
+    if (popupOpen) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (loading || disableOption()) return;
+    if (!String(inputMessage || "").trim()) return;
+    handleSendMessage();
   };
 
   const onPaste = (e) => {
@@ -548,7 +552,6 @@ const CustomInput = (props) => {
           }
         }}
         onPaste={onPaste}
-        onKeyPress={onKeyPress}
         style={{ width: "100%" }}
         renderInput={(params) => {
           const { InputLabelProps, InputProps, ...rest } = params;
@@ -562,6 +565,7 @@ const CustomInput = (props) => {
               multiline
               className={classes.messageInput}
               maxRows={5}
+              onKeyDown={onKeyDown}
             />
           );
         }}
@@ -797,6 +801,7 @@ const MessageInputCustom = (props) => {
 
   const handleSendMessage = async () => {
     if (isOrphanTicket(ticket)) return;
+    if (loading) return;
     if (inputMessage.trim() === "") return;
     setLoading(true);
 
