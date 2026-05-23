@@ -1169,6 +1169,18 @@ const messages = {
 				collapsedDropHint: "Drop here to move",
 				showingCount: "Showing {{visible}} of {{total}}",
 				loadMore: "Load more tickets",
+				filters: {
+					user: "User",
+					queue: "Queue",
+					connection: "Connection",
+					status: "Status",
+					all: "All",
+					allConnections: "All",
+					statusPending: "Pending",
+					statusOpen: "Open",
+					statusClosed: "Closed",
+				},
+				connectionFallback: "Connection {{id}}",
 				searchPlaceholder: "Search Kanban...",
 				searchClear: "Clear search",
 				filteringBy: "Filtering by: {{term}}",
@@ -1183,6 +1195,10 @@ const messages = {
 				noQueuesHint:
 					"No queue linked to your user. Kanban needs queues to list tickets.",
 				loading: "Loading board…",
+				drag: {
+					blockedClosedToPending:
+						"Cannot move a closed ticket back to Waiting. Drag to In progress to reopen.",
+				},
 				quickActions: {
 					menuAria: "Ticket actions",
 					transferTooltip: "Transfer conversation",

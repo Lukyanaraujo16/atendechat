@@ -21,7 +21,8 @@ import ChevronRightIcon from "@material-ui/icons/ChevronRight";
 import SearchIcon from "@material-ui/icons/Search";
 import ClearIcon from "@material-ui/icons/Clear";
 import { formatDistanceToNow } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { ptBR, enUS, es } from "date-fns/locale";
+import { toast } from "react-toastify";
 
 import api from "../../services/api";
 import { getApiUrl } from "../../config/backendUrl";
@@ -52,8 +53,20 @@ import {
   nextVisibleLimit,
 } from "../../utils/kanbanColumnVisibleLimit";
 import { filterTicketsByKanbanSearch } from "../../utils/kanbanSearch";
+import {
+  buildKanbanStatusUpdateBody,
+  isKanbanDragTransitionBlocked,
+  kanbanDragNeedsCloseConfirm,
+} from "../../utils/kanbanStatusTransition";
 
 const KANBAN_SEARCH_DEBOUNCE_MS = 300;
+
+function getDateFnsLocale() {
+  const lang = (i18n.language || "pt").slice(0, 2);
+  if (lang === "en") return enUS;
+  if (lang === "es") return es;
+  return ptBR;
+}
 
 const COLUMN_ORDER = [
   { key: "pending", labelKey: "kanban.column.pending", accent: "pending" },
@@ -459,11 +472,16 @@ function KanbanBoardSkeleton({ classes }) {
 }
 
 /**
- * Atualiza só o status (PUT existente). queueId/userId/contact permanecem no servidor.
+ * Atualiza status via PUT /tickets/:id com payload alinhado aos fluxos da inbox (aceitar, finalizar, reabrir).
  */
-export async function applyKanbanStatusChange(ticketId, newStatus) {
-  if (ticketId == null || !newStatus) return;
-  await api.put(`/tickets/${ticketId}`, { status: newStatus });
+export async function applyKanbanStatusChange(ticket, targetStatus, authUser) {
+  if (!ticket?.id || !targetStatus) return null;
+
+  const body = buildKanbanStatusUpdateBody(ticket, targetStatus, authUser);
+  if (!body) return null;
+
+  const { data } = await api.put(`/tickets/${ticket.id}`, body);
+  return data ?? null;
 }
 
 const Kanban = () => {
@@ -781,19 +799,48 @@ const Kanban = () => {
       const current = tickets.find((t) => t.id === ticketId);
       if (!current || current.status === targetStatus) return;
 
+      if (isKanbanDragTransitionBlocked(current.status, targetStatus)) {
+        toast.info(i18n.t("kanban.drag.blockedClosedToPending"));
+        return;
+      }
+
+      if (kanbanDragNeedsCloseConfirm(current.status, targetStatus)) {
+        if (!window.confirm(i18n.t("kanban.quickActions.confirmClose"))) return;
+      }
+
       const snapshot = tickets;
+      const optimistic = buildKanbanStatusUpdateBody(current, targetStatus, user);
       setTickets((prev) =>
-        prev.map((t) => (t.id === ticketId ? { ...t, status: targetStatus } : t))
+        prev.map((t) =>
+          t.id === ticketId
+            ? {
+                ...t,
+                ...optimistic,
+                status: targetStatus,
+              }
+            : t
+        )
       );
 
       try {
-        await applyKanbanStatusChange(ticketId, targetStatus);
+        const data = await applyKanbanStatusChange(current, targetStatus, user);
+        if (data && typeof data === "object") {
+          setTickets((prev) => {
+            const idx = prev.findIndex((t) => t.id === ticketId);
+            if (idx === -1) return prev;
+            const merged = { ...prev[idx], ...data };
+            if (!ticketMatchesUiFilters(merged)) {
+              return prev.filter((t) => t.id !== ticketId);
+            }
+            return prev.map((t, i) => (i === idx ? merged : t));
+          });
+        }
       } catch (err) {
         setTickets(snapshot);
         toastError(err);
       }
     },
-    [tickets]
+    [tickets, user, ticketMatchesUiFilters]
   );
 
   const goToTicket = (ticket) => {
@@ -823,14 +870,14 @@ const Kanban = () => {
     <div className={classes.root}>
       <Paper elevation={0} className={classes.filterBar}>
         <FormControl variant="outlined" size="small" className={classes.filterControl}>
-          <InputLabel id="kanban-filter-user">Usuário</InputLabel>
+          <InputLabel id="kanban-filter-user">{i18n.t("kanban.filters.user")}</InputLabel>
           <Select
             labelId="kanban-filter-user"
             value={filterUser}
             onChange={(e) => setFilterUser(e.target.value)}
-            label="Usuário"
+            label={i18n.t("kanban.filters.user")}
           >
-            <MenuItem value="">Todos</MenuItem>
+            <MenuItem value="">{i18n.t("kanban.filters.all")}</MenuItem>
             {(usersList || []).map((u) => (
               <MenuItem key={u.id} value={String(u.id)}>
                 {u.name}
@@ -839,14 +886,14 @@ const Kanban = () => {
           </Select>
         </FormControl>
         <FormControl variant="outlined" size="small" className={classes.filterControl}>
-          <InputLabel id="kanban-filter-setor">Setor</InputLabel>
+          <InputLabel id="kanban-filter-setor">{i18n.t("kanban.filters.queue")}</InputLabel>
           <Select
             labelId="kanban-filter-setor"
             value={filterSetor}
             onChange={(e) => setFilterSetor(e.target.value)}
-            label="Setor"
+            label={i18n.t("kanban.filters.queue")}
           >
-            <MenuItem value="">Todos</MenuItem>
+            <MenuItem value="">{i18n.t("kanban.filters.all")}</MenuItem>
             {(queues || []).map((q) => (
               <MenuItem key={q.id} value={String(q.id)}>
                 {q.name}
@@ -855,33 +902,33 @@ const Kanban = () => {
           </Select>
         </FormControl>
         <FormControl variant="outlined" size="small" className={classes.filterControl}>
-          <InputLabel id="kanban-filter-conexao">Conexão</InputLabel>
+          <InputLabel id="kanban-filter-conexao">{i18n.t("kanban.filters.connection")}</InputLabel>
           <Select
             labelId="kanban-filter-conexao"
             value={filterConexao}
             onChange={(e) => setFilterConexao(e.target.value)}
-            label="Conexão"
+            label={i18n.t("kanban.filters.connection")}
           >
-            <MenuItem value="">Todas</MenuItem>
+            <MenuItem value="">{i18n.t("kanban.filters.allConnections")}</MenuItem>
             {(Array.isArray(whatsApps) ? whatsApps : []).map((w) => (
               <MenuItem key={w.id} value={String(w.id)}>
-                {w.name || `Conexão ${w.id}`}
+                {w.name || i18n.t("kanban.connectionFallback", { id: w.id })}
               </MenuItem>
             ))}
           </Select>
         </FormControl>
         <FormControl variant="outlined" size="small" className={classes.filterControl}>
-          <InputLabel id="kanban-filter-status">Status</InputLabel>
+          <InputLabel id="kanban-filter-status">{i18n.t("kanban.filters.status")}</InputLabel>
           <Select
             labelId="kanban-filter-status"
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            label="Status"
+            label={i18n.t("kanban.filters.status")}
           >
-            <MenuItem value="">Todos</MenuItem>
-            <MenuItem value="pending">Pendente</MenuItem>
-            <MenuItem value="open">Em aberto</MenuItem>
-            <MenuItem value="closed">Finalizado</MenuItem>
+            <MenuItem value="">{i18n.t("kanban.filters.all")}</MenuItem>
+            <MenuItem value="pending">{i18n.t("kanban.filters.statusPending")}</MenuItem>
+            <MenuItem value="open">{i18n.t("kanban.filters.statusOpen")}</MenuItem>
+            <MenuItem value="closed">{i18n.t("kanban.filters.statusClosed")}</MenuItem>
           </Select>
         </FormControl>
         <TextField
@@ -1199,7 +1246,7 @@ const Kanban = () => {
                             {ticket.updatedAt
                               ? formatDistanceToNow(new Date(ticket.updatedAt), {
                                   addSuffix: true,
-                                  locale: ptBR,
+                                  locale: getDateFnsLocale(),
                                 })
                               : "—"}
                           </Typography>

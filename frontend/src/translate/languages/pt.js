@@ -1241,6 +1241,18 @@ const messages = {
         collapsedDropHint: "Solte aqui para mover",
         showingCount: "Exibindo {{visible}} de {{total}}",
         loadMore: "Carregar mais tickets",
+        filters: {
+          user: "Usuário",
+          queue: "Setor",
+          connection: "Conexão",
+          status: "Status",
+          all: "Todos",
+          allConnections: "Todas",
+          statusPending: "Pendente",
+          statusOpen: "Em aberto",
+          statusClosed: "Finalizado",
+        },
+        connectionFallback: "Conexão {{id}}",
         searchPlaceholder: "Buscar no Kanban...",
         searchClear: "Limpar busca",
         filteringBy: "Filtrando por: {{term}}",
@@ -1255,6 +1267,10 @@ const messages = {
         noQueuesHint:
           "Nenhum setor vinculado ao seu usuário. O Kanban precisa de filas para listar tickets.",
         loading: "Carregando quadro…",
+        drag: {
+          blockedClosedToPending:
+            "Não é possível mover um ticket finalizado para Aguardando. Arraste para Em atendimento para reabrir.",
+        },
         quickActions: {
           menuAria: "Ações do ticket",
           transferTooltip: "Transferir conversa",
