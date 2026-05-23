@@ -111,8 +111,28 @@ export const index = async (req: Request, res: Response): Promise<Response> => {
 
     return res.status(200).json({ tickets, count, hasMore });
   } catch (error) {
+    const err = error as {
+      message?: string;
+      name?: string;
+      parent?: {
+        code?: string;
+        errno?: number;
+        sqlMessage?: string;
+        sql?: string;
+      };
+      original?: {
+        code?: string;
+        errno?: number;
+        sqlMessage?: string;
+        sql?: string;
+      };
+      stack?: string;
+    };
+    const parent = err?.parent || err?.original;
+
     logger.error(
       {
+        tag: "[TicketController.index]",
         companyId,
         userId,
         status,
@@ -120,8 +140,17 @@ export const index = async (req: Request, res: Response): Promise<Response> => {
         contactLabels: contactLabelIdsStringified ?? "",
         queueIds: queueIdsStringified ?? "",
         isGroup: isGroup ?? "",
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined
+        message: err?.message,
+        name: err?.name,
+        parent: parent
+          ? {
+              code: parent.code,
+              errno: parent.errno,
+              sqlMessage: parent.sqlMessage,
+              sql: parent.sql
+            }
+          : undefined,
+        stack: err?.stack
       },
       "[ListTicketsService] failed"
     );

@@ -18,8 +18,10 @@ import {
   attachTicketPinnedFlagsFromList,
   buildPinnedTicketOrderClause,
   isPinnedTicketsTableMissingError,
-  loadPinnedTicketsForUser
+  loadPinnedTicketsForUser,
+  logListTicketsQueryError
 } from "../../helpers/ticketPinned";
+import type { PinnedTicketListItem } from "../PinnedTicketServices/ListPinnedTicketsService";
 import { logger } from "../../utils/logger";
 import {
   buildNonAdminTicketListWhere,
@@ -310,17 +312,24 @@ const ListTicketsService = async ({
     };
   }
 
-  const baseOrder: Array<[ReturnType<typeof col>, string]> = [
-    [col("Ticket.updatedAt"), "DESC"]
+  const baseOrder: Array<[typeof Ticket, string, string]> = [
+    [Ticket, "updatedAt", "DESC"]
   ];
 
+  let pinnedList: PinnedTicketListItem[] = [];
+  if (pinForUser) {
+    pinnedList = await loadPinnedTicketsForUser(Number(userId), companyId);
+  }
+
+  const buildOrderClause = (withPinOrder: boolean) => {
+    const pinOrder = withPinOrder
+      ? buildPinnedTicketOrderClause(Number(userId), companyId)
+      : [];
+    return pinOrder.length ? [...pinOrder, ...baseOrder] : baseOrder;
+  };
+
   const runListQuery = async (withPinOrder: boolean) => {
-    const orderClause = withPinOrder
-      ? [
-          ...buildPinnedTicketOrderClause(Number(userId), companyId),
-          ...baseOrder
-        ]
-      : baseOrder;
+    const orderClause = buildOrderClause(withPinOrder);
 
     return Ticket.findAndCountAll({
       where: whereCondition,
@@ -339,6 +348,14 @@ const ListTicketsService = async ({
   try {
     ({ count, rows: tickets } = await runListQuery(pinForUser));
   } catch (err) {
+    logListTicketsQueryError(err, {
+      status,
+      userId,
+      companyId,
+      pinnedOrderActive: pinForUser,
+      order: buildOrderClause(pinForUser)
+    });
+
     if (pinForUser && isPinnedTicketsTableMissingError(err)) {
       logger.warn(
         { companyId, userId, status },
@@ -355,11 +372,7 @@ const ListTicketsService = async ({
   attachTicketIsOrphanFlag(tickets);
 
   if (pinForUser) {
-    const pinned = await loadPinnedTicketsForUser(
-      Number(userId),
-      companyId
-    );
-    attachTicketPinnedFlagsFromList(tickets, pinned);
+    attachTicketPinnedFlagsFromList(tickets, pinnedList);
   }
 
   if (status === "pending") {
