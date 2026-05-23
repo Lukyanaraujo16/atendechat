@@ -3371,6 +3371,16 @@ const messages = {
 				unreadCount: "{{count}} unread",
 				noUnread: "No pending notifications",
 			},
+			unifiedNotificationBell: {
+				ariaLabel: "Notifications",
+				tabs: {
+					activity: "Activity",
+					central: "Inbox",
+				},
+			},
+			announcementsPopover: {
+				tooltip: "Announcements",
+			},
 			notificationCenter: {
 				title: "Notifications",
 				empty: "You're all caught up",

@@ -2,7 +2,8 @@ import React, { useEffect, useReducer, useState, useContext } from "react";
 import { makeStyles } from "@material-ui/core/styles";
 import toastError from "../../errors/toastError";
 import Popover from "@material-ui/core/Popover";
-import Notifications from "@material-ui/icons/Notifications";
+import AnnouncementIcon from "@material-ui/icons/Announcement";
+import Tooltip from "@material-ui/core/Tooltip";
 
 import {
   Avatar,
@@ -25,6 +26,7 @@ import { isArray } from "lodash";
 import moment from "moment";
 import { SocketContext } from "../../context/Socket/SocketContext";
 import { getBackendBaseURL } from "../../config/backendUrl";
+import { i18n } from "../../translate/i18n";
 
 const useStyles = makeStyles((theme) => ({
   popoverPaper: {
@@ -240,15 +242,18 @@ export default function AnnouncementsPopover() {
         open={showAnnouncementDialog}
         handleClose={() => setShowAnnouncementDialog(false)}
       />
-      <IconButton
-        aria-describedby={id}
-        onClick={handleClick}
-        style={{ color: "rgba(0, 0, 0, 0.54)" }}
-      >
-        <PulsingNotificationBadge hasNotification={announcements.length > 0 && !invisible}>
-          <Notifications />
-        </PulsingNotificationBadge>
-      </IconButton>
+      <Tooltip title={i18n.t("announcementsPopover.tooltip")}>
+        <IconButton
+          aria-describedby={id}
+          aria-label={i18n.t("announcementsPopover.tooltip")}
+          onClick={handleClick}
+          style={{ color: "rgba(0, 0, 0, 0.54)" }}
+        >
+          <PulsingNotificationBadge hasNotification={announcements.length > 0 && !invisible}>
+            <AnnouncementIcon />
+          </PulsingNotificationBadge>
+        </IconButton>
+      </Tooltip>
       <Popover
         id={id}
         open={open}

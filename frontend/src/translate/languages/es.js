@@ -3382,6 +3382,16 @@ const messages = {
         unreadCount: "{{count}} sin leer",
         noUnread: "Ninguna notificación pendiente",
       },
+      unifiedNotificationBell: {
+        ariaLabel: "Notificaciones",
+        tabs: {
+          activity: "Actividad",
+          central: "Central",
+        },
+      },
+      announcementsPopover: {
+        tooltip: "Comunicados",
+      },
       notificationCenter: {
         title: "Notificaciones",
         empty: "Estás al día",

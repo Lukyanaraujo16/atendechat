@@ -25,8 +25,7 @@ import MenuIcon from "@material-ui/icons/Menu";
 import AccountCircle from "@material-ui/icons/AccountCircle";
 
 import MainListItems from "./MainListItems";
-import NotificationsPopOver from "../components/NotificationsPopOver";
-import UserNotificationCenter from "../components/UserNotificationCenter";
+import UnifiedNotificationBell from "../components/UnifiedNotificationBell";
 import NotificationsVolume from "../components/NotificationsVolume";
 import UserModal from "../components/UserModal";
 import { AuthContext } from "../context/Auth/AuthContext";
@@ -593,9 +592,7 @@ const LoggedInLayout = ({ children, themeToggle }) => {
 
           <NotificationsVolume />
 
-          {user.id && <NotificationsPopOver />}
-
-          {user.id && <UserNotificationCenter />}
+          {user.id && <UnifiedNotificationBell />}
 
           <AnnouncementsPopover />
 
