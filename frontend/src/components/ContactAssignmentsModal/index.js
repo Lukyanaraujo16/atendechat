@@ -21,6 +21,7 @@ import {
   AppSecondaryButton,
 } from "../../ui";
 import { AuthContext } from "../../context/Auth/AuthContext";
+import { filterContactAssigneeUsers } from "../../utils/filterContactAssigneeUsers";
 
 export default function ContactAssignmentsModal({
   open,
@@ -46,11 +47,7 @@ export default function ContactAssignmentsModal({
           api.get(`/contacts/${contactId}/assignments`),
         ]);
         const users = Array.isArray(usersRes.data) ? usersRes.data : [];
-        setCompanyUsers(
-          users.filter(
-            (u) => Number(u.companyId) === Number(authUser?.companyId)
-          )
-        );
+        setCompanyUsers(filterContactAssigneeUsers(users, authUser?.companyId));
         const assignments = assignRes.data?.assignments || [];
         setSelectedUsers(
           assignments.map((a) => a.user).filter(Boolean)

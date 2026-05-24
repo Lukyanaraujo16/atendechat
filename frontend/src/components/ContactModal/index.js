@@ -27,6 +27,10 @@ import { showSuccessToast } from "../../errors/feedbackToasts";
 import { AuthContext } from "../../context/Auth/AuthContext";
 import { canManageContactAssignments } from "../../utils/canManageContactAssignments";
 import {
+	filterContactAssigneeUsers,
+	normalizeAssigneeUserIds,
+} from "../../utils/filterContactAssigneeUsers";
+import {
 	normalizeWhatsAppInput,
 	suggestWhatsAppCountryCode,
 } from "../../utils/normalizeWhatsAppNumber";
@@ -123,13 +127,13 @@ const useStyles = makeStyles(theme => ({
 	},
 }));
 
-const normalizeAssigneeIds = users =>
-	[...new Set((users || []).map(u => Number(u.id)).filter(id => id > 0))].sort(
-		(a, b) => a - b
-	);
+const normalizeAssigneeIds = normalizeAssigneeUserIds;
 
-const sameAssigneeIds = (a, b) =>
-	a.length === b.length && a.every((id, index) => id === b[index]);
+const sameAssigneeIds = (a, b) => {
+	const left = [...a].sort((x, y) => x - y);
+	const right = [...b].sort((x, y) => x - y);
+	return left.length === right.length && left.every((id, index) => id === right[index]);
+};
 
 const ContactModal = ({
 	open,
@@ -287,11 +291,7 @@ const ContactModal = ({
 				const { data } = await api.get("/users/list");
 				if (cancelled || !isMounted.current) return;
 				const users = Array.isArray(data) ? data : [];
-				setCompanyUsers(
-					users.filter(
-						u => Number(u.companyId) === Number(authUser?.companyId)
-					)
-				);
+				setCompanyUsers(filterContactAssigneeUsers(users, authUser?.companyId));
 			} catch (err) {
 				toastError(err);
 			}
@@ -323,12 +323,20 @@ const ContactModal = ({
 			return currentAssignments;
 		}
 
-		const userIds = normalizeAssigneeIds(selectedAssignees);
-		if (!userIds.length) {
+		const allowedIds = new Set(
+			companyUsers.map((u) => Number(u.id)).filter((id) => id > 0)
+		);
+		const userIds = normalizeAssigneeIds(selectedAssignees).filter((id) =>
+			allowedIds.has(id)
+		);
+
+		// Sem seleção válida: mantém autoatribuição do criador feita no POST — não chama PUT
+		if (userIds.length === 0) {
 			return currentAssignments;
 		}
 
-		if (contactId && !assigneesChanged()) {
+		const isEdit = Boolean(contactId);
+		if (isEdit && !assigneesChanged()) {
 			return currentAssignments;
 		}
 
