@@ -9,8 +9,7 @@ import getAssignmentsForContactIds from "../../helpers/getAssignmentsForContactI
 import ContactLabelRelation from "../../models/ContactLabelRelation";
 import {
   canViewAllCompanyContacts,
-  getAssignedContactIdsForUser,
-  applyAssignedContactFilter,
+  applyContactVisibilityFilter,
   ContactAccessUser
 } from "../../helpers/contactAccess";
 
@@ -208,11 +207,11 @@ const ListContactsService = async ({
 
   let finalWhere = whereClause;
   if (accessUser && !canViewAllCompanyContacts(accessUser)) {
-    const assignedIds = await getAssignedContactIdsForUser(
+    finalWhere = await applyContactVisibilityFilter(
+      whereClause,
       Number(accessUser.id),
       companyId
     );
-    finalWhere = applyAssignedContactFilter(whereClause, assignedIds);
   }
 
   const limit = 30;

@@ -3,8 +3,7 @@ import AppError from "../../errors/AppError";
 import { FindOptions, Op } from "sequelize";
 import {
   canViewAllCompanyContacts,
-  getAssignedContactIdsForUser,
-  applyAssignedContactFilter,
+  applyContactVisibilityFilter,
   ContactAccessUser
 } from "../../helpers/contactAccess";
 
@@ -50,13 +49,10 @@ const SimpleListService = async ({
   }
 
   if (accessUser && !canViewAllCompanyContacts(accessUser)) {
-    const assignedIds = await getAssignedContactIdsForUser(
+    options.where = await applyContactVisibilityFilter(
+      options.where as Record<string, unknown>,
       Number(accessUser.id),
       Number(companyId)
-    );
-    options.where = applyAssignedContactFilter(
-      options.where as Record<string, unknown>,
-      assignedIds
     );
   }
 

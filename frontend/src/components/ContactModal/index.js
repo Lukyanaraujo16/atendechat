@@ -27,6 +27,10 @@ import { showSuccessToast } from "../../errors/feedbackToasts";
 import { AuthContext } from "../../context/Auth/AuthContext";
 import { canManageContactAssignments } from "../../utils/canManageContactAssignments";
 import {
+	normalizeWhatsAppInput,
+	suggestWhatsAppCountryCode,
+} from "../../utils/normalizeWhatsAppNumber";
+import {
   AppDialog,
   AppDialogTitle,
   AppDialogContent,
@@ -285,9 +289,7 @@ const ContactModal = ({
 				const users = Array.isArray(data) ? data : [];
 				setCompanyUsers(
 					users.filter(
-						u =>
-							Number(u.companyId) === Number(authUser?.companyId) ||
-							u.companyId == null
+						u => Number(u.companyId) === Number(authUser?.companyId)
 					)
 				);
 			} catch (err) {
@@ -359,7 +361,7 @@ const ContactModal = ({
 
 			const payload = {
 				name: values.name,
-				number: values.number,
+				number: normalizeWhatsAppInput(values.number),
 				email: values.email,
 				notes: values.notes,
 				extraInfo: values.extraInfo,
@@ -442,7 +444,7 @@ const ContactModal = ({
 						}, 400);
 					}}
 				>
-					{({ values, errors, touched, isSubmitting }) => (
+					{({ values, errors, touched, isSubmitting, setFieldValue, setFieldTouched }) => (
 						<Form>
 							<AppDialogContent dividers className={classes.dialogContent}>
 								{contactId && (
@@ -570,13 +572,37 @@ const ContactModal = ({
 										/>
 									</Grid>
 									<Grid item xs={12}>
-										<Field
-											as={TextField}
+										<TextField
 											name="number"
 											label={i18n.t("contactModal.form.number")}
+											value={values.number}
+											onChange={(e) =>
+												setFieldValue(
+													"number",
+													normalizeWhatsAppInput(e.target.value)
+												)
+											}
+											onBlur={() => setFieldTouched("number", true)}
 											error={touched.number && Boolean(errors.number)}
-											helperText={touched.number && errors.number}
-											placeholder=""
+											helperText={
+												touched.number && errors.number
+													? errors.number
+													: (() => {
+															const countryCode = suggestWhatsAppCountryCode(
+																values.number
+															);
+															if (countryCode) {
+																return i18n.t(
+																	"contactModal.form.numberCountryHint",
+																	{ code: countryCode }
+																);
+															}
+															return i18n.t("contactModal.form.numberHelper");
+													  })()
+											}
+											placeholder={i18n.t(
+												"contactModal.form.numberPlaceholder"
+											)}
 											fullWidth
 											variant="outlined"
 											margin="dense"

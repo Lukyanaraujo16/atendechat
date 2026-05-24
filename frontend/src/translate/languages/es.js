@@ -1882,6 +1882,11 @@ const messages = {
           whatsapp: "Conexión Origen: ",
           assigneesHint:
             "Los administradores pueden definir qué usuarios tendrán acceso a este contacto.",
+          numberPlaceholder: "Ej: 5527999999999",
+          numberHelper:
+            "Use código de país + DDD + número. Ej: 5527999999999",
+          numberCountryHint:
+            "Parece faltar el código de país ({{code}}). Ejemplo: {{code}}27999999999",
         },
         formErrors: {
           name: {
@@ -4960,6 +4965,10 @@ const messages = {
         ERR_PLAN_FEATURE_DISABLED:
           "Este recurso no está disponible en su plan.",
         ERR_DUPLICATED_CONTACT: "Ya existe un contacto con este número.",
+        ERR_USER_NOT_FOUND:
+          "Uno o más responsables seleccionados son inválidos o no pertenecen a su empresa.",
+        ERR_CONTACT_REQUIRES_ASSIGNEE:
+          "El contacto debe tener al menos un responsable.",
         ERR_NO_SETTING_FOUND: "No se encontró ninguna configuración con este ID.",
         ERR_NO_CONTACT_FOUND: "No se encontró ningún contacto con este ID.",
         ERR_INVALID_LABEL_IDS:

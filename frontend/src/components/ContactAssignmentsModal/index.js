@@ -48,9 +48,7 @@ export default function ContactAssignmentsModal({
         const users = Array.isArray(usersRes.data) ? usersRes.data : [];
         setCompanyUsers(
           users.filter(
-            (u) =>
-              Number(u.companyId) === Number(authUser?.companyId) ||
-              u.companyId == null
+            (u) => Number(u.companyId) === Number(authUser?.companyId)
           )
         );
         const assignments = assignRes.data?.assignments || [];

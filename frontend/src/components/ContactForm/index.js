@@ -15,6 +15,10 @@ import { i18n } from "../../translate/i18n";
 import api from "../../services/api";
 import toastError from "../../errors/toastError";
 import { Grid } from "@material-ui/core";
+import {
+	normalizeWhatsAppInput,
+	suggestWhatsAppCountryCode,
+} from "../../utils/normalizeWhatsAppNumber";
 
 const useStyles = makeStyles(theme => ({
 	root: {
@@ -70,10 +74,14 @@ export function ContactForm ({ initialContact, onSave, onCancel }) {
 
 	const handleSaveContact = async values => {
 		try {
+			const payload = {
+				...values,
+				number: normalizeWhatsAppInput(values.number),
+			};
 			if (contact.id) {
-				await api.put(`/contacts/${contact.id}`, values);
+				await api.put(`/contacts/${contact.id}`, payload);
 			} else {
-				const { data } = await api.post("/contacts", values);
+				const { data } = await api.post("/contacts", payload);
 				if (onSave) {
 					onSave(data);
 				}
@@ -96,7 +104,7 @@ export function ContactForm ({ initialContact, onSave, onCancel }) {
                 }, 400);
             }}
         >
-            {({ values, errors, touched, isSubmitting }) => (
+            {({ values, errors, touched, isSubmitting, setFieldValue, setFieldTouched }) => (
                 <Form>
                     <Grid container spacing={1}>
                         {/* <Grid item xs={12}>
@@ -119,13 +127,35 @@ export function ContactForm ({ initialContact, onSave, onCancel }) {
                             />
                         </Grid>
                         <Grid item xs={12}>
-                            <Field
-                                as={TextField}
+                            <TextField
                                 label={i18n.t("contactModal.form.number")}
                                 name="number"
+                                value={values.number}
+                                onChange={(e) =>
+                                    setFieldValue(
+                                        "number",
+                                        normalizeWhatsAppInput(e.target.value)
+                                    )
+                                }
+                                onBlur={() => setFieldTouched("number", true)}
                                 error={touched.number && Boolean(errors.number)}
-                                helperText={touched.number && errors.number}
-                                placeholder="5513912344321"
+                                helperText={
+                                    touched.number && errors.number
+                                        ? errors.number
+                                        : (() => {
+                                                const countryCode = suggestWhatsAppCountryCode(
+                                                    values.number
+                                                );
+                                                if (countryCode) {
+                                                    return i18n.t(
+                                                        "contactModal.form.numberCountryHint",
+                                                        { code: countryCode }
+                                                    );
+                                                }
+                                                return i18n.t("contactModal.form.numberHelper");
+                                          })()
+                                }
+                                placeholder={i18n.t("contactModal.form.numberPlaceholder")}
                                 variant="outlined"
                                 margin="dense"
                                 fullWidth

@@ -1870,6 +1870,11 @@ const messages = {
 					whatsapp: "Source Connection: ",
 					assigneesHint:
 						"Administrators can choose which users will have access to this contact.",
+					numberPlaceholder: "E.g. 5527999999999",
+					numberHelper:
+						"Use country code + area code + number. E.g. 5527999999999",
+					numberCountryHint:
+						"Country code may be missing ({{code}}). Full example: {{code}}27999999999",
 				},
 				formErrors: {
 					name: {
@@ -5045,6 +5050,10 @@ const messages = {
 					"This module is not enabled for your company (plan or platform settings).",
 				ERR_PLAN_FEATURE_DISABLED: "This feature is not included in your plan.",
 				ERR_DUPLICATED_CONTACT: "A contact with this number already exists.",
+				ERR_USER_NOT_FOUND:
+					"One or more selected assignees are invalid or do not belong to your company.",
+				ERR_CONTACT_REQUIRES_ASSIGNEE:
+					"The contact must have at least one assignee.",
 				ERR_NO_SETTING_FOUND: "No settings found with this ID.",
 				ERR_NO_CONTACT_FOUND: "No contact found with this ID.",
 				ERR_INVALID_LABEL_IDS:

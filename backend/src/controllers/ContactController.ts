@@ -115,7 +115,13 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
     newContact,
     Number(companyId),
     schema,
-    Number(creatorUserId)
+    Number(creatorUserId),
+    {
+      id: creatorUserId,
+      profile: req.user.profile,
+      supportMode: req.user.supportMode,
+      super: (req.user as { super?: boolean }).super
+    }
   );
 
   return res.status(200).json(contact);
@@ -177,7 +183,14 @@ export const summary = async (
   res: Response
 ): Promise<Response> => {
   const { contactId } = req.params;
-  const { companyId } = req.user;
+  const { companyId, id, profile, supportMode } = req.user;
+
+  await assertUserCanAccessContact(Number(contactId), companyId, {
+    id,
+    profile,
+    supportMode,
+    super: (req.user as { super?: boolean }).super
+  });
 
   const data = await ContactSummaryService(Number(contactId), companyId);
 
@@ -190,11 +203,18 @@ export const addTag = async (
 ): Promise<Response> => {
   const { contactId } = req.params;
   const { tagId } = req.body as { tagId?: number };
-  const { companyId } = req.user;
+  const { companyId, id, profile, supportMode } = req.user;
 
   if (tagId === undefined || tagId === null) {
     throw new AppError("tagId é obrigatório", 400);
   }
+
+  await assertUserCanAccessContact(Number(contactId), companyId, {
+    id,
+    profile,
+    supportMode,
+    super: (req.user as { super?: boolean }).super
+  });
 
   await AddTagToContactService({
     contactId: Number(contactId),
@@ -210,7 +230,14 @@ export const removeTag = async (
   res: Response
 ): Promise<Response> => {
   const { contactId, tagId } = req.params;
-  const { companyId } = req.user;
+  const { companyId, id, profile, supportMode } = req.user;
+
+  await assertUserCanAccessContact(Number(contactId), companyId, {
+    id,
+    profile,
+    supportMode,
+    super: (req.user as { super?: boolean }).super
+  });
 
   await RemoveTagFromContactService({
     contactId: Number(contactId),
@@ -418,7 +445,12 @@ const createNewContact = async (
   companyId: number,
   schema: any,
   creatorUserId: number,
-  _profile?: string
+  accessUser?: {
+    id?: number | string;
+    profile?: string;
+    supportMode?: boolean;
+    super?: boolean;
+  }
 ) => {
   if (!Number.isFinite(companyId) || companyId <= 0) {
     throw new AppError("ERR_NO_PERMISSION", 403);
@@ -440,7 +472,9 @@ const createNewContact = async (
 
   const contact = await CreateContactService({
     ...newContact,
-    companyId
+    companyId,
+    accessUser,
+    creatorUserId
   });
 
   try {
