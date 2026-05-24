@@ -2024,6 +2024,10 @@ const messages = {
           queueData: "Dados do setor",
           attendanceTime: "Horários de Atendimento",
         },
+        expedientQueueModeHint:
+          "O horário desta fila só é aplicado nas conexões WhatsApp cujo expediente estiver no modo Fila.",
+        outOfHoursQueueModeHelper:
+          "Usada apenas quando a conexão do ticket estiver com expediente no modo Fila.",
       },
       userModal: {
         title: {
@@ -4621,6 +4625,9 @@ const messages = {
         },
         whatsappBehavior: {
           sectionTitle: "Configurar conexões",
+          connectionTabsTitle: "Conexão WhatsApp",
+          connectionGlobalFallbackHint:
+            "Esta conexão ainda usa o padrão global da empresa. Ao alterar chamadas ou grupos, a configuração passa a ser exclusiva desta conexão.",
           applyToConnections: "Aplicar às conexões",
           allConnections: "Todas as conexões",
           selectConnections: "Selecione uma ou mais conexões",
@@ -4630,6 +4637,20 @@ const messages = {
             "Ao salvar, essas regras serão aplicadas às conexões escolhidas.",
           callsSaved: "Configurações de chamadas salvas",
           groupsSaved: "Configurações de grupos salvas",
+          autoMessagesSaved: "Mensagens automáticas salvas para esta conexão",
+          chatBotTypeSaved: "Tipo de chatbot salvo para esta conexão",
+          userRatingSaved: "Avaliação salva para esta conexão",
+          scheduleTypeSaved: "Expediente salvo para esta conexão",
+          perConnectionModeInfo:
+            "O modo de expediente é por conexão. Os horários ainda usam a grade da empresa ou da fila, conforme o modo escolhido.",
+        },
+        expedientUx: {
+          hoursSectionTitle: "Horários de expediente",
+          companySharedSchedules:
+            "Esta grade é compartilhada por todas as conexões que usam o modo Empresa.",
+          queueModeInfo: "Os horários são definidos em cada fila.",
+          manageQueuesButton: "Gerenciar filas",
+          disabledInfo: "Esta conexão não usa bloqueio por expediente.",
         },
         status: {
           ratingsOn: "Avaliações ativas",

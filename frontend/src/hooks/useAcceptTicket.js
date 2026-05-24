@@ -63,7 +63,7 @@ export function useAcceptTicket() {
       const shouldGreet =
         sendGreeting !== false &&
         !ticket.isGroup &&
-        (await shouldSendGreetingAccepted());
+        (await shouldSendGreetingAccepted(updated.whatsappId ?? ticket.whatsappId));
 
       if (shouldGreet) {
         await sendGreetingMessage(updated.id, user?.name);
@@ -77,9 +77,20 @@ export function useAcceptTicket() {
   return { completeAcceptTicket };
 }
 
-async function shouldSendGreetingAccepted() {
+async function shouldSendGreetingAccepted(whatsappId) {
+  const resolvedWhatsappId = Number(whatsappId);
+  if (Number.isFinite(resolvedWhatsappId) && resolvedWhatsappId > 0) {
+    try {
+      const { data } = await api.get(
+        `/whatsapps/${resolvedWhatsappId}/settings-behavior`
+      );
+      return data?.sendGreetingAccepted === "enabled";
+    } catch {
+      // fallback global abaixo
+    }
+  }
   try {
-    const { data } = await api.get("/settings/");
+    const { data } = await api.get("/settings");
     const settingIndex = Array.isArray(data)
       ? data.filter((s) => s.key === "sendGreetingAccepted")
       : [];

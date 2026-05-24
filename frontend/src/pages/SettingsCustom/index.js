@@ -35,6 +35,8 @@ import CompanyCrmVisibilitySettings from "../../components/CompanyCrmVisibilityS
 import PushNotificationPreferences from "../../components/PushNotificationPreferences";
 import api from "../../services/api";
 import toastError from "../../errors/toastError";
+import { canManageWhatsappBehavior } from "../../utils/canManageWhatsappBehavior";
+import Alert from "@material-ui/lab/Alert";
 
 const PLATFORM_QUICK_LINKS = [
   { to: "/saas/companies", labelKey: "platform.tabs.companies" },
@@ -191,6 +193,10 @@ const SettingsCustom = () => {
   const [chatbotWeekdayEnd, setChatbotWeekdayEnd] = useState("18:00");
   const [settingsPreview, setSettingsPreview] = useState({});
   const [chatbotSaveTick, setChatbotSaveTick] = useState(0);
+  const [connectionBehaviorRows, setConnectionBehaviorRows] = useState([]);
+  const [activeWhatsappId, setActiveWhatsappId] = useState(null);
+  const [connectionBehaviorLoading, setConnectionBehaviorLoading] = useState(false);
+  const [connectionBehaviorSaving, setConnectionBehaviorSaving] = useState(false);
 
   const { getCurrentUserInfo } = useContext(AuthContext);
   const { find, updateSchedules } = useCompanies();
@@ -369,6 +375,90 @@ const SettingsCustom = () => {
     setLoading(false);
   };
 
+  const canManageConnectionBehavior = canManageWhatsappBehavior(currentUser);
+  const useConnectionBehaviorTabs =
+    canManageConnectionBehavior && connectionBehaviorRows.length > 0;
+
+  const connectionBehavior = useMemo(
+    () =>
+      connectionBehaviorRows.find((row) => row.id === activeWhatsappId) ?? null,
+    [connectionBehaviorRows, activeWhatsappId]
+  );
+
+  const globalScheduleTypeValue = useMemo(() => {
+    if (Array.isArray(settings)) {
+      const row = settings.find((s) => s.key === "scheduleType");
+      if (row?.value) {
+        return row.value;
+      }
+    }
+    return settingsPreview?.scheduleType || "disabled";
+  }, [settings, settingsPreview]);
+
+  const effectiveScheduleType = useConnectionBehaviorTabs
+    ? connectionBehavior?.scheduleType || "disabled"
+    : globalScheduleTypeValue;
+
+  const canEditExpedientSettings =
+    currentUser?.profile === "admin" || currentUser?.supportMode === true;
+
+  const loadConnectionBehaviorRows = useCallback(async () => {
+    if (!canManageConnectionBehavior || !company?.id) {
+      setConnectionBehaviorRows([]);
+      setActiveWhatsappId(null);
+      return;
+    }
+    setConnectionBehaviorLoading(true);
+    try {
+      const { data } = await api.get("/whatsapps/settings-behavior");
+      const list = Array.isArray(data) ? data : [];
+      setConnectionBehaviorRows(list);
+      setActiveWhatsappId((prev) => {
+        if (prev != null && list.some((row) => row.id === prev)) {
+          return prev;
+        }
+        return list[0]?.id ?? null;
+      });
+    } catch (err) {
+      toastError(err);
+      setConnectionBehaviorRows([]);
+      setActiveWhatsappId(null);
+    } finally {
+      setConnectionBehaviorLoading(false);
+    }
+  }, [canManageConnectionBehavior, company?.id]);
+
+  useEffect(() => {
+    loadConnectionBehaviorRows();
+  }, [loadConnectionBehaviorRows]);
+
+  const handleUpdateConnectionBehavior = useCallback(
+    async (whatsappId, settings) => {
+      if (!whatsappId) return;
+      setConnectionBehaviorSaving(true);
+      try {
+        const { data } = await api.put(
+          `/whatsapps/${whatsappId}/settings-behavior`,
+          { settings }
+        );
+        if (data?.id != null) {
+          setConnectionBehaviorRows((rows) =>
+            rows.map((row) => (row.id === data.id ? data : row))
+          );
+        } else {
+          await loadConnectionBehaviorRows();
+        }
+        return data;
+      } catch (err) {
+        toastError(err);
+        throw err;
+      } finally {
+        setConnectionBehaviorSaving(false);
+      }
+    },
+    [loadConnectionBehaviorRows]
+  );
+
   const showPlatformIntegrations =
     currentUser?.profile === "superadmin" || currentUser?.super === true;
   const showGroupManagerButton =
@@ -379,15 +469,17 @@ const SettingsCustom = () => {
     (currentUser?.profile === "admin" || currentUser?.supportMode === true) &&
     Boolean(company?.id);
   const showNotificationsTab = Boolean(currentUser?.super || currentUser?.companyId);
-  const showSettingsTabs = schedulesEnabled || showNotificationsTab;
+  const legacySchedulesTabEnabled =
+    !useConnectionBehaviorTabs && globalScheduleTypeValue === "company";
+  const showSettingsTabs = legacySchedulesTabEnabled || showNotificationsTab;
 
   const effectiveTab = useMemo(() => {
-    if (tab === "schedules" && schedulesEnabled) return "schedules";
+    if (tab === "schedules" && legacySchedulesTabEnabled) return "schedules";
     if (tab === "notifications" && showNotificationsTab) return "notifications";
-    if (schedulesEnabled) return "schedules";
+    if (legacySchedulesTabEnabled) return "schedules";
     if (showNotificationsTab) return "notifications";
     return "schedules";
-  }, [tab, schedulesEnabled, showNotificationsTab]);
+  }, [tab, legacySchedulesTabEnabled, showNotificationsTab]);
 
   const summaryLines = useMemo(() => {
     if (!company?.id) return [];
@@ -562,7 +654,60 @@ const SettingsCustom = () => {
           onSaveChatbotControl={handleSaveChatbotControl}
           onSettingCommitted={handleSettingCommitted}
           chatbotSaveTick={chatbotSaveTick}
+          useConnectionBehaviorTabs={useConnectionBehaviorTabs}
+          connectionBehaviorRows={connectionBehaviorRows}
+          activeWhatsappId={activeWhatsappId}
+          onActiveWhatsappIdChange={setActiveWhatsappId}
+          connectionBehavior={connectionBehavior}
+          connectionBehaviorLoading={connectionBehaviorLoading}
+          connectionBehaviorSaving={connectionBehaviorSaving}
+          onUpdateConnectionBehavior={handleUpdateConnectionBehavior}
         />
+
+        {useConnectionBehaviorTabs && canEditExpedientSettings && company?.id ? (
+          <Paper elevation={1} className={classes.sectionPaper}>
+            <Typography variant="h6" className={classes.sectionTitle} gutterBottom>
+              {i18n.t("settings.expedientUx.hoursSectionTitle")}
+            </Typography>
+            {connectionBehavior?.name ? (
+              <Typography variant="body2" color="textSecondary" gutterBottom>
+                {connectionBehavior.name}
+              </Typography>
+            ) : null}
+            {effectiveScheduleType === "company" ? (
+              <>
+                <Alert severity="info" style={{ marginBottom: 16 }}>
+                  {i18n.t("settings.expedientUx.companySharedSchedules")}
+                </Alert>
+                <SchedulesForm
+                  loading={loading}
+                  onSubmit={handleSubmitSchedules}
+                  initialValues={schedules}
+                />
+              </>
+            ) : null}
+            {effectiveScheduleType === "queue" ? (
+              <Box>
+                <Alert severity="info" style={{ marginBottom: 16 }}>
+                  {i18n.t("settings.expedientUx.queueModeInfo")}
+                </Alert>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  component={RouterLink}
+                  to="/queues"
+                >
+                  {i18n.t("settings.expedientUx.manageQueuesButton")}
+                </Button>
+              </Box>
+            ) : null}
+            {effectiveScheduleType === "disabled" ? (
+              <Alert severity="info">
+                {i18n.t("settings.expedientUx.disabledInfo")}
+              </Alert>
+            ) : null}
+          </Paper>
+        ) : null}
 
           {(currentUser?.profile === "admin" || currentUser?.supportMode === true) &&
           company?.id ? (
@@ -672,7 +817,7 @@ const SettingsCustom = () => {
               onChange={handleTabChange}
               className={classes.tab}
             >
-              {schedulesEnabled ? (
+              {legacySchedulesTabEnabled ? (
                 <Tab label={i18n.t("settings.tabs.schedules")} value={"schedules"} />
               ) : null}
               {showNotificationsTab ? (

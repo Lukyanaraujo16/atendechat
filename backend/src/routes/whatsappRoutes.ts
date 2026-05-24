@@ -22,6 +22,19 @@ whatsappRoutes.put(
   WhatsappBehaviorSettingsController.bulkUpdate
 );
 
+whatsappRoutes.get(
+  "/whatsapps/:whatsappId/settings-behavior",
+  isAuth,
+  WhatsappBehaviorSettingsController.show
+);
+
+whatsappRoutes.put(
+  "/whatsapps/:whatsappId/settings-behavior",
+  isAuth,
+  requireWhatsappBehaviorManager,
+  WhatsappBehaviorSettingsController.update
+);
+
 whatsappRoutes.get("/whatsapp/", isAuth, WhatsAppController.index);
 
 whatsappRoutes.post(

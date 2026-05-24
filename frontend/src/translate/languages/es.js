@@ -1948,6 +1948,10 @@ const messages = {
           queueData: "Datos de la cola",
           attendanceTime: "Horarios de Atención",
         },
+        expedientQueueModeHint:
+          "El horario de esta cola solo se aplica en las conexiones WhatsApp con expediente en modo Cola.",
+        outOfHoursQueueModeHelper:
+          "Se usa solo cuando la conexión del ticket tiene expediente en modo Cola.",
       },
       userModal: {
         title: {
@@ -4389,6 +4393,9 @@ const messages = {
         },
         whatsappBehavior: {
           sectionTitle: "Configurar conexiones",
+          connectionTabsTitle: "Conexión WhatsApp",
+          connectionGlobalFallbackHint:
+            "Esta conexión aún usa el valor global de la empresa. Al cambiar llamadas o grupos, la configuración quedará solo en esta conexión.",
           applyToConnections: "Aplicar a las conexiones",
           allConnections: "Todas las conexiones",
           selectConnections: "Seleccione una o más conexiones",
@@ -4398,6 +4405,20 @@ const messages = {
             "Al guardar, estas reglas se aplicarán a las conexiones elegidas.",
           callsSaved: "Configuración de llamadas guardada",
           groupsSaved: "Configuración de grupos guardada",
+          autoMessagesSaved: "Mensajes automáticos guardados para esta conexión",
+          chatBotTypeSaved: "Tipo de chatbot guardado para esta conexión",
+          userRatingSaved: "Evaluación guardada para esta conexión",
+          scheduleTypeSaved: "Expediente guardado para esta conexión",
+          perConnectionModeInfo:
+            "El modo de expediente es por conexión. Los horarios siguen usando la grilla de la empresa o de la cola, según el modo elegido.",
+        },
+        expedientUx: {
+          hoursSectionTitle: "Horarios de expediente",
+          companySharedSchedules:
+            "Esta grilla es compartida por todas las conexiones que usan el modo Empresa.",
+          queueModeInfo: "Los horarios se definen en cada cola.",
+          manageQueuesButton: "Gestionar colas",
+          disabledInfo: "Esta conexión no usa bloqueo por expediente.",
         },
         status: {
           ratingsOn: "Evaluaciones activas",

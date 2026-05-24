@@ -179,6 +179,28 @@ class Whatsapp extends Model<Whatsapp> {
   /** ignore | receive — null usa Settings globais */
   @Column(DataType.STRING(16))
   groupMessagesMode: string | null;
+
+  /** enabled | disabled — null herda Settings da empresa */
+  @Column(DataType.STRING(16))
+  sendGreetingAccepted: string | null;
+
+  @Column(DataType.STRING(16))
+  sendMsgTransfTicket: string | null;
+
+  @Column(DataType.STRING(16))
+  sendGreetingMessageOneQueues: string | null;
+
+  /** text | button | list — null herda Settings.chatBotType da empresa */
+  @Column(DataType.STRING(16))
+  chatBotType: string | null;
+
+  /** enabled | disabled — null herda Settings.userRating da empresa */
+  @Column(DataType.STRING(16))
+  userRating: string | null;
+
+  /** disabled | company | queue — null herda Settings.scheduleType da empresa */
+  @Column(DataType.STRING(16))
+  scheduleType: string | null;
 }
 
 export default Whatsapp;

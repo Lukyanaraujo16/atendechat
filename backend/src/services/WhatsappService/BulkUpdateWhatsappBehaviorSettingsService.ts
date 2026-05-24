@@ -1,18 +1,13 @@
 import { Op } from "sequelize";
 import Whatsapp from "../../models/Whatsapp";
 import AppError from "../../errors/AppError";
+import { listWhatsappBehaviorRows } from "../../helpers/whatsappBehaviorSettings";
 import {
-  CallHandlingMode,
-  GroupMessagesMode,
-  listWhatsappBehaviorRows
-} from "../../helpers/whatsappBehaviorSettings";
+  buildWhatsappBehaviorPatch,
+  BehaviorSettingsPayload
+} from "../../helpers/buildWhatsappBehaviorPatch";
 
-export type BehaviorSettingsPayload = {
-  callHandlingMode?: CallHandlingMode;
-  sendMessageOnCallReject?: boolean;
-  callRejectMessage?: string | null;
-  groupMessagesMode?: GroupMessagesMode;
-};
+export type { BehaviorSettingsPayload };
 
 type Input = {
   companyId: number;
@@ -36,32 +31,7 @@ const BulkUpdateWhatsappBehaviorSettingsService = async (
     throw new AppError("ERR_NO_PERMISSION", 403);
   }
 
-  const patch: Record<string, unknown> = {};
-  if (input.settings.callHandlingMode != null) {
-    if (!["accept", "reject"].includes(input.settings.callHandlingMode)) {
-      throw new AppError("ERR_VALIDATION_ERROR", 400);
-    }
-    patch.callHandlingMode = input.settings.callHandlingMode;
-  }
-  if (input.settings.sendMessageOnCallReject != null) {
-    patch.sendMessageOnCallReject = Boolean(input.settings.sendMessageOnCallReject);
-  }
-  if (input.settings.callRejectMessage !== undefined) {
-    patch.callRejectMessage =
-      input.settings.callRejectMessage == null
-        ? null
-        : String(input.settings.callRejectMessage);
-  }
-  if (input.settings.groupMessagesMode != null) {
-    if (!["ignore", "receive"].includes(input.settings.groupMessagesMode)) {
-      throw new AppError("ERR_VALIDATION_ERROR", 400);
-    }
-    patch.groupMessagesMode = input.settings.groupMessagesMode;
-  }
-
-  if (Object.keys(patch).length === 0) {
-    throw new AppError("ERR_VALIDATION_ERROR", 400);
-  }
+  const patch = buildWhatsappBehaviorPatch(input.settings);
 
   const [updated] = await Whatsapp.update(patch, {
     where: { companyId: input.companyId, id: { [Op.in]: ids } }

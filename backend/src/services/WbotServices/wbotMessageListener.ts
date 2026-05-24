@@ -47,8 +47,11 @@ import CampaignShipping from "../../models/CampaignShipping";
 import { Op } from "sequelize";
 import { campaignQueue, parseToMilliseconds, randomValue } from "../../queues";
 import User from "../../models/User";
-import Setting from "../../models/Setting";
-import { resolveWhatsappBehavior } from "../../helpers/whatsappBehaviorSettings";
+import {
+  resolveWhatsappSettings,
+  WhatsappSettingsResolved
+} from "../../helpers/resolveWhatsappSettings";
+import { createMessageSettingsTracker } from "../../helpers/whatsappBehaviorDebug";
 import { cacheLayer } from "../../libs/cache";
 import { provider } from "./providers";
 import { debounce } from "../../helpers/Debounce";
@@ -1414,15 +1417,47 @@ const resolveFirstFlowExecutableNodeId = (
   };
 };
 
+const createWhatsappSettingsLoader = (
+  tracker: ReturnType<typeof createMessageSettingsTracker>
+) => {
+  let cached: WhatsappSettingsResolved | null = null;
+  let cacheKey: string | null = null;
+
+  return async (
+    whatsappId: number | null | undefined,
+    companyId: number,
+    context: string
+  ): Promise<WhatsappSettingsResolved> => {
+    const key = `${companyId}:${Number(whatsappId) || 0}`;
+    if (cached && cacheKey === key) {
+      return cached;
+    }
+    const t0 = Date.now();
+    cached = await resolveWhatsappSettings(whatsappId, companyId, context);
+    tracker.noteResolution(Date.now() - t0);
+    cacheKey = key;
+    return cached;
+  };
+};
+
 const verifyQueue = async (
   wbot: Session,
   msg: proto.IWebMessageInfo,
   ticket: Ticket,
   contact: Contact,
-  mediaSent?: Message | undefined
+  mediaSent?: Message | undefined,
+  whatsappSettings?: WhatsappSettingsResolved
 ) => {
 
   const companyId = ticket.companyId;
+
+  const settings =
+    whatsappSettings ??
+    (await resolveWhatsappSettings(
+      ticket.whatsappId ?? wbot.id,
+      companyId,
+      "verifyQueue"
+    ));
 
   const whatsappSession = await ShowWhatsAppService(wbot.id!, ticket.companyId);
   const { queues, greetingMessage, maxUseBotQueues, timeUseBotQueues } =
@@ -1485,16 +1520,11 @@ const verifyQueue = async (
   }
 
   if (queues.length === 1) {
-    const sendGreetingMessageOneQueues = await Setting.findOne({
-      where: {
-        key: "sendGreetingMessageOneQueues",
-        companyId: ticket.companyId
-      }
-    });
+    const autoMessages = settings.autoMessages;
 
     if (
       connectionGreetingTrim.length > 1 &&
-      sendGreetingMessageOneQueues?.value === "enabled"
+      autoMessages?.sendGreetingMessageOneQueues === "enabled"
     ) {
       const body = formatBody(`${connectionGreetingTrim}`, contact);
 
@@ -1563,12 +1593,7 @@ const verifyQueue = async (
   const selectedOption = getBodyMessage(msg);
   const choosenQueue = queues[+selectedOption - 1];
 
-  const buttonActive = await Setting.findOne({
-    where: {
-      key: "chatBotType",
-      companyId
-    }
-  });
+  const chatBotType = settings.chatBotType;
 
   const botText = async () => {
     let options = "";
@@ -1606,8 +1631,13 @@ const verifyQueue = async (
       companyId: ticket.companyId
     });
 
+    const effectiveScheduleTypeMenu = settings.scheduleType;
+
     /* Tratamento para envio de mensagem quando a fila está fora do expediente */
-    if (choosenQueue.options.length === 0) {
+    if (
+      effectiveScheduleTypeMenu === "queue" &&
+      choosenQueue.options.length === 0
+    ) {
       const queue = await Queue.findByPk(choosenQueue.id);
       const { schedules }: any = queue;
       const now = moment();
@@ -1747,7 +1777,7 @@ const verifyQueue = async (
       chatbotAt: null
     });
 
-    if (buttonActive.value === "text") {
+    if (chatBotType === "text") {
       return botText();
     }
   }
@@ -1853,8 +1883,17 @@ const handleChartbot = async (
   ticket: Ticket,
   msg: proto.IWebMessageInfo,
   wbot: Session,
-  dontReadTheFirstQuestion: boolean = false
+  dontReadTheFirstQuestion: boolean = false,
+  whatsappSettings?: WhatsappSettingsResolved
 ) => {
+  const companyId = ticket.companyId;
+  const settings =
+    whatsappSettings ??
+    (await resolveWhatsappSettings(
+      ticket.whatsappId ?? wbot.id,
+      companyId,
+      "handleChartbot"
+    ));
   const queue = await Queue.findByPk(ticket.queueId, {
     include: [
       {
@@ -1874,7 +1913,7 @@ const handleChartbot = async (
   if (messageBody == "#") {
     // voltar para o menu inicial
     await ticket.update({ queueOptionId: null, chatbot: false, queueId: null });
-    await verifyQueue(wbot, msg, ticket, ticket.contact);
+    await verifyQueue(wbot, msg, ticket, ticket.contact, undefined, settings);
     return;
   }
 
@@ -1928,14 +1967,7 @@ const handleChartbot = async (
       ]
     });
 
-    const companyId = ticket.companyId;
-
-    const buttonActive = await Setting.findOne({
-      where: {
-        key: "chatBotType",
-        companyId
-      }
-    });
+    const chatBotType = settings.chatBotType;
 
     // const botList = async () => {
     // const sectionsRows = [];
@@ -2028,15 +2060,15 @@ const handleChartbot = async (
     //   return botList();
     // };
 
-    if (buttonActive.value === "button" && QueueOption.length <= 4) {
+    if (chatBotType === "button" && QueueOption.length <= 4) {
       return botButton();
     }
 
-    if (buttonActive.value === "text") {
+    if (chatBotType === "text") {
       return botText();
     }
 
-    if (buttonActive.value === "button" && QueueOption.length > 4) {
+    if (chatBotType === "button" && QueueOption.length > 4) {
       return botText();
     }
   } else if (!isNil(queue) && !isNil(ticket.queueOptionId)) {
@@ -2050,13 +2082,7 @@ const handleChartbot = async (
     });
 
     if (queueOptions.length > -1) {
-      const companyId = ticket.companyId;
-      const buttonActive = await Setting.findOne({
-        where: {
-          key: "chatBotType",
-          companyId
-        }
-      });
+      const chatBotType = settings.chatBotType;
 
       const botList = async () => {
         const sectionsRows = [];
@@ -2149,19 +2175,19 @@ const handleChartbot = async (
         await verifyMessage(sendMsg, ticket, ticket.contact);
       };
 
-      if (buttonActive.value === "list") {
+      if (chatBotType === "list") {
         return botList();
       }
 
-      if (buttonActive.value === "button" && QueueOption.length <= 4) {
+      if (chatBotType === "button" && QueueOption.length <= 4) {
         return botButton();
       }
 
-      if (buttonActive.value === "text") {
+      if (chatBotType === "text") {
         return botText();
       }
 
-      if (buttonActive.value === "button" && QueueOption.length > 4) {
+      if (chatBotType === "button" && QueueOption.length > 4) {
         return botText();
       }
     }
@@ -2824,6 +2850,8 @@ const handleMessage = async (
   companyId: number
 ): Promise<void> => {
   let mediaSent: Message | undefined;
+  const settingsTracker = createMessageSettingsTracker();
+  const loadWhatsappSettings = createWhatsappSettingsLoader(settingsTracker);
 
   try {
     if (!isValidMsg(msg)) {
@@ -2873,11 +2901,12 @@ const handleMessage = async (
 
     const whatsappIdEarly = wbot.id;
     if (isGroup && whatsappIdEarly) {
-      const groupBehavior = await resolveWhatsappBehavior(
+      const groupSettings = await loadWhatsappSettings(
         whatsappIdEarly,
-        companyId
+        companyId,
+        "handleMessage:groupGate"
       );
-      if (groupBehavior.groupMessagesMode === "ignore") {
+      if (groupSettings.callsGroups.groupMessagesMode === "ignore") {
         logger.info(
           `[WhatsAppInbound] ignored reason=group_messages_disabled whatsappId=${whatsappIdEarly} messageId=${msg.key?.id ?? ""}`
         );
@@ -3057,6 +3086,13 @@ const handleMessage = async (
       }
     }
 
+    const whatsappSettings = await loadWhatsappSettings(
+      ticket.whatsappId ?? whatsapp?.id ?? wbot.id,
+      companyId,
+      "handleMessage"
+    );
+    const effectiveScheduleType = whatsappSettings.scheduleType;
+
     if (
       process.env.WHATSAPP_TRACE_INBOUND === "true" &&
       !msg.key.fromMe
@@ -3078,7 +3114,14 @@ const handleMessage = async (
         chatbot: false,
         queueId: null
       });
-      await verifyQueue(wbot, msg, ticket, ticket.contact);
+      await verifyQueue(
+        wbot,
+        msg,
+        ticket,
+        ticket.contact,
+        undefined,
+        whatsappSettings
+      );
       return;
     }
 
@@ -3131,24 +3174,17 @@ const handleMessage = async (
       return;
     }
 
-    const currentSchedule = await VerifyCurrentSchedule(companyId);
-    const scheduleType = await Setting.findOne({
-      where: {
-        companyId,
-        key: "scheduleType"
-      }
-    });
-
     try {
-      if (!msg.key.fromMe && scheduleType) {
+      if (!msg.key.fromMe && effectiveScheduleType !== "disabled") {
         /**
          * Tratamento para envio de mensagem quando a empresa está fora do expediente
          */
-        if (
-          scheduleType.value === "company" &&
-          !isNil(currentSchedule) &&
-          (!currentSchedule || currentSchedule.inActivity === false)
-        ) {
+        if (effectiveScheduleType === "company") {
+          const currentSchedule = await VerifyCurrentSchedule(companyId);
+          if (
+            !isNil(currentSchedule) &&
+            (!currentSchedule || currentSchedule.inActivity === false)
+          ) {
           const body = `\u200e ${whatsapp.outOfHoursMessage}`;
 
           const debouncedSentMessage = debounce(
@@ -3167,9 +3203,10 @@ const handleMessage = async (
           );
           debouncedSentMessage();
           return;
+          }
         }
 
-        if (scheduleType.value === "queue" && ticket.queueId !== null) {
+        if (effectiveScheduleType === "queue" && ticket.queueId !== null) {
           /**
            * Tratamento para envio de mensagem quando a fila está fora do expediente
            */
@@ -3192,7 +3229,6 @@ const handleMessage = async (
           }
 
           if (
-            scheduleType.value === "queue" &&
             queue.outOfHoursMessage !== null &&
             queue.outOfHoursMessage !== "" &&
             !isNil(schedule)
@@ -3574,7 +3610,14 @@ const handleMessage = async (
       whatsapp.queues.length >= 1 &&
       !ticket.useIntegration
     ) {
-      await verifyQueue(wbot, msg, ticket, contact);
+      await verifyQueue(
+        wbot,
+        msg,
+        ticket,
+        contact,
+        undefined,
+        whatsappSettings
+      );
 
       if (ticketTraking && ticketTraking.chatbotAt === null) {
         await ticketTraking.update({
@@ -3659,7 +3702,11 @@ const handleMessage = async (
 
     try {
       //Fluxo fora do expediente
-      if (!msg.key.fromMe && scheduleType && ticket.queueId !== null) {
+      if (
+        !msg.key.fromMe &&
+        effectiveScheduleType === "queue" &&
+        ticket.queueId !== null
+      ) {
         /**
          * Tratamento para envio de mensagem quando a fila está fora do expediente
          */
@@ -3682,7 +3729,6 @@ const handleMessage = async (
         }
 
         if (
-          scheduleType.value === "queue" &&
           queue.outOfHoursMessage !== null &&
           queue.outOfHoursMessage !== "" &&
           !isNil(schedule)
@@ -3760,13 +3806,19 @@ const handleMessage = async (
 
     if (whatsapp.queues.length == 1 && ticket.queue) {
       if (ticket.chatbot && !msg.key.fromMe) {
-        await handleChartbot(ticket, msg, wbot);
+        await handleChartbot(ticket, msg, wbot, false, whatsappSettings);
       }
     }
 
     if (whatsapp.queues.length > 1 && ticket.queue) {
       if (ticket.chatbot && !msg.key.fromMe) {
-        await handleChartbot(ticket, msg, wbot, dontReadTheFirstQuestion);
+        await handleChartbot(
+          ticket,
+          msg,
+          wbot,
+          dontReadTheFirstQuestion,
+          whatsappSettings
+        );
       }
     }
 
@@ -3783,6 +3835,11 @@ const handleMessage = async (
     );
     Sentry.captureException(err);
     throw err;
+  } finally {
+    settingsTracker.finish({
+      companyId,
+      messageId: msg.key?.id != null ? String(msg.key.id) : null
+    });
   }
 };
 

@@ -4,14 +4,17 @@ import CheckContactOpenTickets from "../../helpers/CheckContactOpenTickets";
 import SetTicketMessagesAsRead from "../../helpers/SetTicketMessagesAsRead";
 import { getIO } from "../../libs/socket";
 import Ticket from "../../models/Ticket";
-import Setting from "../../models/Setting";
 import Queue from "../../models/Queue";
 import ShowTicketService from "./ShowTicketService";
 import SendWhatsAppMessage from "../WbotServices/SendWhatsAppMessage";
 import FindOrCreateATicketTrakingService from "./FindOrCreateATicketTrakingService";
 import GetTicketWbot from "../../helpers/GetTicketWbot";
 import { verifyMessage } from "../WbotServices/wbotMessageListener";
-import ListSettingsServiceOne from "../SettingServices/ListSettingsServiceOne"; //NOVO PLW DESIGN//
+import {
+  getGlobalAutoMessagesFallback,
+  resolveUserRating,
+  resolveWhatsappAutoMessageSettings
+} from "../../helpers/whatsappBehaviorSettings";
 import ShowUserService from "../UserServices/ShowUserService"; //NOVO PLW DESIGN//
 import { isNil } from "lodash";
 import Whatsapp from "../../models/Whatsapp";
@@ -65,14 +68,6 @@ const UpdateTicketService = async ({
     let integrationId: number | null = ticketData.integrationId || null;
 
     const io = getIO();
-
-    const key = "userRating";
-    const setting = await Setting.findOne({
-      where: {
-        companyId,
-        key
-      }
-    });
 
     const ticket = await ShowTicketService(ticketId, companyId);
     const ticketTraking = await FindOrCreateATicketTrakingService({
@@ -140,7 +135,10 @@ const UpdateTicketService = async ({
       const ratingMessage = whatsappConfig?.ratingMessage ?? null;
 
       try {
-        if (setting?.value === "enabled") {
+        const userRatingEnabled =
+          (await resolveUserRating(ticket.whatsappId, companyId)) === "enabled";
+
+        if (userRatingEnabled) {
           if (ticketTraking.ratingAt == null) {
             const ratingTxt = ratingMessage || "";
             let bodyRatingMessage = `\u200e${ratingTxt}\n\n`;
@@ -157,9 +155,11 @@ const UpdateTicketService = async ({
             }
 
             if (ratingSent) {
+              const ratingAssigneeUserId =
+                ticket.userId != null ? ticket.userId : actionUserId;
               await ticketTraking.update({
                 ratingAt: moment().toDate(),
-                userId: actionUserId
+                userId: ratingAssigneeUserId
               });
 
               io.to(`company-${ticket.companyId}-open`)
@@ -213,9 +213,11 @@ const UpdateTicketService = async ({
       ticketTraking.queuedAt = moment().toDate();
     }
 
-    const settingsTransfTicket = await ListSettingsServiceOne({ companyId: companyId, key: "sendMsgTransfTicket" });
+    const transferAutoMessages = ticket.whatsappId
+      ? await resolveWhatsappAutoMessageSettings(ticket.whatsappId, companyId)
+      : await getGlobalAutoMessagesFallback(companyId);
 
-    if (settingsTransfTicket?.value === "enabled") {
+    if (transferAutoMessages.sendMsgTransfTicket === "enabled") {
       try {
         // Mensagem de transferencia da FILA
         if (oldQueueId !== queueId && oldUserId === userId && !isNil(oldQueueId) && !isNil(queueId)) {

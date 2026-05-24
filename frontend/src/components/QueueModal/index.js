@@ -538,26 +538,32 @@ const QueueModal = ({ open, onClose, queueId, reload }) => {
                         margin="dense"
                       />
                       {schedulesEnabled && (
-                        <Field
-                          as={TextField}
-                          label={i18n.t("queueModal.form.outOfHoursMessage")}
-                          type="outOfHoursMessage"
-                          multiline
-                          inputRef={greetingRef}
-                          rows={5}
-                          fullWidth
-                          name="outOfHoursMessage"
-                          error={
-                            touched.outOfHoursMessage &&
-                            Boolean(errors.outOfHoursMessage)
-                          }
-                          helperText={
-                            touched.outOfHoursMessage &&
-                            errors.outOfHoursMessage
-                          }
-                          variant="outlined"
-                          margin="dense"
-                        />
+                        <>
+                          <Alert severity="info" style={{ marginTop: 8, marginBottom: 8 }}>
+                            {i18n.t("queueModal.expedientQueueModeHint")}
+                          </Alert>
+                          <Field
+                            as={TextField}
+                            label={i18n.t("queueModal.form.outOfHoursMessage")}
+                            type="outOfHoursMessage"
+                            multiline
+                            inputRef={greetingRef}
+                            rows={5}
+                            fullWidth
+                            name="outOfHoursMessage"
+                            error={
+                              touched.outOfHoursMessage &&
+                              Boolean(errors.outOfHoursMessage)
+                            }
+                            helperText={
+                              touched.outOfHoursMessage && errors.outOfHoursMessage
+                                ? errors.outOfHoursMessage
+                                : i18n.t("queueModal.outOfHoursQueueModeHelper")
+                            }
+                            variant="outlined"
+                            margin="dense"
+                          />
+                        </>
                       )}
                     </div>
                     <QueueOptions queueId={queueId} />
@@ -596,6 +602,9 @@ const QueueModal = ({ open, onClose, queueId, reload }) => {
         )}
         {tab === 1 && (
           <Paper style={{ padding: 20 }}>
+            <Alert severity="info" style={{ marginBottom: 16 }}>
+              {i18n.t("queueModal.expedientQueueModeHint")}
+            </Alert>
             <SchedulesForm
               loading={false}
               onSubmit={handleSaveSchedules}

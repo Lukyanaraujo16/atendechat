@@ -1939,6 +1939,10 @@ const messages = {
 					queueData: "Queue Data",
 					attendanceTime: "Service Hours",
 				},
+				expedientQueueModeHint:
+					"This queue's hours only apply to WhatsApp connections whose business hours mode is set to Queue.",
+				outOfHoursQueueModeHelper:
+					"Used only when the ticket's connection has business hours in Queue mode.",
 			},
 			userModal: {
 				title: {
@@ -4476,6 +4480,9 @@ const messages = {
 				},
 				whatsappBehavior: {
 					sectionTitle: "Configure connections",
+					connectionTabsTitle: "WhatsApp connection",
+					connectionGlobalFallbackHint:
+						"This connection still uses the company default. Changing calls or groups will save settings for this connection only.",
 					applyToConnections: "Apply to connections",
 					allConnections: "All connections",
 					selectConnections: "Select one or more connections",
@@ -4485,6 +4492,20 @@ const messages = {
 						"When you save, these rules will apply to the selected connections.",
 					callsSaved: "Call settings saved",
 					groupsSaved: "Group settings saved",
+					autoMessagesSaved: "Auto messages saved for this connection",
+					chatBotTypeSaved: "Chatbot type saved for this connection",
+					userRatingSaved: "Rating saved for this connection",
+					scheduleTypeSaved: "Business hours mode saved for this connection",
+					perConnectionModeInfo:
+						"Business hours mode is per connection. Schedules still use the company grid or each queue grid, depending on the selected mode.",
+				},
+				expedientUx: {
+					hoursSectionTitle: "Business hours schedules",
+					companySharedSchedules:
+						"This grid is shared by every connection using Company mode.",
+					queueModeInfo: "Schedules are defined in each queue.",
+					manageQueuesButton: "Manage queues",
+					disabledInfo: "This connection does not block chats outside business hours.",
 				},
 				status: {
 					ratingsOn: "Ratings on",

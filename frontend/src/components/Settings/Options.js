@@ -17,6 +17,8 @@ import Chip from "@material-ui/core/Chip";
 import InfoOutlined from "@material-ui/icons/InfoOutlined";
 import CheckCircleOutline from "@material-ui/icons/CheckCircleOutline";
 import Divider from "@material-ui/core/Divider";
+import Tabs from "@material-ui/core/Tabs";
+import Tab from "@material-ui/core/Tab";
 import useSettings from "../../hooks/useSettings";
 import { makeStyles, alpha } from "@material-ui/core/styles";
 import { grey, blue } from "@material-ui/core/colors";
@@ -27,7 +29,8 @@ import { useHistory } from "react-router-dom";
 import { AuthContext } from "../../context/Auth/AuthContext";
 import { canManageWhatsappBehavior } from "../../utils/canManageWhatsappBehavior";
 import useWhatsappBehaviorSettings from "../../hooks/useWhatsappBehaviorSettings";
-import WhatsappBehaviorConnectionBar from "./WhatsappBehaviorConnectionBar";
+import { showSuccessToast } from "../../errors/feedbackToasts";
+import Alert from "@material-ui/lab/Alert";
 
 //import 'react-toastify/dist/ReactToastify.css';
  
@@ -94,6 +97,14 @@ const useStyles = makeStyles((theme) => ({
   },
   sectionTitle: {
     fontWeight: 600,
+  },
+  connectionTabsPaper: {
+    padding: theme.spacing(2, 2, 0),
+    width: "100%",
+  },
+  connectionTabs: {
+    borderBottom: `1px solid ${theme.palette.divider}`,
+    marginBottom: theme.spacing(1),
   },
   sectionStack: {
     display: "flex",
@@ -239,12 +250,22 @@ export default function Options(props) {
     chatbotWeekdayEnd = "18:00",
     setChatbotWeekdayEnd,
     onSaveChatbotControl,
+    useConnectionBehaviorTabs = false,
+    connectionBehaviorRows = [],
+    activeWhatsappId = null,
+    onActiveWhatsappIdChange,
+    connectionBehavior = null,
+    connectionBehaviorLoading = false,
+    connectionBehaviorSaving = false,
+    onUpdateConnectionBehavior,
   } = props;
   const classes = useStyles();
   const history = useHistory();
   const { user } = React.useContext(AuthContext);
   const canManageBehavior = canManageWhatsappBehavior(user);
-  const behavior = useWhatsappBehaviorSettings(canManageBehavior);
+  const behavior = useWhatsappBehaviorSettings(
+    canManageBehavior && !useConnectionBehaviorTabs
+  );
   const [userRating, setUserRating] = useState("disabled");
   const [scheduleType, setScheduleType] = useState("disabled");
   const [callType, setCallType] = useState("enabled");
@@ -289,6 +310,12 @@ export default function Options(props) {
   const [loadingSendGreetingMessageOneQueues, setLoadingSendGreetingMessageOneQueues] = useState(false);
 
   const { update } = useSettings();
+  const connectionFieldsDisabled =
+    useConnectionBehaviorTabs &&
+    (connectionBehaviorLoading ||
+      connectionBehaviorSaving ||
+      !connectionBehavior);
+  const behaviorFieldsReadOnly = !canManageBehavior;
   const autoSaveTimers = useRef({});
   const [autoSaveFlash, setAutoSaveFlash] = useState({});
   const [chatbotManualSaved, setChatbotManualSaved] = useState(false);
@@ -325,6 +352,9 @@ export default function Options(props) {
   }, [chatbotSaveTick]);
 
   useEffect(() => {
+    if (useConnectionBehaviorTabs) {
+      return;
+    }
     if (!canManageBehavior || behavior.loading || !behavior.selectedRows.length) {
       return;
     }
@@ -345,6 +375,7 @@ export default function Options(props) {
       setCheckMsgIsGroupType(gm === "ignore" ? "enabled" : "disabled");
     }
   }, [
+    useConnectionBehaviorTabs,
     canManageBehavior,
     behavior.loading,
     behavior.selectedIds,
@@ -354,53 +385,90 @@ export default function Options(props) {
   ]);
 
   useEffect(() => {
-    if (Array.isArray(settings) && settings.length) {
-      if (canManageBehavior && behavior.rows.length > 0) {
-        return;
-      }
-      const userRating = settings.find((s) => s.key === "userRating");
-      if (userRating) {
-        setUserRating(userRating.value);
-      }
-      const scheduleType = settings.find((s) => s.key === "scheduleType");
-      if (scheduleType) {
-        setScheduleType(scheduleType.value);
-      }
-      const callType = settings.find((s) => s.key === "call");
-      if (callType) {
-        setCallType(callType.value);
-      }
-      const crs = settings.find((s) => s.key === "callRejectSendMessage");
-      setCallRejectSendMessage(crs ? crs.value : "enabled");
-      const crm = settings.find((s) => s.key === "callRejectMessage");
-      setCallRejectMessage(crm && crm.value != null ? String(crm.value) : "");
-      const CheckMsgIsGroup = settings.find((s) => s.key === "CheckMsgIsGroup");
-      if (CheckMsgIsGroup) {
-        setCheckMsgIsGroupType(CheckMsgIsGroup.value);
-      }
-	  
-	  {/*PLW DESIGN SAUDAÇÃO*/}
-      const SendGreetingAccepted = settings.find((s) => s.key === "sendGreetingAccepted");
-      if (SendGreetingAccepted) {
-        setSendGreetingAccepted(SendGreetingAccepted.value);
-      }	 
-	  {/*PLW DESIGN SAUDAÇÃO*/}	 
-	  
-	  {/*TRANSFERIR TICKET*/}	
-	  const SettingsTransfTicket = settings.find((s) => s.key === "sendMsgTransfTicket");
-      if (SettingsTransfTicket) {
-        setSettingsTransfTicket(SettingsTransfTicket.value);
-      }
-	  {/*TRANSFERIR TICKET*/}
+    if (!useConnectionBehaviorTabs || !connectionBehavior) {
+      return;
+    }
+    setCallType(
+      connectionBehavior.callHandlingMode === "accept" ? "enabled" : "disabled"
+    );
+    setCallRejectSendMessage(
+      connectionBehavior.sendMessageOnCallReject ? "enabled" : "disabled"
+    );
+    setCallRejectMessage(connectionBehavior.callRejectMessage || "");
+    setCheckMsgIsGroupType(
+      connectionBehavior.groupMessagesMode === "ignore" ? "enabled" : "disabled"
+    );
+    setSendGreetingAccepted(connectionBehavior.sendGreetingAccepted || "disabled");
+    setSettingsTransfTicket(connectionBehavior.sendMsgTransfTicket || "disabled");
+    setSendGreetingMessageOneQueues(
+      connectionBehavior.sendGreetingMessageOneQueues || "disabled"
+    );
+    setChatbotType(connectionBehavior.chatBotType || "text");
+    setUserRating(connectionBehavior.userRating || "disabled");
+    setScheduleType(connectionBehavior.scheduleType || "disabled");
+  }, [useConnectionBehaviorTabs, connectionBehavior, activeWhatsappId]);
 
-      const sendGreetingMessageOneQueues = settings.find((s) => s.key === "sendGreetingMessageOneQueues");
-      if (sendGreetingMessageOneQueues) {
-        setSendGreetingMessageOneQueues(sendGreetingMessageOneQueues.value)
-      }	  
-	  
-      const chatbotType = settings.find((s) => s.key === "chatBotType");
-      if (chatbotType) {
-        setChatbotType(chatbotType.value);
+  const skipBehaviorFromGlobalSettings =
+    useConnectionBehaviorTabs ||
+    (canManageBehavior && connectionBehaviorLoading);
+
+  const skipAutoMessagesFromGlobalSettings = skipBehaviorFromGlobalSettings;
+  const skipChatBotTypeFromGlobalSettings = skipBehaviorFromGlobalSettings;
+  const skipUserRatingFromGlobalSettings = skipBehaviorFromGlobalSettings;
+  const skipScheduleTypeFromGlobalSettings = skipBehaviorFromGlobalSettings;
+
+  useEffect(() => {
+    if (Array.isArray(settings) && settings.length) {
+      if (!skipUserRatingFromGlobalSettings) {
+        const userRating = settings.find((s) => s.key === "userRating");
+        if (userRating) {
+          setUserRating(userRating.value);
+        }
+      }
+      if (!skipScheduleTypeFromGlobalSettings) {
+        const scheduleType = settings.find((s) => s.key === "scheduleType");
+        if (scheduleType) {
+          setScheduleType(scheduleType.value);
+        }
+      }
+
+      if (!skipBehaviorFromGlobalSettings) {
+        const callType = settings.find((s) => s.key === "call");
+        if (callType) {
+          setCallType(callType.value);
+        }
+        const crs = settings.find((s) => s.key === "callRejectSendMessage");
+        setCallRejectSendMessage(crs ? crs.value : "enabled");
+        const crm = settings.find((s) => s.key === "callRejectMessage");
+        setCallRejectMessage(crm && crm.value != null ? String(crm.value) : "");
+        const CheckMsgIsGroup = settings.find((s) => s.key === "CheckMsgIsGroup");
+        if (CheckMsgIsGroup) {
+          setCheckMsgIsGroupType(CheckMsgIsGroup.value);
+        }
+      }
+
+      if (!skipAutoMessagesFromGlobalSettings) {
+        const SendGreetingAccepted = settings.find((s) => s.key === "sendGreetingAccepted");
+        if (SendGreetingAccepted) {
+          setSendGreetingAccepted(SendGreetingAccepted.value);
+        }
+        const SettingsTransfTicket = settings.find((s) => s.key === "sendMsgTransfTicket");
+        if (SettingsTransfTicket) {
+          setSettingsTransfTicket(SettingsTransfTicket.value);
+        }
+        const sendGreetingMessageOneQueues = settings.find(
+          (s) => s.key === "sendGreetingMessageOneQueues"
+        );
+        if (sendGreetingMessageOneQueues) {
+          setSendGreetingMessageOneQueues(sendGreetingMessageOneQueues.value);
+        }
+      }
+
+      if (!skipChatBotTypeFromGlobalSettings) {
+        const chatbotType = settings.find((s) => s.key === "chatBotType");
+        if (chatbotType) {
+          setChatbotType(chatbotType.value);
+        }
       }
 
 	    {/*const ipixcType = settings.find((s) => s.key === "ipixc");
@@ -433,12 +501,31 @@ export default function Options(props) {
         setAsaasType(asaasType.value);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings]);
+  }, [
+    settings,
+    skipBehaviorFromGlobalSettings,
+    skipAutoMessagesFromGlobalSettings,
+    skipChatBotTypeFromGlobalSettings,
+    skipUserRatingFromGlobalSettings,
+    skipScheduleTypeFromGlobalSettings,
+  ]);
 
   async function handleChangeUserRating(value) {
+    const targetWhatsappId = activeWhatsappId;
     setUserRating(value);
     setLoadingUserRating(true);
+    if (
+      await saveConnectionBehavior(
+        targetWhatsappId,
+        { userRating: value },
+        "settings.whatsappBehavior.userRatingSaved"
+      )
+    ) {
+      markAutoSaved("ratings");
+      notifyCommitted("userRating", value);
+      setLoadingUserRating(false);
+      return;
+    }
     await update({
       key: "userRating",
       value,
@@ -448,9 +535,22 @@ export default function Options(props) {
     setLoadingUserRating(false);
   }
   
-    async function handleSendGreetingMessageOneQueues(value) {
+  async function handleSendGreetingMessageOneQueues(value) {
+    const targetWhatsappId = activeWhatsappId;
     setSendGreetingMessageOneQueues(value);
     setLoadingSendGreetingMessageOneQueues(true);
+    if (
+      await saveConnectionBehavior(
+        targetWhatsappId,
+        { sendGreetingMessageOneQueues: value },
+        "settings.whatsappBehavior.autoMessagesSaved"
+      )
+    ) {
+      markAutoSaved("autoMsg");
+      notifyCommitted("sendGreetingMessageOneQueues", value);
+      setLoadingSendGreetingMessageOneQueues(false);
+      return;
+    }
     await update({
       key: "sendGreetingMessageOneQueues",
       value,
@@ -461,8 +561,21 @@ export default function Options(props) {
   }
 
   async function handleScheduleType(value) {
+    const targetWhatsappId = activeWhatsappId;
     setScheduleType(value);
     setLoadingScheduleType(true);
+    if (
+      await saveConnectionBehavior(
+        targetWhatsappId,
+        { scheduleType: value },
+        "settings.whatsappBehavior.scheduleTypeSaved"
+      )
+    ) {
+      markAutoSaved("ratings");
+      notifyCommitted("scheduleType", value);
+      setLoadingScheduleType(false);
+      return;
+    }
     await update({
       key: "scheduleType",
       value,
@@ -475,9 +588,39 @@ export default function Options(props) {
     }
   }
 
+  const saveConnectionBehavior = useCallback(
+    async (whatsappId, settings, toastKey) => {
+      if (
+        !useConnectionBehaviorTabs ||
+        whatsappId == null ||
+        typeof onUpdateConnectionBehavior !== "function"
+      ) {
+        return false;
+      }
+      await onUpdateConnectionBehavior(whatsappId, settings);
+      if (toastKey) {
+        showSuccessToast(toastKey);
+      }
+      return true;
+    },
+    [useConnectionBehaviorTabs, onUpdateConnectionBehavior]
+  );
+
   async function handleCallType(value) {
+    const targetWhatsappId = activeWhatsappId;
     setCallType(value);
     setLoadingCallType(true);
+    if (
+      await saveConnectionBehavior(
+        targetWhatsappId,
+        { callHandlingMode: value === "enabled" ? "accept" : "reject" },
+        "settings.whatsappBehavior.callsSaved"
+      )
+    ) {
+      markAutoSaved("calls");
+      setLoadingCallType(false);
+      return;
+    }
     if (canManageBehavior && behavior.rows.length > 0) {
       await behavior.bulkUpdate(
         { callHandlingMode: value === "enabled" ? "accept" : "reject" },
@@ -492,8 +635,20 @@ export default function Options(props) {
   }
 
   async function handleCallRejectSendMessage(value) {
+    const targetWhatsappId = activeWhatsappId;
     setCallRejectSendMessage(value);
     setLoadingCallRejectSendMessage(true);
+    if (
+      await saveConnectionBehavior(
+        targetWhatsappId,
+        { sendMessageOnCallReject: value !== "disabled" },
+        "settings.whatsappBehavior.callsSaved"
+      )
+    ) {
+      markAutoSaved("calls");
+      setLoadingCallRejectSendMessage(false);
+      return;
+    }
     if (canManageBehavior && behavior.rows.length > 0) {
       await behavior.bulkUpdate(
         { sendMessageOnCallReject: value !== "disabled" },
@@ -508,7 +663,20 @@ export default function Options(props) {
   }
 
   async function handleCallRejectMessageSave() {
+    const targetWhatsappId = activeWhatsappId;
+    const messageToSave = callRejectMessage;
     setLoadingCallRejectMessage(true);
+    if (
+      await saveConnectionBehavior(
+        targetWhatsappId,
+        { callRejectMessage: messageToSave },
+        "settings.whatsappBehavior.callsSaved"
+      )
+    ) {
+      markAutoSaved("calls");
+      setLoadingCallRejectMessage(false);
+      return;
+    }
     if (canManageBehavior && behavior.rows.length > 0) {
       await behavior.bulkUpdate(
         { callRejectMessage },
@@ -523,8 +691,21 @@ export default function Options(props) {
   }
 
   async function handleChatbotType(value) {
+    const targetWhatsappId = activeWhatsappId;
     setChatbotType(value);
     setLoadingChatbotType(true);
+    if (
+      await saveConnectionBehavior(
+        targetWhatsappId,
+        { chatBotType: value },
+        "settings.whatsappBehavior.chatBotTypeSaved"
+      )
+    ) {
+      markAutoSaved("chatbot");
+      notifyCommitted("chatBotType", value);
+      setLoadingChatbotType(false);
+      return;
+    }
     await update({
       key: "chatBotType",
       value,
@@ -535,8 +716,20 @@ export default function Options(props) {
   }
 
   async function handleGroupType(value) {
+    const targetWhatsappId = activeWhatsappId;
     setCheckMsgIsGroupType(value);
     setCheckMsgIsGroup(true);
+    if (
+      await saveConnectionBehavior(
+        targetWhatsappId,
+        { groupMessagesMode: value === "enabled" ? "ignore" : "receive" },
+        "settings.whatsappBehavior.groupsSaved"
+      )
+    ) {
+      markAutoSaved("groups");
+      setCheckMsgIsGroup(false);
+      return;
+    }
     if (canManageBehavior && behavior.rows.length > 0) {
       await behavior.bulkUpdate(
         { groupMessagesMode: value === "enabled" ? "ignore" : "receive" },
@@ -555,8 +748,21 @@ export default function Options(props) {
   
   {/*NOVO CÓDIGO*/}  
   async function handleSendGreetingAccepted(value) {
+    const targetWhatsappId = activeWhatsappId;
     setSendGreetingAccepted(value);
     setLoadingSendGreetingAccepted(true);
+    if (
+      await saveConnectionBehavior(
+        targetWhatsappId,
+        { sendGreetingAccepted: value },
+        "settings.whatsappBehavior.autoMessagesSaved"
+      )
+    ) {
+      markAutoSaved("autoMsg");
+      notifyCommitted("sendGreetingAccepted", value);
+      setLoadingSendGreetingAccepted(false);
+      return;
+    }
     await update({
       key: "sendGreetingAccepted",
       value,
@@ -564,23 +770,32 @@ export default function Options(props) {
     markAutoSaved("autoMsg");
     notifyCommitted("sendGreetingAccepted", value);
     setLoadingSendGreetingAccepted(false);
-  }  
-  
-  
-  {/*NOVO CÓDIGO*/}    
+  }
 
   async function handleSettingsTransfTicket(value) {
+    const targetWhatsappId = activeWhatsappId;
     setSettingsTransfTicket(value);
     setLoadingSettingsTransfTicket(true);
+    if (
+      await saveConnectionBehavior(
+        targetWhatsappId,
+        { sendMsgTransfTicket: value },
+        "settings.whatsappBehavior.autoMessagesSaved"
+      )
+    ) {
+      markAutoSaved("autoMsg");
+      notifyCommitted("sendMsgTransfTicket", value);
+      setLoadingSettingsTransfTicket(false);
+      return;
+    }
     await update({
       key: "sendMsgTransfTicket",
       value,
     });
-
     markAutoSaved("autoMsg");
     notifyCommitted("sendMsgTransfTicket", value);
     setLoadingSettingsTransfTicket(false);
-  } 
+  }
  
  {/*async function handleChangeIPIxc(value) {
     setIpIxcType(value);
@@ -810,7 +1025,11 @@ export default function Options(props) {
 
   return (
     <Box className={classes.sectionStack}>
-      <Paper elevation={1} className={classes.sectionPaper}>
+      <Paper
+        key={useConnectionBehaviorTabs ? `ratings-${activeWhatsappId}` : "ratings-global"}
+        elevation={1}
+        className={classes.sectionPaper}
+      >
         {renderCardHeader({
           iconEmojiKey: "settings.ux.cardIconRating",
           titleKey: "settings.sections.ratingsScheduleTitle",
@@ -818,6 +1037,23 @@ export default function Options(props) {
           tooltipKey: "settings.sections.tooltips.ratingsSchedule",
           chips: [ratingsStatusChip, expedientStatusChip],
         })}
+        {useConnectionBehaviorTabs ? (
+          <Alert severity="info" style={{ marginBottom: 12 }}>
+            {i18n.t("settings.whatsappBehavior.perConnectionModeInfo")}
+          </Alert>
+        ) : null}
+        {useConnectionBehaviorTabs &&
+        (connectionBehavior?.usesPerConnectionUserRating === false ||
+          connectionBehavior?.usesPerConnectionScheduleType === false) ? (
+          <Typography
+            variant="caption"
+            color="textSecondary"
+            display="block"
+            style={{ marginBottom: 12 }}
+          >
+            {i18n.t("settings.whatsappBehavior.connectionGlobalFallbackHint")}
+          </Typography>
+        ) : null}
         <Grid spacing={3} container>
           <Grid xs={12} sm={6} md={4} item>
             <FormControl className={classes.selectContainer}>
@@ -825,6 +1061,10 @@ export default function Options(props) {
               <Select
                 labelId="ratings-label"
                 value={userRating}
+                disabled={
+                  behaviorFieldsReadOnly ||
+                  (useConnectionBehaviorTabs && connectionFieldsDisabled)
+                }
                 onChange={async (e) => {
                   handleChangeUserRating(e.target.value);
                 }}
@@ -845,6 +1085,10 @@ export default function Options(props) {
               <Select
                 labelId="schedule-type-label"
                 value={scheduleType}
+                disabled={
+                  behaviorFieldsReadOnly ||
+                  (useConnectionBehaviorTabs && connectionFieldsDisabled)
+                }
                 onChange={async (e) => {
                   handleScheduleType(e.target.value);
                 }}
@@ -864,22 +1108,71 @@ export default function Options(props) {
         {renderAutoSaveRow("ratings")}
       </Paper>
 
-      {canManageBehavior && behavior.rows.length > 0 ? (
-        <Paper elevation={1} className={classes.sectionPaper}>
+      {useConnectionBehaviorTabs ? (
+        <Paper elevation={1} className={classes.connectionTabsPaper}>
           <Typography variant="subtitle2" style={{ marginBottom: 8 }}>
-            {i18n.t("settings.whatsappBehavior.sectionTitle")}
+            {i18n.t("settings.whatsappBehavior.connectionTabsTitle")}
           </Typography>
-          <WhatsappBehaviorConnectionBar
-            rows={behavior.rows}
-            selectedIds={behavior.selectedIds}
-            onChange={behavior.applySelection}
-            loading={behavior.loading || behavior.saving}
-            mixedValues={behavior.mixedValues}
-          />
+          <Tabs
+            className={classes.connectionTabs}
+            value={activeWhatsappId ?? false}
+            onChange={(_, nextId) => {
+              const nextRow = connectionBehaviorRows.find((row) => row.id === nextId);
+              if (nextRow) {
+                setCallType(
+                  nextRow.callHandlingMode === "accept" ? "enabled" : "disabled"
+                );
+                setCallRejectSendMessage(
+                  nextRow.sendMessageOnCallReject ? "enabled" : "disabled"
+                );
+                setCallRejectMessage(nextRow.callRejectMessage || "");
+                setCheckMsgIsGroupType(
+                  nextRow.groupMessagesMode === "ignore" ? "enabled" : "disabled"
+                );
+                setSendGreetingAccepted(nextRow.sendGreetingAccepted || "disabled");
+                setSettingsTransfTicket(nextRow.sendMsgTransfTicket || "disabled");
+                setSendGreetingMessageOneQueues(
+                  nextRow.sendGreetingMessageOneQueues || "disabled"
+                );
+                setChatbotType(nextRow.chatBotType || "text");
+                setUserRating(nextRow.userRating || "disabled");
+                setScheduleType(nextRow.scheduleType || "disabled");
+              }
+              if (typeof onActiveWhatsappIdChange === "function") {
+                onActiveWhatsappIdChange(nextId);
+              }
+            }}
+            indicatorColor="primary"
+            textColor="primary"
+            variant="scrollable"
+            scrollButtons="auto"
+          >
+            {connectionBehaviorRows.map((row) => (
+              <Tab
+                key={row.id}
+                value={row.id}
+                label={row.name || `#${row.id}`}
+                disabled={connectionBehaviorLoading || connectionBehaviorSaving}
+              />
+            ))}
+          </Tabs>
+          {connectionBehavior?.usesPerConnectionConfig === false ||
+          connectionBehavior?.usesPerConnectionAutoMessages === false ||
+          connectionBehavior?.usesPerConnectionChatBotType === false ||
+          connectionBehavior?.usesPerConnectionUserRating === false ||
+          connectionBehavior?.usesPerConnectionScheduleType === false ? (
+            <Typography variant="caption" color="textSecondary" display="block">
+              {i18n.t("settings.whatsappBehavior.connectionGlobalFallbackHint")}
+            </Typography>
+          ) : null}
         </Paper>
       ) : null}
 
-      <Paper elevation={1} className={classes.sectionPaper}>
+      <Paper
+        key={useConnectionBehaviorTabs ? `calls-${activeWhatsappId}` : "calls-global"}
+        elevation={1}
+        className={classes.sectionPaper}
+      >
         {renderCardHeader({
           iconEmojiKey: "settings.ux.cardIconCalls",
           titleKey: "settings.sections.attendanceCallsCardTitle",
@@ -896,6 +1189,7 @@ export default function Options(props) {
               <Select
                 labelId="call-type-label"
                 value={callType}
+                disabled={behaviorFieldsReadOnly || connectionFieldsDisabled}
                 onChange={async (e) => {
                   handleCallType(e.target.value);
                 }}
@@ -918,6 +1212,7 @@ export default function Options(props) {
                   <Select
                     labelId="call-reject-send-label"
                     value={callRejectSendMessage}
+                    disabled={behaviorFieldsReadOnly || connectionFieldsDisabled}
                     onChange={async (e) => {
                       handleCallRejectSendMessage(e.target.value);
                     }}
@@ -937,7 +1232,11 @@ export default function Options(props) {
                   value={callRejectMessage}
                   onChange={(e) => setCallRejectMessage(e.target.value)}
                   onBlur={() => handleCallRejectMessageSave()}
-                  disabled={callRejectSendMessage === "disabled"}
+                  disabled={
+                    behaviorFieldsReadOnly ||
+                    connectionFieldsDisabled ||
+                    callRejectSendMessage === "disabled"
+                  }
                   multiline
                   minRows={2}
                   variant="outlined"
@@ -955,7 +1254,11 @@ export default function Options(props) {
         {renderAutoSaveRow("calls")}
       </Paper>
 
-      <Paper elevation={1} className={classes.sectionPaper}>
+      <Paper
+        key={useConnectionBehaviorTabs ? `groups-${activeWhatsappId}` : "groups-global"}
+        elevation={1}
+        className={classes.sectionPaper}
+      >
         {renderCardHeader({
           iconEmojiKey: "settings.ux.cardIconGroups",
           titleKey: "settings.sections.attendanceGroupsCardTitle",
@@ -983,6 +1286,7 @@ export default function Options(props) {
               <Select
                 labelId="group-type-label"
                 value={CheckMsgIsGroup}
+                disabled={behaviorFieldsReadOnly || connectionFieldsDisabled}
                 onChange={async (e) => {
                   handleGroupType(e.target.value);
                 }}
@@ -1003,7 +1307,11 @@ export default function Options(props) {
         {renderAutoSaveRow("groups")}
       </Paper>
 
-      <Paper elevation={1} className={classes.sectionPaper}>
+      <Paper
+        key={useConnectionBehaviorTabs ? `autoMsg-${activeWhatsappId}` : "autoMsg-global"}
+        elevation={1}
+        className={classes.sectionPaper}
+      >
         {renderCardHeader({
           iconEmojiKey: "settings.ux.cardIconAutoMsg",
           titleKey: "settings.sections.attendanceAutoMsgCardTitle",
@@ -1011,6 +1319,17 @@ export default function Options(props) {
           tooltipKey: "settings.sections.tooltips.autoMessagesCard",
           chips: [autoMsgStatusChip],
         })}
+        {useConnectionBehaviorTabs &&
+        connectionBehavior?.usesPerConnectionAutoMessages === false ? (
+          <Typography
+            variant="caption"
+            color="textSecondary"
+            display="block"
+            style={{ marginBottom: 12 }}
+          >
+            {i18n.t("settings.whatsappBehavior.connectionGlobalFallbackHint")}
+          </Typography>
+        ) : null}
         <Grid spacing={2} container>
           <Grid xs={12} sm={6} md={4} item>
             <FormControl className={classes.selectContainer}>
@@ -1020,6 +1339,7 @@ export default function Options(props) {
               <Select
                 labelId="sendGreetingAccepted-label"
                 value={SendGreetingAccepted}
+                disabled={behaviorFieldsReadOnly || connectionFieldsDisabled}
                 onChange={async (e) => {
                   handleSendGreetingAccepted(e.target.value);
                 }}
@@ -1040,6 +1360,7 @@ export default function Options(props) {
               <Select
                 labelId="sendMsgTransfTicket-label"
                 value={SettingsTransfTicket}
+                disabled={behaviorFieldsReadOnly || connectionFieldsDisabled}
                 onChange={async (e) => {
                   handleSettingsTransfTicket(e.target.value);
                 }}
@@ -1060,6 +1381,7 @@ export default function Options(props) {
               <Select
                 labelId="sendGreetingMessageOneQueues-label"
                 value={sendGreetingMessageOneQueues}
+                disabled={behaviorFieldsReadOnly || connectionFieldsDisabled}
                 onChange={async (e) => {
                   handleSendGreetingMessageOneQueues(e.target.value);
                 }}
@@ -1207,6 +1529,17 @@ export default function Options(props) {
         <Typography variant="body2" color="textSecondary" paragraph style={{ marginBottom: 12 }}>
           {i18n.t("settings.sections.chatbotBehaviorHint")}
         </Typography>
+        {useConnectionBehaviorTabs &&
+        connectionBehavior?.usesPerConnectionChatBotType === false ? (
+          <Typography
+            variant="caption"
+            color="textSecondary"
+            display="block"
+            style={{ marginBottom: 12 }}
+          >
+            {i18n.t("settings.whatsappBehavior.connectionGlobalFallbackHint")}
+          </Typography>
+        ) : null}
         <Grid spacing={2} container alignItems="flex-end">
           <Grid xs={12} sm={6} md={4} item>
             <FormControl className={classes.selectContainer} fullWidth>
@@ -1216,6 +1549,7 @@ export default function Options(props) {
               <Select
                 labelId="chatbot-type-label"
                 value={chatbotType}
+                disabled={behaviorFieldsReadOnly || connectionFieldsDisabled}
                 onChange={async (e) => {
                   handleChatbotType(e.target.value);
                 }}
