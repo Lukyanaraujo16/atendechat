@@ -24,7 +24,11 @@ import ContactCustomField from "../models/ContactCustomField";
 import { logger } from "../utils/logger";
 import ToggleDisableBotContactService from "../services/ContactServices/ToggleDisableBotContactService";
 import AssignCreatorOnContactCreateService from "../services/ContactServices/AssignCreatorOnContactCreateService";
-import { assertUserCanAccessContact } from "../helpers/contactAccess";
+import ReplaceContactAssignmentsService from "../services/ContactServices/ReplaceContactAssignmentsService";
+import {
+  assertUserCanAccessContact,
+  canManageContactAssignments
+} from "../helpers/contactAccess";
 
 type IndexQuery = {
   searchParam: string;
@@ -50,6 +54,7 @@ interface ContactData {
   email?: string;
   notes?: string | null;
   extraInfo?: ExtraInfo[];
+  assigneeUserIds?: number[];
 }
 
 export const index = async (req: Request, res: Response): Promise<Response> => {
@@ -95,12 +100,19 @@ export const getContact = async (
 export const store = async (req: Request, res: Response): Promise<Response> => {
   const { companyId, id: creatorUserId } = req.user;
   const body = req.body as ContactData & { companyId?: number };
+  const accessUser = {
+    id: creatorUserId,
+    profile: req.user.profile,
+    supportMode: req.user.supportMode,
+    super: (req.user as { super?: boolean }).super
+  };
   const newContact: ContactData = {
     name: body.name,
     number: body.number,
     email: body.email,
     notes: body.notes,
-    extraInfo: body.extraInfo
+    extraInfo: body.extraInfo,
+    assigneeUserIds: body.assigneeUserIds
   };
   newContact.number = String(newContact.number || "").replace(/\D/g, "");
 
@@ -116,12 +128,7 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
     Number(companyId),
     schema,
     Number(creatorUserId),
-    {
-      id: creatorUserId,
-      profile: req.user.profile,
-      supportMode: req.user.supportMode,
-      super: (req.user as { super?: boolean }).super
-    }
+    accessUser
   );
 
   return res.status(200).json(contact);
@@ -440,6 +447,9 @@ const emitContactWithAssignments = async (
   return contact;
 };
 
+const normalizeAssigneeUserIds = (raw?: number[]): number[] =>
+  [...new Set((raw || []).map((id) => Number(id)).filter((id) => id > 0))];
+
 const createNewContact = async (
   newContact: ContactData,
   companyId: number,
@@ -470,6 +480,13 @@ const createNewContact = async (
     companyId
   );
 
+  const privileged = canManageContactAssignments(accessUser || {});
+  const assigneeUserIds = normalizeAssigneeUserIds(newContact.assigneeUserIds);
+
+  if (privileged && !assigneeUserIds.length) {
+    throw new AppError("ERR_CONTACT_REQUIRES_ASSIGNEE", 400);
+  }
+
   const contact = await CreateContactService({
     ...newContact,
     companyId,
@@ -477,18 +494,27 @@ const createNewContact = async (
     creatorUserId
   });
 
-  try {
-    await AssignCreatorOnContactCreateService({
+  if (privileged) {
+    await ReplaceContactAssignmentsService({
       contactId: contact.id,
       companyId,
-      creatorUserId
+      userIds: assigneeUserIds,
+      assignedByUserId: creatorUserId
     });
-  } catch (assignErr) {
-    logger.error(
-      { assignErr, contactId: contact.id, creatorUserId, companyId },
-      "[Contact] falha ao atribuir criador — contato já criado"
-    );
-    throw assignErr;
+  } else {
+    try {
+      await AssignCreatorOnContactCreateService({
+        contactId: contact.id,
+        companyId,
+        creatorUserId
+      });
+    } catch (assignErr) {
+      logger.error(
+        { assignErr, contactId: contact.id, creatorUserId, companyId },
+        "[Contact] falha ao atribuir criador — contato já criado"
+      );
+      throw assignErr;
+    }
   }
 
   return emitContactWithAssignments(contact.id, companyId, "create");

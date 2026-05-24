@@ -4,8 +4,7 @@ import ContactCustomField from "../../models/ContactCustomField";
 import {
   canViewAllCompanyContacts,
   ContactAccessUser,
-  getVisibleContactIdsForUser,
-  loadUserContactScope
+  getVisibleContactIdsForUser
 } from "../../helpers/contactAccess";
 import CreateContactAssignmentService from "./CreateContactAssignmentService";
 
@@ -48,11 +47,9 @@ const CreateContactService = async ({
       creatorUserId &&
       Number.isFinite(creatorUserId)
     ) {
-      const scope = await loadUserContactScope(creatorUserId, companyId);
       const visibleIds = await getVisibleContactIdsForUser(
         creatorUserId,
-        companyId,
-        scope
+        companyId
       );
 
       if (visibleIds.includes(numberExists.id)) {

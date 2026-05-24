@@ -1583,14 +1583,14 @@ const messages = {
         loading: "Cargando contactos…",
         assignments: {
           title: "Responsables del contacto",
-          hint: "Seleccione los usuarios que pueden ver y atender este contacto. Se requiere al menos un responsable.",
+          hint: "Defina quién puede ver y gestionar este contacto.",
           fieldLabel: "Responsables",
           fieldPlaceholder: "Buscar usuario…",
           manage: "Gestionar responsables",
           save: "Guardar",
           cancel: "Cancelar",
           saved: "Responsables actualizados.",
-          requiresOne: "El contacto debe tener al menos un responsable.",
+          requiresOne: "Seleccione al menos un responsable del contacto.",
         },
       },
       contactLabelsManage: {
@@ -1881,7 +1881,7 @@ const messages = {
           extraValue: "Valor",
           whatsapp: "Conexión Origen: ",
           assigneesHint:
-            "Los administradores pueden definir qué usuarios tendrán acceso a este contacto.",
+            "Defina quién puede ver y gestionar este contacto.",
           numberPlaceholder: "Ej: 5527999999999",
           numberHelper:
             "Use código de país + DDD + número. Ej: 5527999999999",
@@ -4968,7 +4968,7 @@ const messages = {
         ERR_USER_NOT_FOUND:
           "Uno o más responsables seleccionados son inválidos o no pertenecen a su empresa.",
         ERR_CONTACT_REQUIRES_ASSIGNEE:
-          "El contacto debe tener al menos un responsable.",
+          "Seleccione al menos un responsable del contacto.",
         ERR_NO_SETTING_FOUND: "No se encontró ninguna configuración con este ID.",
         ERR_NO_CONTACT_FOUND: "No se encontró ningún contacto con este ID.",
         ERR_INVALID_LABEL_IDS:

@@ -1,8 +1,9 @@
-/** Apenas admin (ou super/support) pode alterar responsáveis de contatos. */
+/** Admin, supervisor, super ou supportMode podem gerenciar responsáveis de contatos. */
 export function canManageContactAssignments(user) {
   if (!user) return false;
   if (user.super === true || user.supportMode === true) return true;
-  return String(user.profile || "") === "admin";
+  const profile = String(user.profile || "");
+  return profile === "admin" || profile === "supervisor";
 }
 
 export default canManageContactAssignments;

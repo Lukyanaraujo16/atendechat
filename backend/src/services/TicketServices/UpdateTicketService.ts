@@ -21,6 +21,7 @@ import Company from "../../models/Company";
 import { logger } from "../../utils/logger";
 import notifyTicketAfterUpdate from "../OneSignalPush/notifyTicketAfterUpdate";
 import RemovePinnedTicketsForTicketService from "../PinnedTicketServices/RemovePinnedTicketsForTicketService";
+import ensureContactAssignmentForTicketUser from "../ContactServices/ensureContactAssignmentForTicketUser";
 
 interface TicketData {
   status?: string;
@@ -360,6 +361,15 @@ const UpdateTicketService = async ({
       oldStatus,
       oldQueueId,
       oldUserId
+    });
+
+    await ensureContactAssignmentForTicketUser({
+      contactId: ticketForEmit.contactId,
+      userId: ticketForEmit.userId,
+      companyId,
+      ticketStatus: ticketForEmit.status,
+      assignedByUserId:
+        actionUserId != null ? Number(actionUserId) : ticketForEmit.userId
     });
 
     return { ticket: ticketForEmit, oldStatus, oldUserId };

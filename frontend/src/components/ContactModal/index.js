@@ -166,6 +166,7 @@ const ContactModal = ({
 	const [companyUsers, setCompanyUsers] = useState([]);
 	const [selectedAssignees, setSelectedAssignees] = useState([]);
 	const [initialAssigneeIds, setInitialAssigneeIds] = useState([]);
+	const [assigneesError, setAssigneesError] = useState("");
 
 	const validationSchema = useMemo(
 		() =>
@@ -210,6 +211,7 @@ const ContactModal = ({
 				setCampaignLists([]);
 				setSelectedAssignees([]);
 				setInitialAssigneeIds([]);
+				setAssigneesError("");
 				return;
 			}
 
@@ -302,6 +304,30 @@ const ContactModal = ({
 		};
 	}, [open, canManageAssignees, authUser?.companyId]);
 
+	const getValidSelectedAssigneeIds = () => {
+		const allowedIds = new Set(
+			companyUsers.map((u) => Number(u.id)).filter((id) => id > 0)
+		);
+		return normalizeAssigneeIds(selectedAssignees).filter((id) =>
+			allowedIds.has(id)
+		);
+	};
+
+	const validateAssigneesRequired = () => {
+		if (!canManageAssignees) {
+			setAssigneesError("");
+			return true;
+		}
+		if (getValidSelectedAssigneeIds().length === 0) {
+			const message = i18n.t("contacts.assignments.requiresOne");
+			setAssigneesError(message);
+			toastError(new Error(message));
+			return false;
+		}
+		setAssigneesError("");
+		return true;
+	};
+
 	const assigneesChanged = () =>
 		!sameAssigneeIds(
 			initialAssigneeIds,
@@ -316,6 +342,7 @@ const ContactModal = ({
 		setCampaignLists([]);
 		setSelectedAssignees([]);
 		setInitialAssigneeIds([]);
+		setAssigneesError("");
 	};
 
 	const syncAssignmentsAfterSave = async (savedContactId, currentAssignments) => {
@@ -323,20 +350,12 @@ const ContactModal = ({
 			return currentAssignments;
 		}
 
-		const allowedIds = new Set(
-			companyUsers.map((u) => Number(u.id)).filter((id) => id > 0)
-		);
-		const userIds = normalizeAssigneeIds(selectedAssignees).filter((id) =>
-			allowedIds.has(id)
-		);
-
-		// Sem seleção válida: mantém autoatribuição do criador feita no POST — não chama PUT
+		const userIds = getValidSelectedAssigneeIds();
 		if (userIds.length === 0) {
 			return currentAssignments;
 		}
 
-		const isEdit = Boolean(contactId);
-		if (isEdit && !assigneesChanged()) {
+		if (!assigneesChanged()) {
 			return currentAssignments;
 		}
 
@@ -357,13 +376,7 @@ const ContactModal = ({
 
 	const handleSaveContact = async values => {
 		try {
-			if (
-				canManageAssignees &&
-				contactId &&
-				assigneesChanged() &&
-				!selectedAssignees.length
-			) {
-				toastError(new Error(i18n.t("contacts.assignments.requiresOne")));
+			if (!validateAssigneesRequired()) {
 				return;
 			}
 
@@ -387,12 +400,11 @@ const ContactModal = ({
 				}
 				handleClose();
 			} else {
+				if (canManageAssignees) {
+					payload.assigneeUserIds = getValidSelectedAssigneeIds();
+				}
 				const { data } = await api.post("/contacts", payload);
-				const assignments = await syncAssignmentsAfterSave(
-					data.id,
-					data.assignments
-				);
-				const enriched = { ...data, tags: localTags, assignments };
+				const enriched = { ...data, tags: localTags, assignments: data.assignments };
 				if (onSave) {
 					onSave(enriched);
 				}
@@ -651,11 +663,15 @@ const ContactModal = ({
 										</Typography>
 										<Autocomplete
 											multiple
+											required
 											options={companyUsers}
 											value={selectedAssignees}
-											onChange={(_, value) =>
-												setSelectedAssignees(value || [])
-											}
+											onChange={(_, value) => {
+												setSelectedAssignees(value || []);
+												if ((value || []).length > 0) {
+													setAssigneesError("");
+												}
+											}}
 											getOptionLabel={option =>
 												option.name
 													? `${option.name}${
@@ -682,6 +698,12 @@ const ContactModal = ({
 													variant="outlined"
 													margin="dense"
 													fullWidth
+													required
+													error={Boolean(assigneesError)}
+													helperText={
+														assigneesError ||
+														i18n.t("contacts.assignments.hint")
+													}
 													label={i18n.t("contacts.assignments.fieldLabel")}
 													placeholder={i18n.t(
 														"contacts.assignments.fieldPlaceholder"

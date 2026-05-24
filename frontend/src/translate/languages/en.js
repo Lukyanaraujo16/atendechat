@@ -1572,14 +1572,14 @@ const messages = {
 				loading: "Loading contacts…",
 				assignments: {
 					title: "Contact assignees",
-					hint: "Select users who can view and handle this contact. At least one assignee is required.",
+					hint: "Define who can view and manage this contact.",
 					fieldLabel: "Assignees",
 					fieldPlaceholder: "Search user…",
 					manage: "Manage assignees",
 					save: "Save",
 					cancel: "Cancel",
 					saved: "Assignees updated.",
-					requiresOne: "The contact must have at least one assignee.",
+					requiresOne: "Select at least one contact assignee.",
 				},
 			},
 			contactLabelsManage: {
@@ -1869,7 +1869,7 @@ const messages = {
 					extraValue: "Value",
 					whatsapp: "Source Connection: ",
 					assigneesHint:
-						"Administrators can choose which users will have access to this contact.",
+						"Define who can view and manage this contact.",
 					numberPlaceholder: "E.g. 5527999999999",
 					numberHelper:
 						"Use country code + area code + number. E.g. 5527999999999",
@@ -5053,7 +5053,7 @@ const messages = {
 				ERR_USER_NOT_FOUND:
 					"One or more selected assignees are invalid or do not belong to your company.",
 				ERR_CONTACT_REQUIRES_ASSIGNEE:
-					"The contact must have at least one assignee.",
+					"Select at least one contact assignee.",
 				ERR_NO_SETTING_FOUND: "No settings found with this ID.",
 				ERR_NO_CONTACT_FOUND: "No contact found with this ID.",
 				ERR_INVALID_LABEL_IDS:
