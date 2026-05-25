@@ -429,7 +429,11 @@ const TicketsListCustom = (props) => {
         if (assignee != null && !Number.isNaN(assignee) && assignee > 0) {
           if (assignee !== myId) return;
         } else {
-          const qid = data.ticket?.queue?.id;
+          const qidRaw = data.ticket?.queueId ?? data.ticket?.queue?.id;
+          const qid =
+            qidRaw != null && qidRaw !== "" && !Number.isNaN(Number(qidRaw))
+              ? Number(qidRaw)
+              : null;
           if (qid == null) {
             if (user?.allTicket !== "enabled") return;
           } else if (queueIds.indexOf(qid) === -1) {

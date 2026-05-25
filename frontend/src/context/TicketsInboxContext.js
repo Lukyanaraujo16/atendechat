@@ -70,6 +70,11 @@ function applyStatusPageBatch(prev, batch, status, pageNumber, recentlyDeletedRe
   if (page <= 1) {
     const other = prev.filter((t) => t.status !== status);
     if (list.length === 0) {
+      /** Evita apagar upsert local quando refetch volta vazio (corrida pós-aceitar / socket). */
+      const existingOfStatus = prev.filter((t) => t.status === status);
+      if (existingOfStatus.length > 0) {
+        return prev;
+      }
       return other;
     }
     return mergeLoadBatch(other, list);
@@ -102,6 +107,8 @@ export function TicketsInboxProvider({
   showAll,
   /** Guia “ABERTAS” ativa: busca API; inativa: mantém estado e socket. */
   inboxUiActive,
+  /** Sub-aba ativa (open | pending | chatbot) — refetch ao trocar se lista vazia e contador > 0. */
+  activeInboxSubTab = "open",
 }) {
   const { user } = useContext(AuthContext);
   const socketManager = useContext(SocketContext);
@@ -122,6 +129,9 @@ export function TicketsInboxProvider({
   });
   const recentlyDeletedIdsRef = useRef(new Set());
   const refreshCountsTimerRef = useRef(null);
+  const reloadOpenTimerRef = useRef(null);
+  const reloadPendingTimerRef = useRef(null);
+  const tabEmptyRefetchKeyRef = useRef("");
 
   const queueIdsJson = useMemo(
     () => JSON.stringify(Array.isArray(selectedQueueIds) ? selectedQueueIds : []),
@@ -206,6 +216,12 @@ export function TicketsInboxProvider({
       if (refreshCountsTimerRef.current) {
         clearTimeout(refreshCountsTimerRef.current);
       }
+      if (reloadOpenTimerRef.current) {
+        clearTimeout(reloadOpenTimerRef.current);
+      }
+      if (reloadPendingTimerRef.current) {
+        clearTimeout(reloadPendingTimerRef.current);
+      }
     };
   }, [refreshTabCounts]);
 
@@ -218,6 +234,26 @@ export function TicketsInboxProvider({
     setPendingPage(1);
     setPendingReloadToken((n) => n + 1);
   }, []);
+
+  const scheduleReloadOpenList = useCallback(() => {
+    if (!fetchEnabled) return;
+    if (reloadOpenTimerRef.current) {
+      clearTimeout(reloadOpenTimerRef.current);
+    }
+    reloadOpenTimerRef.current = setTimeout(() => {
+      reloadOpenList();
+    }, 400);
+  }, [fetchEnabled, reloadOpenList]);
+
+  const scheduleReloadPendingList = useCallback(() => {
+    if (!fetchEnabled) return;
+    if (reloadPendingTimerRef.current) {
+      clearTimeout(reloadPendingTimerRef.current);
+    }
+    reloadPendingTimerRef.current = setTimeout(() => {
+      reloadPendingList();
+    }, 400);
+  }, [fetchEnabled, reloadPendingList]);
 
   const openFetch = useTickets({
     enabled: fetchEnabled,
@@ -484,6 +520,8 @@ export function TicketsInboxProvider({
       if (data.action === "delete" && data.ticketId != null) {
         removeTicket(data.ticketId);
         scheduleRefreshTabCounts();
+        scheduleReloadOpenList();
+        scheduleReloadPendingList();
         return;
       }
       if (data.action === "update" && data.ticket) {
@@ -493,10 +531,14 @@ export function TicketsInboxProvider({
         }
         if (t.isGroup) {
           removeTicket(t.id);
+          scheduleRefreshTabCounts();
           return;
         }
         if (!shouldShowTicket(t)) {
           removeTicket(t.id);
+          scheduleRefreshTabCounts();
+          scheduleReloadOpenList();
+          scheduleReloadPendingList();
           return;
         }
         if (t.status === "open" || t.status === "pending") {
@@ -504,11 +546,18 @@ export function TicketsInboxProvider({
             ...t,
             isPinned: pinnedIdSet.has(Number(t.id)),
           });
+          if (t.status === "open") {
+            scheduleReloadOpenList();
+          } else {
+            scheduleReloadPendingList();
+          }
         } else {
           setPinnedMeta((prev) =>
             prev.filter((row) => row.ticketId !== Number(t.id))
           );
           removeTicket(t.id);
+          scheduleReloadOpenList();
+          scheduleReloadPendingList();
         }
         scheduleRefreshTabCounts();
       }
@@ -517,29 +566,12 @@ export function TicketsInboxProvider({
     const handleAppMessage = (data) => {
       if (data.action !== "create" || !data.ticket) return;
       if (isRecentlyDeleted(data.ticket.id)) return;
-      const myId = Number(user?.id);
-      const t = data.ticket;
-      if (profile === "user") {
-        const queueIds = safeQueues.map((q) => q.id);
-        const assigneeRaw = t?.userId;
-        const assignee =
-          assigneeRaw != null && assigneeRaw !== ""
-            ? Number(assigneeRaw)
-            : null;
-        if (assignee != null && !Number.isNaN(assignee) && assignee > 0) {
-          if (assignee !== myId) return;
-        } else {
-          const qid = t?.queue?.id;
-          if (qid == null) {
-            if (user?.allTicket !== "enabled") return;
-          } else if (queueIds.indexOf(qid) === -1) {
-            return;
-          }
-        }
-      }
       const t2 = data.ticket;
       if (t2.isGroup || !shouldShowTicket(t2)) {
-        removeTicket(t2.id);
+        if (t2.id != null) {
+          removeTicket(t2.id);
+        }
+        scheduleRefreshTabCounts();
         return;
       }
       if (t2.status === "open" || t2.status === "pending") {
@@ -547,11 +579,18 @@ export function TicketsInboxProvider({
           ...t2,
           isPinned: pinnedIdSet.has(Number(t2.id)),
         });
+        if (t2.status === "open") {
+          scheduleReloadOpenList();
+        } else {
+          scheduleReloadPendingList();
+        }
       } else {
         setPinnedMeta((prev) =>
           prev.filter((row) => row.ticketId !== Number(t2.id))
         );
         removeTicket(t2.id);
+        scheduleReloadOpenList();
+        scheduleReloadPendingList();
       }
       scheduleRefreshTabCounts();
     };
@@ -578,8 +617,6 @@ export function TicketsInboxProvider({
     };
   }, [
     socketManager,
-    profile,
-    safeQueues,
     shouldShowTicket,
     upsertTicket,
     upsertTicketMessageActivity,
@@ -587,10 +624,10 @@ export function TicketsInboxProvider({
     updateUnread,
     updateContact,
     isRecentlyDeleted,
-    user?.id,
-    user?.allTicket,
     pinnedIdSet,
     scheduleRefreshTabCounts,
+    scheduleReloadOpenList,
+    scheduleReloadPendingList,
   ]);
 
   const afterProfileFilter = useMemo(() => {
@@ -682,6 +719,69 @@ export function TicketsInboxProvider({
     setPendingPage((p) => p + 1);
   }, []);
 
+  useEffect(() => {
+    if (!fetchEnabled) return;
+
+    const tryRefetchEmptyTab = (subTab, count, listLength, loading, reloadFn) => {
+      if (count <= 0 || listLength > 0 || loading) {
+        return;
+      }
+      const key = `${subTab}:empty:${count}`;
+      if (tabEmptyRefetchKeyRef.current === key) {
+        return;
+      }
+      tabEmptyRefetchKeyRef.current = key;
+      reloadFn();
+    };
+
+    if (activeInboxSubTab === "open") {
+      tryRefetchEmptyTab(
+        "open",
+        tabCounts.open,
+        openTicketsRaw.length,
+        openFetch.loading,
+        reloadOpenList
+      );
+    } else if (activeInboxSubTab === "pending") {
+      tryRefetchEmptyTab(
+        "pending",
+        tabCounts.pending,
+        pendingTicketsRaw.length,
+        pendingFetch.loading,
+        reloadPendingList
+      );
+    } else if (activeInboxSubTab === "chatbot") {
+      tryRefetchEmptyTab(
+        "chatbot",
+        tabCounts.chatbot,
+        chatbotTicketsRaw.length,
+        pendingFetch.loading,
+        reloadPendingList
+      );
+    }
+
+    if (
+      (activeInboxSubTab === "open" && openTicketsRaw.length > 0) ||
+      (activeInboxSubTab === "pending" && pendingTicketsRaw.length > 0) ||
+      (activeInboxSubTab === "chatbot" && chatbotTicketsRaw.length > 0)
+    ) {
+      tabEmptyRefetchKeyRef.current = "";
+    }
+  }, [
+    fetchEnabled,
+    activeInboxSubTab,
+    tabCounts.open,
+    tabCounts.pending,
+    tabCounts.chatbot,
+    openTicketsRaw.length,
+    pendingTicketsRaw.length,
+    chatbotTicketsRaw.length,
+    openFetch.loading,
+    pendingFetch.loading,
+    reloadOpenList,
+    reloadPendingList,
+  ]);
+
   const metricsValue = useMemo(
     () => ({
       openCount,
@@ -751,6 +851,8 @@ export function TicketsInboxProvider({
       acceptTicketInInbox,
       reloadOpenList,
       reloadPendingList,
+      scheduleReloadOpenList,
+      scheduleReloadPendingList,
       refreshTabCounts,
       removeTicket,
       removeTickets,
@@ -777,6 +879,8 @@ export function TicketsInboxProvider({
       acceptTicketInInbox,
       reloadOpenList,
       reloadPendingList,
+      scheduleReloadOpenList,
+      scheduleReloadPendingList,
       refreshTabCounts,
       removeTicket,
       removeTickets,

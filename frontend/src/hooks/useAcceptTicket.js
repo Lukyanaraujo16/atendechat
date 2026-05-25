@@ -42,8 +42,8 @@ export function useAcceptTicket() {
         inbox.upsertTicket(updated);
       }
 
-      if (typeof inbox?.reloadOpenList === "function") {
-        inbox.reloadOpenList();
+      if (typeof inbox?.scheduleReloadPendingList === "function") {
+        inbox.scheduleReloadPendingList();
       }
 
       if (typeof inbox?.refreshTabCounts === "function") {

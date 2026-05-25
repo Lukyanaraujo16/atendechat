@@ -81,7 +81,6 @@ import {
 	getInboxListSurface,
 	getInboxCardSurface,
 } from "../../theme/ticketPanelStyles";
-import { canSeeChatbotInboxTab } from "../../utils/canSeeChatbotInboxTab";
 import {
   EMPTY_TICKET_SEARCH,
   getActiveTicketSearchKey,
@@ -529,7 +528,6 @@ const InboxSubTabsPills = memo(function InboxSubTabsPills({
   tabOpen,
   setTabOpen,
   classes,
-  showChatbotTab,
 }) {
   const { openCount, pendingCount, chatbotCount } = useTicketsInboxMetrics();
   return (
@@ -568,24 +566,22 @@ const InboxSubTabsPills = memo(function InboxSubTabsPills({
         </span>
       </ButtonBase>
 
-      {showChatbotTab ? (
-        <ButtonBase
-          className={`${classes.statusPill} ${classes.statusPillBtn} ${classes.statusPillGreen} ${
-            tabOpen === "chatbot" ? classes.statusPillGreenActive : ""
-          }`}
-          onClick={() => setTabOpen("chatbot")}
+      <ButtonBase
+        className={`${classes.statusPill} ${classes.statusPillBtn} ${classes.statusPillGreen} ${
+          tabOpen === "chatbot" ? classes.statusPillGreenActive : ""
+        }`}
+        onClick={() => setTabOpen("chatbot")}
+      >
+        <span className={classes.statusCountGreen}>{chatbotCount}</span>
+        <AndroidIcon className={clsx(classes.statusPillIcon, classes.statusIconGreen)} />
+        <span
+          className={
+            tabOpen === "chatbot" ? classes.statusPillTextActive : classes.statusPillText
+          }
         >
-          <span className={classes.statusCountGreen}>{chatbotCount}</span>
-          <AndroidIcon className={clsx(classes.statusPillIcon, classes.statusIconGreen)} />
-          <span
-            className={
-              tabOpen === "chatbot" ? classes.statusPillTextActive : classes.statusPillText
-            }
-          >
-            CHATBOT
-          </span>
-        </ButtonBase>
-      ) : null}
+          CHATBOT
+        </span>
+      </ButtonBase>
     </div>
   );
 });
@@ -698,7 +694,6 @@ function OpenInboxTicketLists({
   compactList,
   selectedQueueIds,
   showAllTickets,
-  showChatbotTab,
   ticketSearch,
   bulkSelectMode,
   onBulkSelectionApiChange,
@@ -737,17 +732,15 @@ function OpenInboxTicketLists({
         isBulkListActive={tabOpen === "pending"}
         onBulkSelectionApiChange={onBulkSelectionApiChange}
       />
-      {showChatbotTab ? (
-        <InboxChatbotListPanel
-          compactList={compactList}
-          style={styleChatbot}
-          selectedQueueIds={selectedQueueIds}
-          searchParam={ticketSearch.chatbot}
-          bulkSelectMode={bulkSelectMode}
-          isBulkListActive={tabOpen === "chatbot"}
-          onBulkSelectionApiChange={onBulkSelectionApiChange}
-        />
-      ) : null}
+      <InboxChatbotListPanel
+        compactList={compactList}
+        style={styleChatbot}
+        selectedQueueIds={selectedQueueIds}
+        searchParam={ticketSearch.chatbot}
+        bulkSelectMode={bulkSelectMode}
+        isBulkListActive={tabOpen === "chatbot"}
+        onBulkSelectionApiChange={onBulkSelectionApiChange}
+      />
     </>
   );
 }
@@ -778,7 +771,6 @@ const TicketsManagerTabs = () => {
   const { user } = useContext(AuthContext);
   const { whatsApps } = useContext(WhatsAppsContext);
   const { profile } = user;
-  const showChatbotTab = useMemo(() => canSeeChatbotInboxTab(user), [user]);
   const mayBulkDelete = canDeleteTickets(user);
   const [bulkSelectMode, setBulkSelectMode] = useState(false);
   const [bulkListApi, setBulkListApi] = useState(null);
@@ -829,12 +821,6 @@ const TicketsManagerTabs = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  useEffect(() => {
-    if (!showChatbotTab && tabOpen === "chatbot") {
-      setTabOpen("open");
-    }
-  }, [showChatbotTab, tabOpen, setTabOpen]);
 
   const activeSearchKey = useMemo(
     () => getActiveTicketSearchKey(tab, tabOpen),
@@ -954,6 +940,7 @@ const TicketsManagerTabs = () => {
       selectedQueueIds={selectedQueueIds}
       showAll={showAllTickets}
       inboxUiActive={tab === "open"}
+      activeInboxSubTab={tabOpen}
     >
     <Paper elevation={0} className={classes.ticketsRoot}>
       <NewTicketModal
@@ -1080,7 +1067,6 @@ const TicketsManagerTabs = () => {
           tabOpen={tabOpen}
           setTabOpen={setTabOpen}
           classes={classes}
-          showChatbotTab={showChatbotTab}
         />
       )}
 
@@ -1253,7 +1239,6 @@ const TicketsManagerTabs = () => {
             compactList={compactList}
             selectedQueueIds={selectedQueueIds}
             showAllTickets={showAllTickets}
-            showChatbotTab={showChatbotTab}
             ticketSearch={ticketSearch}
             bulkSelectMode={bulkSelectMode}
             onBulkSelectionApiChange={setBulkListApi}
