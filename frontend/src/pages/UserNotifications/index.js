@@ -173,7 +173,9 @@ export default function UserNotificationsPage() {
         toastError(e);
       }
     }
-    navigateFromNotificationData(n.data, history);
+    navigateFromNotificationData(n.data, history, {
+      effectiveFeatures: user?.effectiveUserFeatures,
+    });
   };
 
   const markAll = async () => {

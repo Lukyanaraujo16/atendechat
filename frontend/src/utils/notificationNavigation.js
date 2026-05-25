@@ -1,7 +1,11 @@
+import { hasAttendanceInboxAccess } from "./attendanceAccess";
+
 /**
  * Navegação a partir de `UserNotification.data` (tickets, agenda, cobrança plataforma).
+ * @param {{ effectiveFeatures?: Record<string, boolean> }} [options]
  */
-export function navigateFromNotificationData(data, history) {
+export function navigateFromNotificationData(data, history, options = {}) {
+  const fx = options.effectiveFeatures || {};
   const d = data || {};
   const dealIdRaw =
     (d.type === "crm_followup_overdue" ||
@@ -30,6 +34,9 @@ export function navigateFromNotificationData(data, history) {
       return;
     }
     history.push("/saas/companies");
+    return;
+  }
+  if (!hasAttendanceInboxAccess(fx)) {
     return;
   }
   const uuid = d.ticketUuid != null ? String(d.ticketUuid).trim() : "";

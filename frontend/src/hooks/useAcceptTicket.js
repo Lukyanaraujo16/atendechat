@@ -46,6 +46,10 @@ export function useAcceptTicket() {
         inbox.scheduleReloadPendingList();
       }
 
+      if (typeof inbox?.scheduleReloadOpenList === "function") {
+        inbox.scheduleReloadOpenList();
+      }
+
       if (typeof inbox?.refreshTabCounts === "function") {
         inbox.refreshTabCounts();
       }

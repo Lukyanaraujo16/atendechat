@@ -24,6 +24,11 @@ import NotificationsIcon from "@material-ui/icons/Notifications";
 import AssessmentOutlinedIcon from "@material-ui/icons/AssessmentOutlined";
 import { AccountTree, BusinessCenter } from "@material-ui/icons";
 import { i18n } from "../translate/i18n";
+import {
+  getAttendanceDefaultPath,
+  hasAttendanceModuleAccess,
+  hasInternalChatAccess,
+} from "../utils/attendanceAccess";
 import { WhatsAppsContext } from "../context/WhatsApp/WhatsAppsContext";
 import { AuthContext } from "../context/Auth/AuthContext";
 import { Can } from "../components/Can";
@@ -156,7 +161,7 @@ const reducer = (state, action) => {
   }
 };
 
-function defaultAutomacaoPath(planFlags, isTenantManager) {
+function defaultAutomacaoPath(planFlags, isTenantManager, user) {
   if (!isTenantManager) return "/quick-messages";
   const fx = planFlags.effectiveFeatures || {};
   if (fx["automation.chatbot"] === true) return "/flowbuilders";
@@ -166,7 +171,12 @@ function defaultAutomacaoPath(planFlags, isTenantManager) {
   }
   if (planFlags.useOpenAi || fx["automation.openai"] === true) return "/prompts";
   if (fx["automation.quick_replies"] === true) return "/quick-messages";
-  return "/tickets";
+  return getAttendanceDefaultPath({
+    effectiveFeatures: fx,
+    planFlags,
+    isAdmin: isTenantManager,
+    user,
+  });
 }
 
 function MenuDrawerSkeleton({ classes }) {
@@ -226,7 +236,14 @@ const MainListItems = (props) => {
   const showCampaigns = planFlags.useCampaigns;
   const showKanban = planFlags.useKanban;
   const showSchedules = planFlags.useSchedules;
-  const showInternalChat = planFlags.useInternalChat;
+  const showInternalChat = hasInternalChatAccess(fx);
+  const showAtendimento = hasAttendanceModuleAccess(fx);
+  const atendimentoPath = getAttendanceDefaultPath({
+    effectiveFeatures: fx,
+    planFlags,
+    isAdmin: isTenantManager,
+    user,
+  });
   const showDashboardNav =
     fx["dashboard.main"] === true || fx["dashboard.reports"] === true;
   const showAgendaNav = fx["agenda.calendar"] === true;
@@ -354,7 +371,7 @@ const MainListItems = (props) => {
   const selNotifications = path === "/notifications";
   const selSaaS = path.startsWith("/saas") || path.startsWith("/platform");
 
-  const toAutomacao = defaultAutomacaoPath(planFlags, isTenantManager);
+  const toAutomacao = defaultAutomacaoPath(planFlags, isTenantManager, user);
   const automacaoVisible =
     isTenantManager &&
     (fx["automation.chatbot"] === true ||
@@ -509,15 +526,17 @@ const MainListItems = (props) => {
         />
       )}
 
-      <ListItemLink
-        to="/tickets"
-        primary={i18n.t("mainDrawer.sections.atendimento")}
-        icon={<WhatsAppIcon />}
-        listItemClassName={classes.listItem}
-        listItemIconClassName={classes.listItemIcon}
-        listItemTextClassName={classes.listItemText}
-        selected={selAtendimento}
-      />
+      {showAtendimento ? (
+        <ListItemLink
+          to={atendimentoPath}
+          primary={i18n.t("mainDrawer.sections.atendimento")}
+          icon={<WhatsAppIcon />}
+          listItemClassName={classes.listItem}
+          listItemIconClassName={classes.listItemIcon}
+          listItemTextClassName={classes.listItemText}
+          selected={selAtendimento}
+        />
+      ) : null}
 
       {user?.companyId != null &&
         user?.companyId !== "" &&

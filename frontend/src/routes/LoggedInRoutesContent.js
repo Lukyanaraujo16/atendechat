@@ -10,6 +10,16 @@ import ModuleTabsLayout from "../layout/ModuleTabsLayout";
 import PlanFeatureBlocked from "../components/PlanFeatureBlocked";
 import { i18n } from "../translate/i18n";
 import { canManageContactLabels } from "../utils/canManageContactLabels";
+import {
+  ATTENDANCE_OPERATIONAL_FEATURE_KEYS,
+  buildAtendimentoTabs,
+  getAttendanceDefaultPath,
+  getDefaultAppPath,
+  hasAttendanceInboxAccess,
+  hasAttendanceModuleAccess,
+  hasInternalChatAccess,
+  INTERNAL_CHAT_FEATURE_KEY,
+} from "../utils/attendanceAccess";
 
 import Dashboard from "../pages/Dashboard/";
 import TicketResponsiveContainer from "../pages/TicketResponsiveContainer";
@@ -94,6 +104,18 @@ function DashboardRouteGuard() {
   const fx = planFlags.effectiveFeatures || {};
   const allowed =
     fx["dashboard.main"] === true || fx["dashboard.reports"] === true;
+  const showDashboardNav =
+    fx["dashboard.main"] === true || fx["dashboard.reports"] === true;
+  const fallbackPath = getDefaultAppPath({
+    effectiveFeatures: fx,
+    showDashboardNav,
+    planFlags,
+    isAdmin:
+      user?.profile === "admin" ||
+      user?.profile === "supervisor" ||
+      user?.supportMode === true,
+    user,
+  });
   return (
     <Can
       role={user.profile}
@@ -111,9 +133,28 @@ function DashboardRouteGuard() {
           );
         return <DashboardModule planFlags={planFlags} />;
       }}
-      no={() => <Redirect to="/tickets" />}
+      no={() => <Redirect to={fallbackPath} />}
     />
   );
+}
+
+function AttendanceModuleGuard({ planFlags, user, isAdmin, children }) {
+  const fx = planFlags.effectiveFeatures || {};
+  if (!planFlags.loaded) {
+    return <PlanFlagsLoadingState />;
+  }
+  if (!hasAttendanceModuleAccess(fx)) {
+    if (hasInternalChatAccess(fx)) {
+      return <Redirect to="/chats" />;
+    }
+    return (
+      <FeatureBlocked
+        planFlags={planFlags}
+        anyOf={ATTENDANCE_OPERATIONAL_FEATURE_KEYS}
+      />
+    );
+  }
+  return children({ fx });
 }
 
 function DashboardModule({ planFlags }) {
@@ -156,34 +197,57 @@ function DashboardModule({ planFlags }) {
 }
 
 function AtendimentoModule({ planFlags, isAdmin, user }) {
-  const tabs = useMemo(() => {
-    const t = [{ path: "/tickets", label: i18n.t("mainDrawer.listItems.tickets") }];
-    if (planFlags.useKanban) {
-      t.push({ path: "/kanban", label: i18n.t("mainDrawer.listItems.kanban") });
-    }
-    t.push({ path: "/contacts", label: i18n.t("mainDrawer.listItems.contacts") });
-    if (canManageContactLabels(user)) {
-      t.push({
-        path: "/contacts/labels",
-        label: i18n.t("mainDrawer.listItems.contactLabels"),
-      });
-    }
-    if (isAdmin && planFlags.useGroups) {
-      t.push({ path: "/group-manager", label: i18n.t("mainDrawer.listItems.groups") });
-    }
-    return t;
-  }, [planFlags.useKanban, planFlags.useGroups, isAdmin, user, i18n.language]);
+  const fx = planFlags.effectiveFeatures || {};
+  const defaultPath = useMemo(
+    () =>
+      getAttendanceDefaultPath({
+        effectiveFeatures: fx,
+        planFlags,
+        isAdmin,
+        user,
+      }),
+    [fx, planFlags, isAdmin, user]
+  );
+
+  const tabs = useMemo(
+    () =>
+      buildAtendimentoTabs({
+        effectiveFeatures: fx,
+        planFlags,
+        isAdmin,
+        user,
+        t: (key) => i18n.t(key),
+      }),
+    [fx, planFlags, isAdmin, user, i18n.language]
+  );
+
+  if (!tabs.length) {
+    return <Redirect to={defaultPath} />;
+  }
 
   return (
     <ModuleTabsLayout tabs={tabs}>
       <Switch>
-        <Route exact path="/tickets/:ticketId?" component={TicketResponsiveContainer} />
+        <Route
+          exact
+          path="/tickets/:ticketId?"
+          render={() =>
+            hasAttendanceInboxAccess(fx) ? (
+              <TicketResponsiveContainer />
+            ) : (
+              <Redirect to={defaultPath} />
+            )
+          }
+        />
         <Route
           exact
           path="/kanban"
           render={() => {
             if (!planFlags.loaded) {
               return <PlanFlagsLoadingState />;
+            }
+            if (fx["attendance.kanban"] !== true) {
+              return <Redirect to={defaultPath} />;
             }
             return planFlags.useKanban ? (
               <Kanban />
@@ -192,15 +256,25 @@ function AtendimentoModule({ planFlags, isAdmin, user }) {
             );
           }}
         />
-        <Route exact path="/contacts" component={Contacts} />
+        <Route
+          exact
+          path="/contacts"
+          render={() =>
+            hasAttendanceInboxAccess(fx) ? (
+              <Contacts />
+            ) : (
+              <Redirect to={defaultPath} />
+            )
+          }
+        />
         <Route
           exact
           path="/contacts/labels"
           render={() =>
-            canManageContactLabels(user) ? (
+            canManageContactLabels(user) && fx["contacts.tags"] === true ? (
               <ContactLabels />
             ) : (
-              <Redirect to="/tickets" />
+              <Redirect to={defaultPath} />
             )
           }
         />
@@ -211,6 +285,9 @@ function AtendimentoModule({ planFlags, isAdmin, user }) {
             if (!planFlags.loaded) {
               return <PlanFlagsLoadingState />;
             }
+            if (fx["team.groups"] !== true) {
+              return <Redirect to={defaultPath} />;
+            }
             return isAdmin && planFlags.useGroups ? (
               <GroupManager />
             ) : (
@@ -218,6 +295,7 @@ function AtendimentoModule({ planFlags, isAdmin, user }) {
             );
           }}
         />
+        <Route render={() => <Redirect to={defaultPath} />} />
       </Switch>
     </ModuleTabsLayout>
   );
@@ -282,7 +360,7 @@ function AutomacaoModule({ planFlags, isAdmin }) {
     );
   }
 
-  const fallback = tabs[0]?.path || "/tickets";
+  const fallback = tabs[0]?.path || "/quick-messages";
 
   return (
     <ModuleTabsLayout tabs={tabs}>
@@ -500,6 +578,15 @@ export default function LoggedInRoutesContent() {
     user?.profile === "admin" || user?.profile === "supervisor" || user?.supportMode === true;
   const showMediaManager = isAdmin || user?.supportMode === true;
   const fx = planFlags.effectiveFeatures || {};
+  const showDashboardNav =
+    fx["dashboard.main"] === true || fx["dashboard.reports"] === true;
+  const appDefaultPath = getDefaultAppPath({
+    effectiveFeatures: fx,
+    showDashboardNav,
+    planFlags,
+    isAdmin: isTenantManager,
+    user,
+  });
 
   const atendimentoPaths = [
     "/tickets/:ticketId?",
@@ -543,11 +630,19 @@ export default function LoggedInRoutesContent() {
       <Route
         path={atendimentoPaths}
         render={() => (
-          <AtendimentoModule
+          <AttendanceModuleGuard
             planFlags={planFlags}
-            isAdmin={isTenantManager}
             user={user}
-          />
+            isAdmin={isTenantManager}
+          >
+            {() => (
+              <AtendimentoModule
+                planFlags={planFlags}
+                isAdmin={isTenantManager}
+                user={user}
+              />
+            )}
+          </AttendanceModuleGuard>
         )}
       />
 
@@ -558,11 +653,27 @@ export default function LoggedInRoutesContent() {
           if (!planFlags.loaded) {
             return <PlanFlagsLoadingState />;
           }
-          return planFlags.useInternalChat ? (
-            <Chat />
-          ) : (
-            <FeatureBlocked planFlags={planFlags} anyOf={["attendance.internal_chat"]} />
-          );
+          if (!hasInternalChatAccess(fx)) {
+            if (hasAttendanceModuleAccess(fx)) {
+              return (
+                <Redirect
+                  to={getAttendanceDefaultPath({
+                    effectiveFeatures: fx,
+                    planFlags,
+                    isAdmin: isTenantManager,
+                    user,
+                  })}
+                />
+              );
+            }
+            return (
+              <FeatureBlocked
+                planFlags={planFlags}
+                anyOf={[INTERNAL_CHAT_FEATURE_KEY]}
+              />
+            );
+          }
+          return <Chat />;
         }}
       />
       <Route
@@ -572,11 +683,27 @@ export default function LoggedInRoutesContent() {
           if (!planFlags.loaded) {
             return <PlanFlagsLoadingState />;
           }
-          return planFlags.useInternalChat ? (
-            <Chat {...routeProps} />
-          ) : (
-            <FeatureBlocked planFlags={planFlags} anyOf={["attendance.internal_chat"]} />
-          );
+          if (!hasInternalChatAccess(fx)) {
+            if (hasAttendanceModuleAccess(fx)) {
+              return (
+                <Redirect
+                  to={getAttendanceDefaultPath({
+                    effectiveFeatures: fx,
+                    planFlags,
+                    isAdmin: isTenantManager,
+                    user,
+                  })}
+                />
+              );
+            }
+            return (
+              <FeatureBlocked
+                planFlags={planFlags}
+                anyOf={[INTERNAL_CHAT_FEATURE_KEY]}
+              />
+            );
+          }
+          return <Chat {...routeProps} />;
         }}
       />
 
@@ -781,7 +908,7 @@ export default function LoggedInRoutesContent() {
         }}
       />
 
-      <Route render={() => <Redirect to="/tickets" />} />
+      <Route render={() => <Redirect to={appDefaultPath} />} />
     </Switch>
   );
 }

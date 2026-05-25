@@ -98,7 +98,9 @@ export default function useUserNotifications({ enabled = true } = {}) {
     async (n) => {
       try {
         await markRead(n);
-        navigateFromNotificationData(n.data, history);
+        navigateFromNotificationData(n.data, history, {
+          effectiveFeatures: user?.effectiveUserFeatures,
+        });
       } catch (e) {
         toastError(e);
       }

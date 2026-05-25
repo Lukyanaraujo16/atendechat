@@ -60,6 +60,49 @@ function mergeLoadBatch(prev, batch) {
  * Página 1: substitui todos os tickets daquele status (permite lista vazia após exclusão).
  * Páginas seguintes: apenas mescla.
  */
+function isPendingChatbotTicket(ticket) {
+  return !!ticket?.chatbot;
+}
+
+/** Subconjunto pending alinhado ao countOnly (chatbot=true|false). */
+function applyPendingSubsetBatch(
+  prev,
+  batch,
+  chatbotSubset,
+  pageNumber,
+  recentlyDeletedRef
+) {
+  const page = Number(pageNumber) || 1;
+  const raw = Array.isArray(batch) ? batch : [];
+  const list =
+    recentlyDeletedRef?.current?.size > 0
+      ? raw.filter((t) => !recentlyDeletedRef.current.has(Number(t.id)))
+      : raw;
+
+  const inSubset = (t) =>
+    t.status === "pending" &&
+    (chatbotSubset
+      ? isPendingChatbotTicket(t)
+      : !isPendingChatbotTicket(t));
+
+  const withoutSubset = prev.filter((t) => !inSubset(t));
+
+  if (page <= 1) {
+    if (list.length === 0) {
+      const existingSubset = prev.filter(inSubset);
+      if (existingSubset.length > 0) {
+        return prev;
+      }
+      return withoutSubset;
+    }
+    return mergeLoadBatch(withoutSubset, list);
+  }
+  if (list.length === 0) {
+    return prev;
+  }
+  return mergeLoadBatch(prev, list);
+}
+
 function applyStatusPageBatch(prev, batch, status, pageNumber, recentlyDeletedRef) {
   const page = Number(pageNumber) || 1;
   const raw = Array.isArray(batch) ? batch : [];
@@ -120,6 +163,8 @@ export function TicketsInboxProvider({
   const [pendingPage, setPendingPage] = useState(1);
   const [openReloadToken, setOpenReloadToken] = useState(0);
   const [pendingReloadToken, setPendingReloadToken] = useState(0);
+  const [chatbotPage, setChatbotPage] = useState(1);
+  const [chatbotReloadToken, setChatbotReloadToken] = useState(0);
   const [pinnedMeta, setPinnedMeta] = useState([]);
   const [pinActionTicketId, setPinActionTicketId] = useState(null);
   const [tabCounts, setTabCounts] = useState({
@@ -131,7 +176,9 @@ export function TicketsInboxProvider({
   const refreshCountsTimerRef = useRef(null);
   const reloadOpenTimerRef = useRef(null);
   const reloadPendingTimerRef = useRef(null);
-  const tabEmptyRefetchKeyRef = useRef("");
+  const reloadChatbotTimerRef = useRef(null);
+  const mismatchReloadTimersRef = useRef({});
+  const lastMismatchReloadAtRef = useRef({ open: 0, pending: 0, chatbot: 0 });
 
   const queueIdsJson = useMemo(
     () => JSON.stringify(Array.isArray(selectedQueueIds) ? selectedQueueIds : []),
@@ -167,9 +214,11 @@ export function TicketsInboxProvider({
     setTickets([]);
     setOpenPage(1);
     setPendingPage(1);
+    setChatbotPage(1);
     setPinnedMeta([]);
     setTabCounts({ open: 0, pending: 0, chatbot: 0 });
     recentlyDeletedIdsRef.current = new Set();
+    lastMismatchReloadAtRef.current = { open: 0, pending: 0, chatbot: 0 };
   }, [queueIdsJson, showAll]);
 
   const refreshTabCounts = useCallback(async () => {
@@ -222,6 +271,12 @@ export function TicketsInboxProvider({
       if (reloadPendingTimerRef.current) {
         clearTimeout(reloadPendingTimerRef.current);
       }
+      if (reloadChatbotTimerRef.current) {
+        clearTimeout(reloadChatbotTimerRef.current);
+      }
+      Object.values(mismatchReloadTimersRef.current).forEach((id) => {
+        if (id) clearTimeout(id);
+      });
     };
   }, [refreshTabCounts]);
 
@@ -233,6 +288,11 @@ export function TicketsInboxProvider({
   const reloadPendingList = useCallback(() => {
     setPendingPage(1);
     setPendingReloadToken((n) => n + 1);
+  }, []);
+
+  const reloadChatbotList = useCallback(() => {
+    setChatbotPage(1);
+    setChatbotReloadToken((n) => n + 1);
   }, []);
 
   const scheduleReloadOpenList = useCallback(() => {
@@ -255,6 +315,36 @@ export function TicketsInboxProvider({
     }, 400);
   }, [fetchEnabled, reloadPendingList]);
 
+  const scheduleReloadChatbotList = useCallback(() => {
+    if (!fetchEnabled) return;
+    if (reloadChatbotTimerRef.current) {
+      clearTimeout(reloadChatbotTimerRef.current);
+    }
+    reloadChatbotTimerRef.current = setTimeout(() => {
+      reloadChatbotList();
+    }, 400);
+  }, [fetchEnabled, reloadChatbotList]);
+
+  const scheduleMismatchReload = useCallback(
+    (tabKey, reloadFn) => {
+      if (!fetchEnabled || typeof reloadFn !== "function") return;
+      const prevTimer = mismatchReloadTimersRef.current[tabKey];
+      if (prevTimer) {
+        clearTimeout(prevTimer);
+      }
+      mismatchReloadTimersRef.current[tabKey] = setTimeout(() => {
+        const now = Date.now();
+        const last = lastMismatchReloadAtRef.current[tabKey] || 0;
+        if (now - last < 2000) {
+          return;
+        }
+        lastMismatchReloadAtRef.current[tabKey] = now;
+        reloadFn();
+      }, 400);
+    },
+    [fetchEnabled]
+  );
+
   const openFetch = useTickets({
     enabled: fetchEnabled,
     pageNumber: openPage,
@@ -274,6 +364,21 @@ export function TicketsInboxProvider({
     reloadToken: pendingReloadToken,
     searchParam: "",
     status: "pending",
+    chatbot: "false",
+    showAll,
+    tags: undefined,
+    users: undefined,
+    queueIds: queueIdsJson,
+    isGroup: undefined,
+  });
+
+  const chatbotFetch = useTickets({
+    enabled: fetchEnabled,
+    pageNumber: chatbotPage,
+    reloadToken: chatbotReloadToken,
+    searchParam: "",
+    status: "pending",
+    chatbot: "true",
     showAll,
     tags: undefined,
     users: undefined,
@@ -297,15 +402,28 @@ export function TicketsInboxProvider({
   useEffect(() => {
     if (!fetchEnabled || pendingFetch.loading) return;
     setTickets((prev) =>
-      applyStatusPageBatch(
+      applyPendingSubsetBatch(
         prev,
         pendingFetch.tickets,
-        "pending",
+        false,
         pendingPage,
         recentlyDeletedIdsRef
       )
     );
   }, [fetchEnabled, pendingFetch.loading, pendingFetch.tickets, pendingPage]);
+
+  useEffect(() => {
+    if (!fetchEnabled || chatbotFetch.loading) return;
+    setTickets((prev) =>
+      applyPendingSubsetBatch(
+        prev,
+        chatbotFetch.tickets,
+        true,
+        chatbotPage,
+        recentlyDeletedIdsRef
+      )
+    );
+  }, [fetchEnabled, chatbotFetch.loading, chatbotFetch.tickets, chatbotPage]);
 
   useEffect(() => {
     if (!fetchEnabled || openFetch.loading) return;
@@ -522,6 +640,7 @@ export function TicketsInboxProvider({
         scheduleRefreshTabCounts();
         scheduleReloadOpenList();
         scheduleReloadPendingList();
+        scheduleReloadChatbotList();
         return;
       }
       if (data.action === "update" && data.ticket) {
@@ -539,6 +658,7 @@ export function TicketsInboxProvider({
           scheduleRefreshTabCounts();
           scheduleReloadOpenList();
           scheduleReloadPendingList();
+          scheduleReloadChatbotList();
           return;
         }
         if (t.status === "open" || t.status === "pending") {
@@ -548,6 +668,8 @@ export function TicketsInboxProvider({
           });
           if (t.status === "open") {
             scheduleReloadOpenList();
+          } else if (isPendingChatbotTicket(t)) {
+            scheduleReloadChatbotList();
           } else {
             scheduleReloadPendingList();
           }
@@ -558,6 +680,7 @@ export function TicketsInboxProvider({
           removeTicket(t.id);
           scheduleReloadOpenList();
           scheduleReloadPendingList();
+          scheduleReloadChatbotList();
         }
         scheduleRefreshTabCounts();
       }
@@ -581,6 +704,8 @@ export function TicketsInboxProvider({
         });
         if (t2.status === "open") {
           scheduleReloadOpenList();
+        } else if (isPendingChatbotTicket(t2)) {
+          scheduleReloadChatbotList();
         } else {
           scheduleReloadPendingList();
         }
@@ -591,6 +716,7 @@ export function TicketsInboxProvider({
         removeTicket(t2.id);
         scheduleReloadOpenList();
         scheduleReloadPendingList();
+        scheduleReloadChatbotList();
       }
       scheduleRefreshTabCounts();
     };
@@ -628,6 +754,7 @@ export function TicketsInboxProvider({
     scheduleRefreshTabCounts,
     scheduleReloadOpenList,
     scheduleReloadPendingList,
+    scheduleReloadChatbotList,
   ]);
 
   const afterProfileFilter = useMemo(() => {
@@ -719,67 +846,86 @@ export function TicketsInboxProvider({
     setPendingPage((p) => p + 1);
   }, []);
 
+  const loadMoreChatbot = useCallback(() => {
+    setChatbotPage((p) => p + 1);
+  }, []);
+
+  /**
+   * Regra obrigatória: se contador > tickets renderizados na aba ativa, refetch da API.
+   * Fonte da verdade da lista = GET /tickets (alinhado ao countOnly por chatbot).
+   */
   useEffect(() => {
     if (!fetchEnabled) return;
 
-    const tryRefetchEmptyTab = (subTab, count, listLength, loading, reloadFn) => {
-      if (count <= 0 || listLength > 0 || loading) {
+    const tabSpecs = [
+      {
+        key: "open",
+        count: tabCounts.open,
+        loaded: openTickets.length,
+        loading: openFetch.loading,
+        reload: reloadOpenList,
+      },
+      {
+        key: "pending",
+        count: tabCounts.pending,
+        loaded: pendingTickets.length,
+        loading: pendingFetch.loading,
+        reload: reloadPendingList,
+      },
+      {
+        key: "chatbot",
+        count: tabCounts.chatbot,
+        loaded: chatbotTickets.length,
+        loading: chatbotFetch.loading,
+        reload: reloadChatbotList,
+      },
+    ];
+
+    tabSpecs.forEach(({ key, count, loaded, loading, reload }) => {
+      if (loaded >= count) {
+        lastMismatchReloadAtRef.current[key] = 0;
         return;
       }
-      const key = `${subTab}:empty:${count}`;
-      if (tabEmptyRefetchKeyRef.current === key) {
+      if (activeInboxSubTab !== key || count <= 0 || loading) {
         return;
       }
-      tabEmptyRefetchKeyRef.current = key;
-      reloadFn();
-    };
-
-    if (activeInboxSubTab === "open") {
-      tryRefetchEmptyTab(
-        "open",
-        tabCounts.open,
-        openTicketsRaw.length,
-        openFetch.loading,
-        reloadOpenList
-      );
-    } else if (activeInboxSubTab === "pending") {
-      tryRefetchEmptyTab(
-        "pending",
-        tabCounts.pending,
-        pendingTicketsRaw.length,
-        pendingFetch.loading,
-        reloadPendingList
-      );
-    } else if (activeInboxSubTab === "chatbot") {
-      tryRefetchEmptyTab(
-        "chatbot",
-        tabCounts.chatbot,
-        chatbotTicketsRaw.length,
-        pendingFetch.loading,
-        reloadPendingList
-      );
-    }
-
-    if (
-      (activeInboxSubTab === "open" && openTicketsRaw.length > 0) ||
-      (activeInboxSubTab === "pending" && pendingTicketsRaw.length > 0) ||
-      (activeInboxSubTab === "chatbot" && chatbotTicketsRaw.length > 0)
-    ) {
-      tabEmptyRefetchKeyRef.current = "";
-    }
+      scheduleMismatchReload(key, reload);
+    });
   }, [
     fetchEnabled,
     activeInboxSubTab,
     tabCounts.open,
     tabCounts.pending,
     tabCounts.chatbot,
-    openTicketsRaw.length,
-    pendingTicketsRaw.length,
-    chatbotTicketsRaw.length,
+    openTickets.length,
+    pendingTickets.length,
+    chatbotTickets.length,
     openFetch.loading,
     pendingFetch.loading,
+    chatbotFetch.loading,
     reloadOpenList,
     reloadPendingList,
+    reloadChatbotList,
+    scheduleMismatchReload,
+  ]);
+
+  /** Ao trocar de sub-aba, força verificação imediata (debounce no scheduleMismatchReload). */
+  useEffect(() => {
+    if (!fetchEnabled) return;
+    if (activeInboxSubTab === "open") {
+      scheduleMismatchReload("open", reloadOpenList);
+    } else if (activeInboxSubTab === "pending") {
+      scheduleMismatchReload("pending", reloadPendingList);
+    } else if (activeInboxSubTab === "chatbot") {
+      scheduleMismatchReload("chatbot", reloadChatbotList);
+    }
+  }, [
+    fetchEnabled,
+    activeInboxSubTab,
+    reloadOpenList,
+    reloadPendingList,
+    reloadChatbotList,
+    scheduleMismatchReload,
   ]);
 
   const metricsValue = useMemo(
@@ -825,11 +971,11 @@ export function TicketsInboxProvider({
   const chatbotColumnValue = useMemo(
     () => ({
       tickets: chatbotTickets,
-      loading: pendingFetch.loading,
-      hasMore: pendingFetch.hasMore,
-      loadMore: loadMorePending,
+      loading: chatbotFetch.loading,
+      hasMore: chatbotFetch.hasMore,
+      loadMore: loadMoreChatbot,
     }),
-    [chatbotTickets, pendingFetch.loading, pendingFetch.hasMore, loadMorePending]
+    [chatbotTickets, chatbotFetch.loading, chatbotFetch.hasMore, loadMoreChatbot]
   );
 
   const legacyValue = useMemo(
@@ -851,8 +997,10 @@ export function TicketsInboxProvider({
       acceptTicketInInbox,
       reloadOpenList,
       reloadPendingList,
+      reloadChatbotList,
       scheduleReloadOpenList,
       scheduleReloadPendingList,
+      scheduleReloadChatbotList,
       refreshTabCounts,
       removeTicket,
       removeTickets,
@@ -879,8 +1027,10 @@ export function TicketsInboxProvider({
       acceptTicketInInbox,
       reloadOpenList,
       reloadPendingList,
+      reloadChatbotList,
       scheduleReloadOpenList,
       scheduleReloadPendingList,
+      scheduleReloadChatbotList,
       refreshTabCounts,
       removeTicket,
       removeTickets,

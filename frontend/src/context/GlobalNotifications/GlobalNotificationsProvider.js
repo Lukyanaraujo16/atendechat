@@ -25,6 +25,8 @@ import {
   GlobalNotificationsStateProvider,
   useGlobalNotifications,
 } from "./GlobalNotificationsContext";
+import usePlanFlags from "../../hooks/usePlanFlags";
+import { hasAttendanceInboxAccess } from "../../utils/attendanceAccess";
 
 const TOAST_AUTO_CLOSE_MS = 7000;
 const SOUND_DEBOUNCE_MS = 1000;
@@ -35,6 +37,9 @@ function createNotificationId(dedupeKey) {
 
 function GlobalNotificationsSocketBridge({ children }) {
   const { user } = useContext(AuthContext);
+  const planFlags = usePlanFlags();
+  const effectiveFeatures = planFlags.effectiveFeatures || {};
+  const canAccessWhatsappInbox = hasAttendanceInboxAccess(effectiveFeatures);
   const socketManager = useContext(SocketContext);
   const history = useHistory();
   const location = useLocation();
@@ -130,10 +135,14 @@ function GlobalNotificationsSocketBridge({ children }) {
         });
       }
       if (notification.targetUrl) {
+        const isTicketTarget = String(notification.targetUrl).startsWith("/tickets");
+        if (isTicketTarget && !canAccessWhatsappInbox) {
+          return;
+        }
         history.push(notification.targetUrl);
       }
     },
-    [history, markAsReadByChat, markAsReadByTicket]
+    [history, markAsReadByChat, markAsReadByTicket, canAccessWhatsappInbox]
   );
 
   useEffect(() => {
@@ -152,6 +161,9 @@ function GlobalNotificationsSocketBridge({ children }) {
 
   const handleWhatsappMessage = useCallback(
     (data) => {
+      if (!canAccessWhatsappInbox) {
+        return;
+      }
       if (!shouldNotifyWhatsappMessage(data, user)) {
         return;
       }
@@ -201,7 +213,14 @@ function GlobalNotificationsSocketBridge({ children }) {
       });
       showToast(notification, () => openNotificationTarget(notification));
     },
-    [addNotification, openNotificationTarget, playSound, showToast, user]
+    [
+      addNotification,
+      canAccessWhatsappInbox,
+      openNotificationTarget,
+      playSound,
+      showToast,
+      user,
+    ]
   );
 
   const handleInternalChatMessage = useCallback(
