@@ -46,12 +46,7 @@ export function isInternalChatOpenInRoute(chat, pathname = "") {
 
 export function shouldNotifyWhatsappMessage(data, user) {
   if (data.action !== "create" || data.message?.fromMe) return false;
-  if (
-    !(data.ticket.status !== "pending") ||
-    !(!data.message.read || data.ticket.status === "pending")
-  ) {
-    return false;
-  }
+  if (data.message?.read) return false;
   return shouldNotifyUserAboutTicket(data.ticket, user);
 }
 

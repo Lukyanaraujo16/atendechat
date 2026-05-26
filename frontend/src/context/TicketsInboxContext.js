@@ -64,26 +64,18 @@ function isPendingChatbotTicket(ticket) {
   return !!ticket?.chatbot;
 }
 
-/** Mescla API na coluna; mantém tickets locais se a resposta da API vier incompleta. */
-function mergeColumnWithApi(prev, apiTickets, apiTotal) {
+function countVisibleTickets(list) {
+  return (Array.isArray(list) ? list : []).filter((t) => !t.isGroup).length;
+}
+
+/** Upsert da API sem remover tickets locais (socket chega antes do GET). */
+function mergeColumnWithApi(prev, apiTickets) {
   const apiList = Array.isArray(apiTickets) ? apiTickets : [];
-  const total = Number(apiTotal);
   const apiIds = new Set(apiList.map((t) => Number(t.id)));
   const safePrev = Array.isArray(prev) ? prev : [];
-  const scrubbed = safePrev.filter((t) => apiIds.has(Number(t.id)));
-  let next = mergeLoadBatch(scrubbed, apiList);
-  const responseComplete =
-    Number.isFinite(total) && total >= 0 && apiList.length >= total;
-  if (!responseComplete) {
-    const orphans = safePrev.filter((t) => !apiIds.has(Number(t.id)));
-    next = mergeLoadBatch(next, orphans);
-  } else {
-    next = next.filter((t) => apiIds.has(Number(t.id)));
-  }
-  const effectiveCount = responseComplete
-    ? total
-    : Math.max(next.length, apiList.length);
-  return { tickets: next, count: effectiveCount };
+  const kept = safePrev.filter((t) => !apiIds.has(Number(t.id)));
+  const next = mergeLoadBatch(kept, apiList);
+  return { tickets: next, count: countVisibleTickets(next) };
 }
 
 /**
@@ -190,6 +182,8 @@ export function TicketsInboxProvider({
   const chatbotSyncAtRef = useRef(0);
   const syncWaitingTimerRef = useRef(null);
   const syncChatbotTimerRef = useRef(null);
+  /** IDs inseridos/atualizados via socket antes do GET refletir no banco. */
+  const recentSocketPendingIdsRef = useRef(new Set());
 
   const queueIdsJson = useMemo(
     () => JSON.stringify(Array.isArray(selectedQueueIds) ? selectedQueueIds : []),
@@ -275,63 +269,59 @@ export function TicketsInboxProvider({
     [showAll, queueIdsJson]
   );
 
-  const syncWaitingColumnFromApi = useCallback(async () => {
-    if (!fetchEnabled) return;
-    setPendingColumnLoading(true);
-    try {
-      const { tickets, count, hasMore } = await fetchAllTicketsForColumn({
-        status: "pending",
-        chatbot: "false",
-      });
-      waitingSyncAtRef.current = Date.now();
-      let mergedTickets = tickets;
-      setWaitingTicketsList((prev) => {
-        const merged = mergeColumnWithApi(prev, tickets, count);
-        mergedTickets = merged.tickets;
-        return merged.tickets;
-      });
-      const visibleCount = mergedTickets.filter((t) => !t.isGroup).length;
-      setTabCounts((p) =>
-        p.pending === visibleCount ? p : { ...p, pending: visibleCount }
-      );
-      setPendingHasMore(Boolean(hasMore));
-      setPendingPage(1);
-      mismatchRetryCountRef.current.pending = 0;
-    } catch (err) {
-      toastError(err);
-    } finally {
-      setPendingColumnLoading(false);
-    }
-  }, [fetchEnabled, fetchAllTicketsForColumn]);
+  const syncWaitingColumnFromApi = useCallback(
+    async ({ ignoreUiGate = false } = {}) => {
+      if (!fetchEnabled && !ignoreUiGate) return;
+      setPendingColumnLoading(true);
+      try {
+        const { tickets, hasMore } = await fetchAllTicketsForColumn({
+          status: "pending",
+          chatbot: "false",
+        });
+        waitingSyncAtRef.current = Date.now();
+        setWaitingTicketsList((prev) => {
+          const merged = mergeColumnWithApi(prev, tickets);
+          tickets.forEach((t) => {
+            if (t?.id != null) {
+              recentSocketPendingIdsRef.current.delete(Number(t.id));
+            }
+          });
+          return merged.tickets;
+        });
+        setPendingHasMore(Boolean(hasMore));
+        setPendingPage(1);
+        mismatchRetryCountRef.current.pending = 0;
+      } catch (err) {
+        toastError(err);
+      } finally {
+        setPendingColumnLoading(false);
+      }
+    },
+    [fetchEnabled, fetchAllTicketsForColumn]
+  );
 
-  const syncChatbotColumnFromApi = useCallback(async () => {
-    if (!fetchEnabled) return;
-    setChatbotColumnLoading(true);
-    try {
-      const { tickets, count, hasMore } = await fetchAllTicketsForColumn({
-        status: "pending",
-        chatbot: "true",
-      });
-      chatbotSyncAtRef.current = Date.now();
-      let mergedTickets = tickets;
-      setChatbotTicketsList((prev) => {
-        const merged = mergeColumnWithApi(prev, tickets, count);
-        mergedTickets = merged.tickets;
-        return merged.tickets;
-      });
-      const visibleCount = mergedTickets.filter((t) => !t.isGroup).length;
-      setTabCounts((p) =>
-        p.chatbot === visibleCount ? p : { ...p, chatbot: visibleCount }
-      );
-      setChatbotHasMore(Boolean(hasMore));
-      setChatbotPage(1);
-      mismatchRetryCountRef.current.chatbot = 0;
-    } catch (err) {
-      toastError(err);
-    } finally {
-      setChatbotColumnLoading(false);
-    }
-  }, [fetchEnabled, fetchAllTicketsForColumn]);
+  const syncChatbotColumnFromApi = useCallback(
+    async ({ ignoreUiGate = false } = {}) => {
+      if (!fetchEnabled && !ignoreUiGate) return;
+      setChatbotColumnLoading(true);
+      try {
+        const { tickets, hasMore } = await fetchAllTicketsForColumn({
+          status: "pending",
+          chatbot: "true",
+        });
+        chatbotSyncAtRef.current = Date.now();
+        setChatbotTicketsList((prev) => mergeColumnWithApi(prev, tickets).tickets);
+        setChatbotHasMore(Boolean(hasMore));
+        setChatbotPage(1);
+        mismatchRetryCountRef.current.chatbot = 0;
+      } catch (err) {
+        toastError(err);
+      } finally {
+        setChatbotColumnLoading(false);
+      }
+    },
+    [fetchEnabled, fetchAllTicketsForColumn]
+  );
 
   const scheduleSyncWaitingColumn = useCallback(() => {
     if (!fetchEnabled) return;
@@ -339,8 +329,8 @@ export function TicketsInboxProvider({
       clearTimeout(syncWaitingTimerRef.current);
     }
     syncWaitingTimerRef.current = setTimeout(() => {
-      syncWaitingColumnFromApi();
-    }, 600);
+      syncWaitingColumnFromApi({ ignoreUiGate: true });
+    }, 350);
   }, [fetchEnabled, syncWaitingColumnFromApi]);
 
   const scheduleSyncChatbotColumn = useCallback(() => {
@@ -349,8 +339,8 @@ export function TicketsInboxProvider({
       clearTimeout(syncChatbotTimerRef.current);
     }
     syncChatbotTimerRef.current = setTimeout(() => {
-      syncChatbotColumnFromApi();
-    }, 600);
+      syncChatbotColumnFromApi({ ignoreUiGate: true });
+    }, 350);
   }, [fetchEnabled, syncChatbotColumnFromApi]);
 
   const scheduleSyncBothPendingColumns = useCallback(() => {
@@ -440,7 +430,7 @@ export function TicketsInboxProvider({
         lastMismatchReloadAtRef.current.pending = 0;
         mismatchRetryCountRef.current.pending = 0;
       }
-      return syncWaitingColumnFromApi();
+      return syncWaitingColumnFromApi({ ignoreUiGate: true });
     },
     [syncWaitingColumnFromApi]
   );
@@ -451,7 +441,7 @@ export function TicketsInboxProvider({
         lastMismatchReloadAtRef.current.chatbot = 0;
         mismatchRetryCountRef.current.chatbot = 0;
       }
-      return syncChatbotColumnFromApi();
+      return syncChatbotColumnFromApi({ ignoreUiGate: true });
     },
     [syncChatbotColumnFromApi]
   );
@@ -643,7 +633,12 @@ export function TicketsInboxProvider({
   const reconcilePendingTicket = useCallback(
     (ticket, { bumpToTop = false } = {}) => {
       if (!ticket?.id || isRecentlyDeleted(ticket.id)) return;
-      const id = ticket.id;
+      const id = Number(ticket.id);
+      recentSocketPendingIdsRef.current.add(id);
+      setTimeout(() => {
+        recentSocketPendingIdsRef.current.delete(id);
+      }, 120000);
+
       const isBot = isPendingChatbotTicket(ticket);
       if (isBot) {
         setWaitingTicketsList((prev) => prev.filter((t) => t.id !== id));
@@ -895,7 +890,7 @@ export function TicketsInboxProvider({
       if (data.action !== "create" || !data.ticket) return;
       if (isRecentlyDeleted(data.ticket.id)) return;
       const t2 = data.ticket;
-      if (t2.isGroup || !shouldShowTicket(t2)) {
+      if (t2.isGroup) {
         if (t2.id != null) {
           removeTicket(t2.id);
         }
@@ -908,7 +903,18 @@ export function TicketsInboxProvider({
           isPinned: pinnedIdSet.has(Number(t2.id)),
         };
         if (t2.status === "pending") {
-          reconcilePendingTicket(normalizedMsg, { bumpToTop: true });
+          if (shouldShowTicket(t2)) {
+            reconcilePendingTicket(normalizedMsg, { bumpToTop: true });
+          } else if (t2.id != null) {
+            removeTicket(t2.id);
+          }
+          scheduleSyncBothPendingColumns();
+        } else if (!shouldShowTicket(t2)) {
+          if (t2.id != null) {
+            removeTicket(t2.id);
+          }
+          scheduleRefreshTabCounts();
+          scheduleReloadOpenList();
           scheduleSyncBothPendingColumns();
         } else {
           upsertTicketMessageActivity(normalizedMsg);
@@ -1021,6 +1027,17 @@ export function TicketsInboxProvider({
     () => (chatbotTicketsList || []).filter((t) => !t.isGroup),
     [chatbotTicketsList]
   );
+
+  /** Contadores sempre alinhados às listas (inclui upsert via socket antes do GET). */
+  useEffect(() => {
+    const pending = countVisibleTickets(waitingTicketsList);
+    const chatbot = countVisibleTickets(chatbotTicketsList);
+    setTabCounts((prev) =>
+      prev.pending === pending && prev.chatbot === chatbot
+        ? prev
+        : { ...prev, pending, chatbot }
+    );
+  }, [waitingTicketsList, chatbotTicketsList]);
 
   const openStableRef = useRef(null);
 
