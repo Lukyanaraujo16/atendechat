@@ -64,6 +64,17 @@ function isPendingChatbotTicket(ticket) {
   return !!ticket?.chatbot;
 }
 
+/** Remove por id pending antigo com flag chatbot errada antes de mesclar o lote da API. */
+function scrubPendingIdsFromList(arr, listIds) {
+  if (!listIds || listIds.size === 0) {
+    return arr;
+  }
+  return arr.filter((t) => {
+    if (t.status !== "pending") return true;
+    return !listIds.has(Number(t.id));
+  });
+}
+
 /** Subconjunto pending alinhado ao countOnly (chatbot=true|false). */
 function applyPendingSubsetBatch(
   prev,
@@ -86,6 +97,7 @@ function applyPendingSubsetBatch(
       : !isPendingChatbotTicket(t));
 
   const withoutSubset = prev.filter((t) => !inSubset(t));
+  const listIds = new Set(list.map((t) => Number(t.id)));
 
   if (page <= 1) {
     if (list.length === 0) {
@@ -95,12 +107,23 @@ function applyPendingSubsetBatch(
       }
       return withoutSubset;
     }
-    return mergeLoadBatch(withoutSubset, list);
+    const scrubbed = scrubPendingIdsFromList(withoutSubset, listIds);
+    return mergeLoadBatch(scrubbed, list);
   }
   if (list.length === 0) {
     return prev;
   }
-  return mergeLoadBatch(prev, list);
+  const scrubbed = scrubPendingIdsFromList(prev, listIds);
+  return mergeLoadBatch(scrubbed, list);
+}
+
+/** Transição chatbot ↔ aguardando: um id só, sem duplicar flag stale no array unificado. */
+function reconcilePendingTicketInList(prev, ticket, { bumpToTop } = {}) {
+  if (!ticket || ticket.id == null) {
+    return prev;
+  }
+  const withoutId = prev.filter((t) => t.id !== ticket.id);
+  return upsertTicketInList(withoutId, ticket, { bumpToTop });
 }
 
 function applyStatusPageBatch(prev, batch, status, pageNumber, recentlyDeletedRef) {
@@ -325,6 +348,17 @@ export function TicketsInboxProvider({
     }, 400);
   }, [fetchEnabled, reloadChatbotList]);
 
+  /** pending e chatbot compartilham status; qualquer mudança exige os dois refetch. */
+  const reloadBothPendingSubsets = useCallback(() => {
+    reloadPendingList();
+    reloadChatbotList();
+  }, [reloadPendingList, reloadChatbotList]);
+
+  const scheduleReloadBothPendingSubsets = useCallback(() => {
+    scheduleReloadPendingList();
+    scheduleReloadChatbotList();
+  }, [scheduleReloadPendingList, scheduleReloadChatbotList]);
+
   const scheduleMismatchReload = useCallback(
     (tabKey, reloadFn) => {
       if (!fetchEnabled || typeof reloadFn !== "function") return;
@@ -505,6 +539,16 @@ export function TicketsInboxProvider({
     [isRecentlyDeleted]
   );
 
+  const reconcilePendingTicket = useCallback(
+    (ticket, { bumpToTop = false } = {}) => {
+      if (!ticket?.id || isRecentlyDeleted(ticket.id)) return;
+      setTickets((prev) =>
+        reconcilePendingTicketInList(prev, ticket, { bumpToTop })
+      );
+    },
+    [isRecentlyDeleted]
+  );
+
   const pinnedOrderIds = useMemo(
     () => pinnedMeta.map((row) => row.ticketId),
     [pinnedMeta]
@@ -662,16 +706,17 @@ export function TicketsInboxProvider({
           return;
         }
         if (t.status === "open" || t.status === "pending") {
-          upsertTicket({
+          const normalized = {
             ...t,
             isPinned: pinnedIdSet.has(Number(t.id)),
-          });
-          if (t.status === "open") {
-            scheduleReloadOpenList();
-          } else if (isPendingChatbotTicket(t)) {
-            scheduleReloadChatbotList();
+          };
+          if (t.status === "pending") {
+            reconcilePendingTicket(normalized);
+            scheduleReloadBothPendingSubsets();
           } else {
-            scheduleReloadPendingList();
+            upsertTicket(normalized);
+            scheduleReloadOpenList();
+            scheduleReloadBothPendingSubsets();
           }
         } else {
           setPinnedMeta((prev) =>
@@ -698,16 +743,17 @@ export function TicketsInboxProvider({
         return;
       }
       if (t2.status === "open" || t2.status === "pending") {
-        upsertTicketMessageActivity({
+        const normalizedMsg = {
           ...t2,
           isPinned: pinnedIdSet.has(Number(t2.id)),
-        });
-        if (t2.status === "open") {
-          scheduleReloadOpenList();
-        } else if (isPendingChatbotTicket(t2)) {
-          scheduleReloadChatbotList();
+        };
+        if (t2.status === "pending") {
+          reconcilePendingTicket(normalizedMsg, { bumpToTop: true });
+          scheduleReloadBothPendingSubsets();
         } else {
-          scheduleReloadPendingList();
+          upsertTicketMessageActivity(normalizedMsg);
+          scheduleReloadOpenList();
+          scheduleReloadBothPendingSubsets();
         }
       } else {
         setPinnedMeta((prev) =>
@@ -745,6 +791,7 @@ export function TicketsInboxProvider({
     socketManager,
     shouldShowTicket,
     upsertTicket,
+    reconcilePendingTicket,
     upsertTicketMessageActivity,
     removeTicket,
     updateUnread,
@@ -753,7 +800,7 @@ export function TicketsInboxProvider({
     pinnedIdSet,
     scheduleRefreshTabCounts,
     scheduleReloadOpenList,
-    scheduleReloadPendingList,
+    scheduleReloadBothPendingSubsets,
     scheduleReloadChatbotList,
   ]);
 
@@ -869,15 +916,15 @@ export function TicketsInboxProvider({
         key: "pending",
         count: tabCounts.pending,
         loaded: pendingTickets.length,
-        loading: pendingFetch.loading,
-        reload: reloadPendingList,
+        loading: pendingFetch.loading || chatbotFetch.loading,
+        reload: reloadBothPendingSubsets,
       },
       {
         key: "chatbot",
         count: tabCounts.chatbot,
         loaded: chatbotTickets.length,
-        loading: chatbotFetch.loading,
-        reload: reloadChatbotList,
+        loading: pendingFetch.loading || chatbotFetch.loading,
+        reload: reloadBothPendingSubsets,
       },
     ];
 
@@ -904,8 +951,7 @@ export function TicketsInboxProvider({
     pendingFetch.loading,
     chatbotFetch.loading,
     reloadOpenList,
-    reloadPendingList,
-    reloadChatbotList,
+    reloadBothPendingSubsets,
     scheduleMismatchReload,
   ]);
 
@@ -915,16 +961,18 @@ export function TicketsInboxProvider({
     if (activeInboxSubTab === "open") {
       scheduleMismatchReload("open", reloadOpenList);
     } else if (activeInboxSubTab === "pending") {
-      scheduleMismatchReload("pending", reloadPendingList);
+      scheduleMismatchReload("pending", reloadBothPendingSubsets);
+      scheduleReloadBothPendingSubsets();
     } else if (activeInboxSubTab === "chatbot") {
-      scheduleMismatchReload("chatbot", reloadChatbotList);
+      scheduleMismatchReload("chatbot", reloadBothPendingSubsets);
+      scheduleReloadBothPendingSubsets();
     }
   }, [
     fetchEnabled,
     activeInboxSubTab,
     reloadOpenList,
-    reloadPendingList,
-    reloadChatbotList,
+    reloadBothPendingSubsets,
+    scheduleReloadBothPendingSubsets,
     scheduleMismatchReload,
   ]);
 
@@ -998,9 +1046,11 @@ export function TicketsInboxProvider({
       reloadOpenList,
       reloadPendingList,
       reloadChatbotList,
+      reloadBothPendingSubsets,
       scheduleReloadOpenList,
       scheduleReloadPendingList,
       scheduleReloadChatbotList,
+      scheduleReloadBothPendingSubsets,
       refreshTabCounts,
       removeTicket,
       removeTickets,
@@ -1028,9 +1078,11 @@ export function TicketsInboxProvider({
       reloadOpenList,
       reloadPendingList,
       reloadChatbotList,
+      reloadBothPendingSubsets,
       scheduleReloadOpenList,
       scheduleReloadPendingList,
       scheduleReloadChatbotList,
+      scheduleReloadBothPendingSubsets,
       refreshTabCounts,
       removeTicket,
       removeTickets,

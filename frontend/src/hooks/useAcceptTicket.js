@@ -42,8 +42,15 @@ export function useAcceptTicket() {
         inbox.upsertTicket(updated);
       }
 
-      if (typeof inbox?.scheduleReloadPendingList === "function") {
-        inbox.scheduleReloadPendingList();
+      if (typeof inbox?.scheduleReloadBothPendingSubsets === "function") {
+        inbox.scheduleReloadBothPendingSubsets();
+      } else {
+        if (typeof inbox?.scheduleReloadPendingList === "function") {
+          inbox.scheduleReloadPendingList();
+        }
+        if (typeof inbox?.scheduleReloadChatbotList === "function") {
+          inbox.scheduleReloadChatbotList();
+        }
       }
 
       if (typeof inbox?.scheduleReloadOpenList === "function") {
