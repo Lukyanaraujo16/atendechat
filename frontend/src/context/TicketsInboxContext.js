@@ -64,8 +64,17 @@ function isPendingChatbotTicket(ticket) {
   return !!ticket?.chatbot;
 }
 
-/** Página 1 da coluna = substituição total pela API (id único por coluna). */
-function applyColumnFetchBatch(prev, batch, pageNumber, recentlyDeletedRef) {
+/**
+ * Página 1: faz upsert por id (nunca apaga tickets locais se a API vier incompleta).
+ * Só poda órfãos quando o lote cobre o contador esperado (resposta completa).
+ */
+function applyColumnFetchBatch(
+  prev,
+  batch,
+  pageNumber,
+  recentlyDeletedRef,
+  expectedCount = null
+) {
   const page = Number(pageNumber) || 1;
   const raw = Array.isArray(batch) ? batch : [];
   const list =
@@ -73,13 +82,30 @@ function applyColumnFetchBatch(prev, batch, pageNumber, recentlyDeletedRef) {
       ? raw.filter((t) => !recentlyDeletedRef.current.has(Number(t.id)))
       : raw;
 
+  const listIds = new Set(list.map((t) => Number(t.id)));
+  const expected = Number(expectedCount);
+  const hasExpected =
+    Number.isFinite(expected) && expected >= 0 ? expected : null;
+
   if (page <= 1) {
-    return list;
+    if (list.length === 0) {
+      if (prev.length > 0 && hasExpected != null && hasExpected > 0) {
+        return prev;
+      }
+      return [];
+    }
+    const withoutIdsInBatch = prev.filter((t) => !listIds.has(Number(t.id)));
+    let next = mergeLoadBatch(withoutIdsInBatch, list);
+    if (hasExpected != null && list.length >= hasExpected) {
+      next = next.filter((t) => listIds.has(Number(t.id)));
+    }
+    return next;
   }
   if (list.length === 0) {
     return prev;
   }
-  return mergeLoadBatch(prev, list);
+  const scrubbed = prev.filter((t) => !listIds.has(Number(t.id)));
+  return mergeLoadBatch(scrubbed, list);
 }
 
 function upsertTicketInList(prev, ticket, { bumpToTop } = {}) {
@@ -135,6 +161,7 @@ export function TicketsInboxProvider({
   const reloadChatbotTimerRef = useRef(null);
   const mismatchReloadTimersRef = useRef({});
   const lastMismatchReloadAtRef = useRef({ open: 0, pending: 0, chatbot: 0 });
+  const mismatchRetryCountRef = useRef({ open: 0, pending: 0, chatbot: 0 });
 
   const queueIdsJson = useMemo(
     () => JSON.stringify(Array.isArray(selectedQueueIds) ? selectedQueueIds : []),
@@ -177,6 +204,7 @@ export function TicketsInboxProvider({
     setTabCounts({ open: 0, pending: 0, chatbot: 0 });
     recentlyDeletedIdsRef.current = new Set();
     lastMismatchReloadAtRef.current = { open: 0, pending: 0, chatbot: 0 };
+    mismatchRetryCountRef.current = { open: 0, pending: 0, chatbot: 0 };
   }, [queueIdsJson, showAll]);
 
   const refreshTabCounts = useCallback(async () => {
@@ -304,21 +332,23 @@ export function TicketsInboxProvider({
   }, [scheduleReloadPendingList, scheduleReloadChatbotList]);
 
   const scheduleMismatchReload = useCallback(
-    (tabKey, reloadFn) => {
+    (tabKey, reloadFn, { urgent = false } = {}) => {
       if (!fetchEnabled || typeof reloadFn !== "function") return;
+      if (urgent) {
+        const retries = mismatchRetryCountRef.current[tabKey] || 0;
+        if (retries >= 8) {
+          return;
+        }
+        mismatchRetryCountRef.current[tabKey] = retries + 1;
+      }
       const prevTimer = mismatchReloadTimersRef.current[tabKey];
       if (prevTimer) {
         clearTimeout(prevTimer);
       }
       mismatchReloadTimersRef.current[tabKey] = setTimeout(() => {
-        const now = Date.now();
-        const last = lastMismatchReloadAtRef.current[tabKey] || 0;
-        if (now - last < 2000) {
-          return;
-        }
-        lastMismatchReloadAtRef.current[tabKey] = now;
+        lastMismatchReloadAtRef.current[tabKey] = Date.now();
         reloadFn();
-      }, 400);
+      }, urgent ? 250 : 400);
     },
     [fetchEnabled]
   );
@@ -371,22 +401,69 @@ export function TicketsInboxProvider({
         prev,
         openFetch.tickets,
         openPage,
-        recentlyDeletedIdsRef
+        recentlyDeletedIdsRef,
+        tabCounts.open
       )
     );
-  }, [fetchEnabled, openFetch.loading, openFetch.tickets, openPage]);
+    const apiLen = Array.isArray(openFetch.tickets) ? openFetch.tickets.length : 0;
+    if (tabCounts.open > apiLen && tabCounts.open > 0) {
+      scheduleMismatchReload("open", () => reloadOpenList({ force: true }), {
+        urgent: true,
+      });
+    }
+  }, [
+    fetchEnabled,
+    openFetch.loading,
+    openFetch.tickets,
+    openPage,
+    tabCounts.open,
+    reloadOpenList,
+    scheduleMismatchReload,
+  ]);
 
   useEffect(() => {
     if (!fetchEnabled || pendingFetch.loading) return;
+    const apiCount =
+      typeof pendingFetch.count === "number"
+        ? pendingFetch.count
+        : tabCounts.pending;
     setWaitingTicketsList((prev) =>
       applyColumnFetchBatch(
         prev,
         pendingFetch.tickets,
         pendingPage,
-        recentlyDeletedIdsRef
+        recentlyDeletedIdsRef,
+        apiCount
       )
     );
-  }, [fetchEnabled, pendingFetch.loading, pendingFetch.tickets, pendingPage]);
+    if (typeof pendingFetch.count === "number" && pendingFetch.count !== tabCounts.pending) {
+      setTabCounts((prev) =>
+        prev.pending === pendingFetch.count
+          ? prev
+          : { ...prev, pending: pendingFetch.count }
+      );
+    }
+    const apiLen = Array.isArray(pendingFetch.tickets)
+      ? pendingFetch.tickets.length
+      : 0;
+    const expected = Math.max(tabCounts.pending, apiCount);
+    if (expected > apiLen && expected > 0) {
+      scheduleMismatchReload(
+        "pending",
+        () => reloadPendingList({ force: true }),
+        { urgent: true }
+      );
+    }
+  }, [
+    fetchEnabled,
+    pendingFetch.loading,
+    pendingFetch.tickets,
+    pendingFetch.count,
+    pendingPage,
+    tabCounts.pending,
+    reloadPendingList,
+    scheduleMismatchReload,
+  ]);
 
   useEffect(() => {
     if (!fetchEnabled || chatbotFetch.loading) return;
@@ -395,10 +472,29 @@ export function TicketsInboxProvider({
         prev,
         chatbotFetch.tickets,
         chatbotPage,
-        recentlyDeletedIdsRef
+        recentlyDeletedIdsRef,
+        tabCounts.chatbot
       )
     );
-  }, [fetchEnabled, chatbotFetch.loading, chatbotFetch.tickets, chatbotPage]);
+    const apiLen = Array.isArray(chatbotFetch.tickets)
+      ? chatbotFetch.tickets.length
+      : 0;
+    if (tabCounts.chatbot > apiLen && tabCounts.chatbot > 0) {
+      scheduleMismatchReload(
+        "chatbot",
+        () => reloadChatbotList({ force: true }),
+        { urgent: true }
+      );
+    }
+  }, [
+    fetchEnabled,
+    chatbotFetch.loading,
+    chatbotFetch.tickets,
+    chatbotPage,
+    tabCounts.chatbot,
+    reloadChatbotList,
+    scheduleMismatchReload,
+  ]);
 
   useEffect(() => {
     if (!fetchEnabled || openFetch.loading) return;
@@ -936,12 +1032,15 @@ export function TicketsInboxProvider({
     tabSpecs.forEach(({ key, count, loaded, loading, reload }) => {
       if (loaded >= count) {
         lastMismatchReloadAtRef.current[key] = 0;
+        mismatchRetryCountRef.current[key] = 0;
         return;
       }
-      if (activeInboxSubTab !== key || count <= 0 || loading) {
+      if (count <= 0 || loading) {
         return;
       }
-      scheduleMismatchReload(key, reload);
+      scheduleMismatchReload(key, reload, {
+        urgent: activeInboxSubTab === key,
+      });
     });
   }, [
     fetchEnabled,
