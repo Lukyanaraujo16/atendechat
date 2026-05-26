@@ -202,6 +202,7 @@ const TicketsListCustom = (props) => {
     /** Inbox: tickets vindos do TicketsInboxContext (sem reducer/socket local). */
     controlledTickets,
     controlledLoading = false,
+    controlledTabCount = 0,
     controlledHasMore = false,
     onControlledLoadMore,
     enableBulkDelete = false,
@@ -308,7 +309,12 @@ const TicketsListCustom = (props) => {
     }
     return rawDisplayTickets;
   }, [isControlled, rawDisplayTickets, searchParam]);
-  const displayLoading = isControlled ? controlledLoading : loading;
+  const displayLoading = isControlled
+    ? Boolean(
+        controlledLoading ||
+          (Number(controlledTabCount) > 0 && displayTickets.length === 0)
+      )
+    : loading;
   const displayHasMore = isControlled ? controlledHasMore : hasMore;
 
   useEffect(() => {

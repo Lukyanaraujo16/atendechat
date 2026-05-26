@@ -529,14 +529,29 @@ const InboxSubTabsPills = memo(function InboxSubTabsPills({
   setTabOpen,
   classes,
 }) {
-  const { openCount, pendingCount, chatbotCount } = useTicketsInboxMetrics();
+  const {
+    openCount,
+    pendingCount,
+    chatbotCount,
+    reloadOpenList,
+    reloadPendingList,
+    reloadChatbotList,
+  } = useTicketsInboxMetrics();
+
+  const selectTab = (tab, reloadFn) => {
+    setTabOpen(tab);
+    if (typeof reloadFn === "function") {
+      reloadFn({ force: true });
+    }
+  };
+
   return (
     <div className={classes.statusPillsRow}>
       <ButtonBase
         className={`${classes.statusPill} ${classes.statusPillBtn} ${classes.statusPillGreen} ${
           tabOpen === "open" ? classes.statusPillGreenActive : ""
         }`}
-        onClick={() => setTabOpen("open")}
+        onClick={() => selectTab("open", reloadOpenList)}
       >
         <span className={classes.statusCountGreen}>{openCount}</span>
         <FolderOpenIcon className={clsx(classes.statusPillIcon, classes.statusIconGreen)} />
@@ -553,7 +568,7 @@ const InboxSubTabsPills = memo(function InboxSubTabsPills({
         className={`${classes.statusPill} ${classes.statusPillBtn} ${classes.statusPillPink} ${
           tabOpen === "pending" ? classes.statusPillPinkActive : ""
         }`}
-        onClick={() => setTabOpen("pending")}
+        onClick={() => selectTab("pending", reloadPendingList)}
       >
         <span className={classes.statusCountPink}>{pendingCount}</span>
         <PersonIcon className={clsx(classes.statusPillIcon, classes.statusIconPink)} />
@@ -570,7 +585,7 @@ const InboxSubTabsPills = memo(function InboxSubTabsPills({
         className={`${classes.statusPill} ${classes.statusPillBtn} ${classes.statusPillGreen} ${
           tabOpen === "chatbot" ? classes.statusPillGreenActive : ""
         }`}
-        onClick={() => setTabOpen("chatbot")}
+        onClick={() => selectTab("chatbot", reloadChatbotList)}
       >
         <span className={classes.statusCountGreen}>{chatbotCount}</span>
         <AndroidIcon className={clsx(classes.statusPillIcon, classes.statusIconGreen)} />
@@ -599,6 +614,7 @@ const InboxOpenListPanel = memo(function InboxOpenListPanel({
   const {
     tickets,
     loading,
+    tabCount,
     hasMore,
     loadMore,
     toggleTicketPin,
@@ -612,6 +628,7 @@ const InboxOpenListPanel = memo(function InboxOpenListPanel({
       searchParam={searchParam}
       controlledTickets={tickets}
       controlledLoading={loading}
+      controlledTabCount={tabCount}
       controlledHasMore={hasMore}
       onControlledLoadMore={loadMore}
       compact={compactList}
@@ -637,7 +654,8 @@ const InboxPendingListPanel = memo(function InboxPendingListPanel({
   isBulkListActive,
   onBulkSelectionApiChange,
 }) {
-  const { tickets, loading, hasMore, loadMore } = useTicketsInboxPendingColumn();
+  const { tickets, loading, tabCount, hasMore, loadMore } =
+    useTicketsInboxPendingColumn();
   return (
     <TicketsList
       status="pending"
@@ -645,6 +663,7 @@ const InboxPendingListPanel = memo(function InboxPendingListPanel({
       searchParam={searchParam}
       controlledTickets={tickets}
       controlledLoading={loading}
+      controlledTabCount={tabCount}
       controlledHasMore={hasMore}
       onControlledLoadMore={loadMore}
       compact={compactList}
@@ -667,7 +686,8 @@ const InboxChatbotListPanel = memo(function InboxChatbotListPanel({
   isBulkListActive,
   onBulkSelectionApiChange,
 }) {
-  const { tickets, loading, hasMore, loadMore } = useTicketsInboxChatbotColumn();
+  const { tickets, loading, tabCount, hasMore, loadMore } =
+    useTicketsInboxChatbotColumn();
   return (
     <TicketsList
       status="pending"
@@ -676,6 +696,7 @@ const InboxChatbotListPanel = memo(function InboxChatbotListPanel({
       chatbotOnly
       controlledTickets={tickets}
       controlledLoading={loading}
+      controlledTabCount={tabCount}
       controlledHasMore={hasMore}
       onControlledLoadMore={loadMore}
       compact={compactList}
