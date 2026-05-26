@@ -922,7 +922,7 @@ export function TicketsInboxProvider({
       if (data.action === "update" && data.ticket) {
         const t = data.ticket;
         if (isRecentlyDeleted(t.id)) {
-          return;
+          recentlyDeletedIdsRef.current.delete(Number(t.id));
         }
         if (t.isGroup) {
           removeTicket(t.id);
@@ -959,7 +959,9 @@ export function TicketsInboxProvider({
 
     const handleAppMessage = (data) => {
       if (data.action !== "create" || !data.ticket) return;
-      if (isRecentlyDeleted(data.ticket.id)) return;
+      if (isRecentlyDeleted(data.ticket.id)) {
+        recentlyDeletedIdsRef.current.delete(Number(data.ticket.id));
+      }
       const t2 = data.ticket;
       if (t2.isGroup) {
         if (t2.id != null) {

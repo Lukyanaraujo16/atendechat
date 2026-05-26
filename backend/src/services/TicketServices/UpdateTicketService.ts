@@ -330,7 +330,16 @@ const UpdateTicketService = async ({
 
     await ticketTraking.save();
 
-    if (ticketForEmit.status !== oldStatus || ticketForEmit.user?.id !== oldUserId) {
+    const statusChanged = ticketForEmit.status !== oldStatus;
+    const oldChatbot = Boolean(ticket.chatbot);
+    const newChatbot = Boolean(ticketForEmit.chatbot);
+
+    /**
+     * Delete só quando o ticket sai do status anterior (ex.: pending → open).
+     * Não emitir delete em pending→pending (FlowBuilder: chatbot→humano, atribuição de userId),
+     * senão o cliente marca recentlyDeleted e ignora o update seguinte.
+     */
+    if (statusChanged) {
       let deleteEmitter = io
         .to(`company-${companyId}-${oldStatus}`)
         .to(`company-${companyId}-mainchannel`)
@@ -343,6 +352,36 @@ const UpdateTicketService = async ({
         ticketId: ticketForEmit.id
       });
     }
+
+    const emitRooms = [
+      `company-${companyId}-${ticketForEmit.status}`,
+      `company-${companyId}-notification`,
+      `company-${companyId}-mainchannel`,
+      `queue-${ticketForEmit.queueId}-${ticketForEmit.status}`,
+      `queue-${ticketForEmit.queueId}-notification`,
+      String(ticketId),
+      `user-${ticketForEmit?.userId}`,
+      `user-${oldUserId}`
+    ];
+
+    logger.info(
+      {
+        ticketId: ticketForEmit.id,
+        companyId,
+        status: ticketForEmit.status,
+        chatbot: ticketForEmit.chatbot,
+        queueId: ticketForEmit.queueId,
+        userId: ticketForEmit.userId,
+        statusChanged,
+        chatbotChanged: oldChatbot !== newChatbot,
+        oldStatus,
+        oldUserId,
+        oldQueueId,
+        action: "update",
+        rooms: emitRooms.filter((r) => r && !r.includes("undefined") && !r.includes("null"))
+      },
+      "[UpdateTicketService][socket] emit company-ticket update"
+    );
 
     io.to(`company-${companyId}-${ticketForEmit.status}`)
       .to(`company-${companyId}-notification`)

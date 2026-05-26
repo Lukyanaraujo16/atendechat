@@ -755,18 +755,49 @@ export const ActionsWebhookService = async (
             const previousUserId = currentTicket.userId;
             const previousQueueId = currentTicket.queueId;
             const previousStatus = currentTicket.status;
-            await UpdateTicketService({
-              ticketData: {
-                /** pending: atendente designado vê como aguardando e pode assumir (open = “em atendimento”). */
-                status: "pending",
-                userId: targetUserId,
-                queueId: currentTicket.queueId ?? null,
-                chatbot: false
+            const attendantTicketData = {
+              /** pending: atendente designado vê como aguardando e pode assumir (open = “em atendimento”). */
+              status: "pending" as const,
+              userId: targetUserId,
+              queueId: currentTicket.queueId ?? null,
+              chatbot: false,
+              queueOptionId: null,
+              useIntegration: false,
+              integrationId: null,
+              promptId: null
+            };
+            logger.info(
+              {
+                flowBuilderAttendant: true,
+                ticketId: idTicket,
+                companyId,
+                updateTicketPayload: attendantTicketData,
+                previousStatus: currentTicket.status,
+                previousChatbot: currentTicket.chatbot,
+                previousUserId: currentTicket.userId,
+                previousQueueId: currentTicket.queueId
               },
+              "[FlowBuilder][attendant][debug] updateTicket payload"
+            );
+            const { ticket: updatedAttendantTicket } = await UpdateTicketService({
+              ticketData: attendantTicketData,
               ticketId: String(idTicket),
               companyId
             });
-            ticket = await ShowTicketService(idTicket, companyId);
+            ticket = updatedAttendantTicket;
+            logger.info(
+              {
+                flowBuilderAttendant: true,
+                ticketId: idTicket,
+                status: ticket.status,
+                chatbot: ticket.chatbot,
+                queueId: ticket.queueId,
+                userId: ticket.userId,
+                socketEvent: `company-${companyId}-ticket`,
+                socketAction: "update"
+              },
+              "[FlowBuilder][attendant][debug] updatedTicket after UpdateTicketService (socket emit no UpdateTicketService)"
+            );
             flowAssignedHumanUser = true;
 
             await createFlowExecutionLogIfTicket(
