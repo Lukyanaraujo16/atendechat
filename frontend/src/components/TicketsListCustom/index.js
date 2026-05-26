@@ -309,12 +309,10 @@ const TicketsListCustom = (props) => {
     }
     return rawDisplayTickets;
   }, [isControlled, rawDisplayTickets, searchParam]);
+  /** Skeleton só na carga inicial (lista vazia). Refetch com itens não bloqueia a UI. */
   const displayLoading = isControlled
-    ? Boolean(
-        controlledLoading ||
-          (Number(controlledTabCount) > 0 && displayTickets.length === 0)
-      )
-    : loading;
+    ? Boolean(controlledLoading && displayTickets.length === 0)
+    : Boolean(loading && displayTickets.length === 0);
   const displayHasMore = isControlled ? controlledHasMore : hasMore;
 
   useEffect(() => {
@@ -699,7 +697,9 @@ const TicketsListCustom = (props) => {
               ))}
             </>
           )}
-          {displayLoading && <TicketsListSkeleton />}
+          {displayLoading && displayTickets.length === 0 && (
+            <TicketsListSkeleton />
+          )}
         </List>
       </Paper>
     </Paper>

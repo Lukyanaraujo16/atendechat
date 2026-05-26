@@ -129,6 +129,7 @@ const Ticket = () => {
   const [ticket, setTicket] = useState({});
   const [partialEnrichWarning, setPartialEnrichWarning] = useState(false);
   const [statusActionLoading, setStatusActionLoading] = useState(false);
+  const [messagesReloadToken, setMessagesReloadToken] = useState(0);
 
   const socketManager = useContext(SocketContext);
   const setCurrentTicket = useContext(TicketsSetContext);
@@ -230,6 +231,7 @@ const Ticket = () => {
       if (!id) return;
       if (data.action === "update" && data.ticket?.id === id) {
         setTicket(data.ticket);
+        setMessagesReloadToken((t) => t + 1);
       }
       if (data.action === "delete" && data.ticketId === id) {
         history.push("/tickets");
@@ -361,6 +363,7 @@ const Ticket = () => {
       ticket={ticket}
       ticketId={ticket.id}
       isGroup={ticket.isGroup}
+      reloadToken={messagesReloadToken}
       onPartialEnrichWarning={() => setPartialEnrichWarning(true)}
       onLoadError={() => setPartialEnrichWarning(true)}
     />

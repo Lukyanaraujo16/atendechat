@@ -82,13 +82,6 @@ function applyColumnFetchBatch(prev, batch, pageNumber, recentlyDeletedRef) {
   return mergeLoadBatch(prev, list);
 }
 
-/** Loading da coluna: evita empty state prematuro quando contador > itens visíveis. */
-function computeColumnLoading(apiLoading, tabCount, visibleCount) {
-  const count = Number(tabCount) || 0;
-  const loaded = Number(visibleCount) || 0;
-  return Boolean(apiLoading) || (count > 0 && loaded < count);
-}
-
 function upsertTicketInList(prev, ticket, { bumpToTop } = {}) {
   if (!ticket || ticket.id == null) {
     return prev;
@@ -1006,40 +999,10 @@ export function TicketsInboxProvider({
     ]
   );
 
-  const openColumnLoading = useMemo(
-    () =>
-      computeColumnLoading(
-        openFetch.loading,
-        tabCounts.open,
-        openTickets.length
-      ),
-    [openFetch.loading, tabCounts.open, openTickets.length]
-  );
-
-  const pendingColumnLoading = useMemo(
-    () =>
-      computeColumnLoading(
-        pendingFetch.loading,
-        tabCounts.pending,
-        pendingTickets.length
-      ),
-    [pendingFetch.loading, tabCounts.pending, pendingTickets.length]
-  );
-
-  const chatbotColumnLoading = useMemo(
-    () =>
-      computeColumnLoading(
-        chatbotFetch.loading,
-        tabCounts.chatbot,
-        chatbotTickets.length
-      ),
-    [chatbotFetch.loading, tabCounts.chatbot, chatbotTickets.length]
-  );
-
   const openColumnValue = useMemo(
     () => ({
       tickets: openTickets,
-      loading: openColumnLoading,
+      loading: openFetch.loading,
       tabCount: openCount,
       hasMore: openFetch.hasMore,
       loadMore: loadMoreOpen,
@@ -1049,7 +1012,7 @@ export function TicketsInboxProvider({
     }),
     [
       openTickets,
-      openColumnLoading,
+      openFetch.loading,
       openCount,
       openFetch.hasMore,
       loadMoreOpen,
@@ -1062,14 +1025,14 @@ export function TicketsInboxProvider({
   const pendingColumnValue = useMemo(
     () => ({
       tickets: pendingTickets,
-      loading: pendingColumnLoading,
+      loading: pendingFetch.loading,
       tabCount: pendingCount,
       hasMore: pendingFetch.hasMore,
       loadMore: loadMorePending,
     }),
     [
       pendingTickets,
-      pendingColumnLoading,
+      pendingFetch.loading,
       pendingCount,
       pendingFetch.hasMore,
       loadMorePending,
@@ -1079,14 +1042,14 @@ export function TicketsInboxProvider({
   const chatbotColumnValue = useMemo(
     () => ({
       tickets: chatbotTickets,
-      loading: chatbotColumnLoading,
+      loading: chatbotFetch.loading,
       tabCount: chatbotCount,
       hasMore: chatbotFetch.hasMore,
       loadMore: loadMoreChatbot,
     }),
     [
       chatbotTickets,
-      chatbotColumnLoading,
+      chatbotFetch.loading,
       chatbotCount,
       chatbotFetch.hasMore,
       loadMoreChatbot,

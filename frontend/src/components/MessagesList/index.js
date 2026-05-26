@@ -351,6 +351,8 @@ const MessagesList = ({
   isGroup,
   onPartialEnrichWarning,
   onLoadError,
+  /** Incrementar para recarregar mensagens (ex.: ticket atualizado via socket). */
+  reloadToken = 0,
 }) => {
   const classes = useStyles();
 
@@ -372,7 +374,7 @@ const MessagesList = ({
     setPageNumber(1);
 
     currentTicketId.current = ticketId;
-  }, [ticketId]);
+  }, [ticketId, reloadToken]);
 
   useEffect(() => {
     setLoading(true);
@@ -417,7 +419,7 @@ const MessagesList = ({
     return () => {
       clearTimeout(delayDebounceFn);
     };
-  }, [pageNumber, ticketId]);
+  }, [pageNumber, ticketId, reloadToken]);
 
   useEffect(() => {
     const companyId = localStorage.getItem("companyId");
@@ -447,9 +449,11 @@ const MessagesList = ({
     };
 
     socket.on(`company-${companyId}-appMessage`, handleAppMessage);
+    joinRoom();
 
     return () => {
-      socket.disconnect();
+      socket.off("ready", joinRoom);
+      socket.off(`company-${companyId}-appMessage`, handleAppMessage);
     };
   }, [ticketId, socketManager]);
 
