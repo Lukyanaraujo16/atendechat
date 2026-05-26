@@ -689,7 +689,13 @@ export const ActionsWebhookService = async (
             await UpdateTicketService({
               ticketData: {
                 status: "pending",
-                queueId: queue.id
+                queueId: queue.id,
+                chatbot: false,
+                queueOptionId: null,
+                userId: null,
+                useIntegration: false,
+                integrationId: null,
+                promptId: null
               },
               ticketId: String(idTicket),
               companyId

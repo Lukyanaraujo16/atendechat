@@ -1879,6 +1879,45 @@ export const handleRating = async (
     });
 };
 
+/**
+ * Menu de fila (chatbot): ao concluir opção folha, libera para Aguardando e emite socket.
+ * Antes só `ticket.update` — inbox não recebia `company-{id}-ticket` update.
+ */
+const releaseTicketFromChatbotToWaiting = async (
+  ticket: Ticket,
+  companyId: number
+): Promise<void> => {
+  if (!ticket?.id || !ticket.chatbot) {
+    return;
+  }
+  const previousChatbot = ticket.chatbot;
+  const previousQueueOptionId = ticket.queueOptionId;
+  await UpdateTicketService({
+    ticketData: {
+      status: "pending",
+      chatbot: false,
+      queueOptionId: null,
+      userId: null,
+      queueId: ticket.queueId ?? null,
+      useIntegration: false,
+      integrationId: null,
+      promptId: null
+    },
+    ticketId: ticket.id,
+    companyId
+  });
+  logger.info(
+    {
+      ticketId: ticket.id,
+      companyId,
+      queueId: ticket.queueId,
+      chatbotBefore: previousChatbot,
+      queueOptionIdBefore: previousQueueOptionId
+    },
+    "[Chatbot] ticket released to waiting (pending, chatbot=false)"
+  );
+};
+
 const handleChartbot = async (
   ticket: Ticket,
   msg: proto.IWebMessageInfo,
@@ -1911,8 +1950,18 @@ const handleChartbot = async (
   const messageBody = getBodyMessage(msg);
 
   if (messageBody == "#") {
-    // voltar para o menu inicial
-    await ticket.update({ queueOptionId: null, chatbot: false, queueId: null });
+    await UpdateTicketService({
+      ticketData: {
+        status: "pending",
+        queueOptionId: null,
+        chatbot: false,
+        queueId: null,
+        userId: null
+      },
+      ticketId: ticket.id,
+      companyId
+    });
+    await ticket.reload();
     await verifyQueue(wbot, msg, ticket, ticket.contact, undefined, settings);
     return;
   }
@@ -1927,6 +1976,10 @@ const handleChartbot = async (
     const count = await QueueOption.count({
       where: { parentId: ticket.queueOptionId }
     });
+    if (count === 0) {
+      await releaseTicketFromChatbotToWaiting(ticket, companyId);
+      return;
+    }
     let option: any = {};
     if (count == 1) {
       option = await QueueOption.findOne({
@@ -1942,6 +1995,14 @@ const handleChartbot = async (
     }
     if (option) {
       await ticket.update({ queueOptionId: option?.id });
+      const childCount = await QueueOption.count({
+        where: { parentId: option.id }
+      });
+      if (childCount === 0) {
+        await ticket.reload();
+        await releaseTicketFromChatbotToWaiting(ticket, companyId);
+        return;
+      }
     }
 
     // não linha a primeira pergunta
@@ -1953,6 +2014,14 @@ const handleChartbot = async (
     const option = queue?.options.find(o => o.option == messageBody);
     if (option) {
       await ticket.update({ queueOptionId: option?.id });
+      const childCount = await QueueOption.count({
+        where: { parentId: option.id }
+      });
+      if (childCount === 0) {
+        await ticket.reload();
+        await releaseTicketFromChatbotToWaiting(ticket, companyId);
+        return;
+      }
     }
   }
 
@@ -2081,7 +2150,12 @@ const handleChartbot = async (
       ]
     });
 
-    if (queueOptions.length > -1) {
+    if (queueOptions.length === 0) {
+      await releaseTicketFromChatbotToWaiting(ticket, companyId);
+      return;
+    }
+
+    if (queueOptions.length > 0) {
       const chatBotType = settings.chatBotType;
 
       const botList = async () => {
@@ -3109,11 +3183,18 @@ const handleMessage = async (
     // voltar para o menu inicial
 
     if (bodyMessage == "#" && !ticket.isGroup) {
-      await ticket.update({
-        queueOptionId: null,
-        chatbot: false,
-        queueId: null
+      await UpdateTicketService({
+        ticketData: {
+          status: "pending",
+          queueOptionId: null,
+          chatbot: false,
+          queueId: null,
+          userId: null
+        },
+        ticketId: ticket.id,
+        companyId
       });
+      await ticket.reload();
       await verifyQueue(
         wbot,
         msg,
