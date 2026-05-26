@@ -309,10 +309,21 @@ const TicketsListCustom = (props) => {
     }
     return rawDisplayTickets;
   }, [isControlled, rawDisplayTickets, searchParam]);
-  /** Skeleton só na carga inicial (lista vazia). Refetch com itens não bloqueia a UI. */
+  /** Skeleton na carga inicial ou quando contador > 0 mas lista ainda não sincronizou. */
+  const controlledCountMismatch =
+    isControlled &&
+    Number(controlledTabCount) > 0 &&
+    displayTickets.length === 0;
   const displayLoading = isControlled
-    ? Boolean(controlledLoading && displayTickets.length === 0)
+    ? Boolean(
+        (controlledLoading && displayTickets.length === 0) ||
+          controlledCountMismatch
+      )
     : Boolean(loading && displayTickets.length === 0);
+  const showEmptyState =
+    displayTickets.length === 0 &&
+    !displayLoading &&
+    !(isControlled && Number(controlledTabCount) > 0);
   const displayHasMore = isControlled ? controlledHasMore : hasMore;
 
   useEffect(() => {
@@ -660,7 +671,7 @@ const TicketsListCustom = (props) => {
         onScroll={handleScroll}
       >
         <List disablePadding className={classes.listRoot}>
-          {displayTickets.length === 0 && !displayLoading ? (
+          {showEmptyState ? (
             <Box className={classes.emptyStateWrap}>
               <AppEmptyState
                 title={i18n.t("ticketsList.emptyStateTitle")}

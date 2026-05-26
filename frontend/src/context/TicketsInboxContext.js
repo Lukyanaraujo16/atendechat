@@ -78,6 +78,87 @@ function mergeColumnWithApi(prev, apiTickets) {
   return { tickets: next, count: countVisibleTickets(next) };
 }
 
+const OPTIMISTIC_MOVE_MS = 2500;
+
+function markOptimisticMove(recentMovesRef, ticket) {
+  if (ticket?.id == null) return;
+  recentMovesRef.current.set(Number(ticket.id), {
+    at: Date.now(),
+    status: String(ticket.status || "").toLowerCase(),
+    chatbot: !!ticket.chatbot,
+  });
+}
+
+function hasRecentOptimisticMove(recentMovesRef, ticketId) {
+  const entry = recentMovesRef.current.get(Number(ticketId));
+  if (!entry) return false;
+  return Date.now() - entry.at < OPTIMISTIC_MOVE_MS;
+}
+
+/** GET vazio após mover ticket não pode apagar lista (corrida com backend). */
+function applySafeColumnMerge(prev, apiTickets, recentMovesRef) {
+  const apiList = Array.isArray(apiTickets) ? apiTickets : [];
+  const safePrev = Array.isArray(prev) ? prev : [];
+  if (apiList.length === 0) {
+    if (safePrev.length === 0) {
+      return safePrev;
+    }
+    const optimisticKeep = safePrev.filter((t) =>
+      hasRecentOptimisticMove(recentMovesRef, t.id)
+    );
+    if (optimisticKeep.length > 0) {
+      return optimisticKeep;
+    }
+    return safePrev;
+  }
+  return mergeColumnWithApi(safePrev, apiList).tickets;
+}
+
+/**
+ * Move ticket entre colunas open / aguardando / chatbot por status+chatbot.
+ * Retorna as três listas já sem duplicar o id.
+ */
+function computeMoveTicketToColumns(
+  prevOpen,
+  prevWait,
+  prevChat,
+  ticket,
+  { pinnedOrderIds, pinnedIdSet, userId, bumpToTop = false } = {}
+) {
+  const id = ticket.id;
+  let open = (Array.isArray(prevOpen) ? prevOpen : []).filter((t) => t.id !== id);
+  let wait = (Array.isArray(prevWait) ? prevWait : []).filter((t) => t.id !== id);
+  let chat = (Array.isArray(prevChat) ? prevChat : []).filter((t) => t.id !== id);
+
+  const status = String(ticket.status || "").toLowerCase();
+  if (status === "closed") {
+    return { open, wait, chat };
+  }
+
+  if (status === "open") {
+    const normalized = {
+      ...ticket,
+      status: "open",
+      userId: ticket.userId ?? userId,
+      isPinned: pinnedIdSet.has(Number(id)) || Boolean(ticket.isPinned),
+    };
+    open = sortOpenTicketsWithPins([...open, normalized], pinnedOrderIds);
+    return { open, wait, chat };
+  }
+
+  if (status === "pending") {
+    const normalized = { ...ticket, status: "pending" };
+    if (isPendingChatbotTicket(normalized)) {
+      chat = upsertTicketInList(chat, normalized, { bumpToTop });
+    } else {
+      wait = upsertTicketInList(wait, normalized, { bumpToTop });
+    }
+    return { open, wait, chat };
+  }
+
+  return { open, wait, chat };
+}
+
 /**
  * Página 1: faz upsert por id (nunca apaga tickets locais se a API vier incompleta).
  * Só poda órfãos quando o lote cobre o contador esperado (resposta completa).
@@ -184,6 +265,11 @@ export function TicketsInboxProvider({
   const syncChatbotTimerRef = useRef(null);
   /** IDs inseridos/atualizados via socket antes do GET refletir no banco. */
   const recentSocketPendingIdsRef = useRef(new Set());
+  /** Movimentação otimista (aceitar, transferir, socket) — protege contra GET vazio. */
+  const recentOptimisticMovesRef = useRef(new Map());
+  const openListRef = useRef([]);
+  const waitingListRef = useRef([]);
+  const chatbotListRef = useRef([]);
 
   const queueIdsJson = useMemo(
     () => JSON.stringify(Array.isArray(selectedQueueIds) ? selectedQueueIds : []),
@@ -280,13 +366,18 @@ export function TicketsInboxProvider({
         });
         waitingSyncAtRef.current = Date.now();
         setWaitingTicketsList((prev) => {
-          const merged = mergeColumnWithApi(prev, tickets);
+          const next = applySafeColumnMerge(
+            prev,
+            tickets,
+            recentOptimisticMovesRef
+          );
           tickets.forEach((t) => {
             if (t?.id != null) {
               recentSocketPendingIdsRef.current.delete(Number(t.id));
             }
           });
-          return merged.tickets;
+          waitingListRef.current = next;
+          return next;
         });
         setPendingHasMore(Boolean(hasMore));
         setPendingPage(1);
@@ -310,7 +401,15 @@ export function TicketsInboxProvider({
           chatbot: "true",
         });
         chatbotSyncAtRef.current = Date.now();
-        setChatbotTicketsList((prev) => mergeColumnWithApi(prev, tickets).tickets);
+        setChatbotTicketsList((prev) => {
+          const next = applySafeColumnMerge(
+            prev,
+            tickets,
+            recentOptimisticMovesRef
+          );
+          chatbotListRef.current = next;
+          return next;
+        });
         setChatbotHasMore(Boolean(hasMore));
         setChatbotPage(1);
         mismatchRetryCountRef.current.chatbot = 0;
@@ -521,40 +620,48 @@ export function TicketsInboxProvider({
   });
 
   useEffect(() => {
+    openListRef.current = openTicketsList;
+  }, [openTicketsList]);
+
+  useEffect(() => {
+    waitingListRef.current = waitingTicketsList;
+  }, [waitingTicketsList]);
+
+  useEffect(() => {
+    chatbotListRef.current = chatbotTicketsList;
+  }, [chatbotTicketsList]);
+
+  useEffect(() => {
     if (!fetchEnabled || openFetch.loading) return;
-    setOpenTicketsList((prev) =>
-      applyColumnFetchBatch(
+    if (openPage > 1) {
+      setOpenTicketsList((prev) =>
+        applyColumnFetchBatch(
+          prev,
+          openFetch.tickets,
+          openPage,
+          recentlyDeletedIdsRef,
+          tabCounts.open
+        )
+      );
+      return;
+    }
+    setOpenTicketsList((prev) => {
+      const next = applySafeColumnMerge(
         prev,
         openFetch.tickets,
-        openPage,
-        recentlyDeletedIdsRef,
-        tabCounts.open
-      )
-    );
-    const apiLen = Array.isArray(openFetch.tickets) ? openFetch.tickets.length : 0;
-    if (tabCounts.open > apiLen && tabCounts.open > 0) {
-      scheduleMismatchReload("open", () => reloadOpenList({ force: true }), {
-        urgent: true,
-      });
-    }
+        recentOptimisticMovesRef
+      );
+      openListRef.current = next;
+      return next;
+    });
   }, [
     fetchEnabled,
     openFetch.loading,
     openFetch.tickets,
     openPage,
-    tabCounts.open,
     reloadOpenList,
     scheduleMismatchReload,
   ]);
-
-  useEffect(() => {
-    if (!fetchEnabled || openFetch.loading) return;
-    const nextOpen = Number(openFetch.count);
-    if (!Number.isFinite(nextOpen)) return;
-    setTabCounts((prev) =>
-      prev.open === nextOpen ? prev : { ...prev, open: nextOpen }
-    );
-  }, [fetchEnabled, openFetch.loading, openFetch.count]);
 
   const userId = user?.id;
   const shouldShowTicket = useCallback(
@@ -629,63 +736,6 @@ export function TicketsInboxProvider({
     setChatbotTicketsList(filterOut);
   }, []);
 
-  /** Transição chatbot ↔ aguardando: id único; remove da coluna oposta. */
-  const reconcilePendingTicket = useCallback(
-    (ticket, { bumpToTop = false } = {}) => {
-      if (!ticket?.id || isRecentlyDeleted(ticket.id)) return;
-      const id = Number(ticket.id);
-      recentSocketPendingIdsRef.current.add(id);
-      setTimeout(() => {
-        recentSocketPendingIdsRef.current.delete(id);
-      }, 120000);
-
-      const isBot = isPendingChatbotTicket(ticket);
-      if (isBot) {
-        setWaitingTicketsList((prev) => prev.filter((t) => t.id !== id));
-        setChatbotTicketsList((prev) =>
-          upsertTicketInList(
-            prev.filter((t) => t.id !== id),
-            ticket,
-            { bumpToTop }
-          )
-        );
-      } else {
-        setChatbotTicketsList((prev) => prev.filter((t) => t.id !== id));
-        setWaitingTicketsList((prev) =>
-          upsertTicketInList(
-            prev.filter((t) => t.id !== id),
-            ticket,
-            { bumpToTop }
-          )
-        );
-      }
-    },
-    [isRecentlyDeleted]
-  );
-
-  const upsertTicket = useCallback(
-    (ticket) => {
-      if (!ticket?.id || isRecentlyDeleted(ticket.id)) return;
-      if (ticket.status === "pending") {
-        reconcilePendingTicket(ticket);
-        return;
-      }
-      if (ticket.status === "open") {
-        const id = ticket.id;
-        setWaitingTicketsList((prev) => prev.filter((t) => t.id !== id));
-        setChatbotTicketsList((prev) => prev.filter((t) => t.id !== id));
-        setOpenTicketsList((prev) =>
-          upsertTicketInList(
-            prev.filter((t) => t.id !== id),
-            ticket,
-            { bumpToTop: false }
-          )
-        );
-      }
-    },
-    [isRecentlyDeleted, reconcilePendingTicket]
-  );
-
   const pinnedOrderIds = useMemo(
     () => pinnedMeta.map((row) => row.ticketId),
     [pinnedMeta]
@@ -696,7 +746,48 @@ export function TicketsInboxProvider({
     [pinnedOrderIds]
   );
 
-  /** pending → open: remove de outras abas, insere em open abaixo dos fixados. */
+  const moveTicketToColumn = useCallback(
+    (ticket, { bumpToTop = false } = {}) => {
+      if (!ticket?.id || isRecentlyDeleted(ticket.id)) return;
+      markOptimisticMove(recentOptimisticMovesRef, ticket);
+      const id = Number(ticket.id);
+      recentSocketPendingIdsRef.current.add(id);
+      setTimeout(() => {
+        recentSocketPendingIdsRef.current.delete(id);
+      }, 120000);
+
+      const result = computeMoveTicketToColumns(
+        openListRef.current,
+        waitingListRef.current,
+        chatbotListRef.current,
+        ticket,
+        { pinnedOrderIds, pinnedIdSet, userId, bumpToTop }
+      );
+      openListRef.current = result.open;
+      waitingListRef.current = result.wait;
+      chatbotListRef.current = result.chat;
+      setOpenTicketsList(result.open);
+      setWaitingTicketsList(result.wait);
+      setChatbotTicketsList(result.chat);
+    },
+    [isRecentlyDeleted, pinnedOrderIds, pinnedIdSet, userId]
+  );
+
+  const reconcilePendingTicket = useCallback(
+    (ticket, options = {}) => {
+      moveTicketToColumn(ticket, options);
+    },
+    [moveTicketToColumn]
+  );
+
+  const upsertTicket = useCallback(
+    (ticket) => {
+      moveTicketToColumn(ticket, { bumpToTop: false });
+    },
+    [moveTicketToColumn]
+  );
+
+  /** pending → open: moveTicketToColumn + reload open em background. */
   const acceptTicketInInbox = useCallback(
     (ticket) => {
       if (!ticket?.id || isRecentlyDeleted(ticket.id)) return;
@@ -706,38 +797,25 @@ export function TicketsInboxProvider({
         userId: ticket.userId ?? userId,
         isPinned: pinnedIdSet.has(Number(ticket.id)) || Boolean(ticket.isPinned),
       };
-      const id = normalized.id;
-      setWaitingTicketsList((prev) => prev.filter((t) => t.id !== id));
-      setChatbotTicketsList((prev) => prev.filter((t) => t.id !== id));
-      setOpenTicketsList((prev) => {
-        const rest = prev.filter((t) => t.id !== id);
-        return sortOpenTicketsWithPins([...rest, normalized], pinnedOrderIds);
-      });
-      scheduleRefreshTabCounts();
+      moveTicketToColumn(normalized, { bumpToTop: true });
+      scheduleReloadOpenList();
+      scheduleReloadBothPendingSubsets();
     },
     [
       isRecentlyDeleted,
       userId,
       pinnedIdSet,
-      pinnedOrderIds,
-      scheduleRefreshTabCounts,
+      moveTicketToColumn,
+      scheduleReloadOpenList,
+      scheduleReloadBothPendingSubsets,
     ]
   );
 
   const upsertTicketMessageActivity = useCallback(
     (ticket) => {
-      if (!ticket?.id || isRecentlyDeleted(ticket.id)) return;
-      if (ticket.status === "pending") {
-        reconcilePendingTicket(ticket, { bumpToTop: true });
-        return;
-      }
-      if (ticket.status === "open") {
-        setOpenTicketsList((prev) =>
-          upsertTicketInList(prev, ticket, { bumpToTop: true })
-        );
-      }
+      moveTicketToColumn(ticket, { bumpToTop: true });
     },
-    [isRecentlyDeleted, reconcilePendingTicket]
+    [moveTicketToColumn]
   );
 
   const patchTicketInLists = useCallback((predicate, patch) => {
@@ -851,34 +929,27 @@ export function TicketsInboxProvider({
           scheduleRefreshTabCounts();
           return;
         }
+        const normalized = {
+          ...t,
+          isPinned: pinnedIdSet.has(Number(t.id)),
+        };
         if (t.status === "open" || t.status === "pending") {
-          const normalized = {
-            ...t,
-            isPinned: pinnedIdSet.has(Number(t.id)),
-          };
-          if (t.status === "pending") {
-            if (shouldShowTicket(t)) {
-              reconcilePendingTicket(normalized);
-            } else {
-              removeTicket(t.id);
-            }
-            scheduleSyncBothPendingColumns();
-          } else if (!shouldShowTicket(t)) {
+          if (shouldShowTicket(t)) {
+            moveTicketToColumn(normalized, { bumpToTop: false });
+          } else {
             removeTicket(t.id);
-            scheduleRefreshTabCounts();
-            scheduleReloadOpenList();
+          }
+          if (t.status === "pending") {
             scheduleSyncBothPendingColumns();
           } else {
-            upsertTicket(normalized);
             scheduleReloadOpenList();
             scheduleSyncBothPendingColumns();
-            scheduleRefreshTabCounts();
           }
         } else {
           setPinnedMeta((prev) =>
             prev.filter((row) => row.ticketId !== Number(t.id))
           );
-          removeTicket(t.id);
+          moveTicketToColumn({ ...normalized, status: "closed" });
           scheduleReloadOpenList();
           scheduleSyncBothPendingColumns();
           scheduleRefreshTabCounts();
@@ -902,31 +973,22 @@ export function TicketsInboxProvider({
           ...t2,
           isPinned: pinnedIdSet.has(Number(t2.id)),
         };
+        if (shouldShowTicket(t2)) {
+          moveTicketToColumn(normalizedMsg, { bumpToTop: true });
+        } else if (t2.id != null) {
+          removeTicket(t2.id);
+        }
         if (t2.status === "pending") {
-          if (shouldShowTicket(t2)) {
-            reconcilePendingTicket(normalizedMsg, { bumpToTop: true });
-          } else if (t2.id != null) {
-            removeTicket(t2.id);
-          }
-          scheduleSyncBothPendingColumns();
-        } else if (!shouldShowTicket(t2)) {
-          if (t2.id != null) {
-            removeTicket(t2.id);
-          }
-          scheduleRefreshTabCounts();
-          scheduleReloadOpenList();
           scheduleSyncBothPendingColumns();
         } else {
-          upsertTicketMessageActivity(normalizedMsg);
           scheduleReloadOpenList();
           scheduleSyncBothPendingColumns();
-          scheduleRefreshTabCounts();
         }
       } else {
         setPinnedMeta((prev) =>
           prev.filter((row) => row.ticketId !== Number(t2.id))
         );
-        removeTicket(t2.id);
+        moveTicketToColumn({ ...t2, status: "closed" });
         scheduleReloadOpenList();
         scheduleSyncBothPendingColumns();
         scheduleRefreshTabCounts();
@@ -956,9 +1018,7 @@ export function TicketsInboxProvider({
   }, [
     socketManager,
     shouldShowTicket,
-    upsertTicket,
-    reconcilePendingTicket,
-    upsertTicketMessageActivity,
+    moveTicketToColumn,
     removeTicket,
     updateUnread,
     updateContact,
@@ -966,7 +1026,6 @@ export function TicketsInboxProvider({
     pinnedIdSet,
     scheduleRefreshTabCounts,
     scheduleReloadOpenList,
-    scheduleSyncBothPendingColumns,
     scheduleSyncBothPendingColumns,
   ]);
 
@@ -1028,17 +1087,6 @@ export function TicketsInboxProvider({
     [chatbotTicketsList]
   );
 
-  /** Contadores sempre alinhados às listas (inclui upsert via socket antes do GET). */
-  useEffect(() => {
-    const pending = countVisibleTickets(waitingTicketsList);
-    const chatbot = countVisibleTickets(chatbotTicketsList);
-    setTabCounts((prev) =>
-      prev.pending === pending && prev.chatbot === chatbot
-        ? prev
-        : { ...prev, pending, chatbot }
-    );
-  }, [waitingTicketsList, chatbotTicketsList]);
-
   const openStableRef = useRef(null);
 
   const openTickets = useMemo(() => {
@@ -1046,6 +1094,18 @@ export function TicketsInboxProvider({
     openStableRef.current = s;
     return s;
   }, [openTicketsRaw]);
+
+  /** Contadores alinhados ao que a UI renderiza (evita contador 1 + lista vazia). */
+  useEffect(() => {
+    const open = openTicketsRaw.length;
+    const pending = pendingTickets.length;
+    const chatbot = chatbotTickets.length;
+    setTabCounts((prev) =>
+      prev.open === open && prev.pending === pending && prev.chatbot === chatbot
+        ? prev
+        : { ...prev, open, pending, chatbot }
+    );
+  }, [openTicketsRaw, pendingTickets, chatbotTickets]);
 
   const openCount = tabCounts.open;
   const pendingCount = tabCounts.pending;
@@ -1300,6 +1360,7 @@ export function TicketsInboxProvider({
       loadMoreOpen,
       loadMorePending,
       upsertTicket,
+      moveTicketToColumn,
       acceptTicketInInbox,
       reloadOpenList,
       reloadPendingList,
@@ -1335,6 +1396,7 @@ export function TicketsInboxProvider({
       loadMoreOpen,
       loadMorePending,
       upsertTicket,
+      moveTicketToColumn,
       acceptTicketInInbox,
       reloadOpenList,
       reloadPendingList,
