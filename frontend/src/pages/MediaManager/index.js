@@ -23,6 +23,7 @@ import {
   TableBody,
   TableCell,
   TableHead,
+  TablePagination,
   TableRow,
   Tabs,
   TextField,
@@ -30,6 +31,7 @@ import {
   Typography,
   Chip,
 } from "@material-ui/core";
+import { Pagination } from "@material-ui/lab";
 import { makeStyles } from "@material-ui/core/styles";
 import GetAppIcon from "@material-ui/icons/GetApp";
 import DeleteOutlineIcon from "@material-ui/icons/DeleteOutline";
@@ -103,10 +105,41 @@ const useStyles = makeStyles((theme) => ({
         : theme.palette.primary.light,
     border: `1px solid ${theme.palette.divider}`,
   },
+  paginationBar: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: theme.spacing(1),
+    marginTop: theme.spacing(2),
+    borderTop: `1px solid ${theme.palette.divider}`,
+    paddingTop: theme.spacing(1),
+  },
+  paginationPages: {
+    display: "flex",
+    justifyContent: "center",
+    width: "100%",
+    [theme.breakpoints.up("sm")]: {
+      width: "auto",
+      flex: "0 0 auto",
+    },
+  },
 }));
 
 const TYPE_TABS = ["all", "image", "video", "audio", "document", "other"];
 const SORT_KEYS = ["createdAt_desc", "createdAt_asc", "size_desc", "size_asc"];
+const PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
+const PAGE_SIZE_STORAGE_KEY = "mediaManager.pageSize";
+
+function readStoredPageSize() {
+  try {
+    const n = parseInt(localStorage.getItem(PAGE_SIZE_STORAGE_KEY), 10);
+    if (PAGE_SIZE_OPTIONS.includes(n)) return n;
+  } catch {
+    /* ignore */
+  }
+  return 25;
+}
 
 function formatBytesEst(n) {
   const num = Number(n);
@@ -145,9 +178,9 @@ export default function MediaManager() {
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState([]);
   const [count, setCount] = useState(0);
-  const [hasMore, setHasMore] = useState(false);
   const [summary, setSummary] = useState(null);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(readStoredPageSize);
   const [typeFilter, setTypeFilter] = useState("all");
   const [sort, setSort] = useState("createdAt_desc");
   const [search, setSearch] = useState("");
@@ -166,7 +199,7 @@ export default function MediaManager() {
 
   useEffect(() => {
     setSelectedMap({});
-  }, [typeFilter, searchDebounced, sort]);
+  }, [typeFilter, searchDebounced, sort, page, pageSize]);
 
   const loadStorage = useCallback(async () => {
     setStorageLoading(true);
@@ -188,13 +221,12 @@ export default function MediaManager() {
           type: typeFilter,
           search: searchDebounced || undefined,
           page,
-          limit: 25,
+          limit: pageSize,
           sort,
         },
       });
       setItems(Array.isArray(data.items) ? data.items : []);
       setCount(Number(data.count) || 0);
-      setHasMore(Boolean(data.hasMore));
       setSummary(data.summary || null);
       if (data.summary?.totalBytes > 0) {
         setStorage((prev) => {
@@ -213,7 +245,7 @@ export default function MediaManager() {
     } finally {
       setLoading(false);
     }
-  }, [page, typeFilter, searchDebounced, sort]);
+  }, [page, pageSize, typeFilter, searchDebounced, sort]);
 
   const handleRecalculateStorage = useCallback(async () => {
     setRecalculateLoading(true);
@@ -241,7 +273,41 @@ export default function MediaManager() {
 
   useEffect(() => {
     setPage(1);
-  }, [typeFilter, searchDebounced]);
+  }, [typeFilter, searchDebounced, sort, pageSize]);
+
+  const totalPages = useMemo(() => {
+    if (count <= 0) return 0;
+    return Math.max(1, Math.ceil(count / pageSize));
+  }, [count, pageSize]);
+
+  const rangeLabel = useMemo(() => {
+    if (count <= 0 || !items.length) {
+      return i18n.t("mediaManager.pagination.empty");
+    }
+    const from = (page - 1) * pageSize + 1;
+    const to = (page - 1) * pageSize + items.length;
+    return i18n.t("mediaManager.pagination.range", { from, to, count });
+  }, [count, items.length, page, pageSize]);
+
+  const handlePageSizeChange = (event) => {
+    const next = parseInt(event.target.value, 10);
+    if (!PAGE_SIZE_OPTIONS.includes(next)) return;
+    setPageSize(next);
+    try {
+      localStorage.setItem(PAGE_SIZE_STORAGE_KEY, String(next));
+    } catch {
+      /* ignore */
+    }
+    setPage(1);
+  };
+
+  const handleTablePageChange = (_, newPage) => {
+    setPage(newPage + 1);
+  };
+
+  const handleNumberedPageChange = (_, value) => {
+    setPage(value);
+  };
 
   const selectedEntries = useMemo(() => Object.values(selectedMap), [selectedMap]);
   const selectedCount = selectedEntries.length;
@@ -539,10 +605,7 @@ export default function MediaManager() {
               labelId="media-sort-label"
               label={i18n.t("mediaManager.sort.label")}
               value={sort}
-              onChange={(e) => {
-                setSort(e.target.value);
-                setPage(1);
-              }}
+              onChange={(e) => setSort(e.target.value)}
             >
               {SORT_KEYS.map((k) => (
                 <MenuItem key={k} value={k}>
@@ -559,7 +622,7 @@ export default function MediaManager() {
         {selectedCount > 0 ? (
           <Box className={classes.bulkBar}>
             <Typography variant="body2" style={{ flex: 1, fontWeight: 600 }}>
-              {i18n.t("mediaManager.bulk.selectedCount", { count: selectedCount })}
+              {i18n.t("mediaManager.bulk.selectedCountPage", { count: selectedCount })}
             </Typography>
             <Button
               color="secondary"
@@ -675,16 +738,32 @@ export default function MediaManager() {
           </Table>
         )}
 
-        <Box display="flex" justifyContent="flex-end" mt={2} style={{ gap: 8 }}>
-          <Button
-            disabled={page <= 1 || loading}
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-          >
-            {i18n.t("mediaManager.prev")}
-          </Button>
-          <Button disabled={!hasMore || loading} onClick={() => setPage((p) => p + 1)}>
-            {i18n.t("mediaManager.next")}
-          </Button>
+        <Box className={classes.paginationBar}>
+          <TablePagination
+            component="div"
+            count={count}
+            page={Math.max(0, page - 1)}
+            onChangePage={handleTablePageChange}
+            rowsPerPage={pageSize}
+            onChangeRowsPerPage={handlePageSizeChange}
+            rowsPerPageOptions={PAGE_SIZE_OPTIONS}
+            labelRowsPerPage={i18n.t("mediaManager.pagination.rowsPerPage")}
+            labelDisplayedRows={() => rangeLabel}
+          />
+          {totalPages > 1 ? (
+            <Box className={classes.paginationPages}>
+              <Pagination
+                color="primary"
+                size="small"
+                count={totalPages}
+                page={page}
+                onChange={handleNumberedPageChange}
+                showFirstButton
+                showLastButton
+                disabled={loading}
+              />
+            </Box>
+          ) : null}
         </Box>
       </Paper>
 

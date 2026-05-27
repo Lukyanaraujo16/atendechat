@@ -27,7 +27,7 @@ import { i18n } from "../translate/i18n";
 import {
   getAttendanceDefaultPath,
   hasAttendanceModuleAccess,
-  hasInternalChatAccess,
+  canAccessInternalChatModule,
 } from "../utils/attendanceAccess";
 import { WhatsAppsContext } from "../context/WhatsApp/WhatsAppsContext";
 import { AuthContext } from "../context/Auth/AuthContext";
@@ -236,7 +236,7 @@ const MainListItems = (props) => {
   const showCampaigns = planFlags.useCampaigns;
   const showKanban = planFlags.useKanban;
   const showSchedules = planFlags.useSchedules;
-  const showInternalChat = hasInternalChatAccess(fx);
+  const showInternalChat = canAccessInternalChatModule(fx, user, planFlags);
   const showAtendimento = hasAttendanceModuleAccess(fx);
   const atendimentoPath = getAttendanceDefaultPath({
     effectiveFeatures: fx,

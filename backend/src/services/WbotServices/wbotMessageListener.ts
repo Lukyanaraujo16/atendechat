@@ -91,6 +91,16 @@ import Company from "../../models/Company";
 import { formatChatbotBypassSystemMessage } from "../../helpers/chatbotBypassMessages";
 import { extractMessageReceivedAt } from "../../helpers/extractMessageReceivedAt";
 import { TicketRecreationBlockedError } from "../TicketServices/TicketDeletionGuardService";
+import {
+  extractInboundJidMeta,
+  InvalidInboundContactJidError,
+  isRejectableWhatsAppJid,
+  jidFromWhatsAppPhoneNumber,
+  normalizeWhatsAppJidToNumber,
+  resolveGroupParticipantJid,
+  resolvePrivateChatJid,
+  WhatsAppJidNormalizeOptions
+} from "../../helpers/normalizeWhatsAppJidToNumber";
 
 const request = require("request");
 
@@ -109,6 +119,7 @@ interface ImessageUpsert {
 interface IMe {
   name: string;
   id: string;
+  jidNormalizeOptions?: WhatsAppJidNormalizeOptions;
 }
 
 interface IMessage {
@@ -534,54 +545,27 @@ const getSenderMessage = (
   return senderId && jidNormalizedUser(senderId);
 };
 
-/** JID do participante em grupos — prioriza número real (senderPn) em vez de @lid interno. */
+/** JID do participante em grupos — número real ou fallback do sender. */
 const getGroupParticipantContactJid = (
   msg: proto.IWebMessageInfo,
   wbot: Session
 ): string => {
-  const participant = msg.key.participant || msg.participant;
-  if (!participant) {
-    return getSenderMessage(msg, wbot);
+  const resolved = resolveGroupParticipantJid(msg, getSenderMessage(msg, wbot));
+  if (resolved) {
+    return resolved;
   }
-  const raw = String(participant);
-  if (raw.endsWith("@lid")) {
-    const key = msg.key as { senderPn?: string };
-    if (key.senderPn) {
-      const phone = String(key.senderPn).replace(/\D/g, "");
-      if (phone.length >= 8 && phone.length <= 15) {
-        return `${phone}@s.whatsapp.net`;
-      }
-    }
-  }
-  const normalized = jidNormalizedUser(raw);
-  const local = normalized.split("@")[0].split(":")[0];
-  const digits = local.replace(/\D/g, "");
-  if (digits.length >= 8 && digits.length <= 15) {
-    return `${digits}@s.whatsapp.net`;
-  }
-  return normalized;
+  return getSenderMessage(msg, wbot);
 };
 
 /**
- * Para chat 1:1, retorna sempre o JID no formato @s.whatsapp.net (número real) quando disponível.
- * Quando a mensagem vem com @lid (Linked Identity), tenta obter o número real por:
- * 1. key.senderPn - número em formato string
- * 2. key.remoteJidAlt - JID alternativo com número (ex: 5511999999999@s.whatsapp.net)
- * Caso contrário retorna o LID para envio, mas o contato ficará com número "LID" para exibição.
+ * Chat 1:1: JID @s.whatsapp.net com número real (senderPn / remoteJidAlt quando @lid).
  */
 const getContactJidForChat = (msg: proto.IWebMessageInfo): string => {
-  const remoteJid = msg.key.remoteJid || "";
-  if (remoteJid.endsWith("@lid")) {
-    const key = msg.key as { senderPn?: string; remoteJidAlt?: string };
-    if (key.senderPn) {
-      const phone = String(key.senderPn).replace(/\D/g, "");
-      if (phone) return `${phone}@s.whatsapp.net`;
-    }
-    if (key.remoteJidAlt && key.remoteJidAlt.endsWith("@s.whatsapp.net")) {
-      return key.remoteJidAlt;
-    }
+  const resolved = resolvePrivateChatJid(msg);
+  if (resolved) {
+    return resolved;
   }
-  return remoteJid;
+  return String(msg.key.remoteJid || "");
 };
 
 /**
@@ -638,19 +622,35 @@ const findTicketForOutgoingEcho = async (
   return t;
 };
 
-const getContactMessage = async (msg: proto.IWebMessageInfo, wbot: Session) => {
-  const isGroup = msg.key.remoteJid.includes("g.us");
-  const contactJid = isGroup ? msg.key.remoteJid : getContactJidForChat(msg);
-  const rawNumber = contactJid.replace(/\D/g, "");
-  return isGroup
-    ? {
-        id: getGroupParticipantContactJid(msg, wbot),
-        name: msg.pushName
-      }
-    : {
-        id: contactJid,
-        name: msg.key.fromMe ? rawNumber : msg.pushName
-      };
+const getContactMessage = async (
+  msg: proto.IWebMessageInfo,
+  wbot: Session
+): Promise<IMe> => {
+  const meta = extractInboundJidMeta(msg);
+  const normalizeOpts: WhatsAppJidNormalizeOptions = {
+    senderPn: meta.senderPn,
+    remoteJidAlt: meta.remoteJidAlt
+  };
+  const isGroup = meta.remoteJid.includes("g.us");
+
+  if (isGroup) {
+    return {
+      id: getGroupParticipantContactJid(msg, wbot),
+      name: msg.pushName,
+      jidNormalizeOptions: normalizeOpts
+    };
+  }
+
+  const contactJid = getContactJidForChat(msg);
+  const normalizedNumber = normalizeWhatsAppJidToNumber(meta.remoteJid, normalizeOpts);
+
+  return {
+    id: contactJid,
+    name: msg.key.fromMe
+      ? normalizedNumber || "Cliente"
+      : msg.pushName,
+    jidNormalizeOptions: normalizeOpts
+  };
 };
 
 const downloadMedia = async (msg: proto.IWebMessageInfo) => {
@@ -701,26 +701,48 @@ const verifyContact = async (
   wbot: Session,
   companyId: number
 ): Promise<Contact> => {
+  const rawId = String(msgContact.id || "");
+  const isGroupEntity = rawId.includes("g.us");
+
+  let number: string;
+  if (isGroupEntity) {
+    number = rawId.replace(/\D/g, "");
+  } else {
+    const normalized = normalizeWhatsAppJidToNumber(
+      rawId,
+      msgContact.jidNormalizeOptions || {}
+    );
+    if (!normalized) {
+      logger.warn(
+        {
+          contactJid: rawId,
+          senderPn: msgContact.jidNormalizeOptions?.senderPn,
+          remoteJidAlt: msgContact.jidNormalizeOptions?.remoteJidAlt
+        },
+        "[ContactNormalization] invalid inbound jid ignored"
+      );
+      throw new InvalidInboundContactJidError(rawId);
+    }
+    number = normalized;
+  }
+
   let profilePicUrl: string;
+  const profileJid =
+    !isGroupEntity && jidFromWhatsAppPhoneNumber(number)
+      ? jidFromWhatsAppPhoneNumber(number)!
+      : rawId;
   try {
-    profilePicUrl = await wbot.profilePictureUrl(msgContact.id);
+    profilePicUrl = await wbot.profilePictureUrl(profileJid);
   } catch (e) {
     Sentry.captureException(e);
     profilePicUrl = `${process.env.FRONTEND_URL}/nopicture.png`;
   }
 
-  // Para LID sem número resolvível: não usar dígitos do JID (não é o telefone real)
-  const rawId = msgContact.id;
-  const isLidWithoutNumber = rawId.endsWith("@lid");
-  const number = isLidWithoutNumber
-    ? "LID"
-    : rawId.replace(/\D/g, "");
-
   const contactData = {
-    name: msgContact?.name || (isLidWithoutNumber ? "Cliente" : rawId.replace(/\D/g, "")),
+    name: msgContact?.name || number,
     number,
     profilePicUrl,
-    isGroup: msgContact.id.includes("g.us"),
+    isGroup: isGroupEntity,
     companyId,
     whatsappId: wbot.id
   };
@@ -1300,7 +1322,7 @@ export const verifyMessage = async (
 };
 
 const isValidMsg = (msg: proto.IWebMessageInfo): boolean => {
-  if (msg.key.remoteJid === "status@broadcast") {
+  if (isRejectableWhatsAppJid(msg.key.remoteJid)) {
     return false;
   }
   try {
@@ -2992,9 +3014,12 @@ const handleMessage = async (
     if (!isGroup && msg.key.remoteJid) {
       const myId = (wbot as WASocket).user?.id;
       if (myId) {
-        const contactJid = getContactJidForChat(msg);
-        const remoteNumber = contactJid.replace(/\D/g, "");
-        const myNumber = jidNormalizedUser(myId).replace(/\D/g, "");
+        const inboundMeta = extractInboundJidMeta(msg);
+        const remoteNumber = normalizeWhatsAppJidToNumber(inboundMeta.remoteJid, {
+          senderPn: inboundMeta.senderPn,
+          remoteJidAlt: inboundMeta.remoteJidAlt
+        });
+        const myNumber = normalizeWhatsAppJidToNumber(jidNormalizedUser(myId));
         if (remoteNumber && myNumber && remoteNumber === myNumber) {
           logger.info(
             `[WhatsAppInbound] ignored reason=self_chat messageId=${msg.key?.id ?? ""}`
@@ -3042,7 +3067,17 @@ const handleMessage = async (
     }
 
     if (!ticketFromEcho) {
-      contact = await verifyContact(msgContact, wbot, companyId);
+      try {
+        contact = await verifyContact(msgContact, wbot, companyId);
+      } catch (err) {
+        if (err instanceof InvalidInboundContactJidError) {
+          logger.info(
+            `[WhatsAppInbound] ignored reason=invalid_contact_jid messageId=${msg.key?.id ?? ""} jid=${err.jid}`
+          );
+          return;
+        }
+        throw err;
+      }
     }
 
     let unreadMessages = 0;

@@ -64,11 +64,25 @@ function parseSort(raw: string | undefined): (typeof ALLOWED_SORT)[number] {
   return "createdAt_desc";
 }
 
+export const COMPANY_MEDIA_PAGE_LIMITS = [25, 50, 100, 200] as const;
+export const COMPANY_MEDIA_DEFAULT_LIMIT = 25;
+export const COMPANY_MEDIA_MAX_LIMIT = 200;
+
+function normalizeListLimit(raw: unknown): number {
+  const n = Number(raw);
+  if (
+    COMPANY_MEDIA_PAGE_LIMITS.includes(
+      n as (typeof COMPANY_MEDIA_PAGE_LIMITS)[number]
+    )
+  ) {
+    return n;
+  }
+  return COMPANY_MEDIA_DEFAULT_LIMIT;
+}
+
 function safePageLimit(q: Record<string, unknown>) {
-  const pageRaw = firstQueryString(q.page);
-  const limitRaw = firstQueryString(q.limit);
-  const pageNum = Math.max(1, Number(pageRaw) || 1);
-  const limitNum = Math.min(100, Math.max(1, Number(limitRaw) || 25));
+  const pageNum = Math.max(1, Number(firstQueryString(q.page)) || 1);
+  const limitNum = normalizeListLimit(firstQueryString(q.limit));
   return { pageNum, limitNum };
 }
 
@@ -118,10 +132,16 @@ export const listCompanyMedia = async (
       otherBytes: Number(data?.summary?.otherBytes) || 0
     };
 
+    const totalPages =
+      count > 0 ? Math.ceil(count / limitNum) : 0;
+
     return res.json({
       items,
       count,
       hasMore,
+      pageNumber: pageNum,
+      limit: limitNum,
+      totalPages,
       summary: {
         ...summaryNums,
         totalFormatted: formatBytesPtBr(summaryNums.totalBytes),

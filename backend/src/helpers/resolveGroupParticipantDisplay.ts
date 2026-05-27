@@ -1,4 +1,5 @@
 import Contact from "../models/Contact";
+import { isPlausibleWhatsAppPhoneNumber } from "./normalizeWhatsAppJidToNumber";
 
 export type GroupParticipantDisplayInput = {
   contact?: { name?: string | null; number?: string | null } | null;
@@ -24,7 +25,7 @@ export function extractParticipantPhoneFromJid(
   }
   const local = raw.split("@")[0].split(":")[0];
   const digits = local.replace(/\D/g, "");
-  if (digits.length >= 8 && digits.length <= 15) {
+  if (isPlausibleWhatsAppPhoneNumber(digits)) {
     return digits;
   }
   return null;

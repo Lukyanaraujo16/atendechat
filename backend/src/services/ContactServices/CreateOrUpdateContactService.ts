@@ -2,6 +2,8 @@ import { getIO } from "../../libs/socket";
 import Contact from "../../models/Contact";
 import ContactCustomField from "../../models/ContactCustomField";
 import { isNil } from "lodash";
+import AppError from "../../errors/AppError";
+import { isPlausibleWhatsAppPhoneNumber } from "../../helpers/normalizeWhatsAppJidToNumber";
 interface ExtraInfo extends ContactCustomField {
   name: string;
   value: string;
@@ -32,6 +34,10 @@ const CreateOrUpdateContactService = async ({
   whatsappId
 }: Request): Promise<Contact> => {
   const number = isGroup ? rawNumber : rawNumber.replace(/[^0-9]/g, "");
+
+  if (!isGroup && !isPlausibleWhatsAppPhoneNumber(number)) {
+    throw new AppError("ERR_INVALID_CONTACT_NUMBER", 400);
+  }
 
   const io = getIO();
   let contact: Contact | null;

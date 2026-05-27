@@ -309,21 +309,23 @@ const TicketsListCustom = (props) => {
     }
     return rawDisplayTickets;
   }, [isControlled, rawDisplayTickets, searchParam]);
-  /** Skeleton na carga inicial ou quando contador > 0 mas lista ainda não sincronizou. */
-  const controlledCountMismatch =
-    isControlled &&
-    Number(controlledTabCount) > 0 &&
-    displayTickets.length === 0;
+  const controlledTabCountNum = Number(controlledTabCount) || 0;
+  /**
+   * Inbox controlada: skeleton só quando o contador indica tickets mas a lista
+   * ainda não chegou. Aba vazia (count = 0) mantém empty state estável, mesmo
+   * durante refetch em segundo plano.
+   */
   const displayLoading = isControlled
     ? Boolean(
-        (controlledLoading && displayTickets.length === 0) ||
-          controlledCountMismatch
+        controlledLoading &&
+        displayTickets.length === 0 &&
+        controlledTabCountNum > 0
       )
     : Boolean(loading && displayTickets.length === 0);
   const showEmptyState =
     displayTickets.length === 0 &&
     !displayLoading &&
-    !(isControlled && Number(controlledTabCount) > 0);
+    !(isControlled && controlledTabCountNum > 0);
   const displayHasMore = isControlled ? controlledHasMore : hasMore;
 
   useEffect(() => {

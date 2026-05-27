@@ -4320,8 +4320,14 @@ const messages = {
 						"{{deleted}} media deleted • {{size}} freed. {{failed}} item(s) could not be processed.",
 					batchNoneProcessed: "No items were deleted. Check permissions or whether the media was already removed.",
 				},
+				pagination: {
+					rowsPerPage: "Items per page",
+					range: "Showing {{from}}–{{to}} of {{count}}",
+					empty: "No records to display",
+				},
 				bulk: {
 					selectedCount: "{{count}} item(s) selected",
+					selectedCountPage: "{{count}} selected on this page",
 					deleteSelected: "Delete selected",
 					clearSelection: "Clear selection",
 					deleteBatchConfirm:

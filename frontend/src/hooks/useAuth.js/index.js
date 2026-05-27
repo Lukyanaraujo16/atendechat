@@ -12,6 +12,7 @@ import moment from "moment";
 import { computeFinanceFromDueDate } from "../../helpers/financeFlags";
 import { oneSignalLogout } from "../../services/oneSignalService";
 import { canAccessSaasPlatform } from "../../utils/platformUser";
+import { getPostLoginHomePath } from "../../utils/attendanceAccess";
 
 const BUSINESS_FORBIDDEN = [
   "ERR_COMPANY_DELINQUENT",
@@ -322,7 +323,7 @@ const useAuth = () => {
       if (canAccessSaasPlatform(data.user)) {
         history.push("/saas");
       } else {
-        history.push("/tickets");
+        history.push(getPostLoginHomePath(data.user));
       }
       setLoading(false);
 
@@ -372,7 +373,7 @@ const useAuth = () => {
       setUser(data.user);
       setIsAuth(true);
       toast.success(i18n.t("platform.support.entered"));
-      history.push("/tickets");
+      history.push(getPostLoginHomePath(data.user));
     } catch (err) {
       toastError(err);
     } finally {

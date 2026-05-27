@@ -17,7 +17,7 @@ import {
   getDefaultAppPath,
   hasAttendanceInboxAccess,
   hasAttendanceModuleAccess,
-  hasInternalChatAccess,
+  canAccessInternalChatModule,
   INTERNAL_CHAT_FEATURE_KEY,
 } from "../utils/attendanceAccess";
 
@@ -144,7 +144,7 @@ function AttendanceModuleGuard({ planFlags, user, isAdmin, children }) {
     return <PlanFlagsLoadingState />;
   }
   if (!hasAttendanceModuleAccess(fx)) {
-    if (hasInternalChatAccess(fx)) {
+    if (canAccessInternalChatModule(fx, user, planFlags)) {
       return <Redirect to="/chats" />;
     }
     return (
@@ -653,7 +653,7 @@ export default function LoggedInRoutesContent() {
           if (!planFlags.loaded) {
             return <PlanFlagsLoadingState />;
           }
-          if (!hasInternalChatAccess(fx)) {
+          if (!canAccessInternalChatModule(fx, user, planFlags)) {
             if (hasAttendanceModuleAccess(fx)) {
               return (
                 <Redirect
@@ -683,7 +683,7 @@ export default function LoggedInRoutesContent() {
           if (!planFlags.loaded) {
             return <PlanFlagsLoadingState />;
           }
-          if (!hasInternalChatAccess(fx)) {
+          if (!canAccessInternalChatModule(fx, user, planFlags)) {
             if (hasAttendanceModuleAccess(fx)) {
               return (
                 <Redirect

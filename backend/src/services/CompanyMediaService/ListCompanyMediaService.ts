@@ -119,9 +119,20 @@ export type ListCompanyMediaInput = {
   sort?: "createdAt_desc" | "createdAt_asc" | "size_desc" | "size_asc";
 };
 
+const ALLOWED_PAGE_LIMITS = [25, 50, 100, 200] as const;
+const DEFAULT_PAGE_LIMIT = 25;
+
+function normalizePageLimit(raw?: number): number {
+  const n = Number(raw);
+  if (ALLOWED_PAGE_LIMITS.includes(n as (typeof ALLOWED_PAGE_LIMITS)[number])) {
+    return n;
+  }
+  return DEFAULT_PAGE_LIMIT;
+}
+
 function parsePageLimit(page?: number, limit?: number): { page: number; limit: number; offset: number } {
   const p = Math.max(1, Number(page) || 1);
-  const l = Math.min(100, Math.max(1, Number(limit) || 25));
+  const l = normalizePageLimit(limit);
   return { page: p, limit: l, offset: (p - 1) * l };
 }
 

@@ -19,7 +19,45 @@ export function filterContactAssigneeUsers(users, authCompanyId) {
 	});
 }
 
-/** IDs válidos para PUT /contacts/:id/assignments */
+function assigneeEntryToId(entry) {
+	if (entry == null) return NaN;
+	if (typeof entry === "number" || typeof entry === "string") {
+		return Number(entry);
+	}
+	return Number(entry.id ?? entry.userId);
+}
+
+/** IDs válidos para POST/PUT de responsáveis (objetos de usuário, { userId } ou id numérico). */
 export function normalizeAssigneeUserIds(users) {
-	return [...new Set((users || []).map((u) => Number(u.id)).filter((id) => id > 0))];
+	return [
+		...new Set(
+			(users || []).map(assigneeEntryToId).filter((id) => Number.isFinite(id) && id > 0)
+		),
+	];
+}
+
+/**
+ * IDs a enviar na API: remove apenas responsáveis claramente inválidos.
+ * Se /users/list ainda não carregou, confia na seleção do Autocomplete.
+ * Mantém responsáveis já gravados no contato mesmo fora da lista atual.
+ */
+export function resolveContactAssigneeUserIds(
+	selectedAssignees,
+	companyUsers,
+	{ initialAssigneeIds = [] } = {}
+) {
+	const selectedIds = normalizeAssigneeUserIds(selectedAssignees);
+	if (!selectedIds.length) return [];
+
+	const allowedIds = new Set(normalizeAssigneeUserIds(companyUsers));
+	const initialIds = new Set(normalizeAssigneeUserIds(initialAssigneeIds));
+
+	if (allowedIds.size === 0) {
+		return selectedIds;
+	}
+
+	const valid = selectedIds.filter(
+		(id) => allowedIds.has(id) || initialIds.has(id)
+	);
+	return valid.length > 0 ? valid : selectedIds;
 }

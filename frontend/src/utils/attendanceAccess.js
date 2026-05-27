@@ -19,10 +19,57 @@ export function hasAttendanceModuleAccess(effectiveFeatures) {
   return ATTENDANCE_OPERATIONAL_FEATURE_KEYS.some((key) => fx[key] === true);
 }
 
-/** Alias alinhado ao pedido de produto (permissions.internalChat). */
-export function hasInternalChatAccess(effectiveFeatures) {
-  const fx = effectiveFeatures || {};
-  return fx[INTERNAL_CHAT_FEATURE_KEY] === true;
+/**
+ * Chat interno: independente de attendance.inbox.
+ * Usa effectiveFeatures do plano (usePlanFlags) e, se necessário, effectiveUserFeatures do JWT.
+ */
+export function hasInternalChatAccess(effectiveFeatures, user) {
+  const fromFlags = effectiveFeatures || {};
+  if (fromFlags[INTERNAL_CHAT_FEATURE_KEY] === true) {
+    return true;
+  }
+  const fromUser = user?.effectiveUserFeatures;
+  if (fromUser?.[INTERNAL_CHAT_FEATURE_KEY] === true) {
+    return true;
+  }
+  return false;
+}
+
+/** Plano da empresa inclui chat interno (antes de permissões individuais). */
+export function isInternalChatEnabledOnPlan(planFlags) {
+  const pf = planFlags?.planTierEffectiveFeatures;
+  if (!pf || typeof pf !== "object" || Object.keys(pf).length === 0) {
+    return true;
+  }
+  return pf[INTERNAL_CHAT_FEATURE_KEY] === true;
+}
+
+export function canAccessInternalChatModule(effectiveFeatures, user, planFlags) {
+  if (!isInternalChatEnabledOnPlan(planFlags)) {
+    return false;
+  }
+  return hasInternalChatAccess(effectiveFeatures, user);
+}
+
+/** Home após login / modo suporte (não força /tickets). */
+export function getPostLoginHomePath(user, planFlags = {}) {
+  const fx =
+    user?.effectiveUserFeatures && Object.keys(user.effectiveUserFeatures).length > 0
+      ? user.effectiveUserFeatures
+      : planFlags?.effectiveFeatures || {};
+  const showDashboardNav =
+    fx["dashboard.main"] === true || fx["dashboard.reports"] === true;
+  const isAdmin =
+    user?.profile === "admin" ||
+    user?.profile === "supervisor" ||
+    user?.supportMode === true;
+  return getDefaultAppPath({
+    effectiveFeatures: fx,
+    showDashboardNav,
+    planFlags,
+    isAdmin,
+    user,
+  });
 }
 
 export function hasAttendanceInboxAccess(effectiveFeatures) {
@@ -125,7 +172,7 @@ export function getDefaultAppPath({
       user,
     });
   }
-  if (hasInternalChatAccess(effectiveFeatures)) {
+  if (canAccessInternalChatModule(effectiveFeatures, user, planFlags)) {
     return "/chats";
   }
   return "/notifications";

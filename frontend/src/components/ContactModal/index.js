@@ -29,6 +29,7 @@ import { canManageContactAssignments } from "../../utils/canManageContactAssignm
 import {
 	filterContactAssigneeUsers,
 	normalizeAssigneeUserIds,
+	resolveContactAssigneeUserIds,
 } from "../../utils/filterContactAssigneeUsers";
 import {
 	normalizeWhatsAppInput,
@@ -304,21 +305,18 @@ const ContactModal = ({
 		};
 	}, [open, canManageAssignees, authUser?.companyId]);
 
-	const getValidSelectedAssigneeIds = () => {
-		const allowedIds = new Set(
-			companyUsers.map((u) => Number(u.id)).filter((id) => id > 0)
-		);
-		return normalizeAssigneeIds(selectedAssignees).filter((id) =>
-			allowedIds.has(id)
-		);
-	};
+	const getValidSelectedAssigneeIds = () =>
+		resolveContactAssigneeUserIds(selectedAssignees, companyUsers, {
+			initialAssigneeIds,
+		});
 
 	const validateAssigneesRequired = () => {
 		if (!canManageAssignees) {
 			setAssigneesError("");
 			return true;
 		}
-		if (getValidSelectedAssigneeIds().length === 0) {
+		const validIds = getValidSelectedAssigneeIds();
+		if (validIds.length === 0) {
 			const message = i18n.t("contacts.assignments.requiresOne");
 			setAssigneesError(message);
 			toastError(new Error(message));
@@ -667,8 +665,13 @@ const ContactModal = ({
 											options={companyUsers}
 											value={selectedAssignees}
 											onChange={(_, value) => {
-												setSelectedAssignees(value || []);
-												if ((value || []).length > 0) {
+												const next = value || [];
+												setSelectedAssignees(next);
+												if (
+													resolveContactAssigneeUserIds(next, companyUsers, {
+														initialAssigneeIds,
+													}).length > 0
+												) {
 													setAssigneesError("");
 												}
 											}}
@@ -681,7 +684,9 @@ const ContactModal = ({
 													  }`
 													: option.email || ""
 											}
-											getOptionSelected={(opt, val) => opt.id === val.id}
+											getOptionSelected={(opt, val) =>
+												Number(opt.id) === Number(val.id)
+											}
 											renderTags={(value, getTagProps) =>
 												value.map((option, index) => (
 													<Chip

@@ -4447,8 +4447,14 @@ const messages = {
           batchNoneProcessed:
             "Nenhuma mídia foi excluída. Os arquivos podem já não existir, não ter permissão ou o identificador não foi reconhecido.{{reason}}",
         },
+        pagination: {
+          rowsPerPage: "Itens por página",
+          range: "Exibindo {{from}}–{{to}} de {{count}}",
+          empty: "Nenhum registo a exibir",
+        },
         bulk: {
           selectedCount: "{{count}} itens selecionados",
+          selectedCountPage: "{{count}} selecionados nesta página",
           deleteSelected: "Excluir selecionados",
           clearSelection: "Limpar selecção",
           deleteBatchConfirm:

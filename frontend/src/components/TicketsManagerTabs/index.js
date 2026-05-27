@@ -529,20 +529,10 @@ const InboxSubTabsPills = memo(function InboxSubTabsPills({
   setTabOpen,
   classes,
 }) {
-  const {
-    openCount,
-    pendingCount,
-    chatbotCount,
-    reloadOpenList,
-    reloadPendingList,
-    reloadChatbotList,
-  } = useTicketsInboxMetrics();
+  const { openCount, pendingCount, chatbotCount } = useTicketsInboxMetrics();
 
-  const selectTab = (tab, reloadFn) => {
+  const selectTab = (tab) => {
     setTabOpen(tab);
-    if (typeof reloadFn === "function") {
-      reloadFn({ force: true });
-    }
   };
 
   return (
@@ -551,7 +541,7 @@ const InboxSubTabsPills = memo(function InboxSubTabsPills({
         className={`${classes.statusPill} ${classes.statusPillBtn} ${classes.statusPillGreen} ${
           tabOpen === "open" ? classes.statusPillGreenActive : ""
         }`}
-        onClick={() => selectTab("open", reloadOpenList)}
+        onClick={() => selectTab("open")}
       >
         <span className={classes.statusCountGreen}>{openCount}</span>
         <FolderOpenIcon className={clsx(classes.statusPillIcon, classes.statusIconGreen)} />
@@ -568,7 +558,7 @@ const InboxSubTabsPills = memo(function InboxSubTabsPills({
         className={`${classes.statusPill} ${classes.statusPillBtn} ${classes.statusPillPink} ${
           tabOpen === "pending" ? classes.statusPillPinkActive : ""
         }`}
-        onClick={() => selectTab("pending", reloadPendingList)}
+        onClick={() => selectTab("pending")}
       >
         <span className={classes.statusCountPink}>{pendingCount}</span>
         <PersonIcon className={clsx(classes.statusPillIcon, classes.statusIconPink)} />
@@ -585,7 +575,7 @@ const InboxSubTabsPills = memo(function InboxSubTabsPills({
         className={`${classes.statusPill} ${classes.statusPillBtn} ${classes.statusPillGreen} ${
           tabOpen === "chatbot" ? classes.statusPillGreenActive : ""
         }`}
-        onClick={() => selectTab("chatbot", reloadChatbotList)}
+        onClick={() => selectTab("chatbot")}
       >
         <span className={classes.statusCountGreen}>{chatbotCount}</span>
         <AndroidIcon className={clsx(classes.statusPillIcon, classes.statusIconGreen)} />

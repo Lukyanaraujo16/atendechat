@@ -4232,8 +4232,14 @@ const messages = {
           batchNoneProcessed:
             "No se eliminó ningún elemento. Compruebe permisos o si el medio ya fue eliminado.",
         },
+        pagination: {
+          rowsPerPage: "Elementos por página",
+          range: "Mostrando {{from}}–{{to}} de {{count}}",
+          empty: "No hay registros para mostrar",
+        },
         bulk: {
           selectedCount: "{{count}} elemento(s) seleccionado(s)",
+          selectedCountPage: "{{count}} seleccionados en esta página",
           deleteSelected: "Eliminar seleccionados",
           clearSelection: "Limpiar selección",
           deleteBatchConfirm:
