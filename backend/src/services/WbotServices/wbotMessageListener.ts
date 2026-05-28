@@ -94,10 +94,11 @@ import { TicketRecreationBlockedError } from "../TicketServices/TicketDeletionGu
 import {
   extractInboundJidMeta,
   InvalidInboundContactJidError,
-  isRejectableWhatsAppJid,
+  isIgnorableInboundRemoteJid,
   jidFromWhatsAppPhoneNumber,
   normalizeWhatsAppJidToNumber,
   resolveGroupParticipantJid,
+  resolveInboundContactFromMessage,
   resolvePrivateChatJid,
   WhatsAppJidNormalizeOptions
 } from "../../helpers/normalizeWhatsAppJidToNumber";
@@ -629,7 +630,8 @@ const getContactMessage = async (
   const meta = extractInboundJidMeta(msg);
   const normalizeOpts: WhatsAppJidNormalizeOptions = {
     senderPn: meta.senderPn,
-    remoteJidAlt: meta.remoteJidAlt
+    remoteJidAlt: meta.remoteJidAlt,
+    participantPn: meta.participantPn
   };
   const isGroup = meta.remoteJid.includes("g.us");
 
@@ -699,38 +701,61 @@ const downloadMedia = async (msg: proto.IWebMessageInfo) => {
 const verifyContact = async (
   msgContact: IMe,
   wbot: Session,
-  companyId: number
+  companyId: number,
+  inboundMsg?: proto.IWebMessageInfo
 ): Promise<Contact> => {
   const rawId = String(msgContact.id || "");
   const isGroupEntity = rawId.includes("g.us");
 
   let number: string;
+  let profileJid: string;
+
   if (isGroupEntity) {
     number = rawId.replace(/\D/g, "");
+    profileJid = rawId;
+  } else if (inboundMsg) {
+    const tryOnWhatsApp = async (jid: string): Promise<string | null> => {
+      try {
+        const results = await wbot.onWhatsApp(jid);
+        const first = Array.isArray(results) ? results[0] : results;
+        if (first?.exists && first?.jid) {
+          return normalizeWhatsAppJidToNumber(first.jid);
+        }
+      } catch (probeErr) {
+        logger.debug(
+          { err: probeErr, jid },
+          "[ContactNormalization] onWhatsApp probe failed"
+        );
+      }
+      return null;
+    };
+
+    const resolved = await resolveInboundContactFromMessage(inboundMsg, {
+      tryOnWhatsApp
+    });
+
+    if (resolved.ok === false) {
+      throw new InvalidInboundContactJidError(
+        rawId,
+        resolved.reason || "no_plausible_number"
+      );
+    }
+
+    number = resolved.data.number;
+    profileJid = resolved.data.jidForProfile;
   } else {
     const normalized = normalizeWhatsAppJidToNumber(
       rawId,
       msgContact.jidNormalizeOptions || {}
     );
     if (!normalized) {
-      logger.warn(
-        {
-          contactJid: rawId,
-          senderPn: msgContact.jidNormalizeOptions?.senderPn,
-          remoteJidAlt: msgContact.jidNormalizeOptions?.remoteJidAlt
-        },
-        "[ContactNormalization] invalid inbound jid ignored"
-      );
-      throw new InvalidInboundContactJidError(rawId);
+      throw new InvalidInboundContactJidError(rawId, "no_inbound_msg_context");
     }
     number = normalized;
+    profileJid = jidFromWhatsAppPhoneNumber(number) || rawId;
   }
 
   let profilePicUrl: string;
-  const profileJid =
-    !isGroupEntity && jidFromWhatsAppPhoneNumber(number)
-      ? jidFromWhatsAppPhoneNumber(number)!
-      : rawId;
   try {
     profilePicUrl = await wbot.profilePictureUrl(profileJid);
   } catch (e) {
@@ -1322,7 +1347,7 @@ export const verifyMessage = async (
 };
 
 const isValidMsg = (msg: proto.IWebMessageInfo): boolean => {
-  if (isRejectableWhatsAppJid(msg.key.remoteJid)) {
+  if (isIgnorableInboundRemoteJid(msg.key.remoteJid)) {
     return false;
   }
   try {
@@ -3017,7 +3042,8 @@ const handleMessage = async (
         const inboundMeta = extractInboundJidMeta(msg);
         const remoteNumber = normalizeWhatsAppJidToNumber(inboundMeta.remoteJid, {
           senderPn: inboundMeta.senderPn,
-          remoteJidAlt: inboundMeta.remoteJidAlt
+          remoteJidAlt: inboundMeta.remoteJidAlt,
+          participantPn: inboundMeta.participantPn
         });
         const myNumber = normalizeWhatsAppJidToNumber(jidNormalizedUser(myId));
         if (remoteNumber && myNumber && remoteNumber === myNumber) {
@@ -3035,7 +3061,7 @@ const handleMessage = async (
         id: grupoMeta.id,
         name: grupoMeta.subject
       };
-      groupContact = await verifyContact(msgGroupContact, wbot, companyId);
+      groupContact = await verifyContact(msgGroupContact, wbot, companyId, msg);
     }
 
     const whatsapp = await ShowWhatsAppService(wbot.id!, companyId);
@@ -3068,11 +3094,19 @@ const handleMessage = async (
 
     if (!ticketFromEcho) {
       try {
-        contact = await verifyContact(msgContact, wbot, companyId);
+        contact = await verifyContact(msgContact, wbot, companyId, msg);
       } catch (err) {
         if (err instanceof InvalidInboundContactJidError) {
-          logger.info(
-            `[WhatsAppInbound] ignored reason=invalid_contact_jid messageId=${msg.key?.id ?? ""} jid=${err.jid}`
+          logger.warn(
+            {
+              messageId: msg.key?.id ?? "",
+              jid: err.jid,
+              reason: err.reason,
+              remoteJid: msg.key?.remoteJid,
+              senderPn: (msg.key as { senderPn?: string })?.senderPn,
+              remoteJidAlt: (msg.key as { remoteJidAlt?: string })?.remoteJidAlt
+            },
+            `[WhatsAppInbound] ignored reason=invalid_contact_jid messageId=${msg.key?.id ?? ""}`
           );
           return;
         }
