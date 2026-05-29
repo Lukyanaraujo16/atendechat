@@ -8,6 +8,11 @@ import CountUnreadUserNotificationsService from "../services/UserNotificationSer
 import ArchiveUserNotificationService from "../services/UserNotificationService/ArchiveUserNotificationService";
 import ArchiveAllReadUserNotificationsService from "../services/UserNotificationService/ArchiveAllReadUserNotificationsService";
 import ArchiveManyUserNotificationsService from "../services/UserNotificationService/ArchiveManyUserNotificationsService";
+import DeleteUserNotificationService from "../services/UserNotificationService/DeleteUserNotificationService";
+import DeleteManyUserNotificationsService from "../services/UserNotificationService/DeleteManyUserNotificationsService";
+import DeleteAllReadUserNotificationsService from "../services/UserNotificationService/DeleteAllReadUserNotificationsService";
+import DeleteAllArchivedUserNotificationsService from "../services/UserNotificationService/DeleteAllArchivedUserNotificationsService";
+import DeleteAllUserNotificationsService from "../services/UserNotificationService/DeleteAllUserNotificationsService";
 import {
   assertTenantCompany,
   loadNotificationRequestContext
@@ -155,4 +160,61 @@ export const archiveMany = async (
   const ids = Array.isArray(raw) ? raw : [];
   const archived = await ArchiveManyUserNotificationsService(ids, ctx);
   return res.json({ archived });
+};
+
+export const destroyOne = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const ctx = await loadCtx(req);
+  const id = Number(req.params.id);
+  if (Number.isNaN(id)) {
+    throw new AppError("ERR_INVALID_ID", 400);
+  }
+  const ok = await DeleteUserNotificationService(id, ctx);
+  if (!ok) {
+    throw new AppError("ERR_NO_NOTIFICATION", 404);
+  }
+  return res.json({ deleted: 1 });
+};
+
+export const destroyMany = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const ctx = await loadCtx(req);
+  const raw = (req.body && req.body.ids) as unknown;
+  const ids = Array.isArray(raw) ? raw : [];
+  const deleted = await DeleteManyUserNotificationsService(ids, ctx);
+  return res.json({ deleted });
+};
+
+export const destroyAllRead = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const ctx = await loadCtx(req);
+  const deleted = await DeleteAllReadUserNotificationsService(ctx);
+  return res.json({ deleted });
+};
+
+export const destroyAllArchived = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const ctx = await loadCtx(req);
+  const deleted = await DeleteAllArchivedUserNotificationsService(ctx);
+  return res.json({ deleted });
+};
+
+export const destroyAll = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const ctx = await loadCtx(req);
+  if (req.body?.confirm !== true) {
+    throw new AppError("ERR_CONFIRMATION_REQUIRED", 400);
+  }
+  const deleted = await DeleteAllUserNotificationsService(ctx);
+  return res.json({ deleted });
 };

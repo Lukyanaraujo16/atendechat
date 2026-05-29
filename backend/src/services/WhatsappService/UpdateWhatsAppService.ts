@@ -26,7 +26,7 @@ interface WhatsappData {
   timeUseBotQueues?: number;
   expiresTicket?: number;
   expiresInactiveMessage?: string;
-  integrationId?: number;
+  integrationId?: number | null;
   flowIdWelcome?: number;
   flowIdNotPhrase?: number;
   autoReadMessages?: boolean;
@@ -154,7 +154,13 @@ const UpdateWhatsAppService = async ({
     updateData.promptId = promptId;
   }
   if (integrationId !== undefined) {
-    updateData.integrationId = integrationId;
+    const rawIntegration = integrationId as number | string | null;
+    updateData.integrationId =
+      rawIntegration === null ||
+      rawIntegration === "" ||
+      rawIntegration === undefined
+        ? null
+        : Number(rawIntegration) || null;
   }
   if (token !== undefined) {
     updateData.token = token;

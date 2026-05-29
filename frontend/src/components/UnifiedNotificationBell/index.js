@@ -109,6 +109,8 @@ export default function UnifiedNotificationBell() {
     markAllRead: centralMarkAllRead,
     archiveRead: centralArchiveRead,
     archiveOne: centralArchiveOne,
+    deleteOne: centralDeleteOne,
+    deleteAllRead: centralDeleteAllRead,
   } = useUserNotifications({ enabled: Boolean(user?.id) });
 
   const {
@@ -274,6 +276,8 @@ export default function UnifiedNotificationBell() {
               onMarkAllRead={centralMarkAllRead}
               onArchiveRead={centralArchiveRead}
               onArchiveOne={centralArchiveOne}
+              onDeleteOne={centralDeleteOne}
+              onDeleteAllRead={centralDeleteAllRead}
               onViewAllClick={handleClose}
             />
           ) : null}

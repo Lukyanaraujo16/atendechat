@@ -25,13 +25,11 @@ import { ptBR, enUS, es } from "date-fns/locale";
 import { toast } from "react-toastify";
 
 import api from "../../services/api";
-import { getApiUrl } from "../../config/backendUrl";
 import { AuthContext } from "../../context/Auth/AuthContext";
 import { WhatsAppsContext } from "../../context/WhatsApp/WhatsAppsContext";
 import { SocketContext } from "../../context/Socket/SocketContext";
 import { i18n } from "../../translate/i18n";
 import { useHistory } from "react-router-dom";
-import useUsers from "../../hooks/useUsers";
 import toastError from "../../errors/toastError";
 import KanbanTicketQuickMenu from "./KanbanTicketQuickMenu";
 import {
@@ -491,7 +489,7 @@ const Kanban = () => {
   const { user } = useContext(AuthContext);
   const socketManager = useContext(SocketContext);
   const { whatsApps } = useContext(WhatsAppsContext);
-  const { users: usersList } = useUsers();
+  const [usersList, setUsersList] = useState([]);
   const { profile, queues } = user;
   const queuesList = Array.isArray(queues) ? queues : [];
   const isAdmin = String(profile || "").toLowerCase() === "admin";
@@ -540,6 +538,25 @@ const Kanban = () => {
     [filterUser]
   );
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await api.get("/users/list");
+        if (!cancelled) {
+          setUsersList(Array.isArray(data) ? data : []);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setUsersList([]);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const fetchTickets = useCallback(async () => {
     if (!isAdmin && queuesList.length === 0) {
       setTickets([]);
@@ -548,7 +565,7 @@ const Kanban = () => {
     }
     setLoading(true);
     try {
-      const { data } = await api.get(getApiUrl("/ticket/kanban"), {
+      const { data } = await api.get("/ticket/kanban", {
         params: {
           queueIds: JSON.stringify(queueIdsParam),
           showAll: isAdmin ? "true" : "false",
@@ -574,6 +591,7 @@ const Kanban = () => {
     } catch (err) {
       console.error(err);
       setTickets([]);
+      toastError(err);
     } finally {
       setLoading(false);
     }

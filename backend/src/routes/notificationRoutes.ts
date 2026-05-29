@@ -34,6 +34,31 @@ notificationRoutes.put(
   isAuth,
   UserNotificationController.archiveMany
 );
+notificationRoutes.post(
+  "/notifications/delete-selected",
+  isAuth,
+  UserNotificationController.destroyMany
+);
+notificationRoutes.post(
+  "/notifications/delete-read",
+  isAuth,
+  UserNotificationController.destroyAllRead
+);
+notificationRoutes.post(
+  "/notifications/delete-archived",
+  isAuth,
+  UserNotificationController.destroyAllArchived
+);
+notificationRoutes.post(
+  "/notifications/delete-all",
+  isAuth,
+  UserNotificationController.destroyAll
+);
+notificationRoutes.delete(
+  "/notifications/:id",
+  isAuth,
+  UserNotificationController.destroyOne
+);
 notificationRoutes.put(
   "/notifications/:id/read",
   isAuth,

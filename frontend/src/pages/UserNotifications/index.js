@@ -20,8 +20,10 @@ import {
   TablePagination,
   TextField,
   Typography,
+  IconButton,
   makeStyles,
 } from "@material-ui/core";
+import DeleteOutlineIcon from "@material-ui/icons/DeleteOutline";
 import ChatBubbleOutlineIcon from "@material-ui/icons/ChatBubbleOutline";
 import ConfirmationNumberOutlinedIcon from "@material-ui/icons/ConfirmationNumberOutlined";
 import EventOutlinedIcon from "@material-ui/icons/EventOutlined";
@@ -131,8 +133,15 @@ export default function UserNotificationsPage() {
       if (String(searchApplied).trim() !== "") params.q = String(searchApplied).trim();
 
       const { data } = await api.get("/notifications", { params });
-      setRows(Array.isArray(data?.notifications) ? data.notifications : []);
-      setTotal(Number(data?.count) || 0);
+      const list = Array.isArray(data?.notifications) ? data.notifications : [];
+      const count = Number(data?.count) || 0;
+      const maxPage = Math.max(0, Math.ceil(count / rowsPerPage) - 1);
+      if (list.length === 0 && page > maxPage) {
+        setPage(maxPage);
+        return;
+      }
+      setRows(list);
+      setTotal(count);
       setSelected({});
     } catch (e) {
       toastError(e);
@@ -213,6 +222,66 @@ export default function UserNotificationsPage() {
       await load();
     } catch (e) {
       toastError(e);
+    }
+  };
+
+  const confirmAction = (messageKey) =>
+    window.confirm(i18n.t(messageKey));
+
+  const deleteOne = async (n, e) => {
+    if (e && typeof e.stopPropagation === "function") {
+      e.stopPropagation();
+    }
+    if (!confirmAction("userNotificationCenter.confirmDeleteOne")) return;
+    try {
+      await api.delete(`/notifications/${n.id}`);
+      await load();
+    } catch (err) {
+      toastError(err);
+    }
+  };
+
+  const bulkDelete = async () => {
+    if (!selectedIds.length) return;
+    if (!confirmAction("userNotificationCenter.confirmDeleteSelected")) return;
+    try {
+      await api.post("/notifications/delete-selected", { ids: selectedIds });
+      await load();
+    } catch (err) {
+      toastError(err);
+    }
+  };
+
+  const deleteAllRead = async () => {
+    if (!confirmAction("userNotificationCenter.confirmDeleteRead")) return;
+    try {
+      await api.post("/notifications/delete-read");
+      setPage(0);
+      await load();
+    } catch (err) {
+      toastError(err);
+    }
+  };
+
+  const deleteAllArchived = async () => {
+    if (!confirmAction("userNotificationCenter.confirmDeleteArchived")) return;
+    try {
+      await api.post("/notifications/delete-archived");
+      setPage(0);
+      await load();
+    } catch (err) {
+      toastError(err);
+    }
+  };
+
+  const deleteAll = async () => {
+    if (!confirmAction("userNotificationCenter.confirmDeleteAll")) return;
+    try {
+      await api.post("/notifications/delete-all", { confirm: true });
+      setPage(0);
+      await load();
+    } catch (err) {
+      toastError(err);
     }
   };
 
@@ -333,6 +402,31 @@ export default function UserNotificationsPage() {
           >
             {i18n.t("userNotificationCenter.bulkArchive")}
           </Button>
+          <Button
+            size="small"
+            variant="text"
+            color="secondary"
+            disabled={!selectedIds.length}
+            onClick={bulkDelete}
+          >
+            {i18n.t("userNotificationCenter.bulkDelete")}
+          </Button>
+          <Button size="small" variant="text" color="secondary" onClick={deleteAllRead}>
+            {i18n.t("userNotificationCenter.deleteRead")}
+          </Button>
+          {tab === "archived" ? (
+            <Button
+              size="small"
+              variant="text"
+              color="secondary"
+              onClick={deleteAllArchived}
+            >
+              {i18n.t("userNotificationCenter.deleteArchived")}
+            </Button>
+          ) : null}
+          <Button size="small" variant="text" color="secondary" onClick={deleteAll}>
+            {i18n.t("userNotificationCenter.deleteAll")}
+          </Button>
         </Box>
         <Box className={classes.tableWrap}>
           {loading ? (
@@ -357,12 +451,13 @@ export default function UserNotificationsPage() {
                   <TableCell>{i18n.t("userNotificationCenter.colPreview")}</TableCell>
                   <TableCell width={160}>{i18n.t("userNotificationCenter.colWhen")}</TableCell>
                   <TableCell width={120}>{i18n.t("userNotificationCenter.colStatus")}</TableCell>
+                  <TableCell width={56} align="right" />
                 </TableRow>
               </TableHead>
               <TableBody>
                 {rows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6}>
+                    <TableCell colSpan={7}>
                       <Typography variant="body2" color="textSecondary">
                         {emptyMessage}
                       </Typography>
@@ -404,6 +499,15 @@ export default function UserNotificationsPage() {
                           : n.read
                             ? i18n.t("userNotificationCenter.statusRead")
                             : i18n.t("userNotificationCenter.statusUnread")}
+                      </TableCell>
+                      <TableCell align="right" onClick={(e) => e.stopPropagation()}>
+                        <IconButton
+                          size="small"
+                          aria-label={i18n.t("userNotificationCenter.deleteOneAria")}
+                          onClick={(e) => deleteOne(n, e)}
+                        >
+                          <DeleteOutlineIcon fontSize="small" />
+                        </IconButton>
                       </TableCell>
                     </TableRow>
                   ))

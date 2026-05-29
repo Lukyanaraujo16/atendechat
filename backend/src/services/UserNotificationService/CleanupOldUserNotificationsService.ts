@@ -1,23 +1,28 @@
 import { Op } from "sequelize";
-import { subDays } from "date-fns";
+import { subDays, subHours } from "date-fns";
 import { logger } from "../../utils/logger";
 import UserNotification from "../../models/UserNotification";
+import {
+  RETENTION_ARCHIVED_HOURS,
+  RETENTION_READ_HOURS,
+  RETENTION_UNREAD_DAYS
+} from "../../config/userNotificationRetention";
 
 /**
- * - Lidas + arquivadas há mais de 90 dias: apagar.
- * - Lidas + não arquivadas com mais de 180 dias: apagar.
- * - Não lidas: nunca apagar.
+ * Limpeza global (todos os utilizadores). Ver userNotificationRetention.ts.
  */
 const CleanupOldUserNotificationsService = async (): Promise<{
-  deletedArchivedOld: number;
-  deletedReadStale: number;
+  deletedArchived: number;
+  deletedRead: number;
+  deletedUnreadStale: number;
 }> => {
-  const cutoffArchived = subDays(new Date(), 90);
-  const cutoffReadOnly = subDays(new Date(), 180);
+  const now = new Date();
+  const cutoffArchived = subHours(now, RETENTION_ARCHIVED_HOURS);
+  const cutoffRead = subHours(now, RETENTION_READ_HOURS);
+  const cutoffUnread = subDays(now, RETENTION_UNREAD_DAYS);
 
-  const deletedArchivedOld = await UserNotification.destroy({
+  const deletedArchived = await UserNotification.destroy({
     where: {
-      read: true,
       [Op.and]: [
         { archivedAt: { [Op.ne]: null } },
         { archivedAt: { [Op.lt]: cutoffArchived } }
@@ -25,24 +30,43 @@ const CleanupOldUserNotificationsService = async (): Promise<{
     }
   });
 
-  const deletedReadStale = await UserNotification.destroy({
+  const deletedRead = await UserNotification.destroy({
     where: {
       read: true,
       archivedAt: { [Op.is]: null },
-      createdAt: { [Op.lt]: cutoffReadOnly }
+      [Op.or]: [
+        { readAt: { [Op.lt]: cutoffRead } },
+        {
+          readAt: { [Op.is]: null },
+          updatedAt: { [Op.lt]: cutoffRead }
+        }
+      ]
     }
   });
 
+  const deletedUnreadStale = await UserNotification.destroy({
+    where: {
+      read: false,
+      createdAt: { [Op.lt]: cutoffUnread }
+    }
+  });
+
+  const removedCount = deletedArchived + deletedRead + deletedUnreadStale;
+
   logger.info(
     {
-      deletedCount: deletedArchivedOld + deletedReadStale,
-      deletedArchivedOld,
-      deletedReadStale
+      removedCount,
+      deletedArchived,
+      deletedRead,
+      deletedUnreadStale,
+      retentionReadHours: RETENTION_READ_HOURS,
+      retentionArchivedHours: RETENTION_ARCHIVED_HOURS,
+      retentionUnreadDays: RETENTION_UNREAD_DAYS
     },
-    "[UserNotificationCleanup]"
+    "[UserNotificationsCleanup]"
   );
 
-  return { deletedArchivedOld, deletedReadStale };
+  return { deletedArchived, deletedRead, deletedUnreadStale };
 };
 
 export default CleanupOldUserNotificationsService;

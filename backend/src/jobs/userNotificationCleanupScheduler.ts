@@ -4,17 +4,24 @@ import { logger } from "../utils/logger";
 
 let running = false;
 
-/** Diariamente às 04:15 — manutenção leve da tabela UserNotifications. */
+/** A cada 6 horas + uma execução no arranque do servidor. */
+const CRON_EVERY_6_HOURS = "0 */6 * * *";
+
+async function runCleanup(): Promise<void> {
+  if (running) return;
+  running = true;
+  try {
+    await CleanupOldUserNotificationsService();
+  } catch (e) {
+    logger.warn({ err: e }, "[UserNotificationsCleanup] job_failed");
+  } finally {
+    running = false;
+  }
+}
+
 export function startUserNotificationCleanupScheduler(): void {
-  cron.schedule("15 4 * * *", async () => {
-    if (running) return;
-    running = true;
-    try {
-      await CleanupOldUserNotificationsService();
-    } catch (e) {
-      logger.warn({ err: e }, "[UserNotificationCleanup] job_failed");
-    } finally {
-      running = false;
-    }
+  void runCleanup();
+  cron.schedule(CRON_EVERY_6_HOURS, () => {
+    void runCleanup();
   });
 }

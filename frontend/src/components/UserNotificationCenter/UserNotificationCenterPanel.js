@@ -20,6 +20,7 @@ import EventOutlinedIcon from "@material-ui/icons/EventOutlined";
 import AttachMoneyOutlinedIcon from "@material-ui/icons/AttachMoneyOutlined";
 import TrackChangesOutlinedIcon from "@material-ui/icons/TrackChangesOutlined";
 import ArchiveOutlinedIcon from "@material-ui/icons/ArchiveOutlined";
+import DeleteOutlineIcon from "@material-ui/icons/DeleteOutline";
 
 import { i18n } from "../../translate/i18n";
 import { notificationVisualType } from "../../utils/notificationNavigation";
@@ -83,6 +84,8 @@ export default function UserNotificationCenterPanel({
   onMarkAllRead,
   onArchiveRead,
   onArchiveOne,
+  onDeleteOne,
+  onDeleteAllRead,
   onViewAllClick,
 }) {
   const classes = useStyles();
@@ -116,6 +119,19 @@ export default function UserNotificationCenterPanel({
           }
         />
         <ListItemSecondaryAction>
+          {onDeleteOne ? (
+            <IconButton
+              edge="end"
+              size="small"
+              aria-label={i18n.t("userNotificationCenter.deleteOneAria")}
+              onClick={(e) => {
+                e.stopPropagation();
+                onDeleteOne(n);
+              }}
+            >
+              <DeleteOutlineIcon fontSize="small" />
+            </IconButton>
+          ) : null}
           <IconButton
             edge="end"
             size="small"
@@ -176,6 +192,11 @@ export default function UserNotificationCenterPanel({
         <Button size="small" onClick={onArchiveRead}>
           {i18n.t("userNotificationCenter.archiveRead")}
         </Button>
+        {onDeleteAllRead ? (
+          <Button size="small" onClick={onDeleteAllRead}>
+            {i18n.t("userNotificationCenter.deleteRead")}
+          </Button>
+        ) : null}
         <Box flex="1" />
         <Button
           size="small"

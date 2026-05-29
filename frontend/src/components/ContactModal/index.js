@@ -661,7 +661,6 @@ const ContactModal = ({
 										</Typography>
 										<Autocomplete
 											multiple
-											required
 											options={companyUsers}
 											value={selectedAssignees}
 											onChange={(_, value) => {
@@ -703,7 +702,12 @@ const ContactModal = ({
 													variant="outlined"
 													margin="dense"
 													fullWidth
-													required
+													required={false}
+													inputProps={{
+														...params.inputProps,
+														required: false,
+														"aria-required": canManageAssignees,
+													}}
 													error={Boolean(assigneesError)}
 													helperText={
 														assigneesError ||

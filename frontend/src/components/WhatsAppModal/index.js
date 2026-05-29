@@ -143,7 +143,11 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
 
           setWhatsApp(data);
           setSelectedPrompt( data.promptId );
-          setSelectedIntegration(data.integrationId)
+          setSelectedIntegration(
+            data.integrationId != null && data.integrationId !== ""
+              ? data.integrationId
+              : null
+          );
 
           const whatsQueueIds = data.queues?.map((queue) => queue.id);
           setSelectedQueueIds(whatsQueueIds);
@@ -221,7 +225,10 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
             ? selectedPrompt
             : null)
         : (whatsAppId && whatsApp?.promptId != null ? whatsApp.promptId : null),
-      integrationId: selectedIntegration,
+      integrationId:
+        selectedIntegration != null && selectedIntegration !== ""
+          ? selectedIntegration
+          : null,
       flowIdWelcome: selectedFlowWelcome || null,
       flowIdNotPhrase: selectedFlowNotPhrase || null
     };
@@ -262,8 +269,9 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
   };
 
   const handleChangeIntegration = (e) => {
-    setSelectedIntegration(e.target.value);
-  }
+    const value = e.target.value;
+    setSelectedIntegration(value === "" || value == null ? null : value);
+  };
 
   const handleClose = () => {
     onClose();
@@ -272,6 +280,8 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
     setSelectedQueueIds([]);
     setSelectedFlowWelcome(null);
     setSelectedFlowNotPhrase(null);
+    setSelectedIntegration(null);
+    setSelectedPrompt(null);
     setTokenDialogOpen(false);
     setCreatedToken("");
   };
@@ -572,12 +582,15 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
                       getContentAnchorEl: null,
                     }}
                   >
-                    {(integrations || []).map((prompt) => (
+                    <MenuItem value="">
+                      {i18n.t("whatsappModal.form.noIntegration")}
+                    </MenuItem>
+                    {(integrations || []).map((integration) => (
                       <MenuItem
-                        key={prompt.id}
-                        value={prompt.id}
+                        key={integration.id}
+                        value={integration.id}
                       >
-                        {prompt.name}
+                        {integration.name}
                       </MenuItem>
                     ))}
                   </Select>

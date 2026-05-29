@@ -1,6 +1,5 @@
 import express from "express";
 import isAuth from "../middleware/isAuth";
-import requireEffectiveModule from "../middleware/requireEffectiveModule";
 import requireAnyPlanFeature from "../middleware/requirePlanFeature";
 
 import * as TicketController from "../controllers/TicketController";
@@ -13,8 +12,15 @@ ticketRoutes.get(
   "/ticket/kanban",
   isAuth,
   requireAnyPlanFeature("attendance.kanban"),
-  requireEffectiveModule("useKanban"),
   TicketController.kanban
+);
+
+/** Atualização de ticket: inbox OU kanban (antes do gate só-inbox). */
+ticketRoutes.put(
+  "/tickets/:ticketId",
+  isAuth,
+  requireAnyPlanFeature("attendance.inbox", "attendance.kanban"),
+  TicketController.update
 );
 
 ticketRoutes.use(isAuth);
@@ -45,8 +51,6 @@ ticketRoutes.get(
 ticketRoutes.post("/tickets", TicketController.store);
 
 ticketRoutes.put("/tickets/:ticketId/reassign-whatsapp", TicketController.reassignWhatsapp);
-
-ticketRoutes.put("/tickets/:ticketId", TicketController.update);
 
 ticketRoutes.delete("/tickets/batch", TicketController.removeBatch);
 

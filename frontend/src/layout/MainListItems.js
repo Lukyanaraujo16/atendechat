@@ -35,7 +35,7 @@ import { Can } from "../components/Can";
 import { SocketContext } from "../context/Socket/SocketContext";
 import { isArray } from "lodash";
 import api from "../services/api";
-import toastError from "../errors/toastError";
+import { isForbiddenPermissionError } from "../utils/apiErrorUtils";
 import { makeStyles, alpha } from "@material-ui/core/styles";
 import Skeleton from "@material-ui/lab/Skeleton";
 import usePlanFlags from "../hooks/usePlanFlags";
@@ -320,7 +320,11 @@ const MainListItems = (props) => {
       });
       dispatch({ type: "LOAD_CHATS", payload: data.records });
     } catch (err) {
-      toastError(err);
+      // Badge do menu: falha não deve bloquear outras páginas (ex.: Ajuda) com toast global.
+      if (!isForbiddenPermissionError(err)) {
+        console.warn("[MainListItems] fetchChats:", err?.response?.status || err?.message);
+      }
+      dispatch({ type: "LOAD_CHATS", payload: [] });
     }
   };
 

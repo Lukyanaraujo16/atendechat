@@ -1534,6 +1534,7 @@ const messages = {
             "Opcional. Só é enviada quando você usar saudação automática da conexão (por exemplo, menu com vários setores ou configuração de saudação com um setor).",
           complationMessage: "Mensagem de conclusão",
           integration: "Integrações",
+          noIntegration: "Nenhuma integração",
           token: "Token da API",
           tokenReadOnly: "Gerado automaticamente. Use na página API de mensagens.",
           generateToken: "Gerar novo token",
@@ -3568,6 +3569,20 @@ const messages = {
         searchButton: "Pesquisar",
         bulkMarkRead: "Marcar selecionadas como lidas",
         bulkArchive: "Arquivar selecionadas",
+        bulkDelete: "Apagar selecionadas",
+        deleteRead: "Limpar lidas",
+        deleteArchived: "Apagar arquivadas",
+        deleteAll: "Apagar todas",
+        deleteOneAria: "Apagar notificação",
+        confirmDeleteOne: "Apagar esta notificação? Esta ação não poderá ser desfeita.",
+        confirmDeleteSelected:
+          "Apagar as notificações selecionadas? Esta ação não poderá ser desfeita.",
+        confirmDeleteRead:
+          "Apagar todas as notificações lidas (não arquivadas)? Esta ação não poderá ser desfeita.",
+        confirmDeleteArchived:
+          "Apagar todas as notificações arquivadas? Esta ação não poderá ser desfeita.",
+        confirmDeleteAll:
+          "Tem certeza que deseja apagar todas as notificações? Esta ação não poderá ser desfeita.",
         statusArchived: "Arquivada",
         bellAria: "Abrir central de notificações",
         noCompany: "Inicia sessão com uma empresa ativa ou como super administrador.",

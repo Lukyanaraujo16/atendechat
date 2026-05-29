@@ -1452,6 +1452,7 @@ const messages = {
 						"Optional. Only sent when you use this connection's automatic greeting (e.g. multi-queue menu or single-queue greeting setting).",
 					complationMessage: "Completion message",
 					integration: "Integration",
+					noIntegration: "No integration",
 					token: "API Token",
 					tokenReadOnly: "Generated automatically. Use on the Messages API page.",
 					generateToken: "Generate new token",
@@ -3475,6 +3476,20 @@ const messages = {
 				searchButton: "Search",
 				bulkMarkRead: "Mark selected as read",
 				bulkArchive: "Archive selected",
+				bulkDelete: "Delete selected",
+				deleteRead: "Clear read",
+				deleteArchived: "Delete archived",
+				deleteAll: "Delete all",
+				deleteOneAria: "Delete notification",
+				confirmDeleteOne: "Delete this notification? This cannot be undone.",
+				confirmDeleteSelected:
+					"Delete the selected notifications? This cannot be undone.",
+				confirmDeleteRead:
+					"Delete all read notifications (not archived)? This cannot be undone.",
+				confirmDeleteArchived:
+					"Delete all archived notifications? This cannot be undone.",
+				confirmDeleteAll:
+					"Are you sure you want to delete all notifications? This cannot be undone.",
 				statusArchived: "Archived",
 				bellAria: "Open notification center",
 				noCompany: "Sign in with an active company or as a super admin.",

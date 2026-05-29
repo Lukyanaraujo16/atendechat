@@ -1,6 +1,6 @@
 import express from "express";
 import isAuth from "../middleware/isAuth";
-import requireEffectiveModule from "../middleware/requireEffectiveModule";
+import requireAnyPlanFeature from "../middleware/requirePlanFeature";
 
 import * as TagController from "../controllers/TagController";
 
@@ -13,7 +13,7 @@ tagRoutes.get("/tags", isAuth, TagController.index);
 tagRoutes.get(
   "/tags/kanban",
   isAuth,
-  requireEffectiveModule("useKanban"),
+  requireAnyPlanFeature("attendance.kanban"),
   TagController.kanban
 );
 

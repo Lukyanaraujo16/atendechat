@@ -2,6 +2,7 @@ import { Box, Chip, TextField } from "@material-ui/core";
 import Autocomplete from "@material-ui/lab/Autocomplete";
 import React, { useEffect, useState } from "react";
 import toastError from "../../errors/toastError";
+import { isForbiddenPermissionError } from "../../utils/apiErrorUtils";
 import api from "../../services/api";
 import { i18n } from "../../translate/i18n";
 
@@ -34,7 +35,9 @@ export function UsersFilter({ onFiltered, initialUsers }) {
       const userList = Array.isArray(data) ? data.map((u) => ({ id: u.id, name: u.name })) : [];
       setUsers(userList);
     } catch (err) {
-      toastError(err);
+      if (!isForbiddenPermissionError(err)) {
+        toastError(err);
+      }
     }
   };
 

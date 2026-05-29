@@ -1461,6 +1461,7 @@ const messages = {
             "Opcional. Solo se envía si usa el saludo automático de esta conexión (p. ej. menú con varias colas o saludo con una sola cola).",
           complationMessage: "Mensaje de conclusión",
           integration: "Integración",
+          noIntegration: "Sin integración",
           token: "Token de API",
           tokenReadOnly: "Generado automáticamente. Use en la página API de mensajes.",
           generateToken: "Generar nuevo token",
@@ -3486,6 +3487,20 @@ const messages = {
         searchButton: "Buscar",
         bulkMarkRead: "Marcar seleccionadas como leídas",
         bulkArchive: "Archivar seleccionadas",
+        bulkDelete: "Eliminar seleccionadas",
+        deleteRead: "Limpiar leídas",
+        deleteArchived: "Eliminar archivadas",
+        deleteAll: "Eliminar todas",
+        deleteOneAria: "Eliminar notificación",
+        confirmDeleteOne: "¿Eliminar esta notificación? Esta acción no se puede deshacer.",
+        confirmDeleteSelected:
+          "¿Eliminar las notificaciones seleccionadas? Esta acción no se puede deshacer.",
+        confirmDeleteRead:
+          "¿Eliminar todas las notificaciones leídas (no archivadas)? Esta acción no se puede deshacer.",
+        confirmDeleteArchived:
+          "¿Eliminar todas las notificaciones archivadas? Esta acción no se puede deshacer.",
+        confirmDeleteAll:
+          "¿Seguro que deseas eliminar todas las notificaciones? Esta acción no se puede deshacer.",
         statusArchived: "Archivada",
         bellAria: "Abrir centro de notificaciones",
         noCompany: "Inicia sesión con una empresa activa o como super administrador.",

@@ -7,6 +7,7 @@ import React, {
 import { useHistory } from "react-router-dom";
 import { alpha, makeStyles } from "@material-ui/core/styles";
 import toastError from "../../errors/toastError";
+import { isForbiddenPermissionError } from "../../utils/apiErrorUtils";
 import Popover from "@material-ui/core/Popover";
 import ForumIcon from "@material-ui/icons/Forum";
 import {
@@ -181,7 +182,10 @@ export default function ChatPopover() {
       setHasMore(data.hasMore);
       setLoading(false);
     } catch (err) {
-      toastError(err);
+      if (!isForbiddenPermissionError(err)) {
+        toastError(err);
+      }
+      setLoading(false);
     }
   };
 

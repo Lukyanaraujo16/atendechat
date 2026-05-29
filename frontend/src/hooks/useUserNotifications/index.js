@@ -142,6 +142,53 @@ export default function useUserNotifications({ enabled = true } = {}) {
     }
   }, []);
 
+  const removeIdsFromState = useCallback((ids) => {
+    const idSet = new Set(
+      (Array.isArray(ids) ? ids : [ids]).map((id) => Number(id)).filter((id) => !Number.isNaN(id))
+    );
+    if (!idSet.size) return;
+    setItems((prev) => {
+      let unreadRemoved = 0;
+      const next = prev.filter((x) => {
+        if (!idSet.has(Number(x.id))) return true;
+        if (!x.read) unreadRemoved += 1;
+        return false;
+      });
+      if (unreadRemoved > 0) {
+        setUnreadCount((c) => Math.max(0, c - unreadRemoved));
+      }
+      return next;
+    });
+  }, []);
+
+  const deleteOne = useCallback(
+    async (n) => {
+      if (!n?.id) return;
+      try {
+        await api.delete(`/notifications/${n.id}`);
+        removeIdsFromState([n.id]);
+      } catch (err) {
+        toastError(err);
+      }
+    },
+    [removeIdsFromState]
+  );
+
+  const deleteAllRead = useCallback(async () => {
+    try {
+      const { data } = await api.post("/notifications/delete-read");
+      const deleted = Number(data?.deleted) || 0;
+      setItems((prev) => prev.filter((x) => !(x.read && !x.archivedAt)));
+      if (deleted > 0) {
+        await fetchUnread();
+      }
+      return deleted;
+    } catch (err) {
+      toastError(err);
+      return 0;
+    }
+  }, [fetchUnread]);
+
   return {
     canUse,
     unreadCount,
@@ -155,5 +202,7 @@ export default function useUserNotifications({ enabled = true } = {}) {
     markAllRead,
     archiveRead,
     archiveOne,
+    deleteOne,
+    deleteAllRead,
   };
 }
