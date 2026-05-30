@@ -240,13 +240,6 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
-function formatBytes(n) {
-  if (n == null || Number.isNaN(n)) return "—";
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
-}
-
 function typeLabel(backupSource) {
   const k = `platform.backup.type.${backupSource || "manual"}`;
   const t = i18n.t(k);
