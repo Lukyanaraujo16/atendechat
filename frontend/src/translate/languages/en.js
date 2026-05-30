@@ -3069,6 +3069,11 @@ const messages = {
 					generate: "Generate backup now",
 					generateHint:
 						"Each backup includes manifest.json (metadata), database.sql, and the public/ tree. Does not include .env, Redis, Bull queues, or proxy config.",
+					diskSpace: {
+						ok: "Free disk space on the server: {{available}} (estimated space for a new backup: {{needed}}).",
+						insufficient:
+							"Not enough disk space to create a backup. About {{missing}} short (free: {{available}}, required: {{needed}}).",
+					},
 					sectionAuto: "Automatic backups",
 					sectionAutoHint:
 						"Scheduled on the server (node-cron). Files use the same folder as manual backups. Retention applies only to automatic copies.",
@@ -3175,8 +3180,18 @@ const messages = {
 					modalBodyStrong:
 						"All current application data will be removed from the database before import. The public folder will be replaced. A safety backup is created first. This cannot be undone without that backup.",
 					modalConfirm: "Yes, restore",
+					jobProgressTitle: "Backup in progress",
+					jobStep: {
+						dumping_database: "Generating database dump…",
+						copying_public: "Copying public folder files…",
+						compressing: "Compressing ZIP…",
+						finalizing: "Finishing…",
+					},
 					toasts: {
 						generated: "Backup created successfully.",
+						jobStarted: "Backup started. Track progress below.",
+						jobCompleted: "Backup completed successfully.",
+						jobFailed: "Backup generation failed.",
 						uploadValidated: "File accepted. Confirm to restore.",
 						restored: "Restore completed.",
 						autoSaved: "Backup schedule saved.",
@@ -5248,6 +5263,14 @@ const messages = {
 				ERR_CRM_CUSTOM_FIELD_KEY: "Could not generate a unique key for the field.",
 				ERR_CRM_CUSTOM_FIELD_UNKNOWN:
 					"One or more custom fields are not valid for this pipeline.",
+				BACKUP_JOB_ALREADY_RUNNING:
+					"A backup is already in progress. Wait for it to finish before starting another.",
+				BACKUP_INSUFFICIENT_DISK_SPACE:
+					"Not enough disk space. About {{missing}} short (free: {{available}}, required: {{needed}}).",
+				BACKUP_DISK_SPACE_ESTIMATE_FAILED:
+					"Could not estimate the disk space required for backup. Check permissions and try again.",
+				BACKUP_DISK_SPACE_CHECK_UNAVAILABLE:
+					"Could not check free disk space on the server.",
 			},
 		}
 	},

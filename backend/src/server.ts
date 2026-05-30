@@ -8,6 +8,7 @@ import { startQueueProcess } from "./queues";
 import { TransferTicketQueue } from "./wbotTransferTicketQueue";
 import cron from "node-cron";
 import { startBackupAutoScheduler } from "./jobs/backupAutoScheduler";
+import { cleanupOrphanBackupArtifacts, ensureBackupDirs } from "./config/backup";
 import { startBillingAutomationScheduler } from "./jobs/billingAutomationScheduler";
 import { startSignupCriticalSocketScheduler } from "./jobs/signupCriticalSocketScheduler";
 import { startUserNotificationCleanupScheduler } from "./jobs/userNotificationCleanupScheduler";
@@ -34,6 +35,14 @@ const server = app.listen(process.env.PORT, async () => {
       "(e o mesmo sob prefixo /api, ex. POST /api/platform/super-admins). " +
       "Se aparecer «Cannot POST /platform/super-admins», faça «npm run build» e reinicie o Node com este código."
   );
+  ensureBackupDirs();
+  void cleanupOrphanBackupArtifacts().then((r) => {
+    if (r.zipTmpFilesRemoved > 0 || r.workDirsRemoved > 0) {
+      logger.info(
+        `[backup] Limpeza de órfãos: ${r.zipTmpFilesRemoved} .zip.tmp, ${r.workDirsRemoved} pasta(s) .tmp-*`
+      );
+    }
+  });
   startBackupAutoScheduler();
   startBillingAutomationScheduler();
   startSignupCriticalSocketScheduler();

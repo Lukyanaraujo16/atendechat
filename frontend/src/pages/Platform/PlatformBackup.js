@@ -18,6 +18,7 @@ import Switch from "@material-ui/core/Switch";
 import IconButton from "@material-ui/core/IconButton";
 import Paper from "@material-ui/core/Paper";
 import Alert from "@material-ui/lab/Alert";
+import LinearProgress from "@material-ui/core/LinearProgress";
 import { makeStyles, alpha } from "@material-ui/core/styles";
 import GetAppIcon from "@material-ui/icons/GetApp";
 import BackupIcon from "@material-ui/icons/Backup";
@@ -48,6 +49,16 @@ import AppTableContainer from "../../ui/components/AppTableContainer";
 const CONFIRM = "RESTAURAR";
 const STRONG_CONFIRM_DEFAULT = "RESTAURAR E SUBSTITUIR";
 const DELETE_PHRASE = "EXCLUIR";
+const BACKUP_JOB_POLL_MS = 2000;
+
+function formatBytes(n) {
+  const b = Number(n);
+  if (!Number.isFinite(b) || b < 0) return "—";
+  if (b < 1024) return `${b} B`;
+  if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
+  if (b < 1024 * 1024 * 1024) return `${(b / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(b / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
 
 const defaultAutoConfig = {
   backupAutoEnabled: false,
@@ -190,6 +201,16 @@ const useStyles = makeStyles((theme) => ({
     backgroundColor: alpha(theme.palette.primary.main, 0.07),
     boxShadow: `inset 3px 0 0 ${theme.palette.primary.main}`,
   },
+  jobProgressBox: {
+    marginTop: theme.spacing(2),
+    padding: theme.spacing(2),
+    borderRadius: theme.shape.borderRadius,
+    border: `1px solid ${theme.palette.divider}`,
+    backgroundColor:
+      theme.palette.type === "dark"
+        ? alpha(theme.palette.primary.main, 0.08)
+        : alpha(theme.palette.primary.main, 0.04),
+  },
   recentPill: {
     display: "block",
     fontSize: "0.65rem",
@@ -293,6 +314,7 @@ export default function PlatformBackup() {
   const [backups, setBackups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [backupJob, setBackupJob] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [restoreToken, setRestoreToken] = useState(null);
   const [restorePreview, setRestorePreview] = useState(null);
@@ -308,21 +330,27 @@ export default function PlatformBackup() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deletePhrase, setDeletePhrase] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const [diskSpace, setDiskSpace] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [listRes, cfgRes] = await Promise.all([
+      const [listRes, cfgRes, diskRes] = await Promise.all([
         api.get("/platform/backups"),
         api.get("/platform/backup-config").catch(() => ({ data: null })),
+        api.get("/platform/backups/disk-space").catch(() => ({ data: null })),
       ]);
       setBackups(Array.isArray(listRes.data?.backups) ? listRes.data.backups : []);
+      if (listRes.data?.activeJob?.status === "running") {
+        setBackupJob(listRes.data.activeJob);
+      }
       if (cfgRes.data && typeof cfgRes.data === "object") {
         setAutoConfig({
           ...defaultAutoConfig,
           ...cfgRes.data,
         });
       }
+      setDiskSpace(diskRes?.data?.diskSpace ?? null);
     } catch (e) {
       toastError(e);
       setBackups([]);
@@ -334,6 +362,51 @@ export default function PlatformBackup() {
   useEffect(() => {
     load();
   }, [load]);
+
+  const backupJobRunning = backupJob?.status === "running";
+
+  const backupJobStepLabel = useMemo(() => {
+    if (!backupJob?.step) return i18n.t("platform.backup.jobStep.finalizing");
+    const key = `platform.backup.jobStep.${backupJob.step}`;
+    const t = i18n.t(key);
+    return t !== key ? t : backupJob.step;
+  }, [backupJob?.step]);
+
+  useEffect(() => {
+    if (!backupJob?.jobId || backupJob.status !== "running") return undefined;
+
+    let cancelled = false;
+
+    const poll = async () => {
+      try {
+        const { data } = await api.get(`/platform/backups/jobs/${backupJob.jobId}`);
+        if (cancelled) return;
+        const job = data?.job;
+        if (!job) return;
+        setBackupJob(job);
+        if (job.status === "completed") {
+          toast.success(i18n.t("platform.backup.toasts.jobCompleted"));
+          setBackupJob(null);
+          await load();
+        } else if (job.status === "failed") {
+          toast.error(job.error || i18n.t("platform.backup.toasts.jobFailed"));
+          setBackupJob(null);
+        }
+      } catch (e) {
+        if (!cancelled) toastError(e);
+      }
+    };
+
+    const timer = setInterval(() => {
+      void poll();
+    }, BACKUP_JOB_POLL_MS);
+    void poll();
+
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [backupJob?.jobId, backupJob?.status, load]);
 
   const handleSaveAuto = async () => {
     setSavingAuto(true);
@@ -349,11 +422,18 @@ export default function PlatformBackup() {
   };
 
   const handleGenerate = async () => {
+    if (backupJobRunning) return;
     setGenerating(true);
     try {
-      await api.post("/platform/backups/generate");
-      toast.success(i18n.t("platform.backup.toasts.generated"));
-      await load();
+      const { data } = await api.post("/platform/backups/generate");
+      if (data?.jobId) {
+        setBackupJob({
+          jobId: data.jobId,
+          status: "running",
+          step: "dumping_database",
+        });
+        toast.success(data?.message || i18n.t("platform.backup.toasts.jobStarted"));
+      }
     } catch (e) {
       toastError(e);
     } finally {
@@ -556,13 +636,44 @@ export default function PlatformBackup() {
             <AppPrimaryButton
               startIcon={<BackupIcon />}
               onClick={handleGenerate}
-              disabled={generating}
+              disabled={generating || backupJobRunning}
               loading={generating}
             >
               {i18n.t("platform.backup.generate")}
             </AppPrimaryButton>
           </AppActionBar>
+          {backupJobRunning ? (
+            <Box className={classes.jobProgressBox}>
+              <Typography variant="subtitle2" gutterBottom>
+                {i18n.t("platform.backup.jobProgressTitle")}
+              </Typography>
+              <Typography variant="body2" color="textSecondary" style={{ marginBottom: 8 }}>
+                {backupJobStepLabel}
+              </Typography>
+              <LinearProgress />
+            </Box>
+          ) : null}
           <Typography className={classes.hint}>{i18n.t("platform.backup.generateHint")}</Typography>
+          {diskSpace ? (
+            <Box mt={2}>
+              {diskSpace.sufficient ? (
+                <Alert severity="info">
+                  {i18n.t("platform.backup.diskSpace.ok", {
+                    available: formatBytes(diskSpace.availableBytes),
+                    needed: formatBytes(diskSpace.totalNeeded),
+                  })}
+                </Alert>
+              ) : (
+                <Alert severity="warning">
+                  {i18n.t("platform.backup.diskSpace.insufficient", {
+                    missing: formatBytes(diskSpace.missingBytes),
+                    available: formatBytes(diskSpace.availableBytes),
+                    needed: formatBytes(diskSpace.totalNeeded),
+                  })}
+                </Alert>
+              )}
+            </Box>
+          ) : null}
         </AppSectionCard>
 
         <Typography style={{ fontWeight: 600, fontSize: "1.0625rem" }}>

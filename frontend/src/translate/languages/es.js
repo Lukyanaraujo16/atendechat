@@ -3079,6 +3079,11 @@ const messages = {
           generate: "Generar copia ahora",
           generateHint:
             "Cada copia incluye manifest.json, database.sql y public/. No incluye .env, Redis, colas Bull ni proxy.",
+          diskSpace: {
+            ok: "Espacio libre en el disco del servidor: {{available}} (estimación necesaria para una nueva copia: {{needed}}).",
+            insufficient:
+              "Espacio en disco insuficiente para generar la copia. Faltan unos {{missing}} (libre: {{available}}, necesario: {{needed}}).",
+          },
           sectionAuto: "Copias automáticas",
           sectionAutoHint:
             "Programación en el servidor (node-cron). Los archivos van a la misma carpeta que las copias manuales. La retención solo afecta a copias automáticas.",
@@ -3185,8 +3190,18 @@ const messages = {
           modalBodyStrong:
             "Se borrarán todos los datos actuales de la aplicación antes del import. La carpeta public será sustituida. Primero se crea una copia de seguridad. Es irreversible sin esa copia.",
           modalConfirm: "Sí, restaurar",
+          jobProgressTitle: "Copia en curso",
+          jobStep: {
+            dumping_database: "Generando volcado de la base de datos…",
+            copying_public: "Copiando archivos de la carpeta public…",
+            compressing: "Comprimiendo ZIP…",
+            finalizing: "Finalizando…",
+          },
           toasts: {
             generated: "Copia creada correctamente.",
+            jobStarted: "Copia iniciada. Siga el progreso abajo.",
+            jobCompleted: "Copia completada con éxito.",
+            jobFailed: "Error al generar la copia.",
             uploadValidated: "Archivo aceptado. Confirme para restaurar.",
             restored: "Restauración completada.",
             autoSaved: "Programación de copias guardada.",
@@ -5165,6 +5180,14 @@ const messages = {
         ERR_CRM_CUSTOM_FIELD_KEY: "No se pudo generar una clave única para el campo.",
         ERR_CRM_CUSTOM_FIELD_UNKNOWN:
           "Uno o más campos personalizados no son válidos para este pipeline.",
+        BACKUP_JOB_ALREADY_RUNNING:
+          "Ya hay una copia de seguridad en curso. Espere a que termine antes de iniciar otra.",
+        BACKUP_INSUFFICIENT_DISK_SPACE:
+          "Espacio en disco insuficiente. Faltan unos {{missing}} (libre: {{available}}, necesario: {{needed}}).",
+        BACKUP_DISK_SPACE_ESTIMATE_FAILED:
+          "No se pudo estimar el espacio necesario para la copia. Verifique permisos e intente de nuevo.",
+        BACKUP_DISK_SPACE_CHECK_UNAVAILABLE:
+          "No se pudo verificar el espacio libre en el disco del servidor.",
       },
     }
   }

@@ -1,7 +1,11 @@
 import fs from "fs";
 import path from "path";
 import AdmZip from "adm-zip";
-import { getBackupsRoot, isAppGeneratedBackupZipBaseName } from "../../config/backup";
+import {
+  getBackupsRoot,
+  isAppGeneratedBackupZipBaseName,
+  isBackupTempZipFileName
+} from "../../config/backup";
 import type { BackupManifest, BackupSource } from "./createApplicationBackup";
 
 export interface BackupListItem {
@@ -28,6 +32,7 @@ export async function listBackupFiles(): Promise<BackupListItem[]> {
   const items: BackupListItem[] = [];
 
   for (const name of names) {
+    if (isBackupTempZipFileName(name)) continue;
     if (!safeZipName(name)) continue;
     const abs = path.join(root, name);
     const st = await fs.promises.stat(abs);

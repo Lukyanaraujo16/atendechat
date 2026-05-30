@@ -7,6 +7,15 @@ import { getErrorToastOptions } from "./feedbackToasts";
  * Exibe erro amigável: prioriza códigos `backendErrors.*`, rede e mensagem genérica.
  * Mensagens técnicas sem tradução não são mostradas cruas ao utilizador.
  */
+const formatBytesShort = (bytes) => {
+  const n = Number(bytes);
+  if (!Number.isFinite(n) || n < 0) return "";
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  if (n < 1024 * 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(n / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+};
+
 const toastError = (err) => {
   const errOpts = getErrorToastOptions();
 
@@ -15,6 +24,19 @@ const toastError = (err) => {
   const apiMessage = apiPayload?.message;
 
   if (errorCode) {
+    if (errorCode === "BACKUP_INSUFFICIENT_DISK_SPACE" && apiPayload?.missingBytes != null) {
+      const text = i18n.t("backendErrors.BACKUP_INSUFFICIENT_DISK_SPACE", {
+        missing: formatBytesShort(apiPayload.missingBytes),
+        available: formatBytesShort(apiPayload.availableBytes),
+        needed: formatBytesShort(apiPayload.totalNeeded),
+      });
+      console.error("[API]", errorCode, text, apiPayload);
+      toast.error(text, {
+        ...errOpts,
+        toastId: `be-${errorCode}`,
+      });
+      return;
+    }
     if (i18n.exists(`backendErrors.${errorCode}`)) {
       const text = i18n.t(`backendErrors.${errorCode}`);
       console.error("[API]", errorCode, text);

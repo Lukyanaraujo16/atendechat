@@ -12,8 +12,12 @@ import {
   isSafeBackupZipFileName,
   isStrongRestoreConfirmation
 } from "../config/backup";
-import { createApplicationBackup } from "../services/BackupService/createApplicationBackup";
 import { listBackupFiles } from "../services/BackupService/listBackupFiles";
+import {
+  getActiveManualBackupJob,
+  getBackupGenerationJob,
+  startManualBackupGenerationJob
+} from "../services/BackupService/backupGenerationJobService";
 import { restoreFromValidatedZipFile } from "../services/BackupService/restoreFromZipFile";
 import type { BackupManifest } from "../services/BackupService/createApplicationBackup";
 import {
@@ -23,32 +27,46 @@ import {
 } from "../services/BackupService/backupAutoConfigService";
 import { validateRestoreZipEntries } from "../services/BackupService/validateRestoreZip";
 import { inspectDatabaseForRestore } from "../services/BackupService/inspectDatabaseForRestore";
+import { checkBackupDiskSpace } from "../services/BackupService/checkBackupDiskSpace";
+
+export const getDiskSpace = async (_req: Request, res: Response): Promise<void> => {
+  const report = await checkBackupDiskSpace();
+  res.json({ ok: true, diskSpace: report });
+};
 
 export const list = async (_req: Request, res: Response): Promise<void> => {
   const items = await listBackupFiles();
-  res.json({ backups: items });
+  const activeJob = getActiveManualBackupJob();
+  res.json({ backups: items, activeJob });
 };
 
 export const generate = async (_req: Request, res: Response): Promise<void> => {
   try {
-    const result = await createApplicationBackup({ backupSource: "manual" });
-    res.status(201).json({
+    const { jobId, message } = await startManualBackupGenerationJob();
+    res.status(202).json({
       ok: true,
-      fileName: result.fileName,
-      sizeBytes: result.sizeBytes,
-      manifest: result.manifest
+      jobId,
+      message,
+      status: "running"
     });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (msg.includes("mysqldump") || msg.includes("pg_dump")) {
-      throw new AppError(
-        "BACKUP_DUMP_FAILED",
-        500,
-        "Verifique se mysqldump/pg_dump está no PATH e se as credenciais DB em .env estão corretas."
-      );
+    if (err instanceof AppError) {
+      throw err;
     }
     throw err;
   }
+};
+
+export const getGenerateJobStatus = async (req: Request, res: Response): Promise<void> => {
+  const jobId = String(req.params.jobId || "").trim();
+  if (!jobId) {
+    throw new AppError("BACKUP_JOB_ID_REQUIRED", 400);
+  }
+  const job = getBackupGenerationJob(jobId);
+  if (!job) {
+    throw new AppError("BACKUP_JOB_NOT_FOUND", 404);
+  }
+  res.json({ ok: true, job });
 };
 
 export const download = async (req: Request, res: Response): Promise<void> => {

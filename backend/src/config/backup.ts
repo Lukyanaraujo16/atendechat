@@ -23,8 +23,95 @@ export function ensureBackupDirs(): void {
   if (!fs.existsSync(incoming)) fs.mkdirSync(incoming, { recursive: true });
 }
 
+/** Pastas de trabalho abandonadas durante geração (ex.: backups/.tmp-1730.../). */
+export function isBackupWorkTempDirName(name: string): boolean {
+  if (!name || typeof name !== "string") return false;
+  const base = path.basename(name);
+  if (base !== name || base.includes("..")) return false;
+  return base.startsWith(".tmp-");
+}
+
+function resolveSafeUnderBackupsRoot(root: string, entryName: string): string | null {
+  const abs = path.resolve(root, entryName);
+  const rootResolved = path.resolve(root);
+  if (!abs.startsWith(`${rootResolved}${path.sep}`) && abs !== rootResolved) {
+    return null;
+  }
+  return abs;
+}
+
+export type BackupOrphanCleanupResult = {
+  zipTmpFilesRemoved: number;
+  workDirsRemoved: number;
+};
+
+/**
+ * Remove apenas artefactos temporários de backup (nunca coreflow-backup-*.zip final).
+ * - *.zip.tmp
+ * - diretórios backups/.tmp-* (database.sql, public copiado, etc.)
+ */
+export async function cleanupOrphanBackupArtifacts(): Promise<BackupOrphanCleanupResult> {
+  const root = getBackupsRoot();
+  const result: BackupOrphanCleanupResult = {
+    zipTmpFilesRemoved: 0,
+    workDirsRemoved: 0
+  };
+  if (!fs.existsSync(root)) return result;
+
+  const names = await fs.promises.readdir(root, { withFileTypes: true });
+
+  for (const dirent of names) {
+    const name = dirent.name;
+    const safePath = resolveSafeUnderBackupsRoot(root, name);
+    if (!safePath) continue;
+
+    if (dirent.isFile() && isBackupTempZipFileName(name)) {
+      try {
+        await fs.promises.unlink(safePath);
+        result.zipTmpFilesRemoved += 1;
+      } catch {
+        /* ignore */
+      }
+      continue;
+    }
+
+    if (dirent.isDirectory() && isBackupWorkTempDirName(name)) {
+      try {
+        await fs.promises.rm(safePath, { recursive: true, force: true });
+        result.workDirsRemoved += 1;
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
+  return result;
+}
+
+/** @deprecated Use cleanupOrphanBackupArtifacts */
+export async function cleanupOrphanBackupTempFiles(): Promise<number> {
+  const r = await cleanupOrphanBackupArtifacts();
+  return r.zipTmpFilesRemoved;
+}
+
 /** Novos ficheiros gerados pela app. */
 export const BACKUP_FILENAME_PREFIX = "coreflow-backup-";
+
+/** Sufixo enquanto o ZIP está a ser escrito (não listar nem descarregar). */
+export const BACKUP_TEMP_ZIP_SUFFIX = ".zip.tmp";
+
+/** Compressão ZIP: prioriza velocidade em backups grandes (public/mídias). */
+export const BACKUP_ZLIB_LEVEL = 1;
+
+export function isBackupTempZipFileName(name: string): boolean {
+  if (!name || typeof name !== "string") return false;
+  const base = path.basename(name);
+  return (
+    (base.startsWith(BACKUP_FILENAME_PREFIX) ||
+      base.startsWith(LEGACY_BACKUP_FILENAME_PREFIX)) &&
+    base.endsWith(BACKUP_TEMP_ZIP_SUFFIX)
+  );
+}
 /** Backups antigos (antes da renomeação interna) — mantido para listagem/restauro. */
 export const LEGACY_BACKUP_FILENAME_PREFIX = "atendechat-backup-";
 

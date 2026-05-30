@@ -24,6 +24,13 @@ const restoreUpload = multer({
 
 backupRoutes.get("/platform/backups", isAuth, isSuper, BackupController.list);
 
+backupRoutes.get(
+  "/platform/backups/disk-space",
+  isAuth,
+  isSuper,
+  BackupController.getDiskSpace
+);
+
 backupRoutes.get("/platform/backup-config", isAuth, isSuper, BackupController.getBackupConfig);
 
 backupRoutes.put("/platform/backup-config", isAuth, isSuper, BackupController.updateBackupConfig);
@@ -33,6 +40,13 @@ backupRoutes.post(
   isAuth,
   isSuper,
   BackupController.generate
+);
+
+backupRoutes.get(
+  "/platform/backups/jobs/:jobId",
+  isAuth,
+  isSuper,
+  BackupController.getGenerateJobStatus
 );
 
 backupRoutes.delete(

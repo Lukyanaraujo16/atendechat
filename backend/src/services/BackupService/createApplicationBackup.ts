@@ -3,7 +3,12 @@ import path from "path";
 import archiver from "archiver";
 import { createWriteStream } from "fs";
 import uploadConfig from "../../config/upload";
-import { getBackupsRoot, BACKUP_FILENAME_PREFIX, ensureBackupDirs } from "../../config/backup";
+import {
+  getBackupsRoot,
+  BACKUP_FILENAME_PREFIX,
+  BACKUP_ZLIB_LEVEL,
+  ensureBackupDirs
+} from "../../config/backup";
 import { dumpDatabaseToFile } from "./dumpDatabase";
 
 function readAppVersion(): string {
@@ -18,6 +23,16 @@ function readAppVersion(): string {
 }
 
 export type BackupSource = "manual" | "automatic" | "pre_restore";
+
+export type BackupProgressStep =
+  | "dumping_database"
+  | "copying_public"
+  | "compressing"
+  | "finalizing";
+
+export interface BackupProgressUpdate {
+  step: BackupProgressStep;
+}
 
 export interface BackupManifest {
   formatVersion: 1;
@@ -53,10 +68,33 @@ function buildManifest(backupSource: BackupSource): BackupManifest {
 
 export interface CreateApplicationBackupOptions {
   backupSource?: BackupSource;
+  onProgress?: (update: BackupProgressUpdate) => void;
+}
+
+function buildBackupFileNames(backupSource: BackupSource): {
+  tempFileName: string;
+  finalFileName: string;
+  tempAbsolutePath: string;
+  finalAbsolutePath: string;
+} {
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  let base = `${BACKUP_FILENAME_PREFIX}${stamp}`;
+  if (backupSource === "pre_restore") {
+    base = `coreflow-backup-antes-restauro-${Date.now()}`;
+  }
+  const tempFileName = `${base}.zip.tmp`;
+  const finalFileName = `${base}.zip`;
+  const root = getBackupsRoot();
+  return {
+    tempFileName,
+    finalFileName,
+    tempAbsolutePath: path.join(root, tempFileName),
+    finalAbsolutePath: path.join(root, finalFileName)
+  };
 }
 
 /**
- * Gera ZIP em backups/coreflow-backup-{timestamp}.zip (legado: atendechat-backup-)
+ * Gera ZIP em backups/ (primeiro .zip.tmp, renomeia para .zip ao concluir).
  */
 export async function createApplicationBackup(
   options?: CreateApplicationBackupOptions
@@ -67,7 +105,12 @@ export async function createApplicationBackup(
   sizeBytes: number;
 }> {
   const backupSource: BackupSource = options?.backupSource ?? "manual";
+  const onProgress = options?.onProgress;
   ensureBackupDirs();
+
+  const { tempFileName, finalFileName, tempAbsolutePath, finalAbsolutePath } =
+    buildBackupFileNames(backupSource);
+
   const tempRoot = path.join(
     getBackupsRoot(),
     `.tmp-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
@@ -76,48 +119,57 @@ export async function createApplicationBackup(
   const sqlPath = path.join(tempRoot, "database.sql");
   const manifestPath = path.join(tempRoot, "manifest.json");
 
-  await fs.promises.mkdir(tempRoot, { recursive: true });
+  try {
+    await fs.promises.mkdir(tempRoot, { recursive: true });
 
-  await dumpDatabaseToFile(sqlPath);
+    onProgress?.({ step: "dumping_database" });
+    await dumpDatabaseToFile(sqlPath);
 
-  const publicSrc = uploadConfig.directory;
-  if (fs.existsSync(publicSrc)) {
-    await fs.promises.cp(publicSrc, tempPublic, { recursive: true });
-  } else {
-    await fs.promises.mkdir(tempPublic, { recursive: true });
+    onProgress?.({ step: "copying_public" });
+    const publicSrc = uploadConfig.directory;
+    if (fs.existsSync(publicSrc)) {
+      await fs.promises.cp(publicSrc, tempPublic, { recursive: true });
+    } else {
+      await fs.promises.mkdir(tempPublic, { recursive: true });
+    }
+    const publicRootMarker = path.join(tempPublic, ".coreflow-backup-public-root");
+    if (!fs.existsSync(publicRootMarker)) {
+      await fs.promises.writeFile(publicRootMarker, "coreflow-backup-public-root\n", "utf8");
+    }
+
+    const manifest = buildManifest(backupSource);
+    await fs.promises.writeFile(manifestPath, JSON.stringify(manifest, null, 2), "utf8");
+
+    onProgress?.({ step: "compressing" });
+    await fs.promises.rm(tempAbsolutePath, { force: true }).catch(() => {});
+
+    await new Promise<void>((resolve, reject) => {
+      const output = createWriteStream(tempAbsolutePath);
+      const archive = archiver("zip", { zlib: { level: BACKUP_ZLIB_LEVEL } });
+      output.on("close", () => resolve());
+      output.on("error", (err) => reject(err));
+      archive.on("error", (err) => reject(err));
+      archive.pipe(output);
+      archive.file(manifestPath, { name: "manifest.json" });
+      archive.file(sqlPath, { name: "database.sql" });
+      archive.directory(tempPublic, "public");
+      archive.finalize();
+    });
+
+    onProgress?.({ step: "finalizing" });
+    await fs.promises.rename(tempAbsolutePath, finalAbsolutePath);
+
+    const st = await fs.promises.stat(finalAbsolutePath);
+    return {
+      fileName: finalFileName,
+      absolutePath: finalAbsolutePath,
+      manifest,
+      sizeBytes: st.size
+    };
+  } catch (e) {
+    await fs.promises.rm(tempAbsolutePath, { force: true }).catch(() => {});
+    throw e;
+  } finally {
+    await fs.promises.rm(tempRoot, { recursive: true, force: true }).catch(() => {});
   }
-  /** Garante entrada public/ no ZIP mesmo quando a pasta de origem está vazia. */
-  const publicRootMarker = path.join(tempPublic, ".coreflow-backup-public-root");
-  if (!fs.existsSync(publicRootMarker)) {
-    await fs.promises.writeFile(publicRootMarker, "coreflow-backup-public-root\n", "utf8");
-  }
-
-  const manifest = buildManifest(backupSource);
-  await fs.promises.writeFile(manifestPath, JSON.stringify(manifest, null, 2), "utf8");
-
-  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const fileName = `${BACKUP_FILENAME_PREFIX}${stamp}.zip`;
-  const destZip = path.join(getBackupsRoot(), fileName);
-
-  await new Promise<void>((resolve, reject) => {
-    const output = createWriteStream(destZip);
-    const archive = archiver("zip", { zlib: { level: 9 } });
-    output.on("close", () => resolve());
-    archive.on("error", (err) => reject(err));
-    archive.pipe(output);
-    archive.file(manifestPath, { name: "manifest.json" });
-    archive.file(sqlPath, { name: "database.sql" });
-    archive.directory(tempPublic, "public");
-    archive.finalize();
-  });
-
-  await fs.promises.rm(tempRoot, { recursive: true, force: true });
-
-  const st = await fs.promises.stat(destZip);
-  return {
-    fileName,
-    absolutePath: destZip,
-    manifest,
-    sizeBytes: st.size
-  };
 }

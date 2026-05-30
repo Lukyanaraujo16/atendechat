@@ -2,9 +2,14 @@ import cron from "node-cron";
 import { createApplicationBackup } from "../services/BackupService/createApplicationBackup";
 import { pruneAutomaticBackups } from "../services/BackupService/pruneAutomaticBackups";
 import { getBackupAutoConfig } from "../services/BackupService/backupAutoConfigService";
+import {
+  getGlobalBackupLockInfo,
+  isGlobalBackupInProgress,
+  runWithGlobalBackupLock
+} from "../services/BackupService/backupGlobalLock";
 import { logger } from "../utils/logger";
+import { checkBackupDiskSpace } from "../services/BackupService/checkBackupDiskSpace";
 
-let jobRunning = false;
 let lastRunKey: string | null = null;
 
 /**
@@ -13,7 +18,6 @@ let lastRunKey: string | null = null;
  */
 export function startBackupAutoScheduler(): void {
   cron.schedule("* * * * *", async () => {
-    if (jobRunning) return;
     try {
       const cfg = await getBackupAutoConfig();
       if (!cfg.backupAutoEnabled) return;
@@ -38,9 +42,36 @@ export function startBackupAutoScheduler(): void {
 
       if (lastRunKey === runKey) return;
 
-      jobRunning = true;
+      if (isGlobalBackupInProgress()) {
+        const lock = getGlobalBackupLockInfo();
+        logger.info(
+          `[backup-auto] Ignorado (${runKey}): outro backup em curso (${lock?.source ?? "desconhecido"}).`
+        );
+        return;
+      }
+
+      const ownerId = `automatic-${runKey}`;
       try {
-        await createApplicationBackup({ backupSource: "automatic" });
+        let diskReport;
+        try {
+          diskReport = await checkBackupDiskSpace();
+        } catch (diskErr: unknown) {
+          const msg = diskErr instanceof Error ? diskErr.message : String(diskErr);
+          logger.warn(
+            `[backup-auto] Ignorado (${runKey}): não foi possível verificar disco (${msg}).`
+          );
+          return;
+        }
+        if (!diskReport.sufficient) {
+          logger.warn(
+            `[backup-auto] Ignorado (${runKey}): disco insuficiente. totalNeeded=${diskReport.totalNeeded} available=${diskReport.availableBytes} missing=${diskReport.missingBytes}`
+          );
+          return;
+        }
+
+        await runWithGlobalBackupLock("automatic", ownerId, async () => {
+          await createApplicationBackup({ backupSource: "automatic" });
+        });
         const removed = await pruneAutomaticBackups(cfg.backupAutoRetention);
         lastRunKey = runKey;
         logger.info(
@@ -48,8 +79,6 @@ export function startBackupAutoScheduler(): void {
         );
       } catch (e) {
         logger.error(e);
-      } finally {
-        jobRunning = false;
       }
     } catch (e) {
       logger.error(e);

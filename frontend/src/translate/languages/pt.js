@@ -3161,6 +3161,11 @@ const messages = {
           generate: "Gerar backup agora",
           generateHint:
             "Cada backup inclui manifest.json (metadados), database.sql e a árvore public/. Não inclui .env, Redis, filas Bull nem configuração do proxy.",
+          diskSpace: {
+            ok: "Espaço livre no disco do servidor: {{available}} (estimativa necessária para um novo backup: {{needed}}).",
+            insufficient:
+              "Espaço em disco insuficiente para gerar backup. Faltam cerca de {{missing}} (livre: {{available}}, necessário: {{needed}}).",
+          },
           sectionAuto: "Backups automáticos",
           sectionAutoHint:
             "Agendamento no servidor (node-cron). Os ficheiros ficam na mesma pasta dos backups manuais. A retenção aplica-se só a cópias automáticas.",
@@ -3267,8 +3272,18 @@ const messages = {
           modalBodyStrong:
             "Todos os dados atuais da aplicação serão apagados da base antes do import. A pasta public será substituída. Um backup de segurança será criado primeiro. Esta ação é irreversível sem esse backup.",
           modalConfirm: "Sim, restaurar",
+          jobProgressTitle: "Backup em andamento",
+          jobStep: {
+            dumping_database: "Gerando dump do banco de dados…",
+            copying_public: "Copiando arquivos da pasta public…",
+            compressing: "Compactando ZIP…",
+            finalizing: "Finalizando…",
+          },
           toasts: {
             generated: "Backup criado com sucesso.",
+            jobStarted: "Backup iniciado. Acompanhe o progresso abaixo.",
+            jobCompleted: "Backup concluído com sucesso.",
+            jobFailed: "Falha ao gerar o backup.",
             uploadValidated: "Ficheiro reconhecido. Confirme para restaurar.",
             restored: "Restauração concluída.",
             autoSaved: "Agendamento de backup guardado.",
@@ -5273,6 +5288,14 @@ const messages = {
           "Um ou mais responsáveis selecionados são inválidos ou não pertencem à sua empresa.",
         ERR_CONTACT_REQUIRES_ASSIGNEE:
           "Selecione pelo menos um responsável pelo contato.",
+        BACKUP_JOB_ALREADY_RUNNING:
+          "Já existe um backup em andamento. Aguarde a conclusão antes de iniciar outro.",
+        BACKUP_INSUFFICIENT_DISK_SPACE:
+          "Espaço em disco insuficiente. Faltam cerca de {{missing}} (livre: {{available}}, necessário: {{needed}}).",
+        BACKUP_DISK_SPACE_ESTIMATE_FAILED:
+          "Não foi possível estimar o espaço necessário para o backup. Verifique permissões e tente novamente.",
+        BACKUP_DISK_SPACE_CHECK_UNAVAILABLE:
+          "Não foi possível verificar o espaço livre no disco do servidor.",
         ERR_NO_SETTING_FOUND: "Nenhuma configuração encontrada com este ID.",
         ERR_NO_CONTACT_FOUND: "Nenhum contato encontrado com este ID.",
         ERR_INVALID_LABEL_IDS:

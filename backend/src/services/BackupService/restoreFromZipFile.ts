@@ -5,6 +5,10 @@ import uploadConfig from "../../config/upload";
 import { getBackupsRoot, ensureBackupDirs } from "../../config/backup";
 import { createApplicationBackup } from "./createApplicationBackup";
 import {
+  assertNoGlobalBackupInProgress,
+  runWithGlobalBackupLock
+} from "./backupGlobalLock";
+import {
   grantPostgresAppUserAfterSuperuserImport,
   restoreMysqlFromSqlFile,
   restorePostgresFromSqlFile,
@@ -15,6 +19,8 @@ import type { BackupManifest } from "./createApplicationBackup";
 import { validateRestoreZipEntries } from "./validateRestoreZip";
 import { inspectDatabaseForRestore } from "./inspectDatabaseForRestore";
 import { clearDatabaseBeforeRestore } from "./clearDatabaseBeforeRestore";
+import { assertBackupDiskSpaceAvailable } from "./checkBackupDiskSpace";
+import AppError from "../../errors/AppError";
 
 export interface RestoreFromZipOptions {
   /** Confirmação forte quando a BD já contém dados (obrigatória nesse caso). */
@@ -50,6 +56,8 @@ export async function restoreFromValidatedZipFile(
     throw new Error("BACKUP_STRONG_CONFIRMATION_REQUIRED");
   }
 
+  assertNoGlobalBackupInProgress();
+
   ensureBackupDirs();
   const extractRoot = path.join(
     getBackupsRoot(),
@@ -71,10 +79,19 @@ export async function restoreFromValidatedZipFile(
     throw new Error("BACKUP_MISSING_PUBLIC_DIRECTORY");
   }
 
-  const safety = await createApplicationBackup({ backupSource: "pre_restore" });
-  const safetyName = `coreflow-backup-antes-restauro-${Date.now()}.zip`;
-  const safetyDest = path.join(getBackupsRoot(), safetyName);
-  await fs.promises.rename(safety.absolutePath, safetyDest);
+  try {
+    await assertBackupDiskSpaceAvailable();
+  } catch (err: unknown) {
+    await fs.promises.rm(extractRoot, { recursive: true, force: true }).catch(() => {});
+    if (err instanceof AppError) throw err;
+    throw err;
+  }
+
+  const preRestoreOwnerId = `pre_restore-${Date.now()}`;
+  const safety = await runWithGlobalBackupLock("pre_restore", preRestoreOwnerId, () =>
+    createApplicationBackup({ backupSource: "pre_restore" })
+  );
+  const safetyName = safety.fileName;
 
   try {
     if (!dbInspection.databaseLooksEmpty && options?.substitutionConfirmed) {
