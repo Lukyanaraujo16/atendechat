@@ -75,12 +75,22 @@ function columnLoadingForUi(loading, tabCount, ticketCount) {
   return true;
 }
 
-/** Upsert da API sem remover tickets locais (socket chega antes do GET). */
-function mergeColumnWithApi(prev, apiTickets) {
+/**
+ * Mescla API na coluna. Só preserva itens locais ausentes no GET quando há
+ * movimento/socket recente — evita reintroduzir ticket após transferência.
+ */
+function mergeColumnWithApi(prev, apiTickets, recentMovesRef, recentSocketIdsRef) {
   const apiList = Array.isArray(apiTickets) ? apiTickets : [];
   const apiIds = new Set(apiList.map((t) => Number(t.id)));
   const safePrev = Array.isArray(prev) ? prev : [];
-  const kept = safePrev.filter((t) => !apiIds.has(Number(t.id)));
+  const kept = safePrev.filter((t) => {
+    const id = Number(t.id);
+    if (apiIds.has(id)) return false;
+    return (
+      hasRecentOptimisticMove(recentMovesRef, id) ||
+      recentSocketIdsRef?.has?.(id)
+    );
+  });
   const next = mergeLoadBatch(kept, apiList);
   return { tickets: next, count: countVisibleTickets(next) };
 }
@@ -103,22 +113,32 @@ function hasRecentOptimisticMove(recentMovesRef, ticketId) {
 }
 
 /** GET vazio após mover ticket não pode apagar lista (corrida com backend). */
-function applySafeColumnMerge(prev, apiTickets, recentMovesRef) {
+function applySafeColumnMerge(
+  prev,
+  apiTickets,
+  recentMovesRef,
+  recentSocketIdsRef
+) {
   const apiList = Array.isArray(apiTickets) ? apiTickets : [];
   const safePrev = Array.isArray(prev) ? prev : [];
   if (apiList.length === 0) {
     if (safePrev.length === 0) {
       return safePrev;
     }
-    const optimisticKeep = safePrev.filter((t) =>
-      hasRecentOptimisticMove(recentMovesRef, t.id)
-    );
-    if (optimisticKeep.length > 0) {
-      return optimisticKeep;
-    }
-    return safePrev;
+    return safePrev.filter((t) => {
+      const id = Number(t.id);
+      return (
+        hasRecentOptimisticMove(recentMovesRef, id) ||
+        recentSocketIdsRef?.has?.(id)
+      );
+    });
   }
-  return mergeColumnWithApi(safePrev, apiList).tickets;
+  return mergeColumnWithApi(
+    safePrev,
+    apiList,
+    recentMovesRef,
+    recentSocketIdsRef
+  ).tickets;
 }
 
 /**
@@ -376,7 +396,8 @@ export function TicketsInboxProvider({
           const next = applySafeColumnMerge(
             prev,
             tickets,
-            recentOptimisticMovesRef
+            recentOptimisticMovesRef,
+            recentSocketPendingIdsRef
           );
           tickets.forEach((t) => {
             if (t?.id != null) {
@@ -412,7 +433,8 @@ export function TicketsInboxProvider({
           const next = applySafeColumnMerge(
             prev,
             tickets,
-            recentOptimisticMovesRef
+            recentOptimisticMovesRef,
+            recentSocketPendingIdsRef
           );
           chatbotListRef.current = next;
           return next;
@@ -656,7 +678,8 @@ export function TicketsInboxProvider({
       const next = applySafeColumnMerge(
         prev,
         openFetch.tickets,
-        recentOptimisticMovesRef
+        recentOptimisticMovesRef,
+        recentSocketPendingIdsRef
       );
       openListRef.current = next;
       return next;

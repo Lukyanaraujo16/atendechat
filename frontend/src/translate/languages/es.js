@@ -3162,13 +3162,28 @@ const messages = {
           previewDb: "Base en la copia: {{name}}",
           previewDialect: "Motor: {{d}}",
           previewVersion: "Versión de la app: {{v}}",
+          previewPublic: "Carpeta public/ en el ZIP: {{ok}}",
+          previewPublicYes: "presente",
+          previewPublicNo: "ausente",
+          previewTables: "Tablas actuales en la base: {{count}}",
+          restoreDbNotEmptyWarning:
+            "La base de datos actual ya tiene datos. La restauración borrará todas las tablas de la aplicación antes de importar la copia. Confirme con la frase indicada.",
+          restoreDbEmptyInfo:
+            "La base parece vacía (sin registros en tablas principales). Puede restaurar con la confirmación normal.",
+          restoreRowsLabel: "registros",
           confirmLabel: "Confirmación",
           confirmHelper: "Para confirmar, escriba: RESTAURAR",
+          confirmStrongHelper:
+            "La base tiene datos. Escriba exactamente: RESTAURAR E SUBSTITUIR (o: ENTENDO QUE OS DADOS ATUAIS SERÃO SUBSTITUÍDOS)",
           restoreButton: "Restaurar (sobrescribe la BD actual)",
           restoreConfirmError: "Escriba exactamente RESTAURAR para continuar.",
+          restoreStrongConfirmError:
+            "Escriba exactamente RESTAURAR E SUBSTITUIR o ENTENDO QUE OS DADOS ATUAIS SERÃO SUBSTITUÍDOS",
           modalTitle: "Confirmar restauración",
           modalBody:
             "Esta operación sustituye la base de datos y la carpeta public. Antes se crea una copia de seguridad. Reinicie el backend tras el éxito.",
+          modalBodyStrong:
+            "Se borrarán todos los datos actuales de la aplicación antes del import. La carpeta public será sustituida. Primero se crea una copia de seguridad. Es irreversible sin esa copia.",
           modalConfirm: "Sí, restaurar",
           toasts: {
             generated: "Copia creada correctamente.",

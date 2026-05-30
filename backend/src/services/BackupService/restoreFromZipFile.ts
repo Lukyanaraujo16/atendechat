@@ -12,35 +12,42 @@ import {
   verifyRestoredSchemaCoreTables
 } from "./restoreDatabase";
 import type { BackupManifest } from "./createApplicationBackup";
+import { validateRestoreZipEntries } from "./validateRestoreZip";
+import { inspectDatabaseForRestore } from "./inspectDatabaseForRestore";
+import { clearDatabaseBeforeRestore } from "./clearDatabaseBeforeRestore";
+
+export interface RestoreFromZipOptions {
+  /** Confirmação forte quando a BD já contém dados (obrigatória nesse caso). */
+  substitutionConfirmed?: boolean;
+}
 
 /**
- * Extrai, valida manifest v1, cria backup de segurança, importa SQL e substitui `public/`.
+ * 1) Valida ZIP + public/
+ * 2) Inspeciona BD (sem alterar)
+ * 3) Exige confirmação forte se BD não vazia
+ * 4) Backup pre_restore
+ * 5) Limpa schema se BD não vazia e confirmado
+ * 6) Import SQL → migrate → verificação → substitui public/
  */
-export async function restoreFromValidatedZipFile(zipAbsolutePath: string): Promise<{
+export async function restoreFromValidatedZipFile(
+  zipAbsolutePath: string,
+  options?: RestoreFromZipOptions
+): Promise<{
   safetyBackupFileName: string;
   manifest: BackupManifest;
 }> {
   const zip = new AdmZip(zipAbsolutePath);
-  const manifestEntry = zip.getEntry("manifest.json");
-  const sqlEntry = zip.getEntry("database.sql");
-  if (!manifestEntry || !sqlEntry) {
-    throw new Error("BACKUP_INVALID_ARCHIVE_STRUCTURE");
-  }
-
-  let manifest: BackupManifest;
-  try {
-    manifest = JSON.parse(manifestEntry.getData().toString("utf8")) as BackupManifest;
-  } catch {
-    throw new Error("BACKUP_INVALID_MANIFEST");
-  }
-  if (manifest.formatVersion !== 1) {
-    throw new Error("BACKUP_UNSUPPORTED_FORMAT");
-  }
+  const { manifest } = validateRestoreZipEntries(zip);
 
   const currentDialect = (process.env.DB_DIALECT || "mysql").toLowerCase();
   const backupDialect = (manifest.dbDialect || "").toLowerCase();
   if (backupDialect !== currentDialect) {
     throw new Error(`BACKUP_DIALECT_MISMATCH:${backupDialect}->${currentDialect}`);
+  }
+
+  const dbInspection = await inspectDatabaseForRestore();
+  if (dbInspection.requiresStrongConfirmation && !options?.substitutionConfirmed) {
+    throw new Error("BACKUP_STRONG_CONFIRMATION_REQUIRED");
   }
 
   ensureBackupDirs();
@@ -59,13 +66,21 @@ export async function restoreFromValidatedZipFile(zipAbsolutePath: string): Prom
     throw new Error("BACKUP_MISSING_SQL");
   }
 
-  // Backup de segurança do estado atual (ZIP completo).
+  if (!fs.existsSync(publicExtracted)) {
+    await fs.promises.rm(extractRoot, { recursive: true, force: true });
+    throw new Error("BACKUP_MISSING_PUBLIC_DIRECTORY");
+  }
+
   const safety = await createApplicationBackup({ backupSource: "pre_restore" });
   const safetyName = `coreflow-backup-antes-restauro-${Date.now()}.zip`;
   const safetyDest = path.join(getBackupsRoot(), safetyName);
   await fs.promises.rename(safety.absolutePath, safetyDest);
 
   try {
+    if (!dbInspection.databaseLooksEmpty && options?.substitutionConfirmed) {
+      await clearDatabaseBeforeRestore();
+    }
+
     if (currentDialect === "postgres" || currentDialect === "postgresql") {
       await restorePostgresFromSqlFile(sqlPath);
       await grantPostgresAppUserAfterSuperuserImport();
@@ -77,10 +92,8 @@ export async function restoreFromValidatedZipFile(zipAbsolutePath: string): Prom
     await verifyRestoredSchemaCoreTables();
 
     const publicTarget = uploadConfig.directory;
-    if (fs.existsSync(publicExtracted)) {
-      await fs.promises.rm(publicTarget, { recursive: true, force: true });
-      await fs.promises.cp(publicExtracted, publicTarget, { recursive: true });
-    }
+    await fs.promises.rm(publicTarget, { recursive: true, force: true });
+    await fs.promises.cp(publicExtracted, publicTarget, { recursive: true });
   } catch (e) {
     await fs.promises.rm(extractRoot, { recursive: true, force: true }).catch(() => {});
     throw e;

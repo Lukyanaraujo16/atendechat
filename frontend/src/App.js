@@ -50,6 +50,8 @@ const App = () => {
 
   useEffect(() => {
     window.localStorage.setItem("preferredTheme", mode);
+    document.documentElement.setAttribute("data-theme", mode);
+    document.body.setAttribute("data-theme", mode);
   }, [mode]);
 
   return (

@@ -24,6 +24,8 @@ import ButtonWithSpinner from "../ButtonWithSpinner";
 import toastError from "../../errors/toastError";
 import useQueues from "../../hooks/useQueues";
 import { AuthContext } from "../../context/Auth/AuthContext";
+import { TicketsInboxContext } from "../../context/TicketsInboxContext";
+import { canAccessTicket } from "../../utils/canAccessTicket";
 
 const useStyles = makeStyles((theme) => ({
   maxWidth: {
@@ -55,6 +57,7 @@ const TransferTicketModalCustom = ({ modalOpen, onClose, ticketid }) => {
   const [whatsapps, setWhatsapps] = useState([]);
   const [selectedWhatsapp, setSelectedWhatsapp] = useState("");
   const { user } = useContext(AuthContext);
+  const inbox = useContext(TicketsInboxContext);
   const { companyId, whatsappId } = user;
 
   useEffect(() => {
@@ -240,8 +243,24 @@ const TransferTicketModalCustom = ({ modalOpen, onClose, ticketid }) => {
       if (selectedWhatsapp) {
         data.whatsappId = selectedWhatsapp;
       }
-      await api.put(`/tickets/${ticketid}`, data);
+      const { data: updatedTicket } = await api.put(`/tickets/${ticketid}`, data);
 
+      if (updatedTicket && typeof inbox?.moveTicketToColumn === "function" && canAccessTicket(user, updatedTicket)) {
+        inbox.moveTicketToColumn(updatedTicket);
+      } else if (typeof inbox?.removeTicket === "function") {
+        inbox.removeTicket(ticketid);
+      }
+      if (typeof inbox?.refreshTabCounts === "function") {
+        inbox.refreshTabCounts();
+      }
+      if (typeof inbox?.scheduleReloadBothPendingSubsets === "function") {
+        inbox.scheduleReloadBothPendingSubsets();
+      }
+      if (typeof inbox?.scheduleReloadOpenList === "function") {
+        inbox.scheduleReloadOpenList();
+      }
+
+      onClose();
       history.push(`/tickets`);
     } catch (err) {
       setSaving(false);

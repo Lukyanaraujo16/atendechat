@@ -59,8 +59,8 @@ export function isParticipantInInternalChat(chat, userId) {
 const MEDIA_PREVIEW = {
   image: "📷 Imagem",
   sticker: "📷 Imagem",
-  audio: "🎵 Áudio",
-  video: "🎬 Vídeo",
+  audio: "🎧 Áudio",
+  video: "🎥 Vídeo",
   document: "📄 Documento",
   application: "📄 Arquivo",
   locationMessage: "📍 Localização",
@@ -100,4 +100,39 @@ export function getInternalChatSenderName(newMessage, chat) {
 export function buildNotificationDedupeKey(type, messageId) {
   if (messageId == null || messageId === "") return null;
   return `${type}:${messageId}`;
+}
+
+/** Chave estável por ticket (toast único por conversa). */
+export function buildTicketNotificationDedupeKey(ticket) {
+  const id = ticket?.uuid || ticket?.id;
+  if (id == null || id === "") return null;
+  return `whatsapp-ticket:${id}`;
+}
+
+const REALTIME_SKEW_MS = 8000;
+
+/** Mensagem criada após o início da sessão (evita burst ao reconectar). */
+export function isRealtimeInboundMessage(message, sessionStartMs) {
+  if (!sessionStartMs || !message) return false;
+  const raw = message.createdAt;
+  if (!raw) return true;
+  const ts = new Date(raw).getTime();
+  if (Number.isNaN(ts)) return true;
+  return ts >= sessionStartMs - REALTIME_SKEW_MS;
+}
+
+/** /tickets sem conversa aberta = toast discreto; demais rotas = normal. */
+export function getWhatsappToastVariant(pathname, ticket) {
+  if (isTicketOpenInRoute(ticket, pathname)) {
+    return "none";
+  }
+  const p = String(pathname || "");
+  if (p === "/tickets" || p === "/tickets/") {
+    return "discrete";
+  }
+  return "normal";
+}
+
+export function isOnAttendanceTicketsScreen(pathname) {
+  return /^\/tickets(\/|$)/.test(String(pathname || ""));
 }

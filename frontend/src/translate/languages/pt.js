@@ -3244,13 +3244,28 @@ const messages = {
           previewDb: "Base no backup: {{name}}",
           previewDialect: "Motor: {{d}}",
           previewVersion: "Versão da app no backup: {{v}}",
+          previewPublic: "Pasta public/ no ZIP: {{ok}}",
+          previewPublicYes: "presente",
+          previewPublicNo: "ausente",
+          previewTables: "Tabelas atuais na base: {{count}}",
+          restoreDbNotEmptyWarning:
+            "A base de dados atual já contém dados. A restauração irá apagar todas as tabelas da aplicação antes de importar o backup. Confirme com a frase indicada abaixo.",
+          restoreDbEmptyInfo:
+            "A base parece vazia (sem registos nas tabelas principais). Pode restaurar com a confirmação normal.",
+          restoreRowsLabel: "registos",
           confirmLabel: "Confirmação",
           confirmHelper: "Para confirmar a restauração, escreva: RESTAURAR",
+          confirmStrongHelper:
+            "A base tem dados. Escreva exatamente: RESTAURAR E SUBSTITUIR (ou: ENTENDO QUE OS DADOS ATUAIS SERÃO SUBSTITUÍDOS)",
           restoreButton: "Restaurar (irreversível na BD atual)",
           restoreConfirmError: "Escreva exatamente RESTAURAR para continuar.",
+          restoreStrongConfirmError:
+            "Escreva exatamente RESTAURAR E SUBSTITUIR ou ENTENDO QUE OS DADOS ATUAIS SERÃO SUBSTITUÍDOS",
           modalTitle: "Confirmar restauração",
           modalBody:
             "Esta operação substitui a base de dados atual e a pasta public. Antes é criado automaticamente um backup de segurança no servidor. Recomenda-se reiniciar o backend após o sucesso.",
+          modalBodyStrong:
+            "Todos os dados atuais da aplicação serão apagados da base antes do import. A pasta public será substituída. Um backup de segurança será criado primeiro. Esta ação é irreversível sem esse backup.",
           modalConfirm: "Sim, restaurar",
           toasts: {
             generated: "Backup criado com sucesso.",

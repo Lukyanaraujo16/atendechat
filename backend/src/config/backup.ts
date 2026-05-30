@@ -31,6 +31,21 @@ export const LEGACY_BACKUP_FILENAME_PREFIX = "atendechat-backup-";
 export const BACKUP_CONFIRM_PHRASE = "RESTAURAR";
 export const BACKUP_DELETE_CONFIRM_PHRASE = "EXCLUIR";
 
+/** Confirmação obrigatória ao restaurar sobre base que já contém dados. */
+export const BACKUP_STRONG_CONFIRM_PHRASES = [
+  "RESTAURAR E SUBSTITUIR",
+  "ENTENDO QUE OS DADOS ATUAIS SERÃO SUBSTITUÍDOS"
+] as const;
+
+export function isStrongRestoreConfirmation(value: string | undefined): boolean {
+  if (!value || typeof value !== "string") return false;
+  const normalized = value.trim();
+  return (BACKUP_STRONG_CONFIRM_PHRASES as readonly string[]).includes(normalized);
+}
+
+export const BACKUP_MISSING_PUBLIC_MESSAGE =
+  "Backup inválido: pasta public/ ausente. Restauração abortada para evitar inconsistência de arquivos.";
+
 /** ZIP gerado por esta aplicação (prefixo atual ou legado). */
 export function isAppGeneratedBackupZipBaseName(base: string): boolean {
   if (!base || base.includes("..")) return false;

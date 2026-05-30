@@ -95,7 +95,7 @@ const UpdateTicketService = async ({
     await SetTicketMessagesAsRead(ticket);
 
     const oldStatus = ticket.status;
-    const oldUserId = ticket.user?.id;
+    const oldUserId = ticket.userId ?? ticket.user?.id;
     const oldQueueId = ticket.queueId;
 
     if (oldStatus === "closed" || Number(whatsappId) !== ticket.whatsappId) {
@@ -333,11 +333,22 @@ const UpdateTicketService = async ({
     const statusChanged = ticketForEmit.status !== oldStatus;
     const oldChatbot = Boolean(ticket.chatbot);
     const newChatbot = Boolean(ticketForEmit.chatbot);
+    const oldUid =
+      oldUserId != null && oldUserId !== undefined && !Number.isNaN(Number(oldUserId))
+        ? Number(oldUserId)
+        : null;
+    const newUid =
+      ticketForEmit.userId != null &&
+      ticketForEmit.userId !== undefined &&
+      !Number.isNaN(Number(ticketForEmit.userId))
+        ? Number(ticketForEmit.userId)
+        : null;
+    const assigneeChanged = oldUid !== newUid;
 
     /**
-     * Delete só quando o ticket sai do status anterior (ex.: pending → open).
-     * Não emitir delete em pending→pending (FlowBuilder: chatbot→humano, atribuição de userId),
-     * senão o cliente marca recentlyDeleted e ignora o update seguinte.
+     * Delete amplo quando o status muda (ex.: pending → open).
+     * Em pending→pending (FlowBuilder) não emitir delete global — só update.
+     * Transferência de responsável: delete direcionado ao userId anterior.
      */
     if (statusChanged) {
       let deleteEmitter = io
@@ -348,6 +359,11 @@ const UpdateTicketService = async ({
         deleteEmitter = deleteEmitter.to(`queue-${oldQueueId}-${oldStatus}`);
       }
       deleteEmitter.emit(`company-${companyId}-ticket`, {
+        action: "delete",
+        ticketId: ticketForEmit.id
+      });
+    } else if (assigneeChanged && oldUid != null) {
+      io.to(`user-${oldUid}`).emit(`company-${companyId}-ticket`, {
         action: "delete",
         ticketId: ticketForEmit.id
       });
@@ -373,9 +389,10 @@ const UpdateTicketService = async ({
         queueId: ticketForEmit.queueId,
         userId: ticketForEmit.userId,
         statusChanged,
+        assigneeChanged,
         chatbotChanged: oldChatbot !== newChatbot,
         oldStatus,
-        oldUserId,
+        oldUserId: oldUid,
         oldQueueId,
         action: "update",
         rooms: emitRooms.filter((r) => r && !r.includes("undefined") && !r.includes("null"))

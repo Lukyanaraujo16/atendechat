@@ -3152,13 +3152,28 @@ const messages = {
 					previewDb: "Database in backup: {{name}}",
 					previewDialect: "Engine: {{d}}",
 					previewVersion: "App version in backup: {{v}}",
+					previewPublic: "public/ folder in ZIP: {{ok}}",
+					previewPublicYes: "present",
+					previewPublicNo: "missing",
+					previewTables: "Current tables in database: {{count}}",
+					restoreDbNotEmptyWarning:
+						"The current database already has data. Restore will drop all application tables before importing the backup. Use the confirmation phrase below.",
+					restoreDbEmptyInfo:
+						"The database looks empty (no rows in core tables). You can restore with the normal confirmation.",
+					restoreRowsLabel: "rows",
 					confirmLabel: "Confirmation",
 					confirmHelper: "To confirm restore, type: RESTAURAR",
+					confirmStrongHelper:
+						"Database has data. Type exactly: RESTAURAR E SUBSTITUIR (or: ENTENDO QUE OS DADOS ATUAIS SERÃO SUBSTITUÍDOS)",
 					restoreButton: "Restore (current DB will be overwritten)",
 					restoreConfirmError: "Type exactly RESTAURAR to continue.",
+					restoreStrongConfirmError:
+						"Type exactly RESTAURAR E SUBSTITUIR or ENTENDO QUE OS DADOS ATUAIS SERÃO SUBSTITUÍDOS",
 					modalTitle: "Confirm restore",
 					modalBody:
 						"This replaces the current database and public folder. A safety backup is created automatically first. Restart the backend after success.",
+					modalBodyStrong:
+						"All current application data will be removed from the database before import. The public folder will be replaced. A safety backup is created first. This cannot be undone without that backup.",
 					modalConfirm: "Yes, restore",
 					toasts: {
 						generated: "Backup created successfully.",

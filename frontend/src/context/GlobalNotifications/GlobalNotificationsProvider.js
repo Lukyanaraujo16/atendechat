@@ -1,6 +1,5 @@
 import React, { useCallback, useContext, useEffect, useRef } from "react";
 import { useHistory, useLocation } from "react-router-dom";
-import { toast } from "react-toastify";
 
 import { AuthContext } from "../Auth/AuthContext";
 import { SocketContext } from "../Socket/SocketContext";
@@ -12,10 +11,13 @@ import { playNotificationSoundThrottled } from "../../utils/notificationSoundPla
 import {
   buildInternalChatPreview,
   buildNotificationDedupeKey,
+  buildTicketNotificationDedupeKey,
   buildWhatsappMessagePreview,
   getInternalChatSenderName,
+  getWhatsappToastVariant,
   isInternalChatOpenInRoute,
   isParticipantInInternalChat,
+  isRealtimeInboundMessage,
   isTicketOpenInRoute,
   shouldNotifyWhatsappMessage,
 } from "../../utils/globalNotificationRules";
@@ -27,8 +29,14 @@ import {
 } from "./GlobalNotificationsContext";
 import usePlanFlags from "../../hooks/usePlanFlags";
 import { hasAttendanceInboxAccess } from "../../utils/attendanceAccess";
+import {
+  getTicketMessageToastId,
+  MESSAGE_TOAST_AUTO_CLOSE_DISCRETE_MS,
+  MESSAGE_TOAST_AUTO_CLOSE_MS,
+  showOrUpdateMessageToast,
+} from "../../utils/globalMessageToast";
+import "../../styles/globalMessageToast.css";
 
-const TOAST_AUTO_CLOSE_MS = 7000;
 const SOUND_DEBOUNCE_MS = 1000;
 
 function createNotificationId(dedupeKey) {
@@ -45,6 +53,8 @@ function GlobalNotificationsSocketBridge({ children }) {
   const location = useLocation();
   const locationRef = useRef(location.pathname);
   const lastSoundAtRef = useRef(0);
+  const sessionStartMsRef = useRef(Date.now());
+  const socketLiveRef = useRef(false);
 
   const {
     addNotification,
@@ -96,29 +106,55 @@ function GlobalNotificationsSocketBridge({ children }) {
     ]
   );
 
-  const showToast = useCallback((notification, onOpen) => {
-    const toastId = notification.dedupeKey || notification.id;
-    if (toast.isActive(toastId)) {
-      return;
-    }
+  const showWhatsappMessageToast = useCallback((notification, onOpen) => {
+    const toastId =
+      notification.toastId || getTicketMessageToastId(notification.ticketRef);
+    if (!toastId) return;
 
-    toast.info(
-      ({ closeToast }) => (
+    const variant = notification.toastVariant || "normal";
+    const autoClose =
+      variant === "discrete"
+        ? MESSAGE_TOAST_AUTO_CLOSE_DISCRETE_MS
+        : MESSAGE_TOAST_AUTO_CLOSE_MS;
+
+    showOrUpdateMessageToast({
+      toastId,
+      autoClose,
+      className:
+        variant === "discrete"
+          ? "global-message-toast global-message-toast--discrete"
+          : "global-message-toast",
+      onOpen,
+      render: ({ closeToast }) => (
         <GlobalNotificationToast
-          title={notification.title}
-          body={notification.body}
+          contactName={notification.contactName}
+          preview={notification.preview}
+          avatarUrl={notification.avatarUrl}
+          variant={variant}
           onOpen={onOpen}
           closeToast={closeToast}
         />
       ),
-      {
-        position: "top-right",
-        autoClose: TOAST_AUTO_CLOSE_MS,
-        hideProgressBar: false,
-        closeOnClick: false,
-        toastId,
-      }
-    );
+    });
+  }, []);
+
+  const showInternalChatToast = useCallback((notification, onOpen) => {
+    const toastId = notification.dedupeKey || notification.id;
+    showOrUpdateMessageToast({
+      toastId,
+      autoClose: MESSAGE_TOAST_AUTO_CLOSE_MS,
+      className: "global-message-toast",
+      onOpen,
+      render: ({ closeToast }) => (
+        <GlobalNotificationToast
+          contactName={notification.senderName}
+          preview={notification.preview}
+          variant="normal"
+          onOpen={onOpen}
+          closeToast={closeToast}
+        />
+      ),
+    });
   }, []);
 
   const openNotificationTarget = useCallback(
@@ -164,25 +200,32 @@ function GlobalNotificationsSocketBridge({ children }) {
       if (!canAccessWhatsappInbox) {
         return;
       }
+      if (!socketLiveRef.current) {
+        return;
+      }
       if (!shouldNotifyWhatsappMessage(data, user)) {
         return;
       }
 
       const { message, contact, ticket } = data;
-      const dedupeKey = buildNotificationDedupeKey("whatsapp", message?.id);
-      if (!dedupeKey) return;
+      if (!isRealtimeInboundMessage(message, sessionStartMsRef.current)) {
+        return;
+      }
+
+      const messageDedupeKey = buildNotificationDedupeKey("whatsapp", message?.id);
+      const ticketDedupeKey = buildTicketNotificationDedupeKey(ticket);
+      if (!messageDedupeKey) return;
 
       const contactName = contact?.name || i18n.t("globalNotifications.unknownContact");
       const preview = buildWhatsappMessagePreview(message);
-      const body = preview
-        ? `${contactName}: ${preview}`
-        : contactName;
+      const body = preview ? `${contactName}: ${preview}` : contactName;
       const targetUrl = `/tickets/${ticket.uuid || ticket.id}`;
       const ticketOpen = isTicketOpenInRoute(ticket, locationRef.current);
+      const toastVariant = getWhatsappToastVariant(locationRef.current, ticket);
 
       const notification = {
-        id: createNotificationId(dedupeKey),
-        dedupeKey,
+        id: createNotificationId(messageDedupeKey),
+        dedupeKey: messageDedupeKey,
         type: "whatsapp",
         title: i18n.t("globalNotifications.whatsappTitle"),
         body,
@@ -191,15 +234,22 @@ function GlobalNotificationsSocketBridge({ children }) {
         targetUrl,
         ticketId: ticket.id,
         ticketUuid: ticket.uuid,
+        ticketRef: ticket,
         chatId: null,
+        contactName,
+        preview,
+        avatarUrl: contact?.profilePicUrl || contact?.urlPicture || null,
+        toastVariant,
+        toastId: getTicketMessageToastId(ticket),
         senderName: contactName,
         companyId: user?.companyId,
         messageId: message.id,
+        ticketListDedupeKey: ticketDedupeKey,
       };
 
       addNotification(notification);
 
-      if (ticketOpen) {
+      if (ticketOpen || toastVariant === "none") {
         playSound(NOTIFICATION_SOUND_TYPES.openConversationMessage, {
           ticketId: ticket.id,
           ticketUuid: ticket.uuid,
@@ -211,20 +261,25 @@ function GlobalNotificationsSocketBridge({ children }) {
         ticketId: ticket.id,
         ticketUuid: ticket.uuid,
       });
-      showToast(notification, () => openNotificationTarget(notification));
+      showWhatsappMessageToast(notification, () =>
+        openNotificationTarget(notification)
+      );
     },
     [
       addNotification,
       canAccessWhatsappInbox,
       openNotificationTarget,
       playSound,
-      showToast,
+      showWhatsappMessageToast,
       user,
     ]
   );
 
   const handleInternalChatMessage = useCallback(
     (data) => {
+      if (!socketLiveRef.current) {
+        return;
+      }
       if (data.action !== "new-message" || !data.newMessage || !data.chat) {
         return;
       }
@@ -238,6 +293,9 @@ function GlobalNotificationsSocketBridge({ children }) {
       if (Number(newMessage.senderId) === myId) {
         return;
       }
+      if (!isRealtimeInboundMessage(newMessage, sessionStartMsRef.current)) {
+        return;
+      }
 
       const dedupeKey = buildNotificationDedupeKey(
         "internalChat",
@@ -247,9 +305,7 @@ function GlobalNotificationsSocketBridge({ children }) {
 
       const senderName = getInternalChatSenderName(newMessage, chat);
       const preview = buildInternalChatPreview(newMessage);
-      const body = preview
-        ? `${senderName}: ${preview}`
-        : senderName;
+      const body = preview ? `${senderName}: ${preview}` : senderName;
       const chatPathId = chat.uuid || chat.id;
       const targetUrl = `/chats/${chatPathId}`;
       const chatOpen = isInternalChatOpenInRoute(chat, locationRef.current);
@@ -267,6 +323,8 @@ function GlobalNotificationsSocketBridge({ children }) {
         chatId: chat.id,
         chatUuid: chat.uuid,
         senderName,
+        contactName: senderName,
+        preview,
         companyId: user?.companyId,
         messageId: newMessage.id,
       };
@@ -284,18 +342,25 @@ function GlobalNotificationsSocketBridge({ children }) {
       }
 
       playSound(NOTIFICATION_SOUND_TYPES.internalChat);
-      showToast(notification, () => openNotificationTarget(notification));
+      showInternalChatToast(notification, () =>
+        openNotificationTarget(notification)
+      );
     },
     [
       addNotification,
       openConversationEnabled,
       openNotificationTarget,
       playSound,
-      showToast,
+      showInternalChatToast,
       user?.companyId,
       user?.id,
     ]
   );
+
+  useEffect(() => {
+    sessionStartMsRef.current = Date.now();
+    socketLiveRef.current = false;
+  }, [user?.companyId, user?.id]);
 
   useEffect(() => {
     if (!user?.companyId || !user?.id) {
@@ -312,7 +377,10 @@ function GlobalNotificationsSocketBridge({ children }) {
     const appMessageEvent = `company-${companyId}-appMessage`;
     const chatEvent = `company-${companyId}-chat`;
 
-    const onReadyJoin = () => socket.emit("joinNotification");
+    const onReadyJoin = () => {
+      socket.emit("joinNotification");
+      socketLiveRef.current = true;
+    };
 
     const onTicket = (payload) => {
       if (payload.action === "updateUnread" || payload.action === "delete") {
@@ -325,7 +393,12 @@ function GlobalNotificationsSocketBridge({ children }) {
     socket.on(appMessageEvent, handleWhatsappMessage);
     socket.on(chatEvent, handleInternalChatMessage);
 
+    if (socket.connected) {
+      onReadyJoin();
+    }
+
     return () => {
+      socketLiveRef.current = false;
       socket.off("ready", onReadyJoin);
       socket.off(ticketEvent, onTicket);
       socket.off(appMessageEvent, handleWhatsappMessage);

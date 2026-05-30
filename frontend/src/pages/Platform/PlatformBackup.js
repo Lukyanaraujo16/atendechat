@@ -17,6 +17,7 @@ import Select from "@material-ui/core/Select";
 import Switch from "@material-ui/core/Switch";
 import IconButton from "@material-ui/core/IconButton";
 import Paper from "@material-ui/core/Paper";
+import Alert from "@material-ui/lab/Alert";
 import { makeStyles, alpha } from "@material-ui/core/styles";
 import GetAppIcon from "@material-ui/icons/GetApp";
 import BackupIcon from "@material-ui/icons/Backup";
@@ -45,6 +46,7 @@ import {
 import AppTableContainer from "../../ui/components/AppTableContainer";
 
 const CONFIRM = "RESTAURAR";
+const STRONG_CONFIRM_DEFAULT = "RESTAURAR E SUBSTITUIR";
 const DELETE_PHRASE = "EXCLUIR";
 
 const defaultAutoConfig = {
@@ -294,6 +296,7 @@ export default function PlatformBackup() {
   const [uploading, setUploading] = useState(false);
   const [restoreToken, setRestoreToken] = useState(null);
   const [restorePreview, setRestorePreview] = useState(null);
+  const [restoreMeta, setRestoreMeta] = useState(null);
   const [confirmPhrase, setConfirmPhrase] = useState("");
   const [restoreExecuting, setRestoreExecuting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -410,6 +413,8 @@ export default function PlatformBackup() {
     setUploading(true);
     setRestoreToken(null);
     setRestorePreview(null);
+    setRestoreMeta(null);
+    setConfirmPhrase("");
     try {
       const fd = new FormData();
       fd.append("file", file);
@@ -418,6 +423,18 @@ export default function PlatformBackup() {
       });
       setRestoreToken(data.restoreToken);
       setRestorePreview(data.preview);
+      setRestoreMeta({
+        databaseLooksEmpty: Boolean(data.databaseLooksEmpty),
+        existingTablesCount: data.existingTablesCount ?? 0,
+        existingCriticalTables: Array.isArray(data.existingCriticalTables)
+          ? data.existingCriticalTables
+          : [],
+        hasPublicDirectoryInZip: Boolean(data.hasPublicDirectoryInZip),
+        requiresStrongConfirmation: Boolean(data.requiresStrongConfirmation),
+        strongConfirmationPhrases: Array.isArray(data.strongConfirmationPhrases)
+          ? data.strongConfirmationPhrases
+          : [STRONG_CONFIRM_DEFAULT],
+      });
       toast.success(i18n.t("platform.backup.toasts.uploadValidated"));
     } catch (err) {
       toastError(err);
@@ -426,10 +443,27 @@ export default function PlatformBackup() {
     }
   };
 
+  const requiresStrongConfirmation = Boolean(restoreMeta?.requiresStrongConfirmation);
+
+  const isRestorePhraseValid = () => {
+    const trimmed = confirmPhrase.trim();
+    if (requiresStrongConfirmation) {
+      const allowed = restoreMeta?.strongConfirmationPhrases?.length
+        ? restoreMeta.strongConfirmationPhrases
+        : [STRONG_CONFIRM_DEFAULT];
+      return allowed.includes(trimmed);
+    }
+    return trimmed === CONFIRM;
+  };
+
   const openRestoreConfirm = () => {
     if (!restoreToken) return;
-    if (confirmPhrase.trim() !== CONFIRM) {
-      toast.error(i18n.t("platform.backup.restoreConfirmError"));
+    if (!isRestorePhraseValid()) {
+      toast.error(
+        requiresStrongConfirmation
+          ? i18n.t("platform.backup.restoreStrongConfirmError")
+          : i18n.t("platform.backup.restoreConfirmError")
+      );
       return;
     }
     setConfirmOpen(true);
@@ -438,14 +472,20 @@ export default function PlatformBackup() {
   const executeRestore = async () => {
     setRestoreExecuting(true);
     try {
-      const { data } = await api.post("/platform/backups/execute-restore", {
-        restoreToken,
-        confirmPhrase: confirmPhrase.trim(),
-      });
+      const trimmed = confirmPhrase.trim();
+      const body = { restoreToken };
+      if (requiresStrongConfirmation) {
+        body.confirmation = trimmed;
+        body.confirmPhrase = trimmed;
+      } else {
+        body.confirmPhrase = trimmed;
+      }
+      const { data } = await api.post("/platform/backups/execute-restore", body);
       toast.success(data?.message || i18n.t("platform.backup.toasts.restored"));
       setConfirmOpen(false);
       setRestoreToken(null);
       setRestorePreview(null);
+      setRestoreMeta(null);
       setConfirmPhrase("");
       await load();
     } catch (e) {
@@ -817,17 +857,57 @@ export default function PlatformBackup() {
                 <Typography variant="body2" color="textSecondary">
                   {i18n.t("platform.backup.previewVersion", { v: restorePreview.appVersion || "—" })}
                 </Typography>
+                {restoreMeta ? (
+                  <>
+                    <Typography variant="body2" color="textSecondary" style={{ marginTop: 8 }}>
+                      {i18n.t("platform.backup.previewPublic", {
+                        ok: restoreMeta.hasPublicDirectoryInZip
+                          ? i18n.t("platform.backup.previewPublicYes")
+                          : i18n.t("platform.backup.previewPublicNo"),
+                      })}
+                    </Typography>
+                    <Typography variant="body2" color="textSecondary">
+                      {i18n.t("platform.backup.previewTables", {
+                        count: restoreMeta.existingTablesCount ?? 0,
+                      })}
+                    </Typography>
+                  </>
+                ) : null}
               </Box>
+            ) : null}
+            {restoreMeta?.requiresStrongConfirmation ? (
+              <Alert severity="warning">
+                <Typography variant="body2" component="div">
+                  {i18n.t("platform.backup.restoreDbNotEmptyWarning")}
+                </Typography>
+                {restoreMeta.existingCriticalTables
+                  ?.filter((t) => t.exists && t.rowCount > 0)
+                  .map((t) => (
+                    <Typography key={t.name} variant="caption" display="block" color="inherit">
+                      {t.name}: {t.rowCount} {i18n.t("platform.backup.restoreRowsLabel")}
+                    </Typography>
+                  ))}
+              </Alert>
+            ) : restoreMeta && restoreMeta.databaseLooksEmpty ? (
+              <Alert severity="info">
+                <Typography variant="body2">{i18n.t("platform.backup.restoreDbEmptyInfo")}</Typography>
+              </Alert>
             ) : null}
             <TextField
               fullWidth
               variant="outlined"
               size="small"
               label={i18n.t("platform.backup.confirmLabel")}
-              placeholder={CONFIRM}
+              placeholder={
+                requiresStrongConfirmation ? STRONG_CONFIRM_DEFAULT : CONFIRM
+              }
               value={confirmPhrase}
               onChange={(e) => setConfirmPhrase(e.target.value)}
-              helperText={i18n.t("platform.backup.confirmHelper")}
+              helperText={
+                requiresStrongConfirmation
+                  ? i18n.t("platform.backup.confirmStrongHelper")
+                  : i18n.t("platform.backup.confirmHelper")
+              }
             />
             <AppPrimaryButton
               onClick={openRestoreConfirm}
@@ -850,7 +930,9 @@ export default function PlatformBackup() {
         confirmText={i18n.t("platform.backup.modalConfirm")}
         destructive
       >
-        {i18n.t("platform.backup.modalBody")}
+        {requiresStrongConfirmation
+          ? i18n.t("platform.backup.modalBodyStrong")
+          : i18n.t("platform.backup.modalBody")}
       </ConfirmationModal>
 
       <AppDialog open={deleteOpen} onClose={() => !deleting && setDeleteOpen(false)} maxWidth="xs" fullWidth>

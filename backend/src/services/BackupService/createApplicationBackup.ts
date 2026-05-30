@@ -86,6 +86,11 @@ export async function createApplicationBackup(
   } else {
     await fs.promises.mkdir(tempPublic, { recursive: true });
   }
+  /** Garante entrada public/ no ZIP mesmo quando a pasta de origem está vazia. */
+  const publicRootMarker = path.join(tempPublic, ".coreflow-backup-public-root");
+  if (!fs.existsSync(publicRootMarker)) {
+    await fs.promises.writeFile(publicRootMarker, "coreflow-backup-public-root\n", "utf8");
+  }
 
   const manifest = buildManifest(backupSource);
   await fs.promises.writeFile(manifestPath, JSON.stringify(manifest, null, 2), "utf8");
