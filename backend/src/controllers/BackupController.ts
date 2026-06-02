@@ -28,6 +28,7 @@ import {
 import { validateRestoreZipEntries } from "../services/BackupService/validateRestoreZip";
 import { inspectDatabaseForRestore } from "../services/BackupService/inspectDatabaseForRestore";
 import { checkBackupDiskSpace } from "../services/BackupService/checkBackupDiskSpace";
+import { deleteBackupZipAndMeta } from "../services/BackupService/backupZipMeta";
 
 export const getDiskSpace = async (_req: Request, res: Response): Promise<void> => {
   const report = await checkBackupDiskSpace();
@@ -244,7 +245,7 @@ export const remove = async (req: Request, res: Response): Promise<void> => {
     throw new AppError("BACKUP_NOT_FOUND", 404);
   }
   try {
-    await fs.promises.unlink(abs);
+    await deleteBackupZipAndMeta(base);
   } catch {
     throw new AppError("BACKUP_DELETE_FAILED", 500, "Não foi possível apagar o ficheiro.");
   }

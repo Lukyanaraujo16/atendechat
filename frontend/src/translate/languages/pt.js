@@ -3246,13 +3246,17 @@ const messages = {
           },
           delete: "Excluir",
           deleteTitle: "Excluir backup",
-          deleteBody: "Esta ação remove o ficheiro ZIP do servidor de forma permanente.",
+          deleteBody:
+            "Esta ação remove o ficheiro ZIP e os metadados associados do servidor de forma permanente.",
           deleteConfirmLabel: "Confirmação",
           deleteConfirmHelper: "Para apagar, escreva: EXCLUIR",
           deleteConfirmButton: "Excluir definitivamente",
           deletePhraseError: "Escreva exatamente EXCLUIR para continuar.",
           statusOk: "Válido",
           statusInvalid: "Inválido",
+          statusUnknown: "Não verificado",
+          statusUnknownTooltip:
+            "Este backup foi gerado antes da validação leve ou é grande demais para inspeção rápida. Use a preparação de restauração para validar.",
           download: "Descarregar",
           sectionRestore: "Restaurar a partir de ficheiro",
           restoreIntro:

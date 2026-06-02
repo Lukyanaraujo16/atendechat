@@ -9,6 +9,7 @@ import TableHead from "@material-ui/core/TableHead";
 import TableRow from "@material-ui/core/TableRow";
 import TextField from "@material-ui/core/TextField";
 import Chip from "@material-ui/core/Chip";
+import Tooltip from "@material-ui/core/Tooltip";
 import FormControl from "@material-ui/core/FormControl";
 import FormControlLabel from "@material-ui/core/FormControlLabel";
 import InputLabel from "@material-ui/core/InputLabel";
@@ -300,6 +301,23 @@ function getTypeChipClass(backupSource, classes) {
     default:
       return classes.chipManual;
   }
+}
+
+function backupStatusLabel(status) {
+  if (status === "ok") return i18n.t("platform.backup.statusOk");
+  if (status === "unknown") return i18n.t("platform.backup.statusUnknown");
+  return i18n.t("platform.backup.statusInvalid");
+}
+
+function backupStatusChipProps(status) {
+  if (status === "ok") {
+    return { color: "primary", variant: "default" };
+  }
+  return { color: "default", variant: "outlined" };
+}
+
+function canDownloadBackup(status) {
+  return status === "ok" || status === "unknown";
 }
 
 export default function PlatformBackup() {
@@ -892,23 +910,28 @@ export default function PlatformBackup() {
                       />
                     </TableCell>
                     <TableCell>
-                      <Chip
-                        size="small"
-                        label={
-                          b.status === "ok"
-                            ? i18n.t("platform.backup.statusOk")
-                            : i18n.t("platform.backup.statusInvalid")
-                        }
-                        color={b.status === "ok" ? "primary" : "default"}
-                        variant={b.status === "ok" ? "default" : "outlined"}
-                      />
+                      {b.status === "unknown" ? (
+                        <Tooltip title={i18n.t("platform.backup.statusUnknownTooltip")}>
+                          <Chip
+                            size="small"
+                            label={backupStatusLabel(b.status)}
+                            {...backupStatusChipProps(b.status)}
+                          />
+                        </Tooltip>
+                      ) : (
+                        <Chip
+                          size="small"
+                          label={backupStatusLabel(b.status)}
+                          {...backupStatusChipProps(b.status)}
+                        />
+                      )}
                     </TableCell>
                     <TableCell align="right" className={classes.actionsCell}>
                       <AppSecondaryButton
                         size="small"
                         startIcon={<GetAppIcon />}
                         onClick={() => handleDownload(b.fileName)}
-                        disabled={b.status !== "ok"}
+                        disabled={!canDownloadBackup(b.status)}
                         style={{ marginRight: 4 }}
                       >
                         {i18n.t("platform.backup.download")}

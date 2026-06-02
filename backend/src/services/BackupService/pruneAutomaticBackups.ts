@@ -1,7 +1,6 @@
-import fs from "fs";
-import path from "path";
 import { getBackupsRoot, ensureBackupDirs } from "../../config/backup";
 import { listBackupFiles } from "./listBackupFiles";
+import { deleteBackupZipAndMeta } from "./backupZipMeta";
 
 /**
  * Mantém no máximo `maxToKeep` backups com origem automática; os mais antigos são apagados.
@@ -23,13 +22,11 @@ export async function pruneAutomaticBackups(maxToKeep: number): Promise<string[]
   });
 
   const toRemove = sorted.slice(0, sorted.length - maxToKeep);
-  const root = getBackupsRoot();
   const deleted: string[] = [];
 
   for (const item of toRemove) {
-    const abs = path.join(root, item.fileName);
     try {
-      await fs.promises.unlink(abs);
+      await deleteBackupZipAndMeta(item.fileName);
       deleted.push(item.fileName);
     } catch {
       /* ignore per file */

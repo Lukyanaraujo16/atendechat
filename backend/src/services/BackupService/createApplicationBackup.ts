@@ -10,6 +10,7 @@ import {
   ensureBackupDirs
 } from "../../config/backup";
 import { dumpDatabaseToFile } from "./dumpDatabase";
+import { buildBackupZipMeta, writeBackupZipMeta } from "./backupZipMeta";
 
 function readAppVersion(): string {
   try {
@@ -160,6 +161,17 @@ export async function createApplicationBackup(
     await fs.promises.rename(tempAbsolutePath, finalAbsolutePath);
 
     const st = await fs.promises.stat(finalAbsolutePath);
+    const completedAt = new Date().toISOString();
+    await writeBackupZipMeta(
+      finalFileName,
+      buildBackupZipMeta({
+        fileName: finalFileName,
+        sizeBytes: st.size,
+        manifest,
+        completedAt
+      })
+    );
+
     return {
       fileName: finalFileName,
       absolutePath: finalAbsolutePath,

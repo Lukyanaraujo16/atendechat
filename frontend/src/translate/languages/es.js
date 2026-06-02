@@ -3164,13 +3164,17 @@ const messages = {
           },
           delete: "Eliminar",
           deleteTitle: "Eliminar copia",
-          deleteBody: "Esta acción borra el ZIP del servidor de forma permanente.",
+          deleteBody:
+            "Esta acción borra el ZIP y los metadatos asociados del servidor de forma permanente.",
           deleteConfirmLabel: "Confirmación",
           deleteConfirmHelper: "Para eliminar, escriba: EXCLUIR",
           deleteConfirmButton: "Eliminar definitivamente",
           deletePhraseError: "Escriba exactamente EXCLUIR para continuar.",
           statusOk: "Válido",
           statusInvalid: "Inválido",
+          statusUnknown: "No verificado",
+          statusUnknownTooltip:
+            "Esta copia se generó antes de la validación ligera o es demasiado grande para una inspección rápida. Use la preparación de restauración para validar.",
           download: "Descargar",
           sectionRestore: "Restaurar desde archivo",
           restoreIntro:

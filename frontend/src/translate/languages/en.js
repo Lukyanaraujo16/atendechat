@@ -3154,13 +3154,17 @@ const messages = {
 					},
 					delete: "Delete",
 					deleteTitle: "Delete backup",
-					deleteBody: "This permanently removes the ZIP file from the server.",
+					deleteBody:
+						"This permanently removes the ZIP file and associated metadata from the server.",
 					deleteConfirmLabel: "Confirmation",
 					deleteConfirmHelper: "To delete, type: EXCLUIR",
 					deleteConfirmButton: "Delete permanently",
 					deletePhraseError: "Type exactly EXCLUIR to continue.",
 					statusOk: "Valid",
 					statusInvalid: "Invalid",
+					statusUnknown: "Not verified",
+					statusUnknownTooltip:
+						"This backup was created before lightweight validation or is too large for a quick inspection. Use restore preparation to validate.",
 					download: "Download",
 					sectionRestore: "Restore from file",
 					restoreIntro:
