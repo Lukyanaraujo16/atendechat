@@ -40,6 +40,7 @@ import { useBranding } from "../context/Branding/BrandingContext";
 import { SocketContext } from "../context/Socket/SocketContext";
 import ChatPopover from "../pages/Chat/ChatPopover";
 import GlobalNotificationsProvider from "../context/GlobalNotifications/GlobalNotificationsProvider";
+import { countPostLogin } from "../utils/postLoginDebug";
 
 import { useDate } from "../hooks/useDate";
 
@@ -314,6 +315,7 @@ const useStyles = makeStyles((theme) => ({
 }));
 
 const LoggedInLayout = ({ children, themeToggle }) => {
+  countPostLogin("LoggedInLayout render");
   const classes = useStyles();
   const location = useLocation();
   const isTicketsPage =

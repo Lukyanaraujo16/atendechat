@@ -139,13 +139,16 @@ export default function ChatPopover() {
     if (!hasTenant) {
       return undefined;
     }
+    if (!anchorEl) {
+      return undefined;
+    }
     setLoading(true);
     const delayDebounceFn = setTimeout(() => {
       fetchChats();
     }, 500);
     return () => clearTimeout(delayDebounceFn);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParam, pageNumber, hasTenant]);
+  }, [searchParam, pageNumber, hasTenant, anchorEl]);
 
   useEffect(() => {
     if (!hasTenant || !user?.id) {

@@ -162,7 +162,7 @@ export default function AnnouncementsPopover() {
       return () => {}; 
     }
 
-    socket.on(`company-announcement`, (data) => {
+    const onAnnouncement = (data) => {
       if (data.action === "update" || data.action === "create") {
         dispatch({ type: "UPDATE_ANNOUNCEMENTS", payload: data.record });
         setInvisible(false);
@@ -170,9 +170,11 @@ export default function AnnouncementsPopover() {
       if (data.action === "delete") {
         dispatch({ type: "DELETE_ANNOUNCEMENT", payload: +data.id });
       }
-    });
+    };
+
+    socket.on("company-announcement", onAnnouncement);
     return () => {
-      socket.disconnect();
+      socket.off("company-announcement", onAnnouncement);
     };
   }, [socketManager]);
 

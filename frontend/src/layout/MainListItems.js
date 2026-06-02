@@ -263,11 +263,14 @@ const MainListItems = (props) => {
 
   useEffect(() => {
     if (!planFlags.loaded || !showInternalChat) return undefined;
+    const path = location.pathname;
+    const onChatRoute = path.startsWith("/chats");
+    if (!onChatRoute) return undefined;
     const delayDebounceFn = setTimeout(() => {
       fetchChats();
     }, 500);
     return () => clearTimeout(delayDebounceFn);
-  }, [searchParam, pageNumber, planFlags.loaded, showInternalChat]);
+  }, [searchParam, pageNumber, planFlags.loaded, showInternalChat, location.pathname]);
 
   useEffect(() => {
     const companyId = localStorage.getItem("companyId");

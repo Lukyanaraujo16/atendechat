@@ -61,7 +61,14 @@ const Routes = () => {
               )}
             />
           </Switch>
-          <ToastContainer autoClose={3000} />
+          <ToastContainer
+            autoClose={3000}
+            limit={4}
+            newestOnTop
+            pauseOnFocusLoss={false}
+            closeOnClick
+            draggable={false}
+          />
         </TicketsContextProvider>
       </AuthProvider>
     </BrowserRouter>

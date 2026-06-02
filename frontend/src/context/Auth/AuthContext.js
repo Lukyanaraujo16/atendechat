@@ -1,6 +1,7 @@
-import React, { createContext } from "react";
+import React, { createContext, useMemo } from "react";
 
 import useAuth from "../../hooks/useAuth.js";
+import { countPostLogin } from "../../utils/postLoginDebug";
 
 const AuthContext = createContext();
 
@@ -16,19 +17,33 @@ const AuthProvider = ({ children }) => {
 		exitSupportMode,
 	} = useAuth();
 
+	countPostLogin("AuthProvider render");
+
+	const value = useMemo(
+		() => ({
+			loading,
+			user,
+			isAuth,
+			handleLogin,
+			handleLogout,
+			getCurrentUserInfo,
+			enterSupportMode,
+			exitSupportMode,
+		}),
+		[
+			loading,
+			user,
+			isAuth,
+			handleLogin,
+			handleLogout,
+			getCurrentUserInfo,
+			enterSupportMode,
+			exitSupportMode,
+		]
+	);
+
 	return (
-		<AuthContext.Provider
-			value={{
-				loading,
-				user,
-				isAuth,
-				handleLogin,
-				handleLogout,
-				getCurrentUserInfo,
-				enterSupportMode,
-				exitSupportMode,
-			}}
-		>
+		<AuthContext.Provider value={value}>
 			{children}
 		</AuthContext.Provider>
 	);

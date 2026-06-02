@@ -2,6 +2,7 @@ import { createContext } from "react";
 import openSocket from "socket.io-client";
 import jwt from "jsonwebtoken";
 import { getBackendBaseURL } from "../../config/backendUrl";
+import { countPostLogin } from "../../utils/postLoginDebug";
 
 class ManagedSocket {
   constructor(socketManager) {
@@ -99,6 +100,7 @@ const SocketManager = {
 
     if (companyId !== this.currentCompanyId || userId !== this.currentUserId) {
       if (this.currentSocket) {
+        countPostLogin("socket reconnect (company/user changed)");
         console.warn("closing old socket - company or user changed");
         this.currentSocket.removeAllListeners();
         this.currentSocket.disconnect();
@@ -137,6 +139,7 @@ const SocketManager = {
       });
       
       this.currentSocket.on("disconnect", (reason) => {
+        countPostLogin("socket disconnect");
         console.warn(`socket disconnected because: ${reason}`);
         if (reason.startsWith("io ")) {
           const decoded = jwt.decode(token);
@@ -149,6 +152,7 @@ const SocketManager = {
       });
       
       this.currentSocket.on("connect", (...params) => {
+        countPostLogin("socket connect");
         console.warn("socket connected", params);
       });
 

@@ -1,10 +1,15 @@
 import axios from "axios";
 import { resolveBackendBaseURL } from "../config/backendUrl";
+import { countPostLogin } from "../utils/postLoginDebug";
+import { registerAuthApiInterceptors } from "./authApiInterceptors";
+
+registerAuthApiInterceptors();
 
 let warnedEmptyBackend = false;
 
 function attachBackendInterceptor(client) {
 	client.interceptors.request.use((config) => {
+		countPostLogin("axios request");
 		const rawUrl = config.url || "";
 		if (rawUrl.startsWith("http://") || rawUrl.startsWith("https://")) {
 			return config;

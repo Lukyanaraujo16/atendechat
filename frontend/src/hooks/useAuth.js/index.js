@@ -13,15 +13,8 @@ import { computeFinanceFromDueDate } from "../../helpers/financeFlags";
 import { oneSignalLogout } from "../../services/oneSignalService";
 import { canAccessSaasPlatform } from "../../utils/platformUser";
 import { getPostLoginHomePath } from "../../utils/attendanceAccess";
-
-const BUSINESS_FORBIDDEN = [
-  "ERR_COMPANY_DELINQUENT",
-  "ERR_EXTERNAL_API_NOT_ALLOWED",
-  "ERR_NO_PERMISSION",
-  /** Plano / feature: não é falha de sessão — não tentar refresh nem logout */
-  "ERR_PLAN_FEATURE_DISABLED",
-  "ERR_USER_FEATURE_DISABLED",
-];
+import { registerAuthApiInterceptors } from "../../services/authApiInterceptors";
+import { countPostLogin, debugPostLogin } from "../../utils/postLoginDebug";
 
 const useAuth = () => {
   const history = useHistory();
@@ -29,99 +22,10 @@ const useAuth = () => {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState({});
 
-  const isRefreshingRef = useRef(false);
-  const failedRequestsQueueRef = useRef([]);
-
-  /** Regista interceptors uma vez; evita empilhar handlers e re-render em cada request (crítico no mobile). */
   useEffect(() => {
-    const requestId = api.interceptors.request.use(
-      (config) => {
-        const token = localStorage.getItem("token");
-        if (token) {
-          config.headers.Authorization = `Bearer ${JSON.parse(token)}`;
-        }
-        return config;
-      },
-      (error) => Promise.reject(error)
-    );
-
-    const responseId = api.interceptors.response.use(
-      (response) => response,
-      async (error) => {
-        const originalRequest = error.config;
-
-        if (originalRequest?.skipLogoutOnAuthError) {
-          return Promise.reject(error);
-        }
-
-        if (error?.response?.status === 403 && !originalRequest._retry) {
-          const errCode = error?.response?.data?.error;
-          if (errCode && BUSINESS_FORBIDDEN.includes(errCode)) {
-            return Promise.reject(error);
-          }
-          if (isRefreshingRef.current) {
-            return new Promise((resolve, reject) => {
-              failedRequestsQueueRef.current.push({ resolve, reject });
-            })
-              .then((token) => {
-                originalRequest.headers.Authorization = `Bearer ${token}`;
-                return api(originalRequest);
-              })
-              .catch((err) => Promise.reject(err));
-          }
-
-          originalRequest._retry = true;
-          isRefreshingRef.current = true;
-
-          try {
-            const { data } = await api.post("/auth/refresh_token");
-
-            if (data) {
-              localStorage.setItem("token", JSON.stringify(data.token));
-              api.defaults.headers.Authorization = `Bearer ${data.token}`;
-
-              failedRequestsQueueRef.current.forEach((request) => {
-                request.resolve(data.token);
-              });
-              failedRequestsQueueRef.current = [];
-            }
-
-            return api(originalRequest);
-          } catch (refreshError) {
-            failedRequestsQueueRef.current.forEach((request) => {
-              request.reject(refreshError);
-            });
-            failedRequestsQueueRef.current = [];
-
-            localStorage.removeItem("token");
-            localStorage.removeItem("companyId");
-            api.defaults.headers.Authorization = undefined;
-            setIsAuth(false);
-
-            return Promise.reject(refreshError);
-          } finally {
-            isRefreshingRef.current = false;
-          }
-        }
-
-        if (
-          error?.response?.status === 401 ||
-          (error?.response?.status === 403 && originalRequest._retry)
-        ) {
-          localStorage.removeItem("token");
-          localStorage.removeItem("companyId");
-          api.defaults.headers.Authorization = undefined;
-          setIsAuth(false);
-        }
-
-        return Promise.reject(error);
-      }
-    );
-
-    return () => {
-      api.interceptors.request.eject(requestId);
-      api.interceptors.response.eject(responseId);
-    };
+    registerAuthApiInterceptors({
+      onSessionInvalid: () => setIsAuth(false),
+    });
   }, []);
 
   const socketManager = useContext(SocketContext);
@@ -266,9 +170,7 @@ const useAuth = () => {
     };
   }, [socketManager, user?.companyId]);
 
-  const handleLogin = async (userData) => {
-    setLoading(true);
-
+  const handleLogin = useCallback(async (userData) => {
     try {
       const { data } = await api.post("/auth/login", userData);
       const {
@@ -301,38 +203,51 @@ const useAuth = () => {
       api.defaults.headers.Authorization = `Bearer ${data.token}`;
       setUser(data.user);
       setIsAuth(true);
-      toast.success(i18n.t("auth.toasts.success"));
+      setLoading(false);
 
-      if (dueDate) {
-        const dias = moment.duration(moment(dueDate).diff(moment())).asDays();
-        if (dias >= 0 && Math.round(dias) < 5) {
-          toast.warn(
-            i18n.t("finance.login.expiringSoon", {
-              days: Math.round(dias),
-              count: Math.round(dias),
-            })
-          );
-        }
-      }
-
-      if (data.user.finance?.delinquent) {
-        toast.warn(i18n.t("finance.login.delinquentWarning"), { autoClose: 10000 });
-      }
+      debugPostLogin("handleLogin success", {
+        companyId,
+        path: canAccessSaasPlatform(data.user) ? "/saas" : getPostLoginHomePath(data.user),
+      });
 
       if (canAccessSaasPlatform(data.user)) {
         history.push("/saas");
       } else {
         history.push(getPostLoginHomePath(data.user));
       }
-      setLoading(false);
 
+      window.requestAnimationFrame(() => {
+        toast.success(i18n.t("auth.toasts.success"), {
+          toastId: "auth-login-success",
+          autoClose: 2500,
+        });
+
+        if (dueDate) {
+          const dias = moment.duration(moment(dueDate).diff(moment())).asDays();
+          if (dias >= 0 && Math.round(dias) < 5) {
+            toast.warn(
+              i18n.t("finance.login.expiringSoon", {
+                days: Math.round(dias),
+                count: Math.round(dias),
+              }),
+              { autoClose: 6000 }
+            );
+          }
+        }
+
+        if (data.user.finance?.delinquent) {
+          toast.warn(i18n.t("finance.login.delinquentWarning"), {
+            autoClose: 8000,
+          });
+        }
+      });
     } catch (err) {
       toastError(err);
       setLoading(false);
     }
-  };
+  }, [history]);
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     setLoading(true);
 
     try {
@@ -351,18 +266,18 @@ const useAuth = () => {
       toastError(err);
       setLoading(false);
     }
-  };
+  }, [history]);
 
-  const getCurrentUserInfo = async () => {
+  const getCurrentUserInfo = useCallback(async () => {
     try {
       const { data } = await api.get("/auth/me");
       return data;
     } catch (err) {
       toastError(err);
     }
-  };
+  }, []);
 
-  const enterSupportMode = async (companyId) => {
+  const enterSupportMode = useCallback(async (companyId) => {
     setLoading(true);
     try {
       const { data } = await api.post("/auth/support/start", { companyId });
@@ -378,9 +293,9 @@ const useAuth = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [history]);
 
-  const exitSupportMode = async () => {
+  const exitSupportMode = useCallback(async () => {
     setLoading(true);
     try {
       const { data } = await api.post("/auth/support/stop");
@@ -400,7 +315,7 @@ const useAuth = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [history]);
 
   return {
     isAuth,

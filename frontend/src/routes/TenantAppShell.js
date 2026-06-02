@@ -5,6 +5,7 @@ import { AuthContext } from "../context/Auth/AuthContext";
 import BackdropLoading from "../components/BackdropLoading";
 import LoggedInLayout from "../layout";
 import { canAccessSaasPlatform } from "../utils/platformUser";
+import { PlanFlagsProvider } from "../hooks/usePlanFlags";
 
 /**
  * Garante que Super Admin sem empresa nunca monta o shell tenant (drawer, chats, socket de fila).
@@ -20,5 +21,9 @@ export default function TenantAppShell({ children }) {
     return <Redirect to="/saas" />;
   }
 
-  return <LoggedInLayout>{children}</LoggedInLayout>;
+  return (
+    <PlanFlagsProvider>
+      <LoggedInLayout>{children}</LoggedInLayout>
+    </PlanFlagsProvider>
+  );
 }

@@ -1,7 +1,17 @@
-import { useState, useEffect, useContext, useRef, useMemo } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useRef,
+  useMemo,
+} from "react";
 import { AuthContext } from "../context/Auth/AuthContext";
 import usePlans from "./usePlans";
 import { buildEffectiveModuleFlagsFromFeatureMap } from "../components/ModuleSettings/moduleSync";
+import { countPostLogin } from "../utils/postLoginDebug";
+
+const PlanFlagsContext = createContext(null);
 
 function readUserEffectiveFeatures(user) {
   const userFx = user?.effectiveUserFeatures;
@@ -11,7 +21,6 @@ function readUserEffectiveFeatures(user) {
   return null;
 }
 
-/** Alinha o override legado `cshow` ao mesmo instante em que o plano fica pronto (evita “saltar” campanhas). */
 function applyCampaignsShowOverride(base) {
   if (typeof window === "undefined" || !localStorage.getItem("cshow")) {
     return base;
@@ -30,14 +39,29 @@ function applyCampaignsShowOverride(base) {
   };
 }
 
-/**
- * Flags de plano (legado) + mapa granular `effectiveFeatures` (chaves config/features),
- * refinado com `user.effectiveUserFeatures` quando existir (backend já aplica plano ∧ utilizador).
- */
-export default function usePlanFlags() {
+function flagsPayloadEqual(a, b) {
+  if (!a || !b) return false;
+  return (
+    a.loaded === b.loaded &&
+    a.useCampaigns === b.useCampaigns &&
+    a.useFlowbuilders === b.useFlowbuilders &&
+    a.useKanban === b.useKanban &&
+    a.useOpenAi === b.useOpenAi &&
+    a.useIntegrations === b.useIntegrations &&
+    a.useSchedules === b.useSchedules &&
+    a.useExternalApi === b.useExternalApi &&
+    a.useGroups === b.useGroups &&
+    a.useInternalChat === b.useInternalChat &&
+    JSON.stringify(a.effectiveFeatures || {}) ===
+      JSON.stringify(b.effectiveFeatures || {})
+  );
+}
+
+function usePlanFlagsState() {
   const { user } = useContext(AuthContext);
   const { getPlanCompany } = usePlans();
   const lastCompanyIdRef = useRef(undefined);
+  const inFlightRef = useRef(false);
   const [flags, setFlags] = useState({
     useCampaigns: false,
     useFlowbuilders: false,
@@ -49,23 +73,35 @@ export default function usePlanFlags() {
     useGroups: true,
     useInternalChat: true,
     loaded: false,
-    /** Só o teto do plano (sem camada de utilizador). */
     planTierEffectiveFeatures: {},
     effectiveFeatures: {},
   });
 
+  const userFxKey = useMemo(
+    () => JSON.stringify(user?.effectiveUserFeatures || {}),
+    [user?.effectiveUserFeatures]
+  );
+
+  const modulePermsKey = useMemo(
+    () => JSON.stringify(user?.company?.modulePermissions || {}),
+    [user?.company?.modulePermissions]
+  );
+
   useEffect(() => {
+    countPostLogin("usePlanFlags effect");
+
     if (!user?.companyId) {
       lastCompanyIdRef.current = undefined;
-      setFlags((f) =>
-        applyCampaignsShowOverride({
+      setFlags((f) => {
+        const next = applyCampaignsShowOverride({
           ...f,
           loaded: true,
           effectiveFeatures: {},
           planTierEffectiveFeatures: {},
-        })
-      );
-      return;
+        });
+        return flagsPayloadEqual(f, next) ? f : next;
+      });
+      return undefined;
     }
 
     const cid = user.companyId;
@@ -73,14 +109,22 @@ export default function usePlanFlags() {
     lastCompanyIdRef.current = cid;
 
     if (companyChanged) {
-      setFlags((f) => ({ ...f, loaded: false }));
+      setFlags((f) => (f.loaded ? { ...f, loaded: false } : f));
+    }
+
+    if (inFlightRef.current) {
+      return undefined;
     }
 
     let cancelled = false;
+    inFlightRef.current = true;
+
     (async () => {
       try {
+        countPostLogin("usePlanFlags fetch listPlan");
         const planConfigs = await getPlanCompany(undefined, user.companyId);
         if (cancelled) return;
+
         const p = planConfigs?.plan;
         const eff = planConfigs?.effectiveModules;
         const planEffectiveFeatures = planConfigs?.effectiveFeatures || {};
@@ -99,101 +143,106 @@ export default function usePlanFlags() {
               modulePerms ?? {}
             )
           : null;
+
+        const applyNext = (payload) => {
+          setFlags((f) => {
+            const next = applyCampaignsShowOverride(payload);
+            return flagsPayloadEqual(f, next) ? f : next;
+          });
+        };
+
         if (!p) {
-          setFlags(
-            applyCampaignsShowOverride({
-              useCampaigns: false,
-              useFlowbuilders: false,
-              useKanban: false,
-              useOpenAi: false,
-              useIntegrations: false,
-              useSchedules: false,
-              useExternalApi: false,
-              useGroups: true,
-              useInternalChat: false,
-              loaded: true,
-              planTierEffectiveFeatures: planEffectiveFeatures,
-              effectiveFeatures,
-            })
-          );
+          applyNext({
+            useCampaigns: false,
+            useFlowbuilders: false,
+            useKanban: false,
+            useOpenAi: false,
+            useIntegrations: false,
+            useSchedules: false,
+            useExternalApi: false,
+            useGroups: true,
+            useInternalChat: false,
+            loaded: true,
+            planTierEffectiveFeatures: planEffectiveFeatures,
+            effectiveFeatures,
+          });
           return;
         }
+
         if (effFromFeatures) {
-          setFlags(
-            applyCampaignsShowOverride({
-              useCampaigns: !!effFromFeatures.useCampaigns,
-              useFlowbuilders: !!effFromFeatures.useFlowbuilders,
-              useKanban: !!effFromFeatures.useKanban,
-              useOpenAi: !!effFromFeatures.useOpenAi,
-              useIntegrations: !!effFromFeatures.useIntegrations,
-              useSchedules: !!effFromFeatures.useSchedules,
-              useExternalApi: !!effFromFeatures.useExternalApi,
-              useGroups: effFromFeatures.useGroups !== false,
-              useInternalChat: !!effFromFeatures.useInternalChat,
-              loaded: true,
-              planTierEffectiveFeatures: planEffectiveFeatures,
-              effectiveFeatures,
-            })
-          );
+          applyNext({
+            useCampaigns: !!effFromFeatures.useCampaigns,
+            useFlowbuilders: !!effFromFeatures.useFlowbuilders,
+            useKanban: !!effFromFeatures.useKanban,
+            useOpenAi: !!effFromFeatures.useOpenAi,
+            useIntegrations: !!effFromFeatures.useIntegrations,
+            useSchedules: !!effFromFeatures.useSchedules,
+            useExternalApi: !!effFromFeatures.useExternalApi,
+            useGroups: effFromFeatures.useGroups !== false,
+            useInternalChat: !!effFromFeatures.useInternalChat,
+            loaded: true,
+            planTierEffectiveFeatures: planEffectiveFeatures,
+            effectiveFeatures,
+          });
           return;
         }
+
         if (eff) {
-          setFlags(
-            applyCampaignsShowOverride({
-              useCampaigns: !!eff.useCampaigns,
-              useFlowbuilders: !!eff.useFlowbuilders,
-              useKanban: !!eff.useKanban,
-              useOpenAi: !!eff.useOpenAi,
-              useIntegrations: !!eff.useIntegrations,
-              useSchedules: !!eff.useSchedules,
-              useExternalApi: !!eff.useExternalApi,
-              useGroups: eff.useGroups !== false,
-              useInternalChat:
-                eff.useInternalChat !== undefined
-                  ? !!eff.useInternalChat
-                  : p.useInternalChat !== false,
-              loaded: true,
-              planTierEffectiveFeatures: planEffectiveFeatures,
-              effectiveFeatures,
-            })
-          );
+          applyNext({
+            useCampaigns: !!eff.useCampaigns,
+            useFlowbuilders: !!eff.useFlowbuilders,
+            useKanban: !!eff.useKanban,
+            useOpenAi: !!eff.useOpenAi,
+            useIntegrations: !!eff.useIntegrations,
+            useSchedules: !!eff.useSchedules,
+            useExternalApi: !!eff.useExternalApi,
+            useGroups: eff.useGroups !== false,
+            useInternalChat:
+              eff.useInternalChat !== undefined
+                ? !!eff.useInternalChat
+                : p.useInternalChat !== false,
+            loaded: true,
+            planTierEffectiveFeatures: planEffectiveFeatures,
+            effectiveFeatures,
+          });
         } else {
-          setFlags(
-            applyCampaignsShowOverride({
-              useCampaigns: !!p.useCampaigns,
-              useFlowbuilders: !!(p.useFlowbuilders ?? p.useCampaigns),
-              useKanban: !!p.useKanban,
-              useOpenAi: !!p.useOpenAi,
-              useIntegrations: !!p.useIntegrations,
-              useSchedules: !!p.useSchedules,
-              useExternalApi: !!p.useExternalApi,
-              useGroups: true,
-              useInternalChat: p.useInternalChat !== false,
-              loaded: true,
-              planTierEffectiveFeatures: planEffectiveFeatures,
-              effectiveFeatures,
-            })
-          );
+          applyNext({
+            useCampaigns: !!p.useCampaigns,
+            useFlowbuilders: !!(p.useFlowbuilders ?? p.useCampaigns),
+            useKanban: !!p.useKanban,
+            useOpenAi: !!p.useOpenAi,
+            useIntegrations: !!p.useIntegrations,
+            useSchedules: !!p.useSchedules,
+            useExternalApi: !!p.useExternalApi,
+            useGroups: true,
+            useInternalChat: p.useInternalChat !== false,
+            loaded: true,
+            planTierEffectiveFeatures: planEffectiveFeatures,
+            effectiveFeatures,
+          });
         }
       } catch {
         if (!cancelled) {
-          setFlags((f) => applyCampaignsShowOverride({ ...f, loaded: true }));
+          setFlags((f) => {
+            const next = applyCampaignsShowOverride({ ...f, loaded: true });
+            return flagsPayloadEqual(f, next) ? f : next;
+          });
         }
+      } finally {
+        inFlightRef.current = false;
       }
     })();
+
     return () => {
       cancelled = true;
+      inFlightRef.current = false;
     };
-  }, [
-    user?.companyId,
-    user?.effectiveUserFeatures,
-    user?.company?.modulePermissions,
-    getPlanCompany,
-  ]);
+  }, [user?.companyId, userFxKey, modulePermsKey, getPlanCompany]);
 
-  const userFxSync = useMemo(() => readUserEffectiveFeatures(user), [
-    user?.effectiveUserFeatures,
-  ]);
+  const userFxSync = useMemo(
+    () => readUserEffectiveFeatures(user),
+    [user?.effectiveUserFeatures]
+  );
 
   const effectiveFeaturesOut = useMemo(() => {
     if (flags.loaded) {
@@ -214,4 +263,19 @@ export default function usePlanFlags() {
     ready,
     permissionsReady: ready,
   };
+}
+
+export function PlanFlagsProvider({ children }) {
+  const value = usePlanFlagsState();
+  return (
+    <PlanFlagsContext.Provider value={value}>{children}</PlanFlagsContext.Provider>
+  );
+}
+
+export default function usePlanFlags() {
+  const ctx = useContext(PlanFlagsContext);
+  if (!ctx) {
+    throw new Error("usePlanFlags deve ser usado dentro de PlanFlagsProvider");
+  }
+  return ctx;
 }

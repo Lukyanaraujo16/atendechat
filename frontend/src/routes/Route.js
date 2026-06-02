@@ -14,12 +14,7 @@ const Route = ({ component: Component, isPrivate = false, ...rest }) => {
     if (loading && hasToken) {
       return <BackdropLoading />;
     }
-    return (
-      <>
-        {loading && <BackdropLoading />}
-        <Redirect to={{ pathname: "/login", state: { from: rest.location } }} />
-      </>
-    );
+    return <Redirect to={{ pathname: "/login", state: { from: rest.location } }} />;
   }
 
   if (isAuth && !isPrivate) {
@@ -30,14 +25,15 @@ const Route = ({ component: Component, isPrivate = false, ...rest }) => {
     return <Redirect to={{ pathname: home, state: { from: rest.location } }} />;
   }
 
+  if (isPrivate && loading && hasToken) {
+    return <BackdropLoading />;
+  }
+
   return (
-    <>
-      {loading && <BackdropLoading />}
-      <RouterRoute
-        {...rest}
-        {...(Component ? { component: Component } : {})}
-      />
-    </>
+    <RouterRoute
+      {...rest}
+      {...(Component ? { component: Component } : {})}
+    />
   );
 };
 
