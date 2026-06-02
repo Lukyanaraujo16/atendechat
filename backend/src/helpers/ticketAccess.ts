@@ -1,6 +1,13 @@
 import AppError from "../errors/AppError";
 import User from "../models/User";
 import Queue from "../models/Queue";
+import {
+  assertWhatsappTicketAccess,
+  isWhatsappTicketVisibilityPrivileged,
+  loadWhatsappTicketVisibility,
+  normalizeWhatsappTicketVisibility,
+  WHATSAPP_TICKET_VISIBILITY_ADMIN_SUPERVISOR
+} from "./whatsappTicketVisibility";
 
 export type TicketAccessUser = {
   id: string | number;
@@ -11,6 +18,9 @@ export type TicketAccessUser = {
 export type TicketAccessTicket = {
   userId?: number | string | null;
   queueId?: number | string | null;
+  whatsappId?: number | string | null;
+  companyId?: number;
+  whatsapp?: { ticketVisibility?: string | null } | null;
 };
 
 export function getUserQueueIdsFromQueues(
@@ -69,8 +79,33 @@ export async function loadUserQueueIds(
 
 export async function assertTicketAccess(
   user: TicketAccessUser,
-  ticket: TicketAccessTicket
+  ticket: TicketAccessTicket,
+  companyId?: number
 ): Promise<void> {
+  const cid = companyId ?? ticket.companyId;
+  if (cid == null) {
+    throw new AppError("ERR_NO_PERMISSION", 403);
+  }
+
+  await assertWhatsappTicketAccess(ticket, user, Number(cid));
+
+  let visibility = ticket.whatsapp?.ticketVisibility;
+  if (visibility == null && ticket.whatsappId != null) {
+    visibility = await loadWhatsappTicketVisibility(
+      Number(ticket.whatsappId),
+      Number(cid)
+    );
+  } else {
+    visibility = normalizeWhatsappTicketVisibility(visibility);
+  }
+
+  if (
+    isWhatsappTicketVisibilityPrivileged(user) &&
+    visibility === WHATSAPP_TICKET_VISIBILITY_ADMIN_SUPERVISOR
+  ) {
+    return;
+  }
+
   if (canAccessTicket(user, ticket, [])) {
     return;
   }

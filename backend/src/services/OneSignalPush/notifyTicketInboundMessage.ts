@@ -86,7 +86,8 @@ const notifyTicketInboundMessage = async ({
       dataType = "ticket_pending";
       recipientIds = await resolveRecipientsForPendingOrQueue(
         companyId,
-        ticket.queueId != null ? Number(ticket.queueId) : null
+        ticket.queueId != null ? Number(ticket.queueId) : null,
+        ticket.whatsappId != null ? Number(ticket.whatsappId) : null
       );
     } else {
       eventType = "ticket_message_inbound";
@@ -94,7 +95,8 @@ const notifyTicketInboundMessage = async ({
       dataType = "ticket_message";
       recipientIds = await resolveRecipientsForInboundMessage(companyId, {
         userId: ticket.userId,
-        queueId: ticket.queueId
+        queueId: ticket.queueId,
+        whatsappId: ticket.whatsappId != null ? Number(ticket.whatsappId) : null
       });
     }
 

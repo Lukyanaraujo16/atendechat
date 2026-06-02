@@ -245,7 +245,14 @@ export const show = async (req: Request, res: Response): Promise<Response> => {
 
   await assertTicketAccess(
     { id, profile, supportMode },
-    { userId: ticket.userId, queueId: ticket.queueId }
+    {
+      userId: ticket.userId,
+      queueId: ticket.queueId,
+      whatsappId: ticket.whatsappId,
+      companyId: ticket.companyId,
+      whatsapp: ticket.whatsapp as any
+    },
+    companyId
   );
 
   if (ticket.isGroup === true && ticket.contact) {
@@ -304,7 +311,14 @@ export const showFromUUID = async (
 
   await assertTicketAccess(
     { id, profile, supportMode },
-    { userId: ticket.userId, queueId: ticket.queueId }
+    {
+      userId: ticket.userId,
+      queueId: ticket.queueId,
+      whatsappId: ticket.whatsappId,
+      companyId: ticket.companyId,
+      whatsapp: (ticket as any).whatsapp
+    },
+    companyId
   );
 
   if ((ticket as any).isGroup === true && (ticket as any).contact) {
@@ -364,7 +378,14 @@ export const update = async (
   const existing = await ShowTicketService(ticketId, companyId);
   await assertTicketAccess(
     { id, profile, supportMode },
-    { userId: existing.userId, queueId: existing.queueId }
+    {
+      userId: existing.userId,
+      queueId: existing.queueId,
+      whatsappId: existing.whatsappId,
+      companyId: existing.companyId,
+      whatsapp: existing.whatsapp as any
+    },
+    companyId
   );
 
   const { ticket } = await UpdateTicketService({

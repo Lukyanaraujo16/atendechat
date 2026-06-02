@@ -24,9 +24,9 @@ import {
 import type { PinnedTicketListItem } from "../PinnedTicketServices/ListPinnedTicketsService";
 import { logger } from "../../utils/logger";
 import {
-  buildNonAdminTicketListWhere,
-  queueInAllowedOrUnassigned
-} from "../../helpers/agentTicketListWhere";
+  buildAgentTicketListWhere,
+  buildShowAllTicketListWhere
+} from "../../helpers/whatsappTicketVisibility";
 import {
   buildGroupContactVisibilityWhere,
   isGroupVisibilityPrivileged,
@@ -85,28 +85,36 @@ const ListTicketsService = async ({
 }: Request): Promise<Response> => {
   let whereCondition: Filterable["where"];
 
+  const actor = {
+    id: userId,
+    profile: userProfile,
+    supportMode
+  };
+
   if (parseTruthyQuery(showAll)) {
-    whereCondition = queueInAllowedOrUnassigned(queueIds);
+    whereCondition = buildShowAllTicketListWhere(actor, queueIds, companyId);
   } else {
     const userRow = await User.findByPk(userId, {
       attributes: ["allTicket"]
     });
-    whereCondition = buildNonAdminTicketListWhere(
+    whereCondition = buildAgentTicketListWhere(
+      actor,
       userId,
       queueIds,
-      userRow?.allTicket === "enabled"
+      userRow?.allTicket === "enabled",
+      companyId
     );
   }
 
   let includeCondition: Includeable[];
 
-  const actor = {
+  const groupActor = {
     id: userId,
     profile: userProfile,
     supportMode,
     companyId
   };
-  const privileged = isGroupVisibilityPrivileged(actor);
+  const privileged = isGroupVisibilityPrivileged(groupActor);
   const userQueueIds = privileged ? [] : await loadUserQueueIds(userId);
 
   includeCondition = [
@@ -125,7 +133,7 @@ const ListTicketsService = async ({
       ...(privileged
         ? {}
         : {
-            where: buildGroupContactVisibilityWhere(actor, userQueueIds)
+            where: buildGroupContactVisibilityWhere(groupActor, userQueueIds)
           })
     },
     {
@@ -146,7 +154,7 @@ const ListTicketsService = async ({
     {
       model: Whatsapp,
       as: "whatsapp",
-      attributes: ["name", "status"],
+      attributes: ["name", "status", "ticketVisibility"],
       required: false
     },
   ];
@@ -225,10 +233,12 @@ const ListTicketsService = async ({
     const userQueueIds = user.queues.map(queue => queue.id);
 
     whereCondition = {
-      ...buildNonAdminTicketListWhere(
+      ...buildAgentTicketListWhere(
+        actor,
         userId,
         userQueueIds,
-        user?.allTicket === "enabled"
+        user?.allTicket === "enabled",
+        companyId
       ),
       unreadMessages: { [Op.gt]: 0 }
     };

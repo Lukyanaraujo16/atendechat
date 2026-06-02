@@ -1419,6 +1419,8 @@ const messages = {
 					session: "Session",
 					emptyTitle: "No connections yet",
 					emptyHint: "Add a WhatsApp to generate a QR code and start service.",
+					visibilityAll: "All",
+					visibilityRestricted: "Restricted",
 				},
 			},
 			whatsappModal: {
@@ -1474,6 +1476,11 @@ const messages = {
 						"When enabled, new groups found on this connection will automatically be visible to regular users. You can still change each group’s visibility in Group Management.",
 					defaultGroupVisibleExistingHint:
 						"Existing groups will not be changed. To update already saved groups, use Group Management.",
+					ticketVisibility: "Ticket visibility for this connection",
+					ticketVisibilityAll: "All users with inbox access",
+					ticketVisibilityAdminSupervisor: "Admin and supervisor only",
+					ticketVisibilityHint:
+						"Restricted connections (e.g. personal WhatsApp) hide tickets from regular users.",
 				},
 				buttons: {
 					okAdd: "Add",

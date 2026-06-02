@@ -436,6 +436,10 @@ const TicketsListCustom = (props) => {
 
     socket.on(`company-${companyId}-appMessage`, (data) => {
       if (!groupsOnly && profile === "user") {
+        const vis = data.ticket?.whatsapp?.ticketVisibility || "all";
+        if (vis === "admin_supervisor") {
+          return;
+        }
         const myId = Number(user?.id);
         const queueIds = safeQueues.map((q) => q.id);
         const assigneeRaw = data.ticket?.userId;

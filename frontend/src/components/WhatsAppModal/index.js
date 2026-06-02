@@ -83,6 +83,7 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
     isDefault: false,
     autoReadMessages: true,
     defaultGroupVisible: false,
+    ticketVisibility: "all",
     token: "",
     provider: "beta",
     //timeSendQueue: 0,
@@ -381,6 +382,29 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
                       </Typography>
                       <Typography variant="caption" color="textSecondary" display="block">
                         {i18n.t("whatsappModal.form.defaultGroupVisibleExistingHint")}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12}>
+                      <FormControl variant="outlined" margin="dense" fullWidth>
+                        <InputLabel id="ticketVisibility-label">
+                          {i18n.t("whatsappModal.form.ticketVisibility")}
+                        </InputLabel>
+                        <Field
+                          as={Select}
+                          name="ticketVisibility"
+                          labelId="ticketVisibility-label"
+                          label={i18n.t("whatsappModal.form.ticketVisibility")}
+                        >
+                          <MenuItem value="all">
+                            {i18n.t("whatsappModal.form.ticketVisibilityAll")}
+                          </MenuItem>
+                          <MenuItem value="admin_supervisor">
+                            {i18n.t("whatsappModal.form.ticketVisibilityAdminSupervisor")}
+                          </MenuItem>
+                        </Field>
+                      </FormControl>
+                      <Typography variant="caption" color="textSecondary" display="block">
+                        {i18n.t("whatsappModal.form.ticketVisibilityHint")}
                       </Typography>
                     </Grid>
                   </Grid>

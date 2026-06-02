@@ -133,7 +133,8 @@ const notifyTicketAfterUpdate = async ({
     if (queueChanged) {
       const transferRecipients = await resolveRecipientsForPendingOrQueue(
         companyId,
-        newQueueId
+        newQueueId,
+        ticket.whatsappId != null ? Number(ticket.whatsappId) : null
       );
       await sendBlock({
         dedupeKey: `transfer:${ticket.id}:${oldQ ?? "null"}:${newQueueId ?? "null"}`,
@@ -157,7 +158,8 @@ const notifyTicketAfterUpdate = async ({
     if (becamePending) {
       const pendingRecipients = await resolveRecipientsForPendingOrQueue(
         companyId,
-        newQueueId
+        newQueueId,
+        ticket.whatsappId != null ? Number(ticket.whatsappId) : null
       );
       await sendBlock({
         dedupeKey: `pending:${ticket.id}`,

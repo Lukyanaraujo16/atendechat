@@ -13,7 +13,11 @@ import { intersection } from "lodash";
 import Whatsapp from "../../models/Whatsapp";
 import { attachTicketIsOrphanFlag } from "../../helpers/ticketOrphan";
 import { parseTruthyQuery } from "../../utils/parseQueryBoolean";
-import { buildNonAdminTicketListWhere } from "../../helpers/agentTicketListWhere";
+import {
+  buildAgentTicketListWhere,
+  buildExcludeRestrictedWhatsappWhere,
+  isWhatsappTicketVisibilityPrivileged
+} from "../../helpers/whatsappTicketVisibility";
 import {
   buildGroupContactVisibilityWhere,
   isGroupVisibilityPrivileged,
@@ -107,7 +111,7 @@ const ListTicketsServiceKanban = async ({
     {
       model: Whatsapp,
       as: "whatsapp",
-      attributes: ["name", "status"],
+      attributes: ["name", "status", "ticketVisibility"],
       required: false
     },
   ];
@@ -129,17 +133,28 @@ const ListTicketsServiceKanban = async ({
         };
 
   if (parseTruthyQuery(showAll)) {
-    whereCondition = statusKanbanFilter;
+    if (isWhatsappTicketVisibilityPrivileged(actor)) {
+      whereCondition = statusKanbanFilter;
+    } else {
+      whereCondition = {
+        [Op.and]: [
+          statusKanbanFilter,
+          buildExcludeRestrictedWhatsappWhere(companyId)
+        ]
+      };
+    }
   } else {
     const userRow = await User.findByPk(userId, {
       attributes: ["allTicket"]
     });
     whereCondition = {
       [Op.and]: [
-        buildNonAdminTicketListWhere(
+        buildAgentTicketListWhere(
+          actor,
           userId,
           queueIds,
-          userRow?.allTicket === "enabled"
+          userRow?.allTicket === "enabled",
+          companyId
         ),
         statusKanbanFilter
       ]
@@ -213,10 +228,12 @@ const ListTicketsServiceKanban = async ({
     const userQueueIds = user.queues.map(queue => queue.id);
 
     whereCondition = {
-      ...buildNonAdminTicketListWhere(
+      ...buildAgentTicketListWhere(
+        actor,
         userId,
         userQueueIds,
-        user?.allTicket === "enabled"
+        user?.allTicket === "enabled",
+        companyId
       ),
       unreadMessages: { [Op.gt]: 0 }
     };

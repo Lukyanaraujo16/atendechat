@@ -38,7 +38,7 @@ const ShowTicketService = async (
       {
         model: Whatsapp,
         as: "whatsapp",
-        attributes: ["name", "status"],
+        attributes: ["name", "status", "ticketVisibility"],
         required: false
       },
       {

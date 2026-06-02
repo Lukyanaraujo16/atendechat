@@ -494,7 +494,23 @@ const Connections = () => {
 								{whatsApps.map(whatsApp => (
 										<TableRow key={whatsApp.id} hover>
 											<TableCell align="left" className={classes.connectionName}>
-												{whatsApp.name}
+												<Box display="flex" alignItems="center" flexWrap="wrap" style={{ gap: 8 }}>
+													<span>{whatsApp.name}</span>
+													<Chip
+														size="small"
+														variant="outlined"
+														color={
+															whatsApp.ticketVisibility === "admin_supervisor"
+																? "default"
+																: "primary"
+														}
+														label={
+															whatsApp.ticketVisibility === "admin_supervisor"
+																? i18n.t("connections.table.visibilityRestricted")
+																: i18n.t("connections.table.visibilityAll")
+														}
+													/>
+												</Box>
 											</TableCell>
 											<TableCell align="center">
 												{renderStatusToolTips(whatsApp)}

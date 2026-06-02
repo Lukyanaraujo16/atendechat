@@ -1,6 +1,24 @@
 /** Som / notificação só para tickets do usuário: atribuído a ele OU sem responsável na fila dele. */
+export function canUserSeeTicketByWhatsapp(ticket, user) {
+  if (!ticket) return false;
+  const profile = user?.profile;
+  if (
+    profile === "admin" ||
+    profile === "supervisor" ||
+    user?.supportMode === true
+  ) {
+    return true;
+  }
+  const vis = ticket?.whatsapp?.ticketVisibility || "all";
+  if (vis === "admin_supervisor") {
+    return false;
+  }
+  return true;
+}
+
 export function shouldNotifyUserAboutTicket(ticket, user) {
   if (!user?.id || !ticket || ticket.isGroup) return false;
+  if (!canUserSeeTicketByWhatsapp(ticket, user)) return false;
   const myId = Number(user.id);
   const rawAssignee = ticket.userId;
   const hasAssignee =

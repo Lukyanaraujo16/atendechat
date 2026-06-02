@@ -32,6 +32,7 @@ interface Request {
   flowIdNotPhrase?: number;
   autoReadMessages?: boolean;
   defaultGroupVisible?: boolean;
+  ticketVisibility?: string;
 }
 
 interface Response {
@@ -64,7 +65,8 @@ const CreateWhatsAppService = async ({
   flowIdWelcome = null,
   flowIdNotPhrase = null,
   autoReadMessages = true,
-  defaultGroupVisible = false
+  defaultGroupVisible = false,
+  ticketVisibility = "all"
 }: Request): Promise<Response> => {
 
   const company = await Company.findOne({
@@ -195,7 +197,9 @@ const CreateWhatsAppService = async ({
       flowIdWelcome,
       flowIdNotPhrase,
       autoReadMessages,
-      defaultGroupVisible: Boolean(defaultGroupVisible)
+      defaultGroupVisible: Boolean(defaultGroupVisible),
+      ticketVisibility:
+        ticketVisibility === "admin_supervisor" ? "admin_supervisor" : "all"
     },
     { include: ["queues"] }
   );

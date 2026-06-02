@@ -697,6 +697,17 @@ export function TicketsInboxProvider({
   const shouldShowTicket = useCallback(
     (ticket) => {
       if (!ticket) return false;
+      const profile = user?.profile;
+      if (
+        profile !== "admin" &&
+        profile !== "supervisor" &&
+        user?.supportMode !== true
+      ) {
+        const vis = ticket?.whatsapp?.ticketVisibility || "all";
+        if (vis === "admin_supervisor") {
+          return false;
+        }
+      }
       if (showAll) return true;
       const myId = Number(userId);
       const assigneeRaw = ticket.userId;
@@ -719,7 +730,7 @@ export function TicketsInboxProvider({
       }
       return selected.indexOf(qid) > -1;
     },
-    [userId, showAll, selectedQueueIds, user?.allTicket]
+    [userId, showAll, selectedQueueIds, user?.allTicket, user?.profile, user?.supportMode]
   );
 
   const isRecentlyDeleted = useCallback((ticketId) => {
@@ -1070,6 +1081,10 @@ export function TicketsInboxProvider({
       const queueIds = safeQueues.map((q) => q.id);
       const myId = Number(user?.id);
       return base.filter((t) => {
+        const vis = t?.whatsapp?.ticketVisibility || "all";
+        if (vis === "admin_supervisor") {
+          return false;
+        }
         const assigneeRaw = t.userId;
         const assignee =
           assigneeRaw != null && assigneeRaw !== ""

@@ -31,6 +31,7 @@ interface WhatsappData {
   flowIdNotPhrase?: number;
   autoReadMessages?: boolean;
   defaultGroupVisible?: boolean;
+  ticketVisibility?: string;
 }
 
 interface Request {
@@ -79,7 +80,8 @@ const UpdateWhatsAppService = async ({
     flowIdWelcome,
     flowIdNotPhrase,
     autoReadMessages,
-    defaultGroupVisible
+    defaultGroupVisible,
+    ticketVisibility
   } = whatsappData;
 
   try {
@@ -176,6 +178,10 @@ const UpdateWhatsAppService = async ({
   }
   if (defaultGroupVisible !== undefined) {
     updateData.defaultGroupVisible = Boolean(defaultGroupVisible);
+  }
+  if (ticketVisibility !== undefined) {
+    updateData.ticketVisibility =
+      ticketVisibility === "admin_supervisor" ? "admin_supervisor" : "all";
   }
 
   await whatsapp.update(updateData);

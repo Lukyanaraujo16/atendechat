@@ -194,6 +194,14 @@ class Whatsapp extends Model<Whatsapp> {
   @Column(DataType.STRING(16))
   chatBotType: string | null;
 
+  /**
+   * Quem pode ver tickets desta conexão:
+   * all | admin_supervisor (futuro: specific_users, specific_queues)
+   */
+  @Default("all")
+  @Column(DataType.STRING(32))
+  ticketVisibility: string;
+
   /** enabled | disabled — null herda Settings.userRating da empresa */
   @Column(DataType.STRING(16))
   userRating: string | null;
