@@ -1,9 +1,7 @@
 import axios from "axios";
 import { resolveBackendBaseURL } from "../config/backendUrl";
 import { countPostLogin } from "../utils/postLoginDebug";
-import { registerAuthApiInterceptors } from "./authApiInterceptors";
-
-registerAuthApiInterceptors();
+import { attachAuthApiInterceptors } from "./authApiInterceptors";
 
 let warnedEmptyBackend = false;
 
@@ -33,6 +31,7 @@ const api = axios.create({
 });
 
 attachBackendInterceptor(api);
+attachAuthApiInterceptors(api);
 
 export const openApi = axios.create({});
 

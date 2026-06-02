@@ -2,9 +2,12 @@ import React from "react";
 import ReactDOM from "react-dom";
 
 import App from "./App";
+import AppErrorBoundary from "./components/AppErrorBoundary";
 
 ReactDOM.render(
-	<App />,
+	<AppErrorBoundary>
+		<App />
+	</AppErrorBoundary>,
 	document.getElementById("root")
 );
 

@@ -13,7 +13,7 @@ import { computeFinanceFromDueDate } from "../../helpers/financeFlags";
 import { oneSignalLogout } from "../../services/oneSignalService";
 import { canAccessSaasPlatform } from "../../utils/platformUser";
 import { getPostLoginHomePath } from "../../utils/attendanceAccess";
-import { registerAuthApiInterceptors } from "../../services/authApiInterceptors";
+import { setAuthSessionInvalidHandler } from "../../services/authApiInterceptors";
 import { countPostLogin, debugPostLogin } from "../../utils/postLoginDebug";
 
 const useAuth = () => {
@@ -23,9 +23,8 @@ const useAuth = () => {
   const [user, setUser] = useState({});
 
   useEffect(() => {
-    registerAuthApiInterceptors({
-      onSessionInvalid: () => setIsAuth(false),
-    });
+    setAuthSessionInvalidHandler(() => setIsAuth(false));
+    return () => setAuthSessionInvalidHandler(null);
   }, []);
 
   const socketManager = useContext(SocketContext);

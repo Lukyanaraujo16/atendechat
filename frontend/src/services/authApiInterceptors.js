@@ -1,5 +1,3 @@
-import api from "./api";
-
 const BUSINESS_FORBIDDEN = [
   "ERR_COMPANY_DELINQUENT",
   "ERR_EXTERNAL_API_NOT_ALLOWED",
@@ -16,23 +14,29 @@ const sessionHandlers = {
   onSessionInvalid: null,
 };
 
+export function setAuthSessionInvalidHandler(handler) {
+  sessionHandlers.onSessionInvalid = typeof handler === "function" ? handler : null;
+}
+
 /**
- * Regista interceptors de auth uma única vez por sessão da app (nunca por render).
+ * Anexa interceptors de auth ao cliente axios (chamar uma vez, após axios.create).
+ * Não importar ./api aqui — evita dependência circular e api undefined no bootstrap.
  */
-export function registerAuthApiInterceptors(handlers = {}) {
-  if (handlers.onSessionInvalid) {
-    sessionHandlers.onSessionInvalid = handlers.onSessionInvalid;
-  }
-  if (registered) {
+export function attachAuthApiInterceptors(api) {
+  if (!api || registered) {
     return;
   }
   registered = true;
 
   api.interceptors.request.use(
     (config) => {
-      const token = localStorage.getItem("token");
-      if (token) {
-        config.headers.Authorization = `Bearer ${JSON.parse(token)}`;
+      try {
+        const token = localStorage.getItem("token");
+        if (token) {
+          config.headers.Authorization = `Bearer ${JSON.parse(token)}`;
+        }
+      } catch {
+        /* token inválido no storage — segue sem header */
       }
       return config;
     },
@@ -114,4 +118,11 @@ export function registerAuthApiInterceptors(handlers = {}) {
       return Promise.reject(error);
     }
   );
+}
+
+/** @deprecated use attachAuthApiInterceptors + setAuthSessionInvalidHandler */
+export function registerAuthApiInterceptors(handlers = {}) {
+  if (handlers.onSessionInvalid) {
+    setAuthSessionInvalidHandler(handlers.onSessionInvalid);
+  }
 }
