@@ -81,6 +81,12 @@ const messages = {
           toastEnabled: "El grupo ahora es visible para los usuarios.",
           toastDisabled: "El grupo ahora está oculto para los usuarios.",
         },
+        queues: {
+          label: "Sectores autorizados",
+          placeholder: "Vacío = todos los sectores",
+          allSectors: "Todos los sectores",
+          toastSaved: "Sectores del grupo actualizados.",
+        },
       },
       crm: {
         common: { cancel: "Cancelar", save: "Guardar" },

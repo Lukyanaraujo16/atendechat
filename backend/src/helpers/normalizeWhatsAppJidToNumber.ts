@@ -333,12 +333,15 @@ export async function resolveInboundContactFromMessage(
     {
       source: "participant",
       number: normalizeWhatsAppJidToNumber(meta.participant, normalizeOpts)
-    },
-    {
-      source: "remoteJid",
-      number: normalizeWhatsAppJidToNumber(meta.remoteJid, normalizeOpts)
     }
   ];
+
+  if (!isGroup) {
+    trySources.push({
+      source: "remoteJid",
+      number: normalizeWhatsAppJidToNumber(meta.remoteJid, normalizeOpts)
+    });
+  }
 
   for (const { source, number } of trySources) {
     const jid = jidFromWhatsAppPhoneNumber(number);
@@ -355,7 +358,7 @@ export async function resolveInboundContactFromMessage(
   if (options.tryOnWhatsApp) {
     const jidsToProbe = [
       meta.remoteJidAlt,
-      meta.remoteJid,
+      ...(isGroup ? [] : [meta.remoteJid]),
       meta.participant
     ].filter((j) => j && !isIgnorableInboundRemoteJid(j));
 

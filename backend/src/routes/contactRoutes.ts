@@ -60,6 +60,16 @@ contactRoutes.put(
   ContactController.updateGroupVisibilityForContact
 );
 
+contactRoutes.get(
+  "/contacts/:contactId/group-queues",
+  ContactController.getGroupQueuesForContact
+);
+
+contactRoutes.put(
+  "/contacts/:contactId/group-queues",
+  ContactController.updateGroupQueuesForContact
+);
+
 contactRoutes.put("/contacts/toggleDisableBot/:contactId", ContactController.toggleDisableBot);
 
 export default contactRoutes;

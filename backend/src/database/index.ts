@@ -29,6 +29,7 @@ import Tag from "../models/Tag";
 import TicketTag from "../models/TicketTag";
 import ContactLabel from "../models/ContactLabel";
 import ContactLabelRelation from "../models/ContactLabelRelation";
+import ContactQueueVisibility from "../models/ContactQueueVisibility";
 import ContactAssignment from "../models/ContactAssignment";
 import ContactList from "../models/ContactList";
 import ContactListItem from "../models/ContactListItem";
@@ -113,6 +114,7 @@ const models = [
   TicketTag,
   ContactLabel,
   ContactLabelRelation,
+  ContactQueueVisibility,
   ContactAssignment,
   ContactList,
   ContactListItem,

@@ -7,6 +7,12 @@ import Whatsapp from "../models/Whatsapp";
 import GroupOpenConversationService from "../services/GroupServices/GroupOpenConversationService";
 import ShowWhatsAppService from "../services/WhatsappService/ShowWhatsAppService";
 import { logger } from "../utils/logger";
+import {
+  assertUserCanAccessGroupContact,
+  filterGroupRowsForUser,
+  isGroupVisibilityPrivileged,
+  loadAuthorizedQueueIdsByContact
+} from "../helpers/groupVisibility";
 
 const ADMIN_PREVIEW_MAX = 5;
 
@@ -87,8 +93,8 @@ export const list = async (req: Request, res: Response): Promise<Response> => {
       mapGroupListEntry(jid, meta)
     );
 
-    const privileged =
-      profile === "admin" || profile === "supervisor" || supportMode === true;
+    const actor = { id: req.user.id, profile, supportMode, companyId };
+    const privileged = isGroupVisibilityPrivileged(actor);
 
     const digitsByJid = new Map<string, string>();
     rawGroups.forEach(g => {
@@ -140,17 +146,28 @@ export const list = async (req: Request, res: Response): Promise<Response> => {
       }
     }
 
-    const groups = rawGroups
-      .map(g => {
-        const digits = digitsByJid.get(String(g.id)) || "";
-        const cfg = digits ? byDigits.get(digits) : undefined;
-        return {
-          ...g,
-          contactId: cfg?.id ?? null,
-          groupVisible: cfg?.groupVisible ?? false
-        };
-      })
-      .filter(g => (privileged ? true : g.groupVisible === true));
+    const contactIdsForAuth = [...byDigits.values()].map((c) => c.id);
+    const authorizedMap = await loadAuthorizedQueueIdsByContact(
+      contactIdsForAuth,
+      companyId
+    );
+
+    const groupsMapped = rawGroups.map(g => {
+      const digits = digitsByJid.get(String(g.id)) || "";
+      const cfg = digits ? byDigits.get(digits) : undefined;
+      const contactId = cfg?.id ?? null;
+      const authorizedQueueIds = contactId
+        ? authorizedMap.get(contactId) || []
+        : [];
+      return {
+        ...g,
+        contactId,
+        groupVisible: cfg?.groupVisible ?? false,
+        authorizedQueueIds
+      };
+    });
+
+    const groups = await filterGroupRowsForUser(groupsMapped, actor);
 
     return res.status(200).json({ groups });
   } catch (err: any) {
@@ -252,20 +269,17 @@ export const openConversation = async (
   }
 
   try {
-    const privileged =
-      profile === "admin" || profile === "supervisor" || supportMode === true;
-    if (!privileged) {
-      const digits = String(groupId).includes("@g.us")
-        ? String(groupId).replace(/\D/g, "")
-        : String(groupId).replace(/\D/g, "");
-      const groupContact = await Contact.findOne({
-        where: { companyId, isGroup: true, number: digits },
-        attributes: ["id", "groupVisible"]
-      });
-      if (!groupContact || (groupContact as any).groupVisible !== true) {
-        throw new AppError("ERR_GROUP_NOT_VISIBLE", 403);
-      }
+    const actor = { id: req.user.id, profile, supportMode, companyId };
+    const digits = String(groupId).includes("@g.us")
+      ? String(groupId).replace(/\D/g, "")
+      : String(groupId).replace(/\D/g, "");
+    const groupContact = await Contact.findOne({
+      where: { companyId, isGroup: true, number: digits }
+    });
+    if (!groupContact) {
+      throw new AppError("ERR_GROUP_NOT_VISIBLE", 403);
     }
+    await assertUserCanAccessGroupContact(groupContact, actor);
 
     const { uuid } = await GroupOpenConversationService({
       companyId,

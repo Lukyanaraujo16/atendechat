@@ -149,7 +149,7 @@ const TransferTicketModalCustom = ({ modalOpen, onClose, ticketid }) => {
 
     const fetchUsers = async () => {
       try {
-        const { data } = await api.get("/users/", {
+        const { data } = await api.get("/users/transfer-list", {
           params: { searchParam: trimmed },
         });
         if (!cancelled && isMounted.current) {
@@ -225,20 +225,16 @@ const TransferTicketModalCustom = ({ modalOpen, onClose, ticketid }) => {
     if (!selectedQueue || selectedQueue === "") return;
     setSaving(true);
     try {
-      const data = {};
-
-      if (selectedUser) {
-        data.userId = selectedUser.id;
-      }
-
-      if (selectedQueue && selectedQueue !== null) {
-        data.queueId = selectedQueue;
-
-        if (!selectedUser) {
-          data.status = "pending";
-          data.userId = null;
-        }
-      }
+      const data = {
+        status: "pending",
+        chatbot: false,
+        queueOptionId: null,
+        useIntegration: false,
+        integrationId: null,
+        promptId: null,
+        userId: selectedUser ? selectedUser.id : null,
+        queueId: selectedQueue,
+      };
 
       if (selectedWhatsapp) {
         data.whatsappId = selectedWhatsapp;

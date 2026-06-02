@@ -81,6 +81,12 @@ const messages = {
           toastEnabled: "Grupo liberado para usuários.",
           toastDisabled: "Grupo oculto para usuários.",
         },
+        queues: {
+          label: "Setores autorizados",
+          placeholder: "Vazio = todos os setores",
+          allSectors: "Todos os setores",
+          toastSaved: "Setores do grupo atualizados.",
+        },
       },
       crm: {
         common: {

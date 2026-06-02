@@ -6,6 +6,10 @@ import {
   applyContactVisibilityFilter,
   ContactAccessUser
 } from "../../helpers/contactAccess";
+import {
+  buildGroupContactVisibilityWhere,
+  loadUserQueueIds
+} from "../../helpers/groupVisibility";
 
 export interface SearchContactParams {
   companyId: string | number;
@@ -35,17 +39,23 @@ const SimpleListService = async ({
     }
   }
 
-  options.where = {
-    ...options.where,
-    companyId,
-    ...(includeHiddenGroups
-      ? {}
-      : {
-          [Op.or]: [
-            { isGroup: false },
-            { isGroup: true, groupVisible: true }
-          ]
-        })
+  const baseWhere = { ...options.where, companyId };
+
+  if (includeHiddenGroups || !accessUser) {
+    options.where = baseWhere;
+  } else if (canViewAllCompanyContacts(accessUser)) {
+    options.where = baseWhere;
+  } else {
+    const actor = {
+      id: accessUser.id,
+      profile: accessUser.profile,
+      supportMode: accessUser.supportMode,
+      companyId: Number(companyId)
+    };
+    const userQueueIds = await loadUserQueueIds(accessUser.id);
+    options.where = {
+      [Op.and]: [baseWhere, buildGroupContactVisibilityWhere(actor, userQueueIds)]
+    };
   }
 
   if (accessUser && !canViewAllCompanyContacts(accessUser)) {

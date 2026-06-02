@@ -51,6 +51,125 @@ interface Response {
   oldUserId: number | undefined;
 }
 
+function normalizeUid(value: number | null | undefined): number | null {
+  if (value == null || Number.isNaN(Number(value))) return null;
+  return Number(value);
+}
+
+/**
+ * Transferências operacionais devem ir para Aguardando (pending), não Atendendo (open).
+ */
+function applyTransferPendingRules(params: {
+  ticketData: TicketData;
+  ticket: Ticket;
+  actionUserId: string | null;
+}): TicketData {
+  const { ticketData, ticket, actionUserId } = params;
+  const oldStatus = ticket.status;
+  const oldUid = normalizeUid(ticket.userId ?? ticket.user?.id);
+  const oldQueueId =
+    ticket.queueId != null && !Number.isNaN(Number(ticket.queueId))
+      ? Number(ticket.queueId)
+      : null;
+
+  let status = ticketData.status;
+  let userId =
+    ticketData.userId !== undefined ? ticketData.userId : ticket.userId;
+  let queueId =
+    ticketData.queueId !== undefined ? ticketData.queueId : ticket.queueId;
+  let chatbot =
+    ticketData.chatbot !== undefined ? ticketData.chatbot : ticket.chatbot;
+  let queueOptionId =
+    ticketData.queueOptionId !== undefined
+      ? ticketData.queueOptionId
+      : ticket.queueOptionId;
+  let useIntegration =
+    ticketData.useIntegration !== undefined
+      ? ticketData.useIntegration
+      : ticket.useIntegration;
+  let integrationId =
+    ticketData.integrationId !== undefined
+      ? ticketData.integrationId
+      : ticket.integrationId;
+  let promptId =
+    ticketData.promptId !== undefined ? ticketData.promptId : ticket.promptId;
+
+  if (status === "closed") {
+    return ticketData;
+  }
+
+  const newUid = userId !== undefined ? normalizeUid(userId) : oldUid;
+  const newQueueId =
+    queueId !== undefined && queueId !== null && !Number.isNaN(Number(queueId))
+      ? Number(queueId)
+      : oldQueueId;
+
+  const userIdInPayload = ticketData.userId !== undefined;
+  const queueIdInPayload = ticketData.queueId !== undefined;
+
+  const userChanged =
+    userIdInPayload && newUid !== oldUid;
+  const queueChanged =
+    queueIdInPayload && newQueueId !== oldQueueId;
+
+  const actionUid =
+    actionUserId != null && !Number.isNaN(Number(actionUserId))
+      ? Number(actionUserId)
+      : null;
+
+  const isAcceptingTicket =
+    status === "open" &&
+    newUid != null &&
+    actionUid != null &&
+    newUid === actionUid &&
+    (oldUid == null || oldStatus === "pending");
+
+  if (isAcceptingTicket) {
+    return ticketData;
+  }
+
+  const mistakenOpenTransfer =
+    status === "open" &&
+    userIdInPayload &&
+    newUid != null &&
+    actionUid != null &&
+    newUid !== actionUid;
+
+  const isTransfer = userChanged || queueChanged || mistakenOpenTransfer;
+
+  if (!isTransfer) {
+    return ticketData;
+  }
+
+  if (status === undefined || status === "open" || mistakenOpenTransfer) {
+    status = "pending";
+  }
+
+  if (userIdInPayload && ticketData.userId === null) {
+    userId = null;
+  } else if (queueChanged && !userIdInPayload) {
+    userId = null;
+  }
+
+  chatbot = false;
+  queueOptionId = null;
+  useIntegration = false;
+  integrationId = null;
+  promptId = null;
+
+  return {
+    ...ticketData,
+    status,
+    userId,
+    queueId,
+    chatbot,
+    queueOptionId,
+    useIntegration,
+    integrationId,
+    promptId
+  };
+}
+
 const UpdateTicketService = async ({
   ticketData,
   ticketId,
@@ -59,17 +178,23 @@ const UpdateTicketService = async ({
 }: Request): Promise<Response> => {
 
   try {
-    const { status } = ticketData;
-    let { queueId, userId, whatsappId } = ticketData;
-    let chatbot: boolean | null = ticketData.chatbot || false;
-    let queueOptionId: number | null = ticketData.queueOptionId || null;
-    let promptId: number | null = ticketData.promptId || null;
-    let useIntegration: boolean | null = ticketData.useIntegration || false;
-    let integrationId: number | null = ticketData.integrationId || null;
-
     const io = getIO();
 
     const ticket = await ShowTicketService(ticketId, companyId);
+
+    const normalizedTicketData = applyTransferPendingRules({
+      ticketData,
+      ticket,
+      actionUserId
+    });
+
+    const { status } = normalizedTicketData;
+    let { queueId, userId, whatsappId } = normalizedTicketData;
+    let chatbot: boolean | null = normalizedTicketData.chatbot ?? false;
+    let queueOptionId: number | null = normalizedTicketData.queueOptionId ?? null;
+    let promptId: number | null = normalizedTicketData.promptId ?? null;
+    let useIntegration: boolean | null = normalizedTicketData.useIntegration ?? false;
+    let integrationId: number | null = normalizedTicketData.integrationId ?? null;
     const ticketTraking = await FindOrCreateATicketTrakingService({
       ticketId,
       companyId,
@@ -300,7 +425,10 @@ const UpdateTicketService = async ({
       userId,
       whatsappId: whatsappIdForDb,
       chatbot,
-      queueOptionId
+      queueOptionId,
+      useIntegration,
+      integrationId,
+      promptId
     });
 
     if (status !== undefined && status !== "open") {

@@ -730,8 +730,12 @@ const verifyContact = async (
       return null;
     };
 
+    const isGroupParticipantMsg = Boolean(
+      inboundMsg?.key?.remoteJid?.endsWith("@g.us")
+    );
     const resolved = await resolveInboundContactFromMessage(inboundMsg, {
-      tryOnWhatsApp
+      tryOnWhatsApp,
+      isGroup: isGroupParticipantMsg
     });
 
     if (resolved.ok === false) {

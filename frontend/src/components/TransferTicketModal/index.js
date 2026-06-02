@@ -74,7 +74,7 @@ const TransferTicketModal = ({ modalOpen, onClose, ticketid }) => {
 
 		const fetchUsers = async () => {
 			try {
-				const { data } = await api.get("/users/", {
+				const { data } = await api.get("/users/transfer-list", {
 					params: { searchParam: trimmed },
 				});
 				if (!cancelled) {
@@ -145,7 +145,12 @@ const TransferTicketModal = ({ modalOpen, onClose, ticketid }) => {
 			await api.put(`/tickets/${ticketid}`, {
 				userId: selectedUser.id,
 				queueId: null,
-				status: "open",
+				status: "pending",
+				chatbot: false,
+				queueOptionId: null,
+				useIntegration: false,
+				integrationId: null,
+				promptId: null,
 			});
 			setSaving(false);
 			history.push(`/tickets`);

@@ -1,5 +1,8 @@
 import Contact from "../models/Contact";
-import { isPlausibleWhatsAppPhoneNumber } from "./normalizeWhatsAppJidToNumber";
+import {
+  isPlausibleWhatsAppPhoneNumber,
+  normalizeWhatsAppJidToNumber
+} from "./normalizeWhatsAppJidToNumber";
 
 export type GroupParticipantDisplayInput = {
   contact?: { name?: string | null; number?: string | null } | null;
@@ -37,16 +40,22 @@ export function extractSenderPnFromDataJson(
   if (!dataJson) return null;
   try {
     const parsed = JSON.parse(dataJson) as {
-      key?: { senderPn?: string; participant?: string };
+      key?: { senderPn?: string; participantPn?: string; participant?: string };
       pushName?: string;
       participant?: string;
       senderPn?: string;
+      participantPn?: string;
     };
     const key = parsed?.key;
     const pn = key?.senderPn ?? parsed?.senderPn;
     if (pn) {
-      const d = String(pn).replace(/\D/g, "");
-      if (d.length >= 8 && d.length <= 15) return d;
+      const d = normalizeWhatsAppJidToNumber(null, { senderPn: pn });
+      if (d && isPlausibleWhatsAppPhoneNumber(d)) return d;
+    }
+    const ppn = key?.participantPn ?? parsed?.participantPn;
+    if (ppn) {
+      const d = normalizeWhatsAppJidToNumber(null, { participantPn: ppn });
+      if (d && isPlausibleWhatsAppPhoneNumber(d)) return d;
     }
     const part = key?.participant ?? parsed?.participant;
     if (part) {

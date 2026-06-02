@@ -12,6 +12,9 @@ import ContactSummaryService from "../services/ContactServices/ContactSummarySer
 import AddTagToContactService from "../services/ContactServices/AddTagToContactService";
 import RemoveTagFromContactService from "../services/ContactServices/RemoveTagFromContactService";
 import Contact from "../models/Contact";
+import ListContactGroupQueuesService from "../services/ContactServices/ListContactGroupQueuesService";
+import UpdateContactGroupQueuesService from "../services/ContactServices/UpdateContactGroupQueuesService";
+import { isGroupVisibilityPrivileged } from "../helpers/groupVisibility";
 
 import CheckContactNumber from "../services/WbotServices/CheckNumber";
 import CheckIsValidContact from "../services/WbotServices/CheckIsValidContact";
@@ -598,6 +601,53 @@ export const updateChatbotForContact = async (
   });
 
   return res.status(200).json(contact);
+};
+
+export const getGroupQueuesForContact = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const { contactId } = req.params;
+  const { companyId, profile, supportMode } = req.user;
+
+  if (!isGroupVisibilityPrivileged({ id: req.user.id, profile, supportMode, companyId })) {
+    throw new AppError("ERR_NO_PERMISSION", 403);
+  }
+
+  const data = await ListContactGroupQueuesService(Number(contactId), companyId);
+  return res.status(200).json(data);
+};
+
+export const updateGroupQueuesForContact = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const { contactId } = req.params;
+  const { companyId, profile, supportMode } = req.user;
+
+  if (!isGroupVisibilityPrivileged({ id: req.user.id, profile, supportMode, companyId })) {
+    throw new AppError("ERR_NO_PERMISSION", 403);
+  }
+
+  const schema = Yup.object().shape({
+    queueIds: Yup.array().of(Yup.number().integer().positive()).required()
+  });
+  const { queueIds } = await schema.validate(req.body, { abortEarly: false });
+
+  const result = await UpdateContactGroupQueuesService({
+    contactId: Number(contactId),
+    companyId,
+    queueIds: queueIds as number[]
+  });
+
+  const contact = await ShowContactService(contactId, companyId);
+  const io = getIO();
+  io.to(`company-${companyId}-mainchannel`).emit(`company-${companyId}-contact`, {
+    action: "update",
+    contact
+  });
+
+  return res.status(200).json(result);
 };
 
 export const updateGroupVisibilityForContact = async (

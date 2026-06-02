@@ -32,6 +32,7 @@ import {
   toCompanyTicketAudience,
   toCompanyTicketDeleteAudience
 } from "../helpers/companyTicketSocket";
+import { assertUserCanAccessGroupContact } from "../helpers/groupVisibility";
 
 type IndexQuery = {
   searchParam: string;
@@ -247,13 +248,13 @@ export const show = async (req: Request, res: Response): Promise<Response> => {
     { userId: ticket.userId, queueId: ticket.queueId }
   );
 
-  const privileged =
-    profile === "admin" || profile === "supervisor" || supportMode === true;
-  if (!privileged && ticket.isGroup === true) {
-    const gv = (ticket.contact as any)?.groupVisible;
-    if (gv !== true) {
-      throw new AppError("ERR_GROUP_NOT_VISIBLE", 403);
-    }
+  if (ticket.isGroup === true && ticket.contact) {
+    await assertUserCanAccessGroupContact(ticket.contact as any, {
+      id,
+      profile,
+      supportMode,
+      companyId
+    });
   }
 
   return res.status(200).json(ticket);
@@ -306,13 +307,13 @@ export const showFromUUID = async (
     { userId: ticket.userId, queueId: ticket.queueId }
   );
 
-  const privileged =
-    profile === "admin" || profile === "supervisor" || supportMode === true;
-  if (!privileged && ticket.companyId === companyId && (ticket as any).isGroup === true) {
-    const gv = (ticket as any)?.contact?.groupVisible;
-    if (gv !== true) {
-      throw new AppError("ERR_GROUP_NOT_VISIBLE", 403);
-    }
+  if ((ticket as any).isGroup === true && (ticket as any).contact) {
+    await assertUserCanAccessGroupContact((ticket as any).contact, {
+      id,
+      profile,
+      supportMode,
+      companyId
+    });
   }
 
   return res.status(200).json(ticket);

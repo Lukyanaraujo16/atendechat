@@ -27,6 +27,13 @@ userRoutes.get(
 
 userRoutes.get("/users/list", isAuth, UserController.list);
 
+userRoutes.get(
+  "/users/transfer-list",
+  isAuth,
+  requireAnyPlanFeature("attendance.inbox", "attendance.kanban"),
+  UserController.transferList
+);
+
 userRoutes.post(
   "/users",
   isAuth,

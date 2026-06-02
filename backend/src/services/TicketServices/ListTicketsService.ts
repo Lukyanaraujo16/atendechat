@@ -27,6 +27,11 @@ import {
   buildNonAdminTicketListWhere,
   queueInAllowedOrUnassigned
 } from "../../helpers/agentTicketListWhere";
+import {
+  buildGroupContactVisibilityWhere,
+  isGroupVisibilityPrivileged,
+  loadUserQueueIds
+} from "../../helpers/groupVisibility";
 
 interface Request {
   searchParam?: string;
@@ -95,8 +100,14 @@ const ListTicketsService = async ({
 
   let includeCondition: Includeable[];
 
-  const privileged =
-    userProfile === "admin" || userProfile === "supervisor" || supportMode === true;
+  const actor = {
+    id: userId,
+    profile: userProfile,
+    supportMode,
+    companyId
+  };
+  const privileged = isGroupVisibilityPrivileged(actor);
+  const userQueueIds = privileged ? [] : await loadUserQueueIds(userId);
 
   includeCondition = [
     {
@@ -114,12 +125,7 @@ const ListTicketsService = async ({
       ...(privileged
         ? {}
         : {
-            where: {
-              [Op.or]: [
-                { isGroup: false },
-                { isGroup: true, groupVisible: true }
-              ]
-            }
+            where: buildGroupContactVisibilityWhere(actor, userQueueIds)
           })
     },
     {

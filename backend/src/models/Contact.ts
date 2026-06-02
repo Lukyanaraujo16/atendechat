@@ -16,6 +16,7 @@ import {
 } from "sequelize-typescript";
 import ContactCustomField from "./ContactCustomField";
 import ContactAssignment from "./ContactAssignment";
+import ContactQueueVisibility from "./ContactQueueVisibility";
 import Ticket from "./Ticket";
 import Company from "./Company";
 import Schedule from "./Schedule";
@@ -81,6 +82,9 @@ class Contact extends Model<Contact> {
 
   @HasMany(() => ContactAssignment, { as: "assignments" })
   assignments: ContactAssignment[];
+
+  @HasMany(() => ContactQueueVisibility, { as: "authorizedQueues" })
+  authorizedQueues: ContactQueueVisibility[];
 
   @ForeignKey(() => Company)
   @Column

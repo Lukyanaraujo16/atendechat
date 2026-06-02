@@ -26,6 +26,7 @@ import Chip from "@material-ui/core/Chip";
 import LinearProgress from "@material-ui/core/LinearProgress";
 import Switch from "@material-ui/core/Switch";
 import FormControlLabel from "@material-ui/core/FormControlLabel";
+import Autocomplete from "@material-ui/lab/Autocomplete";
 
 import RefreshIcon from "@material-ui/icons/Refresh";
 import ExitToAppIcon from "@material-ui/icons/ExitToApp";
@@ -43,6 +44,7 @@ import api from "../../services/api";
 import toastError from "../../errors/toastError";
 import { toast } from "react-toastify";
 import { i18n } from "../../translate/i18n";
+import useQueues from "../../hooks/useQueues";
 
 const useStyles = makeStyles((theme) => ({
   paper: {
@@ -139,6 +141,7 @@ const GroupManager = () => {
   const history = useHistory();
   const { whatsApps, loading: loadingWhats } = useContext(WhatsAppsContext);
   const { user } = useContext(AuthContext);
+  const { findAll: findAllQueues } = useQueues();
 
   const [whatsappId, setWhatsappId] = useState("");
   const [tab, setTab] = useState(0);
@@ -156,6 +159,8 @@ const GroupManager = () => {
   const [leaveModal, setLeaveModal] = useState({ open: false, group: null });
   const [leaving, setLeaving] = useState(false);
   const [openingGroupId, setOpeningGroupId] = useState(null);
+  const [companyQueues, setCompanyQueues] = useState([]);
+  const [savingQueuesFor, setSavingQueuesFor] = useState(null);
 
   const connectedList = useMemo(
     () =>
@@ -211,6 +216,62 @@ const GroupManager = () => {
       setGroups([]);
     }
   }, [whatsappId, fetchGroups]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = await findAllQueues();
+        if (!cancelled) setCompanyQueues(Array.isArray(list) ? list : []);
+      } catch {
+        if (!cancelled) setCompanyQueues([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [findAllQueues]);
+
+  const resolveQueueChips = useCallback(
+    (g) => {
+      if (g.groupVisible !== true) {
+        return [{ key: "hidden", label: i18n.t("groups.visibility.hiddenChip") }];
+      }
+      const ids = Array.isArray(g.authorizedQueueIds) ? g.authorizedQueueIds : [];
+      if (!ids.length) {
+        return [{ key: "all", label: i18n.t("groups.queues.allSectors") }];
+      }
+      return ids.map((id) => {
+        const q = companyQueues.find((x) => Number(x.id) === Number(id));
+        return {
+          key: `q-${id}`,
+          label: q?.name || `#${id}`,
+        };
+      });
+    },
+    [companyQueues]
+  );
+
+  const handleSaveGroupQueues = async (g, nextQueueIds) => {
+    if (!g?.contactId) return;
+    setSavingQueuesFor(g.id);
+    try {
+      const { data } = await api.put(`/contacts/${g.contactId}/group-queues`, {
+        queueIds: nextQueueIds,
+      });
+      const saved = Array.isArray(data?.queueIds) ? data.queueIds : nextQueueIds;
+      setGroups((prev) =>
+        (Array.isArray(prev) ? prev : []).map((x) =>
+          x.id === g.id ? { ...x, authorizedQueueIds: saved } : x
+        )
+      );
+      toast.success(i18n.t("groups.queues.toastSaved"));
+    } catch (err) {
+      toastError(err);
+    } finally {
+      setSavingQueuesFor(null);
+    }
+  };
 
   const filteredGroups = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -480,9 +541,15 @@ const GroupManager = () => {
                       <div className={classes.cardMeta}>
                         <Chip size="small" label={i18n.t("groups.manager.participantsChip", { count: g.participantCount ?? 0 })} variant="outlined" />
                         <Chip size="small" label={i18n.t("groups.manager.adminsChip", { count: g.adminCount ?? 0 })} variant="outlined" />
-                        {canManageVisibility && g.groupVisible !== true ? (
-                          <Chip size="small" color="default" label={i18n.t("groups.visibility.hiddenChip")} variant="outlined" />
-                        ) : null}
+                        {resolveQueueChips(g).map((chip) => (
+                          <Chip
+                            key={chip.key}
+                            size="small"
+                            color={chip.key === "hidden" ? "default" : "primary"}
+                            variant="outlined"
+                            label={chip.label}
+                          />
+                        ))}
                       </div>
                       <Typography className={classes.adminLine}>{renderAdminSummary(g)}</Typography>
                       <Tooltip title={g.id || ""} placement="top">
@@ -494,25 +561,55 @@ const GroupManager = () => {
                     </CardContent>
                     <CardActions style={{ padding: "8px 16px 16px", flexWrap: "wrap", gap: 8 }}>
                       {canManageVisibility && (
-                        <Tooltip
-                          title={
-                            g.groupVisible
-                              ? i18n.t("groups.visibility.hideTooltip")
-                              : i18n.t("groups.visibility.showTooltip")
-                          }
-                        >
-                          <FormControlLabel
-                            control={
-                              <Switch
-                                color="primary"
-                                checked={Boolean(g.groupVisible)}
-                                onChange={() => handleToggleGroupVisible(g)}
-                                disabled={!g.contactId}
-                              />
+                        <Box display="flex" flexDirection="column" style={{ gap: 8, minWidth: 260 }}>
+                          <Tooltip
+                            title={
+                              g.groupVisible
+                                ? i18n.t("groups.visibility.hideTooltip")
+                                : i18n.t("groups.visibility.showTooltip")
                             }
-                            label={i18n.t("groups.visibility.label")}
-                          />
-                        </Tooltip>
+                          >
+                            <FormControlLabel
+                              control={
+                                <Switch
+                                  color="primary"
+                                  checked={Boolean(g.groupVisible)}
+                                  onChange={() => handleToggleGroupVisible(g)}
+                                  disabled={!g.contactId}
+                                />
+                              }
+                              label={i18n.t("groups.visibility.label")}
+                            />
+                          </Tooltip>
+                          {g.contactId && g.groupVisible === true ? (
+                            <Autocomplete
+                              multiple
+                              size="small"
+                              options={companyQueues}
+                              getOptionLabel={(opt) => opt?.name || ""}
+                              value={companyQueues.filter((q) =>
+                                (Array.isArray(g.authorizedQueueIds) ? g.authorizedQueueIds : []).includes(
+                                  Number(q.id)
+                                )
+                              )}
+                              onChange={(_e, newValue) => {
+                                handleSaveGroupQueues(
+                                  g,
+                                  (newValue || []).map((q) => Number(q.id))
+                                );
+                              }}
+                              disabled={savingQueuesFor === g.id}
+                              renderInput={(params) => (
+                                <TextField
+                                  {...params}
+                                  variant="outlined"
+                                  label={i18n.t("groups.queues.label")}
+                                  placeholder={i18n.t("groups.queues.placeholder")}
+                                />
+                              )}
+                            />
+                          ) : null}
+                        </Box>
                       )}
                       <Button
                         size="small"

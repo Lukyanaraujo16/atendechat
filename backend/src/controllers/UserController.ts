@@ -10,6 +10,7 @@ import UpdateUserService from "../services/UserServices/UpdateUserService";
 import ShowUserService from "../services/UserServices/ShowUserService";
 import DeleteUserService from "../services/UserServices/DeleteUserService";
 import SimpleListService from "../services/UserServices/SimpleListService";
+import ListUsersForTransferService from "../services/UserServices/ListUsersForTransferService";
 import User from "../models/User";
 import SetLanguageCompanyService from "../services/UserServices/SetLanguageCompanyService";
 import { loadCompanyPlanContext } from "../middleware/loadCompanyEffectiveFeatures";
@@ -278,6 +279,21 @@ export const list = async (req: Request, res: Response): Promise<Response> => {
   });
 
   return res.status(200).json(users);
+};
+
+export const transferList = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const { searchParam } = req.query as { searchParam?: string };
+  const { companyId } = req.user;
+
+  const { users, count, hasMore } = await ListUsersForTransferService({
+    searchParam,
+    companyId
+  });
+
+  return res.status(200).json({ users, count, hasMore });
 };
 
 export const setLanguage = async (req: Request, res: Response): Promise<Response> => {
