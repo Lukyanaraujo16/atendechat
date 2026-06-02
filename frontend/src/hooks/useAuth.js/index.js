@@ -29,100 +29,100 @@ const useAuth = () => {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState({});
 
-  api.interceptors.request.use(
-    (config) => {
-      const token = localStorage.getItem("token");
-      if (token) {
-        config.headers["Authorization"] = `Bearer ${JSON.parse(token)}`;
-        setIsAuth(true);
-      }
-      return config;
-    },
-    (error) => {
-      Promise.reject(error);
-    }
-  );
+  const isRefreshingRef = useRef(false);
+  const failedRequestsQueueRef = useRef([]);
 
-  let isRefreshing = false;
-  let failedRequestsQueue = [];
+  /** Regista interceptors uma vez; evita empilhar handlers e re-render em cada request (crítico no mobile). */
+  useEffect(() => {
+    const requestId = api.interceptors.request.use(
+      (config) => {
+        const token = localStorage.getItem("token");
+        if (token) {
+          config.headers.Authorization = `Bearer ${JSON.parse(token)}`;
+        }
+        return config;
+      },
+      (error) => Promise.reject(error)
+    );
 
-  api.interceptors.response.use(
-    (response) => {
-      return response;
-    },
-    async (error) => {
-      const originalRequest = error.config;
+    const responseId = api.interceptors.response.use(
+      (response) => response,
+      async (error) => {
+        const originalRequest = error.config;
 
-      /** Pedidos “soft” (ex.: sync após alteração de permissões) — não limpar sessão nem deslogar. */
-      if (originalRequest?.skipLogoutOnAuthError) {
-        return Promise.reject(error);
-      }
-
-      if (error?.response?.status === 403 && !originalRequest._retry) {
-        const errCode = error?.response?.data?.error;
-        if (errCode && BUSINESS_FORBIDDEN.includes(errCode)) {
+        if (originalRequest?.skipLogoutOnAuthError) {
           return Promise.reject(error);
         }
-        if (isRefreshing) {
-          return new Promise((resolve, reject) => {
-            failedRequestsQueue.push({ resolve, reject });
-          })
-            .then((token) => {
-              originalRequest.headers.Authorization = `Bearer ${token}`;
-              return api(originalRequest);
+
+        if (error?.response?.status === 403 && !originalRequest._retry) {
+          const errCode = error?.response?.data?.error;
+          if (errCode && BUSINESS_FORBIDDEN.includes(errCode)) {
+            return Promise.reject(error);
+          }
+          if (isRefreshingRef.current) {
+            return new Promise((resolve, reject) => {
+              failedRequestsQueueRef.current.push({ resolve, reject });
             })
-            .catch((err) => {
-              return Promise.reject(err);
-            });
-        }
-
-        originalRequest._retry = true;
-        isRefreshing = true;
-
-        try {
-          const { data } = await api.post("/auth/refresh_token");
-
-          if (data) {
-            localStorage.setItem("token", JSON.stringify(data.token));
-            api.defaults.headers.Authorization = `Bearer ${data.token}`;
-
-            failedRequestsQueue.forEach((request) => {
-              request.resolve(data.token);
-            });
-            failedRequestsQueue = [];
+              .then((token) => {
+                originalRequest.headers.Authorization = `Bearer ${token}`;
+                return api(originalRequest);
+              })
+              .catch((err) => Promise.reject(err));
           }
 
-          return api(originalRequest);
-        } catch (refreshError) {
-          failedRequestsQueue.forEach((request) => {
-            request.reject(refreshError);
-          });
-          failedRequestsQueue = [];
+          originalRequest._retry = true;
+          isRefreshingRef.current = true;
 
+          try {
+            const { data } = await api.post("/auth/refresh_token");
+
+            if (data) {
+              localStorage.setItem("token", JSON.stringify(data.token));
+              api.defaults.headers.Authorization = `Bearer ${data.token}`;
+
+              failedRequestsQueueRef.current.forEach((request) => {
+                request.resolve(data.token);
+              });
+              failedRequestsQueueRef.current = [];
+            }
+
+            return api(originalRequest);
+          } catch (refreshError) {
+            failedRequestsQueueRef.current.forEach((request) => {
+              request.reject(refreshError);
+            });
+            failedRequestsQueueRef.current = [];
+
+            localStorage.removeItem("token");
+            localStorage.removeItem("companyId");
+            api.defaults.headers.Authorization = undefined;
+            setIsAuth(false);
+
+            return Promise.reject(refreshError);
+          } finally {
+            isRefreshingRef.current = false;
+          }
+        }
+
+        if (
+          error?.response?.status === 401 ||
+          (error?.response?.status === 403 && originalRequest._retry)
+        ) {
           localStorage.removeItem("token");
           localStorage.removeItem("companyId");
           api.defaults.headers.Authorization = undefined;
           setIsAuth(false);
-
-          return Promise.reject(refreshError);
-        } finally {
-          isRefreshing = false;
         }
-      }
 
-      if (
-        error?.response?.status === 401 ||
-        (error?.response?.status === 403 && originalRequest._retry)
-      ) {
-        localStorage.removeItem("token");
-        localStorage.removeItem("companyId");
-        api.defaults.headers.Authorization = undefined;
-        setIsAuth(false);
+        return Promise.reject(error);
       }
+    );
 
-      return Promise.reject(error);
-    }
-  );
+    return () => {
+      api.interceptors.request.eject(requestId);
+      api.interceptors.response.eject(responseId);
+    };
+  }, []);
 
   const socketManager = useContext(SocketContext);
 
@@ -239,7 +239,6 @@ const useAuth = () => {
       }
       socket.off(`company-${companyId}-user`, onCompanyUser);
       socket.off("user-permissions-updated", onPermissionsUpdated);
-      socket.disconnect();
     };
   }, [socketManager, user?.id, user?.companyId, refreshSessionAfterPermissionChange]);
 

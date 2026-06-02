@@ -409,7 +409,7 @@ const LoggedInLayout = ({ children, themeToggle }) => {
 
     const socket = socketManager.getSocket(companyId);
 
-    socket.on(`company-${companyId}-auth`, (data) => {
+    const onAuthConflict = (data) => {
       if (data.user.id === +userId) {
         toastError("Sua conta foi acessada em outro computador.");
         setTimeout(() => {
@@ -417,7 +417,9 @@ const LoggedInLayout = ({ children, themeToggle }) => {
           window.location.reload();
         }, 1000);
       }
-    });
+    };
+
+    socket.on(`company-${companyId}-auth`, onAuthConflict);
 
     socket.emit("userStatus");
     const interval = setInterval(() => {
@@ -425,7 +427,7 @@ const LoggedInLayout = ({ children, themeToggle }) => {
     }, 1000 * 60 * 5);
 
     return () => {
-      socket.disconnect();
+      socket.off(`company-${companyId}-auth`, onAuthConflict);
       clearInterval(interval);
     };
   }, [socketManager, user?.companyId]);

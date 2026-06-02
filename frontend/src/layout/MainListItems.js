@@ -271,14 +271,16 @@ const MainListItems = (props) => {
 
   useEffect(() => {
     const companyId = localStorage.getItem("companyId");
+    if (!companyId) return undefined;
     const socket = socketManager.getSocket(companyId);
-    socket.on(`company-${companyId}-chat`, (data) => {
+    const onChat = (data) => {
       if (data.action === "new-message" || data.action === "update") {
         dispatch({ type: "CHANGE_CHAT", payload: data });
       }
-    });
+    };
+    socket.on(`company-${companyId}-chat`, onChat);
     return () => {
-      socket.disconnect();
+      socket.off(`company-${companyId}-chat`, onChat);
     };
   }, [socketManager]);
 
