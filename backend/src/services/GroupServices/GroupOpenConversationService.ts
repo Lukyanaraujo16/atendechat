@@ -5,6 +5,7 @@ import Whatsapp from "../../models/Whatsapp";
 import CreateOrUpdateContactService from "../ContactServices/CreateOrUpdateContactService";
 import FindOrCreateTicketService from "../TicketServices/FindOrCreateTicketService";
 import ShowWhatsAppService from "../WhatsappService/ShowWhatsAppService";
+import { ensureGroupContactDisplayName } from "../../helpers/groupContactName";
 
 function normalizeGroupJid(groupId: string): string {
   const s = String(groupId || "").trim();
@@ -76,6 +77,8 @@ const GroupOpenConversationService = async ({
       whatsappId,
       profilePicUrl
     });
+  } else {
+    await ensureGroupContactDisplayName(groupContact, { wbot, whatsappId });
   }
 
   const ticket = await FindOrCreateTicketService(

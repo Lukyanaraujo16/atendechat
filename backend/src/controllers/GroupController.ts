@@ -14,6 +14,10 @@ import {
   isGroupVisibilityPrivileged,
   loadAuthorizedQueueIdsByContact
 } from "../helpers/groupVisibility";
+import {
+  contactNeedsGroupNameResolution,
+  ensureGroupContactDisplayName
+} from "../helpers/groupContactName";
 
 const ADMIN_PREVIEW_MAX = 5;
 
@@ -112,17 +116,35 @@ export const list = async (req: Request, res: Response): Promise<Response> => {
     });
     const digitsList = Array.from(new Set(Array.from(digitsByJid.values())));
 
+    const subjectByDigits = new Map<string, string>();
+    rawGroups.forEach((g) => {
+      const digits = digitsByJid.get(String(g.id)) || "";
+      const subject = String(g.name || "").trim();
+      if (digits && subject) subjectByDigits.set(digits, subject);
+    });
+
     const contactRows =
       digitsList.length > 0
         ? await Contact.findAll({
             where: { companyId, isGroup: true, number: digitsList },
-            attributes: ["id", "number", "groupVisible"]
+            attributes: ["id", "name", "number", "groupVisible", "whatsappId", "isGroup"]
           })
         : [];
     const byDigits = new Map<string, { id: number; groupVisible: boolean }>();
-    contactRows.forEach(c => {
-      byDigits.set(String(c.number), { id: c.id, groupVisible: Boolean((c as any).groupVisible) });
-    });
+    for (const c of contactRows) {
+      if (contactNeedsGroupNameResolution(c)) {
+        const subjectHint = subjectByDigits.get(String(c.number));
+        await ensureGroupContactDisplayName(c, {
+          wbot,
+          whatsappId: Number(whatsappId),
+          subjectHint
+        });
+      }
+      byDigits.set(String(c.number), {
+        id: c.id,
+        groupVisible: Boolean((c as any).groupVisible)
+      });
+    }
 
     // Admin/supervisor: garante existência do contato para poder configurar visibilidade.
     if (privileged && digitsList.length > 0) {
@@ -135,8 +157,9 @@ export const list = async (req: Request, res: Response): Promise<Response> => {
         const created = await Promise.all(
           missing.map(async d => {
             try {
+              const displayName = subjectByDigits.get(d) || d;
               const row = await Contact.create({
-                name: d,
+                name: displayName,
                 number: d,
                 isGroup: true,
                 groupVisible: defaultGroupVisible,

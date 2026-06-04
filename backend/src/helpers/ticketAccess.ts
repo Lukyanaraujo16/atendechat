@@ -1,6 +1,8 @@
 import AppError from "../errors/AppError";
+import Contact from "../models/Contact";
 import User from "../models/User";
 import Queue from "../models/Queue";
+import { assertUserCanAccessGroupContact } from "./groupVisibility";
 import {
   assertWhatsappTicketAccess,
   isWhatsappTicketVisibilityPrivileged,
@@ -15,13 +17,43 @@ export type TicketAccessUser = {
   supportMode?: boolean;
 };
 
+export type TicketAccessContact = Pick<
+  Contact,
+  "id" | "isGroup" | "groupVisible" | "companyId"
+>;
+
 export type TicketAccessTicket = {
   userId?: number | string | null;
   queueId?: number | string | null;
   whatsappId?: number | string | null;
   companyId?: number;
   whatsapp?: { ticketVisibility?: string | null } | null;
+  isGroup?: boolean;
+  contact?: TicketAccessContact | null;
+  contactId?: number | string | null;
 };
+
+export function toTicketAccessPayload(ticket: {
+  userId?: number | string | null;
+  queueId?: number | string | null;
+  whatsappId?: number | string | null;
+  companyId?: number;
+  whatsapp?: { ticketVisibility?: string | null } | null;
+  isGroup?: boolean;
+  contact?: TicketAccessContact | null;
+  contactId?: number | string | null;
+}): TicketAccessTicket {
+  return {
+    userId: ticket.userId,
+    queueId: ticket.queueId,
+    whatsappId: ticket.whatsappId,
+    companyId: ticket.companyId,
+    whatsapp: ticket.whatsapp,
+    isGroup: ticket.isGroup === true,
+    contact: ticket.contact ?? null,
+    contactId: ticket.contactId
+  };
+}
 
 export function getUserQueueIdsFromQueues(
   queues: { id: number }[] | undefined
@@ -77,6 +109,26 @@ export async function loadUserQueueIds(
   return getUserQueueIdsFromQueues(userRow?.queues);
 }
 
+async function resolveGroupContactForAccess(
+  ticket: TicketAccessTicket,
+  companyId: number
+): Promise<Contact> {
+  if (ticket.contact?.id) {
+    return ticket.contact as Contact;
+  }
+  const contactId = ticket.contactId;
+  if (contactId == null || contactId === "") {
+    throw new AppError("ERR_NO_PERMISSION", 403);
+  }
+  const row = await Contact.findByPk(Number(contactId), {
+    attributes: ["id", "isGroup", "groupVisible", "companyId"]
+  });
+  if (!row || row.isGroup !== true || row.companyId !== companyId) {
+    throw new AppError("ERR_NO_PERMISSION", 403);
+  }
+  return row;
+}
+
 export async function assertTicketAccess(
   user: TicketAccessUser,
   ticket: TicketAccessTicket,
@@ -88,6 +140,19 @@ export async function assertTicketAccess(
   }
 
   await assertWhatsappTicketAccess(ticket, user, Number(cid));
+
+  const isGroupTicket = ticket.isGroup === true;
+
+  if (isGroupTicket) {
+    const contact = await resolveGroupContactForAccess(ticket, Number(cid));
+    await assertUserCanAccessGroupContact(contact, {
+      id: user.id,
+      profile: user.profile,
+      supportMode: user.supportMode,
+      companyId: Number(cid)
+    });
+    return;
+  }
 
   let visibility = ticket.whatsapp?.ticketVisibility;
   if (visibility == null && ticket.whatsappId != null) {

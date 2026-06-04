@@ -10,6 +10,7 @@ import {
   loadUserQueueIds
 } from "../../helpers/groupVisibility";
 import { canUserAccessTicketByWhatsapp } from "../../helpers/whatsappTicketVisibility";
+import { ensureGroupContactDisplayName } from "../../helpers/groupContactName";
 
 export type GroupsInboxAvailableItem = {
   type: "group";
@@ -125,10 +126,14 @@ const ListGroupsInboxService = async ({
       continue;
     }
 
+    const displayName = await ensureGroupContactDisplayName(contact, {
+      whatsappId: contact.whatsappId ?? whatsapp?.id ?? null
+    });
+
     groups.push({
       type: "group",
       contactId: contact.id,
-      name: contact.name || contact.number || "",
+      name: displayName || contact.number || "",
       number: contact.number,
       whatsappId: contact.whatsappId ?? whatsapp?.id ?? null,
       whatsappName: whatsapp?.name ?? null,
