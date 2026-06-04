@@ -7,6 +7,7 @@ import ShowTicketService from "../TicketServices/ShowTicketService";
 import Queue from "../../models/Queue";
 import { MessageWithParticipantDisplay } from "../../helpers/enrichGroupMessagesDisplay";
 import { enrichGroupMessagesSafe } from "../../helpers/enrichGroupMessagesSafe";
+import { isGroupTicket } from "../../helpers/groupTicketRules";
 
 interface Request {
   ticketId: string;
@@ -56,7 +57,7 @@ const ListMessagesService = async ({
     ticket.userId != null &&
     Number(ticket.userId) === Number(actorUserId);
 
-  if (queues.length > 0 && !isDirectAssignee) {
+  if (queues.length > 0 && !isDirectAssignee && !isGroupTicket(ticket)) {
     options.where["queueId"] = {
       [Op.or]: {
         [Op.in]: queues,

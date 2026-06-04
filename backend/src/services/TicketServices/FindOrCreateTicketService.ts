@@ -70,7 +70,13 @@ const FindOrCreateTicketService = async (
       unreadMessages,
       whatsappId,
       ...(groupContact
-        ? { chatbot: false, useIntegration: false, integrationId: null, promptId: null }
+        ? {
+            isGroup: true,
+            chatbot: false,
+            useIntegration: false,
+            integrationId: null,
+            promptId: null
+          }
         : {})
     });
   }

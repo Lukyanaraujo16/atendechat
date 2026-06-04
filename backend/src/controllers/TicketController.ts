@@ -9,7 +9,10 @@ import CreateTicketService from "../services/TicketServices/CreateTicketService"
 import DeleteTicketService from "../services/TicketServices/DeleteTicketService";
 import BatchDeleteTicketsService from "../services/TicketServices/BatchDeleteTicketsService";
 import { userCanDeleteTicket } from "../helpers/canDeleteTicket";
-import { assertTicketAccess, toTicketAccessPayload } from "../helpers/ticketAccess";
+import {
+  assertUserCanAccessTicketResource,
+  toTicketAccessPayload
+} from "../helpers/ticketAccess";
 import ListTicketsService from "../services/TicketServices/ListTicketsService";
 import attachContactLabelsToTickets from "../helpers/attachContactLabelsToTickets";
 import { parseArrayQueryParam } from "../utils/parseArrayQueryParam";
@@ -241,7 +244,7 @@ export const show = async (req: Request, res: Response): Promise<Response> => {
 
   const ticket = await ShowTicketService(ticketId, companyId);
 
-  await assertTicketAccess(
+  await assertUserCanAccessTicketResource(
     { id, profile, supportMode },
     toTicketAccessPayload(ticket),
     companyId
@@ -292,7 +295,7 @@ export const showFromUUID = async (
     throw new AppError("ERR_NO_PERMISSION", 403);
   }
 
-  await assertTicketAccess(
+  await assertUserCanAccessTicketResource(
     { id, profile, supportMode },
     toTicketAccessPayload(ticket),
     companyId
@@ -344,7 +347,7 @@ export const update = async (
   const { companyId, id, profile, supportMode } = req.user;
 
   const existing = await ShowTicketService(ticketId, companyId);
-  await assertTicketAccess(
+  await assertUserCanAccessTicketResource(
     { id, profile, supportMode },
     toTicketAccessPayload(existing),
     companyId

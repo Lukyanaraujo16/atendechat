@@ -1,9 +1,19 @@
+import { isTruthyGroupFlag } from "./isGroupTicket";
+
 /**
- * Mesma regra do backend (`ticketAccess.ts`):
- * admin/supportMode → tudo; senão userId === eu ou pool sem responsável na minha fila.
+ * Espelha `ticketAccess.ts` no cliente.
+ * Grupos: se o backend devolveu o ticket, confia na regra de groupVisibility já validada no servidor.
+ * 1:1: userId === eu ou pool sem responsável na minha fila.
  */
 export function canAccessTicket(user, ticket) {
   if (!user || !ticket) return false;
+
+  if (
+    isTruthyGroupFlag(ticket.isGroup) ||
+    isTruthyGroupFlag(ticket.contact?.isGroup)
+  ) {
+    return true;
+  }
 
   if (user.profile === "admin" || user.supportMode === true) {
     return true;

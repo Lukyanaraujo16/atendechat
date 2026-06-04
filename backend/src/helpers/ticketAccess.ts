@@ -3,6 +3,7 @@ import Contact from "../models/Contact";
 import User from "../models/User";
 import Queue from "../models/Queue";
 import { assertUserCanAccessGroupContact } from "./groupVisibility";
+import { isGroupTicket } from "./groupTicketRules";
 import {
   assertWhatsappTicketAccess,
   isWhatsappTicketVisibilityPrivileged,
@@ -28,7 +29,7 @@ export type TicketAccessTicket = {
   whatsappId?: number | string | null;
   companyId?: number;
   whatsapp?: { ticketVisibility?: string | null } | null;
-  isGroup?: boolean;
+  isGroup?: boolean | number | string | null;
   contact?: TicketAccessContact | null;
   contactId?: number | string | null;
 };
@@ -39,7 +40,7 @@ export function toTicketAccessPayload(ticket: {
   whatsappId?: number | string | null;
   companyId?: number;
   whatsapp?: { ticketVisibility?: string | null } | null;
-  isGroup?: boolean;
+  isGroup?: boolean | number | string | null;
   contact?: TicketAccessContact | null;
   contactId?: number | string | null;
 }): TicketAccessTicket {
@@ -49,8 +50,7 @@ export function toTicketAccessPayload(ticket: {
     whatsappId: ticket.whatsappId,
     companyId: ticket.companyId,
     whatsapp: ticket.whatsapp,
-    isGroup:
-      ticket.isGroup === true || ticket.contact?.isGroup === true,
+    isGroup: ticket.isGroup,
     contact: ticket.contact ?? null,
     contactId: ticket.contactId
   };
@@ -124,13 +124,18 @@ async function resolveGroupContactForAccess(
   const row = await Contact.findByPk(Number(contactId), {
     attributes: ["id", "isGroup", "groupVisible", "companyId"]
   });
-  if (!row || row.isGroup !== true || row.companyId !== companyId) {
+  if (!row || !isGroupTicket({ contact: row }) || row.companyId !== companyId) {
     throw new AppError("ERR_NO_PERMISSION", 403);
   }
   return row;
 }
 
-export async function assertTicketAccess(
+/**
+ * Único gate de acesso a ticket/recurso ligado ao ticket.
+ * Grupo: whatsappTicketVisibility + groupVisibility (sem userId/queueId).
+ * 1:1: regra de fila/atendente.
+ */
+export async function assertUserCanAccessTicketResource(
   user: TicketAccessUser,
   ticket: TicketAccessTicket,
   companyId?: number
@@ -142,10 +147,7 @@ export async function assertTicketAccess(
 
   await assertWhatsappTicketAccess(ticket, user, Number(cid));
 
-  const isGroupTicket =
-    ticket.isGroup === true || ticket.contact?.isGroup === true;
-
-  if (isGroupTicket) {
+  if (isGroupTicket(ticket)) {
     const contact = await resolveGroupContactForAccess(ticket, Number(cid));
     await assertUserCanAccessGroupContact(contact, {
       id: user.id,
@@ -182,3 +184,6 @@ export async function assertTicketAccess(
     throw new AppError("ERR_NO_PERMISSION", 403);
   }
 }
+
+/** @deprecated Preferir assertUserCanAccessTicketResource */
+export const assertTicketAccess = assertUserCanAccessTicketResource;

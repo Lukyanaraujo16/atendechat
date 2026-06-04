@@ -20,7 +20,10 @@ import DeleteWhatsAppMessage from "../services/WbotServices/DeleteWhatsAppMessag
 import SendWhatsAppMedia from "../services/WbotServices/SendWhatsAppMedia";
 import SendWhatsAppMessage from "../services/WbotServices/SendWhatsAppMessage";
 import CreateMessageService from "../services/MessageServices/CreateMessageService";
-import { assertTicketAccess, toTicketAccessPayload } from "../helpers/ticketAccess";
+import {
+  assertUserCanAccessTicketResource,
+  toTicketAccessPayload
+} from "../helpers/ticketAccess";
 import { logger } from "../utils/logger";
 import {
   getOpenTicketElapsedMs,
@@ -62,7 +65,7 @@ export const index = async (req: Request, res: Response): Promise<Response> => {
 
   try {
     const ticketForAccess = await ShowTicketService(ticketId, companyId);
-    await assertTicketAccess(
+    await assertUserCanAccessTicketResource(
       { id, profile, supportMode },
       toTicketAccessPayload(ticketForAccess),
       companyId
@@ -133,7 +136,7 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
 
   const ticket = await ShowTicketService(ticketId, companyId);
 
-  await assertTicketAccess(
+  await assertUserCanAccessTicketResource(
     { id, profile, supportMode },
     toTicketAccessPayload(ticket),
     companyId

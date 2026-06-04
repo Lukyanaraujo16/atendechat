@@ -1,10 +1,13 @@
 import Ticket from "../../models/Ticket";
+import Contact from "../../models/Contact";
 import PinnedTicket from "../../models/PinnedTicket";
 import AppError from "../../errors/AppError";
 import {
-  assertTicketAccess,
+  assertUserCanAccessTicketResource,
+  toTicketAccessPayload,
   TicketAccessUser
 } from "../../helpers/ticketAccess";
+import { isGroupTicket } from "../../helpers/groupTicketRules";
 
 const MAX_PINNED_TICKETS = 3;
 
@@ -22,18 +25,30 @@ const PinTicketService = async ({
   user
 }: Request): Promise<PinnedTicket> => {
   const ticket = await Ticket.findOne({
-    where: { id: ticketId, companyId }
+    where: { id: ticketId, companyId },
+    include: [
+      {
+        model: Contact,
+        as: "contact",
+        attributes: ["id", "isGroup", "groupVisible", "companyId"],
+        required: false
+      }
+    ]
   });
 
   if (!ticket) {
     throw new AppError("ERR_NO_TICKET_FOUND", 404);
   }
 
-  if (ticket.status !== "open") {
+  if (ticket.status !== "open" && !isGroupTicket(ticket)) {
     throw new AppError("ERR_PIN_ONLY_OPEN_TICKETS", 400);
   }
 
-  await assertTicketAccess(user, ticket);
+  await assertUserCanAccessTicketResource(
+    user,
+    toTicketAccessPayload(ticket),
+    companyId
+  );
 
   const existing = await PinnedTicket.findOne({
     where: { userId, companyId, ticketId }

@@ -1,15 +1,25 @@
 import AppError from "../errors/AppError";
 import Ticket from "../models/Ticket";
-import { isGroupVisibilityPrivileged, GroupAccessActor } from "./groupVisibility";
+import {
+  isGroupVisibilityPrivileged,
+  GroupAccessActor
+} from "./groupVisibility";
+
+/** Sequelize/JSON podem devolver boolean ou 0/1. */
+export function isTruthyGroupFlag(value: unknown): boolean {
+  return value === true || value === 1 || value === "1" || value === "true";
+}
 
 export function isGroupTicket(
   ticket: {
-    isGroup?: boolean;
-    contact?: { isGroup?: boolean } | null;
+    isGroup?: boolean | number | string | null;
+    contact?: { isGroup?: boolean | number | string | null } | null;
   } | null | undefined
 ): boolean {
   if (!ticket) return false;
-  return ticket.isGroup === true || ticket.contact?.isGroup === true;
+  return (
+    isTruthyGroupFlag(ticket.isGroup) || isTruthyGroupFlag(ticket.contact?.isGroup)
+  );
 }
 
 /**
@@ -30,12 +40,14 @@ export async function ensureGroupTicketPermanentOpen(
   await ticket.update({
     status: "open",
     userId: null,
-    queueId: null
+    queueId: null,
+    isGroup: true
   });
 
   ticket.status = "open";
   ticket.userId = null as any;
   ticket.queueId = null as any;
+  (ticket as any).isGroup = true;
 
   return ticket;
 }
