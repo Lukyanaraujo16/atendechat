@@ -207,6 +207,8 @@ export async function probeGroupContactAccess(
       assertUserCanAccessGroupContact: "allowed",
       groupVisibilityPrivileged: privileged,
       contactCompanyId: contact.companyId,
+      contactCompanyIdOnModel: contact.companyId,
+      actorCompanyId: companyId,
       contactIsGroup: contact.isGroup,
       contactGroupVisible: contact.groupVisible
     };
@@ -215,8 +217,14 @@ export async function probeGroupContactAccess(
       assertUserCanAccessGroupContact: "denied",
       groupVisibilityPrivileged: privileged,
       contactCompanyId: contact.companyId,
+      contactCompanyIdOnModel: contact.companyId,
+      actorCompanyId: companyId,
       contactIsGroup: contact.isGroup,
       contactGroupVisible: contact.groupVisible,
+      denyHint:
+        privileged && (contact.companyId == null || contact.companyId === undefined)
+          ? "privileged_should_allow_after_fix"
+          : undefined,
       ...formatThrownError(error)
     };
   }

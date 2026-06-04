@@ -12,12 +12,32 @@ export type GroupAccessActor = {
   companyId: number;
 };
 
+/** JWT/JSON podem enviar supportMode como boolean, 1 ou "true". */
+export function isTruthySupportMode(value: unknown): boolean {
+  return value === true || value === 1 || value === "1" || value === "true";
+}
+
 export function isGroupVisibilityPrivileged(actor: GroupAccessActor): boolean {
   return (
     actor.profile === "admin" ||
     actor.profile === "supervisor" ||
-    actor.supportMode === true
+    isTruthySupportMode(actor.supportMode as unknown)
   );
+}
+
+async function resolveContactCompanyId(contact: Contact): Promise<number | null> {
+  const raw = contact.companyId;
+  if (raw != null && Number.isFinite(Number(raw))) {
+    return Number(raw);
+  }
+  if (!contact.id) return null;
+  const row = await Contact.findByPk(contact.id, {
+    attributes: ["companyId"]
+  });
+  if (row?.companyId == null || !Number.isFinite(Number(row.companyId))) {
+    return null;
+  }
+  return Number(row.companyId);
 }
 
 export async function loadUserQueueIds(userId: string | number): Promise<number[]> {
@@ -95,10 +115,19 @@ export async function assertUserCanAccessGroupContact(
   actor: GroupAccessActor
 ): Promise<void> {
   if (!contact.isGroup) return;
-  if (Number(contact.companyId) !== Number(actor.companyId)) {
+
+  /** Admin/supervisor/suporte: sem filtro de setor (companyId do contact pode vir ausente no include). */
+  if (isGroupVisibilityPrivileged(actor)) {
+    return;
+  }
+
+  const contactCompanyId = await resolveContactCompanyId(contact);
+  if (
+    contactCompanyId == null ||
+    Number(contactCompanyId) !== Number(actor.companyId)
+  ) {
     throw new AppError("ERR_NO_PERMISSION", 403);
   }
-  if (isGroupVisibilityPrivileged(actor)) return;
 
   const authorized = await loadAuthorizedQueueIdsByContact(
     [contact.id],

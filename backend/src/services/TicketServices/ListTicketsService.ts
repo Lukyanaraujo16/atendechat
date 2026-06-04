@@ -128,7 +128,8 @@ const ListTicketsService = async ({
         "email",
         "profilePicUrl",
         "isGroup",
-        "groupVisible"
+        "groupVisible",
+        "companyId"
       ],
       ...(privileged
         ? {}
