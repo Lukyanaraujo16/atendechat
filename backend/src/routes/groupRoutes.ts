@@ -13,6 +13,8 @@ groupRoutes.post("/groups/leave", isAuth,
   requireEffectiveModule("useGroups"), GroupController.leave);
 groupRoutes.post("/groups/open-conversation", isAuth,
   requireEffectiveModule("useGroups"), GroupController.openConversation);
+groupRoutes.get("/groups/inbox", isAuth,
+  requireEffectiveModule("useGroups"), GroupController.inbox);
 groupRoutes.get("/groups/:whatsappId", isAuth,
   requireEffectiveModule("useGroups"), GroupController.list);
 

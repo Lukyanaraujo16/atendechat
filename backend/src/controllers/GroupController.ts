@@ -5,6 +5,7 @@ import { getWbot } from "../libs/wbot";
 import Contact from "../models/Contact";
 import Whatsapp from "../models/Whatsapp";
 import GroupOpenConversationService from "../services/GroupServices/GroupOpenConversationService";
+import ListGroupsInboxService from "../services/GroupServices/ListGroupsInboxService";
 import ShowWhatsAppService from "../services/WhatsappService/ShowWhatsAppService";
 import { logger } from "../utils/logger";
 import {
@@ -79,6 +80,14 @@ function mapGroupListEntry(id: string, meta: any) {
     adminPreview: buildAdminPreview(participants)
   };
 }
+
+/** Grupos autorizados sem ticket open/pending (aba Atendimento → Grupos). */
+export const inbox = async (req: Request, res: Response): Promise<Response> => {
+  const { companyId, profile, supportMode } = req.user;
+  const actor = { id: req.user.id, profile, supportMode, companyId };
+  const data = await ListGroupsInboxService({ companyId, actor });
+  return res.status(200).json(data);
+};
 
 export const list = async (req: Request, res: Response): Promise<Response> => {
   const { whatsappId } = req.params;

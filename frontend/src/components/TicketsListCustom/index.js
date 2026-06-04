@@ -17,6 +17,7 @@ import { canDeleteTickets } from "../../utils/canDeleteTickets";
  * Preferir este componente a `TicketsList` (legado).
  */
 import TicketListItem from "../TicketListItemCustom";
+import GroupInboxListItem from "../GroupInboxListItem";
 import TicketsListSkeleton from "../TicketsListSkeleton";
 
 import useTickets from "../../hooks/useTickets";
@@ -218,6 +219,8 @@ const TicketsListCustom = (props) => {
   const { ticketId: routeTicketId } = useParams();
   const [pageNumber, setPageNumber] = useState(1);
   const [listReloadToken, setListReloadToken] = useState(0);
+  const [availableGroups, setAvailableGroups] = useState([]);
+  const [loadingAvailableGroups, setLoadingAvailableGroups] = useState(false);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
@@ -242,6 +245,32 @@ const TicketsListCustom = (props) => {
     setPageNumber(1);
     setListReloadToken((t) => t + 1);
   }, []);
+
+  const fetchAvailableGroups = useCallback(async () => {
+    if (!groupsOnly) return;
+    setLoadingAvailableGroups(true);
+    try {
+      const { data } = await api.get("/groups/inbox");
+      setAvailableGroups(Array.isArray(data?.groups) ? data.groups : []);
+    } catch (err) {
+      toastError(err);
+      setAvailableGroups([]);
+    } finally {
+      setLoadingAvailableGroups(false);
+    }
+  }, [groupsOnly]);
+
+  useEffect(() => {
+    if (!groupsOnly || isControlled) return;
+    fetchAvailableGroups();
+  }, [groupsOnly, isControlled, listReloadToken, fetchAvailableGroups]);
+
+  const handleAvailableGroupOpened = useCallback((contactId) => {
+    setAvailableGroups((prev) =>
+      (Array.isArray(prev) ? prev : []).filter((g) => g.contactId !== contactId)
+    );
+    reloadUncontrolledList();
+  }, [reloadUncontrolledList]);
 
   const { tickets, hasMore, loading } = useTickets({
     enabled: !isControlled,
@@ -309,21 +338,51 @@ const TicketsListCustom = (props) => {
     }
     return rawDisplayTickets;
   }, [isControlled, rawDisplayTickets, searchParam]);
+
+  const ticketContactIds = useMemo(() => {
+    const ids = new Set();
+    (Array.isArray(displayTickets) ? displayTickets : []).forEach((t) => {
+      const cid = t.contactId ?? t.contact?.id;
+      if (cid != null) ids.add(Number(cid));
+    });
+    return ids;
+  }, [displayTickets]);
+
+  const displayAvailableGroups = useMemo(() => {
+    if (!groupsOnly) return [];
+    const q = (searchParam || "").trim().toLowerCase();
+    return (Array.isArray(availableGroups) ? availableGroups : []).filter((g) => {
+      if (ticketContactIds.has(Number(g.contactId))) return false;
+      if (!q) return true;
+      return (
+        (g.name || "").toLowerCase().includes(q) ||
+        String(g.number || "").includes(q) ||
+        (g.whatsappName || "").toLowerCase().includes(q)
+      );
+    });
+  }, [groupsOnly, availableGroups, searchParam, ticketContactIds]);
   const controlledTabCountNum = Number(controlledTabCount) || 0;
   /**
    * Inbox controlada: skeleton só quando o contador indica tickets mas a lista
    * ainda não chegou. Aba vazia (count = 0) mantém empty state estável, mesmo
    * durante refetch em segundo plano.
    */
+  const hasGroupListContent =
+    displayTickets.length > 0 ||
+    (groupsOnly && displayAvailableGroups.length > 0);
+
   const displayLoading = isControlled
     ? Boolean(
         controlledLoading &&
-        displayTickets.length === 0 &&
+        !hasGroupListContent &&
         controlledTabCountNum > 0
       )
-    : Boolean(loading && displayTickets.length === 0);
+    : Boolean(
+        (loading || (groupsOnly && loadingAvailableGroups)) && !hasGroupListContent
+      );
+
   const showEmptyState =
-    displayTickets.length === 0 &&
+    !hasGroupListContent &&
     !displayLoading &&
     !(isControlled && controlledTabCountNum > 0);
   const displayHasMore = isControlled ? controlledHasMore : hasMore;
@@ -420,6 +479,9 @@ const TicketsListCustom = (props) => {
             type: "UPDATE_TICKET",
             payload: data.ticket,
           });
+          if (groupsOnly && data.ticket.isGroup) {
+            fetchAvailableGroups();
+          }
         } else if (
           (groupsOnly && data.ticket.isGroup) ||
           (!groupsOnly && !data.ticket.isGroup)
@@ -431,6 +493,7 @@ const TicketsListCustom = (props) => {
 
       if (data.action === "delete") {
         dispatch({ type: "DELETE_TICKET", payload: data.ticketId });
+        if (groupsOnly) fetchAvailableGroups();
       }
     });
 
@@ -469,6 +532,9 @@ const TicketsListCustom = (props) => {
             type: "UPDATE_TICKET_UNREAD_MESSAGES",
             payload: data.ticket,
           });
+          if (groupsOnly && data.ticket.isGroup) {
+            fetchAvailableGroups();
+          }
         } else if (
           (groupsOnly && data.ticket.isGroup) ||
           (!groupsOnly && !data.ticket.isGroup)
@@ -488,7 +554,10 @@ const TicketsListCustom = (props) => {
     });
 
     return () => {
-      socket.disconnect();
+      socket.off("ready");
+      socket.off(`company-${companyId}-ticket`);
+      socket.off(`company-${companyId}-appMessage`);
+      socket.off(`company-${companyId}-contact`);
     };
   }, [
     isControlled,
@@ -506,6 +575,7 @@ const TicketsListCustom = (props) => {
     groupsOnly,
     user?.allTicket,
     safeQueues,
+    fetchAvailableGroups,
   ]);
 
   useEffect(() => {
@@ -680,9 +750,21 @@ const TicketsListCustom = (props) => {
           {showEmptyState ? (
             <Box className={classes.emptyStateWrap}>
               <AppEmptyState
-                title={i18n.t("ticketsList.emptyStateTitle")}
-                description={i18n.t("ticketsList.emptyStateMessage")}
-                hint={i18n.t("ticketsList.emptyStateHint")}
+                title={
+                  groupsOnly
+                    ? i18n.t("groups.inbox.emptyTitle")
+                    : i18n.t("ticketsList.emptyStateTitle")
+                }
+                description={
+                  groupsOnly
+                    ? i18n.t("groups.inbox.emptyDescription")
+                    : i18n.t("ticketsList.emptyStateMessage")
+                }
+                hint={
+                  groupsOnly
+                    ? i18n.t("groups.inbox.emptyHint")
+                    : i18n.t("ticketsList.emptyStateHint")
+                }
               />
             </Box>
           ) : (
@@ -690,7 +772,7 @@ const TicketsListCustom = (props) => {
               {displayTickets.map((ticket) => (
                 <TicketListItem
                   ticket={ticket}
-                  key={ticket.id}
+                  key={`ticket-${ticket.id}`}
                   compact={compact}
                   selected={isRowSelected(ticket)}
                   bulkSelectMode={bulkActiveOnCards}
@@ -704,6 +786,7 @@ const TicketsListCustom = (props) => {
                       ? (ticketId) => {
                           dispatch({ type: "DELETE_TICKET", payload: ticketId });
                           reloadUncontrolledList();
+                          if (groupsOnly) fetchAvailableGroups();
                           if (typeof inbox?.refreshTabCounts === "function") {
                             inbox.refreshTabCounts();
                           }
@@ -712,9 +795,17 @@ const TicketsListCustom = (props) => {
                   }
                 />
               ))}
+              {groupsOnly &&
+                displayAvailableGroups.map((g) => (
+                  <GroupInboxListItem
+                    key={`group-${g.contactId}`}
+                    group={g}
+                    onOpened={handleAvailableGroupOpened}
+                  />
+                ))}
             </>
           )}
-          {displayLoading && displayTickets.length === 0 && (
+          {displayLoading && !hasGroupListContent && (
             <TicketsListSkeleton />
           )}
         </List>

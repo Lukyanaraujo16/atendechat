@@ -87,6 +87,18 @@ const messages = {
           allSectors: "Todos os setores",
           toastSaved: "Setores do grupo atualizados.",
         },
+        inbox: {
+          chipGroup: "Grupo",
+          chipNoConversation: "Sem conversa",
+          chipStart: "Iniciar",
+          noConversationYet: "Sem conversa ainda",
+          openingConversation: "Abrindo conversa do grupo…",
+          emptyTitle: "Nenhum grupo disponível",
+          emptyDescription:
+            "Não há conversas de grupo nem grupos liberados para seus setores.",
+          emptyHint:
+            "Peça ao administrador para liberar grupos em Gestão de Grupos ou aguarde novas mensagens.",
+        },
       },
       crm: {
         common: {

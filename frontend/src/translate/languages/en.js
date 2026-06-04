@@ -86,6 +86,18 @@ const messages = {
 					allSectors: "All queues",
 					toastSaved: "Group queues updated.",
 				},
+				inbox: {
+					chipGroup: "Group",
+					chipNoConversation: "No conversation",
+					chipStart: "Start",
+					noConversationYet: "No conversation yet",
+					openingConversation: "Opening group conversation…",
+					emptyTitle: "No groups available",
+					emptyDescription:
+						"There are no group conversations or groups authorized for your queues.",
+					emptyHint:
+						"Ask an administrator to enable groups in Group Management or wait for new messages.",
+				},
 			},
 			crm: {
 				common: { cancel: "Cancel", save: "Save" },
