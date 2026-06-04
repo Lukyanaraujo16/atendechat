@@ -3,16 +3,18 @@ import { useHistory } from "react-router-dom";
 
 import Button from "@material-ui/core/Button";
 import TextField from "@material-ui/core/TextField";
-import Dialog from "@material-ui/core/Dialog";
 import Select from "@material-ui/core/Select";
 import FormControl from "@material-ui/core/FormControl";
 import InputLabel from "@material-ui/core/InputLabel";
 import MenuItem from "@material-ui/core/MenuItem";
 import { Grid, ListItemText, Typography, makeStyles } from "@material-ui/core";
 
-import DialogActions from "@material-ui/core/DialogActions";
-import DialogContent from "@material-ui/core/DialogContent";
-import DialogTitle from "@material-ui/core/DialogTitle";
+import {
+  AppDialog,
+  AppDialogTitle,
+  AppDialogContent,
+  AppDialogActions,
+} from "../../ui";
 import Autocomplete, {
   createFilterOptions,
 } from "@material-ui/lab/Autocomplete";
@@ -30,6 +32,11 @@ import { canAccessTicket } from "../../utils/canAccessTicket";
 const useStyles = makeStyles((theme) => ({
   maxWidth: {
     width: "100%",
+  },
+  autocomplete: {
+    width: "100%",
+    maxWidth: "100%",
+    marginBottom: theme.spacing(2.5),
   },
 }));
 
@@ -265,10 +272,11 @@ const TransferTicketModalCustom = ({ modalOpen, onClose, ticketid }) => {
   };
 
   return (
-    <Dialog
+    <AppDialog
       open={modalOpen}
       onClose={handleClose}
-      maxWidth="lg"
+      maxWidth="sm"
+      fullWidth
       scroll="paper"
       disableEnforceFocus
       disableAutoFocus
@@ -276,16 +284,15 @@ const TransferTicketModalCustom = ({ modalOpen, onClose, ticketid }) => {
       keepMounted
     >
       <form onSubmit={handleSaveTicket}>
-        <DialogTitle id="form-dialog-title">
+        <AppDialogTitle id="form-dialog-title">
           {i18n.t("transferTicketModal.title")}
-        </DialogTitle>
-        <DialogContent
-          dividers
+        </AppDialogTitle>
+        <AppDialogContent
           onMouseDown={stopDialogEvent}
           onClick={stopDialogEvent}
         >
           <Autocomplete
-            style={{ width: 300, marginBottom: 20 }}
+            className={classes.autocomplete}
             value={selectedUser}
             getOptionLabel={(option) =>
               typeof option === "string" ? option : `${option.name || ""}`
@@ -387,8 +394,8 @@ const TransferTicketModalCustom = ({ modalOpen, onClose, ticketid }) => {
               </Select>
             </Grid>
           </Grid>
-        </DialogContent>
-        <DialogActions>
+        </AppDialogContent>
+        <AppDialogActions stickyFooter>
           <Button
             onClick={handleClose}
             color="secondary"
@@ -405,9 +412,9 @@ const TransferTicketModalCustom = ({ modalOpen, onClose, ticketid }) => {
           >
             {i18n.t("transferTicketModal.buttons.ok")}
           </ButtonWithSpinner>
-        </DialogActions>
+        </AppDialogActions>
       </form>
-    </Dialog>
+    </AppDialog>
   );
 };
 

@@ -1,108 +1,56 @@
-import React, { useState, useEffect, useContext } from "react";
+import React from "react";
 import { useParams } from "react-router-dom";
+import Box from "@material-ui/core/Box";
 import { makeStyles } from "@material-ui/core/styles";
-import Button from '@material-ui/core/Button';
-import Box from '@material-ui/core/Box';
-import BottomNavigation from '@material-ui/core/BottomNavigation';
-import BottomNavigationAction from '@material-ui/core/BottomNavigationAction';
-import QuestionAnswerIcon from '@material-ui/icons/QuestionAnswer';
-import ChatIcon from '@material-ui/icons/Chat';
 
 import TicketsManagerTabs from "../../components/TicketsManagerTabs/";
 import Ticket from "../../components/Ticket/";
-import TicketAdvancedLayout from "../../components/TicketAdvancedLayout";
-import { useBranding } from "../../context/Branding/BrandingContext";
-import { TicketsContext } from "../../context/Tickets/TicketsContext";
 
-import { i18n } from "../../translate/i18n";
-
-const useStyles = makeStyles(theme => ({
-    header: {
-    },
-    content: {
-        overflow: "auto"
-    },
-    placeholderContainer: {
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        height: "100%",
-		backgroundColor: theme.palette.boxticket, //DARK MODE PLW DESIGN//
-    },
-    placeholderItem: {
-    }
+const useStyles = makeStyles((theme) => ({
+  inboxRoot: {
+    display: "flex",
+    flexDirection: "column",
+    flex: 1,
+    minHeight: 0,
+    height: "100%",
+    width: "100%",
+    maxWidth: "100%",
+    overflow: "hidden",
+  },
+  conversationRoot: {
+    display: "flex",
+    flexDirection: "column",
+    flex: 1,
+    minHeight: 0,
+    height: "100%",
+    width: "100%",
+    maxWidth: "100%",
+    overflow: "hidden",
+    backgroundColor: theme.palette.background.default,
+  },
 }));
 
-const TicketAdvanced = (props) => {
-	const classes = useStyles();
-	const { ticketId } = useParams();
-	const [option, setOption] = useState(0);
-    const { currentTicket, setCurrentTicket } = useContext(TicketsContext);
-	const { branding, resolveMenuLogo } = useBranding();
+/**
+ * Mobile (< md): lista e conversa em rotas separadas — estilo app/PWA.
+ * /tickets → só inbox; /tickets/:uuid → conversa fullscreen com voltar.
+ */
+const TicketAdvanced = () => {
+  const classes = useStyles();
+  const { ticketId } = useParams();
 
-    useEffect(() => {
-        if(currentTicket.id !== null) {
-            setCurrentTicket({ id: currentTicket.id, code: '#open' })
-        }
-        if (!ticketId) {
-            setOption(1)
-        }
-        return () => {
-            setCurrentTicket({ id: null, code: null })
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [])
+  if (ticketId) {
+    return (
+      <Box className={classes.conversationRoot} data-tickets-mobile="conversation">
+        <Ticket />
+      </Box>
+    );
+  }
 
-    useEffect(() => {
-        if (currentTicket.id !== null) {
-            setOption(0)
-        }
-    }, [currentTicket])
-
-	const renderPlaceholder = () => {
-		return <Box className={classes.placeholderContainer}>
-			<div>
-			<center><img style={{ margin: "0 auto", width: "70%" }} src={resolveMenuLogo()} alt={branding.systemName || ""} /></center>
-			</div>
-			<br />
-            <Button onClick={() => setOption(1)} variant="contained" color="primary">
-                {i18n.t("ticketAdvanced.selectTicket")}
-            </Button>
-        </Box>
-	}
-
-	const renderMessageContext = () => {
-		if (ticketId) {
-			return <Ticket />
-		}
-		return renderPlaceholder()
-	}
-
-	const renderTicketsManagerTabs = () => {
-		return <TicketsManagerTabs />
-	}
-
-	return (
-        <TicketAdvancedLayout>
-            <Box className={classes.header}>
-                <BottomNavigation
-                    value={option}
-                    onChange={(event, newValue) => {
-                        setOption(newValue);
-                    }}
-                    showLabels
-                    className={classes.root}
-                >
-                    <BottomNavigationAction label={i18n.t("ticketAdvanced.ticketNav")} icon={<ChatIcon />} />
-                    <BottomNavigationAction label={i18n.t("ticketAdvanced.attendanceNav")} icon={<QuestionAnswerIcon />} />
-                </BottomNavigation>
-            </Box>
-            <Box className={classes.content}>
-                { option === 0 ? renderMessageContext() : renderTicketsManagerTabs() }
-            </Box>
-        </TicketAdvancedLayout>
-	);
+  return (
+    <Box className={classes.inboxRoot} data-tickets-mobile="inbox">
+      <TicketsManagerTabs />
+    </Box>
+  );
 };
 
 export default TicketAdvanced;

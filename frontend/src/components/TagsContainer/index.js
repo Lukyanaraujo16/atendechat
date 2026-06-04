@@ -9,7 +9,15 @@ import {
   Typography,
   Badge,
   Tooltip,
+  Button,
 } from "@material-ui/core";
+import {
+  AppDialog,
+  AppDialogTitle,
+  AppDialogContent,
+  AppDialogActions,
+} from "../../ui";
+import useIsMobile from "../../hooks/useIsMobile";
 import { makeStyles, alpha } from "@material-ui/core/styles";
 import Autocomplete from "@material-ui/lab/Autocomplete";
 import LocalOfferOutlinedIcon from "@material-ui/icons/LocalOfferOutlined";
@@ -188,20 +196,36 @@ export function TicketTagsEditor({ ticket, autoFocus }) {
   );
 }
 
-/** Ícone no header que abre popover para gerenciar tags do ticket. */
+/** Ícone no header que abre popover (desktop) ou dialog fullscreen (mobile) para tags. */
 export function TicketTagsButton({ ticket, disabled, className }) {
   const classes = usePopoverStyles();
+  const isMobile = useIsMobile();
   const [anchorEl, setAnchorEl] = useState(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const tagCount = Array.isArray(ticket?.tags) ? ticket.tags.length : 0;
 
   if (!ticket?.id) return null;
 
-  const open = Boolean(anchorEl);
+  const popoverOpen = Boolean(anchorEl);
+  const open = isMobile ? dialogOpen : popoverOpen;
+
   const handleOpen = (e) => {
     e.stopPropagation();
-    setAnchorEl(e.currentTarget);
+    if (isMobile) {
+      setDialogOpen(true);
+    } else {
+      setAnchorEl(e.currentTarget);
+    }
   };
-  const handleClose = () => setAnchorEl(null);
+
+  const handleClose = () => {
+    setAnchorEl(null);
+    setDialogOpen(false);
+  };
+
+  const editor = (
+    <TicketTagsEditor ticket={ticket} autoFocus={open} />
+  );
 
   return (
     <>
@@ -227,22 +251,40 @@ export function TicketTagsButton({ ticket, disabled, className }) {
           </IconButton>
         </span>
       </Tooltip>
-      <Popover
-        open={open}
-        anchorEl={anchorEl}
-        onClose={handleClose}
-        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-        transformOrigin={{ vertical: "top", horizontal: "right" }}
-        PaperProps={{ className: classes.popoverPaper }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <Box>
-          <Typography className={classes.popoverTitle} component="p">
+      {isMobile ? (
+        <AppDialog
+          open={dialogOpen}
+          onClose={handleClose}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <AppDialogTitle>
             {i18n.t("messagesList.header.buttons.manageTags")}
-          </Typography>
-          <TicketTagsEditor ticket={ticket} autoFocus={open} />
-        </Box>
-      </Popover>
+          </AppDialogTitle>
+          <AppDialogContent>{editor}</AppDialogContent>
+          <AppDialogActions stickyFooter>
+            <Button color="primary" variant="contained" onClick={handleClose}>
+              {i18n.t("confirmationModal.buttons.confirm")}
+            </Button>
+          </AppDialogActions>
+        </AppDialog>
+      ) : (
+        <Popover
+          open={popoverOpen}
+          anchorEl={anchorEl}
+          onClose={handleClose}
+          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+          transformOrigin={{ vertical: "top", horizontal: "right" }}
+          PaperProps={{ className: classes.popoverPaper }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Box>
+            <Typography className={classes.popoverTitle} component="p">
+              {i18n.t("messagesList.header.buttons.manageTags")}
+            </Typography>
+            {editor}
+          </Box>
+        </Popover>
+      )}
     </>
   );
 }

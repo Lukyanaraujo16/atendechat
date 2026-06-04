@@ -8,8 +8,6 @@ import {
   Grid,
   makeStyles,
   Paper,
-  Tab,
-  Tabs,
   TextField,
   Typography,
 } from "@material-ui/core";
@@ -27,8 +25,8 @@ import { has, isObject } from "lodash";
 
 import { AuthContext } from "../../context/Auth/AuthContext";
 import { useGlobalNotifications } from "../../context/GlobalNotifications/GlobalNotificationsContext";
-import withWidth, { isWidthUp } from "@material-ui/core/withWidth";
 import { i18n } from "../../translate/i18n";
+import useIsMobile from "../../hooks/useIsMobile";
 import toastError from "../../errors/toastError";
 import {
   AppPrimaryButton,
@@ -48,10 +46,37 @@ const useStyles = makeStyles((theme) => ({
     flexDirection: "column",
     position: "relative",
     flex: 1,
+    minHeight: 0,
     padding: theme.spacing(2),
     height: `calc(100% - 48px)`,
     overflow: "hidden",
     backgroundColor: theme.palette.type === "light" ? theme.palette.grey[100] : theme.palette.background.default,
+    [theme.breakpoints.down("md")]: {
+      padding: 0,
+      height: "100%",
+      maxWidth: "100%",
+    },
+  },
+  mobileInboxRoot: {
+    display: "flex",
+    flexDirection: "column",
+    flex: 1,
+    minHeight: 0,
+    height: "100%",
+    width: "100%",
+    maxWidth: "100%",
+    overflow: "hidden",
+    backgroundColor: theme.palette.background.paper,
+  },
+  mobileConversationRoot: {
+    display: "flex",
+    flexDirection: "column",
+    flex: 1,
+    minHeight: 0,
+    height: "100%",
+    width: "100%",
+    maxWidth: "100%",
+    overflow: "hidden",
   },
   gridContainer: {
     flex: 1,
@@ -68,6 +93,9 @@ const useStyles = makeStyles((theme) => ({
     flexDirection: "column",
     overflow: "hidden",
     borderRight: `1px solid ${theme.palette.divider}`,
+    [theme.breakpoints.down("md")]: {
+      borderRight: "none",
+    },
   },
   gridItemRight: {
     height: "100%",
@@ -121,10 +149,9 @@ const useStyles = makeStyles((theme) => ({
     bottom: 16,
     right: 16,
     zIndex: 10,
-  },
-  gridItemTab: {
-    height: "92%",
-    width: "100%",
+    [theme.breakpoints.down("md")]: {
+      bottom: `calc(16px + env(safe-area-inset-bottom, 0px))`,
+    },
   },
 }));
 
@@ -223,10 +250,11 @@ export function ChatModal({
   );
 }
 
-function Chat(props) {
+function Chat() {
   const classes = useStyles();
   const { user } = useContext(AuthContext);
   const history = useHistory();
+  const isMobile = useIsMobile();
 
   const [showDialog, setShowDialog] = useState(false);
   const [dialogType, setDialogType] = useState("new");
@@ -238,7 +266,6 @@ function Chat(props) {
   const [messagesPage, setMessagesPage] = useState(1);
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [chatsLoading, setChatsLoading] = useState(true);
-  const [tab, setTab] = useState(0);
   const [searchChat, setSearchChat] = useState("");
   const isMounted = useRef(true);
   const scrollToBottomRef = useRef();
@@ -291,8 +318,8 @@ function Chat(props) {
         setChatsPageInfo(data);
 
         if (id && records.length) {
-          const chat = records.find((r) => r.uuid === id);
-          if (chat) selectChat(chat);
+          const chat = records.find((r) => r.uuid === id || String(r.id) === String(id));
+          if (chat) selectChat(chat, { skipNavigation: true });
         }
       });
     }
@@ -430,15 +457,14 @@ function Chat(props) {
     };
   }, [socketManager, currentChat?.id]);
 
-  const selectChat = (chat) => {
+  const selectChat = (chat, { skipNavigation = false } = {}) => {
     if (!chat) return;
     markAsReadByChat({ chatId: chat.id, chatUuid: chat.uuid });
     setMessages([]);
     setMessagesPage(1);
     setCurrentChat(chat);
-    setTab(1);
     const pathId = chat.uuid || chat.id;
-    if (pathId) {
+    if (!skipNavigation && pathId) {
       history.push(`/chats/${pathId}`);
     }
   };
@@ -525,236 +551,163 @@ function Chat(props) {
     }
   };
 
-  const renderGrid = () => {
-    const hasChatSelected = isObject(currentChat) && has(currentChat, "id");
-    const searchTrim = (searchChat || "").trim();
-    const hasSearch = searchTrim.length > 0;
-    return (
-      <Grid className={classes.gridContainer} container>
-        <Grid className={classes.gridItem} md={4} item>
-          <div className={classes.leftPane}>
-            <Box className={classes.paneHeader}>
-              <Typography
-                variant="h6"
-                color="primary"
-                component="h1"
-                className={classes.paneTitle}
-              >
-                {i18n.t("chat.page.title")}
-              </Typography>
-              <Typography variant="body2" color="textSecondary" component="p">
-                {i18n.t("chat.page.subtitle")}
-              </Typography>
-            </Box>
-            <Box className={classes.searchBar}>
-              <AppActionBar className={classes.filtersBar}>
-                <TextField
-                  className={classes.searchField}
-                  placeholder={i18n.t("chat.page.searchPlaceholder")}
-                  value={searchChat}
-                  onChange={(e) => setSearchChat(e.target.value)}
-                  variant="outlined"
-                  size="small"
-                  fullWidth
-                  inputProps={{ "aria-label": i18n.t("chat.page.searchPlaceholder") }}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <SearchIcon color="action" fontSize="small" />
-                      </InputAdornment>
-                    ),
-                  }}
-                />
-              </AppActionBar>
-            </Box>
-            <div className={classes.listWrap}>
-              {chatsLoading ? (
-                <AppLoadingState message={i18n.t("chat.page.loadingConversations")} />
-              ) : filteredChats.length === 0 ? (
-                <AppEmptyState
-                  icon={PeopleIcon}
-                  title={
-                    hasSearch && chats.length > 0
-                      ? i18n.t("chat.page.emptyNoSearchTitle")
-                      : i18n.t("chat.page.emptyNoConversationsTitle")
-                  }
-                  description={
-                    hasSearch && chats.length > 0
-                      ? i18n.t("chat.page.emptyNoSearchSub")
-                      : i18n.t("chat.page.emptyNoConversationsSub")
-                  }
-                >
-                  {!(hasSearch && chats.length > 0) && (
-                    <AppPrimaryButton
-                      startIcon={<AddIcon />}
-                      onClick={() => {
-                        setDialogType("new");
-                        setShowDialog(true);
-                      }}
-                    >
-                      {i18n.t("chat.page.newConversationButton")}
-                    </AppPrimaryButton>
-                  )}
-                </AppEmptyState>
-              ) : (
-                <ChatList
-                  chats={filteredChats}
-                  pageInfo={chatsPageInfo}
-                  loading={chatsLoading}
-                  handleSelectChat={(chat) => selectChat(chat)}
-                  handleDeleteChat={(chat) => deleteChat(chat)}
-                  handleEditChat={() => {
-                    setDialogType("edit");
-                    setShowDialog(true);
-                  }}
-                />
-              )}
-            </div>
-            <Fab
-              className={classes.fabNew}
-              color="primary"
-              size="medium"
-              aria-label="nova conversa"
-              onClick={() => {
-                setDialogType("new");
-                setShowDialog(true);
-              }}
-            >
-              <AddIcon />
-            </Fab>
-          </div>
-        </Grid>
-        <Grid className={classes.gridItemRight} md={8} item>
-          {hasChatSelected ? (
-            <ChatMessages
-              chat={currentChat}
-              scrollToBottomRef={scrollToBottomRef}
-              pageInfo={messagesPageInfo}
-              messages={messages}
-              loading={messagesLoading}
-              handleSendMessage={sendMessage}
-              handleSendMessageWithMedia={sendMessageWithMedia}
-              handleLoadMore={loadMoreMessages}
-            />
-          ) : (
-            <div className={classes.emptyPaneFill}>
-              <AppEmptyState
-                icon={PeopleIcon}
-                title={i18n.t("chat.page.emptySelectTitle")}
-                description={i18n.t("chat.page.emptySelectSub")}
-              />
-            </div>
-          )}
-        </Grid>
-      </Grid>
-    );
+  const searchTrim = (searchChat || "").trim();
+  const hasSearch = searchTrim.length > 0;
+  const hasChatSelected = isObject(currentChat) && has(currentChat, "id");
+
+  const openNewChatDialog = () => {
+    setDialogType("new");
+    setShowDialog(true);
   };
 
-  const renderTab = () => {
-    const searchTrim = (searchChat || "").trim();
-    const hasSearch = searchTrim.length > 0;
-    return (
-      <Grid className={classes.gridContainer} container>
-        <Grid md={12} item>
-          <Box className={classes.paneHeader}>
-            <Typography
-              variant="h6"
-              color="primary"
-              component="h1"
-              className={classes.paneTitle}
-            >
-              {i18n.t("chat.page.title")}
-            </Typography>
-            <Typography variant="body2" color="textSecondary" component="p">
-              {i18n.t("chat.page.subtitle")}
-            </Typography>
-          </Box>
-          <Box className={classes.searchBar}>
-            <AppActionBar className={classes.filtersBar} align="between">
-              <TextField
-                className={classes.searchField}
-                placeholder={i18n.t("chat.page.searchPlaceholder")}
-                value={searchChat}
-                onChange={(e) => setSearchChat(e.target.value)}
-                variant="outlined"
-                size="small"
-                fullWidth
-                inputProps={{ "aria-label": i18n.t("chat.page.searchPlaceholder") }}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon color="action" fontSize="small" />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-              <AppPrimaryButton
-                onClick={() => {
-                  setDialogType("new");
-                  setShowDialog(true);
-                }}
-              >
-                {i18n.t("chat.buttons.newChat")}
-              </AppPrimaryButton>
-            </AppActionBar>
-          </Box>
-          <Tabs
-            value={tab}
-            indicatorColor="primary"
-            textColor="primary"
-            onChange={(e, v) => setTab(v)}
-            aria-label={i18n.t("chat.page.tabsAria")}
+  const openEditChatDialog = () => {
+    setDialogType("edit");
+    setShowDialog(true);
+  };
+
+  const renderListPane = () => (
+    <div className={classes.leftPane}>
+      <Box className={classes.paneHeader}>
+        <Typography
+          variant="h6"
+          color="primary"
+          component="h1"
+          className={classes.paneTitle}
+        >
+          {i18n.t("chat.page.title")}
+        </Typography>
+        <Typography variant="body2" color="textSecondary" component="p">
+          {i18n.t("chat.page.subtitle")}
+        </Typography>
+      </Box>
+      <Box className={classes.searchBar}>
+        <AppActionBar className={classes.filtersBar}>
+          <TextField
+            className={classes.searchField}
+            placeholder={i18n.t("chat.page.searchPlaceholder")}
+            value={searchChat}
+            onChange={(e) => setSearchChat(e.target.value)}
+            variant="outlined"
+            size="small"
+            fullWidth
+            inputProps={{ "aria-label": i18n.t("chat.page.searchPlaceholder") }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon color="action" fontSize="small" />
+                </InputAdornment>
+              ),
+            }}
+          />
+        </AppActionBar>
+      </Box>
+      <div className={classes.listWrap}>
+        {chatsLoading ? (
+          <AppLoadingState message={i18n.t("chat.page.loadingConversations")} />
+        ) : filteredChats.length === 0 ? (
+          <AppEmptyState
+            icon={PeopleIcon}
+            title={
+              hasSearch && chats.length > 0
+                ? i18n.t("chat.page.emptyNoSearchTitle")
+                : i18n.t("chat.page.emptyNoConversationsTitle")
+            }
+            description={
+              hasSearch && chats.length > 0
+                ? i18n.t("chat.page.emptyNoSearchSub")
+                : i18n.t("chat.page.emptyNoConversationsSub")
+            }
           >
-            <Tab label={i18n.t("chat.chats")} />
-            <Tab label={i18n.t("chat.messages")} />
-          </Tabs>
-        </Grid>
-        {tab === 0 && (
-          <Grid className={classes.gridItemTab} md={12} item>
-            {chatsLoading ? (
-              <AppLoadingState message={i18n.t("chat.page.loadingConversations")} />
-            ) : filteredChats.length === 0 ? (
-              <AppEmptyState
-                icon={PeopleIcon}
-                title={
-                  hasSearch && chats.length > 0
-                    ? i18n.t("chat.page.emptyNoSearchTitle")
-                    : i18n.t("chat.page.emptyNoConversationsTitle")
-                }
-                description={
-                  hasSearch && chats.length > 0
-                    ? i18n.t("chat.page.emptyNoSearchSub")
-                    : i18n.t("chat.page.emptyNoConversationsSub")
-                }
-              />
-            ) : (
-              <ChatList
-                chats={filteredChats}
-                pageInfo={chatsPageInfo}
-                loading={chatsLoading}
-                handleSelectChat={(chat) => selectChat(chat)}
-                handleDeleteChat={(chat) => deleteChat(chat)}
-                handleEditChat={() => {
-                  setDialogType("edit");
-                  setShowDialog(true);
-                }}
-              />
+            {!(hasSearch && chats.length > 0) && (
+              <AppPrimaryButton startIcon={<AddIcon />} onClick={openNewChatDialog}>
+                {i18n.t("chat.page.newConversationButton")}
+              </AppPrimaryButton>
             )}
-          </Grid>
+          </AppEmptyState>
+        ) : (
+          <ChatList
+            chats={filteredChats}
+            pageInfo={chatsPageInfo}
+            loading={chatsLoading}
+            handleSelectChat={(chat) => selectChat(chat)}
+            handleDeleteChat={(chat) => deleteChat(chat)}
+            handleEditChat={openEditChatDialog}
+          />
         )}
-        {tab === 1 && (
-          <Grid className={classes.gridItemTab} md={12} item>
-            {isObject(currentChat) && has(currentChat, "id") ? (
-              <ChatMessages
-                chat={currentChat}
-                scrollToBottomRef={scrollToBottomRef}
-                pageInfo={messagesPageInfo}
-                messages={messages}
-                loading={messagesLoading}
-                handleSendMessage={sendMessage}
-                handleSendMessageWithMedia={sendMessageWithMedia}
-                handleLoadMore={loadMoreMessages}
-              />
+      </div>
+      <Fab
+        className={classes.fabNew}
+        color="primary"
+        size="medium"
+        aria-label="nova conversa"
+        onClick={openNewChatDialog}
+      >
+        <AddIcon />
+      </Fab>
+    </div>
+  );
+
+  const renderMessagesPane = (mobileBack = false) => (
+    <ChatMessages
+      chat={currentChat}
+      scrollToBottomRef={scrollToBottomRef}
+      pageInfo={messagesPageInfo}
+      messages={messages}
+      loading={messagesLoading}
+      handleSendMessage={sendMessage}
+      handleSendMessageWithMedia={sendMessageWithMedia}
+      handleLoadMore={loadMoreMessages}
+      showBackButton={mobileBack}
+      onBack={mobileBack ? () => history.push("/chats") : undefined}
+    />
+  );
+
+  const renderGrid = () => (
+    <Grid className={classes.gridContainer} container>
+      <Grid className={classes.gridItem} md={4} item>
+        {renderListPane()}
+      </Grid>
+      <Grid className={classes.gridItemRight} md={8} item>
+        {hasChatSelected ? (
+          renderMessagesPane(false)
+        ) : (
+          <div className={classes.emptyPaneFill}>
+            <AppEmptyState
+              icon={PeopleIcon}
+              title={i18n.t("chat.page.emptySelectTitle")}
+              description={i18n.t("chat.page.emptySelectSub")}
+            />
+          </div>
+        )}
+      </Grid>
+    </Grid>
+  );
+
+  const chatModal = (
+    <ChatModal
+      type={dialogType}
+      open={showDialog}
+      chat={currentChat}
+      handleLoadNewChat={(data) => {
+        history.push(`/chats/${data.uuid}`);
+      }}
+      handleClose={() => setShowDialog(false)}
+    />
+  );
+
+  if (isMobile) {
+    if (id) {
+      return (
+        <>
+          {chatModal}
+          <Box
+            className={classes.mobileConversationRoot}
+            data-chat-mobile="conversation"
+          >
+            {hasChatSelected ? (
+              renderMessagesPane(true)
+            ) : chatsLoading ? (
+              <AppLoadingState message={i18n.t("chat.page.loadingConversations")} />
             ) : (
               <div className={classes.emptyPaneFill}>
                 <AppEmptyState
@@ -764,32 +717,27 @@ function Chat(props) {
                 />
               </div>
             )}
-          </Grid>
-        )}
-      </Grid>
+          </Box>
+        </>
+      );
+    }
+
+    return (
+      <>
+        {chatModal}
+        <Box className={classes.mobileInboxRoot} data-chat-mobile="inbox">
+          {renderListPane()}
+        </Box>
+      </>
     );
-  };
+  }
 
   return (
     <>
-      <ChatModal
-        type={dialogType}
-        open={showDialog}
-        chat={currentChat}
-        handleLoadNewChat={(data) => {
-          setMessages([]);
-          setMessagesPage(1);
-          setCurrentChat(data);
-          setTab(1);
-          history.push(`/chats/${data.uuid}`);
-        }}
-        handleClose={() => setShowDialog(false)}
-      />
-      <Paper className={classes.mainContainer}>
-        {isWidthUp("md", props.width) ? renderGrid() : renderTab()}
-      </Paper>
+      {chatModal}
+      <Paper className={classes.mainContainer}>{renderGrid()}</Paper>
     </>
   );
 }
 
-export default withWidth()(Chat);
+export default Chat;

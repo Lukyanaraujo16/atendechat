@@ -1,15 +1,13 @@
 import React from "react";
+import clsx from "clsx";
 import Dialog from "@material-ui/core/Dialog";
 import DialogTitle from "@material-ui/core/DialogTitle";
 import DialogContent from "@material-ui/core/DialogContent";
 import DialogActions from "@material-ui/core/DialogActions";
 import Typography from "@material-ui/core/Typography";
 import { makeStyles } from "@material-ui/core/styles";
+import useIsMobile from "../../hooks/useIsMobile";
 
-/**
- * Estilos opcionais para casos em que o modal não usa os subcomponentes AppDialog*.
- * O tema global (MuiDialog*) define padding e separadores; aqui reforçamos raio do paper e título.
- */
 export const useAppDialogStyles = makeStyles((theme) => ({
   titleHeading: {
     fontWeight: 600,
@@ -27,29 +25,74 @@ export const useAppDialogStyles = makeStyles((theme) => ({
   },
 }));
 
+const useResponsiveDialogStyles = makeStyles((theme) => ({
+  paperFullscreen: {
+    display: "flex",
+    flexDirection: "column",
+    margin: 0,
+    width: "100%",
+    maxWidth: "100%",
+    maxHeight: "100dvh",
+    height: "100dvh",
+    borderRadius: 0,
+    "@supports not (height: 100dvh)": {
+      maxHeight: "100vh",
+      height: "100vh",
+    },
+  },
+  contentFullscreen: {
+    flex: 1,
+    minHeight: 0,
+    overflowY: "auto",
+    overflowX: "hidden",
+    WebkitOverflowScrolling: "touch",
+    paddingLeft: theme.spacing(2),
+    paddingRight: theme.spacing(2),
+    paddingTop: theme.spacing(1.5),
+    paddingBottom: theme.spacing(2),
+  },
+  actionsSticky: {
+    flexShrink: 0,
+    margin: 0,
+    borderTop: `1px solid ${theme.palette.divider}`,
+    padding: theme.spacing(1.5, 2),
+    paddingBottom: `calc(${theme.spacing(2)}px + env(safe-area-inset-bottom, 0px))`,
+    backgroundColor: theme.palette.background.paper,
+    "& > *": {
+      marginLeft: theme.spacing(1),
+    },
+  },
+}));
+
 function mergePaperClasses(...parts) {
   return parts.filter(Boolean).join(" ").trim();
 }
 
-/**
- * Dialog padrão: fullWidth, scroll em paper, maxWidth configurável (sm | md | lg | xs).
- */
 export function AppDialog({
   children,
   paperClassName,
   maxWidth = "sm",
   fullWidth = true,
   scroll = "paper",
+  fullScreen: fullScreenProp,
   classes: dialogClassesProp,
   ...rest
 }) {
+  const isMobile = useIsMobile();
+  const responsiveClasses = useResponsiveDialogStyles();
+  const fullScreen =
+    fullScreenProp !== undefined ? fullScreenProp : isMobile;
+
   const paper = mergePaperClasses(
     paperClassName,
+    fullScreen && responsiveClasses.paperFullscreen,
     dialogClassesProp && dialogClassesProp.paper
   );
+
   return (
     <Dialog
-      maxWidth={maxWidth}
+      fullScreen={fullScreen}
+      maxWidth={fullScreen ? false : maxWidth}
       fullWidth={fullWidth}
       scroll={scroll}
       classes={{ ...dialogClassesProp, ...(paper ? { paper } : {}) }}
@@ -60,9 +103,6 @@ export function AppDialog({
   );
 }
 
-/**
- * Título com hierarquia consistente. Use disableTypography quando o título for JSX composto (ex.: ScheduleModal).
- */
 export function AppDialogTitle({
   children,
   subtitle,
@@ -96,10 +136,42 @@ export function AppDialogTitle({
   );
 }
 
-export function AppDialogContent({ className, dividers = true, ...rest }) {
-  return <DialogContent dividers={dividers} className={className} {...rest} />;
+export function AppDialogContent({
+  className,
+  dividers = true,
+  fullscreenContent,
+  ...rest
+}) {
+  const isMobile = useIsMobile();
+  const responsiveClasses = useResponsiveDialogStyles();
+  const useFullscreenContent =
+    fullscreenContent !== undefined ? fullscreenContent : isMobile;
+
+  return (
+    <DialogContent
+      dividers={dividers && !useFullscreenContent}
+      className={clsx(
+        className,
+        useFullscreenContent && responsiveClasses.contentFullscreen
+      )}
+      {...rest}
+    />
+  );
 }
 
-export function AppDialogActions({ className, ...rest }) {
-  return <DialogActions className={className} {...rest} />;
+export function AppDialogActions({
+  className,
+  stickyFooter,
+  ...rest
+}) {
+  const isMobile = useIsMobile();
+  const responsiveClasses = useResponsiveDialogStyles();
+  const sticky = stickyFooter !== undefined ? stickyFooter : isMobile;
+
+  return (
+    <DialogActions
+      className={clsx(className, sticky && responsiveClasses.actionsSticky)}
+      {...rest}
+    />
+  );
 }

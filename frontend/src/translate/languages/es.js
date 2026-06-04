@@ -2089,6 +2089,7 @@ const messages = {
           title: "Chat interno",
           subtitle:
             "Mensajes del equipo y conversaciones por canal.",
+          backToList: "Volver a la lista",
           searchPlaceholder: "Buscar conversaciones...",
           loadingMessages: "Cargando mensajes...",
           loadingConversations: "Cargando conversaciones...",
@@ -2303,6 +2304,7 @@ const messages = {
         selectTicket: "Seleccionar Ticket",
         ticketNav: "Ticket",
         attendanceNav: "Atenciones",
+        backToList: "Volver a la lista",
       },
       newTicketModal: {
         title: "Crear Ticket",
@@ -2394,6 +2396,13 @@ const messages = {
           roleSuperAdmin: "Super Admin",
           roleAdmin: "Administrador",
           roleUser: "Usuario",
+        },
+        drawerUtilities: {
+          sectionTitle: "Preferencias",
+          active: "Activo",
+          paused: "Pausado",
+          pauseAttendance: "Pausar atención",
+          resumeAttendance: "Reanudar atención",
         },
       },
       saas: {

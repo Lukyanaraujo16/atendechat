@@ -5,6 +5,7 @@ import { toast } from "react-toastify";
 import clsx from "clsx";
 
 import { Paper, makeStyles } from "@material-ui/core";
+import useIsMobile from "../../hooks/useIsMobile";
 
 import ErrorBoundary from "../ErrorBoundary";
 import ContactDrawer from "../ContactDrawer";
@@ -74,6 +75,13 @@ const useStyles = makeStyles((theme) => ({
       easing: theme.transitions.easing.sharp,
       duration: theme.transitions.duration.leavingScreen,
     }),
+    [theme.breakpoints.down("md")]: {
+      marginRight: 0,
+      borderRadius: 0,
+      boxShadow: "none",
+      width: "100%",
+      maxWidth: "100%",
+    },
   },
 
   mainWrapperShift: {
@@ -82,6 +90,12 @@ const useStyles = makeStyles((theme) => ({
       duration: theme.transitions.duration.enteringScreen,
     }),
     marginRight: 0,
+  },
+
+  ticketPanelMobileShift: {
+    [theme.breakpoints.down("md")]: {
+      marginRight: 0,
+    },
   },
 
   chatBody: {
@@ -105,6 +119,10 @@ const useStyles = makeStyles((theme) => ({
     flexShrink: 0,
     backgroundColor: getComposerSurface(theme),
     borderBottomRightRadius: PANEL_RADIUS,
+    paddingBottom: "env(safe-area-inset-bottom, 0px)",
+    [theme.breakpoints.down("md")]: {
+      borderBottomRightRadius: 0,
+    },
   },
 
 }));
@@ -113,6 +131,7 @@ const Ticket = () => {
   const { ticketId } = useParams();
   const history = useHistory();
   const classes = useStyles();
+  const isMobile = useIsMobile();
 
   const { user } = useContext(AuthContext);
   const userRef = useRef(user);
@@ -412,7 +431,8 @@ const Ticket = () => {
       <Paper
         elevation={0}
         className={clsx(classes.ticketPanel, {
-          [classes.mainWrapperShift]: drawerOpen,
+          [classes.mainWrapperShift]: drawerOpen && !isMobile,
+          [classes.ticketPanelMobileShift]: isMobile,
         })}
         data-ticket-chat-panel
       >

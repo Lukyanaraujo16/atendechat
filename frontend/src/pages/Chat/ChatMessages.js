@@ -11,6 +11,8 @@ import {
 import { alpha } from "@material-ui/core/styles";
 import SendIcon from "@material-ui/icons/Send";
 import AttachFileIcon from "@material-ui/icons/AttachFile";
+import ArrowBackIcon from "@material-ui/icons/ArrowBack";
+import { useHistory } from "react-router-dom";
 
 import { AuthContext } from "../../context/Auth/AuthContext";
 import { useDate } from "../../hooks/useDate";
@@ -32,6 +34,10 @@ const useStyles = makeStyles((theme) => ({
     borderLeft: `1px solid ${theme.palette.divider}`,
     backgroundColor: theme.palette.background.paper,
     color: theme.palette.text.primary,
+    [theme.breakpoints.down("md")]: {
+      borderLeft: "none",
+      borderRadius: 0,
+    },
   },
   chatHeader: {
     display: "flex",
@@ -40,6 +46,16 @@ const useStyles = makeStyles((theme) => ({
     borderBottom: `1px solid ${theme.palette.divider}`,
     backgroundColor: theme.palette.background.paper,
     color: theme.palette.text.primary,
+    flexShrink: 0,
+  },
+  backButton: {
+    marginRight: theme.spacing(0.5),
+    marginLeft: theme.spacing(-0.5),
+    flexShrink: 0,
+  },
+  headerBody: {
+    flex: 1,
+    minWidth: 0,
   },
   headerAvatar: {
     width: 40,
@@ -75,8 +91,10 @@ const useStyles = makeStyles((theme) => ({
     display: "flex",
     alignItems: "center",
     padding: theme.spacing(1, 2),
+    paddingBottom: `calc(${theme.spacing(1)}px + env(safe-area-inset-bottom, 0px))`,
     borderTop: `1px solid ${theme.palette.divider}`,
     backgroundColor: theme.palette.background.paper,
+    flexShrink: 0,
   },
   input: {
     flex: 1,
@@ -149,8 +167,11 @@ export default function ChatMessages({
   scrollToBottomRef,
   pageInfo,
   loading,
+  showBackButton = false,
+  onBack,
 }) {
   const classes = useStyles();
+  const history = useHistory();
   const { user } = useContext(AuthContext);
   const { datetimeToClient } = useDate();
   const baseRef = useRef();
@@ -251,12 +272,36 @@ export default function ChatMessages({
     return `${rounded} ${units[i]}`;
   };
 
+  const handleBack = (e) => {
+    if (e && typeof e.stopPropagation === "function") {
+      e.stopPropagation();
+    }
+    if (typeof onBack === "function") {
+      onBack();
+      return;
+    }
+    history.push("/chats");
+  };
+
   return (
     <Paper className={classes.mainContainer}>
       <div className={classes.chatHeader}>
+        {showBackButton ? (
+          <IconButton
+            className={classes.backButton}
+            size="small"
+            edge="start"
+            onClick={handleBack}
+            aria-label={i18n.t("chat.page.backToList")}
+          >
+            <ArrowBackIcon />
+          </IconButton>
+        ) : null}
         <div className={classes.headerAvatar}>{initial}</div>
-        <div>
-          <Typography className={classes.headerTitle}>{chat?.title || "Chat"}</Typography>
+        <div className={classes.headerBody}>
+          <Typography className={classes.headerTitle} noWrap>
+            {chat?.title || "Chat"}
+          </Typography>
           <Typography className={classes.headerSub}>{participantLabel}</Typography>
         </div>
       </div>

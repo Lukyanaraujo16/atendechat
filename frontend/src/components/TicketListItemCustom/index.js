@@ -46,6 +46,7 @@ import { TicketsInboxContext } from "../../context/TicketsInboxContext";
 import toastError from "../../errors/toastError";
 import { v4 as uuidv4 } from "uuid";
 import { useAcceptTicket } from "../../hooks/useAcceptTicket";
+import useIsMobile from "../../hooks/useIsMobile";
 
 import ContactTag from "../ContactTag";
 import ContactLabelChip from "../ContactLabelChip";
@@ -477,6 +478,7 @@ const TicketListItemCustom = ({
   const classes = useStyles();
   const theme = useTheme();
   const history = useHistory();
+  const isMobile = useIsMobile();
   const [loading, setLoading] = useState(false);
   const [ticketUser, setTicketUser] = useState(null);
   const [tag, setTag] = useState([]);
@@ -566,8 +568,11 @@ const TicketListItemCustom = ({
       const code = uuidv4();
       const { id, uuid } = t;
       setCurrentTicket({ id, uuid, code });
+      if (isMobile) {
+        history.push(`/tickets/${uuid}`);
+      }
     },
-    [setCurrentTicket]
+    [setCurrentTicket, history, isMobile]
   );
 
   const handleDeleteTicket = async () => {

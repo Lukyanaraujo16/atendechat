@@ -51,15 +51,19 @@ import LanguageControl from "../components/LanguageControl";
 import ConfirmationModal from "../components/ConfirmationModal";
 import { versionSystem } from "../../package.json";
 import { APP_HEADER_HEIGHT } from "./layoutConstants";
+import useIsMobile from "../hooks/useIsMobile";
+import Box from "@material-ui/core/Box";
 
 const drawerWidth = 299;
 
 const useStyles = makeStyles((theme) => ({
   root: {
     display: "flex",
-    height: "100vh",
-    [theme.breakpoints.down("sm")]: {
-      height: "calc(100vh - 56px)",
+    height: "100dvh",
+    maxWidth: "100%",
+    overflowX: "hidden",
+    "@supports not (height: 100dvh)": {
+      height: "100vh",
     },
     backgroundColor: theme.palette.background.default,
     '& .MuiButton-outlinedPrimary': {
@@ -157,6 +161,100 @@ const useStyles = makeStyles((theme) => ({
   },
   menuButton: {
     marginRight: 36,
+    [theme.breakpoints.down("md")]: {
+      marginRight: theme.spacing(0.5),
+    },
+  },
+  toolbarMobile: {
+    paddingRight: theme.spacing(1),
+    paddingLeft: theme.spacing(0.5),
+    paddingTop: "max(0px, env(safe-area-inset-top, 0px))",
+    gap: theme.spacing(0.25),
+    flexWrap: "nowrap",
+    overflow: "hidden",
+  },
+  mobileBrandTitle: {
+    flex: 1,
+    minWidth: 0,
+    fontWeight: 600,
+    fontSize: "0.9375rem",
+    lineHeight: 1.3,
+    color: theme.palette.text.primary,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    marginRight: theme.spacing(0.5),
+  },
+  mobileBrandLogo: {
+    flex: 1,
+    minWidth: 0,
+    display: "flex",
+    alignItems: "center",
+    marginRight: theme.spacing(0.5),
+    "& img": {
+      maxHeight: 28,
+      maxWidth: 140,
+      width: "auto",
+      objectFit: "contain",
+    },
+  },
+  toolbarActionsCluster: {
+    display: "flex",
+    alignItems: "center",
+    flexShrink: 0,
+    gap: theme.spacing(0.25),
+  },
+  attendanceChipMobile: {
+    fontSize: "0.6875rem",
+    fontWeight: 600,
+    color: theme.palette.text.secondary,
+    whiteSpace: "nowrap",
+    marginRight: theme.spacing(0.25),
+    display: "none",
+    [theme.breakpoints.down("md")]: {
+      display: "block",
+    },
+  },
+  drawerUtilities: {
+    flexShrink: 0,
+    padding: theme.spacing(1.25, 2),
+    borderTop: `1px solid ${theme.palette.divider}`,
+    backgroundColor: theme.palette.background.paper,
+  },
+  drawerUtilitiesTitle: {
+    fontSize: "0.6875rem",
+    fontWeight: 600,
+    textTransform: "uppercase",
+    letterSpacing: "0.04em",
+    color: theme.palette.text.secondary,
+    marginBottom: theme.spacing(1),
+  },
+  drawerUtilitiesRow: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: theme.spacing(0.5),
+    marginBottom: theme.spacing(1),
+    "& .MuiIconButton-root": {
+      minWidth: 44,
+      minHeight: 44,
+    },
+  },
+  drawerAttendanceRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: theme.spacing(1),
+    paddingTop: theme.spacing(0.5),
+  },
+  appBarFullWidth: {
+    width: "100%",
+    marginLeft: 0,
+  },
+  contentMobileSafe: {
+    [theme.breakpoints.down("md")]: {
+      paddingBottom: "env(safe-area-inset-bottom, 0px)",
+    },
   },
   menuButtonHidden: {
     display: "none",
@@ -317,19 +415,31 @@ const useStyles = makeStyles((theme) => ({
 const LoggedInLayout = ({ children, themeToggle }) => {
   countPostLogin("LoggedInLayout render");
   const classes = useStyles();
+  const isMobile = useIsMobile();
   const location = useLocation();
   const isTicketsPage =
     location.pathname === "/tickets" || location.pathname.startsWith("/tickets/");
+  const isChatsPage =
+    location.pathname === "/chats" || location.pathname.startsWith("/chats/");
+  const isFullHeightModulePage = isTicketsPage || isChatsPage;
   const [userModalOpen, setUserModalOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const { handleLogout, loading, user, exitSupportMode } = useContext(AuthContext);
   const [drawerOpen, setDrawerOpen] = useState(() => {
+    if (typeof window !== "undefined" && window.matchMedia("(max-width:959.95px)").matches) {
+      return false;
+    }
     const saved = localStorage.getItem("drawerOpen");
     if (saved !== null) return saved === "true";
-    return true; // sempre expandido por padrão, independente da resolução
+    return true;
   });
-  const [drawerVariant, setDrawerVariant] = useState("permanent");
+  const [drawerVariant, setDrawerVariant] = useState(() => {
+    if (typeof window !== "undefined" && window.matchMedia("(max-width:959.95px)").matches) {
+      return "temporary";
+    }
+    return "permanent";
+  });
   // const [dueDate, setDueDate] = useState("");
   const { branding, resolveMenuLogo } = useBranding();
   const menuLogoSrc = resolveMenuLogo();
@@ -395,12 +505,23 @@ const LoggedInLayout = ({ children, themeToggle }) => {
   const socketManager = useContext(SocketContext);
 
   useEffect(() => {
-    if (document.body.offsetWidth < 600) {
-      setDrawerVariant("temporary");
-    } else {
-      setDrawerVariant("permanent");
+    if (typeof window === "undefined" || !window.matchMedia) return undefined;
+    const mq = window.matchMedia("(max-width:959.95px)");
+    const syncDrawerMode = () => {
+      if (mq.matches) {
+        setDrawerVariant("temporary");
+      } else {
+        setDrawerVariant("permanent");
+      }
+    };
+    syncDrawerMode();
+    if (typeof mq.addEventListener === "function") {
+      mq.addEventListener("change", syncDrawerMode);
+      return () => mq.removeEventListener("change", syncDrawerMode);
     }
-  }, [drawerOpen]);
+    mq.addListener(syncDrawerMode);
+    return () => mq.removeListener(syncDrawerMode);
+  }, []);
 
   useEffect(() => {
     if (user?.companyId == null || user?.companyId === "") {
@@ -455,7 +576,7 @@ const LoggedInLayout = ({ children, themeToggle }) => {
   };
 
   const drawerClose = () => {
-    if (document.body.offsetWidth < 600) {
+    if (isMobile) {
       setDrawerOpen(false);
     }
   };
@@ -477,13 +598,6 @@ const LoggedInLayout = ({ children, themeToggle }) => {
     // TODO: emitir para backend e enviar mensagem automática quando pausado
   };
 
-  const handleMenuItemClick = () => {
-    const { innerWidth: width } = window;
-    if (width <= 600) {
-      setDrawerOpen(false);
-    }
-  };
-
   const toggleColorMode = () => {
     colorMode.toggleColorMode();
   }
@@ -501,10 +615,18 @@ const LoggedInLayout = ({ children, themeToggle }) => {
         classes={{
           paper: clsx(
             classes.drawerPaper,
-            !drawerOpen && classes.drawerPaperClose
+            !drawerOpen && !isMobile && classes.drawerPaperClose
           ),
         }}
         open={drawerOpen}
+        onClose={() => {
+          if (drawerVariant === "temporary") {
+            setDrawerOpen(false);
+          }
+        }}
+        ModalProps={{
+          keepMounted: false,
+        }}
       >
         <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
           <div
@@ -526,6 +648,39 @@ const LoggedInLayout = ({ children, themeToggle }) => {
           <List className={classes.containerWithScroll}>
             <MainListItems drawerClose={drawerClose} />
           </List>
+          {isMobile && drawerOpen && (
+            <div className={classes.drawerUtilities}>
+              <Typography className={classes.drawerUtilitiesTitle} component="p">
+                {i18n.t("mainDrawer.drawerUtilities.sectionTitle")}
+              </Typography>
+              <Box className={classes.drawerUtilitiesRow}>
+                <LanguageControl />
+                <IconButton
+                  size="small"
+                  onClick={toggleColorMode}
+                  aria-label={theme.palette.type === "dark" ? "Tema claro" : "Tema escuro"}
+                >
+                  {theme.palette.type === "dark" ? <Brightness7Icon /> : <Brightness4Icon />}
+                </IconButton>
+                <NotificationsVolume />
+                <AnnouncementsPopover />
+                <ChatPopover />
+              </Box>
+              <Box className={classes.drawerAttendanceRow}>
+                <Typography variant="body2" className={classes.attendanceLabel}>
+                  {attendancePaused
+                    ? i18n.t("mainDrawer.drawerUtilities.paused")
+                    : i18n.t("mainDrawer.drawerUtilities.active")}
+                </Typography>
+                <Switch
+                  checked={!attendancePaused}
+                  onChange={handleAttendancePausedChange}
+                  color="primary"
+                  size="small"
+                />
+              </Box>
+            </div>
+          )}
           {drawerOpen && (
             <div className={classes.drawerFooter}>
               <div className={classes.drawerFooterUser}>
@@ -569,87 +724,144 @@ const LoggedInLayout = ({ children, themeToggle }) => {
       </ConfirmationModal>
       <AppBar
         position="absolute"
-        className={clsx(classes.appBar, drawerOpen && classes.appBarShift)}
+        className={clsx(
+          classes.appBar,
+          drawerOpen && drawerVariant === "permanent" && classes.appBarShift,
+          isMobile && classes.appBarFullWidth
+        )}
         color="default"
       >
-        <Toolbar variant="dense" className={classes.toolbar}>
+        <Toolbar
+          variant="dense"
+          className={clsx(classes.toolbar, isMobile && classes.toolbarMobile)}
+        >
           <IconButton
             edge="start"
             aria-label="menu"
             onClick={() => {
               const next = !drawerOpen;
               setDrawerOpen(next);
-              localStorage.setItem("drawerOpen", String(next));
+              if (!isMobile) {
+                localStorage.setItem("drawerOpen", String(next));
+              }
             }}
             className={classes.menuButton}
           >
             <MenuIcon />
           </IconButton>
 
-          <Typography component="div" className={classes.title} style={{ flex: 1 }}/>
+          {isMobile ? (
+            menuLogoSrc ? (
+              <div className={classes.mobileBrandLogo}>
+                <img src={menuLogoSrc} alt={branding.systemName || "logo"} />
+              </div>
+            ) : (
+              <Typography component="h1" className={classes.mobileBrandTitle} noWrap>
+                {branding.systemName || ""}
+              </Typography>
+            )
+          ) : (
+            <Typography component="div" className={classes.title} style={{ flex: 1 }} />
+          )}
 
-          <LanguageControl />
+          <div className={classes.toolbarActionsCluster} style={isMobile ? undefined : { flex: 1, justifyContent: "flex-end", display: "flex", alignItems: "center" }}>
+            {!isMobile && (
+              <>
+                <LanguageControl />
+                <IconButton onClick={toggleColorMode}>
+                  {theme.palette.type === "dark" ? <Brightness7Icon /> : <Brightness4Icon />}
+                </IconButton>
+                <NotificationsVolume />
+              </>
+            )}
 
-          <IconButton onClick={toggleColorMode}>
-            {theme.mode === 'dark' ? <Brightness7Icon /> : <Brightness4Icon />}
-          </IconButton>
+            {user.id && <UnifiedNotificationBell />}
 
-          <NotificationsVolume />
+            {!isMobile && (
+              <>
+                <AnnouncementsPopover />
+                <ChatPopover />
+              </>
+            )}
 
-          {user.id && <UnifiedNotificationBell />}
+            {isMobile ? (
+              <Typography component="span" className={classes.attendanceChipMobile}>
+                {attendancePaused
+                  ? i18n.t("mainDrawer.drawerUtilities.paused")
+                  : i18n.t("mainDrawer.drawerUtilities.active")}
+              </Typography>
+            ) : (
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <Typography variant="body2" className={classes.attendanceLabel}>
+                  {attendancePaused ? "Pausado" : "Ativo"}
+                </Typography>
+                <Switch
+                  checked={!attendancePaused}
+                  onChange={handleAttendancePausedChange}
+                  color="primary"
+                  size="small"
+                />
+              </div>
+            )}
 
-          <AnnouncementsPopover />
-
-          <ChatPopover />
-
-          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            <Typography variant="body2" className={classes.attendanceLabel}>
-              {attendancePaused ? "Pausado" : "Ativo"}
-            </Typography>
-            <Switch
-              checked={!attendancePaused}
-              onChange={handleAttendancePausedChange}
-              color="primary"
-              size="small"
-            />
-          </div>
-
-          <div>
-            <IconButton
-              aria-label="conta"
-              aria-controls="menu-appbar"
-              aria-haspopup="true"
-              onClick={handleMenu}
-            >
-              <AccountCircle />
-            </IconButton>
-            <Menu
-              id="menu-appbar"
-              anchorEl={anchorEl}
-              getContentAnchorEl={null}
-              anchorOrigin={{
-                vertical: "bottom",
-                horizontal: "right",
-              }}
-              transformOrigin={{
-                vertical: "top",
-                horizontal: "right",
-              }}
-              open={menuOpen}
-              onClose={handleCloseMenu}
-            >
-              <MenuItem onClick={handleOpenUserModal}>
-                {i18n.t("mainDrawer.appBar.user.profile")}
-              </MenuItem>
-              <MenuItem onClick={handleClickLogout}>
-                {i18n.t("mainDrawer.appBar.user.logout")}
-              </MenuItem>
-            </Menu>
+            <div>
+              <IconButton
+                aria-label="conta"
+                aria-controls="menu-appbar"
+                aria-haspopup="true"
+                onClick={handleMenu}
+              >
+                <AccountCircle />
+              </IconButton>
+              <Menu
+                id="menu-appbar"
+                anchorEl={anchorEl}
+                getContentAnchorEl={null}
+                anchorOrigin={{
+                  vertical: "bottom",
+                  horizontal: "right",
+                }}
+                transformOrigin={{
+                  vertical: "top",
+                  horizontal: "right",
+                }}
+                open={menuOpen}
+                onClose={handleCloseMenu}
+              >
+                <MenuItem onClick={handleOpenUserModal}>
+                  {i18n.t("mainDrawer.appBar.user.profile")}
+                </MenuItem>
+                {isMobile ? (
+                  <MenuItem
+                    onClick={() => {
+                      handleCloseMenu();
+                      if (attendancePaused) {
+                        setAttendancePaused(false);
+                        localStorage.setItem("attendancePaused", "false");
+                      } else {
+                        setShowPauseConfirmDialog(true);
+                      }
+                    }}
+                  >
+                    {attendancePaused
+                      ? i18n.t("mainDrawer.drawerUtilities.resumeAttendance")
+                      : i18n.t("mainDrawer.drawerUtilities.pauseAttendance")}
+                  </MenuItem>
+                ) : null}
+                <MenuItem onClick={handleClickLogout}>
+                  {i18n.t("mainDrawer.appBar.user.logout")}
+                </MenuItem>
+              </Menu>
+            </div>
           </div>
         </Toolbar>
       </AppBar>
       <main
-        className={clsx(classes.content, isTicketsPage && classes.contentTicketsFocus)}
+        className={clsx(
+          classes.content,
+          isFullHeightModulePage && classes.contentTicketsFocus,
+          classes.contentMobileSafe
+        )}
       >
         <div className={classes.appBarSpacer} />
 
@@ -725,7 +937,7 @@ const LoggedInLayout = ({ children, themeToggle }) => {
         )}
 
         {children ? (
-          isTicketsPage ? (
+          isFullHeightModulePage ? (
             <div className={classes.contentChildrenGrow}>{children}</div>
           ) : (
             children

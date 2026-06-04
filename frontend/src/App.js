@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 
+import "./styles/mobileViewport.css";
 import "react-toastify/dist/ReactToastify.css";
 import { QueryClient, QueryClientProvider } from "react-query";
 

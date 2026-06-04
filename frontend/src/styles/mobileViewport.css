@@ -1,0 +1,37 @@
+/* Fundação mobile/PWA: evita scroll horizontal e melhora altura no iOS */
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+#root {
+  max-width: 100%;
+  overflow-x: hidden;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+@supports (-webkit-touch-callout: none) {
+  #root {
+    min-height: -webkit-fill-available;
+  }
+}
+
+/* Toasts acima do drawer (1200), abaixo de modais MUI (~1300+) */
+.Toastify__toast-container {
+  z-index: 1400;
+  pointer-events: none;
+}
+
+.Toastify__toast-container .Toastify__toast {
+  pointer-events: auto;
+}
+
+/* Alvos de toque mínimos em controles globais do shell */
+@media (max-width: 959.95px) {
+  .MuiToolbar-root .MuiIconButton-root {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}

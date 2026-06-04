@@ -45,21 +45,49 @@ const Copyright = ({ brandName, classes }) => {
 
 const useStyles = makeStyles((theme) => ({
 	root: {
-		width: "100vw",
-		height: "100vh",
+		width: "100%",
+		maxWidth: "100%",
+		minHeight: "100dvh",
+		boxSizing: "border-box",
 		display: "flex",
+		flexDirection: "column",
 		alignItems: "center",
 		justifyContent: "center",
 		position: "relative",
+		overflowX: "hidden",
+		overflowY: "auto",
+		WebkitOverflowScrolling: "touch",
 		backgroundColor: theme.palette.background.default,
 		color: theme.palette.text.primary,
+		paddingTop: "max(12px, env(safe-area-inset-top, 0px))",
+		paddingLeft: "max(16px, env(safe-area-inset-left, 0px))",
+		paddingRight: "max(16px, env(safe-area-inset-right, 0px))",
+		paddingBottom: "max(16px, env(safe-area-inset-bottom, 0px))",
+		"@supports not (min-height: 100dvh)": {
+			minHeight: "100vh",
+		},
 		[theme.breakpoints.down("sm")]: {
-			padding: theme.spacing(2),
+			justifyContent: "flex-start",
+			paddingTop: "max(48px, calc(12px + env(safe-area-inset-top, 0px)))",
+		},
+	},
+	loginMain: {
+		width: "100%",
+		maxWidth: 420,
+		flex: "0 0 auto",
+		display: "flex",
+		flexDirection: "column",
+		alignItems: "stretch",
+		margin: "auto 0",
+		[theme.breakpoints.down("sm")]: {
+			marginTop: theme.spacing(1),
+			marginBottom: theme.spacing(2),
 		},
 	},
 	card: {
 		width: "100%",
 		maxWidth: 420,
+		boxSizing: "border-box",
 		backgroundColor: theme.palette.background.paper,
 		borderRadius: 8,
 		border: `1px solid ${theme.palette.divider}`,
@@ -72,7 +100,7 @@ const useStyles = makeStyles((theme) => ({
 		flexDirection: "column",
 		alignItems: "center",
 		[theme.breakpoints.down("sm")]: {
-			padding: theme.spacing(3, 2.5, 2.5),
+			padding: theme.spacing(3, 2, 2.5),
 		},
 	},
 	logoWrap: {
@@ -84,13 +112,17 @@ const useStyles = makeStyles((theme) => ({
 	},
 	form: {
 		width: "100%",
-		maxWidth: 360,
+		maxWidth: "100%",
 	},
 	logo: {
 		maxWidth: 260,
 		width: "100%",
 		height: "auto",
 		objectFit: "contain",
+		[theme.breakpoints.down("sm")]: {
+			maxWidth: 200,
+			maxHeight: 72,
+		},
 	},
 	input: {
 		"& .MuiOutlinedInput-root": {
@@ -126,7 +158,8 @@ const useStyles = makeStyles((theme) => ({
 		margin: theme.spacing(2.5, 0, 1.5),
 		borderRadius: 4,
 		fontWeight: 700,
-		padding: "10px 0",
+		padding: "12px 0",
+		minHeight: 44,
 		backgroundColor: theme.palette.primary.main,
 		color: theme.palette.primary.contrastText,
 		boxShadow:
@@ -175,9 +208,13 @@ const useStyles = makeStyles((theme) => ({
 	},
 	languageControl: {
 		position: "absolute",
-		top: 12,
-		right: 12,
-		zIndex: 1,
+		top: "max(12px, env(safe-area-inset-top, 0px))",
+		right: "max(12px, env(safe-area-inset-right, 0px))",
+		zIndex: 2,
+		"& .MuiIconButton-root": {
+			minWidth: 44,
+			minHeight: 44,
+		},
 	},
 	footer: {
 		position: "absolute",
@@ -230,7 +267,14 @@ const useStyles = makeStyles((theme) => ({
 		display: "flex",
 		alignItems: "center",
 		gap: 10,
-		zIndex: 1500,
+		zIndex: 2,
+		[theme.breakpoints.down("sm")]: {
+			position: "static",
+			alignSelf: "flex-end",
+			marginTop: theme.spacing(2),
+			marginBottom: theme.spacing(0.5),
+			paddingRight: 0,
+		},
 	},
 	supportBadge: {
 		backgroundColor: theme.palette.background.paper,
@@ -244,10 +288,15 @@ const useStyles = makeStyles((theme) => ({
 		fontSize: 12.5,
 		color: theme.palette.text.primary,
 		whiteSpace: "nowrap",
+		[theme.breakpoints.down("xs")]: {
+			display: "none",
+		},
 	},
 	whatsFab: {
 		backgroundColor: "#25D366",
 		color: "#fff",
+		minHeight: 48,
+		minWidth: 48,
 		"&:hover": {
 			backgroundColor: "#1fb857",
 		},
@@ -341,6 +390,7 @@ const Login = () => {
 				</Menu>
 			</div>
 
+			<div className={classes.loginMain}>
 			<div className={classes.card}>
 				<div className={classes.logoWrap}>
 					<img className={classes.logo} src={loginLogoSrc} alt={displayName} />
@@ -467,6 +517,7 @@ const Login = () => {
 					</Fab>
 				</div>
 			) : null}
+			</div>
 		</div>
 	);
 };

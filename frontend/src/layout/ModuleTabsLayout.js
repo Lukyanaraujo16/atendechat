@@ -6,6 +6,7 @@ import Paper from "@material-ui/core/Paper";
 import Tabs from "@material-ui/core/Tabs";
 import Tab from "@material-ui/core/Tab";
 import { makeStyles } from "@material-ui/core/styles";
+import useIsMobile from "../hooks/useIsMobile";
 
 const useStyles = makeStyles((theme) => ({
   /** Área do módulo: respiro moderado; conteúdo com mais peso visual que a barra de tabs */
@@ -40,6 +41,14 @@ const useStyles = makeStyles((theme) => ({
       height: 2,
       borderRadius: "2px 2px 0 0",
     },
+    "& .MuiTabs-scroller": {
+      overflowX: "auto",
+      WebkitOverflowScrolling: "touch",
+      scrollbarWidth: "none",
+      "&::-webkit-scrollbar": {
+        display: "none",
+      },
+    },
     "& .MuiTab-root": {
       minHeight: 38,
       paddingTop: theme.spacing(0.5),
@@ -52,10 +61,17 @@ const useStyles = makeStyles((theme) => ({
       lineHeight: 1.25,
       letterSpacing: "0.01em",
       color: theme.palette.text.secondary,
+      flexShrink: 0,
     },
     "& .MuiTab-textColorPrimary.Mui-selected": {
       fontWeight: 600,
       color: theme.palette.primary.main,
+    },
+    [theme.breakpoints.down("md")]: {
+      minHeight: 44,
+      "& .MuiTab-root": {
+        minHeight: 44,
+      },
     },
   },
   contentBelow: {
@@ -93,6 +109,7 @@ const useStyles = makeStyles((theme) => ({
 export default function ModuleTabsLayout({ tabs, children }) {
   const location = useLocation();
   const classes = useStyles();
+  const isMobile = useIsMobile();
   const pathname = location.pathname;
 
   let activeIndex = 0;
@@ -135,7 +152,7 @@ export default function ModuleTabsLayout({ tabs, children }) {
           indicatorColor="primary"
           textColor="primary"
           variant="scrollable"
-          scrollButtons="auto"
+          scrollButtons={isMobile ? "on" : "auto"}
         >
           {tabs.map((tab) => (
             <Tab key={tab.path} label={tab.label} component={Link} to={tab.path} />

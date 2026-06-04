@@ -2172,6 +2172,7 @@ const messages = {
         page: {
           title: "Chat interno",
           subtitle: "Mensagens da equipe, fora do WhatsApp do cliente.",
+          backToList: "Voltar à lista",
           searchPlaceholder: "Buscar conversas...",
           loadingMessages: "Carregando mensagens...",
           loadingConversations: "Carregando conversas...",
@@ -2387,6 +2388,7 @@ const messages = {
         selectTicket: "Selecionar Ticket",
         ticketNav: "Ticket",
         attendanceNav: "Atendimentos",
+        backToList: "Voltar à lista",
       },
       newTicketModal: {
         title: "Criar Ticket",
@@ -2478,6 +2480,13 @@ const messages = {
           roleSuperAdmin: "Super Admin",
           roleAdmin: "Administrador",
           roleUser: "Usuário",
+        },
+        drawerUtilities: {
+          sectionTitle: "Preferências",
+          active: "Ativo",
+          paused: "Pausado",
+          pauseAttendance: "Pausar atendimento",
+          resumeAttendance: "Retomar atendimento",
         },
       },
       saas: {

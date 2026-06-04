@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from "react";
+import { useHistory } from "react-router-dom";
 
-import { Avatar, CardHeader } from "@material-ui/core";
+import { Avatar, CardHeader, IconButton, Box } from "@material-ui/core";
+import ArrowBackIcon from "@material-ui/icons/ArrowBack";
 import { makeStyles, useTheme, alpha } from "@material-ui/core/styles";
+import useIsMobile from "../../hooks/useIsMobile";
 
 import { i18n } from "../../translate/i18n";
 import ContactLabelsBar from "../ContactLabelsBar";
@@ -13,6 +16,8 @@ const useStyles = makeStyles((theme) => ({
 		padding: theme.spacing(1.25, 2),
 		alignItems: "center",
 		cursor: "pointer",
+		display: "flex",
+		flexDirection: "row",
 		transition: theme.transitions.create("background-color", { duration: 150 }),
 		"&:hover": {
 			backgroundColor: theme.palette.action.hover,
@@ -45,6 +50,22 @@ const useStyles = makeStyles((theme) => ({
 		color: theme.palette.text.secondary,
 		marginTop: theme.spacing(0.25),
 	},
+	backButton: {
+		marginRight: theme.spacing(0.5),
+		marginLeft: theme.spacing(-0.5),
+		flexShrink: 0,
+	},
+	headerRow: {
+		display: "flex",
+		alignItems: "center",
+		flex: 1,
+		minWidth: 0,
+		width: "100%",
+	},
+	headerMain: {
+		flex: 1,
+		minWidth: 0,
+	},
 }));
 
 const TicketInfo = ({
@@ -55,6 +76,8 @@ const TicketInfo = ({
 }) => {
 	const classes = useStyles();
 	const theme = useTheme();
+	const history = useHistory();
+	const isMobile = useIsMobile();
 	const { user } = ticket;
 	const [userName, setUserName] = useState("");
 	const [contactName, setContactName] = useState("");
@@ -79,18 +102,36 @@ const TicketInfo = ({
 		}
 	}, [ticket, contact]);
 
+	const handleBack = (e) => {
+		e.stopPropagation();
+		history.push("/tickets");
+	};
+
 	return (
-		<CardHeader
-			onClick={onClick}
-			classes={{
-				root: classes.root,
-				avatar: classes.avatar,
-				title: classes.title,
-				subheader: classes.subheader,
-			}}
-			titleTypographyProps={{ noWrap: true, variant: "subtitle1", component: "span" }}
-			subheaderTypographyProps={{ noWrap: true, component: "span" }}
-			avatar={<Avatar src={contact.profilePicUrl} alt="contact_image" />}
+		<Box className={classes.headerRow}>
+			{isMobile ? (
+				<IconButton
+					className={classes.backButton}
+					size="small"
+					edge="start"
+					onClick={handleBack}
+					aria-label={i18n.t("ticketAdvanced.backToList")}
+				>
+					<ArrowBackIcon />
+				</IconButton>
+			) : null}
+			<CardHeader
+				onClick={onClick}
+				className={classes.headerMain}
+				classes={{
+					root: classes.root,
+					avatar: classes.avatar,
+					title: classes.title,
+					subheader: classes.subheader,
+				}}
+				titleTypographyProps={{ noWrap: true, variant: "subtitle1", component: "span" }}
+				subheaderTypographyProps={{ noWrap: true, component: "span" }}
+				avatar={<Avatar src={contact.profilePicUrl} alt="contact_image" />}
 			title={
 				<span>
 					<span style={{ display: "block" }}>{`${contactName} #${ticket.id}`}</span>
@@ -128,7 +169,8 @@ const TicketInfo = ({
 					)}
 				</span>
 			}
-		/>
+			/>
+		</Box>
 	);
 };
 
