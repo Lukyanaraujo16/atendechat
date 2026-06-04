@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import api from "../../services/api";
+import { isForbiddenPermissionError } from "../../utils/apiErrorUtils";
 
 const useQuickMessages = () => {
     const save = useCallback(async (data) => {
@@ -29,12 +30,19 @@ const useQuickMessages = () => {
     }, []);
 
     const list = useCallback(async (params) => {
-        const { data } = await api.request({
-            url: '/quick-messages/list',
-            method: 'GET',
-            params
-        });
-        return data;
+        try {
+            const { data } = await api.request({
+                url: '/quick-messages/list',
+                method: 'GET',
+                params
+            });
+            return data;
+        } catch (err) {
+            if (isForbiddenPermissionError(err)) {
+                return [];
+            }
+            throw err;
+        }
     }, []);
 
     return {

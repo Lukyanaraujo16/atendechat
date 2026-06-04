@@ -23,6 +23,9 @@ import StarBorderIcon from "@material-ui/icons/StarBorder";
 
 import { i18n } from "../../translate/i18n";
 import useQuickMessages from "../../hooks/useQuickMessages";
+import usePlanFlags from "../../hooks/usePlanFlags";
+import { canUseQuickRepliesFeature } from "../../utils/canUseQuickRepliesFeature";
+import { isForbiddenPermissionError } from "../../utils/apiErrorUtils";
 import { AuthContext } from "../../context/Auth/AuthContext";
 import { SocketContext } from "../../context/Socket/SocketContext";
 import toastError from "../../errors/toastError";
@@ -88,6 +91,8 @@ const QuickMessageChatModal = ({
 }) => {
   const classes = useStyles();
   const { user } = useContext(AuthContext);
+  const planFlags = usePlanFlags();
+  const quickRepliesEnabled = canUseQuickRepliesFeature(user, planFlags);
   const { list, save } = useQuickMessages();
   const socketManager = useContext(SocketContext);
   const contact = contactProp || {};
@@ -125,7 +130,7 @@ const QuickMessageChatModal = ({
 
   const loadList = useCallback(async () => {
     const companyId = localStorage.getItem("companyId");
-    if (!companyId || !user?.id) {
+    if (!companyId || !user?.id || !quickRepliesEnabled) {
       setItems([]);
       return;
     }
@@ -134,15 +139,17 @@ const QuickMessageChatModal = ({
       const messages = await list({ companyId, userId: user.id });
       setItems(Array.isArray(messages) ? messages : []);
     } catch (err) {
-      toastError(err);
+      if (!isForbiddenPermissionError(err)) {
+        toastError(err);
+      }
       setItems([]);
     } finally {
       setLoading(false);
     }
-  }, [list, user?.id]);
+  }, [list, user?.id, quickRepliesEnabled]);
 
   useEffect(() => {
-    if (open) {
+    if (open && quickRepliesEnabled) {
       loadList();
     } else {
       setSearch("");
@@ -151,11 +158,11 @@ const QuickMessageChatModal = ({
       setNewMessage("");
       setSelectedCategory(null);
     }
-  }, [open, loadList]);
+  }, [open, loadList, quickRepliesEnabled]);
 
   useEffect(() => {
     const companyId = localStorage.getItem("companyId");
-    if (!open || !companyId || !user?.id) return;
+    if (!open || !companyId || !user?.id || !quickRepliesEnabled) return;
     const socket = socketManager.getSocket(companyId);
     const onQm = () => {
       loadList();
@@ -164,7 +171,7 @@ const QuickMessageChatModal = ({
     return () => {
       socket.off(`company-${companyId}-quickmessage`, onQm);
     };
-  }, [open, socketManager, user?.id, loadList]);
+  }, [open, socketManager, user?.id, loadList, quickRepliesEnabled]);
 
   const applyAndClose = (row) => {
     const ref = chatInputControllerRef?.current;

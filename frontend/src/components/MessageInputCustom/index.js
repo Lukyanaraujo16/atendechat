@@ -35,6 +35,8 @@ import { useLocalStorage } from "../../hooks/useLocalStorage";
 import toastError from "../../errors/toastError";
 
 import useQuickMessages from "../../hooks/useQuickMessages";
+import usePlanFlags from "../../hooks/usePlanFlags";
+import { canUseQuickRepliesFeature } from "../../utils/canUseQuickRepliesFeature";
 import { SocketContext } from "../../context/Socket/SocketContext";
 import { useWhatsAppPanelRecorder } from "../../hooks/useWhatsAppPanelRecorder";
 import resolveQuickMessageTemplate from "../../utils/resolveQuickMessageTemplate";
@@ -411,15 +413,21 @@ const CustomInput = (props) => {
   const [popupOpen, setPopupOpen] = useState(false);
 
   const { user } = useContext(AuthContext);
+  const planFlags = usePlanFlags();
+  const quickRepliesEnabled = canUseQuickRepliesFeature(user, planFlags);
 
   const { list: listQuickMessages } = useQuickMessages();
   const socketManager = useContext(SocketContext);
 
   const loadQuickMessageOptions = useCallback(async () => {
     const companyId = localStorage.getItem("companyId");
-    if (!companyId || !user?.id) return;
-    const messages = await listQuickMessages({ companyId, userId: user.id });
-    const options = (Array.isArray(messages) ? messages : []).map((m) => {
+    if (!companyId || !user?.id || !quickRepliesEnabled) {
+      setQuickMessages([]);
+      return;
+    }
+    try {
+      const messages = await listQuickMessages({ companyId, userId: user.id });
+      const options = (Array.isArray(messages) ? messages : []).map((m) => {
       let truncatedMessage = m.message;
       if (isString(truncatedMessage) && truncatedMessage.length > 48) {
         truncatedMessage = m.message.substring(0, 48) + "...";
@@ -432,9 +440,12 @@ const CustomInput = (props) => {
         shortcode: m.shortcode,
         mediaPath: m.mediaPath,
       };
-    });
-    setQuickMessages(options);
-  }, [listQuickMessages, user?.id]);
+      });
+      setQuickMessages(options);
+    } catch {
+      setQuickMessages([]);
+    }
+  }, [listQuickMessages, user?.id, quickRepliesEnabled]);
 
   useEffect(() => {
     loadQuickMessageOptions();
@@ -442,7 +453,7 @@ const CustomInput = (props) => {
 
   useEffect(() => {
     const companyId = localStorage.getItem("companyId");
-    if (!companyId || !user?.id) return;
+    if (!companyId || !user?.id || !quickRepliesEnabled) return;
     const socket = socketManager.getSocket(companyId);
     const onQm = () => {
       loadQuickMessageOptions();
@@ -451,7 +462,7 @@ const CustomInput = (props) => {
     return () => {
       socket.off(`company-${companyId}-quickmessage`, onQm);
     };
-  }, [socketManager, user?.id, loadQuickMessageOptions]);
+  }, [socketManager, user?.id, loadQuickMessageOptions, quickRepliesEnabled]);
 
   useEffect(() => {
     if (
