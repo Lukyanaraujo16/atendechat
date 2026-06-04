@@ -30,6 +30,11 @@ export async function ensureGroupTicketPermanentOpen(
 ): Promise<Ticket> {
   if (!isGroupTicket(ticket)) return ticket;
 
+  (ticket as any).isGroup = true;
+  if ((ticket as any).dataValues) {
+    (ticket as any).dataValues.isGroup = true;
+  }
+
   const needsUpdate =
     ticket.status !== "open" ||
     ticket.userId != null ||

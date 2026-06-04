@@ -1,4 +1,4 @@
-import { Op, fn, where, col, Filterable, Includeable } from "sequelize";
+import { Op, fn, where, col, Filterable, Includeable, literal } from "sequelize";
 import { startOfDay, endOfDay, parseISO } from "date-fns";
 
 import Ticket from "../../models/Ticket";
@@ -324,7 +324,15 @@ const ListTicketsService = async ({
   if (isGroup === "true") {
     whereCondition = {
       ...whereCondition,
-      isGroup: true,
+      [Op.or]: [
+        { isGroup: true },
+        literal(`EXISTS (
+          SELECT 1 FROM "Contacts" AS gc
+          WHERE gc.id = "Ticket"."contactId"
+            AND gc."companyId" = ${Number(companyId)}
+            AND gc."isGroup" = true
+        )`)
+      ],
       ...(!status ? { status: { [Op.in]: ["open", "pending"] } } : {})
     };
   } else {

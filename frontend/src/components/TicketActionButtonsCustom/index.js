@@ -24,6 +24,7 @@ import TicketCrmDealButton from "../Crm/TicketCrmDealButton";
 import { TicketTagsButton } from "../TagsContainer";
 import { canDeleteTickets } from "../../utils/canDeleteTickets";
 import { useAcceptTicket } from "../../hooks/useAcceptTicket";
+import { isGroupTicket } from "../../utils/isGroupTicket";
 
 const useStyles = makeStyles((theme) => ({
   actionButtons: {
@@ -69,7 +70,7 @@ const TicketActionButtonsCustom = ({
   const crmFeatureLoading = showCrmSlot && !crmEnabled && !planFlags.ready;
   const mayDelete = canDeleteTickets(user);
   const { completeAcceptTicket } = useAcceptTicket();
-  const isGroupTicket = Boolean(ticket?.isGroup);
+  const isGroupConversation = isGroupTicket(ticket);
 
   const handleAcceptTicket = async () => {
     setLoading(true);
@@ -134,7 +135,7 @@ const TicketActionButtonsCustom = ({
     }
   };
 
-  if (isGroupTicket) {
+  if (isGroupConversation) {
     return (
       <div className={classes.actionButtons}>
         <div className={classes.legacyCluster}>

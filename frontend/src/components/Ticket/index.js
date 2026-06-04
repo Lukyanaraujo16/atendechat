@@ -381,7 +381,7 @@ const Ticket = () => {
     <MessagesList
       ticket={ticket}
       ticketId={ticket.id}
-      isGroup={ticket.isGroup}
+      isGroup={ticket?.isGroup || ticket?.contact?.isGroup}
       reloadToken={messagesReloadToken}
       onPartialEnrichWarning={() => setPartialEnrichWarning(true)}
       onLoadError={() => setPartialEnrichWarning(true)}

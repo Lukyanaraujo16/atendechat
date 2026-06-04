@@ -4,6 +4,7 @@ import User from "../models/User";
 import Queue from "../models/Queue";
 import { assertUserCanAccessGroupContact } from "./groupVisibility";
 import { isGroupTicket } from "./groupTicketRules";
+import { logGroupTicketAccessDebug } from "./groupTicketAccessDebug";
 import {
   assertWhatsappTicketAccess,
   isWhatsappTicketVisibilityPrivileged,
@@ -119,12 +120,31 @@ async function resolveGroupContactForAccess(
   }
   const contactId = ticket.contactId;
   if (contactId == null || contactId === "") {
+    logGroupTicketAccessDebug("ticketAccess", "group_contact_resolve_deny", {
+      denyReason: "missing_contact_and_contactId",
+      companyId
+    });
     throw new AppError("ERR_NO_PERMISSION", 403);
   }
   const row = await Contact.findByPk(Number(contactId), {
     attributes: ["id", "isGroup", "groupVisible", "companyId"]
   });
-  if (!row || !isGroupTicket({ contact: row }) || row.companyId !== companyId) {
+  if (!row || !isGroupTicket({ contact: row })) {
+    logGroupTicketAccessDebug("ticketAccess", "group_contact_resolve_deny", {
+      denyReason: "contact_not_found_or_not_group",
+      companyId,
+      contactId: Number(contactId),
+      rowFound: Boolean(row),
+      rowIsGroup: row?.isGroup
+    });
+    throw new AppError("ERR_NO_PERMISSION", 403);
+  }
+  if (Number(row.companyId) !== Number(companyId)) {
+    logGroupTicketAccessDebug("ticketAccess", "group_contact_resolve_deny", {
+      denyReason: "contact_company_mismatch",
+      companyId,
+      contactCompanyId: row.companyId
+    });
     throw new AppError("ERR_NO_PERMISSION", 403);
   }
   return row;
@@ -138,31 +158,87 @@ async function resolveGroupContactForAccess(
 export async function assertUserCanAccessTicketResource(
   user: TicketAccessUser,
   ticket: TicketAccessTicket,
-  companyId?: number
+  companyId?: number,
+  debugEndpoint = "ticketAccess"
 ): Promise<void> {
   const cid = companyId ?? ticket.companyId;
-  if (cid == null) {
+  const numericCid = cid != null ? Number(cid) : NaN;
+
+  logGroupTicketAccessDebug(debugEndpoint, "assert_enter", {
+    userId: user.id,
+    profile: user.profile,
+    supportMode: user.supportMode,
+    reqCompanyId: companyId,
+    ticketCompanyId: ticket.companyId,
+    isGroupTicket: isGroupTicket(ticket),
+    ticketIsGroupFlag: ticket.isGroup,
+    contactPresent: Boolean(ticket.contact?.id),
+    contactIsGroup: ticket.contact?.isGroup,
+    whatsappTicketVisibility: ticket.whatsapp?.ticketVisibility,
+    ticketUserId: ticket.userId,
+    ticketQueueId: ticket.queueId
+  });
+
+  if (cid == null || !Number.isFinite(numericCid)) {
+    logGroupTicketAccessDebug(debugEndpoint, "assert_deny", {
+      branch: "precheck",
+      denyReason: "missing_company_context",
+      cid
+    });
     throw new AppError("ERR_NO_PERMISSION", 403);
   }
 
-  await assertWhatsappTicketAccess(ticket, user, Number(cid));
+  try {
+    await assertWhatsappTicketAccess(ticket, user, numericCid);
+    logGroupTicketAccessDebug(debugEndpoint, "assert_whatsapp", {
+      branch: "whatsapp",
+      result: "allowed"
+    });
+  } catch (error) {
+    logGroupTicketAccessDebug(debugEndpoint, "assert_deny", {
+      branch: "whatsapp",
+      denyReason: "assertWhatsappTicketAccess",
+      errorMessage: error instanceof AppError ? error.message : String(error)
+    });
+    throw error;
+  }
 
   if (isGroupTicket(ticket)) {
-    const contact = await resolveGroupContactForAccess(ticket, Number(cid));
-    await assertUserCanAccessGroupContact(contact, {
-      id: user.id,
-      profile: user.profile,
-      supportMode: user.supportMode,
-      companyId: Number(cid)
+    logGroupTicketAccessDebug(debugEndpoint, "assert_branch", {
+      branch: "group"
     });
+    const contact = await resolveGroupContactForAccess(ticket, numericCid);
+    try {
+      await assertUserCanAccessGroupContact(contact, {
+        id: user.id,
+        profile: user.profile,
+        supportMode: user.supportMode,
+        companyId: numericCid
+      });
+      logGroupTicketAccessDebug(debugEndpoint, "assert_allow", {
+        branch: "group",
+        result: "allowed"
+      });
+    } catch (error) {
+      logGroupTicketAccessDebug(debugEndpoint, "assert_deny", {
+        branch: "group",
+        denyReason: "assertUserCanAccessGroupContact",
+        errorMessage: error instanceof AppError ? error.message : String(error)
+      });
+      throw error;
+    }
     return;
   }
+
+  logGroupTicketAccessDebug(debugEndpoint, "assert_branch", {
+    branch: "normal"
+  });
 
   let visibility = ticket.whatsapp?.ticketVisibility;
   if (visibility == null && ticket.whatsappId != null) {
     visibility = await loadWhatsappTicketVisibility(
       Number(ticket.whatsappId),
-      Number(cid)
+      numericCid
     );
   } else {
     visibility = normalizeWhatsappTicketVisibility(visibility);
@@ -172,17 +248,41 @@ export async function assertUserCanAccessTicketResource(
     isWhatsappTicketVisibilityPrivileged(user) &&
     visibility === WHATSAPP_TICKET_VISIBILITY_ADMIN_SUPERVISOR
   ) {
+    logGroupTicketAccessDebug(debugEndpoint, "assert_allow", {
+      branch: "normal",
+      denyReason: null,
+      subReason: "privileged_restricted_whatsapp"
+    });
     return;
   }
 
   if (canAccessTicket(user, ticket, [])) {
+    logGroupTicketAccessDebug(debugEndpoint, "assert_allow", {
+      branch: "normal",
+      subReason: "canAccessTicket_without_queues"
+    });
     return;
   }
 
   const userQueueIds = await loadUserQueueIds(user.id);
   if (!canAccessTicket(user, ticket, userQueueIds)) {
+    logGroupTicketAccessDebug(debugEndpoint, "assert_deny", {
+      branch: "normal",
+      denyReason: "canAccessTicket_failed",
+      userQueueIds,
+      ticketUserId: ticket.userId,
+      ticketQueueId: ticket.queueId,
+      profile: user.profile,
+      supportMode: user.supportMode
+    });
     throw new AppError("ERR_NO_PERMISSION", 403);
   }
+
+  logGroupTicketAccessDebug(debugEndpoint, "assert_allow", {
+    branch: "normal",
+    subReason: "canAccessTicket_with_queues",
+    userQueueIds
+  });
 }
 
 /** @deprecated Preferir assertUserCanAccessTicketResource */

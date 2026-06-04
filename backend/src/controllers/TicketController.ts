@@ -13,6 +13,17 @@ import {
   assertUserCanAccessTicketResource,
   toTicketAccessPayload
 } from "../helpers/ticketAccess";
+import {
+  companyIdsMatch,
+  logGroupTicketAccessDebug,
+  logGroupTicketAccessDebugError,
+  probeGroupContactAccess,
+  probeWhatsappTicketAccess,
+  serializeReqUserForDebug,
+  serializeTicketForAccessDebug,
+  formatThrownError
+} from "../helpers/groupTicketAccessDebug";
+import { isGroupTicket } from "../helpers/groupTicketRules";
 import ListTicketsService from "../services/TicketServices/ListTicketsService";
 import attachContactLabelsToTickets from "../helpers/attachContactLabelsToTickets";
 import { parseArrayQueryParam } from "../utils/parseArrayQueryParam";
@@ -291,15 +302,61 @@ export const showFromUUID = async (
     throw error;
   }
 
-  if (ticket.companyId !== companyId) {
+  const endpoint = "GET /tickets/u/:uuid";
+  logGroupTicketAccessDebug(endpoint, "before_assert", {
+    uuid,
+    ...serializeReqUserForDebug(req.user),
+    ...serializeTicketForAccessDebug(ticket),
+    isGroupTicket: isGroupTicket(ticket)
+  });
+
+  if (!companyIdsMatch(ticket.companyId, companyId)) {
+    logGroupTicketAccessDebug(endpoint, "deny_pre_assert", {
+      denyReason: "ticket_companyId_mismatch",
+      ticketCompanyId: ticket.companyId,
+      reqCompanyId: companyId,
+      ticketCompanyIdType: typeof ticket.companyId,
+      reqCompanyIdType: typeof companyId
+    });
     throw new AppError("ERR_NO_PERMISSION", 403);
   }
 
-  await assertUserCanAccessTicketResource(
-    { id, profile, supportMode },
-    toTicketAccessPayload(ticket),
-    companyId
+  const accessUser = { id, profile, supportMode };
+  const accessPayload = toTicketAccessPayload(ticket);
+  const numericCompanyId = Number(companyId);
+
+  const whatsappProbe = await probeWhatsappTicketAccess(
+    accessPayload,
+    accessUser,
+    numericCompanyId
   );
+  logGroupTicketAccessDebug(endpoint, "probe_whatsapp", whatsappProbe);
+
+  if (isGroupTicket(ticket) && ticket.contact) {
+    const groupProbe = await probeGroupContactAccess(
+      ticket.contact as any,
+      accessUser,
+      numericCompanyId
+    );
+    logGroupTicketAccessDebug(endpoint, "probe_group_contact", groupProbe);
+  }
+
+  try {
+    await assertUserCanAccessTicketResource(
+      accessUser,
+      accessPayload,
+      numericCompanyId,
+      endpoint
+    );
+    logGroupTicketAccessDebug(endpoint, "assert_ok", {
+      result: "allowed"
+    });
+  } catch (error) {
+    logGroupTicketAccessDebugError(endpoint, "assert_failed", error, {
+      ...formatThrownError(error)
+    });
+    throw error;
+  }
 
   return res.status(200).json(ticket);
 };
@@ -346,12 +403,28 @@ export const update = async (
   const ticketData: TicketData = req.body;
   const { companyId, id, profile, supportMode } = req.user;
 
+  const endpoint = "PUT /tickets/:ticketId";
   const existing = await ShowTicketService(ticketId, companyId);
-  await assertUserCanAccessTicketResource(
-    { id, profile, supportMode },
-    toTicketAccessPayload(existing),
-    companyId
-  );
+
+  logGroupTicketAccessDebug(endpoint, "before_assert", {
+    ticketId,
+    ticketData,
+    ...serializeReqUserForDebug(req.user),
+    ...serializeTicketForAccessDebug(existing),
+    isGroupTicket: isGroupTicket(existing)
+  });
+
+  try {
+    await assertUserCanAccessTicketResource(
+      { id, profile, supportMode },
+      toTicketAccessPayload(existing),
+      Number(companyId),
+      endpoint
+    );
+  } catch (error) {
+    logGroupTicketAccessDebugError(endpoint, "assert_failed", error);
+    throw error;
+  }
 
   const { ticket } = await UpdateTicketService({
     ticketData,
@@ -501,7 +574,7 @@ export const registerActiveView = async (
   const ticket = await Ticket.findByPk(tid, {
     attributes: ["id", "companyId"]
   });
-  if (!ticket || ticket.companyId !== companyId) {
+  if (!ticket || !companyIdsMatch(ticket.companyId, companyId)) {
     throw new AppError("ERR_NO_TICKET_FOUND", 404);
   }
   try {

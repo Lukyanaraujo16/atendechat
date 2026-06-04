@@ -9,6 +9,7 @@ import {
 } from "../context/Tickets/TicketsContext";
 import { TicketsInboxContext } from "../context/TicketsInboxContext";
 import toastError from "../errors/toastError";
+import { isGroupTicket } from "../utils/isGroupTicket";
 
 /**
  * Fluxo pós-aceitar: API → estado inbox → aba "Em atendimento" → abrir conversa.
@@ -24,7 +25,7 @@ export function useAcceptTicket() {
     async (ticket, { sendGreeting } = {}) => {
       if (!ticket?.id) return null;
 
-      if (ticket.isGroup) {
+      if (isGroupTicket(ticket)) {
         const updated = { ...ticket, status: "open", userId: null };
         if (typeof inbox?.upsertTicket === "function") {
           inbox.upsertTicket(updated);
@@ -69,7 +70,7 @@ export function useAcceptTicket() {
 
       const shouldGreet =
         sendGreeting !== false &&
-        !ticket.isGroup &&
+        !isGroupTicket(ticket) &&
         (await shouldSendGreetingAccepted(updated.whatsappId ?? ticket.whatsappId));
 
       if (shouldGreet) {

@@ -95,7 +95,7 @@ export async function assertUserCanAccessGroupContact(
   actor: GroupAccessActor
 ): Promise<void> {
   if (!contact.isGroup) return;
-  if (contact.companyId !== actor.companyId) {
+  if (Number(contact.companyId) !== Number(actor.companyId)) {
     throw new AppError("ERR_NO_PERMISSION", 403);
   }
   if (isGroupVisibilityPrivileged(actor)) return;

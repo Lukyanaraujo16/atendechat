@@ -1,4 +1,5 @@
 import { isOrphanTicket } from "./isOrphanTicket";
+import { isGroupTicket } from "./isGroupTicket";
 
 /** Estados visuais únicos do painel de atendimento (mutuamente exclusivos). */
 export const TICKET_VIEW_STATE = {
@@ -22,7 +23,7 @@ export function getTicketViewState(ticket, { loading = false } = {}) {
     return TICKET_VIEW_STATE.ORPHAN;
   }
 
-  if (ticket.isGroup === true) {
+  if (isGroupTicket(ticket)) {
     const status = String(ticket.status || "").toLowerCase();
     if (status === "closed") {
       return TICKET_VIEW_STATE.CLOSED;

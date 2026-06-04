@@ -11,6 +11,10 @@ import {
 } from "../../helpers/ticketOrphan";
 import attachContactLabelsToContact from "../../helpers/attachContactLabelsToContact";
 import { ensureGroupTicketPermanentOpen } from "../../helpers/groupTicketRules";
+import {
+  logGroupTicketAccessDebug,
+  snapshotTicketIncludes
+} from "../../helpers/groupTicketAccessDebug";
 
 const ShowTicketUUIDService = async (uuid: string): Promise<Ticket> => {
   const ticket = await Ticket.findOne({
@@ -51,6 +55,18 @@ const ShowTicketUUIDService = async (uuid: string): Promise<Ticket> => {
   if (!ticket) {
     throw new AppError("ERR_NO_TICKET_FOUND", 404);
   }
+
+  logGroupTicketAccessDebug("ShowTicketFromUUIDService", "loaded", {
+    uuid,
+    ticketId: ticket.id,
+    ...snapshotTicketIncludes(ticket),
+    contactId: ticket.contact?.id,
+    contactIsGroup: ticket.contact?.isGroup,
+    whatsappId: ticket.whatsappId,
+    whatsappTicketVisibility: ticket.whatsapp?.ticketVisibility,
+    queueId: ticket.queue?.id,
+    userId: ticket.user?.id
+  });
 
   setIsOrphanOnTicket(ticket);
   setStartedOutsideSystemOnTicket(ticket);

@@ -86,10 +86,26 @@ app.use(async (err: Error, req: Request, res: Response, _: NextFunction) => {
     });
   }
 
+  const pathStr = req.originalUrl || req.url || "";
+  if (
+    pathStr.includes("/tickets") ||
+    pathStr.includes("/messages/") ||
+    pathStr.includes("/groups/")
+  ) {
+    logger.error(
+      {
+        method: req.method,
+        path: pathStr,
+        error: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined
+      },
+      "[GroupTicketAccessDebug] unhandled_500"
+    );
+  }
+
   logger.error(err);
   const detail =
     err instanceof Error ? err.message : String(err);
-  const pathStr = req.originalUrl || req.url || "";
   const exposeDetail =
     pathStr.includes("/platform/backups/execute-restore") ||
     pathStr.includes("/platform/backups/generate");

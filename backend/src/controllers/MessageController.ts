@@ -24,6 +24,16 @@ import {
   assertUserCanAccessTicketResource,
   toTicketAccessPayload
 } from "../helpers/ticketAccess";
+import {
+  logGroupTicketAccessDebug,
+  logGroupTicketAccessDebugError,
+  probeGroupContactAccess,
+  probeWhatsappTicketAccess,
+  serializeReqUserForDebug,
+  serializeTicketForAccessDebug,
+  formatThrownError
+} from "../helpers/groupTicketAccessDebug";
+import { isGroupTicket } from "../helpers/groupTicketRules";
 import { logger } from "../utils/logger";
 import {
   getOpenTicketElapsedMs,
@@ -63,13 +73,51 @@ export const index = async (req: Request, res: Response): Promise<Response> => {
 
   logger.info(logBase, "[OpenTicket] show-ticket start");
 
+  const endpoint = "GET /messages/:ticketId";
   try {
     const ticketForAccess = await ShowTicketService(ticketId, companyId);
-    await assertUserCanAccessTicketResource(
-      { id, profile, supportMode },
-      toTicketAccessPayload(ticketForAccess),
-      companyId
+
+    logGroupTicketAccessDebug(endpoint, "before_assert", {
+      ...logBase,
+      ...serializeReqUserForDebug(req.user),
+      ...serializeTicketForAccessDebug(ticketForAccess),
+      isGroupTicket: isGroupTicket(ticketForAccess)
+    });
+
+    const accessUser = { id, profile, supportMode };
+    const accessPayload = toTicketAccessPayload(ticketForAccess);
+    const numericCompanyId = Number(companyId);
+
+    const whatsappProbe = await probeWhatsappTicketAccess(
+      accessPayload,
+      accessUser,
+      numericCompanyId
     );
+    logGroupTicketAccessDebug(endpoint, "probe_whatsapp", whatsappProbe);
+
+    if (isGroupTicket(ticketForAccess) && ticketForAccess.contact) {
+      const groupProbe = await probeGroupContactAccess(
+        ticketForAccess.contact as any,
+        accessUser,
+        numericCompanyId
+      );
+      logGroupTicketAccessDebug(endpoint, "probe_group_contact", groupProbe);
+    }
+
+    try {
+      await assertUserCanAccessTicketResource(
+        accessUser,
+        accessPayload,
+        numericCompanyId,
+        endpoint
+      );
+    } catch (assertErr) {
+      logGroupTicketAccessDebugError(endpoint, "assert_failed", assertErr, {
+        ...logBase,
+        ...formatThrownError(assertErr)
+      });
+      throw assertErr;
+    }
 
     if (profile !== "admin" && supportMode !== true) {
       const user = await User.findByPk(req.user.id, {

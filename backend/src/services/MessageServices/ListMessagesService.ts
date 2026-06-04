@@ -89,10 +89,9 @@ const ListMessagesService = async ({
 
   const ordered = messages.reverse();
 
-  const enrichedMessages =
-    ticket.isGroup === true
-      ? await enrichGroupMessagesSafe(ordered, companyId, { ticketId })
-      : ordered;
+  const enrichedMessages = isGroupTicket(ticket)
+    ? await enrichGroupMessagesSafe(ordered, companyId, { ticketId })
+    : ordered;
 
   return {
     messages: enrichedMessages,

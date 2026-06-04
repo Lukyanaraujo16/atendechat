@@ -1,4 +1,4 @@
-import { Op } from "sequelize";
+import { Op, literal } from "sequelize";
 import Contact from "../../models/Contact";
 import Ticket from "../../models/Ticket";
 import Whatsapp from "../../models/Whatsapp";
@@ -44,8 +44,16 @@ const ListGroupsInboxService = async ({
   const activeGroupTickets = await Ticket.findAll({
     where: {
       companyId,
-      isGroup: true,
-      status: { [Op.in]: ["open", "pending"] }
+      status: { [Op.in]: ["open", "pending"] },
+      [Op.or]: [
+        { isGroup: true },
+        literal(`EXISTS (
+          SELECT 1 FROM "Contacts" AS gc
+          WHERE gc.id = "Ticket"."contactId"
+            AND gc."companyId" = ${Number(companyId)}
+            AND gc."isGroup" = true
+        )`)
+      ]
     },
     attributes: ["contactId"],
     raw: true
