@@ -24,6 +24,7 @@ import { enUS, es, ptBR } from "date-fns/locale";
 import { i18n } from "../../translate/i18n";
 import api from "../../services/api";
 import toastError from "../../errors/toastError";
+import { isForbiddenPermissionError } from "../../utils/apiErrorUtils";
 import { toast } from "react-toastify";
 import { getErrorToastOptions } from "../../errors/feedbackToasts";
 
@@ -88,7 +89,9 @@ export default function ContactCrmSection({
       setDeals(Array.isArray(dRes.data) ? dRes.data : []);
       setPipelines(Array.isArray(pRes.data) ? pRes.data : []);
     } catch (e) {
-      toastError(e);
+      if (!isForbiddenPermissionError(e)) {
+        toastError(e);
+      }
       setDeals([]);
     } finally {
       setLoading(false);

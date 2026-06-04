@@ -5,9 +5,16 @@ import { logger } from "../utils/logger";
 import User from "../models/User";
 import Queue from "../models/Queue";
 import Ticket from "../models/Ticket";
+import Contact from "../models/Contact";
+import Whatsapp from "../models/Whatsapp";
 import { verify } from "jsonwebtoken";
 import authConfig from "../config/auth";
 import { CounterManager } from "./counter";
+import {
+  assertUserCanAccessTicketResource,
+  toTicketAccessPayload
+} from "../helpers/ticketAccess";
+import { isTruthySupportMode } from "../helpers/groupVisibility";
 
 let io: SocketIO;
 
@@ -57,11 +64,23 @@ export const initIO = (httpServer: Server): SocketIO => {
     }
 
     /** Sala alinhada ao JWT (empresa efetiva), p.ex. modo suporte; não só user.companyId da BD. */
-    const jwtPayload = tokenData as { companyId?: number };
+    const jwtPayload = tokenData as {
+      id?: string | number;
+      profile?: string;
+      companyId?: number;
+      supportMode?: boolean;
+    };
     const effectiveCompanyIdForSocket =
       jwtPayload.companyId !== undefined && jwtPayload.companyId !== null
         ? Number(jwtPayload.companyId)
         : user.companyId;
+    const socketActor = {
+      id: jwtPayload.id ?? user.id,
+      profile: jwtPayload.profile ?? user.profile,
+      supportMode:
+        isTruthySupportMode(jwtPayload.supportMode) ||
+        isTruthySupportMode((user as any).supportMode)
+    };
 
     socket.join(`user-${user.id}`);
     if (user.super) {
@@ -80,23 +99,64 @@ export const initIO = (httpServer: Server): SocketIO => {
       if (!ticketId || ticketId === "undefined") {
         return;
       }
-      Ticket.findByPk(ticketId).then(
-        (ticket) => {
-          if (ticket && ticket.companyId === effectiveCompanyIdForSocket
-            && (ticket.userId === user.id || user.profile === "admin")) {
-            let c: number;
-            if ((c = counters.incrementCounter(`ticket-${ticketId}`)) === 1) {
-              socket.join(ticketId);
+      try {
+        const ticket = await Ticket.findByPk(ticketId, {
+          include: [
+            {
+              model: Contact,
+              as: "contact",
+              attributes: ["id", "isGroup", "groupVisible", "companyId"]
+            },
+            {
+              model: Whatsapp,
+              as: "whatsapp",
+              attributes: ["ticketVisibility"],
+              required: false
             }
-            logger.debug(`joinChatbox[${c}]: Channel: ${ticketId} by user ${user.id}`)
-          } else {
-            logger.info(`Invalid attempt to join channel of ticket ${ticketId} by user ${user.id}`)
-          }
-        },
-        (error) => {
-          logger.error(error, `Error fetching ticket ${ticketId}`);
+          ]
+        });
+
+        if (!ticket) {
+          logger.info(
+            `Invalid attempt to join channel of ticket ${ticketId} by user ${user.id} (not found)`
+          );
+          return;
         }
-      );
+
+        const effCid = Number(effectiveCompanyIdForSocket);
+        if (
+          !Number.isFinite(effCid) ||
+          Number(ticket.companyId) !== effCid
+        ) {
+          logger.info(
+            `Invalid attempt to join channel of ticket ${ticketId} by user ${user.id} (company mismatch)`
+          );
+          return;
+        }
+
+        await assertUserCanAccessTicketResource(
+          socketActor,
+          toTicketAccessPayload(ticket),
+          effCid,
+          "socket.joinChatBox"
+        );
+
+        let c: number;
+        if ((c = counters.incrementCounter(`ticket-${ticketId}`)) === 1) {
+          socket.join(ticketId);
+        }
+        logger.debug(
+          `joinChatbox[${c}]: Channel: ${ticketId} by user ${user.id}`
+        );
+      } catch (error) {
+        logger.info(
+          `Invalid attempt to join channel of ticket ${ticketId} by user ${user.id}`
+        );
+        logger.debug(
+          { err: error instanceof Error ? error.message : String(error) },
+          "[socket] joinChatBox denied"
+        );
+      }
     });
     
     socket.on("leaveChatBox", async (ticketId: string) => {

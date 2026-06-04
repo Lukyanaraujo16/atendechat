@@ -12,6 +12,7 @@ import { AuthContext } from "../../context/Auth/AuthContext";
 import { getCrmTerminology } from "../../utils/crmTerminology";
 import api from "../../services/api";
 import toastError from "../../errors/toastError";
+import { isForbiddenPermissionError } from "../../utils/apiErrorUtils";
 
 function buildTicketCrmNotes(ticket) {
   const contactName = ticket.contact?.name || "";
@@ -108,7 +109,9 @@ export default function TicketCrmDealButton({
         return;
       }
     } catch (e) {
-      toastError(e);
+      if (!isForbiddenPermissionError(e)) {
+        toastError(e);
+      }
       return;
     } finally {
       setOpening(false);

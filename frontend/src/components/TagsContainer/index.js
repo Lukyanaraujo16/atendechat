@@ -23,6 +23,7 @@ import Autocomplete from "@material-ui/lab/Autocomplete";
 import LocalOfferOutlinedIcon from "@material-ui/icons/LocalOfferOutlined";
 import { isArray, isString } from "lodash";
 import toastError from "../../errors/toastError";
+import { isForbiddenPermissionError } from "../../utils/apiErrorUtils";
 import api from "../../services/api";
 import { i18n } from "../../translate/i18n";
 
@@ -73,7 +74,7 @@ const usePopoverStyles = makeStyles((theme) => ({
 }));
 
 /** Autocomplete de tags do ticket (sincroniza via POST /tags/sync). */
-export function TicketTagsEditor({ ticket, autoFocus }) {
+export function TicketTagsEditor({ ticket, autoFocus, loadWhenActive = true }) {
   const classes = useEditorStyles();
   const [tags, setTags] = useState([]);
   const [selecteds, setSelecteds] = useState([]);
@@ -86,23 +87,27 @@ export function TicketTagsEditor({ ticket, autoFocus }) {
   }, []);
 
   useEffect(() => {
-    if (isMounted.current) {
-      loadTags().then(() => {
-        if (Array.isArray(ticket?.tags)) {
-          setSelecteds(ticket.tags);
-        } else {
-          setSelecteds([]);
-        }
-      });
+    if (!loadWhenActive || !isMounted.current) {
+      return;
     }
-  }, [ticket]);
+    loadTags().then(() => {
+      if (!isMounted.current) return;
+      if (Array.isArray(ticket?.tags)) {
+        setSelecteds(ticket.tags);
+      } else {
+        setSelecteds([]);
+      }
+    });
+  }, [ticket, loadWhenActive]);
 
   const createTag = async (data) => {
     try {
       const { data: responseData } = await api.post(`/tags`, data);
       return responseData;
     } catch (err) {
-      toastError(err);
+      if (!isForbiddenPermissionError(err)) {
+        toastError(err);
+      }
     }
   };
 
@@ -111,7 +116,9 @@ export function TicketTagsEditor({ ticket, autoFocus }) {
       const { data } = await api.get(`/tags/list`);
       setTags(Array.isArray(data) ? data : data?.tags || []);
     } catch (err) {
-      toastError(err);
+      if (!isForbiddenPermissionError(err)) {
+        toastError(err);
+      }
     }
   };
 
@@ -120,7 +127,9 @@ export function TicketTagsEditor({ ticket, autoFocus }) {
       const { data: responseData } = await api.post(`/tags/sync`, data);
       return responseData;
     } catch (err) {
-      toastError(err);
+      if (!isForbiddenPermissionError(err)) {
+        toastError(err);
+      }
     }
   };
 
@@ -224,7 +233,7 @@ export function TicketTagsButton({ ticket, disabled, className }) {
   };
 
   const editor = (
-    <TicketTagsEditor ticket={ticket} autoFocus={open} />
+    <TicketTagsEditor ticket={ticket} autoFocus={open} loadWhenActive={open} />
   );
 
   return (

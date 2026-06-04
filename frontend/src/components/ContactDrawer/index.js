@@ -28,6 +28,8 @@ import api from "../../services/api";
 import toastError from "../../errors/toastError";
 import { AuthContext } from "../../context/Auth/AuthContext";
 import { getCrmTerminology } from "../../utils/crmTerminology";
+import { canUseCrmFeature } from "../../utils/canUseCrmFeature";
+import { isForbiddenPermissionError } from "../../utils/apiErrorUtils";
 
 const drawerWidth = 320;
 
@@ -109,7 +111,7 @@ const ContactDrawer = ({
 		[user?.company?.businessSegment]
 	);
 	const planFlags = usePlanFlags();
-	const fx = planFlags.effectiveFeatures || {};
+	const showCrmPanel = canUseCrmFeature(user, planFlags);
 
 	const [modalOpen, setModalOpen] = useState(false);
 	const [openForm, setOpenForm] = useState(false);
@@ -129,7 +131,9 @@ const ContactDrawer = ({
 				return;
 			}
 		} catch (e) {
-			toastError(e);
+			if (!isForbiddenPermissionError(e)) {
+				toastError(e);
+			}
 			return;
 		}
 		setCrmDialogDealId(null);
@@ -215,7 +219,7 @@ const ContactDrawer = ({
 							>
 								{i18n.t("contactDrawer.buttons.edit")}
 							</Button>
-							{contact?.id && fx["crm.pipeline"] === true ? (
+							{contact?.id && showCrmPanel ? (
 								<Button
 									variant="outlined"
 									color="primary"
@@ -227,7 +231,7 @@ const ContactDrawer = ({
 							) : null}
 							{(contact.id && openForm) && <ContactForm initialContact={contact} onCancel={() => setOpenForm(false)} />}
 						</Paper>
-						{contact?.id && fx["crm.pipeline"] === true ? (
+						{contact?.id && showCrmPanel ? (
 							<Paper square variant="outlined" className={classes.contactDetails}>
 								<ContactCrmSection
 									contactId={contact.id}
