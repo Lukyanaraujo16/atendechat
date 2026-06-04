@@ -61,10 +61,7 @@ const CreateMessageService = async ({
   }
 
   const io = getIO();
-  const outboundMessage =
-    message.ticket?.isGroup === true
-      ? enrichSingleGroupMessage(message)
-      : message;
+  const outboundMessage = serializeMessageForClient(message);
 
   // mainchannel: todos os usuários da empresa já estão na sala (libs/socket.ts).
   // Sem isso, tickets com queueId null ou fora das filas do usuário não recebiam o evento em tempo real.
@@ -87,5 +84,23 @@ const CreateMessageService = async ({
 
   return message;
 };
+
+/** Payload JSON estável para socket e resposta HTTP (garante ticketId no topo). */
+export function serializeMessageForClient(message: Message) {
+  const plain =
+    message.ticket?.isGroup === true
+      ? enrichSingleGroupMessage(message)
+      : (message.get({ plain: true }) as Record<string, unknown>);
+
+  const ticketId =
+    plain.ticketId ??
+    (plain.ticket as { id?: number } | undefined)?.id ??
+    message.ticketId;
+
+  return {
+    ...plain,
+    ticketId
+  };
+}
 
 export default CreateMessageService;

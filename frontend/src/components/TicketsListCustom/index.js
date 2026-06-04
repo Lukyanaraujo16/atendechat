@@ -229,6 +229,9 @@ const TicketsListCustom = (props) => {
   const inbox = useContext(TicketsInboxContext);
   const { profile, queues } = user || {};
   const safeQueues = Array.isArray(queues) ? queues : [];
+  const queueIdsKey = (Array.isArray(queues) ? queues : [])
+    .map((q) => q.id)
+    .join(",");
 
   const socketManager = useContext(SocketContext);
 
@@ -434,7 +437,7 @@ const TicketsListCustom = (props) => {
       return ticket.status === status;
     };
 
-    socket.on("ready", () => {
+    const onReady = () => {
       if (groupsOnly) {
         socket.emit("joinTickets", "open");
         socket.emit("joinTickets", "pending");
@@ -443,7 +446,9 @@ const TicketsListCustom = (props) => {
       } else {
         socket.emit("joinNotification");
       }
-    });
+    };
+
+    socket.on("ready", onReady);
 
     const ticketFitsThisList = (ticket) => {
       if (!ticket) return false;
@@ -455,7 +460,7 @@ const TicketsListCustom = (props) => {
       return true;
     };
 
-    socket.on(`company-${companyId}-ticket`, (data) => {
+    const onTicket = (data) => {
       if (data.action === "updateUnread") {
         dispatch({
           type: "RESET_UNREAD",
@@ -495,9 +500,9 @@ const TicketsListCustom = (props) => {
         dispatch({ type: "DELETE_TICKET", payload: data.ticketId });
         if (groupsOnly) fetchAvailableGroups();
       }
-    });
+    };
 
-    socket.on(`company-${companyId}-appMessage`, (data) => {
+    const onAppMessage = (data) => {
       if (!groupsOnly && profile === "user") {
         const vis = data.ticket?.whatsapp?.ticketVisibility || "all";
         if (vis === "admin_supervisor") {
@@ -542,22 +547,26 @@ const TicketsListCustom = (props) => {
           dispatch({ type: "DELETE_TICKET", payload: data.ticket.id });
         }
       }
-    });
+    };
 
-    socket.on(`company-${companyId}-contact`, (data) => {
+    const onContact = (data) => {
       if (data.action === "update") {
         dispatch({
           type: "UPDATE_TICKET_CONTACT",
           payload: data.contact,
         });
       }
-    });
+    };
+
+    socket.on(`company-${companyId}-ticket`, onTicket);
+    socket.on(`company-${companyId}-appMessage`, onAppMessage);
+    socket.on(`company-${companyId}-contact`, onContact);
 
     return () => {
-      socket.off("ready");
-      socket.off(`company-${companyId}-ticket`);
-      socket.off(`company-${companyId}-appMessage`);
-      socket.off(`company-${companyId}-contact`);
+      socket.off("ready", onReady);
+      socket.off(`company-${companyId}-ticket`, onTicket);
+      socket.off(`company-${companyId}-appMessage`, onAppMessage);
+      socket.off(`company-${companyId}-contact`, onContact);
     };
   }, [
     isControlled,
@@ -574,7 +583,7 @@ const TicketsListCustom = (props) => {
     chatbotOnly,
     groupsOnly,
     user?.allTicket,
-    safeQueues,
+    queueIdsKey,
     fetchAvailableGroups,
   ]);
 

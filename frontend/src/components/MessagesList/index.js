@@ -1,4 +1,13 @@
-import React, { useState, useEffect, useReducer, useRef, useContext } from "react";
+import React, {
+  useState,
+  useEffect,
+  useReducer,
+  useRef,
+  useContext,
+  useCallback,
+  forwardRef,
+  useImperativeHandle,
+} from "react";
 
 import { isSameDay, parseISO, format } from "date-fns";
 import clsx from "clsx";
@@ -333,6 +342,17 @@ const reducer = (state, action) => {
   }
 };
 
+export const resolveMessageTicketId = (message, data = null) => {
+  const raw =
+    message?.ticketId ??
+    message?.ticket?.id ??
+    data?.ticket?.id ??
+    data?.message?.ticketId;
+  if (raw == null || raw === "") return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+};
+
 const getGroupSenderDisplayName = (message) => {
   if (message?.displayParticipantName) {
     return message.displayParticipantName;
@@ -345,15 +365,18 @@ const getGroupSenderDisplayName = (message) => {
   return name || number || "";
 };
 
-const MessagesList = ({
-  ticket,
-  ticketId,
-  isGroup,
-  onPartialEnrichWarning,
-  onLoadError,
-  /** Incrementar para recarregar mensagens (ex.: ticket atualizado via socket). */
-  reloadToken = 0,
-}) => {
+const MessagesList = forwardRef(function MessagesList(
+  {
+    ticket,
+    ticketId,
+    isGroup,
+    onPartialEnrichWarning,
+    onLoadError,
+    /** Incrementar para recarregar mensagens (ex.: ticket atualizado via socket). */
+    reloadToken = 0,
+  },
+  ref
+) {
   const classes = useStyles();
 
   const [messagesList, dispatch] = useReducer(reducer, []);
@@ -368,6 +391,32 @@ const MessagesList = ({
   const currentTicketId = useRef(ticketId);
 
   const socketManager = useContext(SocketContext);
+
+  const scrollToBottom = useCallback(() => {
+    if (lastMessageRef.current) {
+      lastMessageRef.current.scrollIntoView({});
+    }
+  }, []);
+
+  const appendMessage = useCallback(
+    (message, data = null) => {
+      if (!message?.id) return;
+      const msgTicketId = resolveMessageTicketId(message, data);
+      const openId = currentTicketId.current;
+      if (
+        msgTicketId == null ||
+        openId == null ||
+        Number(msgTicketId) !== Number(openId)
+      ) {
+        return;
+      }
+      dispatch({ type: "ADD_MESSAGE", payload: message });
+      scrollToBottom();
+    },
+    [scrollToBottom]
+  );
+
+  useImperativeHandle(ref, () => ({ appendMessage }), [appendMessage]);
 
   useEffect(() => {
     dispatch({ type: "RESET" });
@@ -432,18 +481,19 @@ const MessagesList = ({
 
     socket.on("ready", joinRoom);
 
-    const sameOpenTicket = (msgTicketId) =>
-      msgTicketId != null &&
-      currentTicketId.current != null &&
-      Number(msgTicketId) === Number(currentTicketId.current);
-
     const handleAppMessage = (data) => {
-      if (data.action === "create" && sameOpenTicket(data.message.ticketId)) {
-        dispatch({ type: "ADD_MESSAGE", payload: data.message });
-        scrollToBottom();
+      const msgTicketId = resolveMessageTicketId(data?.message, data);
+      const openId = currentTicketId.current;
+      const sameOpenTicket =
+        msgTicketId != null &&
+        openId != null &&
+        Number(msgTicketId) === Number(openId);
+
+      if (data.action === "create" && sameOpenTicket && data.message) {
+        appendMessage(data.message, data);
       }
 
-      if (data.action === "update" && sameOpenTicket(data.message.ticketId)) {
+      if (data.action === "update" && sameOpenTicket && data.message) {
         dispatch({ type: "UPDATE_MESSAGE", payload: data.message });
       }
     };
@@ -455,16 +505,10 @@ const MessagesList = ({
       socket.off("ready", joinRoom);
       socket.off(`company-${companyId}-appMessage`, handleAppMessage);
     };
-  }, [ticketId, socketManager]);
+  }, [ticketId, socketManager, appendMessage]);
 
   const loadMore = () => {
     setPageNumber((prevPageNumber) => prevPageNumber + 1);
-  };
-
-  const scrollToBottom = () => {
-    if (lastMessageRef.current) {
-      lastMessageRef.current.scrollIntoView({});
-    }
   };
 
   const handleScroll = (e) => {
@@ -908,6 +952,6 @@ const MessagesList = ({
       )}
     </div>
   );
-};
+});
 
 export default MessagesList;

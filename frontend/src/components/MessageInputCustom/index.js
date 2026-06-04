@@ -594,6 +594,7 @@ const MessageInputCustom = (props) => {
     ticket,
     transferModalOpen = false,
     quickRepliesOpen = false,
+    onMessageSent,
   } = props;
 
   const focusBlockers = { transferModalOpen, quickRepliesOpen };
@@ -826,7 +827,10 @@ const MessageInputCustom = (props) => {
       quotedMsg: replyingMessage,
     };
     try {
-      await api.post(`/messages/${ticketId}`, message);
+      const { data } = await api.post(`/messages/${ticketId}`, message);
+      if (data?.message && typeof onMessageSent === "function") {
+        onMessageSent(data.message);
+      }
     } catch (err) {
       toastError(err);
     }

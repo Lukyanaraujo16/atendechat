@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, useRef } from "react";
+import React, { useState, useEffect, useContext, useRef, useCallback } from "react";
 import { useParams, useHistory } from "react-router-dom";
 
 import { toast } from "react-toastify";
@@ -149,6 +149,7 @@ const Ticket = () => {
   const [partialEnrichWarning, setPartialEnrichWarning] = useState(false);
   const [statusActionLoading, setStatusActionLoading] = useState(false);
   const [messagesReloadToken, setMessagesReloadToken] = useState(0);
+  const messagesListRef = useRef(null);
 
   const socketManager = useContext(SocketContext);
   const setCurrentTicket = useContext(TicketsSetContext);
@@ -249,8 +250,18 @@ const Ticket = () => {
       const id = ticketRef.current?.id;
       if (!id) return;
       if (data.action === "update" && data.ticket?.id === id) {
+        const prev = ticketRef.current;
         setTicket(data.ticket);
-        setMessagesReloadToken((t) => t + 1);
+        const isGroup =
+          data.ticket?.isGroup === true ||
+          data.ticket?.contact?.isGroup === true;
+        const structuralChange =
+          data.ticket?.status !== prev?.status ||
+          data.ticket?.userId !== prev?.userId ||
+          data.ticket?.queueId !== prev?.queueId;
+        if (!isGroup && structuralChange) {
+          setMessagesReloadToken((t) => t + 1);
+        }
       }
       if (data.action === "delete" && data.ticketId === id) {
         history.push("/tickets");
@@ -377,8 +388,16 @@ const Ticket = () => {
     );
   };
 
+  const handleMessageSent = useCallback((message) => {
+    const listApi = messagesListRef.current;
+    if (listApi && typeof listApi.appendMessage === "function") {
+      listApi.appendMessage(message);
+    }
+  }, []);
+
   const renderMessagesList = () => (
     <MessagesList
+      ref={messagesListRef}
       ticket={ticket}
       ticketId={ticket.id}
       isGroup={ticket?.isGroup || ticket?.contact?.isGroup}
@@ -421,6 +440,7 @@ const Ticket = () => {
           chatInputControllerRef={chatInputControllerRef}
           transferModalOpen={transferTicketModalOpen}
           quickRepliesOpen={quickRepliesOpen}
+          onMessageSent={handleMessageSent}
         />
       </div>
     );

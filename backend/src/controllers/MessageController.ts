@@ -19,7 +19,9 @@ import UpdateTicketService from "../services/TicketServices/UpdateTicketService"
 import DeleteWhatsAppMessage from "../services/WbotServices/DeleteWhatsAppMessage";
 import SendWhatsAppMedia from "../services/WbotServices/SendWhatsAppMedia";
 import SendWhatsAppMessage from "../services/WbotServices/SendWhatsAppMessage";
-import CreateMessageService from "../services/MessageServices/CreateMessageService";
+import CreateMessageService, {
+  serializeMessageForClient
+} from "../services/MessageServices/CreateMessageService";
 import {
   assertUserCanAccessTicketResource,
   toTicketAccessPayload
@@ -204,29 +206,29 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
         });
       })
     );
-  } else {
-    const sentMessage = await SendWhatsAppMessage({ body, ticket, quotedMsg });
-    const bodyToSave = formatBody(body, ticket.contact);
-    const idToSave = (sentMessage as any)?.key?.id || uuidv4();
-    await CreateMessageService({
-      messageData: {
-        id: idToSave,
-        ticketId: ticket.id,
-        body: bodyToSave,
-        fromMe: true,
-        read: true,
-        ack: (sentMessage as any)?.status,
-        mediaType: "conversation",
-        // mantém rastreabilidade do retorno do Baileys, mas não depende dele para o body
-        ...(sentMessage
-          ? { dataJson: JSON.stringify(sentMessage as any) }
-          : {})
-      } as any,
-      companyId: ticket.companyId
-    });
+    return res.send();
   }
 
-  return res.send();
+  const sentMessage = await SendWhatsAppMessage({ body, ticket, quotedMsg });
+  const bodyToSave = formatBody(body, ticket.contact);
+  const idToSave = (sentMessage as any)?.key?.id || uuidv4();
+  const savedMessage = await CreateMessageService({
+    messageData: {
+      id: idToSave,
+      ticketId: ticket.id,
+      body: bodyToSave,
+      fromMe: true,
+      read: true,
+      ack: (sentMessage as any)?.status,
+      mediaType: "conversation",
+      ...(sentMessage ? { dataJson: JSON.stringify(sentMessage as any) } : {})
+    } as any,
+    companyId: ticket.companyId
+  });
+
+  return res.status(200).json({
+    message: serializeMessageForClient(savedMessage)
+  });
 };
 
 export const remove = async (
