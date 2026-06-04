@@ -49,7 +49,8 @@ export function toTicketAccessPayload(ticket: {
     whatsappId: ticket.whatsappId,
     companyId: ticket.companyId,
     whatsapp: ticket.whatsapp,
-    isGroup: ticket.isGroup === true,
+    isGroup:
+      ticket.isGroup === true || ticket.contact?.isGroup === true,
     contact: ticket.contact ?? null,
     contactId: ticket.contactId
   };
@@ -141,7 +142,8 @@ export async function assertTicketAccess(
 
   await assertWhatsappTicketAccess(ticket, user, Number(cid));
 
-  const isGroupTicket = ticket.isGroup === true;
+  const isGroupTicket =
+    ticket.isGroup === true || ticket.contact?.isGroup === true;
 
   if (isGroupTicket) {
     const contact = await resolveGroupContactForAccess(ticket, Number(cid));

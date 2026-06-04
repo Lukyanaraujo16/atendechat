@@ -5070,6 +5070,8 @@ const messages = {
         ERR_SESSION_EXPIRED: "Sesión expirada. Por favor inicie sesión.",
         ERR_USER_CREATION_DISABLED: "La creación de usuarios fue deshabilitada por el administrador.",
         ERR_NO_PERMISSION: "No tiene permiso para acceder a este recurso.",
+        ERR_GROUP_PERMANENT_CONVERSATION:
+          "Las conversaciones de grupo permanecen abiertas y no se pueden finalizar.",
         ERR_MODULE_NOT_ALLOWED:
           "Este módulo no está habilitado para su empresa (plan o configuración de la plataforma).",
         ERR_PLAN_FEATURE_DISABLED:

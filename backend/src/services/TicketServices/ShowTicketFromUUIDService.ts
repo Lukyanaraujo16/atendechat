@@ -10,6 +10,7 @@ import {
   setStartedOutsideSystemOnTicket
 } from "../../helpers/ticketOrphan";
 import attachContactLabelsToContact from "../../helpers/attachContactLabelsToContact";
+import { ensureGroupTicketPermanentOpen } from "../../helpers/groupTicketRules";
 
 const ShowTicketUUIDService = async (uuid: string): Promise<Ticket> => {
   const ticket = await Ticket.findOne({
@@ -56,7 +57,7 @@ const ShowTicketUUIDService = async (uuid: string): Promise<Ticket> => {
 
   await attachContactLabelsToContact(ticket.contact, ticket.companyId);
 
-  return ticket;
+  return ensureGroupTicketPermanentOpen(ticket);
 };
 
 export default ShowTicketUUIDService;

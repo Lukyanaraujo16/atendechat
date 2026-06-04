@@ -227,7 +227,7 @@ const FindOrCreateTicketService = async (
     }
 
     const initialStatus = groupContact
-      ? "pending"
+      ? "open"
       : options?.newTicketStatus ?? "pending";
 
     const outboundMeta =

@@ -24,6 +24,19 @@ export function useAcceptTicket() {
     async (ticket, { sendGreeting } = {}) => {
       if (!ticket?.id) return null;
 
+      if (ticket.isGroup) {
+        const updated = { ...ticket, status: "open", userId: null };
+        if (typeof inbox?.upsertTicket === "function") {
+          inbox.upsertTicket(updated);
+        }
+        setCurrentTicket({
+          id: updated.id,
+          uuid: updated.uuid,
+          code: uuidv4(),
+        });
+        return updated;
+      }
+
       const { data } = await api.put(`/tickets/${ticket.id}`, {
         status: "open",
         userId: user?.id,

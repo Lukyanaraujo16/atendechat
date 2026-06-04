@@ -22,6 +22,14 @@ export function getTicketViewState(ticket, { loading = false } = {}) {
     return TICKET_VIEW_STATE.ORPHAN;
   }
 
+  if (ticket.isGroup === true) {
+    const status = String(ticket.status || "").toLowerCase();
+    if (status === "closed") {
+      return TICKET_VIEW_STATE.CLOSED;
+    }
+    return TICKET_VIEW_STATE.ACTIVE;
+  }
+
   const status = String(ticket.status || "").toLowerCase();
   if (status === "pending") {
     return TICKET_VIEW_STATE.PENDING;

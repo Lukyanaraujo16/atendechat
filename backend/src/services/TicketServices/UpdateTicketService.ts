@@ -25,6 +25,10 @@ import { logger } from "../../utils/logger";
 import notifyTicketAfterUpdate from "../OneSignalPush/notifyTicketAfterUpdate";
 import RemovePinnedTicketsForTicketService from "../PinnedTicketServices/RemovePinnedTicketsForTicketService";
 import ensureContactAssignmentForTicketUser from "../ContactServices/ensureContactAssignmentForTicketUser";
+import {
+  isGroupTicket,
+  normalizeGroupTicketUpdate
+} from "../../helpers/groupTicketRules";
 
 interface TicketData {
   status?: string;
@@ -43,6 +47,8 @@ interface Request {
   ticketId: string | number;
   companyId: number;
   actionUserId?: string | null;
+  actorProfile?: string;
+  actorSupportMode?: boolean;
 }
 
 interface Response {
@@ -64,6 +70,10 @@ function applyTransferPendingRules(params: {
   ticket: Ticket;
   actionUserId: string | null;
 }): TicketData {
+  if (isGroupTicket(params.ticket)) {
+    return params.ticketData;
+  }
+
   const { ticketData, ticket, actionUserId } = params;
   const oldStatus = ticket.status;
   const oldUid = normalizeUid(ticket.userId ?? ticket.user?.id);
@@ -174,7 +184,9 @@ const UpdateTicketService = async ({
   ticketData,
   ticketId,
   companyId,
-  actionUserId = null
+  actionUserId = null,
+  actorProfile,
+  actorSupportMode
 }: Request): Promise<Response> => {
 
   try {
@@ -182,8 +194,15 @@ const UpdateTicketService = async ({
 
     const ticket = await ShowTicketService(ticketId, companyId);
 
+    const groupSafeData = normalizeGroupTicketUpdate(ticket, ticketData, {
+      id: actionUserId ?? 0,
+      profile: actorProfile,
+      supportMode: actorSupportMode,
+      companyId
+    });
+
     const normalizedTicketData = applyTransferPendingRules({
-      ticketData,
+      ticketData: groupSafeData,
       ticket,
       actionUserId
     });
@@ -549,14 +568,16 @@ const UpdateTicketService = async ({
       oldUserId
     });
 
-    await ensureContactAssignmentForTicketUser({
-      contactId: ticketForEmit.contactId,
-      userId: ticketForEmit.userId,
-      companyId,
-      ticketStatus: ticketForEmit.status,
-      assignedByUserId:
-        actionUserId != null ? Number(actionUserId) : ticketForEmit.userId
-    });
+    if (!isGroupTicket(ticketForEmit)) {
+      await ensureContactAssignmentForTicketUser({
+        contactId: ticketForEmit.contactId,
+        userId: ticketForEmit.userId,
+        companyId,
+        ticketStatus: ticketForEmit.status,
+        assignedByUserId:
+          actionUserId != null ? Number(actionUserId) : ticketForEmit.userId
+      });
+    }
 
     return { ticket: ticketForEmit, oldStatus, oldUserId };
   } catch (err) {

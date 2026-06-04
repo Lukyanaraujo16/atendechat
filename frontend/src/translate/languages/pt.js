@@ -5317,6 +5317,8 @@ const messages = {
         ERR_USER_CREATION_DISABLED:
             "A criação do usuário foi desabilitada pelo administrador.",
         ERR_NO_PERMISSION: "Você não tem permissão para acessar este recurso.",
+        ERR_GROUP_PERMANENT_CONVERSATION:
+          "Conversas de grupo permanecem abertas e não podem ser finalizadas.",
         ERR_MODULE_NOT_ALLOWED:
           "Este módulo não está liberado para a sua empresa (plano ou configuração da plataforma).",
         ERR_PLAN_FEATURE_DISABLED:

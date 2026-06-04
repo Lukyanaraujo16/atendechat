@@ -11,6 +11,7 @@ import {
   setStartedOutsideSystemOnTicket
 } from "../../helpers/ticketOrphan";
 import attachContactLabelsToContact from "../../helpers/attachContactLabelsToContact";
+import { ensureGroupTicketPermanentOpen } from "../../helpers/groupTicketRules";
 
 const ShowTicketService = async (
   id: string | number,
@@ -62,7 +63,7 @@ const ShowTicketService = async (
 
   await attachContactLabelsToContact(ticket.contact, companyId);
 
-  return ticket;
+  return ensureGroupTicketPermanentOpen(ticket);
 };
 
 export default ShowTicketService;

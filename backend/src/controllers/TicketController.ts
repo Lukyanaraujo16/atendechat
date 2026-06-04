@@ -354,7 +354,9 @@ export const update = async (
     ticketData,
     ticketId,
     companyId,
-    actionUserId: id
+    actionUserId: id,
+    actorProfile: profile,
+    actorSupportMode: supportMode
   });
 
 

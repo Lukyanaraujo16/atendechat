@@ -6,6 +6,7 @@ import CreateOrUpdateContactService from "../ContactServices/CreateOrUpdateConta
 import FindOrCreateTicketService from "../TicketServices/FindOrCreateTicketService";
 import ShowWhatsAppService from "../WhatsappService/ShowWhatsAppService";
 import { ensureGroupContactDisplayName } from "../../helpers/groupContactName";
+import { ensureGroupTicketPermanentOpen } from "../../helpers/groupTicketRules";
 
 function normalizeGroupJid(groupId: string): string {
   const s = String(groupId || "").trim();
@@ -81,7 +82,7 @@ const GroupOpenConversationService = async ({
     await ensureGroupContactDisplayName(groupContact, { wbot, whatsappId });
   }
 
-  const ticket = await FindOrCreateTicketService(
+  let ticket = await FindOrCreateTicketService(
     groupContact,
     whatsappId,
     0,
@@ -89,6 +90,8 @@ const GroupOpenConversationService = async ({
     groupContact,
     { forceCreate: true, messageReceivedAt: new Date() }
   );
+
+  ticket = await ensureGroupTicketPermanentOpen(ticket);
 
   return { uuid: ticket.uuid };
 };

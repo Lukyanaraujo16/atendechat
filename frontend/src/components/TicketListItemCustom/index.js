@@ -621,6 +621,15 @@ const TicketListItemCustom = ({
 
   const statusChipMeta = useMemo(() => {
     const isDark = theme.palette.type === "dark";
+    if (ticket.isGroup) {
+      return {
+        label: i18n.t("groups.inbox.chipGroup"),
+        style: {
+          backgroundColor: alpha(theme.palette.primary.main, isDark ? 0.22 : 0.12),
+          color: isDark ? theme.palette.primary.light : theme.palette.primary.dark,
+        },
+      };
+    }
     if (ticket.status === "closed") {
       return {
         label: "Finalizado",
@@ -899,9 +908,10 @@ const TicketListItemCustom = ({
             ) : null}
           </Box>
 
-          {(ticket.status === "pending" ||
-            ticket.status === "open" ||
-            ticket.status === "closed") && (
+          {!ticket.isGroup &&
+            (ticket.status === "pending" ||
+              ticket.status === "open" ||
+              ticket.status === "closed") && (
             <Box className={classes.actionsRow}>
               {ticket.status === "pending" && (
                 <ButtonWithSpinner

@@ -69,6 +69,7 @@ const TicketActionButtonsCustom = ({
   const crmFeatureLoading = showCrmSlot && !crmEnabled && !planFlags.ready;
   const mayDelete = canDeleteTickets(user);
   const { completeAcceptTicket } = useAcceptTicket();
+  const isGroupTicket = Boolean(ticket?.isGroup);
 
   const handleAcceptTicket = async () => {
     setLoading(true);
@@ -132,6 +133,54 @@ const TicketActionButtonsCustom = ({
       setChatbotToggleLoading(false);
     }
   };
+
+  if (isGroupTicket) {
+    return (
+      <div className={classes.actionButtons}>
+        <div className={classes.legacyCluster}>
+          <TicketTagsButton ticket={ticket} disabled={loading} />
+          {contact?.id ? (
+            <Tooltip
+              title={
+                contact.chatbotDisabled
+                  ? i18n.t(
+                      "ticket.chatbot.enableForContact",
+                      "Ativar chatbot para este contato"
+                    )
+                  : i18n.t(
+                      "ticket.chatbot.disableForContact",
+                      "Desativar chatbot para este contato"
+                    )
+              }
+            >
+              <span>
+                <IconButton
+                  size="small"
+                  onClick={handleToggleChatbotForContact}
+                  disabled={loading || chatbotToggleLoading}
+                  aria-label={i18n.t("contacts.chatbotToggle")}
+                >
+                  {contact.chatbotDisabled ? (
+                    <SmartToyOutlinedIcon fontSize="small" />
+                  ) : (
+                    <SmartToyIcon fontSize="small" />
+                  )}
+                </IconButton>
+              </span>
+            </Tooltip>
+          ) : null}
+          {showCrmSlot ? (
+            <TicketCrmDealButton
+              ticket={ticket}
+              onCrmDealSaved={onCrmDealSaved}
+              disabled={loading}
+              featureLoading={crmFeatureLoading}
+            />
+          ) : null}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={classes.actionButtons}>

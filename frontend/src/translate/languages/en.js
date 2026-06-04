@@ -5156,6 +5156,8 @@ const messages = {
 				ERR_SESSION_EXPIRED: "Session expired. Please log in.",
 				ERR_USER_CREATION_DISABLED: "User creation has been disabled by the administrator.",
 				ERR_NO_PERMISSION: "You don't have permission to access this resource.",
+				ERR_GROUP_PERMANENT_CONVERSATION:
+					"Group conversations stay open and cannot be closed.",
 				ERR_MODULE_NOT_ALLOWED:
 					"This module is not enabled for your company (plan or platform settings).",
 				ERR_PLAN_FEATURE_DISABLED: "This feature is not included in your plan.",
