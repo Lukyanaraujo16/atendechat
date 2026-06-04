@@ -17,6 +17,7 @@ import Route from "./Route";
 import LoggedInRoutesContent from "./LoggedInRoutesContent";
 import { LegacyPlatformRedirect } from "./saasRouteUtils";
 import TenantAppShell from "./TenantAppShell";
+import { PlanFlagsProvider } from "../hooks/usePlanFlags";
 
 const Routes = () => {
   return (
@@ -34,11 +35,13 @@ const Routes = () => {
               isPrivate
               path="/saas"
               render={() => (
-                <WhatsAppsProvider>
-                  <SaaSRootLayout>
-                    <PlatformModule />
-                  </SaaSRootLayout>
-                </WhatsAppsProvider>
+                <PlanFlagsProvider>
+                  <WhatsAppsProvider>
+                    <SaaSRootLayout>
+                      <PlatformModule />
+                    </SaaSRootLayout>
+                  </WhatsAppsProvider>
+                </PlanFlagsProvider>
               )}
             />
             <Route
