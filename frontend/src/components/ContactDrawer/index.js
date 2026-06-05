@@ -30,6 +30,7 @@ import { AuthContext } from "../../context/Auth/AuthContext";
 import { getCrmTerminology } from "../../utils/crmTerminology";
 import { canUseCrmFeature } from "../../utils/canUseCrmFeature";
 import { isForbiddenPermissionError } from "../../utils/apiErrorUtils";
+import useIsMobile from "../../hooks/useIsMobile";
 
 const drawerWidth = 320;
 
@@ -37,6 +38,10 @@ const useStyles = makeStyles(theme => ({
 	drawer: {
 		width: drawerWidth,
 		flexShrink: 0,
+	},
+	drawerMobile: {
+		flexShrink: 0,
+		width: 0,
 	},
 	drawerPaper: {
 		width: drawerWidth,
@@ -105,6 +110,7 @@ const ContactDrawer = ({
 	onCrmPanelDataChanged,
 }) => {
 	const classes = useStyles();
+	const isMobile = useIsMobile();
 	const { user } = useContext(AuthContext);
 	const crmTerms = useMemo(
 		() => getCrmTerminology(user?.company?.businessSegment),
@@ -155,16 +161,25 @@ const ContactDrawer = ({
 	return (
 		<>
 			<Drawer
-				className={classes.drawer}
-				variant="persistent"
+				className={isMobile ? classes.drawerMobile : classes.drawer}
+				variant={isMobile ? "temporary" : "persistent"}
 				anchor="right"
 				open={open}
-				PaperProps={{ style: { position: "absolute" } }}
-				BackdropProps={{ style: { position: "absolute" } }}
-				ModalProps={{
-					container: document.getElementById("drawer-container"),
-					style: { position: "absolute" },
-				}}
+				onClose={isMobile ? handleDrawerClose : undefined}
+				PaperProps={
+					isMobile ? undefined : { style: { position: "absolute" } }
+				}
+				BackdropProps={
+					isMobile ? undefined : { style: { position: "absolute" } }
+				}
+				ModalProps={
+					isMobile
+						? undefined
+						: {
+								container: document.getElementById("drawer-container"),
+								style: { position: "absolute" },
+						  }
+				}
 				classes={{
 					paper: classes.drawerPaper,
 				}}

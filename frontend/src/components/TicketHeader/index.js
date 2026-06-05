@@ -14,6 +14,9 @@ const useStyles = makeStyles((theme) => {
 			alignItems: "center",
 			flexWrap: "nowrap",
 			flexShrink: 0,
+			width: "100%",
+			maxWidth: "100%",
+			minWidth: 0,
 			height: "auto",
 			backgroundColor: getChatHeaderSurface(theme),
 			minHeight: 56,
@@ -24,7 +27,8 @@ const useStyles = makeStyles((theme) => {
 			borderTopLeftRadius: PANEL_RADIUS,
 			boxShadow: "none",
 			overflow: "hidden",
-			[theme.breakpoints.down("sm")]: {
+			boxSizing: "border-box",
+			[theme.breakpoints.down("md")]: {
 				flexWrap: "wrap",
 			},
 		},

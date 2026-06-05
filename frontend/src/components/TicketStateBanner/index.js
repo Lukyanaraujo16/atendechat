@@ -10,6 +10,10 @@ const useStyles = makeStyles((theme) => ({
   root: {
     borderRadius: 0,
     flexShrink: 0,
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
+    boxSizing: "border-box",
     alignItems: "flex-start",
     "& .MuiAlert-message": {
       flex: 1,
