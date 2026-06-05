@@ -16,7 +16,13 @@ import ErrorIcon from '@material-ui/icons/Error';
 import moment from 'moment';
 
 import Rating from '@material-ui/lab/Rating';
+import Chip from "@material-ui/core/Chip";
+import Box from "@material-ui/core/Box";
+import Typography from "@material-ui/core/Typography";
+import PeopleIcon from "@material-ui/icons/People";
 import { i18n } from "../../translate/i18n";
+import useIsMobile from "../../hooks/useIsMobile";
+import { MobileEntityCard, MobileCardList } from "../../ui";
 
 const useStyles = makeStyles(theme => ({
 	on: {
@@ -57,6 +63,12 @@ const useStyles = makeStyles(theme => ({
 		backgroundColor: theme.palette.background.paper,
 		boxShadow: "none",
 	},
+	mobileCardChips: {
+		display: "flex",
+		flexWrap: "wrap",
+		gap: theme.spacing(0.5),
+		maxWidth: "100%",
+	},
 }));
 
 export function RatingBox ({ rating }) {
@@ -73,6 +85,7 @@ export function RatingBox ({ rating }) {
 export default function TableAttendantsStatus(props) {
     const { loading, attendants } = props
 	const classes = useStyles();
+	const isMobile = useIsMobile();
 
     function renderList () {
         return attendants.map((a, k) => (
@@ -94,6 +107,49 @@ export default function TableAttendantsStatus(props) {
 
 	function formatTime(minutes){
 		return moment().startOf('day').add(minutes, 'minutes').format('HH[h] mm[m]');
+	}
+
+	if (isMobile) {
+		if (loading) {
+			return <Skeleton variant="rect" height={150} />;
+		}
+		if (!attendants?.length) {
+			return (
+				<Typography color="textSecondary" align="center" style={{ padding: 24 }}>
+					{i18n.t("dashboard.mobile.noData")}
+				</Typography>
+			);
+		}
+		return (
+			<MobileCardList>
+				{attendants.map((a, k) => (
+					<MobileEntityCard
+						key={k}
+						leading={<PeopleIcon color="action" />}
+						title={a.name}
+						subtitle={
+							a.online
+								? i18n.t("dashboard.mobile.statusOnline")
+								: i18n.t("dashboard.mobile.statusOffline")
+						}
+					>
+						<Box className={classes.mobileCardChips}>
+							<Chip
+								size="small"
+								variant="outlined"
+								label={i18n.t("dashboard.onlineTable.ratings")}
+							/>
+							<RatingBox rating={a.rating} />
+							<Chip
+								size="small"
+								variant="outlined"
+								label={`${i18n.t("dashboard.onlineTable.avgSupportTime")}: ${formatTime(a.avgSupportTime, 2)}`}
+							/>
+						</Box>
+					</MobileEntityCard>
+				))}
+			</MobileCardList>
+		);
 	}
 
     return ( !loading ?

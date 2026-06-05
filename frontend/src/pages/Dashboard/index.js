@@ -45,6 +45,20 @@ import { i18n } from "../../translate/i18n";
 import CompanyStorageUsageCard from "../../components/CompanyStorageUsageCard";
 import OnboardingChecklist from "../../components/OnboardingChecklist";
 import { AuthContext } from "../../context/Auth/AuthContext";
+import useIsMobile from "../../hooks/useIsMobile";
+import {
+  AppDialog,
+  AppDialogTitle,
+  AppDialogContent,
+  AppDialogActions,
+  AppPrimaryButton,
+  AppSecondaryButton,
+  MobileEntityCard,
+  MobileCardList,
+} from "../../ui";
+import Box from "@material-ui/core/Box";
+import Chip from "@material-ui/core/Chip";
+import PeopleIcon from "@material-ui/icons/People";
 
 const useStyles = makeStyles((theme) => ({
   container: {
@@ -124,6 +138,7 @@ const useStyles = makeStyles((theme) => ({
     fontSize: "0.875rem",
     fontWeight: 500,
     color: theme.palette.text.secondary,
+    wordBreak: "break-word",
   },
   iconCircle: {
     width: 40,
@@ -250,6 +265,36 @@ const useStyles = makeStyles((theme) => ({
     border: `1px solid ${theme.palette.divider}`,
     boxShadow: theme.shadows[1],
   },
+  mobileRoot: {
+    overflowX: "hidden",
+    width: "100%",
+    maxWidth: "100%",
+  },
+  mobilePeriodRow: {
+    display: "flex",
+    flexDirection: "column",
+    gap: theme.spacing(1.5),
+    width: "100%",
+    marginBottom: theme.spacing(2),
+  },
+  mobilePeriodSelect: {
+    width: "100%",
+  },
+  mobileCardChips: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: theme.spacing(0.5),
+    maxWidth: "100%",
+  },
+  mobileMetricItem: {
+    [theme.breakpoints.down("md")]: {
+      padding: theme.spacing(0.5),
+    },
+  },
+  mobileSectionTitle: {
+    fontSize: "1rem",
+    marginTop: theme.spacing(2),
+  },
 }));
 
 // Converte série real (por dia) em dados para o mini gráfico. Se não houver série, usa valor único (linha estável).
@@ -267,7 +312,9 @@ function seriesToSparkData(series, valueKey, fallbackValue = 0) {
 const Dashboard = () => {
   const classes = useStyles();
   const theme = useTheme();
+  const isMobile = useIsMobile();
   const { user } = useContext(AuthContext);
+  const [periodDialogOpen, setPeriodDialogOpen] = useState(false);
   const chartInfo = theme.palette.info.main;
   const chartWarning = theme.palette.warning.main;
   const chartSuccess = theme.palette.success.main;
@@ -332,7 +379,11 @@ const Dashboard = () => {
   }, [user?.profile, user?.supportMode]);
 
   const handlePeriodChange = (value) => {
-    setPeriod(Number(value));
+    const next = Number(value);
+    setPeriod(next);
+    if (isMobile && next === 0) {
+      setPeriodDialogOpen(true);
+    }
   };
 
   async function fetchData() {
@@ -416,59 +467,206 @@ const Dashboard = () => {
         }))
       : [{ name: "1", value: totalMensagens }, { name: "2", value: totalMensagens }];
 
+  const metricGridProps = isMobile ? { xs: 6, sm: 6, md: 4 } : { xs: 12, sm: 6, md: 4 };
+
+  const renderUserPerformanceMobile = () => {
+    if (!attendants.length) {
+      return (
+        <Paper elevation={0} className={classes.tableSectionPaper}>
+          <Typography className={classes.emptyRow}>
+            {i18n.t("dashboard.mobile.noData")}
+          </Typography>
+        </Paper>
+      );
+    }
+    return (
+      <MobileCardList>
+        {attendants.map((a, k) => (
+          <MobileEntityCard
+            key={k}
+            leading={<PeopleIcon color="action" />}
+            title={a.name}
+            subtitle={
+              a.online
+                ? i18n.t("dashboard.mobile.statusOnline")
+                : i18n.t("dashboard.mobile.statusOffline")
+            }
+          >
+            <Box className={classes.mobileCardChips}>
+              <Chip
+                size="small"
+                variant="outlined"
+                label={`${i18n.t("dashboard.mobile.total")}: ${a.total != null ? a.total : "—"}`}
+              />
+              <Chip
+                size="small"
+                variant="outlined"
+                label={`${i18n.t("dashboard.mobile.avgTime")}: ${
+                  a.avgSupportTime != null ? formatTime(a.avgSupportTime) : "—"
+                }`}
+              />
+              <Chip
+                size="small"
+                variant="outlined"
+                label={`${i18n.t("dashboard.mobile.rating")}: ${
+                  a.rating != null ? Number(a.rating).toFixed(1) : "—"
+                }`}
+              />
+              <Chip
+                size="small"
+                color={a.online ? "primary" : "default"}
+                variant="outlined"
+                label={
+                  a.online
+                    ? i18n.t("dashboard.mobile.statusOnline")
+                    : i18n.t("dashboard.mobile.statusOffline")
+                }
+              />
+            </Box>
+          </MobileEntityCard>
+        ))}
+      </MobileCardList>
+    );
+  };
+
+  const renderPerformanceTableDesktop = (columns, rows, emptyColSpan) => (
+    <Paper elevation={0} className={classes.tableSectionPaper}>
+      <TableContainer>
+        <Table size="small" className={classes.performanceTable}>
+          <TableHead>
+            <TableRow>
+              {columns.map((col) => (
+                <TableCell key={col.key} align={col.align || "left"}>
+                  {col.label}
+                </TableCell>
+              ))}
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {rows.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={emptyColSpan} className={classes.emptyRow}>
+                  {i18n.t("dashboard.mobile.noData")}
+                </TableCell>
+              </TableRow>
+            ) : (
+              rows
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    </Paper>
+  );
+
+  const customPeriodFields = (
+    <>
+      <TextField
+        type="date"
+        size="small"
+        fullWidth={isMobile}
+        label={i18n.t("dashboard.filters.initialDate")}
+        value={dateFrom}
+        onChange={(e) => setDateFrom(e.target.value)}
+        InputLabelProps={{ shrink: true }}
+        className={classes.periodDateField}
+        inputProps={{ "aria-label": i18n.t("dashboard.filters.initialDate") }}
+      />
+      <TextField
+        type="date"
+        size="small"
+        fullWidth={isMobile}
+        label={i18n.t("dashboard.filters.finalDate")}
+        value={dateTo}
+        onChange={(e) => setDateTo(e.target.value)}
+        InputLabelProps={{ shrink: true }}
+        className={classes.periodDateField}
+        inputProps={{ "aria-label": i18n.t("dashboard.filters.finalDate") }}
+      />
+      <ButtonWithSpinner
+        loading={loading}
+        onClick={() => {
+          fetchData();
+          if (isMobile) setPeriodDialogOpen(false);
+        }}
+        variant="contained"
+        color="primary"
+        size="small"
+        fullWidth={isMobile}
+      >
+        {i18n.t("dashboard.buttons.filter", "Filtrar")}
+      </ButtonWithSpinner>
+    </>
+  );
+
   return (
-    <div className={classes.dashboardBg}>
+    <div className={`${classes.dashboardBg} ${isMobile ? classes.mobileRoot : ""}`}>
       <Container maxWidth={false} disableGutters className={classes.container}>
-        {/* Seletor de período - compacto, canto superior direito */}
-        <div className={classes.periodSelectorRow}>
-          <FormControl size="small" variant="outlined" className={classes.periodSelect}>
-            <InputLabel>{i18n.t("dashboard.periodSelect.title", "Período")}</InputLabel>
-            <Select
-              value={period}
-              onChange={(e) => handlePeriodChange(e.target.value)}
-              label={i18n.t("dashboard.periodSelect.title", "Período")}
+        {isMobile ? (
+          <AppDialog
+            open={periodDialogOpen}
+            onClose={() => setPeriodDialogOpen(false)}
+            maxWidth="sm"
+          >
+            <AppDialogTitle>{i18n.t("dashboard.periodSelect.options.custom")}</AppDialogTitle>
+            <AppDialogContent>
+              <Box display="flex" flexDirection="column" style={{ gap: 12 }}>
+                {customPeriodFields}
+              </Box>
+            </AppDialogContent>
+            <AppDialogActions>
+              <AppSecondaryButton onClick={() => setPeriodDialogOpen(false)}>
+                {i18n.t("kanban.quickActions.cancel")}
+              </AppSecondaryButton>
+            </AppDialogActions>
+          </AppDialog>
+        ) : null}
+
+        {isMobile ? (
+          <div className={classes.mobilePeriodRow}>
+            <FormControl
+              size="small"
+              variant="outlined"
+              fullWidth
+              className={classes.mobilePeriodSelect}
             >
-              <MenuItem value={1}>{i18n.t("dashboard.periodSelect.options.today", "Hoje")}</MenuItem>
-              <MenuItem value={7}>{i18n.t("dashboard.periodSelect.options.last7", "7 dias")}</MenuItem>
-              <MenuItem value={15}>{i18n.t("dashboard.periodSelect.options.last15", "15 dias")}</MenuItem>
-              <MenuItem value={30}>{i18n.t("dashboard.periodSelect.options.last30", "30 dias")}</MenuItem>
-              <MenuItem value={0}>{i18n.t("dashboard.periodSelect.options.custom", "Personalizado")}</MenuItem>
-            </Select>
-          </FormControl>
-          {period === 0 && (
-            <>
-              <TextField
-                type="date"
-                size="small"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                InputLabelProps={{ shrink: true }}
-                className={classes.periodDateField}
-                style={{ width: 140 }}
-                inputProps={{ "aria-label": "Data inicial" }}
-              />
-              <TextField
-                type="date"
-                size="small"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                InputLabelProps={{ shrink: true }}
-                className={classes.periodDateField}
-                style={{ width: 140 }}
-                inputProps={{ "aria-label": "Data final" }}
-              />
-              <ButtonWithSpinner
-                loading={loading}
-                onClick={() => fetchData()}
-                variant="contained"
-                color="primary"
-                size="small"
+              <InputLabel>{i18n.t("dashboard.periodSelect.title", "Período")}</InputLabel>
+              <Select
+                value={period}
+                onChange={(e) => handlePeriodChange(e.target.value)}
+                label={i18n.t("dashboard.periodSelect.title", "Período")}
               >
-                {i18n.t("dashboard.buttons.filter", "Filtrar")}
-              </ButtonWithSpinner>
-            </>
-          )}
-        </div>
+                <MenuItem value={1}>{i18n.t("dashboard.periodSelect.options.today", "Hoje")}</MenuItem>
+                <MenuItem value={7}>{i18n.t("dashboard.periodSelect.options.last7", "7 dias")}</MenuItem>
+                <MenuItem value={15}>{i18n.t("dashboard.periodSelect.options.last15", "15 dias")}</MenuItem>
+                <MenuItem value={30}>{i18n.t("dashboard.periodSelect.options.last30", "30 dias")}</MenuItem>
+                <MenuItem value={0}>{i18n.t("dashboard.periodSelect.options.custom", "Personalizado")}</MenuItem>
+              </Select>
+            </FormControl>
+            {period === 0 ? (
+              <AppSecondaryButton onClick={() => setPeriodDialogOpen(true)} fullWidth>
+                {i18n.t("dashboard.mobile.configurePeriod")}
+              </AppSecondaryButton>
+            ) : null}
+          </div>
+        ) : (
+          <div className={classes.periodSelectorRow}>
+            <FormControl size="small" variant="outlined" className={classes.periodSelect}>
+              <InputLabel>{i18n.t("dashboard.periodSelect.title", "Período")}</InputLabel>
+              <Select
+                value={period}
+                onChange={(e) => handlePeriodChange(e.target.value)}
+                label={i18n.t("dashboard.periodSelect.title", "Período")}
+              >
+                <MenuItem value={1}>{i18n.t("dashboard.periodSelect.options.today", "Hoje")}</MenuItem>
+                <MenuItem value={7}>{i18n.t("dashboard.periodSelect.options.last7", "7 dias")}</MenuItem>
+                <MenuItem value={15}>{i18n.t("dashboard.periodSelect.options.last15", "15 dias")}</MenuItem>
+                <MenuItem value={30}>{i18n.t("dashboard.periodSelect.options.last30", "30 dias")}</MenuItem>
+                <MenuItem value={0}>{i18n.t("dashboard.periodSelect.options.custom", "Personalizado")}</MenuItem>
+              </Select>
+            </FormControl>
+            {period === 0 ? customPeriodFields : null}
+          </div>
+        )}
 
         {/* Cards */}
         <Grid container spacing={3}>
@@ -478,12 +676,12 @@ const Dashboard = () => {
             </Grid>
           ) : null}
           {user?.profile === "admin" || user?.supportMode === true ? (
-            <Grid item xs={12} sm={6} md={4}>
+            <Grid item {...metricGridProps} className={isMobile ? classes.mobileMetricItem : undefined}>
               <CompanyStorageUsageCard data={companyStorage} loading={companyStorageLoading} />
             </Grid>
           ) : null}
           {/* 1. Total de Atendimentos */}
-          <Grid item xs={12} sm={6} md={4}>
+          <Grid item {...metricGridProps} className={isMobile ? classes.mobileMetricItem : undefined}>
             <Paper className={classes.card} elevation={0}>
               <div className={classes.cardHeader}>
                 <Typography className={classes.cardTitle}>
@@ -519,7 +717,7 @@ const Dashboard = () => {
           </Grid>
 
           {/* 2. Pendentes */}
-          <Grid item xs={12} sm={6} md={4}>
+          <Grid item {...metricGridProps} className={isMobile ? classes.mobileMetricItem : undefined}>
             <Paper className={classes.card} elevation={0}>
               <div className={classes.cardHeader}>
                 <Typography className={classes.cardTitle}>
@@ -555,7 +753,7 @@ const Dashboard = () => {
           </Grid>
 
           {/* 3. Fechados */}
-          <Grid item xs={12} sm={6} md={4}>
+          <Grid item {...metricGridProps} className={isMobile ? classes.mobileMetricItem : undefined}>
             <Paper className={classes.card} elevation={0}>
               <div className={classes.cardHeader}>
                 <Typography className={classes.cardTitle}>
@@ -594,7 +792,7 @@ const Dashboard = () => {
           </Grid>
 
           {/* 4. Tempo Médio 1° Resposta */}
-          <Grid item xs={12} sm={6} md={4}>
+          <Grid item {...metricGridProps} className={isMobile ? classes.mobileMetricItem : undefined}>
             <Paper className={classes.card} elevation={0}>
               <div className={classes.cardHeader}>
                 <Typography className={classes.cardTitle}>
@@ -630,7 +828,7 @@ const Dashboard = () => {
           </Grid>
 
           {/* 5. Tempo Médio Atendimento */}
-          <Grid item xs={12} sm={6} md={4}>
+          <Grid item {...metricGridProps} className={isMobile ? classes.mobileMetricItem : undefined}>
             <Paper className={classes.card} elevation={0}>
               <div className={classes.cardHeader}>
                 <Typography className={classes.cardTitle}>
@@ -666,7 +864,7 @@ const Dashboard = () => {
           </Grid>
 
           {/* 6. Total de Mensagens */}
-          <Grid item xs={12} sm={6} md={4}>
+          <Grid item {...metricGridProps} className={isMobile ? classes.mobileMetricItem : undefined}>
             <Paper className={classes.card} elevation={0}>
               <div className={classes.cardHeader}>
                 <Typography className={classes.cardTitle}>
@@ -702,7 +900,7 @@ const Dashboard = () => {
           </Grid>
 
           {/* 7. Total de Contatos */}
-          <Grid item xs={12} sm={6} md={4}>
+          <Grid item {...metricGridProps} className={isMobile ? classes.mobileMetricItem : undefined}>
             <Paper className={classes.card} elevation={0}>
               <div className={classes.cardHeader}>
                 <Typography className={classes.cardTitle}>Total de Contatos</Typography>
@@ -732,7 +930,7 @@ const Dashboard = () => {
           </Grid>
 
           {/* 8. Usuários Online */}
-          <Grid item xs={12} sm={6} md={4}>
+          <Grid item {...metricGridProps} className={isMobile ? classes.mobileMetricItem : undefined}>
             <Paper className={classes.card} elevation={0}>
               <div className={classes.cardHeader}>
                 <Typography className={classes.cardTitle}>Usuários Online</Typography>
@@ -762,7 +960,7 @@ const Dashboard = () => {
           </Grid>
 
           {/* 9. Avaliação Média */}
-          <Grid item xs={12} sm={6} md={4}>
+          <Grid item {...metricGridProps} className={isMobile ? classes.mobileMetricItem : undefined}>
             <Paper className={classes.card} elevation={0}>
               <div className={classes.cardHeader}>
                 <Typography className={classes.cardTitle}>
@@ -803,126 +1001,122 @@ const Dashboard = () => {
           </Grid>
         </Grid>
 
-        {/* Performance de Usuários / Filas / Conexões */}
-        <Typography className={classes.sectionTitle}>
-          Performance de Usuários
+        <Typography
+          className={isMobile ? `${classes.sectionTitle} ${classes.mobileSectionTitle}` : classes.sectionTitle}
+        >
+          {i18n.t("dashboard.mobile.userPerformance")}
         </Typography>
-        {attendants.length > 0 ? (
-          <Paper elevation={0} className={classes.tableSectionPaper}>
-            <TableContainer>
-              <Table size="small" className={classes.performanceTable}>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Usuário</TableCell>
-                    <TableCell align="center">Status</TableCell>
-                    <TableCell align="center">Total</TableCell>
-                    <TableCell align="center">Tempo Médio</TableCell>
-                    <TableCell align="center">Avaliação</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {attendants.map((a, k) => (
-                    <TableRow key={k}>
-                      <TableCell>{a.name}</TableCell>
-                      <TableCell align="center">
-                        <span className={a.online ? classes.statusBadgeOnline : classes.statusBadgeOffline}>
-                          {a.online ? "Online" : "Offline"}
-                        </span>
-                      </TableCell>
-                      <TableCell align="center">{a.total != null ? a.total : "-"}</TableCell>
-                      <TableCell align="center">{a.avgSupportTime != null ? formatTime(a.avgSupportTime) : "-"}</TableCell>
-                      <TableCell align="center">{a.rating != null ? Number(a.rating).toFixed(1) : "-"}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Paper>
+        {isMobile ? (
+          renderUserPerformanceMobile()
         ) : (
-          <Paper elevation={0} className={classes.tableSectionPaper}>
-            <TableContainer>
-              <Table size="small" className={classes.performanceTable}>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Usuário</TableCell>
-                    <TableCell align="center">Status</TableCell>
-                    <TableCell align="center">Total</TableCell>
-                    <TableCell align="center">Tempo Médio</TableCell>
-                    <TableCell align="center">Avaliação</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  <TableRow><TableCell colSpan={5} className={classes.emptyRow}>Nenhum dado disponível</TableCell></TableRow>
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Paper>
+          renderPerformanceTableDesktop(
+            [
+              { key: "user", label: i18n.t("dashboard.mobile.userColumn") },
+              { key: "status", label: i18n.t("dashboard.mobile.statusColumn"), align: "center" },
+              { key: "total", label: i18n.t("dashboard.mobile.total"), align: "center" },
+              { key: "avg", label: i18n.t("dashboard.mobile.avgTime"), align: "center" },
+              { key: "rating", label: i18n.t("dashboard.mobile.rating"), align: "center" },
+            ],
+            attendants.map((a, k) => (
+              <TableRow key={k}>
+                <TableCell>{a.name}</TableCell>
+                <TableCell align="center">
+                  <span className={a.online ? classes.statusBadgeOnline : classes.statusBadgeOffline}>
+                    {a.online
+                      ? i18n.t("dashboard.mobile.statusOnline")
+                      : i18n.t("dashboard.mobile.statusOffline")}
+                  </span>
+                </TableCell>
+                <TableCell align="center">{a.total != null ? a.total : "-"}</TableCell>
+                <TableCell align="center">
+                  {a.avgSupportTime != null ? formatTime(a.avgSupportTime) : "-"}
+                </TableCell>
+                <TableCell align="center">
+                  {a.rating != null ? Number(a.rating).toFixed(1) : "-"}
+                </TableCell>
+              </TableRow>
+            )),
+            5
+          )
         )}
 
-        <Typography className={classes.sectionTitle}>
-          Performance de Filas
+        <Typography
+          className={isMobile ? `${classes.sectionTitle} ${classes.mobileSectionTitle}` : classes.sectionTitle}
+        >
+          {i18n.t("dashboard.mobile.queuePerformance")}
         </Typography>
-        <Paper elevation={0} className={classes.tableSectionPaper}>
-          <TableContainer>
-            <Table size="small" className={classes.performanceTable}>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Fila</TableCell>
-                  <TableCell align="center">Total</TableCell>
-                  <TableCell align="center">Tempo Médio</TableCell>
-                  <TableCell align="center">Taxa Resolução</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                <TableRow><TableCell colSpan={4} className={classes.emptyRow}>Nenhum dado disponível</TableCell></TableRow>
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Paper>
+        {isMobile ? (
+          <Paper elevation={0} className={classes.tableSectionPaper}>
+            <Typography className={classes.emptyRow}>{i18n.t("dashboard.mobile.noData")}</Typography>
+          </Paper>
+        ) : (
+          renderPerformanceTableDesktop(
+            [
+              { key: "queue", label: i18n.t("dashboard.mobile.queueColumn") },
+              { key: "total", label: i18n.t("dashboard.mobile.total"), align: "center" },
+              { key: "avg", label: i18n.t("dashboard.mobile.avgTime"), align: "center" },
+              { key: "rate", label: i18n.t("dashboard.cards.resolutionRate"), align: "center" },
+            ],
+            [],
+            4
+          )
+        )}
 
-        <Typography className={classes.sectionTitle}>
-          Performance de Conexões
+        <Typography
+          className={isMobile ? `${classes.sectionTitle} ${classes.mobileSectionTitle}` : classes.sectionTitle}
+        >
+          {i18n.t("dashboard.mobile.connectionPerformance")}
         </Typography>
-        <Paper elevation={0} className={classes.tableSectionPaper}>
-          <TableContainer>
-            <Table size="small" className={classes.performanceTable}>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Conexão</TableCell>
-                  <TableCell align="center">Status</TableCell>
-                  <TableCell align="center">Atendimentos</TableCell>
-                  <TableCell align="center">Mensagens</TableCell>
-                  <TableCell align="center">Tempo Médio</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                <TableRow><TableCell colSpan={5} className={classes.emptyRow}>Nenhum dado disponível</TableCell></TableRow>
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Paper>
+        {isMobile ? (
+          <Paper elevation={0} className={classes.tableSectionPaper}>
+            <Typography className={classes.emptyRow}>{i18n.t("dashboard.mobile.noData")}</Typography>
+          </Paper>
+        ) : (
+          renderPerformanceTableDesktop(
+            [
+              { key: "conn", label: i18n.t("dashboard.mobile.connectionColumn") },
+              { key: "status", label: i18n.t("dashboard.mobile.statusColumn"), align: "center" },
+              { key: "att", label: i18n.t("dashboard.mobile.attendances"), align: "center" },
+              { key: "msg", label: i18n.t("dashboard.cards.totalMessages"), align: "center" },
+              { key: "avg", label: i18n.t("dashboard.mobile.avgTime"), align: "center" },
+            ],
+            [],
+            5
+          )
+        )}
 
-        {/* Gráficos */}
-        <Typography className={classes.sectionTitle}>
-          Atendimentos ao Longo do Tempo
+        <Typography
+          className={isMobile ? `${classes.sectionTitle} ${classes.mobileSectionTitle}` : classes.sectionTitle}
+        >
+          {i18n.t("dashboard.mobile.chartsOverTime")}
         </Typography>
-        <Grid container spacing={3} style={{ marginTop: 8, marginBottom: 24 }}>
+        <Grid container spacing={isMobile ? 2 : 3} style={{ marginTop: 8, marginBottom: isMobile ? 16 : 24 }}>
           <Grid item xs={12}>
             <ChartsDate />
           </Grid>
         </Grid>
-        <Typography className={classes.sectionTitle}>
-          Mensagens ao Longo do Tempo / Performance por Usuário
+        <Typography
+          className={isMobile ? `${classes.sectionTitle} ${classes.mobileSectionTitle}` : classes.sectionTitle}
+        >
+          {i18n.t("dashboard.mobile.chartsByUser")}
         </Typography>
-        <Grid container spacing={3} style={{ marginTop: 8 }}>
+        <Grid container spacing={isMobile ? 2 : 3} style={{ marginTop: 8 }}>
           <Grid item xs={12} md={6}>
             <ChatsUser />
           </Grid>
           <Grid item xs={12} md={6}>
-            {attendants.length > 0 ? (
-              <Paper elevation={0} className={classes.tableSectionPaper} style={{ marginBottom: 0, height: "100%" }}>
+            {attendants.length > 0 || loading ? (
+              isMobile ? (
                 <TableAttendantsStatus attendants={attendants} loading={loading} />
-              </Paper>
+              ) : (
+                <Paper
+                  elevation={0}
+                  className={classes.tableSectionPaper}
+                  style={{ marginBottom: 0, height: "100%" }}
+                >
+                  <TableAttendantsStatus attendants={attendants} loading={loading} />
+                </Paper>
+              )
             ) : null}
           </Grid>
         </Grid>

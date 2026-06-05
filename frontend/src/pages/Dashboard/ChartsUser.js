@@ -19,9 +19,11 @@ import api from '../../services/api';
 import { format } from 'date-fns';
 import { toast } from 'react-toastify';
 import { i18n } from '../../translate/i18n';
+import useIsMobile from '../../hooks/useIsMobile';
 
 export const ChatsUser = () => {
   const theme = useMuiV5BridgedTheme();
+  const isMobile = useIsMobile();
   const [initialDate, setInitialDate] = useState(new Date());
   const [finalDate, setFinalDate] = useState(new Date());
   const [ticketsData, setTicketsData] = useState({ data: [] });
@@ -89,7 +91,7 @@ export const ChatsUser = () => {
   };
 
   const dateFieldSx = {
-    width: '18ch',
+    width: isMobile ? '100%' : '18ch',
     '& .MuiInputBase-input': { color: theme.palette.text.primary },
     '& .MuiInputLabel-root': { color: theme.palette.text.secondary },
     '& .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.divider },
@@ -102,11 +104,16 @@ export const ChatsUser = () => {
   return (
     <ThemeProvider theme={theme}>
     <Paper elevation={0} sx={paperSx}>
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 2, mb: 3 }}>
-        <Typography variant="h6" style={{ fontWeight: 600 }} color="text.primary">
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 2, mb: 3, width: '100%', maxWidth: '100%', overflow: 'hidden' }}>
+        <Typography variant={isMobile ? 'subtitle1' : 'h6'} style={{ fontWeight: 600, width: isMobile ? '100%' : undefined }} color="text.primary">
           {i18n.t('dashboard.charts.user.title')}
         </Typography>
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="center">
+        <Stack
+          direction={isMobile ? 'column' : 'row'}
+          spacing={2}
+          alignItems={isMobile ? 'stretch' : 'center'}
+          sx={{ width: isMobile ? '100%' : 'auto' }}
+        >
           <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={brLocale}>
             <DatePicker
               value={initialDate}
@@ -125,22 +132,29 @@ export const ChatsUser = () => {
             variant="contained"
             onClick={handleGetTicketsInformation}
             disabled={loading}
+            fullWidth={isMobile}
             sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
           >
             {i18n.t('dashboard.charts.user.filter')}
           </Button>
         </Stack>
       </Box>
-      <Box sx={{ width: '100%', height: 320 }}>
-        <ResponsiveContainer>
+      <Box sx={{ width: '100%', height: isMobile ? Math.max(260, chartData.length * 36) : 320, maxWidth: '100%', overflow: 'hidden' }}>
+        <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={chartData}
             layout="vertical"
-            margin={{ top: 8, right: 24, left: 80, bottom: 8 }}
+            margin={{ top: 8, right: 16, left: isMobile ? 4 : 80, bottom: 8 }}
           >
             <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
-            <XAxis type="number" tick={{ fontSize: 12, fill: axisStroke }} stroke={axisStroke} allowDecimals={false} />
-            <YAxis type="category" dataKey="name" width={72} tick={{ fontSize: 12, fill: axisStroke }} stroke={axisStroke} />
+            <XAxis type="number" tick={{ fontSize: isMobile ? 10 : 12, fill: axisStroke }} stroke={axisStroke} allowDecimals={false} />
+            <YAxis
+              type="category"
+              dataKey="name"
+              width={isMobile ? 96 : 72}
+              tick={{ fontSize: isMobile ? 10 : 12, fill: axisStroke }}
+              stroke={axisStroke}
+            />
             <Tooltip content={<CustomTooltip />} />
             <Bar dataKey="quantidade" radius={[0, 4, 4, 0]} maxBarSize={28}>
               {chartData.map((_, index) => (
