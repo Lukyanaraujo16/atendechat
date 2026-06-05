@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useReducer } from "react";
+import React, { useState, useEffect, useReducer, useMemo } from "react";
 
 import { toast } from "react-toastify";
 import { useHistory } from "react-router-dom";
@@ -51,6 +51,21 @@ import {
 import FlowBuilderModal from "../../components/FlowBuilderModal";
 import FlowBuilderTemplateModal from "../../components/FlowBuilderTemplateModal";
 import FlowBuilderImportFlowModal from "../../components/FlowBuilderImportFlowModal";
+import useIsMobile from "../../hooks/useIsMobile";
+import {
+  AppDialog,
+  AppDialogTitle,
+  AppDialogContent,
+  AppDialogActions,
+  AppPrimaryButton,
+  AppSecondaryButton,
+  MobileEntityCard,
+  MobileCardList,
+  MobileActionsMenu,
+} from "../../ui";
+import { flowNodeCountFromRecord } from "../../utils/flowBuilderNodeLabels";
+import FilterListIcon from "@material-ui/icons/FilterList";
+import VisibilityOutlinedIcon from "@material-ui/icons/VisibilityOutlined";
 
 const reducer = (state, action) => {
   if (action.type === "LOAD_CONTACTS") {
@@ -107,6 +122,21 @@ const useStyles = makeStyles((theme) => ({
     color: theme.palette.text.primary,
     ...theme.scrollbarStyles,
   },
+  mainPaperMobile: {
+    overflowX: "hidden",
+  },
+  mobileActions: {
+    display: "flex",
+    flexDirection: "column",
+    gap: theme.spacing(1),
+    width: "100%",
+  },
+  mobileSearchRow: {
+    display: "flex",
+    gap: theme.spacing(1),
+    width: "100%",
+    alignItems: "center",
+  },
   searchField: {
     "& .MuiOutlinedInput-input": {
       color: theme.palette.text.primary,
@@ -128,13 +158,15 @@ const useStyles = makeStyles((theme) => ({
 }));
 
 function formatFlowSubtitle(flow) {
-  const ts = flow.updatedAt;
+  const ts = flow.updatedAt || flow.createdAt;
   if (!ts) return null;
   try {
-    return `Atualizado ${new Date(ts).toLocaleString("pt-BR", {
-      dateStyle: "short",
-      timeStyle: "short",
-    })}`;
+    return i18n.t("flowBuilderList.updatedAt", {
+      date: new Date(ts).toLocaleString(undefined, {
+        dateStyle: "short",
+        timeStyle: "short",
+      }),
+    });
   } catch {
     return null;
   }
@@ -145,6 +177,7 @@ const FlowBuilder = () => {
   const muiV4Theme = useMuiV4Theme();
   const muiV5Theme = useMuiV5BridgedTheme();
   const history = useHistory();
+  const isMobile = useIsMobile();
 
   const [loading, setLoading] = useState(false);
   const [pageNumber, setPageNumber] = useState(1);
@@ -160,6 +193,8 @@ const FlowBuilder = () => {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmDuplicateOpen, setConfirmDuplicateOpen] = useState(false);
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
+  const [filtersDialogOpen, setFiltersDialogOpen] = useState(false);
+  const [editorWarnFlow, setEditorWarnFlow] = useState(null);
 
   const [hasMore, setHasMore] = useState(false);
   const [reloadData, setReloadData] = useState(false);
@@ -276,6 +311,106 @@ const FlowBuilder = () => {
     }
   };
 
+  const filteredFlows = useMemo(() => {
+    const list = Array.isArray(webhooks) ? webhooks : [];
+    const q = String(searchParam || "").trim().toLowerCase();
+    if (!q) return list;
+    return list.filter((f) => String(f.name || "").toLowerCase().includes(q));
+  }, [webhooks, searchParam]);
+
+  const openFlowSummary = (flow) => {
+    history.push(`/flowbuilder/${flow.id}`);
+  };
+
+  const openFlowEditor = (flow, force = false) => {
+    if (!isMobile || force) {
+      history.push(`/flowbuilder/${flow.id}${force ? "?editor=1" : ""}`);
+      return;
+    }
+    setEditorWarnFlow(flow);
+  };
+
+  const renderMobileFlowCard = (flow) => {
+    const subtitle = formatFlowSubtitle(flow);
+    const nodeCount = flowNodeCountFromRecord(flow);
+    const nodeLabel =
+      nodeCount > 0
+        ? i18n.t("flowBuilderList.nodeCount", { count: nodeCount })
+        : i18n.t("flowBuilderList.noNodes");
+
+    const menuItems = [
+      {
+        key: "summary",
+        label: i18n.t("flowBuilderList.mobile.viewSummary"),
+        icon: <VisibilityOutlinedIcon fontSize="small" />,
+        onClick: () => openFlowSummary(flow),
+      },
+      {
+        key: "rename",
+        label: i18n.t("flowBuilderList.mobile.editName"),
+        icon: <EditIcon fontSize="small" />,
+        onClick: () => handleOpenRenameModal(flow),
+      },
+      {
+        key: "editor",
+        label: i18n.t("flowBuilderList.mobile.openAdvancedEditor"),
+        icon: <TuneIcon fontSize="small" />,
+        onClick: () => openFlowEditor(flow),
+      },
+      {
+        key: "duplicate",
+        label: i18n.t("flowBuilderList.mobile.duplicate"),
+        icon: <ContentCopyIcon fontSize="small" />,
+        onClick: () => {
+          setDeletingContact(flow);
+          setConfirmDuplicateOpen(true);
+        },
+      },
+      {
+        key: "delete",
+        label: i18n.t("flowBuilderList.mobile.delete"),
+        icon: <DeleteOutlineIcon fontSize="small" />,
+        danger: true,
+        onClick: () => {
+          setDeletingContact(flow);
+          setConfirmOpen(true);
+        },
+      },
+    ];
+
+    return (
+      <MobileEntityCard
+        key={flow.id}
+        leading={<AccountTreeIcon color="primary" />}
+        title={flow.name}
+        subtitle={subtitle || undefined}
+        badges={
+          <MobileActionsMenu
+            items={menuItems}
+            ariaLabel={i18n.t("flowBuilderList.mobile.flowActions")}
+          />
+        }
+        onClick={() => openFlowSummary(flow)}
+        footer={
+          <Chip
+            size="small"
+            label={
+              flow.active
+                ? i18n.t("flowBuilderList.active")
+                : i18n.t("flowBuilderList.inactive")
+            }
+            color={flow.active ? "success" : "default"}
+            variant={flow.active ? "default" : "outlined"}
+          />
+        }
+      >
+        <Typography variant="caption" color="textSecondary" display="block">
+          {nodeLabel}
+        </Typography>
+      </MobileEntityCard>
+    );
+  };
+
   return (
     <ThemeProvider theme={muiV5Theme}>
     <MainContainer>
@@ -335,50 +470,163 @@ const FlowBuilder = () => {
           ? `Tem certeza que deseja duplicar este fluxo?`
           : `${i18n.t("contacts.confirmationModal.importMessage")}`}
       </ConfirmationModal>
-      <MainHeader>
-        <Title>Fluxos de conversa</Title>
-        <MainHeaderButtonsWrapper>
-          <TextField
-            className={classes.searchField}
-            placeholder={i18n.t("contacts.searchPlaceholder")}
-            type="search"
-            variant="outlined"
-            size="small"
-            value={searchParam}
-            onChange={handleSearch}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon style={{ color: muiV4Theme.palette.text.secondary }} />
-                </InputAdornment>
-              ),
+      {isMobile ? (
+        <AppDialog
+          open={filtersDialogOpen}
+          onClose={() => setFiltersDialogOpen(false)}
+          maxWidth="sm"
+        >
+          <AppDialogTitle>{i18n.t("flowBuilderList.mobile.filters")}</AppDialogTitle>
+          <AppDialogContent>
+            <Box className={classes.mobileActions}>
+              <FlowBuilderImportFlowModal fullWidth />
+              <Button
+                variant="outlined"
+                fullWidth
+                onClick={() => {
+                  setTemplateModalOpen(true);
+                  setFiltersDialogOpen(false);
+                }}
+                color="primary"
+              >
+                <Stack direction="row" gap={1} alignItems="center" justifyContent="center">
+                  <PostAdd />
+                  {i18n.t("flowBuilderList.fromTemplate")}
+                </Stack>
+              </Button>
+            </Box>
+          </AppDialogContent>
+          <AppDialogActions>
+            <AppPrimaryButton onClick={() => setFiltersDialogOpen(false)}>
+              {i18n.t("flowBuilderList.mobile.filters")}
+            </AppPrimaryButton>
+          </AppDialogActions>
+        </AppDialog>
+      ) : null}
+
+      <AppDialog
+        open={Boolean(editorWarnFlow)}
+        onClose={() => setEditorWarnFlow(null)}
+        maxWidth="xs"
+      >
+        <AppDialogTitle>
+          {i18n.t("flowBuilderList.mobile.editorWarningTitle")}
+        </AppDialogTitle>
+        <AppDialogContent>
+          <Typography variant="body2" color="textSecondary">
+            {i18n.t("flowBuilderList.mobile.editorWarningBody")}
+          </Typography>
+        </AppDialogContent>
+        <AppDialogActions>
+          <AppSecondaryButton onClick={() => setEditorWarnFlow(null)}>
+            {i18n.t("contactModal.buttons.cancel")}
+          </AppSecondaryButton>
+          <AppSecondaryButton
+            onClick={() => {
+              if (editorWarnFlow) openFlowSummary(editorWarnFlow);
+              setEditorWarnFlow(null);
             }}
-          />
-          <FlowBuilderImportFlowModal />
-          <Button
-            variant="outlined"
-            onClick={() => setTemplateModalOpen(true)}
-            color="primary"
           >
-            <Stack direction={"row"} gap={1}>
-              <PostAdd />
-              Criar a partir de template
-            </Stack>
-          </Button>
-          <Button
-            variant="contained"
-            onClick={handleOpenContactModal}
-            color="primary"
+            {i18n.t("flowBuilderList.mobile.viewSummaryAction")}
+          </AppSecondaryButton>
+          <AppPrimaryButton
+            onClick={() => {
+              if (editorWarnFlow) openFlowEditor(editorWarnFlow, true);
+              setEditorWarnFlow(null);
+            }}
           >
-            <Stack direction={"row"} gap={1}>
-              <AddCircle />
-              {"Adicionar Fluxo"}
-            </Stack>
-          </Button>
-        </MainHeaderButtonsWrapper>
+            {i18n.t("flowBuilderList.mobile.openAnyway")}
+          </AppPrimaryButton>
+        </AppDialogActions>
+      </AppDialog>
+
+      <MainHeader>
+        <Title>{i18n.t("flowBuilderList.title")}</Title>
+        {isMobile ? (
+          <Box className={classes.mobileActions} mt={1}>
+            <Box className={classes.mobileSearchRow}>
+              <TextField
+                className={classes.searchField}
+                placeholder={i18n.t("contacts.searchPlaceholder")}
+                type="search"
+                variant="outlined"
+                size="small"
+                fullWidth
+                value={searchParam}
+                onChange={handleSearch}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon style={{ color: muiV4Theme.palette.text.secondary }} />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => setFiltersDialogOpen(true)}
+                style={{ minHeight: 40, flexShrink: 0 }}
+              >
+                <FilterListIcon />
+              </Button>
+            </Box>
+            <Button
+              variant="contained"
+              onClick={handleOpenContactModal}
+              color="primary"
+              fullWidth
+            >
+              <Stack direction="row" gap={1} alignItems="center" justifyContent="center">
+                <AddCircle />
+                {i18n.t("flowBuilderList.addFlow")}
+              </Stack>
+            </Button>
+          </Box>
+        ) : (
+          <MainHeaderButtonsWrapper>
+            <TextField
+              className={classes.searchField}
+              placeholder={i18n.t("contacts.searchPlaceholder")}
+              type="search"
+              variant="outlined"
+              size="small"
+              value={searchParam}
+              onChange={handleSearch}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon style={{ color: muiV4Theme.palette.text.secondary }} />
+                  </InputAdornment>
+                ),
+              }}
+            />
+            <FlowBuilderImportFlowModal />
+            <Button
+              variant="outlined"
+              onClick={() => setTemplateModalOpen(true)}
+              color="primary"
+            >
+              <Stack direction={"row"} gap={1}>
+                <PostAdd />
+                {i18n.t("flowBuilderList.fromTemplate")}
+              </Stack>
+            </Button>
+            <Button
+              variant="contained"
+              onClick={handleOpenContactModal}
+              color="primary"
+            >
+              <Stack direction={"row"} gap={1}>
+                <AddCircle />
+                {i18n.t("flowBuilderList.addFlow")}
+              </Stack>
+            </Button>
+          </MainHeaderButtonsWrapper>
+        )}
       </MainHeader>
       <Paper
-        className={classes.mainPaper}
+        className={isMobile ? `${classes.mainPaper} ${classes.mainPaperMobile}` : classes.mainPaper}
         variant="outlined"
         onScroll={handleScroll}
       >
@@ -390,6 +638,16 @@ const FlowBuilder = () => {
           >
             <CircularProgress />
           </Stack>
+        ) : isMobile ? (
+          filteredFlows.length === 0 ? (
+            <Typography variant="body2" color="textSecondary" align="center" py={4}>
+              {i18n.t("contacts.noContacts")}
+            </Typography>
+          ) : (
+            <MobileCardList>
+              {filteredFlows.map((flow) => renderMobileFlowCard(flow))}
+            </MobileCardList>
+          )
         ) : (
           <Table
             size="medium"
@@ -446,7 +704,7 @@ const FlowBuilder = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {(Array.isArray(webhooks) ? webhooks : []).map((contact) => {
+              {filteredFlows.map((contact) => {
                 const subtitle = formatFlowSubtitle(contact);
                 return (
                   <TableRow

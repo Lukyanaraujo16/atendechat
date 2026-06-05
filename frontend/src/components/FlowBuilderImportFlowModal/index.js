@@ -3,10 +3,12 @@ import { useHistory } from "react-router-dom";
 import { toast } from "react-toastify";
 
 import Button from "@material-ui/core/Button";
-import Dialog from "@material-ui/core/Dialog";
-import DialogActions from "@material-ui/core/DialogActions";
-import DialogContent from "@material-ui/core/DialogContent";
-import DialogTitle from "@material-ui/core/DialogTitle";
+import {
+  AppDialog,
+  AppDialogTitle,
+  AppDialogContent,
+  AppDialogActions,
+} from "../../ui";
 import TextField from "@material-ui/core/TextField";
 import CircularProgress from "@material-ui/core/CircularProgress";
 
@@ -19,7 +21,7 @@ import { readFlowImportFromFile } from "../../flowBuilderTemplates/flowImportExp
 /**
  * Botão "Importar fluxo" + input de arquivo + confirmação do nome.
  */
-const FlowBuilderImportFlowModal = () => {
+const FlowBuilderImportFlowModal = ({ fullWidth = false }) => {
   const history = useHistory();
   const fileRef = useRef(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -105,14 +107,15 @@ const FlowBuilderImportFlowModal = () => {
         variant="outlined"
         color="primary"
         onClick={handlePickFile}
+        fullWidth={fullWidth}
         sx={{ textTransform: "none" }}
       >
         Importar fluxo
       </Button>
 
-      <Dialog open={confirmOpen} onClose={handleCloseConfirm} fullWidth maxWidth="xs">
-        <DialogTitle>Confirmar importação</DialogTitle>
-        <DialogContent dividers>
+      <AppDialog open={confirmOpen} onClose={handleCloseConfirm} fullWidth maxWidth="xs">
+        <AppDialogTitle>Confirmar importação</AppDialogTitle>
+        <AppDialogContent>
           <Stack spacing={2}>
             <Typography variant="body2" color="text.secondary">
               Será criado um novo fluxo com os nós e conexões do arquivo. Ajuste setores, listas e
@@ -128,16 +131,16 @@ const FlowBuilderImportFlowModal = () => {
               helperText="Este nome aparece na lista de fluxos."
             />
           </Stack>
-        </DialogContent>
-        <DialogActions>
+        </AppDialogContent>
+        <AppDialogActions>
           <Button onClick={handleCloseConfirm} color="secondary" variant="outlined" disabled={submitting}>
             Cancelar
           </Button>
           <Button onClick={handleConfirmImport} color="primary" variant="contained" disabled={submitting}>
             {submitting ? <CircularProgress size={22} color="inherit" /> : "Importar"}
           </Button>
-        </DialogActions>
-      </Dialog>
+        </AppDialogActions>
+      </AppDialog>
     </>
   );
 };

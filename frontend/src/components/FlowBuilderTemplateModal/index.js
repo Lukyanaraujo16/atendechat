@@ -3,10 +3,12 @@ import { useHistory } from "react-router-dom";
 import { toast } from "react-toastify";
 
 import Button from "@material-ui/core/Button";
-import Dialog from "@material-ui/core/Dialog";
-import DialogActions from "@material-ui/core/DialogActions";
-import DialogContent from "@material-ui/core/DialogContent";
-import DialogTitle from "@material-ui/core/DialogTitle";
+import {
+  AppDialog,
+  AppDialogTitle,
+  AppDialogContent,
+  AppDialogActions,
+} from "../../ui";
 import TextField from "@material-ui/core/TextField";
 import CircularProgress from "@material-ui/core/CircularProgress";
 
@@ -91,9 +93,9 @@ const FlowBuilderTemplateModal = ({ open, onClose }) => {
   };
 
   return (
-    <Dialog open={open} onClose={handleClose} fullWidth maxWidth="md" scroll="paper">
-      <DialogTitle>Criar a partir de template</DialogTitle>
-      <DialogContent dividers>
+    <AppDialog open={open} onClose={handleClose} fullWidth maxWidth="md" scroll="paper">
+      <AppDialogTitle>Criar a partir de template</AppDialogTitle>
+      <AppDialogContent>
         <Stack spacing={2} sx={{ pt: 0.5 }}>
           <Typography variant="body2" color="text.secondary">
             Escolha um modelo pronto. O fluxo será criado já com blocos conectados; configure filas,
@@ -154,8 +156,8 @@ const FlowBuilderTemplateModal = ({ open, onClose }) => {
             helperText="Este nome aparece na lista de fluxos."
           />
         </Stack>
-      </DialogContent>
-      <DialogActions>
+      </AppDialogContent>
+      <AppDialogActions>
         <Button onClick={handleClose} color="secondary" variant="outlined" disabled={submitting}>
           Cancelar
         </Button>
@@ -167,8 +169,8 @@ const FlowBuilderTemplateModal = ({ open, onClose }) => {
         >
           {submitting ? <CircularProgress size={22} color="inherit" /> : "Criar fluxo"}
         </Button>
-      </DialogActions>
-    </Dialog>
+      </AppDialogActions>
+    </AppDialog>
   );
 };
 

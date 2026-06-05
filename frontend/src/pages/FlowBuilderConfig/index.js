@@ -50,8 +50,21 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import { useParams } from "react-router-dom";
+import { useParams, useLocation } from "react-router-dom";
 import { CircularProgress } from "@material-ui/core";
+import Alert from "@material-ui/lab/Alert";
+import List from "@material-ui/core/List";
+import ListItem from "@material-ui/core/ListItem";
+import ListItemText from "@material-ui/core/ListItemText";
+import ArrowBackIcon from "@material-ui/icons/ArrowBack";
+import useIsMobile from "../../hooks/useIsMobile";
+import FlowBuilderModal from "../../components/FlowBuilderModal";
+import {
+  AppPrimaryButton,
+  AppSecondaryButton,
+} from "../../ui";
+import { flowNodeSummaryText } from "../../utils/flowBuilderNodeLabels";
+import { i18n } from "../../translate/i18n";
 
 import "reactflow/dist/style.css";
 
@@ -174,7 +187,9 @@ const initialEdges = [];
 const FlowBuilderConfig = () => {
   const classes = useStyles();
   const history = useHistory();
+  const location = useLocation();
   const { id } = useParams();
+  const isMobile = useIsMobile();
 
   const storageItems = useNodeStorage();
 
@@ -208,6 +223,15 @@ const FlowBuilderConfig = () => {
   const [addNodeMenuAnchor, setAddNodeMenuAnchor] = useState(null);
   const [flowDisplayName, setFlowDisplayName] = useState("Fluxo");
   const [flowTestOpen, setFlowTestOpen] = useState(false);
+  const [mobileEditorOpen, setMobileEditorOpen] = useState(
+    () => new URLSearchParams(location.search).get("editor") === "1"
+  );
+  const [renameModalOpen, setRenameModalOpen] = useState(false);
+
+  useEffect(() => {
+    const openEditor = new URLSearchParams(location.search).get("editor") === "1";
+    setMobileEditorOpen(openEditor);
+  }, [location.search]);
 
   const connectionLineStyle = { stroke: "#2b2b2b", strokeWidth: "6px" };
 
@@ -951,9 +975,95 @@ const FlowBuilderConfig = () => {
     }
   }, [storageItems.action]);
 
+  const handleBackToSummary = () => {
+    setMobileEditorOpen(false);
+    history.replace(`/flowbuilder/${id}`);
+  };
+
+  const renderMobileSummary = () => (
+    <Stack sx={{ height: "100dvh", overflow: "hidden" }}>
+      <MainHeader>
+        <Stack direction="row" alignItems="center" spacing={1} width="100%">
+          <IconButton
+            aria-label={i18n.t("flowBuilderList.mobile.backToList")}
+            onClick={() => history.push("/flowbuilders")}
+            size="small"
+          >
+            <ArrowBackIcon />
+          </IconButton>
+          <Title>{flowDisplayName}</Title>
+        </Stack>
+      </MainHeader>
+      {loading ? (
+        <Stack justifyContent="center" alignItems="center" flex={1}>
+          <CircularProgress />
+        </Stack>
+      ) : (
+        <Stack
+          spacing={2}
+          sx={{
+            flex: 1,
+            overflowY: "auto",
+            overflowX: "hidden",
+            px: 2,
+            pb: 2,
+          }}
+        >
+          <Alert severity="info">
+            {i18n.t("flowBuilderList.mobile.editorDesktopHint")}
+          </Alert>
+          <Typography variant="body2" color="textSecondary">
+            {i18n.t("flowBuilderList.nodeCount", { count: nodes.length })}
+            {" · "}
+            {i18n.t("flowBuilderList.mobile.connectionsCount", {
+              count: edges.length,
+            })}
+          </Typography>
+          <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+            {i18n.t("flowBuilderList.mobile.blocksTitle")}
+          </Typography>
+          <List dense disablePadding>
+            {nodes.map((node, index) => (
+              <ListItem key={node.id || index} divider>
+                <ListItemText
+                  primary={`${index + 1}. ${flowNodeSummaryText(node)}`}
+                  secondary={node.id ? `ID: ${node.id}` : undefined}
+                />
+              </ListItem>
+            ))}
+          </List>
+          <Stack spacing={1}>
+            <AppSecondaryButton fullWidth onClick={() => setRenameModalOpen(true)}>
+              {i18n.t("flowBuilderList.mobile.editName")}
+            </AppSecondaryButton>
+            <AppPrimaryButton
+              fullWidth
+              onClick={() => {
+                setMobileEditorOpen(true);
+                history.replace(`/flowbuilder/${id}?editor=1`);
+              }}
+            >
+              {i18n.t("flowBuilderList.mobile.openVisualEditor")}
+            </AppPrimaryButton>
+          </Stack>
+        </Stack>
+      )}
+      <FlowBuilderModal
+        open={renameModalOpen}
+        onClose={() => setRenameModalOpen(false)}
+        flowId={id}
+        nameWebhook={flowDisplayName}
+        onSave={(name) => {
+          if (name) setFlowDisplayName(name);
+          setRenameModalOpen(false);
+        }}
+      />
+    </Stack>
+  );
+
   return (
     <FlowBuilderFlowContext.Provider value={{ edges }}>
-    <Stack sx={{ height: "100vh" }}>
+    <Stack sx={{ height: isMobile ? "100dvh" : "100vh" }}>
       <FlowBuilderAddTextModal
         open={modalAddText}
         onSave={textAdd}
@@ -1106,14 +1216,45 @@ const FlowBuilderConfig = () => {
         close={setModalAddFlowUp}
       />
 
+      {isMobile && !mobileEditorOpen ? (
+        renderMobileSummary()
+      ) : (
+        <>
       <MainHeader>
-        <Title>Desenhe seu fluxo</Title>
+        <Stack direction="row" alignItems="center" spacing={1} width="100%">
+          {isMobile ? (
+            <IconButton
+              aria-label={i18n.t("flowBuilderList.mobile.backToSummary")}
+              onClick={handleBackToSummary}
+              size="small"
+            >
+              <ArrowBackIcon />
+            </IconButton>
+          ) : null}
+          <Title>Desenhe seu fluxo</Title>
+        </Stack>
       </MainHeader>
+      {isMobile && mobileEditorOpen ? (
+        <Alert severity="warning" sx={{ mx: 1, mb: 1 }}>
+          {i18n.t("flowBuilderList.mobile.editorDesktopHint")}
+        </Alert>
+      ) : null}
       {!loading && (
         <Paper
           className={classes.mainPaper}
           variant="outlined"
           onScroll={handleScroll}
+          style={
+            isMobile
+              ? {
+                  flex: 1,
+                  minHeight: 0,
+                  display: "flex",
+                  flexDirection: "column",
+                  maxHeight: "calc(100dvh - 120px)",
+                }
+              : undefined
+          }
         >
           <Stack>
             <IconButton
@@ -1438,8 +1579,10 @@ const FlowBuilderConfig = () => {
           <CircularProgress />
         </Stack>
       )}
+        </>
+      )}
       <FlowBuilderTestFab
-        visible={!loading}
+        visible={!loading && (!isMobile || mobileEditorOpen)}
         onClick={() => setFlowTestOpen(true)}
       />
       <FlowBuilderTestPanel

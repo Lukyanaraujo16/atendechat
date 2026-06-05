@@ -8,10 +8,12 @@ import { makeStyles } from "@material-ui/core/styles";
 import { green } from "@material-ui/core/colors";
 import Button from "@material-ui/core/Button";
 import TextField from "@material-ui/core/TextField";
-import Dialog from "@material-ui/core/Dialog";
-import DialogActions from "@material-ui/core/DialogActions";
-import DialogContent from "@material-ui/core/DialogContent";
-import DialogTitle from "@material-ui/core/DialogTitle";
+import {
+  AppDialog,
+  AppDialogTitle,
+  AppDialogContent,
+  AppDialogActions,
+} from "../../ui";
 import CircularProgress from "@material-ui/core/CircularProgress";
 
 import { i18n } from "../../translate/i18n";
@@ -119,10 +121,10 @@ const FlowBuilderModal = ({
 
   return (
     <div className={classes.root}>
-      <Dialog open={open} onClose={handleClose} fullWidth="md" scroll="paper">
-        <DialogTitle id="form-dialog-title">
+      <AppDialog open={open} onClose={handleClose} fullWidth maxWidth="sm" scroll="paper">
+        <AppDialogTitle id="form-dialog-title">
           {flowId ? `Editar Fluxo` : `Adicionar Fluxo`}
-        </DialogTitle>
+        </AppDialogTitle>
         <Formik
           initialValues={contact}
           enableReinitialize={true}
@@ -136,7 +138,7 @@ const FlowBuilderModal = ({
         >
           {({ errors, isSubmitting }) => (
             <Form>
-              <DialogContent dividers>
+              <AppDialogContent>
                 <Field
                   as={TextField}
                   label={i18n.t("contactModal.form.name")}
@@ -148,10 +150,10 @@ const FlowBuilderModal = ({
                   variant="outlined"
                   margin="dense"
                   className={classes.textField}
-                  style={{ width: "95%" }}
+                  fullWidth
                 />
-              </DialogContent>
-              <DialogActions>
+              </AppDialogContent>
+              <AppDialogActions>
                 <Button
                   onClick={handleClose}
                   color="secondary"
@@ -177,11 +179,11 @@ const FlowBuilderModal = ({
                     />
                   )}
                 </Button>
-              </DialogActions>
+              </AppDialogActions>
             </Form>
           )}
         </Formik>
-      </Dialog>
+      </AppDialog>
     </div>
   );
 };
