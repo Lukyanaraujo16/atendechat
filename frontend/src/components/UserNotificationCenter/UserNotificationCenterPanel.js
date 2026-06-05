@@ -33,6 +33,14 @@ const useStyles = makeStyles((theme) => ({
     minHeight: 200,
     maxHeight: 420,
   },
+  rootEmbedded: {
+    display: "flex",
+    flexDirection: "column",
+    flex: 1,
+    minHeight: 0,
+    maxHeight: "none",
+    height: "100%",
+  },
   list: {
     overflowY: "auto",
     flex: 1,
@@ -87,6 +95,7 @@ export default function UserNotificationCenterPanel({
   onDeleteOne,
   onDeleteAllRead,
   onViewAllClick,
+  embedded = false,
 }) {
   const classes = useStyles();
 
@@ -149,7 +158,7 @@ export default function UserNotificationCenterPanel({
   };
 
   return (
-    <div className={classes.root}>
+    <div className={embedded ? classes.rootEmbedded : classes.root}>
       {listLoading ? (
         <Box display="flex" justifyContent="center" py={3}>
           <CircularProgress size={28} />

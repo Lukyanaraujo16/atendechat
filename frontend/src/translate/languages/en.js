@@ -86,6 +86,14 @@ const messages = {
 					allSectors: "All queues",
 					toastSaved: "Group queues updated.",
 				},
+				mobile: {
+					actions: "Group actions",
+					editSectors: "Edit queues",
+					toggleVisibility: "Toggle visibility",
+					sectorsDialogTitle: "Authorized queues",
+					saveSectors: "Save queues",
+					connection: "Connection",
+				},
 				inbox: {
 					chipGroup: "Group",
 					chipNoConversation: "No conversation",
@@ -1434,6 +1442,13 @@ const messages = {
 					visibilityAll: "All",
 					visibilityRestricted: "Restricted",
 				},
+				mobile: {
+					actions: "Connection actions",
+					lastUpdate: "Updated",
+					defaultConnection: "Default",
+					edit: "Edit",
+					delete: "Delete",
+				},
 			},
 			whatsappModal: {
 				title: {
@@ -1596,6 +1611,15 @@ const messages = {
 						"Adjust search or filters, import a list, or add a contact to get started.",
 				},
 				loading: "Loading contacts…",
+				mobile: {
+					filtersButton: "Filters",
+					applyFilters: "Apply",
+					clearFilters: "Clear filters",
+					activeFilters: "{{count}} active filter(s)",
+					loadMore: "Load more",
+					actions: "Contact actions",
+					groupBadge: "Group",
+				},
 				assignments: {
 					title: "Contact assignees",
 					hint: "Define who can view and manage this contact.",
@@ -3477,6 +3501,7 @@ const messages = {
 			},
 			unifiedNotificationBell: {
 				ariaLabel: "Notifications",
+				mobileTitle: "Notifications",
 				tabs: {
 					activity: "Activity",
 					central: "Inbox",
@@ -3568,6 +3593,17 @@ const messages = {
 				statusRead: "Read",
 				statusUnread: "Unread",
 				rowsPerPage: "Rows per page",
+				markReadOne: "Mark as read",
+				openDestination: "Open destination",
+				archiveOne: "Archive",
+				mobile: {
+					actions: "Notification actions",
+					bulkActions: "Bulk actions",
+					filters: "Filters",
+					applyFilters: "Apply",
+					selectAll: "Select page",
+					selectedCount: "{{count}} selected",
+				},
 			},
 			agenda: {
 				title: "Agenda",

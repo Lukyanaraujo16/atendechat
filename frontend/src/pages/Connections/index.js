@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useContext } from "react";
+import useIsMobile from "../../hooks/useIsMobile";
 import { toast } from "react-toastify";
 import { format, parseISO } from "date-fns";
 
@@ -45,7 +46,13 @@ import toastError from "../../errors/toastError";
 
 import { AuthContext } from "../../context/Auth/AuthContext";
 import { Can } from "../../components/Can";
-import { AppTableContainer, AppEmptyState } from "../../ui";
+import {
+	AppTableContainer,
+	AppEmptyState,
+	MobileActionsMenu,
+	MobileEntityCard,
+	MobileCardList,
+} from "../../ui";
 
 const useStyles = makeStyles(theme => ({
 	mainPaper: {
@@ -101,6 +108,23 @@ const useStyles = makeStyles(theme => ({
 		fontWeight: 600,
 		backgroundColor: "rgba(0,0,0,0.02)",
 	},
+	mobileGuide: {
+		[theme.breakpoints.down("md")]: {
+			padding: theme.spacing(1.5),
+			marginBottom: theme.spacing(1.5),
+		},
+	},
+	mobileCardMeta: {
+		display: "flex",
+		flexWrap: "wrap",
+		gap: theme.spacing(0.75),
+		alignItems: "center",
+	},
+	mobileCardRow: {
+		display: "flex",
+		flexWrap: "wrap",
+		gap: theme.spacing(0.5),
+	},
 }));
 
 const CustomToolTip = ({ title, content, children }) => {
@@ -129,6 +153,7 @@ const CustomToolTip = ({ title, content, children }) => {
 
 const Connections = () => {
 	const classes = useStyles();
+	const isMobile = useIsMobile();
 
 	const { user } = useContext(AuthContext);
 	const { whatsApps, loading } = useContext(WhatsAppsContext);
@@ -344,6 +369,105 @@ const Connections = () => {
 		}
 	};
 
+	const buildConnectionActionItems = (whatsApp) => {
+		const items = [];
+
+		if (whatsApp.status === "qrcode") {
+			items.push({
+				key: "qrcode",
+				label: i18n.t("connections.buttons.qrcode"),
+				icon: <CropFree fontSize="small" />,
+				onClick: () => handleOpenQrModal(whatsApp),
+			});
+		}
+
+		if (whatsApp.status === "DISCONNECTED" || whatsApp.status === "PENDING") {
+			items.push({
+				key: "tryAgain",
+				label: i18n.t("connections.buttons.tryAgain"),
+				onClick: () => handleStartWhatsAppSession(whatsApp.id),
+			});
+			items.push({
+				key: "newQr",
+				label: i18n.t("connections.buttons.newQr"),
+				onClick: () => handleRequestNewQrCode(whatsApp.id),
+			});
+		}
+
+		if (
+			whatsApp.status === "CONNECTED" ||
+			whatsApp.status === "PAIRING" ||
+			whatsApp.status === "TIMEOUT"
+		) {
+			items.push({
+				key: "disconnect",
+				label: i18n.t("connections.buttons.disconnect"),
+				onClick: () => handleOpenConfirmationModal("disconnect", whatsApp.id),
+			});
+		}
+
+		if (user?.profile === "admin") {
+			items.push({ key: "edit-divider", divider: true });
+			items.push({
+				key: "edit",
+				label: i18n.t("connections.mobile.edit"),
+				icon: <Edit fontSize="small" />,
+				onClick: () => handleEditWhatsApp(whatsApp),
+			});
+			items.push({
+				key: "delete",
+				label: i18n.t("connections.mobile.delete"),
+				icon: <DeleteOutline fontSize="small" />,
+				danger: true,
+				onClick: () => handleOpenConfirmationModal("delete", whatsApp.id),
+			});
+		}
+
+		return items;
+	};
+
+	const renderConnectionMobileCard = (whatsApp) => {
+		const visibilityLabel =
+			whatsApp.ticketVisibility === "admin_supervisor"
+				? i18n.t("connections.table.visibilityRestricted")
+				: i18n.t("connections.table.visibilityAll");
+
+		return (
+			<MobileEntityCard
+				key={whatsApp.id}
+				title={whatsApp.name}
+				subtitle={
+					whatsApp.updatedAt
+						? `${i18n.t("connections.mobile.lastUpdate")}: ${format(
+								parseISO(whatsApp.updatedAt),
+								"dd/MM/yy HH:mm"
+						  )}`
+						: undefined
+				}
+				badges={
+					<MobileActionsMenu
+						items={buildConnectionActionItems(whatsApp)}
+						ariaLabel={i18n.t("connections.mobile.actions")}
+					/>
+				}
+			>
+				<Box className={classes.mobileCardMeta}>{renderStatusToolTips(whatsApp)}</Box>
+				<Box className={classes.mobileCardRow}>
+					<Chip size="small" variant="outlined" label={visibilityLabel} />
+					{whatsApp.isDefault ? (
+						<Chip
+							size="small"
+							color="primary"
+							variant="outlined"
+							icon={<CheckCircle style={{ color: green[500] }} />}
+							label={i18n.t("connections.mobile.defaultConnection")}
+						/>
+					) : null}
+				</Box>
+			</MobileEntityCard>
+		);
+	};
+
 	const renderStatusToolTips = whatsApp => {
 		const statusLabel = getStatusLabel(whatsApp.status);
 		const chip = statusChipProps(whatsApp.status);
@@ -421,7 +545,7 @@ const Connections = () => {
 				</MainHeaderButtonsWrapper>
 			</MainHeader>
 			<Paper className={classes.mainPaper} variant="outlined">
-				<Box className={classes.guideBox}>
+				<Box className={`${classes.guideBox} ${isMobile ? classes.mobileGuide : ""}`}>
 					<Typography className={classes.guideTitle} variant="subtitle1">
 						{i18n.t("connections.guide.title")}
 					</Typography>
@@ -441,6 +565,20 @@ const Connections = () => {
 						4. {i18n.t("connections.guide.step4")}
 					</Typography>
 				</Box>
+				{isMobile ? (
+					loading ? (
+						<TableRowSkeleton />
+					) : !whatsApps?.length ? (
+						<AppEmptyState
+							title={i18n.t("connections.table.emptyTitle")}
+							description={i18n.t("connections.table.emptyHint")}
+						/>
+					) : (
+						<MobileCardList>
+							{whatsApps.map((whatsApp) => renderConnectionMobileCard(whatsApp))}
+						</MobileCardList>
+					)
+				) : (
 				<AppTableContainer nested>
 					<Table size="small" stickyHeader>
 					<TableHead>
@@ -564,6 +702,7 @@ const Connections = () => {
 					</TableBody>
 					</Table>
 				</AppTableContainer>
+				)}
 			</Paper>
 		</MainContainer>
 	);

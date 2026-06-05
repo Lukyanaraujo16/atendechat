@@ -39,6 +39,17 @@ const useStyles = makeStyles((theme) => ({
     overflow: "hidden",
     boxShadow: theme.shadows[8],
   },
+  rootEmbedded: {
+    display: "flex",
+    flexDirection: "column",
+    flex: 1,
+    minHeight: 0,
+    width: "100%",
+    maxWidth: "100%",
+    backgroundColor: theme.palette.background.paper,
+    overflow: "hidden",
+    boxShadow: "none",
+  },
   header: {
     padding: theme.spacing(2, 2, 1),
   },
@@ -141,6 +152,7 @@ export default function NotificationCenterPanel({
   onTabChange,
   onItemClick,
   onMarkAllRead,
+  embedded = false,
 }) {
   const classes = useStyles();
   const [visibleLimit, setVisibleLimit] = useState(
@@ -227,13 +239,19 @@ export default function NotificationCenterPanel({
 
   const isEmpty = filtered.length === 0;
 
+  const listHeight = embedded
+    ? Math.max(240, (typeof window !== "undefined" ? window.innerHeight : 640) - 220)
+    : 360;
+
   return (
-    <div className={classes.root}>
-      <div className={classes.header}>
-        <Typography className={classes.headerTitle}>
-          🔔 {i18n.t("notificationCenter.title")}
-        </Typography>
-      </div>
+    <div className={embedded ? classes.rootEmbedded : classes.root}>
+      {!embedded ? (
+        <div className={classes.header}>
+          <Typography className={classes.headerTitle}>
+            🔔 {i18n.t("notificationCenter.title")}
+          </Typography>
+        </div>
+      ) : null}
 
       <Tabs
         value={activeTab}
@@ -277,7 +295,7 @@ export default function NotificationCenterPanel({
         <>
           <VirtualizedNotificationList
             rows={rows}
-            height={360}
+            height={listHeight}
             renderSection={renderSection}
             renderItem={renderItem}
           />

@@ -4,6 +4,7 @@ import {
   Box,
   Button,
   Checkbox,
+  Chip,
   CircularProgress,
   FormControl,
   InputLabel,
@@ -29,9 +30,26 @@ import ConfirmationNumberOutlinedIcon from "@material-ui/icons/ConfirmationNumbe
 import EventOutlinedIcon from "@material-ui/icons/EventOutlined";
 import AttachMoneyOutlinedIcon from "@material-ui/icons/AttachMoneyOutlined";
 import TrackChangesOutlinedIcon from "@material-ui/icons/TrackChangesOutlined";
+import OpenInNewIcon from "@material-ui/icons/OpenInNew";
+import DoneAllIcon from "@material-ui/icons/DoneAll";
+import ArchiveOutlinedIcon from "@material-ui/icons/ArchiveOutlined";
+import FilterListIcon from "@material-ui/icons/FilterList";
+import MoreHorizIcon from "@material-ui/icons/MoreHoriz";
 
 import MainContainer from "../../components/MainContainer";
-import { AppPageHeader } from "../../ui";
+import {
+  AppPageHeader,
+  AppDialog,
+  AppDialogTitle,
+  AppDialogContent,
+  AppDialogActions,
+  AppSecondaryButton,
+  AppPrimaryButton,
+  MobileEntityCard,
+  MobileCardList,
+  MobileActionsMenu,
+} from "../../ui";
+import useIsMobile from "../../hooks/useIsMobile";
 import { i18n } from "../../translate/i18n";
 import api from "../../services/api";
 import toastError from "../../errors/toastError";
@@ -73,6 +91,45 @@ const useStyles = makeStyles((theme) => ({
     alignItems: "center",
     gap: theme.spacing(1),
   },
+  mobileToolbar: {
+    display: "flex",
+    flexDirection: "column",
+    gap: theme.spacing(1.5),
+    width: "100%",
+    maxWidth: "100%",
+  },
+  mobileTabs: {
+    width: "100%",
+    maxWidth: "100%",
+  },
+  mobileSearchRow: {
+    display: "flex",
+    flexDirection: "column",
+    gap: theme.spacing(1),
+    width: "100%",
+  },
+  mobileActionsRow: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: theme.spacing(1),
+    alignItems: "center",
+    width: "100%",
+  },
+  mobileSelectBar: {
+    display: "flex",
+    alignItems: "center",
+    gap: theme.spacing(0.5),
+    width: "100%",
+  },
+  mobileCardChips: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: theme.spacing(0.5),
+    maxWidth: "100%",
+  },
+  unreadCard: {
+    borderLeft: `3px solid ${theme.palette.primary.main}`,
+  },
 }));
 
 function TypeIcon({ v }) {
@@ -83,11 +140,28 @@ function TypeIcon({ v }) {
   return <ConfirmationNumberOutlinedIcon fontSize="small" color="action" />;
 }
 
+function kindLabel(v) {
+  if (v === "message") return i18n.t("userNotificationCenter.kindTicket");
+  if (v === "appointment") return i18n.t("userNotificationCenter.kindAppointment");
+  if (v === "billing") return i18n.t("userNotificationCenter.kindBilling");
+  if (v === "crm") return i18n.t("userNotificationCenter.kindCrm");
+  return i18n.t("userNotificationCenter.kindAll");
+}
+
+function statusLabel(n) {
+  if (n.archivedAt) return i18n.t("userNotificationCenter.statusArchived");
+  if (n.read) return i18n.t("userNotificationCenter.statusRead");
+  return i18n.t("userNotificationCenter.statusUnread");
+}
+
 export default function UserNotificationsPage() {
   const classes = useStyles();
+  const isMobile = useIsMobile();
   const history = useHistory();
   const { user } = useContext(AuthContext);
   const [tab, setTab] = useState("all");
+  const [filtersDialogOpen, setFiltersDialogOpen] = useState(false);
+  const [bulkActionsOpen, setBulkActionsOpen] = useState(false);
   const [kind, setKind] = useState("");
   const [search, setSearch] = useState("");
   const [searchApplied, setSearchApplied] = useState("");
@@ -228,6 +302,30 @@ export default function UserNotificationsPage() {
   const confirmAction = (messageKey) =>
     window.confirm(i18n.t(messageKey));
 
+  const markOneRead = async (n) => {
+    if (!n?.id || n.read) return;
+    try {
+      await api.put(`/notifications/${n.id}/read`);
+      setRows((prev) =>
+        prev.map((x) =>
+          x.id === n.id ? { ...x, read: true, readAt: new Date().toISOString() } : x
+        )
+      );
+    } catch (e) {
+      toastError(e);
+    }
+  };
+
+  const archiveOne = async (n) => {
+    if (!n?.id) return;
+    try {
+      await api.put(`/notifications/${n.id}/archive`);
+      await load();
+    } catch (err) {
+      toastError(err);
+    }
+  };
+
   const deleteOne = async (n, e) => {
     if (e && typeof e.stopPropagation === "function") {
       e.stopPropagation();
@@ -304,6 +402,115 @@ export default function UserNotificationsPage() {
             ? i18n.t("userNotificationCenter.emptyFiltered")
             : i18n.t("userNotificationCenter.empty");
 
+  const buildNotificationActionItems = (n) => {
+    const items = [
+      {
+        key: "open",
+        label: i18n.t("userNotificationCenter.openDestination"),
+        icon: <OpenInNewIcon fontSize="small" />,
+        onClick: () => openRow(n),
+      },
+    ];
+    if (!n.read) {
+      items.push({
+        key: "read",
+        label: i18n.t("userNotificationCenter.markReadOne"),
+        icon: <DoneAllIcon fontSize="small" />,
+        onClick: () => markOneRead(n),
+      });
+    }
+    if (!n.archivedAt) {
+      items.push({
+        key: "archive",
+        label: i18n.t("userNotificationCenter.archiveOne"),
+        icon: <ArchiveOutlinedIcon fontSize="small" />,
+        onClick: () => archiveOne(n),
+      });
+    }
+    items.push({ key: "delete-divider", divider: true });
+    items.push({
+      key: "delete",
+      label: i18n.t("userNotificationCenter.deleteOneAria"),
+      icon: <DeleteOutlineIcon fontSize="small" />,
+      danger: true,
+      onClick: () => deleteOne(n),
+    });
+    return items;
+  };
+
+  const renderNotificationMobileCard = (n) => {
+    const visualType = notificationVisualType(n);
+    return (
+      <MobileEntityCard
+        key={n.id}
+        className={!n.read ? classes.unreadCard : undefined}
+        leading={
+          <Box
+            display="flex"
+            flexDirection="column"
+            alignItems="center"
+            style={{ gap: 4 }}
+          >
+            <Checkbox
+              size="small"
+              checked={Boolean(selected[n.id])}
+              onClick={(e) => e.stopPropagation()}
+              onChange={() => toggleSelect(n.id)}
+            />
+            <TypeIcon v={visualType} />
+          </Box>
+        }
+        title={n.title}
+        subtitle={n.body}
+        badges={
+          <MobileActionsMenu
+            items={buildNotificationActionItems(n)}
+            ariaLabel={i18n.t("userNotificationCenter.mobile.actions")}
+          />
+        }
+        onClick={() => openRow(n)}
+      >
+        <Box className={classes.mobileCardChips}>
+          <Chip size="small" variant="outlined" label={kindLabel(visualType)} />
+          <Chip
+            size="small"
+            variant="outlined"
+            color={!n.read && !n.archivedAt ? "primary" : "default"}
+            label={statusLabel(n)}
+          />
+        </Box>
+        <Typography variant="caption" color="textSecondary" display="block">
+          {n.createdAt ? formatNotificationTime(n.createdAt) : "—"}
+        </Typography>
+      </MobileEntityCard>
+    );
+  };
+
+  const kindFilterControl = (
+    <FormControl variant="outlined" size="small" fullWidth={isMobile}>
+      <InputLabel id="notif-kind-label">
+        {i18n.t("userNotificationCenter.filterKind")}
+      </InputLabel>
+      <Select
+        labelId="notif-kind-label"
+        label={i18n.t("userNotificationCenter.filterKind")}
+        value={kind}
+        onChange={(e) => {
+          setKind(e.target.value);
+          setPage(0);
+        }}
+      >
+        <MenuItem value="">{i18n.t("userNotificationCenter.kindAll")}</MenuItem>
+        <MenuItem value="ticket">{i18n.t("userNotificationCenter.kindTicket")}</MenuItem>
+        <MenuItem value="appointment">
+          {i18n.t("userNotificationCenter.kindAppointment")}
+        </MenuItem>
+        <MenuItem value="billing">{i18n.t("userNotificationCenter.kindBilling")}</MenuItem>
+        <MenuItem value="crm">{i18n.t("userNotificationCenter.kindCrm")}</MenuItem>
+      </Select>
+    </FormControl>
+  );
+
   return (
     <MainContainer className={classes.root}>
       <AppPageHeader
@@ -313,8 +520,110 @@ export default function UserNotificationsPage() {
           </Typography>
         }
       />
+      {isMobile ? (
+        <AppDialog
+          open={filtersDialogOpen}
+          onClose={() => setFiltersDialogOpen(false)}
+          maxWidth="sm"
+        >
+          <AppDialogTitle>{i18n.t("userNotificationCenter.mobile.filters")}</AppDialogTitle>
+          <AppDialogContent>
+            {kindFilterControl}
+          </AppDialogContent>
+          <AppDialogActions>
+            <AppSecondaryButton onClick={() => setFiltersDialogOpen(false)}>
+              {i18n.t("transferTicketModal.buttons.cancel")}
+            </AppSecondaryButton>
+            <AppPrimaryButton
+              onClick={() => {
+                setFiltersDialogOpen(false);
+                setPage(0);
+              }}
+            >
+              {i18n.t("userNotificationCenter.mobile.applyFilters")}
+            </AppPrimaryButton>
+          </AppDialogActions>
+        </AppDialog>
+      ) : null}
+
+      {isMobile ? (
+        <AppDialog
+          open={bulkActionsOpen}
+          onClose={() => setBulkActionsOpen(false)}
+          maxWidth="sm"
+        >
+          <AppDialogTitle>{i18n.t("userNotificationCenter.mobile.bulkActions")}</AppDialogTitle>
+          <AppDialogContent>
+            <Box display="flex" flexDirection="column" style={{ gap: 8 }}>
+              <Button variant="outlined" size="small" onClick={() => { markAll(); setBulkActionsOpen(false); }}>
+                {i18n.t("userNotificationCenter.markAllRead")}
+              </Button>
+              <Button variant="outlined" size="small" onClick={() => { archiveAllRead(); setBulkActionsOpen(false); }}>
+                {i18n.t("userNotificationCenter.archiveRead")}
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                disabled={!selectedIds.length}
+                onClick={() => { bulkMarkRead(); setBulkActionsOpen(false); }}
+              >
+                {i18n.t("userNotificationCenter.bulkMarkRead")}
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                disabled={!selectedIds.length}
+                onClick={() => { bulkArchive(); setBulkActionsOpen(false); }}
+              >
+                {i18n.t("userNotificationCenter.bulkArchive")}
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                color="secondary"
+                disabled={!selectedIds.length}
+                onClick={() => { bulkDelete(); setBulkActionsOpen(false); }}
+              >
+                {i18n.t("userNotificationCenter.bulkDelete")}
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                color="secondary"
+                onClick={() => { deleteAllRead(); setBulkActionsOpen(false); }}
+              >
+                {i18n.t("userNotificationCenter.deleteRead")}
+              </Button>
+              {tab === "archived" ? (
+                <Button
+                  variant="outlined"
+                  size="small"
+                  color="secondary"
+                  onClick={() => { deleteAllArchived(); setBulkActionsOpen(false); }}
+                >
+                  {i18n.t("userNotificationCenter.deleteArchived")}
+                </Button>
+              ) : null}
+              <Button
+                variant="outlined"
+                size="small"
+                color="secondary"
+                onClick={() => { deleteAll(); setBulkActionsOpen(false); }}
+              >
+                {i18n.t("userNotificationCenter.deleteAll")}
+              </Button>
+            </Box>
+          </AppDialogContent>
+          <AppDialogActions>
+            <AppSecondaryButton onClick={() => setBulkActionsOpen(false)}>
+              {i18n.t("transferTicketModal.buttons.cancel")}
+            </AppSecondaryButton>
+          </AppDialogActions>
+        </AppDialog>
+      ) : null}
+
       <Paper className={classes.paper} elevation={1}>
-        <Box px={2} pt={2} className={classes.toolbar}>
+        <Box px={2} pt={2} className={isMobile ? classes.mobileToolbar : classes.toolbar}>
           <Tabs
             value={tab}
             onChange={(_, v) => {
@@ -323,116 +632,194 @@ export default function UserNotificationsPage() {
             }}
             indicatorColor="primary"
             textColor="primary"
+            variant={isMobile ? "scrollable" : "standard"}
+            scrollButtons={isMobile ? "auto" : undefined}
+            className={isMobile ? classes.mobileTabs : undefined}
           >
             <Tab label={i18n.t("userNotificationCenter.all")} value="all" />
             <Tab label={i18n.t("userNotificationCenter.unread")} value="unread" />
             <Tab label={i18n.t("userNotificationCenter.readTab")} value="read" />
             <Tab label={i18n.t("userNotificationCenter.archivedTab")} value="archived" />
           </Tabs>
-        </Box>
-        <Box px={2} pb={1} className={classes.toolbar}>
-          <FormControl variant="outlined" size="small" style={{ minWidth: 160 }}>
-            <InputLabel id="notif-kind-label">
-              {i18n.t("userNotificationCenter.filterKind")}
-            </InputLabel>
-            <Select
-              labelId="notif-kind-label"
-              label={i18n.t("userNotificationCenter.filterKind")}
-              value={kind}
-              onChange={(e) => {
-                setKind(e.target.value);
-                setPage(0);
-              }}
-            >
-              <MenuItem value="">{i18n.t("userNotificationCenter.kindAll")}</MenuItem>
-              <MenuItem value="ticket">{i18n.t("userNotificationCenter.kindTicket")}</MenuItem>
-              <MenuItem value="appointment">
-                {i18n.t("userNotificationCenter.kindAppointment")}
-              </MenuItem>
-              <MenuItem value="billing">{i18n.t("userNotificationCenter.kindBilling")}</MenuItem>
-              <MenuItem value="crm">{i18n.t("userNotificationCenter.kindCrm")}</MenuItem>
-            </Select>
-          </FormControl>
-          <TextField
-            size="small"
-            variant="outlined"
-            placeholder={i18n.t("userNotificationCenter.searchPlaceholder")}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                setSearchApplied(search);
-                setPage(0);
-              }
-            }}
-            style={{ flex: "1 1 200px", maxWidth: 360 }}
-          />
-          <Button
-            variant="outlined"
-            size="small"
-            onClick={() => {
-              setSearchApplied(search);
-              setPage(0);
-            }}
-          >
-            {i18n.t("userNotificationCenter.searchButton")}
-          </Button>
-          <Box flex="1" />
-          <Button variant="outlined" size="small" onClick={markAll}>
-            {i18n.t("userNotificationCenter.markAllRead")}
-          </Button>
-          <Button variant="outlined" size="small" onClick={archiveAllRead}>
-            {i18n.t("userNotificationCenter.archiveRead")}
-          </Button>
-        </Box>
-        <Box px={2} pb={1} className={classes.toolbar}>
-          <Button
-            size="small"
-            variant="text"
-            disabled={!selectedIds.length}
-            onClick={bulkMarkRead}
-          >
-            {i18n.t("userNotificationCenter.bulkMarkRead")}
-          </Button>
-          <Button
-            size="small"
-            variant="text"
-            disabled={!selectedIds.length}
-            onClick={bulkArchive}
-          >
-            {i18n.t("userNotificationCenter.bulkArchive")}
-          </Button>
-          <Button
-            size="small"
-            variant="text"
-            color="secondary"
-            disabled={!selectedIds.length}
-            onClick={bulkDelete}
-          >
-            {i18n.t("userNotificationCenter.bulkDelete")}
-          </Button>
-          <Button size="small" variant="text" color="secondary" onClick={deleteAllRead}>
-            {i18n.t("userNotificationCenter.deleteRead")}
-          </Button>
-          {tab === "archived" ? (
-            <Button
-              size="small"
-              variant="text"
-              color="secondary"
-              onClick={deleteAllArchived}
-            >
-              {i18n.t("userNotificationCenter.deleteArchived")}
-            </Button>
+
+          {isMobile ? (
+            <Box className={classes.mobileSearchRow}>
+              <TextField
+                fullWidth
+                size="small"
+                variant="outlined"
+                placeholder={i18n.t("userNotificationCenter.searchPlaceholder")}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    setSearchApplied(search);
+                    setPage(0);
+                  }
+                }}
+              />
+              <Box className={classes.mobileActionsRow}>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => {
+                    setSearchApplied(search);
+                    setPage(0);
+                  }}
+                >
+                  {i18n.t("userNotificationCenter.searchButton")}
+                </Button>
+                <AppSecondaryButton
+                  size="small"
+                  startIcon={<FilterListIcon />}
+                  onClick={() => setFiltersDialogOpen(true)}
+                >
+                  {i18n.t("userNotificationCenter.mobile.filters")}
+                </AppSecondaryButton>
+                <AppSecondaryButton
+                  size="small"
+                  startIcon={<MoreHorizIcon />}
+                  onClick={() => setBulkActionsOpen(true)}
+                >
+                  {i18n.t("userNotificationCenter.mobile.bulkActions")}
+                </AppSecondaryButton>
+              </Box>
+              <Box className={classes.mobileSelectBar}>
+                <Checkbox
+                  indeterminate={selectedIds.length > 0 && !allOnPageSelected}
+                  checked={allOnPageSelected}
+                  onChange={(e) => toggleSelectAllOnPage(e.target.checked)}
+                  size="small"
+                />
+                <Typography variant="caption" color="textSecondary">
+                  {i18n.t("userNotificationCenter.mobile.selectAll")}
+                  {selectedIds.length > 0
+                    ? ` · ${i18n.t("userNotificationCenter.mobile.selectedCount", { count: selectedIds.length })}`
+                    : ""}
+                </Typography>
+              </Box>
+            </Box>
           ) : null}
-          <Button size="small" variant="text" color="secondary" onClick={deleteAll}>
-            {i18n.t("userNotificationCenter.deleteAll")}
-          </Button>
         </Box>
-        <Box className={classes.tableWrap}>
+
+        {!isMobile ? (
+          <>
+            <Box px={2} pb={1} className={classes.toolbar}>
+              <FormControl variant="outlined" size="small" style={{ minWidth: 160 }}>
+                <InputLabel id="notif-kind-label-desktop">
+                  {i18n.t("userNotificationCenter.filterKind")}
+                </InputLabel>
+                <Select
+                  labelId="notif-kind-label-desktop"
+                  label={i18n.t("userNotificationCenter.filterKind")}
+                  value={kind}
+                  onChange={(e) => {
+                    setKind(e.target.value);
+                    setPage(0);
+                  }}
+                >
+                  <MenuItem value="">{i18n.t("userNotificationCenter.kindAll")}</MenuItem>
+                  <MenuItem value="ticket">{i18n.t("userNotificationCenter.kindTicket")}</MenuItem>
+                  <MenuItem value="appointment">
+                    {i18n.t("userNotificationCenter.kindAppointment")}
+                  </MenuItem>
+                  <MenuItem value="billing">{i18n.t("userNotificationCenter.kindBilling")}</MenuItem>
+                  <MenuItem value="crm">{i18n.t("userNotificationCenter.kindCrm")}</MenuItem>
+                </Select>
+              </FormControl>
+              <TextField
+                size="small"
+                variant="outlined"
+                placeholder={i18n.t("userNotificationCenter.searchPlaceholder")}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    setSearchApplied(search);
+                    setPage(0);
+                  }
+                }}
+                style={{ flex: "1 1 200px", maxWidth: 360 }}
+              />
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => {
+                  setSearchApplied(search);
+                  setPage(0);
+                }}
+              >
+                {i18n.t("userNotificationCenter.searchButton")}
+              </Button>
+              <Box flex="1" />
+              <Button variant="outlined" size="small" onClick={markAll}>
+                {i18n.t("userNotificationCenter.markAllRead")}
+              </Button>
+              <Button variant="outlined" size="small" onClick={archiveAllRead}>
+                {i18n.t("userNotificationCenter.archiveRead")}
+              </Button>
+            </Box>
+            <Box px={2} pb={1} className={classes.toolbar}>
+              <Button
+                size="small"
+                variant="text"
+                disabled={!selectedIds.length}
+                onClick={bulkMarkRead}
+              >
+                {i18n.t("userNotificationCenter.bulkMarkRead")}
+              </Button>
+              <Button
+                size="small"
+                variant="text"
+                disabled={!selectedIds.length}
+                onClick={bulkArchive}
+              >
+                {i18n.t("userNotificationCenter.bulkArchive")}
+              </Button>
+              <Button
+                size="small"
+                variant="text"
+                color="secondary"
+                disabled={!selectedIds.length}
+                onClick={bulkDelete}
+              >
+                {i18n.t("userNotificationCenter.bulkDelete")}
+              </Button>
+              <Button size="small" variant="text" color="secondary" onClick={deleteAllRead}>
+                {i18n.t("userNotificationCenter.deleteRead")}
+              </Button>
+              {tab === "archived" ? (
+                <Button
+                  size="small"
+                  variant="text"
+                  color="secondary"
+                  onClick={deleteAllArchived}
+                >
+                  {i18n.t("userNotificationCenter.deleteArchived")}
+                </Button>
+              ) : null}
+              <Button size="small" variant="text" color="secondary" onClick={deleteAll}>
+                {i18n.t("userNotificationCenter.deleteAll")}
+              </Button>
+            </Box>
+          </>
+        ) : null}
+
+        <Box className={classes.tableWrap} px={isMobile ? 2 : 0} pb={isMobile ? 2 : 0}>
           {loading ? (
             <Box display="flex" justifyContent="center" p={3}>
               <CircularProgress size={32} />
             </Box>
+          ) : isMobile ? (
+            rows.length === 0 ? (
+              <Typography variant="body2" color="textSecondary">
+                {emptyMessage}
+              </Typography>
+            ) : (
+              <MobileCardList>
+                {rows.map((n) => renderNotificationMobileCard(n))}
+              </MobileCardList>
+            )
           ) : (
             <Table size="small" stickyHeader>
               <TableHead>
@@ -494,11 +881,7 @@ export default function UserNotificationsPage() {
                         {n.createdAt ? formatNotificationTime(n.createdAt) : "—"}
                       </TableCell>
                       <TableCell>
-                        {n.archivedAt
-                          ? i18n.t("userNotificationCenter.statusArchived")
-                          : n.read
-                            ? i18n.t("userNotificationCenter.statusRead")
-                            : i18n.t("userNotificationCenter.statusUnread")}
+                        {statusLabel(n)}
                       </TableCell>
                       <TableCell align="right" onClick={(e) => e.stopPropagation()}>
                         <IconButton

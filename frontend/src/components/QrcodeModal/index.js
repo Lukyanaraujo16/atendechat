@@ -4,20 +4,59 @@ import { toast } from "react-toastify";
 import toastError from "../../errors/toastError";
 
 import {
-  Dialog,
-  DialogContent,
   Paper,
   Typography,
   Button,
   Box,
   CircularProgress,
 } from "@material-ui/core";
+import { makeStyles } from "@material-ui/core/styles";
 import { i18n } from "../../translate/i18n";
 import api from "../../services/api";
 import { SocketContext } from "../../context/Socket/SocketContext";
 import { AuthContext } from "../../context/Auth/AuthContext";
+import useIsMobile from "../../hooks/useIsMobile";
+import {
+  AppDialog,
+  AppDialogTitle,
+  AppDialogContent,
+} from "../../ui";
+
+const useStyles = makeStyles((theme) => ({
+  layout: {
+    display: "flex",
+    alignItems: "flex-start",
+    flexWrap: "wrap",
+    gap: theme.spacing(2),
+    [theme.breakpoints.down("md")]: {
+      flexDirection: "column",
+      alignItems: "center",
+    },
+  },
+  steps: {
+    flex: "1 1 240px",
+    minWidth: 0,
+    [theme.breakpoints.down("md")]: {
+      width: "100%",
+    },
+  },
+  qrBox: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
+    maxWidth: 280,
+  },
+  qrImage: {
+    maxWidth: "100%",
+    height: "auto",
+  },
+}));
 
 const QrcodeModal = ({ open, onClose, whatsAppId }) => {
+  const classes = useStyles();
+  const isMobile = useIsMobile();
   const [qrCode, setQrCode] = useState("");
   const [connected, setConnected] = useState(false);
   const [loadingNewQr, setLoadingNewQr] = useState(false);
@@ -96,15 +135,15 @@ const QrcodeModal = ({ open, onClose, whatsAppId }) => {
     }
   };
 
+  const qrSize = isMobile ? Math.min(240, window.innerWidth - 64) : 256;
+
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="lg" scroll="paper">
-      <DialogContent>
+    <AppDialog open={open} onClose={onClose} maxWidth="lg" scroll="paper">
+      <AppDialogTitle>{i18n.t("qrCodeModal.title")}</AppDialogTitle>
+      <AppDialogContent>
         <Paper elevation={0}>
-          <Box display="flex" alignItems="flex-start" flexWrap="wrap" p={1}>
-            <Box flex="1" minWidth={240} mr={2} mb={2}>
-              <Typography variant="h6" color="textPrimary" gutterBottom>
-                {i18n.t("qrCodeModal.title")}
-              </Typography>
+          <Box className={classes.layout} p={isMobile ? 0 : 1}>
+            <Box className={classes.steps}>
               <Typography variant="body2" color="textSecondary" paragraph>
                 1. {i18n.t("qrCodeModal.steps.one")}
               </Typography>
@@ -120,14 +159,18 @@ const QrcodeModal = ({ open, onClose, whatsAppId }) => {
                 4. {i18n.t("qrCodeModal.steps.four")}
               </Typography>
             </Box>
-            <Box display="flex" flexDirection="column" alignItems="center">
+            <Box className={classes.qrBox}>
               {connected ? (
                 <Typography variant="h6" color="primary" style={{ padding: 24 }}>
                   {i18n.t("qrCodeModal.connected")}
                 </Typography>
               ) : qrCode ? (
                 <>
-                  <QRCode value={qrCode} size={256} />
+                  <QRCode
+                    value={qrCode}
+                    size={qrSize}
+                    className={classes.qrImage}
+                  />
                   <Button
                     variant="outlined"
                     color="primary"
@@ -148,8 +191,8 @@ const QrcodeModal = ({ open, onClose, whatsAppId }) => {
             </Box>
           </Box>
         </Paper>
-      </DialogContent>
-    </Dialog>
+      </AppDialogContent>
+    </AppDialog>
   );
 };
 

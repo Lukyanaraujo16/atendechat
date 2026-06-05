@@ -87,6 +87,14 @@ const messages = {
           allSectors: "Todos os setores",
           toastSaved: "Setores do grupo atualizados.",
         },
+        mobile: {
+          actions: "Ações do grupo",
+          editSectors: "Editar setores",
+          toggleVisibility: "Alternar visibilidade",
+          sectorsDialogTitle: "Setores autorizados",
+          saveSectors: "Salvar setores",
+          connection: "Conexão",
+        },
         inbox: {
           chipGroup: "Grupo",
           chipNoConversation: "Sem conversa",
@@ -1513,6 +1521,13 @@ const messages = {
           visibilityAll: "Todos",
           visibilityRestricted: "Restrito",
         },
+        mobile: {
+          actions: "Ações da conexão",
+          lastUpdate: "Atualizado",
+          defaultConnection: "Padrão",
+          edit: "Editar",
+          delete: "Excluir",
+        },
       },
       whatsappModal: {
         title: {
@@ -1680,6 +1695,15 @@ const messages = {
             "Ajuste a pesquisa ou os filtros, importe uma lista ou adicione um contato para começar.",
         },
         loading: "Carregando contatos…",
+        mobile: {
+          filtersButton: "Filtros",
+          applyFilters: "Aplicar",
+          clearFilters: "Limpar filtros",
+          activeFilters: "{{count}} filtro(s) ativo(s)",
+          loadMore: "Carregar mais",
+          actions: "Ações do contato",
+          groupBadge: "Grupo",
+        },
         assignments: {
           title: "Responsáveis do contato",
           hint: "Defina quem poderá visualizar e gerenciar este contato.",
@@ -3570,6 +3594,7 @@ const messages = {
       },
       unifiedNotificationBell: {
         ariaLabel: "Notificações",
+        mobileTitle: "Notificações",
         tabs: {
           activity: "Atividade",
           central: "Central",
@@ -3661,6 +3686,17 @@ const messages = {
         statusRead: "Lida",
         statusUnread: "Não lida",
         rowsPerPage: "Por página",
+        markReadOne: "Marcar como lida",
+        openDestination: "Abrir destino",
+        archiveOne: "Arquivar",
+        mobile: {
+          actions: "Ações da notificação",
+          bulkActions: "Ações em massa",
+          filters: "Filtros",
+          applyFilters: "Aplicar",
+          selectAll: "Selecionar página",
+          selectedCount: "{{count}} selecionada(s)",
+        },
       },
       agenda: {
         title: "Agenda",

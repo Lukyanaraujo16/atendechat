@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useReducer, useContext } from "react";
+import React, { useState, useEffect, useReducer, useContext, useMemo } from "react";
 
 import { useHistory } from "react-router-dom";
 import { Tooltip } from "@material-ui/core";
@@ -48,6 +48,13 @@ import {
 	AppEmptyState,
 	AppLoadingState,
 	AppTableRowSkeleton,
+	AppDialog,
+	AppDialogTitle,
+	AppDialogContent,
+	AppDialogActions,
+	MobileActionsMenu,
+	MobileEntityCard,
+	MobileCardList,
 } from "../../ui";
 import toastError from "../../errors/toastError";
 import { showSuccessToast } from "../../errors/feedbackToasts";
@@ -60,8 +67,13 @@ import ContactAssigneesChips from "../../components/ContactAssigneesChips";
 import ContactAssignmentsModal from "../../components/ContactAssignmentsModal";
 import { canManageContactAssignments } from "../../utils/canManageContactAssignments";
 import PeopleIcon from "@material-ui/icons/People";
+import FilterListIcon from "@material-ui/icons/FilterList";
+import GroupIcon from "@material-ui/icons/Group";
+import Badge from "@material-ui/core/Badge";
+import CircularProgress from "@material-ui/core/CircularProgress";
 
 import { CSVLink } from "react-csv";
+import useIsMobile from "../../hooks/useIsMobile";
 import ImportContactsModal from "../../components/ImportContactsModal";
 import ScheduleModal from "../../components/ScheduleModal";
 
@@ -297,11 +309,35 @@ const useStyles = makeStyles((theme) => ({
 		textDecoration: "none",
 		display: "inline-flex",
 	},
+	mobileSearchRow: {
+		display: "flex",
+		flexDirection: "column",
+		gap: theme.spacing(1.5),
+		width: "100%",
+	},
+	mobileFilterActions: {
+		display: "flex",
+		alignItems: "center",
+		gap: theme.spacing(1),
+		flexWrap: "wrap",
+	},
+	mobileLoadMore: {
+		display: "flex",
+		justifyContent: "center",
+		padding: theme.spacing(2, 0, 1),
+	},
+	mobileCardChips: {
+		display: "flex",
+		flexWrap: "wrap",
+		gap: theme.spacing(0.5),
+		maxWidth: "100%",
+	},
 }));
 
 const Contacts = () => {
 	const classes = useStyles();
 	const history = useHistory();
+	const isMobile = useIsMobile();
 
 	const { user } = useContext(AuthContext);
 
@@ -328,6 +364,7 @@ const Contacts = () => {
 	const [chatbotToggleLoadingId, setChatbotToggleLoadingId] = useState(null);
 	const [assignmentsModalOpen, setAssignmentsModalOpen] = useState(false);
 	const [assignmentsContact, setAssignmentsContact] = useState(null);
+	const [filtersDialogOpen, setFiltersDialogOpen] = useState(false);
 
 	const socketManager = useContext(SocketContext);
 	const canManageAssignments = canManageContactAssignments(user);
@@ -585,6 +622,211 @@ const Contacts = () => {
 		}
 	};
 
+	const activeFiltersCount = useMemo(() => {
+		let count = 0;
+		if (tagFilter) count += 1;
+		if (labelFilter) count += 1;
+		if (dateFrom) count += 1;
+		if (dateTo) count += 1;
+		return count;
+	}, [tagFilter, labelFilter, dateFrom, dateTo]);
+
+	const clearAdvancedFilters = () => {
+		setTagFilter("");
+		setLabelFilter("");
+		setDateFrom("");
+		setDateTo("");
+	};
+
+	const renderAdvancedFilterItems = () => (
+		<>
+			<Grid item xs={12} sm={6} md={2}>
+				<FormControl variant="outlined" size="small" fullWidth>
+					<InputLabel id="contacts-tag-filter">
+						{i18n.t("contacts.filters.tag")}
+					</InputLabel>
+					<Select
+						labelId="contacts-tag-filter"
+						value={tagFilter}
+						onChange={(e) => setTagFilter(e.target.value)}
+						label={i18n.t("contacts.filters.tag")}
+					>
+						<MenuItem value="">
+							<em>{i18n.t("contacts.filters.allTags")}</em>
+						</MenuItem>
+						{tagOptions.map((t) => (
+							<MenuItem key={t.id} value={String(t.id)}>
+								{t.name}
+							</MenuItem>
+						))}
+					</Select>
+				</FormControl>
+			</Grid>
+			<Grid item xs={12} sm={6} md={2}>
+				<FormControl variant="outlined" size="small" fullWidth>
+					<InputLabel id="contacts-label-filter">
+						{i18n.t("contacts.filters.label")}
+					</InputLabel>
+					<Select
+						labelId="contacts-label-filter"
+						value={labelFilter}
+						onChange={(e) => setLabelFilter(e.target.value)}
+						label={i18n.t("contacts.filters.label")}
+					>
+						<MenuItem value="">
+							<em>{i18n.t("contacts.filters.allLabels")}</em>
+						</MenuItem>
+						{labelOptions.map((l) => (
+							<MenuItem key={l.id} value={String(l.id)}>
+								{l.name}
+							</MenuItem>
+						))}
+					</Select>
+				</FormControl>
+			</Grid>
+			<Grid item xs={12} sm={6} md={2}>
+				<TextField
+					fullWidth
+					label={i18n.t("contacts.filters.dateFrom")}
+					type="date"
+					variant="outlined"
+					size="small"
+					InputLabelProps={{ shrink: true }}
+					value={dateFrom}
+					onChange={(e) => setDateFrom(e.target.value)}
+				/>
+			</Grid>
+			<Grid item xs={12} sm={6} md={2}>
+				<TextField
+					fullWidth
+					label={i18n.t("contacts.filters.dateTo")}
+					type="date"
+					variant="outlined"
+					size="small"
+					InputLabelProps={{ shrink: true }}
+					value={dateTo}
+					onChange={(e) => setDateTo(e.target.value)}
+				/>
+			</Grid>
+		</>
+	);
+
+	const buildContactActionItems = (contact) => {
+		const items = [
+			{
+				key: "attendance",
+				label: i18n.t("contacts.openAttendance"),
+				icon: <WhatsAppIcon fontSize="small" />,
+				onClick: () => {
+					setContactTicket(contact);
+					setNewTicketModalOpen(true);
+				},
+			},
+			{
+				key: "schedule",
+				label: i18n.t("contacts.scheduleMessage"),
+				icon: <ScheduleIcon fontSize="small" />,
+				onClick: () => handleOpenScheduleModal(contact.id),
+			},
+			{
+				key: "chatbot",
+				label: contact.chatbotDisabled
+					? i18n.t("contacts.chatbotDisabled")
+					: i18n.t("contacts.chatbotEnabled"),
+				icon: contact.chatbotDisabled ? (
+					<SmartToyOutlinedIcon fontSize="small" />
+				) : (
+					<SmartToyIcon fontSize="small" />
+				),
+				disabled: chatbotToggleLoadingId === contact.id,
+				onClick: () => handleToggleChatbotForContact(contact),
+			},
+			{
+				key: "edit",
+				label: i18n.t("contacts.buttons.edit"),
+				icon: <EditIcon fontSize="small" />,
+				onClick: () => handleEditContact(contact.id),
+			},
+		];
+
+		if (canManageAssignments) {
+			items.push({
+				key: "assignments",
+				label: i18n.t("contacts.assignments.manage"),
+				icon: <PeopleIcon fontSize="small" />,
+				onClick: () => {
+					setAssignmentsContact(contact);
+					setAssignmentsModalOpen(true);
+				},
+			});
+		}
+
+		if (user?.profile === "admin") {
+			items.push({ key: "delete-divider", divider: true });
+			items.push({
+				key: "delete",
+				label: i18n.t("contacts.buttons.deleteRow"),
+				icon: <DeleteOutlineIcon fontSize="small" />,
+				danger: true,
+				onClick: () => {
+					setConfirmOpen(true);
+					setDeletingContact(contact);
+				},
+			});
+		}
+
+		return items;
+	};
+
+	const renderContactMobileCard = (contact) => (
+		<MobileEntityCard
+			key={contact.id}
+			leading={<Avatar src={contact.profilePicUrl} />}
+			title={contact.name}
+			subtitle={contact.number || "—"}
+			badges={
+				<MobileActionsMenu
+					items={buildContactActionItems(contact)}
+					ariaLabel={i18n.t("contacts.mobile.actions")}
+				/>
+			}
+			onClick={() => handleEditContact(contact.id)}
+		>
+			{contact.email ? (
+				<Typography variant="caption" color="textSecondary" display="block" noWrap>
+					{contact.email}
+				</Typography>
+			) : null}
+			<Box className={classes.mobileCardChips}>
+				{contact.isGroup ? (
+					<Chip
+						size="small"
+						icon={<GroupIcon />}
+						label={i18n.t("contacts.mobile.groupBadge")}
+						color="primary"
+						variant="outlined"
+					/>
+				) : null}
+				{(contact.tags || []).slice(0, 4).map((tag) => (
+					<Chip
+						key={tag.id}
+						label={tag.name}
+						size="small"
+						className={`${classes.tagChip} ${
+							!tag.color ? classes.tagChipNeutral : ""
+						}`}
+						style={tag.color ? { backgroundColor: tag.color } : undefined}
+					/>
+				))}
+				{(contact.labels || []).slice(0, 3).map((label) => (
+					<ContactLabelChip key={label.id} label={label} />
+				))}
+			</Box>
+			<ContactAssigneesChips assignments={contact.assignments} />
+			{renderLastInteraction(contact.lastInteractionAt)}
+		</MobileEntityCard>
+	);
+
 	return (
 		<MainContainer className={classes.pageRoot}>
 			<ImportContactsModal
@@ -720,18 +962,51 @@ const Contacts = () => {
 				</Alert>
 			</Box>
 
+			<AppDialog
+				open={filtersDialogOpen}
+				onClose={() => setFiltersDialogOpen(false)}
+				maxWidth="sm"
+			>
+				<AppDialogTitle>{i18n.t("contacts.filters.sectionLabel")}</AppDialogTitle>
+				<AppDialogContent>
+					<Box className={classes.filterStack}>
+						<Grid container spacing={2}>
+							{renderAdvancedFilterItems()}
+						</Grid>
+						<Typography variant="caption" className={classes.filterHint}>
+							{i18n.t("contacts.filters.tagHint")}
+						</Typography>
+						<Typography variant="caption" className={classes.filterHint}>
+							{i18n.t("contacts.filters.dateHint")}
+						</Typography>
+					</Box>
+				</AppDialogContent>
+				<AppDialogActions>
+					{activeFiltersCount > 0 ? (
+						<AppSecondaryButton onClick={clearAdvancedFilters}>
+							{i18n.t("contacts.mobile.clearFilters")}
+						</AppSecondaryButton>
+					) : null}
+					<AppPrimaryButton onClick={() => setFiltersDialogOpen(false)}>
+						{i18n.t("contacts.mobile.applyFilters")}
+					</AppPrimaryButton>
+				</AppDialogActions>
+			</AppDialog>
+
 			<AppSectionCard dense variant="outlined">
 				<Box className={classes.filterStack}>
-					<Typography
-						component="h2"
-						variant="subtitle1"
-						className={classes.filtersSectionTitle}
-					>
-						{i18n.t("contacts.filters.sectionLabel")}
-					</Typography>
+					{!isMobile ? (
+						<Typography
+							component="h2"
+							variant="subtitle1"
+							className={classes.filtersSectionTitle}
+						>
+							{i18n.t("contacts.filters.sectionLabel")}
+						</Typography>
+					) : null}
 
-					<Grid container spacing={2} alignItems="center">
-						<Grid item xs={12} md={5}>
+					{isMobile ? (
+						<Box className={classes.mobileSearchRow}>
 							<TextField
 								fullWidth
 								className={classes.searchField}
@@ -749,94 +1024,75 @@ const Contacts = () => {
 									),
 								}}
 							/>
-						</Grid>
-						<Grid item xs={12} sm={6} md={2}>
-							<FormControl variant="outlined" size="small" fullWidth>
-								<InputLabel id="contacts-tag-filter">
-									{i18n.t("contacts.filters.tag")}
-								</InputLabel>
-								<Select
-									labelId="contacts-tag-filter"
-									value={tagFilter}
-									onChange={(e) => setTagFilter(e.target.value)}
-									label={i18n.t("contacts.filters.tag")}
+							<Box className={classes.mobileFilterActions}>
+								<Badge
+									color="primary"
+									variant="dot"
+									invisible={activeFiltersCount === 0}
 								>
-									<MenuItem value="">
-										<em>{i18n.t("contacts.filters.allTags")}</em>
-									</MenuItem>
-									{tagOptions.map((t) => (
-										<MenuItem key={t.id} value={String(t.id)}>
-											{t.name}
-										</MenuItem>
-									))}
-								</Select>
-							</FormControl>
-						</Grid>
-						<Grid item xs={12} sm={6} md={2}>
-							<FormControl variant="outlined" size="small" fullWidth>
-								<InputLabel id="contacts-label-filter">
-									{i18n.t("contacts.filters.label")}
-								</InputLabel>
-								<Select
-									labelId="contacts-label-filter"
-									value={labelFilter}
-									onChange={(e) => setLabelFilter(e.target.value)}
-									label={i18n.t("contacts.filters.label")}
-								>
-									<MenuItem value="">
-										<em>{i18n.t("contacts.filters.allLabels")}</em>
-									</MenuItem>
-									{labelOptions.map((l) => (
-										<MenuItem key={l.id} value={String(l.id)}>
-											{l.name}
-										</MenuItem>
-									))}
-								</Select>
-							</FormControl>
-						</Grid>
-						<Grid item xs={12} sm={6} md={2}>
-							<TextField
-								fullWidth
-								label={i18n.t("contacts.filters.dateFrom")}
-								type="date"
-								variant="outlined"
-								size="small"
-								InputLabelProps={{ shrink: true }}
-								value={dateFrom}
-								onChange={(e) => setDateFrom(e.target.value)}
-							/>
-						</Grid>
-						<Grid item xs={12} sm={6} md={2}>
-							<TextField
-								fullWidth
-								label={i18n.t("contacts.filters.dateTo")}
-								type="date"
-								variant="outlined"
-								size="small"
-								InputLabelProps={{ shrink: true }}
-								value={dateTo}
-								onChange={(e) => setDateTo(e.target.value)}
-							/>
-						</Grid>
-					</Grid>
-
-					<Grid container spacing={2} className={classes.filterHintsRow}>
-						<Grid item xs={12} md={5}>
+									<AppSecondaryButton
+										startIcon={<FilterListIcon />}
+										onClick={() => setFiltersDialogOpen(true)}
+									>
+										{i18n.t("contacts.mobile.filtersButton")}
+									</AppSecondaryButton>
+								</Badge>
+								{activeFiltersCount > 0 ? (
+									<Typography variant="caption" color="textSecondary">
+										{i18n.t("contacts.mobile.activeFilters", {
+											count: activeFiltersCount,
+										})}
+									</Typography>
+								) : null}
+							</Box>
 							<Typography variant="caption" className={classes.filterHint}>
 								{i18n.t("contacts.filters.searchHint")}
 							</Typography>
-						</Grid>
-						<Grid item xs={12} sm={6} md={3}>
-							<Typography variant="caption" className={classes.filterHint}>
-								{i18n.t("contacts.filters.tagHint")}
-							</Typography>
-						</Grid>
-						<Grid item xs={12} sm={6} md={4}>
-							<Typography variant="caption" className={classes.filterHint}>
-								{i18n.t("contacts.filters.dateHint")}
-							</Typography>
-						</Grid>
-					</Grid>
+						</Box>
+					) : (
+						<>
+							<Grid container spacing={2} alignItems="center">
+								<Grid item xs={12} md={5}>
+									<TextField
+										fullWidth
+										className={classes.searchField}
+										placeholder={i18n.t("contacts.searchPlaceholder")}
+										type="search"
+										value={searchParam}
+										onChange={handleSearch}
+										variant="outlined"
+										size="small"
+										InputProps={{
+											startAdornment: (
+												<InputAdornment position="start">
+													<SearchIcon fontSize="small" color="inherit" />
+												</InputAdornment>
+											),
+										}}
+									/>
+								</Grid>
+								{renderAdvancedFilterItems()}
+							</Grid>
+
+							<Grid container spacing={2} className={classes.filterHintsRow}>
+								<Grid item xs={12} md={5}>
+									<Typography variant="caption" className={classes.filterHint}>
+										{i18n.t("contacts.filters.searchHint")}
+									</Typography>
+								</Grid>
+								<Grid item xs={12} sm={6} md={3}>
+									<Typography variant="caption" className={classes.filterHint}>
+										{i18n.t("contacts.filters.tagHint")}
+									</Typography>
+								</Grid>
+								<Grid item xs={12} sm={6} md={4}>
+									<Typography variant="caption" className={classes.filterHint}>
+										{i18n.t("contacts.filters.dateHint")}
+									</Typography>
+								</Grid>
+							</Grid>
+						</>
+					)}
 				</Box>
 			</AppSectionCard>
 
@@ -857,6 +1113,24 @@ const Contacts = () => {
 							{i18n.t("contacts.buttons.add")}
 						</AppPrimaryButton>
 					</AppEmptyState>
+				) : isMobile ? (
+					<>
+						<MobileCardList>
+							{contacts.map((contact) => renderContactMobileCard(contact))}
+						</MobileCardList>
+						{loading ? (
+							<Box className={classes.mobileLoadMore}>
+								<CircularProgress size={28} />
+							</Box>
+						) : null}
+						{hasMore && !loading ? (
+							<Box className={classes.mobileLoadMore}>
+								<AppSecondaryButton onClick={loadMore}>
+									{i18n.t("contacts.mobile.loadMore")}
+								</AppSecondaryButton>
+							</Box>
+						) : null}
+					</>
 				) : (
 					<AppTableContainer nested>
 						<Table size="medium">

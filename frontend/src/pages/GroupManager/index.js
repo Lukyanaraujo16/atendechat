@@ -45,6 +45,21 @@ import toastError from "../../errors/toastError";
 import { toast } from "react-toastify";
 import { i18n } from "../../translate/i18n";
 import useQueues from "../../hooks/useQueues";
+import useIsMobile from "../../hooks/useIsMobile";
+import {
+  AppDialog,
+  AppDialogTitle,
+  AppDialogContent,
+  AppDialogActions,
+  AppPrimaryButton,
+  AppSecondaryButton,
+  MobileEntityCard,
+  MobileCardList,
+  MobileActionsMenu,
+} from "../../ui";
+import VisibilityIcon from "@material-ui/icons/Visibility";
+import VisibilityOffIcon from "@material-ui/icons/VisibilityOff";
+import EditIcon from "@material-ui/icons/Edit";
 
 const useStyles = makeStyles((theme) => ({
   paper: {
@@ -61,6 +76,23 @@ const useStyles = makeStyles((theme) => ({
   },
   connectionSelect: {
     minWidth: 260,
+  },
+  connectionSelectMobile: {
+    width: "100%",
+    minWidth: 0,
+  },
+  filterRowMobile: {
+    flexDirection: "column",
+    alignItems: "stretch",
+  },
+  mobileSearchField: {
+    width: "100%",
+  },
+  mobileCardChips: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: theme.spacing(0.5),
+    maxWidth: "100%",
   },
   tabPanel: {
     paddingTop: theme.spacing(2),
@@ -138,6 +170,7 @@ function TabPanel({ children, value, index }) {
 
 const GroupManager = () => {
   const classes = useStyles();
+  const isMobile = useIsMobile();
   const history = useHistory();
   const { whatsApps, loading: loadingWhats } = useContext(WhatsAppsContext);
   const { user } = useContext(AuthContext);
@@ -161,6 +194,11 @@ const GroupManager = () => {
   const [openingGroupId, setOpeningGroupId] = useState(null);
   const [companyQueues, setCompanyQueues] = useState([]);
   const [savingQueuesFor, setSavingQueuesFor] = useState(null);
+  const [sectorsDialog, setSectorsDialog] = useState({
+    open: false,
+    group: null,
+    queueIds: [],
+  });
 
   const connectedList = useMemo(
     () =>
@@ -393,43 +431,243 @@ const GroupManager = () => {
     return `Admins: ${preview.join(", ")}${more}`;
   };
 
+  const selectedConnectionName = useMemo(() => {
+    const conn = connectedList.find((w) => String(w.id) === String(whatsappId));
+    return conn?.name || (whatsappId ? `Conexão ${whatsappId}` : "");
+  }, [connectedList, whatsappId]);
+
+  const openSectorsDialog = (g) => {
+    setSectorsDialog({
+      open: true,
+      group: g,
+      queueIds: Array.isArray(g.authorizedQueueIds)
+        ? g.authorizedQueueIds.map((id) => Number(id))
+        : [],
+    });
+  };
+
+  const saveSectorsDialog = async () => {
+    if (!sectorsDialog.group) return;
+    await handleSaveGroupQueues(sectorsDialog.group, sectorsDialog.queueIds);
+    setSectorsDialog({ open: false, group: null, queueIds: [] });
+  };
+
+  const buildGroupActionItems = (g) => {
+    const items = [
+      {
+        key: "open",
+        label: i18n.t("groups.manager.openConversation"),
+        icon:
+          openingGroupId === g.id ? (
+            <CircularProgress size={18} />
+          ) : (
+            <ForumIcon fontSize="small" />
+          ),
+        disabled: loadingList || openingGroupId === g.id,
+        onClick: () => handleOpenConversation(g),
+      },
+    ];
+
+    if (canManageVisibility && g.contactId) {
+      items.push({
+        key: "visibility",
+        label: i18n.t("groups.mobile.toggleVisibility"),
+        icon: g.groupVisible ? (
+          <VisibilityOffIcon fontSize="small" />
+        ) : (
+          <VisibilityIcon fontSize="small" />
+        ),
+        onClick: () => handleToggleGroupVisible(g),
+      });
+      if (g.groupVisible === true) {
+        items.push({
+          key: "sectors",
+          label: i18n.t("groups.mobile.editSectors"),
+          icon: <EditIcon fontSize="small" />,
+          onClick: () => openSectorsDialog(g),
+        });
+      }
+    }
+
+    items.push({ key: "leave-divider", divider: true });
+    items.push({
+      key: "leave",
+      label: i18n.t("groups.manager.leave"),
+      icon: <ExitToAppIcon fontSize="small" />,
+      danger: true,
+      disabled: loadingList || !!openingGroupId,
+      onClick: () => setLeaveModal({ open: true, group: g }),
+    });
+
+    return items;
+  };
+
+  const renderGroupMobileCard = (g) => (
+    <MobileEntityCard
+      key={g.id}
+      leading={<GroupIcon color="action" />}
+      title={g.name || "—"}
+      subtitle={
+        selectedConnectionName
+          ? `${selectedConnectionName} · ${i18n.t("groups.manager.participantsChip", { count: g.participantCount ?? 0 })}`
+          : i18n.t("groups.manager.participantsChip", { count: g.participantCount ?? 0 })
+      }
+      badges={
+        <MobileActionsMenu
+          items={buildGroupActionItems(g)}
+          ariaLabel={i18n.t("groups.mobile.actions")}
+        />
+      }
+    >
+      <Box className={classes.mobileCardChips}>
+        <Chip
+          size="small"
+          label={i18n.t("groups.manager.adminsChip", { count: g.adminCount ?? 0 })}
+          variant="outlined"
+        />
+        {resolveQueueChips(g).map((chip) => (
+          <Chip
+            key={chip.key}
+            size="small"
+            color={chip.key === "hidden" ? "default" : "primary"}
+            variant="outlined"
+            label={chip.label}
+          />
+        ))}
+        {canManageVisibility ? (
+          <Chip
+            size="small"
+            variant="outlined"
+            color={g.groupVisible ? "primary" : "default"}
+            label={
+              g.groupVisible
+                ? i18n.t("groups.visibility.label")
+                : i18n.t("groups.visibility.hiddenChip")
+            }
+          />
+        ) : null}
+      </Box>
+      <Typography className={classes.adminLine}>{renderAdminSummary(g)}</Typography>
+    </MobileEntityCard>
+  );
+
+  const leaveDialogBody = (
+    <Typography variant="body2" color="textSecondary">
+      {leaveModal.group
+        ? `Sair de "${leaveModal.group.name || "grupo"}"? Você deixará de receber mensagens deste grupo nesta conexão. Esta ação não pode ser desfeita pelo sistema.`
+        : ""}
+    </Typography>
+  );
+
+  const leaveDialogActions = (
+    <>
+      <Button
+        onClick={() => !leaving && setLeaveModal({ open: false, group: null })}
+        disabled={leaving}
+        variant="outlined"
+      >
+        Cancelar
+      </Button>
+      <Button
+        onClick={confirmLeave}
+        disabled={leaving}
+        variant="contained"
+        color="secondary"
+      >
+        {leaving ? <CircularProgress size={22} color="inherit" /> : "Sair do grupo"}
+      </Button>
+    </>
+  );
+
   return (
     <MainContainer>
-      <Dialog
-        open={leaveModal.open}
-        onClose={() => !leaving && setLeaveModal({ open: false, group: null })}
-        maxWidth="xs"
-        fullWidth
-        PaperProps={{ className: classes.leaveDialogPaper }}
-      >
-        <DialogTitle className={classes.leaveDialogTitle} id="gm-leave-title">
-          Sair do grupo
-        </DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="textSecondary">
-            {leaveModal.group
-              ? `Sair de "${leaveModal.group.name || "grupo"}"? Você deixará de receber mensagens deste grupo nesta conexão. Esta ação não pode ser desfeita pelo sistema.`
-              : ""}
-          </Typography>
-        </DialogContent>
-        <DialogActions className={classes.leaveDialogActions}>
-          <Button
-            onClick={() => !leaving && setLeaveModal({ open: false, group: null })}
-            disabled={leaving}
-            variant="outlined"
-          >
-            Cancelar
-          </Button>
-          <Button
-            onClick={confirmLeave}
-            disabled={leaving}
-            variant="contained"
-            color="secondary"
-          >
-            {leaving ? <CircularProgress size={22} color="inherit" /> : "Sair do grupo"}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      {isMobile ? (
+        <AppDialog
+          open={sectorsDialog.open}
+          onClose={() =>
+            !savingQueuesFor &&
+            setSectorsDialog({ open: false, group: null, queueIds: [] })
+          }
+          maxWidth="sm"
+        >
+          <AppDialogTitle>{i18n.t("groups.mobile.sectorsDialogTitle")}</AppDialogTitle>
+          <AppDialogContent>
+            <Autocomplete
+              multiple
+              size="small"
+              options={companyQueues}
+              getOptionLabel={(opt) => opt?.name || ""}
+              value={companyQueues.filter((q) =>
+                (sectorsDialog.queueIds || []).includes(Number(q.id))
+              )}
+              onChange={(_e, newValue) => {
+                setSectorsDialog((prev) => ({
+                  ...prev,
+                  queueIds: (newValue || []).map((q) => Number(q.id)),
+                }));
+              }}
+              disabled={savingQueuesFor === sectorsDialog.group?.id}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  variant="outlined"
+                  label={i18n.t("groups.queues.label")}
+                  placeholder={i18n.t("groups.queues.placeholder")}
+                  fullWidth
+                />
+              )}
+            />
+          </AppDialogContent>
+          <AppDialogActions>
+            <AppSecondaryButton
+              onClick={() =>
+                setSectorsDialog({ open: false, group: null, queueIds: [] })
+              }
+              disabled={savingQueuesFor === sectorsDialog.group?.id}
+            >
+              Cancelar
+            </AppSecondaryButton>
+            <AppPrimaryButton
+              onClick={saveSectorsDialog}
+              disabled={savingQueuesFor === sectorsDialog.group?.id}
+            >
+              {savingQueuesFor === sectorsDialog.group?.id ? (
+                <CircularProgress size={22} color="inherit" />
+              ) : (
+                i18n.t("groups.mobile.saveSectors")
+              )}
+            </AppPrimaryButton>
+          </AppDialogActions>
+        </AppDialog>
+      ) : null}
+
+      {isMobile ? (
+        <AppDialog
+          open={leaveModal.open}
+          onClose={() => !leaving && setLeaveModal({ open: false, group: null })}
+          maxWidth="xs"
+        >
+          <AppDialogTitle id="gm-leave-title">Sair do grupo</AppDialogTitle>
+          <AppDialogContent>{leaveDialogBody}</AppDialogContent>
+          <AppDialogActions>{leaveDialogActions}</AppDialogActions>
+        </AppDialog>
+      ) : (
+        <Dialog
+          open={leaveModal.open}
+          onClose={() => !leaving && setLeaveModal({ open: false, group: null })}
+          maxWidth="xs"
+          fullWidth
+          PaperProps={{ className: classes.leaveDialogPaper }}
+        >
+          <DialogTitle className={classes.leaveDialogTitle} id="gm-leave-title">
+            Sair do grupo
+          </DialogTitle>
+          <DialogContent>{leaveDialogBody}</DialogContent>
+          <DialogActions className={classes.leaveDialogActions}>
+            {leaveDialogActions}
+          </DialogActions>
+        </Dialog>
+      )}
 
       <MainHeader>
         <Title>Gerenciar grupos (WhatsApp)</Title>
@@ -441,8 +679,15 @@ const GroupManager = () => {
           nativos do WhatsApp. A abertura de conversa na inbox só cria/atualiza o registro operacional do grupo
           (sem chatbot).
         </Typography>
-        <div className={classes.filterRow}>
-          <FormControl variant="outlined" size="small" className={classes.connectionSelect}>
+        <div
+          className={`${classes.filterRow} ${isMobile ? classes.filterRowMobile : ""}`}
+        >
+          <FormControl
+            variant="outlined"
+            size="small"
+            className={isMobile ? classes.connectionSelectMobile : classes.connectionSelect}
+            fullWidth={isMobile}
+          >
             <InputLabel id="gm-conn-label">Conexão WhatsApp</InputLabel>
             <Select
               labelId="gm-conn-label"
@@ -469,6 +714,8 @@ const GroupManager = () => {
           onChange={(_, v) => setTab(v)}
           indicatorColor="primary"
           textColor="primary"
+          variant={isMobile ? "scrollable" : "standard"}
+          scrollButtons={isMobile ? "auto" : undefined}
         >
           <Tab icon={<GroupIcon />} label="Meus grupos" />
           <Tab label="Criar grupo" />
@@ -477,7 +724,13 @@ const GroupManager = () => {
 
         <TabPanel value={tab} index={0}>
           <div className={classes.tabPanel}>
-            <Box display="flex" flexWrap="wrap" gap={2} alignItems="center" mb={2}>
+            <Box
+              display="flex"
+              flexWrap="wrap"
+              alignItems="center"
+              mb={2}
+              style={{ gap: isMobile ? 8 : 16 }}
+            >
               <TextField
                 size="small"
                 variant="outlined"
@@ -491,12 +744,15 @@ const GroupManager = () => {
                     </InputAdornment>
                   ),
                 }}
-                style={{ minWidth: 240 }}
+                className={isMobile ? classes.mobileSearchField : undefined}
+                style={isMobile ? undefined : { minWidth: 240 }}
+                fullWidth={isMobile}
                 disabled={!whatsappId}
               />
               <Button
                 variant="contained"
                 color="primary"
+                fullWidth={isMobile}
                 startIcon={loadingList ? <CircularProgress size={18} color="inherit" /> : <RefreshIcon />}
                 onClick={fetchGroups}
                 disabled={!whatsappId || loadingList}
@@ -530,7 +786,12 @@ const GroupManager = () => {
                 </Typography>
               </div>
             )}
-            {whatsappId && !loadingList && filteredGroups.length > 0 && (
+            {whatsappId && !loadingList && filteredGroups.length > 0 && isMobile ? (
+              <MobileCardList>
+                {filteredGroups.map((g) => renderGroupMobileCard(g))}
+              </MobileCardList>
+            ) : null}
+            {whatsappId && !loadingList && filteredGroups.length > 0 && !isMobile ? (
               <div className={classes.listGrid}>
                 {filteredGroups.map((g) => (
                   <Card key={g.id} className={classes.groupCard} elevation={0}>
@@ -641,7 +902,7 @@ const GroupManager = () => {
                   </Card>
                 ))}
               </div>
-            )}
+            ) : null}
           </div>
         </TabPanel>
 

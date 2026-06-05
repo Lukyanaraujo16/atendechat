@@ -23,6 +23,8 @@ import {
   saveNotificationCenterTab,
 } from "../../utils/notificationCenterUtils";
 import { i18n } from "../../translate/i18n";
+import useIsMobile from "../../hooks/useIsMobile";
+import { AppDialog, AppDialogTitle, AppDialogContent } from "../../ui";
 
 const MAIN_TAB_ACTIVITY = 0;
 const MAIN_TAB_CENTRAL = 1;
@@ -76,6 +78,20 @@ const useStyles = makeStyles((theme) => ({
     minHeight: 0,
     overflow: "auto",
   },
+  panelWrapFullscreen: {
+    flex: 1,
+    minHeight: 0,
+    overflow: "hidden",
+    display: "flex",
+    flexDirection: "column",
+    height: "100%",
+  },
+  activityWrapFullscreen: {
+    flex: 1,
+    minHeight: 0,
+    overflow: "auto",
+    WebkitOverflowScrolling: "touch",
+  },
 }));
 
 /**
@@ -84,6 +100,7 @@ const useStyles = makeStyles((theme) => ({
  */
 export default function UnifiedNotificationBell() {
   const classes = useStyles();
+  const isMobile = useIsMobile();
   const { user } = useContext(AuthContext);
   const history = useHistory();
   const anchorEl = useRef();
@@ -202,6 +219,63 @@ export default function UnifiedNotificationBell() {
     return null;
   }
 
+  const bellTabs = (
+    <Tabs
+      value={mainTab}
+      onChange={(_, v) => setMainTab(v)}
+      className={classes.mainTabs}
+      indicatorColor="primary"
+      textColor="primary"
+      variant={isMobile ? "scrollable" : "fullWidth"}
+      scrollButtons={isMobile ? "auto" : undefined}
+    >
+      <Tab
+        className={classes.mainTab}
+        label={i18n.t("unifiedNotificationBell.tabs.activity")}
+      />
+      <Tab
+        className={classes.mainTab}
+        label={
+          centralUnreadCountRaw > 0
+            ? `${i18n.t("unifiedNotificationBell.tabs.central")} (${centralUnreadCountRaw})`
+            : i18n.t("unifiedNotificationBell.tabs.central")
+        }
+      />
+    </Tabs>
+  );
+
+  const bellPanels = (
+    <Box className={isMobile ? classes.panelWrapFullscreen : classes.panelWrap}>
+      {mainTab === MAIN_TAB_ACTIVITY ? (
+        <Box className={isMobile ? classes.activityWrapFullscreen : classes.activityWrap}>
+          <NotificationCenterPanel
+            notifications={notifications}
+            activeTab={activityTab}
+            onTabChange={handleActivityTabChange}
+            onItemClick={handleActivityItemClick}
+            onMarkAllRead={markAllAsRead}
+            embedded={isMobile}
+          />
+        </Box>
+      ) : canUseCentral ? (
+        <UserNotificationCenterPanel
+          items={centralItems}
+          listLoading={centralListLoading}
+          listError={centralListError}
+          unreadCount={centralUnreadCountRaw}
+          onMarkReadAndGo={handleCentralMarkReadAndGo}
+          onMarkAllRead={centralMarkAllRead}
+          onArchiveRead={centralArchiveRead}
+          onArchiveOne={centralArchiveOne}
+          onDeleteOne={centralDeleteOne}
+          onDeleteAllRead={centralDeleteAllRead}
+          onViewAllClick={handleClose}
+          embedded={isMobile}
+        />
+      ) : null}
+    </Box>
+  );
+
   return (
     <>
       <IconButton
@@ -219,70 +293,34 @@ export default function UnifiedNotificationBell() {
           <NotificationsIcon />
         </Badge>
       </IconButton>
-      <Popover
-        disableScrollLock
-        open={isOpen}
-        anchorEl={anchorEl.current}
-        anchorOrigin={{
-          vertical: "bottom",
-          horizontal: "right",
-        }}
-        transformOrigin={{
-          vertical: "top",
-          horizontal: "right",
-        }}
-        classes={{ paper: classes.popoverPaper }}
-        onClose={handleClose}
-      >
-        <Tabs
-          value={mainTab}
-          onChange={(_, v) => setMainTab(v)}
-          className={classes.mainTabs}
-          indicatorColor="primary"
-          textColor="primary"
-          variant="fullWidth"
+      {isMobile ? (
+        <AppDialog open={isOpen} onClose={handleClose} maxWidth="sm">
+          <AppDialogTitle>{i18n.t("unifiedNotificationBell.mobileTitle")}</AppDialogTitle>
+          <AppDialogContent dividers={false}>
+            {bellTabs}
+            {bellPanels}
+          </AppDialogContent>
+        </AppDialog>
+      ) : (
+        <Popover
+          disableScrollLock
+          open={isOpen}
+          anchorEl={anchorEl.current}
+          anchorOrigin={{
+            vertical: "bottom",
+            horizontal: "right",
+          }}
+          transformOrigin={{
+            vertical: "top",
+            horizontal: "right",
+          }}
+          classes={{ paper: classes.popoverPaper }}
+          onClose={handleClose}
         >
-          <Tab
-            className={classes.mainTab}
-            label={i18n.t("unifiedNotificationBell.tabs.activity")}
-          />
-          <Tab
-            className={classes.mainTab}
-            label={
-              centralUnreadCountRaw > 0
-                ? `${i18n.t("unifiedNotificationBell.tabs.central")} (${centralUnreadCountRaw})`
-                : i18n.t("unifiedNotificationBell.tabs.central")
-            }
-          />
-        </Tabs>
-        <Box className={classes.panelWrap}>
-          {mainTab === MAIN_TAB_ACTIVITY ? (
-            <Box className={classes.activityWrap}>
-              <NotificationCenterPanel
-                notifications={notifications}
-                activeTab={activityTab}
-                onTabChange={handleActivityTabChange}
-                onItemClick={handleActivityItemClick}
-                onMarkAllRead={markAllAsRead}
-              />
-            </Box>
-          ) : canUseCentral ? (
-            <UserNotificationCenterPanel
-              items={centralItems}
-              listLoading={centralListLoading}
-              listError={centralListError}
-              unreadCount={centralUnreadCountRaw}
-              onMarkReadAndGo={handleCentralMarkReadAndGo}
-              onMarkAllRead={centralMarkAllRead}
-              onArchiveRead={centralArchiveRead}
-              onArchiveOne={centralArchiveOne}
-              onDeleteOne={centralDeleteOne}
-              onDeleteAllRead={centralDeleteAllRead}
-              onViewAllClick={handleClose}
-            />
-          ) : null}
-        </Box>
-      </Popover>
+          {bellTabs}
+          {bellPanels}
+        </Popover>
+      )}
     </>
   );
 }

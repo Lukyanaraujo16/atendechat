@@ -108,6 +108,9 @@ const useStyles = makeStyles(theme => ({
 	dialogContent: {
 		maxHeight: "calc(100vh - 200px)",
 		overflowY: "auto",
+		[theme.breakpoints.down("md")]: {
+			maxHeight: "none",
+		},
 	},
 	contextAlert: {
 		marginBottom: theme.spacing(1.5),

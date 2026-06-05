@@ -7,11 +7,7 @@ import { makeStyles } from "@material-ui/core/styles";
 import { green } from "@material-ui/core/colors";
 
 import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
   Button,
-  DialogActions,
   CircularProgress,
   TextField,
   Switch,
@@ -33,6 +29,13 @@ import toastError from "../../errors/toastError";
 import QueueSelect from "../QueueSelect";
 import useFeature from "../../hooks/useFeature";
 import Alert from "@material-ui/lab/Alert";
+import useIsMobile from "../../hooks/useIsMobile";
+import {
+  AppDialog,
+  AppDialogTitle,
+  AppDialogContent,
+  AppDialogActions,
+} from "../../ui";
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -59,6 +62,14 @@ const useStyles = makeStyles((theme) => ({
     marginTop: -12,
     marginLeft: -12,
   },
+  textField: {
+    width: "100%",
+  },
+  formSection: {
+    width: "100%",
+    maxWidth: "100%",
+    overflowX: "hidden",
+  },
 }));
 
 const SessionSchema = Yup.object().shape({
@@ -71,6 +82,7 @@ const SessionSchema = Yup.object().shape({
 const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
 
   const classes = useStyles();
+  const isMobile = useIsMobile();
   const { enabled: openAiEnabled, loaded: openAiLoaded } = useFeature(
     "automation.openai"
   );
@@ -295,18 +307,17 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
 
   return (
     <div className={classes.root}>
-      <Dialog
+      <AppDialog
         open={open}
         onClose={handleClose}
         maxWidth="md"
-        fullWidth
         scroll="paper"
       >
-        <DialogTitle>
+        <AppDialogTitle>
           {whatsAppId
             ? i18n.t("whatsappModal.title.edit")
             : i18n.t("whatsappModal.title.add")}
-        </DialogTitle>
+        </AppDialogTitle>
         <Formik
           initialValues={whatsApp}
           enableReinitialize={true}
@@ -320,10 +331,10 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
         >
           {({ values, touched, errors, isSubmitting, setFieldValue }) => (
             <Form>
-              <DialogContent dividers>
+              <AppDialogContent dividers className={classes.formSection}>
                 <div className={classes.multFieldLine}>
                   <Grid spacing={2} container>
-                    <Grid item>
+                    <Grid item xs={12} sm={6}>
                       <Field
                         as={TextField}
                         label={i18n.t("whatsappModal.form.name")}
@@ -336,7 +347,7 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
                         className={classes.textField}
                       />
                     </Grid>
-                    <Grid style={{ paddingTop: 15 }} item>
+                    <Grid style={{ paddingTop: isMobile ? 0 : 15 }} item xs={12} sm={6}>
                       <FormControlLabel
                         control={
                           <Field
@@ -747,8 +758,8 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
                     />
                   </div>
                 </div>
-              </DialogContent>
-              <DialogActions>
+              </AppDialogContent>
+              <AppDialogActions>
                 <Button
                   onClick={handleClose}
                   color="secondary"
@@ -774,15 +785,15 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
                     />
                   )}
                 </Button>
-              </DialogActions>
+              </AppDialogActions>
             </Form>
           )}
         </Formik>
-      </Dialog>
+      </AppDialog>
 
-      <Dialog open={tokenDialogOpen} onClose={handleCloseTokenDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>{i18n.t("whatsappModal.form.tokenCreatedTitle")}</DialogTitle>
-        <DialogContent>
+      <AppDialog open={tokenDialogOpen} onClose={handleCloseTokenDialog} maxWidth="sm">
+        <AppDialogTitle>{i18n.t("whatsappModal.form.tokenCreatedTitle")}</AppDialogTitle>
+        <AppDialogContent>
           <Typography variant="body2" paragraph>
             {i18n.t("whatsappModal.form.tokenCreatedMessage")}
           </Typography>
@@ -807,13 +818,13 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
             variant="outlined"
             margin="dense"
           />
-        </DialogContent>
-        <DialogActions>
+        </AppDialogContent>
+        <AppDialogActions>
           <Button onClick={handleCloseTokenDialog} color="primary" variant="contained">
             {i18n.t("whatsappModal.buttons.close")}
           </Button>
-        </DialogActions>
-      </Dialog>
+        </AppDialogActions>
+      </AppDialog>
     </div>
   );
 };
