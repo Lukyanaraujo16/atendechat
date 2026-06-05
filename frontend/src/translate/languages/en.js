@@ -1225,6 +1225,16 @@ const messages = {
 					blockedClosedToPending:
 						"Cannot move a closed ticket back to Waiting. Drag to In progress to reopen.",
 				},
+				mobile: {
+					filters: "Filters",
+					applyFilters: "Apply",
+					columnCount: "{{count}} ticket(s) in this column",
+					emptyColumnHint: "Wait for new tickets or use Move to reorganize.",
+					moveToColumn: "Move to…",
+					moveDialogTitle: "Move ticket",
+					moveTargetLabel: "New column",
+					moveConfirm: "Move",
+				},
 				quickActions: {
 					menuAria: "Ticket actions",
 					transferTooltip: "Transfer conversation",

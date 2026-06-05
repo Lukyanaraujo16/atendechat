@@ -12,6 +12,9 @@ import InputAdornment from "@material-ui/core/InputAdornment";
 import Typography from "@material-ui/core/Typography";
 import Button from "@material-ui/core/Button";
 import Chip from "@material-ui/core/Chip";
+import CircularProgress from "@material-ui/core/CircularProgress";
+import Tabs from "@material-ui/core/Tabs";
+import Tab from "@material-ui/core/Tab";
 import IconButton from "@material-ui/core/IconButton";
 import Tooltip from "@material-ui/core/Tooltip";
 import Skeleton from "@material-ui/lab/Skeleton";
@@ -32,6 +35,19 @@ import { i18n } from "../../translate/i18n";
 import { useHistory } from "react-router-dom";
 import toastError from "../../errors/toastError";
 import KanbanTicketQuickMenu from "./KanbanTicketQuickMenu";
+import useIsMobile from "../../hooks/useIsMobile";
+import {
+  AppDialog,
+  AppDialogTitle,
+  AppDialogContent,
+  AppDialogActions,
+  AppPrimaryButton,
+  AppSecondaryButton,
+  MobileEntityCard,
+  MobileCardList,
+} from "../../ui";
+import FilterListIcon from "@material-ui/icons/FilterList";
+import ForumIcon from "@material-ui/icons/Forum";
 import {
   KANBAN_CLOSED_PERIOD_OPTIONS,
   readKanbanClosedPeriodFromStorage,
@@ -435,6 +451,54 @@ const useStyles = makeStyles((theme) => ({
     borderRadius: 12,
     border: `1px dashed ${theme.palette.divider}`,
   },
+  mobileFilterBar: {
+    display: "flex",
+    flexDirection: "column",
+    gap: theme.spacing(1.5),
+    width: "100%",
+    maxWidth: "100%",
+  },
+  mobileColumnTabs: {
+    width: "100%",
+    maxWidth: "100%",
+    marginBottom: theme.spacing(1),
+  },
+  mobileColumnMeta: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: theme.spacing(1),
+    marginBottom: theme.spacing(1.5),
+    width: "100%",
+  },
+  mobileCardChips: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: theme.spacing(0.5),
+    maxWidth: "100%",
+  },
+  mobileListWrap: {
+    flex: 1,
+    minHeight: 0,
+    overflowY: "auto",
+    overflowX: "hidden",
+    width: "100%",
+    ...theme.scrollbarStyles,
+  },
+  mobileLoadMore: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "stretch",
+    gap: theme.spacing(0.75),
+    padding: theme.spacing(1.5, 0),
+  },
+  mobileSkeletonList: {
+    display: "flex",
+    flexDirection: "column",
+    gap: theme.spacing(1.5),
+    width: "100%",
+  },
 }));
 
 function columnAccentClass(classes, statusKey) {
@@ -482,9 +546,28 @@ export async function applyKanbanStatusChange(ticket, targetStatus, authUser) {
   return data ?? null;
 }
 
+function KanbanMobileSkeleton({ classes }) {
+  return (
+    <Box className={classes.mobileSkeletonList} aria-busy="true">
+      {[1, 2, 3].map((row) => (
+        <Paper key={row} variant="outlined" style={{ padding: 12, borderRadius: 10 }}>
+          <Skeleton variant="text" width="60%" height={22} />
+          <Skeleton variant="text" width="100%" height={16} />
+          <Skeleton variant="text" width="80%" height={16} />
+          <Box display="flex" gap={1} mt={1}>
+            <Skeleton variant="rect" width={72} height={24} style={{ borderRadius: 12 }} />
+            <Skeleton variant="rect" width={88} height={24} style={{ borderRadius: 12 }} />
+          </Box>
+        </Paper>
+      ))}
+    </Box>
+  );
+}
+
 const Kanban = () => {
   const classes = useStyles();
   const theme = useTheme();
+  const isMobile = useIsMobile();
   const history = useHistory();
   const { user } = useContext(AuthContext);
   const socketManager = useContext(SocketContext);
@@ -517,6 +600,11 @@ const Kanban = () => {
   );
   const collapsedDefaultsAppliedRef = useRef(false);
   const columnScrollLoadAtRef = useRef({});
+  const [activeColumn, setActiveColumn] = useState("pending");
+  const [filtersDialogOpen, setFiltersDialogOpen] = useState(false);
+  const [moveDialogTicket, setMoveDialogTicket] = useState(null);
+  const [moveTargetStatus, setMoveTargetStatus] = useState("");
+  const [moveSaving, setMoveSaving] = useState(false);
 
   const handleClosedPeriodChange = useCallback((e) => {
     const next = e.target.value;
@@ -629,6 +717,12 @@ const Kanban = () => {
   useEffect(() => {
     setVisibleLimits(getInitialKanbanVisibleLimits());
   }, [debouncedSearch]);
+
+  useEffect(() => {
+    if (filterStatus && ["pending", "open", "closed"].includes(filterStatus)) {
+      setActiveColumn(filterStatus);
+    }
+  }, [filterStatus]);
 
   useEffect(() => {
     const end = () => {
@@ -804,26 +898,18 @@ const Kanban = () => {
     }
   }, [loading, columnsByStatus.closed.length]);
 
-  const handleDropOnColumn = useCallback(
-    async (e, targetStatus) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setDragOverColumn(null);
-
-      const raw = e.dataTransfer.getData("application/x-kanban-ticket-id");
-      const ticketId = raw ? Number(raw) : NaN;
-      if (!Number.isFinite(ticketId)) return;
-
+  const applyTicketStatusChange = useCallback(
+    async (ticketId, targetStatus) => {
       const current = tickets.find((t) => t.id === ticketId);
-      if (!current || current.status === targetStatus) return;
+      if (!current || current.status === targetStatus) return false;
 
       if (isKanbanDragTransitionBlocked(current.status, targetStatus)) {
         toast.info(i18n.t("kanban.drag.blockedClosedToPending"));
-        return;
+        return false;
       }
 
       if (kanbanDragNeedsCloseConfirm(current.status, targetStatus)) {
-        if (!window.confirm(i18n.t("kanban.quickActions.confirmClose"))) return;
+        if (!window.confirm(i18n.t("kanban.quickActions.confirmClose"))) return false;
       }
 
       const snapshot = tickets;
@@ -853,13 +939,61 @@ const Kanban = () => {
             return prev.map((t, i) => (i === idx ? merged : t));
           });
         }
+        return true;
       } catch (err) {
         setTickets(snapshot);
         toastError(err);
+        return false;
       }
     },
     [tickets, user, ticketMatchesUiFilters]
   );
+
+  const handleDropOnColumn = useCallback(
+    async (e, targetStatus) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setDragOverColumn(null);
+
+      const raw = e.dataTransfer.getData("application/x-kanban-ticket-id");
+      const ticketId = raw ? Number(raw) : NaN;
+      if (!Number.isFinite(ticketId)) return;
+
+      await applyTicketStatusChange(ticketId, targetStatus);
+    },
+    [applyTicketStatusChange]
+  );
+
+  const getMoveTargets = useCallback((ticket) => {
+    if (!ticket?.status) return [];
+    return COLUMN_ORDER.map((c) => c.key).filter((target) => {
+      if (ticket.status === target) return false;
+      return !isKanbanDragTransitionBlocked(ticket.status, target);
+    });
+  }, []);
+
+  const openMoveDialog = useCallback((ticket) => {
+    const targets = getMoveTargets(ticket);
+    setMoveDialogTicket(ticket);
+    setMoveTargetStatus(targets[0] || "");
+  }, [getMoveTargets]);
+
+  const handleMoveConfirm = useCallback(async () => {
+    if (!moveDialogTicket?.id || !moveTargetStatus) return;
+    setMoveSaving(true);
+    try {
+      const ok = await applyTicketStatusChange(moveDialogTicket.id, moveTargetStatus);
+      if (ok) {
+        setMoveDialogTicket(null);
+        setMoveTargetStatus("");
+        if (isMobile) {
+          setActiveColumn(moveTargetStatus);
+        }
+      }
+    } finally {
+      setMoveSaving(false);
+    }
+  }, [moveDialogTicket, moveTargetStatus, applyTicketStatusChange, isMobile]);
 
   const goToTicket = (ticket) => {
     if (Date.now() < ignoreCardClickUntilRef.current) return;
@@ -884,98 +1018,448 @@ const Kanban = () => {
     [ticketMatchesUiFilters]
   );
 
+  const renderMobileKanbanCard = (ticket) => {
+    const sk = ticket.status;
+    const queueColor = ticket.queue?.color;
+    return (
+      <MobileEntityCard
+        key={ticket.id}
+        className={columnAccentClass(classes, sk)}
+        leading={<ForumIcon color="action" />}
+        title={ticket.contact?.name || ticket.contact?.number || `#${ticket.id}`}
+        subtitle={ticket.contact?.number || undefined}
+        badges={
+          <KanbanTicketQuickMenu
+            ticket={ticket}
+            authUser={user}
+            usersList={usersList}
+            queuesList={Array.isArray(queues) ? queues : []}
+            onTicketUpdated={handleTicketUpdatedFromQuickAction}
+            canTransfer={isAdmin || queuesList.length > 0}
+            onMoveToColumn={openMoveDialog}
+          />
+        }
+        onClick={() => goToTicket(ticket)}
+      >
+        <Typography className={classes.lastMessage} component="p">
+          {truncateText(ticket.lastMessage)}
+        </Typography>
+        <Box className={classes.mobileCardChips}>
+          <Chip
+            size="small"
+            variant="outlined"
+            label={i18n.t(`kanban.column.${sk}`)}
+            className={classes.statusChip}
+            style={statusChipColor(sk, theme)}
+          />
+          {ticket.unreadMessages > 0 ? (
+            <Chip
+              size="small"
+              color="secondary"
+              label={`${ticket.unreadMessages} ${i18n.t("kanban.unread")}`}
+              className={classes.unreadChip}
+            />
+          ) : null}
+          <Chip
+            size="small"
+            label={ticket.queue?.name || "—"}
+            className={classes.chipQueue}
+            variant="outlined"
+            style={
+              queueColor
+                ? {
+                    borderColor: queueColor,
+                    backgroundColor: `${queueColor}22`,
+                  }
+                : undefined
+            }
+          />
+          <Chip
+            size="small"
+            label={ticket.user?.name || "—"}
+            className={classes.chipUser}
+            variant="outlined"
+            color={ticket.user ? "primary" : "default"}
+          />
+          {(Array.isArray(ticket.tags) ? ticket.tags : []).slice(0, 4).map((tag) => (
+            <Chip
+              key={tag.id}
+              size="small"
+              label={tag.name}
+              variant="outlined"
+              style={tag.color ? { backgroundColor: tag.color } : undefined}
+            />
+          ))}
+        </Box>
+        <Typography className={classes.timeRow} component="p">
+          {i18n.t("kanban.lastInteraction")}:{" "}
+          {ticket.updatedAt
+            ? formatDistanceToNow(new Date(ticket.updatedAt), {
+                addSuffix: true,
+                locale: getDateFnsLocale(),
+              })
+            : "—"}
+        </Typography>
+      </MobileEntityCard>
+    );
+  };
+
+  const renderFilterControls = (fullWidth = false) => (
+    <>
+      <FormControl
+        variant="outlined"
+        size="small"
+        className={classes.filterControl}
+        fullWidth={fullWidth}
+      >
+        <InputLabel id="kanban-filter-user">{i18n.t("kanban.filters.user")}</InputLabel>
+        <Select
+          labelId="kanban-filter-user"
+          value={filterUser}
+          onChange={(e) => setFilterUser(e.target.value)}
+          label={i18n.t("kanban.filters.user")}
+        >
+          <MenuItem value="">{i18n.t("kanban.filters.all")}</MenuItem>
+          {(usersList || []).map((u) => (
+            <MenuItem key={u.id} value={String(u.id)}>
+              {u.name}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+      <FormControl
+        variant="outlined"
+        size="small"
+        className={classes.filterControl}
+        fullWidth={fullWidth}
+      >
+        <InputLabel id="kanban-filter-setor">{i18n.t("kanban.filters.queue")}</InputLabel>
+        <Select
+          labelId="kanban-filter-setor"
+          value={filterSetor}
+          onChange={(e) => setFilterSetor(e.target.value)}
+          label={i18n.t("kanban.filters.queue")}
+        >
+          <MenuItem value="">{i18n.t("kanban.filters.all")}</MenuItem>
+          {(queues || []).map((q) => (
+            <MenuItem key={q.id} value={String(q.id)}>
+              {q.name}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+      <FormControl
+        variant="outlined"
+        size="small"
+        className={classes.filterControl}
+        fullWidth={fullWidth}
+      >
+        <InputLabel id="kanban-filter-conexao">{i18n.t("kanban.filters.connection")}</InputLabel>
+        <Select
+          labelId="kanban-filter-conexao"
+          value={filterConexao}
+          onChange={(e) => setFilterConexao(e.target.value)}
+          label={i18n.t("kanban.filters.connection")}
+        >
+          <MenuItem value="">{i18n.t("kanban.filters.allConnections")}</MenuItem>
+          {(Array.isArray(whatsApps) ? whatsApps : []).map((w) => (
+            <MenuItem key={w.id} value={String(w.id)}>
+              {w.name || i18n.t("kanban.connectionFallback", { id: w.id })}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+      <FormControl
+        variant="outlined"
+        size="small"
+        className={classes.filterControl}
+        fullWidth={fullWidth}
+      >
+        <InputLabel id="kanban-filter-status">{i18n.t("kanban.filters.status")}</InputLabel>
+        <Select
+          labelId="kanban-filter-status"
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value)}
+          label={i18n.t("kanban.filters.status")}
+        >
+          <MenuItem value="">{i18n.t("kanban.filters.all")}</MenuItem>
+          <MenuItem value="pending">{i18n.t("kanban.filters.statusPending")}</MenuItem>
+          <MenuItem value="open">{i18n.t("kanban.filters.statusOpen")}</MenuItem>
+          <MenuItem value="closed">{i18n.t("kanban.filters.statusClosed")}</MenuItem>
+        </Select>
+      </FormControl>
+    </>
+  );
+
+  const activeColumnMeta = useMemo(() => {
+    const col = COLUMN_ORDER.find((c) => c.key === activeColumn) || COLUMN_ORDER[0];
+    const totalInColumn = columnsByStatus[col.key]?.length ?? 0;
+    const filteredList = columnsAfterSearch[col.key] || [];
+    const columnVisible = getColumnVisibleMeta(filteredList, visibleLimits[col.key]);
+    return {
+      col,
+      totalInColumn,
+      filteredList,
+      columnVisible,
+    };
+  }, [activeColumn, columnsByStatus, columnsAfterSearch, visibleLimits]);
+
+  const renderMobileBoard = () => {
+    const { col, totalInColumn, filteredList, columnVisible } = activeColumnMeta;
+    const visibleTickets = columnVisible.visibleTickets;
+    const countChipLabel =
+      searchActive && filteredList.length !== totalInColumn
+        ? i18n.t("kanban.countFiltered", {
+            filtered: filteredList.length,
+            total: totalInColumn,
+          })
+        : String(totalInColumn);
+
+    return (
+      <>
+        <Tabs
+          value={activeColumn}
+          onChange={(_, v) => setActiveColumn(v)}
+          variant="scrollable"
+          scrollButtons="auto"
+          indicatorColor="primary"
+          textColor="primary"
+          className={classes.mobileColumnTabs}
+        >
+          {COLUMN_ORDER.map((column) => {
+            const total = columnsByStatus[column.key]?.length ?? 0;
+            const filtered = columnsAfterSearch[column.key]?.length ?? 0;
+            const labelCount =
+              searchActive && filtered !== total
+                ? i18n.t("kanban.countFiltered", { filtered, total })
+                : String(total);
+            return (
+              <Tab
+                key={column.key}
+                value={column.key}
+                label={`${i18n.t(column.labelKey)} (${labelCount})`}
+              />
+            );
+          })}
+        </Tabs>
+
+        <Box className={classes.mobileColumnMeta}>
+          <Typography variant="body2" color="textSecondary">
+            {i18n.t("kanban.mobile.columnCount", { count: countChipLabel })}
+          </Typography>
+          {activeColumn === "closed" ? (
+            <FormControl variant="outlined" size="small" style={{ minWidth: 140, flex: 1 }}>
+              <Select
+                value={closedPeriod}
+                onChange={handleClosedPeriodChange}
+                displayEmpty
+                inputProps={{
+                  "aria-label": i18n.t("kanban.closedPeriod.label"),
+                }}
+              >
+                {KANBAN_CLOSED_PERIOD_OPTIONS.map((opt) => (
+                  <MenuItem key={opt} value={opt} dense>
+                    {i18n.t(`kanban.closedPeriod.${opt}`)}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          ) : null}
+        </Box>
+
+        <Box className={classes.mobileListWrap}>
+          {filteredList.length === 0 ? (
+            <div className={classes.emptyHint}>
+              <InboxOutlinedIcon className={classes.emptyIcon} />
+              <Typography variant="subtitle2" gutterBottom>
+                {searchActive && totalInColumn > 0
+                  ? i18n.t("kanban.searchEmptyColumn")
+                  : i18n.t("kanban.emptyColumnTitle")}
+              </Typography>
+              {!searchActive || totalInColumn === 0 ? (
+                <Typography variant="body2" color="textSecondary">
+                  {i18n.t("kanban.mobile.emptyColumnHint")}
+                </Typography>
+              ) : null}
+            </div>
+          ) : (
+            <>
+              <MobileCardList>
+                {visibleTickets.map((ticket) => renderMobileKanbanCard(ticket))}
+              </MobileCardList>
+              {columnVisible.hasMore ? (
+                <Box className={classes.mobileLoadMore}>
+                  <Typography className={classes.showingCountText} component="p">
+                    {i18n.t("kanban.showingCount", {
+                      visible: columnVisible.visibleCount,
+                      total: columnVisible.total,
+                    })}
+                  </Typography>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    color="primary"
+                    fullWidth
+                    onClick={() => loadMoreColumn(col.key)}
+                  >
+                    {i18n.t("kanban.loadMore")}
+                  </Button>
+                </Box>
+              ) : null}
+            </>
+          )}
+        </Box>
+      </>
+    );
+  };
+
   return (
     <div className={classes.root}>
-      <Paper elevation={0} className={classes.filterBar}>
-        <FormControl variant="outlined" size="small" className={classes.filterControl}>
-          <InputLabel id="kanban-filter-user">{i18n.t("kanban.filters.user")}</InputLabel>
-          <Select
-            labelId="kanban-filter-user"
-            value={filterUser}
-            onChange={(e) => setFilterUser(e.target.value)}
-            label={i18n.t("kanban.filters.user")}
+      {isMobile ? (
+        <AppDialog
+          open={filtersDialogOpen}
+          onClose={() => setFiltersDialogOpen(false)}
+          maxWidth="sm"
+        >
+          <AppDialogTitle>{i18n.t("kanban.mobile.filters")}</AppDialogTitle>
+          <AppDialogContent>
+            <Box display="flex" flexDirection="column" style={{ gap: 12 }}>
+              {renderFilterControls(true)}
+            </Box>
+          </AppDialogContent>
+          <AppDialogActions>
+            <AppSecondaryButton onClick={() => setFiltersDialogOpen(false)}>
+              {i18n.t("kanban.quickActions.cancel")}
+            </AppSecondaryButton>
+            <AppPrimaryButton onClick={() => setFiltersDialogOpen(false)}>
+              {i18n.t("kanban.mobile.applyFilters")}
+            </AppPrimaryButton>
+          </AppDialogActions>
+        </AppDialog>
+      ) : null}
+
+      <AppDialog
+        open={Boolean(moveDialogTicket)}
+        onClose={() => !moveSaving && setMoveDialogTicket(null)}
+        maxWidth="xs"
+      >
+        <AppDialogTitle>{i18n.t("kanban.mobile.moveDialogTitle")}</AppDialogTitle>
+        <AppDialogContent>
+          <Typography variant="body2" color="textSecondary" paragraph>
+            {moveDialogTicket
+              ? moveDialogTicket.contact?.name ||
+                moveDialogTicket.contact?.number ||
+                `#${moveDialogTicket.id}`
+              : ""}
+          </Typography>
+          <FormControl variant="outlined" fullWidth size="small">
+            <InputLabel id="kanban-move-target-label">
+              {i18n.t("kanban.mobile.moveTargetLabel")}
+            </InputLabel>
+            <Select
+              labelId="kanban-move-target-label"
+              label={i18n.t("kanban.mobile.moveTargetLabel")}
+              value={moveTargetStatus}
+              onChange={(e) => setMoveTargetStatus(e.target.value)}
+            >
+              {(moveDialogTicket ? getMoveTargets(moveDialogTicket) : []).map((target) => (
+                <MenuItem key={target} value={target}>
+                  {i18n.t(`kanban.column.${target}`)}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </AppDialogContent>
+        <AppDialogActions>
+          <AppSecondaryButton
+            onClick={() => setMoveDialogTicket(null)}
+            disabled={moveSaving}
           >
-            <MenuItem value="">{i18n.t("kanban.filters.all")}</MenuItem>
-            {(usersList || []).map((u) => (
-              <MenuItem key={u.id} value={String(u.id)}>
-                {u.name}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <FormControl variant="outlined" size="small" className={classes.filterControl}>
-          <InputLabel id="kanban-filter-setor">{i18n.t("kanban.filters.queue")}</InputLabel>
-          <Select
-            labelId="kanban-filter-setor"
-            value={filterSetor}
-            onChange={(e) => setFilterSetor(e.target.value)}
-            label={i18n.t("kanban.filters.queue")}
+            {i18n.t("kanban.quickActions.cancel")}
+          </AppSecondaryButton>
+          <AppPrimaryButton
+            onClick={handleMoveConfirm}
+            disabled={moveSaving || !moveTargetStatus}
           >
-            <MenuItem value="">{i18n.t("kanban.filters.all")}</MenuItem>
-            {(queues || []).map((q) => (
-              <MenuItem key={q.id} value={String(q.id)}>
-                {q.name}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <FormControl variant="outlined" size="small" className={classes.filterControl}>
-          <InputLabel id="kanban-filter-conexao">{i18n.t("kanban.filters.connection")}</InputLabel>
-          <Select
-            labelId="kanban-filter-conexao"
-            value={filterConexao}
-            onChange={(e) => setFilterConexao(e.target.value)}
-            label={i18n.t("kanban.filters.connection")}
-          >
-            <MenuItem value="">{i18n.t("kanban.filters.allConnections")}</MenuItem>
-            {(Array.isArray(whatsApps) ? whatsApps : []).map((w) => (
-              <MenuItem key={w.id} value={String(w.id)}>
-                {w.name || i18n.t("kanban.connectionFallback", { id: w.id })}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <FormControl variant="outlined" size="small" className={classes.filterControl}>
-          <InputLabel id="kanban-filter-status">{i18n.t("kanban.filters.status")}</InputLabel>
-          <Select
-            labelId="kanban-filter-status"
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            label={i18n.t("kanban.filters.status")}
-          >
-            <MenuItem value="">{i18n.t("kanban.filters.all")}</MenuItem>
-            <MenuItem value="pending">{i18n.t("kanban.filters.statusPending")}</MenuItem>
-            <MenuItem value="open">{i18n.t("kanban.filters.statusOpen")}</MenuItem>
-            <MenuItem value="closed">{i18n.t("kanban.filters.statusClosed")}</MenuItem>
-          </Select>
-        </FormControl>
-        <TextField
-          className={clsx(classes.filterControl, classes.searchControl, classes.searchField)}
-          variant="outlined"
-          size="small"
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-          placeholder={i18n.t("kanban.searchPlaceholder")}
-          inputProps={{ "aria-label": i18n.t("kanban.searchPlaceholder") }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon fontSize="small" color="action" />
-              </InputAdornment>
-            ),
-            endAdornment: searchInput ? (
-              <InputAdornment position="end">
-                <IconButton
-                  size="small"
-                  aria-label={i18n.t("kanban.searchClear")}
-                  onClick={() => setSearchInput("")}
-                >
-                  <ClearIcon fontSize="small" />
-                </IconButton>
-              </InputAdornment>
-            ) : null,
-          }}
-        />
+            {moveSaving ? (
+              <CircularProgress size={20} color="inherit" />
+            ) : (
+              i18n.t("kanban.mobile.moveConfirm")
+            )}
+          </AppPrimaryButton>
+        </AppDialogActions>
+      </AppDialog>
+
+      <Paper elevation={0} className={isMobile ? classes.mobileFilterBar : classes.filterBar}>
+        {isMobile ? (
+          <>
+            <TextField
+              fullWidth
+              className={clsx(classes.searchControl, classes.searchField)}
+              variant="outlined"
+              size="small"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder={i18n.t("kanban.searchPlaceholder")}
+              inputProps={{ "aria-label": i18n.t("kanban.searchPlaceholder") }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" color="action" />
+                  </InputAdornment>
+                ),
+                endAdornment: searchInput ? (
+                  <InputAdornment position="end">
+                    <IconButton
+                      size="small"
+                      aria-label={i18n.t("kanban.searchClear")}
+                      onClick={() => setSearchInput("")}
+                    >
+                      <ClearIcon fontSize="small" />
+                    </IconButton>
+                  </InputAdornment>
+                ) : null,
+              }}
+            />
+            <AppSecondaryButton
+              startIcon={<FilterListIcon />}
+              onClick={() => setFiltersDialogOpen(true)}
+            >
+              {i18n.t("kanban.mobile.filters")}
+            </AppSecondaryButton>
+          </>
+        ) : (
+          <>
+            {renderFilterControls(false)}
+            <TextField
+              className={clsx(classes.filterControl, classes.searchControl, classes.searchField)}
+              variant="outlined"
+              size="small"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder={i18n.t("kanban.searchPlaceholder")}
+              inputProps={{ "aria-label": i18n.t("kanban.searchPlaceholder") }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" color="action" />
+                  </InputAdornment>
+                ),
+                endAdornment: searchInput ? (
+                  <InputAdornment position="end">
+                    <IconButton
+                      size="small"
+                      aria-label={i18n.t("kanban.searchClear")}
+                      onClick={() => setSearchInput("")}
+                    >
+                      <ClearIcon fontSize="small" />
+                    </IconButton>
+                  </InputAdornment>
+                ) : null,
+              }}
+            />
+          </>
+        )}
       </Paper>
       {searchActive ? (
         <Typography className={classes.filteringHint} component="p">
@@ -988,7 +1472,13 @@ const Kanban = () => {
           <Typography color="textSecondary">{i18n.t("kanban.noQueuesHint")}</Typography>
         </Paper>
       ) : loading ? (
-        <KanbanBoardSkeleton classes={classes} />
+        isMobile ? (
+          <KanbanMobileSkeleton classes={classes} />
+        ) : (
+          <KanbanBoardSkeleton classes={classes} />
+        )
+      ) : isMobile ? (
+        renderMobileBoard()
       ) : (
         <div className={classes.boardRow}>
           {COLUMN_ORDER.map((col) => {

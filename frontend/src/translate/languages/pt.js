@@ -1297,6 +1297,16 @@ const messages = {
           blockedClosedToPending:
             "Não é possível mover um ticket finalizado para Aguardando. Arraste para Em atendimento para reabrir.",
         },
+        mobile: {
+          filters: "Filtros",
+          applyFilters: "Aplicar",
+          columnCount: "{{count}} ticket(s) nesta coluna",
+          emptyColumnHint: "Aguarde novos tickets ou use Mover para reorganizar.",
+          moveToColumn: "Mover para…",
+          moveDialogTitle: "Mover ticket",
+          moveTargetLabel: "Nova coluna",
+          moveConfirm: "Mover",
+        },
         quickActions: {
           menuAria: "Ações do ticket",
           transferTooltip: "Transferir conversa",

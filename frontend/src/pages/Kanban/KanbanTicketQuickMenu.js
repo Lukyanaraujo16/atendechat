@@ -26,6 +26,16 @@ import DoneOutlinedIcon from "@material-ui/icons/DoneOutlined";
 import api from "../../services/api";
 import toastError from "../../errors/toastError";
 import { i18n } from "../../translate/i18n";
+import useIsMobile from "../../hooks/useIsMobile";
+import {
+  AppDialog,
+  AppDialogTitle,
+  AppDialogContent,
+  AppDialogActions,
+  AppPrimaryButton,
+  AppSecondaryButton,
+} from "../../ui";
+import SwapVertIcon from "@material-ui/icons/SwapVert";
 
 const useStyles = makeStyles((theme) => ({
   iconBtn: {
@@ -72,8 +82,10 @@ const KanbanTicketQuickMenu = ({
   queuesList,
   onTicketUpdated,
   canTransfer = true,
+  onMoveToColumn,
 }) => {
   const classes = useStyles();
+  const isMobile = useIsMobile();
   const [anchorEl, setAnchorEl] = useState(null);
   const [dialog, setDialog] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -236,6 +248,19 @@ const KanbanTicketQuickMenu = ({
         transformOrigin={{ vertical: "top", horizontal: "right" }}
         classes={{ paper: classes.menuPaper }}
       >
+        {typeof onMoveToColumn === "function" ? (
+          <MenuItem
+            onClick={() => {
+              closeMenu();
+              onMoveToColumn(ticket);
+            }}
+          >
+            <ListItemIcon>
+              <SwapVertIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText primary={i18n.t("kanban.mobile.moveToColumn")} />
+          </MenuItem>
+        ) : null}
         {!isClosed && transferAllowed && (
           <MenuItem
             onClick={() => {
@@ -276,96 +301,194 @@ const KanbanTicketQuickMenu = ({
         )}
       </Menu>
 
-      <Dialog open={dialog === "transfer"} onClose={() => !saving && setDialog(null)} maxWidth="xs" fullWidth>
-        <DialogTitle>{i18n.t("kanban.quickActions.transferConversation")}</DialogTitle>
-        <DialogContent>
-          <FormControl variant="outlined" margin="normal" fullWidth size="small" required>
-            <InputLabel>{i18n.t("kanban.quickActions.selectQueue")}</InputLabel>
-            <Select
-              label={i18n.t("kanban.quickActions.selectQueue")}
-              value={transferQueueId}
-              onChange={(e) => setTransferQueueId(e.target.value)}
-            >
-              {(queuesList || []).map((q) => (
-                <MenuItem key={q.id} value={String(q.id)}>
-                  {q.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <FormControl
-            variant="outlined"
-            margin="normal"
-            fullWidth
-            size="small"
-            disabled={!transferQueueId}
-          >
-            <InputLabel>{i18n.t("kanban.quickActions.selectUserOptional")}</InputLabel>
-            <Select
-              label={i18n.t("kanban.quickActions.selectUserOptional")}
-              value={transferUserId}
-              onChange={(e) => setTransferUserId(e.target.value)}
-              displayEmpty
+      {isMobile ? (
+        <AppDialog
+          open={dialog === "transfer"}
+          onClose={() => !saving && setDialog(null)}
+          maxWidth="xs"
+        >
+          <AppDialogTitle>{i18n.t("kanban.quickActions.transferConversation")}</AppDialogTitle>
+          <AppDialogContent>
+            <FormControl variant="outlined" margin="normal" fullWidth size="small" required>
+              <InputLabel>{i18n.t("kanban.quickActions.selectQueue")}</InputLabel>
+              <Select
+                label={i18n.t("kanban.quickActions.selectQueue")}
+                value={transferQueueId}
+                onChange={(e) => setTransferQueueId(e.target.value)}
+              >
+                {(queuesList || []).map((q) => (
+                  <MenuItem key={q.id} value={String(q.id)}>
+                    {q.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl
+              variant="outlined"
+              margin="normal"
+              fullWidth
+              size="small"
               disabled={!transferQueueId}
             >
-              <MenuItem value="">
-                <em>{i18n.t("kanban.quickActions.keepCurrentAttendant")}</em>
-              </MenuItem>
-              {attendantsForSelectedQueue.map((u) => (
-                <MenuItem key={u.id} value={String(u.id)}>
-                  {u.name}
+              <InputLabel>{i18n.t("kanban.quickActions.selectUserOptional")}</InputLabel>
+              <Select
+                label={i18n.t("kanban.quickActions.selectUserOptional")}
+                value={transferUserId}
+                onChange={(e) => setTransferUserId(e.target.value)}
+                displayEmpty
+                disabled={!transferQueueId}
+              >
+                <MenuItem value="">
+                  <em>{i18n.t("kanban.quickActions.keepCurrentAttendant")}</em>
                 </MenuItem>
-              ))}
-            </Select>
-            {transferQueueId && attendantsForSelectedQueue.length === 0 ? (
-              <FormHelperText>{i18n.t("kanban.quickActions.noAttendantsForQueue")}</FormHelperText>
-            ) : null}
-          </FormControl>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDialog(null)} disabled={saving}>
-            {i18n.t("kanban.quickActions.cancel")}
-          </Button>
-          <Button
-            color="primary"
-            variant="contained"
-            disabled={saving || !transferQueueId}
-            onClick={handleTransferSave}
-          >
-            {i18n.t("kanban.quickActions.confirm")}
-          </Button>
-        </DialogActions>
-      </Dialog>
+                {attendantsForSelectedQueue.map((u) => (
+                  <MenuItem key={u.id} value={String(u.id)}>
+                    {u.name}
+                  </MenuItem>
+                ))}
+              </Select>
+              {transferQueueId && attendantsForSelectedQueue.length === 0 ? (
+                <FormHelperText>{i18n.t("kanban.quickActions.noAttendantsForQueue")}</FormHelperText>
+              ) : null}
+            </FormControl>
+          </AppDialogContent>
+          <AppDialogActions>
+            <AppSecondaryButton onClick={() => setDialog(null)} disabled={saving}>
+              {i18n.t("kanban.quickActions.cancel")}
+            </AppSecondaryButton>
+            <AppPrimaryButton
+              disabled={saving || !transferQueueId}
+              onClick={handleTransferSave}
+            >
+              {i18n.t("kanban.quickActions.confirm")}
+            </AppPrimaryButton>
+          </AppDialogActions>
+        </AppDialog>
+      ) : (
+        <Dialog open={dialog === "transfer"} onClose={() => !saving && setDialog(null)} maxWidth="xs" fullWidth>
+          <DialogTitle>{i18n.t("kanban.quickActions.transferConversation")}</DialogTitle>
+          <DialogContent>
+            <FormControl variant="outlined" margin="normal" fullWidth size="small" required>
+              <InputLabel>{i18n.t("kanban.quickActions.selectQueue")}</InputLabel>
+              <Select
+                label={i18n.t("kanban.quickActions.selectQueue")}
+                value={transferQueueId}
+                onChange={(e) => setTransferQueueId(e.target.value)}
+              >
+                {(queuesList || []).map((q) => (
+                  <MenuItem key={q.id} value={String(q.id)}>
+                    {q.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl
+              variant="outlined"
+              margin="normal"
+              fullWidth
+              size="small"
+              disabled={!transferQueueId}
+            >
+              <InputLabel>{i18n.t("kanban.quickActions.selectUserOptional")}</InputLabel>
+              <Select
+                label={i18n.t("kanban.quickActions.selectUserOptional")}
+                value={transferUserId}
+                onChange={(e) => setTransferUserId(e.target.value)}
+                displayEmpty
+                disabled={!transferQueueId}
+              >
+                <MenuItem value="">
+                  <em>{i18n.t("kanban.quickActions.keepCurrentAttendant")}</em>
+                </MenuItem>
+                {attendantsForSelectedQueue.map((u) => (
+                  <MenuItem key={u.id} value={String(u.id)}>
+                    {u.name}
+                  </MenuItem>
+                ))}
+              </Select>
+              {transferQueueId && attendantsForSelectedQueue.length === 0 ? (
+                <FormHelperText>{i18n.t("kanban.quickActions.noAttendantsForQueue")}</FormHelperText>
+              ) : null}
+            </FormControl>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setDialog(null)} disabled={saving}>
+              {i18n.t("kanban.quickActions.cancel")}
+            </Button>
+            <Button
+              color="primary"
+              variant="contained"
+              disabled={saving || !transferQueueId}
+              onClick={handleTransferSave}
+            >
+              {i18n.t("kanban.quickActions.confirm")}
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
 
-      <Dialog open={dialog === "tags"} onClose={() => !saving && setDialog(null)} maxWidth="sm" fullWidth>
-        <DialogTitle>{i18n.t("kanban.quickActions.tags")}</DialogTitle>
-        <DialogContent>
-          <Autocomplete
-            multiple
-            options={tagOptions}
-            value={tagsSelection}
-            onChange={(e, v) => setTagsSelection(v)}
-            getOptionLabel={(o) => (typeof o === "string" ? o : o?.name || "")}
-            getOptionSelected={(option, value) => Boolean(value) && option.id === value.id}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                variant="outlined"
-                margin="normal"
-                placeholder={i18n.t("kanban.quickActions.tagsPlaceholder")}
-              />
-            )}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDialog(null)} disabled={saving}>
-            {i18n.t("kanban.quickActions.cancel")}
-          </Button>
-          <Button color="primary" variant="contained" disabled={saving} onClick={handleTagsSave}>
-            {i18n.t("kanban.quickActions.save")}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      {isMobile ? (
+        <AppDialog open={dialog === "tags"} onClose={() => !saving && setDialog(null)} maxWidth="sm">
+          <AppDialogTitle>{i18n.t("kanban.quickActions.tags")}</AppDialogTitle>
+          <AppDialogContent>
+            <Autocomplete
+              multiple
+              options={tagOptions}
+              value={tagsSelection}
+              onChange={(e, v) => setTagsSelection(v)}
+              getOptionLabel={(o) => (typeof o === "string" ? o : o?.name || "")}
+              getOptionSelected={(option, value) => Boolean(value) && option.id === value.id}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  variant="outlined"
+                  margin="normal"
+                  placeholder={i18n.t("kanban.quickActions.tagsPlaceholder")}
+                  fullWidth
+                />
+              )}
+            />
+          </AppDialogContent>
+          <AppDialogActions>
+            <AppSecondaryButton onClick={() => setDialog(null)} disabled={saving}>
+              {i18n.t("kanban.quickActions.cancel")}
+            </AppSecondaryButton>
+            <AppPrimaryButton disabled={saving} onClick={handleTagsSave}>
+              {i18n.t("kanban.quickActions.save")}
+            </AppPrimaryButton>
+          </AppDialogActions>
+        </AppDialog>
+      ) : (
+        <Dialog open={dialog === "tags"} onClose={() => !saving && setDialog(null)} maxWidth="sm" fullWidth>
+          <DialogTitle>{i18n.t("kanban.quickActions.tags")}</DialogTitle>
+          <DialogContent>
+            <Autocomplete
+              multiple
+              options={tagOptions}
+              value={tagsSelection}
+              onChange={(e, v) => setTagsSelection(v)}
+              getOptionLabel={(o) => (typeof o === "string" ? o : o?.name || "")}
+              getOptionSelected={(option, value) => Boolean(value) && option.id === value.id}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  variant="outlined"
+                  margin="normal"
+                  placeholder={i18n.t("kanban.quickActions.tagsPlaceholder")}
+                />
+              )}
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setDialog(null)} disabled={saving}>
+              {i18n.t("kanban.quickActions.cancel")}
+            </Button>
+            <Button color="primary" variant="contained" disabled={saving} onClick={handleTagsSave}>
+              {i18n.t("kanban.quickActions.save")}
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
     </>
   );
 };
