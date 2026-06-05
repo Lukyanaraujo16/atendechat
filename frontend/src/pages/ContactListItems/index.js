@@ -20,14 +20,17 @@ import Button from "@material-ui/core/Button";
 import SearchIcon from "@material-ui/icons/Search";
 import TextField from "@material-ui/core/TextField";
 import InputAdornment from "@material-ui/core/InputAdornment";
+import Box from "@material-ui/core/Box";
+import Chip from "@material-ui/core/Chip";
+import Typography from "@material-ui/core/Typography";
 
 import IconButton from "@material-ui/core/IconButton";
 import DeleteOutlineIcon from "@material-ui/icons/DeleteOutline";
 import EditIcon from "@material-ui/icons/Edit";
 import CheckCircleIcon from "@material-ui/icons/CheckCircle";
 import BlockIcon from "@material-ui/icons/Block";
-
 import api from "../../services/api";
+import rules from "../../rules";
 import TableRowSkeleton from "../../components/TableRowSkeleton";
 import ContactListItemModal from "../../components/ContactListItemModal";
 import ConfirmationModal from "../../components/ConfirmationModal/";
@@ -44,6 +47,12 @@ import { Grid } from "@material-ui/core";
 
 import planilhaExemplo from "../../assets/planilha.xlsx";
 import { SocketContext } from "../../context/Socket/SocketContext";
+import useIsMobile from "../../hooks/useIsMobile";
+import {
+  MobileEntityCard,
+  MobileCardList,
+  MobileActionsMenu,
+} from "../../ui";
 
 const reducer = (state, action) => {
   if (action.type === "LOAD_CONTACTS") {
@@ -96,10 +105,22 @@ const useStyles = makeStyles((theme) => ({
     overflowY: "scroll",
     ...theme.scrollbarStyles,
   },
+  mobileList: {
+    width: "100%",
+    maxWidth: "100%",
+    overflowX: "hidden",
+  },
+  mobileActions: {
+    display: "flex",
+    flexDirection: "column",
+    gap: theme.spacing(1),
+    width: "100%",
+  },
 }));
 
 const ContactListItems = () => {
   const classes = useStyles();
+  const isMobile = useIsMobile();
 
   const { user } = useContext(AuthContext);
   const { contactListId } = useParams();
@@ -158,7 +179,7 @@ const ContactListItems = () => {
     const companyId = localStorage.getItem("companyId");
     const socket = socketManager.getSocket(companyId);
 
-    socket.on(`company-${companyId}-ContactListItem`, (data) => {
+    const itemHandler = (data) => {
       if (data.action === "update" || data.action === "create") {
         dispatch({ type: "UPDATE_CONTACTS", payload: data.record });
       }
@@ -170,19 +191,26 @@ const ContactListItems = () => {
       if (data.action === "reload") {
         dispatch({ type: "LOAD_CONTACTS", payload: data.records });
       }
-    });
+    };
 
+    const listHandler = (data) => {
+      if (data.action === "reload") {
+        dispatch({ type: "LOAD_CONTACTS", payload: data.records });
+      }
+    };
+
+    socket.on(`company-${companyId}-ContactListItem`, itemHandler);
     socket.on(
       `company-${companyId}-ContactListItem-${contactListId}`,
-      (data) => {
-        if (data.action === "reload") {
-          dispatch({ type: "LOAD_CONTACTS", payload: data.records });
-        }
-      }
+      listHandler
     );
 
     return () => {
-      socket.disconnect();
+      socket.off(`company-${companyId}-ContactListItem`, itemHandler);
+      socket.off(
+        `company-${companyId}-ContactListItem-${contactListId}`,
+        listHandler
+      );
     };
   }, [contactListId, socketManager]);
 
@@ -247,6 +275,103 @@ const ContactListItems = () => {
     history.push("/contact-lists");
   };
 
+  const canDeleteContact =
+    rules[user.profile]?.static?.includes("contacts-page:deleteContact");
+
+  const renderMobileContactCard = (contact) => {
+    const menuItems = [
+      {
+        key: "edit",
+        label: i18n.t("contactListItems.dialog.edit"),
+        icon: <EditIcon fontSize="small" />,
+        onClick: () => hadleEditContact(contact.id),
+      },
+      canDeleteContact
+        ? {
+            key: "delete",
+            label: i18n.t("contactListItems.confirmationModal.deleteTitle"),
+            icon: <DeleteOutlineIcon fontSize="small" />,
+            danger: true,
+            onClick: () => {
+              setConfirmOpen(true);
+              setDeletingContact(contact);
+            },
+          }
+        : null,
+    ].filter(Boolean);
+
+    return (
+      <MobileEntityCard
+        key={contact.id}
+        leading={
+          contact.isWhatsappValid ? (
+            <CheckCircleIcon style={{ color: "green" }} />
+          ) : (
+            <BlockIcon color="disabled" />
+          )
+        }
+        title={contact.name}
+        subtitle={contact.number}
+        badges={
+          <MobileActionsMenu
+            items={menuItems}
+            ariaLabel={i18n.t("contactListItems.mobile.flowActions")}
+          />
+        }
+        onClick={() => hadleEditContact(contact.id)}
+        footer={
+          <Chip
+            size="small"
+            variant="outlined"
+            label={
+              contact.isWhatsappValid
+                ? i18n.t("contactListItems.mobile.whatsappValid")
+                : i18n.t("contactListItems.mobile.whatsappInvalid")
+            }
+          />
+        }
+      >
+        {contact.email ? (
+          <Typography variant="caption" color="textSecondary" display="block">
+            {contact.email}
+          </Typography>
+        ) : null}
+      </MobileEntityCard>
+    );
+  };
+
+  const actionButtons = (
+    <>
+      <Button
+        fullWidth
+        variant="contained"
+        color="primary"
+        onClick={goToContactLists}
+      >
+        {i18n.t("contactListItems.buttons.lists")}
+      </Button>
+      <Button
+        fullWidth
+        variant="contained"
+        color="primary"
+        onClick={() => {
+          fileUploadRef.current.value = null;
+          fileUploadRef.current.click();
+        }}
+      >
+        {i18n.t("contactListItems.buttons.import")}
+      </Button>
+      <Button
+        fullWidth
+        variant="contained"
+        color="primary"
+        onClick={handleOpenContactListItemModal}
+      >
+        {i18n.t("contactListItems.buttons.add")}
+      </Button>
+    </>
+  );
+
   return (
     <MainContainer className={classes.mainContainer}>
       <ContactListItemModal
@@ -289,7 +414,7 @@ const ContactListItems = () => {
           </Grid>
           <Grid xs={12} sm={7} item>
             <Grid spacing={2} container>
-              <Grid xs={12} sm={6} item>
+              <Grid xs={12} item>
                 <TextField
                   fullWidth
                   placeholder={i18n.t("contactListItems.searchPlaceholder")}
@@ -305,39 +430,47 @@ const ContactListItems = () => {
                   }}
                 />
               </Grid>
-              <Grid xs={4} sm={2} item>
-                <Button
-                  fullWidth
-                  variant="contained"
-                  color="primary"
-                  onClick={goToContactLists}
-                >
-                  {i18n.t("contactListItems.buttons.lists")}
-                </Button>
-              </Grid>
-              <Grid xs={4} sm={2} item>
-                <Button
-                  fullWidth
-                  variant="contained"
-                  color="primary"
-                  onClick={() => {
-                    fileUploadRef.current.value = null;
-                    fileUploadRef.current.click();
-                  }}
-                >
-                  {i18n.t("contactListItems.buttons.import")}
-                </Button>
-              </Grid>
-              <Grid xs={4} sm={2} item>
-                <Button
-                  fullWidth
-                  variant="contained"
-                  color="primary"
-                  onClick={handleOpenContactListItemModal}
-                >
-                  {i18n.t("contactListItems.buttons.add")}
-                </Button>
-              </Grid>
+              {isMobile ? (
+                <Grid xs={12} item>
+                  <Box className={classes.mobileActions}>{actionButtons}</Box>
+                </Grid>
+              ) : (
+                <>
+                  <Grid xs={4} sm={2} item>
+                    <Button
+                      fullWidth
+                      variant="contained"
+                      color="primary"
+                      onClick={goToContactLists}
+                    >
+                      {i18n.t("contactListItems.buttons.lists")}
+                    </Button>
+                  </Grid>
+                  <Grid xs={4} sm={2} item>
+                    <Button
+                      fullWidth
+                      variant="contained"
+                      color="primary"
+                      onClick={() => {
+                        fileUploadRef.current.value = null;
+                        fileUploadRef.current.click();
+                      }}
+                    >
+                      {i18n.t("contactListItems.buttons.import")}
+                    </Button>
+                  </Grid>
+                  <Grid xs={4} sm={2} item>
+                    <Button
+                      fullWidth
+                      variant="contained"
+                      color="primary"
+                      onClick={handleOpenContactListItemModal}
+                    >
+                      {i18n.t("contactListItems.buttons.add")}
+                    </Button>
+                  </Grid>
+                </>
+              )}
             </Grid>
           </Grid>
         </Grid>
@@ -360,75 +493,90 @@ const ContactListItems = () => {
             ref={fileUploadRef}
           />
         </>
-        <Table size="small">
-          <TableHead>
-            <TableRow>
-              <TableCell align="center" style={{ width: "0%" }}>
-                #
-              </TableCell>
-              <TableCell>{i18n.t("contactListItems.table.name")}</TableCell>
-              <TableCell align="center">
-                {i18n.t("contactListItems.table.number")}
-              </TableCell>
-              <TableCell align="center">
-                {i18n.t("contactListItems.table.email")}
-              </TableCell>
-              <TableCell align="center">
-                {i18n.t("contactListItems.table.actions")}
-              </TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            <>
-              {contacts.map((contact) => (
-                <TableRow key={contact.id}>
-                  <TableCell align="center" style={{ width: "0%" }}>
-                    <IconButton>
-                      {contact.isWhatsappValid ? (
-                        <CheckCircleIcon
-                          titleAccess="Whatsapp Válido"
-                          htmlColor="green"
-                        />
-                      ) : (
-                        <BlockIcon
-                          titleAccess="Whatsapp Inválido"
-                          htmlColor="grey"
-                        />
-                      )}
-                    </IconButton>
-                  </TableCell>
-                  <TableCell>{contact.name}</TableCell>
-                  <TableCell align="center">{contact.number}</TableCell>
-                  <TableCell align="center">{contact.email}</TableCell>
-                  <TableCell align="center">
-                    <IconButton
-                      size="small"
-                      onClick={() => hadleEditContact(contact.id)}
-                    >
-                      <EditIcon />
-                    </IconButton>
-                    <Can
-                      role={user.profile}
-                      perform="contacts-page:deleteContact"
-                      yes={() => (
-                        <IconButton
-                          size="small"
-                          onClick={() => {
-                            setConfirmOpen(true);
-                            setDeletingContact(contact);
-                          }}
-                        >
-                          <DeleteOutlineIcon />
-                        </IconButton>
-                      )}
-                    />
-                  </TableCell>
-                </TableRow>
-              ))}
-              {loading && <TableRowSkeleton columns={4} />}
-            </>
-          </TableBody>
-        </Table>
+        {isMobile ? (
+          <Box className={classes.mobileList}>
+            {contacts.length === 0 && !loading ? (
+              <Typography variant="body2" color="textSecondary" align="center" style={{ padding: 24 }}>
+                {i18n.t("contactListItems.searchPlaceholder")}
+              </Typography>
+            ) : (
+              <MobileCardList>
+                {contacts.map((contact) => renderMobileContactCard(contact))}
+              </MobileCardList>
+            )}
+            {loading ? <TableRowSkeleton columns={1} /> : null}
+          </Box>
+        ) : (
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell align="center" style={{ width: "0%" }}>
+                  #
+                </TableCell>
+                <TableCell>{i18n.t("contactListItems.table.name")}</TableCell>
+                <TableCell align="center">
+                  {i18n.t("contactListItems.table.number")}
+                </TableCell>
+                <TableCell align="center">
+                  {i18n.t("contactListItems.table.email")}
+                </TableCell>
+                <TableCell align="center">
+                  {i18n.t("contactListItems.table.actions")}
+                </TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              <>
+                {contacts.map((contact) => (
+                  <TableRow key={contact.id}>
+                    <TableCell align="center" style={{ width: "0%" }}>
+                      <IconButton>
+                        {contact.isWhatsappValid ? (
+                          <CheckCircleIcon
+                            titleAccess="Whatsapp Válido"
+                            htmlColor="green"
+                          />
+                        ) : (
+                          <BlockIcon
+                            titleAccess="Whatsapp Inválido"
+                            htmlColor="grey"
+                          />
+                        )}
+                      </IconButton>
+                    </TableCell>
+                    <TableCell>{contact.name}</TableCell>
+                    <TableCell align="center">{contact.number}</TableCell>
+                    <TableCell align="center">{contact.email}</TableCell>
+                    <TableCell align="center">
+                      <IconButton
+                        size="small"
+                        onClick={() => hadleEditContact(contact.id)}
+                      >
+                        <EditIcon />
+                      </IconButton>
+                      <Can
+                        role={user.profile}
+                        perform="contacts-page:deleteContact"
+                        yes={() => (
+                          <IconButton
+                            size="small"
+                            onClick={() => {
+                              setConfirmOpen(true);
+                              setDeletingContact(contact);
+                            }}
+                          >
+                            <DeleteOutlineIcon />
+                          </IconButton>
+                        )}
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {loading && <TableRowSkeleton columns={4} />}
+              </>
+            </TableBody>
+          </Table>
+        )}
       </Paper>
     </MainContainer>
   );

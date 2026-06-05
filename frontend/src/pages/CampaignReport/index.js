@@ -91,8 +91,7 @@ const CampaignReport = () => {
     const companyId = localStorage.getItem("companyId");
     const socket = socketManager.getSocket(companyId);
 
-    socket.on(`company-${companyId}-campaign`, (data) => {
-     
+    const handler = (data) => {
       if (data.record.id === +campaignId) {
         setCampaign(data.record);
 
@@ -102,10 +101,12 @@ const CampaignReport = () => {
           }, 5000);
         }
       }
-    });
+    };
+
+    socket.on(`company-${companyId}-campaign`, handler);
 
     return () => {
-      socket.disconnect();
+      socket.off(`company-${companyId}-campaign`, handler);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [campaignId, socketManager]);

@@ -15,11 +15,15 @@ import IconButton from "@material-ui/core/IconButton";
 import SearchIcon from "@material-ui/icons/Search";
 import TextField from "@material-ui/core/TextField";
 import InputAdornment from "@material-ui/core/InputAdornment";
+import Box from "@material-ui/core/Box";
+import Typography from "@material-ui/core/Typography";
+import Chip from "@material-ui/core/Chip";
 
 import DeleteOutlineIcon from "@material-ui/icons/DeleteOutline";
 import EditIcon from "@material-ui/icons/Edit";
 import PeopleIcon from "@material-ui/icons/People";
 import DownloadIcon from "@material-ui/icons/GetApp";
+import ListAltIcon from "@material-ui/icons/ListAlt";
 
 import MainContainer from "../../components/MainContainer";
 import MainHeader from "../../components/MainHeader";
@@ -35,6 +39,12 @@ import { Grid } from "@material-ui/core";
 
 import planilhaExemplo from "../../assets/planilha.xlsx";
 import { SocketContext } from "../../context/Socket/SocketContext";
+import useIsMobile from "../../hooks/useIsMobile";
+import {
+  MobileEntityCard,
+  MobileCardList,
+  MobileActionsMenu,
+} from "../../ui";
 
 const reducer = (state, action) => {
   if (action.type === "LOAD_CONTACTLISTS") {
@@ -87,11 +97,17 @@ const useStyles = makeStyles((theme) => ({
     overflowY: "scroll",
     ...theme.scrollbarStyles,
   },
+  mobileList: {
+    width: "100%",
+    maxWidth: "100%",
+    overflowX: "hidden",
+  },
 }));
 
 const ContactLists = () => {
   const classes = useStyles();
   const history = useHistory();
+  const isMobile = useIsMobile();
 
   const [loading, setLoading] = useState(false);
   const [pageNumber, setPageNumber] = useState(1);
@@ -134,7 +150,7 @@ const ContactLists = () => {
     const companyId = localStorage.getItem("companyId");
     const socket = socketManager.getSocket(companyId);
 
-    socket.on(`company-${companyId}-ContactList`, (data) => {
+    const handler = (data) => {
       if (data.action === "update" || data.action === "create") {
         dispatch({ type: "UPDATE_CONTACTLIST", payload: data.record });
       }
@@ -142,10 +158,12 @@ const ContactLists = () => {
       if (data.action === "delete") {
         dispatch({ type: "DELETE_CONTACTLIST", payload: +data.id });
       }
-    });
+    };
+
+    socket.on(`company-${companyId}-ContactList`, handler);
 
     return () => {
-      socket.disconnect();
+      socket.off(`company-${companyId}-ContactList`, handler);
     };
   }, [socketManager]);
 
@@ -196,6 +214,66 @@ const ContactLists = () => {
     history.push(`/contact-lists/${id}/contacts`);
   };
 
+  const renderMobileContactListCard = (contactList) => {
+    const menuItems = [
+      {
+        key: "contacts",
+        label: i18n.t("contactLists.mobile.viewContacts"),
+        icon: <PeopleIcon fontSize="small" />,
+        onClick: () => goToContacts(contactList.id),
+      },
+      {
+        key: "download",
+        label: i18n.t("contactLists.mobile.downloadTemplate"),
+        icon: <DownloadIcon fontSize="small" />,
+        onClick: () => {
+          const link = document.createElement("a");
+          link.href = planilhaExemplo;
+          link.download = "planilha.xlsx";
+          link.click();
+        },
+      },
+      {
+        key: "edit",
+        label: i18n.t("contactLists.dialog.edit"),
+        icon: <EditIcon fontSize="small" />,
+        onClick: () => handleEditContactList(contactList),
+      },
+      {
+        key: "delete",
+        label: i18n.t("contactLists.confirmationModal.deleteTitle"),
+        icon: <DeleteOutlineIcon fontSize="small" />,
+        danger: true,
+        onClick: () => {
+          setConfirmModalOpen(true);
+          setDeletingContactList(contactList);
+        },
+      },
+    ];
+
+    return (
+      <MobileEntityCard
+        key={contactList.id}
+        leading={<ListAltIcon color="primary" />}
+        title={contactList.name}
+        badges={
+          <MobileActionsMenu
+            items={menuItems}
+            ariaLabel={i18n.t("contactLists.mobile.flowActions")}
+          />
+        }
+        onClick={() => goToContacts(contactList.id)}
+        footer={
+          <Chip
+            size="small"
+            variant="outlined"
+            label={`${contactList.contactsCount || 0} ${i18n.t("contactLists.table.contacts").toLowerCase()}`}
+          />
+        }
+      />
+    );
+  };
+
   return (
     <MainContainer>
       <ConfirmationModal
@@ -224,7 +302,7 @@ const ContactLists = () => {
           </Grid>
           <Grid xs={12} sm={4} item>
             <Grid spacing={2} container>
-              <Grid xs={7} sm={6} item>
+              <Grid xs={12} sm={6} item>
                 <TextField
                   fullWidth
                   placeholder={i18n.t("contacts.searchPlaceholder")}
@@ -240,7 +318,7 @@ const ContactLists = () => {
                   }}
                 />
               </Grid>
-              <Grid xs={5} sm={6} item>
+              <Grid xs={12} sm={6} item>
                 <Button
                   fullWidth
                   variant="contained"
@@ -259,65 +337,82 @@ const ContactLists = () => {
         variant="outlined"
         onScroll={handleScroll}
       >
-        <Table size="small">
-          <TableHead>
-            <TableRow>
-              <TableCell align="center">
-                {i18n.t("contactLists.table.name")}
-              </TableCell>
-              <TableCell align="center">
-                {i18n.t("contactLists.table.contacts")}
-              </TableCell>
-              <TableCell align="center">
-                {i18n.t("contactLists.table.actions")}
-              </TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            <>
-              {contactLists.map((contactList) => (
-                <TableRow key={contactList.id}>
-                  <TableCell align="center">{contactList.name}</TableCell>
-                  <TableCell align="center">
-                    {contactList.contactsCount || 0}
-                  </TableCell>
-                  <TableCell align="center">
-                    <a href={planilhaExemplo} download="planilha.xlsx">
-                      <IconButton size="small" title="Baixar Planilha Exemplo">
-                        <DownloadIcon />
+        {isMobile ? (
+          <Box className={classes.mobileList}>
+            {contactLists.length === 0 && !loading ? (
+              <Typography variant="body2" color="textSecondary" align="center" style={{ padding: 24 }}>
+                {i18n.t("contacts.searchPlaceholder")}
+              </Typography>
+            ) : (
+              <MobileCardList>
+                {contactLists.map((contactList) =>
+                  renderMobileContactListCard(contactList)
+                )}
+              </MobileCardList>
+            )}
+            {loading ? <TableRowSkeleton columns={1} /> : null}
+          </Box>
+        ) : (
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell align="center">
+                  {i18n.t("contactLists.table.name")}
+                </TableCell>
+                <TableCell align="center">
+                  {i18n.t("contactLists.table.contacts")}
+                </TableCell>
+                <TableCell align="center">
+                  {i18n.t("contactLists.table.actions")}
+                </TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              <>
+                {contactLists.map((contactList) => (
+                  <TableRow key={contactList.id}>
+                    <TableCell align="center">{contactList.name}</TableCell>
+                    <TableCell align="center">
+                      {contactList.contactsCount || 0}
+                    </TableCell>
+                    <TableCell align="center">
+                      <a href={planilhaExemplo} download="planilha.xlsx">
+                        <IconButton size="small" title="Baixar Planilha Exemplo">
+                          <DownloadIcon />
+                        </IconButton>
+                      </a>
+
+                      <IconButton
+                        size="small"
+                        onClick={() => goToContacts(contactList.id)}
+                      >
+                        <PeopleIcon />
                       </IconButton>
-                    </a>
 
-                    <IconButton
-                      size="small"
-                      onClick={() => goToContacts(contactList.id)}
-                    >
-                      <PeopleIcon />
-                    </IconButton>
+                      <IconButton
+                        size="small"
+                        onClick={() => handleEditContactList(contactList)}
+                      >
+                        <EditIcon />
+                      </IconButton>
 
-                    <IconButton
-                      size="small"
-                      onClick={() => handleEditContactList(contactList)}
-                    >
-                      <EditIcon />
-                    </IconButton>
-
-                    <IconButton
-                      size="small"
-                      onClick={(e) => {
-                        setConfirmModalOpen(true);
-                        setDeletingContactList(contactList);
-                      }}
-                    >
-                      <DeleteOutlineIcon />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {loading && <TableRowSkeleton columns={3} />}
-            </>
-          </TableBody>
-        </Table>
+                      <IconButton
+                        size="small"
+                        onClick={(e) => {
+                          setConfirmModalOpen(true);
+                          setDeletingContactList(contactList);
+                        }}
+                      >
+                        <DeleteOutlineIcon />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {loading && <TableRowSkeleton columns={3} />}
+              </>
+            </TableBody>
+          </Table>
+        )}
       </Paper>
     </MainContainer>
   );

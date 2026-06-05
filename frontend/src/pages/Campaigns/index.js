@@ -45,7 +45,13 @@ import {
   AppEmptyState,
   AppLoadingState,
   AppTableRowSkeleton,
+  MobileEntityCard,
+  MobileCardList,
+  MobileActionsMenu,
 } from "../../ui";
+import useIsMobile from "../../hooks/useIsMobile";
+import Chip from "@material-ui/core/Chip";
+import SendIcon from "@material-ui/icons/Send";
 
 const STATUS_STYLES = {
   INATIVA: { backgroundColor: "#9e9e9e", color: "#fff" },
@@ -126,10 +132,16 @@ const useStyles = makeStyles((theme) => ({
     minWidth: 200,
     maxWidth: 420,
   },
+  mobileList: {
+    width: "100%",
+    maxWidth: "100%",
+    overflowX: "hidden",
+  },
 }));
 
 const Campaigns = () => {
   const classes = useStyles();
+  const isMobile = useIsMobile();
 
   const history = useHistory();
 
@@ -188,7 +200,7 @@ const Campaigns = () => {
     const companyId = localStorage.getItem("companyId");
     const socket = socketManager.getSocket(companyId);
 
-    socket.on(`company-${companyId}-campaign`, (data) => {
+    const handler = (data) => {
       if (data.action === "update" || data.action === "create") {
         dispatch({ type: "UPDATE_CAMPAIGNS", payload: data.record });
         if (data.record && data.record.id) {
@@ -209,9 +221,11 @@ const Campaigns = () => {
       if (data.action === "delete") {
         dispatch({ type: "DELETE_CAMPAIGN", payload: +data.id });
       }
-    });
+    };
+
+    socket.on(`company-${companyId}-campaign`, handler);
     return () => {
-      socket.disconnect();
+      socket.off(`company-${companyId}-campaign`, handler);
     };
   }, [socketManager]);
 
@@ -373,6 +387,136 @@ const Campaigns = () => {
     prog.failed > 0 &&
     ["EM_ANDAMENTO", "FINALIZADA", "CANCELADA"].includes(campaign.status);
 
+  const renderMobileCampaignCard = (campaign) => {
+    const prog = progressById[campaign.id];
+    const pct =
+      prog && prog.total > 0
+        ? Math.min(100, Math.round((prog.sent / prog.total) * 100))
+        : 0;
+
+    const menuItems = [
+      {
+        key: "report",
+        label: i18n.t("campaigns.table.report"),
+        icon: <DescriptionIcon fontSize="small" />,
+        onClick: () => history.push(`/campaign/${campaign.id}/report`),
+      },
+      {
+        key: "edit",
+        label: i18n.t("campaigns.table.edit"),
+        icon: <EditIcon fontSize="small" />,
+        onClick: () => handleEditCampaign(campaign),
+      },
+      campaign.status === "EM_ANDAMENTO"
+        ? {
+            key: "stop",
+            label: i18n.t("campaigns.table.stopCampaign"),
+            icon: <PauseCircleOutlineIcon fontSize="small" />,
+            onClick: () => cancelCampaign(campaign),
+          }
+        : null,
+      campaign.status === "CANCELADA"
+        ? {
+            key: "resume",
+            label: i18n.t("campaigns.table.resumeCampaign"),
+            icon: <PlayCircleOutlineIcon fontSize="small" />,
+            onClick: () => {
+              setRestartTarget(campaign);
+              setRestartModalOpen(true);
+            },
+          }
+        : null,
+      canShowRetryFailed(campaign, prog)
+        ? {
+            key: "retry",
+            label: i18n.t("campaigns.table.retryFailed"),
+            icon: <ReplayIcon fontSize="small" />,
+            onClick: () => {
+              setRetryFailedTarget(campaign);
+              setRetryFailedModalOpen(true);
+            },
+          }
+        : null,
+      {
+        key: "delete",
+        label: i18n.t("campaigns.table.delete"),
+        icon: <DeleteOutlineIcon fontSize="small" />,
+        danger: true,
+        onClick: () => {
+          setConfirmModalOpen(true);
+          setDeletingCampaign(campaign);
+        },
+      },
+    ].filter(Boolean);
+
+    const statusStyle = STATUS_STYLES[campaign.status] || {
+      backgroundColor: "#757575",
+      color: "#fff",
+    };
+
+    return (
+      <MobileEntityCard
+        key={campaign.id}
+        leading={<SendIcon color="primary" />}
+        title={campaign.name}
+        badges={
+          <MobileActionsMenu
+            items={menuItems}
+            ariaLabel={i18n.t("campaigns.mobile.flowActions")}
+          />
+        }
+        onClick={() => handleEditCampaign(campaign)}
+        footer={
+          <Chip
+            size="small"
+            label={formatStatus(campaign.status)}
+            style={statusStyle}
+          />
+        }
+      >
+        <Typography variant="caption" color="textSecondary" display="block">
+          {i18n.t("campaigns.mobile.scheduledAt")}:{" "}
+          {campaign.scheduledAt
+            ? datetimeToClient(campaign.scheduledAt)
+            : i18n.t("campaigns.mobile.notScheduled")}
+        </Typography>
+        <Typography variant="caption" color="textSecondary" display="block">
+          {i18n.t("campaigns.mobile.connection")}:{" "}
+          {campaign.whatsappId
+            ? campaign.whatsapp?.name
+            : i18n.t("campaigns.table.notDefined2")}
+        </Typography>
+        <Typography variant="caption" color="textSecondary" display="block">
+          {i18n.t("campaigns.mobile.contactList")}:{" "}
+          {campaign.contactListId
+            ? campaign.contactList?.name
+            : i18n.t("campaigns.table.notDefined")}
+        </Typography>
+        {prog && prog.total > 0 ? (
+          <Box mt={0.5}>
+            <LinearProgress
+              variant="determinate"
+              value={pct}
+              style={{ height: 8, borderRadius: 4 }}
+            />
+            <Typography variant="caption" color="textSecondary" display="block">
+              {i18n.t("campaigns.table.progressLine", {
+                pct,
+                sent: prog.sent,
+                total: prog.total,
+              })}
+            </Typography>
+            {prog.failed > 0 ? (
+              <Typography variant="caption" style={{ color: "#c62828" }} display="block">
+                {i18n.t("campaigns.table.failedLine", { failed: prog.failed })}
+              </Typography>
+            ) : null}
+          </Box>
+        ) : null}
+      </MobileEntityCard>
+    );
+  };
+
   return (
     <MainContainer className={classes.pageRoot}>
       <ConfirmationModal
@@ -470,6 +614,7 @@ const Campaigns = () => {
             onChange={handleSearch}
             variant="outlined"
             size="small"
+            fullWidth={isMobile}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
@@ -490,6 +635,13 @@ const Campaigns = () => {
               {i18n.t("campaigns.buttons.add")}
             </AppPrimaryButton>
           </AppEmptyState>
+        ) : isMobile ? (
+          <Box className={classes.mobileList}>
+            <MobileCardList>
+              {campaigns.map((campaign) => renderMobileCampaignCard(campaign))}
+            </MobileCardList>
+            {loading ? <AppLoadingState message={i18n.t("campaigns.loading")} /> : null}
+          </Box>
         ) : (
         <Table size="small">
           <TableHead>

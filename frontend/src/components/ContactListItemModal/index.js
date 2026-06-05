@@ -6,12 +6,7 @@ import { toast } from "react-toastify";
 
 import { makeStyles } from "@material-ui/core/styles";
 import { green } from "@material-ui/core/colors";
-import Button from "@material-ui/core/Button";
 import TextField from "@material-ui/core/TextField";
-import Dialog from "@material-ui/core/Dialog";
-import DialogActions from "@material-ui/core/DialogActions";
-import DialogContent from "@material-ui/core/DialogContent";
-import DialogTitle from "@material-ui/core/DialogTitle";
 import Typography from "@material-ui/core/Typography";
 import CircularProgress from "@material-ui/core/CircularProgress";
 
@@ -21,6 +16,14 @@ import api from "../../services/api";
 import toastError from "../../errors/toastError";
 import { useParams } from "react-router-dom";
 import { AuthContext } from "../../context/Auth/AuthContext";
+import {
+  AppDialog,
+  AppDialogTitle,
+  AppDialogContent,
+  AppDialogActions,
+  AppPrimaryButton,
+  AppSecondaryButton,
+} from "../../ui";
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -30,6 +33,7 @@ const useStyles = makeStyles((theme) => ({
   textField: {
     marginRight: theme.spacing(1),
     flex: 1,
+    width: "100%",
   },
 
   extraAttr: {
@@ -49,6 +53,12 @@ const useStyles = makeStyles((theme) => ({
     left: "50%",
     marginTop: -12,
     marginLeft: -12,
+  },
+  fieldStack: {
+    display: "flex",
+    flexDirection: "column",
+    gap: theme.spacing(1),
+    width: "100%",
   },
 }));
 
@@ -146,12 +156,12 @@ const ContactListItemModal = ({
 
   return (
     <div className={classes.root}>
-      <Dialog open={open} onClose={handleClose} maxWidth="lg" scroll="paper">
-        <DialogTitle id="form-dialog-title">
+      <AppDialog open={open} onClose={handleClose} maxWidth="sm" fullWidth scroll="paper">
+        <AppDialogTitle id="form-dialog-title">
           {contactId
             ? `${i18n.t("contactModal.title.edit")}`
             : `${i18n.t("contactModal.title.add")}`}
-        </DialogTitle>
+        </AppDialogTitle>
         <Formik
           initialValues={contact}
           enableReinitialize={true}
@@ -165,32 +175,33 @@ const ContactListItemModal = ({
         >
           {({ values, errors, touched, isSubmitting }) => (
             <Form>
-              <DialogContent dividers>
+              <AppDialogContent dividers>
                 <Typography variant="subtitle1" gutterBottom>
                   {i18n.t("contactModal.form.mainInfo")}
                 </Typography>
-                <Field
-                  as={TextField}
-                  label={i18n.t("contactModal.form.name")}
-                  name="name"
-                  autoFocus
-                  error={touched.name && Boolean(errors.name)}
-                  helperText={touched.name && errors.name}
-                  variant="outlined"
-                  margin="dense"
-                  className={classes.textField}
-                />
-                <Field
-                  as={TextField}
-                  label={i18n.t("contactModal.form.number")}
-                  name="number"
-                  error={touched.number && Boolean(errors.number)}
-                  helperText={touched.number && errors.number}
-                  placeholder="5513912344321"
-                  variant="outlined"
-                  margin="dense"
-                />
-                <div>
+                <div className={classes.fieldStack}>
+                  <Field
+                    as={TextField}
+                    label={i18n.t("contactModal.form.name")}
+                    name="name"
+                    autoFocus
+                    error={touched.name && Boolean(errors.name)}
+                    helperText={touched.name && errors.name}
+                    variant="outlined"
+                    margin="dense"
+                    fullWidth
+                  />
+                  <Field
+                    as={TextField}
+                    label={i18n.t("contactModal.form.number")}
+                    name="number"
+                    error={touched.number && Boolean(errors.number)}
+                    helperText={touched.number && errors.number}
+                    placeholder="5513912344321"
+                    variant="outlined"
+                    margin="dense"
+                    fullWidth
+                  />
                   <Field
                     as={TextField}
                     label={i18n.t("contactModal.form.email")}
@@ -203,21 +214,17 @@ const ContactListItemModal = ({
                     variant="outlined"
                   />
                 </div>
-              </DialogContent>
-              <DialogActions>
-                <Button
+              </AppDialogContent>
+              <AppDialogActions>
+                <AppSecondaryButton
                   onClick={handleClose}
-                  color="secondary"
                   disabled={isSubmitting}
-                  variant="outlined"
                 >
                   {i18n.t("contactModal.buttons.cancel")}
-                </Button>
-                <Button
+                </AppSecondaryButton>
+                <AppPrimaryButton
                   type="submit"
-                  color="primary"
                   disabled={isSubmitting}
-                  variant="contained"
                   className={classes.btnWrapper}
                 >
                   {contactId
@@ -229,12 +236,12 @@ const ContactListItemModal = ({
                       className={classes.buttonProgress}
                     />
                   )}
-                </Button>
-              </DialogActions>
+                </AppPrimaryButton>
+              </AppDialogActions>
             </Form>
           )}
         </Formik>
-      </Dialog>
+      </AppDialog>
     </div>
   );
 };

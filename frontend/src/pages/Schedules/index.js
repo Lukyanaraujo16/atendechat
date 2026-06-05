@@ -15,7 +15,13 @@ import {
   AppDangerAction,
   AppEmptyState,
   AppLoadingState,
+  MobileEntityCard,
+  MobileCardList,
+  MobileActionsMenu,
 } from "../../ui";
+import useIsMobile from "../../hooks/useIsMobile";
+import Chip from "@material-ui/core/Chip";
+import EventIcon from "@material-ui/icons/Event";
 import ScheduleModal from "../../components/ScheduleModal";
 import ConfirmationModal from "../../components/ConfirmationModal";
 import toastError from "../../errors/toastError";
@@ -142,12 +148,24 @@ const useStyles = makeStyles((theme) => ({
   listIntro: {
     marginBottom: theme.spacing(2),
   },
+  mobileList: {
+    width: "100%",
+    maxWidth: "100%",
+    overflowX: "hidden",
+  },
+  mobileChips: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: theme.spacing(0.5),
+    maxWidth: "100%",
+  },
 }));
 
 const Schedules = () => {
   const localizer = createMomentLocalizer();
   const classes = useStyles();
   const history = useHistory();
+  const isMobile = useIsMobile();
 
   const { user } = useContext(AuthContext);
 
@@ -337,6 +355,119 @@ const Schedules = () => {
     }
   };
 
+  const contactPhone = (schedule) => {
+    if (schedule.contact?.number) return schedule.contact.number;
+    const linked = (schedule.scheduleContacts || []).find((sc) => sc.contact?.number);
+    return linked?.contact?.number || "—";
+  };
+
+  const scheduleDateLabel = (row) => {
+    if (row.scheduleType === "recurring" && row.nextRunAt) {
+      return formatUtcInCompanyTz(row.nextRunAt);
+    }
+    if (row.sendAt) {
+      return formatUtcInCompanyTz(row.sendAt);
+    }
+    return "—";
+  };
+
+  const renderMobileScheduleCard = (row) => {
+    const n =
+      row.scheduleContacts?.length || (row.contactId ? 1 : 0);
+    const menuItems = [
+      {
+        key: "edit",
+        label: i18n.t("schedules.buttons.edit"),
+        icon: <EditIcon fontSize="small" />,
+        onClick: () => handleEditSchedule(row),
+      },
+      user.profile === "admin" &&
+      row.scheduleType === "recurring" &&
+      row.sentAt == null
+        ? {
+            key: "pause",
+            label:
+              row.isActive === false
+                ? i18n.t("schedules.buttons.resume")
+                : i18n.t("schedules.buttons.pause"),
+            icon:
+              row.isActive === false ? (
+                <PlayCircleOutlineIcon fontSize="small" />
+              ) : (
+                <PauseCircleOutlineIcon fontSize="small" />
+              ),
+            onClick: () => handleTogglePause(row),
+          }
+        : null,
+      {
+        key: "delete",
+        label: i18n.t("schedules.buttons.delete"),
+        icon: <DeleteOutlineIcon fontSize="small" />,
+        danger: true,
+        onClick: () => {
+          setDeletingSchedule(row);
+          setConfirmModalOpen(true);
+        },
+      },
+    ].filter(Boolean);
+
+    return (
+      <MobileEntityCard
+        key={row.id}
+        leading={<EventIcon color="action" />}
+        title={contactLabel(row)}
+        subtitle={contactPhone(row)}
+        badges={
+          <MobileActionsMenu
+            items={menuItems}
+            ariaLabel={i18n.t("schedules.mobile.flowActions")}
+          />
+        }
+        onClick={() => handleEditSchedule(row)}
+        footer={
+          <Chip
+            size="small"
+            label={i18n.t(`schedules.statusLabels.${row.status || "PENDENTE"}`)}
+          />
+        }
+      >
+        <Typography variant="caption" color="textSecondary" display="block">
+          {row.scheduleType === "recurring"
+            ? i18n.t("schedules.typeRecurring")
+            : i18n.t("schedules.typeSingle")}
+          {row.scheduleType === "recurring" && row.isActive === false
+            ? ` (${i18n.t("schedules.paused")})`
+            : ""}
+        </Typography>
+        <Typography variant="caption" color="textSecondary" display="block">
+          {i18n.t("schedules.nextRun")}: {scheduleDateLabel(row)}
+        </Typography>
+        {row.body ? (
+          <Typography variant="caption" color="textSecondary" display="block">
+            {truncate(String(row.body), 120)}
+          </Typography>
+        ) : null}
+        <Box className={classes.mobileChips}>
+          <Chip
+            size="small"
+            variant="outlined"
+            label={i18n.t("schedules.contactsCount", { count: n })}
+          />
+          {row.preferredWhatsapp?.name ? (
+            <Chip
+              size="small"
+              variant="outlined"
+              label={`${i18n.t("schedules.preferredShort")}: ${row.preferredWhatsapp.name}`}
+            />
+          ) : null}
+          {row.user?.name ? (
+            <Chip size="small" variant="outlined" label={row.user.name} />
+          ) : null}
+        </Box>
+      </MobileEntityCard>
+    );
+  };
+
   return (
     <MainContainer className={classes.pageRoot}>
       <ConfirmationModal
@@ -395,6 +526,7 @@ const Schedules = () => {
             onChange={handleSearch}
             variant="outlined"
             size="small"
+            fullWidth={isMobile}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
@@ -406,7 +538,7 @@ const Schedules = () => {
         </AppActionBar>
         <Typography variant="body2" color="textSecondary" className={classes.listIntro}>
           {i18n.t("schedules.listIntro")}{" "}
-          <Box component="span" style={{ whiteSpace: "nowrap" }}>
+          <Box component="span" style={{ whiteSpace: isMobile ? "normal" : "nowrap" }}>
             ({i18n.t("schedules.companyTimezoneShort")}: {companyTz})
           </Box>
         </Typography>
@@ -421,6 +553,12 @@ const Schedules = () => {
               {i18n.t("schedules.buttons.add")}
             </AppPrimaryButton>
           </AppEmptyState>
+        ) : isMobile ? (
+          <Box className={classes.mobileList}>
+            <MobileCardList>
+              {schedules.map((row) => renderMobileScheduleCard(row))}
+            </MobileCardList>
+          </Box>
         ) : (
           <>
         <Calendar

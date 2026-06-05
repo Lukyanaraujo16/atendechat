@@ -3875,6 +3875,11 @@ const messages = {
 			},
 			contactLists: {
 				title: "Contact Lists",
+				mobile: {
+					flowActions: "List actions",
+					viewContacts: "View contacts",
+					downloadTemplate: "Download sample spreadsheet",
+				},
 				table: {
 					name: "Name",
 					contacts: "Contacts",
@@ -3906,6 +3911,11 @@ const messages = {
 			},
 			contactListItems: {
 				title: "Contacts",
+				mobile: {
+					flowActions: "Contact actions",
+					whatsappValid: "Valid WhatsApp",
+					whatsappInvalid: "Invalid WhatsApp",
+				},
 				searchPlaceholder: "Search",
 				buttons: {
 					add: "New",
@@ -3994,6 +4004,15 @@ const messages = {
 					inProgress: "In progress",
 					canceled: "Canceled",
 					finished: "Finished",
+				},
+				mobile: {
+					flowActions: "Campaign actions",
+					scheduledAt: "Scheduled for",
+					completedAt: "Completed at",
+					connection: "Connection",
+					contactList: "List",
+					notScheduled: "Not scheduled",
+					notConcluded: "Not completed",
 				},
 				table: {
 					name: "Name",
@@ -4417,6 +4436,10 @@ const messages = {
 				},
 				toasts: {
 					deleted: "Schedule deleted successfully.",
+				},
+				mobile: {
+					flowActions: "Schedule actions",
+					openContact: "Open contact",
 				},
 			},
 			tags: {

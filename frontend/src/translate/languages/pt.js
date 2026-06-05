@@ -3968,6 +3968,11 @@ const messages = {
       },
       contactLists: {
         title: "Listas de Contatos",
+        mobile: {
+          flowActions: "Ações da lista",
+          viewContacts: "Ver contatos",
+          downloadTemplate: "Baixar planilha exemplo",
+        },
         table: {
           name: "Nome",
           contacts: "Contatos",
@@ -3999,6 +4004,11 @@ const messages = {
       },
       contactListItems: {
         title: "Contatos",
+        mobile: {
+          flowActions: "Ações do contato",
+          whatsappValid: "WhatsApp válido",
+          whatsappInvalid: "WhatsApp inválido",
+        },
         searchPlaceholder: "Pesquisa",
         buttons: {
           add: "Novo",
@@ -4088,6 +4098,15 @@ const messages = {
           inProgress: "Em andamento",
           canceled: "Cancelada",
           finished: "Finalizada",
+        },
+        mobile: {
+          flowActions: "Ações da campanha",
+          scheduledAt: "Agendada para",
+          completedAt: "Concluída em",
+          connection: "Conexão",
+          contactList: "Lista",
+          notScheduled: "Sem agendamento",
+          notConcluded: "Não concluída",
         },
         table: {
           name: "Nome",
@@ -4543,6 +4562,10 @@ const messages = {
         },
         toasts: {
           deleted: "Agendamento excluído com sucesso.",
+        },
+        mobile: {
+          flowActions: "Ações do agendamento",
+          openContact: "Abrir contato",
         },
       },
       tags: {

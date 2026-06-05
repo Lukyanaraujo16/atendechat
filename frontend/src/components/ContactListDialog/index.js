@@ -6,18 +6,21 @@ import { toast } from "react-toastify";
 
 import { makeStyles } from "@material-ui/core/styles";
 import { green } from "@material-ui/core/colors";
-import Button from "@material-ui/core/Button";
 import TextField from "@material-ui/core/TextField";
-import Dialog from "@material-ui/core/Dialog";
-import DialogActions from "@material-ui/core/DialogActions";
-import DialogContent from "@material-ui/core/DialogContent";
-import DialogTitle from "@material-ui/core/DialogTitle";
 import CircularProgress from "@material-ui/core/CircularProgress";
 
 import { i18n } from "../../translate/i18n";
 
 import api from "../../services/api";
 import toastError from "../../errors/toastError";
+import {
+  AppDialog,
+  AppDialogTitle,
+  AppDialogContent,
+  AppDialogActions,
+  AppPrimaryButton,
+  AppSecondaryButton,
+} from "../../ui";
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -103,18 +106,18 @@ const ContactListModal = ({ open, onClose, contactListId }) => {
 
   return (
     <div className={classes.root}>
-      <Dialog
+      <AppDialog
         open={open}
         onClose={handleClose}
         maxWidth="xs"
         fullWidth
         scroll="paper"
       >
-        <DialogTitle id="form-dialog-title">
+        <AppDialogTitle id="form-dialog-title">
           {contactListId
             ? `${i18n.t("contactLists.dialog.edit")}`
             : `${i18n.t("contactLists.dialog.add")}`}
-        </DialogTitle>
+        </AppDialogTitle>
         <Formik
           initialValues={contactList}
           enableReinitialize={true}
@@ -128,7 +131,7 @@ const ContactListModal = ({ open, onClose, contactListId }) => {
         >
           {({ touched, errors, isSubmitting }) => (
             <Form>
-              <DialogContent dividers>
+              <AppDialogContent dividers>
                 <div className={classes.multFieldLine}>
                   <Field
                     as={TextField}
@@ -142,21 +145,17 @@ const ContactListModal = ({ open, onClose, contactListId }) => {
                     fullWidth
                   />
                 </div>
-              </DialogContent>
-              <DialogActions>
-                <Button
+              </AppDialogContent>
+              <AppDialogActions>
+                <AppSecondaryButton
                   onClick={handleClose}
-                  color="secondary"
                   disabled={isSubmitting}
-                  variant="outlined"
                 >
                   {i18n.t("contactLists.dialog.cancel")}
-                </Button>
-                <Button
+                </AppSecondaryButton>
+                <AppPrimaryButton
                   type="submit"
-                  color="primary"
                   disabled={isSubmitting}
-                  variant="contained"
                   className={classes.btnWrapper}
                 >
                   {contactListId
@@ -168,12 +167,12 @@ const ContactListModal = ({ open, onClose, contactListId }) => {
                       className={classes.buttonProgress}
                     />
                   )}
-                </Button>
-              </DialogActions>
+                </AppPrimaryButton>
+              </AppDialogActions>
             </Form>
           )}
         </Formik>
-      </Dialog>
+      </AppDialog>
     </div>
   );
 };
