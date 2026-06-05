@@ -4632,6 +4632,17 @@ const messages = {
           actions: "Acções",
           selectAll: "Seleccionar todos desta página",
         },
+        mobile: {
+          actions: "Ações da mídia",
+          filters: "Filtros",
+          applyFilters: "Aplicar",
+          preview: "Visualizar",
+          copyLink: "Copiar link",
+          linkCopied: "Link copiado para a área de transferência.",
+          linkCopyFailed: "Não foi possível copiar o link.",
+          loadMore: "Carregar mais",
+          closePreview: "Fechar",
+        },
       },
       settings: {
         schedulesUpdated: "Horários atualizados com sucesso.",

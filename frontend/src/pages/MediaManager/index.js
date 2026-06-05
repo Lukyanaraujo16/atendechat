@@ -43,7 +43,22 @@ import ImageIcon from "@material-ui/icons/Image";
 
 import MainContainer from "../../components/MainContainer";
 import CompanyStorageUsageCard from "../../components/CompanyStorageUsageCard";
-import { AppPageHeader } from "../../ui";
+import {
+  AppPageHeader,
+  AppDialog,
+  AppDialogTitle,
+  AppDialogContent,
+  AppDialogActions,
+  AppPrimaryButton,
+  AppSecondaryButton,
+  MobileEntityCard,
+  MobileCardList,
+  MobileActionsMenu,
+} from "../../ui";
+import useIsMobile from "../../hooks/useIsMobile";
+import FilterListIcon from "@material-ui/icons/FilterList";
+import FileCopyOutlinedIcon from "@material-ui/icons/FileCopyOutlined";
+import VisibilityOutlinedIcon from "@material-ui/icons/VisibilityOutlined";
 import { AuthContext } from "../../context/Auth/AuthContext";
 import api from "../../services/api";
 import toastError from "../../errors/toastError";
@@ -124,6 +139,59 @@ const useStyles = makeStyles((theme) => ({
       flex: "0 0 auto",
     },
   },
+  mobileToolbar: {
+    display: "flex",
+    flexDirection: "column",
+    gap: theme.spacing(1.5),
+    width: "100%",
+    maxWidth: "100%",
+  },
+  mobileSearchRow: {
+    width: "100%",
+  },
+  mobileCardChips: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: theme.spacing(0.5),
+    maxWidth: "100%",
+  },
+  mobilePreviewImage: {
+    width: "100%",
+    maxWidth: "100%",
+    maxHeight: "calc(100dvh - 120px)",
+    objectFit: "contain",
+    display: "block",
+    margin: "0 auto",
+  },
+  mobilePreviewVideo: {
+    width: "100%",
+    maxWidth: "100%",
+    maxHeight: "calc(100dvh - 120px)",
+  },
+  mobilePreviewAudio: {
+    width: "100%",
+  },
+  mobileLoadMore: {
+    display: "flex",
+    justifyContent: "center",
+    padding: theme.spacing(2, 0),
+  },
+  mobileThumbnail: {
+    width: 48,
+    height: 48,
+    objectFit: "cover",
+    borderRadius: 6,
+    backgroundColor: theme.palette.action.hover,
+  },
+  mobileThumbnailIcon: {
+    width: 48,
+    height: 48,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 6,
+    backgroundColor: theme.palette.action.hover,
+  },
 }));
 
 const TYPE_TABS = ["all", "image", "video", "audio", "document", "other"];
@@ -171,12 +239,16 @@ function typeIcon(type) {
 
 export default function MediaManager() {
   const classes = useStyles();
+  const isMobile = useIsMobile();
   const history = useHistory();
   const { user } = useContext(AuthContext);
   const canAccess = user?.profile === "admin" || user?.supportMode === true;
 
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState([]);
+  const [mobileListItems, setMobileListItems] = useState([]);
+  const [filtersDialogOpen, setFiltersDialogOpen] = useState(false);
+  const [previewTarget, setPreviewTarget] = useState(null);
   const [count, setCount] = useState(0);
   const [summary, setSummary] = useState(null);
   const [page, setPage] = useState(1);
@@ -275,6 +347,19 @@ export default function MediaManager() {
     setPage(1);
   }, [typeFilter, searchDebounced, sort, pageSize]);
 
+  useEffect(() => {
+    if (!isMobile) return;
+    if (page === 1) {
+      setMobileListItems(items);
+      return;
+    }
+    setMobileListItems((prev) => {
+      const ids = new Set(prev.map((x) => x.id));
+      const added = items.filter((x) => !ids.has(x.id));
+      return added.length ? [...prev, ...added] : prev;
+    });
+  }, [items, page, isMobile]);
+
   const totalPages = useMemo(() => {
     if (count <= 0) return 0;
     return Math.max(1, Math.ceil(count / pageSize));
@@ -308,6 +393,25 @@ export default function MediaManager() {
   const handleNumberedPageChange = (_, value) => {
     setPage(value);
   };
+
+  const handleLoadMore = () => {
+    if (page < totalPages) {
+      setPage((p) => p + 1);
+    }
+  };
+
+  const handleCopyLink = async (row) => {
+    if (!row?.mediaUrl) return;
+    try {
+      await navigator.clipboard.writeText(row.mediaUrl);
+      showSuccessToast("mediaManager.mobile.linkCopied");
+    } catch {
+      showWarningToast("mediaManager.mobile.linkCopyFailed");
+    }
+  };
+
+  const canPreview = (row) =>
+    Boolean(row?.mediaUrl) && !row.missing && ["image", "video", "audio"].includes(row.type);
 
   const selectedEntries = useMemo(() => Object.values(selectedMap), [selectedMap]);
   const selectedCount = selectedEntries.length;
@@ -436,6 +540,203 @@ export default function MediaManager() {
     }
   };
 
+  const displayItems = isMobile ? mobileListItems : items;
+
+  const buildMediaActionItems = (row) => {
+    const actionItems = [];
+    if (canPreview(row)) {
+      actionItems.push({
+        key: "preview",
+        label: i18n.t("mediaManager.mobile.preview"),
+        icon: <VisibilityOutlinedIcon fontSize="small" />,
+        onClick: () => setPreviewTarget(row),
+      });
+    }
+    if (row.mediaUrl && !row.missing) {
+      actionItems.push({
+        key: "open",
+        label: i18n.t("mediaManager.open"),
+        icon: <OpenInNewIcon fontSize="small" />,
+        onClick: () => window.open(row.mediaUrl, "_blank", "noopener,noreferrer"),
+      });
+      actionItems.push({
+        key: "copy",
+        label: i18n.t("mediaManager.mobile.copyLink"),
+        icon: <FileCopyOutlinedIcon fontSize="small" />,
+        onClick: () => handleCopyLink(row),
+      });
+      actionItems.push({
+        key: "download",
+        label: i18n.t("mediaManager.download"),
+        icon: <GetAppIcon fontSize="small" />,
+        onClick: () => {
+          const a = document.createElement("a");
+          a.href = row.mediaUrl;
+          a.download = row.fileName || "";
+          a.target = "_blank";
+          a.rel = "noopener noreferrer";
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        },
+      });
+    }
+    actionItems.push({ key: "delete-divider", divider: true });
+    actionItems.push({
+      key: "delete",
+      label: i18n.t("mediaManager.deleteMedia"),
+      icon: <DeleteOutlineIcon fontSize="small" />,
+      danger: true,
+      onClick: () => setDeleteTarget(row),
+    });
+    return actionItems;
+  };
+
+  const renderMediaLeading = (row) => {
+    if (row.type === "image" && !row.missing && row.mediaUrl) {
+      return (
+        <img
+          className={classes.mobileThumbnail}
+          src={row.mediaUrl}
+          alt=""
+          onClick={(e) => {
+            e.stopPropagation();
+            setPreviewTarget(row);
+          }}
+          style={{ cursor: "pointer" }}
+        />
+      );
+    }
+    return <Box className={classes.mobileThumbnailIcon}>{typeIcon(row.type)}</Box>;
+  };
+
+  const renderMediaMobileCard = (row) => (
+    <MobileEntityCard
+      key={row.id}
+      leading={
+        <Box display="flex" flexDirection="column" alignItems="center" style={{ gap: 4 }}>
+          <Checkbox
+            size="small"
+            checked={Boolean(selectedMap[row.id])}
+            onClick={(e) => e.stopPropagation()}
+            onChange={() => toggleRow(row)}
+          />
+          {renderMediaLeading(row)}
+        </Box>
+      }
+      title={row.fileName}
+      badges={
+        <MobileActionsMenu
+          items={buildMediaActionItems(row)}
+          ariaLabel={i18n.t("mediaManager.mobile.actions")}
+        />
+      }
+      onClick={() => {
+        if (canPreview(row)) setPreviewTarget(row);
+        else if (row.mediaUrl && !row.missing) {
+          window.open(row.mediaUrl, "_blank", "noopener,noreferrer");
+        }
+      }}
+    >
+      <Box className={classes.mobileCardChips}>
+        <Chip size="small" variant="outlined" label={i18n.t(`mediaManager.types.${row.type}`)} />
+        <Chip size="small" variant="outlined" label={row.sizeFormatted} />
+        <Chip
+          size="small"
+          variant="outlined"
+          label={i18n.t(`mediaManager.source.${row.source}`)}
+        />
+        {row.missing ? (
+          <Chip
+            size="small"
+            label={i18n.t("mediaManager.missingFile")}
+            color="default"
+            variant="outlined"
+          />
+        ) : null}
+      </Box>
+      <Typography variant="caption" color="textSecondary" display="block">
+        {moment(row.createdAt).format("L LT")}
+      </Typography>
+    </MobileEntityCard>
+  );
+
+  const renderPreviewContent = () => {
+    if (!previewTarget?.mediaUrl || previewTarget.missing) return null;
+    if (previewTarget.type === "image") {
+      return (
+        <img
+          className={classes.mobilePreviewImage}
+          src={previewTarget.mediaUrl}
+          alt={previewTarget.fileName || ""}
+        />
+      );
+    }
+    if (previewTarget.type === "video") {
+      return (
+        <video
+          className={classes.mobilePreviewVideo}
+          src={previewTarget.mediaUrl}
+          controls
+          playsInline
+        />
+      );
+    }
+    if (previewTarget.type === "audio") {
+      return (
+        <audio
+          className={classes.mobilePreviewAudio}
+          src={previewTarget.mediaUrl}
+          controls
+        />
+      );
+    }
+    return (
+      <Box textAlign="center" py={2}>
+        <Typography variant="body2" color="textSecondary" paragraph>
+          {previewTarget.fileName}
+        </Typography>
+        <Button
+          variant="contained"
+          color="primary"
+          startIcon={<OpenInNewIcon />}
+          onClick={() => window.open(previewTarget.mediaUrl, "_blank", "noopener,noreferrer")}
+        >
+          {i18n.t("mediaManager.open")}
+        </Button>
+        <Box mt={1}>
+          <Button
+            variant="outlined"
+            startIcon={<GetAppIcon />}
+            component="a"
+            href={previewTarget.mediaUrl}
+            download={previewTarget.fileName}
+          >
+            {i18n.t("mediaManager.download")}
+          </Button>
+        </Box>
+      </Box>
+    );
+  };
+
+  const sortFilterControl = (
+    <FormControl variant="outlined" size="small" fullWidth>
+      <InputLabel id="media-sort-label">{i18n.t("mediaManager.sort.label")}</InputLabel>
+      <Select
+        labelId="media-sort-label"
+        label={i18n.t("mediaManager.sort.label")}
+        value={sort}
+        onChange={(e) => setSort(e.target.value)}
+      >
+        {SORT_KEYS.map((k) => (
+          <MenuItem key={k} value={k}>
+            {i18n.t(`mediaManager.sort.${k}`)}
+          </MenuItem>
+        ))}
+      </Select>
+    </FormControl>
+  );
+
   if (!canAccess) {
     return (
       <MainContainer>
@@ -464,13 +765,63 @@ export default function MediaManager() {
         }
       />
 
+      {isMobile ? (
+        <AppDialog
+          open={filtersDialogOpen}
+          onClose={() => setFiltersDialogOpen(false)}
+          maxWidth="sm"
+        >
+          <AppDialogTitle>{i18n.t("mediaManager.mobile.filters")}</AppDialogTitle>
+          <AppDialogContent>{sortFilterControl}</AppDialogContent>
+          <AppDialogActions>
+            <AppSecondaryButton onClick={() => setFiltersDialogOpen(false)}>
+              {i18n.t("mediaManager.cancel")}
+            </AppSecondaryButton>
+            <AppPrimaryButton onClick={() => setFiltersDialogOpen(false)}>
+              {i18n.t("mediaManager.mobile.applyFilters")}
+            </AppPrimaryButton>
+          </AppDialogActions>
+        </AppDialog>
+      ) : null}
+
+      <AppDialog
+        open={Boolean(previewTarget)}
+        onClose={() => setPreviewTarget(null)}
+        maxWidth="md"
+      >
+        <AppDialogTitle>
+          {previewTarget?.fileName || i18n.t("mediaManager.mobile.preview")}
+        </AppDialogTitle>
+        <AppDialogContent dividers={false}>{renderPreviewContent()}</AppDialogContent>
+        <AppDialogActions>
+          {previewTarget?.mediaUrl && !previewTarget?.missing ? (
+            <>
+              <AppSecondaryButton onClick={() => handleCopyLink(previewTarget)}>
+                {i18n.t("mediaManager.mobile.copyLink")}
+              </AppSecondaryButton>
+              <AppSecondaryButton
+                component="a"
+                href={previewTarget.mediaUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {i18n.t("mediaManager.open")}
+              </AppSecondaryButton>
+            </>
+          ) : null}
+          <AppPrimaryButton onClick={() => setPreviewTarget(null)}>
+            {i18n.t("mediaManager.mobile.closePreview")}
+          </AppPrimaryButton>
+        </AppDialogActions>
+      </AppDialog>
+
       <Box
         display="flex"
         flexWrap="wrap"
         alignItems="flex-start"
         style={{ gap: 12 }}
       >
-        <Box flex="1" minWidth={280}>
+        <Box flex="1" minWidth={isMobile ? 0 : 280} width={isMobile ? "100%" : undefined}>
           <CompanyStorageUsageCard
             data={storage ? { ...storage, summary } : null}
             loading={storageLoading}
@@ -584,8 +935,10 @@ export default function MediaManager() {
             <Tab key={t} value={t} label={i18n.t(`mediaManager.tabs.${t}`)} />
           ))}
         </Tabs>
-        <Box className={classes.filters} mt={2}>
+        <Box className={isMobile ? classes.mobileToolbar : classes.filters} mt={2}>
           <TextField
+            fullWidth={isMobile}
+            className={isMobile ? classes.mobileSearchRow : undefined}
             size="small"
             variant="outlined"
             label={i18n.t("mediaManager.search")}
@@ -599,24 +952,43 @@ export default function MediaManager() {
               ) : null,
             }}
           />
-          <FormControl variant="outlined" size="small" style={{ minWidth: 200 }}>
-            <InputLabel id="media-sort-label">{i18n.t("mediaManager.sort.label")}</InputLabel>
-            <Select
-              labelId="media-sort-label"
-              label={i18n.t("mediaManager.sort.label")}
-              value={sort}
-              onChange={(e) => setSort(e.target.value)}
-            >
-              {SORT_KEYS.map((k) => (
-                <MenuItem key={k} value={k}>
-                  {i18n.t(`mediaManager.sort.${k}`)}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <Typography variant="caption" color="textSecondary" style={{ marginLeft: 8 }}>
-            {i18n.t("mediaManager.resultsCount", { count })}
-          </Typography>
+          {isMobile ? (
+            <Box display="flex" flexWrap="wrap" alignItems="center" style={{ gap: 8 }}>
+              <AppSecondaryButton
+                size="small"
+                startIcon={<FilterListIcon />}
+                onClick={() => setFiltersDialogOpen(true)}
+              >
+                {i18n.t("mediaManager.mobile.filters")}
+              </AppSecondaryButton>
+              <Typography variant="caption" color="textSecondary">
+                {i18n.t("mediaManager.resultsCount", { count })}
+              </Typography>
+            </Box>
+          ) : (
+            <>
+              <FormControl variant="outlined" size="small" style={{ minWidth: 200 }}>
+                <InputLabel id="media-sort-label-desktop">
+                  {i18n.t("mediaManager.sort.label")}
+                </InputLabel>
+                <Select
+                  labelId="media-sort-label-desktop"
+                  label={i18n.t("mediaManager.sort.label")}
+                  value={sort}
+                  onChange={(e) => setSort(e.target.value)}
+                >
+                  {SORT_KEYS.map((k) => (
+                    <MenuItem key={k} value={k}>
+                      {i18n.t(`mediaManager.sort.${k}`)}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <Typography variant="caption" color="textSecondary" style={{ marginLeft: 8 }}>
+                {i18n.t("mediaManager.resultsCount", { count })}
+              </Typography>
+            </>
+          )}
         </Box>
 
         {selectedCount > 0 ? (
@@ -638,10 +1010,34 @@ export default function MediaManager() {
           </Box>
         ) : null}
 
-        {loading && !items.length ? (
+        {loading && !displayItems.length ? (
           <Box display="flex" justifyContent="center" p={4}>
             <CircularProgress />
           </Box>
+        ) : isMobile ? (
+          displayItems.length === 0 ? (
+            <Typography variant="body2" color="textSecondary">
+              {i18n.t("mediaManager.pagination.empty")}
+            </Typography>
+          ) : (
+            <>
+              <MobileCardList>
+                {displayItems.map((row) => renderMediaMobileCard(row))}
+              </MobileCardList>
+              {loading ? (
+                <Box className={classes.mobileLoadMore}>
+                  <CircularProgress size={28} />
+                </Box>
+              ) : null}
+              {page < totalPages && !loading ? (
+                <Box className={classes.mobileLoadMore}>
+                  <AppSecondaryButton onClick={handleLoadMore}>
+                    {i18n.t("mediaManager.mobile.loadMore")}
+                  </AppSecondaryButton>
+                </Box>
+              ) : null}
+            </>
+          )
         ) : (
           <Table size="small">
             <TableHead>
@@ -738,79 +1134,141 @@ export default function MediaManager() {
           </Table>
         )}
 
-        <Box className={classes.paginationBar}>
-          <TablePagination
-            component="div"
-            count={count}
-            page={Math.max(0, page - 1)}
-            onChangePage={handleTablePageChange}
-            rowsPerPage={pageSize}
-            onChangeRowsPerPage={handlePageSizeChange}
-            rowsPerPageOptions={PAGE_SIZE_OPTIONS}
-            labelRowsPerPage={i18n.t("mediaManager.pagination.rowsPerPage")}
-            labelDisplayedRows={() => rangeLabel}
-          />
-          {totalPages > 1 ? (
-            <Box className={classes.paginationPages}>
-              <Pagination
-                color="primary"
-                size="small"
-                count={totalPages}
-                page={page}
-                onChange={handleNumberedPageChange}
-                showFirstButton
-                showLastButton
-                disabled={loading}
-              />
-            </Box>
-          ) : null}
-        </Box>
+        {!isMobile ? (
+          <Box className={classes.paginationBar}>
+            <TablePagination
+              component="div"
+              count={count}
+              page={Math.max(0, page - 1)}
+              onChangePage={handleTablePageChange}
+              rowsPerPage={pageSize}
+              onChangeRowsPerPage={handlePageSizeChange}
+              rowsPerPageOptions={PAGE_SIZE_OPTIONS}
+              labelRowsPerPage={i18n.t("mediaManager.pagination.rowsPerPage")}
+              labelDisplayedRows={() => rangeLabel}
+            />
+            {totalPages > 1 ? (
+              <Box className={classes.paginationPages}>
+                <Pagination
+                  color="primary"
+                  size="small"
+                  count={totalPages}
+                  page={page}
+                  onChange={handleNumberedPageChange}
+                  showFirstButton
+                  showLastButton
+                  disabled={loading}
+                />
+              </Box>
+            ) : null}
+          </Box>
+        ) : (
+          <Typography variant="caption" color="textSecondary" display="block" style={{ marginTop: 16 }}>
+            {rangeLabel}
+          </Typography>
+        )}
       </Paper>
 
-      <Dialog open={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} maxWidth="sm" fullWidth>
-        <DialogTitle>{i18n.t("mediaManager.deleteMedia")}</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2">{i18n.t("mediaManager.deleteConfirm")}</Typography>
-          <Typography variant="body2" color="textSecondary" style={{ marginTop: 12 }}>
-            {i18n.t("mediaManager.deleteIrreversible")}
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteTarget(null)}>{i18n.t("mediaManager.cancel")}</Button>
-          <Button color="secondary" variant="contained" onClick={handleDelete}>
-            {i18n.t("mediaManager.deleteMedia")}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      {isMobile ? (
+        <AppDialog
+          open={Boolean(deleteTarget)}
+          onClose={() => setDeleteTarget(null)}
+          maxWidth="sm"
+        >
+          <AppDialogTitle>{i18n.t("mediaManager.deleteMedia")}</AppDialogTitle>
+          <AppDialogContent>
+            <Typography variant="body2">{i18n.t("mediaManager.deleteConfirm")}</Typography>
+            <Typography variant="body2" color="textSecondary" style={{ marginTop: 12 }}>
+              {i18n.t("mediaManager.deleteIrreversible")}
+            </Typography>
+          </AppDialogContent>
+          <AppDialogActions>
+            <AppSecondaryButton onClick={() => setDeleteTarget(null)}>
+              {i18n.t("mediaManager.cancel")}
+            </AppSecondaryButton>
+            <AppPrimaryButton color="secondary" onClick={handleDelete}>
+              {i18n.t("mediaManager.deleteMedia")}
+            </AppPrimaryButton>
+          </AppDialogActions>
+        </AppDialog>
+      ) : (
+        <Dialog open={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} maxWidth="sm" fullWidth>
+          <DialogTitle>{i18n.t("mediaManager.deleteMedia")}</DialogTitle>
+          <DialogContent>
+            <Typography variant="body2">{i18n.t("mediaManager.deleteConfirm")}</Typography>
+            <Typography variant="body2" color="textSecondary" style={{ marginTop: 12 }}>
+              {i18n.t("mediaManager.deleteIrreversible")}
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setDeleteTarget(null)}>{i18n.t("mediaManager.cancel")}</Button>
+            <Button color="secondary" variant="contained" onClick={handleDelete}>
+              {i18n.t("mediaManager.deleteMedia")}
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
 
-      <Dialog
-        open={batchDialogOpen}
-        onClose={() => setBatchDialogOpen(false)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>{i18n.t("mediaManager.bulk.deleteSelected")}</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2">
-            {i18n.t("mediaManager.bulk.deleteBatchConfirm", {
-              count: selectedCount,
-              size: formatBytesEst(estimatedBatchBytes),
-            })}
-          </Typography>
-          <Typography variant="body2" color="textSecondary" style={{ marginTop: 12 }}>
-            {i18n.t("mediaManager.deleteIrreversible")}
-          </Typography>
-          <Typography variant="caption" color="textSecondary" display="block" style={{ marginTop: 12 }}>
-            {i18n.t("mediaManager.bulk.estimatedNote")}
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setBatchDialogOpen(false)}>{i18n.t("mediaManager.cancel")}</Button>
-          <Button color="secondary" variant="contained" onClick={handleBatchDelete}>
-            {i18n.t("mediaManager.bulk.deleteSelected")}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      {isMobile ? (
+        <AppDialog
+          open={batchDialogOpen}
+          onClose={() => setBatchDialogOpen(false)}
+          maxWidth="sm"
+        >
+          <AppDialogTitle>{i18n.t("mediaManager.bulk.deleteSelected")}</AppDialogTitle>
+          <AppDialogContent>
+            <Typography variant="body2">
+              {i18n.t("mediaManager.bulk.deleteBatchConfirm", {
+                count: selectedCount,
+                size: formatBytesEst(estimatedBatchBytes),
+              })}
+            </Typography>
+            <Typography variant="body2" color="textSecondary" style={{ marginTop: 12 }}>
+              {i18n.t("mediaManager.deleteIrreversible")}
+            </Typography>
+            <Typography variant="caption" color="textSecondary" display="block" style={{ marginTop: 12 }}>
+              {i18n.t("mediaManager.bulk.estimatedNote")}
+            </Typography>
+          </AppDialogContent>
+          <AppDialogActions>
+            <AppSecondaryButton onClick={() => setBatchDialogOpen(false)}>
+              {i18n.t("mediaManager.cancel")}
+            </AppSecondaryButton>
+            <AppPrimaryButton color="secondary" onClick={handleBatchDelete}>
+              {i18n.t("mediaManager.bulk.deleteSelected")}
+            </AppPrimaryButton>
+          </AppDialogActions>
+        </AppDialog>
+      ) : (
+        <Dialog
+          open={batchDialogOpen}
+          onClose={() => setBatchDialogOpen(false)}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>{i18n.t("mediaManager.bulk.deleteSelected")}</DialogTitle>
+          <DialogContent>
+            <Typography variant="body2">
+              {i18n.t("mediaManager.bulk.deleteBatchConfirm", {
+                count: selectedCount,
+                size: formatBytesEst(estimatedBatchBytes),
+              })}
+            </Typography>
+            <Typography variant="body2" color="textSecondary" style={{ marginTop: 12 }}>
+              {i18n.t("mediaManager.deleteIrreversible")}
+            </Typography>
+            <Typography variant="caption" color="textSecondary" display="block" style={{ marginTop: 12 }}>
+              {i18n.t("mediaManager.bulk.estimatedNote")}
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setBatchDialogOpen(false)}>{i18n.t("mediaManager.cancel")}</Button>
+            <Button color="secondary" variant="contained" onClick={handleBatchDelete}>
+              {i18n.t("mediaManager.bulk.deleteSelected")}
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
     </MainContainer>
   );
 }

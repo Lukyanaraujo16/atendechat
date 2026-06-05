@@ -4505,6 +4505,17 @@ const messages = {
 					actions: "Actions",
 					selectAll: "Select all on this page",
 				},
+				mobile: {
+					actions: "Media actions",
+					filters: "Filters",
+					applyFilters: "Apply",
+					preview: "Preview",
+					copyLink: "Copy link",
+					linkCopied: "Link copied to clipboard.",
+					linkCopyFailed: "Could not copy the link.",
+					loadMore: "Load more",
+					closePreview: "Close",
+				},
 			},
 			settings: {
 				schedulesUpdated: "Schedules updated successfully.",
