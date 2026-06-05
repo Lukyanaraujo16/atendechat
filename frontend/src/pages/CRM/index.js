@@ -25,10 +25,29 @@ import Alert from "@material-ui/lab/Alert";
 import Chip from "@material-ui/core/Chip";
 import Divider from "@material-ui/core/Divider";
 import Tooltip from "@material-ui/core/Tooltip";
+import Tabs from "@material-ui/core/Tabs";
+import Tab from "@material-ui/core/Tab";
 import MoreVertIcon from "@material-ui/icons/MoreVert";
 import AddIcon from "@material-ui/icons/Add";
 import SmsOutlinedIcon from "@material-ui/icons/SmsOutlined";
 import CheckCircleOutlineIcon from "@material-ui/icons/CheckCircleOutline";
+import FilterListIcon from "@material-ui/icons/FilterList";
+import BusinessCenterOutlinedIcon from "@material-ui/icons/BusinessCenterOutlined";
+import EditOutlinedIcon from "@material-ui/icons/EditOutlined";
+import DeleteOutlineIcon from "@material-ui/icons/DeleteOutline";
+import SwapHorizIcon from "@material-ui/icons/SwapHoriz";
+import useIsMobile from "../../hooks/useIsMobile";
+import {
+  AppDialog,
+  AppDialogTitle,
+  AppDialogContent,
+  AppDialogActions,
+  AppPrimaryButton,
+  AppSecondaryButton,
+  MobileEntityCard,
+  MobileCardList,
+  MobileActionsMenu,
+} from "../../ui";
 import { formatDistanceToNow, format, isTomorrow } from "date-fns";
 import { enUS, es, ptBR } from "date-fns/locale";
 
@@ -204,6 +223,64 @@ const useStyles = makeStyles((theme) => ({
     display: "flex",
     flexWrap: "wrap",
     gap: theme.spacing(1.5),
+    alignItems: "center",
+  },
+  rootMobile: {
+    overflowX: "hidden",
+    padding: theme.spacing(1.5),
+  },
+  mobileFilterBar: {
+    display: "flex",
+    flexDirection: "column",
+    gap: theme.spacing(1.5),
+    width: "100%",
+    maxWidth: "100%",
+    marginBottom: theme.spacing(1.5),
+  },
+  mobileFilterRow: {
+    display: "flex",
+    gap: theme.spacing(1),
+    width: "100%",
+    alignItems: "center",
+  },
+  mobileColumnTabs: {
+    width: "100%",
+    maxWidth: "100%",
+    marginBottom: theme.spacing(1),
+  },
+  mobileColumnMeta: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: theme.spacing(1),
+    marginBottom: theme.spacing(1),
+  },
+  mobileListWrap: {
+    flex: 1,
+    minHeight: 0,
+    overflowY: "auto",
+    overflowX: "hidden",
+    width: "100%",
+    ...theme.scrollbarStyles,
+  },
+  mobileMetricGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gap: theme.spacing(1),
+    marginTop: theme.spacing(1),
+    width: "100%",
+  },
+  mobileCardChips: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: theme.spacing(0.5),
+    maxWidth: "100%",
+  },
+  mobileHeaderActions: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: theme.spacing(1),
+    width: "100%",
     alignItems: "center",
   },
 }));
@@ -468,6 +545,7 @@ function followUpReminderChipProps(category, theme) {
 export default function CrmBoardPage() {
   const classes = useStyles();
   const theme = useTheme();
+  const isMobile = useIsMobile();
   const { user } = useContext(AuthContext);
   const bizSegment = user?.company?.businessSegment;
   const terms = useMemo(() => getCrmTerminology(bizSegment), [bizSegment]);
@@ -507,6 +585,11 @@ export default function CrmBoardPage() {
   const [menuAnchor, setMenuAnchor] = useState(null);
   const [menuDeal, setMenuDeal] = useState(null);
   const [bootstrapping, setBootstrapping] = useState(false);
+  const [activeStageId, setActiveStageId] = useState(null);
+  const [filtersDialogOpen, setFiltersDialogOpen] = useState(false);
+  const [moveStageDeal, setMoveStageDeal] = useState(null);
+  const [moveStageTargetId, setMoveStageTargetId] = useState("");
+  const [moveStageSaving, setMoveStageSaving] = useState(false);
 
   const location = useLocation();
 
@@ -626,6 +709,29 @@ export default function CrmBoardPage() {
     const s = selectedPipeline?.stages || [];
     return [...s].sort((a, b) => a.position - b.position);
   }, [selectedPipeline]);
+
+  useEffect(() => {
+    if (!stages.length) {
+      setActiveStageId(null);
+      return;
+    }
+    setActiveStageId((prev) => {
+      if (prev != null && stages.some((s) => s.id === prev)) return prev;
+      return stages[0].id;
+    });
+  }, [stages]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const raw = params.get("dealId");
+    if (!raw || !isMobile) return;
+    const id = Number(raw);
+    if (Number.isNaN(id)) return;
+    const deal = (allDeals || []).find((d) => d.id === id);
+    if (deal?.stageId) {
+      setActiveStageId(deal.stageId);
+    }
+  }, [location.search, allDeals, isMobile]);
 
   const refreshPipelineCustomFields = useCallback(async () => {
     if (!pipelineId) {
@@ -1024,6 +1130,493 @@ export default function CrmBoardPage() {
     }
   };
 
+  const deleteDealById = async (dealId) => {
+    try {
+      await api.delete(`/crm/deals/${dealId}`);
+      loadDeals();
+    } catch (e) {
+      toastError(e);
+    }
+  };
+
+  const moveDealToStage = async (dealId, destStageId) => {
+    const prev = allDeals;
+    setAllDeals((cur) =>
+      cur.map((d) => (d.id === dealId ? { ...d, stageId: destStageId } : d))
+    );
+    try {
+      await api.put(`/crm/deals/${dealId}/stage`, { stageId: destStageId });
+      await loadDeals();
+    } catch (e) {
+      setAllDeals(prev);
+      toastError(e);
+      throw e;
+    }
+  };
+
+  const openMoveStageDialog = (deal) => {
+    setMoveStageDeal(deal);
+    setMoveStageTargetId(deal?.stageId ? String(deal.stageId) : "");
+  };
+
+  const handleConfirmMoveStage = async () => {
+    if (!moveStageDeal || !moveStageTargetId) return;
+    const destStageId = Number(moveStageTargetId);
+    if (Number.isNaN(destStageId)) return;
+    setMoveStageSaving(true);
+    try {
+      await moveDealToStage(moveStageDeal.id, destStageId);
+      if (isMobile) {
+        setActiveStageId(destStageId);
+      }
+      setMoveStageDeal(null);
+      setMoveStageTargetId("");
+    } catch {
+      /* toast já exibido */
+    } finally {
+      setMoveStageSaving(false);
+    }
+  };
+
+  const activeMobileFilterCount = useMemo(() => {
+    let n = 0;
+    if (assigneeFilter) n += 1;
+    if (priorityFilter) n += 1;
+    if (sourceFilter) n += 1;
+    if (tagFilter) n += 1;
+    if (staleFilter) n += 1;
+    if (followUpFilter) n += 1;
+    if (attentionFilter) n += 1;
+    return n + activeAdvancedFilterCount;
+  }, [
+    assigneeFilter,
+    priorityFilter,
+    sourceFilter,
+    tagFilter,
+    staleFilter,
+    followUpFilter,
+    attentionFilter,
+    activeAdvancedFilterCount,
+  ]);
+
+  const renderDealChips = (deal) => {
+    const staleLevel = getCrmDealStaleLevel(deal);
+    const actTs = getCrmDealActivityTimestamp(deal);
+    return (
+      <>
+        <Box className={classes.mobileCardChips}>
+          {deal.status === "open" && staleLevel !== "normal" ? (
+            <Chip
+              size="small"
+              label={i18n.t(`crm.stale.${staleLevel}`)}
+              style={{
+                backgroundColor:
+                  staleLevel === "critical"
+                    ? alpha(theme.palette.error.main, 0.14)
+                    : staleLevel === "danger"
+                      ? alpha(theme.palette.warning.main, 0.2)
+                      : alpha(theme.palette.warning.main, 0.12),
+              }}
+            />
+          ) : null}
+          {deal.value != null && deal.value !== "" ? (
+            <Chip size="small" label={formatMoney(deal.value)} />
+          ) : null}
+          <Chip
+            size="small"
+            label={i18n.t(`crm.deal.source.${deal.source || "manual"}`)}
+            variant="outlined"
+          />
+          <Chip
+            size="small"
+            label={i18n.t(`crm.priority.${deal.priority || "medium"}`)}
+            {...priorityChipProps(deal.priority, theme)}
+          />
+          {deal.assignedUser ? (
+            <Chip size="small" label={deal.assignedUser.name} variant="outlined" />
+          ) : null}
+          {deal.nextFollowUpAt ? (
+            <Chip
+              size="small"
+              label={formatFollowUpChipLabel(deal)}
+              {...followUpReminderChipProps(dealFollowUpCategory(deal), theme)}
+            />
+          ) : null}
+          {deal.attentionAt ? (
+            <Chip
+              size="small"
+              label={i18n.t("crm.attention.chip")}
+              style={{
+                backgroundColor: alpha(theme.palette.warning.main, 0.22),
+                color: theme.palette.warning.dark,
+              }}
+            />
+          ) : null}
+          <Chip size="small" label={dealStatusLabel(deal, terms)} variant="outlined" />
+        </Box>
+        {deal.status === "open" && staleLevel !== "normal" ? (
+          <Typography variant="caption" color="textSecondary" display="block">
+            {i18n.t("crm.stale.noUpdateShort")}{" "}
+            {formatDistanceToNow(new Date(actTs), {
+              addSuffix: true,
+              locale: dateFnsLocale(),
+            })}
+          </Typography>
+        ) : (
+          <Typography variant="caption" color="textSecondary" display="block">
+            {i18n.t("crm.card.lastActivity")}:{" "}
+            {deal.lastActivityAt || deal.updatedAt
+              ? formatDistanceToNow(new Date(deal.lastActivityAt || deal.updatedAt), {
+                  addSuffix: true,
+                  locale: dateFnsLocale(),
+                })
+              : "—"}
+          </Typography>
+        )}
+      </>
+    );
+  };
+
+  const renderMobileDealCard = (deal) => {
+    const staleLevel = getCrmDealStaleLevel(deal);
+    const accent = staleAccentStyle(staleLevel !== "normal" && deal.status === "open" ? staleLevel : "normal", theme);
+    const contactLine = deal.contact
+      ? `${deal.contact.name || ""}${deal.contact.number ? ` · ${deal.contact.number}` : ""}`.trim()
+      : undefined;
+
+    const menuItems = [
+      {
+        key: "details",
+        label: i18n.t("crm.mobile.openDetails"),
+        icon: <BusinessCenterOutlinedIcon fontSize="small" />,
+        onClick: () => openEdit(deal.id),
+      },
+      {
+        key: "edit",
+        label: i18n.t("crm.actions.edit"),
+        icon: <EditOutlinedIcon fontSize="small" />,
+        onClick: () => openEdit(deal.id),
+      },
+      deal.status === "open"
+        ? {
+            key: "move",
+            label: i18n.t("crm.mobile.moveStage"),
+            icon: <SwapHorizIcon fontSize="small" />,
+            onClick: () => openMoveStageDialog(deal),
+          }
+        : null,
+      deal.attentionAt
+        ? {
+            key: "resolve",
+            label: i18n.t("crm.attention.resolve"),
+            icon: <CheckCircleOutlineIcon fontSize="small" />,
+            onClick: () => handleResolveAttention(null, deal.id),
+          }
+        : null,
+      {
+        key: "delete",
+        label: i18n.t("crm.actions.delete"),
+        icon: <DeleteOutlineIcon fontSize="small" />,
+        danger: true,
+        onClick: () => deleteDealById(deal.id),
+      },
+    ].filter(Boolean);
+
+    return (
+      <Box key={deal.id} data-crm-deal-card={deal.id} style={accent}>
+      <MobileEntityCard
+        className={deal.attentionAt ? classes.dealCardNeedsAttention : undefined}
+        leading={
+          deal.ticketId ? (
+            <SmsOutlinedIcon style={{ fontSize: 20, opacity: 0.65 }} color="primary" />
+          ) : (
+            <BusinessCenterOutlinedIcon color="action" />
+          )
+        }
+        title={deal.title}
+        subtitle={contactLine}
+        badges={<MobileActionsMenu items={menuItems} ariaLabel={i18n.t("crm.mobile.dealActions")} />}
+        onClick={() => openEdit(deal.id)}
+      >
+        {visibleCardCustomFields.length ? (
+          <Box>
+            {visibleCardCustomFields.map((cf) => {
+              const raw =
+                deal.customFields && typeof deal.customFields === "object"
+                  ? deal.customFields[cf.key]
+                  : undefined;
+              return (
+                <Typography
+                  key={cf.id || cf.key}
+                  variant="caption"
+                  color="textSecondary"
+                  display="block"
+                >
+                  {cf.label}: {formatCrmCustomFieldCardValue(cf, raw)}
+                </Typography>
+              );
+            })}
+          </Box>
+        ) : null}
+        {renderDealChips(deal)}
+        {Array.isArray(deal.tags) && deal.tags.length ? (
+          <Box className={classes.mobileCardChips}>
+            {deal.tags.slice(0, 4).map((tg) => (
+              <Chip key={tg} size="small" label={tg} />
+            ))}
+          </Box>
+        ) : null}
+      </MobileEntityCard>
+      </Box>
+    );
+  };
+
+  const renderMobileFilterFields = (fullWidth = false) => (
+    <>
+      <FormControl variant="outlined" size="small" fullWidth={fullWidth} style={{ minWidth: fullWidth ? undefined : 200 }}>
+        <InputLabel>{i18n.t("crm.summary.pipeline")}</InputLabel>
+        <Select
+          label={i18n.t("crm.summary.pipeline")}
+          value={pipelineId}
+          onChange={(e) => setPipelineId(e.target.value)}
+        >
+          {pipelines.map((p) => (
+            <MenuItem key={p.id} value={String(p.id)}>
+              {p.name}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+      <TextField
+        size="small"
+        variant="outlined"
+        label={i18n.t("crm.filters.search")}
+        value={searchDraft}
+        onChange={(e) => setSearchDraft(e.target.value)}
+        fullWidth={fullWidth}
+        style={{ minWidth: fullWidth ? undefined : 240 }}
+      />
+      <FormControl variant="outlined" size="small" fullWidth={fullWidth} style={{ minWidth: fullWidth ? undefined : 140 }}>
+        <InputLabel>{i18n.t("crm.filters.status")}</InputLabel>
+        <Select
+          label={i18n.t("crm.filters.status")}
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+        >
+          <MenuItem value="">{i18n.t("crm.filters.all")}</MenuItem>
+          <MenuItem value="open">{i18n.t("crm.status.open")}</MenuItem>
+          <MenuItem value="won">{terms.statusWon}</MenuItem>
+          <MenuItem value="lost">{terms.statusLost}</MenuItem>
+        </Select>
+      </FormControl>
+      <FormControl variant="outlined" size="small" fullWidth={fullWidth} style={{ minWidth: fullWidth ? undefined : 140 }}>
+        <InputLabel>{i18n.t("crm.filters.priority")}</InputLabel>
+        <Select
+          label={i18n.t("crm.filters.priority")}
+          value={priorityFilter}
+          onChange={(e) => setPriorityFilter(e.target.value)}
+        >
+          <MenuItem value="">{i18n.t("crm.filters.all")}</MenuItem>
+          <MenuItem value="low">{i18n.t("crm.priority.low")}</MenuItem>
+          <MenuItem value="medium">{i18n.t("crm.priority.medium")}</MenuItem>
+          <MenuItem value="high">{i18n.t("crm.priority.high")}</MenuItem>
+          <MenuItem value="urgent">{i18n.t("crm.priority.urgent")}</MenuItem>
+        </Select>
+      </FormControl>
+      <FormControl variant="outlined" size="small" fullWidth={fullWidth} style={{ minWidth: fullWidth ? undefined : 150 }}>
+        <InputLabel>{i18n.t("crm.filters.source")}</InputLabel>
+        <Select
+          label={i18n.t("crm.filters.source")}
+          value={sourceFilter}
+          onChange={(e) => setSourceFilter(e.target.value)}
+        >
+          <MenuItem value="">{i18n.t("crm.filters.all")}</MenuItem>
+          <MenuItem value="manual">{i18n.t("crm.deal.source.manual")}</MenuItem>
+          <MenuItem value="whatsapp">{i18n.t("crm.deal.source.whatsapp")}</MenuItem>
+          <MenuItem value="instagram">{i18n.t("crm.deal.source.instagram")}</MenuItem>
+          <MenuItem value="other">{i18n.t("crm.deal.source.other")}</MenuItem>
+        </Select>
+      </FormControl>
+      <TextField
+        size="small"
+        variant="outlined"
+        label={i18n.t("crm.filters.tag")}
+        value={tagDraft}
+        onChange={(e) => setTagDraft(e.target.value)}
+        fullWidth={fullWidth}
+        style={{ minWidth: fullWidth ? undefined : 160 }}
+      />
+      <FormControl variant="outlined" size="small" fullWidth={fullWidth} style={{ minWidth: fullWidth ? undefined : 200 }}>
+        <InputLabel>{i18n.t("crm.filters.assignee")}</InputLabel>
+        <Select
+          label={i18n.t("crm.filters.assignee")}
+          value={assigneeFilter}
+          onChange={(e) => setAssigneeFilter(e.target.value)}
+        >
+          <MenuItem value="">{i18n.t("crm.filters.all")}</MenuItem>
+          <MenuItem value="unassigned">{i18n.t("crm.deal.fields.unassigned")}</MenuItem>
+          {users.map((u) => (
+            <MenuItem key={u.id} value={String(u.id)}>
+              {u.name}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+      <Box width="100%">
+        <CrmSavedViewsBar
+          views={savedViews}
+          selectedViewId={selectedSavedViewId}
+          onSelectedViewIdChange={setSelectedSavedViewId}
+          onApplyParsedFilters={applyFilterPayloadToState}
+          onClearAllFilters={clearAllSavedViewFilters}
+          currentFiltersPayload={currentViewFiltersPayload}
+          user={user}
+          onReloadViews={loadSavedViews}
+          disabled={!pipelineId || loading}
+        />
+      </Box>
+      <Button
+        size="small"
+        variant="outlined"
+        fullWidth={fullWidth}
+        onClick={() => setAdvancedFiltersOpen(true)}
+        style={{ height: 40 }}
+      >
+        {i18n.t("crm.advancedFilters.title")}
+      </Button>
+      {activeAdvancedFilterCount > 0 ? (
+        <Button size="small" onClick={() => setAdvancedFilterRows([])} fullWidth={fullWidth}>
+          {i18n.t("crm.advancedFilters.clearAll")}
+        </Button>
+      ) : null}
+      <Box width="100%">
+        <Typography variant="caption" color="textSecondary" display="block" gutterBottom>
+          {i18n.t("crm.staleFilter.label")}:
+        </Typography>
+        <Box display="flex" flexWrap="wrap" style={{ gap: 8 }}>
+          {[
+            { key: "", label: i18n.t("crm.staleFilter.all") },
+            { key: "24", label: i18n.t("crm.staleFilter.h24") },
+            { key: "48", label: i18n.t("crm.staleFilter.h48") },
+            { key: "72", label: i18n.t("crm.staleFilter.h72") },
+          ].map(({ key, label }) => (
+            <Chip
+              key={key || "all"}
+              size="small"
+              label={label}
+              color={staleFilter === key ? "primary" : "default"}
+              onClick={() => setStaleFilter(key)}
+              variant={staleFilter === key ? "default" : "outlined"}
+            />
+          ))}
+        </Box>
+      </Box>
+      <Box width="100%">
+        <Typography variant="caption" color="textSecondary" display="block" gutterBottom>
+          {i18n.t("crm.followUp.filterLabel")}:
+        </Typography>
+        <Box display="flex" flexWrap="wrap" style={{ gap: 8 }}>
+          {[
+            { key: "", label: i18n.t("crm.filters.all") },
+            { key: "has", label: i18n.t("crm.followUp.filterHas") },
+            { key: "overdue", label: i18n.t("crm.followUp.filterOverdue") },
+            { key: "today", label: i18n.t("crm.followUp.filterToday") },
+          ].map(({ key, label }) => (
+            <Chip
+              key={key || "fu-all"}
+              size="small"
+              label={label}
+              color={followUpFilter === key ? "primary" : "default"}
+              onClick={() => setFollowUpFilter(key)}
+              variant={followUpFilter === key ? "default" : "outlined"}
+            />
+          ))}
+        </Box>
+      </Box>
+      <Box width="100%">
+        <Typography variant="caption" color="textSecondary" display="block" gutterBottom>
+          {i18n.t("crm.attention.filterLabel")}:
+        </Typography>
+        <Box display="flex" flexWrap="wrap" style={{ gap: 8 }}>
+          {[
+            { key: "", label: i18n.t("crm.filters.all") },
+            { key: "needs", label: i18n.t("crm.attention.filterNeeds") },
+          ].map(({ key, label }) => (
+            <Chip
+              key={key || "attn-all"}
+              size="small"
+              label={label}
+              color={attentionFilter === key ? "primary" : "default"}
+              onClick={() => setAttentionFilter(key)}
+              variant={attentionFilter === key ? "default" : "outlined"}
+            />
+          ))}
+        </Box>
+      </Box>
+    </>
+  );
+
+  const renderMobileBoard = () => {
+    const activeStage = stages.find((s) => s.id === activeStageId) || stages[0];
+    if (!activeStage) return null;
+    const colDeals = displayDeals.filter((d) => d.stageId === activeStage.id);
+    const colMeta = totals[activeStage.id] || { count: 0, sum: 0 };
+    const avgMs = stageAvgMs[activeStage.id];
+    const avgLabel =
+      avgMs != null ? formatAvgMs(avgMs) : i18n.t("crm.dashboard.noData");
+
+    return (
+      <>
+        <Tabs
+          value={activeStageId}
+          onChange={(_, v) => setActiveStageId(v)}
+          variant="scrollable"
+          scrollButtons="auto"
+          indicatorColor="primary"
+          textColor="primary"
+          className={classes.mobileColumnTabs}
+        >
+          {stages.map((stage) => {
+            const count = (displayDeals || []).filter((d) => d.stageId === stage.id).length;
+            return (
+              <Tab
+                key={stage.id}
+                value={stage.id}
+                label={`${stage.name} (${count})`}
+              />
+            );
+          })}
+        </Tabs>
+
+        <Box className={classes.mobileColumnMeta}>
+          <Typography variant="body2" color="textSecondary">
+            {i18n.t("crm.mobile.stageCount", {
+              count: colMeta.count,
+              item:
+                colMeta.count === 1 ? terms.itemSingular : terms.itemPlural,
+            })}
+          </Typography>
+          <Chip size="small" label={formatMoney(colMeta.sum)} variant="outlined" />
+          <Typography variant="caption" color="textSecondary">
+            {i18n.t("crm.dashboard.avgStageTime")}: {avgLabel}
+          </Typography>
+        </Box>
+
+        <Box className={classes.mobileListWrap}>
+          {colDeals.length === 0 ? (
+            <Typography className={classes.emptyCol}>
+              {boardEmptyMessage || i18n.t("crm.empty.column")}
+            </Typography>
+          ) : (
+            <MobileCardList>
+              {colDeals.map((deal) => renderMobileDealCard(deal))}
+            </MobileCardList>
+          )}
+        </Box>
+      </>
+    );
+  };
+
   const avgCloseLabel =
     dashboardMetrics.avgCloseMs != null
       ? formatAvgMs(dashboardMetrics.avgCloseMs)
@@ -1033,19 +1626,32 @@ export default function CrmBoardPage() {
 
   if (loading) {
     return (
-      <Box className={classes.root}>
+      <Box className={isMobile ? `${classes.root} ${classes.rootMobile}` : classes.root}>
         <Skeleton variant="rect" height={56} style={{ borderRadius: 8 }} />
-        <Box display="flex" mt={2} style={{ gap: 16 }}>
-          {[1, 2, 3, 4].map((i) => (
-            <Skeleton
-              key={i}
-              variant="rect"
-              width={300}
-              height={400}
-              style={{ borderRadius: 12 }}
-            />
-          ))}
-        </Box>
+        {isMobile ? (
+          <Box mt={2} display="flex" flexDirection="column" style={{ gap: 12 }}>
+            {[1, 2, 3, 4, 5].map((i) => (
+              <Skeleton
+                key={i}
+                variant="rect"
+                height={120}
+                style={{ borderRadius: 12, width: "100%" }}
+              />
+            ))}
+          </Box>
+        ) : (
+          <Box display="flex" mt={2} style={{ gap: 16 }}>
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton
+                key={i}
+                variant="rect"
+                width={300}
+                height={400}
+                style={{ borderRadius: 12 }}
+              />
+            ))}
+          </Box>
+        )}
       </Box>
     );
   }
@@ -1096,60 +1702,185 @@ export default function CrmBoardPage() {
   }
 
   return (
-    <Box className={classes.root}>
+    <Box className={isMobile ? `${classes.root} ${classes.rootMobile}` : classes.root}>
+      {isMobile ? (
+        <AppDialog
+          open={filtersDialogOpen}
+          onClose={() => setFiltersDialogOpen(false)}
+          maxWidth="sm"
+        >
+          <AppDialogTitle>{i18n.t("crm.mobile.filters")}</AppDialogTitle>
+          <AppDialogContent>
+            <Box display="flex" flexDirection="column" style={{ gap: 12 }}>
+              {renderMobileFilterFields(true)}
+            </Box>
+          </AppDialogContent>
+          <AppDialogActions>
+            <AppSecondaryButton
+              onClick={() => {
+                clearAllSavedViewFilters();
+                setSelectedSavedViewId(null);
+              }}
+            >
+              {i18n.t("crm.mobile.clearFilters")}
+            </AppSecondaryButton>
+            <AppPrimaryButton onClick={() => setFiltersDialogOpen(false)}>
+              {i18n.t("crm.mobile.applyFilters")}
+            </AppPrimaryButton>
+          </AppDialogActions>
+        </AppDialog>
+      ) : null}
+
+      <AppDialog
+        open={Boolean(moveStageDeal)}
+        onClose={() => !moveStageSaving && setMoveStageDeal(null)}
+        maxWidth="xs"
+      >
+        <AppDialogTitle>{i18n.t("crm.mobile.moveStageTitle")}</AppDialogTitle>
+        <AppDialogContent>
+          <Typography variant="body2" color="textSecondary" paragraph>
+            {moveStageDeal?.title || ""}
+          </Typography>
+          <FormControl variant="outlined" size="small" fullWidth>
+            <InputLabel>{i18n.t("crm.deal.fields.stage")}</InputLabel>
+            <Select
+              label={i18n.t("crm.deal.fields.stage")}
+              value={moveStageTargetId}
+              onChange={(e) => setMoveStageTargetId(e.target.value)}
+            >
+              {stages.map((s) => (
+                <MenuItem key={s.id} value={String(s.id)}>
+                  {s.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </AppDialogContent>
+        <AppDialogActions>
+          <AppSecondaryButton
+            onClick={() => setMoveStageDeal(null)}
+            disabled={moveStageSaving}
+          >
+            {i18n.t("crm.common.cancel")}
+          </AppSecondaryButton>
+          <AppPrimaryButton
+            onClick={handleConfirmMoveStage}
+            disabled={moveStageSaving || !moveStageTargetId}
+          >
+            {i18n.t("crm.mobile.moveStageConfirm")}
+          </AppPrimaryButton>
+        </AppDialogActions>
+      </AppDialog>
+
       <Box className={classes.header}>
         <Box className={classes.headerTitle}>
-          <Typography variant="h5" style={{ fontWeight: 600 }}>
+          <Typography variant={isMobile ? "h6" : "h5"} style={{ fontWeight: 600 }}>
             {terms.boardTitle}
           </Typography>
-          <Typography variant="body2" color="textSecondary">
-            {terms.itemPlural}
-          </Typography>
+          {!isMobile ? (
+            <Typography variant="body2" color="textSecondary">
+              {terms.itemPlural}
+            </Typography>
+          ) : null}
         </Box>
-        <Box
-          style={{
-            display: "flex",
-            gap: 8,
-            marginLeft: "auto",
-            flexWrap: "wrap",
-            alignItems: "center",
-          }}
-        >
-          <Button component={Link} to="/crm/reports" variant="outlined">
-            {i18n.t("crm.reports.nav")}
-          </Button>
-          {canEditPipeline && selectedPipeline ? (
-            <Button variant="outlined" onClick={() => setPipelineEditOpen(true)}>
-              {i18n.t("crm.pipelineEdit.title")}
-            </Button>
-          ) : null}
-          {canEditPipeline && selectedPipeline ? (
-            <Button
-              variant="outlined"
-              onClick={() => setCustomFieldsDialogOpen(true)}
-            >
-              {i18n.t("crm.customFields.title")}
-            </Button>
-          ) : null}
-          {canInitCrm ? (
+        {isMobile ? (
+          <Box className={classes.mobileHeaderActions}>
             <Button
               component={Link}
-              to="/crm/automations"
+              to="/crm/reports"
               variant="outlined"
+              size="small"
+              fullWidth
             >
-              {i18n.t("crm.automation.open")}
+              {i18n.t("crm.reports.nav")}
             </Button>
-          ) : null}
-          <Button
-            color="primary"
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={openNew}
-            style={{ alignSelf: "center" }}
+            {canEditPipeline && selectedPipeline ? (
+              <>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  fullWidth
+                  onClick={() => setPipelineEditOpen(true)}
+                >
+                  {i18n.t("crm.pipelineEdit.title")}
+                </Button>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  fullWidth
+                  onClick={() => setCustomFieldsDialogOpen(true)}
+                >
+                  {i18n.t("crm.customFields.title")}
+                </Button>
+              </>
+            ) : null}
+            {canInitCrm ? (
+              <Button
+                component={Link}
+                to="/crm/automations"
+                variant="outlined"
+                size="small"
+                fullWidth
+              >
+                {i18n.t("crm.automation.open")}
+              </Button>
+            ) : null}
+            <Button
+              color="primary"
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={openNew}
+              fullWidth
+            >
+              {terms.createButton}
+            </Button>
+          </Box>
+        ) : (
+          <Box
+            style={{
+              display: "flex",
+              gap: 8,
+              marginLeft: "auto",
+              flexWrap: "wrap",
+              alignItems: "center",
+            }}
           >
-            {terms.createButton}
-          </Button>
-        </Box>
+            <Button component={Link} to="/crm/reports" variant="outlined">
+              {i18n.t("crm.reports.nav")}
+            </Button>
+            {canEditPipeline && selectedPipeline ? (
+              <Button variant="outlined" onClick={() => setPipelineEditOpen(true)}>
+                {i18n.t("crm.pipelineEdit.title")}
+              </Button>
+            ) : null}
+            {canEditPipeline && selectedPipeline ? (
+              <Button
+                variant="outlined"
+                onClick={() => setCustomFieldsDialogOpen(true)}
+              >
+                {i18n.t("crm.customFields.title")}
+              </Button>
+            ) : null}
+            {canInitCrm ? (
+              <Button
+                component={Link}
+                to="/crm/automations"
+                variant="outlined"
+              >
+                {i18n.t("crm.automation.open")}
+              </Button>
+            ) : null}
+            <Button
+              color="primary"
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={openNew}
+              style={{ alignSelf: "center" }}
+            >
+              {terms.createButton}
+            </Button>
+          </Box>
+        )}
       </Box>
 
       {user?.company?.crmVisibilityMode === "assigned" &&
@@ -1161,10 +1892,12 @@ export default function CrmBoardPage() {
       ) : null}
 
       <Paper className={classes.dashboardPaper} elevation={0}>
-        <Typography variant="caption" color="textSecondary">
-          {i18n.t("crm.dashboard.avgStageNote")}
-        </Typography>
-        <Box className={classes.metricGrid}>
+        {!isMobile ? (
+          <Typography variant="caption" color="textSecondary">
+            {i18n.t("crm.dashboard.avgStageNote")}
+          </Typography>
+        ) : null}
+        <Box className={isMobile ? classes.mobileMetricGrid : classes.metricGrid}>
           <Box className={classes.summaryMini}>
             <Typography variant="caption" color="textSecondary" display="block">
               {terms.metricOpen}
@@ -1248,182 +1981,234 @@ export default function CrmBoardPage() {
         </Box>
       </Paper>
 
-      <Box className={classes.filters} mb={2}>
-        <FormControl variant="outlined" size="small" style={{ minWidth: 200 }}>
-          <InputLabel>{i18n.t("crm.summary.pipeline")}</InputLabel>
-          <Select
-            label={i18n.t("crm.summary.pipeline")}
-            value={pipelineId}
-            onChange={(e) => setPipelineId(e.target.value)}
-          >
-            {pipelines.map((p) => (
-              <MenuItem key={p.id} value={String(p.id)}>
-                {p.name}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <TextField
-          size="small"
-          variant="outlined"
-          label={i18n.t("crm.filters.search")}
-          value={searchDraft}
-          onChange={(e) => setSearchDraft(e.target.value)}
-          style={{ minWidth: 240 }}
-        />
-        <FormControl variant="outlined" size="small" style={{ minWidth: 140 }}>
-          <InputLabel>{i18n.t("crm.filters.status")}</InputLabel>
-          <Select
-            label={i18n.t("crm.filters.status")}
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            <MenuItem value="">{i18n.t("crm.filters.all")}</MenuItem>
-            <MenuItem value="open">{i18n.t("crm.status.open")}</MenuItem>
-            <MenuItem value="won">{terms.statusWon}</MenuItem>
-            <MenuItem value="lost">{terms.statusLost}</MenuItem>
-          </Select>
-        </FormControl>
-        <FormControl variant="outlined" size="small" style={{ minWidth: 140 }}>
-          <InputLabel>{i18n.t("crm.filters.priority")}</InputLabel>
-          <Select
-            label={i18n.t("crm.filters.priority")}
-            value={priorityFilter}
-            onChange={(e) => setPriorityFilter(e.target.value)}
-          >
-            <MenuItem value="">{i18n.t("crm.filters.all")}</MenuItem>
-            <MenuItem value="low">{i18n.t("crm.priority.low")}</MenuItem>
-            <MenuItem value="medium">{i18n.t("crm.priority.medium")}</MenuItem>
-            <MenuItem value="high">{i18n.t("crm.priority.high")}</MenuItem>
-            <MenuItem value="urgent">{i18n.t("crm.priority.urgent")}</MenuItem>
-          </Select>
-        </FormControl>
-        <FormControl variant="outlined" size="small" style={{ minWidth: 150 }}>
-          <InputLabel>{i18n.t("crm.filters.source")}</InputLabel>
-          <Select
-            label={i18n.t("crm.filters.source")}
-            value={sourceFilter}
-            onChange={(e) => setSourceFilter(e.target.value)}
-          >
-            <MenuItem value="">{i18n.t("crm.filters.all")}</MenuItem>
-            <MenuItem value="manual">{i18n.t("crm.deal.source.manual")}</MenuItem>
-            <MenuItem value="whatsapp">{i18n.t("crm.deal.source.whatsapp")}</MenuItem>
-            <MenuItem value="instagram">{i18n.t("crm.deal.source.instagram")}</MenuItem>
-            <MenuItem value="other">{i18n.t("crm.deal.source.other")}</MenuItem>
-          </Select>
-        </FormControl>
-        <TextField
-          size="small"
-          variant="outlined"
-          label={i18n.t("crm.filters.tag")}
-          value={tagDraft}
-          onChange={(e) => setTagDraft(e.target.value)}
-          style={{ minWidth: 160 }}
-        />
-        <FormControl variant="outlined" size="small" style={{ minWidth: 200 }}>
-          <InputLabel>{i18n.t("crm.filters.assignee")}</InputLabel>
-          <Select
-            label={i18n.t("crm.filters.assignee")}
-            value={assigneeFilter}
-            onChange={(e) => setAssigneeFilter(e.target.value)}
-          >
-            <MenuItem value="">{i18n.t("crm.filters.all")}</MenuItem>
-            <MenuItem value="unassigned">{i18n.t("crm.deal.fields.unassigned")}</MenuItem>
-            {users.map((u) => (
-              <MenuItem key={u.id} value={String(u.id)}>
-                {u.name}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <Box display="flex" alignItems="center" flexWrap="wrap" style={{ gap: 10 }}>
-          <CrmSavedViewsBar
-            views={savedViews}
-            selectedViewId={selectedSavedViewId}
-            onSelectedViewIdChange={setSelectedSavedViewId}
-            onApplyParsedFilters={applyFilterPayloadToState}
-            onClearAllFilters={clearAllSavedViewFilters}
-            currentFiltersPayload={currentViewFiltersPayload}
-            user={user}
-            onReloadViews={loadSavedViews}
-            disabled={!pipelineId || loading}
-          />
-          <Button
+      {isMobile ? (
+        <Box className={classes.mobileFilterBar}>
+          <FormControl variant="outlined" size="small" fullWidth>
+            <InputLabel>{i18n.t("crm.summary.pipeline")}</InputLabel>
+            <Select
+              label={i18n.t("crm.summary.pipeline")}
+              value={pipelineId}
+              onChange={(e) => setPipelineId(e.target.value)}
+            >
+              {pipelines.map((p) => (
+                <MenuItem key={p.id} value={String(p.id)}>
+                  {p.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <TextField
             size="small"
             variant="outlined"
-            onClick={() => setAdvancedFiltersOpen(true)}
-            style={{ height: 40 }}
-          >
-            {i18n.t("crm.advancedFilters.title")}
-          </Button>
-          {activeAdvancedFilterCount > 0 ? (
-            <Chip size="small" label={activeAdvancedFilterCount} />
-          ) : null}
-          {activeAdvancedFilterCount > 0 ? (
-            <Button size="small" onClick={() => setAdvancedFilterRows([])}>
-              {i18n.t("crm.advancedFilters.clearAll")}
+            label={i18n.t("crm.filters.search")}
+            value={searchDraft}
+            onChange={(e) => setSearchDraft(e.target.value)}
+            fullWidth
+          />
+          <Box className={classes.mobileFilterRow}>
+            <FormControl variant="outlined" size="small" style={{ flex: 1 }}>
+              <InputLabel>{i18n.t("crm.filters.status")}</InputLabel>
+              <Select
+                label={i18n.t("crm.filters.status")}
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+              >
+                <MenuItem value="">{i18n.t("crm.filters.all")}</MenuItem>
+                <MenuItem value="open">{i18n.t("crm.status.open")}</MenuItem>
+                <MenuItem value="won">{terms.statusWon}</MenuItem>
+                <MenuItem value="lost">{terms.statusLost}</MenuItem>
+              </Select>
+            </FormControl>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<FilterListIcon />}
+              onClick={() => setFiltersDialogOpen(true)}
+              style={{ minHeight: 40, flexShrink: 0 }}
+            >
+              {i18n.t("crm.mobile.filters")}
+              {activeMobileFilterCount > 0 ? ` (${activeMobileFilterCount})` : ""}
             </Button>
-          ) : null}
+          </Box>
         </Box>
-        <Box display="flex" alignItems="center" flexWrap="wrap" style={{ gap: 8 }}>
-          <Typography variant="caption" color="textSecondary">
-            {i18n.t("crm.staleFilter.label")}:
-          </Typography>
-          {[
-            { key: "", label: i18n.t("crm.staleFilter.all") },
-            { key: "24", label: i18n.t("crm.staleFilter.h24") },
-            { key: "48", label: i18n.t("crm.staleFilter.h48") },
-            { key: "72", label: i18n.t("crm.staleFilter.h72") },
-          ].map(({ key, label }) => (
-            <Chip
-              key={key || "all"}
-              size="small"
-              label={label}
-              color={staleFilter === key ? "primary" : "default"}
-              onClick={() => setStaleFilter(key)}
-              variant={staleFilter === key ? "default" : "outlined"}
+      ) : (
+        <Box className={classes.filters} mb={2}>
+          <FormControl variant="outlined" size="small" style={{ minWidth: 200 }}>
+            <InputLabel>{i18n.t("crm.summary.pipeline")}</InputLabel>
+            <Select
+              label={i18n.t("crm.summary.pipeline")}
+              value={pipelineId}
+              onChange={(e) => setPipelineId(e.target.value)}
+            >
+              {pipelines.map((p) => (
+                <MenuItem key={p.id} value={String(p.id)}>
+                  {p.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <TextField
+            size="small"
+            variant="outlined"
+            label={i18n.t("crm.filters.search")}
+            value={searchDraft}
+            onChange={(e) => setSearchDraft(e.target.value)}
+            style={{ minWidth: 240 }}
+          />
+          <FormControl variant="outlined" size="small" style={{ minWidth: 140 }}>
+            <InputLabel>{i18n.t("crm.filters.status")}</InputLabel>
+            <Select
+              label={i18n.t("crm.filters.status")}
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <MenuItem value="">{i18n.t("crm.filters.all")}</MenuItem>
+              <MenuItem value="open">{i18n.t("crm.status.open")}</MenuItem>
+              <MenuItem value="won">{terms.statusWon}</MenuItem>
+              <MenuItem value="lost">{terms.statusLost}</MenuItem>
+            </Select>
+          </FormControl>
+          <FormControl variant="outlined" size="small" style={{ minWidth: 140 }}>
+            <InputLabel>{i18n.t("crm.filters.priority")}</InputLabel>
+            <Select
+              label={i18n.t("crm.filters.priority")}
+              value={priorityFilter}
+              onChange={(e) => setPriorityFilter(e.target.value)}
+            >
+              <MenuItem value="">{i18n.t("crm.filters.all")}</MenuItem>
+              <MenuItem value="low">{i18n.t("crm.priority.low")}</MenuItem>
+              <MenuItem value="medium">{i18n.t("crm.priority.medium")}</MenuItem>
+              <MenuItem value="high">{i18n.t("crm.priority.high")}</MenuItem>
+              <MenuItem value="urgent">{i18n.t("crm.priority.urgent")}</MenuItem>
+            </Select>
+          </FormControl>
+          <FormControl variant="outlined" size="small" style={{ minWidth: 150 }}>
+            <InputLabel>{i18n.t("crm.filters.source")}</InputLabel>
+            <Select
+              label={i18n.t("crm.filters.source")}
+              value={sourceFilter}
+              onChange={(e) => setSourceFilter(e.target.value)}
+            >
+              <MenuItem value="">{i18n.t("crm.filters.all")}</MenuItem>
+              <MenuItem value="manual">{i18n.t("crm.deal.source.manual")}</MenuItem>
+              <MenuItem value="whatsapp">{i18n.t("crm.deal.source.whatsapp")}</MenuItem>
+              <MenuItem value="instagram">{i18n.t("crm.deal.source.instagram")}</MenuItem>
+              <MenuItem value="other">{i18n.t("crm.deal.source.other")}</MenuItem>
+            </Select>
+          </FormControl>
+          <TextField
+            size="small"
+            variant="outlined"
+            label={i18n.t("crm.filters.tag")}
+            value={tagDraft}
+            onChange={(e) => setTagDraft(e.target.value)}
+            style={{ minWidth: 160 }}
+          />
+          <FormControl variant="outlined" size="small" style={{ minWidth: 200 }}>
+            <InputLabel>{i18n.t("crm.filters.assignee")}</InputLabel>
+            <Select
+              label={i18n.t("crm.filters.assignee")}
+              value={assigneeFilter}
+              onChange={(e) => setAssigneeFilter(e.target.value)}
+            >
+              <MenuItem value="">{i18n.t("crm.filters.all")}</MenuItem>
+              <MenuItem value="unassigned">{i18n.t("crm.deal.fields.unassigned")}</MenuItem>
+              {users.map((u) => (
+                <MenuItem key={u.id} value={String(u.id)}>
+                  {u.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <Box display="flex" alignItems="center" flexWrap="wrap" style={{ gap: 10 }}>
+            <CrmSavedViewsBar
+              views={savedViews}
+              selectedViewId={selectedSavedViewId}
+              onSelectedViewIdChange={setSelectedSavedViewId}
+              onApplyParsedFilters={applyFilterPayloadToState}
+              onClearAllFilters={clearAllSavedViewFilters}
+              currentFiltersPayload={currentViewFiltersPayload}
+              user={user}
+              onReloadViews={loadSavedViews}
+              disabled={!pipelineId || loading}
             />
-          ))}
-        </Box>
-        <Box display="flex" alignItems="center" flexWrap="wrap" style={{ gap: 8 }}>
-          <Typography variant="caption" color="textSecondary">
-            {i18n.t("crm.followUp.filterLabel")}:
-          </Typography>
-          {[
-            { key: "", label: i18n.t("crm.filters.all") },
-            { key: "has", label: i18n.t("crm.followUp.filterHas") },
-            { key: "overdue", label: i18n.t("crm.followUp.filterOverdue") },
-            { key: "today", label: i18n.t("crm.followUp.filterToday") },
-          ].map(({ key, label }) => (
-            <Chip
-              key={key || "fu-all"}
+            <Button
               size="small"
-              label={label}
-              color={followUpFilter === key ? "primary" : "default"}
-              onClick={() => setFollowUpFilter(key)}
-              variant={followUpFilter === key ? "default" : "outlined"}
-            />
-          ))}
+              variant="outlined"
+              onClick={() => setAdvancedFiltersOpen(true)}
+              style={{ height: 40 }}
+            >
+              {i18n.t("crm.advancedFilters.title")}
+            </Button>
+            {activeAdvancedFilterCount > 0 ? (
+              <Chip size="small" label={activeAdvancedFilterCount} />
+            ) : null}
+            {activeAdvancedFilterCount > 0 ? (
+              <Button size="small" onClick={() => setAdvancedFilterRows([])}>
+                {i18n.t("crm.advancedFilters.clearAll")}
+              </Button>
+            ) : null}
+          </Box>
+          <Box display="flex" alignItems="center" flexWrap="wrap" style={{ gap: 8 }}>
+            <Typography variant="caption" color="textSecondary">
+              {i18n.t("crm.staleFilter.label")}:
+            </Typography>
+            {[
+              { key: "", label: i18n.t("crm.staleFilter.all") },
+              { key: "24", label: i18n.t("crm.staleFilter.h24") },
+              { key: "48", label: i18n.t("crm.staleFilter.h48") },
+              { key: "72", label: i18n.t("crm.staleFilter.h72") },
+            ].map(({ key, label }) => (
+              <Chip
+                key={key || "all"}
+                size="small"
+                label={label}
+                color={staleFilter === key ? "primary" : "default"}
+                onClick={() => setStaleFilter(key)}
+                variant={staleFilter === key ? "default" : "outlined"}
+              />
+            ))}
+          </Box>
+          <Box display="flex" alignItems="center" flexWrap="wrap" style={{ gap: 8 }}>
+            <Typography variant="caption" color="textSecondary">
+              {i18n.t("crm.followUp.filterLabel")}:
+            </Typography>
+            {[
+              { key: "", label: i18n.t("crm.filters.all") },
+              { key: "has", label: i18n.t("crm.followUp.filterHas") },
+              { key: "overdue", label: i18n.t("crm.followUp.filterOverdue") },
+              { key: "today", label: i18n.t("crm.followUp.filterToday") },
+            ].map(({ key, label }) => (
+              <Chip
+                key={key || "fu-all"}
+                size="small"
+                label={label}
+                color={followUpFilter === key ? "primary" : "default"}
+                onClick={() => setFollowUpFilter(key)}
+                variant={followUpFilter === key ? "default" : "outlined"}
+              />
+            ))}
+          </Box>
+          <Box display="flex" alignItems="center" flexWrap="wrap" style={{ gap: 8 }}>
+            <Typography variant="caption" color="textSecondary">
+              {i18n.t("crm.attention.filterLabel")}:
+            </Typography>
+            {[
+              { key: "", label: i18n.t("crm.filters.all") },
+              { key: "needs", label: i18n.t("crm.attention.filterNeeds") },
+            ].map(({ key, label }) => (
+              <Chip
+                key={key || "attn-all"}
+                size="small"
+                label={label}
+                color={attentionFilter === key ? "primary" : "default"}
+                onClick={() => setAttentionFilter(key)}
+                variant={attentionFilter === key ? "default" : "outlined"}
+              />
+            ))}
+          </Box>
         </Box>
-        <Box display="flex" alignItems="center" flexWrap="wrap" style={{ gap: 8 }}>
-          <Typography variant="caption" color="textSecondary">
-            {i18n.t("crm.attention.filterLabel")}:
-          </Typography>
-          {[
-            { key: "", label: i18n.t("crm.filters.all") },
-            { key: "needs", label: i18n.t("crm.attention.filterNeeds") },
-          ].map(({ key, label }) => (
-            <Chip
-              key={key || "attn-all"}
-              size="small"
-              label={label}
-              color={attentionFilter === key ? "primary" : "default"}
-              onClick={() => setAttentionFilter(key)}
-              variant={attentionFilter === key ? "default" : "outlined"}
-            />
-          ))}
-        </Box>
-      </Box>
+      )}
 
       {boardEmptyMessage ? (
         <Box mb={1.5}>
@@ -1433,6 +2218,9 @@ export default function CrmBoardPage() {
         </Box>
       ) : null}
 
+      {isMobile ? (
+        renderMobileBoard()
+      ) : (
       <DragDropContext onDragEnd={onDragEnd}>
         <Box className={classes.board}>
           {stages.map((stage) => {
@@ -1733,7 +2521,9 @@ export default function CrmBoardPage() {
           })}
         </Box>
       </DragDropContext>
+      )}
 
+      {!isMobile ? (
       <Menu anchorEl={menuAnchor} open={Boolean(menuAnchor)} onClose={closeMenu}>
         {menuDeal?.attentionAt ? (
           <MenuItem
@@ -1757,6 +2547,7 @@ export default function CrmBoardPage() {
           {i18n.t("crm.actions.delete")}
         </MenuItem>
       </Menu>
+      ) : null}
 
       <CrmPipelineEditDialog
         open={pipelineEditOpen}

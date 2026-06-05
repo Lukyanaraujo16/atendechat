@@ -1,9 +1,11 @@
 import React, { useMemo, useCallback } from "react";
-import Dialog from "@material-ui/core/Dialog";
-import DialogTitle from "@material-ui/core/DialogTitle";
-import DialogContent from "@material-ui/core/DialogContent";
-import DialogActions from "@material-ui/core/DialogActions";
 import Button from "@material-ui/core/Button";
+import {
+  AppDialog,
+  AppDialogTitle,
+  AppDialogContent,
+  AppDialogActions,
+} from "../../ui";
 import Box from "@material-ui/core/Box";
 import Grid from "@material-ui/core/Grid";
 import FormControl from "@material-ui/core/FormControl";
@@ -155,9 +157,9 @@ export default function CrmAdvancedFilters({
   );
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
-      <DialogTitle>{i18n.t("crm.advancedFilters.title")}</DialogTitle>
-      <DialogContent>
+    <AppDialog open={open} onClose={onClose} fullWidth maxWidth="md">
+      <AppDialogTitle>{i18n.t("crm.advancedFilters.title")}</AppDialogTitle>
+      <AppDialogContent>
         <Typography variant="body2" color="textSecondary" paragraph>
           {i18n.t("crm.advancedFilters.hint")}
         </Typography>
@@ -274,13 +276,13 @@ export default function CrmAdvancedFilters({
             {i18n.t("crm.advancedFilters.clearAll")}
           </Button>
         </Box>
-      </DialogContent>
-      <DialogActions>
+      </AppDialogContent>
+      <AppDialogActions>
         <Button onClick={onClose} color="primary">
           {i18n.t("crm.common.cancel")}
         </Button>
-      </DialogActions>
-    </Dialog>
+      </AppDialogActions>
+    </AppDialog>
   );
 }
 

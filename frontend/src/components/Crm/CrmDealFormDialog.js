@@ -1,9 +1,12 @@
 import React, { useEffect, useState, useMemo, useRef } from "react";
-import Dialog from "@material-ui/core/Dialog";
-import DialogTitle from "@material-ui/core/DialogTitle";
-import DialogContent from "@material-ui/core/DialogContent";
-import DialogActions from "@material-ui/core/DialogActions";
 import Button from "@material-ui/core/Button";
+import useIsMobile from "../../hooks/useIsMobile";
+import {
+  AppDialog,
+  AppDialogTitle,
+  AppDialogContent,
+  AppDialogActions,
+} from "../../ui";
 import TextField from "@material-ui/core/TextField";
 import MenuItem from "@material-ui/core/MenuItem";
 import FormControl from "@material-ui/core/FormControl";
@@ -230,6 +233,7 @@ export default function CrmDealFormDialog({
   defaults = {},
   terminology = null,
 }) {
+  const isMobile = useIsMobile();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [pipelines, setPipelines] = useState([]);
@@ -571,21 +575,29 @@ export default function CrmDealFormDialog({
   };
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth={dealId ? "md" : "sm"}>
-      <DialogTitle>{dialogTitle}</DialogTitle>
+    <AppDialog
+      open={open}
+      onClose={onClose}
+      fullWidth
+      maxWidth={dealId ? "md" : "sm"}
+      fullScreen={isMobile}
+    >
+      <AppDialogTitle>{dialogTitle}</AppDialogTitle>
       {dealId ? (
         <Tabs
           value={tab}
           onChange={(_, v) => setTab(v)}
           indicatorColor="primary"
           textColor="primary"
+          variant={isMobile ? "scrollable" : "standard"}
+          scrollButtons={isMobile ? "auto" : undefined}
           style={{ borderBottom: "1px solid rgba(0,0,0,0.08)" }}
         >
           <Tab label={i18n.t("crm.history.detailsTab")} />
           <Tab label={i18n.t("crm.history.tab")} />
         </Tabs>
       ) : null}
-      <DialogContent>
+      <AppDialogContent>
         {loading ? (
           <Grid container justifyContent="center" style={{ padding: 24 }}>
             <CircularProgress size={32} />
@@ -1037,8 +1049,8 @@ export default function CrmDealFormDialog({
             ) : null}
           </>
         )}
-      </DialogContent>
-      <DialogActions>
+      </AppDialogContent>
+      <AppDialogActions>
         {dealId && dealHasAttention ? (
           <Button
             onClick={handleResolveAttentionOnly}
@@ -1061,7 +1073,7 @@ export default function CrmDealFormDialog({
         >
           {i18n.t("crm.common.save")}
         </ButtonWithSpinner>
-      </DialogActions>
-    </Dialog>
+      </AppDialogActions>
+    </AppDialog>
   );
 }

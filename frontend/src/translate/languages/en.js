@@ -196,6 +196,17 @@ const messages = {
 					critical: "Critical",
 					noUpdateShort: "No update",
 				},
+				mobile: {
+					filters: "Filters",
+					applyFilters: "Apply",
+					clearFilters: "Clear filters",
+					stageCount: "{{count}} {{item}} in this stage",
+					openDetails: "Open details",
+					moveStage: "Move stage",
+					moveStageTitle: "Move to stage",
+					moveStageConfirm: "Move",
+					dealActions: "Deal actions",
+				},
 				empty: {
 					noPipelineTitle: "CRM not set up",
 					noPipelineBody:

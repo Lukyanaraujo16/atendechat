@@ -18,6 +18,7 @@ import OpenInNewIcon from "@material-ui/icons/OpenInNew";
 import EditIcon from "@material-ui/icons/Edit";
 import EventIcon from "@material-ui/icons/Event";
 import FlagOutlinedIcon from "@material-ui/icons/FlagOutlined";
+import BusinessCenterOutlinedIcon from "@material-ui/icons/BusinessCenterOutlined";
 import { format } from "date-fns";
 import { enUS, es, ptBR } from "date-fns/locale";
 
@@ -27,6 +28,18 @@ import toastError from "../../errors/toastError";
 import { isForbiddenPermissionError } from "../../utils/apiErrorUtils";
 import { toast } from "react-toastify";
 import { getErrorToastOptions } from "../../errors/feedbackToasts";
+import useIsMobile from "../../hooks/useIsMobile";
+import {
+  AppDialog,
+  AppDialogTitle,
+  AppDialogContent,
+  AppDialogActions,
+  AppPrimaryButton,
+  AppSecondaryButton,
+  MobileEntityCard,
+  MobileCardList,
+  MobileActionsMenu,
+} from "../../ui";
 
 const PRIORITIES = ["low", "medium", "high", "urgent"];
 
@@ -67,6 +80,7 @@ export default function ContactCrmSection({
   onCreateCrm,
 }) {
   const history = useHistory();
+  const isMobile = useIsMobile();
   const [deals, setDeals] = useState([]);
   const [pipelines, setPipelines] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -74,6 +88,7 @@ export default function ContactCrmSection({
   const [followAnchor, setFollowAnchor] = useState(null);
   const [followDealId, setFollowDealId] = useState(null);
   const [followLocal, setFollowLocal] = useState("");
+  const [followDialogOpen, setFollowDialogOpen] = useState(false);
 
   const loadData = useCallback(async () => {
     if (!contactId) {
@@ -108,12 +123,22 @@ export default function ContactCrmSection({
     return [...p.stages].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
   };
 
-  const openFollowPopover = (e, deal) => {
+  const openFollowEditor = (e, deal) => {
     setFollowDealId(deal.id);
     setFollowLocal(
       deal.nextFollowUpAt ? dateToDatetimeLocalInput(new Date(deal.nextFollowUpAt)) : ""
     );
-    setFollowAnchor(e.currentTarget);
+    if (isMobile) {
+      setFollowDialogOpen(true);
+    } else {
+      setFollowAnchor(e.currentTarget);
+    }
+  };
+
+  const closeFollowEditor = () => {
+    setFollowAnchor(null);
+    setFollowDealId(null);
+    setFollowDialogOpen(false);
   };
 
   const saveFollowUp = async () => {
@@ -125,8 +150,7 @@ export default function ContactCrmSection({
         nextFollowUpAt: iso,
       });
       toast.success(i18n.t("crm.ticket.followUpSaved"), getErrorToastOptions());
-      setFollowAnchor(null);
-      setFollowDealId(null);
+      closeFollowEditor();
       await loadData();
     } catch (err) {
       toastError(err);
@@ -193,10 +217,253 @@ export default function ContactCrmSection({
 
   const loc = dateFnsLocale();
 
+  const renderDealActions = (deal, busy) => (
+    <Box display="flex" flexWrap="wrap" style={{ gap: 6 }} alignItems="center" width="100%">
+      <FormControl
+        size="small"
+        variant="outlined"
+        style={{ minWidth: 120, flex: "1 1 100%" }}
+        fullWidth={isMobile}
+        disabled={busy || deal.status !== "open" || !stagesForPipeline(deal.pipelineId).length}
+      >
+        <InputLabel shrink>{i18n.t("crm.ticket.changeStage")}</InputLabel>
+        <Select
+          label={i18n.t("crm.ticket.changeStage")}
+          value={deal.stageId || ""}
+          displayEmpty
+          onChange={(e) => handleStageChange(deal, e.target.value)}
+        >
+          {stagesForPipeline(deal.pipelineId).map((s) => (
+            <MenuItem key={s.id} value={s.id}>
+              {s.name}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+
+      <FormControl
+        size="small"
+        variant="outlined"
+        style={{ minWidth: 110, flex: isMobile ? "1 1 100%" : "1 1 45%" }}
+        fullWidth={isMobile}
+        disabled={busy}
+      >
+        <InputLabel shrink>{i18n.t("crm.filters.priority")}</InputLabel>
+        <Select
+          label={i18n.t("crm.filters.priority")}
+          value={deal.priority || "medium"}
+          onChange={(e) => handlePriorityChange(deal, e.target.value)}
+        >
+          {PRIORITIES.map((p) => (
+            <MenuItem key={p} value={p}>
+              {i18n.t(`crm.priority.${p}`)}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+
+      {!isMobile ? (
+        <>
+          <Tooltip title={i18n.t("crm.ticket.setFollowUp")}>
+            <span>
+              <IconButton
+                size="small"
+                disabled={busy || deal.status !== "open"}
+                onClick={(e) => openFollowEditor(e, deal)}
+              >
+                <EventIcon fontSize="small" />
+              </IconButton>
+            </span>
+          </Tooltip>
+          {deal.nextFollowUpAt ? (
+            <Button size="small" onClick={() => clearFollowUp(deal.id)} disabled={busy}>
+              {i18n.t("crm.followUp.clearReminder")}
+            </Button>
+          ) : null}
+          {deal.attentionAt ? (
+            <Button
+              size="small"
+              color="secondary"
+              disabled={busy}
+              onClick={() => resolveAttention(deal.id)}
+            >
+              {i18n.t("crm.attention.resolve")}
+            </Button>
+          ) : null}
+          <Tooltip title={i18n.t("crm.ticket.openInCrm")}>
+            <IconButton size="small" onClick={() => openInCrm(deal.id)}>
+              <OpenInNewIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          {onOpenDealEdit ? (
+            <Tooltip title={i18n.t("crm.deal.editTitle")}>
+              <IconButton size="small" onClick={() => onOpenDealEdit(deal.id)}>
+                <EditIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          ) : null}
+        </>
+      ) : null}
+    </Box>
+  );
+
+  const renderMobileDealCard = (deal) => {
+    const busy = busyId === deal.id;
+    const wonLabel = terminology?.statusWon || i18n.t("crm.status.won");
+    const lostLabel = terminology?.statusLost || i18n.t("crm.status.lost");
+    let statusLabel = i18n.t("crm.status.open");
+    if (deal.status === "won") statusLabel = wonLabel;
+    if (deal.status === "lost") statusLabel = lostLabel;
+
+    const menuItems = [
+      deal.status === "open"
+        ? {
+            key: "follow",
+            label: i18n.t("crm.ticket.setFollowUp"),
+            icon: <EventIcon fontSize="small" />,
+            onClick: () => openFollowEditor(null, deal),
+          }
+        : null,
+      deal.nextFollowUpAt
+        ? {
+            key: "clearFollow",
+            label: i18n.t("crm.followUp.clearReminder"),
+            onClick: () => clearFollowUp(deal.id),
+          }
+        : null,
+      deal.attentionAt
+        ? {
+            key: "resolve",
+            label: i18n.t("crm.attention.resolve"),
+            onClick: () => resolveAttention(deal.id),
+          }
+        : null,
+      {
+        key: "open",
+        label: i18n.t("crm.ticket.openInCrm"),
+        icon: <OpenInNewIcon fontSize="small" />,
+        onClick: () => openInCrm(deal.id),
+      },
+      onOpenDealEdit
+        ? {
+            key: "edit",
+            label: i18n.t("crm.actions.edit"),
+            icon: <EditIcon fontSize="small" />,
+            onClick: () => onOpenDealEdit(deal.id),
+          }
+        : null,
+    ].filter(Boolean);
+
+    return (
+      <MobileEntityCard
+        key={deal.id}
+        leading={<BusinessCenterOutlinedIcon color="action" />}
+        title={deal.title || "—"}
+        subtitle={`${deal.pipeline?.name ? `${deal.pipeline.name} · ` : ""}${deal.stage?.name || "—"}`}
+        badges={
+          <MobileActionsMenu
+            items={menuItems}
+            ariaLabel={i18n.t("crm.mobile.dealActions")}
+          />
+        }
+        footer={<Chip size="small" label={statusLabel} />}
+      >
+        <Typography variant="caption" color="textSecondary" display="block">
+          {i18n.t("crm.filters.assignee")}: {deal.assignedUser?.name || "—"}
+        </Typography>
+        <Typography variant="caption" color="textSecondary" display="block">
+          {i18n.t("crm.reports.valueCurrent")}: {formatMoneyBrief(deal.value)}
+        </Typography>
+        {deal.nextFollowUpAt ? (
+          <Typography variant="caption" color="textSecondary" display="block">
+            {i18n.t("crm.followUp.nextFollowUp")}:{" "}
+            {format(new Date(deal.nextFollowUpAt), "Pp", { locale: loc })}
+          </Typography>
+        ) : null}
+        {deal.attentionAt ? (
+          <Chip
+            size="small"
+            icon={<FlagOutlinedIcon style={{ fontSize: 14 }} />}
+            label={i18n.t("crm.attention.chip")}
+            color="secondary"
+          />
+        ) : null}
+        {renderDealActions(deal, busy)}
+      </MobileEntityCard>
+    );
+  };
+
+  const renderDesktopDealCard = (deal) => {
+    const busy = busyId === deal.id;
+    const wonLabel = terminology?.statusWon || i18n.t("crm.status.won");
+    const lostLabel = terminology?.statusLost || i18n.t("crm.status.lost");
+    let statusLabel = i18n.t("crm.status.open");
+    if (deal.status === "won") statusLabel = wonLabel;
+    if (deal.status === "lost") statusLabel = lostLabel;
+
+    return (
+      <Box
+        key={deal.id}
+        style={{
+          border: "1px solid rgba(0,0,0,0.12)",
+          borderRadius: 6,
+          padding: 8,
+          marginBottom: 8,
+          fontSize: 12,
+        }}
+      >
+        <Box display="flex" alignItems="flex-start" justifyContent="space-between" style={{ gap: 4 }}>
+          <Typography variant="body2" style={{ fontWeight: 600, flex: 1 }} noWrap>
+            {deal.title || "—"}
+          </Typography>
+          <Chip size="small" label={statusLabel} style={{ height: 22, fontSize: 11 }} />
+        </Box>
+        <Typography variant="caption" color="textSecondary" display="block">
+          {deal.pipeline?.name ? `${deal.pipeline.name} · ` : ""}
+          {deal.stage?.name || "—"}
+        </Typography>
+        <Typography variant="caption" color="textSecondary" display="block">
+          {i18n.t("crm.filters.assignee")}: {deal.assignedUser?.name || "—"}
+        </Typography>
+        <Typography variant="caption" color="textSecondary" display="block">
+          {i18n.t("crm.filters.priority")}:{" "}
+          {i18n.t(`crm.priority.${deal.priority || "medium"}`)}
+        </Typography>
+        {deal.nextFollowUpAt ? (
+          <Typography variant="caption" color="textSecondary" display="block">
+            {i18n.t("crm.followUp.nextFollowUp")}:{" "}
+            {format(new Date(deal.nextFollowUpAt), "Pp", { locale: loc })}
+          </Typography>
+        ) : null}
+        {deal.attentionAt ? (
+          <Chip
+            size="small"
+            icon={<FlagOutlinedIcon style={{ fontSize: 14 }} />}
+            label={i18n.t("crm.attention.chip")}
+            style={{ height: 22, fontSize: 11, marginTop: 4 }}
+            color="secondary"
+          />
+        ) : null}
+        {Array.isArray(deal.tags) && deal.tags.length ? (
+          <Typography variant="caption" display="block" style={{ marginTop: 4 }}>
+            {deal.tags.join(", ")}
+          </Typography>
+        ) : null}
+        <Typography variant="caption" display="block" style={{ marginTop: 2 }}>
+          {i18n.t("crm.reports.valueCurrent")}: {formatMoneyBrief(deal.value)}
+        </Typography>
+
+        <Divider style={{ margin: "8px 0" }} />
+
+        {renderDealActions(deal, busy)}
+      </Box>
+    );
+  };
+
   if (!contactId) return null;
 
   return (
-    <Box style={{ marginTop: 8 }}>
+    <Box style={{ marginTop: 8, maxWidth: "100%", overflowX: "hidden" }}>
       <Typography variant="subtitle2" style={{ fontWeight: 600, marginBottom: 8 }}>
         {i18n.t("crm.ticket.contactCrmTitle")}
       </Typography>
@@ -215,175 +482,75 @@ export default function ContactCrmSection({
               variant="outlined"
               color="primary"
               style={{ marginTop: 8 }}
+              fullWidth={isMobile}
               onClick={onCreateCrm}
             >
               {i18n.t("crm.ticket.createCrmItem")}
             </Button>
           ) : null}
         </Box>
+      ) : isMobile ? (
+        <MobileCardList>{deals.map((deal) => renderMobileDealCard(deal))}</MobileCardList>
       ) : (
-        deals.map((deal) => {
-          const stages = stagesForPipeline(deal.pipelineId);
-          const busy = busyId === deal.id;
-          const wonLabel = terminology?.statusWon || i18n.t("crm.status.won");
-          const lostLabel = terminology?.statusLost || i18n.t("crm.status.lost");
-          let statusLabel = i18n.t("crm.status.open");
-          if (deal.status === "won") statusLabel = wonLabel;
-          if (deal.status === "lost") statusLabel = lostLabel;
-
-          return (
-            <Box
-              key={deal.id}
-              style={{
-                border: "1px solid rgba(0,0,0,0.12)",
-                borderRadius: 6,
-                padding: 8,
-                marginBottom: 8,
-                fontSize: 12,
-              }}
-            >
-              <Box display="flex" alignItems="flex-start" justifyContent="space-between" style={{ gap: 4 }}>
-                <Typography variant="body2" style={{ fontWeight: 600, flex: 1 }} noWrap>
-                  {deal.title || "—"}
-                </Typography>
-                <Chip size="small" label={statusLabel} style={{ height: 22, fontSize: 11 }} />
-              </Box>
-              <Typography variant="caption" color="textSecondary" display="block">
-                {deal.pipeline?.name ? `${deal.pipeline.name} · ` : ""}
-                {deal.stage?.name || "—"}
-              </Typography>
-              <Typography variant="caption" color="textSecondary" display="block">
-                {i18n.t("crm.filters.assignee")}: {deal.assignedUser?.name || "—"}
-              </Typography>
-              <Typography variant="caption" color="textSecondary" display="block">
-                {i18n.t("crm.filters.priority")}:{" "}
-                {i18n.t(`crm.priority.${deal.priority || "medium"}`)}
-              </Typography>
-              {deal.nextFollowUpAt ? (
-                <Typography variant="caption" color="textSecondary" display="block">
-                  {i18n.t("crm.followUp.nextFollowUp")}:{" "}
-                  {format(new Date(deal.nextFollowUpAt), "Pp", { locale: loc })}
-                </Typography>
-              ) : null}
-              {deal.attentionAt ? (
-                <Chip
-                  size="small"
-                  icon={<FlagOutlinedIcon style={{ fontSize: 14 }} />}
-                  label={i18n.t("crm.attention.chip")}
-                  style={{ height: 22, fontSize: 11, marginTop: 4 }}
-                  color="secondary"
-                />
-              ) : null}
-              {Array.isArray(deal.tags) && deal.tags.length ? (
-                <Typography variant="caption" display="block" style={{ marginTop: 4 }}>
-                  {deal.tags.join(", ")}
-                </Typography>
-              ) : null}
-              <Typography variant="caption" display="block" style={{ marginTop: 2 }}>
-                {i18n.t("crm.reports.valueCurrent")}: {formatMoneyBrief(deal.value)}
-              </Typography>
-
-              <Divider style={{ margin: "8px 0" }} />
-
-              <Box display="flex" flexWrap="wrap" style={{ gap: 6 }} alignItems="center">
-                <FormControl size="small" variant="outlined" style={{ minWidth: 120, flex: "1 1 100%" }} disabled={busy || deal.status !== "open" || !stages.length}>
-                  <InputLabel shrink>{i18n.t("crm.ticket.changeStage")}</InputLabel>
-                  <Select
-                    label={i18n.t("crm.ticket.changeStage")}
-                    value={deal.stageId || ""}
-                    displayEmpty
-                    onChange={(e) => handleStageChange(deal, e.target.value)}
-                  >
-                    {stages.map((s) => (
-                      <MenuItem key={s.id} value={s.id}>
-                        {s.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-
-                <FormControl size="small" variant="outlined" style={{ minWidth: 110, flex: "1 1 45%" }} disabled={busy}>
-                  <InputLabel shrink>{i18n.t("crm.filters.priority")}</InputLabel>
-                  <Select
-                    label={i18n.t("crm.filters.priority")}
-                    value={deal.priority || "medium"}
-                    onChange={(e) => handlePriorityChange(deal, e.target.value)}
-                  >
-                    {PRIORITIES.map((p) => (
-                      <MenuItem key={p} value={p}>
-                        {i18n.t(`crm.priority.${p}`)}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-
-                <Tooltip title={i18n.t("crm.ticket.setFollowUp")}>
-                  <span>
-                    <IconButton
-                      size="small"
-                      disabled={busy || deal.status !== "open"}
-                      onClick={(e) => openFollowPopover(e, deal)}
-                    >
-                      <EventIcon fontSize="small" />
-                    </IconButton>
-                  </span>
-                </Tooltip>
-                {deal.nextFollowUpAt ? (
-                  <Button size="small" onClick={() => clearFollowUp(deal.id)} disabled={busy}>
-                    {i18n.t("crm.followUp.clearReminder")}
-                  </Button>
-                ) : null}
-                {deal.attentionAt ? (
-                  <Button size="small" color="secondary" disabled={busy} onClick={() => resolveAttention(deal.id)}>
-                    {i18n.t("crm.attention.resolve")}
-                  </Button>
-                ) : null}
-                <Tooltip title={i18n.t("crm.ticket.openInCrm")}>
-                  <IconButton size="small" onClick={() => openInCrm(deal.id)}>
-                    <OpenInNewIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-                {onOpenDealEdit ? (
-                  <Tooltip title={i18n.t("crm.deal.editTitle")}>
-                    <IconButton size="small" onClick={() => onOpenDealEdit(deal.id)}>
-                      <EditIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                ) : null}
-              </Box>
-            </Box>
-          );
-        })
+        deals.map((deal) => renderDesktopDealCard(deal))
       )}
 
-      <Popover
-        open={Boolean(followAnchor)}
-        anchorEl={followAnchor}
-        onClose={() => {
-          setFollowAnchor(null);
-          setFollowDealId(null);
-        }}
-        anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
-      >
-        <Box p={2} style={{ minWidth: 260 }}>
-          <Typography variant="subtitle2" gutterBottom>
-            {i18n.t("crm.ticket.setFollowUp")}
-          </Typography>
-          <TextField
-            type="datetime-local"
-            size="small"
-            fullWidth
-            variant="outlined"
-            value={followLocal}
-            onChange={(e) => setFollowLocal(e.target.value)}
-            InputLabelProps={{ shrink: true }}
-            style={{ marginBottom: 8 }}
-          />
-          <Button variant="contained" color="primary" size="small" disabled={busyId === followDealId} onClick={saveFollowUp}>
-            {i18n.t("crm.common.save")}
-          </Button>
-        </Box>
-      </Popover>
+      {isMobile ? (
+        <AppDialog open={followDialogOpen} onClose={closeFollowEditor} maxWidth="xs">
+          <AppDialogTitle>{i18n.t("crm.ticket.setFollowUp")}</AppDialogTitle>
+          <AppDialogContent>
+            <TextField
+              type="datetime-local"
+              size="small"
+              fullWidth
+              variant="outlined"
+              value={followLocal}
+              onChange={(e) => setFollowLocal(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+            />
+          </AppDialogContent>
+          <AppDialogActions>
+            <AppSecondaryButton onClick={closeFollowEditor} disabled={busyId === followDealId}>
+              {i18n.t("crm.common.cancel")}
+            </AppSecondaryButton>
+            <AppPrimaryButton onClick={saveFollowUp} disabled={busyId === followDealId}>
+              {i18n.t("crm.common.save")}
+            </AppPrimaryButton>
+          </AppDialogActions>
+        </AppDialog>
+      ) : (
+        <Popover
+          open={Boolean(followAnchor)}
+          anchorEl={followAnchor}
+          onClose={closeFollowEditor}
+          anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+        >
+          <Box p={2} style={{ minWidth: 260 }}>
+            <Typography variant="subtitle2" gutterBottom>
+              {i18n.t("crm.ticket.setFollowUp")}
+            </Typography>
+            <TextField
+              type="datetime-local"
+              size="small"
+              fullWidth
+              variant="outlined"
+              value={followLocal}
+              onChange={(e) => setFollowLocal(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              style={{ marginBottom: 8 }}
+            />
+            <Button
+              variant="contained"
+              color="primary"
+              size="small"
+              disabled={busyId === followDealId}
+              onClick={saveFollowUp}
+            >
+              {i18n.t("crm.common.save")}
+            </Button>
+          </Box>
+        </Popover>
+      )}
     </Box>
   );
 }

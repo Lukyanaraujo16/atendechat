@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useState } from "react";
-import Dialog from "@material-ui/core/Dialog";
-import DialogTitle from "@material-ui/core/DialogTitle";
-import DialogContent from "@material-ui/core/DialogContent";
-import DialogActions from "@material-ui/core/DialogActions";
 import Button from "@material-ui/core/Button";
+import {
+  AppDialog,
+  AppDialogTitle,
+  AppDialogContent,
+  AppDialogActions,
+} from "../../ui";
 import TextField from "@material-ui/core/TextField";
 import IconButton from "@material-ui/core/IconButton";
 import Typography from "@material-ui/core/Typography";
@@ -203,9 +205,9 @@ export default function CrmPipelineEditDialog({ open, onClose, pipeline, onSaved
   }, [draft, initialRows, pipeline, onClose, onSaved]);
 
   return (
-    <Dialog open={open} onClose={saving ? undefined : onClose} maxWidth="md" fullWidth>
-      <DialogTitle>{i18n.t("crm.pipelineEdit.title")}</DialogTitle>
-      <DialogContent>
+    <AppDialog open={open} onClose={saving ? undefined : onClose} maxWidth="md" fullWidth>
+      <AppDialogTitle>{i18n.t("crm.pipelineEdit.title")}</AppDialogTitle>
+      <AppDialogContent>
         <Typography variant="caption" color="textSecondary" display="block" paragraph>
           {i18n.t("crm.pipelineEdit.reorderHint")}
         </Typography>
@@ -289,15 +291,15 @@ export default function CrmPipelineEditDialog({ open, onClose, pipeline, onSaved
             {i18n.t("crm.pipelineEdit.newStage")}
           </Button>
         </Box>
-      </DialogContent>
-      <DialogActions>
+      </AppDialogContent>
+      <AppDialogActions>
         <Button onClick={onClose} disabled={saving}>
           {i18n.t("crm.pipelineEdit.cancel")}
         </Button>
         <Button color="primary" variant="contained" onClick={handleSave} disabled={saving}>
           {saving ? i18n.t("crm.pipelineEdit.saving") : i18n.t("crm.pipelineEdit.save")}
         </Button>
-      </DialogActions>
-    </Dialog>
+      </AppDialogActions>
+    </AppDialog>
   );
 }

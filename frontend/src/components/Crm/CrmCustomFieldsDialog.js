@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useState } from "react";
-import Dialog from "@material-ui/core/Dialog";
-import DialogTitle from "@material-ui/core/DialogTitle";
-import DialogContent from "@material-ui/core/DialogContent";
-import DialogActions from "@material-ui/core/DialogActions";
 import Button from "@material-ui/core/Button";
+import {
+  AppDialog,
+  AppDialogTitle,
+  AppDialogContent,
+  AppDialogActions,
+} from "../../ui";
 import TextField from "@material-ui/core/TextField";
 import MenuItem from "@material-ui/core/MenuItem";
 import FormControl from "@material-ui/core/FormControl";
@@ -190,16 +192,19 @@ export default function CrmCustomFieldsDialog({
 
   return (
     <>
-      <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
-        <DialogTitle>
+      <AppDialog open={open} onClose={onClose} fullWidth maxWidth="md">
+        <AppDialogTitle
+          subtitle={
+            subtitle ? (
+              <Typography variant="caption" color="textSecondary" component="span">
+                {subtitle}
+              </Typography>
+            ) : undefined
+          }
+        >
           {i18n.t("crm.customFields.title")}
-          {subtitle ? (
-            <Typography variant="caption" color="textSecondary" component="div">
-              {subtitle}
-            </Typography>
-          ) : null}
-        </DialogTitle>
-        <DialogContent>
+        </AppDialogTitle>
+        <AppDialogContent>
           {loading ? (
             <Box display="flex" justifyContent="center" py={3}>
               <CircularProgress size={32} />
@@ -258,28 +263,28 @@ export default function CrmCustomFieldsDialog({
               ))}
             </Box>
           )}
-        </DialogContent>
-        <DialogActions>
+        </AppDialogContent>
+        <AppDialogActions>
           <Button onClick={openCreate} color="primary" disabled={!pipelineId}>
             {i18n.t("crm.customFields.newField")}
           </Button>
           <Box flex={1} />
           <Button onClick={onClose}>{i18n.t("crm.common.cancel")}</Button>
-        </DialogActions>
-      </Dialog>
+        </AppDialogActions>
+      </AppDialog>
 
-      <Dialog
+      <AppDialog
         open={editorOpen}
         onClose={() => !saving && setEditorOpen(false)}
         fullWidth
         maxWidth="sm"
       >
-        <DialogTitle>
+        <AppDialogTitle>
           {editingId
             ? i18n.t("crm.customFields.editField")
             : i18n.t("crm.customFields.newField")}
-        </DialogTitle>
-        <DialogContent>
+        </AppDialogTitle>
+        <AppDialogContent>
           <Box display="flex" flexDirection="column" style={{ gap: 12, marginTop: 8 }}>
             <TextField
               label={i18n.t("crm.customFields.fieldLabel")}
@@ -372,8 +377,8 @@ export default function CrmCustomFieldsDialog({
               />
             ) : null}
           </Box>
-        </DialogContent>
-        <DialogActions>
+        </AppDialogContent>
+        <AppDialogActions>
           <Button onClick={() => setEditorOpen(false)} disabled={saving}>
             {i18n.t("crm.common.cancel")}
           </Button>
@@ -385,8 +390,8 @@ export default function CrmCustomFieldsDialog({
           >
             {i18n.t("crm.common.save")}
           </Button>
-        </DialogActions>
-      </Dialog>
+        </AppDialogActions>
+      </AppDialog>
     </>
   );
 }
