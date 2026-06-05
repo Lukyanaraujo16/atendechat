@@ -8,11 +8,13 @@ import { makeStyles } from "@material-ui/core/styles";
 import { green } from "@material-ui/core/colors";
 import Button from "@material-ui/core/Button";
 import TextField from "@material-ui/core/TextField";
-import Dialog from "@material-ui/core/Dialog";
-import DialogActions from "@material-ui/core/DialogActions";
-import DialogContent from "@material-ui/core/DialogContent";
-import DialogTitle from "@material-ui/core/DialogTitle";
 import CircularProgress from "@material-ui/core/CircularProgress";
+import Tabs from "@material-ui/core/Tabs";
+import Tab from "@material-ui/core/Tab";
+import Accordion from "@material-ui/core/Accordion";
+import AccordionSummary from "@material-ui/core/AccordionSummary";
+import AccordionDetails from "@material-ui/core/AccordionDetails";
+import ExpandMoreIcon from "@material-ui/icons/ExpandMore";
 import Select from "@material-ui/core/Select";
 import InputLabel from "@material-ui/core/InputLabel";
 import MenuItem from "@material-ui/core/MenuItem";
@@ -43,6 +45,15 @@ import {
 	clearAllInPlan,
 	keysForGroupInPlan,
 } from "./permissionUiConfig";
+import useIsMobile from "../../hooks/useIsMobile";
+import {
+	AppDialog,
+	AppDialogTitle,
+	AppDialogContent,
+	AppDialogActions,
+	AppPrimaryButton,
+	AppSecondaryButton,
+} from "../../ui";
 
 const useStyles = makeStyles(theme => ({
 	root: {
@@ -100,6 +111,23 @@ const useStyles = makeStyles(theme => ({
 		textTransform: "uppercase",
 		letterSpacing: "0.08em",
 	},
+	multFieldLineMobile: {
+		display: "flex",
+		flexDirection: "column",
+		gap: theme.spacing(1),
+		"& > *": {
+			width: "100%",
+			marginRight: 0,
+		},
+	},
+	permissionSwitch: {
+		display: "flex",
+		alignItems: "flex-start",
+		marginBottom: theme.spacing(0.5),
+		"& .MuiFormControlLabel-label": {
+			fontSize: "0.875rem",
+		},
+	},
 }));
 
 function buildDefaultFeaturePermissions(planMap, profile) {
@@ -126,6 +154,8 @@ function buildDefaultFeaturePermissions(planMap, profile) {
 
 const UserModal = ({ open, onClose, userId, reload }) => {
 	const classes = useStyles();
+	const isMobile = useIsMobile();
+	const [mobileTab, setMobileTab] = useState(0);
 
 	const initialState = {
 		name: "",
@@ -246,7 +276,10 @@ const UserModal = ({ open, onClose, userId, reload }) => {
 		setUser(initialState);
 		setSelectedQueueIds([]);
 		setWhatsappId(false);
+		setMobileTab(0);
 	};
+
+	const showSection = section => !isMobile || mobileTab === section;
 
 	const handleSaveUser = async values => {
 		const { permissionPreset: _preset, ...valuesRest } = values;
@@ -280,18 +313,18 @@ const UserModal = ({ open, onClose, userId, reload }) => {
 
 	return (
 		<div className={classes.root}>
-			<Dialog
+			<AppDialog
 				open={open}
 				onClose={handleClose}
 				maxWidth="md"
 				fullWidth
 				scroll="paper"
 			>
-				<DialogTitle id="form-dialog-title">
+				<AppDialogTitle id="form-dialog-title">
 					{userId
 						? `${i18n.t("userModal.title.edit")}`
 						: `${i18n.t("userModal.title.add")}`}
-				</DialogTitle>
+				</AppDialogTitle>
 				<Formik
 					initialValues={user}
 					enableReinitialize={true}
@@ -305,8 +338,24 @@ const UserModal = ({ open, onClose, userId, reload }) => {
 				>
 					{({ touched, errors, isSubmitting, values, setFieldValue }) => (
 						<Form>
-							<DialogContent dividers>
-								<div className={classes.multFieldLine}>
+							{isMobile ? (
+								<Tabs
+									value={mobileTab}
+									onChange={(_, v) => setMobileTab(v)}
+									variant="scrollable"
+									scrollButtons="auto"
+									indicatorColor="primary"
+									textColor="primary"
+								>
+									<Tab label={i18n.t("userModal.mobile.tabs.basic")} />
+									<Tab label={i18n.t("userModal.mobile.tabs.queues")} />
+									<Tab label={i18n.t("userModal.mobile.tabs.permissions")} />
+									<Tab label={i18n.t("userModal.mobile.tabs.settings")} />
+								</Tabs>
+							) : null}
+							<AppDialogContent dividers>
+								{showSection(0) ? (
+								<div className={isMobile ? classes.multFieldLineMobile : classes.multFieldLine}>
 									<Field
 										as={TextField}
 										label={i18n.t("userModal.form.name")}
@@ -336,7 +385,9 @@ const UserModal = ({ open, onClose, userId, reload }) => {
 										fullWidth
 									/>
 								</div>
-								<div className={classes.multFieldLine}>
+								) : null}
+								{showSection(0) ? (
+								<div className={isMobile ? classes.multFieldLineMobile : classes.multFieldLine}>
 									<Field
 										as={TextField}
 										label={i18n.t("userModal.form.email")}
@@ -383,6 +434,9 @@ const UserModal = ({ open, onClose, userId, reload }) => {
 										/>
 									</FormControl>
 								</div>
+								) : null}
+								{showSection(1) ? (
+								<>
 								<Can
 									role={loggedInUser.profile}
 									perform="user-modal:editQueues"
@@ -393,6 +447,7 @@ const UserModal = ({ open, onClose, userId, reload }) => {
 										/>
 									)}
 								/>
+								{!isMobile ? (
 								<Can
 									role={loggedInUser.profile}
 									perform="user-modal:editProfile"
@@ -422,8 +477,12 @@ const UserModal = ({ open, onClose, userId, reload }) => {
 										</FormControl>
 									)}
 								/>
+								) : null}
+								</>
+								) : null}
 
-								{(values.profile === "user" || values.profile === "supervisor") &&
+								{showSection(2) &&
+								(values.profile === "user" || values.profile === "supervisor") &&
 									planFlags.loaded &&
 									orderedPlanKeys.length > 0 && (
 										<>
@@ -534,44 +593,60 @@ const UserModal = ({ open, onClose, userId, reload }) => {
 												const plan = planFlags.planTierEffectiveFeatures || {};
 												const keys = keysForGroupInPlan(group, plan);
 												if (!keys.length) return null;
+												const permissionItems = keys.map(key => {
+													const blockedByActor =
+														actorPermCeiling &&
+														actorPermCeiling[key] !== true;
+													return (
+														<FormControlLabel
+															key={key}
+															className={isMobile ? classes.permissionSwitch : undefined}
+															control={
+																<Checkbox
+																	color="primary"
+																	disabled={!!blockedByActor}
+																	checked={
+																		!!values.featurePermissions?.[key]
+																	}
+																	onChange={e => {
+																		setFieldValue("permissionPreset", "custom");
+																		setFieldValue("featurePermissions", {
+																			...(values.featurePermissions || {}),
+																			[key]: e.target.checked,
+																		});
+																	}}
+																/>
+															}
+															label={getFeatureLabel(key)}
+														/>
+													);
+												});
+												if (isMobile) {
+													return (
+														<Accordion key={group.id} defaultExpanded={false}>
+															<AccordionSummary expandIcon={<ExpandMoreIcon />}>
+																<Typography variant="subtitle2">
+																	{i18n.t(group.titleKey)}
+																</Typography>
+															</AccordionSummary>
+															<AccordionDetails style={{ flexDirection: "column", padding: 8 }}>
+																{permissionItems}
+															</AccordionDetails>
+														</Accordion>
+													);
+												}
 												return (
 													<Box key={group.id} marginBottom={2}>
 														<Typography variant="subtitle2" gutterBottom>
 															{i18n.t(group.titleKey)}
 														</Typography>
-														{keys.map(key => {
-															const blockedByActor =
-																actorPermCeiling &&
-																actorPermCeiling[key] !== true;
-															return (
-																<FormControlLabel
-																	key={key}
-																	control={
-																		<Checkbox
-																			color="primary"
-																			disabled={!!blockedByActor}
-																			checked={
-																				!!values.featurePermissions?.[key]
-																			}
-																			onChange={e => {
-																				setFieldValue("permissionPreset", "custom");
-																				setFieldValue("featurePermissions", {
-																					...(values.featurePermissions || {}),
-																					[key]: e.target.checked,
-																				});
-																			}}
-																		/>
-																	}
-																	label={getFeatureLabel(key)}
-																/>
-															);
-														})}
+														{permissionItems}
 													</Box>
 												);
 											})}
 										</>
 									)}
-								{values.profile === "admin" && (
+								{showSection(2) && values.profile === "admin" && (
 									<Typography
 										variant="body2"
 										color="textSecondary"
@@ -581,11 +656,47 @@ const UserModal = ({ open, onClose, userId, reload }) => {
 									</Typography>
 								)}
 
+								{showSection(3) ? (
+								<>
+								{!isMobile ? (
 								<div className={classes.divider}>
 									<span className={classes.dividerText}>
 										{i18n.t("userModal.labels.liberations")}
 									</span>
 								</div>
+								) : null}
+
+								{isMobile ? (
+								<Can
+									role={loggedInUser.profile}
+									perform="user-modal:editProfile"
+									yes={() => (
+										<FormControl
+											variant="outlined"
+											className={classes.maxWidth}
+											margin="dense"
+											fullWidth
+										>
+											<InputLabel>
+												{i18n.t("userModal.form.whatsapp")}
+											</InputLabel>
+											<Field
+												as={Select}
+												value={whatsappId}
+												onChange={e => setWhatsappId(e.target.value)}
+												label={i18n.t("userModal.form.whatsapp")}
+											>
+												<MenuItem value={""}>&nbsp;</MenuItem>
+												{whatsApps.map(whatsapp => (
+													<MenuItem key={whatsapp.id} value={whatsapp.id}>
+														{whatsapp.name}
+													</MenuItem>
+												))}
+											</Field>
+										</FormControl>
+									)}
+								/>
+								) : null}
 
 								<Can
 									role={loggedInUser.profile}
@@ -599,52 +710,48 @@ const UserModal = ({ open, onClose, userId, reload }) => {
 													margin="dense"
 													fullWidth
 												>
-													<>
-														<InputLabel id="allTicket-selection-label">
-															{i18n.t("userModal.form.allTicket")}
-														</InputLabel>
+													<InputLabel id="allTicket-selection-label">
+														{i18n.t("userModal.form.allTicket")}
+													</InputLabel>
 
-														<Field
-															as={Select}
-															label={i18n.t("allTicket.form.viewTags")}
-															name="allTicket"
-															labelId="allTicket-selection-label"
-															id="allTicket-selection"
-															required
-														>
-															<MenuItem value="enabled">
-																{i18n.t("userModal.form.allTicketEnabled")}
-															</MenuItem>
-															<MenuItem value="desabled">
-																{i18n.t("userModal.form.allTicketDesabled")}
-															</MenuItem>
-														</Field>
-													</>
+													<Field
+														as={Select}
+														label={i18n.t("allTicket.form.viewTags")}
+														name="allTicket"
+														labelId="allTicket-selection-label"
+														id="allTicket-selection"
+														required
+													>
+														<MenuItem value="enabled">
+															{i18n.t("userModal.form.allTicketEnabled")}
+														</MenuItem>
+														<MenuItem value="desabled">
+															{i18n.t("userModal.form.allTicketDesabled")}
+														</MenuItem>
+													</Field>
 												</FormControl>
 											</div>
 										)
 									}
 								/>
-								{!userId && (
+								</>
+								) : null}
+								{showSection(0) && !userId && (
 									<Typography variant="caption" color="textSecondary">
 										{i18n.t("userModal.hints.passwordCreate")}
 									</Typography>
 								)}
-							</DialogContent>
-							<DialogActions>
-								<Button
+							</AppDialogContent>
+							<AppDialogActions>
+								<AppSecondaryButton
 									onClick={handleClose}
-									color="secondary"
 									disabled={isSubmitting}
-									variant="outlined"
 								>
 									{i18n.t("userModal.buttons.cancel")}
-								</Button>
-								<Button
+								</AppSecondaryButton>
+								<AppPrimaryButton
 									type="submit"
-									color="primary"
 									disabled={isSubmitting}
-									variant="contained"
 									className={classes.btnWrapper}
 								>
 									{userId
@@ -656,12 +763,12 @@ const UserModal = ({ open, onClose, userId, reload }) => {
 											className={classes.buttonProgress}
 										/>
 									)}
-								</Button>
-							</DialogActions>
+								</AppPrimaryButton>
+							</AppDialogActions>
 						</Form>
 					)}
 				</Formik>
-			</Dialog>
+			</AppDialog>
 		</div>
 	);
 };

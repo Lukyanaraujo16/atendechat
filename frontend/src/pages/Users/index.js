@@ -28,8 +28,15 @@ import Tooltip from "@material-ui/core/Tooltip";
 
 import DeleteOutlineIcon from "@material-ui/icons/DeleteOutline";
 import EditIcon from "@material-ui/icons/Edit";
+import PersonIcon from "@material-ui/icons/Person";
 
 import MainContainer from "../../components/MainContainer";
+import useIsMobile from "../../hooks/useIsMobile";
+import {
+	MobileEntityCard,
+	MobileCardList,
+	MobileActionsMenu,
+} from "../../ui";
 import MainHeader from "../../components/MainHeader";
 import MainHeaderButtonsWrapper from "../../components/MainHeaderButtonsWrapper";
 import Title from "../../components/Title";
@@ -115,6 +122,17 @@ const useStyles = makeStyles(theme => ({
 		maxWidth: 280,
 		margin: "0 auto",
 	},
+	mobileList: {
+		width: "100%",
+		maxWidth: "100%",
+		overflowX: "hidden",
+	},
+	mobileChips: {
+		display: "flex",
+		flexWrap: "wrap",
+		gap: theme.spacing(0.5),
+		marginTop: theme.spacing(0.5),
+	},
 }));
 
 const profileLabel = profile => {
@@ -125,6 +143,7 @@ const profileLabel = profile => {
 
 const Users = () => {
 	const classes = useStyles();
+	const isMobile = useIsMobile();
 
 	const [loading, setLoading] = useState(false);
 	const [pageNumber, setPageNumber] = useState(1);
@@ -246,6 +265,81 @@ const Users = () => {
 
 	const ticketCount = u => u.ticketsAssignedCount ?? 0;
 
+	const renderMobileUserCard = user => {
+		const menuItems = [
+			{
+				key: "edit",
+				label: i18n.t("users.buttons.edit"),
+				icon: <EditIcon fontSize="small" />,
+				onClick: () => handleEditUser(user),
+			},
+			{
+				key: "delete",
+				label: i18n.t("users.buttons.delete"),
+				icon: <DeleteOutlineIcon fontSize="small" />,
+				danger: true,
+				onClick: () => {
+					setConfirmModalOpen(true);
+					setDeletingUser(user);
+				},
+			},
+		];
+
+		return (
+			<MobileEntityCard
+				key={user.id}
+				leading={<PersonIcon color="primary" />}
+				title={user.name}
+				subtitle={user.email}
+				badges={
+					<MobileActionsMenu
+						items={menuItems}
+						ariaLabel={i18n.t("users.mobile.flowActions")}
+					/>
+				}
+				onClick={() => handleEditUser(user)}
+				footer={
+					<Chip
+						size="small"
+						label={
+							user.online
+								? i18n.t("users.online.yes")
+								: i18n.t("users.online.no")
+						}
+						color={user.online ? "primary" : "default"}
+						variant={user.online ? "default" : "outlined"}
+					/>
+				}
+			>
+				<Typography variant="caption" color="textSecondary" display="block">
+					{i18n.t("users.table.profile")}: {profileLabel(user.profile)}
+				</Typography>
+				<Typography variant="caption" color="textSecondary" display="block">
+					{i18n.t("users.mobile.tickets")}: {ticketCount(user)}
+				</Typography>
+				<Typography variant="caption" color="textSecondary" display="block">
+					{i18n.t("users.mobile.registeredAt")}: {formatCreated(user.createdAt)}
+				</Typography>
+				{user.queues && user.queues.length > 0 ? (
+					<Box className={classes.mobileChips}>
+						{user.queues.map(q => (
+							<Chip
+								key={q.id}
+								size="small"
+								variant="outlined"
+								label={q.name}
+								style={{
+									borderColor: q.color || "#eee",
+									color: chipTextColor(q.color),
+								}}
+							/>
+						))}
+					</Box>
+				) : null}
+			</MobileEntityCard>
+		);
+	};
+
 	return (
 		<MainContainer>
 			<ConfirmationModal
@@ -289,6 +383,7 @@ const Users = () => {
 						type="search"
 						value={searchParam}
 						onChange={handleSearch}
+						fullWidth={isMobile}
 						InputProps={{
 							startAdornment: (
 								<InputAdornment position="start">
@@ -319,6 +414,13 @@ const Users = () => {
 						<Typography variant="body2" color="textSecondary">
 							{i18n.t("users.empty.subtitle")}
 						</Typography>
+					</Box>
+				) : isMobile ? (
+					<Box className={classes.mobileList}>
+						<MobileCardList>
+							{users.map(user => renderMobileUserCard(user))}
+						</MobileCardList>
+						{loading ? <TableRowSkeleton columns={1} /> : null}
 					</Box>
 				) : (
 					<Table size="small">

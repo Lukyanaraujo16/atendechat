@@ -17,16 +17,29 @@ const useStyles = makeStyles((theme) => ({
     display: "flex",
     alignItems: "center",
     padding: theme.spacing(4),
+    [theme.breakpoints.down("sm")]: {
+      padding: theme.spacing(2),
+    },
   },
 
   paper: {
     padding: theme.spacing(2),
     display: "flex",
     alignItems: "center",
+    flexWrap: "wrap",
+    gap: theme.spacing(1),
+    [theme.breakpoints.down("sm")]: {
+      flexDirection: "column",
+      alignItems: "stretch",
+    },
   },
 
   settingOption: {
     marginLeft: "auto",
+    [theme.breakpoints.down("sm")]: {
+      marginLeft: 0,
+      width: "100%",
+    },
   },
   margin: {
     margin: theme.spacing(1),
@@ -56,7 +69,7 @@ const Settings = () => {
     const companyId = localStorage.getItem("companyId");
     const socket = socketManager.getSocket(companyId);
 
-    socket.on(`company-${companyId}-settings`, (data) => {
+    const handler = (data) => {
       if (data.action === "update") {
         setSettings((prevState) => {
           const aux = [...prevState];
@@ -65,10 +78,12 @@ const Settings = () => {
           return aux;
         });
       }
-    });
+    };
+
+    socket.on(`company-${companyId}-settings`, handler);
 
     return () => {
-      socket.disconnect();
+      socket.off(`company-${companyId}-settings`, handler);
     };
   }, [socketManager]);
 

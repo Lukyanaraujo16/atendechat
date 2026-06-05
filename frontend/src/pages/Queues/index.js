@@ -37,6 +37,12 @@ import toastError from "../../errors/toastError";
 import api from "../../services/api";
 import { DeleteOutline, Edit } from "@material-ui/icons";
 import QueueModal from "../../components/QueueModal";
+import useIsMobile from "../../hooks/useIsMobile";
+import {
+	MobileEntityCard,
+	MobileCardList,
+	MobileActionsMenu,
+} from "../../ui";
 import { toast } from "react-toastify";
 import ConfirmationModal from "../../components/ConfirmationModal";
 import { SocketContext } from "../../context/Socket/SocketContext";
@@ -67,6 +73,11 @@ const useStyles = makeStyles((theme) => ({
 		borderRadius: 4,
 		border: `1px solid ${theme.palette.divider}`,
 		margin: "0 auto",
+	},
+	mobileList: {
+		width: "100%",
+		maxWidth: "100%",
+		overflowX: "hidden",
 	},
 }));
 
@@ -116,6 +127,7 @@ const reducer = (state, action) => {
 
 const Queues = () => {
 	const classes = useStyles();
+	const isMobile = useIsMobile();
 	const { user } = useContext(AuthContext);
 
 	const [queues, dispatch] = useReducer(reducer, []);
@@ -220,6 +232,71 @@ const Queues = () => {
 	const usageTickets = (q) => q.ticketsCount ?? 0;
 	const usageUsers = (q) => q.usersCount ?? 0;
 
+	const renderMobileQueueCard = (queue) => {
+		const menuItems = [
+			{
+				key: "edit",
+				label: i18n.t("queueModal.title.edit"),
+				icon: <Edit fontSize="small" />,
+				onClick: () => handleEditQueue(queue),
+			},
+			{
+				key: "delete",
+				label: i18n.t("queues.confirmationModal.deleteTitle"),
+				icon: <DeleteOutline fontSize="small" />,
+				danger: true,
+				onClick: () => {
+					setSelectedQueue(queue);
+					setConfirmModalOpen(true);
+				},
+			},
+		];
+
+		return (
+			<MobileEntityCard
+				key={queue.id}
+				leading={
+					<Box
+						className={classes.swatch}
+						style={{ backgroundColor: queue.color || "#ccc" }}
+					/>
+				}
+				title={queue.name}
+				badges={
+					<MobileActionsMenu
+						items={menuItems}
+						ariaLabel={i18n.t("queues.mobile.flowActions")}
+					/>
+				}
+				onClick={() => handleEditQueue(queue)}
+				footer={
+					<Chip
+						size="small"
+						label={queue.name}
+						style={{
+							backgroundColor: queue.color || "#ccc",
+							color: chipTextColor(queue.color),
+							fontWeight: 600,
+						}}
+					/>
+				}
+			>
+				<Typography variant="caption" color="textSecondary" display="block">
+					{i18n.t("queues.mobile.tickets")}: {usageTickets(queue)} ·{" "}
+					{i18n.t("queues.mobile.users")}: {usageUsers(queue)}
+				</Typography>
+				<Typography variant="caption" color="textSecondary" display="block">
+					{i18n.t("queues.mobile.order")}: {queue.orderQueue ?? "—"}
+				</Typography>
+				{queue.greetingMessage ? (
+					<Typography variant="caption" color="textSecondary" display="block" noWrap>
+						{i18n.t("queues.mobile.greeting")}: {queue.greetingMessage}
+					</Typography>
+				) : null}
+			</MobileEntityCard>
+		);
+	};
+
 	return (
 		<MainContainer>
 			<ConfirmationModal
@@ -265,6 +342,7 @@ const Queues = () => {
 						type="search"
 						value={searchParam}
 						onChange={(e) => setSearchParam(e.target.value)}
+						fullWidth={isMobile}
 						InputProps={{
 							startAdornment: (
 								<InputAdornment position="start">
@@ -291,6 +369,13 @@ const Queues = () => {
 						<Typography variant="body2" color="textSecondary">
 							{i18n.t("queues.empty.subtitle")}
 						</Typography>
+					</Box>
+				) : isMobile ? (
+					<Box className={classes.mobileList}>
+						<MobileCardList>
+							{filteredQueues.map((queue) => renderMobileQueueCard(queue))}
+						</MobileCardList>
+						{loading ? <TableRowSkeleton columns={1} /> : null}
 					</Box>
 				) : (
 					<Table size="small">

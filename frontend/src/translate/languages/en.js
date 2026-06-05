@@ -2039,6 +2039,14 @@ const messages = {
 					add: "Add User",
 					edit: "Edit User",
 				},
+				mobile: {
+					tabs: {
+						basic: "Details",
+						queues: "Queues",
+						permissions: "Permissions",
+						settings: "Settings",
+					},
+				},
 				form: {
 					name: "Name",
 					email: "Email",
@@ -4188,6 +4196,14 @@ const messages = {
 			queues: {
 				title: "Queues & Chatbot",
 				searchPlaceholder: "Search queues...",
+				mobile: {
+					flowActions: "Queue actions",
+					members: "Members",
+					tickets: "Tickets",
+					users: "Users",
+					order: "Order",
+					greeting: "Greeting",
+				},
 				table: {
 					id: "ID",
 					name: "Queue",
@@ -4222,6 +4238,11 @@ const messages = {
 			users: {
 				title: "Users",
 				searchPlaceholder: "Search by name or email…",
+				mobile: {
+					flowActions: "User actions",
+					tickets: "Tickets",
+					registeredAt: "Registered",
+				},
 				table: {
 					id: "ID",
 					name: "Name",

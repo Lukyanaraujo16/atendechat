@@ -11,6 +11,8 @@ import {
   TableHead,
   TableRow,
   Typography,
+  Box,
+  Chip,
 } from "@material-ui/core";
 
 import MainContainer from "../../components/MainContainer";
@@ -26,6 +28,13 @@ import { toast } from "react-toastify";
 import ConfirmationModal from "../../components/ConfirmationModal";
 import SetorMembersModal from "../../components/SetorMembersModal";
 import { SocketContext } from "../../context/Socket/SocketContext";
+import { i18n } from "../../translate/i18n";
+import useIsMobile from "../../hooks/useIsMobile";
+import {
+  MobileEntityCard,
+  MobileCardList,
+  MobileActionsMenu,
+} from "../../ui";
 
 const useStyles = makeStyles((theme) => ({
   mainPaper: {
@@ -39,7 +48,30 @@ const useStyles = makeStyles((theme) => ({
     alignItems: "center",
     justifyContent: "center",
   },
+  swatch: {
+    width: 28,
+    height: 28,
+    borderRadius: 4,
+    border: `1px solid ${theme.palette.divider}`,
+  },
+  mobileList: {
+    width: "100%",
+    maxWidth: "100%",
+    overflowX: "hidden",
+  },
 }));
+
+const chipTextColor = (hex) => {
+  if (!hex || typeof hex !== "string") return "#fff";
+  const h = hex.replace("#", "").slice(0, 6);
+  if (h.length !== 6) return "#fff";
+  const r = parseInt(h.substr(0, 2), 16);
+  const g = parseInt(h.substr(2, 2), 16);
+  const b = parseInt(h.substr(4, 2), 16);
+  if (Number.isNaN(r + g + b)) return "#fff";
+  const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+  return yiq >= 186 ? "#111" : "#fff";
+};
 
 const reducer = (state, action) => {
   if (action.type === "LOAD_QUEUES") {
@@ -87,6 +119,7 @@ const reducer = (state, action) => {
 
 const Setores = () => {
   const classes = useStyles();
+  const isMobile = useIsMobile();
 
   const [queues, dispatch] = useReducer(reducer, []);
   const [loading, setLoading] = useState(false);
@@ -176,6 +209,73 @@ const Setores = () => {
     setMembersQueue(null);
   };
 
+  const renderMobileSetorCard = (queue) => {
+    const menuItems = [
+      {
+        key: "members",
+        label: i18n.t("queues.mobile.members"),
+        icon: <People fontSize="small" />,
+        onClick: () => handleOpenMembers(queue),
+      },
+      {
+        key: "edit",
+        label: i18n.t("queueModal.title.edit"),
+        icon: <Edit fontSize="small" />,
+        onClick: () => handleEditQueue(queue),
+      },
+      {
+        key: "delete",
+        label: i18n.t("queues.confirmationModal.deleteTitle"),
+        icon: <DeleteOutline fontSize="small" />,
+        danger: true,
+        onClick: () => {
+          setSelectedQueue(queue);
+          setConfirmModalOpen(true);
+        },
+      },
+    ];
+
+    return (
+      <MobileEntityCard
+        key={queue.id}
+        leading={
+          <Box
+            className={classes.swatch}
+            style={{ backgroundColor: queue.color || "#ccc" }}
+          />
+        }
+        title={queue.name}
+        badges={
+          <MobileActionsMenu
+            items={menuItems}
+            ariaLabel={i18n.t("queues.mobile.flowActions")}
+          />
+        }
+        onClick={() => handleEditQueue(queue)}
+        footer={
+          <Chip
+            size="small"
+            label={queue.name}
+            style={{
+              backgroundColor: queue.color || "#ccc",
+              color: chipTextColor(queue.color),
+              fontWeight: 600,
+            }}
+          />
+        }
+      >
+        <Typography variant="caption" color="textSecondary" display="block">
+          {i18n.t("queues.mobile.order")}: {queue.orderQueue || "—"}
+        </Typography>
+        {queue.greetingMessage ? (
+          <Typography variant="caption" color="textSecondary" display="block" noWrap>
+            {i18n.t("queues.mobile.greeting")}: {queue.greetingMessage}
+          </Typography>
+        ) : null}
+      </MobileEntityCard>
+    );
+  };
+
   return (
     <MainContainer>
       <ConfirmationModal
@@ -217,6 +317,14 @@ const Setores = () => {
       </MainHeader>
 
       <Paper className={classes.mainPaper} variant="outlined">
+        {isMobile ? (
+          <Box className={classes.mobileList}>
+            <MobileCardList>
+              {queues.map((queue) => renderMobileSetorCard(queue))}
+            </MobileCardList>
+            {loading ? <TableRowSkeleton columns={1} /> : null}
+          </Box>
+        ) : (
         <Table size="small">
           <TableHead>
             <TableRow>
@@ -288,6 +396,7 @@ const Setores = () => {
             {loading && <TableRowSkeleton columns={6} />}
           </TableBody>
         </Table>
+        )}
       </Paper>
     </MainContainer>
   );

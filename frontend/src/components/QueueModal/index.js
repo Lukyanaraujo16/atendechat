@@ -6,12 +6,7 @@ import { toast } from "react-toastify";
 
 import { makeStyles } from "@material-ui/core/styles";
 import { green } from "@material-ui/core/colors";
-import Button from "@material-ui/core/Button";
 import TextField from "@material-ui/core/TextField";
-import Dialog from "@material-ui/core/Dialog";
-import DialogActions from "@material-ui/core/DialogActions";
-import DialogContent from "@material-ui/core/DialogContent";
-import DialogTitle from "@material-ui/core/DialogTitle";
 import CircularProgress from "@material-ui/core/CircularProgress";
 import Chip from "@material-ui/core/Chip";
 import Box from "@material-ui/core/Box";
@@ -41,6 +36,15 @@ import {
 import { Colorize } from "@material-ui/icons";
 import { QueueOptions } from "../QueueOptions";
 import SchedulesForm from "../SchedulesForm";
+import useIsMobile from "../../hooks/useIsMobile";
+import {
+  AppDialog,
+  AppDialogTitle,
+  AppDialogContent,
+  AppDialogActions,
+  AppPrimaryButton,
+  AppSecondaryButton,
+} from "../../ui";
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -79,6 +83,12 @@ const useStyles = makeStyles((theme) => ({
     backgroundColor: theme.palette.background.default,
     border: `1px solid ${theme.palette.divider}`,
   },
+  fieldStack: {
+    display: "flex",
+    flexDirection: "column",
+    gap: theme.spacing(1),
+    width: "100%",
+  },
 }));
 
 const chipTextColor = (hex) => {
@@ -109,6 +119,7 @@ const DEFAULT_QUEUE_COLOR = "#2196F3";
 
 const QueueModal = ({ open, onClose, queueId, reload }) => {
   const classes = useStyles();
+  const isMobile = useIsMobile();
   const { enabled: openAiEnabled, loaded: openAiLoaded } = useFeature(
     "automation.openai"
   );
@@ -303,23 +314,25 @@ const QueueModal = ({ open, onClose, queueId, reload }) => {
 
   return (
     <div className={classes.root}>
-      <Dialog
+      <AppDialog
         maxWidth="md"
         fullWidth={true}
         open={open}
         onClose={handleClose}
         scroll="paper"
       >
-        <DialogTitle>
+        <AppDialogTitle>
           {queueId
             ? `${i18n.t("queueModal.title.edit")}`
             : `${i18n.t("queueModal.title.add")}`}
-        </DialogTitle>
+        </AppDialogTitle>
         <Tabs
           value={tab}
           indicatorColor="primary"
           textColor="primary"
           onChange={(_, v) => setTab(v)}
+          variant={isMobile ? "scrollable" : "standard"}
+          scrollButtons={isMobile ? "auto" : undefined}
           aria-label="disabled tabs example"
         >
           <Tab label={i18n.t("queueModal.tabs.queueData")} />
@@ -340,7 +353,7 @@ const QueueModal = ({ open, onClose, queueId, reload }) => {
             >
               {({ touched, errors, isSubmitting, values }) => (
                 <Form>
-                  <DialogContent dividers>
+                  <AppDialogContent dividers>
                     <Box className={classes.previewBox}>
                       <Typography
                         variant="caption"
@@ -366,6 +379,7 @@ const QueueModal = ({ open, onClose, queueId, reload }) => {
                         />
                       </Box>
                     </Box>
+                    <div className={isMobile ? classes.fieldStack : undefined}>
                     <Field
                       as={TextField}
                       label={i18n.t("queueModal.form.name")}
@@ -375,7 +389,8 @@ const QueueModal = ({ open, onClose, queueId, reload }) => {
                       helperText={touched.name && errors.name}
                       variant="outlined"
                       margin="dense"
-                      className={classes.textField}
+                      fullWidth={isMobile}
+                      className={isMobile ? undefined : classes.textField}
                     />
                     <Field
                       as={TextField}
@@ -409,7 +424,8 @@ const QueueModal = ({ open, onClose, queueId, reload }) => {
                       }}
                       variant="outlined"
                       margin="dense"
-                      className={classes.textField}
+                      fullWidth={isMobile}
+                      className={isMobile ? undefined : classes.textField}
                     />
                     <ColorPicker
                       open={colorPickerModalOpen}
@@ -430,7 +446,7 @@ const QueueModal = ({ open, onClose, queueId, reload }) => {
                       helperText={touched.orderQueue && errors.orderQueue}
                       variant="outlined"
                       margin="dense"
-                      className={classes.textField1}
+                      fullWidth={isMobile}
                     />
                     <Box mt={1}>
                       <FormControlLabel
@@ -567,21 +583,18 @@ const QueueModal = ({ open, onClose, queueId, reload }) => {
                       )}
                     </div>
                     <QueueOptions queueId={queueId} />
-                  </DialogContent>
-                  <DialogActions>
-                    <Button
+                    </div>
+                  </AppDialogContent>
+                  <AppDialogActions>
+                    <AppSecondaryButton
                       onClick={handleClose}
-                      color="secondary"
                       disabled={isSubmitting}
-                      variant="outlined"
                     >
                       {i18n.t("queueModal.buttons.cancel")}
-                    </Button>
-                    <Button
+                    </AppSecondaryButton>
+                    <AppPrimaryButton
                       type="submit"
-                      color="primary"
                       disabled={isSubmitting}
-                      variant="contained"
                       className={classes.btnWrapper}
                     >
                       {queueId
@@ -593,8 +606,8 @@ const QueueModal = ({ open, onClose, queueId, reload }) => {
                           className={classes.buttonProgress}
                         />
                       )}
-                    </Button>
-                  </DialogActions>
+                    </AppPrimaryButton>
+                  </AppDialogActions>
                 </Form>
               )}
             </Formik>
@@ -613,7 +626,7 @@ const QueueModal = ({ open, onClose, queueId, reload }) => {
             />
           </Paper>
         )}
-      </Dialog>
+      </AppDialog>
     </div>
   );
 };

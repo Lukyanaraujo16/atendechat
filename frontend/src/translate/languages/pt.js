@@ -2124,6 +2124,14 @@ const messages = {
           add: "Adicionar usuário",
           edit: "Editar usuário",
         },
+        mobile: {
+          tabs: {
+            basic: "Dados",
+            queues: "Setores",
+            permissions: "Permissões",
+            settings: "Configurações",
+          },
+        },
         form: {
           name: "Nome",
           email: "Email",
@@ -4283,6 +4291,14 @@ const messages = {
       queues: {
         title: "Setores & Chatbot",
         searchPlaceholder: "Pesquisar setores...",
+        mobile: {
+          flowActions: "Ações do setor",
+          members: "Membros",
+          tickets: "Tickets",
+          users: "Usuários",
+          order: "Ordem",
+          greeting: "Saudação",
+        },
         table: {
           id: "ID",
           name: "Setor",
@@ -4318,6 +4334,11 @@ const messages = {
       users: {
         title: "Usuários",
         searchPlaceholder: "Buscar por nome ou e-mail…",
+        mobile: {
+          flowActions: "Ações do usuário",
+          tickets: "Tickets",
+          registeredAt: "Cadastro",
+        },
         table: {
           id: "ID",
           name: "Nome",
