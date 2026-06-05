@@ -3,13 +3,16 @@ import { toast } from "react-toastify";
 import {
   makeStyles,
   Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   MenuItem,
   Select,
 } from "@material-ui/core";
+import {
+  AppDialog,
+  AppDialogTitle,
+  AppDialogContent,
+  AppDialogActions,
+} from "../../ui";
+
 import { Stack, CircularProgress } from "@mui/material";
 import { i18n } from "../../translate/i18n";
 import api from "../../services/api";
@@ -91,12 +94,12 @@ const FlowBuilderSectorModal = ({ open, onSave, data, onUpdate, close }) => {
 
   return (
     <div className={classes.root}>
-      <Dialog open={activeModal} onClose={handleClose} fullWidth maxWidth="sm" scroll="paper">
-        <DialogTitle>
+      <AppDialog open={activeModal} onClose={handleClose} fullWidth maxWidth="sm" scroll="paper">
+        <AppDialogTitle>
           {open === "create" ? "Adicionar Setor" : "Editar Setor"}
-        </DialogTitle>
+        </AppDialogTitle>
         <Stack>
-          <DialogContent dividers>
+          <AppDialogContent dividers>
             {loading ? (
               <Stack alignItems="center" py={2}>
                 <CircularProgress size={32} />
@@ -123,8 +126,8 @@ const FlowBuilderSectorModal = ({ open, onSave, data, onUpdate, close }) => {
                 ))}
               </Select>
             )}
-          </DialogContent>
-          <DialogActions>
+          </AppDialogContent>
+          <AppDialogActions>
             <Button onClick={handleClose} color="secondary" variant="outlined">
               {i18n.t("contactModal.buttons.cancel")}
             </Button>
@@ -136,9 +139,9 @@ const FlowBuilderSectorModal = ({ open, onSave, data, onUpdate, close }) => {
             >
               {open === "create" ? "Adicionar" : "Editar"}
             </Button>
-          </DialogActions>
+          </AppDialogActions>
         </Stack>
-      </Dialog>
+      </AppDialog>
     </div>
   );
 };

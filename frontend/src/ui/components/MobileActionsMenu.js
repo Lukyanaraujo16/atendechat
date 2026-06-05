@@ -9,6 +9,11 @@ import MoreVertIcon from "@material-ui/icons/MoreVert";
 import { makeStyles } from "@material-ui/core/styles";
 
 const useStyles = makeStyles((theme) => ({
+  menuButton: {
+    minWidth: 44,
+    minHeight: 44,
+    padding: theme.spacing(1),
+  },
   danger: {
     color: theme.palette.error.main,
   },
@@ -45,6 +50,7 @@ export default function MobileActionsMenu({ items = [], ariaLabel = "Ações" })
     <>
       <IconButton
         size="small"
+        className={classes.menuButton}
         onClick={handleOpen}
         aria-label={ariaLabel}
         aria-haspopup="true"

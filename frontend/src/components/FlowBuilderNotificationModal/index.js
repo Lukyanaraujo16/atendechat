@@ -5,10 +5,12 @@ import { makeStyles } from "@material-ui/core/styles";
 import { green } from "@material-ui/core/colors";
 import Button from "@material-ui/core/Button";
 import TextField from "@material-ui/core/TextField";
-import Dialog from "@material-ui/core/Dialog";
-import DialogActions from "@material-ui/core/DialogActions";
-import DialogContent from "@material-ui/core/DialogContent";
-import DialogTitle from "@material-ui/core/DialogTitle";
+import {
+  AppDialog,
+  AppDialogTitle,
+  AppDialogContent,
+  AppDialogActions,
+} from "../../ui";
 import { Stack, Typography } from "@mui/material";
 
 import { i18n } from "../../translate/i18n";
@@ -91,9 +93,9 @@ const FlowBuilderNotificationModal = ({ open, onSave, onUpdate, data, close }) =
   };
 
   return (
-    <Dialog open={activeModal} onClose={handleClose} fullWidth maxWidth="sm">
-      <DialogTitle>Notificação (WhatsApp)</DialogTitle>
-      <DialogContent dividers>
+    <AppDialog open={activeModal} onClose={handleClose} fullWidth maxWidth="sm">
+      <AppDialogTitle>Notificação (WhatsApp)</AppDialogTitle>
+      <AppDialogContent dividers>
         <Stack spacing={2} sx={{ pt: 1 }}>
           <Typography variant="caption" color="text.secondary">
             Envia uma mensagem pelo mesmo WhatsApp da conexão atual, sem abrir outro ticket.
@@ -123,8 +125,8 @@ const FlowBuilderNotificationModal = ({ open, onSave, onUpdate, data, close }) =
             placeholder="Cliente escolheu financeiro: {{nome}} — protocolo {{protocol}}"
           />
         </Stack>
-      </DialogContent>
-      <DialogActions>
+      </AppDialogContent>
+      <AppDialogActions>
         <Button onClick={handleClose} color="secondary" variant="outlined">
           {i18n.t("contactModal.buttons.cancel")}
         </Button>
@@ -136,8 +138,8 @@ const FlowBuilderNotificationModal = ({ open, onSave, onUpdate, data, close }) =
         >
           {open === "create" ? "Adicionar" : "Salvar"}
         </Button>
-      </DialogActions>
-    </Dialog>
+      </AppDialogActions>
+    </AppDialog>
   );
 };
 

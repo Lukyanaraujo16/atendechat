@@ -6,10 +6,6 @@ import {
   Button,
   Checkbox,
   CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   FormControl,
   Grid,
   IconButton,
@@ -1169,106 +1165,59 @@ export default function MediaManager() {
         )}
       </Paper>
 
-      {isMobile ? (
-        <AppDialog
-          open={Boolean(deleteTarget)}
-          onClose={() => setDeleteTarget(null)}
-          maxWidth="sm"
-        >
-          <AppDialogTitle>{i18n.t("mediaManager.deleteMedia")}</AppDialogTitle>
-          <AppDialogContent>
-            <Typography variant="body2">{i18n.t("mediaManager.deleteConfirm")}</Typography>
-            <Typography variant="body2" color="textSecondary" style={{ marginTop: 12 }}>
-              {i18n.t("mediaManager.deleteIrreversible")}
-            </Typography>
-          </AppDialogContent>
-          <AppDialogActions>
-            <AppSecondaryButton onClick={() => setDeleteTarget(null)}>
-              {i18n.t("mediaManager.cancel")}
-            </AppSecondaryButton>
-            <AppPrimaryButton color="secondary" onClick={handleDelete}>
-              {i18n.t("mediaManager.deleteMedia")}
-            </AppPrimaryButton>
-          </AppDialogActions>
-        </AppDialog>
-      ) : (
-        <Dialog open={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} maxWidth="sm" fullWidth>
-          <DialogTitle>{i18n.t("mediaManager.deleteMedia")}</DialogTitle>
-          <DialogContent>
-            <Typography variant="body2">{i18n.t("mediaManager.deleteConfirm")}</Typography>
-            <Typography variant="body2" color="textSecondary" style={{ marginTop: 12 }}>
-              {i18n.t("mediaManager.deleteIrreversible")}
-            </Typography>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setDeleteTarget(null)}>{i18n.t("mediaManager.cancel")}</Button>
-            <Button color="secondary" variant="contained" onClick={handleDelete}>
-              {i18n.t("mediaManager.deleteMedia")}
-            </Button>
-          </DialogActions>
-        </Dialog>
-      )}
+      <AppDialog
+        open={Boolean(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <AppDialogTitle>{i18n.t("mediaManager.deleteMedia")}</AppDialogTitle>
+        <AppDialogContent>
+          <Typography variant="body2">{i18n.t("mediaManager.deleteConfirm")}</Typography>
+          <Typography variant="body2" color="textSecondary" style={{ marginTop: 12 }}>
+            {i18n.t("mediaManager.deleteIrreversible")}
+          </Typography>
+        </AppDialogContent>
+        <AppDialogActions>
+          <AppSecondaryButton onClick={() => setDeleteTarget(null)}>
+            {i18n.t("mediaManager.cancel")}
+          </AppSecondaryButton>
+          <AppPrimaryButton color="secondary" onClick={handleDelete}>
+            {i18n.t("mediaManager.deleteMedia")}
+          </AppPrimaryButton>
+        </AppDialogActions>
+      </AppDialog>
 
-      {isMobile ? (
-        <AppDialog
-          open={batchDialogOpen}
-          onClose={() => setBatchDialogOpen(false)}
-          maxWidth="sm"
-        >
-          <AppDialogTitle>{i18n.t("mediaManager.bulk.deleteSelected")}</AppDialogTitle>
-          <AppDialogContent>
-            <Typography variant="body2">
-              {i18n.t("mediaManager.bulk.deleteBatchConfirm", {
-                count: selectedCount,
-                size: formatBytesEst(estimatedBatchBytes),
-              })}
-            </Typography>
-            <Typography variant="body2" color="textSecondary" style={{ marginTop: 12 }}>
-              {i18n.t("mediaManager.deleteIrreversible")}
-            </Typography>
-            <Typography variant="caption" color="textSecondary" display="block" style={{ marginTop: 12 }}>
-              {i18n.t("mediaManager.bulk.estimatedNote")}
-            </Typography>
-          </AppDialogContent>
-          <AppDialogActions>
-            <AppSecondaryButton onClick={() => setBatchDialogOpen(false)}>
-              {i18n.t("mediaManager.cancel")}
-            </AppSecondaryButton>
-            <AppPrimaryButton color="secondary" onClick={handleBatchDelete}>
-              {i18n.t("mediaManager.bulk.deleteSelected")}
-            </AppPrimaryButton>
-          </AppDialogActions>
-        </AppDialog>
-      ) : (
-        <Dialog
-          open={batchDialogOpen}
-          onClose={() => setBatchDialogOpen(false)}
-          maxWidth="sm"
-          fullWidth
-        >
-          <DialogTitle>{i18n.t("mediaManager.bulk.deleteSelected")}</DialogTitle>
-          <DialogContent>
-            <Typography variant="body2">
-              {i18n.t("mediaManager.bulk.deleteBatchConfirm", {
-                count: selectedCount,
-                size: formatBytesEst(estimatedBatchBytes),
-              })}
-            </Typography>
-            <Typography variant="body2" color="textSecondary" style={{ marginTop: 12 }}>
-              {i18n.t("mediaManager.deleteIrreversible")}
-            </Typography>
-            <Typography variant="caption" color="textSecondary" display="block" style={{ marginTop: 12 }}>
-              {i18n.t("mediaManager.bulk.estimatedNote")}
-            </Typography>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setBatchDialogOpen(false)}>{i18n.t("mediaManager.cancel")}</Button>
-            <Button color="secondary" variant="contained" onClick={handleBatchDelete}>
-              {i18n.t("mediaManager.bulk.deleteSelected")}
-            </Button>
-          </DialogActions>
-        </Dialog>
-      )}
+      <AppDialog
+        open={batchDialogOpen}
+        onClose={() => setBatchDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <AppDialogTitle>{i18n.t("mediaManager.bulk.deleteSelected")}</AppDialogTitle>
+        <AppDialogContent>
+          <Typography variant="body2">
+            {i18n.t("mediaManager.bulk.deleteBatchConfirm", {
+              count: selectedCount,
+              size: formatBytesEst(estimatedBatchBytes),
+            })}
+          </Typography>
+          <Typography variant="body2" color="textSecondary" style={{ marginTop: 12 }}>
+            {i18n.t("mediaManager.deleteIrreversible")}
+          </Typography>
+          <Typography variant="caption" color="textSecondary" display="block" style={{ marginTop: 12 }}>
+            {i18n.t("mediaManager.bulk.estimatedNote")}
+          </Typography>
+        </AppDialogContent>
+        <AppDialogActions>
+          <AppSecondaryButton onClick={() => setBatchDialogOpen(false)}>
+            {i18n.t("mediaManager.cancel")}
+          </AppSecondaryButton>
+          <AppPrimaryButton color="secondary" onClick={handleBatchDelete}>
+            {i18n.t("mediaManager.bulk.deleteSelected")}
+          </AppPrimaryButton>
+        </AppDialogActions>
+      </AppDialog>
     </MainContainer>
   );
 }

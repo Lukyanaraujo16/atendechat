@@ -1,12 +1,15 @@
 import React from "react";
 import {
   Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   Typography,
 } from "@material-ui/core";
+import {
+  AppDialog,
+  AppDialogTitle,
+  AppDialogContent,
+  AppDialogActions,
+} from "../../ui";
+
 import { i18n } from "../../translate/i18n";
 
 const FlowBuilderCloseTicketModal = ({ open, onSave, data, onUpdate, close }) => {
@@ -35,25 +38,25 @@ const FlowBuilderCloseTicketModal = ({ open, onSave, data, onUpdate, close }) =>
   if (!activeModal) return null;
 
   return (
-    <Dialog open={activeModal} onClose={handleClose} fullWidth maxWidth="xs">
-      <DialogTitle>
+    <AppDialog open={activeModal} onClose={handleClose} fullWidth maxWidth="xs">
+      <AppDialogTitle>
         {open === "create" ? "Adicionar Encerrar Ticket" : "Encerrar Ticket"}
-      </DialogTitle>
-      <DialogContent dividers>
+      </AppDialogTitle>
+      <AppDialogContent dividers>
         <Typography variant="body2" color="textSecondary">
           Este nó finaliza o atendimento ao ser executado no fluxo. O ticket será marcado como encerrado.
         </Typography>
         {/* Espaço reservado para configurações futuras (ex: mensagem de despedida) */}
-      </DialogContent>
-      <DialogActions>
+      </AppDialogContent>
+      <AppDialogActions>
         <Button onClick={handleClose} color="secondary" variant="outlined">
           {i18n.t("contactModal.buttons.cancel")}
         </Button>
         <Button color="primary" variant="contained" onClick={handleConfirm}>
           {open === "create" ? "Adicionar" : "OK"}
         </Button>
-      </DialogActions>
-    </Dialog>
+      </AppDialogActions>
+    </AppDialog>
   );
 };
 

@@ -4,10 +4,12 @@ import { toast } from "react-toastify";
 import { makeStyles } from "@material-ui/core/styles";
 import { green } from "@material-ui/core/colors";
 import Button from "@material-ui/core/Button";
-import Dialog from "@material-ui/core/Dialog";
-import DialogActions from "@material-ui/core/DialogActions";
-import DialogContent from "@material-ui/core/DialogContent";
-import DialogTitle from "@material-ui/core/DialogTitle";
+import {
+  AppDialog,
+  AppDialogTitle,
+  AppDialogContent,
+  AppDialogActions,
+} from "../../ui";
 import TextField from "@material-ui/core/TextField";
 import IconButton from "@material-ui/core/IconButton";
 import DeleteOutlineIcon from "@material-ui/icons/DeleteOutline";
@@ -232,9 +234,9 @@ const FlowBuilderHttpRequestModal = ({ open, onSave, onUpdate, data, close }) =>
   };
 
   return (
-    <Dialog open={activeModal} onClose={handleClose} fullWidth maxWidth="md">
-      <DialogTitle>HTTP Request</DialogTitle>
-      <DialogContent dividers>
+    <AppDialog open={activeModal} onClose={handleClose} fullWidth maxWidth="md">
+      <AppDialogTitle>HTTP Request</AppDialogTitle>
+      <AppDialogContent dividers>
         <Stack spacing={2} sx={{ pt: 1 }}>
           <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
             <FormControl variant="outlined" size="small" sx={{ minWidth: 120 }}>
@@ -427,8 +429,8 @@ const FlowBuilderHttpRequestModal = ({ open, onSave, onUpdate, data, close }) =>
             </>
           )}
         </Stack>
-      </DialogContent>
-      <DialogActions>
+      </AppDialogContent>
+      <AppDialogActions>
         <Button onClick={handleClose} color="secondary" variant="outlined">
           {i18n.t("contactModal.buttons.cancel")}
         </Button>
@@ -440,8 +442,8 @@ const FlowBuilderHttpRequestModal = ({ open, onSave, onUpdate, data, close }) =>
         >
           {open === "create" ? "Adicionar" : "Salvar"}
         </Button>
-      </DialogActions>
-    </Dialog>
+      </AppDialogActions>
+    </AppDialog>
   );
 };
 

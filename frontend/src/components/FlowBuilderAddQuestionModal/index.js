@@ -8,10 +8,12 @@ import Button from "@material-ui/core/Button";
 import { MenuItem, FormControl, InputLabel, Select } from "@material-ui/core";
 import { Visibility, VisibilityOff } from "@material-ui/icons";
 import { InputAdornment, IconButton } from "@material-ui/core";
-import Dialog from "@material-ui/core/Dialog";
-import DialogActions from "@material-ui/core/DialogActions";
-import DialogContent from "@material-ui/core/DialogContent";
-import DialogTitle from "@material-ui/core/DialogTitle";
+import {
+  AppDialog,
+  AppDialogTitle,
+  AppDialogContent,
+  AppDialogActions,
+} from "../../ui";
 import { i18n } from "../../translate/i18n";
 import TextField from "@material-ui/core/TextField";
 
@@ -149,16 +151,16 @@ const FlowBuilderAddQuestionModal = ({
 
   return (
     <div className={classes.root}>
-      <Dialog
+      <AppDialog
         open={activeModal}
         onClose={handleClose}
         fullWidth
         maxWidth="md"
         scroll="paper"
       >
-        <DialogTitle id="form-dialog-title">
+        <AppDialogTitle id="form-dialog-title">
           {open === "create" ? `Adicionar Perguta ao fluxo` : `Editar Perguta`}
-        </DialogTitle>
+        </AppDialogTitle>
         <Formik
           initialValues={integration}
           enableReinitialize={true}
@@ -171,7 +173,7 @@ const FlowBuilderAddQuestionModal = ({
         >
           {({ touched, errors, isSubmitting, values }) => (
             <Form style={{ width: "100%" }}>
-              <DialogContent dividers>
+              <AppDialogContent dividers>
                 <TextField
                   label={"Mensagem"}
                   multiline
@@ -200,8 +202,8 @@ const FlowBuilderAddQuestionModal = ({
                   fullWidth
                   required
                 />
-              </DialogContent>
-              <DialogActions>
+              </AppDialogContent>
+              <AppDialogActions>
                 <Button
                   onClick={handleClose}
                   color="secondary"
@@ -218,11 +220,11 @@ const FlowBuilderAddQuestionModal = ({
                 >
                   {open === "create" ? `Adicionar` : "Editar"}
                 </Button>
-              </DialogActions>
+              </AppDialogActions>
             </Form>
           )}
         </Formik>
-      </Dialog>
+      </AppDialog>
     </div>
   );
 };

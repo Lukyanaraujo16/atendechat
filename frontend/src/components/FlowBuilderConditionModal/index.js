@@ -6,10 +6,12 @@ import { makeStyles } from "@material-ui/core/styles";
 import { green } from "@material-ui/core/colors";
 import Button from "@material-ui/core/Button";
 import TextField from "@material-ui/core/TextField";
-import Dialog from "@material-ui/core/Dialog";
-import DialogActions from "@material-ui/core/DialogActions";
-import DialogContent from "@material-ui/core/DialogContent";
-import DialogTitle from "@material-ui/core/DialogTitle";
+import {
+  AppDialog,
+  AppDialogTitle,
+  AppDialogContent,
+  AppDialogActions,
+} from "../../ui";
 import IconButton from "@material-ui/core/IconButton";
 import DeleteOutlineIcon from "@material-ui/icons/DeleteOutline";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
@@ -241,14 +243,14 @@ const FlowBuilderConditionModal = ({ open, onSave, onUpdate, data, close }) => {
 
   return (
     <div>
-      <Dialog
+      <AppDialog
         open={activeModal}
         onClose={handleClose}
         fullWidth
         maxWidth="md"
         scroll="paper"
       >
-        <DialogTitle>{labels.title}</DialogTitle>
+        <AppDialogTitle>{labels.title}</AppDialogTitle>
         <Formik
           enableReinitialize
           initialValues={initial}
@@ -256,7 +258,7 @@ const FlowBuilderConditionModal = ({ open, onSave, onUpdate, data, close }) => {
         >
           {({ values, setFieldValue }) => (
             <Form>
-              <DialogContent dividers>
+              <AppDialogContent dividers>
                 <Stack spacing={2}>
                   <Typography variant="body2" color="textSecondary">
                     Combine regras com <strong>E</strong> (todas) ou{" "}
@@ -419,9 +421,9 @@ const FlowBuilderConditionModal = ({ open, onSave, onUpdate, data, close }) => {
                     )}
                   </FieldArray>
                 </Stack>
-              </DialogContent>
+              </AppDialogContent>
               <Divider />
-              <DialogActions>
+              <AppDialogActions>
                 <Button
                   onClick={handleClose}
                   color="secondary"
@@ -437,11 +439,11 @@ const FlowBuilderConditionModal = ({ open, onSave, onUpdate, data, close }) => {
                 >
                   {labels.btn}
                 </Button>
-              </DialogActions>
+              </AppDialogActions>
             </Form>
           )}
         </Formik>
-      </Dialog>
+      </AppDialog>
     </div>
   );
 };

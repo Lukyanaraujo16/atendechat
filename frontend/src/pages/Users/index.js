@@ -25,6 +25,7 @@ import Box from "@material-ui/core/Box";
 import Typography from "@material-ui/core/Typography";
 import Chip from "@material-ui/core/Chip";
 import Tooltip from "@material-ui/core/Tooltip";
+import CircularProgress from "@material-ui/core/CircularProgress";
 
 import DeleteOutlineIcon from "@material-ui/icons/DeleteOutline";
 import EditIcon from "@material-ui/icons/Edit";
@@ -36,6 +37,7 @@ import {
 	MobileEntityCard,
 	MobileCardList,
 	MobileActionsMenu,
+	AppSecondaryButton,
 } from "../../ui";
 import MainHeader from "../../components/MainHeader";
 import MainHeaderButtonsWrapper from "../../components/MainHeaderButtonsWrapper";
@@ -132,6 +134,11 @@ const useStyles = makeStyles(theme => ({
 		flexWrap: "wrap",
 		gap: theme.spacing(0.5),
 		marginTop: theme.spacing(0.5),
+	},
+	mobileLoadMore: {
+		display: "flex",
+		justifyContent: "center",
+		padding: theme.spacing(2, 0, 1),
 	},
 }));
 
@@ -404,7 +411,7 @@ const Users = () => {
 			<Paper
 				className={classes.mainPaper}
 				variant="outlined"
-				onScroll={handleScroll}
+				onScroll={isMobile ? undefined : handleScroll}
 			>
 				{!loading && users.length === 0 ? (
 					<Box py={8} textAlign="center">
@@ -420,7 +427,18 @@ const Users = () => {
 						<MobileCardList>
 							{users.map(user => renderMobileUserCard(user))}
 						</MobileCardList>
-						{loading ? <TableRowSkeleton columns={1} /> : null}
+						{loading && users.length > 0 ? (
+							<Box className={classes.mobileLoadMore}>
+								<CircularProgress size={28} />
+							</Box>
+						) : null}
+						{hasMore && !loading ? (
+							<Box className={classes.mobileLoadMore}>
+								<AppSecondaryButton onClick={loadMore}>
+									{i18n.t("users.mobile.loadMore")}
+								</AppSecondaryButton>
+							</Box>
+						) : null}
 					</Box>
 				) : (
 					<Table size="small">

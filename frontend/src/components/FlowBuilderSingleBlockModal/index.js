@@ -8,10 +8,12 @@ import { makeStyles } from "@material-ui/core/styles";
 import { green } from "@material-ui/core/colors";
 import Button from "@material-ui/core/Button";
 import TextField from "@material-ui/core/TextField";
-import Dialog from "@material-ui/core/Dialog";
-import DialogActions from "@material-ui/core/DialogActions";
-import DialogContent from "@material-ui/core/DialogContent";
-import DialogTitle from "@material-ui/core/DialogTitle";
+import {
+  AppDialog,
+  AppDialogTitle,
+  AppDialogContent,
+  AppDialogActions,
+} from "../../ui";
 import IconButton from "@material-ui/core/IconButton";
 import DeleteOutlineIcon from "@material-ui/icons/DeleteOutline";
 import CircularProgress from "@material-ui/core/CircularProgress";
@@ -1221,11 +1223,11 @@ const FlowBuilderSingleBlockModal = ({
   };
   return (
     <div>
-      <Dialog open={activeModal} fullWidth="md" scroll="paper">
+      <AppDialog open={activeModal} fullWidth="md" scroll="paper">
         {!loading && (
-          <DialogTitle id="form-dialog-title">
+          <AppDialogTitle id="form-dialog-title">
             Adicionar conteúdo ao fluxo
-          </DialogTitle>
+          </AppDialogTitle>
         )}
         <Stack>
           <Stack
@@ -1400,7 +1402,7 @@ const FlowBuilderSingleBlockModal = ({
             </Box>
           </Stack>
 
-          <DialogActions>
+          <AppDialogActions>
             <Button
               onClick={handleClose}
               color="secondary"
@@ -1418,7 +1420,7 @@ const FlowBuilderSingleBlockModal = ({
             >
               {`${labels.btn}`}
             </Button>
-          </DialogActions>
+          </AppDialogActions>
         </Stack>
         {loading && (
           <Stack
@@ -1440,7 +1442,7 @@ const FlowBuilderSingleBlockModal = ({
             </Stack>
           </Stack>
         )}
-      </Dialog>
+      </AppDialog>
     </div>
   );
 };

@@ -18,7 +18,9 @@ import {
   MobileEntityCard,
   MobileCardList,
   MobileActionsMenu,
+  AppSecondaryButton,
 } from "../../ui";
+import CircularProgress from "@material-ui/core/CircularProgress";
 import useIsMobile from "../../hooks/useIsMobile";
 import Chip from "@material-ui/core/Chip";
 import EventIcon from "@material-ui/icons/Event";
@@ -158,6 +160,11 @@ const useStyles = makeStyles((theme) => ({
     flexWrap: "wrap",
     gap: theme.spacing(0.5),
     maxWidth: "100%",
+  },
+  mobileLoadMore: {
+    display: "flex",
+    justifyContent: "center",
+    padding: theme.spacing(2, 0, 1),
   },
 }));
 
@@ -515,7 +522,7 @@ const Schedules = () => {
         scrollable
         className={classes.mainPaper}
         variant="outlined"
-        onScroll={handleScroll}
+        onScroll={isMobile ? undefined : handleScroll}
       >
         <AppActionBar className={classes.filtersBar}>
           <TextField
@@ -558,6 +565,18 @@ const Schedules = () => {
             <MobileCardList>
               {schedules.map((row) => renderMobileScheduleCard(row))}
             </MobileCardList>
+            {loading && schedules.length > 0 ? (
+              <Box className={classes.mobileLoadMore}>
+                <CircularProgress size={28} />
+              </Box>
+            ) : null}
+            {hasMore && !loading ? (
+              <Box className={classes.mobileLoadMore}>
+                <AppSecondaryButton onClick={loadMore}>
+                  {i18n.t("schedules.mobile.loadMore")}
+                </AppSecondaryButton>
+              </Box>
+            ) : null}
           </Box>
         ) : (
           <>

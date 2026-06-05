@@ -8,10 +8,12 @@ import { makeStyles } from "@material-ui/core/styles";
 import { green } from "@material-ui/core/colors";
 import Button from "@material-ui/core/Button";
 import TextField from "@material-ui/core/TextField";
-import Dialog from "@material-ui/core/Dialog";
-import DialogActions from "@material-ui/core/DialogActions";
-import DialogContent from "@material-ui/core/DialogContent";
-import DialogTitle from "@material-ui/core/DialogTitle";
+import {
+  AppDialog,
+  AppDialogTitle,
+  AppDialogContent,
+  AppDialogActions,
+} from "../../ui";
 import Typography from "@material-ui/core/Typography";
 import IconButton from "@material-ui/core/IconButton";
 import DeleteOutlineIcon from "@material-ui/icons/DeleteOutline";
@@ -177,15 +179,15 @@ const FlowBuilderAddVideoModal = ({ open, onSave, onUpdate, data, close }) => {
 
   return (
     <div className={classes.root}>
-      <Dialog
+      <AppDialog
         open={activeModal}
         onClose={handleClose}
         fullWidth="md"
         scroll="paper"
       >
-        <DialogTitle id="form-dialog-title">{labels.title}</DialogTitle>
+        <AppDialogTitle id="form-dialog-title">{labels.title}</AppDialogTitle>
         <Stack>
-          <DialogContent dividers>
+          <AppDialogContent dividers>
             <Stack gap={"16px"}>
               {preview && (
                 <Stack direction={'row'} justifyContent={'center'}>
@@ -218,8 +220,8 @@ const FlowBuilderAddVideoModal = ({ open, onSave, onUpdate, data, close }) => {
                 </>
               )}
             </Stack>
-          </DialogContent>
-          <DialogActions>
+          </AppDialogContent>
+          <AppDialogActions>
             {!loading && (
               <>
                 <Button
@@ -245,9 +247,9 @@ const FlowBuilderAddVideoModal = ({ open, onSave, onUpdate, data, close }) => {
                 </Button>
               </>
             )}
-          </DialogActions>
+          </AppDialogActions>
         </Stack>
-      </Dialog>
+      </AppDialog>
     </div>
   );
 };

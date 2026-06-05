@@ -48,7 +48,9 @@ import {
   MobileEntityCard,
   MobileCardList,
   MobileActionsMenu,
+  AppSecondaryButton,
 } from "../../ui";
+import CircularProgress from "@material-ui/core/CircularProgress";
 import useIsMobile from "../../hooks/useIsMobile";
 import Chip from "@material-ui/core/Chip";
 import SendIcon from "@material-ui/icons/Send";
@@ -136,6 +138,11 @@ const useStyles = makeStyles((theme) => ({
     width: "100%",
     maxWidth: "100%",
     overflowX: "hidden",
+  },
+  mobileLoadMore: {
+    display: "flex",
+    justifyContent: "center",
+    padding: theme.spacing(2, 0, 1),
   },
 }));
 
@@ -603,7 +610,7 @@ const Campaigns = () => {
         scrollable
         className={classes.mainPaper}
         variant="outlined"
-        onScroll={handleScroll}
+        onScroll={isMobile ? undefined : handleScroll}
       >
         <AppActionBar className={classes.filtersBar}>
           <TextField
@@ -640,7 +647,18 @@ const Campaigns = () => {
             <MobileCardList>
               {campaigns.map((campaign) => renderMobileCampaignCard(campaign))}
             </MobileCardList>
-            {loading ? <AppLoadingState message={i18n.t("campaigns.loading")} /> : null}
+            {loading && campaigns.length > 0 ? (
+              <Box className={classes.mobileLoadMore}>
+                <CircularProgress size={28} />
+              </Box>
+            ) : null}
+            {hasMore && !loading ? (
+              <Box className={classes.mobileLoadMore}>
+                <AppSecondaryButton onClick={loadMore}>
+                  {i18n.t("campaigns.mobile.loadMore")}
+                </AppSecondaryButton>
+              </Box>
+            ) : null}
           </Box>
         ) : (
         <Table size="small">

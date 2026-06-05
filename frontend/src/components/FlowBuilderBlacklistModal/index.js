@@ -4,10 +4,12 @@ import { toast } from "react-toastify";
 import { makeStyles } from "@material-ui/core/styles";
 import { green } from "@material-ui/core/colors";
 import Button from "@material-ui/core/Button";
-import Dialog from "@material-ui/core/Dialog";
-import DialogActions from "@material-ui/core/DialogActions";
-import DialogContent from "@material-ui/core/DialogContent";
-import DialogTitle from "@material-ui/core/DialogTitle";
+import {
+  AppDialog,
+  AppDialogTitle,
+  AppDialogContent,
+  AppDialogActions,
+} from "../../ui";
 import { FormControl, InputLabel, MenuItem, Select, Stack, Typography } from "@mui/material";
 
 import { i18n } from "../../translate/i18n";
@@ -66,9 +68,9 @@ const FlowBuilderBlacklistModal = ({ open, onSave, onUpdate, data, close }) => {
   };
 
   return (
-    <Dialog open={activeModal} onClose={handleClose} fullWidth maxWidth="xs">
-      <DialogTitle>Blacklist (bot / automações)</DialogTitle>
-      <DialogContent dividers>
+    <AppDialog open={activeModal} onClose={handleClose} fullWidth maxWidth="xs">
+      <AppDialogTitle>Blacklist (bot / automações)</AppDialogTitle>
+      <AppDialogContent dividers>
         <Stack spacing={2} sx={{ pt: 1 }}>
           <Typography variant="caption" color="text.secondary">
             Aplica no contato deste ticket: bloquear ou reabilitar disparos automáticos do bot (campo
@@ -87,8 +89,8 @@ const FlowBuilderBlacklistModal = ({ open, onSave, onUpdate, data, close }) => {
             </Select>
           </FormControl>
         </Stack>
-      </DialogContent>
-      <DialogActions>
+      </AppDialogContent>
+      <AppDialogActions>
         <Button onClick={handleClose} color="secondary" variant="outlined">
           {i18n.t("contactModal.buttons.cancel")}
         </Button>
@@ -100,8 +102,8 @@ const FlowBuilderBlacklistModal = ({ open, onSave, onUpdate, data, close }) => {
         >
           {open === "create" ? "Adicionar" : "Salvar"}
         </Button>
-      </DialogActions>
-    </Dialog>
+      </AppDialogActions>
+    </AppDialog>
   );
 };
 

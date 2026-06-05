@@ -4,10 +4,12 @@ import { toast } from "react-toastify";
 import { makeStyles } from "@material-ui/core/styles";
 import { green } from "@material-ui/core/colors";
 import Button from "@material-ui/core/Button";
-import Dialog from "@material-ui/core/Dialog";
-import DialogActions from "@material-ui/core/DialogActions";
-import DialogContent from "@material-ui/core/DialogContent";
-import DialogTitle from "@material-ui/core/DialogTitle";
+import {
+  AppDialog,
+  AppDialogTitle,
+  AppDialogContent,
+  AppDialogActions,
+} from "../../ui";
 import { FormControl, InputLabel, MenuItem, Select, Stack, CircularProgress } from "@mui/material";
 
 import { i18n } from "../../translate/i18n";
@@ -107,9 +109,9 @@ const FlowBuilderFlowUpModal = ({ open, onSave, onUpdate, data, close }) => {
   };
 
   return (
-    <Dialog open={activeModal} onClose={handleClose} fullWidth maxWidth="sm">
-      <DialogTitle>FlowUp (lista / remarketing)</DialogTitle>
-      <DialogContent dividers>
+    <AppDialog open={activeModal} onClose={handleClose} fullWidth maxWidth="sm">
+      <AppDialogTitle>FlowUp (lista / remarketing)</AppDialogTitle>
+      <AppDialogContent dividers>
         <Stack spacing={2} sx={{ pt: 1 }}>
           {loading ? (
             <Stack alignItems="center" py={2}>
@@ -136,8 +138,8 @@ const FlowBuilderFlowUpModal = ({ open, onSave, onUpdate, data, close }) => {
             </FormControl>
           )}
         </Stack>
-      </DialogContent>
-      <DialogActions>
+      </AppDialogContent>
+      <AppDialogActions>
         <Button onClick={handleClose} color="secondary" variant="outlined">
           {i18n.t("contactModal.buttons.cancel")}
         </Button>
@@ -150,8 +152,8 @@ const FlowBuilderFlowUpModal = ({ open, onSave, onUpdate, data, close }) => {
         >
           {open === "create" ? "Adicionar" : "Salvar"}
         </Button>
-      </DialogActions>
-    </Dialog>
+      </AppDialogActions>
+    </AppDialog>
   );
 };
 

@@ -10,10 +10,12 @@ import { makeStyles } from "@material-ui/core/styles";
 import { green } from "@material-ui/core/colors";
 import Button from "@material-ui/core/Button";
 import TextField from "@material-ui/core/TextField";
-import Dialog from "@material-ui/core/Dialog";
-import DialogActions from "@material-ui/core/DialogActions";
-import DialogContent from "@material-ui/core/DialogContent";
-import DialogTitle from "@material-ui/core/DialogTitle";
+import {
+  AppDialog,
+  AppDialogTitle,
+  AppDialogContent,
+  AppDialogActions,
+} from "../../ui";
 import Typography from "@material-ui/core/Typography";
 import IconButton from "@material-ui/core/IconButton";
 import DeleteOutlineIcon from "@material-ui/icons/DeleteOutline";
@@ -127,12 +129,12 @@ const FlowBuilderTicketModal = ({
 
     return (
         <div className={classes.root}>
-            <Dialog open={activeModal} onClose={handleClose} fullWidth="md" scroll="paper">
-                <DialogTitle id="form-dialog-title">
+            <AppDialog open={activeModal} onClose={handleClose} fullWidth="md" scroll="paper">
+                <AppDialogTitle id="form-dialog-title">
                     {open === 'create' ? `Adicionar um intervalo ao fluxo` : `Editar intervalo`}
-                </DialogTitle>
+                </AppDialogTitle>
                 <Stack>
-                    <DialogContent dividers>
+                    <AppDialogContent dividers>
                         <Select
                             labelId="demo-simple-select-label"
                             id="demo-simple-select"
@@ -166,8 +168,8 @@ const FlowBuilderTicketModal = ({
                                 ))
                             )}
                         </Select>
-                    </DialogContent>
-                    <DialogActions>
+                    </AppDialogContent>
+                    <AppDialogActions>
                         <Button
                             onClick={handleClose}
                             color="secondary"
@@ -184,9 +186,9 @@ const FlowBuilderTicketModal = ({
                         >
                             {open === 'create' ? `Adicionar` : 'Editar'}
                         </Button>
-                    </DialogActions>
+                    </AppDialogActions>
                 </Stack>
-            </Dialog>
+            </AppDialog>
         </div>
     );
 };

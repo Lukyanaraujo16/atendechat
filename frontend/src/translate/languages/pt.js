@@ -3980,6 +3980,7 @@ const messages = {
           flowActions: "Ações da lista",
           viewContacts: "Ver contatos",
           downloadTemplate: "Baixar planilha exemplo",
+          loadMore: "Carregar mais",
         },
         table: {
           name: "Nome",
@@ -4016,6 +4017,7 @@ const messages = {
           flowActions: "Ações do contato",
           whatsappValid: "WhatsApp válido",
           whatsappInvalid: "WhatsApp inválido",
+          loadMore: "Carregar mais",
         },
         searchPlaceholder: "Pesquisa",
         buttons: {
@@ -4115,6 +4117,7 @@ const messages = {
           contactList: "Lista",
           notScheduled: "Sem agendamento",
           notConcluded: "Não concluída",
+          loadMore: "Carregar mais",
         },
         table: {
           name: "Nome",
@@ -4338,6 +4341,7 @@ const messages = {
           flowActions: "Ações do usuário",
           tickets: "Tickets",
           registeredAt: "Cadastro",
+          loadMore: "Carregar mais",
         },
         table: {
           id: "ID",
@@ -4587,6 +4591,7 @@ const messages = {
         mobile: {
           flowActions: "Ações do agendamento",
           openContact: "Abrir contato",
+          loadMore: "Carregar mais",
         },
       },
       tags: {
@@ -5357,6 +5362,7 @@ const messages = {
           backToList: "Voltar à lista",
           backToSummary: "Voltar ao resumo",
           openVisualEditor: "Abrir editor visual",
+          loadMore: "Carregar mais",
         },
       },
       flowBuilderSimulator: {

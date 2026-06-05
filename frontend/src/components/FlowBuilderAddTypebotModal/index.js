@@ -6,10 +6,12 @@ import { makeStyles } from "@material-ui/core/styles";
 import { green } from "@material-ui/core/colors";
 import Button from "@material-ui/core/Button";
 import TextField from "@material-ui/core/TextField";
-import Dialog from "@material-ui/core/Dialog";
-import DialogActions from "@material-ui/core/DialogActions";
-import DialogContent from "@material-ui/core/DialogContent";
-import DialogTitle from "@material-ui/core/DialogTitle";
+import {
+  AppDialog,
+  AppDialogTitle,
+  AppDialogContent,
+  AppDialogActions,
+} from "../../ui";
 import { i18n } from "../../translate/i18n";
 import api from "../../services/api";
 import toastError from "../../errors/toastError";
@@ -133,16 +135,16 @@ const FlowBuilderTypebotModal = ({ open, onSave, data, onUpdate, close }) => {
 
   return (
     <div className={classes.root}>
-      <Dialog
+      <AppDialog
         open={activeModal}
         onClose={handleClose}
         fullWidth
         maxWidth="md"
         scroll="paper"
       >
-        <DialogTitle id="form-dialog-title">
+        <AppDialogTitle id="form-dialog-title">
           {open === "create" ? `Adicionar Typebot ao fluxo` : `Editar Typebot`}
-        </DialogTitle>
+        </AppDialogTitle>
         <Formik
           initialValues={integration}
           enableReinitialize={true}
@@ -157,7 +159,7 @@ const FlowBuilderTypebotModal = ({ open, onSave, data, onUpdate, close }) => {
           {({ touched, errors, isSubmitting, values }) => (
             <Form>
               <Paper square className={classes.mainPaper} elevation={1}>
-                <DialogContent dividers>
+                <AppDialogContent dividers>
                   <Grid container spacing={1}>
                     <>
                       <Grid item xs={12} md={6} xl={6}>
@@ -334,9 +336,9 @@ const FlowBuilderTypebotModal = ({ open, onSave, data, onUpdate, close }) => {
                       </Grid>
                     </>
                   </Grid>
-                </DialogContent>
+                </AppDialogContent>
               </Paper>
-              <DialogActions>
+              <AppDialogActions>
                 <Button
                   onClick={handleClose}
                   color="secondary"
@@ -353,11 +355,11 @@ const FlowBuilderTypebotModal = ({ open, onSave, data, onUpdate, close }) => {
                 >
                   {open === "create" ? `Adicionar` : "Editar"}
                 </Button>
-              </DialogActions>
+              </AppDialogActions>
             </Form>
           )}
         </Formik>
-      </Dialog>
+      </AppDialog>
     </div>
   );
 };

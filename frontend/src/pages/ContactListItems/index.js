@@ -52,7 +52,9 @@ import {
   MobileEntityCard,
   MobileCardList,
   MobileActionsMenu,
+  AppSecondaryButton,
 } from "../../ui";
+import CircularProgress from "@material-ui/core/CircularProgress";
 
 const reducer = (state, action) => {
   if (action.type === "LOAD_CONTACTS") {
@@ -115,6 +117,11 @@ const useStyles = makeStyles((theme) => ({
     flexDirection: "column",
     gap: theme.spacing(1),
     width: "100%",
+  },
+  mobileLoadMore: {
+    display: "flex",
+    justifyContent: "center",
+    padding: theme.spacing(2, 0, 1),
   },
 }));
 
@@ -478,7 +485,7 @@ const ContactListItems = () => {
       <Paper
         className={classes.mainPaper}
         variant="outlined"
-        onScroll={handleScroll}
+        onScroll={isMobile ? undefined : handleScroll}
       >
         <>
           <input
@@ -504,7 +511,18 @@ const ContactListItems = () => {
                 {contacts.map((contact) => renderMobileContactCard(contact))}
               </MobileCardList>
             )}
-            {loading ? <TableRowSkeleton columns={1} /> : null}
+            {loading && contacts.length > 0 ? (
+              <Box className={classes.mobileLoadMore}>
+                <CircularProgress size={28} />
+              </Box>
+            ) : null}
+            {hasMore && !loading ? (
+              <Box className={classes.mobileLoadMore}>
+                <AppSecondaryButton onClick={loadMore}>
+                  {i18n.t("contactListItems.mobile.loadMore")}
+                </AppSecondaryButton>
+              </Box>
+            ) : null}
           </Box>
         ) : (
           <Table size="small">

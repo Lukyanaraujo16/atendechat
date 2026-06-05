@@ -125,6 +125,11 @@ const useStyles = makeStyles((theme) => ({
   mainPaperMobile: {
     overflowX: "hidden",
   },
+  mobileLoadMore: {
+    display: "flex",
+    justifyContent: "center",
+    padding: theme.spacing(2, 0, 1),
+  },
   mobileActions: {
     display: "flex",
     flexDirection: "column",
@@ -628,7 +633,7 @@ const FlowBuilder = () => {
       <Paper
         className={isMobile ? `${classes.mainPaper} ${classes.mainPaperMobile}` : classes.mainPaper}
         variant="outlined"
-        onScroll={handleScroll}
+        onScroll={isMobile ? undefined : handleScroll}
       >
         {loading && !(Array.isArray(webhooks) && webhooks.length) ? (
           <Stack
@@ -644,9 +649,23 @@ const FlowBuilder = () => {
               {i18n.t("contacts.noContacts")}
             </Typography>
           ) : (
-            <MobileCardList>
-              {filteredFlows.map((flow) => renderMobileFlowCard(flow))}
-            </MobileCardList>
+            <>
+              <MobileCardList>
+                {filteredFlows.map((flow) => renderMobileFlowCard(flow))}
+              </MobileCardList>
+              {loading && filteredFlows.length > 0 ? (
+                <Box className={classes.mobileLoadMore}>
+                  <CircularProgress size={28} />
+                </Box>
+              ) : null}
+              {hasMore && !loading ? (
+                <Box className={classes.mobileLoadMore}>
+                  <AppSecondaryButton onClick={loadMore}>
+                    {i18n.t("flowBuilderList.mobile.loadMore")}
+                  </AppSecondaryButton>
+                </Box>
+              ) : null}
+            </>
           )
         ) : (
           <Table
