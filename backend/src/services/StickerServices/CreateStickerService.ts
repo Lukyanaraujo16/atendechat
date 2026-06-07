@@ -14,6 +14,7 @@ import {
   STICKER_RASTER_INPUT_MAX_BYTES,
   STICKER_WEBP_INPUT_MAX_BYTES
 } from "../../helpers/stickerImageProcessing";
+import { computeStickerFileHash } from "../../helpers/stickerFileHash";
 import { incrementCompanyStorageUsage } from "../CompanyService/adjustCompanyStorageUsage";
 
 interface Request {
@@ -75,6 +76,8 @@ const CreateStickerService = async ({
     sanitizeStickerBaseName(file.originalname) ||
     fileName;
 
+  const fileHash = computeStickerFileHash(webpBuffer);
+
   const sticker = await Sticker.create({
     companyId,
     name: displayName,
@@ -82,6 +85,7 @@ const CreateStickerService = async ({
     filePath,
     mimeType: "image/webp",
     size: webpBuffer.length,
+    fileHash,
     createdBy: userId,
     isActive: true,
     sortOrder: 0

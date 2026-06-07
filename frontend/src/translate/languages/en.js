@@ -5204,6 +5204,9 @@ const messages = {
 			messageOptionsMenu: {
 				delete: "Delete",
 				reply: "Reply",
+				saveSticker: "Save sticker",
+				saveStickerSuccess: "Sticker saved to the library.",
+				saveStickerDuplicate: "This sticker is already in the library.",
 				confirmationModal: {
 					title: "Delete message?",
 					message: "This action cannot be undone.",
@@ -5363,6 +5366,9 @@ const messages = {
 					"Could not convert the image to a sticker. Try another file.",
 				STICKER_INPUT_TOO_LARGE:
 					"File too large. WebP up to 512 KB; PNG or JPG up to 2 MB.",
+				ERR_NO_STICKER_MESSAGE: "This message is not a sticker.",
+				ERR_STICKER_FILE_MISSING:
+					"Sticker file not found. The media may have been removed.",
 				ERR_DUPLICATED_CONTACT: "A contact with this number already exists.",
 				ERR_USER_NOT_FOUND:
 					"One or more selected assignees are invalid or do not belong to your company.",

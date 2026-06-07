@@ -39,6 +39,9 @@ class Sticker extends Model<Sticker> {
   @Column
   size: number;
 
+  @Column
+  fileHash: string;
+
   @ForeignKey(() => User)
   @Column
   createdBy: number;

@@ -5,6 +5,7 @@ import ListStickersService from "../services/StickerServices/ListStickersService
 import CreateStickerService from "../services/StickerServices/CreateStickerService";
 import DeleteStickerService from "../services/StickerServices/DeleteStickerService";
 import SendStickerToTicketService from "../services/StickerServices/SendStickerToTicketService";
+import CreateStickerFromMessageService from "../services/StickerServices/CreateStickerFromMessageService";
 import { canManageStickerLibrary } from "../helpers/stickerStorage";
 
 export const index = async (req: Request, res: Response): Promise<Response> => {
@@ -86,6 +87,62 @@ export const remove = async (req: Request, res: Response): Promise<Response> => 
   });
 
   return res.status(200).json({ success: true });
+};
+
+export const createFromMessage = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const { companyId, id: userId, profile, supportMode } = req.user;
+  const { messageId } = req.params;
+
+  if (!canManageStickerLibrary(profile)) {
+    throw new AppError("ERR_NO_PERMISSION", 403);
+  }
+
+  const { name } = req.body as { name?: string };
+
+  try {
+    const { sticker, duplicate } = await CreateStickerFromMessageService({
+      messageId,
+      companyId,
+      userId: Number(userId),
+      actor: { id: userId, profile, supportMode },
+      name
+    });
+
+    const stickerPayload = {
+      ...sticker.get({ plain: true }),
+      publicUrl: sticker.publicUrl
+    };
+
+    if (!duplicate) {
+      const io = getIO();
+      io.to(`company-${companyId}-mainchannel`).emit(
+        `company-${companyId}-sticker`,
+        {
+          action: "create",
+          sticker: stickerPayload
+        }
+      );
+    }
+
+    return res.status(200).json({
+      ...stickerPayload,
+      duplicate
+    });
+  } catch (err: any) {
+    const known = [
+      "STICKER_INVALID_FORMAT",
+      "STICKER_TOO_LARGE",
+      "STICKER_CONVERSION_FAILED",
+      "ERR_NO_STICKER_MESSAGE"
+    ];
+    if (known.includes(err?.message)) {
+      throw new AppError(err.message, 400);
+    }
+    throw err;
+  }
 };
 
 export const sendToTicket = async (

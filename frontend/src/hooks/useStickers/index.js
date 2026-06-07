@@ -93,6 +93,21 @@ export default function useStickers() {
     return data?.message;
   }, []);
 
+  const saveStickerFromMessage = useCallback(async (messageId, name) => {
+    const { data } = await api.post(
+      `/stickers/from-message/${messageId}`,
+      name ? { name } : {}
+    );
+    if (data && !data.duplicate) {
+      setStickers((prev) => {
+        const exists = prev.some((s) => s.id === data.id);
+        if (exists) return prev;
+        return [data, ...prev];
+      });
+    }
+    return data;
+  }, []);
+
   return {
     stickers,
     loading,
@@ -100,5 +115,6 @@ export default function useStickers() {
     uploadSticker,
     deleteSticker,
     sendStickerToTicket,
+    saveStickerFromMessage,
   };
 }

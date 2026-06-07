@@ -34,6 +34,10 @@ stickerRoutes.post(
     });
   }
 );
+stickerRoutes.post(
+  "/stickers/from-message/:messageId",
+  StickerController.createFromMessage
+);
 stickerRoutes.delete("/stickers/:stickerId", StickerController.remove);
 stickerRoutes.post(
   "/messages/:ticketId/sticker",

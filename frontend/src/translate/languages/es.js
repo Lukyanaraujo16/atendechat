@@ -4960,6 +4960,9 @@ const messages = {
       messageOptionsMenu: {
         delete: "Eliminar",
         reply: "Responder",
+        saveSticker: "Guardar sticker",
+        saveStickerSuccess: "Sticker guardado en la biblioteca.",
+        saveStickerDuplicate: "Este sticker ya está en la biblioteca.",
         confirmationModal: {
           title: "¿Borrar mensaje?",
           message: "Esta acción no puede ser revertida.",
@@ -5090,6 +5093,9 @@ const messages = {
           "No se pudo convertir la imagen a sticker. Pruebe otro archivo.",
         STICKER_INPUT_TOO_LARGE:
           "Archivo demasiado grande. WebP hasta 512 KB; PNG o JPG hasta 2 MB.",
+        ERR_NO_STICKER_MESSAGE: "Este mensaje no es un sticker.",
+        ERR_STICKER_FILE_MISSING:
+          "Archivo del sticker no encontrado. El medio puede haber sido eliminado.",
         ERR_DUPLICATED_CONTACT: "Ya existe un contacto con este número.",
         ERR_USER_NOT_FOUND:
           "Uno o más responsables seleccionados son inválidos o no pertenecen a su empresa.",

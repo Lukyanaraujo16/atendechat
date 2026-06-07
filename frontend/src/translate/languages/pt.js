@@ -5355,6 +5355,9 @@ const messages = {
       messageOptionsMenu: {
         delete: "Deletar",
         reply: "Responder",
+        saveSticker: "Salvar figurinha",
+        saveStickerSuccess: "Figurinha salva na biblioteca.",
+        saveStickerDuplicate: "Esta figurinha já está na biblioteca.",
         confirmationModal: {
           title: "Apagar mensagem?",
           message: "Esta ação não pode ser revertida.",
@@ -5526,6 +5529,10 @@ const messages = {
           "Não foi possível converter a imagem para figurinha. Tente outro arquivo.",
         STICKER_INPUT_TOO_LARGE:
           "Arquivo muito grande. WebP até 512 KB; PNG ou JPG até 2 MB.",
+        ERR_NO_STICKER_MESSAGE:
+          "Esta mensagem não é uma figurinha.",
+        ERR_STICKER_FILE_MISSING:
+          "Arquivo da figurinha não encontrado. A mídia pode ter sido removida.",
         ERR_DUPLICATED_CONTACT: "Já existe um contato com este número.",
         ERR_USER_NOT_FOUND:
           "Um ou mais responsáveis selecionados são inválidos ou não pertencem à sua empresa.",
