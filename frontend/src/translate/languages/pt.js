@@ -5252,7 +5252,10 @@ const messages = {
           add: "Adicionar figurinha",
           empty: "Nenhuma figurinha salva. Adicione uma para começar.",
           uploadTitle: "Adicionar figurinha",
-          uploadHint: "Envie um arquivo WebP (figurinha do WhatsApp). PNG e JPG serão suportados em versão futura.",
+          uploadHint: "PNG, JPG ou WebP. Imagens serão convertidas para figurinha.",
+          invalidFormat: "Formato inválido. Use PNG, JPG ou WebP.",
+          webpTooLarge: "WebP deve ter no máximo 512 KB.",
+          rasterTooLarge: "PNG ou JPG deve ter no máximo 2 MB.",
           chooseFile: "Escolher arquivo",
           nameLabel: "Nome (opcional)",
           upload: "Salvar",
@@ -5515,6 +5518,14 @@ const messages = {
           "Este módulo não está liberado para a sua empresa (plano ou configuração da plataforma).",
         ERR_PLAN_FEATURE_DISABLED:
           "Este recurso não está disponível no seu plano.",
+        STICKER_INVALID_FORMAT:
+          "Formato inválido. Envie PNG, JPG ou WebP.",
+        STICKER_TOO_LARGE:
+          "A imagem é grande demais para figurinha. Use um arquivo menor ou uma imagem com menos detalhes.",
+        STICKER_CONVERSION_FAILED:
+          "Não foi possível converter a imagem para figurinha. Tente outro arquivo.",
+        STICKER_INPUT_TOO_LARGE:
+          "Arquivo muito grande. WebP até 512 KB; PNG ou JPG até 2 MB.",
         ERR_DUPLICATED_CONTACT: "Já existe um contato com este número.",
         ERR_USER_NOT_FOUND:
           "Um ou mais responsáveis selecionados são inválidos ou não pertencem à sua empresa.",

@@ -54,8 +54,13 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
       publicUrl: sticker.publicUrl
     });
   } catch (err: any) {
-    if (err?.message === "STICKER_WEBP_ONLY") {
-      throw new AppError("STICKER_WEBP_ONLY", 400);
+    const known = [
+      "STICKER_INVALID_FORMAT",
+      "STICKER_TOO_LARGE",
+      "STICKER_CONVERSION_FAILED"
+    ];
+    if (known.includes(err?.message)) {
+      throw new AppError(err.message, 400);
     }
     throw err;
   }

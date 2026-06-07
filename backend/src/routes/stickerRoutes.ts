@@ -19,8 +19,12 @@ stickerRoutes.post(
       if (err) {
         const message =
           err instanceof Error ? err.message : String(err);
-        if (message === "STICKER_WEBP_ONLY") {
-          next(new AppError("STICKER_WEBP_ONLY", 400));
+        if (message === "STICKER_INVALID_FORMAT") {
+          next(new AppError("STICKER_INVALID_FORMAT", 400));
+          return;
+        }
+        if (message === "LIMIT_FILE_SIZE") {
+          next(new AppError("STICKER_INPUT_TOO_LARGE", 400));
           return;
         }
         next(err instanceof Error ? err : new Error(message));

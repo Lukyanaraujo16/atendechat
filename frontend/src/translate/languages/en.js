@@ -5105,7 +5105,10 @@ const messages = {
 					add: "Add sticker",
 					empty: "No saved stickers. Add one to get started.",
 					uploadTitle: "Add sticker",
-					uploadHint: "Upload a WebP file (WhatsApp sticker). PNG and JPG support coming in a future release.",
+					uploadHint: "PNG, JPG or WebP. Images will be converted to a sticker.",
+					invalidFormat: "Invalid format. Use PNG, JPG or WebP.",
+					webpTooLarge: "WebP must be 512 KB or smaller.",
+					rasterTooLarge: "PNG or JPG must be 2 MB or smaller.",
 					chooseFile: "Choose file",
 					nameLabel: "Name (optional)",
 					upload: "Save",
@@ -5353,6 +5356,13 @@ const messages = {
 				ERR_MODULE_NOT_ALLOWED:
 					"This module is not enabled for your company (plan or platform settings).",
 				ERR_PLAN_FEATURE_DISABLED: "This feature is not included in your plan.",
+				STICKER_INVALID_FORMAT: "Invalid format. Upload PNG, JPG or WebP.",
+				STICKER_TOO_LARGE:
+					"The image is too large for a sticker. Use a smaller file or a simpler image.",
+				STICKER_CONVERSION_FAILED:
+					"Could not convert the image to a sticker. Try another file.",
+				STICKER_INPUT_TOO_LARGE:
+					"File too large. WebP up to 512 KB; PNG or JPG up to 2 MB.",
 				ERR_DUPLICATED_CONTACT: "A contact with this number already exists.",
 				ERR_USER_NOT_FOUND:
 					"One or more selected assignees are invalid or do not belong to your company.",

@@ -14,6 +14,11 @@ import { makeStyles } from "@material-ui/core/styles";
 import { i18n } from "../../translate/i18n";
 import toastError from "../../errors/toastError";
 
+const STICKER_WEBP_MAX_BYTES = 512 * 1024;
+const STICKER_RASTER_MAX_BYTES = 2 * 1024 * 1024;
+const ALLOWED_TYPES = new Set(["image/webp", "image/png", "image/jpeg"]);
+const ALLOWED_EXT = /\.(webp|png|jpe?g)$/i;
+
 const useStyles = makeStyles((theme) => ({
   hint: {
     marginBottom: theme.spacing(1.5),
@@ -26,6 +31,26 @@ const useStyles = makeStyles((theme) => ({
     color: theme.palette.text.secondary,
   },
 }));
+
+function isAllowedStickerFile(file) {
+  const type = String(file?.type || "").toLowerCase();
+  const name = String(file?.name || "").toLowerCase();
+  return ALLOWED_TYPES.has(type) && ALLOWED_EXT.test(name);
+}
+
+function validateStickerFileSize(file) {
+  const type = String(file?.type || "").toLowerCase();
+  if (type === "image/webp" && file.size > STICKER_WEBP_MAX_BYTES) {
+    return "messagesInput.stickers.webpTooLarge";
+  }
+  if (
+    (type === "image/png" || type === "image/jpeg") &&
+    file.size > STICKER_RASTER_MAX_BYTES
+  ) {
+    return "messagesInput.stickers.rasterTooLarge";
+  }
+  return null;
+}
 
 export default function StickerUploadDialog({
   open,
@@ -50,17 +75,23 @@ export default function StickerUploadDialog({
   const handleFileChange = (e) => {
     const picked = e.target.files?.[0];
     if (!picked) return;
-    const isWebp =
-      picked.type === "image/webp" ||
-      picked.name.toLowerCase().endsWith(".webp");
-    if (!isWebp) {
-      toastError(new Error(i18n.t("messagesInput.stickerOnlyWebp")));
+
+    if (!isAllowedStickerFile(picked)) {
+      toastError(new Error(i18n.t("messagesInput.stickers.invalidFormat")));
       e.target.value = "";
       return;
     }
+
+    const sizeErrorKey = validateStickerFileSize(picked);
+    if (sizeErrorKey) {
+      toastError(new Error(i18n.t(sizeErrorKey)));
+      e.target.value = "";
+      return;
+    }
+
     setFile(picked);
     if (!name) {
-      setName(picked.name.replace(/\.webp$/i, ""));
+      setName(picked.name.replace(/\.(webp|png|jpe?g)$/i, ""));
     }
     e.target.value = "";
   };
@@ -88,7 +119,7 @@ export default function StickerUploadDialog({
         <input
           ref={inputRef}
           type="file"
-          accept=".webp,image/webp"
+          accept=".webp,.png,.jpg,.jpeg,image/webp,image/png,image/jpeg"
           hidden
           onChange={handleFileChange}
         />

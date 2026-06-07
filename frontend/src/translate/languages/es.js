@@ -4866,6 +4866,12 @@ const messages = {
         signMessage: "Firmar",
         sticker: "Enviar sticker (WebP)",
         stickerOnlyWebp: "El sticker debe ser un archivo .webp",
+        stickers: {
+          uploadHint: "PNG, JPG o WebP. Las imágenes se convertirán en sticker.",
+          invalidFormat: "Formato no válido. Use PNG, JPG o WebP.",
+          webpTooLarge: "WebP debe tener como máximo 512 KB.",
+          rasterTooLarge: "PNG o JPG debe tener como máximo 2 MB.",
+        },
         audioRecorder: {
           generic:
             "No se pudo acceder o iniciar el micrófono. Compruebe los permisos del navegador e inténtelo de nuevo.",
@@ -5076,6 +5082,14 @@ const messages = {
           "Este módulo no está habilitado para su empresa (plan o configuración de la plataforma).",
         ERR_PLAN_FEATURE_DISABLED:
           "Este recurso no está disponible en su plan.",
+        STICKER_INVALID_FORMAT:
+          "Formato no válido. Envíe PNG, JPG o WebP.",
+        STICKER_TOO_LARGE:
+          "La imagen es demasiado grande para un sticker. Use un archivo más pequeño.",
+        STICKER_CONVERSION_FAILED:
+          "No se pudo convertir la imagen a sticker. Pruebe otro archivo.",
+        STICKER_INPUT_TOO_LARGE:
+          "Archivo demasiado grande. WebP hasta 512 KB; PNG o JPG hasta 2 MB.",
         ERR_DUPLICATED_CONTACT: "Ya existe un contacto con este número.",
         ERR_USER_NOT_FOUND:
           "Uno o más responsables seleccionados son inválidos o no pertenecen a su empresa.",
