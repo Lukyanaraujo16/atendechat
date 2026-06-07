@@ -5089,6 +5089,15 @@ const messages = {
 				signMessage: "Sign",
 				sticker: "Send sticker (WebP)",
 				stickerOnlyWebp: "Sticker must be a .webp file",
+				attach: {
+					menuTitle: "Attach",
+					document: "Document",
+					photosVideos: "Photos & videos",
+					audio: "Audio",
+					quickReply: "Quick reply",
+					sticker: "Sticker",
+					stickerHint: "WebP — sticker library coming soon",
+				},
 				audioRecorder: {
 					generic:
 						"Could not access or start the microphone. Check the browser’s permissions and try again.",

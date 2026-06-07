@@ -449,6 +449,7 @@ const Ticket = () => {
           chatInputControllerRef={chatInputControllerRef}
           transferModalOpen={transferTicketModalOpen}
           quickRepliesOpen={quickRepliesOpen}
+          onOpenQuickReplies={() => setQuickRepliesOpen(true)}
           onMessageSent={handleMessageSent}
         />
       </div>

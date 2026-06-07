@@ -5236,6 +5236,15 @@ const messages = {
         signMessage: "Assinar",
         sticker: "Enviar figurinha (WebP)",
         stickerOnlyWebp: "Figurinha deve ser um arquivo .webp",
+        attach: {
+          menuTitle: "Anexar",
+          document: "Documento",
+          photosVideos: "Fotos e vídeos",
+          audio: "Áudio",
+          quickReply: "Resposta rápida",
+          sticker: "Figurinha",
+          stickerHint: "WebP — biblioteca em breve",
+        },
         audioRecorder: {
           generic:
             "Não foi possível acessar ou iniciar o microfone. Verifique as permissões do navegador e tente novamente.",

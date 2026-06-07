@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useContext, useRef, useCallback } from "react";
-import withWidth, { isWidthUp } from "@material-ui/core/withWidth";
 import "emoji-mart/css/emoji-mart.css";
 import { Picker } from "emoji-mart";
 import clsx from "clsx";
@@ -9,9 +8,8 @@ import { makeStyles, alpha } from "@material-ui/core/styles";
 import Paper from "@material-ui/core/Paper";
 import InputBase from "@material-ui/core/InputBase";
 import CircularProgress from "@material-ui/core/CircularProgress";
+import Tooltip from "@material-ui/core/Tooltip";
 import { green } from "@material-ui/core/colors";
-import AttachFileIcon from "@material-ui/icons/AttachFile";
-import ImageIcon from "@material-ui/icons/Image";
 import IconButton from "@material-ui/core/IconButton";
 import MoodIcon from "@material-ui/icons/Mood";
 import SendIcon from "@material-ui/icons/Send";
@@ -20,7 +18,7 @@ import ClearIcon from "@material-ui/icons/Clear";
 import MicIcon from "@material-ui/icons/Mic";
 import CheckCircleOutlineIcon from "@material-ui/icons/CheckCircleOutline";
 import HighlightOffIcon from "@material-ui/icons/HighlightOff";
-import { FormControlLabel, Switch } from "@material-ui/core";
+import CreateOutlinedIcon from "@material-ui/icons/CreateOutlined";
 import Autocomplete from "@material-ui/lab/Autocomplete";
 import { isString, isEmpty, isObject, has } from "lodash";
 
@@ -47,6 +45,7 @@ import {
   safeFocusMessageInput,
 } from "../../utils/messageInputFocus";
 import { isOrphanTicket } from "../../utils/isOrphanTicket";
+import ComposerAttachMenu from "./ComposerAttachMenu";
 
 const useStyles = makeStyles((theme) => {
   const isDark = theme.palette.type === "dark";
@@ -74,21 +73,27 @@ const useStyles = makeStyles((theme) => {
   newMessageBox: {
     backgroundColor: getComposerSurface(theme),
     width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
+    boxSizing: "border-box",
     display: "flex",
     padding: theme.spacing(1, 1.25),
-    alignItems: "center",
-    gap: theme.spacing(0.25),
+    paddingBottom: `calc(${theme.spacing(1)}px + env(safe-area-inset-bottom, 0px))`,
+    alignItems: "flex-end",
+    gap: theme.spacing(0.5),
   },
 
   messageInputWrapper: {
-    padding: theme.spacing(0.75, 1.25),
-    marginRight: theme.spacing(0.75),
+    position: "relative",
+    padding: theme.spacing(0.5, 0.75),
     backgroundColor: isDark
       ? alpha(theme.palette.common.white, 0.06)
       : alpha(theme.palette.common.black, 0.04),
     display: "flex",
-    borderRadius: 999,
+    alignItems: "flex-end",
+    borderRadius: 24,
     flex: 1,
+    minWidth: 0,
     border: `1px solid ${getSubtleBorderColor(theme)}`,
     transition: theme.transitions.create(["box-shadow", "border-color"], {
       duration: 180,
@@ -99,11 +104,52 @@ const useStyles = makeStyles((theme) => {
     },
   },
 
-  messageInput: {
-    paddingLeft: 10,
+  emojiInlineButton: {
+    flexShrink: 0,
+    padding: theme.spacing(0.75),
+    color: theme.palette.text.secondary,
+    [theme.breakpoints.down("md")]: {
+      minWidth: 40,
+      minHeight: 40,
+    },
+  },
+
+  emojiPickerPopover: {
+    position: "absolute",
+    bottom: "calc(100% + 8px)",
+    left: 0,
+    zIndex: 1300,
+    maxWidth: "min(100vw - 24px, 352px)",
+  },
+
+  messageInputField: {
     flex: 1,
+    minWidth: 0,
+    display: "flex",
+    alignItems: "center",
+  },
+
+  messageInput: {
+    paddingLeft: 4,
+    paddingRight: 4,
+    flex: 1,
+    minWidth: 0,
     border: "none",
     color: theme.palette.text.primary,
+  },
+
+  signToggleButton: {
+    flexShrink: 0,
+    padding: theme.spacing(0.75),
+    color: theme.palette.text.disabled,
+    [theme.breakpoints.down("md")]: {
+      minWidth: 36,
+      minHeight: 36,
+    },
+  },
+
+  signToggleActive: {
+    color: theme.palette.primary.main,
   },
 
   sendMessageIcons: {
@@ -144,13 +190,6 @@ const useStyles = makeStyles((theme) => {
     overflow: "hidden",
   },
 
-  emojiBox: {
-    position: "absolute",
-    bottom: 63,
-    width: 40,
-    borderTop: `1px solid ${theme.palette.divider}`,
-  },
-
   circleLoading: {
     color: green[500],
     opacity: "70%",
@@ -185,8 +224,9 @@ const useStyles = makeStyles((theme) => {
     alignItems: "center",
     justifyContent: "center",
     paddingTop: 8,
-    paddingLeft: 73,
-    paddingRight: 7,
+    paddingLeft: theme.spacing(1.25),
+    paddingRight: theme.spacing(1.25),
+    boxSizing: "border-box",
   },
 
   replyginMsgContainer: {
@@ -226,102 +266,6 @@ const useStyles = makeStyles((theme) => {
   },
 };
 });
-
-const EmojiOptions = (props) => {
-  const { disabled, showEmoji, setShowEmoji, handleAddEmoji } = props;
-  const classes = useStyles();
-  return (
-    <>
-      <IconButton
-        aria-label="emojiPicker"
-        component="span"
-        disabled={disabled}
-        onClick={(e) => setShowEmoji((prevState) => !prevState)}
-      >
-        <MoodIcon className={classes.sendMessageIcons} />
-      </IconButton>
-      {showEmoji ? (
-        <div className={classes.emojiBox}>
-          <Picker
-            perLine={16}
-            showPreview={false}
-            showSkinTones={false}
-            onSelect={handleAddEmoji}
-          />
-        </div>
-      ) : null}
-    </>
-  );
-};
-
-const SignSwitch = (props) => {
-  const { width, setSignMessage, signMessage } = props;
-  if (isWidthUp("md", width)) {
-    return (
-      <FormControlLabel
-        style={{ marginRight: 7, color: "gray" }}
-        label={i18n.t("messagesInput.signMessage")}
-        labelPlacement="start"
-        control={
-          <Switch
-            size="small"
-            checked={signMessage}
-            onChange={(e) => {
-              setSignMessage(e.target.checked);
-            }}
-            name="showAllTickets"
-            color="primary"
-          />
-        }
-      />
-    );
-  }
-  return null;
-};
-
-const FileInput = (props) => {
-  const { handleChangeMedias, handleChangeSticker, disableOption } = props;
-  const classes = useStyles();
-  return (
-    <>
-      <input
-        multiple
-        type="file"
-        id="upload-button"
-        disabled={disableOption()}
-        className={classes.uploadInput}
-        onChange={handleChangeMedias}
-      />
-      <input
-        type="file"
-        id="sticker-upload-custom"
-        accept=".webp,image/webp"
-        disabled={disableOption()}
-        className={classes.uploadInput}
-        onChange={handleChangeSticker}
-      />
-      <label htmlFor="upload-button">
-        <IconButton
-          aria-label="upload"
-          component="span"
-          disabled={disableOption()}
-        >
-          <AttachFileIcon className={classes.sendMessageIcons} />
-        </IconButton>
-      </label>
-      <label htmlFor="sticker-upload-custom">
-        <IconButton
-          aria-label={i18n.t("messagesInput.sticker")}
-          component="span"
-          disabled={disableOption()}
-          title={i18n.t("messagesInput.sticker")}
-        >
-          <ImageIcon className={classes.sendMessageIcons} />
-        </IconButton>
-      </label>
-    </>
-  );
-};
 
 const ActionButtons = (props) => {
   const {
@@ -521,7 +465,7 @@ const CustomInput = (props) => {
   };
 
   return (
-    <div className={classes.messageInputWrapper}>
+    <div className={classes.messageInputField}>
       <Autocomplete
         freeSolo
         open={popupOpen}
@@ -594,6 +538,7 @@ const MessageInputCustom = (props) => {
     ticket,
     transferModalOpen = false,
     quickRepliesOpen = false,
+    onOpenQuickReplies,
     onMessageSent,
   } = props;
 
@@ -610,8 +555,13 @@ const MessageInputCustom = (props) => {
   const { setReplyingMessage, replyingMessage } =
     useContext(ReplyMessageContext);
   const { user } = useContext(AuthContext);
+  const planFlags = usePlanFlags();
+  const quickRepliesEnabled = canUseQuickRepliesFeature(user, planFlags);
 
   const [signMessage, setSignMessage] = useLocalStorage("signOption", true);
+  const documentInputRef = useRef(null);
+  const mediaInputRef = useRef(null);
+  const stickerInputRef = useRef(null);
 
   const resolveMessageTemplate = useCallback(
     (text) =>
@@ -674,6 +624,7 @@ const MessageInputCustom = (props) => {
 
     const selectedMedias = Array.from(e.target.files);
     setMedias(selectedMedias);
+    e.target.value = "";
   };
 
   const handleInputPaste = (e) => {
@@ -921,40 +872,99 @@ const MessageInputCustom = (props) => {
         )}
         {replyingMessage && renderReplyingMessage(replyingMessage)}
         <div className={classes.newMessageBox}>
-          <EmojiOptions
+          <input
+            ref={documentInputRef}
+            type="file"
+            multiple
+            className={classes.uploadInput}
             disabled={disableOption()}
-            handleAddEmoji={handleAddEmoji}
-            showEmoji={showEmoji}
-            setShowEmoji={setShowEmoji}
+            accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar,.csv,.xml,.json,.odt,.ods,.pages,.key,.numbers"
+            onChange={handleChangeMedias}
+          />
+          <input
+            ref={mediaInputRef}
+            type="file"
+            multiple
+            className={classes.uploadInput}
+            disabled={disableOption()}
+            accept="image/*,video/*"
+            onChange={handleChangeMedias}
+          />
+          <input
+            ref={stickerInputRef}
+            type="file"
+            className={classes.uploadInput}
+            disabled={disableOption()}
+            accept=".webp,image/webp"
+            onChange={handleChangeSticker}
           />
 
-          <FileInput
-            disableOption={disableOption}
-            handleChangeMedias={handleChangeMedias}
-            handleChangeSticker={handleChangeSticker}
+          <ComposerAttachMenu
+            disabled={disableOption()}
+            quickRepliesEnabled={quickRepliesEnabled}
+            onPickDocument={() => documentInputRef.current?.click()}
+            onPickMedia={() => mediaInputRef.current?.click()}
+            onPickSticker={() => stickerInputRef.current?.click()}
+            onStartRecording={() => {
+              if (!disableOption()) {
+                handleStartRecording();
+              }
+            }}
+            onOpenQuickReplies={() => {
+              if (quickRepliesEnabled && typeof onOpenQuickReplies === "function") {
+                onOpenQuickReplies();
+              }
+            }}
           />
 
-          <SignSwitch
-            width={props.width}
-            setSignMessage={setSignMessage}
-            signMessage={signMessage}
-          />
+          <div className={classes.messageInputWrapper}>
+            <IconButton
+              aria-label="emojiPicker"
+              className={classes.emojiInlineButton}
+              disabled={disableOption()}
+              onClick={() => setShowEmoji((prev) => !prev)}
+            >
+              <MoodIcon fontSize="small" />
+            </IconButton>
+            {showEmoji ? (
+              <div className={classes.emojiPickerPopover}>
+                <Picker
+                  perLine={16}
+                  showPreview={false}
+                  showSkinTones={false}
+                  onSelect={handleAddEmoji}
+                />
+              </div>
+            ) : null}
 
-          <CustomInput
-            loading={loading}
-            inputRef={inputRef}
-            ticketStatus={ticketStatus}
-            isOrphan={isOrphan}
-            inputMessage={inputMessage}
-            setInputMessage={setInputMessage}
-            // handleChangeInput={handleChangeInput}
-            handleSendMessage={handleSendMessage}
-            handleInputPaste={handleInputPaste}
-            disableOption={disableOption}
-            handleQuickAnswersClick={handleQuickAnswersClick}
-            resolveMessageTemplate={resolveMessageTemplate}
-            onQuickMessageUsed={onQuickMessageUsed}
-          />
+            <CustomInput
+              loading={loading}
+              inputRef={inputRef}
+              ticketStatus={ticketStatus}
+              isOrphan={isOrphan}
+              inputMessage={inputMessage}
+              setInputMessage={setInputMessage}
+              handleSendMessage={handleSendMessage}
+              handleInputPaste={handleInputPaste}
+              disableOption={disableOption}
+              handleQuickAnswersClick={handleQuickAnswersClick}
+              resolveMessageTemplate={resolveMessageTemplate}
+              onQuickMessageUsed={onQuickMessageUsed}
+            />
+
+            <Tooltip title={i18n.t("messagesInput.signMessage")}>
+              <IconButton
+                aria-label={i18n.t("messagesInput.signMessage")}
+                className={clsx(classes.signToggleButton, {
+                  [classes.signToggleActive]: signMessage,
+                })}
+                disabled={disableOption()}
+                onClick={() => setSignMessage((prev) => !prev)}
+              >
+                <CreateOutlinedIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </div>
 
           <ActionButtons
             inputMessage={inputMessage}
@@ -973,4 +983,4 @@ const MessageInputCustom = (props) => {
   }
 };
 
-export default withWidth()(MessageInputCustom);
+export default MessageInputCustom;
