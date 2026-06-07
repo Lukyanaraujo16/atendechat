@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useContext, useRef, useCallback } from "react";
 import "emoji-mart/css/emoji-mart.css";
-import { Picker } from "emoji-mart";
 import clsx from "clsx";
 import { isNil } from "lodash";
 
@@ -46,6 +45,8 @@ import {
 } from "../../utils/messageInputFocus";
 import { isOrphanTicket } from "../../utils/isOrphanTicket";
 import ComposerAttachMenu from "./ComposerAttachMenu";
+import ComposerEmojiStickerPanel from "./ComposerEmojiStickerPanel";
+import useStickers from "../../hooks/useStickers";
 
 const useStyles = makeStyles((theme) => {
   const isDark = theme.palette.type === "dark";
@@ -112,14 +113,6 @@ const useStyles = makeStyles((theme) => {
       minWidth: 40,
       minHeight: 40,
     },
-  },
-
-  emojiPickerPopover: {
-    position: "absolute",
-    bottom: "calc(100% + 8px)",
-    left: 0,
-    zIndex: 1300,
-    maxWidth: "min(100vw - 24px, 352px)",
   },
 
   messageInputField: {
@@ -548,10 +541,11 @@ const MessageInputCustom = (props) => {
 
   const [medias, setMedias] = useState([]);
   const [inputMessage, setInputMessage] = useState("");
-  const [showEmoji, setShowEmoji] = useState(false);
+  const [composerPanelOpen, setComposerPanelOpen] = useState(false);
+  const [composerPanelTab, setComposerPanelTab] = useState("emoji");
+  const [sendingStickerId, setSendingStickerId] = useState(null);
   const [loading, setLoading] = useState(false);
   const inputRef = useRef();
-  const uploadAsStickerRef = useRef(false);
   const { setReplyingMessage, replyingMessage } =
     useContext(ReplyMessageContext);
   const { user } = useContext(AuthContext);
@@ -561,7 +555,9 @@ const MessageInputCustom = (props) => {
   const [signMessage, setSignMessage] = useLocalStorage("signOption", true);
   const documentInputRef = useRef(null);
   const mediaInputRef = useRef(null);
-  const stickerInputRef = useRef(null);
+  const { sendStickerToTicket } = useStickers();
+  const canManageStickers =
+    user?.profile === "admin" || user?.profile === "supervisor";
 
   const resolveMessageTemplate = useCallback(
     (text) =>
@@ -598,7 +594,7 @@ const MessageInputCustom = (props) => {
     }
     return () => {
       setInputMessage("");
-      setShowEmoji(false);
+      setComposerPanelOpen(false);
       setMedias([]);
       setReplyingMessage(null);
     };
@@ -633,16 +629,31 @@ const MessageInputCustom = (props) => {
     }
   };
 
-  const handleChangeSticker = (e) => {
-    const file = e.target.files?.[0];
-    if (file && (file.type === "image/webp" || file.name.toLowerCase().endsWith(".webp"))) {
-      uploadAsStickerRef.current = true;
-      setMedias([file]);
-    } else if (file) {
-      toastError(new Error(i18n.t("messagesInput.stickerOnlyWebp")));
-    }
-    e.target.value = "";
-  };
+  const openComposerPanel = useCallback((tab = "emoji") => {
+    setComposerPanelTab(tab);
+    setComposerPanelOpen(true);
+  }, []);
+
+  const handleStickerSend = useCallback(
+    async (sticker) => {
+      if (isOrphan || !ticketId || !sticker?.id || loading) return;
+      setSendingStickerId(sticker.id);
+      setLoading(true);
+      try {
+        const message = await sendStickerToTicket(ticketId, sticker.id);
+        setComposerPanelOpen(false);
+        if (message && typeof onMessageSent === "function") {
+          onMessageSent(message);
+        }
+      } catch (err) {
+        toastError(err);
+      } finally {
+        setSendingStickerId(null);
+        setLoading(false);
+      }
+    },
+    [isOrphan, ticketId, loading, sendStickerToTicket, onMessageSent]
+  );
 
   const handleUploadQuickMessageMedia = async (blob, message) => {
     setLoading(true);
@@ -743,9 +754,6 @@ const MessageInputCustom = (props) => {
 
     const formData = new FormData();
     formData.append("fromMe", true);
-    if (uploadAsStickerRef.current) {
-      formData.append("asSticker", "true");
-    }
     medias.forEach((media) => {
       formData.append("medias", media);
       formData.append("body", media.name);
@@ -759,7 +767,6 @@ const MessageInputCustom = (props) => {
 
     setLoading(false);
     setMedias([]);
-    uploadAsStickerRef.current = false;
   };
 
   const handleSendMessage = async () => {
@@ -787,7 +794,7 @@ const MessageInputCustom = (props) => {
     }
 
     setInputMessage("");
-    setShowEmoji(false);
+    setComposerPanelOpen(false);
     setLoading(false);
     setReplyingMessage(null);
   };
@@ -890,21 +897,12 @@ const MessageInputCustom = (props) => {
             accept="image/*,video/*"
             onChange={handleChangeMedias}
           />
-          <input
-            ref={stickerInputRef}
-            type="file"
-            className={classes.uploadInput}
-            disabled={disableOption()}
-            accept=".webp,image/webp"
-            onChange={handleChangeSticker}
-          />
-
           <ComposerAttachMenu
             disabled={disableOption()}
             quickRepliesEnabled={quickRepliesEnabled}
             onPickDocument={() => documentInputRef.current?.click()}
             onPickMedia={() => mediaInputRef.current?.click()}
-            onPickSticker={() => stickerInputRef.current?.click()}
+            onOpenStickerLibrary={() => openComposerPanel("stickers")}
             onStartRecording={() => {
               if (!disableOption()) {
                 handleStartRecording();
@@ -922,20 +920,26 @@ const MessageInputCustom = (props) => {
               aria-label="emojiPicker"
               className={classes.emojiInlineButton}
               disabled={disableOption()}
-              onClick={() => setShowEmoji((prev) => !prev)}
+              onClick={() => {
+                if (composerPanelOpen && composerPanelTab === "emoji") {
+                  setComposerPanelOpen(false);
+                } else {
+                  openComposerPanel("emoji");
+                }
+              }}
             >
               <MoodIcon fontSize="small" />
             </IconButton>
-            {showEmoji ? (
-              <div className={classes.emojiPickerPopover}>
-                <Picker
-                  perLine={16}
-                  showPreview={false}
-                  showSkinTones={false}
-                  onSelect={handleAddEmoji}
-                />
-              </div>
-            ) : null}
+
+            <ComposerEmojiStickerPanel
+              open={composerPanelOpen}
+              onClose={() => setComposerPanelOpen(false)}
+              initialTab={composerPanelTab}
+              onEmojiSelect={handleAddEmoji}
+              onStickerSend={handleStickerSend}
+              canManageStickers={canManageStickers}
+              sendingStickerId={sendingStickerId}
+            />
 
             <CustomInput
               loading={loading}

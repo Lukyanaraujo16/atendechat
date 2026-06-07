@@ -71,6 +71,7 @@ import CrmAutomationRule from "../models/CrmAutomationRule";
 import CrmDealActivity from "../models/CrmDealActivity";
 import CrmDealStageHistory from "../models/CrmDealStageHistory";
 import CrmSavedView from "../models/CrmSavedView";
+import Sticker from "../models/Sticker";
 import { logDbConnectionAtStartup } from "../helpers/dbConnectionInfo";
 import {
   assertContactLabelRelationModelRegistered,
@@ -155,7 +156,8 @@ const models = [
   CrmAutomationRule,
   CrmDealActivity,
   CrmDealStageHistory,
-  CrmSavedView
+  CrmSavedView,
+  Sticker
 ];
 
 sequelize.addModels(models);

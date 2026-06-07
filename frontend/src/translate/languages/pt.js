@@ -5243,7 +5243,22 @@ const messages = {
           audio: "Áudio",
           quickReply: "Resposta rápida",
           sticker: "Figurinha",
-          stickerHint: "WebP — biblioteca em breve",
+          stickerHint: "Biblioteca da empresa",
+        },
+        stickers: {
+          tabEmoji: "Emoji",
+          tabStickers: "Figurinhas",
+          libraryTitle: "Biblioteca",
+          add: "Adicionar figurinha",
+          empty: "Nenhuma figurinha salva. Adicione uma para começar.",
+          uploadTitle: "Adicionar figurinha",
+          uploadHint: "Envie um arquivo WebP (figurinha do WhatsApp). PNG e JPG serão suportados em versão futura.",
+          chooseFile: "Escolher arquivo",
+          nameLabel: "Nome (opcional)",
+          upload: "Salvar",
+          cancel: "Cancelar",
+          delete: "Excluir figurinha",
+          deleteConfirm: "Excluir esta figurinha da biblioteca?",
         },
         audioRecorder: {
           generic:

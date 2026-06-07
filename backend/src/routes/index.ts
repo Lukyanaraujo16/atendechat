@@ -44,6 +44,7 @@ import notificationRoutes from "./notificationRoutes";
 import systemSettingRoutes from "./systemSettingRoutes";
 import platformSuperRoutes from "./platformSuperRoutes";
 import backupRoutes from "./backupRoutes";
+import stickerRoutes from "./stickerRoutes";
 const routes = Router();
 
 routes.use(systemSettingRoutes);
@@ -60,6 +61,7 @@ routes.use(contactRoutes);
 routes.use(ticketRoutes);
 routes.use(whatsappRoutes);
 routes.use(messageRoutes);
+routes.use(stickerRoutes);
 routes.use(whatsappSessionRoutes);
 routes.use(queueRoutes);
 routes.use(companyRoutes);

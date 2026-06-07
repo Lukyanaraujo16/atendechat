@@ -5096,7 +5096,22 @@ const messages = {
 					audio: "Audio",
 					quickReply: "Quick reply",
 					sticker: "Sticker",
-					stickerHint: "WebP — sticker library coming soon",
+					stickerHint: "Company library",
+				},
+				stickers: {
+					tabEmoji: "Emoji",
+					tabStickers: "Stickers",
+					libraryTitle: "Library",
+					add: "Add sticker",
+					empty: "No saved stickers. Add one to get started.",
+					uploadTitle: "Add sticker",
+					uploadHint: "Upload a WebP file (WhatsApp sticker). PNG and JPG support coming in a future release.",
+					chooseFile: "Choose file",
+					nameLabel: "Name (optional)",
+					upload: "Save",
+					cancel: "Cancel",
+					delete: "Delete sticker",
+					deleteConfirm: "Remove this sticker from the library?",
 				},
 				audioRecorder: {
 					generic:

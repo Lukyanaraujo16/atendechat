@@ -74,7 +74,7 @@ export default function ComposerAttachMenu({
   quickRepliesEnabled,
   onPickDocument,
   onPickMedia,
-  onPickSticker,
+  onOpenStickerLibrary,
   onStartRecording,
   onOpenQuickReplies,
 }) {
@@ -127,8 +127,8 @@ export default function ComposerAttachMenu({
       icon: <ImageOutlinedIcon />,
       primary: i18n.t("messagesInput.attach.sticker"),
       secondary: i18n.t("messagesInput.attach.stickerHint"),
-      dataStickerPhase: "upload-webp",
-      onClick: onPickSticker,
+      dataStickerPhase: "library",
+      onClick: onOpenStickerLibrary,
     },
   ].filter(Boolean);
 
