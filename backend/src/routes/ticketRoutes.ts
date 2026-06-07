@@ -1,6 +1,7 @@
 import express from "express";
 import isAuth from "../middleware/isAuth";
 import requireAnyPlanFeature from "../middleware/requirePlanFeature";
+import noStoreCache from "../middleware/noStoreCache";
 
 import * as TicketController from "../controllers/TicketController";
 import * as FlowExecutionLogController from "../controllers/FlowExecutionLogController";
@@ -26,9 +27,13 @@ ticketRoutes.put(
 ticketRoutes.use(isAuth);
 ticketRoutes.use(requireAnyPlanFeature("attendance.inbox"));
 
-ticketRoutes.get("/tickets", TicketController.index);
-ticketRoutes.get("/tickets/pinned", TicketController.listPinned);
-ticketRoutes.get("/tickets/without-connection", TicketController.listWithoutConnection);
+ticketRoutes.get("/tickets", noStoreCache, TicketController.index);
+ticketRoutes.get("/tickets/pinned", noStoreCache, TicketController.listPinned);
+ticketRoutes.get(
+  "/tickets/without-connection",
+  noStoreCache,
+  TicketController.listWithoutConnection
+);
 ticketRoutes.post("/tickets/bulk-assign-connection", TicketController.bulkAssignConnection);
 
 ticketRoutes.post("/tickets/:ticketId/pin", TicketController.pin);

@@ -126,7 +126,10 @@ export function buildShowAllTicketListWhere(
   queueIds: number[],
   companyId: number
 ): Filterable["where"] {
-  const base = queueInAllowedOrUnassigned(queueIds);
+  const base =
+    Array.isArray(queueIds) && queueIds.length > 0
+      ? queueInAllowedOrUnassigned(queueIds)
+      : {};
   if (isWhatsappTicketVisibilityPrivileged(actor)) {
     return base;
   }

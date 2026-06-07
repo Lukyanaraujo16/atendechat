@@ -2,6 +2,10 @@ import { useState, useEffect } from "react";
 import toastError from "../../errors/toastError";
 
 import api from "../../services/api";
+import {
+  isValidTicketsApiResponse,
+  TICKETS_NO_CACHE_HEADERS,
+} from "../../utils/ticketsApiResponse";
 
 /**
  * Busca tickets na API. Sem debounce aqui: debounce de busca fica no componente
@@ -41,9 +45,6 @@ const useTickets = ({
 
     let cancelled = false;
     setLoading(true);
-    if (!countOnly) {
-      setTickets([]);
-    }
 
     const fetchTickets = async () => {
       try {
@@ -72,8 +73,16 @@ const useTickets = ({
         }
         if (users != null && users !== "" && users !== "[]") params.users = users;
 
-        const { data } = await api.get("/tickets", { params });
+        const response = await api.get("/tickets", {
+          params,
+          headers: TICKETS_NO_CACHE_HEADERS,
+        });
         if (cancelled) return;
+        if (!isValidTicketsApiResponse(response)) {
+          setLoading(false);
+          return;
+        }
+        const { data } = response;
         setCount(typeof data.count === "number" ? data.count : 0);
         if (!countOnly) {
           setTickets(Array.isArray(data.tickets) ? data.tickets : []);

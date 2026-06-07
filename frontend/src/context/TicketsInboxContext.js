@@ -13,6 +13,10 @@ import useTickets from "../hooks/useTickets";
 import api from "../services/api";
 import toastError from "../errors/toastError";
 import sortOpenTicketsWithPins from "../utils/sortOpenTicketsWithPins";
+import {
+  isValidTicketsApiResponse,
+  TICKETS_NO_CACHE_HEADERS,
+} from "../utils/ticketsApiResponse";
 
 /** Mantém a mesma referência de array se todos os elementos forem === aos anteriores (ordem e tamanho iguais). */
 function stabilizeListByRef(prevList, nextList) {
@@ -355,9 +359,14 @@ export function TicketsInboxProvider({
       let hasMore = true;
 
       while (page <= 10 && hasMore) {
-        const { data } = await api.get("/tickets", {
+        const response = await api.get("/tickets", {
           params: { ...baseParams, pageNumber: page },
+          headers: TICKETS_NO_CACHE_HEADERS,
         });
+        if (!isValidTicketsApiResponse(response)) {
+          return { tickets: null, count: null, hasMore: null, skipped: true };
+        }
+        const { data } = response;
         const raw = Array.isArray(data?.tickets) ? data.tickets : [];
         const batch =
           recentlyDeletedIdsRef.current.size > 0
@@ -377,6 +386,7 @@ export function TicketsInboxProvider({
         tickets: all,
         count: responseComplete ? total : all.length,
         hasMore: !responseComplete && hasMore,
+        skipped: false,
       };
     },
     [showAll, queueIdsJson]
@@ -387,10 +397,14 @@ export function TicketsInboxProvider({
       if (!fetchEnabled && !ignoreUiGate) return;
       setPendingColumnLoading(true);
       try {
-        const { tickets, hasMore } = await fetchAllTicketsForColumn({
+        const result = await fetchAllTicketsForColumn({
           status: "pending",
           chatbot: "false",
         });
+        if (result.skipped) {
+          return;
+        }
+        const { tickets, hasMore } = result;
         waitingSyncAtRef.current = Date.now();
         setWaitingTicketsList((prev) => {
           const next = applySafeColumnMerge(
@@ -424,10 +438,14 @@ export function TicketsInboxProvider({
       if (!fetchEnabled && !ignoreUiGate) return;
       setChatbotColumnLoading(true);
       try {
-        const { tickets, hasMore } = await fetchAllTicketsForColumn({
+        const result = await fetchAllTicketsForColumn({
           status: "pending",
           chatbot: "true",
         });
+        if (result.skipped) {
+          return;
+        }
+        const { tickets, hasMore } = result;
         chatbotSyncAtRef.current = Date.now();
         setChatbotTicketsList((prev) => {
           const next = applySafeColumnMerge(
@@ -479,7 +497,7 @@ export function TicketsInboxProvider({
   const refreshTabCounts = useCallback(async () => {
     if (!fetchEnabled) return;
     try {
-      const { data: openRes } = await api.get("/tickets", {
+      const openResponse = await api.get("/tickets", {
         params: {
           pageNumber: 1,
           countOnly: true,
@@ -487,15 +505,18 @@ export function TicketsInboxProvider({
           queueIds: queueIdsJson,
           status: "open",
         },
+        headers: TICKETS_NO_CACHE_HEADERS,
       });
       await Promise.all([
         syncWaitingColumnFromApi(),
         syncChatbotColumnFromApi(),
       ]);
-      setTabCounts((prev) => ({
-        ...prev,
-        open: Number(openRes?.count) || 0,
-      }));
+      if (isValidTicketsApiResponse(openResponse)) {
+        setTabCounts((prev) => ({
+          ...prev,
+          open: Number(openResponse.data?.count) || 0,
+        }));
+      }
     } catch (err) {
       toastError(err);
     }
@@ -1167,7 +1188,7 @@ export function TicketsInboxProvider({
     const nextPage = pendingPage + 1;
     setPendingColumnLoading(true);
     try {
-      const { data } = await api.get("/tickets", {
+      const response = await api.get("/tickets", {
         params: {
           pageNumber: nextPage,
           status: "pending",
@@ -1175,11 +1196,17 @@ export function TicketsInboxProvider({
           showAll,
           queueIds: queueIdsJson,
         },
+        headers: TICKETS_NO_CACHE_HEADERS,
       });
-      const batch = Array.isArray(data?.tickets) ? data.tickets : [];
+      if (!isValidTicketsApiResponse(response)) {
+        return;
+      }
+      const batch = Array.isArray(response.data?.tickets)
+        ? response.data.tickets
+        : [];
       setWaitingTicketsList((prev) => mergeLoadBatch(prev, batch));
       setPendingPage(nextPage);
-      setPendingHasMore(Boolean(data?.hasMore));
+      setPendingHasMore(Boolean(response.data?.hasMore));
     } catch (err) {
       toastError(err);
     } finally {
@@ -1199,7 +1226,7 @@ export function TicketsInboxProvider({
     const nextPage = chatbotPage + 1;
     setChatbotColumnLoading(true);
     try {
-      const { data } = await api.get("/tickets", {
+      const response = await api.get("/tickets", {
         params: {
           pageNumber: nextPage,
           status: "pending",
@@ -1207,11 +1234,17 @@ export function TicketsInboxProvider({
           showAll,
           queueIds: queueIdsJson,
         },
+        headers: TICKETS_NO_CACHE_HEADERS,
       });
-      const batch = Array.isArray(data?.tickets) ? data.tickets : [];
+      if (!isValidTicketsApiResponse(response)) {
+        return;
+      }
+      const batch = Array.isArray(response.data?.tickets)
+        ? response.data.tickets
+        : [];
       setChatbotTicketsList((prev) => mergeLoadBatch(prev, batch));
       setChatbotPage(nextPage);
-      setChatbotHasMore(Boolean(data?.hasMore));
+      setChatbotHasMore(Boolean(response.data?.hasMore));
     } catch (err) {
       toastError(err);
     } finally {
