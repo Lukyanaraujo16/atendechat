@@ -555,6 +555,7 @@ const MessageInputCustom = (props) => {
   const [signMessage, setSignMessage] = useLocalStorage("signOption", true);
   const documentInputRef = useRef(null);
   const mediaInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
   const { sendStickerToTicket } = useStickers();
   const canManageStickers =
     user?.profile === "admin" || user?.profile === "supervisor";
@@ -897,11 +898,21 @@ const MessageInputCustom = (props) => {
             accept="image/*,video/*"
             onChange={handleChangeMedias}
           />
+          <input
+            ref={cameraInputRef}
+            type="file"
+            className={classes.uploadInput}
+            disabled={disableOption()}
+            accept="image/*"
+            capture="environment"
+            onChange={handleChangeMedias}
+          />
           <ComposerAttachMenu
             disabled={disableOption()}
             quickRepliesEnabled={quickRepliesEnabled}
             onPickDocument={() => documentInputRef.current?.click()}
             onPickMedia={() => mediaInputRef.current?.click()}
+            onPickCamera={() => cameraInputRef.current?.click()}
             onOpenStickerLibrary={() => openComposerPanel("stickers")}
             onStartRecording={() => {
               if (!disableOption()) {

@@ -14,6 +14,7 @@ import PhotoLibraryOutlinedIcon from "@material-ui/icons/PhotoLibraryOutlined";
 import MicNoneOutlinedIcon from "@material-ui/icons/MicNoneOutlined";
 import FlashOnOutlinedIcon from "@material-ui/icons/FlashOnOutlined";
 import ImageOutlinedIcon from "@material-ui/icons/ImageOutlined";
+import PhotoCameraOutlinedIcon from "@material-ui/icons/PhotoCameraOutlined";
 
 import { i18n } from "../../translate/i18n";
 import useIsMobile from "../../hooks/useIsMobile";
@@ -74,6 +75,7 @@ export default function ComposerAttachMenu({
   quickRepliesEnabled,
   onPickDocument,
   onPickMedia,
+  onPickCamera,
   onOpenStickerLibrary,
   onStartRecording,
   onOpenQuickReplies,
@@ -103,6 +105,12 @@ export default function ComposerAttachMenu({
       icon: <InsertDriveFileOutlinedIcon />,
       primary: i18n.t("messagesInput.attach.document"),
       onClick: onPickDocument,
+    },
+    isMobile && {
+      key: "camera",
+      icon: <PhotoCameraOutlinedIcon />,
+      primary: i18n.t("messagesInput.attach.camera"),
+      onClick: onPickCamera,
     },
     {
       key: "media",

@@ -4866,6 +4866,9 @@ const messages = {
         signMessage: "Firmar",
         sticker: "Enviar sticker (WebP)",
         stickerOnlyWebp: "El sticker debe ser un archivo .webp",
+        attach: {
+          camera: "Cámara",
+        },
         stickers: {
           uploadHint: "PNG, JPG o WebP. Las imágenes se convertirán en sticker.",
           invalidFormat: "Formato no válido. Use PNG, JPG o WebP.",

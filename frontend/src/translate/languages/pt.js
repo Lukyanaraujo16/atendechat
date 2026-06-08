@@ -5239,6 +5239,7 @@ const messages = {
         attach: {
           menuTitle: "Anexar",
           document: "Documento",
+          camera: "Câmera",
           photosVideos: "Fotos e vídeos",
           audio: "Áudio",
           quickReply: "Resposta rápida",

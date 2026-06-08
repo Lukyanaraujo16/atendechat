@@ -5092,6 +5092,7 @@ const messages = {
 				attach: {
 					menuTitle: "Attach",
 					document: "Document",
+					camera: "Camera",
 					photosVideos: "Photos & videos",
 					audio: "Audio",
 					quickReply: "Quick reply",
