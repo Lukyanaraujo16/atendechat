@@ -133,9 +133,9 @@ const REALTIME_SKEW_MS = 8000;
 export function isRealtimeInboundMessage(message, sessionStartMs) {
   if (!sessionStartMs || !message) return false;
   const raw = message.createdAt;
-  if (!raw) return true;
+  if (!raw) return false;
   const ts = new Date(raw).getTime();
-  if (Number.isNaN(ts)) return true;
+  if (Number.isNaN(ts)) return false;
   return ts >= sessionStartMs - REALTIME_SKEW_MS;
 }
 

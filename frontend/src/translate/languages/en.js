@@ -3546,6 +3546,9 @@ const messages = {
 				markAllRead: "Mark all as read",
 				unreadCount: "{{count}} unread",
 				noUnread: "No pending notifications",
+				backgroundSummaryOne: "You received 1 new message while you were away.",
+				backgroundSummary:
+					"You received {{count}} new messages while you were away.",
 			},
 			unifiedNotificationBell: {
 				ariaLabel: "Notifications",

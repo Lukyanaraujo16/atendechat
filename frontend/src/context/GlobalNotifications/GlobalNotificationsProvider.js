@@ -1,5 +1,6 @@
 import React, { useCallback, useContext, useEffect, useRef } from "react";
 import { useHistory, useLocation } from "react-router-dom";
+import { toast } from "react-toastify";
 
 import { AuthContext } from "../Auth/AuthContext";
 import { SocketContext } from "../Socket/SocketContext";
@@ -36,6 +37,13 @@ import {
   showOrUpdateMessageToast,
 } from "../../utils/globalMessageToast";
 import "../../styles/globalMessageToast.css";
+import {
+  BACKGROUND_SUMMARY_TOAST_ID,
+  initPageVisibilityNotifications,
+  queueBackgroundNotification,
+  registerNotificationFlushHandlers,
+  shouldDeferUiNotification,
+} from "../../utils/pageVisibilityNotifications";
 
 const SOUND_DEBOUNCE_MS = 1000;
 
@@ -138,6 +146,24 @@ function GlobalNotificationsSocketBridge({ children }) {
     });
   }, []);
 
+  const showBackgroundSummaryToast = useCallback((count) => {
+    const total = Number(count) || 0;
+    if (total <= 0) return;
+
+    const text =
+      total === 1
+        ? i18n.t("globalNotifications.backgroundSummaryOne")
+        : i18n.t("globalNotifications.backgroundSummary", { count: total });
+
+    toast.info(text, {
+      toastId: BACKGROUND_SUMMARY_TOAST_ID,
+      position: "top-right",
+      autoClose: 6000,
+      hideProgressBar: false,
+      closeOnClick: true,
+    });
+  }, []);
+
   const showInternalChatToast = useCallback((notification, onOpen) => {
     const toastId = notification.dedupeKey || notification.id;
     showOrUpdateMessageToast({
@@ -187,6 +213,27 @@ function GlobalNotificationsSocketBridge({ children }) {
     const segment = match[1];
     markAsReadByChat({ chatId: segment, chatUuid: segment });
   }, [location.pathname, markAsReadByChat]);
+
+  useEffect(() => {
+    registerNotificationFlushHandlers({
+      playSound: () => {
+        const now = Date.now();
+        if (now - lastSoundAtRef.current < SOUND_DEBOUNCE_MS) {
+          return;
+        }
+        lastSoundAtRef.current = now;
+        playNotificationSoundThrottled(
+          playNotificationSound,
+          NOTIFICATION_SOUND_TYPES.newMessage
+        );
+      },
+      showSummaryToast: showBackgroundSummaryToast,
+    });
+  }, [playNotificationSound, showBackgroundSummaryToast]);
+
+  useEffect(() => {
+    return initPageVisibilityNotifications();
+  }, []);
 
   useEffect(() => {
     const match = location.pathname.match(/^\/tickets\/([^/?#]+)/);
@@ -248,6 +295,11 @@ function GlobalNotificationsSocketBridge({ children }) {
       };
 
       addNotification(notification);
+
+      if (shouldDeferUiNotification()) {
+        queueBackgroundNotification({ messageId: message?.id });
+        return;
+      }
 
       if (ticketOpen || toastVariant === "none") {
         playSound(NOTIFICATION_SOUND_TYPES.openConversationMessage, {
@@ -330,6 +382,11 @@ function GlobalNotificationsSocketBridge({ children }) {
       };
 
       addNotification(notification);
+
+      if (shouldDeferUiNotification()) {
+        queueBackgroundNotification({ messageId: newMessage?.id });
+        return;
+      }
 
       if (chatOpen) {
         if (openConversationEnabled) {
