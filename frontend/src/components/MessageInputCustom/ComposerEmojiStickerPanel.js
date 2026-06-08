@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Picker } from "emoji-mart";
 import Tabs from "@material-ui/core/Tabs";
 import Tab from "@material-ui/core/Tab";
@@ -6,6 +6,7 @@ import Box from "@material-ui/core/Box";
 import IconButton from "@material-ui/core/IconButton";
 import CircularProgress from "@material-ui/core/CircularProgress";
 import Typography from "@material-ui/core/Typography";
+import ClickAwayListener from "@material-ui/core/ClickAwayListener";
 import AddIcon from "@material-ui/icons/Add";
 import DeleteOutlineIcon from "@material-ui/icons/DeleteOutline";
 import { makeStyles } from "@material-ui/core/styles";
@@ -14,11 +15,7 @@ import clsx from "clsx";
 import { i18n } from "../../translate/i18n";
 import useIsMobile from "../../hooks/useIsMobile";
 import useStickers, { stickerPreviewUrl } from "../../hooks/useStickers";
-import {
-  AppDialog,
-  AppDialogTitle,
-  AppDialogContent,
-} from "../../ui";
+import ComposerBottomSheet from "./ComposerBottomSheet";
 import StickerUploadDialog from "./StickerUploadDialog";
 
 const useStyles = makeStyles((theme) => ({
@@ -129,11 +126,16 @@ const useStyles = makeStyles((theme) => ({
     justifyContent: "center",
     padding: theme.spacing(3),
   },
+  mobileSheetContent: {
+    display: "flex",
+    flexDirection: "column",
+    minHeight: 0,
+    overflow: "hidden",
+  },
 }));
 
 /**
- * Painel unificado Emoji + Figurinhas (Fase 2).
- * data-composer-sticker-phase="library" prepara evolução Baileys/biblioteca salva.
+ * Painel unificado Emoji + Figurinhas.
  */
 export default function ComposerEmojiStickerPanel({
   open,
@@ -155,18 +157,32 @@ export default function ComposerEmojiStickerPanel({
     deleteSticker,
   } = useStickers();
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (open) {
       setTab(initialTab);
     }
   }, [open, initialTab]);
 
-  const handleStickerClick = async (sticker) => {
-    if (!sticker?.id || sendingStickerId) return;
-    if (typeof onStickerSend === "function") {
-      await onStickerSend(sticker);
-    }
-  };
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open, onClose]);
+
+  const handleStickerClick = useCallback(
+    async (sticker) => {
+      if (!sticker?.id || sendingStickerId) return;
+      if (typeof onStickerSend === "function") {
+        await onStickerSend(sticker);
+      }
+    },
+    [onStickerSend, sendingStickerId]
+  );
 
   const handleDelete = async (e, sticker) => {
     e.stopPropagation();
@@ -178,6 +194,11 @@ export default function ComposerEmojiStickerPanel({
       /* toast in hook */
     }
   };
+
+  const panelTitle =
+    tab === "stickers"
+      ? i18n.t("messagesInput.stickers.tabStickers")
+      : i18n.t("messagesInput.stickers.tabEmoji");
 
   const stickerTabContent = (
     <Box className={classes.panelBody} data-composer-sticker-phase="library">
@@ -295,18 +316,19 @@ export default function ComposerEmojiStickerPanel({
   return (
     <>
       {isMobile ? (
-        <AppDialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-          <AppDialogTitle>
-            {tab === "stickers"
-              ? i18n.t("messagesInput.stickers.tabStickers")
-              : i18n.t("messagesInput.stickers.tabEmoji")}
-          </AppDialogTitle>
-          <AppDialogContent dividers={false} style={{ padding: 0 }}>
-            {panelInner}
-          </AppDialogContent>
-        </AppDialog>
+        <ComposerBottomSheet
+          open={open}
+          onClose={onClose}
+          title={panelTitle}
+          maxHeight="60vh"
+          contentClassName={classes.mobileSheetContent}
+        >
+          {panelInner}
+        </ComposerBottomSheet>
       ) : open ? (
-        <Box className={classes.desktopPanel}>{panelInner}</Box>
+        <ClickAwayListener onClickAway={onClose}>
+          <Box className={classes.desktopPanel}>{panelInner}</Box>
+        </ClickAwayListener>
       ) : null}
 
       <StickerUploadDialog

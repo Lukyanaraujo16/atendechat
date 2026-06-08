@@ -910,6 +910,7 @@ const MessageInputCustom = (props) => {
           <ComposerAttachMenu
             disabled={disableOption()}
             quickRepliesEnabled={quickRepliesEnabled}
+            onMenuOpen={() => setComposerPanelOpen(false)}
             onPickDocument={() => documentInputRef.current?.click()}
             onPickMedia={() => mediaInputRef.current?.click()}
             onPickCamera={() => cameraInputRef.current?.click()}

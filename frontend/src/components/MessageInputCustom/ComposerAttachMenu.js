@@ -18,11 +18,7 @@ import PhotoCameraOutlinedIcon from "@material-ui/icons/PhotoCameraOutlined";
 
 import { i18n } from "../../translate/i18n";
 import useIsMobile from "../../hooks/useIsMobile";
-import {
-  AppDialog,
-  AppDialogTitle,
-  AppDialogContent,
-} from "../../ui";
+import ComposerBottomSheet from "./ComposerBottomSheet";
 
 const useStyles = makeStyles((theme) => ({
   attachButton: {
@@ -59,6 +55,7 @@ const useStyles = makeStyles((theme) => ({
   },
   mobileList: {
     padding: 0,
+    paddingBottom: theme.spacing(1),
   },
   mobileListItem: {
     paddingTop: theme.spacing(1.5),
@@ -68,7 +65,6 @@ const useStyles = makeStyles((theme) => ({
 
 /**
  * Menu de anexos do composer (estilo WhatsApp).
- * Fase 2: figurinhas salvas / envio real via Baileys — hoje só upload WebP.
  */
 export default function ComposerAttachMenu({
   disabled,
@@ -79,6 +75,7 @@ export default function ComposerAttachMenu({
   onOpenStickerLibrary,
   onStartRecording,
   onOpenQuickReplies,
+  onMenuOpen,
 }) {
   const classes = useStyles();
   const isMobile = useIsMobile();
@@ -89,7 +86,13 @@ export default function ComposerAttachMenu({
 
   const handleToggle = () => {
     if (disabled) return;
-    setOpen((prev) => !prev);
+    setOpen((prev) => {
+      const next = !prev;
+      if (next && typeof onMenuOpen === "function") {
+        onMenuOpen();
+      }
+      return next;
+    });
   };
 
   const runAction = (action) => {
@@ -189,15 +192,14 @@ export default function ComposerAttachMenu({
       </IconButton>
 
       {isMobile ? (
-        <AppDialog
+        <ComposerBottomSheet
           open={open}
           onClose={handleClose}
-          fullWidth
-          maxWidth="xs"
+          title={i18n.t("messagesInput.attach.menuTitle")}
+          maxHeight="50vh"
         >
-          <AppDialogTitle>{i18n.t("messagesInput.attach.menuTitle")}</AppDialogTitle>
-          <AppDialogContent dividers={false}>{renderList(true)}</AppDialogContent>
-        </AppDialog>
+          {renderList(true)}
+        </ComposerBottomSheet>
       ) : (
         <Popover
           open={open}
