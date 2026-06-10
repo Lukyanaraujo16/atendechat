@@ -161,6 +161,19 @@ module.exports = {
         allowNull: false,
         defaultValue: "manual"
       },
+      priority: {
+        type: DataTypes.STRING(16),
+        allowNull: false,
+        defaultValue: "medium"
+      },
+      tags: {
+        type: DataTypes.JSON,
+        allowNull: true
+      },
+      lastActivityAt: {
+        type: DataTypes.DATE,
+        allowNull: true
+      },
       expectedCloseAt: {
         type: DataTypes.DATE,
         allowNull: true
