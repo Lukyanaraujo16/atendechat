@@ -5,6 +5,7 @@ const MAX_LOG_LINES = 500;
 export type SystemUpdateJobStatus = "running" | "success" | "failed" | "timeout";
 
 export type SystemUpdateJobLogLine = {
+  seq: number;
   line: string;
   ts: string;
 };
@@ -24,6 +25,7 @@ export type SystemUpdateJobSnapshot = {
 
 let activeJob: SystemUpdateJobSnapshot | null = null;
 let lastJob: SystemUpdateJobSnapshot | null = null;
+let nextLogSeq = 0;
 
 export function beginSystemUpdateJobSnapshot(params: {
   jobId: string;
@@ -31,6 +33,7 @@ export function beginSystemUpdateJobSnapshot(params: {
   userId: number;
   command: string;
 }): void {
+  nextLogSeq = 0;
   activeJob = {
     jobId: params.jobId,
     action: params.action,
@@ -47,14 +50,17 @@ export function appendSystemUpdateJobLog(
   jobId: string,
   line: string,
   ts: string
-): void {
+): number {
   if (!activeJob || activeJob.jobId !== jobId || activeJob.userId !== userId) {
-    return;
+    return 0;
   }
-  activeJob.logs.push({ line, ts });
+  nextLogSeq += 1;
+  activeJob.logs.push({ seq: nextLogSeq, line, ts });
   if (activeJob.logs.length > MAX_LOG_LINES) {
-    activeJob.logs.splice(0, activeJob.logs.length - MAX_LOG_LINES);
+    const overflow = activeJob.logs.length - MAX_LOG_LINES;
+    activeJob.logs.splice(0, overflow);
   }
+  return nextLogSeq;
 }
 
 export function finishSystemUpdateJobSnapshot(params: {

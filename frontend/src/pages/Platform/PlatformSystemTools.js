@@ -290,7 +290,8 @@ export default function PlatformSystemTools() {
   const pendingRestartRef = useRef(false);
   const monitorInFlightRef = useRef(false);
   const activeJobIdRef = useRef(null);
-  const syncedLogCountRef = useRef(0);
+  const lastServerLogSeqRef = useRef(0);
+  const seenServerLogKeysRef = useRef(new Set());
   const socketEventReceivedRef = useRef(false);
   const socketWatchdogRef = useRef(null);
   const jobRunningRef = useRef(false);
@@ -310,6 +311,42 @@ export default function PlatformSystemTools() {
     ]);
   }, []);
 
+  const resetServerLogTracking = useCallback((jobId, { force = false } = {}) => {
+    if (!force && jobId != null && activeJobIdRef.current === jobId) {
+      return;
+    }
+    activeJobIdRef.current = jobId ?? null;
+    lastServerLogSeqRef.current = 0;
+    seenServerLogKeysRef.current = new Set();
+  }, []);
+
+  const ingestServerLog = useCallback(
+    (jobId, entry) => {
+      if (!entry?.line) return false;
+      if (jobId && activeJobIdRef.current && jobId !== activeJobIdRef.current) {
+        return false;
+      }
+      if (jobId && !activeJobIdRef.current) {
+        activeJobIdRef.current = jobId;
+      }
+
+      const seq = Number(entry.seq);
+      if (Number.isFinite(seq) && seq > 0) {
+        if (seq <= lastServerLogSeqRef.current) return false;
+        lastServerLogSeqRef.current = seq;
+        appendLog(entry.line, entry.ts);
+        return true;
+      }
+
+      const dedupeKey = `${jobId || activeJobIdRef.current || "job"}|${entry.ts}|${entry.line}`;
+      if (seenServerLogKeysRef.current.has(dedupeKey)) return false;
+      seenServerLogKeysRef.current.add(dedupeKey);
+      appendLog(entry.line, entry.ts);
+      return true;
+    },
+    [appendLog]
+  );
+
   const clearSocketWatchdog = useCallback(() => {
     if (socketWatchdogRef.current) {
       clearTimeout(socketWatchdogRef.current);
@@ -321,16 +358,19 @@ export default function PlatformSystemTools() {
     (job, { reset = false } = {}) => {
       if (!job?.logs?.length) return;
       if (reset || activeJobIdRef.current !== job.jobId) {
-        activeJobIdRef.current = job.jobId;
-        syncedLogCountRef.current = 0;
+        resetServerLogTracking(job.jobId);
       }
-      const pending = job.logs.slice(syncedLogCountRef.current);
-      if (!pending.length) return;
-      syncedLogCountRef.current = job.logs.length;
-      socketEventReceivedRef.current = true;
-      pending.forEach((entry) => appendLog(entry.line, entry.ts));
+      let ingested = false;
+      job.logs.forEach((entry) => {
+        if (ingestServerLog(job.jobId, entry)) {
+          ingested = true;
+        }
+      });
+      if (ingested) {
+        socketEventReceivedRef.current = true;
+      }
     },
-    [appendLog]
+    [ingestServerLog, resetServerLogTracking]
   );
 
   const applyJobSnapshot = useCallback(
@@ -435,24 +475,18 @@ export default function PlatformSystemTools() {
       clearSocketWatchdog();
       setJobRunning(true);
       if (payload?.jobId) {
-        activeJobIdRef.current = payload.jobId;
-        syncedLogCountRef.current = 0;
+        resetServerLogTracking(payload.jobId);
       }
       if (payload?.restartsBackend || payload?.action === "backend_restart") {
         pendingRestartRef.current = true;
       }
-      if (payload?.command) {
-        appendLog(`[${formatTime()}] ${payload.command}`, new Date().toISOString());
-      }
     };
 
     const onLog = (payload) => {
-      socketEventReceivedRef.current = true;
       clearSocketWatchdog();
-      if (payload?.jobId && activeJobIdRef.current && payload.jobId !== activeJobIdRef.current) {
-        return;
+      if (ingestServerLog(payload?.jobId, payload)) {
+        socketEventReceivedRef.current = true;
       }
-      if (payload?.line) appendLog(payload.line, payload.ts);
     };
 
     const onDone = (payload) => {
@@ -461,14 +495,6 @@ export default function PlatformSystemTools() {
       setJobRunning(false);
       pendingRestartRef.current = false;
       setBackendRestarting(false);
-      const status = payload?.status || "done";
-      const msg =
-        status === "success"
-          ? i18n.t("platform.systemTools.terminal.success")
-          : status === "timeout"
-            ? i18n.t("platform.systemTools.terminal.timeout")
-            : i18n.t("platform.systemTools.terminal.failed");
-      appendLog(`[${formatTime()}] ${msg}`, new Date().toISOString());
       fetchCurrentJob();
     };
 
@@ -500,9 +526,10 @@ export default function PlatformSystemTools() {
     socketManager,
     user?.id,
     user?.companyId,
-    appendLog,
     clearSocketWatchdog,
     fetchCurrentJob,
+    ingestServerLog,
+    resetServerLogTracking,
   ]);
 
   useEffect(() => {
@@ -525,8 +552,7 @@ export default function PlatformSystemTools() {
 
     setJobRunning(true);
     socketEventReceivedRef.current = false;
-    syncedLogCountRef.current = 0;
-    activeJobIdRef.current = null;
+    resetServerLogTracking(null, { force: true });
     clearSocketWatchdog();
     socketWatchdogRef.current = setTimeout(() => {
       if (!socketEventReceivedRef.current && jobRunningRef.current) {
@@ -541,7 +567,9 @@ export default function PlatformSystemTools() {
     try {
       const { data } = await api.post(`/system/update/${action}`);
       if (data?.jobId) {
-        activeJobIdRef.current = data.jobId;
+        if (!activeJobIdRef.current) {
+          activeJobIdRef.current = data.jobId;
+        }
         appendLog(
           `[${formatTime()}] ${i18n.t("platform.systemTools.terminal.accepted", { jobId: data.jobId })}`,
           new Date().toISOString()

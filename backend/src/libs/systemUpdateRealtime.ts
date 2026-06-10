@@ -8,6 +8,7 @@ export type SystemUpdateSocketPayload = {
   restartsBackend?: boolean;
   line?: string;
   ts?: string;
+  seq?: number;
   status?: "success" | "failed" | "timeout";
   durationMs?: number;
   message?: string;

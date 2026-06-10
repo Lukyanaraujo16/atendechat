@@ -41,8 +41,10 @@ export function getCurrentSystemUpdateJobForUser(userId: number) {
 
 function pushJobLog(userId: number, jobId: string, line: string, ts?: string): void {
   const iso = ts || new Date().toISOString();
-  appendSystemUpdateJobLog(userId, jobId, line, iso);
-  emitSystemUpdateLog(userId, { jobId, line, ts: iso });
+  const seq = appendSystemUpdateJobLog(userId, jobId, line, iso);
+  if (seq > 0) {
+    emitSystemUpdateLog(userId, { jobId, line, ts: iso, seq });
+  }
 }
 
 function sudoHintLine(message: string): string | null {
