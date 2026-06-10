@@ -1418,6 +1418,54 @@ const messages = {
 			},
 			connections: {
 				title: "Connections",
+				tabs: {
+					whatsapp: "WhatsApp",
+					instagram: "Instagram",
+				},
+				instagram: {
+					guide: {
+						title: "How to set up Instagram Direct",
+						intro: "In this phase you can register placeholder accounts and link queues. Meta connection will be enabled in the next phase.",
+						step1: "Click \"Add Instagram account\", enter a name and save.",
+						step2: "Link the queues that will handle messages for this account.",
+					},
+					statusLabel: {
+						CONNECTED: "Connected",
+						DISCONNECTED: "Disconnected",
+						ERROR: "Error",
+						PENDING: "Pending",
+					},
+					toasts: {
+						deleted: "Instagram account deleted successfully!",
+					},
+					confirmationModal: {
+						deleteTitle: "Delete account",
+						deleteMessage: "Are you sure? This action cannot be undone.",
+					},
+					buttons: {
+						add: "Add Instagram account",
+						connectMeta: "Connect with Meta",
+						connectMetaTooltip: "Available in the next phase",
+					},
+					table: {
+						name: "Name",
+						status: "Status",
+						queues: "Queues",
+						lastUpdate: "Last update",
+						default: "Default",
+						actions: "Actions",
+						emptyTitle: "No Instagram accounts",
+						emptyHint: "Add an account to prepare Direct messaging support.",
+						noQueues: "No linked queues",
+					},
+					mobile: {
+						actions: "Account actions",
+						lastUpdate: "Updated",
+						defaultAccount: "Default",
+						edit: "Edit",
+						delete: "Delete",
+					},
+				},
 				guide: {
 					title: "How to connect WhatsApp",
 					intro: "No paid API needed. Connection is via QR Code (like WhatsApp Web).",
@@ -1489,6 +1537,30 @@ const messages = {
 					edit: "Edit",
 					delete: "Delete",
 				},
+			},
+			instagramAccountModal: {
+				title: {
+					add: "Add Instagram account",
+					edit: "Edit Instagram account",
+				},
+				formErrors: {
+					name: {
+						short: "Name too short",
+						long: "Name too long",
+						required: "Name is required",
+					},
+				},
+				form: {
+					name: "Account name",
+					default: "Default account",
+				},
+				buttons: {
+					cancel: "Cancel",
+					okAdd: "Add",
+					okEdit: "Save",
+				},
+				success: "Instagram account updated successfully!",
+				successCreate: "Instagram account created successfully!",
 			},
 			whatsappModal: {
 				title: {

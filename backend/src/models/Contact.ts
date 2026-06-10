@@ -37,6 +37,14 @@ class Contact extends Model<Contact> {
   @Column
   number: string;
 
+  @Default("whatsapp")
+  @Column(DataType.STRING(16))
+  channel: string;
+
+  @AllowNull(true)
+  @Column
+  instagramScopedId: string;
+
   @AllowNull(false)
   @Default("")
   @Column

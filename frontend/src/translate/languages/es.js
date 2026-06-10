@@ -1378,6 +1378,54 @@ const messages = {
       },
       connections: {
         title: "Conexiones",
+        tabs: {
+          whatsapp: "WhatsApp",
+          instagram: "Instagram",
+        },
+        instagram: {
+          guide: {
+            title: "Cómo configurar Instagram Direct",
+            intro: "En esta fase puede registrar cuentas placeholder y vincular colas. La conexión con Meta se habilitará en la próxima fase.",
+            step1: "Haga clic en \"Agregar cuenta Instagram\", ingrese el nombre y guarde.",
+            step2: "Vincule las colas que atenderán los mensajes de esta cuenta.",
+          },
+          statusLabel: {
+            CONNECTED: "Conectado",
+            DISCONNECTED: "Desconectado",
+            ERROR: "Error",
+            PENDING: "Pendiente",
+          },
+          toasts: {
+            deleted: "¡Cuenta de Instagram eliminada con éxito!",
+          },
+          confirmationModal: {
+            deleteTitle: "Eliminar cuenta",
+            deleteMessage: "¿Está seguro? Esta acción no puede ser revertida.",
+          },
+          buttons: {
+            add: "Agregar cuenta Instagram",
+            connectMeta: "Conectar con Meta",
+            connectMetaTooltip: "Disponible en la próxima fase",
+          },
+          table: {
+            name: "Nombre",
+            status: "Estado",
+            queues: "Colas",
+            lastUpdate: "Última actualización",
+            default: "Predeterminado",
+            actions: "Acciones",
+            emptyTitle: "Sin cuentas de Instagram",
+            emptyHint: "Agregue una cuenta para preparar el servicio por Direct.",
+            noQueues: "Sin colas vinculadas",
+          },
+          mobile: {
+            actions: "Acciones de la cuenta",
+            lastUpdate: "Actualizado",
+            defaultAccount: "Predeterminado",
+            edit: "Editar",
+            delete: "Eliminar",
+          },
+        },
         guide: {
           title: "Cómo conectar WhatsApp",
           intro: "No se necesita API de pago. La conexión es por código QR (como WhatsApp Web).",
@@ -1442,6 +1490,37 @@ const messages = {
           visibilityAll: "Todos",
           visibilityRestricted: "Restringido",
         },
+        mobile: {
+          actions: "Acciones de la conexión",
+          lastUpdate: "Actualizado",
+          defaultConnection: "Predeterminado",
+          edit: "Editar",
+          delete: "Eliminar",
+        },
+      },
+      instagramAccountModal: {
+        title: {
+          add: "Agregar cuenta Instagram",
+          edit: "Editar cuenta Instagram",
+        },
+        formErrors: {
+          name: {
+            short: "Nombre demasiado corto",
+            long: "Nombre demasiado largo",
+            required: "El nombre es obligatorio",
+          },
+        },
+        form: {
+          name: "Nombre de la cuenta",
+          default: "Cuenta predeterminada",
+        },
+        buttons: {
+          cancel: "Cancelar",
+          okAdd: "Agregar",
+          okEdit: "Guardar",
+        },
+        success: "¡Cuenta de Instagram actualizada con éxito!",
+        successCreate: "¡Cuenta de Instagram creada con éxito!",
       },
       whatsappModal: {
         title: {

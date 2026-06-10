@@ -21,6 +21,7 @@ import Message from "./Message";
 import Queue from "./Queue";
 import User from "./User";
 import Whatsapp from "./Whatsapp";
+import InstagramAccount from "./InstagramAccount";
 import Company from "./Company";
 import QueueOption from "./QueueOption";
 import Tag from "./Tag";
@@ -75,6 +76,18 @@ class Ticket extends Model<Ticket> {
 
   @BelongsTo(() => Whatsapp)
   whatsapp: Whatsapp;
+
+  @Default("whatsapp")
+  @Column(DataType.STRING(16))
+  channel: string;
+
+  @AllowNull(true)
+  @ForeignKey(() => InstagramAccount)
+  @Column
+  instagramAccountId: number;
+
+  @BelongsTo(() => InstagramAccount)
+  instagramAccount: InstagramAccount;
 
   @ForeignKey(() => Queue)
   @Column

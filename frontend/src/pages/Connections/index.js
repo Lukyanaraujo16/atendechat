@@ -19,6 +19,8 @@ import {
 	CircularProgress,
 	Box,
 	Chip,
+	Tabs,
+	Tab,
 } from "@material-ui/core";
 import {
 	Edit,
@@ -53,6 +55,7 @@ import {
 	MobileEntityCard,
 	MobileCardList,
 } from "../../ui";
+import InstagramConnectionsPanel from "../../components/InstagramConnectionsPanel";
 
 const useStyles = makeStyles(theme => ({
 	mainPaper: {
@@ -125,6 +128,10 @@ const useStyles = makeStyles(theme => ({
 		flexWrap: "wrap",
 		gap: theme.spacing(0.5),
 	},
+	channelTabs: {
+		marginBottom: theme.spacing(2),
+		borderBottom: `1px solid ${theme.palette.divider}`,
+	},
 }));
 
 const CustomToolTip = ({ title, content, children }) => {
@@ -171,6 +178,7 @@ const Connections = () => {
 	const [confirmModalInfo, setConfirmModalInfo] = useState(
 		confirmationModalInitialState
 	);
+	const [activeChannelTab, setActiveChannelTab] = useState("whatsapp");
 
 	const handleStartWhatsAppSession = async whatsAppId => {
 		try {
@@ -529,22 +537,39 @@ const Connections = () => {
 			<MainHeader>
 				<Title>{i18n.t("connections.title")}</Title>
 				<MainHeaderButtonsWrapper>
-					<Can
-						role={user.profile}
-						perform="connections-page:addConnection"
-						yes={() => (
-							<Button
-								variant="contained"
-								color="primary"
-								onClick={handleOpenWhatsAppModal}
-							>
-								{i18n.t("connections.buttons.add")}
-							</Button>
-						)}
-					/>
+					{activeChannelTab === "whatsapp" && (
+						<Can
+							role={user.profile}
+							perform="connections-page:addConnection"
+							yes={() => (
+								<Button
+									variant="contained"
+									color="primary"
+									onClick={handleOpenWhatsAppModal}
+								>
+									{i18n.t("connections.buttons.add")}
+								</Button>
+							)}
+						/>
+					)}
 				</MainHeaderButtonsWrapper>
 			</MainHeader>
 			<Paper className={classes.mainPaper} variant="outlined">
+				<Tabs
+					value={activeChannelTab}
+					onChange={(_, value) => setActiveChannelTab(value)}
+					indicatorColor="primary"
+					textColor="primary"
+					variant={isMobile ? "fullWidth" : "standard"}
+					className={classes.channelTabs}
+				>
+					<Tab value="whatsapp" label={i18n.t("connections.tabs.whatsapp")} />
+					<Tab value="instagram" label={i18n.t("connections.tabs.instagram")} />
+				</Tabs>
+				{activeChannelTab === "instagram" ? (
+					<InstagramConnectionsPanel />
+				) : (
+				<>
 				<Box className={`${classes.guideBox} ${isMobile ? classes.mobileGuide : ""}`}>
 					<Typography className={classes.guideTitle} variant="subtitle1">
 						{i18n.t("connections.guide.title")}
@@ -702,6 +727,8 @@ const Connections = () => {
 					</TableBody>
 					</Table>
 				</AppTableContainer>
+				)}
+				</>
 				)}
 			</Paper>
 		</MainContainer>

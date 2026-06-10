@@ -9,6 +9,8 @@ import Ticket from "../models/Ticket";
 import PinnedTicket from "../models/PinnedTicket";
 import TicketDeletionGuard from "../models/TicketDeletionGuard";
 import Whatsapp from "../models/Whatsapp";
+import InstagramAccount from "../models/InstagramAccount";
+import InstagramAccountQueue from "../models/InstagramAccountQueue";
 import ContactCustomField from "../models/ContactCustomField";
 import Message from "../models/Message";
 import Queue from "../models/Queue";
@@ -96,6 +98,8 @@ const models = [
   TicketDeletionGuard,
   Message,
   Whatsapp,
+  InstagramAccount,
+  InstagramAccountQueue,
   ContactCustomField,
   Setting,
   Queue,

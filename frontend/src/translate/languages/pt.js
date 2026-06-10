@@ -1493,6 +1493,54 @@ const messages = {
       },
       connections: {
         title: "Conexões",
+        tabs: {
+          whatsapp: "WhatsApp",
+          instagram: "Instagram",
+        },
+        instagram: {
+          guide: {
+            title: "Como configurar o Instagram Direct",
+            intro: "Nesta fase você pode cadastrar contas placeholder e vincular setores. A conexão com a Meta será habilitada na próxima fase.",
+            step1: "Clique em \"Adicionar conta Instagram\", informe o nome e salve.",
+            step2: "Vincule os setores/filas que atenderão mensagens desta conta.",
+          },
+          statusLabel: {
+            CONNECTED: "Conectado",
+            DISCONNECTED: "Desconectado",
+            ERROR: "Erro",
+            PENDING: "Pendente",
+          },
+          toasts: {
+            deleted: "Conta Instagram excluída com sucesso!",
+          },
+          confirmationModal: {
+            deleteTitle: "Excluir conta",
+            deleteMessage: "Você tem certeza? Essa ação não pode ser revertida.",
+          },
+          buttons: {
+            add: "Adicionar conta Instagram",
+            connectMeta: "Conectar com Meta",
+            connectMetaTooltip: "Disponível na próxima fase",
+          },
+          table: {
+            name: "Nome",
+            status: "Status",
+            queues: "Setores",
+            lastUpdate: "Última atualização",
+            default: "Padrão",
+            actions: "Ações",
+            emptyTitle: "Nenhuma conta Instagram",
+            emptyHint: "Adicione uma conta para preparar o atendimento via Direct.",
+            noQueues: "Nenhum setor vinculado",
+          },
+          mobile: {
+            actions: "Ações da conta",
+            lastUpdate: "Atualizado",
+            defaultAccount: "Padrão",
+            edit: "Editar",
+            delete: "Excluir",
+          },
+        },
         guide: {
           title: "Como conectar o WhatsApp",
           intro: "Não é necessário API paga. A conexão é por QR Code (como WhatsApp Web).",
@@ -1568,6 +1616,30 @@ const messages = {
           edit: "Editar",
           delete: "Excluir",
         },
+      },
+      instagramAccountModal: {
+        title: {
+          add: "Adicionar conta Instagram",
+          edit: "Editar conta Instagram",
+        },
+        formErrors: {
+          name: {
+            short: "Nome muito curto",
+            long: "Nome muito longo",
+            required: "Nome obrigatório",
+          },
+        },
+        form: {
+          name: "Nome da conta",
+          default: "Conta padrão",
+        },
+        buttons: {
+          cancel: "Cancelar",
+          okAdd: "Adicionar",
+          okEdit: "Salvar",
+        },
+        success: "Conta Instagram atualizada com sucesso!",
+        successCreate: "Conta Instagram criada com sucesso!",
       },
       whatsappModal: {
         title: {
