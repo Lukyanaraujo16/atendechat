@@ -57,6 +57,11 @@ module.exports = {
             allowNull: false,
             defaultValue: "private"
           },
+          color: {
+            type: DataTypes.STRING(16),
+            allowNull: true,
+            defaultValue: null
+          },
           createdAt: {
             type: DataTypes.DATE,
             allowNull: false
