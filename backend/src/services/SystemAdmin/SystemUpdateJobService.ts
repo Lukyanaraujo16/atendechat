@@ -4,13 +4,23 @@ import { logger } from "../../utils/logger";
 import {
   emitSystemUpdateDone,
   emitSystemUpdateLog,
-  emitSystemUpdateStart
+  emitSystemUpdateStart,
+  emitSystemUpdateStep
 } from "../../libs/systemUpdateRealtime";
+import {
+  FULL_UPDATE_JOB_ACTION,
+  FULL_UPDATE_SEQUENCE,
+  isSystemUpdateJobAction,
+  SystemUpdateJobAction
+} from "./fullUpdateSequence";
 import {
   appendSystemUpdateJobLog,
   beginSystemUpdateJobSnapshot,
   finishSystemUpdateJobSnapshot,
-  getSystemUpdateJobSnapshotForUser
+  getSystemUpdateJobSnapshotForUser,
+  initFullUpdateStepsSnapshot,
+  markRemainingFullUpdateStepsSkipped,
+  setFullUpdateStepStatus
 } from "./systemUpdateJobStore";
 import {
   isGitSystemUpdateAction,
@@ -22,7 +32,7 @@ import {
 
 let activeJob: {
   id: string;
-  action: SystemUpdateAction;
+  action: SystemUpdateJobAction;
   userId: number;
   startedAt: number;
 } | null = null;
@@ -47,6 +57,28 @@ function pushJobLog(userId: number, jobId: string, line: string, ts?: string): v
   }
 }
 
+function emitStep(
+  userId: number,
+  jobId: string,
+  stepIndex: number,
+  stepTotal: number,
+  stepLabel: string,
+  stepStatus: "pending" | "running" | "completed" | "failed" | "skipped",
+  action: string
+): void {
+  setFullUpdateStepStatus(userId, jobId, stepIndex, stepStatus);
+  const snapshot = getSystemUpdateJobSnapshotForUser(userId);
+  emitSystemUpdateStep(userId, {
+    jobId,
+    action: FULL_UPDATE_JOB_ACTION,
+    stepIndex,
+    stepTotal,
+    stepLabel,
+    stepStatus,
+    steps: snapshot.job?.steps
+  });
+}
+
 function sudoHintLine(message: string): string | null {
   const lower = message.toLowerCase();
   if (
@@ -62,12 +94,275 @@ function sudoHintLine(message: string): string | null {
   return null;
 }
 
+async function runSingleStep(
+  userId: number,
+  jobId: string,
+  action: SystemUpdateAction
+): Promise<void> {
+  const resolved = resolveWhitelistedCommand(action);
+  pushJobLog(userId, jobId, `[${new Date().toISOString()}] ${resolved.label}`);
+  pushJobLog(userId, jobId, `[cwd] ${resolved.cwd}`);
+  await runWhitelistedCommand(resolved, (line) => {
+    pushJobLog(userId, jobId, line);
+  });
+}
+
+async function runFullUpdateJob(
+  userId: number,
+  jobId: string
+): Promise<{ jobId: string; action: SystemUpdateJobAction }> {
+  const total = FULL_UPDATE_SEQUENCE.length;
+  const commandLabel = `Atualização completa (${total} etapas)`;
+
+  beginSystemUpdateJobSnapshot({
+    jobId,
+    action: FULL_UPDATE_JOB_ACTION,
+    userId,
+    command: commandLabel
+  });
+  initFullUpdateStepsSnapshot(
+    userId,
+    jobId,
+    FULL_UPDATE_SEQUENCE.map((s) => ({ action: s.action, label: s.stepLabel }))
+  );
+
+  emitSystemUpdateStart(userId, {
+    jobId,
+    action: FULL_UPDATE_JOB_ACTION,
+    command: commandLabel,
+    restartsBackend: true
+  });
+  pushJobLog(
+    userId,
+    jobId,
+    `[${new Date().toISOString()}] Iniciando atualização completa (${total} etapas)`
+  );
+
+  const flowStarted = Date.now();
+
+  for (let i = 0; i < FULL_UPDATE_SEQUENCE.length; i++) {
+    const step = FULL_UPDATE_SEQUENCE[i];
+    const stepIndex = i + 1;
+
+    emitStep(userId, jobId, stepIndex, total, step.stepLabel, "running", step.action);
+    pushJobLog(
+      userId,
+      jobId,
+      `[STEP ${stepIndex}/${total}] ${step.stepLabel}`
+    );
+
+    if (step.action === "backend_restart") {
+      pushJobLog(
+        userId,
+        jobId,
+        "Última etapa: reiniciando backend. A conexão pode cair por alguns segundos."
+      );
+    }
+
+    const stepStarted = Date.now();
+    try {
+      await runSingleStep(userId, jobId, step.action);
+      const stepDurationMs = Date.now() - stepStarted;
+      pushJobLog(
+        userId,
+        jobId,
+        `[STEP ${stepIndex}/${total}] Concluída (${stepDurationMs}ms)`
+      );
+      emitStep(userId, jobId, stepIndex, total, step.stepLabel, "completed", step.action);
+
+      if (step.action === "backend_restart") {
+        const durationMs = Date.now() - flowStarted;
+        pushJobLog(
+          userId,
+          jobId,
+          `[${new Date().toISOString()}] Atualização completa finalizada (${durationMs}ms)`
+        );
+        finishSystemUpdateJobSnapshot({
+          userId,
+          jobId,
+          status: "success",
+          durationMs
+        });
+        emitSystemUpdateDone(userId, {
+          jobId,
+          action: FULL_UPDATE_JOB_ACTION,
+          status: "success",
+          durationMs
+        });
+        logger.info(
+          { userId, action: FULL_UPDATE_JOB_ACTION, status: "success", durationMs, jobId },
+          "[system-update] full update completed"
+        );
+        activeJob = null;
+        return { jobId, action: FULL_UPDATE_JOB_ACTION };
+      }
+    } catch (err: unknown) {
+      const stepDurationMs = Date.now() - stepStarted;
+      const message = String((err as Error)?.message || err || "unknown");
+      const status =
+        message === "SYSTEM_UPDATE_TIMEOUT" ? "timeout" : "failed";
+
+      pushJobLog(
+        userId,
+        jobId,
+        `[STEP ${stepIndex}/${total}] Falhou: ${message} (${stepDurationMs}ms)`
+      );
+      if (step.action === "backend_restart") {
+        const hint = sudoHintLine(message);
+        if (hint) pushJobLog(userId, jobId, hint);
+      }
+
+      emitStep(userId, jobId, stepIndex, total, step.stepLabel, "failed", step.action);
+      markRemainingFullUpdateStepsSkipped(userId, jobId, stepIndex);
+      const snapshot = getSystemUpdateJobSnapshotForUser(userId);
+      emitSystemUpdateStep(userId, {
+        jobId,
+        action: FULL_UPDATE_JOB_ACTION,
+        steps: snapshot.job?.steps
+      });
+
+      const durationMs = Date.now() - flowStarted;
+      pushJobLog(
+        userId,
+        jobId,
+        `[${new Date().toISOString()}] Atualização completa interrompida na etapa ${stepIndex}/${total}`
+      );
+      finishSystemUpdateJobSnapshot({
+        userId,
+        jobId,
+        status,
+        durationMs,
+        message
+      });
+      emitSystemUpdateDone(userId, {
+        jobId,
+        action: FULL_UPDATE_JOB_ACTION,
+        status,
+        durationMs,
+        message
+      });
+      logger.warn(
+        {
+          userId,
+          action: FULL_UPDATE_JOB_ACTION,
+          status,
+          durationMs,
+          jobId,
+          message,
+          failedStep: stepIndex
+        },
+        "[system-update] full update failed"
+      );
+      throw err;
+    }
+  }
+
+  const durationMs = Date.now() - flowStarted;
+  finishSystemUpdateJobSnapshot({
+    userId,
+    jobId,
+    status: "success",
+    durationMs
+  });
+  emitSystemUpdateDone(userId, {
+    jobId,
+    action: FULL_UPDATE_JOB_ACTION,
+    status: "success",
+    durationMs
+  });
+  return { jobId, action: FULL_UPDATE_JOB_ACTION };
+}
+
+async function runSingleActionJob(
+  userId: number,
+  jobId: string,
+  action: SystemUpdateAction
+): Promise<{ jobId: string; action: SystemUpdateAction }> {
+  const resolved = resolveWhitelistedCommand(action);
+  beginSystemUpdateJobSnapshot({
+    jobId,
+    action,
+    userId,
+    command: resolved.label
+  });
+
+  emitSystemUpdateStart(userId, {
+    jobId,
+    action,
+    command: resolved.label,
+    restartsBackend: resolved.restartsBackend
+  });
+
+  const started = Date.now();
+  try {
+    await runSingleStep(userId, jobId, action);
+
+    const durationMs = Date.now() - started;
+    pushJobLog(
+      userId,
+      jobId,
+      `[${new Date().toISOString()}] Finalizado com sucesso (${durationMs}ms)`
+    );
+    finishSystemUpdateJobSnapshot({
+      userId,
+      jobId,
+      status: "success",
+      durationMs
+    });
+    emitSystemUpdateDone(userId, {
+      jobId,
+      action,
+      status: "success",
+      durationMs
+    });
+    logger.info(
+      { userId, action, status: "success", durationMs, jobId },
+      "[system-update] job completed"
+    );
+
+    if (resolved.restartsBackend) {
+      activeJob = null;
+    }
+
+    return { jobId, action };
+  } catch (err: unknown) {
+    const durationMs = Date.now() - started;
+    const message = String((err as Error)?.message || err || "unknown");
+    const status =
+      message === "SYSTEM_UPDATE_TIMEOUT" ? "timeout" : "failed";
+    pushJobLog(userId, jobId, `[${new Date().toISOString()}] Erro: ${message}`);
+    const hint = action === "backend_restart" ? sudoHintLine(message) : null;
+    if (hint) {
+      pushJobLog(userId, jobId, hint);
+    }
+    finishSystemUpdateJobSnapshot({
+      userId,
+      jobId,
+      status,
+      durationMs,
+      message
+    });
+    emitSystemUpdateDone(userId, {
+      jobId,
+      action,
+      status,
+      durationMs,
+      message
+    });
+    logger.warn(
+      { userId, action, status, durationMs, jobId, message },
+      "[system-update] job failed"
+    );
+    throw err;
+  }
+}
+
 export async function startSystemUpdateJob(
   actionKey: string,
   userId: number,
   jobId: string
-): Promise<{ jobId: string; action: SystemUpdateAction }> {
-  if (!isSystemUpdateAction(actionKey)) {
+): Promise<{ jobId: string; action: SystemUpdateJobAction }> {
+  if (!isSystemUpdateJobAction(actionKey)) {
     throw new AppError("SYSTEM_UPDATE_INVALID_ACTION", 400);
   }
 
@@ -80,7 +375,9 @@ export async function startSystemUpdateJob(
 
   try {
     const { root } = resolveAppRoot();
-    if (isGitSystemUpdateAction(action)) {
+    const needsGit =
+      action === FULL_UPDATE_JOB_ACTION || isGitSystemUpdateAction(action as SystemUpdateAction);
+    if (needsGit) {
       try {
         assertAppRootIsGitRepo(root);
       } catch {
@@ -88,87 +385,11 @@ export async function startSystemUpdateJob(
       }
     }
 
-    const resolved = resolveWhitelistedCommand(action);
-    beginSystemUpdateJobSnapshot({
-      jobId,
-      action,
-      userId,
-      command: resolved.label
-    });
-
-    emitSystemUpdateStart(userId, {
-      jobId,
-      action,
-      command: resolved.label,
-      restartsBackend: resolved.restartsBackend
-    });
-    pushJobLog(userId, jobId, `[${new Date().toISOString()}] ${resolved.label}`);
-    pushJobLog(userId, jobId, `[cwd] ${resolved.cwd}`);
-
-    const started = Date.now();
-    try {
-      await runWhitelistedCommand(resolved, (line) => {
-        pushJobLog(userId, jobId, line);
-      });
-
-      const durationMs = Date.now() - started;
-      pushJobLog(
-        userId,
-        jobId,
-        `[${new Date().toISOString()}] Finalizado com sucesso (${durationMs}ms)`
-      );
-      finishSystemUpdateJobSnapshot({
-        userId,
-        jobId,
-        status: "success",
-        durationMs
-      });
-      emitSystemUpdateDone(userId, {
-        jobId,
-        action,
-        status: "success",
-        durationMs
-      });
-      logger.info(
-        { userId, action, status: "success", durationMs, jobId },
-        "[system-update] job completed"
-      );
-
-      if (resolved.restartsBackend) {
-        activeJob = null;
-      }
-
-      return { jobId, action };
-    } catch (err: unknown) {
-      const durationMs = Date.now() - started;
-      const message = String((err as Error)?.message || err || "unknown");
-      const status =
-        message === "SYSTEM_UPDATE_TIMEOUT" ? "timeout" : "failed";
-      pushJobLog(userId, jobId, `[${new Date().toISOString()}] Erro: ${message}`);
-      const hint = action === "backend_restart" ? sudoHintLine(message) : null;
-      if (hint) {
-        pushJobLog(userId, jobId, hint);
-      }
-      finishSystemUpdateJobSnapshot({
-        userId,
-        jobId,
-        status,
-        durationMs,
-        message
-      });
-      emitSystemUpdateDone(userId, {
-        jobId,
-        action,
-        status,
-        durationMs,
-        message
-      });
-      logger.warn(
-        { userId, action, status, durationMs, jobId, message },
-        "[system-update] job failed"
-      );
-      throw err;
+    if (action === FULL_UPDATE_JOB_ACTION) {
+      return await runFullUpdateJob(userId, jobId);
     }
+
+    return await runSingleActionJob(userId, jobId, action as SystemUpdateAction);
   } catch (err) {
     if (
       err instanceof AppError &&

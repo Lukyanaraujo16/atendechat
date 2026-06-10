@@ -21,6 +21,9 @@ import StorageIcon from "@material-ui/icons/Storage";
 import ReplayIcon from "@material-ui/icons/Replay";
 import GetAppIcon from "@material-ui/icons/GetApp";
 import Alert from "@material-ui/lab/Alert";
+import Checkbox from "@material-ui/core/Checkbox";
+import FormControlLabel from "@material-ui/core/FormControlLabel";
+import UpdateIcon from "@material-ui/icons/Update";
 
 import MainContainer from "../../components/MainContainer";
 import ConfirmationModal from "../../components/ConfirmationModal";
@@ -37,6 +40,11 @@ import {
   AppPrimaryButton,
   AppSecondaryButton,
   AppLoadingState,
+  AppDialog,
+  AppDialogTitle,
+  AppDialogContent,
+  AppDialogActions,
+  AppNeutralButton,
 } from "../../ui";
 
 const DEFAULT_REFRESH_MS = 5000;
@@ -59,7 +67,41 @@ const ACTION_REQUEST_LABELS = {
   "backend-restart": "platform.systemTools.deploy.actions.backendRestart",
   "frontend-npm-install": "platform.systemTools.deploy.actions.frontendNpmInstall",
   "frontend-build": "platform.systemTools.deploy.actions.frontendBuild",
+  "full-update": "platform.systemTools.fullUpdate.action",
 };
+
+const FULL_UPDATE_STEP_DEFS = [
+  { labelKey: "platform.systemTools.fullUpdate.steps.gitStatus" },
+  { labelKey: "platform.systemTools.fullUpdate.steps.gitPull" },
+  { labelKey: "platform.systemTools.fullUpdate.steps.backendNpm" },
+  { labelKey: "platform.systemTools.fullUpdate.steps.backendBuild" },
+  { labelKey: "platform.systemTools.fullUpdate.steps.migrate" },
+  { labelKey: "platform.systemTools.fullUpdate.steps.frontendNpm" },
+  { labelKey: "platform.systemTools.fullUpdate.steps.frontendBuild" },
+  { labelKey: "platform.systemTools.fullUpdate.steps.restart" },
+];
+
+function createInitialFullUpdateSteps() {
+  return FULL_UPDATE_STEP_DEFS.map((step, idx) => ({
+    index: idx + 1,
+    labelKey: step.labelKey,
+    label: null,
+    status: "pending",
+  }));
+}
+
+function mapServerStepsToUi(steps) {
+  if (!Array.isArray(steps) || !steps.length) return createInitialFullUpdateSteps();
+  return steps.map((step) => {
+    const def = FULL_UPDATE_STEP_DEFS[step.index - 1];
+    return {
+      index: step.index,
+      labelKey: def?.labelKey || null,
+      label: step.label || null,
+      status: step.status || "pending",
+    };
+  });
+}
 
 const REFRESH_INTERVAL_OPTIONS = [
   { value: 0, labelKey: "platform.systemTools.refresh.paused" },
@@ -181,6 +223,40 @@ const useStyles = makeStyles((theme) => ({
     color: theme.palette.text.secondary,
     lineHeight: 1.5,
   },
+  fullUpdateCard: {
+    padding: theme.spacing(2),
+    marginBottom: theme.spacing(2),
+    borderRadius: theme.shape.borderRadius,
+    border: `1px solid ${theme.palette.primary.main}`,
+    backgroundColor:
+      theme.palette.type === "dark"
+        ? "rgba(36, 199, 118, 0.08)"
+        : "rgba(36, 199, 118, 0.06)",
+  },
+  fullUpdateSteps: {
+    margin: theme.spacing(1.5, 0, 2),
+    padding: 0,
+    listStyle: "none",
+  },
+  fullUpdateStepRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: theme.spacing(1),
+    padding: theme.spacing(0.75, 0),
+    borderBottom: `1px solid ${theme.palette.divider}`,
+    fontSize: "0.875rem",
+    "&:last-child": {
+      borderBottom: "none",
+    },
+  },
+  stepChipFailed: {
+    backgroundColor: theme.palette.error.main,
+    color: theme.palette.error.contrastText,
+  },
+  stepChipSkipped: {
+    opacity: 0.65,
+  },
   refreshBar: {
     display: "flex",
     flexWrap: "wrap",
@@ -278,6 +354,9 @@ export default function PlatformSystemTools() {
   const [jobRunning, setJobRunning] = useState(false);
   const [logs, setLogs] = useState([]);
   const [confirmAction, setConfirmAction] = useState(null);
+  const [fullUpdateOpen, setFullUpdateOpen] = useState(false);
+  const [fullUpdateAck, setFullUpdateAck] = useState(false);
+  const [fullUpdateSteps, setFullUpdateSteps] = useState(createInitialFullUpdateSteps);
   const [backendRestarting, setBackendRestarting] = useState(false);
   const [refreshIntervalMs, setRefreshIntervalMs] = useState(DEFAULT_REFRESH_MS);
   const [lastUpdatedAt, setLastUpdatedAt] = useState(null);
@@ -383,6 +462,9 @@ export default function PlatformSystemTools() {
         setJobRunning(false);
         clearSocketWatchdog();
       }
+      if (job.action === "full_update" && job.steps?.length) {
+        setFullUpdateSteps(mapServerStepsToUi(job.steps));
+      }
       syncJobLogsFromSnapshot(job);
     },
     [syncJobLogsFromSnapshot, clearSocketWatchdog]
@@ -477,7 +559,30 @@ export default function PlatformSystemTools() {
       if (payload?.jobId) {
         resetServerLogTracking(payload.jobId);
       }
-      if (payload?.restartsBackend || payload?.action === "backend_restart") {
+      if (payload?.action === "full_update") {
+        setFullUpdateSteps(createInitialFullUpdateSteps());
+        pendingRestartRef.current = false;
+      } else if (payload?.restartsBackend || payload?.action === "backend_restart") {
+        pendingRestartRef.current = true;
+      }
+    };
+
+    const onStep = (payload) => {
+      if (payload?.steps?.length) {
+        setFullUpdateSteps(mapServerStepsToUi(payload.steps));
+      } else if (payload?.stepIndex) {
+        setFullUpdateSteps((prev) =>
+          prev.map((step) =>
+            step.index === payload.stepIndex
+              ? { ...step, status: payload.stepStatus || step.status }
+              : step
+          )
+        );
+      }
+      if (
+        payload?.stepIndex === payload?.stepTotal &&
+        payload?.stepStatus === "running"
+      ) {
         pendingRestartRef.current = true;
       }
     };
@@ -512,12 +617,14 @@ export default function PlatformSystemTools() {
 
     socket.on("system-update:start", onStart);
     socket.on("system-update:log", onLog);
+    socket.on("system-update:step", onStep);
     socket.on("system-update:done", onDone);
     socket.on("disconnect", onDisconnect);
 
     return () => {
       socket.off("system-update:start", onStart);
       socket.off("system-update:log", onLog);
+      socket.off("system-update:step", onStep);
       socket.off("system-update:done", onDone);
       socket.off("disconnect", onDisconnect);
       clearSocketWatchdog();
@@ -848,6 +955,54 @@ export default function PlatformSystemTools() {
           <Typography className={classes.sectionHeading}>
             {i18n.t("platform.systemTools.deploy.section")}
           </Typography>
+
+          <Paper className={classes.fullUpdateCard} elevation={0}>
+            <Typography variant="subtitle1" style={{ fontWeight: 700 }}>
+              {i18n.t("platform.systemTools.fullUpdate.title")}
+            </Typography>
+            <Typography className={classes.deployHint} style={{ marginTop: 8, marginBottom: 0 }}>
+              {i18n.t("platform.systemTools.fullUpdate.description")}
+            </Typography>
+            <Alert severity="warning" style={{ marginTop: 12, marginBottom: 12 }}>
+              {i18n.t("platform.systemTools.fullUpdate.backupWarning")}
+            </Alert>
+            <ul className={classes.fullUpdateSteps}>
+              {fullUpdateSteps.map((step) => {
+                const label = step.labelKey ? i18n.t(step.labelKey) : step.label;
+                const statusKey = `platform.systemTools.fullUpdate.stepStatus.${step.status}`;
+                const chipClass =
+                  step.status === "failed"
+                    ? classes.stepChipFailed
+                    : step.status === "skipped"
+                      ? classes.stepChipSkipped
+                      : undefined;
+                return (
+                  <li key={step.index} className={classes.fullUpdateStepRow}>
+                    <span>
+                      {step.index}. {label}
+                    </span>
+                    <Chip
+                      size="small"
+                      label={i18n.t(statusKey)}
+                      color={step.status === "running" ? "primary" : "default"}
+                      className={chipClass}
+                    />
+                  </li>
+                );
+              })}
+            </ul>
+            <AppPrimaryButton
+              startIcon={<UpdateIcon />}
+              disabled={jobRunning}
+              onClick={() => {
+                setFullUpdateAck(false);
+                setFullUpdateOpen(true);
+              }}
+            >
+              {i18n.t("platform.systemTools.fullUpdate.action")}
+            </AppPrimaryButton>
+          </Paper>
+
           <Typography className={classes.deployHint}>
             {i18n.t("platform.systemTools.deploy.hint")}
           </Typography>
@@ -931,6 +1086,48 @@ export default function PlatformSystemTools() {
       >
         {confirmAction ? i18n.t(confirmAction.confirmBodyKey) : null}
       </ConfirmationModal>
+
+      <AppDialog
+        open={fullUpdateOpen}
+        onClose={() => setFullUpdateOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <AppDialogTitle>{i18n.t("platform.systemTools.fullUpdate.confirm.title")}</AppDialogTitle>
+        <AppDialogContent dividers>
+          <Typography variant="body2" paragraph>
+            {i18n.t("platform.systemTools.fullUpdate.confirm.body")}
+          </Typography>
+          <Alert severity="info" style={{ marginBottom: 16 }}>
+            {i18n.t("platform.systemTools.fullUpdate.backupWarning")}
+          </Alert>
+          <FormControlLabel
+            control={
+              <Checkbox
+                color="primary"
+                checked={fullUpdateAck}
+                onChange={(e) => setFullUpdateAck(e.target.checked)}
+              />
+            }
+            label={i18n.t("platform.systemTools.fullUpdate.confirm.ack")}
+          />
+        </AppDialogContent>
+        <AppDialogActions>
+          <AppNeutralButton onClick={() => setFullUpdateOpen(false)}>
+            {i18n.t("confirmationModal.buttons.cancel")}
+          </AppNeutralButton>
+          <AppPrimaryButton
+            disabled={!fullUpdateAck || jobRunning}
+            onClick={() => {
+              setFullUpdateOpen(false);
+              setFullUpdateSteps(createInitialFullUpdateSteps());
+              runAction("full-update");
+            }}
+          >
+            {i18n.t("platform.systemTools.fullUpdate.action")}
+          </AppPrimaryButton>
+        </AppDialogActions>
+      </AppDialog>
     </MainContainer>
   );
 }

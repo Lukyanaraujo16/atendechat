@@ -2619,6 +2619,37 @@ const messages = {
 							},
 						},
 					},
+					fullUpdate: {
+						title: "Full update",
+						description:
+							"Runs in sequence: Git status, pull, dependencies, build, migrations and backend restart. No frontend restart.",
+						action: "Run full update",
+						backupWarning:
+							"We recommend a recent backup before running migrations. This action does not create a backup automatically.",
+						confirm: {
+							title: "Run full update?",
+							body:
+								"This will fetch Git updates, install dependencies, build backend/frontend, run migrations and restart the backend. The system may be unavailable for a few seconds.",
+							ack: "I understand I should have a recent backup before running migrations.",
+						},
+						steps: {
+							gitStatus: "Git status",
+							gitPull: "Git pull",
+							backendNpm: "npm install backend",
+							backendBuild: "Backend build",
+							migrate: "Migrations",
+							frontendNpm: "npm install frontend",
+							frontendBuild: "Frontend build",
+							restart: "Restart backend",
+						},
+						stepStatus: {
+							pending: "Pending",
+							running: "Running",
+							completed: "Completed",
+							failed: "Failed",
+							skipped: "Skipped",
+						},
+					},
 				},
 				emailSettings: {
 					title: "Email / SMTP",

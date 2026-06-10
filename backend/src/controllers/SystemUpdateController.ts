@@ -1,13 +1,17 @@
 import { Request, Response } from "express";
 import AppError from "../errors/AppError";
+import { FULL_UPDATE_JOB_ACTION } from "../services/SystemAdmin/fullUpdateSequence";
 import {
   getCurrentSystemUpdateJobForUser,
   isSystemUpdateJobRunning,
   startSystemUpdateJob
 } from "../services/SystemAdmin/SystemUpdateJobService";
-import { isSystemUpdateAction, SystemUpdateAction } from "../services/SystemAdmin/SafeCommandRunner";
+import {
+  isSystemUpdateJobAction,
+  SystemUpdateJobAction
+} from "../services/SystemAdmin/fullUpdateSequence";
 
-const ACTION_MAP: Record<string, SystemUpdateAction> = {
+const ACTION_MAP: Record<string, SystemUpdateJobAction> = {
   "git-status": "git_status",
   "git-log": "git_log",
   "git-pull": "git_pull",
@@ -16,7 +20,8 @@ const ACTION_MAP: Record<string, SystemUpdateAction> = {
   "backend-migrate": "backend_migrate",
   "backend-restart": "backend_restart",
   "frontend-npm-install": "frontend_npm_install",
-  "frontend-build": "frontend_build"
+  "frontend-build": "frontend_build",
+  "full-update": FULL_UPDATE_JOB_ACTION
 };
 
 export const getCurrent = async (req: Request, res: Response): Promise<void> => {
@@ -29,7 +34,7 @@ export const runAction = async (req: Request, res: Response): Promise<void> => {
   const routeAction = String(req.params.action || "");
   const mapped = ACTION_MAP[routeAction];
 
-  if (!mapped || !isSystemUpdateAction(mapped)) {
+  if (!mapped || !isSystemUpdateJobAction(mapped)) {
     throw new AppError("SYSTEM_UPDATE_INVALID_ACTION", 400);
   }
 

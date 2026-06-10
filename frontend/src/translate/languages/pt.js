@@ -2709,6 +2709,37 @@ const messages = {
               },
             },
           },
+          fullUpdate: {
+            title: "Atualização completa",
+            description:
+              "Executa em sequência: Git status, pull, dependências, build, migrations e restart do backend. Sem restart de frontend.",
+            action: "Executar atualização completa",
+            backupWarning:
+              "Recomendamos backup recente antes de rodar migrations. Não há backup automático nesta ação.",
+            confirm: {
+              title: "Executar atualização completa?",
+              body:
+                "Essa ação irá buscar atualizações do Git, instalar dependências, compilar backend/frontend, rodar migrations e reiniciar o backend. O sistema pode ficar indisponível por alguns segundos.",
+              ack: "Entendo que devo ter backup recente antes de rodar migrations.",
+            },
+            steps: {
+              gitStatus: "Git status",
+              gitPull: "Git pull",
+              backendNpm: "npm install backend",
+              backendBuild: "Build backend",
+              migrate: "Migrations",
+              frontendNpm: "npm install frontend",
+              frontendBuild: "Build frontend",
+              restart: "Restart backend",
+            },
+            stepStatus: {
+              pending: "Pendente",
+              running: "Rodando",
+              completed: "Concluída",
+              failed: "Falhou",
+              skipped: "Ignorada",
+            },
+          },
         },
         emailSettings: {
           title: "E-mail / SMTP",

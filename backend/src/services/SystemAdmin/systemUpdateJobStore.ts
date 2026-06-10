@@ -1,8 +1,23 @@
-import { SystemUpdateAction } from "./SafeCommandRunner";
+import { SystemUpdateJobAction } from "./fullUpdateSequence";
 
 const MAX_LOG_LINES = 500;
 
 export type SystemUpdateJobStatus = "running" | "success" | "failed" | "timeout";
+
+export type FullUpdateStepStatus =
+  | "pending"
+  | "running"
+  | "completed"
+  | "failed"
+  | "skipped";
+
+export type FullUpdateStepSnapshot = {
+  index: number;
+  total: number;
+  action: string;
+  label: string;
+  status: FullUpdateStepStatus;
+};
 
 export type SystemUpdateJobLogLine = {
   seq: number;
@@ -12,7 +27,7 @@ export type SystemUpdateJobLogLine = {
 
 export type SystemUpdateJobSnapshot = {
   jobId: string;
-  action: SystemUpdateAction;
+  action: SystemUpdateJobAction;
   userId: number;
   status: SystemUpdateJobStatus;
   command?: string;
@@ -21,6 +36,12 @@ export type SystemUpdateJobSnapshot = {
   durationMs?: number;
   message?: string;
   logs: SystemUpdateJobLogLine[];
+  steps?: FullUpdateStepSnapshot[];
+};
+
+export type InitFullUpdateStepInput = {
+  action: string;
+  label: string;
 };
 
 let activeJob: SystemUpdateJobSnapshot | null = null;
@@ -29,7 +50,7 @@ let nextLogSeq = 0;
 
 export function beginSystemUpdateJobSnapshot(params: {
   jobId: string;
-  action: SystemUpdateAction;
+  action: SystemUpdateJobAction;
   userId: number;
   command: string;
 }): void {
@@ -61,6 +82,53 @@ export function appendSystemUpdateJobLog(
     activeJob.logs.splice(0, overflow);
   }
   return nextLogSeq;
+}
+
+export function initFullUpdateStepsSnapshot(
+  userId: number,
+  jobId: string,
+  steps: InitFullUpdateStepInput[]
+): void {
+  if (!activeJob || activeJob.jobId !== jobId || activeJob.userId !== userId) {
+    return;
+  }
+  activeJob.steps = steps.map((step, idx) => ({
+    index: idx + 1,
+    total: steps.length,
+    action: step.action,
+    label: step.label,
+    status: "pending" as FullUpdateStepStatus
+  }));
+}
+
+export function setFullUpdateStepStatus(
+  userId: number,
+  jobId: string,
+  stepIndex: number,
+  status: FullUpdateStepStatus
+): void {
+  if (!activeJob || activeJob.jobId !== jobId || activeJob.userId !== userId) {
+    return;
+  }
+  const step = activeJob.steps?.find((s) => s.index === stepIndex);
+  if (step) {
+    step.status = status;
+  }
+}
+
+export function markRemainingFullUpdateStepsSkipped(
+  userId: number,
+  jobId: string,
+  fromStepIndex: number
+): void {
+  if (!activeJob || activeJob.jobId !== jobId || activeJob.userId !== userId) {
+    return;
+  }
+  activeJob.steps?.forEach((step) => {
+    if (step.index > fromStepIndex && step.status === "pending") {
+      step.status = "skipped";
+    }
+  });
 }
 
 export function finishSystemUpdateJobSnapshot(params: {

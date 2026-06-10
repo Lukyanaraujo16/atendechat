@@ -12,6 +12,17 @@ export type SystemUpdateSocketPayload = {
   status?: "success" | "failed" | "timeout";
   durationMs?: number;
   message?: string;
+  stepIndex?: number;
+  stepTotal?: number;
+  stepLabel?: string;
+  stepStatus?: "pending" | "running" | "completed" | "failed" | "skipped";
+  steps?: Array<{
+    index: number;
+    total: number;
+    action: string;
+    label: string;
+    status: string;
+  }>;
 };
 
 function emitToUser(userId: number | string, event: string, payload: SystemUpdateSocketPayload) {
@@ -38,4 +49,11 @@ export function emitSystemUpdateDone(
   payload: SystemUpdateSocketPayload
 ): void {
   emitToUser(userId, "system-update:done", payload);
+}
+
+export function emitSystemUpdateStep(
+  userId: number,
+  payload: SystemUpdateSocketPayload
+): void {
+  emitToUser(userId, "system-update:step", payload);
 }
