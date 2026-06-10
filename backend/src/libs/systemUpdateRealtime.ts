@@ -1,0 +1,38 @@
+import { getIO } from "./socket";
+
+export type SystemUpdateSocketPayload = {
+  jobId: string;
+  action?: string;
+  command?: string;
+  line?: string;
+  ts?: string;
+  status?: "success" | "failed" | "timeout";
+  durationMs?: number;
+  message?: string;
+};
+
+function emitToUser(userId: number | string, event: string, payload: SystemUpdateSocketPayload) {
+  const io = getIO();
+  io.to(`user-${userId}`).emit(event, payload);
+}
+
+export function emitSystemUpdateStart(
+  userId: number,
+  payload: SystemUpdateSocketPayload
+): void {
+  emitToUser(userId, "system-update:start", payload);
+}
+
+export function emitSystemUpdateLog(
+  userId: number,
+  payload: SystemUpdateSocketPayload
+): void {
+  emitToUser(userId, "system-update:log", payload);
+}
+
+export function emitSystemUpdateDone(
+  userId: number,
+  payload: SystemUpdateSocketPayload
+): void {
+  emitToUser(userId, "system-update:done", payload);
+}

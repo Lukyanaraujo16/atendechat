@@ -12,6 +12,7 @@ import PlatformSuperAdmins from "./PlatformSuperAdmins";
 import PlatformMyAccount from "./PlatformMyAccount";
 import PlatformFinance from "./PlatformFinance";
 import PlatformBackup from "./PlatformBackup";
+import PlatformSystemTools from "./PlatformSystemTools";
 import PlatformPlans from "./PlatformPlans";
 import PlatformHelps from "./PlatformHelps";
 import PlatformInformativos from "./PlatformInformativos";
@@ -45,6 +46,7 @@ export default function PlatformModule() {
         <Route exact path="/saas/finance" component={PlatformFinance} />
         <Route exact path="/saas/billing-automation" component={BillingAutomationPage} />
         <Route exact path="/saas/backup" component={PlatformBackup} />
+        <Route exact path="/saas/system-tools" component={PlatformSystemTools} />
         <Route exact path="/saas/helps" component={PlatformHelps} />
         <Route exact path="/saas/announcements" component={PlatformInformativos} />
         <Route render={() => <Redirect to="/saas" />} />

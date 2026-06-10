@@ -20,6 +20,7 @@ import PaletteOutlinedIcon from "@material-ui/icons/PaletteOutlined";
 import SecurityIcon from "@material-ui/icons/Security";
 import AssignmentTurnedInIcon from "@material-ui/icons/AssignmentTurnedIn";
 import BackupIcon from "@material-ui/icons/Backup";
+import ComputerIcon from "@material-ui/icons/Computer";
 import HelpOutlineIcon from "@material-ui/icons/HelpOutline";
 import AnnouncementIcon from "@material-ui/icons/Announcement";
 import NotificationsActiveIcon from "@material-ui/icons/NotificationsActive";
@@ -154,6 +155,7 @@ function navItems() {
     },
     { path: "/saas/admins", label: i18n.t("platform.tabs.superAdmins"), icon: SecurityIcon },
     { path: "/saas/backup", label: i18n.t("platform.tabs.backup"), icon: BackupIcon },
+    { path: "/saas/system-tools", label: i18n.t("platform.tabs.systemTools"), icon: ComputerIcon },
     { path: "/saas/helps", label: i18n.t("platform.tabs.helps"), icon: HelpOutlineIcon },
     { path: "/saas/announcements", label: i18n.t("platform.tabs.announcements"), icon: AnnouncementIcon },
     { path: "/saas/account", label: i18n.t("platform.tabs.myAccount"), icon: AccountCircleOutlinedIcon },
