@@ -2639,6 +2639,61 @@ const messages = {
             failed: "Finalizado com erro",
             timeout: "Tempo limite excedido",
           },
+          deploy: {
+            section: "Build e Deploy Assistido",
+            hint:
+              "Ações pré-definidas no servidor. Não há terminal livre nem parâmetros customizáveis.",
+            recommendedOrder: "Ordem manual sugerida",
+            backendRestarting:
+              "Backend reiniciando — aguarde alguns segundos e atualize a página se necessário.",
+            steps: {
+              gitPull: "Git pull",
+              backendNpm: "npm install backend (se package.json mudou)",
+              backendBuild: "Build backend",
+              migrate: "Migration (se a atualização exigir)",
+              restart: "Restart backend",
+              frontendNpm: "npm install frontend (se package.json mudou)",
+              frontendBuild: "Build frontend",
+            },
+            actions: {
+              backendNpmInstall: "Instalar dependências backend",
+              backendBuild: "Build backend",
+              backendMigrate: "Rodar migrations",
+              backendRestart: "Reiniciar backend",
+              frontendNpmInstall: "Instalar dependências frontend",
+              frontendBuild: "Build frontend",
+            },
+            confirm: {
+              backendNpmInstall: {
+                title: "Instalar dependências do backend?",
+                body: "Executará `npm install` na pasta backend. Pode demorar alguns minutos.",
+              },
+              backendBuild: {
+                title: "Build do backend?",
+                body:
+                  "Executará `npm run build` no backend. Isso pode demorar alguns minutos. O sistema continua online até o restart.",
+              },
+              backendMigrate: {
+                title: "Rodar migrations?",
+                body:
+                  "Executará `npm run db:migrate`. Execute apenas após backup ou quando a atualização exigir alterações no banco.",
+              },
+              backendRestart: {
+                title: "Reiniciar backend?",
+                body:
+                  "Executará `sudo systemctl restart` no serviço configurado. O sistema pode ficar indisponível por alguns segundos e a conexão em tempo real pode cair.",
+              },
+              frontendNpmInstall: {
+                title: "Instalar dependências do frontend?",
+                body: "Executará `npm install` na pasta frontend. Pode demorar alguns minutos.",
+              },
+              frontendBuild: {
+                title: "Build do frontend?",
+                body:
+                  "Executará `npm run build` no frontend. Após concluir, os novos arquivos estáticos estarão disponíveis. Não é necessário reiniciar frontend.",
+              },
+            },
+          },
         },
         emailSettings: {
           title: "E-mail / SMTP",

@@ -4,6 +4,8 @@ export type SystemUpdateSocketPayload = {
   jobId: string;
   action?: string;
   command?: string;
+  /** true quando a ação reinicia o processo backend (socket pode cair). */
+  restartsBackend?: boolean;
   line?: string;
   ts?: string;
   status?: "success" | "failed" | "timeout";

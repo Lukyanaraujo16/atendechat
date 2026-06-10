@@ -12,8 +12,14 @@ import DeleteSweepIcon from "@material-ui/icons/DeleteSweep";
 import CodeIcon from "@material-ui/icons/Code";
 import CloudDownloadIcon from "@material-ui/icons/CloudDownload";
 import InfoOutlinedIcon from "@material-ui/icons/InfoOutlined";
+import BuildIcon from "@material-ui/icons/Build";
+import StorageIcon from "@material-ui/icons/Storage";
+import ReplayIcon from "@material-ui/icons/Replay";
+import GetAppIcon from "@material-ui/icons/GetApp";
+import Alert from "@material-ui/lab/Alert";
 
 import MainContainer from "../../components/MainContainer";
+import ConfirmationModal from "../../components/ConfirmationModal";
 import api from "../../services/api";
 import toastError from "../../errors/toastError";
 import { i18n } from "../../translate/i18n";
@@ -129,7 +135,71 @@ const useStyles = makeStyles((theme) => ({
     gap: theme.spacing(1),
     marginBottom: theme.spacing(1.5),
   },
+  orderList: {
+    margin: 0,
+    paddingLeft: theme.spacing(2.5),
+    color: theme.palette.text.secondary,
+    fontSize: "0.875rem",
+    lineHeight: 1.6,
+  },
+  deployHint: {
+    marginBottom: theme.spacing(2),
+    fontSize: "0.8125rem",
+    color: theme.palette.text.secondary,
+    lineHeight: 1.5,
+  },
 }));
+
+const DEPLOY_ACTIONS = [
+  {
+    key: "backend-npm-install",
+    labelKey: "platform.systemTools.deploy.actions.backendNpmInstall",
+    confirmTitleKey: "platform.systemTools.deploy.confirm.backendNpmInstall.title",
+    confirmBodyKey: "platform.systemTools.deploy.confirm.backendNpmInstall.body",
+    icon: GetAppIcon,
+    destructive: false,
+  },
+  {
+    key: "backend-build",
+    labelKey: "platform.systemTools.deploy.actions.backendBuild",
+    confirmTitleKey: "platform.systemTools.deploy.confirm.backendBuild.title",
+    confirmBodyKey: "platform.systemTools.deploy.confirm.backendBuild.body",
+    icon: BuildIcon,
+    destructive: false,
+  },
+  {
+    key: "backend-migrate",
+    labelKey: "platform.systemTools.deploy.actions.backendMigrate",
+    confirmTitleKey: "platform.systemTools.deploy.confirm.backendMigrate.title",
+    confirmBodyKey: "platform.systemTools.deploy.confirm.backendMigrate.body",
+    icon: StorageIcon,
+    destructive: false,
+  },
+  {
+    key: "backend-restart",
+    labelKey: "platform.systemTools.deploy.actions.backendRestart",
+    confirmTitleKey: "platform.systemTools.deploy.confirm.backendRestart.title",
+    confirmBodyKey: "platform.systemTools.deploy.confirm.backendRestart.body",
+    icon: ReplayIcon,
+    destructive: true,
+  },
+  {
+    key: "frontend-npm-install",
+    labelKey: "platform.systemTools.deploy.actions.frontendNpmInstall",
+    confirmTitleKey: "platform.systemTools.deploy.confirm.frontendNpmInstall.title",
+    confirmBodyKey: "platform.systemTools.deploy.confirm.frontendNpmInstall.body",
+    icon: GetAppIcon,
+    destructive: false,
+  },
+  {
+    key: "frontend-build",
+    labelKey: "platform.systemTools.deploy.actions.frontendBuild",
+    confirmTitleKey: "platform.systemTools.deploy.confirm.frontendBuild.title",
+    confirmBodyKey: "platform.systemTools.deploy.confirm.frontendBuild.body",
+    icon: BuildIcon,
+    destructive: false,
+  },
+];
 
 function MetricCard({ title, value, sub, percent }) {
   const classes = useStyles();
@@ -159,8 +229,11 @@ export default function PlatformSystemTools() {
   const [refreshing, setRefreshing] = useState(false);
   const [jobRunning, setJobRunning] = useState(false);
   const [logs, setLogs] = useState([]);
+  const [confirmAction, setConfirmAction] = useState(null);
+  const [backendRestarting, setBackendRestarting] = useState(false);
   const terminalRef = useRef(null);
   const autoScrollRef = useRef(true);
+  const pendingRestartRef = useRef(false);
 
   const appendLog = useCallback((line, ts) => {
     setLogs((prev) => [
@@ -194,6 +267,9 @@ export default function PlatformSystemTools() {
 
     const onStart = (payload) => {
       setJobRunning(true);
+      if (payload?.restartsBackend || payload?.action === "backend_restart") {
+        pendingRestartRef.current = true;
+      }
       if (payload?.command) {
         appendLog(`[${formatTime()}] ${payload.command}`, new Date().toISOString());
       }
@@ -205,6 +281,8 @@ export default function PlatformSystemTools() {
 
     const onDone = (payload) => {
       setJobRunning(false);
+      pendingRestartRef.current = false;
+      setBackendRestarting(false);
       const status = payload?.status || "done";
       const msg =
         status === "success"
@@ -215,14 +293,28 @@ export default function PlatformSystemTools() {
       appendLog(`[${formatTime()}] ${msg}`, new Date().toISOString());
     };
 
+    const onDisconnect = () => {
+      if (pendingRestartRef.current) {
+        setBackendRestarting(true);
+        setJobRunning(false);
+        appendLog(
+          `[${formatTime()}] ${i18n.t("platform.systemTools.deploy.backendRestarting")}`,
+          new Date().toISOString()
+        );
+        pendingRestartRef.current = false;
+      }
+    };
+
     socket.on("system-update:start", onStart);
     socket.on("system-update:log", onLog);
     socket.on("system-update:done", onDone);
+    socket.on("disconnect", onDisconnect);
 
     return () => {
       socket.off("system-update:start", onStart);
       socket.off("system-update:log", onLog);
       socket.off("system-update:done", onDone);
+      socket.off("disconnect", onDisconnect);
     };
   }, [socketManager, appendLog]);
 
@@ -246,6 +338,28 @@ export default function PlatformSystemTools() {
       }
       toastError(err);
     }
+  };
+
+  const requestAction = (actionKey, needsConfirm = false) => {
+    if (jobRunning) {
+      toast.info(i18n.t("platform.systemTools.jobRunning"));
+      return;
+    }
+    if (needsConfirm) {
+      const deploy = DEPLOY_ACTIONS.find((a) => a.key === actionKey);
+      if (deploy) {
+        setConfirmAction(deploy);
+        return;
+      }
+    }
+    runAction(actionKey);
+  };
+
+  const handleConfirmDeploy = () => {
+    if (confirmAction?.key) {
+      runAction(confirmAction.key);
+    }
+    setConfirmAction(null);
   };
 
   const copyLogs = async () => {
@@ -441,6 +555,52 @@ export default function PlatformSystemTools() {
 
         <AppSectionCard>
           <Typography className={classes.sectionHeading}>
+            {i18n.t("platform.systemTools.deploy.section")}
+          </Typography>
+          <Typography className={classes.deployHint}>
+            {i18n.t("platform.systemTools.deploy.hint")}
+          </Typography>
+          <Box mb={2}>
+            <Typography variant="subtitle2" gutterBottom>
+              {i18n.t("platform.systemTools.deploy.recommendedOrder")}
+            </Typography>
+            <ol className={classes.orderList}>
+              <li>{i18n.t("platform.systemTools.deploy.steps.gitPull")}</li>
+              <li>{i18n.t("platform.systemTools.deploy.steps.backendNpm")}</li>
+              <li>{i18n.t("platform.systemTools.deploy.steps.backendBuild")}</li>
+              <li>{i18n.t("platform.systemTools.deploy.steps.migrate")}</li>
+              <li>{i18n.t("platform.systemTools.deploy.steps.restart")}</li>
+              <li>{i18n.t("platform.systemTools.deploy.steps.frontendNpm")}</li>
+              <li>{i18n.t("platform.systemTools.deploy.steps.frontendBuild")}</li>
+            </ol>
+          </Box>
+          <Box className={classes.actionRow}>
+            {DEPLOY_ACTIONS.map((item) => {
+              const Icon = item.icon;
+              const ButtonComponent = item.destructive ? AppSecondaryButton : AppPrimaryButton;
+              return (
+                <ButtonComponent
+                  key={item.key}
+                  startIcon={<Icon />}
+                  disabled={jobRunning}
+                  onClick={() => requestAction(item.key, true)}
+                >
+                  {i18n.t(item.labelKey)}
+                </ButtonComponent>
+              );
+            })}
+          </Box>
+          {backendRestarting && (
+            <Box mt={2}>
+              <Alert severity="info">
+                {i18n.t("platform.systemTools.deploy.backendRestarting")}
+              </Alert>
+            </Box>
+          )}
+        </AppSectionCard>
+
+        <AppSectionCard>
+          <Typography className={classes.sectionHeading}>
             {i18n.t("platform.systemTools.terminal.title")}
           </Typography>
           <Box className={classes.terminalActions}>
@@ -466,6 +626,20 @@ export default function PlatformSystemTools() {
           </Paper>
         </AppSectionCard>
       </Box>
+
+      <ConfirmationModal
+        open={Boolean(confirmAction)}
+        onClose={() => setConfirmAction(null)}
+        onConfirm={handleConfirmDeploy}
+        title={
+          confirmAction
+            ? i18n.t(confirmAction.confirmTitleKey)
+            : ""
+        }
+        destructive={confirmAction?.destructive}
+      >
+        {confirmAction ? i18n.t(confirmAction.confirmBodyKey) : null}
+      </ConfirmationModal>
     </MainContainer>
   );
 }

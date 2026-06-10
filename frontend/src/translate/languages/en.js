@@ -2549,6 +2549,61 @@ const messages = {
 						failed: "Finished with error",
 						timeout: "Timeout exceeded",
 					},
+					deploy: {
+						section: "Assisted build and deploy",
+						hint:
+							"Predefined server actions. No free-form terminal or custom parameters.",
+						recommendedOrder: "Suggested manual order",
+						backendRestarting:
+							"Backend restarting — wait a few seconds and refresh the page if needed.",
+						steps: {
+							gitPull: "Git pull",
+							backendNpm: "npm install backend (if package.json changed)",
+							backendBuild: "Backend build",
+							migrate: "Migration (if update requires it)",
+							restart: "Restart backend",
+							frontendNpm: "npm install frontend (if package.json changed)",
+							frontendBuild: "Frontend build",
+						},
+						actions: {
+							backendNpmInstall: "Install backend dependencies",
+							backendBuild: "Backend build",
+							backendMigrate: "Run migrations",
+							backendRestart: "Restart backend",
+							frontendNpmInstall: "Install frontend dependencies",
+							frontendBuild: "Frontend build",
+						},
+						confirm: {
+							backendNpmInstall: {
+								title: "Install backend dependencies?",
+								body: "Runs `npm install` in the backend folder. May take several minutes.",
+							},
+							backendBuild: {
+								title: "Build backend?",
+								body:
+									"Runs `npm run build` in backend. May take several minutes. The system stays online until restart.",
+							},
+							backendMigrate: {
+								title: "Run migrations?",
+								body:
+									"Runs `npm run db:migrate`. Run only after backup or when the update requires database changes.",
+							},
+							backendRestart: {
+								title: "Restart backend?",
+								body:
+									"Runs `sudo systemctl restart` on the configured service. The system may be unavailable briefly and the realtime connection may drop.",
+							},
+							frontendNpmInstall: {
+								title: "Install frontend dependencies?",
+								body: "Runs `npm install` in the frontend folder. May take several minutes.",
+							},
+							frontendBuild: {
+								title: "Build frontend?",
+								body:
+									"Runs `npm run build` in frontend. Static files will be available when done. No frontend restart needed.",
+							},
+						},
+					},
 				},
 				emailSettings: {
 					title: "Email / SMTP",
