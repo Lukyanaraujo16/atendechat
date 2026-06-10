@@ -1,10 +1,14 @@
-import React, { useCallback, useContext, useEffect, useRef, useState } from "react";
+import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import Box from "@material-ui/core/Box";
 import Typography from "@material-ui/core/Typography";
 import Grid from "@material-ui/core/Grid";
 import LinearProgress from "@material-ui/core/LinearProgress";
 import Paper from "@material-ui/core/Paper";
 import Chip from "@material-ui/core/Chip";
+import FormControl from "@material-ui/core/FormControl";
+import InputLabel from "@material-ui/core/InputLabel";
+import Select from "@material-ui/core/Select";
+import MenuItem from "@material-ui/core/MenuItem";
 import { makeStyles } from "@material-ui/core/styles";
 import RefreshIcon from "@material-ui/icons/Refresh";
 import FileCopyIcon from "@material-ui/icons/FileCopy";
@@ -34,7 +38,16 @@ import {
   AppLoadingState,
 } from "../../ui";
 
-const REFRESH_MS = 8000;
+const DEFAULT_REFRESH_MS = 5000;
+const JOB_MIN_REFRESH_MS = 10000;
+
+const REFRESH_INTERVAL_OPTIONS = [
+  { value: 0, labelKey: "platform.systemTools.refresh.paused" },
+  { value: 2000, labelKey: "platform.systemTools.refresh.2s" },
+  { value: 5000, labelKey: "platform.systemTools.refresh.5s" },
+  { value: 10000, labelKey: "platform.systemTools.refresh.10s" },
+  { value: 30000, labelKey: "platform.systemTools.refresh.30s" },
+];
 
 function formatBytes(n) {
   const b = Number(n);
@@ -148,6 +161,20 @@ const useStyles = makeStyles((theme) => ({
     color: theme.palette.text.secondary,
     lineHeight: 1.5,
   },
+  refreshBar: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: theme.spacing(2),
+  },
+  refreshStatus: {
+    fontSize: "0.8125rem",
+    color: theme.palette.text.secondary,
+    minWidth: 160,
+  },
+  intervalSelect: {
+    minWidth: 160,
+  },
 }));
 
 const DEPLOY_ACTIONS = [
@@ -231,9 +258,24 @@ export default function PlatformSystemTools() {
   const [logs, setLogs] = useState([]);
   const [confirmAction, setConfirmAction] = useState(null);
   const [backendRestarting, setBackendRestarting] = useState(false);
+  const [refreshIntervalMs, setRefreshIntervalMs] = useState(DEFAULT_REFRESH_MS);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState(null);
+  const [secondsSinceUpdate, setSecondsSinceUpdate] = useState(0);
+  const [tabVisible, setTabVisible] = useState(
+    () => typeof document !== "undefined" && !document.hidden
+  );
   const terminalRef = useRef(null);
   const autoScrollRef = useRef(true);
   const pendingRestartRef = useRef(false);
+  const monitorInFlightRef = useRef(false);
+
+  const effectiveRefreshMs = useMemo(() => {
+    if (refreshIntervalMs === 0) return 0;
+    if (jobRunning && refreshIntervalMs < JOB_MIN_REFRESH_MS) {
+      return JOB_MIN_REFRESH_MS;
+    }
+    return refreshIntervalMs;
+  }, [refreshIntervalMs, jobRunning]);
 
   const appendLog = useCallback((line, ts) => {
     setLogs((prev) => [
@@ -242,24 +284,56 @@ export default function PlatformSystemTools() {
     ]);
   }, []);
 
-  const fetchMonitor = useCallback(async (silent = false) => {
+  const fetchMonitor = useCallback(async ({ silent = false, force = false } = {}) => {
+    if (monitorInFlightRef.current && !force) return;
+    monitorInFlightRef.current = true;
     if (!silent) setRefreshing(true);
     try {
       const { data } = await api.get("/system/monitor");
       setMonitor(data);
+      setLastUpdatedAt(Date.now());
     } catch (err) {
-      toastError(err);
+      if (!silent) toastError(err);
     } finally {
+      monitorInFlightRef.current = false;
       setLoading(false);
       setRefreshing(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchMonitor();
-    const id = setInterval(() => fetchMonitor(true), REFRESH_MS);
-    return () => clearInterval(id);
+    fetchMonitor({ silent: true });
   }, [fetchMonitor]);
+
+  useEffect(() => {
+    if (!tabVisible || effectiveRefreshMs === 0) return undefined;
+    const id = setInterval(() => {
+      fetchMonitor({ silent: true });
+    }, effectiveRefreshMs);
+    return () => clearInterval(id);
+  }, [tabVisible, effectiveRefreshMs, fetchMonitor]);
+
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      const visible = !document.hidden;
+      setTabVisible(visible);
+      if (visible) {
+        fetchMonitor({ silent: true });
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, [fetchMonitor]);
+
+  useEffect(() => {
+    if (!lastUpdatedAt) return undefined;
+    const tick = () => {
+      setSecondsSinceUpdate(Math.max(0, Math.floor((Date.now() - lastUpdatedAt) / 1000)));
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [lastUpdatedAt]);
 
   useEffect(() => {
     const socket = socketManager?.currentSocket;
@@ -398,21 +472,60 @@ export default function PlatformSystemTools() {
         />
 
         <AppActionBar>
-          <AppSecondaryButton
-            startIcon={<RefreshIcon />}
-            onClick={() => fetchMonitor()}
-            disabled={refreshing}
-          >
-            {refreshing
-              ? i18n.t("platform.systemTools.refreshing")
-              : i18n.t("platform.systemTools.refreshNow")}
-          </AppSecondaryButton>
-          {monitor?.collectedAt && (
-            <Typography variant="caption" color="textSecondary">
-              {i18n.t("platform.systemTools.lastUpdate")}:{" "}
-              {new Date(monitor.collectedAt).toLocaleString()}
+          <Box className={classes.refreshBar}>
+            <AppSecondaryButton
+              startIcon={<RefreshIcon />}
+              onClick={() => fetchMonitor({ silent: false, force: false })}
+              disabled={refreshing}
+            >
+              {refreshing
+                ? i18n.t("platform.systemTools.refreshing")
+                : i18n.t("platform.systemTools.refreshNow")}
+            </AppSecondaryButton>
+            <FormControl
+              variant="outlined"
+              size="small"
+              className={classes.intervalSelect}
+            >
+              <InputLabel id="monitor-refresh-interval">
+                {i18n.t("platform.systemTools.refresh.intervalLabel")}
+              </InputLabel>
+              <Select
+                labelId="monitor-refresh-interval"
+                value={refreshIntervalMs}
+                onChange={(e) => setRefreshIntervalMs(Number(e.target.value))}
+                label={i18n.t("platform.systemTools.refresh.intervalLabel")}
+              >
+                {REFRESH_INTERVAL_OPTIONS.map((opt) => (
+                  <MenuItem key={opt.value} value={opt.value}>
+                    {i18n.t(opt.labelKey)}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <Typography className={classes.refreshStatus} component="span">
+              {refreshIntervalMs === 0
+                ? i18n.t("platform.systemTools.refresh.pausedHint")
+                : secondsSinceUpdate <= 1
+                  ? i18n.t("platform.systemTools.refresh.updatedJustNow")
+                  : i18n.t("platform.systemTools.refresh.updatedAgo", {
+                      seconds: secondsSinceUpdate,
+                    })}
+              {lastUpdatedAt ? (
+                <>
+                  {" · "}
+                  {new Date(lastUpdatedAt).toLocaleTimeString()}
+                </>
+              ) : null}
             </Typography>
-          )}
+            {jobRunning &&
+              refreshIntervalMs > 0 &&
+              refreshIntervalMs < JOB_MIN_REFRESH_MS && (
+                <Typography variant="caption" color="textSecondary">
+                  {i18n.t("platform.systemTools.refresh.jobThrottleHint")}
+                </Typography>
+              )}
+          </Box>
         </AppActionBar>
 
         <AppSectionCard>
