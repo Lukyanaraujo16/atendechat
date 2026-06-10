@@ -2560,6 +2560,9 @@ const messages = {
 						success: "Completed successfully",
 						failed: "Finished with error",
 						timeout: "Timeout exceeded",
+						requesting: "Requesting: {{action}}…",
+						accepted: "Action accepted ({{jobId}})",
+						socketTimeout: "No realtime logs — syncing from server…",
 					},
 					deploy: {
 						section: "Assisted build and deploy",

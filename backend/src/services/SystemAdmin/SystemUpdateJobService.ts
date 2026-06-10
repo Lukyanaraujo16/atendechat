@@ -7,6 +7,12 @@ import {
   emitSystemUpdateStart
 } from "../../libs/systemUpdateRealtime";
 import {
+  appendSystemUpdateJobLog,
+  beginSystemUpdateJobSnapshot,
+  finishSystemUpdateJobSnapshot,
+  getSystemUpdateJobSnapshotForUser
+} from "./systemUpdateJobStore";
+import {
   isGitSystemUpdateAction,
   isSystemUpdateAction,
   resolveWhitelistedCommand,
@@ -29,6 +35,16 @@ export function getActiveSystemUpdateJob() {
   return activeJob;
 }
 
+export function getCurrentSystemUpdateJobForUser(userId: number) {
+  return getSystemUpdateJobSnapshotForUser(userId);
+}
+
+function pushJobLog(userId: number, jobId: string, line: string, ts?: string): void {
+  const iso = ts || new Date().toISOString();
+  appendSystemUpdateJobLog(userId, jobId, line, iso);
+  emitSystemUpdateLog(userId, { jobId, line, ts: iso });
+}
+
 function sudoHintLine(message: string): string | null {
   const lower = message.toLowerCase();
   if (
@@ -46,7 +62,8 @@ function sudoHintLine(message: string): string | null {
 
 export async function startSystemUpdateJob(
   actionKey: string,
-  userId: number
+  userId: number,
+  jobId: string
 ): Promise<{ jobId: string; action: SystemUpdateAction }> {
   if (!isSystemUpdateAction(actionKey)) {
     throw new AppError("SYSTEM_UPDATE_INVALID_ACTION", 400);
@@ -57,7 +74,6 @@ export async function startSystemUpdateJob(
   }
 
   const action = actionKey;
-  const jobId = `sysupd-${Date.now()}`;
   activeJob = { id: jobId, action, userId, startedAt: Date.now() };
 
   try {
@@ -71,6 +87,12 @@ export async function startSystemUpdateJob(
     }
 
     const resolved = resolveWhitelistedCommand(action);
+    beginSystemUpdateJobSnapshot({
+      jobId,
+      action,
+      userId,
+      command: resolved.label
+    });
 
     emitSystemUpdateStart(userId, {
       jobId,
@@ -78,32 +100,26 @@ export async function startSystemUpdateJob(
       command: resolved.label,
       restartsBackend: resolved.restartsBackend
     });
-    emitSystemUpdateLog(userId, {
-      jobId,
-      line: `[${new Date().toISOString()}] ${resolved.label}`,
-      ts: new Date().toISOString()
-    });
-    emitSystemUpdateLog(userId, {
-      jobId,
-      line: `[cwd] ${resolved.cwd}`,
-      ts: new Date().toISOString()
-    });
+    pushJobLog(userId, jobId, `[${new Date().toISOString()}] ${resolved.label}`);
+    pushJobLog(userId, jobId, `[cwd] ${resolved.cwd}`);
 
     const started = Date.now();
     try {
       await runWhitelistedCommand(resolved, (line) => {
-        emitSystemUpdateLog(userId, {
-          jobId,
-          line,
-          ts: new Date().toISOString()
-        });
+        pushJobLog(userId, jobId, line);
       });
 
       const durationMs = Date.now() - started;
-      emitSystemUpdateLog(userId, {
+      pushJobLog(
+        userId,
         jobId,
-        line: `[${new Date().toISOString()}] Finalizado com sucesso (${durationMs}ms)`,
-        ts: new Date().toISOString()
+        `[${new Date().toISOString()}] Finalizado com sucesso (${durationMs}ms)`
+      );
+      finishSystemUpdateJobSnapshot({
+        userId,
+        jobId,
+        status: "success",
+        durationMs
       });
       emitSystemUpdateDone(userId, {
         jobId,
@@ -126,19 +142,18 @@ export async function startSystemUpdateJob(
       const message = String((err as Error)?.message || err || "unknown");
       const status =
         message === "SYSTEM_UPDATE_TIMEOUT" ? "timeout" : "failed";
-      emitSystemUpdateLog(userId, {
-        jobId,
-        line: `[${new Date().toISOString()}] Erro: ${message}`,
-        ts: new Date().toISOString()
-      });
+      pushJobLog(userId, jobId, `[${new Date().toISOString()}] Erro: ${message}`);
       const hint = action === "backend_restart" ? sudoHintLine(message) : null;
       if (hint) {
-        emitSystemUpdateLog(userId, {
-          jobId,
-          line: hint,
-          ts: new Date().toISOString()
-        });
+        pushJobLog(userId, jobId, hint);
       }
+      finishSystemUpdateJobSnapshot({
+        userId,
+        jobId,
+        status,
+        durationMs,
+        message
+      });
       emitSystemUpdateDone(userId, {
         jobId,
         action,
@@ -156,12 +171,15 @@ export async function startSystemUpdateJob(
     if (
       err instanceof AppError &&
       (err.message === "SYSTEM_UPDATE_DIR_NOT_FOUND" ||
-        err.message === "SYSTEM_UPDATE_PACKAGE_JSON_MISSING")
+        err.message === "SYSTEM_UPDATE_PACKAGE_JSON_MISSING" ||
+        err.message === "APP_ROOT_NOT_GIT_REPO")
     ) {
-      emitSystemUpdateLog(userId, {
+      pushJobLog(userId, jobId, `[${new Date().toISOString()}] Erro: ${err.message}`);
+      finishSystemUpdateJobSnapshot({
+        userId,
         jobId,
-        line: `[${new Date().toISOString()}] Erro: ${err.message}`,
-        ts: new Date().toISOString()
+        status: "failed",
+        message: err.message
       });
       emitSystemUpdateDone(userId, {
         jobId,

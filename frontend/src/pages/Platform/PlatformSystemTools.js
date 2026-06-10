@@ -29,6 +29,7 @@ import toastError from "../../errors/toastError";
 import { i18n } from "../../translate/i18n";
 import { toast } from "react-toastify";
 import { SocketContext } from "../../context/Socket/SocketContext";
+import { AuthContext } from "../../context/Auth/AuthContext";
 import {
   AppPageHeader,
   AppSectionCard,
@@ -40,6 +41,25 @@ import {
 
 const DEFAULT_REFRESH_MS = 5000;
 const JOB_MIN_REFRESH_MS = 10000;
+const SOCKET_LOG_TIMEOUT_MS = 15000;
+const JOB_POLL_MS = 2000;
+
+function getSaasSocketKey(user) {
+  if (!user?.id) return null;
+  return user.companyId != null ? user.companyId : `saas-${user.id}`;
+}
+
+const ACTION_REQUEST_LABELS = {
+  "git-status": "platform.systemTools.actions.gitStatus",
+  "git-log": "platform.systemTools.actions.gitLog",
+  "git-pull": "platform.systemTools.actions.gitPull",
+  "backend-npm-install": "platform.systemTools.deploy.actions.backendNpmInstall",
+  "backend-build": "platform.systemTools.deploy.actions.backendBuild",
+  "backend-migrate": "platform.systemTools.deploy.actions.backendMigrate",
+  "backend-restart": "platform.systemTools.deploy.actions.backendRestart",
+  "frontend-npm-install": "platform.systemTools.deploy.actions.frontendNpmInstall",
+  "frontend-build": "platform.systemTools.deploy.actions.frontendBuild",
+};
 
 const REFRESH_INTERVAL_OPTIONS = [
   { value: 0, labelKey: "platform.systemTools.refresh.paused" },
@@ -250,6 +270,7 @@ function MetricCard({ title, value, sub, percent }) {
 
 export default function PlatformSystemTools() {
   const classes = useStyles();
+  const { user } = useContext(AuthContext);
   const socketManager = useContext(SocketContext);
   const [monitor, setMonitor] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -268,6 +289,11 @@ export default function PlatformSystemTools() {
   const autoScrollRef = useRef(true);
   const pendingRestartRef = useRef(false);
   const monitorInFlightRef = useRef(false);
+  const activeJobIdRef = useRef(null);
+  const syncedLogCountRef = useRef(0);
+  const socketEventReceivedRef = useRef(false);
+  const socketWatchdogRef = useRef(null);
+  const jobRunningRef = useRef(false);
 
   const effectiveRefreshMs = useMemo(() => {
     if (refreshIntervalMs === 0) return 0;
@@ -283,6 +309,57 @@ export default function PlatformSystemTools() {
       { id: `${Date.now()}-${prev.length}`, text: line, ts: ts || new Date().toISOString() },
     ]);
   }, []);
+
+  const clearSocketWatchdog = useCallback(() => {
+    if (socketWatchdogRef.current) {
+      clearTimeout(socketWatchdogRef.current);
+      socketWatchdogRef.current = null;
+    }
+  }, []);
+
+  const syncJobLogsFromSnapshot = useCallback(
+    (job, { reset = false } = {}) => {
+      if (!job?.logs?.length) return;
+      if (reset || activeJobIdRef.current !== job.jobId) {
+        activeJobIdRef.current = job.jobId;
+        syncedLogCountRef.current = 0;
+      }
+      const pending = job.logs.slice(syncedLogCountRef.current);
+      if (!pending.length) return;
+      syncedLogCountRef.current = job.logs.length;
+      socketEventReceivedRef.current = true;
+      pending.forEach((entry) => appendLog(entry.line, entry.ts));
+    },
+    [appendLog]
+  );
+
+  const applyJobSnapshot = useCallback(
+    (snapshot) => {
+      if (!snapshot?.job) return;
+      const { job, active } = snapshot;
+      if (active) {
+        setJobRunning(true);
+      } else if (job.status && job.status !== "running") {
+        setJobRunning(false);
+        clearSocketWatchdog();
+      }
+      syncJobLogsFromSnapshot(job);
+    },
+    [syncJobLogsFromSnapshot, clearSocketWatchdog]
+  );
+
+  const fetchCurrentJob = useCallback(async () => {
+    try {
+      const { data } = await api.get("/system/update/current");
+      applyJobSnapshot(data);
+    } catch {
+      /* polling silencioso */
+    }
+  }, [applyJobSnapshot]);
+
+  useEffect(() => {
+    jobRunningRef.current = jobRunning;
+  }, [jobRunning]);
 
   const fetchMonitor = useCallback(async ({ silent = false, force = false } = {}) => {
     if (monitorInFlightRef.current && !force) return;
@@ -336,11 +413,31 @@ export default function PlatformSystemTools() {
   }, [lastUpdatedAt]);
 
   useEffect(() => {
-    const socket = socketManager?.currentSocket;
-    if (!socket) return undefined;
+    fetchCurrentJob();
+  }, [fetchCurrentJob]);
+
+  useEffect(() => {
+    if (!jobRunning) return undefined;
+    const id = setInterval(() => {
+      fetchCurrentJob();
+    }, JOB_POLL_MS);
+    return () => clearInterval(id);
+  }, [jobRunning, fetchCurrentJob]);
+
+  useEffect(() => {
+    const socketKey = getSaasSocketKey(user);
+    if (!socketKey) return undefined;
+
+    const socket = socketManager.getSocket(socketKey);
 
     const onStart = (payload) => {
+      socketEventReceivedRef.current = true;
+      clearSocketWatchdog();
       setJobRunning(true);
+      if (payload?.jobId) {
+        activeJobIdRef.current = payload.jobId;
+        syncedLogCountRef.current = 0;
+      }
       if (payload?.restartsBackend || payload?.action === "backend_restart") {
         pendingRestartRef.current = true;
       }
@@ -350,10 +447,17 @@ export default function PlatformSystemTools() {
     };
 
     const onLog = (payload) => {
+      socketEventReceivedRef.current = true;
+      clearSocketWatchdog();
+      if (payload?.jobId && activeJobIdRef.current && payload.jobId !== activeJobIdRef.current) {
+        return;
+      }
       if (payload?.line) appendLog(payload.line, payload.ts);
     };
 
     const onDone = (payload) => {
+      socketEventReceivedRef.current = true;
+      clearSocketWatchdog();
       setJobRunning(false);
       pendingRestartRef.current = false;
       setBackendRestarting(false);
@@ -365,6 +469,7 @@ export default function PlatformSystemTools() {
             ? i18n.t("platform.systemTools.terminal.timeout")
             : i18n.t("platform.systemTools.terminal.failed");
       appendLog(`[${formatTime()}] ${msg}`, new Date().toISOString());
+      fetchCurrentJob();
     };
 
     const onDisconnect = () => {
@@ -389,8 +494,16 @@ export default function PlatformSystemTools() {
       socket.off("system-update:log", onLog);
       socket.off("system-update:done", onDone);
       socket.off("disconnect", onDisconnect);
+      clearSocketWatchdog();
     };
-  }, [socketManager, appendLog]);
+  }, [
+    socketManager,
+    user?.id,
+    user?.companyId,
+    appendLog,
+    clearSocketWatchdog,
+    fetchCurrentJob,
+  ]);
 
   useEffect(() => {
     if (!autoScrollRef.current || !terminalRef.current) return;
@@ -402,11 +515,48 @@ export default function PlatformSystemTools() {
       toast.info(i18n.t("platform.systemTools.jobRunning"));
       return;
     }
+
+    const labelKey = ACTION_REQUEST_LABELS[action];
+    const actionLabel = labelKey ? i18n.t(labelKey) : action;
+    appendLog(
+      `[${formatTime()}] ${i18n.t("platform.systemTools.terminal.requesting", { action: actionLabel })}`,
+      new Date().toISOString()
+    );
+
+    setJobRunning(true);
+    socketEventReceivedRef.current = false;
+    syncedLogCountRef.current = 0;
+    activeJobIdRef.current = null;
+    clearSocketWatchdog();
+    socketWatchdogRef.current = setTimeout(() => {
+      if (!socketEventReceivedRef.current && jobRunningRef.current) {
+        appendLog(
+          `[${formatTime()}] ${i18n.t("platform.systemTools.terminal.socketTimeout")}`,
+          new Date().toISOString()
+        );
+        fetchCurrentJob();
+      }
+    }, SOCKET_LOG_TIMEOUT_MS);
+
     try {
-      await api.post(`/system/update/${action}`);
+      const { data } = await api.post(`/system/update/${action}`);
+      if (data?.jobId) {
+        activeJobIdRef.current = data.jobId;
+        appendLog(
+          `[${formatTime()}] ${i18n.t("platform.systemTools.terminal.accepted", { jobId: data.jobId })}`,
+          new Date().toISOString()
+        );
+      }
+      fetchCurrentJob();
     } catch (err) {
+      setJobRunning(false);
+      clearSocketWatchdog();
       const code = err?.response?.data?.error;
       if (code === "SYSTEM_UPDATE_JOB_RUNNING") {
+        appendLog(
+          `[${formatTime()}] ${i18n.t("platform.systemTools.jobRunning")}`,
+          new Date().toISOString()
+        );
         toast.info(i18n.t("platform.systemTools.jobRunning"));
         return;
       }

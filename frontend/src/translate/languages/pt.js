@@ -2650,6 +2650,9 @@ const messages = {
             success: "Finalizado com sucesso",
             failed: "Finalizado com erro",
             timeout: "Tempo limite excedido",
+            requesting: "Solicitando execução: {{action}}…",
+            accepted: "Ação aceita ({{jobId}})",
+            socketTimeout: "Sem logs em tempo real — sincronizando pelo servidor…",
           },
           deploy: {
             section: "Build e Deploy Assistido",

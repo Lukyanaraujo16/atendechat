@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import AppError from "../errors/AppError";
 import {
+  getCurrentSystemUpdateJobForUser,
   isSystemUpdateJobRunning,
   startSystemUpdateJob
 } from "../services/SystemAdmin/SystemUpdateJobService";
@@ -18,6 +19,12 @@ const ACTION_MAP: Record<string, SystemUpdateAction> = {
   "frontend-build": "frontend_build"
 };
 
+export const getCurrent = async (req: Request, res: Response): Promise<void> => {
+  const userId = Number(req.user.id);
+  const snapshot = getCurrentSystemUpdateJobForUser(userId);
+  res.json(snapshot);
+};
+
 export const runAction = async (req: Request, res: Response): Promise<void> => {
   const routeAction = String(req.params.action || "");
   const mapped = ACTION_MAP[routeAction];
@@ -31,13 +38,15 @@ export const runAction = async (req: Request, res: Response): Promise<void> => {
   }
 
   const userId = Number(req.user.id);
-  void startSystemUpdateJob(mapped, userId).catch(() => {
+  const jobId = `sysupd-${Date.now()}`;
+  void startSystemUpdateJob(mapped, userId, jobId).catch(() => {
     // erros já emitidos via socket; evita unhandled rejection
   });
 
   res.status(202).json({
     accepted: true,
     action: mapped,
-    routeAction
+    routeAction,
+    jobId
   });
 };

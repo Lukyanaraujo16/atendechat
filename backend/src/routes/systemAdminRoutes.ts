@@ -13,6 +13,13 @@ systemAdminRoutes.get(
   SystemMonitorController.show
 );
 
+systemAdminRoutes.get(
+  "/system/update/current",
+  isAuth,
+  isSuper,
+  SystemUpdateController.getCurrent
+);
+
 systemAdminRoutes.post(
   "/system/update/:action",
   isAuth,
