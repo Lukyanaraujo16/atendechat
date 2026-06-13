@@ -13,7 +13,6 @@ import {
   IconButton,
   Table,
   TableHead,
-  Tooltip,
   Typography,
   Box,
   Chip,
@@ -23,10 +22,13 @@ import {
   CheckCircle,
   DeleteOutline,
   Instagram,
+  Link,
+  LinkOff,
 } from "@material-ui/icons";
 
 import TableRowSkeleton from "../TableRowSkeleton";
 import InstagramAccountModal from "../InstagramAccountModal";
+import InstagramConnectTokenModal from "../InstagramConnectTokenModal";
 import ConfirmationModal from "../ConfirmationModal";
 import { i18n } from "../../translate/i18n";
 import toastError from "../../errors/toastError";
@@ -100,6 +102,9 @@ const useStyles = makeStyles((theme) => ({
     marginRight: theme.spacing(0.5),
     marginBottom: theme.spacing(0.5),
   },
+  metaLine: {
+    marginTop: theme.spacing(0.5),
+  },
 }));
 
 const instagramStatusChip = (status) => {
@@ -116,6 +121,17 @@ const instagramStatusChip = (status) => {
   }
 };
 
+const formatTokenExpiry = (value) => {
+  if (!value) {
+    return i18n.t("connections.instagram.table.noExpiry");
+  }
+  try {
+    return format(parseISO(value), "dd/MM/yy HH:mm");
+  } catch {
+    return i18n.t("connections.instagram.table.noExpiry");
+  }
+};
+
 const InstagramConnectionsPanel = () => {
   const classes = useStyles();
   const isMobile = useIsMobile();
@@ -125,7 +141,10 @@ const InstagramConnectionsPanel = () => {
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState(null);
+  const [connectTokenModalOpen, setConnectTokenModalOpen] = useState(false);
+  const [connectTokenAccount, setConnectTokenAccount] = useState(null);
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
+  const [confirmAction, setConfirmAction] = useState("delete");
   const [confirmAccountId, setConfirmAccountId] = useState(null);
 
   const fetchAccounts = useCallback(async () => {
@@ -159,10 +178,31 @@ const InstagramConnectionsPanel = () => {
     setSelectedAccount(null);
   };
 
-  const handleDelete = async () => {
+  const handleOpenConnectToken = (account) => {
+    setConnectTokenAccount(account);
+    setConnectTokenModalOpen(true);
+  };
+
+  const handleCloseConnectToken = () => {
+    setConnectTokenModalOpen(false);
+    setConnectTokenAccount(null);
+  };
+
+  const openConfirm = (action, accountId) => {
+    setConfirmAction(action);
+    setConfirmAccountId(accountId);
+    setConfirmModalOpen(true);
+  };
+
+  const handleConfirm = async () => {
     try {
-      await api.delete(`/instagram-accounts/${confirmAccountId}`);
-      toast.success(i18n.t("connections.instagram.toasts.deleted"));
+      if (confirmAction === "delete") {
+        await api.delete(`/instagram-accounts/${confirmAccountId}`);
+        toast.success(i18n.t("connections.instagram.toasts.deleted"));
+      } else if (confirmAction === "disconnect") {
+        await api.post(`/instagram-accounts/${confirmAccountId}/disconnect`);
+        toast.success(i18n.t("connections.instagram.toasts.disconnected"));
+      }
       fetchAccounts();
     } catch (err) {
       toastError(err);
@@ -200,6 +240,71 @@ const InstagramConnectionsPanel = () => {
     );
   };
 
+  const renderTokenStatus = (account) => (
+    <Chip
+      size="small"
+      variant="outlined"
+      color={account.hasToken ? "primary" : "default"}
+      label={
+        account.hasToken
+          ? i18n.t("connections.instagram.table.hasToken")
+          : i18n.t("connections.instagram.table.noToken")
+      }
+    />
+  );
+
+  const renderAccountMeta = (account) => (
+    <Box>
+      {account.instagramBusinessAccountId && (
+        <Typography variant="caption" color="textSecondary" display="block">
+          {i18n.t("connections.instagram.table.businessId")}: {account.instagramBusinessAccountId}
+        </Typography>
+      )}
+      <Typography variant="caption" color="textSecondary" display="block" className={classes.metaLine}>
+        {i18n.t("connections.instagram.table.token")}: {account.hasToken
+          ? i18n.t("connections.instagram.table.hasToken")
+          : i18n.t("connections.instagram.table.noToken")}
+        {account.hasToken && (
+          <> · {i18n.t("connections.instagram.table.tokenExpires")}: {formatTokenExpiry(account.tokenExpiresAt)}</>
+        )}
+      </Typography>
+    </Box>
+  );
+
+  const buildActionItems = (account) => {
+    const items = [
+      {
+        label: i18n.t("connections.instagram.mobile.edit"),
+        icon: <Edit fontSize="small" />,
+        onClick: () => handleEdit(account),
+      },
+    ];
+
+    if (account.status !== "CONNECTED" || !account.hasToken) {
+      items.push({
+        label: i18n.t("connections.instagram.mobile.connectToken"),
+        icon: <Link fontSize="small" />,
+        onClick: () => handleOpenConnectToken(account),
+      });
+    }
+
+    if (account.hasToken) {
+      items.push({
+        label: i18n.t("connections.instagram.mobile.disconnect"),
+        icon: <LinkOff fontSize="small" />,
+        onClick: () => openConfirm("disconnect", account.id),
+      });
+    }
+
+    items.push({
+      label: i18n.t("connections.instagram.mobile.delete"),
+      icon: <DeleteOutline fontSize="small" />,
+      onClick: () => openConfirm("delete", account.id),
+    });
+
+    return items;
+  };
+
   const renderMobileCard = (account) => (
     <MobileEntityCard
       key={account.id}
@@ -220,13 +325,17 @@ const InstagramConnectionsPanel = () => {
               label={i18n.t("connections.instagram.mobile.defaultAccount")}
             />
           )}
+          {renderTokenStatus(account)}
         </Box>
       }
       meta={
-        <Typography variant="caption" color="textSecondary">
-          {i18n.t("connections.instagram.mobile.lastUpdate")}:{" "}
-          {format(parseISO(account.updatedAt), "dd/MM/yy HH:mm")}
-        </Typography>
+        <>
+          {renderAccountMeta(account)}
+          <Typography variant="caption" color="textSecondary" display="block" className={classes.metaLine}>
+            {i18n.t("connections.instagram.mobile.lastUpdate")}:{" "}
+            {format(parseISO(account.updatedAt), "dd/MM/yy HH:mm")}
+          </Typography>
+        </>
       }
       footer={renderQueues(account)}
       actions={
@@ -236,21 +345,7 @@ const InstagramConnectionsPanel = () => {
           yes={() => (
             <MobileActionsMenu
               label={i18n.t("connections.instagram.mobile.actions")}
-              items={[
-                {
-                  label: i18n.t("connections.instagram.mobile.edit"),
-                  icon: <Edit fontSize="small" />,
-                  onClick: () => handleEdit(account),
-                },
-                {
-                  label: i18n.t("connections.instagram.mobile.delete"),
-                  icon: <DeleteOutline fontSize="small" />,
-                  onClick: () => {
-                    setConfirmAccountId(account.id);
-                    setConfirmModalOpen(true);
-                  },
-                },
-              ]}
+              items={buildActionItems(account)}
             />
           )}
         />
@@ -258,15 +353,25 @@ const InstagramConnectionsPanel = () => {
     />
   );
 
+  const confirmTitle =
+    confirmAction === "disconnect"
+      ? i18n.t("connections.instagram.confirmationModal.disconnectTitle")
+      : i18n.t("connections.instagram.confirmationModal.deleteTitle");
+
+  const confirmMessage =
+    confirmAction === "disconnect"
+      ? i18n.t("connections.instagram.confirmationModal.disconnectMessage")
+      : i18n.t("connections.instagram.confirmationModal.deleteMessage");
+
   return (
     <>
       <ConfirmationModal
-        title={i18n.t("connections.instagram.confirmationModal.deleteTitle")}
+        title={confirmTitle}
         open={confirmModalOpen}
         onClose={setConfirmModalOpen}
-        onConfirm={handleDelete}
+        onConfirm={handleConfirm}
       >
-        {i18n.t("connections.instagram.confirmationModal.deleteMessage")}
+        {confirmMessage}
       </ConfirmationModal>
 
       <InstagramAccountModal
@@ -274,6 +379,14 @@ const InstagramConnectionsPanel = () => {
         onClose={handleCloseModal}
         instagramAccountId={selectedAccount?.id}
         onSaved={fetchAccounts}
+      />
+
+      <InstagramConnectTokenModal
+        open={connectTokenModalOpen}
+        onClose={handleCloseConnectToken}
+        instagramAccountId={connectTokenAccount?.id}
+        accountName={connectTokenAccount?.name}
+        onConnected={fetchAccounts}
       />
 
       <Box className={`${classes.guideBox} ${isMobile ? classes.mobileGuide : ""}`}>
@@ -292,13 +405,6 @@ const InstagramConnectionsPanel = () => {
       </Box>
 
       <Box className={classes.headerActions}>
-        <Tooltip title={i18n.t("connections.instagram.buttons.connectMetaTooltip")} arrow>
-          <span>
-            <Button variant="outlined" color="primary" disabled>
-              {i18n.t("connections.instagram.buttons.connectMeta")}
-            </Button>
-          </span>
-        </Tooltip>
         <Can
           role={user.profile}
           perform="connections-page:addConnection"
@@ -333,6 +439,12 @@ const InstagramConnectionsPanel = () => {
                   {i18n.t("connections.instagram.table.status")}
                 </TableCell>
                 <TableCell align="center" className={classes.tableHeadCell}>
+                  {i18n.t("connections.instagram.table.businessId")}
+                </TableCell>
+                <TableCell align="center" className={classes.tableHeadCell}>
+                  {i18n.t("connections.instagram.table.token")}
+                </TableCell>
+                <TableCell align="center" className={classes.tableHeadCell}>
                   {i18n.t("connections.instagram.table.queues")}
                 </TableCell>
                 <TableCell align="center" className={classes.tableHeadCell}>
@@ -357,7 +469,7 @@ const InstagramConnectionsPanel = () => {
                 <TableRowSkeleton />
               ) : !accounts?.length ? (
                 <TableRow>
-                  <TableCell colSpan={6} style={{ border: "none" }}>
+                  <TableCell colSpan={8} style={{ border: "none" }}>
                     <AppEmptyState
                       title={i18n.t("connections.instagram.table.emptyTitle")}
                       description={i18n.t("connections.instagram.table.emptyHint")}
@@ -374,6 +486,21 @@ const InstagramConnectionsPanel = () => {
                       </Box>
                     </TableCell>
                     <TableCell align="center">{renderStatus(account)}</TableCell>
+                    <TableCell align="center">
+                      <Typography variant="body2" color="textSecondary">
+                        {account.instagramBusinessAccountId || "—"}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="center">
+                      <Box>
+                        {renderTokenStatus(account)}
+                        {account.hasToken && (
+                          <Typography variant="caption" color="textSecondary" display="block">
+                            {formatTokenExpiry(account.tokenExpiresAt)}
+                          </Typography>
+                        )}
+                      </Box>
+                    </TableCell>
                     <TableCell align="center">{renderQueues(account)}</TableCell>
                     <TableCell align="center">
                       {format(parseISO(account.updatedAt), "dd/MM/yy HH:mm")}
@@ -390,15 +517,30 @@ const InstagramConnectionsPanel = () => {
                       perform="connections-page:editOrDeleteConnection"
                       yes={() => (
                         <TableCell align="center">
+                          {(account.status !== "CONNECTED" || !account.hasToken) && (
+                            <IconButton
+                              size="small"
+                              title={i18n.t("connections.instagram.buttons.connectToken")}
+                              onClick={() => handleOpenConnectToken(account)}
+                            >
+                              <Link />
+                            </IconButton>
+                          )}
+                          {account.hasToken && (
+                            <IconButton
+                              size="small"
+                              title={i18n.t("connections.instagram.buttons.disconnect")}
+                              onClick={() => openConfirm("disconnect", account.id)}
+                            >
+                              <LinkOff />
+                            </IconButton>
+                          )}
                           <IconButton size="small" onClick={() => handleEdit(account)}>
                             <Edit />
                           </IconButton>
                           <IconButton
                             size="small"
-                            onClick={() => {
-                              setConfirmAccountId(account.id);
-                              setConfirmModalOpen(true);
-                            }}
+                            onClick={() => openConfirm("delete", account.id)}
                           >
                             <DeleteOutline />
                           </IconButton>

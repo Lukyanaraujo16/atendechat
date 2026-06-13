@@ -1424,10 +1424,10 @@ const messages = {
 				},
 				instagram: {
 					guide: {
-						title: "How to set up Instagram Direct",
-						intro: "In this phase you can register placeholder accounts and link queues. Meta connection will be enabled in the next phase.",
+						title: "How to connect Instagram Direct",
+						intro: "Register the account, link queues, and connect with the token from Meta for Developers.",
 						step1: "Click \"Add Instagram account\", enter a name and save.",
-						step2: "Link the queues that will handle messages for this account.",
+						step2: "Use \"Connect with token\" and paste the token from Meta.",
 					},
 					statusLabel: {
 						CONNECTED: "Connected",
@@ -1437,26 +1437,48 @@ const messages = {
 					},
 					toasts: {
 						deleted: "Instagram account deleted successfully!",
+						disconnected: "Instagram account disconnected.",
 					},
 					confirmationModal: {
 						deleteTitle: "Delete account",
 						deleteMessage: "Are you sure? This action cannot be undone.",
+						disconnectTitle: "Disconnect",
+						disconnectMessage: "The token will be securely removed. Continue?",
 					},
 					buttons: {
 						add: "Add Instagram account",
-						connectMeta: "Connect with Meta",
-						connectMetaTooltip: "Available in the next phase",
+						connectToken: "Connect with token",
+						disconnect: "Disconnect",
+					},
+					connectToken: {
+						title: "Connect with token",
+						warning:
+							"Use only tokens generated in Meta for Developers. The token will be stored securely and will not be shown again.",
+						hint: "Paste the Instagram Business access token below.",
+						tokenLabel: "Access token",
+						submit: "Validate and connect",
+						cancel: "Cancel",
+						success: "Instagram account connected successfully!",
+						errors: {
+							empty: "Enter the access token.",
+						},
 					},
 					table: {
 						name: "Name",
 						status: "Status",
 						queues: "Queues",
+						businessId: "Instagram Business ID",
+						token: "Token",
+						tokenExpires: "Expires at",
 						lastUpdate: "Last update",
 						default: "Default",
 						actions: "Actions",
 						emptyTitle: "No Instagram accounts",
-						emptyHint: "Add an account to prepare Direct messaging support.",
+						emptyHint: "Add an account and connect with your Meta token.",
 						noQueues: "No linked queues",
+						hasToken: "Configured",
+						noToken: "Missing",
+						noExpiry: "No expiration",
 					},
 					mobile: {
 						actions: "Account actions",
@@ -1464,6 +1486,10 @@ const messages = {
 						defaultAccount: "Default",
 						edit: "Edit",
 						delete: "Delete",
+						connectToken: "Connect with token",
+						disconnect: "Disconnect",
+						businessId: "Business ID",
+						tokenStatus: "Token",
 					},
 				},
 				guide: {
@@ -5602,6 +5628,18 @@ const messages = {
 				ERR_NO_TICKET_FOUND: "No ticket found with this ID.",
 				ERR_NO_USER_FOUND: "No user found with this ID.",
 				ERR_NO_WAPP_FOUND: "No WhatsApp found with this ID.",
+				ERR_NO_INSTAGRAM_ACCOUNT_FOUND: "Instagram account not found.",
+				ERR_INSTAGRAM_TOKEN_INVALID:
+					"Invalid or expired token. Generate a new token in Meta for Developers.",
+				ERR_INSTAGRAM_TOKEN_MISSING_SCOPES:
+					"The token does not have all required permissions for Instagram Direct.",
+				ERR_INSTAGRAM_PROFILE_NOT_FOUND:
+					"Could not retrieve Instagram account data from Meta.",
+				ERR_META_API_FAILED: "Failed to query Meta API. Please try again.",
+				ERR_META_APP_CONFIG_MISSING:
+					"Meta credentials not configured on the server (META_APP_ID / META_APP_SECRET).",
+				ERR_META_TOKEN_ENCRYPTION_KEY_MISSING:
+					"Token encryption key not configured on the server.",
 				ERR_CREATING_MESSAGE: "Error creating message in database.",
 				ERR_CREATING_TICKET: "Error creating ticket in database.",
 				ERR_FETCH_WAPP_MSG: "Error fetching WhatsApp message, it might be too old.",

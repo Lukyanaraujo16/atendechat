@@ -1,6 +1,7 @@
 import express from "express";
 import isAuth from "../middleware/isAuth";
 import requireCompanyNotDelinquent from "../middleware/requireCompanyNotDelinquent";
+import requireWhatsappBehaviorManager from "../middleware/requireWhatsappBehaviorManager";
 
 import * as InstagramAccountController from "../controllers/InstagramAccountController";
 
@@ -29,6 +30,20 @@ instagramAccountRoutes.put(
   "/instagram-accounts/:id",
   isAuth,
   InstagramAccountController.update
+);
+
+instagramAccountRoutes.post(
+  "/instagram-accounts/:id/connect-token",
+  isAuth,
+  requireWhatsappBehaviorManager,
+  InstagramAccountController.connectToken
+);
+
+instagramAccountRoutes.post(
+  "/instagram-accounts/:id/disconnect",
+  isAuth,
+  requireWhatsappBehaviorManager,
+  InstagramAccountController.disconnect
 );
 
 instagramAccountRoutes.delete(

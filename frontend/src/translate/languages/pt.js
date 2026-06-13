@@ -1499,10 +1499,10 @@ const messages = {
         },
         instagram: {
           guide: {
-            title: "Como configurar o Instagram Direct",
-            intro: "Nesta fase você pode cadastrar contas placeholder e vincular setores. A conexão com a Meta será habilitada na próxima fase.",
+            title: "Como conectar o Instagram Direct",
+            intro: "Cadastre a conta, vincule setores e conecte com o token gerado no Meta for Developers.",
             step1: "Clique em \"Adicionar conta Instagram\", informe o nome e salve.",
-            step2: "Vincule os setores/filas que atenderão mensagens desta conta.",
+            step2: "Use \"Conectar com token\" e cole o token gerado na Meta.",
           },
           statusLabel: {
             CONNECTED: "Conectado",
@@ -1512,26 +1512,48 @@ const messages = {
           },
           toasts: {
             deleted: "Conta Instagram excluída com sucesso!",
+            disconnected: "Conta Instagram desconectada.",
           },
           confirmationModal: {
             deleteTitle: "Excluir conta",
             deleteMessage: "Você tem certeza? Essa ação não pode ser revertida.",
+            disconnectTitle: "Desconectar",
+            disconnectMessage: "O token será removido com segurança. Deseja continuar?",
           },
           buttons: {
             add: "Adicionar conta Instagram",
-            connectMeta: "Conectar com Meta",
-            connectMetaTooltip: "Disponível na próxima fase",
+            connectToken: "Conectar com token",
+            disconnect: "Desconectar",
+          },
+          connectToken: {
+            title: "Conectar com token",
+            warning:
+              "Use apenas tokens gerados no Meta for Developers. O token será armazenado de forma segura e não será exibido novamente.",
+            hint: "Cole abaixo o token de acesso da conta Instagram Business.",
+            tokenLabel: "Token de acesso",
+            submit: "Validar e conectar",
+            cancel: "Cancelar",
+            success: "Conta Instagram conectada com sucesso!",
+            errors: {
+              empty: "Informe o token de acesso.",
+            },
           },
           table: {
             name: "Nome",
             status: "Status",
             queues: "Setores",
+            businessId: "Instagram Business ID",
+            token: "Token",
+            tokenExpires: "Expira em",
             lastUpdate: "Última atualização",
             default: "Padrão",
             actions: "Ações",
             emptyTitle: "Nenhuma conta Instagram",
-            emptyHint: "Adicione uma conta para preparar o atendimento via Direct.",
+            emptyHint: "Adicione uma conta e conecte com o token da Meta.",
             noQueues: "Nenhum setor vinculado",
+            hasToken: "Configurado",
+            noToken: "Ausente",
+            noExpiry: "Sem expiração",
           },
           mobile: {
             actions: "Ações da conta",
@@ -1539,6 +1561,10 @@ const messages = {
             defaultAccount: "Padrão",
             edit: "Editar",
             delete: "Excluir",
+            connectToken: "Conectar com token",
+            disconnect: "Desconectar",
+            businessId: "Business ID",
+            tokenStatus: "Token",
           },
         },
         guide: {
@@ -5774,6 +5800,18 @@ const messages = {
         ERR_NO_TICKET_FOUND: "Nenhum tíquete encontrado com este ID.",
         ERR_NO_USER_FOUND: "Nenhum usuário encontrado com este ID.",
         ERR_NO_WAPP_FOUND: "Nenhum WhatsApp encontrado com este ID.",
+        ERR_NO_INSTAGRAM_ACCOUNT_FOUND: "Conta Instagram não encontrada.",
+        ERR_INSTAGRAM_TOKEN_INVALID:
+          "Token inválido ou expirado. Gere um novo token no Meta for Developers.",
+        ERR_INSTAGRAM_TOKEN_MISSING_SCOPES:
+          "O token não possui todas as permissões necessárias para o Instagram Direct.",
+        ERR_INSTAGRAM_PROFILE_NOT_FOUND:
+          "Não foi possível obter os dados da conta Instagram na Meta.",
+        ERR_META_API_FAILED: "Falha ao consultar a API da Meta. Tente novamente.",
+        ERR_META_APP_CONFIG_MISSING:
+          "Credenciais Meta não configuradas no servidor (META_APP_ID / META_APP_SECRET).",
+        ERR_META_TOKEN_ENCRYPTION_KEY_MISSING:
+          "Chave de criptografia de tokens não configurada no servidor.",
         ERR_CREATING_MESSAGE: "Erro ao criar mensagem no banco de dados.",
         ERR_CREATING_TICKET: "Erro ao criar tíquete no banco de dados.",
         ERR_FETCH_WAPP_MSG:
