@@ -8,6 +8,8 @@ const FACEBOOK_GRAPH = `https://graph.facebook.com/${GRAPH_VERSION}`;
 const INSTAGRAM_GRAPH_VERSIONED = `https://graph.instagram.com/${GRAPH_VERSION}`;
 const INSTAGRAM_GRAPH_UNVERSIONED = "https://graph.instagram.com";
 
+export const INSTAGRAM_LOGIN_API_SCOPE = "instagram_login_api";
+
 export const REQUIRED_INSTAGRAM_SCOPES = [
   "instagram_business_basic",
   "instagram_business_manage_messages",
@@ -43,6 +45,13 @@ export interface MetaInstagramProfile {
   name: string | null;
   profilePicUrl: string | null;
   facebookPageId: string | null;
+}
+
+export interface InstagramTokenValidationResult {
+  profile: MetaInstagramProfile;
+  expiresAt: Date | null;
+  scopes: string[];
+  validatedVia: MetaApiPhase;
 }
 
 type MetaErrorBody = {
@@ -86,11 +95,25 @@ export const isMetaTemporaryUnavailable = (err: unknown): boolean => {
   );
 };
 
+const isDebugTokenSkippableError = (err: unknown): boolean => {
+  const meta = parseMetaError(err);
+  if (!meta) {
+    return false;
+  }
+
+  if (meta.code === 190 || meta.code === 2) {
+    return true;
+  }
+
+  return isMetaTemporaryUnavailable(err);
+};
+
 const logMetaApiFailure = (
   phase: MetaApiPhase,
   attempt: number,
   maxAttempts: number,
-  err: unknown
+  err: unknown,
+  optional = false
 ): void => {
   const meta = parseMetaError(err);
   logger.warn(
@@ -98,23 +121,26 @@ const logMetaApiFailure = (
       metaPhase: phase,
       attempt,
       maxAttempts,
+      optional,
       temporary: isMetaTemporaryUnavailable(err),
       metaErrorCode: meta?.code,
       metaErrorMessage: meta?.message
         ? redactSensitiveText(meta.message)
         : undefined
     },
-    "Meta API request failed"
+    optional
+      ? "Meta API optional request failed"
+      : "Meta API request failed"
   );
 };
 
 const throwMetaTemporaryError = (
   phase: MetaApiPhase,
-  context: "debug" | "profile"
+  context: "validation" | "profile"
 ): never => {
   const phaseLabel = META_API_PHASE_LABELS[phase];
   const clientMessage =
-    context === "debug"
+    context === "validation"
       ? `Falha temporária na Meta ao validar token (${phaseLabel}). Tente novamente.`
       : `Falha temporária na Meta ao buscar perfil (${phaseLabel}). Tente novamente.`;
 
@@ -123,25 +149,11 @@ const throwMetaTemporaryError = (
   });
 };
 
-const throwMetaDebugError = (phase: MetaApiPhase, err: unknown): never => {
-  if (isMetaTemporaryUnavailable(err)) {
-    throwMetaTemporaryError(phase, "debug");
-  }
-
-  const meta = parseMetaError(err);
-  const safeMessage = meta?.message
-    ? redactSensitiveText(meta.message)
-    : "Falha ao consultar a API da Meta.";
-
-  throw new AppError("ERR_META_API_FAILED", 400, safeMessage, {
-    metaPhase: phase
-  });
-};
-
 const metaGetWithRetry = async <T>(
   phase: MetaApiPhase,
   url: string,
-  params: Record<string, string>
+  params: Record<string, string>,
+  optional = false
 ): Promise<T> => {
   const maxAttempts = RETRY_DELAYS_MS.length + 1;
   let lastErr: unknown;
@@ -155,7 +167,7 @@ const metaGetWithRetry = async <T>(
       return data;
     } catch (err) {
       lastErr = err;
-      logMetaApiFailure(phase, attempt, maxAttempts, err);
+      logMetaApiFailure(phase, attempt, maxAttempts, err, optional);
 
       const temporary = isMetaTemporaryUnavailable(err);
       if (temporary && attempt < maxAttempts) {
@@ -170,16 +182,12 @@ const metaGetWithRetry = async <T>(
   throw lastErr;
 };
 
-const getMetaAppCredentials = (): { appId: string; appSecret: string } => {
+const getMetaAppCredentials = (): { appId: string; appSecret: string } | null => {
   const appId = process.env.META_APP_ID?.trim();
   const appSecret = process.env.META_APP_SECRET?.trim();
 
   if (!appId || !appSecret) {
-    throw new AppError(
-      "ERR_META_APP_CONFIG_MISSING",
-      500,
-      "Credenciais Meta não configuradas. Defina META_APP_ID e META_APP_SECRET no servidor."
-    );
+    return null;
   }
 
   return { appId, appSecret };
@@ -222,15 +230,18 @@ const mapInstagramMeData = (
   data: Record<string, unknown> | null | undefined
 ): MetaInstagramProfile | null => {
   const userId = data?.user_id ?? data?.id;
-  if (!userId) {
+  const username =
+    typeof data?.username === "string" ? data.username : null;
+
+  if (!userId && !username) {
     return null;
   }
 
   return {
-    instagramBusinessAccountId: String(userId),
+    instagramBusinessAccountId: userId != null ? String(userId) : null,
     name:
       (typeof data?.name === "string" && data.name) ||
-      (typeof data?.username === "string" && data.username) ||
+      username ||
       null,
     profilePicUrl:
       typeof data?.profile_picture_url === "string"
@@ -238,96 +249,6 @@ const mapInstagramMeData = (
         : null,
     facebookPageId: null
   };
-};
-
-export const debugMetaAccessToken = async (
-  inputToken: string
-): Promise<MetaDebugTokenData> => {
-  const phase: MetaApiPhase = "debug_token";
-  const { appId, appSecret } = getMetaAppCredentials();
-  const appAccessToken = `${appId}|${appSecret}`;
-
-  try {
-    const data = await metaGetWithRetry<{
-      data?: Record<string, unknown>;
-    }>(phase, `${FACEBOOK_GRAPH}/debug_token`, {
-      input_token: inputToken,
-      access_token: appAccessToken
-    });
-
-    const tokenData = data?.data;
-    if (!tokenData || typeof tokenData !== "object") {
-      throw new AppError(
-        "ERR_INSTAGRAM_TOKEN_INVALID",
-        400,
-        "Resposta inválida ao validar o token na Meta."
-      );
-    }
-
-    const record = tokenData as Record<string, unknown>;
-
-    return {
-      isValid: record.is_valid === true,
-      expiresAt: parseExpiresAt(record.expires_at),
-      scopes: collectScopes(record),
-      userId:
-        typeof record.user_id === "string"
-          ? record.user_id
-          : record.user_id != null
-            ? String(record.user_id)
-            : null
-    };
-  } catch (err) {
-    if (err instanceof AppError) {
-      throw err;
-    }
-    throwMetaDebugError(phase, err);
-  }
-};
-
-export const assertRequiredInstagramScopes = (scopes: string[]): void => {
-  const missing = REQUIRED_INSTAGRAM_SCOPES.filter(
-    required => !scopes.includes(required)
-  );
-
-  if (missing.length) {
-    throw new AppError(
-      "ERR_INSTAGRAM_TOKEN_MISSING_SCOPES",
-      400,
-      `O token não possui todas as permissões necessárias. Faltam: ${missing.join(", ")}.`,
-      { missingScopes: missing.join(",") }
-    );
-  }
-};
-
-const runProfileStrategy = async (
-  phase: MetaApiPhase,
-  fetcher: () => Promise<MetaInstagramProfile | null>
-): Promise<ProfileStrategyResult> => {
-  try {
-    const profile = await fetcher();
-    if (profile?.instagramBusinessAccountId) {
-      return { kind: "profile", profile };
-    }
-    return { kind: "miss" };
-  } catch (err) {
-    if (isMetaTemporaryUnavailable(err)) {
-      return { kind: "temporary", phase };
-    }
-
-    const meta = parseMetaError(err);
-    logger.warn(
-      {
-        metaPhase: phase,
-        metaErrorCode: meta?.code,
-        metaErrorMessage: meta?.message
-          ? redactSensitiveText(meta.message)
-          : undefined
-      },
-      "Meta profile strategy failed (non-temporary)"
-    );
-    return { kind: "miss" };
-  }
 };
 
 const fetchInstagramMeVersioned = async (
@@ -431,26 +352,161 @@ const fetchUserInstagramBusinessAccount = async (
   };
 };
 
+const runProfileStrategy = async (
+  phase: MetaApiPhase,
+  fetcher: () => Promise<MetaInstagramProfile | null>
+): Promise<ProfileStrategyResult> => {
+  try {
+    const profile = await fetcher();
+    if (profile?.instagramBusinessAccountId || profile?.name) {
+      return { kind: "profile", profile };
+    }
+    return { kind: "miss" };
+  } catch (err) {
+    if (isMetaTemporaryUnavailable(err)) {
+      return { kind: "temporary", phase };
+    }
+
+    const meta = parseMetaError(err);
+    logger.warn(
+      {
+        metaPhase: phase,
+        metaErrorCode: meta?.code,
+        metaErrorMessage: meta?.message
+          ? redactSensitiveText(meta.message)
+          : undefined
+      },
+      "Meta profile strategy failed (non-temporary)"
+    );
+    return { kind: "miss" };
+  }
+};
+
+const requestDebugToken = async (
+  inputToken: string,
+  optional: boolean
+): Promise<MetaDebugTokenData | null> => {
+  const phase: MetaApiPhase = "debug_token";
+  const credentials = getMetaAppCredentials();
+
+  if (!credentials) {
+    if (!optional) {
+      throw new AppError(
+        "ERR_META_APP_CONFIG_MISSING",
+        500,
+        "Credenciais Meta não configuradas. Defina META_APP_ID e META_APP_SECRET no servidor."
+      );
+    }
+    return null;
+  }
+
+  const appAccessToken = `${credentials.appId}|${credentials.appSecret}`;
+
+  try {
+    const data = await metaGetWithRetry<{
+      data?: Record<string, unknown>;
+    }>(
+      phase,
+      `${FACEBOOK_GRAPH}/debug_token`,
+      {
+        input_token: inputToken,
+        access_token: appAccessToken
+      },
+      optional
+    );
+
+    const tokenData = data?.data;
+    if (!tokenData || typeof tokenData !== "object") {
+      return null;
+    }
+
+    const record = tokenData as Record<string, unknown>;
+
+    return {
+      isValid: record.is_valid === true,
+      expiresAt: parseExpiresAt(record.expires_at),
+      scopes: collectScopes(record),
+      userId:
+        typeof record.user_id === "string"
+          ? record.user_id
+          : record.user_id != null
+            ? String(record.user_id)
+            : null
+    };
+  } catch (err) {
+    const meta = parseMetaError(err);
+
+    if (optional) {
+      logger.warn(
+        {
+          metaPhase: phase,
+          optional: true,
+          metaErrorCode: meta?.code,
+          metaErrorMessage: meta?.message
+            ? redactSensitiveText(meta.message)
+            : undefined,
+          skipped: isDebugTokenSkippableError(err)
+        },
+        "debug_token enrichment skipped (non-blocking)"
+      );
+      return null;
+    }
+
+    if (isMetaTemporaryUnavailable(err)) {
+      throwMetaTemporaryError(phase, "validation");
+    }
+
+    return null;
+  }
+};
+
+const tryOptionalDebugTokenEnrichment = async (
+  inputToken: string
+): Promise<MetaDebugTokenData | null> => requestDebugToken(inputToken, true);
+
+export const assertRequiredInstagramScopes = (scopes: string[]): void => {
+  const missing = REQUIRED_INSTAGRAM_SCOPES.filter(
+    required => !scopes.includes(required)
+  );
+
+  if (missing.length) {
+    throw new AppError(
+      "ERR_INSTAGRAM_TOKEN_MISSING_SCOPES",
+      400,
+      `O token não possui todas as permissões necessárias. Faltam: ${missing.join(", ")}.`,
+      { missingScopes: missing.join(",") }
+    );
+  }
+};
+
+const defaultScopesForPhase = (phase: MetaApiPhase): string[] => {
+  if (
+    phase === "instagram_me_unversioned" ||
+    phase === "instagram_me_versioned"
+  ) {
+    return [INSTAGRAM_LOGIN_API_SCOPE];
+  }
+  return [];
+};
+
 /**
- * Obtém perfil Instagram Business.
- * Ordem: graph.instagram.com/{version}/me → graph.instagram.com/me →
- * graph.facebook.com/me/accounts → graph.facebook.com/{user_id}.
+ * Valida token da Instagram API priorizando graph.instagram.com/me.
+ * debug_token é opcional: enriquece scopes/expiração quando disponível.
  */
-export const fetchInstagramBusinessProfile = async (
-  accessToken: string,
-  debugData: MetaDebugTokenData
-): Promise<MetaInstagramProfile> => {
+export const validateInstagramAccessToken = async (
+  accessToken: string
+): Promise<InstagramTokenValidationResult> => {
   const strategies: Array<{
     phase: MetaApiPhase;
     run: () => Promise<MetaInstagramProfile | null>;
   }> = [
     {
-      phase: "instagram_me_versioned",
-      run: () => fetchInstagramMeVersioned(accessToken)
-    },
-    {
       phase: "instagram_me_unversioned",
       run: () => fetchInstagramMeUnversioned(accessToken)
+    },
+    {
+      phase: "instagram_me_versioned",
+      run: () => fetchInstagramMeVersioned(accessToken)
     },
     {
       phase: "facebook_me_accounts",
@@ -458,36 +514,122 @@ export const fetchInstagramBusinessProfile = async (
     }
   ];
 
-  if (debugData.userId) {
-    strategies.push({
-      phase: "facebook_user_profile",
-      run: () =>
-        fetchUserInstagramBusinessAccount(accessToken, debugData.userId as string)
-    });
-  }
-
+  let profile: MetaInstagramProfile | null = null;
+  let validatedVia: MetaApiPhase | null = null;
   const temporaryPhases: MetaApiPhase[] = [];
 
   for (const strategy of strategies) {
     const result = await runProfileStrategy(strategy.phase, strategy.run);
     if (result.kind === "profile") {
-      return result.profile;
+      profile = result.profile;
+      validatedVia = strategy.phase;
+      break;
     }
     if (result.kind === "temporary") {
       temporaryPhases.push(result.phase);
     }
   }
 
-  if (temporaryPhases.length) {
-    throwMetaTemporaryError(
-      temporaryPhases[temporaryPhases.length - 1],
-      "profile"
+  if (!profile) {
+    const debugData = await requestDebugToken(accessToken, false);
+
+    if (debugData?.isValid && debugData.userId) {
+      const userProfile = await runProfileStrategy(
+        "facebook_user_profile",
+        () =>
+          fetchUserInstagramBusinessAccount(accessToken, debugData.userId as string)
+      );
+
+      if (userProfile.kind === "profile") {
+        profile = userProfile.profile;
+        validatedVia = "debug_token";
+      } else if (userProfile.kind === "temporary") {
+        temporaryPhases.push(userProfile.phase);
+      }
+    } else if (debugData?.isValid) {
+      validatedVia = "debug_token";
+      profile = {
+        instagramBusinessAccountId: debugData.userId,
+        name: null,
+        profilePicUrl: null,
+        facebookPageId: null
+      };
+    }
+  }
+
+  if (!profile || !validatedVia) {
+    if (temporaryPhases.length) {
+      throwMetaTemporaryError(
+        temporaryPhases[temporaryPhases.length - 1],
+        "validation"
+      );
+    }
+
+    throw new AppError(
+      "ERR_INSTAGRAM_TOKEN_INVALID",
+      400,
+      "Não foi possível validar o token na Meta. Verifique se o token foi gerado na API do Instagram e tente novamente."
     );
   }
 
-  throw new AppError(
-    "ERR_INSTAGRAM_PROFILE_NOT_FOUND",
-    400,
-    "Token válido, mas não foi possível obter os dados da conta Instagram na Meta."
-  );
+  let scopes = defaultScopesForPhase(validatedVia);
+  let expiresAt: Date | null = null;
+
+  const enrichment = await tryOptionalDebugTokenEnrichment(accessToken);
+  if (enrichment?.isValid) {
+    if (enrichment.scopes.length) {
+      scopes = enrichment.scopes;
+    }
+    expiresAt = enrichment.expiresAt;
+  }
+
+  if (
+    scopes.length > 0 &&
+    scopes[0] !== INSTAGRAM_LOGIN_API_SCOPE &&
+    scopes.some(scope =>
+      (REQUIRED_INSTAGRAM_SCOPES as readonly string[]).includes(scope)
+    )
+  ) {
+    assertRequiredInstagramScopes(scopes);
+  }
+
+  return {
+    profile,
+    expiresAt,
+    scopes,
+    validatedVia
+  };
+};
+
+/** @deprecated Use validateInstagramAccessToken */
+export const debugMetaAccessToken = async (
+  inputToken: string
+): Promise<MetaDebugTokenData> => {
+  const data = await requestDebugToken(inputToken, false);
+  if (!data) {
+    throw new AppError(
+      "ERR_INSTAGRAM_TOKEN_INVALID",
+      400,
+      "Não foi possível validar o token via debug_token."
+    );
+  }
+  return data;
+};
+
+/** @deprecated Use validateInstagramAccessToken */
+export const fetchInstagramBusinessProfile = async (
+  accessToken: string,
+  debugData: MetaDebugTokenData
+): Promise<MetaInstagramProfile> => {
+  const validation = await validateInstagramAccessToken(accessToken);
+  if (debugData.userId && !validation.profile.instagramBusinessAccountId) {
+    const profile = await fetchUserInstagramBusinessAccount(
+      accessToken,
+      debugData.userId
+    );
+    if (profile) {
+      return profile;
+    }
+  }
+  return validation.profile;
 };

@@ -5,11 +5,7 @@ import {
 } from "../../helpers/metaTokenCrypto";
 import { sanitizeInstagramAccount } from "../../helpers/sanitizeInstagramAccount";
 import InstagramAccount from "../../models/InstagramAccount";
-import {
-  assertRequiredInstagramScopes,
-  debugMetaAccessToken,
-  fetchInstagramBusinessProfile
-} from "./MetaGraphApiService";
+import { validateInstagramAccessToken } from "./MetaGraphApiService";
 
 interface Request {
   instagramAccountId: string;
@@ -41,31 +37,19 @@ const ConnectInstagramTokenService = async ({
     throw new AppError("ERR_NO_INSTAGRAM_ACCOUNT_FOUND", 404);
   }
 
-  const debugData = await debugMetaAccessToken(token);
-
-  if (!debugData.isValid) {
-    throw new AppError(
-      "ERR_INSTAGRAM_TOKEN_INVALID",
-      400,
-      "O token informado é inválido ou expirou. Gere um novo token no Meta for Developers."
-    );
-  }
-
-  assertRequiredInstagramScopes(debugData.scopes);
-
-  const profile = await fetchInstagramBusinessProfile(token, debugData);
+  const validation = await validateInstagramAccessToken(token);
 
   const encryptedToken = encryptMetaToken(token);
 
   await account.update({
     status: "CONNECTED",
     pageAccessToken: encryptedToken,
-    tokenExpiresAt: debugData.expiresAt,
-    scopes: JSON.stringify(debugData.scopes),
-    instagramBusinessAccountId: profile.instagramBusinessAccountId,
-    facebookPageId: profile.facebookPageId,
-    profilePicUrl: profile.profilePicUrl || account.profilePicUrl,
-    name: profile.name || account.name
+    tokenExpiresAt: validation.expiresAt,
+    scopes: JSON.stringify(validation.scopes),
+    instagramBusinessAccountId: validation.profile.instagramBusinessAccountId,
+    facebookPageId: validation.profile.facebookPageId,
+    profilePicUrl: validation.profile.profilePicUrl || account.profilePicUrl,
+    name: validation.profile.name || account.name
   });
 
   await account.reload({
