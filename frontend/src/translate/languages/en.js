@@ -5636,6 +5636,8 @@ const messages = {
 				ERR_INSTAGRAM_PROFILE_NOT_FOUND:
 					"Could not retrieve Instagram account data from Meta.",
 				ERR_META_API_FAILED: "Failed to query Meta API. Please try again.",
+				ERR_META_API_TEMPORARY_FAILED:
+					"Temporary Meta API failure. Wait a moment and try again.",
 				ERR_META_APP_CONFIG_MISSING:
 					"Meta credentials not configured on the server (META_APP_ID / META_APP_SECRET).",
 				ERR_META_TOKEN_ENCRYPTION_KEY_MISSING:

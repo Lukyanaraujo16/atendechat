@@ -16,5 +16,8 @@ export function redactSensitiveText(text: string): string {
   return text.replace(
     /(access_token|input_token|pageAccessToken|Bearer)\s*[=:]\s*["']?[\w.-]+["']?/gi,
     "$1=***"
+  ).replace(
+    /[\?&](access_token|input_token)=[^&\s"']+/gi,
+    (match, key) => `${match.startsWith("?") ? "?" : "&"}${key}=***`
   );
 }

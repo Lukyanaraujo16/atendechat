@@ -5808,6 +5808,8 @@ const messages = {
         ERR_INSTAGRAM_PROFILE_NOT_FOUND:
           "Não foi possível obter os dados da conta Instagram na Meta.",
         ERR_META_API_FAILED: "Falha ao consultar a API da Meta. Tente novamente.",
+        ERR_META_API_TEMPORARY_FAILED:
+          "Falha temporária na Meta. Aguarde alguns instantes e tente novamente.",
         ERR_META_APP_CONFIG_MISSING:
           "Credenciais Meta não configuradas no servidor (META_APP_ID / META_APP_SECRET).",
         ERR_META_TOKEN_ENCRYPTION_KEY_MISSING:

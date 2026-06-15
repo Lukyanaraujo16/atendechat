@@ -24,6 +24,18 @@ const toastError = (err) => {
   const apiMessage = apiPayload?.message;
 
   if (errorCode) {
+    if (apiMessage && isString(apiMessage)) {
+      const trimmedClient = apiMessage.trim();
+      if (trimmedClient && !/^ERR_[A-Z0-9_]+$/.test(trimmedClient)) {
+        console.error("[API]", errorCode, trimmedClient);
+        toast.error(trimmedClient, {
+          ...errOpts,
+          toastId: `be-${errorCode}-detail`,
+        });
+        return;
+      }
+    }
+
     if (errorCode === "BACKUP_INSUFFICIENT_DISK_SPACE" && apiPayload?.missingBytes != null) {
       const text = i18n.t("backendErrors.BACKUP_INSUFFICIENT_DISK_SPACE", {
         missing: formatBytesShort(apiPayload.missingBytes),
