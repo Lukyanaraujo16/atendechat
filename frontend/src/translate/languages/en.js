@@ -1491,6 +1491,17 @@ const messages = {
 						businessId: "Business ID",
 						tokenStatus: "Token",
 					},
+					webhook: {
+						title: "Meta Webhook",
+						callbackUrl: "Callback URL",
+						verifyToken: "Verify Token",
+						verifyTokenHint:
+							"Set META_WEBHOOK_VERIFY_TOKEN on the server and use the same value in Meta.",
+						status: "Status",
+						statusAvailable: "Endpoint available",
+						statusAwaiting: "Awaiting configuration",
+						statusPartial: "Partial configuration",
+					},
 				},
 				guide: {
 					title: "How to connect WhatsApp",
@@ -5642,6 +5653,14 @@ const messages = {
 					"Meta credentials not configured on the server (META_APP_ID / META_APP_SECRET).",
 				ERR_META_TOKEN_ENCRYPTION_KEY_MISSING:
 					"Token encryption key not configured on the server.",
+				ERR_META_WEBHOOK_VERIFY_TOKEN_MISSING:
+					"META_WEBHOOK_VERIFY_TOKEN not configured on the server.",
+				ERR_META_WEBHOOK_VERIFY_FORBIDDEN:
+					"Webhook verification denied. Check the Verify Token in Meta.",
+				ERR_META_WEBHOOK_INVALID_SIGNATURE:
+					"Invalid webhook signature.",
+				ERR_META_WEBHOOK_INVALID_PAYLOAD:
+					"Invalid webhook payload.",
 				ERR_CREATING_MESSAGE: "Error creating message in database.",
 				ERR_CREATING_TICKET: "Error creating ticket in database.",
 				ERR_FETCH_WAPP_MSG: "Error fetching WhatsApp message, it might be too old.",

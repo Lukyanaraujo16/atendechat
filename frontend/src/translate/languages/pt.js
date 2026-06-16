@@ -1566,6 +1566,17 @@ const messages = {
             businessId: "Business ID",
             tokenStatus: "Token",
           },
+          webhook: {
+            title: "Webhook Meta",
+            callbackUrl: "URL de callback",
+            verifyToken: "Verify Token",
+            verifyTokenHint:
+              "Configure o valor de META_WEBHOOK_VERIFY_TOKEN no servidor e use o mesmo token na Meta.",
+            status: "Status",
+            statusAvailable: "Endpoint disponível",
+            statusAwaiting: "Aguardando configuração",
+            statusPartial: "Configuração parcial",
+          },
         },
         guide: {
           title: "Como conectar o WhatsApp",
@@ -5814,6 +5825,14 @@ const messages = {
           "Credenciais Meta não configuradas no servidor (META_APP_ID / META_APP_SECRET).",
         ERR_META_TOKEN_ENCRYPTION_KEY_MISSING:
           "Chave de criptografia de tokens não configurada no servidor.",
+        ERR_META_WEBHOOK_VERIFY_TOKEN_MISSING:
+          "META_WEBHOOK_VERIFY_TOKEN não configurado no servidor.",
+        ERR_META_WEBHOOK_VERIFY_FORBIDDEN:
+          "Verificação do webhook recusada. Confira o Verify Token na Meta.",
+        ERR_META_WEBHOOK_INVALID_SIGNATURE:
+          "Assinatura do webhook inválida.",
+        ERR_META_WEBHOOK_INVALID_PAYLOAD:
+          "Payload do webhook inválido.",
         ERR_CREATING_MESSAGE: "Erro ao criar mensagem no banco de dados.",
         ERR_CREATING_TICKET: "Erro ao criar tíquete no banco de dados.",
         ERR_FETCH_WAPP_MSG:

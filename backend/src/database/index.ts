@@ -11,6 +11,7 @@ import TicketDeletionGuard from "../models/TicketDeletionGuard";
 import Whatsapp from "../models/Whatsapp";
 import InstagramAccount from "../models/InstagramAccount";
 import InstagramAccountQueue from "../models/InstagramAccountQueue";
+import MetaWebhookEvent from "../models/MetaWebhookEvent";
 import ContactCustomField from "../models/ContactCustomField";
 import Message from "../models/Message";
 import Queue from "../models/Queue";
@@ -100,6 +101,7 @@ const models = [
   Whatsapp,
   InstagramAccount,
   InstagramAccountQueue,
+  MetaWebhookEvent,
   ContactCustomField,
   Setting,
   Queue,

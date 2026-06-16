@@ -11,6 +11,7 @@ import "./database";
 import uploadConfig from "./config/upload";
 import AppError from "./errors/AppError";
 import routes from "./routes";
+import metaWebhookRoutes from "./routes/metaWebhookRoutes";
 import { logger } from "./utils/logger";
 import { messageQueue, sendScheduledMessages } from "./queues";
 import bodyParser from 'body-parser';
@@ -18,6 +19,9 @@ import bodyParser from 'body-parser';
 Sentry.init({ dsn: process.env.SENTRY_DSN });
 
 const app = express();
+
+/** Webhook Meta: raw body necessário para validar X-Hub-Signature-256 */
+app.use("/webhooks/meta", metaWebhookRoutes);
 
 app.set("queues", {
   messageQueue,

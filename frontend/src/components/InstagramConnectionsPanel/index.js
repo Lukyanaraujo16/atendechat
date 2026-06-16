@@ -105,6 +105,26 @@ const useStyles = makeStyles((theme) => ({
   metaLine: {
     marginTop: theme.spacing(0.5),
   },
+  webhookBox: {
+    padding: theme.spacing(2),
+    marginBottom: theme.spacing(2),
+    borderRadius: theme.shape.borderRadius,
+    border: `1px solid ${theme.palette.divider}`,
+    backgroundColor:
+      theme.palette.type === "light" ? "#fafafa" : "rgba(255,255,255,0.04)",
+  },
+  webhookRow: {
+    marginBottom: theme.spacing(1),
+  },
+  webhookLabel: {
+    fontWeight: 600,
+    marginRight: theme.spacing(1),
+  },
+  webhookUrl: {
+    wordBreak: "break-all",
+    fontFamily: "monospace",
+    fontSize: "0.85rem",
+  },
 }));
 
 const instagramStatusChip = (status) => {
@@ -146,6 +166,7 @@ const InstagramConnectionsPanel = () => {
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState("delete");
   const [confirmAccountId, setConfirmAccountId] = useState(null);
+  const [webhookInfo, setWebhookInfo] = useState(null);
 
   const fetchAccounts = useCallback(async () => {
     setLoading(true);
@@ -162,6 +183,31 @@ const InstagramConnectionsPanel = () => {
   useEffect(() => {
     fetchAccounts();
   }, [fetchAccounts]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await api.get("/instagram-accounts/webhook-info");
+        if (!cancelled) setWebhookInfo(data);
+      } catch {
+        // usuário sem permissão ou endpoint indisponível
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const webhookStatusLabel = (status) => {
+    if (status === "available") {
+      return i18n.t("connections.instagram.webhook.statusAvailable");
+    }
+    if (status === "partial_configuration") {
+      return i18n.t("connections.instagram.webhook.statusPartial");
+    }
+    return i18n.t("connections.instagram.webhook.statusAwaiting");
+  };
 
   const handleOpenModal = () => {
     setSelectedAccount(null);
@@ -402,6 +448,39 @@ const InstagramConnectionsPanel = () => {
         <Typography className={classes.guideStep} variant="body2">
           2. {i18n.t("connections.instagram.guide.step2")}
         </Typography>
+      </Box>
+
+      <Box className={classes.webhookBox}>
+        <Typography className={classes.guideTitle} variant="subtitle1">
+          {i18n.t("connections.instagram.webhook.title")}
+        </Typography>
+        <Box className={classes.webhookRow}>
+          <Typography component="span" className={classes.webhookLabel} variant="body2">
+            {i18n.t("connections.instagram.webhook.callbackUrl")}:
+          </Typography>
+          <Typography component="span" className={classes.webhookUrl} variant="body2" color="textSecondary">
+            {webhookInfo?.callbackUrl || "—"}
+          </Typography>
+        </Box>
+        <Box className={classes.webhookRow}>
+          <Typography component="span" className={classes.webhookLabel} variant="body2">
+            {i18n.t("connections.instagram.webhook.verifyToken")}:
+          </Typography>
+          <Typography variant="body2" color="textSecondary">
+            {i18n.t("connections.instagram.webhook.verifyTokenHint")}
+          </Typography>
+        </Box>
+        <Box className={classes.webhookRow}>
+          <Typography component="span" className={classes.webhookLabel} variant="body2">
+            {i18n.t("connections.instagram.webhook.status")}:
+          </Typography>
+          <Chip
+            size="small"
+            color={webhookInfo?.endpointStatus === "available" ? "primary" : "default"}
+            variant={webhookInfo?.endpointStatus === "available" ? "default" : "outlined"}
+            label={webhookStatusLabel(webhookInfo?.endpointStatus)}
+          />
+        </Box>
       </Box>
 
       <Box className={classes.headerActions}>
