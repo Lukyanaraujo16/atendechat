@@ -24,6 +24,8 @@ import {
   Instagram,
   Link,
   LinkOff,
+  Sync,
+  NotificationsActive,
 } from "@material-ui/icons";
 
 import TableRowSkeleton from "../TableRowSkeleton";
@@ -152,6 +154,15 @@ const formatTokenExpiry = (value) => {
   }
 };
 
+const formatEventDate = (value) => {
+  if (!value) return "—";
+  try {
+    return format(parseISO(value), "dd/MM/yy HH:mm");
+  } catch {
+    return "—";
+  }
+};
+
 const InstagramConnectionsPanel = () => {
   const classes = useStyles();
   const isMobile = useIsMobile();
@@ -167,18 +178,40 @@ const InstagramConnectionsPanel = () => {
   const [confirmAction, setConfirmAction] = useState("delete");
   const [confirmAccountId, setConfirmAccountId] = useState(null);
   const [webhookInfo, setWebhookInfo] = useState(null);
+  const [diagnosticsByAccountId, setDiagnosticsByAccountId] = useState({});
+  const [webhookActionLoadingId, setWebhookActionLoadingId] = useState(null);
+
+  const loadDiagnostics = useCallback(async (accountId, { silent = false } = {}) => {
+    try {
+      const { data } = await api.get(`/instagram-accounts/${accountId}/webhook-diagnostics`);
+      setDiagnosticsByAccountId((prev) => ({ ...prev, [accountId]: data }));
+      if (!silent) {
+        toast.success(i18n.t("connections.instagram.webhook.diagnosticsLoaded"));
+      }
+      return data;
+    } catch (err) {
+      if (!silent) toastError(err);
+      return null;
+    }
+  }, []);
 
   const fetchAccounts = useCallback(async () => {
     setLoading(true);
     try {
       const { data } = await api.get("/instagram-accounts");
       setAccounts(data);
+      const connected = (data || []).filter(
+        (account) => account.status === "CONNECTED" && account.hasToken
+      );
+      await Promise.allSettled(
+        connected.map((account) => loadDiagnostics(account.id, { silent: true }))
+      );
     } catch (err) {
       toastError(err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadDiagnostics]);
 
   useEffect(() => {
     fetchAccounts();
@@ -207,6 +240,68 @@ const InstagramConnectionsPanel = () => {
       return i18n.t("connections.instagram.webhook.statusPartial");
     }
     return i18n.t("connections.instagram.webhook.statusAwaiting");
+  };
+
+  const handleSubscribeWebhook = async (account) => {
+    setWebhookActionLoadingId(account.id);
+    try {
+      const { data } = await api.post(`/instagram-accounts/${account.id}/subscribe-webhook`);
+      if (data?.diagnostics) {
+        setDiagnosticsByAccountId((prev) => ({
+          ...prev,
+          [account.id]: data.diagnostics,
+        }));
+      }
+      toast.success(i18n.t("connections.instagram.webhook.subscribeSuccess"));
+    } catch (err) {
+      toastError(err);
+    } finally {
+      setWebhookActionLoadingId(null);
+    }
+  };
+
+  const renderWebhookAccountStatus = (accountId) => {
+    const diagnostics = diagnosticsByAccountId[accountId];
+    if (!diagnostics) {
+      return (
+        <Chip
+          size="small"
+          variant="outlined"
+          label={i18n.t("connections.instagram.webhook.accountStatusUnknown")}
+        />
+      );
+    }
+
+    const status = diagnostics.webhookAccountStatus;
+    const color =
+      status === "confirmed" ? "primary" : status === "error" ? "secondary" : "default";
+
+    return (
+      <Chip
+        size="small"
+        color={color}
+        variant={status === "confirmed" ? "default" : "outlined"}
+        label={i18n.t(`connections.instagram.webhook.accountStatus.${status}`)}
+      />
+    );
+  };
+
+  const renderWebhookDiagnosticsMeta = (accountId) => {
+    const diagnostics = diagnosticsByAccountId[accountId];
+    if (!diagnostics) return null;
+
+    return (
+      <Box className={classes.metaLine}>
+        <Typography variant="caption" color="textSecondary" display="block">
+          {i18n.t("connections.instagram.webhook.lastEvent")}:{" "}
+          {formatEventDate(diagnostics.lastWebhookEventAt)}
+        </Typography>
+        <Typography variant="caption" color="textSecondary" display="block">
+          {i18n.t("connections.instagram.webhook.lastMappedEvent")}:{" "}
+          {formatEventDate(diagnostics.lastMappedEventAt)}
+        </Typography>
+      </Box>
+    );
   };
 
   const handleOpenModal = () => {
@@ -334,6 +429,19 @@ const InstagramConnectionsPanel = () => {
       });
     }
 
+    if (account.hasToken && account.status === "CONNECTED") {
+      items.push({
+        label: i18n.t("connections.instagram.webhook.verify"),
+        icon: <Sync fontSize="small" />,
+        onClick: () => loadDiagnostics(account.id),
+      });
+      items.push({
+        label: i18n.t("connections.instagram.webhook.subscribe"),
+        icon: <NotificationsActive fontSize="small" />,
+        onClick: () => handleSubscribeWebhook(account),
+      });
+    }
+
     if (account.hasToken) {
       items.push({
         label: i18n.t("connections.instagram.mobile.disconnect"),
@@ -372,11 +480,13 @@ const InstagramConnectionsPanel = () => {
             />
           )}
           {renderTokenStatus(account)}
+          {account.hasToken && account.status === "CONNECTED" && renderWebhookAccountStatus(account.id)}
         </Box>
       }
       meta={
         <>
           {renderAccountMeta(account)}
+          {renderWebhookDiagnosticsMeta(account.id)}
           <Typography variant="caption" color="textSecondary" display="block" className={classes.metaLine}>
             {i18n.t("connections.instagram.mobile.lastUpdate")}:{" "}
             {format(parseISO(account.updatedAt), "dd/MM/yy HH:mm")}
@@ -524,6 +634,9 @@ const InstagramConnectionsPanel = () => {
                   {i18n.t("connections.instagram.table.token")}
                 </TableCell>
                 <TableCell align="center" className={classes.tableHeadCell}>
+                  {i18n.t("connections.instagram.webhook.accountWebhook")}
+                </TableCell>
+                <TableCell align="center" className={classes.tableHeadCell}>
                   {i18n.t("connections.instagram.table.queues")}
                 </TableCell>
                 <TableCell align="center" className={classes.tableHeadCell}>
@@ -548,7 +661,7 @@ const InstagramConnectionsPanel = () => {
                 <TableRowSkeleton />
               ) : !accounts?.length ? (
                 <TableRow>
-                  <TableCell colSpan={8} style={{ border: "none" }}>
+                  <TableCell colSpan={9} style={{ border: "none" }}>
                     <AppEmptyState
                       title={i18n.t("connections.instagram.table.emptyTitle")}
                       description={i18n.t("connections.instagram.table.emptyHint")}
@@ -580,6 +693,18 @@ const InstagramConnectionsPanel = () => {
                         )}
                       </Box>
                     </TableCell>
+                    <TableCell align="center">
+                      <Box>
+                        {account.hasToken && account.status === "CONNECTED" ? (
+                          <>
+                            {renderWebhookAccountStatus(account.id)}
+                            {renderWebhookDiagnosticsMeta(account.id)}
+                          </>
+                        ) : (
+                          <Typography variant="body2" color="textSecondary">—</Typography>
+                        )}
+                      </Box>
+                    </TableCell>
                     <TableCell align="center">{renderQueues(account)}</TableCell>
                     <TableCell align="center">
                       {format(parseISO(account.updatedAt), "dd/MM/yy HH:mm")}
@@ -596,6 +721,26 @@ const InstagramConnectionsPanel = () => {
                       perform="connections-page:editOrDeleteConnection"
                       yes={() => (
                         <TableCell align="center">
+                          {account.hasToken && account.status === "CONNECTED" && (
+                            <>
+                              <IconButton
+                                size="small"
+                                title={i18n.t("connections.instagram.webhook.verify")}
+                                disabled={webhookActionLoadingId === account.id}
+                                onClick={() => loadDiagnostics(account.id)}
+                              >
+                                <Sync />
+                              </IconButton>
+                              <IconButton
+                                size="small"
+                                title={i18n.t("connections.instagram.webhook.subscribe")}
+                                disabled={webhookActionLoadingId === account.id}
+                                onClick={() => handleSubscribeWebhook(account)}
+                              >
+                                <NotificationsActive />
+                              </IconButton>
+                            </>
+                          )}
                           {(account.status !== "CONNECTED" || !account.hasToken) && (
                             <IconButton
                               size="small"

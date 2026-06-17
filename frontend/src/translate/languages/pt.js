@@ -1576,6 +1576,20 @@ const messages = {
             statusAvailable: "Endpoint disponível",
             statusAwaiting: "Aguardando configuração",
             statusPartial: "Configuração parcial",
+            accountWebhook: "Webhook da conta",
+            accountStatusUnknown: "Não verificado",
+            verify: "Verificar webhook",
+            subscribe: "Assinar webhook da conta",
+            subscribeSuccess: "Assinatura de webhook solicitada com sucesso.",
+            diagnosticsLoaded: "Diagnóstico de webhook atualizado.",
+            lastEvent: "Último evento",
+            lastMappedEvent: "Último evento mapeado",
+            accountStatus: {
+              confirmed: "Confirmado",
+              pending: "Pendente",
+              error: "Erro",
+              unavailable: "Indisponível",
+            },
           },
         },
         guide: {
@@ -5833,6 +5847,12 @@ const messages = {
           "Assinatura do webhook inválida.",
         ERR_META_WEBHOOK_INVALID_PAYLOAD:
           "Payload do webhook inválido.",
+        ERR_INSTAGRAM_WEBHOOK_SUBSCRIBE_FAILED:
+          "Falha ao assinar webhook da conta Instagram na Meta.",
+        ERR_INSTAGRAM_TOKEN_NOT_CONFIGURED:
+          "Conta sem token configurado.",
+        ERR_INSTAGRAM_BUSINESS_ID_MISSING:
+          "Instagram Business ID ausente na conta.",
         ERR_CREATING_MESSAGE: "Erro ao criar mensagem no banco de dados.",
         ERR_CREATING_TICKET: "Erro ao criar tíquete no banco de dados.",
         ERR_FETCH_WAPP_MSG:

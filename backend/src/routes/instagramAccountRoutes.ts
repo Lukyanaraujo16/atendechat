@@ -29,6 +29,20 @@ instagramAccountRoutes.post(
 );
 
 instagramAccountRoutes.get(
+  "/instagram-accounts/:id/webhook-diagnostics",
+  isAuth,
+  requireWhatsappBehaviorManager,
+  InstagramAccountController.webhookDiagnostics
+);
+
+instagramAccountRoutes.post(
+  "/instagram-accounts/:id/subscribe-webhook",
+  isAuth,
+  requireWhatsappBehaviorManager,
+  InstagramAccountController.subscribeWebhook
+);
+
+instagramAccountRoutes.get(
   "/instagram-accounts/:id",
   isAuth,
   InstagramAccountController.show

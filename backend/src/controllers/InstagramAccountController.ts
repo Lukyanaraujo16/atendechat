@@ -9,6 +9,8 @@ import DeleteInstagramAccountService from "../services/InstagramAccountService/D
 import ListInstagramAccountsService from "../services/InstagramAccountService/ListInstagramAccountsService";
 import ShowInstagramAccountService from "../services/InstagramAccountService/ShowInstagramAccountService";
 import UpdateInstagramAccountService from "../services/InstagramAccountService/UpdateInstagramAccountService";
+import GetInstagramWebhookDiagnosticsService from "../services/InstagramAccountService/GetInstagramWebhookDiagnosticsService";
+import SubscribeInstagramAccountWebhookService from "../services/InstagramAccountService/SubscribeInstagramAccountWebhookService";
 
 interface InstagramAccountData {
   name: string;
@@ -150,4 +152,42 @@ export const remove = async (
   );
 
   return res.status(200).json({ message: "Instagram account deleted" });
+};
+
+export const webhookDiagnostics = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const { companyId } = req.user;
+  const { id } = req.params;
+
+  const diagnostics = await GetInstagramWebhookDiagnosticsService({
+    instagramAccountId: id,
+    companyId
+  });
+
+  return res.status(200).json(diagnostics);
+};
+
+export const subscribeWebhook = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const { companyId } = req.user;
+  const { id } = req.params;
+
+  const result = await SubscribeInstagramAccountWebhookService({
+    instagramAccountId: id,
+    companyId
+  });
+
+  const diagnostics = await GetInstagramWebhookDiagnosticsService({
+    instagramAccountId: id,
+    companyId
+  });
+
+  return res.status(200).json({
+    subscription: result,
+    diagnostics
+  });
 };

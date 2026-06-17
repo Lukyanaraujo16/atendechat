@@ -1461,6 +1461,20 @@ const messages = {
             statusAvailable: "Endpoint disponible",
             statusAwaiting: "Esperando configuración",
             statusPartial: "Configuración parcial",
+            accountWebhook: "Webhook de la cuenta",
+            accountStatusUnknown: "No verificado",
+            verify: "Verificar webhook",
+            subscribe: "Suscribir webhook de la cuenta",
+            subscribeSuccess: "Suscripción de webhook solicitada con éxito.",
+            diagnosticsLoaded: "Diagnóstico de webhook actualizado.",
+            lastEvent: "Último evento",
+            lastMappedEvent: "Último evento mapeado",
+            accountStatus: {
+              confirmed: "Confirmado",
+              pending: "Pendiente",
+              error: "Error",
+              unavailable: "No disponible",
+            },
           },
         },
         guide: {
@@ -5397,6 +5411,12 @@ const messages = {
           "Firma del webhook inválida.",
         ERR_META_WEBHOOK_INVALID_PAYLOAD:
           "Payload del webhook inválido.",
+        ERR_INSTAGRAM_WEBHOOK_SUBSCRIBE_FAILED:
+          "Error al suscribir el webhook de la cuenta Instagram en Meta.",
+        ERR_INSTAGRAM_TOKEN_NOT_CONFIGURED:
+          "Cuenta sin token configurado.",
+        ERR_INSTAGRAM_BUSINESS_ID_MISSING:
+          "Instagram Business ID ausente en la cuenta.",
         ERR_CREATING_MESSAGE: "Error al crear mensaje en la base de datos.",
         ERR_CREATING_TICKET: "Error al crear ticket en la base de datos.",
         ERR_FETCH_WAPP_MSG: "Error al buscar el mensaje en WhatsApp, tal vez sea muy antiguo.",

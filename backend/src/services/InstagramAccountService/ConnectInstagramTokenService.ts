@@ -6,6 +6,8 @@ import {
 import { sanitizeInstagramAccount } from "../../helpers/sanitizeInstagramAccount";
 import InstagramAccount from "../../models/InstagramAccount";
 import { validateInstagramAccessToken } from "./MetaGraphApiService";
+import { subscribeInstagramAccountWebhook } from "./InstagramWebhookSubscriptionService";
+import { logger } from "../../utils/logger";
 
 interface Request {
   instagramAccountId: string;
@@ -60,6 +62,24 @@ const ConnectInstagramTokenService = async ({
       }
     ]
   });
+
+  if (account.instagramBusinessAccountId) {
+    try {
+      await subscribeInstagramAccountWebhook(
+        account.instagramBusinessAccountId,
+        token
+      );
+    } catch (err) {
+      logger.warn(
+        {
+          instagramAccountId: account.id,
+          companyId,
+          error: err instanceof Error ? err.message : String(err)
+        },
+        "[InstagramWebhook] auto subscribe after connect failed"
+      );
+    }
+  }
 
   return sanitizeInstagramAccount(account);
 };
