@@ -242,27 +242,52 @@ const UpdateTicketService = async ({
     const oldUserId = ticket.userId ?? ticket.user?.id;
     const oldQueueId = ticket.queueId;
 
-    if (oldStatus === "closed" || Number(whatsappId) !== ticket.whatsappId) {
-      // let otherTicket = await Ticket.findOne({
-      //   where: {
-      //     contactId: ticket.contactId,
-      //     status: { [Op.or]: ["open", "pending", "group"] },
-      //     whatsappId
-      //   }
-      // });
-      // if (otherTicket) {
-      //     otherTicket = await ShowTicketService(otherTicket.id, companyId)
+    const resolvedWhatsappIdForCompare =
+      whatsappId != null && `${whatsappId}` !== ""
+        ? Number(whatsappId)
+        : ticket.whatsappId != null
+          ? Number(ticket.whatsappId)
+          : null;
 
-      //     await ticket.update({status: "closed"})
+    const whatsappIdChanged =
+      resolvedWhatsappIdForCompare != null &&
+      ticket.whatsappId != null &&
+      resolvedWhatsappIdForCompare !== Number(ticket.whatsappId);
 
-      //     io.to(oldStatus).emit(`company-${companyId}-ticket`, {
-      //       action: "delete",
-      //       ticketId: ticket.id
-      //     });
+    const isAcceptingPending =
+      status === "open" && oldStatus === "pending";
 
-      //     return { ticket: otherTicket, oldStatus, oldUserId }
-      // }
-      await CheckContactOpenTickets(ticket.contact.id, whatsappId);
+    if (
+      String(ticket.channel || "").toLowerCase() === "instagram" &&
+      isAcceptingPending
+    ) {
+      const existingOther = await Ticket.findOne({
+        where: {
+          contactId: ticket.contactId,
+          status: { [Op.or]: ["open", "pending"] },
+          id: { [Op.ne]: ticket.id }
+        },
+        attributes: ["id", "status"]
+      });
+
+      logger.info(
+        {
+          ticketId: ticket.id,
+          contactId: ticket.contactId,
+          channel: ticket.channel,
+          existingTicketId: existingOther?.id ?? null,
+          existingTicketStatus: existingOther?.status ?? null
+        },
+        "[InstagramAccept]"
+      );
+    }
+
+    if (oldStatus === "closed" || whatsappIdChanged) {
+      await CheckContactOpenTickets(
+        ticket.contact.id,
+        whatsappId,
+        Number(ticketId)
+      );
       chatbot = null;
       queueOptionId = null;
     }
