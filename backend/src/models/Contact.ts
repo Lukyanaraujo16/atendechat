@@ -51,7 +51,7 @@ class Contact extends Model<Contact> {
   email: string;
 
   @Default("")
-  @Column
+  @Column(DataType.TEXT)
   profilePicUrl: string;
 
   @Default(false)

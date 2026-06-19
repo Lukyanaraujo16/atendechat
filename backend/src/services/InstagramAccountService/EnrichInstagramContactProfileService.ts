@@ -14,6 +14,11 @@ interface Request {
   senderId: string;
 }
 
+type PlannedUpdates = {
+  name?: string;
+  profilePicUrl?: string;
+};
+
 const logEnrichmentSkipped = (
   senderId: string,
   reason: string,
@@ -23,6 +28,106 @@ const logEnrichmentSkipped = (
     { senderId, reason, ...extra },
     "[InstagramProfile] enrichment_skipped"
   );
+};
+
+const summarizeUpdates = (updates: PlannedUpdates): Record<string, unknown> => ({
+  fields: Object.keys(updates),
+  name: updates.name ?? null,
+  profilePicUrlLength: updates.profilePicUrl?.length ?? 0
+});
+
+const applyContactFieldUpdates = async ({
+  contact,
+  companyId,
+  senderId,
+  updates
+}: {
+  contact: Contact;
+  companyId: number;
+  senderId: string;
+  updates: PlannedUpdates;
+}): Promise<{ applied: string[]; failed: Array<{ field: string; error: string }> }> => {
+  logger.info(
+    {
+      senderId,
+      contactId: contact.id,
+      beforeName: contact.name,
+      beforeHasProfilePic: Boolean(contact.profilePicUrl),
+      plannedUpdates: summarizeUpdates(updates)
+    },
+    "[InstagramProfile] applying_updates"
+  );
+
+  const applied: string[] = [];
+  const failed: Array<{ field: string; error: string }> = [];
+
+  if (updates.name) {
+    try {
+      await contact.update({ name: updates.name });
+      applied.push("name");
+    } catch (err) {
+      const error = err instanceof Error ? err.message : String(err);
+      failed.push({ field: "name", error });
+      logger.warn(
+        { senderId, contactId: contact.id, field: "name", error },
+        "[InstagramProfile] field_update_failed"
+      );
+    }
+  }
+
+  if (updates.profilePicUrl) {
+    try {
+      await contact.update({ profilePicUrl: updates.profilePicUrl });
+      applied.push("profilePicUrl");
+    } catch (err) {
+      const error = err instanceof Error ? err.message : String(err);
+      failed.push({ field: "profilePicUrl", error });
+      logger.warn(
+        {
+          senderId,
+          contactId: contact.id,
+          field: "profilePicUrl",
+          profilePicUrlLength: updates.profilePicUrl.length,
+          error
+        },
+        "[InstagramProfile] field_update_failed"
+      );
+    }
+  }
+
+  if (applied.length > 0) {
+    const io = getIO();
+    io.to(`company-${companyId}-mainchannel`).emit(`company-${companyId}-contact`, {
+      action: "update",
+      contact
+    });
+
+    logger.info(
+      {
+        senderId,
+        contactId: contact.id,
+        appliedUpdates: applied,
+        failedUpdates: failed.map((item) => item.field),
+        afterName: contact.name,
+        afterHasProfilePic: Boolean(contact.profilePicUrl)
+      },
+      "[InstagramProfile] contact_updated"
+    );
+  }
+
+  if (failed.length > 0 && applied.length > 0) {
+    logger.info(
+      {
+        senderId,
+        contactId: contact.id,
+        appliedUpdates: applied,
+        failed
+      },
+      "[InstagramProfile] contact_partially_updated"
+    );
+  }
+
+  return { applied, failed };
 };
 
 const EnrichInstagramContactProfileService = async ({
@@ -103,7 +208,7 @@ const EnrichInstagramContactProfileService = async ({
     }
 
     const displayName = buildInstagramContactDisplayName(profile, senderId);
-    const updates: Partial<Contact> = {};
+    const updates: PlannedUpdates = {};
     const skipReasons: string[] = [];
 
     const currentName = String(contact.name || "").trim();
@@ -138,24 +243,19 @@ const EnrichInstagramContactProfileService = async ({
       return contact;
     }
 
-    await contact.update(updates);
-
-    const io = getIO();
-    io.to(`company-${companyId}-mainchannel`).emit(`company-${companyId}-contact`, {
-      action: "update",
-      contact
+    const { applied, failed } = await applyContactFieldUpdates({
+      contact,
+      companyId,
+      senderId,
+      updates
     });
 
-    logger.info(
-      {
-        senderId,
+    if (applied.length === 0 && failed.length > 0) {
+      logEnrichmentSkipped(senderId, "field_update_failed", {
         contactId: contact.id,
-        appliedUpdates: Object.keys(updates),
-        name: contact.name,
-        hasProfilePic: Boolean(contact.profilePicUrl)
-      },
-      "[InstagramProfile] contact_updated"
-    );
+        failed
+      });
+    }
 
     return contact;
   } catch (err) {
