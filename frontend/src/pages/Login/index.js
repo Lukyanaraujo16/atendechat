@@ -490,11 +490,11 @@ const Login = () => {
 
 			<div className={classes.footer}>
 				<div className={classes.footerLinks}>
-					<Link component={RouterLink} to="/privacy-policy" color="inherit">
+					<Link component={RouterLink} to="/privacy" color="inherit">
 						{i18n.t("login.footer.privacy")}
 					</Link>
 					<span>|</span>
-					<Link component={RouterLink} to="/terms-of-service" color="inherit">
+					<Link component={RouterLink} to="/terms" color="inherit">
 						{i18n.t("login.footer.terms")}
 					</Link>
 				</div>

@@ -266,11 +266,11 @@ const SignUp = () => {
 										label={
 											<Typography component="span" variant="body2" color="textSecondary">
 												{i18n.t("signup.legal.iAgree")}{" "}
-												<Link component={RouterLink} to="/privacy-policy" color="primary">
+												<Link component={RouterLink} to="/privacy" color="primary">
 													{i18n.t("login.footer.privacy")}
 												</Link>
 												{" "}{i18n.t("signup.legal.and")}{" "}
-												<Link component={RouterLink} to="/terms-of-service" color="primary">
+												<Link component={RouterLink} to="/terms" color="primary">
 													{i18n.t("login.footer.terms")}
 												</Link>
 												.

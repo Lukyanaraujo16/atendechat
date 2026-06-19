@@ -11,6 +11,7 @@ export default function TermsOfService() {
           title={section.title}
           paragraphs={section.paragraphs || []}
           list={section.list || []}
+          paragraphsAfterList={section.paragraphsAfterList || []}
         />
       ))}
     </LegalPageLayout>

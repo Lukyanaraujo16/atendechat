@@ -1,13 +1,11 @@
 import React from "react";
-import { BrowserRouter, Switch } from "react-router-dom";
+import { BrowserRouter, Switch, Route as RouterRoute } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 
 import SaaSRootLayout from "../layout/SaaSRootLayout";
 import Signup from "../pages/Signup/";
 import Login from "../pages/Login/";
 import ForgetPassword from "../pages/ForgetPassWord/";
-import PrivacyPolicy from "../pages/Legal/PrivacyPolicy";
-import TermsOfService from "../pages/Legal/TermsOfService";
 import PlatformModule from "../pages/Platform/PlatformModule";
 import { AuthProvider } from "../context/Auth/AuthContext";
 import OneSignalIntegration from "../components/OneSignalIntegration";
@@ -18,6 +16,7 @@ import LoggedInRoutesContent from "./LoggedInRoutesContent";
 import { LegacyPlatformRedirect } from "./saasRouteUtils";
 import TenantAppShell from "./TenantAppShell";
 import { PlanFlagsProvider } from "../hooks/usePlanFlags";
+import { PUBLIC_LEGAL_ROUTES } from "./publicLegalRoutes";
 
 const Routes = () => {
   return (
@@ -26,20 +25,12 @@ const Routes = () => {
         <OneSignalIntegration />
         <TicketsContextProvider>
           <Switch>
+            {PUBLIC_LEGAL_ROUTES.map(({ path, component }) => (
+              <RouterRoute key={path} exact path={path} component={component} />
+            ))}
             <Route exact path="/login" component={Login} />
             <Route exact path="/signup" component={Signup} />
             <Route exact path="/forgetpsw" component={ForgetPassword} />
-            <Route exact path="/privacy" publicAlways component={PrivacyPolicy} />
-            <Route exact path="/terms" publicAlways component={TermsOfService} />
-            <Route
-              exact
-              path="/politica-de-privacidade"
-              publicAlways
-              component={PrivacyPolicy}
-            />
-            <Route exact path="/termos-de-uso" publicAlways component={TermsOfService} />
-            <Route exact path="/privacy-policy" publicAlways component={PrivacyPolicy} />
-            <Route exact path="/terms-of-service" publicAlways component={TermsOfService} />
             <Route
               isPrivate
               path="/saas"
