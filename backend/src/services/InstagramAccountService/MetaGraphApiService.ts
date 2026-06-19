@@ -642,14 +642,45 @@ export interface InstagramSenderProfile {
   profilePicUrl: string | null;
 }
 
+export type InstagramSenderProfileLookupResult =
+  | {
+      ok: true;
+      profile: InstagramSenderProfile;
+      rawResponse: Record<string, unknown>;
+    }
+  | {
+      ok: false;
+      error: string;
+      statusCode?: number;
+      metaErrorCode?: number;
+      rawResponse?: unknown;
+    };
+
+const parseInstagramSenderProfile = (
+  data: Record<string, unknown>
+): InstagramSenderProfile => ({
+  name: typeof data.name === "string" ? data.name.trim() || null : null,
+  username:
+    typeof data.username === "string" ? data.username.trim() || null : null,
+  profilePicUrl:
+    typeof data.profile_pic === "string"
+      ? data.profile_pic.trim() || null
+      : null
+});
+
+const extractAxiosStatusCode = (err: unknown): number | undefined => {
+  const status = (err as AxiosError)?.response?.status;
+  return typeof status === "number" ? status : undefined;
+};
+
 /**
  * User Profile API — IGSID do webhook + token da conta conectada.
  * @see https://developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login/messaging-api/user-profile/
  */
-export const fetchInstagramSenderProfile = async (
+export const lookupInstagramSenderProfile = async (
   senderId: string,
   accessToken: string
-): Promise<InstagramSenderProfile | null> => {
+): Promise<InstagramSenderProfileLookupResult> => {
   const phase: MetaApiPhase = "instagram_sender_profile";
 
   try {
@@ -664,25 +695,35 @@ export const fetchInstagramSenderProfile = async (
     );
 
     return {
-      name: typeof data.name === "string" ? data.name.trim() || null : null,
-      username:
-        typeof data.username === "string" ? data.username.trim() || null : null,
-      profilePicUrl:
-        typeof data.profile_pic === "string"
-          ? data.profile_pic.trim() || null
-          : null
+      ok: true,
+      profile: parseInstagramSenderProfile(data),
+      rawResponse: data
     };
   } catch (err) {
-    logger.info(
-      {
-        senderId,
-        metaPhase: phase,
-        error: err instanceof Error ? err.message : String(err)
-      },
-      "[InstagramProfile] sender profile unavailable"
-    );
-    return null;
+    const meta = parseMetaError(err);
+    const axiosErr = err as AxiosError<MetaErrorBody>;
+
+    return {
+      ok: false,
+      error: meta?.message
+        ? redactSensitiveText(meta.message)
+        : err instanceof Error
+          ? err.message
+          : String(err),
+      statusCode: extractAxiosStatusCode(err),
+      metaErrorCode: meta?.code,
+      rawResponse: axiosErr.response?.data
+    };
   }
+};
+
+/** @deprecated Prefer lookupInstagramSenderProfile para diagnóstico completo. */
+export const fetchInstagramSenderProfile = async (
+  senderId: string,
+  accessToken: string
+): Promise<InstagramSenderProfile | null> => {
+  const result = await lookupInstagramSenderProfile(senderId, accessToken);
+  return result.ok ? result.profile : null;
 };
 
 export function buildInstagramContactDisplayName(
