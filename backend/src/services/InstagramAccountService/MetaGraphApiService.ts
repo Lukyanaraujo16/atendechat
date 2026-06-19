@@ -21,14 +21,16 @@ export type MetaApiPhase =
   | "instagram_me_versioned"
   | "instagram_me_unversioned"
   | "facebook_me_accounts"
-  | "facebook_user_profile";
+  | "facebook_user_profile"
+  | "instagram_sender_profile";
 
 export const META_API_PHASE_LABELS: Record<MetaApiPhase, string> = {
   debug_token: "debug_token",
   instagram_me_versioned: "graph.instagram.com/me",
   instagram_me_unversioned: "graph.instagram.com/me (sem versão)",
   facebook_me_accounts: "graph.facebook.com/me/accounts",
-  facebook_user_profile: "graph.facebook.com/{user_id}"
+  facebook_user_profile: "graph.facebook.com/{user_id}",
+  instagram_sender_profile: "graph.instagram.com/{igsid}"
 };
 
 const RETRY_DELAYS_MS = [1000, 2000, 4000];
@@ -633,3 +635,71 @@ export const fetchInstagramBusinessProfile = async (
   }
   return validation.profile;
 };
+
+export interface InstagramSenderProfile {
+  name: string | null;
+  username: string | null;
+  profilePicUrl: string | null;
+}
+
+/**
+ * User Profile API — IGSID do webhook + token da conta conectada.
+ * @see https://developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login/messaging-api/user-profile/
+ */
+export const fetchInstagramSenderProfile = async (
+  senderId: string,
+  accessToken: string
+): Promise<InstagramSenderProfile | null> => {
+  const phase: MetaApiPhase = "instagram_sender_profile";
+
+  try {
+    const data = await metaGetWithRetry<Record<string, unknown>>(
+      phase,
+      `${INSTAGRAM_GRAPH_VERSIONED}/${senderId}`,
+      {
+        fields: "name,username,profile_pic",
+        access_token: accessToken
+      },
+      true
+    );
+
+    return {
+      name: typeof data.name === "string" ? data.name.trim() || null : null,
+      username:
+        typeof data.username === "string" ? data.username.trim() || null : null,
+      profilePicUrl:
+        typeof data.profile_pic === "string"
+          ? data.profile_pic.trim() || null
+          : null
+    };
+  } catch (err) {
+    logger.info(
+      {
+        senderId,
+        metaPhase: phase,
+        error: err instanceof Error ? err.message : String(err)
+      },
+      "[InstagramProfile] sender profile unavailable"
+    );
+    return null;
+  }
+};
+
+export function buildInstagramContactDisplayName(
+  profile: InstagramSenderProfile | null,
+  senderId: string
+): string {
+  const name = profile?.name?.trim();
+  const username = profile?.username?.trim();
+
+  if (name && username) {
+    return `${name} (@${username})`;
+  }
+  if (name) {
+    return name;
+  }
+  if (username) {
+    return `@${username}`;
+  }
+  return `Instagram ${senderId}`;
+}

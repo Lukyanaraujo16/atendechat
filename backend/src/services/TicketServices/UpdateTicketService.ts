@@ -29,6 +29,10 @@ import {
   isGroupTicket,
   normalizeGroupTicketUpdate
 } from "../../helpers/groupTicketRules";
+import {
+  isInstagramChannelTicket,
+  normalizeOptionalForeignKeyId
+} from "../../helpers/ticketChannel";
 
 interface TicketData {
   status?: string;
@@ -211,9 +215,14 @@ const UpdateTicketService = async ({
     let { queueId, userId, whatsappId } = normalizedTicketData;
     let chatbot: boolean | null = normalizedTicketData.chatbot ?? false;
     let queueOptionId: number | null = normalizedTicketData.queueOptionId ?? null;
-    let promptId: number | null = normalizedTicketData.promptId ?? null;
+    let promptId: number | null = normalizeOptionalForeignKeyId(
+      normalizedTicketData.promptId
+    );
+    let integrationId: number | null = normalizeOptionalForeignKeyId(
+      normalizedTicketData.integrationId
+    );
     let useIntegration: boolean | null = normalizedTicketData.useIntegration ?? false;
-    let integrationId: number | null = normalizedTicketData.integrationId ?? null;
+    const isInstagram = isInstagramChannelTicket(ticket);
     const ticketTraking = await FindOrCreateATicketTrakingService({
       ticketId,
       companyId,
@@ -293,6 +302,17 @@ const UpdateTicketService = async ({
     }
 
     if (status !== undefined && ["closed"].indexOf(status) > -1) {
+      if (isInstagram) {
+        logger.info(
+          {
+            ticketId: ticket.id,
+            contactId: ticket.contactId,
+            channel: ticket.channel,
+            instagramAccountId: ticket.instagramAccountId
+          },
+          "[InstagramResolve] closing without WhatsApp side-effects"
+        );
+      } else {
       const whatsappConfig =
         ticket.whatsappId != null
           ? await Whatsapp.findOne({
@@ -365,6 +385,7 @@ const UpdateTicketService = async ({
           `UpdateTicketService: erro ao processar mensagens de fechamento (ticket ${ticketId}). Ticket será atualizado mesmo assim. Err: ${err instanceof Error ? err.message : String(err)}`
         );
       }
+      }
       await ticket.update({
         promptId: null,
         integrationId: null,
@@ -382,11 +403,12 @@ const UpdateTicketService = async ({
       ticketTraking.queuedAt = moment().toDate();
     }
 
-    const transferAutoMessages = ticket.whatsappId
+    const transferAutoMessages =
+      !isInstagram && ticket.whatsappId
       ? await resolveWhatsappAutoMessageSettings(ticket.whatsappId, companyId)
       : await getGlobalAutoMessagesFallback(companyId);
 
-    if (transferAutoMessages.sendMsgTransfTicket === "enabled") {
+    if (!isInstagram && transferAutoMessages.sendMsgTransfTicket === "enabled") {
       try {
         // Mensagem de transferencia da FILA
         if (oldQueueId !== queueId && oldUserId === userId && !isNil(oldQueueId) && !isNil(queueId)) {

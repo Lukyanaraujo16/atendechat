@@ -6,6 +6,7 @@ import { ParsedInstagramWebhookEvent } from "./InstagramWebhookParser";
 import FindOrCreateInstagramContactService from "./FindOrCreateInstagramContactService";
 import FindOrCreateInstagramTicketService from "./FindOrCreateInstagramTicketService";
 import CreateInstagramInboundMessageService from "./CreateInstagramInboundMessageService";
+import EnrichInstagramContactProfileService from "./EnrichInstagramContactProfileService";
 
 interface Request {
   parsed: ParsedInstagramWebhookEvent;
@@ -115,7 +116,12 @@ const ProcessInstagramDirectMessageService = async ({
       senderId: parsed.senderId,
       recipientId: parsed.recipientId,
       messageId: parsed.messageId,
-      hasText: true
+      hasText: true,
+      webhookSenderKeys: parsed.rawMessagingItem?.sender
+        ? Object.keys(
+            parsed.rawMessagingItem.sender as Record<string, unknown>
+          )
+        : []
     },
     "[InstagramInbound] received"
   );
@@ -154,8 +160,15 @@ const ProcessInstagramDirectMessageService = async ({
     senderId: parsed.senderId
   });
 
+  const enrichedContact = await EnrichInstagramContactProfileService({
+    contact,
+    companyId,
+    instagramAccountId: account.id,
+    senderId: parsed.senderId
+  });
+
   const { ticket } = await FindOrCreateInstagramTicketService({
-    contactId: contact.id,
+    contactId: enrichedContact.id,
     companyId,
     instagramAccountId: account.id,
     lastMessage: text,
@@ -175,7 +188,7 @@ const ProcessInstagramDirectMessageService = async ({
     messageData: {
       id: parsed.messageId,
       ticketId: ticket.id,
-      contactId: contact.id,
+      contactId: enrichedContact.id,
       body: text,
       externalMessageId: parsed.messageId,
       metaPayload,
@@ -189,7 +202,7 @@ const ProcessInstagramDirectMessageService = async ({
     {
       ticketId: ticket.id,
       messageId: parsed.messageId,
-      contactId: contact.id,
+      contactId: enrichedContact.id,
       accountId: account.id
     },
     "[InstagramInbound] message_saved"
