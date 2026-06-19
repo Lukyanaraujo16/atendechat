@@ -29,8 +29,17 @@ const Routes = () => {
             <Route exact path="/login" component={Login} />
             <Route exact path="/signup" component={Signup} />
             <Route exact path="/forgetpsw" component={ForgetPassword} />
-            <Route exact path="/privacy-policy" component={PrivacyPolicy} />
-            <Route exact path="/terms-of-service" component={TermsOfService} />
+            <Route exact path="/privacy" publicAlways component={PrivacyPolicy} />
+            <Route exact path="/terms" publicAlways component={TermsOfService} />
+            <Route
+              exact
+              path="/politica-de-privacidade"
+              publicAlways
+              component={PrivacyPolicy}
+            />
+            <Route exact path="/termos-de-uso" publicAlways component={TermsOfService} />
+            <Route exact path="/privacy-policy" publicAlways component={PrivacyPolicy} />
+            <Route exact path="/terms-of-service" publicAlways component={TermsOfService} />
             <Route
               isPrivate
               path="/saas"

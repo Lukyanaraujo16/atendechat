@@ -5,7 +5,7 @@ import { AuthContext } from "../context/Auth/AuthContext";
 import BackdropLoading from "../components/BackdropLoading";
 import { canAccessSaasPlatform } from "../utils/platformUser";
 
-const Route = ({ component: Component, isPrivate = false, ...rest }) => {
+const Route = ({ component: Component, isPrivate = false, publicAlways = false, ...rest }) => {
   const { isAuth, loading, user } = useContext(AuthContext);
   const hasToken =
     typeof window !== "undefined" && Boolean(localStorage.getItem("token"));
@@ -17,7 +17,7 @@ const Route = ({ component: Component, isPrivate = false, ...rest }) => {
     return <Redirect to={{ pathname: "/login", state: { from: rest.location } }} />;
   }
 
-  if (isAuth && !isPrivate) {
+  if (isAuth && !isPrivate && !publicAlways) {
     if (loading) {
       return <BackdropLoading />;
     }
