@@ -32,6 +32,11 @@ export function setStartedOutsideSystemOnTicket(ticket: Ticket): void {
  * Requer `whatsapp` com LEFT JOIN (`required: false`) para refletir registro apagado.
  */
 export function setIsOrphanOnTicket(ticket: Ticket): void {
+  if (String(ticket.channel || "").toLowerCase() === "instagram") {
+    (ticket as any).dataValues.isOrphan = false;
+    return;
+  }
+
   const linked =
     ticket.whatsapp === null || ticket.whatsapp === undefined
       ? null

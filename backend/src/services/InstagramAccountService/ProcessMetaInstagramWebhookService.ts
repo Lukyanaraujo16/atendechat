@@ -7,6 +7,7 @@ import {
   parseInstagramWebhookPayload,
   ParsedInstagramWebhookEvent
 } from "./InstagramWebhookParser";
+import ProcessInstagramDirectMessageService from "./ProcessInstagramDirectMessageService";
 
 interface ProcessRequest {
   payload: Record<string, unknown>;
@@ -17,6 +18,10 @@ interface MappedAccount {
   id: number;
   companyId: number;
 }
+
+type PersistResult =
+  | { status: "stored"; eventId: number; externalEventId: string }
+  | { status: "duplicate"; externalEventId: string };
 
 const findMappedInstagramAccount = async (
   businessAccountId: string | null
@@ -65,7 +70,7 @@ const persistWebhookEvent = async (
   payload: Record<string, unknown>,
   signatureValid: boolean,
   mapped: MappedAccount | null
-): Promise<"stored" | "duplicate"> => {
+): Promise<PersistResult> => {
   const externalEventId = resolveExternalEventId(parsed, payload);
 
   const existing = await MetaWebhookEvent.findOne({
@@ -81,10 +86,10 @@ const persistWebhookEvent = async (
       },
       "[InstagramWebhook] duplicate event skipped"
     );
-    return "duplicate";
+    return { status: "duplicate", externalEventId };
   }
 
-  await MetaWebhookEvent.create({
+  const created = await MetaWebhookEvent.create({
     companyId: mapped?.companyId ?? null,
     instagramAccountId: mapped?.id ?? null,
     object: parsed.object,
@@ -96,7 +101,42 @@ const persistWebhookEvent = async (
     receivedAt: new Date()
   });
 
-  return "stored";
+  return { status: "stored", eventId: created.id, externalEventId };
+};
+
+const processInboundIfApplicable = async (
+  parsed: ParsedInstagramWebhookEvent,
+  mapped: MappedAccount,
+  persistResult: PersistResult
+): Promise<void> => {
+  if (parsed.eventType !== "message") {
+    if (persistResult.status === "stored") {
+      await MetaWebhookEvent.update(
+        { processed: true },
+        { where: { id: persistResult.eventId } }
+      );
+    }
+    return;
+  }
+
+  if (persistResult.status === "duplicate") {
+    await ProcessInstagramDirectMessageService({
+      parsed,
+      instagramAccountId: mapped.id,
+      companyId: mapped.companyId,
+      externalEventId: persistResult.externalEventId,
+      webhookEventId: null
+    });
+    return;
+  }
+
+  await ProcessInstagramDirectMessageService({
+    parsed,
+    instagramAccountId: mapped.id,
+    companyId: mapped.companyId,
+    externalEventId: persistResult.externalEventId,
+    webhookEventId: persistResult.eventId
+  });
 };
 
 const processParsedEvent = async (
@@ -130,8 +170,15 @@ const processParsedEvent = async (
     "[InstagramWebhook] received"
   );
 
+  let persistResult: PersistResult;
+
   try {
-    await persistWebhookEvent(parsed, payload, signatureValid, mapped);
+    persistResult = await persistWebhookEvent(
+      parsed,
+      payload,
+      signatureValid,
+      mapped
+    );
   } catch (err) {
     const isUniqueViolation =
       err instanceof Error &&
@@ -143,10 +190,32 @@ const processParsedEvent = async (
         { externalEventId: resolveExternalEventId(parsed, payload) },
         "[InstagramWebhook] duplicate event skipped (race)"
       );
-      return;
+      persistResult = {
+        status: "duplicate",
+        externalEventId: resolveExternalEventId(parsed, payload)
+      };
+    } else {
+      throw err;
     }
+  }
 
-    throw err;
+  if (!mapped) {
+    return;
+  }
+
+  try {
+    await processInboundIfApplicable(parsed, mapped, persistResult);
+  } catch (err) {
+    logger.error(
+      {
+        err,
+        stack: err instanceof Error ? err.stack : undefined,
+        instagramAccountId: mapped.id,
+        companyId: mapped.companyId,
+        messageId: parsed.messageId
+      },
+      "[InstagramInbound] error_processing"
+    );
   }
 };
 

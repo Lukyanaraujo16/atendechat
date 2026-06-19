@@ -108,6 +108,16 @@ class Message extends Model<Message> {
   @Default(false)
   @Column
   isEdited: boolean;
+
+  @Default("whatsapp")
+  @Column(DataType.STRING(16))
+  channel: string;
+
+  @Column(DataType.STRING)
+  externalMessageId: string;
+
+  @Column(DataType.JSONB)
+  metaPayload: Record<string, unknown> | null;
 }
 
 export default Message;

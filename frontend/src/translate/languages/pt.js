@@ -5498,6 +5498,8 @@ const messages = {
         placeholderOpen: "Digite uma mensagem",
         placeholderClosed:
             "Reabra ou aceite esse ticket para enviar uma mensagem.",
+        instagramOutboundBlocked:
+            "Resposta pelo Instagram será liberada na próxima fase.",
         signMessage: "Assinar",
         sticker: "Enviar figurinha (WebP)",
         stickerOnlyWebp: "Figurinha deve ser um arquivo .webp",

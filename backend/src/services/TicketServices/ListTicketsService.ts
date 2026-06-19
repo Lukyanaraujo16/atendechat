@@ -12,6 +12,7 @@ import TicketTag from "../../models/TicketTag";
 import ContactLabelRelation from "../../models/ContactLabelRelation";
 import { intersection } from "lodash";
 import Whatsapp from "../../models/Whatsapp";
+import InstagramAccount from "../../models/InstagramAccount";
 import { parseTruthyQuery } from "../../utils/parseQueryBoolean";
 import { attachTicketIsOrphanFlag } from "../../helpers/ticketOrphan";
 import {
@@ -156,6 +157,12 @@ const ListTicketsService = async ({
       model: Whatsapp,
       as: "whatsapp",
       attributes: ["name", "status", "ticketVisibility"],
+      required: false
+    },
+    {
+      model: InstagramAccount,
+      as: "instagramAccount",
+      attributes: ["id", "name", "status", "instagramBusinessAccountId"],
       required: false
     },
   ];

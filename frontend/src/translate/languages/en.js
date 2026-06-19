@@ -5351,6 +5351,8 @@ const messages = {
 			messagesInput: {
 				placeholderOpen: "Type a message",
 				placeholderClosed: "Reopen or accept this ticket to send a message.",
+				instagramOutboundBlocked:
+					"Replying via Instagram will be available in the next phase.",
 				signMessage: "Sign",
 				sticker: "Send sticker (WebP)",
 				stickerOnlyWebp: "Sticker must be a .webp file",

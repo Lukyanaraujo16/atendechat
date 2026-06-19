@@ -12,6 +12,10 @@ export function isOrphanTicket(ticket) {
     return false;
   }
 
+  if (String(ticket.channel || "").toLowerCase() === "instagram") {
+    return false;
+  }
+
   if (ticket.isOrphan === true) {
     return true;
   }

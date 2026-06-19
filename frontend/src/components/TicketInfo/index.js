@@ -153,6 +153,14 @@ const TicketInfo = ({
 			}
 			subheader={
 				<span>
+					{String(ticket?.channel || "").toLowerCase() === "instagram" ? (
+						<span style={{ display: "block", marginBottom: ticket.user ? 4 : 0 }}>
+							Instagram
+							{ticket?.instagramAccount?.name
+								? ` · ${ticket.instagramAccount.name}`
+								: ""}
+						</span>
+					) : null}
 					{ticket.user && `${userName}`}
 					{ticket.startedOutsideSystem && (
 						<span

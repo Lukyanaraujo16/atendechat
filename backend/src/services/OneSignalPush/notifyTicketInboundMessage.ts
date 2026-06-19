@@ -82,7 +82,10 @@ const notifyTicketInboundMessage = async ({
 
     if (pending && isFirstMessage && !hasAssignee) {
       eventType = "ticket_pending_new";
-      title = "Nova conversa aguardando";
+      title =
+        String(ticket.channel || "").toLowerCase() === "instagram"
+          ? "Nova conversa no Instagram"
+          : "Nova conversa aguardando";
       dataType = "ticket_pending";
       recipientIds = await resolveRecipientsForPendingOrQueue(
         companyId,
@@ -91,7 +94,10 @@ const notifyTicketInboundMessage = async ({
       );
     } else {
       eventType = "ticket_message_inbound";
-      title = "Cliente respondeu";
+      title =
+        String(ticket.channel || "").toLowerCase() === "instagram"
+          ? "Nova mensagem no Instagram"
+          : "Cliente respondeu";
       dataType = "ticket_message";
       recipientIds = await resolveRecipientsForInboundMessage(companyId, {
         userId: ticket.userId,

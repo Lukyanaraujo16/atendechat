@@ -34,6 +34,7 @@ import MarkdownWrapper from "../MarkdownWrapper";
 import AndroidIcon from "@material-ui/icons/Android";
 import VisibilityIcon from "@material-ui/icons/Visibility";
 import DeleteOutlineIcon from "@material-ui/icons/DeleteOutline";
+import InstagramIcon from "@material-ui/icons/Instagram";
 import PushPinOutlinedIcon from "@mui/icons-material/PushPinOutlined";
 import PushPinIcon from "@mui/icons-material/PushPin";
 import Checkbox from "@material-ui/core/Checkbox";
@@ -864,7 +865,21 @@ const TicketListItemCustom = ({
                 {...(statusChipMeta.icon ? { icon: statusChipMeta.icon } : {})}
               />
             ) : null}
-            {ticket?.whatsapp?.name ? (
+            {ticket?.channel === "instagram" ? (
+              <Chip
+                size="small"
+                variant="outlined"
+                icon={
+                  <InstagramIcon
+                    style={{ color: "#e1306c", fontSize: 16 }}
+                  />
+                }
+                label={(
+                  ticket?.instagramAccount?.name || i18n.t("connections.tabs.instagram")
+                ).toUpperCase()}
+                className={classes.chipConnection}
+              />
+            ) : ticket?.whatsapp?.name ? (
               <Chip
                 size="small"
                 variant="outlined"

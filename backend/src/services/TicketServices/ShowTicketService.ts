@@ -5,6 +5,7 @@ import User from "../../models/User";
 import Queue from "../../models/Queue";
 import Tag from "../../models/Tag";
 import Whatsapp from "../../models/Whatsapp";
+import InstagramAccount from "../../models/InstagramAccount";
 import Prompt from "../../models/Prompt";
 import {
   setIsOrphanOnTicket,
@@ -49,6 +50,12 @@ const ShowTicketService = async (
         model: Whatsapp,
         as: "whatsapp",
         attributes: ["name", "status", "ticketVisibility"],
+        required: false
+      },
+      {
+        model: InstagramAccount,
+        as: "instagramAccount",
+        attributes: ["id", "name", "status", "instagramBusinessAccountId"],
         required: false
       },
       {

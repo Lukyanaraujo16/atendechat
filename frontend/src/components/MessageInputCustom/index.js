@@ -834,6 +834,19 @@ const MessageInputCustom = (props) => {
     );
   };
 
+  const isInstagramChannel =
+    String(ticket?.channel || "").toLowerCase() === "instagram";
+
+  if (isInstagramChannel) {
+    return (
+      <Paper square elevation={0} className={classes.mainWrapper}>
+        <div className={classes.pendingHint} data-ticket-instagram-input-hint>
+          {i18n.t("messagesInput.instagramOutboundBlocked")}
+        </div>
+      </Paper>
+    );
+  }
+
   if (medias.length > 0)
     return (
       <Paper elevation={0} square className={classes.viewMediaInputWrapper}>
