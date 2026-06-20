@@ -960,13 +960,19 @@ export const sendInstagramDirectTextMessage = async (
   instagramBusinessAccountId: string,
   recipientId: string,
   text: string,
-  accessToken: string
+  accessToken: string,
+  replyToMid?: string | null
 ): Promise<InstagramDirectSendResult> => {
+  const messagePayload: Record<string, unknown> = { text };
+  if (replyToMid?.trim()) {
+    messagePayload.reply_to = { mid: replyToMid.trim() };
+  }
+
   const { data } = await axios.post<Record<string, unknown>>(
     `${INSTAGRAM_GRAPH_VERSIONED}/${instagramBusinessAccountId}/messages`,
     {
       recipient: { id: recipientId },
-      message: { text }
+      message: messagePayload
     },
     {
       params: { access_token: accessToken },

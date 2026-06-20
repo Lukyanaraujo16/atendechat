@@ -18,12 +18,14 @@ interface Request {
   ticket: Ticket;
   body: string;
   companyId: number;
+  quotedMsg?: Message | null;
 }
 
 const SendInstagramTextMessageService = async ({
   ticket,
   body,
-  companyId
+  companyId,
+  quotedMsg
 }: Request): Promise<Message> => {
   if (!isInstagramChannelTicket(ticket)) {
     throw new AppError("ERR_TICKET_CHANNEL_NOT_INSTAGRAM", 400);
@@ -85,12 +87,30 @@ const SendInstagramTextMessageService = async ({
     "[InstagramOutbound] sending"
   );
 
+  const replyToMid =
+    quotedMsg?.externalMessageId ||
+    (quotedMsg?.id && quotedMsg.id !== quotedMsg?.externalMessageId
+      ? quotedMsg.id
+      : null);
+
+  if (quotedMsg?.id) {
+    logger.info(
+      {
+        ticketId: ticket.id,
+        quotedMsgId: quotedMsg.id,
+        replyToMid
+      },
+      "[InstagramReply] detected"
+    );
+  }
+
   try {
     const sendResult = await sendInstagramDirectTextMessage(
       businessId,
       recipientId,
       text,
-      accessToken
+      accessToken,
+      replyToMid
     );
 
     logger.info(
@@ -117,11 +137,24 @@ const SendInstagramTextMessageService = async ({
       channel: "instagram",
       externalMessageId: sendResult.messageId,
       metaPayload: sendResult.rawResponse,
+      quotedMsgId: quotedMsg?.id ?? null,
       remoteJid: null,
       dataJson: JSON.stringify(sendResult.rawResponse),
       queueId: ticket.queueId ?? null,
       companyId
     });
+
+    if (quotedMsg?.id) {
+      logger.info(
+        {
+          ticketId: ticket.id,
+          quotedMsgId: quotedMsg.id,
+          replyToMid,
+          externalMessageId: sendResult.messageId
+        },
+        "[InstagramReply] linked"
+      );
+    }
 
     const message = await Message.findByPk(messageId, {
       include: [

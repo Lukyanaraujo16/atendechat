@@ -373,7 +373,8 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
     const savedMessage = await SendInstagramTextMessageService({
       ticket,
       body: bodyToSend,
-      companyId
+      companyId,
+      quotedMsg: quotedMsg ?? null
     });
 
     return res.status(200).json({

@@ -545,7 +545,69 @@ const MessagesList = forwardRef(function MessagesList(
     return <MarkdownWrapper>{displayBody}</MarkdownWrapper>;
   };
 
+  const parseMessageMetaPayload = (message) => {
+    if (!message?.metaPayload) return null;
+    if (typeof message.metaPayload === "object") return message.metaPayload;
+    try {
+      return JSON.parse(message.metaPayload);
+    } catch {
+      return null;
+    }
+  };
+
+  const renderInstagramDirectInteraction = (message) => {
+    const { mediaType } = message;
+    const meta = parseMessageMetaPayload(message);
+    const permalink =
+      message.mediaUrl || meta?.share?.permalink || meta?.permalink || null;
+
+    const openInstagramLink = (url) =>
+      url ? (
+        <div className={classes.downloadMedia}>
+          <Button
+            color="primary"
+            variant="outlined"
+            target="_blank"
+            rel="noopener noreferrer"
+            href={url}
+          >
+            Abrir no Instagram
+          </Button>
+        </div>
+      ) : null;
+
+    if (mediaType === "reaction") {
+      return (
+        <div className={classes.downloadMedia}>
+          <span>{message.body || "❤️ Reagiu à mensagem"}</span>
+        </div>
+      );
+    }
+
+    if (
+      mediaType === "instagram_post" ||
+      mediaType === "instagram_reel" ||
+      mediaType === "instagram_story" ||
+      mediaType === "instagram_profile"
+    ) {
+      return (
+        <>
+          <div className={classes.downloadMedia}>
+            <span>{message.body}</span>
+          </div>
+          {openInstagramLink(permalink)}
+        </>
+      );
+    }
+
+    return null;
+  };
+
   const checkMessageMedia = (message) => {
+    const instagramInteraction = renderInstagramDirectInteraction(message);
+    if (instagramInteraction) {
+      return instagramInteraction;
+    }
 
     if (message.mediaType === "locationMessage" && message.body.split('|').length >= 2) {
       let locationParts = message.body.split('|')
@@ -770,8 +832,8 @@ const MessagesList = forwardRef(function MessagesList(
               />
             )
           }
-          {message.quotedMsg.mediaType === "application"
-            && (
+          {(message.quotedMsg.mediaType === "application" ||
+            message.quotedMsg.mediaType === "document") && (
               <div className={classes.downloadMedia}>
                 <Button
                   startIcon={<GetApp />}
@@ -780,11 +842,17 @@ const MessagesList = forwardRef(function MessagesList(
                   target="_blank"
                   href={message.quotedMsg.mediaUrl}
                 >
-                  {i18n.t("messagesList.header.buttons.download")}
+                  {message.quotedMsg.body || i18n.t("messagesList.header.buttons.download")}
                 </Button>
               </div>
-            )
-          }
+            )}
+
+          {(message.quotedMsg.mediaType === "chat" ||
+            message.quotedMsg.mediaType === "conversation" ||
+            !message.quotedMsg.mediaUrl) &&
+            getDisplayableMessageBody(message.quotedMsg) && (
+              <span>{getDisplayableMessageBody(message.quotedMsg)}</span>
+            )}
 
           {message.quotedMsg.mediaType === "image"
             && (<ModalImageCors imageUrl={message.quotedMsg.mediaUrl} />)}

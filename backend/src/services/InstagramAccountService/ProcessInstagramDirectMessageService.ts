@@ -7,7 +7,9 @@ import { incrementCompanyStorageUsage } from "../CompanyService/adjustCompanySto
 import {
   ParsedInstagramWebhookEvent,
   extractInstagramMessageAttachments,
-  resolveInstagramMessageDirection
+  extractInstagramReplyToMessageId,
+  resolveInstagramMessageDirection,
+  summarizeUnsupportedInstagramWebhookPayload
 } from "./InstagramWebhookParser";
 import FindOrCreateInstagramContactService from "./FindOrCreateInstagramContactService";
 import FindOrCreateInstagramTicketService from "./FindOrCreateInstagramTicketService";
@@ -15,6 +17,10 @@ import CreateInstagramInboundMessageService from "./CreateInstagramInboundMessag
 import CreateInstagramOutboundSyncMessageService from "./CreateInstagramOutboundSyncMessageService";
 import EnrichInstagramContactProfileService from "./EnrichInstagramContactProfileService";
 import DownloadInstagramMediaService from "./DownloadInstagramMediaService";
+import ProcessInstagramShareService, {
+  isInstagramShareAttachmentType
+} from "./ProcessInstagramShareService";
+import { resolveInstagramQuotedMessageId } from "./resolveInstagramQuotedMessage";
 import resolveInstagramAccountToken from "./resolveInstagramAccountToken";
 
 interface Request {
@@ -29,6 +35,7 @@ interface ResolvedInstagramMessageContent {
   body: string;
   mediaType: string;
   mediaUrl?: string | null;
+  shareMeta?: Record<string, unknown> | null;
 }
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
@@ -201,6 +208,21 @@ const resolveInstagramMessageContent = async ({
   const fileAttachment = attachments.find(item =>
     FILE_ATTACHMENT_TYPES.has(item.type)
   );
+  const shareAttachment = attachments.find(item =>
+    isInstagramShareAttachmentType(item.type)
+  );
+
+  if (shareAttachment) {
+    const shareContent = ProcessInstagramShareService(shareAttachment, text);
+    if (shareContent) {
+      return {
+        body: text || shareContent.body,
+        mediaType: shareContent.mediaType,
+        mediaUrl: shareContent.mediaUrl,
+        shareMeta: shareContent.shareMeta
+      };
+    }
+  }
 
   if (imageAttachment) {
     return downloadInstagramAttachment({
@@ -273,21 +295,13 @@ const resolveInstagramMessageContent = async ({
 
   if (attachments.length > 0) {
     logger.info(
-      {
-        messageId: parsed.messageId,
-        attachmentsCount: parsed.attachmentsCount,
-        attachmentTypes: attachments.map(item => item.type)
-      },
-      "[InstagramInbound] unsupported_message_type"
+      summarizeUnsupportedInstagramWebhookPayload(parsed),
+      "[InstagramWebhook] unsupported_payload"
     );
   } else {
     logger.info(
-      {
-        messageId: parsed.messageId,
-        attachmentsCount: parsed.attachmentsCount,
-        eventType: parsed.eventType
-      },
-      "[InstagramInbound] unsupported_message_type"
+      summarizeUnsupportedInstagramWebhookPayload(parsed),
+      "[InstagramWebhook] unsupported_payload"
     );
   }
 
@@ -457,8 +471,16 @@ const ProcessInstagramDirectMessageService = async ({
     fromMe,
     isEcho: parsed.isEcho,
     mediaType: content.mediaType,
+    replyToMessageId: extractInstagramReplyToMessageId(parsed),
+    share: content.shareMeta ?? null,
     attachments: extractInstagramMessageAttachments(parsed)
   };
+
+  const quotedMsgId = await resolveInstagramQuotedMessageId({
+    companyId,
+    replyToExternalMessageId: extractInstagramReplyToMessageId(parsed),
+    ticketId: ticket.id
+  });
 
   const messagePayload = {
     id: parsed.messageId,
@@ -469,6 +491,7 @@ const ProcessInstagramDirectMessageService = async ({
     mediaType: content.mediaType,
     mediaUrl: content.mediaUrl ?? null,
     metaPayload,
+    quotedMsgId,
     queueId: ticket.queueId
   };
 

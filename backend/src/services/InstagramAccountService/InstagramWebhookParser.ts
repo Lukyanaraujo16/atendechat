@@ -6,12 +6,20 @@ export interface ParsedInstagramWebhookEvent {
   recipientId: string | null;
   timestamp: number | null;
   messageId: string | null;
+  replyToMessageId: string | null;
   eventType: string | null;
   hasText: boolean;
   textPreview: string | null;
   attachmentsCount: number;
   isEcho: boolean;
   rawMessagingItem: Record<string, unknown> | null;
+}
+
+export interface InstagramWebhookReaction {
+  targetMessageId: string | null;
+  emoji: string | null;
+  action: string | null;
+  reactionType: string | null;
 }
 
 export interface InstagramWebhookMessageDirection {
@@ -22,6 +30,7 @@ export interface InstagramWebhookMessageDirection {
 export interface InstagramWebhookAttachment {
   type: string;
   url: string | null;
+  payload: Record<string, unknown> | null;
 }
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
@@ -66,6 +75,14 @@ const parseMessagingItem = (
         ? String(message.id)
         : null;
 
+  const replyTo = asRecord(message?.reply_to);
+  const replyToMessageId =
+    replyTo?.mid != null
+      ? String(replyTo.mid)
+      : replyTo?.message_id != null
+        ? String(replyTo.message_id)
+        : null;
+
   const attachments = Array.isArray(message?.attachments)
     ? message.attachments
     : [];
@@ -86,6 +103,7 @@ const parseMessagingItem = (
     recipientId,
     timestamp: Number.isFinite(timestamp) ? timestamp : null,
     messageId,
+    replyToMessageId,
     eventType: detectEventType(item),
     hasText: Boolean(message && typeof message.text === "string" && message.text),
     textPreview: message ? extractTextPreview(message) : null,
@@ -177,6 +195,7 @@ export const parseInstagramWebhookPayload = (
               ? Number(entry.time)
               : null,
         messageId: null,
+        replyToMessageId: null,
         eventType:
           typeof change.field === "string" ? `change:${change.field}` : "change",
         hasText: false,
@@ -197,6 +216,7 @@ export const parseInstagramWebhookPayload = (
       recipientId: null,
       timestamp: null,
       messageId: null,
+      replyToMessageId: null,
       eventType: "payload",
       hasText: false,
       textPreview: null,
@@ -230,9 +250,59 @@ export const extractInstagramMessageAttachments = (
           : null;
       const type =
         typeof record.type === "string" ? record.type.toLowerCase() : "unknown";
-      return { type, url };
+      return { type, url, payload };
     })
     .filter((item): item is InstagramWebhookAttachment => Boolean(item));
+};
+
+export const extractInstagramReplyToMessageId = (
+  parsed: ParsedInstagramWebhookEvent
+): string | null => parsed.replyToMessageId;
+
+export const extractInstagramReactionFromEvent = (
+  parsed: ParsedInstagramWebhookEvent
+): InstagramWebhookReaction | null => {
+  const reaction = parsed.rawMessagingItem
+    ? asRecord(parsed.rawMessagingItem.reaction)
+    : null;
+
+  if (!reaction) {
+    return null;
+  }
+
+  const targetMessageIdRaw = reaction.mid ?? reaction.message_id;
+  return {
+    targetMessageId:
+      targetMessageIdRaw != null ? String(targetMessageIdRaw) : null,
+    emoji:
+      typeof reaction.emoji === "string" && reaction.emoji.trim()
+        ? reaction.emoji.trim()
+        : null,
+    action:
+      typeof reaction.action === "string" ? reaction.action.toLowerCase() : null,
+    reactionType:
+      typeof reaction.reaction === "string" ? reaction.reaction : null
+  };
+};
+
+export const summarizeUnsupportedInstagramWebhookPayload = (
+  parsed: ParsedInstagramWebhookEvent
+): Record<string, unknown> => {
+  const message = parsed.rawMessagingItem
+    ? asRecord(parsed.rawMessagingItem.message)
+    : null;
+  const attachments = extractInstagramMessageAttachments(parsed);
+
+  return {
+    eventType: parsed.eventType,
+    messageId: parsed.messageId,
+    replyToMessageId: parsed.replyToMessageId,
+    hasText: parsed.hasText,
+    textPreview: parsed.textPreview,
+    attachmentTypes: attachments.map(item => item.type),
+    messageKeys: message ? Object.keys(message) : [],
+    rawKeys: parsed.rawMessagingItem ? Object.keys(parsed.rawMessagingItem) : []
+  };
 };
 
 export const buildSafeWebhookLogSummary = (

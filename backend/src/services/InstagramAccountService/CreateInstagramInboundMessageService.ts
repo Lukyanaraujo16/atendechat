@@ -14,6 +14,7 @@ export interface InstagramInboundMessageData {
   mediaType?: string;
   mediaUrl?: string | null;
   metaPayload?: Record<string, unknown> | null;
+  quotedMsgId?: string | null;
   queueId?: number | null;
 }
 
@@ -39,6 +40,7 @@ const CreateInstagramInboundMessageService = async ({
     channel: "instagram",
     externalMessageId: messageData.externalMessageId,
     metaPayload: messageData.metaPayload ?? null,
+    quotedMsgId: messageData.quotedMsgId ?? null,
     remoteJid: null,
     dataJson: messageData.metaPayload
       ? JSON.stringify(messageData.metaPayload)

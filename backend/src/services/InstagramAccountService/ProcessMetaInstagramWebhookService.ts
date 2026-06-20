@@ -9,6 +9,7 @@ import {
   ParsedInstagramWebhookEvent
 } from "./InstagramWebhookParser";
 import ProcessInstagramDirectMessageService from "./ProcessInstagramDirectMessageService";
+import ProcessInstagramReactionService from "./ProcessInstagramReactionService";
 
 interface ProcessRequest {
   payload: Record<string, unknown>;
@@ -110,6 +111,30 @@ const processInboundIfApplicable = async (
   mapped: MappedAccount,
   persistResult: PersistResult
 ): Promise<void> => {
+  if (parsed.eventType === "reaction") {
+    try {
+      await ProcessInstagramReactionService({
+        parsed,
+        instagramAccountId: mapped.id,
+        companyId: mapped.companyId,
+        externalEventId: persistResult.externalEventId,
+        webhookEventId:
+          persistResult.status === "stored" ? persistResult.eventId : null
+      });
+    } catch (err) {
+      logger.error(
+        {
+          err,
+          stack: err instanceof Error ? err.stack : undefined,
+          instagramAccountId: mapped.id,
+          companyId: mapped.companyId
+        },
+        "[InstagramReaction] error_processing"
+      );
+    }
+    return;
+  }
+
   if (parsed.eventType !== "message") {
     if (persistResult.status === "stored") {
       await MetaWebhookEvent.update(
