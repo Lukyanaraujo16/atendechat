@@ -1,3 +1,5 @@
+import { redactSensitiveText } from "../../helpers/maskSensitive";
+
 export interface ParsedInstagramWebhookEvent {
   object: string;
   entryId: string | null;
@@ -283,6 +285,206 @@ export const extractInstagramReactionFromEvent = (
     reactionType:
       typeof reaction.reaction === "string" ? reaction.reaction : null
   };
+};
+
+const SENSITIVE_LOG_KEYS = new Set([
+  "access_token",
+  "accesstoken",
+  "input_token",
+  "token",
+  "authorization",
+  "pageaccesstoken",
+  "appsecret",
+  "client_secret",
+  "app_secret"
+]);
+
+const sanitizeWebhookValueForLog = (
+  value: unknown,
+  depth = 0
+): unknown => {
+  if (depth > 10) {
+    return "[max_depth]";
+  }
+
+  if (value == null || typeof value === "boolean" || typeof value === "number") {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    return redactSensitiveText(value);
+  }
+
+  if (Array.isArray(value)) {
+    return value.map(item => sanitizeWebhookValueForLog(item, depth + 1));
+  }
+
+  if (typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    const sanitized: Record<string, unknown> = {};
+
+    for (const [key, nestedValue] of Object.entries(record)) {
+      if (SENSITIVE_LOG_KEYS.has(key.toLowerCase())) {
+        sanitized[key] = "***";
+        continue;
+      }
+
+      sanitized[key] = sanitizeWebhookValueForLog(nestedValue, depth + 1);
+    }
+
+    return sanitized;
+  }
+
+  return String(value);
+};
+
+const normalizeAttachmentForLog = (
+  attachmentRaw: unknown
+): Record<string, unknown> | null => {
+  const attachment = asRecord(attachmentRaw);
+  if (!attachment) {
+    return null;
+  }
+
+  const payload = asRecord(attachment.payload);
+
+  return {
+    type: attachment.type ?? null,
+    payload: payload ? sanitizeWebhookValueForLog(payload) : null,
+    fullAttachment: sanitizeWebhookValueForLog(attachment)
+  };
+};
+
+const attachmentTypeMatches = (
+  attachmentRaw: unknown,
+  matcher: RegExp
+): boolean => {
+  const attachment = asRecord(attachmentRaw);
+  const type =
+    typeof attachment?.type === "string" ? attachment.type.toLowerCase() : "";
+  return matcher.test(type);
+};
+
+const payloadContainsPattern = (
+  attachmentRaw: unknown,
+  matcher: RegExp
+): boolean => {
+  const attachment = asRecord(attachmentRaw);
+  const payload = asRecord(attachment?.payload);
+  if (!payload) {
+    return false;
+  }
+
+  const serialized = JSON.stringify(payload);
+  return matcher.test(serialized);
+};
+
+const extractShareSectionFromAttachments = (
+  attachments: unknown[],
+  matcher: RegExp
+): Record<string, unknown> => {
+  const matched = attachments.filter(
+    item => attachmentTypeMatches(item, matcher) || payloadContainsPattern(item, matcher)
+  );
+
+  return {
+    attachmentTypes: matched.map(item => asRecord(item)?.type ?? null),
+    attachments: matched
+      .map(item => normalizeAttachmentForLog(item))
+      .filter((item): item is Record<string, unknown> => Boolean(item)),
+    payloads: matched
+      .map(item => sanitizeWebhookValueForLog(asRecord(asRecord(item)?.payload)))
+      .filter(Boolean)
+  };
+};
+
+export const buildUnsupportedInstagramWebhookPayloadDetails = (
+  parsed: ParsedInstagramWebhookEvent
+): Record<string, unknown> => {
+  const messagingItem = parsed.rawMessagingItem;
+  const message = messagingItem ? asRecord(messagingItem.message) : null;
+  const sender = messagingItem ? asRecord(messagingItem.sender) : null;
+  const recipient = messagingItem ? asRecord(messagingItem.recipient) : null;
+  const reaction = messagingItem ? asRecord(messagingItem.reaction) : null;
+  const rawAttachments = Array.isArray(message?.attachments)
+    ? message.attachments
+    : [];
+  const normalizedAttachments = rawAttachments
+    .map(item => normalizeAttachmentForLog(item))
+    .filter((item): item is Record<string, unknown> => Boolean(item));
+
+  const storyPattern = /story|stories|story_mention|story_share|ig_story/i;
+  const profilePattern = /profile|profile_share|ig_profile|username/i;
+  const highlightPattern = /highlight|highlights|ig_highlight|reel_highlight/i;
+
+  const messageShare = message?.share ?? null;
+  const messageReferral = message?.referral ?? messagingItem?.referral ?? null;
+
+  return {
+    eventType: parsed.eventType,
+    sender: {
+      id: sender?.id ?? parsed.senderId ?? null
+    },
+    recipient: {
+      id: recipient?.id ?? parsed.recipientId ?? null
+    },
+    message: {
+      mid: message?.mid ?? parsed.messageId ?? null,
+      text: message?.text ?? null,
+      reply_to: message?.reply_to ?? null,
+      referral: messageReferral
+        ? sanitizeWebhookValueForLog(messageReferral)
+        : null,
+      share: messageShare ? sanitizeWebhookValueForLog(messageShare) : null
+    },
+    attachments: normalizedAttachments,
+    attachmentTypes: normalizedAttachments.map(item => item.type ?? null),
+    attachmentPayloads: normalizedAttachments.map(item => item.payload ?? null),
+    reaction: reaction ? sanitizeWebhookValueForLog(reaction) : null,
+    story: {
+      messageShare: messageShare ? sanitizeWebhookValueForLog(messageShare) : null,
+      messageReferral: messageReferral
+        ? sanitizeWebhookValueForLog(messageReferral)
+        : null,
+      ...extractShareSectionFromAttachments(rawAttachments, storyPattern)
+    },
+    profile: {
+      messageShare: messageShare ? sanitizeWebhookValueForLog(messageShare) : null,
+      ...extractShareSectionFromAttachments(rawAttachments, profilePattern)
+    },
+    highlight: {
+      messageShare: messageShare ? sanitizeWebhookValueForLog(messageShare) : null,
+      ...extractShareSectionFromAttachments(rawAttachments, highlightPattern)
+    },
+    messagingItemKeys: messagingItem ? Object.keys(messagingItem) : [],
+    messageKeys: message ? Object.keys(message) : [],
+    normalizedRawPayload: sanitizeWebhookValueForLog(messagingItem),
+    parsedContext: {
+      object: parsed.object,
+      entryId: parsed.entryId,
+      instagramBusinessAccountId: parsed.instagramBusinessAccountId,
+      timestamp: parsed.timestamp,
+      attachmentsCount: parsed.attachmentsCount,
+      hasText: parsed.hasText,
+      textPreview: parsed.textPreview,
+      isEcho: parsed.isEcho,
+      replyToMessageId: parsed.replyToMessageId
+    }
+  };
+};
+
+export const logUnsupportedInstagramWebhookPayload = (
+  parsed: ParsedInstagramWebhookEvent,
+  log: { info: (obj: Record<string, unknown>, msg: string) => void }
+): void => {
+  log.info(
+    summarizeUnsupportedInstagramWebhookPayload(parsed),
+    "[InstagramWebhook] unsupported_payload"
+  );
+  log.info(
+    buildUnsupportedInstagramWebhookPayloadDetails(parsed) as Record<string, unknown>,
+    "[InstagramWebhook] unsupported_payload_details"
+  );
 };
 
 export const summarizeUnsupportedInstagramWebhookPayload = (

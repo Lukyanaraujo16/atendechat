@@ -9,7 +9,7 @@ import {
   extractInstagramMessageAttachments,
   extractInstagramReplyToMessageId,
   resolveInstagramMessageDirection,
-  summarizeUnsupportedInstagramWebhookPayload
+  logUnsupportedInstagramWebhookPayload
 } from "./InstagramWebhookParser";
 import FindOrCreateInstagramContactService from "./FindOrCreateInstagramContactService";
 import FindOrCreateInstagramTicketService from "./FindOrCreateInstagramTicketService";
@@ -312,18 +312,7 @@ const resolveInstagramMessageContent = async ({
     };
   }
 
-  if (attachments.length > 0) {
-    logger.info(
-      summarizeUnsupportedInstagramWebhookPayload(parsed),
-      "[InstagramWebhook] unsupported_payload"
-    );
-  } else {
-    logger.info(
-      summarizeUnsupportedInstagramWebhookPayload(parsed),
-      "[InstagramWebhook] unsupported_payload"
-    );
-  }
-
+  logUnsupportedInstagramWebhookPayload(parsed, logger);
   return null;
 };
 
