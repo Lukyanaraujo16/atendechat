@@ -4,7 +4,8 @@ import {
   ParsedInstagramWebhookEvent
 } from "./InstagramWebhookParser";
 import {
-  extractShareUrlFromPayload,
+  classifyShareUrls,
+  collectShareUrlCandidates,
   isInstagramPermalinkUrl,
   isInstagramShareAttachmentType,
   shouldTreatAttachmentAsShare
@@ -152,8 +153,9 @@ const buildShareContent = ({
   caption: string | null;
   source: string;
 }): InstagramShareMessageContent | null => {
+  const classified = classifyShareUrls(...collectShareUrlCandidates(url, payload));
   const explicitType = mapAttachmentTypeToShare(attachmentType);
-  const inferred = inferShareFromUrl(url);
+  const inferred = inferShareFromUrl(classified.permalink || classified.rawUrl);
   const mediaType =
     explicitType || inferred?.mediaType || inferShareFromPayloadIds(attachmentType, payload);
 
@@ -181,13 +183,22 @@ const buildShareContent = ({
   const storyId = asString(payload.story_id) || inferred?.storyId || null;
   const profileId = asString(payload.profile_id) || asString(payload.ig_id) || null;
   const title = asString(payload.title) || caption;
-  const permalink = isInstagramPermalinkUrl(url) ? url : url;
+  const assetId =
+    classified.assetId ||
+    asString(payload.asset_id) ||
+    asString(payload.ig_post_media_id) ||
+    asString(payload.media_id) ||
+    null;
 
   const shareMeta = {
     source,
     attachmentType,
-    permalink: isInstagramPermalinkUrl(permalink) ? permalink : null,
-    rawUrl: url,
+    permalink: classified.permalink,
+    rawUrl: classified.rawUrl,
+    assetUrl: classified.assetUrl,
+    thumbnailSourceUrl: classified.thumbnailSourceUrl,
+    assetId,
+    thumbnailUrl: null as string | null,
     postId,
     reelId,
     storyId,
@@ -212,6 +223,8 @@ const buildShareContent = ({
       attachmentType,
       mediaType,
       permalink: shareMeta.permalink,
+      assetId,
+      hasAssetUrl: Boolean(shareMeta.assetUrl),
       postId,
       reelId,
       storyId,
@@ -224,7 +237,7 @@ const buildShareContent = ({
   return {
     body: buildShareBody(mediaType),
     mediaType,
-    mediaUrl: (shareMeta.permalink as string | null) || null,
+    mediaUrl: classified.permalink,
     shareMeta
   };
 };
@@ -238,7 +251,12 @@ const ProcessInstagramShareService = (
   }
 
   const payload = attachment.payload || {};
-  const url = extractShareUrlFromPayload(attachment.url, payload);
+  const url =
+    attachment.url ||
+    asString(payload.url) ||
+    asString(payload.link) ||
+    asString(payload.permalink) ||
+    null;
 
   return buildShareContent({
     attachmentType: attachment.type,

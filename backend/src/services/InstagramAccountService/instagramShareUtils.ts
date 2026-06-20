@@ -6,6 +6,139 @@ const asString = (value: unknown): string | null =>
 const INSTAGRAM_PERMALINK_PATTERN =
   /instagram\.com\/(p\/|reel\/|reels\/|tv\/|stories\/)/i;
 
+const LOOKASIDE_CDN_PATTERN = /lookaside\.fbsbx\.com|ig_messaging_cdn/i;
+
+export interface ClassifiedShareUrls {
+  permalink: string | null;
+  rawUrl: string | null;
+  assetUrl: string | null;
+  thumbnailSourceUrl: string | null;
+  assetId: string | null;
+}
+
+export const isLookasideCdnUrl = (url: string | null): boolean => {
+  if (!url) {
+    return false;
+  }
+
+  try {
+    return LOOKASIDE_CDN_PATTERN.test(new URL(url).href);
+  } catch {
+    return LOOKASIDE_CDN_PATTERN.test(url);
+  }
+};
+
+export const isInstagramPermalink = (url: string | null): boolean =>
+  isInstagramPermalinkUrl(url);
+
+export const isInstagramPublicLink = (url: string | null): boolean => {
+  if (!url || isLookasideCdnUrl(url)) {
+    return false;
+  }
+
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname.includes("instagram.com");
+  } catch {
+    return /instagram\.com/i.test(url) && !isLookasideCdnUrl(url);
+  }
+};
+
+export const extractLookasideAssetId = (url: string | null): string | null => {
+  if (!url || !isLookasideCdnUrl(url)) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(url);
+    const fromQuery =
+      parsed.searchParams.get("asset_id") ||
+      parsed.searchParams.get("assetId") ||
+      parsed.searchParams.get("assetid");
+    if (fromQuery) {
+      return fromQuery;
+    }
+  } catch {
+    // fall through to regex
+  }
+
+  const match = url.match(/asset_id(?:=|%3D|:)([^&%]+)/i);
+  return match ? decodeURIComponent(match[1]) : null;
+};
+
+export const collectShareUrlCandidates = (
+  primaryUrl: string | null,
+  payload: Record<string, unknown> | null
+): string[] => {
+  const candidates = [
+    primaryUrl,
+    asString(payload?.url),
+    asString(payload?.link),
+    asString(payload?.permalink),
+    asString(payload?.share_url)
+  ].filter((candidate): candidate is string => Boolean(candidate));
+
+  return [...new Set(candidates)];
+};
+
+export const classifyShareUrls = (
+  ...candidates: Array<string | null | undefined>
+): ClassifiedShareUrls => {
+  let permalink: string | null = null;
+  let assetUrl: string | null = null;
+  let rawUrl: string | null = null;
+
+  for (const candidate of candidates) {
+    const url = asString(candidate);
+    if (!url) {
+      continue;
+    }
+
+    if (isInstagramPublicLink(url) && !isLookasideCdnUrl(url)) {
+      if (isInstagramPermalinkUrl(url) || isInstagramProfileLink(url)) {
+        permalink = permalink || url;
+      }
+      rawUrl = rawUrl || url;
+      continue;
+    }
+
+    if (isLookasideCdnUrl(url)) {
+      assetUrl = assetUrl || url;
+      rawUrl = rawUrl || url;
+    } else if (/^https?:\/\//i.test(url)) {
+      rawUrl = rawUrl || url;
+    }
+  }
+
+  const assetId = extractLookasideAssetId(assetUrl || rawUrl);
+
+  return {
+    permalink,
+    rawUrl,
+    assetUrl,
+    thumbnailSourceUrl: assetUrl,
+    assetId
+  };
+};
+
+const isInstagramProfileLink = (url: string): boolean => {
+  if (!isInstagramPublicLink(url) || isInstagramPermalinkUrl(url)) {
+    return false;
+  }
+
+  try {
+    const segments = new URL(url).pathname.split("/").filter(Boolean);
+    return (
+      segments.length === 1 &&
+      !["p", "reel", "reels", "stories", "explore", "tv"].includes(
+        segments[0].toLowerCase()
+      )
+    );
+  } catch {
+    return false;
+  }
+};
+
 const DIRECT_VIDEO_FILE_PATTERN = /\.(mp4|mov|webm|m4v)(\?|$)/i;
 const DIRECT_VIDEO_CDN_PATTERN =
   /(?:fbcdn|cdninstagram|scontent|video\.|\.mp4|mime=video)/i;
@@ -98,7 +231,7 @@ export const shouldTreatAttachmentAsShare = (
       attachment.url,
       attachment.payload
     );
-    if (isInstagramPermalinkUrl(shareUrl)) {
+    if (isInstagramPermalinkUrl(shareUrl) || isLookasideCdnUrl(shareUrl)) {
       return true;
     }
 
@@ -122,7 +255,11 @@ export const shouldTreatAttachmentAsShare = (
     attachment.url,
     attachment.payload
   );
-  return isInstagramPermalinkUrl(shareUrl);
+  return (
+    isInstagramPermalinkUrl(shareUrl) ||
+    isLookasideCdnUrl(shareUrl) ||
+    attachment.type === "ig_post"
+  );
 };
 
 export const isPlayableVideoAttachment = (

@@ -17,6 +17,7 @@ import CreateInstagramInboundMessageService from "./CreateInstagramInboundMessag
 import CreateInstagramOutboundSyncMessageService from "./CreateInstagramOutboundSyncMessageService";
 import EnrichInstagramContactProfileService from "./EnrichInstagramContactProfileService";
 import DownloadInstagramMediaService from "./DownloadInstagramMediaService";
+import DownloadInstagramShareThumbnailService from "./DownloadInstagramShareThumbnailService";
 import { resolveInstagramShareContent } from "./ProcessInstagramShareService";
 import { isPlayableVideoAttachment } from "./instagramShareUtils";
 import { resolveInstagramQuotedMessageId } from "./resolveInstagramQuotedMessage";
@@ -198,11 +199,36 @@ const resolveInstagramMessageContent = async ({
   const attachments = extractInstagramMessageAttachments(parsed);
   const shareContent = resolveInstagramShareContent(parsed, text);
   if (shareContent) {
+    let shareMeta = { ...shareContent.shareMeta };
+    const thumbnailSourceUrl =
+      typeof shareMeta.thumbnailSourceUrl === "string"
+        ? shareMeta.thumbnailSourceUrl
+        : null;
+
+    if (thumbnailSourceUrl && parsed.messageId) {
+      const thumbnail = await DownloadInstagramShareThumbnailService({
+        thumbnailSourceUrl,
+        accessToken,
+        companyId,
+        messageId: parsed.messageId
+      });
+
+      if (thumbnail) {
+        shareMeta = {
+          ...shareMeta,
+          thumbnailUrl: thumbnail.relativePath
+        };
+        if (thumbnail.bytes > 0) {
+          void incrementCompanyStorageUsage(companyId, thumbnail.bytes);
+        }
+      }
+    }
+
     return {
       body: text || shareContent.body,
       mediaType: shareContent.mediaType,
       mediaUrl: shareContent.mediaUrl,
-      shareMeta: shareContent.shareMeta
+      shareMeta
     };
   }
 

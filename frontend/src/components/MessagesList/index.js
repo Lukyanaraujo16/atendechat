@@ -46,6 +46,7 @@ import { SocketContext } from "../../context/Socket/SocketContext";
 import { hasUserVisibleEnrichWarnings } from "../../utils/openTicketEnrichWarnings";
 import { i18n } from "../../translate/i18n";
 import { getTicketPanelScrollbarStyles } from "../../theme/ticketPanelStyles";
+import { getBackendBaseURL } from "../../config/backendUrl";
 
 const useStyles = makeStyles((theme) => {
   const isDark = theme.palette.type === "dark";
@@ -292,6 +293,29 @@ const useStyles = makeStyles((theme) => {
     justifyContent: "center",
     backgroundColor: "inherit",
     padding: 10,
+  },
+
+  instagramShareCard: {
+    width: 250,
+    maxWidth: "100%",
+    borderRadius: 8,
+    overflow: "hidden",
+    backgroundColor: alpha(theme.palette.common.white, isDark ? 0.06 : 0.72),
+    marginBottom: 4,
+  },
+
+  instagramShareCardBody: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-start",
+    padding: "10px 12px",
+    gap: 4,
+  },
+
+  instagramShareCardActions: {
+    display: "flex",
+    justifyContent: "center",
+    padding: "0 10px 10px",
   },
 };
 });
@@ -558,6 +582,11 @@ const MessagesList = forwardRef(function MessagesList(
   const INSTAGRAM_PERMALINK_PATTERN =
     /instagram\.com\/(p\/|reel\/|reels\/|tv\/|stories\/)/i;
 
+  const LOOKASIDE_CDN_PATTERN = /lookaside\.fbsbx\.com|ig_messaging_cdn/i;
+
+  const isLookasideCdnUrl = (url) =>
+    typeof url === "string" && LOOKASIDE_CDN_PATTERN.test(url);
+
   const INSTAGRAM_INTERACTION_MEDIA_TYPES = new Set([
     "instagram_post",
     "instagram_reel",
@@ -579,11 +608,24 @@ const MessagesList = forwardRef(function MessagesList(
       return embeddedMatch[0];
     }
 
-    if (/^https?:\/\//i.test(trimmed)) {
+    if (/^https?:\/\//i.test(trimmed) && !isLookasideCdnUrl(trimmed)) {
       return trimmed;
     }
 
     return null;
+  };
+
+  const resolveInstagramPublicPermalink = (value) => {
+    const extracted = extractInstagramExternalUrl(value);
+    if (!extracted || isLookasideCdnUrl(extracted)) {
+      return null;
+    }
+
+    if (!/instagram\.com/i.test(extracted)) {
+      return null;
+    }
+
+    return extracted;
   };
 
   const resolveInstagramSharePermalink = (message) => {
@@ -592,17 +634,32 @@ const MessagesList = forwardRef(function MessagesList(
       meta?.share?.permalink,
       meta?.permalink,
       message.mediaUrl,
-      meta?.share?.rawUrl,
     ];
 
     for (const candidate of candidates) {
-      const resolved = extractInstagramExternalUrl(candidate);
+      const resolved = resolveInstagramPublicPermalink(candidate);
       if (resolved) {
         return resolved;
       }
     }
 
     return null;
+  };
+
+  const resolveShareThumbnailUrl = (message) => {
+    const meta = parseMessageMetaPayload(message);
+    const thumbnail = meta?.share?.thumbnailUrl;
+    if (!thumbnail || typeof thumbnail !== "string") {
+      return null;
+    }
+
+    if (/^https?:\/\//i.test(thumbnail)) {
+      return thumbnail;
+    }
+
+    const base = getBackendBaseURL();
+    const normalized = thumbnail.replace(/^\//, "");
+    return base ? `${base}/public/${normalized}` : `/public/${normalized}`;
   };
 
   const isInstagramChannelMessage = (message) =>
@@ -625,7 +682,8 @@ const MessagesList = forwardRef(function MessagesList(
   const resolveMisclassifiedInstagramShare = (message) => {
     const meta = parseMessageMetaPayload(message);
     const shareMeta = meta?.share || null;
-    const url = resolveInstagramSharePermalink(message) || shareMeta?.rawUrl || null;
+    const permalink = resolveInstagramSharePermalink(message);
+    const url = permalink || shareMeta?.rawUrl || message.mediaUrl || null;
 
     if (
       message.mediaType === "instagram_post" ||
@@ -643,20 +701,33 @@ const MessagesList = forwardRef(function MessagesList(
     if (attachmentType === "ig_post" || attachmentType === "post_share") {
       return "instagram_post";
     }
+    if (attachmentType === "story_share" || attachmentType === "story_mention") {
+      return "instagram_story";
+    }
+    if (attachmentType === "profile_share") {
+      return "instagram_profile";
+    }
 
-    if (!url || !extractInstagramExternalUrl(url)) {
+    if (shareMeta?.thumbnailUrl || shareMeta?.assetUrl || isLookasideCdnUrl(url)) {
+      if (/reel/i.test(String(url || ""))) {
+        return "instagram_reel";
+      }
+      return "instagram_post";
+    }
+
+    if (!permalink) {
       return null;
     }
 
-    if (/reel/i.test(url)) {
+    if (/reel/i.test(permalink)) {
       return "instagram_reel";
     }
-    if (/stories/i.test(url)) {
+    if (/stories/i.test(permalink)) {
       return "instagram_story";
     }
     if (
-      /instagram\.com\/[^/?#]+\/?(?:$|[?#])/i.test(url) &&
-      !INSTAGRAM_PERMALINK_PATTERN.test(url)
+      /instagram\.com\/[^/?#]+\/?(?:$|[?#])/i.test(permalink) &&
+      !INSTAGRAM_PERMALINK_PATTERN.test(permalink)
     ) {
       return "instagram_profile";
     }
@@ -670,6 +741,7 @@ const MessagesList = forwardRef(function MessagesList(
       title: "Conteúdo compartilhado do Instagram",
     };
     const permalink = resolveInstagramSharePermalink(message);
+    const thumbnailUrl = resolveShareThumbnailUrl(message);
     const username = meta?.share?.username;
     let title = copy.title;
 
@@ -683,29 +755,44 @@ const MessagesList = forwardRef(function MessagesList(
         : "Conteúdo compartilhado do Instagram";
 
     return (
-      <>
-        <div className={classes.downloadMedia}>
+      <div className={classes.instagramShareCard}>
+        {thumbnailUrl ? <ModalImageCors imageUrl={thumbnailUrl} /> : null}
+        <div className={classes.instagramShareCardBody}>
           <span>
             {copy.icon} {title}
           </span>
           {!permalink && (
-            <div style={{ marginTop: 4, opacity: 0.85 }}>{noLinkFallback}</div>
+            <span style={{ opacity: 0.85, fontSize: 13 }}>{noLinkFallback}</span>
           )}
         </div>
-        {permalink ? (
-          <div className={classes.downloadMedia}>
-            <Button
-              color="primary"
-              variant="outlined"
-              target="_blank"
-              rel="noopener noreferrer"
-              href={permalink}
-            >
-              Abrir no Instagram
-            </Button>
+        {(permalink || thumbnailUrl) && (
+          <div className={classes.instagramShareCardActions}>
+            {permalink ? (
+              <Button
+                color="primary"
+                variant="outlined"
+                size="small"
+                target="_blank"
+                rel="noopener noreferrer"
+                href={permalink}
+              >
+                Abrir no Instagram
+              </Button>
+            ) : (
+              <Button
+                color="primary"
+                variant="outlined"
+                size="small"
+                target="_blank"
+                rel="noopener noreferrer"
+                href={thumbnailUrl}
+              >
+                Visualizar mídia
+              </Button>
+            )}
           </div>
-        ) : null}
-      </>
+        )}
+      </div>
     );
   };
 
