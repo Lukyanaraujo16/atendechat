@@ -766,6 +766,21 @@ export const isInstagramMediaTooLargeError = (err: unknown): boolean => {
   );
 };
 
+export const isInstagramVideoFormatError = (err: unknown): boolean => {
+  const meta = parseMetaError(err);
+  if (!meta) {
+    return false;
+  }
+
+  const message = (meta.message || "").toLowerCase();
+  return (
+    message.includes("video") &&
+    (message.includes("format") ||
+      message.includes("unsupported") ||
+      message.includes("invalid"))
+  );
+};
+
 export const mapInstagramOutboundSendError = (
   err: unknown
 ): {
@@ -804,6 +819,19 @@ export const mapInstagramOutboundSendError = (
         "ERR_INSTAGRAM_IMAGE_TOO_LARGE",
         400,
         "Imagem muito grande para envio pelo Instagram."
+      )
+    };
+  }
+
+  if (isInstagramVideoFormatError(err)) {
+    return {
+      statusCode,
+      metaCode,
+      metaMessage,
+      appError: new AppError(
+        "ERR_INSTAGRAM_VIDEO_FORMAT_UNSUPPORTED",
+        400,
+        "Formato de vídeo não suportado pelo Instagram."
       )
     };
   }
@@ -894,6 +922,44 @@ export const sendInstagramDirectImageMessage = async (
     {
       params: { access_token: accessToken },
       timeout: 30000,
+      headers: { "Content-Type": "application/json" }
+    }
+  );
+
+  const messageIdRaw = data?.message_id ?? data?.id;
+  return {
+    messageId: messageIdRaw != null ? String(messageIdRaw) : null,
+    rawResponse: data ?? {}
+  };
+};
+
+/**
+ * Envia vídeo via Instagram Messaging API (URL pública HTTPS).
+ * POST graph.instagram.com/{instagramBusinessAccountId}/messages
+ */
+export const sendInstagramDirectVideoMessage = async (
+  instagramBusinessAccountId: string,
+  recipientId: string,
+  videoUrl: string,
+  accessToken: string
+): Promise<InstagramDirectSendResult> => {
+  const { data } = await axios.post<Record<string, unknown>>(
+    `${INSTAGRAM_GRAPH_VERSIONED}/${instagramBusinessAccountId}/messages`,
+    {
+      recipient: { id: recipientId },
+      message: {
+        attachment: {
+          type: "video",
+          payload: {
+            url: videoUrl,
+            is_reusable: true
+          }
+        }
+      }
+    },
+    {
+      params: { access_token: accessToken },
+      timeout: 60000,
       headers: { "Content-Type": "application/json" }
     }
   );

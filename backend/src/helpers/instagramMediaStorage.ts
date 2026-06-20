@@ -4,6 +4,12 @@ import { lookup } from "mime-types";
 
 export const INSTAGRAM_IMAGE_MAX_BYTES = 8 * 1024 * 1024;
 
+const parsedVideoMax = Number(process.env.INSTAGRAM_VIDEO_MAX_BYTES);
+export const INSTAGRAM_VIDEO_MAX_BYTES =
+  Number.isFinite(parsedVideoMax) && parsedVideoMax > 0
+    ? parsedVideoMax
+    : 25 * 1024 * 1024;
+
 export const INSTAGRAM_ALLOWED_IMAGE_MIMES = new Set([
   "image/jpeg",
   "image/jpg",
@@ -12,7 +18,25 @@ export const INSTAGRAM_ALLOWED_IMAGE_MIMES = new Set([
   "image/webp"
 ]);
 
+export const INSTAGRAM_ALLOWED_VIDEO_MIMES = new Set([
+  "video/mp4",
+  "video/quicktime"
+]);
+
 const publicFolder = path.resolve(__dirname, "..", "..", "public");
+
+export const isInstagramAllowedImageMime = (mime: string): boolean =>
+  INSTAGRAM_ALLOWED_IMAGE_MIMES.has(mime.toLowerCase());
+
+export const isInstagramAllowedVideoMime = (mime: string): boolean =>
+  INSTAGRAM_ALLOWED_VIDEO_MIMES.has(mime.toLowerCase());
+
+export const getInstagramMediaMaxBytes = (mime: string | null): number => {
+  if (mime && isInstagramAllowedVideoMime(mime)) {
+    return INSTAGRAM_VIDEO_MAX_BYTES;
+  }
+  return INSTAGRAM_IMAGE_MAX_BYTES;
+};
 
 export const getInstagramMediaDirectory = (companyId: number): string => {
   const dir = path.join(publicFolder, "instagram", String(companyId));
@@ -40,6 +64,10 @@ export const resolveExtensionFromMime = (mimeType: string | null): string => {
   if (mimeType.includes("png")) return ".png";
   if (mimeType.includes("gif")) return ".gif";
   if (mimeType.includes("webp")) return ".webp";
+  if (mimeType.includes("quicktime")) return ".mov";
+  if (mimeType.includes("mp4")) return ".mp4";
+  if (mimeType.includes("webm")) return ".webm";
+  if (mimeType.startsWith("video/")) return ".mp4";
   return ".jpg";
 };
 
@@ -52,6 +80,18 @@ export const assertInstagramImageUpload = (
   }
   if (file.size > INSTAGRAM_IMAGE_MAX_BYTES) {
     throw new Error("ERR_INSTAGRAM_IMAGE_TOO_LARGE");
+  }
+};
+
+export const assertInstagramVideoUpload = (
+  file: Express.Multer.File
+): void => {
+  const mime = (file.mimetype || "").toLowerCase();
+  if (!INSTAGRAM_ALLOWED_VIDEO_MIMES.has(mime)) {
+    throw new Error("ERR_INSTAGRAM_VIDEO_FORMAT_UNSUPPORTED");
+  }
+  if (file.size > INSTAGRAM_VIDEO_MAX_BYTES) {
+    throw new Error("ERR_INSTAGRAM_VIDEO_TOO_LARGE");
   }
 };
 
@@ -80,19 +120,21 @@ export const moveUploadedFileToInstagramFolder = ({
   companyId,
   sourcePath,
   originalName,
-  mimeType
+  mimeType,
+  basename = "media"
 }: {
   companyId: number;
   sourcePath: string;
   originalName: string;
   mimeType: string;
+  basename?: string;
 }): { relativePath: string; absolutePath: string; bytes: number } => {
   const buffer = fs.readFileSync(sourcePath);
   const saved = saveInstagramMediaBuffer({
     companyId,
     buffer,
     mimeType,
-    basename: path.parse(originalName).name || "image"
+    basename: path.parse(originalName).name || basename
   });
   try {
     fs.unlinkSync(sourcePath);

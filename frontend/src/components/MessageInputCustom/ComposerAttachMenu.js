@@ -11,6 +11,7 @@ import AddIcon from "@material-ui/icons/Add";
 import CloseIcon from "@material-ui/icons/Close";
 import InsertDriveFileOutlinedIcon from "@material-ui/icons/InsertDriveFileOutlined";
 import PhotoLibraryOutlinedIcon from "@material-ui/icons/PhotoLibraryOutlined";
+import VideocamOutlinedIcon from "@material-ui/icons/VideocamOutlined";
 import MicNoneOutlinedIcon from "@material-ui/icons/MicNoneOutlined";
 import FlashOnOutlinedIcon from "@material-ui/icons/FlashOnOutlined";
 import ImageOutlinedIcon from "@material-ui/icons/ImageOutlined";
@@ -73,6 +74,8 @@ export default function ComposerAttachMenu({
   quickRepliesEnabled,
   onPickDocument,
   onPickMedia,
+  onPickInstagramImage,
+  onPickInstagramVideo,
   onPickCamera,
   onOpenStickerLibrary,
   onStartRecording,
@@ -119,12 +122,25 @@ export default function ComposerAttachMenu({
       primary: i18n.t("messagesInput.attach.camera"),
       onClick: onPickCamera,
     },
-    (!textOnlyMode || instagramImageMode) && {
+    (!textOnlyMode || instagramImageMode) &&
+      instagramImageMode && {
+        key: "instagramImage",
+        icon: <PhotoLibraryOutlinedIcon />,
+        primary: i18n.t("messagesInput.attach.instagramImage"),
+        onClick: onPickInstagramImage || onPickMedia,
+      },
+    (!textOnlyMode || instagramImageMode) &&
+      instagramImageMode && {
+        key: "instagramVideo",
+        icon: <VideocamOutlinedIcon />,
+        primary: i18n.t("messagesInput.attach.instagramVideo"),
+        onClick: onPickInstagramVideo,
+      },
+    (!textOnlyMode || instagramImageMode) &&
+      !instagramImageMode && {
       key: "media",
       icon: <PhotoLibraryOutlinedIcon />,
-      primary: instagramImageMode
-        ? i18n.t("messagesInput.attach.instagramImage")
-        : i18n.t("messagesInput.attach.photosVideos"),
+      primary: i18n.t("messagesInput.attach.photosVideos"),
       onClick: onPickMedia,
     },
     !textOnlyMode && !instagramImageMode && {

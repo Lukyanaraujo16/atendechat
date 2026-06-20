@@ -562,6 +562,8 @@ const MessageInputCustom = (props) => {
   const [signMessage, setSignMessage] = useLocalStorage("signOption", true);
   const documentInputRef = useRef(null);
   const mediaInputRef = useRef(null);
+  const instagramImageInputRef = useRef(null);
+  const instagramVideoInputRef = useRef(null);
   const cameraInputRef = useRef(null);
   const { sendStickerToTicket } = useStickers();
   const canManageStickers =
@@ -621,17 +623,22 @@ const MessageInputCustom = (props) => {
     setInputMessage((prevState) => prevState + emoji);
   };
 
-  const handleChangeMedias = (e) => {
+  const handleChangeMedias = (e, options = {}) => {
     if (!e.target.files) {
       return;
     }
 
     let selectedMedias = Array.from(e.target.files);
+    const { allowedPrefix } = options;
 
     if (isInstagramChannel) {
-      selectedMedias = selectedMedias.filter((file) =>
-        String(file.type || "").startsWith("image/")
-      );
+      selectedMedias = selectedMedias.filter((file) => {
+        const type = String(file.type || "");
+        if (allowedPrefix) {
+          return type.startsWith(allowedPrefix);
+        }
+        return type.startsWith("image/") || type.startsWith("video/");
+      });
       if (!selectedMedias.length) {
         return;
       }
@@ -648,7 +655,8 @@ const MessageInputCustom = (props) => {
     }
 
     if (isInstagramChannel) {
-      if (String(pastedFile.type || "").startsWith("image/")) {
+      const type = String(pastedFile.type || "");
+      if (type.startsWith("image/") || type.startsWith("video/")) {
         setMedias([pastedFile]);
       }
       return;
@@ -791,10 +799,12 @@ const MessageInputCustom = (props) => {
     formData.append("fromMe", true);
     medias.forEach((media) => {
       formData.append("medias", media);
-      formData.append(
-        "body",
-        inputMessage.trim() || (isInstagramChannel ? "Imagem" : media.name)
-      );
+      const fallbackBody = isInstagramChannel
+        ? String(media.type || "").startsWith("video/")
+          ? "Vídeo"
+          : "Imagem"
+        : media.name;
+      formData.append("body", inputMessage.trim() || fallbackBody);
     });
 
     try {
@@ -942,9 +952,27 @@ const MessageInputCustom = (props) => {
             type="file"
             multiple
             className={classes.uploadInput}
-            disabled={disableOption()}
-            accept={isInstagramChannel ? "image/*" : "image/*,video/*"}
+            disabled={disableOption() || isInstagramChannel}
+            accept="image/*,video/*"
             onChange={handleChangeMedias}
+          />
+          <input
+            ref={instagramImageInputRef}
+            type="file"
+            multiple
+            className={classes.uploadInput}
+            disabled={disableOption() || !isInstagramChannel}
+            accept="image/*"
+            onChange={(e) => handleChangeMedias(e, { allowedPrefix: "image/" })}
+          />
+          <input
+            ref={instagramVideoInputRef}
+            type="file"
+            multiple
+            className={classes.uploadInput}
+            disabled={disableOption() || !isInstagramChannel}
+            accept="video/mp4,video/quicktime,.mp4,.mov"
+            onChange={(e) => handleChangeMedias(e, { allowedPrefix: "video/" })}
           />
           <input
             ref={cameraInputRef}
@@ -962,6 +990,8 @@ const MessageInputCustom = (props) => {
             onMenuOpen={() => setComposerPanelOpen(false)}
             onPickDocument={() => documentInputRef.current?.click()}
             onPickMedia={() => mediaInputRef.current?.click()}
+            onPickInstagramImage={() => instagramImageInputRef.current?.click()}
+            onPickInstagramVideo={() => instagramVideoInputRef.current?.click()}
             onPickCamera={() => cameraInputRef.current?.click()}
             onOpenStickerLibrary={() => openComposerPanel("stickers")}
             onStartRecording={() => {

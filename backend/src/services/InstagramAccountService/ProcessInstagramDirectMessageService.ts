@@ -97,6 +97,73 @@ const isDuplicateMessage = async (
   return false;
 };
 
+const VIDEO_ATTACHMENT_TYPES = new Set(["video", "ig_reel"]);
+
+const downloadInstagramAttachment = async ({
+  attachment,
+  parsed,
+  companyId,
+  accessToken,
+  text,
+  mediaKind,
+  defaultLabel,
+  failLabel,
+  receivedLog
+}: {
+  attachment: { type: string; url: string | null };
+  parsed: ParsedInstagramWebhookEvent;
+  companyId: number;
+  accessToken: string;
+  text: string | null;
+  mediaKind: "image" | "video";
+  defaultLabel: string;
+  failLabel: string;
+  receivedLog: string;
+}): Promise<ResolvedInstagramMessageContent> => {
+  logger.info(
+    {
+      messageId: parsed.messageId,
+      attachmentsCount: parsed.attachmentsCount,
+      attachmentType: attachment.type
+    },
+    receivedLog
+  );
+
+  if (attachment.url && parsed.messageId) {
+    try {
+      const downloaded = await DownloadInstagramMediaService({
+        url: attachment.url,
+        accessToken,
+        companyId,
+        messageId: parsed.messageId,
+        mediaKind
+      });
+
+      if (downloaded.bytes > 0) {
+        void incrementCompanyStorageUsage(companyId, downloaded.bytes);
+      }
+
+      return {
+        body: text || defaultLabel,
+        mediaType: mediaKind,
+        mediaUrl: downloaded.relativePath
+      };
+    } catch {
+      return {
+        body: text || failLabel,
+        mediaType: "chat",
+        mediaUrl: null
+      };
+    }
+  }
+
+  return {
+    body: text || failLabel,
+    mediaType: "chat",
+    mediaUrl: null
+  };
+};
+
 const resolveInstagramMessageContent = async ({
   parsed,
   companyId,
@@ -109,49 +176,36 @@ const resolveInstagramMessageContent = async ({
   const text = extractMessageText(parsed);
   const attachments = extractInstagramMessageAttachments(parsed);
   const imageAttachment = attachments.find(item => item.type === "image");
+  const videoAttachment = attachments.find(item =>
+    VIDEO_ATTACHMENT_TYPES.has(item.type)
+  );
 
   if (imageAttachment) {
-    logger.info(
-      {
-        messageId: parsed.messageId,
-        attachmentsCount: parsed.attachmentsCount,
-        attachmentType: imageAttachment.type
-      },
-      "[InstagramMediaInbound] received"
-    );
+    return downloadInstagramAttachment({
+      attachment: imageAttachment,
+      parsed,
+      companyId,
+      accessToken,
+      text,
+      mediaKind: "image",
+      defaultLabel: "Imagem",
+      failLabel: "Imagem recebida (falha ao baixar mídia)",
+      receivedLog: "[InstagramMediaInbound] received"
+    });
+  }
 
-    if (imageAttachment.url && parsed.messageId) {
-      try {
-        const downloaded = await DownloadInstagramMediaService({
-          url: imageAttachment.url,
-          accessToken,
-          companyId,
-          messageId: parsed.messageId
-        });
-
-        if (downloaded.bytes > 0) {
-          void incrementCompanyStorageUsage(companyId, downloaded.bytes);
-        }
-
-        return {
-          body: text || "Imagem",
-          mediaType: "image",
-          mediaUrl: downloaded.relativePath
-        };
-      } catch {
-        return {
-          body: text || "Imagem recebida (falha ao baixar mídia)",
-          mediaType: "chat",
-          mediaUrl: null
-        };
-      }
-    }
-
-    return {
-      body: text || "Imagem recebida (falha ao baixar mídia)",
-      mediaType: "chat",
-      mediaUrl: null
-    };
+  if (videoAttachment) {
+    return downloadInstagramAttachment({
+      attachment: videoAttachment,
+      parsed,
+      companyId,
+      accessToken,
+      text,
+      mediaKind: "video",
+      defaultLabel: "Vídeo",
+      failLabel: "Vídeo recebido (falha ao baixar mídia)",
+      receivedLog: "[InstagramVideoInbound] received"
+    });
   }
 
   if (text) {

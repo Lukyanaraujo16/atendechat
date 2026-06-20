@@ -52,9 +52,12 @@ import { isInstagramChannelTicket } from "../helpers/ticketChannel";
 import extractMessageUploadMedias from "../helpers/extractMessageUploadMedias";
 import SendInstagramTextMessageService from "../services/InstagramAccountService/SendInstagramTextMessageService";
 import SendInstagramImageMessageService from "../services/InstagramAccountService/SendInstagramImageMessageService";
+import SendInstagramVideoMessageService from "../services/InstagramAccountService/SendInstagramVideoMessageService";
 import {
   assertInstagramImageUpload,
-  INSTAGRAM_ALLOWED_IMAGE_MIMES
+  assertInstagramVideoUpload,
+  INSTAGRAM_ALLOWED_IMAGE_MIMES,
+  INSTAGRAM_ALLOWED_VIDEO_MIMES
 } from "../helpers/instagramMediaStorage";
 type IndexQuery = {
   pageNumber: string;
@@ -226,16 +229,39 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
 
       for (const media of medias) {
         const mime = (media.mimetype || "").toLowerCase();
-        if (!INSTAGRAM_ALLOWED_IMAGE_MIMES.has(mime)) {
+        const isImage = INSTAGRAM_ALLOWED_IMAGE_MIMES.has(mime);
+        const isVideo = INSTAGRAM_ALLOWED_VIDEO_MIMES.has(mime);
+
+        if (!isImage && !isVideo) {
           throw new AppError(
             "ERR_INSTAGRAM_MEDIA_TYPE_UNSUPPORTED",
             400,
             "Este tipo de mídia ainda não é suportado no Instagram."
           );
         }
+
         try {
-          assertInstagramImageUpload(media);
-        } catch {
+          if (isVideo) {
+            assertInstagramVideoUpload(media);
+          } else {
+            assertInstagramImageUpload(media);
+          }
+        } catch (err) {
+          const code = err instanceof Error ? err.message : String(err);
+          if (code === "ERR_INSTAGRAM_VIDEO_TOO_LARGE") {
+            throw new AppError(
+              "ERR_INSTAGRAM_VIDEO_TOO_LARGE",
+              400,
+              "Vídeo muito grande para envio pelo Instagram."
+            );
+          }
+          if (code === "ERR_INSTAGRAM_VIDEO_FORMAT_UNSUPPORTED") {
+            throw new AppError(
+              "ERR_INSTAGRAM_VIDEO_FORMAT_UNSUPPORTED",
+              400,
+              "Formato de vídeo não suportado pelo Instagram."
+            );
+          }
           throw new AppError(
             "ERR_INSTAGRAM_IMAGE_TOO_LARGE",
             400,
@@ -245,14 +271,21 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
       }
 
       const savedMessages = await Promise.all(
-        medias.map(async (media: Express.Multer.File, index) =>
-          SendInstagramImageMessageService({
+        medias.map(async (media: Express.Multer.File, index) => {
+          const mime = (media.mimetype || "").toLowerCase();
+          const payload = {
             ticket,
             media,
             body: Array.isArray(body) ? body[index] : body,
             companyId
-          })
-        )
+          };
+
+          if (INSTAGRAM_ALLOWED_VIDEO_MIMES.has(mime)) {
+            return SendInstagramVideoMessageService(payload);
+          }
+
+          return SendInstagramImageMessageService(payload);
+        })
       );
 
       return res.status(200).json({

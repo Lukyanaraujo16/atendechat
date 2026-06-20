@@ -1,16 +1,19 @@
 import axios, { AxiosError } from "axios";
 import { redactSensitiveText } from "../../helpers/maskSensitive";
 import {
-  INSTAGRAM_IMAGE_MAX_BYTES,
+  getInstagramMediaMaxBytes,
   saveInstagramMediaBuffer
 } from "../../helpers/instagramMediaStorage";
 import { logger } from "../../utils/logger";
+
+export type InstagramDownloadMediaKind = "image" | "video";
 
 interface Request {
   url: string;
   accessToken: string;
   companyId: number;
   messageId: string;
+  mediaKind?: InstagramDownloadMediaKind;
 }
 
 export interface DownloadInstagramMediaResult {
@@ -20,9 +23,16 @@ export interface DownloadInstagramMediaResult {
   mimeType: string | null;
 }
 
+const LOG_PREFIX: Record<InstagramDownloadMediaKind, string> = {
+  image: "[InstagramMediaInbound]",
+  video: "[InstagramVideoInbound]"
+};
+
 const downloadWithAuth = async (
   url: string,
-  accessToken: string
+  accessToken: string,
+  maxBytes: number,
+  timeoutMs: number
 ): Promise<{ buffer: Buffer; mimeType: string | null }> => {
   const attempts: Array<Record<string, string>> = [
     { Authorization: `Bearer ${accessToken}` },
@@ -35,9 +45,9 @@ const downloadWithAuth = async (
     try {
       const response = await axios.get<ArrayBuffer>(url, {
         responseType: "arraybuffer",
-        timeout: 30000,
-        maxContentLength: INSTAGRAM_IMAGE_MAX_BYTES + 1024,
-        maxBodyLength: INSTAGRAM_IMAGE_MAX_BYTES + 1024,
+        timeout: timeoutMs,
+        maxContentLength: maxBytes + 1024,
+        maxBodyLength: maxBytes + 1024,
         headers,
         params: headers.Authorization ? undefined : { access_token: accessToken }
       });
@@ -63,12 +73,20 @@ const DownloadInstagramMediaService = async ({
   url,
   accessToken,
   companyId,
-  messageId
+  messageId,
+  mediaKind = "image"
 }: Request): Promise<DownloadInstagramMediaResult> => {
+  const logPrefix = LOG_PREFIX[mediaKind];
+  const maxBytes = getInstagramMediaMaxBytes(
+    mediaKind === "video" ? "video/mp4" : "image/jpeg"
+  );
+  const timeoutMs = mediaKind === "video" ? 120000 : 30000;
+
   logger.info(
     {
       companyId,
       messageId,
+      mediaKind,
       urlHost: (() => {
         try {
           return new URL(url).host;
@@ -77,14 +95,24 @@ const DownloadInstagramMediaService = async ({
         }
       })()
     },
-    "[InstagramMediaInbound] downloading"
+    `${logPrefix} downloading`
   );
 
   try {
-    const { buffer, mimeType } = await downloadWithAuth(url, accessToken);
+    const { buffer, mimeType } = await downloadWithAuth(
+      url,
+      accessToken,
+      maxBytes,
+      timeoutMs
+    );
 
-    if (buffer.length > INSTAGRAM_IMAGE_MAX_BYTES) {
-      throw new Error("ERR_INSTAGRAM_IMAGE_TOO_LARGE");
+    const effectiveMax = getInstagramMediaMaxBytes(mimeType);
+    if (buffer.length > effectiveMax) {
+      throw new Error(
+        mediaKind === "video"
+          ? "ERR_INSTAGRAM_VIDEO_TOO_LARGE"
+          : "ERR_INSTAGRAM_IMAGE_TOO_LARGE"
+      );
     }
 
     const saved = saveInstagramMediaBuffer({
@@ -98,11 +126,12 @@ const DownloadInstagramMediaService = async ({
       {
         companyId,
         messageId,
+        mediaKind,
         relativePath: saved.relativePath,
         bytes: saved.bytes,
         mimeType
       },
-      "[InstagramMediaInbound] saved"
+      `${logPrefix} saved`
     );
 
     return {
@@ -117,10 +146,11 @@ const DownloadInstagramMediaService = async ({
       {
         companyId,
         messageId,
+        mediaKind,
         statusCode: axiosErr.response?.status,
         error: err instanceof Error ? redactSensitiveText(err.message) : String(err)
       },
-      "[InstagramMediaInbound] download_failed"
+      `${logPrefix} download_failed`
     );
     throw err;
   }
