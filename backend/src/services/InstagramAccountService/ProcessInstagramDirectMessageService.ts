@@ -2,10 +2,14 @@ import Message from "../../models/Message";
 import MetaWebhookEvent from "../../models/MetaWebhookEvent";
 import InstagramAccount from "../../models/InstagramAccount";
 import { logger } from "../../utils/logger";
-import { ParsedInstagramWebhookEvent } from "./InstagramWebhookParser";
+import {
+  ParsedInstagramWebhookEvent,
+  resolveInstagramMessageDirection
+} from "./InstagramWebhookParser";
 import FindOrCreateInstagramContactService from "./FindOrCreateInstagramContactService";
 import FindOrCreateInstagramTicketService from "./FindOrCreateInstagramTicketService";
 import CreateInstagramInboundMessageService from "./CreateInstagramInboundMessageService";
+import CreateInstagramOutboundSyncMessageService from "./CreateInstagramOutboundSyncMessageService";
 import EnrichInstagramContactProfileService from "./EnrichInstagramContactProfileService";
 
 interface Request {
@@ -48,6 +52,39 @@ const markWebhookProcessed = async (
     { processed: true },
     { where: { externalEventId } }
   );
+};
+
+const isDuplicateMessage = async (
+  companyId: number,
+  messageId: string,
+  duplicateLog: string
+): Promise<boolean> => {
+  const existingMessage = await Message.findOne({
+    where: {
+      companyId,
+      externalMessageId: messageId
+    },
+    attributes: ["id"]
+  });
+
+  if (existingMessage) {
+    logger.info(
+      { messageId, existingId: existingMessage.id },
+      duplicateLog
+    );
+    return true;
+  }
+
+  const existingById = await Message.findByPk(messageId, {
+    attributes: ["id"]
+  });
+
+  if (existingById) {
+    logger.info({ messageId }, duplicateLog);
+    return true;
+  }
+
+  return false;
 };
 
 const ProcessInstagramDirectMessageService = async ({
@@ -101,7 +138,7 @@ const ProcessInstagramDirectMessageService = async ({
     attributes: ["id", "companyId", "name", "instagramBusinessAccountId"]
   });
 
-  if (!account) {
+  if (!account?.instagramBusinessAccountId) {
     logger.warn(
       { instagramAccountId, companyId },
       "[InstagramInbound] account_not_connected"
@@ -109,62 +146,87 @@ const ProcessInstagramDirectMessageService = async ({
     return "skipped";
   }
 
-  logger.info(
-    {
-      accountId: account.id,
-      companyId,
-      senderId: parsed.senderId,
-      recipientId: parsed.recipientId,
-      messageId: parsed.messageId,
-      hasText: true,
-      webhookSenderKeys: parsed.rawMessagingItem?.sender
-        ? Object.keys(
-            parsed.rawMessagingItem.sender as Record<string, unknown>
-          )
-        : []
-    },
-    "[InstagramInbound] received"
+  const direction = resolveInstagramMessageDirection(
+    parsed,
+    account.instagramBusinessAccountId
   );
 
-  const existingMessage = await Message.findOne({
-    where: {
-      companyId,
-      externalMessageId: parsed.messageId
-    },
-    attributes: ["id"]
-  });
-
-  if (existingMessage) {
+  if (!direction) {
     logger.info(
-      { messageId: parsed.messageId, existingId: existingMessage.id },
-      "[InstagramInbound] duplicate skipped"
+      {
+        senderId: parsed.senderId,
+        recipientId: parsed.recipientId,
+        entryId: parsed.entryId,
+        instagramBusinessAccountId: account.instagramBusinessAccountId
+      },
+      "[InstagramInbound] unsupported_message_type"
     );
     await markWebhookProcessed(webhookEventId, externalEventId);
-    return "duplicate";
+    return "skipped";
   }
 
-  const existingById = await Message.findByPk(parsed.messageId, {
-    attributes: ["id"]
-  });
-  if (existingById) {
+  const { fromMe, contactScopedId } = direction;
+
+  if (fromMe) {
     logger.info(
-      { messageId: parsed.messageId },
-      "[InstagramInbound] duplicate skipped"
+      {
+        accountId: account.id,
+        companyId,
+        instagramBusinessAccountId: account.instagramBusinessAccountId,
+        senderId: parsed.senderId,
+        recipientId: parsed.recipientId,
+        messageId: parsed.messageId,
+        isEcho: parsed.isEcho
+      },
+      "[InstagramOutboundSync] received"
     );
+
+    logger.info(
+      {
+        accountId: account.id,
+        companyId,
+        instagramBusinessAccountId: account.instagramBusinessAccountId
+      },
+      "[InstagramOutboundSync] account_mapped"
+    );
+  } else {
+    logger.info(
+      {
+        accountId: account.id,
+        companyId,
+        senderId: parsed.senderId,
+        recipientId: parsed.recipientId,
+        messageId: parsed.messageId,
+        hasText: true,
+        webhookSenderKeys: parsed.rawMessagingItem?.sender
+          ? Object.keys(
+              parsed.rawMessagingItem.sender as Record<string, unknown>
+            )
+          : []
+      },
+      "[InstagramInbound] received"
+    );
+  }
+
+  const duplicateLog = fromMe
+    ? "[InstagramOutboundSync] duplicate_skipped"
+    : "[InstagramInbound] duplicate skipped";
+
+  if (await isDuplicateMessage(companyId, parsed.messageId, duplicateLog)) {
     await markWebhookProcessed(webhookEventId, externalEventId);
     return "duplicate";
   }
 
   const { contact } = await FindOrCreateInstagramContactService({
     companyId,
-    senderId: parsed.senderId
+    senderId: contactScopedId
   });
 
   const enrichedContact = await EnrichInstagramContactProfileService({
     contact,
     companyId,
     instagramAccountId: account.id,
-    senderId: parsed.senderId
+    senderId: contactScopedId
   });
 
   const { ticket } = await FindOrCreateInstagramTicketService({
@@ -172,7 +234,7 @@ const ProcessInstagramDirectMessageService = async ({
     companyId,
     instagramAccountId: account.id,
     lastMessage: text,
-    unreadMessages: 1
+    unreadMessages: fromMe ? 0 : 1
   });
 
   const metaPayload = {
@@ -180,33 +242,62 @@ const ProcessInstagramDirectMessageService = async ({
     messageId: parsed.messageId,
     senderId: parsed.senderId,
     recipientId: parsed.recipientId,
-    timestamp: parsed.timestamp
+    timestamp: parsed.timestamp,
+    fromMe,
+    isEcho: parsed.isEcho
   };
 
-  await CreateInstagramInboundMessageService({
-    companyId,
-    messageData: {
-      id: parsed.messageId,
-      ticketId: ticket.id,
-      contactId: enrichedContact.id,
-      body: text,
-      externalMessageId: parsed.messageId,
-      metaPayload,
-      queueId: ticket.queueId
-    }
-  });
+  if (fromMe) {
+    await CreateInstagramOutboundSyncMessageService({
+      companyId,
+      messageData: {
+        id: parsed.messageId,
+        ticketId: ticket.id,
+        contactId: enrichedContact.id,
+        body: text,
+        externalMessageId: parsed.messageId,
+        metaPayload,
+        queueId: ticket.queueId
+      }
+    });
+  } else {
+    await CreateInstagramInboundMessageService({
+      companyId,
+      messageData: {
+        id: parsed.messageId,
+        ticketId: ticket.id,
+        contactId: enrichedContact.id,
+        body: text,
+        externalMessageId: parsed.messageId,
+        metaPayload,
+        queueId: ticket.queueId
+      }
+    });
+  }
 
   await markWebhookProcessed(webhookEventId, externalEventId);
 
-  logger.info(
-    {
-      ticketId: ticket.id,
-      messageId: parsed.messageId,
-      contactId: enrichedContact.id,
-      accountId: account.id
-    },
-    "[InstagramInbound] message_saved"
-  );
+  if (fromMe) {
+    logger.info(
+      {
+        ticketId: ticket.id,
+        messageId: parsed.messageId,
+        contactId: enrichedContact.id,
+        accountId: account.id
+      },
+      "[InstagramOutboundSync] message_saved"
+    );
+  } else {
+    logger.info(
+      {
+        ticketId: ticket.id,
+        messageId: parsed.messageId,
+        contactId: enrichedContact.id,
+        accountId: account.id
+      },
+      "[InstagramInbound] message_saved"
+    );
+  }
 
   return "saved";
 };

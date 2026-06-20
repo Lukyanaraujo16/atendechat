@@ -10,7 +10,13 @@ export interface ParsedInstagramWebhookEvent {
   hasText: boolean;
   textPreview: string | null;
   attachmentsCount: number;
+  isEcho: boolean;
   rawMessagingItem: Record<string, unknown> | null;
+}
+
+export interface InstagramWebhookMessageDirection {
+  fromMe: boolean;
+  contactScopedId: string;
 }
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
@@ -69,7 +75,8 @@ const parseMessagingItem = (
   return {
     object,
     entryId,
-    instagramBusinessAccountId: recipientId || entryId,
+    // entry.id is the connected business account; recipient is only business on inbound DMs.
+    instagramBusinessAccountId: entryId || senderId || recipientId,
     senderId,
     recipientId,
     timestamp: Number.isFinite(timestamp) ? timestamp : null,
@@ -78,8 +85,53 @@ const parseMessagingItem = (
     hasText: Boolean(message && typeof message.text === "string" && message.text),
     textPreview: message ? extractTextPreview(message) : null,
     attachmentsCount: attachments.length,
+    isEcho: message?.is_echo === true,
     rawMessagingItem: item
   };
+};
+
+export const collectInstagramBusinessAccountCandidateIds = (
+  parsed: ParsedInstagramWebhookEvent
+): string[] => {
+  const candidates = [
+    parsed.entryId,
+    parsed.instagramBusinessAccountId,
+    parsed.senderId,
+    parsed.recipientId
+  ];
+
+  return [...new Set(candidates.filter((id): id is string => Boolean(id)))];
+};
+
+/**
+ * Inbound: sender = cliente, recipient = conta business.
+ * Outbound (app oficial / echo): sender = conta business, recipient = cliente.
+ */
+export const resolveInstagramMessageDirection = (
+  parsed: ParsedInstagramWebhookEvent,
+  businessAccountId: string
+): InstagramWebhookMessageDirection | null => {
+  if (!parsed.senderId || !parsed.recipientId) {
+    return null;
+  }
+
+  if (parsed.isEcho || parsed.senderId === businessAccountId) {
+    return { fromMe: true, contactScopedId: parsed.recipientId };
+  }
+
+  if (parsed.recipientId === businessAccountId) {
+    return { fromMe: false, contactScopedId: parsed.senderId };
+  }
+
+  if (parsed.entryId === parsed.senderId) {
+    return { fromMe: true, contactScopedId: parsed.recipientId };
+  }
+
+  if (parsed.entryId === parsed.recipientId) {
+    return { fromMe: false, contactScopedId: parsed.senderId };
+  }
+
+  return null;
 };
 
 export const parseInstagramWebhookPayload = (
@@ -125,6 +177,7 @@ export const parseInstagramWebhookPayload = (
         hasText: false,
         textPreview: null,
         attachmentsCount: 0,
+        isEcho: false,
         rawMessagingItem: change
       });
     }
@@ -143,6 +196,7 @@ export const parseInstagramWebhookPayload = (
       hasText: false,
       textPreview: null,
       attachmentsCount: 0,
+      isEcho: false,
       rawMessagingItem: null
     });
   }

@@ -4,6 +4,7 @@ import { hashPayloadForEventId } from "../../helpers/metaWebhookSignature";
 import { logger } from "../../utils/logger";
 import {
   buildSafeWebhookLogSummary,
+  collectInstagramBusinessAccountCandidateIds,
   parseInstagramWebhookPayload,
   ParsedInstagramWebhookEvent
 } from "./InstagramWebhookParser";
@@ -24,25 +25,25 @@ type PersistResult =
   | { status: "duplicate"; externalEventId: string };
 
 const findMappedInstagramAccount = async (
-  businessAccountId: string | null
+  parsed: ParsedInstagramWebhookEvent
 ): Promise<MappedAccount | null> => {
-  if (!businessAccountId) {
-    return null;
+  const candidateIds = collectInstagramBusinessAccountCandidateIds(parsed);
+
+  for (const businessAccountId of candidateIds) {
+    const account = await InstagramAccount.findOne({
+      where: {
+        instagramBusinessAccountId: businessAccountId,
+        status: "CONNECTED"
+      },
+      attributes: ["id", "companyId"]
+    });
+
+    if (account) {
+      return { id: account.id, companyId: account.companyId };
+    }
   }
 
-  const account = await InstagramAccount.findOne({
-    where: {
-      instagramBusinessAccountId: businessAccountId,
-      status: "CONNECTED"
-    },
-    attributes: ["id", "companyId"]
-  });
-
-  if (!account) {
-    return null;
-  }
-
-  return { id: account.id, companyId: account.companyId };
+  return null;
 };
 
 const resolveExternalEventId = (
@@ -144,16 +145,19 @@ const processParsedEvent = async (
   payload: Record<string, unknown>,
   signatureValid: boolean
 ): Promise<void> => {
-  const mapped = await findMappedInstagramAccount(
-    parsed.instagramBusinessAccountId
-  );
+  const mapped = await findMappedInstagramAccount(parsed);
 
   const accountMapped = Boolean(mapped);
+  const candidateIds = collectInstagramBusinessAccountCandidateIds(parsed);
 
-  if (!accountMapped && parsed.instagramBusinessAccountId) {
+  if (!accountMapped && candidateIds.length) {
     logger.warn(
       {
         instagramBusinessAccountId: parsed.instagramBusinessAccountId,
+        entryId: parsed.entryId,
+        senderId: parsed.senderId,
+        recipientId: parsed.recipientId,
+        candidateIds,
         object: parsed.object
       },
       "[InstagramWebhook] account_not_mapped"
