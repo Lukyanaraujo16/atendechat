@@ -751,6 +751,21 @@ export const isInstagramMessagingWindowError = (err: unknown): boolean => {
   );
 };
 
+export const isInstagramMediaTooLargeError = (err: unknown): boolean => {
+  const meta = parseMetaError(err);
+  if (!meta) {
+    return false;
+  }
+
+  const message = (meta.message || "").toLowerCase();
+  return (
+    message.includes("file too large") ||
+    message.includes("too large") ||
+    message.includes("exceeds") ||
+    meta.error_subcode === 2018047
+  );
+};
+
 export const mapInstagramOutboundSendError = (
   err: unknown
 ): {
@@ -776,6 +791,19 @@ export const mapInstagramOutboundSendError = (
         "ERR_INSTAGRAM_MESSAGING_WINDOW_EXPIRED",
         400,
         "Não foi possível enviar: a janela de resposta do Instagram pode ter expirado."
+      )
+    };
+  }
+
+  if (isInstagramMediaTooLargeError(err)) {
+    return {
+      statusCode,
+      metaCode,
+      metaMessage,
+      appError: new AppError(
+        "ERR_INSTAGRAM_IMAGE_TOO_LARGE",
+        400,
+        "Imagem muito grande para envio pelo Instagram."
       )
     };
   }
@@ -828,6 +856,44 @@ export const sendInstagramDirectTextMessage = async (
     {
       params: { access_token: accessToken },
       timeout: 15000,
+      headers: { "Content-Type": "application/json" }
+    }
+  );
+
+  const messageIdRaw = data?.message_id ?? data?.id;
+  return {
+    messageId: messageIdRaw != null ? String(messageIdRaw) : null,
+    rawResponse: data ?? {}
+  };
+};
+
+/**
+ * Envia imagem via Instagram Messaging API (URL pública HTTPS).
+ * POST graph.instagram.com/{instagramBusinessAccountId}/messages
+ */
+export const sendInstagramDirectImageMessage = async (
+  instagramBusinessAccountId: string,
+  recipientId: string,
+  imageUrl: string,
+  accessToken: string
+): Promise<InstagramDirectSendResult> => {
+  const { data } = await axios.post<Record<string, unknown>>(
+    `${INSTAGRAM_GRAPH_VERSIONED}/${instagramBusinessAccountId}/messages`,
+    {
+      recipient: { id: recipientId },
+      message: {
+        attachment: {
+          type: "image",
+          payload: {
+            url: imageUrl,
+            is_reusable: true
+          }
+        }
+      }
+    },
+    {
+      params: { access_token: accessToken },
+      timeout: 30000,
       headers: { "Content-Type": "application/json" }
     }
   );

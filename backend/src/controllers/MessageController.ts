@@ -50,6 +50,11 @@ import CreateOrUpdateContactService from "../services/ContactServices/CreateOrUp
 import { v4 as uuidv4 } from "uuid";
 import { isInstagramChannelTicket } from "../helpers/ticketChannel";
 import SendInstagramTextMessageService from "../services/InstagramAccountService/SendInstagramTextMessageService";
+import SendInstagramImageMessageService from "../services/InstagramAccountService/SendInstagramImageMessageService";
+import {
+  assertInstagramImageUpload,
+  INSTAGRAM_ALLOWED_IMAGE_MIMES
+} from "../helpers/instagramMediaStorage";
 type IndexQuery = {
   pageNumber: string;
 };
@@ -198,20 +203,49 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
   await SetTicketMessagesAsRead(ticket, HUMAN_PANEL_SEND_MESSAGE);
 
   if (isInstagramChannelTicket(ticket)) {
-    if (medias?.length) {
-      throw new AppError(
-        "ERR_INSTAGRAM_MEDIA_NOT_SUPPORTED",
-        400,
-        "Envio de mídia pelo Instagram ainda não está disponível."
-      );
-    }
-
     if (asSticker) {
       throw new AppError(
         "ERR_INSTAGRAM_STICKER_NOT_SUPPORTED",
         400,
         "Envio de figurinha pelo Instagram ainda não está disponível."
       );
+    }
+
+    if (medias?.length) {
+      for (const media of medias) {
+        const mime = (media.mimetype || "").toLowerCase();
+        if (!INSTAGRAM_ALLOWED_IMAGE_MIMES.has(mime)) {
+          throw new AppError(
+            "ERR_INSTAGRAM_MEDIA_TYPE_UNSUPPORTED",
+            400,
+            "Este tipo de mídia ainda não é suportado no Instagram."
+          );
+        }
+        try {
+          assertInstagramImageUpload(media);
+        } catch {
+          throw new AppError(
+            "ERR_INSTAGRAM_IMAGE_TOO_LARGE",
+            400,
+            "Imagem muito grande para envio pelo Instagram."
+          );
+        }
+      }
+
+      const savedMessages = await Promise.all(
+        medias.map(async (media: Express.Multer.File, index) =>
+          SendInstagramImageMessageService({
+            ticket,
+            media,
+            body: Array.isArray(body) ? body[index] : body,
+            companyId
+          })
+        )
+      );
+
+      return res.status(200).json({
+        message: serializeMessageForClient(savedMessages[savedMessages.length - 1])
+      });
     }
 
     if (!body?.trim()) {

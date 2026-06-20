@@ -10,6 +10,8 @@ export interface InstagramOutboundSyncMessageData {
   contactId: number;
   body: string;
   externalMessageId: string;
+  mediaType?: string;
+  mediaUrl?: string | null;
   metaPayload?: Record<string, unknown> | null;
   queueId?: number | null;
 }
@@ -30,7 +32,8 @@ const CreateInstagramOutboundSyncMessageService = async ({
     body: messageData.body,
     fromMe: true,
     read: true,
-    mediaType: "chat",
+    mediaType: messageData.mediaType || "chat",
+    mediaUrl: messageData.mediaUrl ?? null,
     ack: 2,
     channel: "instagram",
     externalMessageId: messageData.externalMessageId,

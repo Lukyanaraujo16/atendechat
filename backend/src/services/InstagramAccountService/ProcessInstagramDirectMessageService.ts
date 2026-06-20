@@ -2,8 +2,10 @@ import Message from "../../models/Message";
 import MetaWebhookEvent from "../../models/MetaWebhookEvent";
 import InstagramAccount from "../../models/InstagramAccount";
 import { logger } from "../../utils/logger";
+import { incrementCompanyStorageUsage } from "../CompanyService/adjustCompanyStorageUsage";
 import {
   ParsedInstagramWebhookEvent,
+  extractInstagramMessageAttachments,
   resolveInstagramMessageDirection
 } from "./InstagramWebhookParser";
 import FindOrCreateInstagramContactService from "./FindOrCreateInstagramContactService";
@@ -11,6 +13,8 @@ import FindOrCreateInstagramTicketService from "./FindOrCreateInstagramTicketSer
 import CreateInstagramInboundMessageService from "./CreateInstagramInboundMessageService";
 import CreateInstagramOutboundSyncMessageService from "./CreateInstagramOutboundSyncMessageService";
 import EnrichInstagramContactProfileService from "./EnrichInstagramContactProfileService";
+import DownloadInstagramMediaService from "./DownloadInstagramMediaService";
+import resolveInstagramAccountToken from "./resolveInstagramAccountToken";
 
 interface Request {
   parsed: ParsedInstagramWebhookEvent;
@@ -18,6 +22,12 @@ interface Request {
   companyId: number;
   externalEventId: string;
   webhookEventId?: number | null;
+}
+
+interface ResolvedInstagramMessageContent {
+  body: string;
+  mediaType: string;
+  mediaUrl?: string | null;
 }
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
@@ -87,6 +97,94 @@ const isDuplicateMessage = async (
   return false;
 };
 
+const resolveInstagramMessageContent = async ({
+  parsed,
+  companyId,
+  accessToken
+}: {
+  parsed: ParsedInstagramWebhookEvent;
+  companyId: number;
+  accessToken: string;
+}): Promise<ResolvedInstagramMessageContent | null> => {
+  const text = extractMessageText(parsed);
+  const attachments = extractInstagramMessageAttachments(parsed);
+  const imageAttachment = attachments.find(item => item.type === "image");
+
+  if (imageAttachment) {
+    logger.info(
+      {
+        messageId: parsed.messageId,
+        attachmentsCount: parsed.attachmentsCount,
+        attachmentType: imageAttachment.type
+      },
+      "[InstagramMediaInbound] received"
+    );
+
+    if (imageAttachment.url && parsed.messageId) {
+      try {
+        const downloaded = await DownloadInstagramMediaService({
+          url: imageAttachment.url,
+          accessToken,
+          companyId,
+          messageId: parsed.messageId
+        });
+
+        if (downloaded.bytes > 0) {
+          void incrementCompanyStorageUsage(companyId, downloaded.bytes);
+        }
+
+        return {
+          body: text || "Imagem",
+          mediaType: "image",
+          mediaUrl: downloaded.relativePath
+        };
+      } catch {
+        return {
+          body: text || "Imagem recebida (falha ao baixar mídia)",
+          mediaType: "chat",
+          mediaUrl: null
+        };
+      }
+    }
+
+    return {
+      body: text || "Imagem recebida (falha ao baixar mídia)",
+      mediaType: "chat",
+      mediaUrl: null
+    };
+  }
+
+  if (text) {
+    return {
+      body: text,
+      mediaType: "chat",
+      mediaUrl: null
+    };
+  }
+
+  if (attachments.length > 0) {
+    logger.info(
+      {
+        messageId: parsed.messageId,
+        attachmentsCount: parsed.attachmentsCount,
+        attachmentTypes: attachments.map(item => item.type)
+      },
+      "[InstagramInbound] unsupported_message_type"
+    );
+  } else {
+    logger.info(
+      {
+        messageId: parsed.messageId,
+        attachmentsCount: parsed.attachmentsCount,
+        eventType: parsed.eventType
+      },
+      "[InstagramInbound] unsupported_message_type"
+    );
+  }
+
+  return null;
+};
+
 const ProcessInstagramDirectMessageService = async ({
   parsed,
   instagramAccountId,
@@ -108,20 +206,6 @@ const ProcessInstagramDirectMessageService = async ({
         senderId: parsed.senderId,
         recipientId: parsed.recipientId,
         messageId: parsed.messageId
-      },
-      "[InstagramInbound] unsupported_message_type"
-    );
-    await markWebhookProcessed(webhookEventId, externalEventId);
-    return "skipped";
-  }
-
-  const text = extractMessageText(parsed);
-  if (!text) {
-    logger.info(
-      {
-        messageId: parsed.messageId,
-        attachmentsCount: parsed.attachmentsCount,
-        eventType: parsed.eventType
       },
       "[InstagramInbound] unsupported_message_type"
     );
@@ -167,6 +251,22 @@ const ProcessInstagramDirectMessageService = async ({
 
   const { fromMe, contactScopedId } = direction;
 
+  const { accessToken } = await resolveInstagramAccountToken(
+    instagramAccountId,
+    companyId
+  );
+
+  const content = await resolveInstagramMessageContent({
+    parsed,
+    companyId,
+    accessToken
+  });
+
+  if (!content) {
+    await markWebhookProcessed(webhookEventId, externalEventId);
+    return "skipped";
+  }
+
   if (fromMe) {
     logger.info(
       {
@@ -176,7 +276,8 @@ const ProcessInstagramDirectMessageService = async ({
         senderId: parsed.senderId,
         recipientId: parsed.recipientId,
         messageId: parsed.messageId,
-        isEcho: parsed.isEcho
+        isEcho: parsed.isEcho,
+        mediaType: content.mediaType
       },
       "[InstagramOutboundSync] received"
     );
@@ -197,7 +298,8 @@ const ProcessInstagramDirectMessageService = async ({
         senderId: parsed.senderId,
         recipientId: parsed.recipientId,
         messageId: parsed.messageId,
-        hasText: true,
+        hasText: Boolean(extractMessageText(parsed)),
+        mediaType: content.mediaType,
         webhookSenderKeys: parsed.rawMessagingItem?.sender
           ? Object.keys(
               parsed.rawMessagingItem.sender as Record<string, unknown>
@@ -233,7 +335,7 @@ const ProcessInstagramDirectMessageService = async ({
     contactId: enrichedContact.id,
     companyId,
     instagramAccountId: account.id,
-    lastMessage: text,
+    lastMessage: content.body,
     unreadMessages: fromMe ? 0 : 1
   });
 
@@ -244,34 +346,32 @@ const ProcessInstagramDirectMessageService = async ({
     recipientId: parsed.recipientId,
     timestamp: parsed.timestamp,
     fromMe,
-    isEcho: parsed.isEcho
+    isEcho: parsed.isEcho,
+    mediaType: content.mediaType,
+    attachments: extractInstagramMessageAttachments(parsed)
+  };
+
+  const messagePayload = {
+    id: parsed.messageId,
+    ticketId: ticket.id,
+    contactId: enrichedContact.id,
+    body: content.body,
+    externalMessageId: parsed.messageId,
+    mediaType: content.mediaType,
+    mediaUrl: content.mediaUrl ?? null,
+    metaPayload,
+    queueId: ticket.queueId
   };
 
   if (fromMe) {
     await CreateInstagramOutboundSyncMessageService({
       companyId,
-      messageData: {
-        id: parsed.messageId,
-        ticketId: ticket.id,
-        contactId: enrichedContact.id,
-        body: text,
-        externalMessageId: parsed.messageId,
-        metaPayload,
-        queueId: ticket.queueId
-      }
+      messageData: messagePayload
     });
   } else {
     await CreateInstagramInboundMessageService({
       companyId,
-      messageData: {
-        id: parsed.messageId,
-        ticketId: ticket.id,
-        contactId: enrichedContact.id,
-        body: text,
-        externalMessageId: parsed.messageId,
-        metaPayload,
-        queueId: ticket.queueId
-      }
+      messageData: messagePayload
     });
   }
 
@@ -283,7 +383,8 @@ const ProcessInstagramDirectMessageService = async ({
         ticketId: ticket.id,
         messageId: parsed.messageId,
         contactId: enrichedContact.id,
-        accountId: account.id
+        accountId: account.id,
+        mediaType: content.mediaType
       },
       "[InstagramOutboundSync] message_saved"
     );
@@ -293,7 +394,8 @@ const ProcessInstagramDirectMessageService = async ({
         ticketId: ticket.id,
         messageId: parsed.messageId,
         contactId: enrichedContact.id,
-        accountId: account.id
+        accountId: account.id,
+        mediaType: content.mediaType
       },
       "[InstagramInbound] message_saved"
     );

@@ -5502,6 +5502,8 @@ const messages = {
             "Resposta pelo Instagram será liberada na próxima fase.",
         instagramTextOnlyHint:
             "Instagram: envio de texto liberado. Mídias serão liberadas em fase futura.",
+        instagramImageHint:
+            "Instagram: texto e imagem liberados. Outros tipos de mídia serão liberados em fase futura.",
         signMessage: "Assinar",
         sticker: "Enviar figurinha (WebP)",
         stickerOnlyWebp: "Figurinha deve ser um arquivo .webp",
@@ -5514,6 +5516,7 @@ const messages = {
           quickReply: "Resposta rápida",
           sticker: "Figurinha",
           stickerHint: "Biblioteca da empresa",
+          instagramImage: "Foto/Imagem",
         },
         stickers: {
           tabEmoji: "Emoji",

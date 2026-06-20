@@ -622,27 +622,39 @@ const MessageInputCustom = (props) => {
   };
 
   const handleChangeMedias = (e) => {
-    if (isInstagramChannel) {
-      return;
-    }
-
     if (!e.target.files) {
       return;
     }
 
-    const selectedMedias = Array.from(e.target.files);
+    let selectedMedias = Array.from(e.target.files);
+
+    if (isInstagramChannel) {
+      selectedMedias = selectedMedias.filter((file) =>
+        String(file.type || "").startsWith("image/")
+      );
+      if (!selectedMedias.length) {
+        return;
+      }
+    }
+
     setMedias(selectedMedias);
     e.target.value = "";
   };
 
   const handleInputPaste = (e) => {
-    if (isInstagramChannel) {
+    const pastedFile = e.clipboardData.files[0];
+    if (!pastedFile) {
       return;
     }
 
-    if (e.clipboardData.files[0]) {
-      setMedias([e.clipboardData.files[0]]);
+    if (isInstagramChannel) {
+      if (String(pastedFile.type || "").startsWith("image/")) {
+        setMedias([pastedFile]);
+      }
+      return;
     }
+
+    setMedias([pastedFile]);
   };
 
   const openComposerPanel = useCallback((tab = "emoji") => {
@@ -771,7 +783,7 @@ const MessageInputCustom = (props) => {
   ]);
 
   const handleUploadMedia = async (e) => {
-    if (isInstagramChannel || isOrphan) return;
+    if (isOrphan) return;
     setLoading(true);
     e.preventDefault();
 
@@ -779,11 +791,20 @@ const MessageInputCustom = (props) => {
     formData.append("fromMe", true);
     medias.forEach((media) => {
       formData.append("medias", media);
-      formData.append("body", media.name);
+      formData.append(
+        "body",
+        inputMessage.trim() || (isInstagramChannel ? "Imagem" : media.name)
+      );
     });
 
     try {
-      await api.post(`/messages/${ticketId}`, formData);
+      const { data } = await api.post(`/messages/${ticketId}`, formData);
+      if (data?.message && typeof onMessageSent === "function") {
+        onMessageSent(data.message);
+      }
+      setInputMessage("");
+      setComposerPanelOpen(false);
+      setReplyingMessage(null);
     } catch (err) {
       toastError(err);
     }
@@ -902,7 +923,7 @@ const MessageInputCustom = (props) => {
         )}
         {isInstagramChannel && (
           <div className={classes.pendingHint} data-ticket-instagram-input-hint>
-            {i18n.t("messagesInput.instagramTextOnlyHint")}
+            {i18n.t("messagesInput.instagramImageHint")}
           </div>
         )}
         {replyingMessage && renderReplyingMessage(replyingMessage)}
@@ -912,7 +933,7 @@ const MessageInputCustom = (props) => {
             type="file"
             multiple
             className={classes.uploadInput}
-            disabled={disableOption()}
+            disabled={disableOption() || isInstagramChannel}
             accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar,.csv,.xml,.json,.odt,.ods,.pages,.key,.numbers"
             onChange={handleChangeMedias}
           />
@@ -922,21 +943,21 @@ const MessageInputCustom = (props) => {
             multiple
             className={classes.uploadInput}
             disabled={disableOption()}
-            accept="image/*,video/*"
+            accept={isInstagramChannel ? "image/*" : "image/*,video/*"}
             onChange={handleChangeMedias}
           />
           <input
             ref={cameraInputRef}
             type="file"
             className={classes.uploadInput}
-            disabled={disableOption()}
+            disabled={disableOption() || isInstagramChannel}
             accept="image/*"
             capture="environment"
             onChange={handleChangeMedias}
           />
           <ComposerAttachMenu
             disabled={disableOption()}
-            textOnlyMode={isInstagramChannel}
+            instagramImageMode={isInstagramChannel}
             quickRepliesEnabled={quickRepliesEnabled}
             onMenuOpen={() => setComposerPanelOpen(false)}
             onPickDocument={() => documentInputRef.current?.click()}

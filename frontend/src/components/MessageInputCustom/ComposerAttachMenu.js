@@ -69,6 +69,7 @@ const useStyles = makeStyles((theme) => ({
 export default function ComposerAttachMenu({
   disabled,
   textOnlyMode = false,
+  instagramImageMode = false,
   quickRepliesEnabled,
   onPickDocument,
   onPickMedia,
@@ -104,38 +105,41 @@ export default function ComposerAttachMenu({
   };
 
   const items = [
-    !textOnlyMode && {
+    !textOnlyMode && !instagramImageMode && {
       key: "document",
       icon: <InsertDriveFileOutlinedIcon />,
       primary: i18n.t("messagesInput.attach.document"),
       onClick: onPickDocument,
     },
     !textOnlyMode &&
+      !instagramImageMode &&
       isMobile && {
       key: "camera",
       icon: <PhotoCameraOutlinedIcon />,
       primary: i18n.t("messagesInput.attach.camera"),
       onClick: onPickCamera,
     },
-    !textOnlyMode && {
+    (!textOnlyMode || instagramImageMode) && {
       key: "media",
       icon: <PhotoLibraryOutlinedIcon />,
-      primary: i18n.t("messagesInput.attach.photosVideos"),
+      primary: instagramImageMode
+        ? i18n.t("messagesInput.attach.instagramImage")
+        : i18n.t("messagesInput.attach.photosVideos"),
       onClick: onPickMedia,
     },
-    !textOnlyMode && {
+    !textOnlyMode && !instagramImageMode && {
       key: "audio",
       icon: <MicNoneOutlinedIcon />,
       primary: i18n.t("messagesInput.attach.audio"),
       onClick: onStartRecording,
     },
-    quickRepliesEnabled && {
+    quickRepliesEnabled && !instagramImageMode && {
       key: "quickReply",
       icon: <FlashOnOutlinedIcon />,
       primary: i18n.t("messagesInput.attach.quickReply"),
       onClick: onOpenQuickReplies,
     },
-    !textOnlyMode && {
+    !textOnlyMode && !instagramImageMode && {
       key: "sticker",
       icon: <ImageOutlinedIcon />,
       primary: i18n.t("messagesInput.attach.sticker"),

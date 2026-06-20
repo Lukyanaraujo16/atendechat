@@ -5355,6 +5355,8 @@ const messages = {
 					"Replying via Instagram will be available in the next phase.",
 				instagramTextOnlyHint:
 					"Instagram: text messaging is enabled. Media will be available in a future phase.",
+				instagramImageHint:
+					"Instagram: text and images are enabled. Other media types will be available in a future phase.",
 				signMessage: "Sign",
 				sticker: "Send sticker (WebP)",
 				stickerOnlyWebp: "Sticker must be a .webp file",
@@ -5367,6 +5369,7 @@ const messages = {
 					quickReply: "Quick reply",
 					sticker: "Sticker",
 					stickerHint: "Company library",
+					instagramImage: "Photo/Image",
 				},
 				stickers: {
 					tabEmoji: "Emoji",

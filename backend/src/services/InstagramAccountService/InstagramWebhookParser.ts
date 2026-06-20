@@ -19,6 +19,11 @@ export interface InstagramWebhookMessageDirection {
   contactScopedId: string;
 }
 
+export interface InstagramWebhookAttachment {
+  type: string;
+  url: string | null;
+}
+
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -202,6 +207,32 @@ export const parseInstagramWebhookPayload = (
   }
 
   return parsed;
+};
+
+export const extractInstagramMessageAttachments = (
+  parsed: ParsedInstagramWebhookEvent
+): InstagramWebhookAttachment[] => {
+  const message = parsed.rawMessagingItem
+    ? asRecord(parsed.rawMessagingItem.message)
+    : null;
+  const attachments = Array.isArray(message?.attachments)
+    ? message.attachments
+    : [];
+
+  return attachments
+    .map(item => {
+      const record = asRecord(item);
+      if (!record) return null;
+      const payload = asRecord(record.payload);
+      const url =
+        typeof payload?.url === "string" && payload.url.trim()
+          ? payload.url.trim()
+          : null;
+      const type =
+        typeof record.type === "string" ? record.type.toLowerCase() : "unknown";
+      return { type, url };
+    })
+    .filter((item): item is InstagramWebhookAttachment => Boolean(item));
 };
 
 export const buildSafeWebhookLogSummary = (
