@@ -53,11 +53,14 @@ import extractMessageUploadMedias from "../helpers/extractMessageUploadMedias";
 import SendInstagramTextMessageService from "../services/InstagramAccountService/SendInstagramTextMessageService";
 import SendInstagramImageMessageService from "../services/InstagramAccountService/SendInstagramImageMessageService";
 import SendInstagramVideoMessageService from "../services/InstagramAccountService/SendInstagramVideoMessageService";
+import SendInstagramAudioMessageService from "../services/InstagramAccountService/SendInstagramAudioMessageService";
 import {
   assertInstagramImageUpload,
   assertInstagramVideoUpload,
+  assertInstagramAudioUpload,
   INSTAGRAM_ALLOWED_IMAGE_MIMES,
-  INSTAGRAM_ALLOWED_VIDEO_MIMES
+  INSTAGRAM_ALLOWED_VIDEO_MIMES,
+  INSTAGRAM_ALLOWED_AUDIO_MIMES
 } from "../helpers/instagramMediaStorage";
 type IndexQuery = {
   pageNumber: string;
@@ -231,8 +234,9 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
         const mime = (media.mimetype || "").toLowerCase();
         const isImage = INSTAGRAM_ALLOWED_IMAGE_MIMES.has(mime);
         const isVideo = INSTAGRAM_ALLOWED_VIDEO_MIMES.has(mime);
+        const isAudio = INSTAGRAM_ALLOWED_AUDIO_MIMES.has(mime);
 
-        if (!isImage && !isVideo) {
+        if (!isImage && !isVideo && !isAudio) {
           throw new AppError(
             "ERR_INSTAGRAM_MEDIA_TYPE_UNSUPPORTED",
             400,
@@ -241,13 +245,29 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
         }
 
         try {
-          if (isVideo) {
+          if (isAudio) {
+            assertInstagramAudioUpload(media);
+          } else if (isVideo) {
             assertInstagramVideoUpload(media);
           } else {
             assertInstagramImageUpload(media);
           }
         } catch (err) {
           const code = err instanceof Error ? err.message : String(err);
+          if (code === "ERR_INSTAGRAM_AUDIO_TOO_LARGE") {
+            throw new AppError(
+              "ERR_INSTAGRAM_AUDIO_TOO_LARGE",
+              400,
+              "Áudio muito grande para envio pelo Instagram."
+            );
+          }
+          if (code === "ERR_INSTAGRAM_AUDIO_FORMAT_UNSUPPORTED") {
+            throw new AppError(
+              "ERR_INSTAGRAM_AUDIO_FORMAT_UNSUPPORTED",
+              400,
+              "Formato de áudio não suportado pelo Instagram."
+            );
+          }
           if (code === "ERR_INSTAGRAM_VIDEO_TOO_LARGE") {
             throw new AppError(
               "ERR_INSTAGRAM_VIDEO_TOO_LARGE",
@@ -279,6 +299,10 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
             body: Array.isArray(body) ? body[index] : body,
             companyId
           };
+
+          if (INSTAGRAM_ALLOWED_AUDIO_MIMES.has(mime)) {
+            return SendInstagramAudioMessageService(payload);
+          }
 
           if (INSTAGRAM_ALLOWED_VIDEO_MIMES.has(mime)) {
             return SendInstagramVideoMessageService(payload);

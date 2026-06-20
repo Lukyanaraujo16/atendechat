@@ -13,9 +13,14 @@ import {
 
 /**
  * Gravação de voz no painel (MediaRecorder + MIME negociado — compatível com Edge/Chrome/Firefox).
- * @param {{ ticketId: number|string, setLoading: (v: boolean) => void }} opts
+ * @param {{ ticketId: number|string, setLoading: (v: boolean) => void, defaultUploadBody?: string, onMessageSent?: (message: unknown) => void }} opts
  */
-export function useWhatsAppPanelRecorder({ ticketId, setLoading }) {
+export function useWhatsAppPanelRecorder({
+  ticketId,
+  setLoading,
+  defaultUploadBody,
+  onMessageSent,
+}) {
   const [recording, setRecording] = useState(false);
   const audioStreamRef = useRef(null);
   const mediaRecorderRef = useRef(null);
@@ -167,10 +172,13 @@ export function useWhatsAppPanelRecorder({ ticketId, setLoading }) {
       const filename = `audio-record-site-${new Date().getTime()}.${ext}`;
       const formData = new FormData();
       formData.append("medias", blob, filename);
-      formData.append("body", filename);
+      formData.append("body", defaultUploadBody || filename);
       formData.append("fromMe", true);
 
-      await api.post(`/messages/${ticketId}`, formData);
+      const { data } = await api.post(`/messages/${ticketId}`, formData);
+      if (data?.message && typeof onMessageSent === "function") {
+        onMessageSent(data.message);
+      }
     } catch (err) {
       logAudioRecorderError("upload_or_stop", err);
       if (err?.response) {
@@ -196,7 +204,9 @@ export function useWhatsAppPanelRecorder({ ticketId, setLoading }) {
       setLoading(false);
     }
   }, [
+    defaultUploadBody,
     detachRecorderListeners,
+    onMessageSent,
     setLoading,
     stopAudioTracks,
     ticketId,

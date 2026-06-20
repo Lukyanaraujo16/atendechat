@@ -781,6 +781,21 @@ export const isInstagramVideoFormatError = (err: unknown): boolean => {
   );
 };
 
+export const isInstagramAudioFormatError = (err: unknown): boolean => {
+  const meta = parseMetaError(err);
+  if (!meta) {
+    return false;
+  }
+
+  const message = (meta.message || "").toLowerCase();
+  return (
+    message.includes("audio") &&
+    (message.includes("format") ||
+      message.includes("unsupported") ||
+      message.includes("invalid"))
+  );
+};
+
 export const mapInstagramOutboundSendError = (
   err: unknown
 ): {
@@ -832,6 +847,19 @@ export const mapInstagramOutboundSendError = (
         "ERR_INSTAGRAM_VIDEO_FORMAT_UNSUPPORTED",
         400,
         "Formato de vídeo não suportado pelo Instagram."
+      )
+    };
+  }
+
+  if (isInstagramAudioFormatError(err)) {
+    return {
+      statusCode,
+      metaCode,
+      metaMessage,
+      appError: new AppError(
+        "ERR_INSTAGRAM_AUDIO_FORMAT_UNSUPPORTED",
+        400,
+        "Formato de áudio não suportado pelo Instagram."
       )
     };
   }
@@ -952,6 +980,44 @@ export const sendInstagramDirectVideoMessage = async (
           type: "video",
           payload: {
             url: videoUrl,
+            is_reusable: true
+          }
+        }
+      }
+    },
+    {
+      params: { access_token: accessToken },
+      timeout: 60000,
+      headers: { "Content-Type": "application/json" }
+    }
+  );
+
+  const messageIdRaw = data?.message_id ?? data?.id;
+  return {
+    messageId: messageIdRaw != null ? String(messageIdRaw) : null,
+    rawResponse: data ?? {}
+  };
+};
+
+/**
+ * Envia áudio via Instagram Messaging API (URL pública HTTPS).
+ * POST graph.instagram.com/{instagramBusinessAccountId}/messages
+ */
+export const sendInstagramDirectAudioMessage = async (
+  instagramBusinessAccountId: string,
+  recipientId: string,
+  audioUrl: string,
+  accessToken: string
+): Promise<InstagramDirectSendResult> => {
+  const { data } = await axios.post<Record<string, unknown>>(
+    `${INSTAGRAM_GRAPH_VERSIONED}/${instagramBusinessAccountId}/messages`,
+    {
+      recipient: { id: recipientId },
+      message: {
+        attachment: {
+          type: "audio",
+          payload: {
+            url: audioUrl,
             is_reusable: true
           }
         }

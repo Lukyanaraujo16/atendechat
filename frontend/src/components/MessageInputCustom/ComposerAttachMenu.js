@@ -143,7 +143,7 @@ export default function ComposerAttachMenu({
       primary: i18n.t("messagesInput.attach.photosVideos"),
       onClick: onPickMedia,
     },
-    !textOnlyMode && !instagramImageMode && {
+    !textOnlyMode && {
       key: "audio",
       icon: <MicNoneOutlinedIcon />,
       primary: i18n.t("messagesInput.attach.audio"),

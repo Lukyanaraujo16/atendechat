@@ -10,6 +10,12 @@ export const INSTAGRAM_VIDEO_MAX_BYTES =
     ? parsedVideoMax
     : 25 * 1024 * 1024;
 
+const parsedAudioMax = Number(process.env.INSTAGRAM_AUDIO_MAX_BYTES);
+export const INSTAGRAM_AUDIO_MAX_BYTES =
+  Number.isFinite(parsedAudioMax) && parsedAudioMax > 0
+    ? parsedAudioMax
+    : 25 * 1024 * 1024;
+
 export const INSTAGRAM_ALLOWED_IMAGE_MIMES = new Set([
   "image/jpeg",
   "image/jpg",
@@ -23,6 +29,19 @@ export const INSTAGRAM_ALLOWED_VIDEO_MIMES = new Set([
   "video/quicktime"
 ]);
 
+export const INSTAGRAM_ALLOWED_AUDIO_MIMES = new Set([
+  "audio/mp4",
+  "audio/m4a",
+  "audio/x-m4a",
+  "audio/aac",
+  "audio/mpeg",
+  "audio/mp3",
+  "audio/wav",
+  "audio/x-wav",
+  "audio/webm",
+  "audio/ogg"
+]);
+
 const publicFolder = path.resolve(__dirname, "..", "..", "public");
 
 export const isInstagramAllowedImageMime = (mime: string): boolean =>
@@ -31,9 +50,15 @@ export const isInstagramAllowedImageMime = (mime: string): boolean =>
 export const isInstagramAllowedVideoMime = (mime: string): boolean =>
   INSTAGRAM_ALLOWED_VIDEO_MIMES.has(mime.toLowerCase());
 
+export const isInstagramAllowedAudioMime = (mime: string): boolean =>
+  INSTAGRAM_ALLOWED_AUDIO_MIMES.has(mime.toLowerCase());
+
 export const getInstagramMediaMaxBytes = (mime: string | null): number => {
   if (mime && isInstagramAllowedVideoMime(mime)) {
     return INSTAGRAM_VIDEO_MAX_BYTES;
+  }
+  if (mime && isInstagramAllowedAudioMime(mime)) {
+    return INSTAGRAM_AUDIO_MAX_BYTES;
   }
   return INSTAGRAM_IMAGE_MAX_BYTES;
 };
@@ -68,6 +93,11 @@ export const resolveExtensionFromMime = (mimeType: string | null): string => {
   if (mimeType.includes("mp4")) return ".mp4";
   if (mimeType.includes("webm")) return ".webm";
   if (mimeType.startsWith("video/")) return ".mp4";
+  if (mimeType.includes("mpeg") || mimeType.includes("mp3")) return ".mp3";
+  if (mimeType.includes("wav")) return ".wav";
+  if (mimeType.includes("ogg")) return ".ogg";
+  if (mimeType.includes("m4a") || mimeType.includes("aac")) return ".m4a";
+  if (mimeType.startsWith("audio/")) return ".m4a";
   return ".jpg";
 };
 
@@ -92,6 +122,18 @@ export const assertInstagramVideoUpload = (
   }
   if (file.size > INSTAGRAM_VIDEO_MAX_BYTES) {
     throw new Error("ERR_INSTAGRAM_VIDEO_TOO_LARGE");
+  }
+};
+
+export const assertInstagramAudioUpload = (
+  file: Express.Multer.File
+): void => {
+  const mime = (file.mimetype || "").toLowerCase();
+  if (!INSTAGRAM_ALLOWED_AUDIO_MIMES.has(mime)) {
+    throw new Error("ERR_INSTAGRAM_AUDIO_FORMAT_UNSUPPORTED");
+  }
+  if (file.size > INSTAGRAM_AUDIO_MAX_BYTES) {
+    throw new Error("ERR_INSTAGRAM_AUDIO_TOO_LARGE");
   }
 };
 

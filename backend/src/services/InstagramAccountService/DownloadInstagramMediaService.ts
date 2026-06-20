@@ -6,7 +6,7 @@ import {
 } from "../../helpers/instagramMediaStorage";
 import { logger } from "../../utils/logger";
 
-export type InstagramDownloadMediaKind = "image" | "video";
+export type InstagramDownloadMediaKind = "image" | "video" | "audio";
 
 interface Request {
   url: string;
@@ -25,7 +25,26 @@ export interface DownloadInstagramMediaResult {
 
 const LOG_PREFIX: Record<InstagramDownloadMediaKind, string> = {
   image: "[InstagramMediaInbound]",
-  video: "[InstagramVideoInbound]"
+  video: "[InstagramVideoInbound]",
+  audio: "[InstagramAudioInbound]"
+};
+
+const TOO_LARGE_ERROR: Record<InstagramDownloadMediaKind, string> = {
+  image: "ERR_INSTAGRAM_IMAGE_TOO_LARGE",
+  video: "ERR_INSTAGRAM_VIDEO_TOO_LARGE",
+  audio: "ERR_INSTAGRAM_AUDIO_TOO_LARGE"
+};
+
+const DEFAULT_MIME: Record<InstagramDownloadMediaKind, string> = {
+  image: "image/jpeg",
+  video: "video/mp4",
+  audio: "audio/mp4"
+};
+
+const TIMEOUT_MS: Record<InstagramDownloadMediaKind, number> = {
+  image: 30000,
+  video: 120000,
+  audio: 60000
 };
 
 const downloadWithAuth = async (
@@ -77,10 +96,8 @@ const DownloadInstagramMediaService = async ({
   mediaKind = "image"
 }: Request): Promise<DownloadInstagramMediaResult> => {
   const logPrefix = LOG_PREFIX[mediaKind];
-  const maxBytes = getInstagramMediaMaxBytes(
-    mediaKind === "video" ? "video/mp4" : "image/jpeg"
-  );
-  const timeoutMs = mediaKind === "video" ? 120000 : 30000;
+  const maxBytes = getInstagramMediaMaxBytes(DEFAULT_MIME[mediaKind]);
+  const timeoutMs = TIMEOUT_MS[mediaKind];
 
   logger.info(
     {
@@ -108,11 +125,7 @@ const DownloadInstagramMediaService = async ({
 
     const effectiveMax = getInstagramMediaMaxBytes(mimeType);
     if (buffer.length > effectiveMax) {
-      throw new Error(
-        mediaKind === "video"
-          ? "ERR_INSTAGRAM_VIDEO_TOO_LARGE"
-          : "ERR_INSTAGRAM_IMAGE_TOO_LARGE"
-      );
+      throw new Error(TOO_LARGE_ERROR[mediaKind]);
     }
 
     const saved = saveInstagramMediaBuffer({

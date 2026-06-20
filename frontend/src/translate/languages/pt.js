@@ -5503,7 +5503,7 @@ const messages = {
         instagramTextOnlyHint:
             "Instagram: envio de texto liberado. Mídias serão liberadas em fase futura.",
         instagramImageHint:
-            "Instagram: texto, imagem e vídeo liberados. Outros tipos de mídia serão liberados em fase futura.",
+            "Instagram: texto, imagem, vídeo e áudio liberados. Outros tipos de mídia serão liberados em fase futura.",
         signMessage: "Assinar",
         sticker: "Enviar figurinha (WebP)",
         stickerOnlyWebp: "Figurinha deve ser um arquivo .webp",

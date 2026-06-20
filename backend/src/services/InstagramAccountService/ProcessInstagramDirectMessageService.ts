@@ -98,6 +98,7 @@ const isDuplicateMessage = async (
 };
 
 const VIDEO_ATTACHMENT_TYPES = new Set(["video", "ig_reel"]);
+const AUDIO_ATTACHMENT_TYPES = new Set(["audio"]);
 
 const downloadInstagramAttachment = async ({
   attachment,
@@ -115,7 +116,7 @@ const downloadInstagramAttachment = async ({
   companyId: number;
   accessToken: string;
   text: string | null;
-  mediaKind: "image" | "video";
+  mediaKind: "image" | "video" | "audio";
   defaultLabel: string;
   failLabel: string;
   receivedLog: string;
@@ -179,6 +180,9 @@ const resolveInstagramMessageContent = async ({
   const videoAttachment = attachments.find(item =>
     VIDEO_ATTACHMENT_TYPES.has(item.type)
   );
+  const audioAttachment = attachments.find(item =>
+    AUDIO_ATTACHMENT_TYPES.has(item.type)
+  );
 
   if (imageAttachment) {
     return downloadInstagramAttachment({
@@ -205,6 +209,20 @@ const resolveInstagramMessageContent = async ({
       defaultLabel: "Vídeo",
       failLabel: "Vídeo recebido (falha ao baixar mídia)",
       receivedLog: "[InstagramVideoInbound] received"
+    });
+  }
+
+  if (audioAttachment) {
+    return downloadInstagramAttachment({
+      attachment: audioAttachment,
+      parsed,
+      companyId,
+      accessToken,
+      text,
+      mediaKind: "audio",
+      defaultLabel: "Áudio",
+      failLabel: "Áudio recebido (falha ao baixar mídia)",
+      receivedLog: "[InstagramAudioInbound] received"
     });
   }
 

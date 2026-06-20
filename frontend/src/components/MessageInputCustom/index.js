@@ -317,10 +317,6 @@ const ActionButtons = (props) => {
       </div>
     );
   } else {
-    if (isInstagramChannel) {
-      return null;
-    }
-
     return (
       <IconButton
         aria-label="showRecorder"
@@ -590,7 +586,12 @@ const MessageInputCustom = (props) => {
   );
 
   const { recording, handleStartRecording, handleUploadAudio, handleCancelAudio } =
-    useWhatsAppPanelRecorder({ ticketId, setLoading });
+    useWhatsAppPanelRecorder({
+      ticketId,
+      setLoading,
+      defaultUploadBody: isInstagramChannel ? "Áudio" : undefined,
+      onMessageSent,
+    });
 
   useEffect(() => {
     if (!replyingMessage || !inputRef.current) return;
@@ -637,7 +638,7 @@ const MessageInputCustom = (props) => {
         if (allowedPrefix) {
           return type.startsWith(allowedPrefix);
         }
-        return type.startsWith("image/") || type.startsWith("video/");
+        return type.startsWith("image/") || type.startsWith("video/") || type.startsWith("audio/");
       });
       if (!selectedMedias.length) {
         return;
@@ -656,7 +657,7 @@ const MessageInputCustom = (props) => {
 
     if (isInstagramChannel) {
       const type = String(pastedFile.type || "");
-      if (type.startsWith("image/") || type.startsWith("video/")) {
+      if (type.startsWith("image/") || type.startsWith("video/") || type.startsWith("audio/")) {
         setMedias([pastedFile]);
       }
       return;
@@ -802,7 +803,9 @@ const MessageInputCustom = (props) => {
       const fallbackBody = isInstagramChannel
         ? String(media.type || "").startsWith("video/")
           ? "Vídeo"
-          : "Imagem"
+          : String(media.type || "").startsWith("audio/")
+            ? "Áudio"
+            : "Imagem"
         : media.name;
       formData.append("body", inputMessage.trim() || fallbackBody);
     });
