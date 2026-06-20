@@ -11,6 +11,9 @@ import ShowInstagramAccountService from "../services/InstagramAccountService/Sho
 import UpdateInstagramAccountService from "../services/InstagramAccountService/UpdateInstagramAccountService";
 import GetInstagramWebhookDiagnosticsService from "../services/InstagramAccountService/GetInstagramWebhookDiagnosticsService";
 import SubscribeInstagramAccountWebhookService from "../services/InstagramAccountService/SubscribeInstagramAccountWebhookService";
+import StartInstagramOAuthService from "../services/InstagramAccountService/StartInstagramOAuthService";
+import HandleInstagramOAuthCallbackService from "../services/InstagramAccountService/HandleInstagramOAuthCallbackService";
+import GetInstagramOAuthStatusService from "../services/InstagramAccountService/GetInstagramOAuthStatusService";
 
 interface InstagramAccountData {
   name: string;
@@ -190,4 +193,53 @@ export const subscribeWebhook = async (
     subscription: result,
     diagnostics
   });
+};
+
+export const startOAuth = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const { companyId, id: userId } = req.user;
+  const { id } = req.params;
+
+  const result = await StartInstagramOAuthService({
+    instagramAccountId: id,
+    companyId,
+    userId
+  });
+
+  return res.status(200).json(result);
+};
+
+export const oauthCallback = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  const redirectUrl = await HandleInstagramOAuthCallbackService({
+    code: typeof req.query.code === "string" ? req.query.code : undefined,
+    state: typeof req.query.state === "string" ? req.query.state : undefined,
+    oauthError:
+      typeof req.query.error === "string" ? req.query.error : undefined,
+    oauthErrorDescription:
+      typeof req.query.error_description === "string"
+        ? req.query.error_description
+        : undefined
+  });
+
+  res.redirect(302, redirectUrl);
+};
+
+export const oauthStatus = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const { companyId } = req.user;
+  const { id } = req.params;
+
+  const status = await GetInstagramOAuthStatusService({
+    instagramAccountId: id,
+    companyId
+  });
+
+  return res.status(200).json(status);
 };

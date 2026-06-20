@@ -58,6 +58,23 @@ class InstagramAccount extends Model<InstagramAccount> {
   @Column(DataType.TEXT)
   profilePicUrl: string;
 
+  /** instagram_login | manual_token | facebook_page */
+  @AllowNull(true)
+  @Column(DataType.STRING(32))
+  connectedVia: string;
+
+  @AllowNull(true)
+  @Column
+  metaUserId: string;
+
+  @AllowNull(true)
+  @Column
+  tokenRefreshedAt: Date;
+
+  @AllowNull(true)
+  @Column(DataType.TEXT)
+  connectionError: string;
+
   @Default(false)
   @Column
   isDefault: boolean;

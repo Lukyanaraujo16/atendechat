@@ -9,6 +9,11 @@ import * as MetaWebhookController from "../controllers/MetaWebhookController";
 const instagramAccountRoutes = express.Router();
 
 instagramAccountRoutes.get(
+  "/instagram/oauth/callback",
+  InstagramAccountController.oauthCallback
+);
+
+instagramAccountRoutes.get(
   "/instagram-accounts/webhook-info",
   isAuth,
   requireWhatsappBehaviorManager,
@@ -59,6 +64,20 @@ instagramAccountRoutes.post(
   isAuth,
   requireWhatsappBehaviorManager,
   InstagramAccountController.connectToken
+);
+
+instagramAccountRoutes.post(
+  "/instagram-accounts/:id/oauth/start",
+  isAuth,
+  requireWhatsappBehaviorManager,
+  InstagramAccountController.startOAuth
+);
+
+instagramAccountRoutes.get(
+  "/instagram-accounts/:id/oauth/status",
+  isAuth,
+  requireWhatsappBehaviorManager,
+  InstagramAccountController.oauthStatus
 );
 
 instagramAccountRoutes.post(
