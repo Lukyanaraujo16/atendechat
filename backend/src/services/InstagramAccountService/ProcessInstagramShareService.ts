@@ -7,6 +7,7 @@ import {
   classifyShareUrls,
   collectShareUrlCandidates,
   extractInstagramPermalinkFromSharePayload,
+  extractShareThumbnailCandidatesFromPayload,
   isInstagramPermalinkUrl,
   isInstagramShareAttachmentType,
   shouldTreatAttachmentAsShare
@@ -240,6 +241,7 @@ const buildShareContent = ({
       shortcode,
       assetId,
       hasAssetUrl: Boolean(shareMeta.assetUrl),
+      hasThumbnailSourceUrl: Boolean(shareMeta.thumbnailSourceUrl),
       postId,
       reelId,
       storyId,
@@ -255,6 +257,15 @@ const buildShareContent = ({
       attachment,
       shareMeta,
       contentMediaType: mediaType
+    });
+  }
+
+  if (mediaType === "instagram_reel" && parsed) {
+    logInstagramReelSharePayload({
+      parsed,
+      attachment,
+      shareMeta,
+      payload
     });
   }
 
@@ -306,6 +317,46 @@ const logInstagramPostSharePayload = ({
       finalShareMeta: shareMeta
     },
     "[InstagramShare] post_payload"
+  );
+};
+
+const logInstagramReelSharePayload = ({
+  parsed,
+  attachment,
+  shareMeta,
+  payload
+}: {
+  parsed?: ParsedInstagramWebhookEvent | null;
+  attachment?: InstagramWebhookAttachment | null;
+  shareMeta: Record<string, unknown>;
+  payload: Record<string, unknown>;
+}): void => {
+  const message = parsed?.rawMessagingItem
+    ? asRecord(parsed.rawMessagingItem.message)
+    : null;
+  const sender = parsed?.rawMessagingItem
+    ? asRecord(parsed.rawMessagingItem.sender)
+    : null;
+  const recipient = parsed?.rawMessagingItem
+    ? asRecord(parsed.rawMessagingItem.recipient)
+    : null;
+  const thumbnailCandidates = extractShareThumbnailCandidatesFromPayload(payload);
+
+  logger.info(
+    {
+      messageMid: parsed?.messageId ?? null,
+      senderId: sender?.id ?? parsed?.senderId ?? null,
+      recipientId: recipient?.id ?? parsed?.recipientId ?? null,
+      attachmentType: attachment?.type ?? shareMeta.attachmentType ?? null,
+      attachmentPayload: attachment?.payload ?? shareMeta.payload ?? null,
+      messageShare: message?.share ?? null,
+      messageText: message?.text ?? null,
+      thumbnailCandidates,
+      extractedThumbnailSourceUrl: shareMeta.thumbnailSourceUrl ?? null,
+      extractedPermalink: shareMeta.permalink ?? null,
+      finalShareMeta: shareMeta
+    },
+    "[InstagramShare] reel_payload"
   );
 };
 

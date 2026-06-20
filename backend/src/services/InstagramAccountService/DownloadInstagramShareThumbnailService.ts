@@ -1,5 +1,5 @@
 import { logger } from "../../utils/logger";
-import { isLookasideCdnUrl } from "./instagramShareUtils";
+import { isShareThumbnailSourceUrl } from "./instagramShareUtils";
 import DownloadInstagramMediaService from "./DownloadInstagramMediaService";
 
 interface Request {
@@ -20,7 +20,7 @@ const DownloadInstagramShareThumbnailService = async ({
   companyId,
   messageId
 }: Request): Promise<DownloadInstagramShareThumbnailResult | null> => {
-  if (!isLookasideCdnUrl(thumbnailSourceUrl)) {
+  if (!isShareThumbnailSourceUrl(thumbnailSourceUrl)) {
     return null;
   }
 

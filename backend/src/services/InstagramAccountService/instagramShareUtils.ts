@@ -341,10 +341,138 @@ export const classifyShareUrls = (
     permalink,
     rawUrl,
     assetUrl,
-    thumbnailSourceUrl: assetUrl,
+    thumbnailSourceUrl:
+      extractShareThumbnailUrlFromPayload(payload) || assetUrl,
     assetId,
     shortcode
   };
+};
+
+const THUMBNAIL_URL_FIELD_NAMES = [
+  "thumbnail_url",
+  "preview_url",
+  "image_url",
+  "cover_url",
+  "picture",
+  "thumb_url",
+  "thumbnailUrl",
+  "previewUrl",
+  "imageUrl",
+  "coverUrl"
+] as const;
+
+const IMAGE_FILE_PATTERN = /\.(jpg|jpeg|png|webp|gif)(\?|$)/i;
+
+export const isShareThumbnailSourceUrl = (url: string | null): boolean => {
+  if (!url || !/^https?:\/\//i.test(url)) {
+    return false;
+  }
+
+  if (isInstagramPermalinkUrl(url) || isInstagramPublicLink(url)) {
+    return false;
+  }
+
+  if (isDirectVideoMediaUrl(url, null)) {
+    return false;
+  }
+
+  if (isLookasideCdnUrl(url)) {
+    return true;
+  }
+
+  if (IMAGE_FILE_PATTERN.test(url)) {
+    return true;
+  }
+
+  return /(?:fbcdn|cdninstagram|scontent)/i.test(url);
+};
+
+export const extractShareThumbnailCandidatesFromPayload = (
+  payload: Record<string, unknown> | null
+): Record<string, string | null> => {
+  const candidates: Record<string, string | null> = {
+    thumbnail_url: null,
+    preview_url: null,
+    image_url: null,
+    media_url: null,
+    cover_url: null
+  };
+
+  if (!payload) {
+    return candidates;
+  }
+
+  candidates.thumbnail_url =
+    asString(payload.thumbnail_url) || asString(payload.thumbnailUrl);
+  candidates.preview_url =
+    asString(payload.preview_url) || asString(payload.previewUrl);
+  candidates.image_url =
+    asString(payload.image_url) || asString(payload.imageUrl);
+  candidates.media_url = asString(payload.media_url) || asString(payload.mediaUrl);
+  candidates.cover_url =
+    asString(payload.cover_url) || asString(payload.coverUrl);
+
+  if (!candidates.image_url) {
+    candidates.image_url = asString(payload.picture);
+  }
+
+  const scanPayloadValues = (
+    record: Record<string, unknown>,
+    depth = 0
+  ): void => {
+    if (depth > 4) {
+      return;
+    }
+
+    for (const [key, value] of Object.entries(record)) {
+      if (typeof value === "string" && value.trim()) {
+        if (/thumbnail|preview|cover|image_url|picture|thumb/i.test(key)) {
+          if (/thumbnail/i.test(key) && !candidates.thumbnail_url) {
+            candidates.thumbnail_url = value.trim();
+          }
+          if (/preview/i.test(key) && !candidates.preview_url) {
+            candidates.preview_url = value.trim();
+          }
+          if (/cover/i.test(key) && !candidates.cover_url) {
+            candidates.cover_url = value.trim();
+          }
+          if (/image/i.test(key) && !candidates.image_url) {
+            candidates.image_url = value.trim();
+          }
+        }
+        continue;
+      }
+
+      if (value && typeof value === "object" && !Array.isArray(value)) {
+        scanPayloadValues(value as Record<string, unknown>, depth + 1);
+      }
+    }
+  };
+
+  scanPayloadValues(payload);
+
+  return candidates;
+};
+
+export const extractShareThumbnailUrlFromPayload = (
+  payload: Record<string, unknown> | null
+): string | null => {
+  const candidates = extractShareThumbnailCandidatesFromPayload(payload);
+  const orderedCandidates = [
+    candidates.thumbnail_url,
+    candidates.preview_url,
+    candidates.cover_url,
+    candidates.image_url,
+    candidates.media_url
+  ];
+
+  for (const candidate of orderedCandidates) {
+    if (candidate && isShareThumbnailSourceUrl(candidate)) {
+      return candidate;
+    }
+  }
+
+  return null;
 };
 
 const isInstagramProfileLink = (url: string): boolean => {
