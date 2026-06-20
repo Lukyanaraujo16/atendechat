@@ -291,17 +291,35 @@ export const summarizeUnsupportedInstagramWebhookPayload = (
   const message = parsed.rawMessagingItem
     ? asRecord(parsed.rawMessagingItem.message)
     : null;
-  const attachments = extractInstagramMessageAttachments(parsed);
+  const sender = parsed.rawMessagingItem
+    ? asRecord(parsed.rawMessagingItem.sender)
+    : null;
+  const recipient = parsed.rawMessagingItem
+    ? asRecord(parsed.rawMessagingItem.recipient)
+    : null;
+  const rawAttachments = Array.isArray(message?.attachments)
+    ? message.attachments
+    : [];
 
   return {
+    messageMid: parsed.messageId,
+    senderId: sender?.id ?? parsed.senderId,
+    recipientId: recipient?.id ?? parsed.recipientId,
+    messageText: message?.text ?? null,
+    messageReferral:
+      message?.referral ?? parsed.rawMessagingItem?.referral ?? null,
+    messageShare: message?.share ?? null,
+    messageAttachments: rawAttachments.map(item => {
+      const attachment = asRecord(item);
+      return {
+        type: attachment?.type ?? null,
+        payload: asRecord(attachment?.payload)
+      };
+    }),
+    attachmentTypes: rawAttachments.map(item => asRecord(item)?.type ?? null),
     eventType: parsed.eventType,
-    messageId: parsed.messageId,
-    replyToMessageId: parsed.replyToMessageId,
     hasText: parsed.hasText,
-    textPreview: parsed.textPreview,
-    attachmentTypes: attachments.map(item => item.type),
-    messageKeys: message ? Object.keys(message) : [],
-    rawKeys: parsed.rawMessagingItem ? Object.keys(parsed.rawMessagingItem) : []
+    textPreview: parsed.textPreview
   };
 };
 

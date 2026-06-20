@@ -17,9 +17,8 @@ import CreateInstagramInboundMessageService from "./CreateInstagramInboundMessag
 import CreateInstagramOutboundSyncMessageService from "./CreateInstagramOutboundSyncMessageService";
 import EnrichInstagramContactProfileService from "./EnrichInstagramContactProfileService";
 import DownloadInstagramMediaService from "./DownloadInstagramMediaService";
-import ProcessInstagramShareService, {
-  isInstagramShareAttachmentType
-} from "./ProcessInstagramShareService";
+import { resolveInstagramShareContent } from "./ProcessInstagramShareService";
+import { isPlayableVideoAttachment } from "./instagramShareUtils";
 import { resolveInstagramQuotedMessageId } from "./resolveInstagramQuotedMessage";
 import resolveInstagramAccountToken from "./resolveInstagramAccountToken";
 
@@ -105,7 +104,6 @@ const isDuplicateMessage = async (
   return false;
 };
 
-const VIDEO_ATTACHMENT_TYPES = new Set(["video", "ig_reel"]);
 const AUDIO_ATTACHMENT_TYPES = new Set(["audio"]);
 const FILE_ATTACHMENT_TYPES = new Set(["file"]);
 
@@ -198,9 +196,19 @@ const resolveInstagramMessageContent = async ({
 }): Promise<ResolvedInstagramMessageContent | null> => {
   const text = extractMessageText(parsed);
   const attachments = extractInstagramMessageAttachments(parsed);
+  const shareContent = resolveInstagramShareContent(parsed, text);
+  if (shareContent) {
+    return {
+      body: text || shareContent.body,
+      mediaType: shareContent.mediaType,
+      mediaUrl: shareContent.mediaUrl,
+      shareMeta: shareContent.shareMeta
+    };
+  }
+
   const imageAttachment = attachments.find(item => item.type === "image");
   const videoAttachment = attachments.find(item =>
-    VIDEO_ATTACHMENT_TYPES.has(item.type)
+    isPlayableVideoAttachment(item)
   );
   const audioAttachment = attachments.find(item =>
     AUDIO_ATTACHMENT_TYPES.has(item.type)
@@ -208,21 +216,6 @@ const resolveInstagramMessageContent = async ({
   const fileAttachment = attachments.find(item =>
     FILE_ATTACHMENT_TYPES.has(item.type)
   );
-  const shareAttachment = attachments.find(item =>
-    isInstagramShareAttachmentType(item.type)
-  );
-
-  if (shareAttachment) {
-    const shareContent = ProcessInstagramShareService(shareAttachment, text);
-    if (shareContent) {
-      return {
-        body: text || shareContent.body,
-        mediaType: shareContent.mediaType,
-        mediaUrl: shareContent.mediaUrl,
-        shareMeta: shareContent.shareMeta
-      };
-    }
-  }
 
   if (imageAttachment) {
     return downloadInstagramAttachment({

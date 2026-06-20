@@ -555,26 +555,109 @@ const MessagesList = forwardRef(function MessagesList(
     }
   };
 
+  const INSTAGRAM_PERMALINK_PATTERN =
+    /instagram\.com\/(p\/|reel\/|reels\/|tv\/|stories\/)/i;
+
+  const isInstagramPermalinkUrl = (url) =>
+    typeof url === "string" && INSTAGRAM_PERMALINK_PATTERN.test(url);
+
+  const isInstagramChannelMessage = (message) =>
+    String(ticket?.channel || message?.channel || "").toLowerCase() ===
+    "instagram";
+
+  const INSTAGRAM_SHARE_CARD_COPY = {
+    instagram_post: { icon: "📷", title: "Post compartilhado" },
+    instagram_reel: { icon: "🎬", title: "Reel compartilhado" },
+    instagram_story: { icon: "📖", title: "Story compartilhado" },
+    instagram_profile: { icon: "👤", title: "Perfil compartilhado" },
+  };
+
+  const resolveMisclassifiedInstagramShare = (message) => {
+    const meta = parseMessageMetaPayload(message);
+    const shareMeta = meta?.share || null;
+    const url =
+      message.mediaUrl ||
+      shareMeta?.permalink ||
+      shareMeta?.rawUrl ||
+      null;
+
+    if (
+      message.mediaType === "instagram_post" ||
+      message.mediaType === "instagram_reel" ||
+      message.mediaType === "instagram_story" ||
+      message.mediaType === "instagram_profile"
+    ) {
+      return null;
+    }
+
+    const attachmentType = shareMeta?.attachmentType;
+    if (attachmentType === "ig_reel" || attachmentType === "reel_share") {
+      return "instagram_reel";
+    }
+    if (attachmentType === "ig_post" || attachmentType === "post_share") {
+      return "instagram_post";
+    }
+
+    if (!isInstagramPermalinkUrl(url)) {
+      return null;
+    }
+
+    if (/reel/i.test(url)) {
+      return "instagram_reel";
+    }
+    if (/stories/i.test(url)) {
+      return "instagram_story";
+    }
+    if (/instagram\.com\/[^/?#]+\/?(?:$|[?#])/i.test(url) && !INSTAGRAM_PERMALINK_PATTERN.test(url)) {
+      return "instagram_profile";
+    }
+    return "instagram_post";
+  };
+
+  const renderInstagramShareCard = (mediaType, message, permalink) => {
+    const copy = INSTAGRAM_SHARE_CARD_COPY[mediaType] || {
+      icon: "📱",
+      title: "Conteúdo compartilhado do Instagram",
+    };
+    const title = message?.body || copy.title;
+    const resolvedPermalink = isInstagramPermalinkUrl(permalink) ? permalink : null;
+
+    return (
+      <>
+        <div className={classes.downloadMedia}>
+          <span>
+            {copy.icon} {title}
+          </span>
+          {!resolvedPermalink && (
+            <div style={{ marginTop: 4, opacity: 0.85 }}>
+              Conteúdo compartilhado do Instagram
+            </div>
+          )}
+        </div>
+        {resolvedPermalink ? (
+          <div className={classes.downloadMedia}>
+            <Button
+              color="primary"
+              variant="outlined"
+              target="_blank"
+              rel="noopener noreferrer"
+              href={resolvedPermalink}
+            >
+              Abrir no Instagram
+            </Button>
+          </div>
+        ) : null}
+      </>
+    );
+  };
+
   const renderInstagramDirectInteraction = (message) => {
     const { mediaType } = message;
     const meta = parseMessageMetaPayload(message);
     const permalink =
-      message.mediaUrl || meta?.share?.permalink || meta?.permalink || null;
-
-    const openInstagramLink = (url) =>
-      url ? (
-        <div className={classes.downloadMedia}>
-          <Button
-            color="primary"
-            variant="outlined"
-            target="_blank"
-            rel="noopener noreferrer"
-            href={url}
-          >
-            Abrir no Instagram
-          </Button>
-        </div>
-      ) : null;
+      (isInstagramPermalinkUrl(message.mediaUrl) ? message.mediaUrl : null) ||
+      meta?.share?.permalink ||
+      null;
 
     if (mediaType === "reaction") {
       return (
@@ -590,14 +673,7 @@ const MessagesList = forwardRef(function MessagesList(
       mediaType === "instagram_story" ||
       mediaType === "instagram_profile"
     ) {
-      return (
-        <>
-          <div className={classes.downloadMedia}>
-            <span>{message.body}</span>
-          </div>
-          {openInstagramLink(permalink)}
-        </>
-      );
+      return renderInstagramShareCard(mediaType, message, permalink);
     }
 
     return null;
@@ -607,6 +683,25 @@ const MessagesList = forwardRef(function MessagesList(
     const instagramInteraction = renderInstagramDirectInteraction(message);
     if (instagramInteraction) {
       return instagramInteraction;
+    }
+
+    if (isInstagramChannelMessage(message)) {
+      const misclassifiedType = resolveMisclassifiedInstagramShare(message);
+      if (misclassifiedType) {
+        const meta = parseMessageMetaPayload(message);
+        const permalink =
+          (isInstagramPermalinkUrl(message.mediaUrl)
+            ? message.mediaUrl
+            : null) ||
+          meta?.share?.permalink ||
+          meta?.share?.rawUrl ||
+          null;
+        return renderInstagramShareCard(
+          misclassifiedType,
+          message,
+          permalink
+        );
+      }
     }
 
     if (message.mediaType === "locationMessage" && message.body.split('|').length >= 2) {

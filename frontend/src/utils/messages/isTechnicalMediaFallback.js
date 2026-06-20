@@ -80,6 +80,18 @@ export function getDisplayableMessageBody(message) {
     return null;
   }
 
+  const INSTAGRAM_CARD_MEDIA_TYPES = new Set([
+    "instagram_post",
+    "instagram_reel",
+    "instagram_story",
+    "instagram_profile",
+    "reaction",
+  ]);
+
+  if (INSTAGRAM_CARD_MEDIA_TYPES.has(mediaType)) {
+    return null;
+  }
+
   const hasMedia =
     Boolean(mediaUrl) ||
     (mediaType && MEDIA_TYPES_WITH_URL.has(mediaType));

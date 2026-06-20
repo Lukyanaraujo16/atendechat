@@ -1,5 +1,14 @@
 import { logger } from "../../utils/logger";
-import { InstagramWebhookAttachment } from "./InstagramWebhookParser";
+import {
+  InstagramWebhookAttachment,
+  ParsedInstagramWebhookEvent
+} from "./InstagramWebhookParser";
+import {
+  extractShareUrlFromPayload,
+  isInstagramPermalinkUrl,
+  isInstagramShareAttachmentType,
+  shouldTreatAttachmentAsShare
+} from "./instagramShareUtils";
 
 export type InstagramShareMediaType =
   | "instagram_post"
@@ -14,22 +23,23 @@ export interface InstagramShareMessageContent {
   shareMeta: Record<string, unknown>;
 }
 
-const SHARE_ATTACHMENT_TYPES = new Set([
-  "share",
-  "story_mention",
-  "template",
-  "post_share",
-  "reel_share",
-  "story_share",
-  "profile_share"
-]);
+const asRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
 
 const asString = (value: unknown): string | null =>
   typeof value === "string" && value.trim() ? value.trim() : null;
 
 const inferShareFromUrl = (
   url: string | null
-): { mediaType: InstagramShareMediaType; postId?: string; reelId?: string; storyId?: string; username?: string } | null => {
+): {
+  mediaType: InstagramShareMediaType;
+  postId?: string;
+  reelId?: string;
+  storyId?: string;
+  username?: string;
+} | null => {
   if (!url) return null;
 
   try {
@@ -54,7 +64,10 @@ const inferShareFromUrl = (
     }
 
     const segments = pathname.split("/").filter(Boolean);
-    if (segments.length === 1 && !["p", "reel", "reels", "stories", "explore"].includes(segments[0])) {
+    if (
+      segments.length === 1 &&
+      !["p", "reel", "reels", "stories", "explore", "tv"].includes(segments[0])
+    ) {
       return { mediaType: "instagram_profile", username: segments[0] };
     }
   } catch {
@@ -69,8 +82,10 @@ const mapAttachmentTypeToShare = (
 ): InstagramShareMediaType | null => {
   switch (attachmentType) {
     case "post_share":
+    case "ig_post":
       return "instagram_post";
     case "reel_share":
+    case "ig_reel":
       return "instagram_reel";
     case "story_share":
     case "story_mention":
@@ -82,39 +97,65 @@ const mapAttachmentTypeToShare = (
   }
 };
 
-const buildShareBody = (
-  mediaType: InstagramShareMediaType,
-  title: string | null,
-  username: string | null
-): string => {
+const inferShareFromPayloadIds = (
+  attachmentType: string,
+  payload: Record<string, unknown>
+): InstagramShareMediaType | null => {
+  if (payload.reel_video_id || payload.ig_reel_media_id) {
+    return "instagram_reel";
+  }
+
+  if (payload.ig_post_media_id || payload.media_id || payload.post_id) {
+    return "instagram_post";
+  }
+
+  if (attachmentType === "ig_post") {
+    return "instagram_post";
+  }
+
+  if (attachmentType === "ig_reel") {
+    return "instagram_reel";
+  }
+
+  if (attachmentType === "share" || attachmentType === "media_share") {
+    return "instagram_post";
+  }
+
+  return null;
+};
+
+const buildShareBody = (mediaType: InstagramShareMediaType): string => {
   switch (mediaType) {
     case "instagram_post":
-      return title ? `📸 Post compartilhado: ${title}` : "📸 Post compartilhado";
+      return "Post compartilhado";
     case "instagram_reel":
-      return title ? `🎬 Reel compartilhado: ${title}` : "🎬 Reel compartilhado";
+      return "Reel compartilhado";
     case "instagram_story":
-      return "📱 Story compartilhado";
+      return "Story compartilhado";
     case "instagram_profile":
-      return username ? `👤 Perfil compartilhado: @${username.replace(/^@/, "")}` : "👤 Perfil compartilhado";
+      return "Perfil compartilhado";
     default:
-      return "Conteúdo compartilhado";
+      return "Conteúdo compartilhado do Instagram";
   }
 };
 
-const ProcessInstagramShareService = (
-  attachment: InstagramWebhookAttachment,
-  caption: string | null
-): InstagramShareMessageContent | null => {
-  if (!SHARE_ATTACHMENT_TYPES.has(attachment.type)) {
-    return null;
-  }
-
-  const payload = attachment.payload || {};
-  const url = attachment.url || asString(payload.url);
-  const title = asString(payload.title) || caption;
-  const explicitType = mapAttachmentTypeToShare(attachment.type);
+const buildShareContent = ({
+  attachmentType,
+  payload,
+  url,
+  caption,
+  source
+}: {
+  attachmentType: string;
+  payload: Record<string, unknown>;
+  url: string | null;
+  caption: string | null;
+  source: string;
+}): InstagramShareMessageContent | null => {
+  const explicitType = mapAttachmentTypeToShare(attachmentType);
   const inferred = inferShareFromUrl(url);
-  const mediaType = explicitType || inferred?.mediaType;
+  const mediaType =
+    explicitType || inferred?.mediaType || inferShareFromPayloadIds(attachmentType, payload);
 
   if (!mediaType) {
     return null;
@@ -125,15 +166,28 @@ const ProcessInstagramShareService = (
     asString(payload.profile_username) ||
     inferred?.username ||
     null;
-  const postId = asString(payload.post_id) || asString(payload.id) || inferred?.postId || null;
-  const reelId = asString(payload.reel_id) || inferred?.reelId || null;
+  const postId =
+    asString(payload.post_id) ||
+    asString(payload.ig_post_media_id) ||
+    asString(payload.media_id) ||
+    inferred?.postId ||
+    null;
+  const reelId =
+    asString(payload.reel_id) ||
+    asString(payload.reel_video_id) ||
+    asString(payload.ig_reel_media_id) ||
+    inferred?.reelId ||
+    null;
   const storyId = asString(payload.story_id) || inferred?.storyId || null;
   const profileId = asString(payload.profile_id) || asString(payload.ig_id) || null;
-  const permalink = url;
+  const title = asString(payload.title) || caption;
+  const permalink = isInstagramPermalinkUrl(url) ? url : url;
 
   const shareMeta = {
-    attachmentType: attachment.type,
-    permalink,
+    source,
+    attachmentType,
+    permalink: isInstagramPermalinkUrl(permalink) ? permalink : null,
+    rawUrl: url,
     postId,
     reelId,
     storyId,
@@ -154,9 +208,10 @@ const ProcessInstagramShareService = (
 
   logger.info(
     {
-      attachmentType: attachment.type,
+      source,
+      attachmentType,
       mediaType,
-      permalink,
+      permalink: shareMeta.permalink,
       postId,
       reelId,
       storyId,
@@ -167,14 +222,120 @@ const ProcessInstagramShareService = (
   );
 
   return {
-    body: buildShareBody(mediaType, title, username),
+    body: buildShareBody(mediaType),
     mediaType,
-    mediaUrl: permalink,
+    mediaUrl: (shareMeta.permalink as string | null) || null,
     shareMeta
   };
 };
 
-export const isInstagramShareAttachmentType = (type: string): boolean =>
-  SHARE_ATTACHMENT_TYPES.has(type);
+const ProcessInstagramShareService = (
+  attachment: InstagramWebhookAttachment,
+  caption: string | null
+): InstagramShareMessageContent | null => {
+  if (!shouldTreatAttachmentAsShare(attachment)) {
+    return null;
+  }
+
+  const payload = attachment.payload || {};
+  const url = extractShareUrlFromPayload(attachment.url, payload);
+
+  return buildShareContent({
+    attachmentType: attachment.type,
+    payload,
+    url,
+    caption,
+    source: "attachment"
+  });
+};
+
+export const resolveInstagramShareFromMessageLevel = (
+  parsed: ParsedInstagramWebhookEvent,
+  caption: string | null
+): InstagramShareMessageContent | null => {
+  const message = parsed.rawMessagingItem
+    ? asRecord(parsed.rawMessagingItem.message)
+    : null;
+
+  const messageShare = asRecord(message?.share);
+  if (messageShare) {
+    const url =
+      asString(messageShare.link) ||
+      asString(messageShare.url) ||
+      asString(messageShare.permalink);
+    const content = buildShareContent({
+      attachmentType: "share",
+      payload: messageShare,
+      url,
+      caption: asString(messageShare.share_text) || caption,
+      source: "message.share"
+    });
+    if (content) {
+      return content;
+    }
+  }
+
+  const referral =
+    asRecord(parsed.rawMessagingItem?.referral) || asRecord(message?.referral);
+  if (referral) {
+    const url = asString(referral.link) || asString(referral.source_url);
+    const content = buildShareContent({
+      attachmentType: "referral",
+      payload: referral,
+      url,
+      caption,
+      source: "message.referral"
+    });
+    if (content) {
+      return content;
+    }
+  }
+
+  return null;
+};
+
+export const resolveInstagramShareContent = (
+  parsed: ParsedInstagramWebhookEvent,
+  caption: string | null
+): InstagramShareMessageContent | null => {
+  const fromMessageLevel = resolveInstagramShareFromMessageLevel(parsed, caption);
+  if (fromMessageLevel) {
+    return fromMessageLevel;
+  }
+
+  const attachments = parsed.rawMessagingItem
+    ? (() => {
+        const message = asRecord(parsed.rawMessagingItem?.message);
+        const raw = Array.isArray(message?.attachments) ? message.attachments : [];
+        return raw
+          .map(item => {
+            const record = asRecord(item);
+            if (!record) return null;
+            const payload = asRecord(record.payload);
+            const url =
+              typeof payload?.url === "string" && payload.url.trim()
+                ? payload.url.trim()
+                : null;
+            const type =
+              typeof record.type === "string"
+                ? record.type.toLowerCase()
+                : "unknown";
+            return { type, url, payload };
+          })
+          .filter((item): item is InstagramWebhookAttachment => Boolean(item));
+      })()
+    : [];
+
+  for (const attachment of attachments) {
+    const content = ProcessInstagramShareService(attachment, caption);
+    if (content) {
+      return content;
+    }
+  }
+
+  return null;
+};
+
+export { isInstagramShareAttachmentType, shouldTreatAttachmentAsShare };
 
 export default ProcessInstagramShareService;
