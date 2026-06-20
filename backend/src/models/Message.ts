@@ -47,12 +47,16 @@ class Message extends Model<Message> {
 
   @Column(DataType.STRING)
   get mediaUrl(): string | null {
-    if (this.getDataValue("mediaUrl")) {
-      return `${process.env.BACKEND_URL}/public/${this.getDataValue(
-        "mediaUrl"
-      )}`;
+    const rawMediaUrl = this.getDataValue("mediaUrl");
+    if (!rawMediaUrl) {
+      return null;
     }
-    return null;
+
+    if (/^https?:\/\//i.test(rawMediaUrl)) {
+      return rawMediaUrl;
+    }
+
+    return `${process.env.BACKEND_URL}/public/${rawMediaUrl}`;
   }
 
   @Column

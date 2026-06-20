@@ -558,28 +558,74 @@ const MessagesList = forwardRef(function MessagesList(
   const INSTAGRAM_PERMALINK_PATTERN =
     /instagram\.com\/(p\/|reel\/|reels\/|tv\/|stories\/)/i;
 
-  const isInstagramPermalinkUrl = (url) =>
-    typeof url === "string" && INSTAGRAM_PERMALINK_PATTERN.test(url);
+  const INSTAGRAM_INTERACTION_MEDIA_TYPES = new Set([
+    "instagram_post",
+    "instagram_reel",
+    "instagram_story",
+    "instagram_profile",
+    "reaction",
+  ]);
+
+  const extractInstagramExternalUrl = (value) => {
+    if (!value || typeof value !== "string") {
+      return null;
+    }
+
+    const trimmed = value.trim();
+    const embeddedMatch = trimmed.match(
+      /https?:\/\/(?:www\.)?instagram\.com\/[^\s"'<>]+/i
+    );
+    if (embeddedMatch) {
+      return embeddedMatch[0];
+    }
+
+    if (/^https?:\/\//i.test(trimmed)) {
+      return trimmed;
+    }
+
+    return null;
+  };
+
+  const resolveInstagramSharePermalink = (message) => {
+    const meta = parseMessageMetaPayload(message);
+    const candidates = [
+      meta?.share?.permalink,
+      meta?.permalink,
+      message.mediaUrl,
+      meta?.share?.rawUrl,
+    ];
+
+    for (const candidate of candidates) {
+      const resolved = extractInstagramExternalUrl(candidate);
+      if (resolved) {
+        return resolved;
+      }
+    }
+
+    return null;
+  };
 
   const isInstagramChannelMessage = (message) =>
     String(ticket?.channel || message?.channel || "").toLowerCase() ===
     "instagram";
 
+  const shouldRenderMessageMedia = (message) =>
+    Boolean(message.mediaUrl) ||
+    message.mediaType === "locationMessage" ||
+    message.mediaType === "vcard" ||
+    INSTAGRAM_INTERACTION_MEDIA_TYPES.has(message.mediaType);
+
   const INSTAGRAM_SHARE_CARD_COPY = {
     instagram_post: { icon: "📷", title: "Post compartilhado" },
     instagram_reel: { icon: "🎬", title: "Reel compartilhado" },
-    instagram_story: { icon: "📖", title: "Story compartilhado" },
+    instagram_story: { icon: "📱", title: "Story compartilhado" },
     instagram_profile: { icon: "👤", title: "Perfil compartilhado" },
   };
 
   const resolveMisclassifiedInstagramShare = (message) => {
     const meta = parseMessageMetaPayload(message);
     const shareMeta = meta?.share || null;
-    const url =
-      message.mediaUrl ||
-      shareMeta?.permalink ||
-      shareMeta?.rawUrl ||
-      null;
+    const url = resolveInstagramSharePermalink(message) || shareMeta?.rawUrl || null;
 
     if (
       message.mediaType === "instagram_post" ||
@@ -598,7 +644,7 @@ const MessagesList = forwardRef(function MessagesList(
       return "instagram_post";
     }
 
-    if (!isInstagramPermalinkUrl(url)) {
+    if (!url || !extractInstagramExternalUrl(url)) {
       return null;
     }
 
@@ -608,19 +654,33 @@ const MessagesList = forwardRef(function MessagesList(
     if (/stories/i.test(url)) {
       return "instagram_story";
     }
-    if (/instagram\.com\/[^/?#]+\/?(?:$|[?#])/i.test(url) && !INSTAGRAM_PERMALINK_PATTERN.test(url)) {
+    if (
+      /instagram\.com\/[^/?#]+\/?(?:$|[?#])/i.test(url) &&
+      !INSTAGRAM_PERMALINK_PATTERN.test(url)
+    ) {
       return "instagram_profile";
     }
     return "instagram_post";
   };
 
-  const renderInstagramShareCard = (mediaType, message, permalink) => {
+  const renderInstagramShareCard = (mediaType, message) => {
+    const meta = parseMessageMetaPayload(message);
     const copy = INSTAGRAM_SHARE_CARD_COPY[mediaType] || {
       icon: "📱",
       title: "Conteúdo compartilhado do Instagram",
     };
-    const title = message?.body || copy.title;
-    const resolvedPermalink = isInstagramPermalinkUrl(permalink) ? permalink : null;
+    const permalink = resolveInstagramSharePermalink(message);
+    const username = meta?.share?.username;
+    let title = copy.title;
+
+    if (mediaType === "instagram_profile" && username) {
+      title = `Perfil compartilhado @${String(username).replace(/^@/, "")}`;
+    }
+
+    const noLinkFallback =
+      mediaType === "instagram_story"
+        ? "Story compartilhado do Instagram"
+        : "Conteúdo compartilhado do Instagram";
 
     return (
       <>
@@ -628,20 +688,18 @@ const MessagesList = forwardRef(function MessagesList(
           <span>
             {copy.icon} {title}
           </span>
-          {!resolvedPermalink && (
-            <div style={{ marginTop: 4, opacity: 0.85 }}>
-              Conteúdo compartilhado do Instagram
-            </div>
+          {!permalink && (
+            <div style={{ marginTop: 4, opacity: 0.85 }}>{noLinkFallback}</div>
           )}
         </div>
-        {resolvedPermalink ? (
+        {permalink ? (
           <div className={classes.downloadMedia}>
             <Button
               color="primary"
               variant="outlined"
               target="_blank"
               rel="noopener noreferrer"
-              href={resolvedPermalink}
+              href={permalink}
             >
               Abrir no Instagram
             </Button>
@@ -653,11 +711,6 @@ const MessagesList = forwardRef(function MessagesList(
 
   const renderInstagramDirectInteraction = (message) => {
     const { mediaType } = message;
-    const meta = parseMessageMetaPayload(message);
-    const permalink =
-      (isInstagramPermalinkUrl(message.mediaUrl) ? message.mediaUrl : null) ||
-      meta?.share?.permalink ||
-      null;
 
     if (mediaType === "reaction") {
       return (
@@ -673,7 +726,7 @@ const MessagesList = forwardRef(function MessagesList(
       mediaType === "instagram_story" ||
       mediaType === "instagram_profile"
     ) {
-      return renderInstagramShareCard(mediaType, message, permalink);
+      return renderInstagramShareCard(mediaType, message);
     }
 
     return null;
@@ -688,19 +741,7 @@ const MessagesList = forwardRef(function MessagesList(
     if (isInstagramChannelMessage(message)) {
       const misclassifiedType = resolveMisclassifiedInstagramShare(message);
       if (misclassifiedType) {
-        const meta = parseMessageMetaPayload(message);
-        const permalink =
-          (isInstagramPermalinkUrl(message.mediaUrl)
-            ? message.mediaUrl
-            : null) ||
-          meta?.share?.permalink ||
-          meta?.share?.rawUrl ||
-          null;
-        return renderInstagramShareCard(
-          misclassifiedType,
-          message,
-          permalink
-        );
+        return renderInstagramShareCard(misclassifiedType, message);
       }
     }
 
@@ -1036,9 +1077,7 @@ const MessagesList = forwardRef(function MessagesList(
                   </div>
                 )}
 
-                {(message.mediaUrl || message.mediaType === "locationMessage" || message.mediaType === "vcard"
-                  //|| message.mediaType === "multi_vcard" 
-                ) && checkMessageMedia(message)}
+                {shouldRenderMessageMedia(message) && checkMessageMedia(message)}
                 <div className={classes.textContentItem}>
                   {message.quotedMsg && renderQuotedMessage(message)}
                   {renderMessageBody(message)}
@@ -1067,9 +1106,7 @@ const MessagesList = forwardRef(function MessagesList(
                 >
                   <ExpandMore />
                 </IconButton>
-                {(message.mediaUrl || message.mediaType === "locationMessage" || message.mediaType === "vcard"
-                  //|| message.mediaType === "multi_vcard" 
-                ) && checkMessageMedia(message)}
+                {shouldRenderMessageMedia(message) && checkMessageMedia(message)}
                 <div
                   className={clsx(classes.textContentItem, {
                     [classes.textContentItemDeleted]: message.isDeleted,
