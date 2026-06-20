@@ -62,8 +62,51 @@ type MetaErrorBody = {
     code?: number;
     error_subcode?: number;
     type?: string;
+    fbtrace_id?: string;
   };
 };
+
+export type InstagramDirectSendMetaErrorLog = {
+  httpStatus?: number;
+  responseData?: unknown;
+  errorCode?: number;
+  errorSubcode?: number;
+  errorMessage?: string;
+  errorType?: string;
+  fbtraceId?: string;
+};
+
+export const extractInstagramDirectSendMetaError = (
+  err: unknown
+): InstagramDirectSendMetaErrorLog => {
+  const axiosErr = err as AxiosError<MetaErrorBody>;
+  const meta = axiosErr.response?.data?.error;
+  return {
+    httpStatus: axiosErr.response?.status,
+    responseData: axiosErr.response?.data,
+    errorCode: meta?.code,
+    errorSubcode: meta?.error_subcode,
+    errorMessage: meta?.message,
+    errorType: meta?.type,
+    fbtraceId: meta?.fbtrace_id
+  };
+};
+
+export const buildInstagramDirectAudioPayload = (
+  recipientId: string,
+  audioUrl: string
+): Record<string, unknown> => ({
+  recipient: { id: recipientId },
+  message: {
+    attachment: {
+      type: "audio",
+      payload: {
+        url: audioUrl,
+        is_reusable: true
+      }
+    }
+  }
+});
 
 type ProfileStrategyResult =
   | { kind: "profile"; profile: MetaInstagramProfile }
@@ -1009,20 +1052,12 @@ export const sendInstagramDirectAudioMessage = async (
   audioUrl: string,
   accessToken: string
 ): Promise<InstagramDirectSendResult> => {
+  const requestBody = buildInstagramDirectAudioPayload(recipientId, audioUrl);
+  const endpoint = `${INSTAGRAM_GRAPH_VERSIONED}/${instagramBusinessAccountId}/messages`;
+
   const { data } = await axios.post<Record<string, unknown>>(
-    `${INSTAGRAM_GRAPH_VERSIONED}/${instagramBusinessAccountId}/messages`,
-    {
-      recipient: { id: recipientId },
-      message: {
-        attachment: {
-          type: "audio",
-          payload: {
-            url: audioUrl,
-            is_reusable: true
-          }
-        }
-      }
-    },
+    endpoint,
+    requestBody,
     {
       params: { access_token: accessToken },
       timeout: 60000,

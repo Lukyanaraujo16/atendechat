@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import path from "path";
 import AppError from "../errors/AppError";
 
 import SetTicketMessagesAsRead, {
@@ -246,6 +247,18 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
 
         try {
           if (isAudio) {
+            logger.info(
+              {
+                ticketId: ticket.id,
+                companyId,
+                channel: ticket.channel,
+                filename: media.originalname,
+                mimeType: media.mimetype,
+                extension: path.extname(media.originalname || ""),
+                fileSize: media.size
+              },
+              "[InstagramAudioOutbound] upload_received"
+            );
             assertInstagramAudioUpload(media);
           } else if (isVideo) {
             assertInstagramVideoUpload(media);

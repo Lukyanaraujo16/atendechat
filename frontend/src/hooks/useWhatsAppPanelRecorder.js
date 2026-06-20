@@ -170,6 +170,13 @@ export function useWhatsAppPanelRecorder({
 
       const ext = getAudioFileExtension(blob.type || mimeType);
       const filename = `audio-record-site-${new Date().getTime()}.${ext}`;
+      console.info("[AudioRecorder] upload", {
+        mimeType: blob.type || mimeType,
+        recorderMimeType: stoppedRec?.mimeType || selectedMimeTypeRef.current,
+        extension: ext,
+        filename,
+        fileSize: blob.size
+      });
       const formData = new FormData();
       formData.append("medias", blob, filename);
       formData.append("body", defaultUploadBody || filename);

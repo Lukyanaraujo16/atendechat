@@ -1,3 +1,4 @@
+import path from "path";
 import { v4 as uuidv4 } from "uuid";
 import AppError from "../../errors/AppError";
 import Contact from "../../models/Contact";
@@ -9,14 +10,22 @@ import formatBody from "../../helpers/Mustache";
 import {
   assertInstagramAudioUpload,
   buildInstagramPublicMediaUrl,
-  moveUploadedFileToInstagramFolder
+  moveUploadedFileToInstagramFolder,
+  resolveExtensionFromMime
 } from "../../helpers/instagramMediaStorage";
 import { isInstagramChannelTicket } from "../../helpers/ticketChannel";
 import { logger } from "../../utils/logger";
-import { incrementCompanyStorageUsage } from "../CompanyService/adjustCompanyStorageUsage";
+import {
+  decrementCompanyStorageUsage,
+  incrementCompanyStorageUsage
+} from "../CompanyService/adjustCompanyStorageUsage";
 import { serializeMessageForClient } from "../MessageServices/CreateMessageService";
 import resolveInstagramAccountToken from "./resolveInstagramAccountToken";
+import ConvertInstagramAudioService from "./ConvertInstagramAudioService";
 import {
+  buildInstagramDirectAudioPayload,
+  extractInstagramDirectSendMetaError,
+  InstagramDirectSendMetaErrorLog,
   isInstagramAudioFormatError,
   isInstagramMediaTooLargeError,
   mapInstagramOutboundSendError,
@@ -30,12 +39,40 @@ interface Request {
   companyId: number;
 }
 
+const logInstagramAudioMetaError = (
+  err: unknown,
+  context: Record<string, unknown>
+): InstagramDirectSendMetaErrorLog => {
+  const metaError = extractInstagramDirectSendMetaError(err);
+  logger.warn(
+    {
+      ...context,
+      ...metaError
+    },
+    "[InstagramAudioOutbound] meta_error"
+  );
+  return metaError;
+};
+
 const SendInstagramAudioMessageService = async ({
   ticket,
   media,
   body,
   companyId
 }: Request): Promise<Message> => {
+  logger.info(
+    {
+      ticketId: ticket.id,
+      companyId,
+      channel: ticket.channel,
+      filename: media.originalname,
+      mimeType: media.mimetype,
+      extension: path.extname(media.originalname || ""),
+      fileSize: media.size
+    },
+    "[InstagramAudioOutbound] upload_received"
+  );
+
   if (!isInstagramChannelTicket(ticket)) {
     throw new AppError("ERR_TICKET_CHANNEL_NOT_INSTAGRAM", 400);
   }
@@ -52,6 +89,18 @@ const SendInstagramAudioMessageService = async ({
     assertInstagramAudioUpload(media);
   } catch (err) {
     const code = err instanceof Error ? err.message : String(err);
+    logger.warn(
+      {
+        ticketId: ticket.id,
+        companyId,
+        filename: media.originalname,
+        mimeType: media.mimetype,
+        extension: path.extname(media.originalname || ""),
+        fileSize: media.size,
+        validationError: code
+      },
+      "[InstagramAudioOutbound] failed"
+    );
     if (code === "ERR_INSTAGRAM_AUDIO_TOO_LARGE") {
       throw new AppError(
         "ERR_INSTAGRAM_AUDIO_TOO_LARGE",
@@ -124,9 +173,60 @@ const SendInstagramAudioMessageService = async ({
     void incrementCompanyStorageUsage(companyId, savedFile.bytes);
   }
 
-  const publicAudioUrl = buildInstagramPublicMediaUrl(savedFile.relativePath);
+  let finalFile = {
+    relativePath: savedFile.relativePath,
+    absolutePath: savedFile.absolutePath,
+    bytes: savedFile.bytes,
+    mimeType: (media.mimetype || "").toLowerCase()
+  };
+
+  try {
+    const converted = await ConvertInstagramAudioService({
+      companyId,
+      inputAbsolutePath: savedFile.absolutePath,
+      inputMime: media.mimetype,
+      inputRelativePath: savedFile.relativePath
+    });
+
+    if (converted.converted) {
+      void decrementCompanyStorageUsage(companyId, savedFile.bytes);
+      if (converted.bytes > 0) {
+        void incrementCompanyStorageUsage(companyId, converted.bytes);
+      }
+    }
+
+    finalFile = {
+      relativePath: converted.relativePath,
+      absolutePath: converted.absolutePath,
+      bytes: converted.bytes,
+      mimeType: converted.mimeType
+    };
+  } catch (err) {
+    if (err instanceof AppError) {
+      throw err;
+    }
+    logger.warn(
+      {
+        ticketId: ticket.id,
+        companyId,
+        inputFile: savedFile.relativePath,
+        error: err instanceof Error ? err.message : String(err)
+      },
+      "[InstagramAudioOutbound] conversion_failed"
+    );
+    throw new AppError(
+      "ERR_INSTAGRAM_AUDIO_CONVERSION_FAILED",
+      500,
+      "Não foi possível converter o áudio para envio pelo Instagram."
+    );
+  }
+
+  const publicAudioUrl = buildInstagramPublicMediaUrl(finalFile.relativePath);
+  const savedExtension = path.extname(finalFile.absolutePath);
   const caption = formatBody(body?.trim() || "", ticket.contact);
   const bodyToSave = caption || "Áudio";
+  const metaEndpoint = `https://graph.instagram.com/v21.0/${businessId}/messages`;
+  const metaPayload = buildInstagramDirectAudioPayload(recipientId, publicAudioUrl);
 
   logger.info(
     {
@@ -134,13 +234,30 @@ const SendInstagramAudioMessageService = async ({
       companyId,
       instagramAccountId: account.id,
       recipientId,
-      publicAudioUrlHost: (() => {
-        try {
-          return new URL(publicAudioUrl).host;
-        } catch {
-          return undefined;
-        }
-      })()
+      filename: media.originalname,
+      mimeType: finalFile.mimeType,
+      extension: savedExtension || path.extname(media.originalname || ""),
+      fileSize: finalFile.bytes,
+      savedFileSize: finalFile.bytes,
+      savedRelativePath: finalFile.relativePath,
+      publicUrl: publicAudioUrl
+    },
+    "[InstagramAudioOutbound] file_info"
+  );
+
+  logger.info(
+    {
+      ticketId: ticket.id,
+      companyId,
+      instagramAccountId: account.id,
+      recipientId,
+      filename: media.originalname,
+      mimeType: finalFile.mimeType,
+      extension: savedExtension || path.extname(media.originalname || ""),
+      fileSize: finalFile.bytes,
+      publicUrl: publicAudioUrl,
+      metaEndpoint,
+      metaPayload
     },
     "[InstagramAudioOutbound] sending"
   );
@@ -151,6 +268,16 @@ const SendInstagramAudioMessageService = async ({
       recipientId,
       publicAudioUrl,
       accessToken
+    );
+
+    logger.info(
+      {
+        ticketId: ticket.id,
+        companyId,
+        externalMessageId: sendResult.messageId,
+        metaResponse: sendResult.rawResponse
+      },
+      "[InstagramAudioOutbound] meta_response"
     );
 
     logger.info(
@@ -173,7 +300,7 @@ const SendInstagramAudioMessageService = async ({
       fromMe: true,
       read: true,
       mediaType: "audio",
-      mediaUrl: savedFile.relativePath,
+      mediaUrl: finalFile.relativePath,
       ack: 2,
       channel: "instagram",
       externalMessageId: sendResult.messageId,
@@ -241,7 +368,32 @@ const SendInstagramAudioMessageService = async ({
       throw err;
     }
 
+    const failureContext = {
+      ticketId: ticket.id,
+      companyId,
+      filename: media.originalname,
+      mimeType: finalFile.mimeType,
+      extension:
+        savedExtension ||
+        path.extname(media.originalname || "") ||
+        resolveExtensionFromMime(finalFile.mimeType),
+      fileSize: finalFile.bytes,
+      publicUrl: publicAudioUrl,
+      metaEndpoint,
+      metaPayload
+    };
+
+    const metaError = logInstagramAudioMetaError(err, failureContext);
+
     if (isInstagramMediaTooLargeError(err)) {
+      logger.warn(
+        {
+          ...failureContext,
+          ...metaError,
+          mappedAppError: "ERR_INSTAGRAM_AUDIO_TOO_LARGE"
+        },
+        "[InstagramAudioOutbound] failed"
+      );
       throw new AppError(
         "ERR_INSTAGRAM_AUDIO_TOO_LARGE",
         400,
@@ -250,6 +402,14 @@ const SendInstagramAudioMessageService = async ({
     }
 
     if (isInstagramAudioFormatError(err)) {
+      logger.warn(
+        {
+          ...failureContext,
+          ...metaError,
+          mappedAppError: "ERR_INSTAGRAM_AUDIO_FORMAT_UNSUPPORTED"
+        },
+        "[InstagramAudioOutbound] failed"
+      );
       throw new AppError(
         "ERR_INSTAGRAM_AUDIO_FORMAT_UNSUPPORTED",
         400,
@@ -258,6 +418,16 @@ const SendInstagramAudioMessageService = async ({
     }
 
     const mapped = mapInstagramOutboundSendError(err);
+    logger.warn(
+      {
+        ...failureContext,
+        ...metaError,
+        mappedAppError: mapped.appError.message,
+        mappedStatusCode: mapped.statusCode
+      },
+      "[InstagramAudioOutbound] failed"
+    );
+
     if (mapped.appError.message === "ERR_INSTAGRAM_SEND_FAILED") {
       throw new AppError(
         "ERR_INSTAGRAM_AUDIO_SEND_FAILED",
@@ -266,15 +436,6 @@ const SendInstagramAudioMessageService = async ({
       );
     }
 
-    logger.warn(
-      {
-        ticketId: ticket.id,
-        statusCode: mapped.statusCode,
-        metaErrorCode: mapped.metaCode,
-        metaErrorMessage: mapped.metaMessage
-      },
-      "[InstagramAudioOutbound] failed"
-    );
     throw mapped.appError;
   }
 };

@@ -42,6 +42,28 @@ export const INSTAGRAM_ALLOWED_AUDIO_MIMES = new Set([
   "audio/ogg"
 ]);
 
+/** Formatos aceitos pela Meta para áudio outbound (Instagram Direct). */
+export const INSTAGRAM_META_AUDIO_MIMES = new Set([
+  "audio/mp4",
+  "audio/m4a",
+  "audio/x-m4a",
+  "audio/aac",
+  "audio/wav",
+  "audio/x-wav"
+]);
+
+export const isInstagramMetaCompatibleAudioMime = (mime: string): boolean =>
+  INSTAGRAM_META_AUDIO_MIMES.has(mime.toLowerCase());
+
+export const needsInstagramAudioConversion = (mime: string): boolean =>
+  !isInstagramMetaCompatibleAudioMime(mime);
+
+export const assertInstagramMetaAudioFileSize = (bytes: number): void => {
+  if (bytes > INSTAGRAM_AUDIO_MAX_BYTES) {
+    throw new Error("ERR_INSTAGRAM_AUDIO_TOO_LARGE");
+  }
+};
+
 const publicFolder = path.resolve(__dirname, "..", "..", "public");
 
 export const isInstagramAllowedImageMime = (mime: string): boolean =>
