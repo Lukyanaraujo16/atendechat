@@ -113,7 +113,7 @@ const SendInstagramTextMessageService = async ({
       fromMe: true,
       read: true,
       mediaType: "chat",
-      ack: 1,
+      ack: 2,
       channel: "instagram",
       externalMessageId: sendResult.messageId,
       metaPayload: sendResult.rawResponse,

@@ -1,4 +1,5 @@
 import { useCallback, useContext } from "react";
+import { useHistory } from "react-router-dom";
 import { v4 as uuidv4 } from "uuid";
 
 import api from "../services/api";
@@ -17,6 +18,7 @@ import { isGroupTicket } from "../utils/isGroupTicket";
  */
 export function useAcceptTicket() {
   const { user } = useContext(AuthContext);
+  const history = useHistory();
   const setCurrentTicket = useContext(TicketsSetContext);
   const ticketsNav = useContext(TicketsContext);
   const inbox = useContext(TicketsInboxContext);
@@ -62,11 +64,18 @@ export function useAcceptTicket() {
         ticketsNav.setInboxSubTab("open");
       }
 
+      const targetUuid = updated.uuid || ticket.uuid;
+      const acceptCode = uuidv4();
+
       setCurrentTicket({
         id: updated.id,
-        uuid: updated.uuid,
-        code: uuidv4(),
+        uuid: targetUuid,
+        code: acceptCode,
       });
+
+      if (targetUuid) {
+        history.push(`/tickets/${targetUuid}`);
+      }
 
       const shouldGreet =
         sendGreeting !== false &&
@@ -79,7 +88,7 @@ export function useAcceptTicket() {
 
       return updated;
     },
-    [user?.id, user?.name, inbox, ticketsNav, setCurrentTicket]
+    [user?.id, user?.name, inbox, ticketsNav, setCurrentTicket, history]
   );
 
   return { completeAcceptTicket };

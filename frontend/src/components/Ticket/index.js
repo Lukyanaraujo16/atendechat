@@ -28,7 +28,10 @@ import QuickMessageChatModal from "../QuickMessageChatModal";
 import TransferTicketModalCustom from "../TransferTicketModalCustom";
 import { canAccessTicket } from "../../utils/canAccessTicket";
 import { canDeleteTickets } from "../../utils/canDeleteTickets";
-import { TicketsSetContext } from "../../context/Tickets/TicketsContext";
+import {
+  TicketsContext,
+  TicketsSetContext,
+} from "../../context/Tickets/TicketsContext";
 import { TicketsInboxContext } from "../../context/TicketsInboxContext";
 import getTicketViewState, {
   TICKET_VIEW_STATE,
@@ -162,6 +165,7 @@ const Ticket = () => {
 
   const socketManager = useContext(SocketContext);
   const setCurrentTicket = useContext(TicketsSetContext);
+  const { currentTicket } = useContext(TicketsContext);
   const inbox = useContext(TicketsInboxContext);
   const { completeAcceptTicket } = useAcceptTicket();
   const { markAsReadByTicket } = useGlobalNotifications();
@@ -208,7 +212,7 @@ const Ticket = () => {
       fetchTicket();
     }, 500);
     return () => clearTimeout(delayDebounceFn);
-  }, [ticketId, history]);
+  }, [ticketId, history, currentTicket?.code]);
 
   /** Heartbeat Fase 4: não enviar push enquanto o ticket está aberto e visível. */
   useEffect(() => {

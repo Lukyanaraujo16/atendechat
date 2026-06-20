@@ -629,16 +629,25 @@ const MessagesList = forwardRef(function MessagesList(
   };
 
   const renderMessageAck = (message) => {
-    if (message.ack === 1) {
-      return <AccessTime fontSize="small" className={classes.ackIcons} />;
-    }
-    if (message.ack === 2) {
+    const ack = Number(message.ack);
+    const isInstagram =
+      String(ticket?.channel || message?.channel || "").toLowerCase() ===
+      "instagram";
+
+    if (isInstagram && message.fromMe && ack <= 1) {
       return <Done fontSize="small" className={classes.ackIcons} />;
     }
-    if (message.ack === 3) {
+
+    if (ack === 1) {
+      return <AccessTime fontSize="small" className={classes.ackIcons} />;
+    }
+    if (ack === 2) {
+      return <Done fontSize="small" className={classes.ackIcons} />;
+    }
+    if (ack === 3) {
       return <DoneAll fontSize="small" className={classes.ackIcons} />;
     }
-    if (message.ack === 4 || message.ack === 5) {
+    if (ack === 4 || ack === 5) {
       return <DoneAll fontSize="small" className={classes.ackDoneAllIcon} />;
     }
   };

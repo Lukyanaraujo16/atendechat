@@ -31,7 +31,7 @@ const CreateInstagramOutboundSyncMessageService = async ({
     fromMe: true,
     read: true,
     mediaType: "chat",
-    ack: 1,
+    ack: 2,
     channel: "instagram",
     externalMessageId: messageData.externalMessageId,
     metaPayload: messageData.metaPayload ?? null,
