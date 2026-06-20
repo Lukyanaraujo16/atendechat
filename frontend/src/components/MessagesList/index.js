@@ -592,6 +592,7 @@ const MessagesList = forwardRef(function MessagesList(
     "instagram_reel",
     "instagram_story",
     "instagram_profile",
+    "instagram_unsupported",
     "reaction",
   ]);
 
@@ -829,8 +830,26 @@ const MessagesList = forwardRef(function MessagesList(
     );
   };
 
+  const renderInstagramUnsupportedCard = () => (
+    <div className={classes.instagramShareCard}>
+      <div className={classes.instagramShareCardBody}>
+        <span>📱 Conteúdo compartilhado do Instagram</span>
+        <span style={{ opacity: 0.85, fontSize: 13 }}>
+          Este tipo de conteúdo não é disponibilizado pela API do Instagram.
+        </span>
+        <span style={{ opacity: 0.85, fontSize: 13 }}>
+          Visualize diretamente pelo aplicativo Instagram.
+        </span>
+      </div>
+    </div>
+  );
+
   const renderInstagramDirectInteraction = (message) => {
     const { mediaType } = message;
+
+    if (mediaType === "instagram_unsupported") {
+      return renderInstagramUnsupportedCard();
+    }
 
     if (mediaType === "reaction") {
       return (

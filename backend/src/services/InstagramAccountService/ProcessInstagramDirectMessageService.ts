@@ -9,6 +9,7 @@ import {
   extractInstagramMessageAttachments,
   extractInstagramReplyToMessageId,
   resolveInstagramMessageDirection,
+  isInstagramUnsupportedWebhookMessage,
   logUnsupportedInstagramWebhookPayload
 } from "./InstagramWebhookParser";
 import FindOrCreateInstagramContactService from "./FindOrCreateInstagramContactService";
@@ -36,7 +37,13 @@ interface ResolvedInstagramMessageContent {
   mediaType: string;
   mediaUrl?: string | null;
   shareMeta?: Record<string, unknown> | null;
+  unsupportedMeta?: Record<string, unknown> | null;
 }
+
+const INSTAGRAM_UNSUPPORTED_MESSAGE_BODY =
+  "📱 Conteúdo compartilhado do Instagram\n\n" +
+  "Este tipo de conteúdo não é disponibilizado pela API do Instagram.\n\n" +
+  "Para visualizar o conteúdo completo, acesse diretamente o aplicativo Instagram.";
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value)
@@ -195,6 +202,27 @@ const resolveInstagramMessageContent = async ({
   companyId: number;
   accessToken: string;
 }): Promise<ResolvedInstagramMessageContent | null> => {
+  if (isInstagramUnsupportedWebhookMessage(parsed)) {
+    logger.info(
+      {
+        messageId: parsed.messageId,
+        senderId: parsed.senderId,
+        recipientId: parsed.recipientId
+      },
+      "[InstagramUnsupported] received"
+    );
+
+    return {
+      body: INSTAGRAM_UNSUPPORTED_MESSAGE_BODY,
+      mediaType: "instagram_unsupported",
+      mediaUrl: null,
+      unsupportedMeta: {
+        unsupported: true,
+        originalMessageId: parsed.messageId
+      }
+    };
+  }
+
   const text = extractMessageText(parsed);
   const attachments = extractInstagramMessageAttachments(parsed);
   const shareContent = resolveInstagramShareContent(parsed, text);
@@ -481,7 +509,13 @@ const ProcessInstagramDirectMessageService = async ({
     mediaType: content.mediaType,
     replyToMessageId: extractInstagramReplyToMessageId(parsed),
     share: content.shareMeta ?? null,
-    attachments: extractInstagramMessageAttachments(parsed)
+    attachments: extractInstagramMessageAttachments(parsed),
+    ...(content.mediaType === "instagram_unsupported"
+      ? {
+          unsupported: true,
+          originalMessageId: parsed.messageId
+        }
+      : {})
   };
 
   const quotedMsgId = await resolveInstagramQuotedMessageId({
@@ -527,6 +561,17 @@ const ProcessInstagramDirectMessageService = async ({
         mediaType: content.mediaType
       },
       "[InstagramOutboundSync] message_saved"
+    );
+  } else if (content.mediaType === "instagram_unsupported") {
+    logger.info(
+      {
+        ticketId: ticket.id,
+        messageId: parsed.messageId,
+        contactId: enrichedContact.id,
+        accountId: account.id,
+        mediaType: content.mediaType
+      },
+      "[InstagramUnsupported] message_saved"
     );
   } else {
     logger.info(

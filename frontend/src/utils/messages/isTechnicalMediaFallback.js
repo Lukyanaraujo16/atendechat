@@ -85,6 +85,7 @@ export function getDisplayableMessageBody(message) {
     "instagram_reel",
     "instagram_story",
     "instagram_profile",
+    "instagram_unsupported",
     "reaction",
   ]);
 

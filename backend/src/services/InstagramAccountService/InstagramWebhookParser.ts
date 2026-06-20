@@ -261,6 +261,16 @@ export const extractInstagramReplyToMessageId = (
   parsed: ParsedInstagramWebhookEvent
 ): string | null => parsed.replyToMessageId;
 
+export const isInstagramUnsupportedWebhookMessage = (
+  parsed: ParsedInstagramWebhookEvent
+): boolean => {
+  const message = parsed.rawMessagingItem
+    ? asRecord(parsed.rawMessagingItem.message)
+    : null;
+
+  return message?.is_unsupported === true;
+};
+
 export const extractInstagramReactionFromEvent = (
   parsed: ParsedInstagramWebhookEvent
 ): InstagramWebhookReaction | null => {
