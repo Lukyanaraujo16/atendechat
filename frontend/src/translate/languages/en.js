@@ -5353,6 +5353,8 @@ const messages = {
 				placeholderClosed: "Reopen or accept this ticket to send a message.",
 				instagramOutboundBlocked:
 					"Replying via Instagram will be available in the next phase.",
+				instagramTextOnlyHint:
+					"Instagram: text messaging is enabled. Media will be available in a future phase.",
 				signMessage: "Sign",
 				sticker: "Send sticker (WebP)",
 				stickerOnlyWebp: "Sticker must be a .webp file",

@@ -145,6 +145,7 @@ export default function ComposerEmojiStickerPanel({
   onStickerSend,
   canManageStickers,
   sendingStickerId,
+  stickersEnabled = true,
 }) {
   const classes = useStyles();
   const isMobile = useIsMobile();
@@ -159,9 +160,9 @@ export default function ComposerEmojiStickerPanel({
 
   useEffect(() => {
     if (open) {
-      setTab(initialTab);
+      setTab(stickersEnabled ? initialTab : "emoji");
     }
-  }, [open, initialTab]);
+  }, [open, initialTab, stickersEnabled]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -288,13 +289,15 @@ export default function ComposerEmojiStickerPanel({
           value="emoji"
           label={i18n.t("messagesInput.stickers.tabEmoji")}
         />
-        <Tab
-          className={classes.tab}
-          value="stickers"
-          label={i18n.t("messagesInput.stickers.tabStickers")}
-        />
+        {stickersEnabled ? (
+          <Tab
+            className={classes.tab}
+            value="stickers"
+            label={i18n.t("messagesInput.stickers.tabStickers")}
+          />
+        ) : null}
       </Tabs>
-      {tab === "emoji" ? (
+      {tab === "emoji" || !stickersEnabled ? (
         <Box className={classes.emojiWrap}>
           <Picker
             perLine={isMobile ? 8 : 9}

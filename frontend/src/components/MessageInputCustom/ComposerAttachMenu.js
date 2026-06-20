@@ -68,6 +68,7 @@ const useStyles = makeStyles((theme) => ({
  */
 export default function ComposerAttachMenu({
   disabled,
+  textOnlyMode = false,
   quickRepliesEnabled,
   onPickDocument,
   onPickMedia,
@@ -103,25 +104,26 @@ export default function ComposerAttachMenu({
   };
 
   const items = [
-    {
+    !textOnlyMode && {
       key: "document",
       icon: <InsertDriveFileOutlinedIcon />,
       primary: i18n.t("messagesInput.attach.document"),
       onClick: onPickDocument,
     },
-    isMobile && {
+    !textOnlyMode &&
+      isMobile && {
       key: "camera",
       icon: <PhotoCameraOutlinedIcon />,
       primary: i18n.t("messagesInput.attach.camera"),
       onClick: onPickCamera,
     },
-    {
+    !textOnlyMode && {
       key: "media",
       icon: <PhotoLibraryOutlinedIcon />,
       primary: i18n.t("messagesInput.attach.photosVideos"),
       onClick: onPickMedia,
     },
-    {
+    !textOnlyMode && {
       key: "audio",
       icon: <MicNoneOutlinedIcon />,
       primary: i18n.t("messagesInput.attach.audio"),
@@ -133,7 +135,7 @@ export default function ComposerAttachMenu({
       primary: i18n.t("messagesInput.attach.quickReply"),
       onClick: onOpenQuickReplies,
     },
-    {
+    !textOnlyMode && {
       key: "sticker",
       icon: <ImageOutlinedIcon />,
       primary: i18n.t("messagesInput.attach.sticker"),
@@ -142,6 +144,10 @@ export default function ComposerAttachMenu({
       onClick: onOpenStickerLibrary,
     },
   ].filter(Boolean);
+
+  if (textOnlyMode && items.length === 0) {
+    return null;
+  }
 
   const renderList = (dense = false) => (
     <List className={dense ? classes.mobileList : classes.menuList} disablePadding={dense}>

@@ -267,6 +267,7 @@ const ActionButtons = (props) => {
     recording,
     ticketStatus,
     isOrphan,
+    isInstagramChannel,
     handleSendMessage,
     handleCancelAudio,
     handleUploadAudio,
@@ -316,6 +317,10 @@ const ActionButtons = (props) => {
       </div>
     );
   } else {
+    if (isInstagramChannel) {
+      return null;
+    }
+
     return (
       <IconButton
         aria-label="showRecorder"
@@ -538,6 +543,8 @@ const MessageInputCustom = (props) => {
   const focusBlockers = { transferModalOpen, quickRepliesOpen };
   const classes = useStyles();
   const isOrphan = isOrphanTicket(ticket);
+  const isInstagramChannel =
+    String(ticket?.channel || "").toLowerCase() === "instagram";
 
   const [medias, setMedias] = useState([]);
   const [inputMessage, setInputMessage] = useState("");
@@ -615,6 +622,10 @@ const MessageInputCustom = (props) => {
   };
 
   const handleChangeMedias = (e) => {
+    if (isInstagramChannel) {
+      return;
+    }
+
     if (!e.target.files) {
       return;
     }
@@ -625,6 +636,10 @@ const MessageInputCustom = (props) => {
   };
 
   const handleInputPaste = (e) => {
+    if (isInstagramChannel) {
+      return;
+    }
+
     if (e.clipboardData.files[0]) {
       setMedias([e.clipboardData.files[0]]);
     }
@@ -637,7 +652,7 @@ const MessageInputCustom = (props) => {
 
   const handleStickerSend = useCallback(
     async (sticker) => {
-      if (isOrphan || !ticketId || !sticker?.id || loading) return;
+      if (isInstagramChannel || isOrphan || !ticketId || !sticker?.id || loading) return;
       setSendingStickerId(sticker.id);
       setLoading(true);
       try {
@@ -653,10 +668,13 @@ const MessageInputCustom = (props) => {
         setLoading(false);
       }
     },
-    [isOrphan, ticketId, loading, sendStickerToTicket, onMessageSent]
+    [isInstagramChannel, isOrphan, ticketId, loading, sendStickerToTicket, onMessageSent]
   );
 
   const handleUploadQuickMessageMedia = async (blob, message) => {
+    if (isInstagramChannel) {
+      return;
+    }
     setLoading(true);
     try {
       const extension = blob.type.split("/")[1];
@@ -678,6 +696,10 @@ const MessageInputCustom = (props) => {
   
   const handleQuickAnswersClick = async (value) => {
     if (value.mediaPath) {
+      if (isInstagramChannel) {
+        return;
+      }
+
       try {
         const { data } = await axios.get(value.mediaPath, {
           responseType: "blob",
@@ -749,7 +771,7 @@ const MessageInputCustom = (props) => {
   ]);
 
   const handleUploadMedia = async (e) => {
-    if (isOrphan) return;
+    if (isInstagramChannel || isOrphan) return;
     setLoading(true);
     e.preventDefault();
 
@@ -834,19 +856,6 @@ const MessageInputCustom = (props) => {
     );
   };
 
-  const isInstagramChannel =
-    String(ticket?.channel || "").toLowerCase() === "instagram";
-
-  if (isInstagramChannel) {
-    return (
-      <Paper square elevation={0} className={classes.mainWrapper}>
-        <div className={classes.pendingHint} data-ticket-instagram-input-hint>
-          {i18n.t("messagesInput.instagramOutboundBlocked")}
-        </div>
-      </Paper>
-    );
-  }
-
   if (medias.length > 0)
     return (
       <Paper elevation={0} square className={classes.viewMediaInputWrapper}>
@@ -891,6 +900,11 @@ const MessageInputCustom = (props) => {
             {i18n.t("ticket.pendingPreview.inputHint")}
           </div>
         )}
+        {isInstagramChannel && (
+          <div className={classes.pendingHint} data-ticket-instagram-input-hint>
+            {i18n.t("messagesInput.instagramTextOnlyHint")}
+          </div>
+        )}
         {replyingMessage && renderReplyingMessage(replyingMessage)}
         <div className={classes.newMessageBox}>
           <input
@@ -922,6 +936,7 @@ const MessageInputCustom = (props) => {
           />
           <ComposerAttachMenu
             disabled={disableOption()}
+            textOnlyMode={isInstagramChannel}
             quickRepliesEnabled={quickRepliesEnabled}
             onMenuOpen={() => setComposerPanelOpen(false)}
             onPickDocument={() => documentInputRef.current?.click()}
@@ -964,6 +979,7 @@ const MessageInputCustom = (props) => {
               onStickerSend={handleStickerSend}
               canManageStickers={canManageStickers}
               sendingStickerId={sendingStickerId}
+              stickersEnabled={!isInstagramChannel}
             />
 
             <CustomInput
@@ -1001,6 +1017,7 @@ const MessageInputCustom = (props) => {
             recording={recording}
             ticketStatus={ticketStatus}
             isOrphan={isOrphan}
+            isInstagramChannel={isInstagramChannel}
             handleSendMessage={handleSendMessage}
             handleCancelAudio={handleCancelAudio}
             handleUploadAudio={handleUploadAudio}

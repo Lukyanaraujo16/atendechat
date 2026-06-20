@@ -5500,6 +5500,8 @@ const messages = {
             "Reabra ou aceite esse ticket para enviar uma mensagem.",
         instagramOutboundBlocked:
             "Resposta pelo Instagram será liberada na próxima fase.",
+        instagramTextOnlyHint:
+            "Instagram: envio de texto liberado. Mídias serão liberadas em fase futura.",
         signMessage: "Assinar",
         sticker: "Enviar figurinha (WebP)",
         stickerOnlyWebp: "Figurinha deve ser um arquivo .webp",

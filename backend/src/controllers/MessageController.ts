@@ -48,6 +48,8 @@ import CheckIsValidContact from "../services/WbotServices/CheckIsValidContact";
 import GetProfilePicUrl from "../services/WbotServices/GetProfilePicUrl";
 import CreateOrUpdateContactService from "../services/ContactServices/CreateOrUpdateContactService";
 import { v4 as uuidv4 } from "uuid";
+import { isInstagramChannelTicket } from "../helpers/ticketChannel";
+import SendInstagramTextMessageService from "../services/InstagramAccountService/SendInstagramTextMessageService";
 type IndexQuery = {
   pageNumber: string;
 };
@@ -194,6 +196,39 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
 
   /** Mesma regra do GET da conversa: atendente humano no painel ao enviar resposta. */
   await SetTicketMessagesAsRead(ticket, HUMAN_PANEL_SEND_MESSAGE);
+
+  if (isInstagramChannelTicket(ticket)) {
+    if (medias?.length) {
+      throw new AppError(
+        "ERR_INSTAGRAM_MEDIA_NOT_SUPPORTED",
+        400,
+        "Envio de mídia pelo Instagram ainda não está disponível."
+      );
+    }
+
+    if (asSticker) {
+      throw new AppError(
+        "ERR_INSTAGRAM_STICKER_NOT_SUPPORTED",
+        400,
+        "Envio de figurinha pelo Instagram ainda não está disponível."
+      );
+    }
+
+    if (!body?.trim()) {
+      throw new AppError("ERR_MESSAGE_BODY_REQUIRED", 400);
+    }
+
+    const bodyToSend = formatBody(body, ticket.contact);
+    const savedMessage = await SendInstagramTextMessageService({
+      ticket,
+      body: bodyToSend,
+      companyId
+    });
+
+    return res.status(200).json({
+      message: serializeMessageForClient(savedMessage)
+    });
+  }
 
   if (medias) {
     await Promise.all(

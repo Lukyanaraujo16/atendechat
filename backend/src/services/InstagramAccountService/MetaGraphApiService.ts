@@ -726,6 +726,119 @@ export const fetchInstagramSenderProfile = async (
   return result.ok ? result.profile : null;
 };
 
+export interface InstagramDirectSendResult {
+  messageId: string | null;
+  rawResponse: Record<string, unknown>;
+}
+
+export const isInstagramMessagingWindowError = (err: unknown): boolean => {
+  const meta = parseMetaError(err);
+  if (!meta) {
+    return false;
+  }
+
+  if (meta.error_subcode === 2534022) {
+    return true;
+  }
+
+  const message = (meta.message || "").toLowerCase();
+  return (
+    message.includes("24 hour") ||
+    message.includes("24-hour") ||
+    message.includes("outside of allowed window") ||
+    message.includes("outside the allowed window") ||
+    message.includes("messaging window")
+  );
+};
+
+export const mapInstagramOutboundSendError = (
+  err: unknown
+): {
+  statusCode: number;
+  metaCode?: number;
+  metaMessage?: string;
+  appError: AppError;
+} => {
+  const axiosErr = err as AxiosError<MetaErrorBody>;
+  const meta = parseMetaError(err);
+  const statusCode = axiosErr.response?.status ?? 502;
+  const metaCode = meta?.code;
+  const metaMessage = meta?.message
+    ? redactSensitiveText(meta.message)
+    : undefined;
+
+  if (isInstagramMessagingWindowError(err)) {
+    return {
+      statusCode,
+      metaCode,
+      metaMessage,
+      appError: new AppError(
+        "ERR_INSTAGRAM_MESSAGING_WINDOW_EXPIRED",
+        400,
+        "Não foi possível enviar: a janela de resposta do Instagram pode ter expirado."
+      )
+    };
+  }
+
+  if (isMetaTemporaryUnavailable(err)) {
+    return {
+      statusCode,
+      metaCode,
+      metaMessage,
+      appError: new AppError(
+        "ERR_META_API_TEMPORARY_FAILED",
+        503,
+        "Falha temporária na Meta ao enviar mensagem. Tente novamente."
+      )
+    };
+  }
+
+  const clientMessage =
+    metaMessage ||
+    "Não foi possível enviar a mensagem pelo Instagram. Tente novamente.";
+
+  return {
+    statusCode,
+    metaCode,
+    metaMessage,
+    appError: new AppError(
+      "ERR_INSTAGRAM_SEND_FAILED",
+      statusCode >= 400 && statusCode < 500 ? 400 : 502,
+      clientMessage
+    )
+  };
+};
+
+/**
+ * Envia texto via Instagram Messaging API (Direct).
+ * POST graph.instagram.com/{instagramBusinessAccountId}/messages
+ */
+export const sendInstagramDirectTextMessage = async (
+  instagramBusinessAccountId: string,
+  recipientId: string,
+  text: string,
+  accessToken: string
+): Promise<InstagramDirectSendResult> => {
+  const { data } = await axios.post<Record<string, unknown>>(
+    `${INSTAGRAM_GRAPH_VERSIONED}/${instagramBusinessAccountId}/messages`,
+    {
+      recipient: { id: recipientId },
+      message: { text }
+    },
+    {
+      params: { access_token: accessToken },
+      timeout: 15000,
+      headers: { "Content-Type": "application/json" }
+    }
+  );
+
+  const messageIdRaw = data?.message_id ?? data?.id;
+  return {
+    messageId: messageIdRaw != null ? String(messageIdRaw) : null,
+    rawResponse: data ?? {}
+  };
+};
+
 export function buildInstagramContactDisplayName(
   profile: InstagramSenderProfile | null,
   senderId: string
