@@ -108,6 +108,22 @@ export const buildInstagramDirectAudioPayload = (
   }
 });
 
+export const buildInstagramDirectFilePayload = (
+  recipientId: string,
+  fileUrl: string
+): Record<string, unknown> => ({
+  recipient: { id: recipientId },
+  message: {
+    attachment: {
+      type: "file",
+      payload: {
+        url: fileUrl,
+        is_reusable: true
+      }
+    }
+  }
+});
+
 type ProfileStrategyResult =
   | { kind: "profile"; profile: MetaInstagramProfile }
   | { kind: "temporary"; phase: MetaApiPhase }
@@ -1053,6 +1069,36 @@ export const sendInstagramDirectAudioMessage = async (
   accessToken: string
 ): Promise<InstagramDirectSendResult> => {
   const requestBody = buildInstagramDirectAudioPayload(recipientId, audioUrl);
+  const endpoint = `${INSTAGRAM_GRAPH_VERSIONED}/${instagramBusinessAccountId}/messages`;
+
+  const { data } = await axios.post<Record<string, unknown>>(
+    endpoint,
+    requestBody,
+    {
+      params: { access_token: accessToken },
+      timeout: 60000,
+      headers: { "Content-Type": "application/json" }
+    }
+  );
+
+  const messageIdRaw = data?.message_id ?? data?.id;
+  return {
+    messageId: messageIdRaw != null ? String(messageIdRaw) : null,
+    rawResponse: data ?? {}
+  };
+};
+
+/**
+ * Envia documento via Instagram Messaging API (URL pública HTTPS).
+ * POST graph.instagram.com/{instagramBusinessAccountId}/messages
+ */
+export const sendInstagramDirectFileMessage = async (
+  instagramBusinessAccountId: string,
+  recipientId: string,
+  fileUrl: string,
+  accessToken: string
+): Promise<InstagramDirectSendResult> => {
+  const requestBody = buildInstagramDirectFilePayload(recipientId, fileUrl);
   const endpoint = `${INSTAGRAM_GRAPH_VERSIONED}/${instagramBusinessAccountId}/messages`;
 
   const { data } = await axios.post<Record<string, unknown>>(

@@ -260,6 +260,23 @@ const useStyles = makeStyles((theme) => {
 };
 });
 
+const INSTAGRAM_DOCUMENT_EXTENSIONS = new Set([
+  ".pdf",
+  ".doc",
+  ".docx",
+  ".xls",
+  ".xlsx",
+  ".txt",
+  ".csv",
+]);
+
+const getFileExtension = (filename) => {
+  const name = String(filename || "");
+  const dotIndex = name.lastIndexOf(".");
+  if (dotIndex < 0) return "";
+  return name.slice(dotIndex).toLowerCase();
+};
+
 const ActionButtons = (props) => {
   const {
     inputMessage,
@@ -560,6 +577,7 @@ const MessageInputCustom = (props) => {
   const mediaInputRef = useRef(null);
   const instagramImageInputRef = useRef(null);
   const instagramVideoInputRef = useRef(null);
+  const instagramDocumentInputRef = useRef(null);
   const cameraInputRef = useRef(null);
   const { sendStickerToTicket } = useStickers();
   const canManageStickers =
@@ -633,13 +651,24 @@ const MessageInputCustom = (props) => {
     const { allowedPrefix } = options;
 
     if (isInstagramChannel) {
-      selectedMedias = selectedMedias.filter((file) => {
-        const type = String(file.type || "");
-        if (allowedPrefix) {
-          return type.startsWith(allowedPrefix);
-        }
-        return type.startsWith("image/") || type.startsWith("video/") || type.startsWith("audio/");
-      });
+      if (options.instagramDocument) {
+        selectedMedias = selectedMedias.filter((file) =>
+          INSTAGRAM_DOCUMENT_EXTENSIONS.has(getFileExtension(file.name))
+        );
+      } else if (allowedPrefix) {
+        selectedMedias = selectedMedias.filter((file) =>
+          String(file.type || "").startsWith(allowedPrefix)
+        );
+      } else {
+        selectedMedias = selectedMedias.filter((file) => {
+          const type = String(file.type || "");
+          return (
+            type.startsWith("image/") ||
+            type.startsWith("video/") ||
+            type.startsWith("audio/")
+          );
+        });
+      }
       if (!selectedMedias.length) {
         return;
       }
@@ -800,14 +829,22 @@ const MessageInputCustom = (props) => {
     formData.append("fromMe", true);
     medias.forEach((media) => {
       formData.append("medias", media);
+      const isInstagramDocument =
+        isInstagramChannel &&
+        INSTAGRAM_DOCUMENT_EXTENSIONS.has(getFileExtension(media.name));
       const fallbackBody = isInstagramChannel
-        ? String(media.type || "").startsWith("video/")
-          ? "Vídeo"
-          : String(media.type || "").startsWith("audio/")
-            ? "Áudio"
-            : "Imagem"
+        ? isInstagramDocument
+          ? media.name
+          : String(media.type || "").startsWith("video/")
+            ? "Vídeo"
+            : String(media.type || "").startsWith("audio/")
+              ? "Áudio"
+              : "Imagem"
         : media.name;
-      formData.append("body", inputMessage.trim() || fallbackBody);
+      formData.append(
+        "body",
+        isInstagramDocument ? media.name : inputMessage.trim() || fallbackBody
+      );
     });
 
     try {
@@ -978,6 +1015,15 @@ const MessageInputCustom = (props) => {
             onChange={(e) => handleChangeMedias(e, { allowedPrefix: "video/" })}
           />
           <input
+            ref={instagramDocumentInputRef}
+            type="file"
+            multiple
+            className={classes.uploadInput}
+            disabled={disableOption() || !isInstagramChannel}
+            accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.csv"
+            onChange={(e) => handleChangeMedias(e, { instagramDocument: true })}
+          />
+          <input
             ref={cameraInputRef}
             type="file"
             className={classes.uploadInput}
@@ -995,6 +1041,7 @@ const MessageInputCustom = (props) => {
             onPickMedia={() => mediaInputRef.current?.click()}
             onPickInstagramImage={() => instagramImageInputRef.current?.click()}
             onPickInstagramVideo={() => instagramVideoInputRef.current?.click()}
+            onPickInstagramDocument={() => instagramDocumentInputRef.current?.click()}
             onPickCamera={() => cameraInputRef.current?.click()}
             onOpenStickerLibrary={() => openComposerPanel("stickers")}
             onStartRecording={() => {

@@ -2,11 +2,16 @@ import axios, { AxiosError } from "axios";
 import { redactSensitiveText } from "../../helpers/maskSensitive";
 import {
   getInstagramMediaMaxBytes,
+  INSTAGRAM_DOCUMENT_MAX_BYTES,
   saveInstagramMediaBuffer
 } from "../../helpers/instagramMediaStorage";
 import { logger } from "../../utils/logger";
 
-export type InstagramDownloadMediaKind = "image" | "video" | "audio";
+export type InstagramDownloadMediaKind =
+  | "image"
+  | "video"
+  | "audio"
+  | "document";
 
 interface Request {
   url: string;
@@ -26,25 +31,29 @@ export interface DownloadInstagramMediaResult {
 const LOG_PREFIX: Record<InstagramDownloadMediaKind, string> = {
   image: "[InstagramMediaInbound]",
   video: "[InstagramVideoInbound]",
-  audio: "[InstagramAudioInbound]"
+  audio: "[InstagramAudioInbound]",
+  document: "[InstagramDocumentInbound]"
 };
 
 const TOO_LARGE_ERROR: Record<InstagramDownloadMediaKind, string> = {
   image: "ERR_INSTAGRAM_IMAGE_TOO_LARGE",
   video: "ERR_INSTAGRAM_VIDEO_TOO_LARGE",
-  audio: "ERR_INSTAGRAM_AUDIO_TOO_LARGE"
+  audio: "ERR_INSTAGRAM_AUDIO_TOO_LARGE",
+  document: "ERR_INSTAGRAM_DOCUMENT_TOO_LARGE"
 };
 
 const DEFAULT_MIME: Record<InstagramDownloadMediaKind, string> = {
   image: "image/jpeg",
   video: "video/mp4",
-  audio: "audio/mp4"
+  audio: "audio/mp4",
+  document: "application/pdf"
 };
 
 const TIMEOUT_MS: Record<InstagramDownloadMediaKind, number> = {
   image: 30000,
   video: 120000,
-  audio: 60000
+  audio: 60000,
+  document: 60000
 };
 
 const downloadWithAuth = async (
@@ -96,7 +105,11 @@ const DownloadInstagramMediaService = async ({
   mediaKind = "image"
 }: Request): Promise<DownloadInstagramMediaResult> => {
   const logPrefix = LOG_PREFIX[mediaKind];
-  const maxBytes = getInstagramMediaMaxBytes(DEFAULT_MIME[mediaKind]);
+  const defaultMime = DEFAULT_MIME[mediaKind];
+  const maxBytes =
+    mediaKind === "document"
+      ? INSTAGRAM_DOCUMENT_MAX_BYTES
+      : getInstagramMediaMaxBytes(defaultMime);
   const timeoutMs = TIMEOUT_MS[mediaKind];
 
   logger.info(
@@ -123,7 +136,10 @@ const DownloadInstagramMediaService = async ({
       timeoutMs
     );
 
-    const effectiveMax = getInstagramMediaMaxBytes(mimeType);
+    const effectiveMax =
+      mediaKind === "document"
+        ? INSTAGRAM_DOCUMENT_MAX_BYTES
+        : getInstagramMediaMaxBytes(mimeType);
     if (buffer.length > effectiveMax) {
       throw new Error(TOO_LARGE_ERROR[mediaKind]);
     }

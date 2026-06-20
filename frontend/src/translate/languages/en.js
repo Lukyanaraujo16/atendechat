@@ -5356,7 +5356,7 @@ const messages = {
 				instagramTextOnlyHint:
 					"Instagram: text messaging is enabled. Media will be available in a future phase.",
 				instagramImageHint:
-					"Instagram: text, images, videos and audio are enabled. Other media types will be available in a future phase.",
+					"Instagram: text, images, videos, audio and documents are enabled. Other media types will be available in a future phase.",
 				signMessage: "Sign",
 				sticker: "Send sticker (WebP)",
 				stickerOnlyWebp: "Sticker must be a .webp file",

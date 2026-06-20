@@ -1,6 +1,7 @@
 import Message from "../../models/Message";
 import MetaWebhookEvent from "../../models/MetaWebhookEvent";
 import InstagramAccount from "../../models/InstagramAccount";
+import path from "path";
 import { logger } from "../../utils/logger";
 import { incrementCompanyStorageUsage } from "../CompanyService/adjustCompanyStorageUsage";
 import {
@@ -99,6 +100,18 @@ const isDuplicateMessage = async (
 
 const VIDEO_ATTACHMENT_TYPES = new Set(["video", "ig_reel"]);
 const AUDIO_ATTACHMENT_TYPES = new Set(["audio"]);
+const FILE_ATTACHMENT_TYPES = new Set(["file"]);
+
+const extractFilenameFromUrl = (url: string | null): string | null => {
+  if (!url) return null;
+  try {
+    const base = path.basename(new URL(url).pathname);
+    if (!base || base === "/") return null;
+    return decodeURIComponent(base);
+  } catch {
+    return null;
+  }
+};
 
 const downloadInstagramAttachment = async ({
   attachment,
@@ -107,6 +120,7 @@ const downloadInstagramAttachment = async ({
   accessToken,
   text,
   mediaKind,
+  messageMediaType,
   defaultLabel,
   failLabel,
   receivedLog
@@ -116,7 +130,8 @@ const downloadInstagramAttachment = async ({
   companyId: number;
   accessToken: string;
   text: string | null;
-  mediaKind: "image" | "video" | "audio";
+  mediaKind: "image" | "video" | "audio" | "document";
+  messageMediaType: string;
   defaultLabel: string;
   failLabel: string;
   receivedLog: string;
@@ -146,7 +161,7 @@ const downloadInstagramAttachment = async ({
 
       return {
         body: text || defaultLabel,
-        mediaType: mediaKind,
+        mediaType: messageMediaType,
         mediaUrl: downloaded.relativePath
       };
     } catch {
@@ -183,6 +198,9 @@ const resolveInstagramMessageContent = async ({
   const audioAttachment = attachments.find(item =>
     AUDIO_ATTACHMENT_TYPES.has(item.type)
   );
+  const fileAttachment = attachments.find(item =>
+    FILE_ATTACHMENT_TYPES.has(item.type)
+  );
 
   if (imageAttachment) {
     return downloadInstagramAttachment({
@@ -192,6 +210,7 @@ const resolveInstagramMessageContent = async ({
       accessToken,
       text,
       mediaKind: "image",
+      messageMediaType: "image",
       defaultLabel: "Imagem",
       failLabel: "Imagem recebida (falha ao baixar mídia)",
       receivedLog: "[InstagramMediaInbound] received"
@@ -206,6 +225,7 @@ const resolveInstagramMessageContent = async ({
       accessToken,
       text,
       mediaKind: "video",
+      messageMediaType: "video",
       defaultLabel: "Vídeo",
       failLabel: "Vídeo recebido (falha ao baixar mídia)",
       receivedLog: "[InstagramVideoInbound] received"
@@ -220,9 +240,26 @@ const resolveInstagramMessageContent = async ({
       accessToken,
       text,
       mediaKind: "audio",
+      messageMediaType: "audio",
       defaultLabel: "Áudio",
       failLabel: "Áudio recebido (falha ao baixar mídia)",
       receivedLog: "[InstagramAudioInbound] received"
+    });
+  }
+
+  if (fileAttachment) {
+    const filenameFromUrl = extractFilenameFromUrl(fileAttachment.url);
+    return downloadInstagramAttachment({
+      attachment: fileAttachment,
+      parsed,
+      companyId,
+      accessToken,
+      text: text || filenameFromUrl,
+      mediaKind: "document",
+      messageMediaType: "document",
+      defaultLabel: filenameFromUrl || "Documento",
+      failLabel: "Documento recebido (falha ao baixar mídia)",
+      receivedLog: "[InstagramDocumentInbound] received"
     });
   }
 

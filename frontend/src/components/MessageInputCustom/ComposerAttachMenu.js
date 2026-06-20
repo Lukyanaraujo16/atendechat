@@ -76,6 +76,7 @@ export default function ComposerAttachMenu({
   onPickMedia,
   onPickInstagramImage,
   onPickInstagramVideo,
+  onPickInstagramDocument,
   onPickCamera,
   onOpenStickerLibrary,
   onStartRecording,
@@ -149,6 +150,13 @@ export default function ComposerAttachMenu({
       primary: i18n.t("messagesInput.attach.audio"),
       onClick: onStartRecording,
     },
+    (!textOnlyMode || instagramImageMode) &&
+      instagramImageMode && {
+        key: "instagramDocument",
+        icon: <InsertDriveFileOutlinedIcon />,
+        primary: i18n.t("messagesInput.attach.document"),
+        onClick: onPickInstagramDocument,
+      },
     quickRepliesEnabled && !instagramImageMode && {
       key: "quickReply",
       icon: <FlashOnOutlinedIcon />,

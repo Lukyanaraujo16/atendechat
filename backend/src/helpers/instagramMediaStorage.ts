@@ -16,6 +16,12 @@ export const INSTAGRAM_AUDIO_MAX_BYTES =
     ? parsedAudioMax
     : 25 * 1024 * 1024;
 
+const parsedDocumentMax = Number(process.env.INSTAGRAM_DOCUMENT_MAX_BYTES);
+export const INSTAGRAM_DOCUMENT_MAX_BYTES =
+  Number.isFinite(parsedDocumentMax) && parsedDocumentMax > 0
+    ? parsedDocumentMax
+    : 25 * 1024 * 1024;
+
 export const INSTAGRAM_ALLOWED_IMAGE_MIMES = new Set([
   "image/jpeg",
   "image/jpg",
@@ -40,6 +46,37 @@ export const INSTAGRAM_ALLOWED_AUDIO_MIMES = new Set([
   "audio/x-wav",
   "audio/webm",
   "audio/ogg"
+]);
+
+export const INSTAGRAM_ALLOWED_DOCUMENT_MIMES = new Set([
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "text/plain",
+  "text/csv"
+]);
+
+export const INSTAGRAM_ALLOWED_DOCUMENT_EXTENSIONS = new Set([
+  ".pdf",
+  ".doc",
+  ".docx",
+  ".xls",
+  ".xlsx",
+  ".txt",
+  ".csv"
+]);
+
+export const INSTAGRAM_BLOCKED_DOCUMENT_EXTENSIONS = new Set([
+  ".exe",
+  ".apk",
+  ".zip",
+  ".rar",
+  ".7z",
+  ".iso",
+  ".bat",
+  ".sh"
 ]);
 
 /** Formatos aceitos pela Meta para áudio outbound (Instagram Direct). */
@@ -75,12 +112,33 @@ export const isInstagramAllowedVideoMime = (mime: string): boolean =>
 export const isInstagramAllowedAudioMime = (mime: string): boolean =>
   INSTAGRAM_ALLOWED_AUDIO_MIMES.has(mime.toLowerCase());
 
+export const resolveInstagramDocumentExtension = (filename: string): string =>
+  path.extname(filename || "").toLowerCase();
+
+export const isInstagramAllowedDocumentMime = (mime: string): boolean =>
+  INSTAGRAM_ALLOWED_DOCUMENT_MIMES.has(mime.toLowerCase());
+
+export const isInstagramDocumentUpload = (file: Express.Multer.File): boolean => {
+  const ext = resolveInstagramDocumentExtension(file.originalname);
+  const mime = (file.mimetype || "").toLowerCase();
+  return (
+    INSTAGRAM_ALLOWED_DOCUMENT_EXTENSIONS.has(ext) ||
+    INSTAGRAM_ALLOWED_DOCUMENT_MIMES.has(mime)
+  );
+};
+
 export const getInstagramMediaMaxBytes = (mime: string | null): number => {
   if (mime && isInstagramAllowedVideoMime(mime)) {
     return INSTAGRAM_VIDEO_MAX_BYTES;
   }
   if (mime && isInstagramAllowedAudioMime(mime)) {
     return INSTAGRAM_AUDIO_MAX_BYTES;
+  }
+  if (mime && isInstagramAllowedDocumentMime(mime)) {
+    return INSTAGRAM_DOCUMENT_MAX_BYTES;
+  }
+  if (mime && (mime.startsWith("text/") || mime === "application/pdf")) {
+    return INSTAGRAM_DOCUMENT_MAX_BYTES;
   }
   return INSTAGRAM_IMAGE_MAX_BYTES;
 };
@@ -120,6 +178,13 @@ export const resolveExtensionFromMime = (mimeType: string | null): string => {
   if (mimeType.includes("ogg")) return ".ogg";
   if (mimeType.includes("m4a") || mimeType.includes("aac")) return ".m4a";
   if (mimeType.startsWith("audio/")) return ".m4a";
+  if (mimeType.includes("pdf")) return ".pdf";
+  if (mimeType.includes("wordprocessingml")) return ".docx";
+  if (mimeType.includes("msword")) return ".doc";
+  if (mimeType.includes("spreadsheetml")) return ".xlsx";
+  if (mimeType.includes("ms-excel")) return ".xls";
+  if (mimeType === "text/plain") return ".txt";
+  if (mimeType === "text/csv") return ".csv";
   return ".jpg";
 };
 
@@ -156,6 +221,27 @@ export const assertInstagramAudioUpload = (
   }
   if (file.size > INSTAGRAM_AUDIO_MAX_BYTES) {
     throw new Error("ERR_INSTAGRAM_AUDIO_TOO_LARGE");
+  }
+};
+
+export const assertInstagramDocumentUpload = (
+  file: Express.Multer.File
+): void => {
+  const ext = resolveInstagramDocumentExtension(file.originalname);
+  if (INSTAGRAM_BLOCKED_DOCUMENT_EXTENSIONS.has(ext)) {
+    throw new Error("ERR_INSTAGRAM_DOCUMENT_TYPE_BLOCKED");
+  }
+
+  const mime = (file.mimetype || "").toLowerCase();
+  const mimeOk = INSTAGRAM_ALLOWED_DOCUMENT_MIMES.has(mime);
+  const extOk = INSTAGRAM_ALLOWED_DOCUMENT_EXTENSIONS.has(ext);
+
+  if (!mimeOk && !extOk) {
+    throw new Error("ERR_INSTAGRAM_DOCUMENT_FORMAT_UNSUPPORTED");
+  }
+
+  if (file.size > INSTAGRAM_DOCUMENT_MAX_BYTES) {
+    throw new Error("ERR_INSTAGRAM_DOCUMENT_TOO_LARGE");
   }
 };
 
