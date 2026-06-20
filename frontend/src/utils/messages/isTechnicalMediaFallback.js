@@ -12,6 +12,12 @@ const RAW_WA_TYPE_PATTERN = /^[a-zA-Z]+Message$/;
 const MEDIA_PLACEHOLDER_BODIES = new Set([
   "áudio",
   "audio",
+  "imagem",
+  "image",
+  "vídeo",
+  "video",
+  "documento",
+  "document",
   "sticker",
   "reaction",
   "varios contatos",
