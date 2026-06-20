@@ -8,6 +8,7 @@
     "watch": "tsc -w",
     "start": "nodemon dist/server.js",
     "start:prod": "node dist/server.js",
+    "prestart:prod": "npm run build",
     "dev:server": "ts-node-dev --respawn --transpile-only --ignore node_modules src/server.ts",
     "db:migrate": "npm run build && npx sequelize db:migrate",
     "db:diagnose-contact-labels": "npm run build && node dist/scripts/diagnose-contact-label-tables.js",

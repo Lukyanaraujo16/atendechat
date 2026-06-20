@@ -49,6 +49,7 @@ import GetProfilePicUrl from "../services/WbotServices/GetProfilePicUrl";
 import CreateOrUpdateContactService from "../services/ContactServices/CreateOrUpdateContactService";
 import { v4 as uuidv4 } from "uuid";
 import { isInstagramChannelTicket } from "../helpers/ticketChannel";
+import extractMessageUploadMedias from "../helpers/extractMessageUploadMedias";
 import SendInstagramTextMessageService from "../services/InstagramAccountService/SendInstagramTextMessageService";
 import SendInstagramImageMessageService from "../services/InstagramAccountService/SendInstagramImageMessageService";
 import {
@@ -188,7 +189,7 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
   const { ticketId } = req.params;
   const { body, quotedMsg }: MessageData = req.body;
   const asSticker = req.body.asSticker === "true" || req.body.asSticker === "1";
-  const medias = req.files as Express.Multer.File[];
+  const medias = extractMessageUploadMedias(req);
   const { companyId, profile, supportMode, id } = req.user;
 
   const ticket = await ShowTicketService(ticketId, companyId);
@@ -211,7 +212,18 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
       );
     }
 
-    if (medias?.length) {
+    if (medias.length) {
+      logger.info(
+        {
+          ticketId: ticket.id,
+          companyId,
+          channel: ticket.channel,
+          filesCount: medias.length,
+          mimetypes: medias.map(media => media.mimetype)
+        },
+        "[InstagramMediaOutbound] upload_received"
+      );
+
       for (const media of medias) {
         const mime = (media.mimetype || "").toLowerCase();
         if (!INSTAGRAM_ALLOWED_IMAGE_MIMES.has(mime)) {
