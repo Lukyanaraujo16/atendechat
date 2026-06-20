@@ -6,6 +6,7 @@ import {
 import {
   classifyShareUrls,
   collectShareUrlCandidates,
+  extractInstagramPermalinkFromSharePayload,
   isInstagramPermalinkUrl,
   isInstagramShareAttachmentType,
   shouldTreatAttachmentAsShare
@@ -145,15 +146,22 @@ const buildShareContent = ({
   payload,
   url,
   caption,
-  source
+  source,
+  parsed,
+  attachment
 }: {
   attachmentType: string;
   payload: Record<string, unknown>;
   url: string | null;
   caption: string | null;
   source: string;
+  parsed?: ParsedInstagramWebhookEvent | null;
+  attachment?: InstagramWebhookAttachment | null;
 }): InstagramShareMessageContent | null => {
-  const classified = classifyShareUrls(...collectShareUrlCandidates(url, payload));
+  const classified = classifyShareUrls(
+    payload,
+    ...collectShareUrlCandidates(url, payload)
+  );
   const explicitType = mapAttachmentTypeToShare(attachmentType);
   const inferred = inferShareFromUrl(classified.permalink || classified.rawUrl);
   const mediaType =
@@ -162,6 +170,13 @@ const buildShareContent = ({
   if (!mediaType) {
     return null;
   }
+
+  const extractedPermalink = extractInstagramPermalinkFromSharePayload(
+    payload,
+    mediaType
+  );
+  const permalink = classified.permalink || extractedPermalink.permalink;
+  const shortcode = classified.shortcode || extractedPermalink.shortcode;
 
   const username =
     asString(payload.username) ||
@@ -186,14 +201,13 @@ const buildShareContent = ({
   const assetId =
     classified.assetId ||
     asString(payload.asset_id) ||
-    asString(payload.ig_post_media_id) ||
-    asString(payload.media_id) ||
     null;
 
   const shareMeta = {
     source,
     attachmentType,
-    permalink: classified.permalink,
+    permalink,
+    shortcode,
     rawUrl: classified.rawUrl,
     assetUrl: classified.assetUrl,
     thumbnailSourceUrl: classified.thumbnailSourceUrl,
@@ -223,6 +237,7 @@ const buildShareContent = ({
       attachmentType,
       mediaType,
       permalink: shareMeta.permalink,
+      shortcode,
       assetId,
       hasAssetUrl: Boolean(shareMeta.assetUrl),
       postId,
@@ -234,17 +249,70 @@ const buildShareContent = ({
     `[InstagramShare] ${logKey}`
   );
 
+  if (mediaType === "instagram_post" && parsed) {
+    logInstagramPostSharePayload({
+      parsed,
+      attachment,
+      shareMeta,
+      contentMediaType: mediaType
+    });
+  }
+
   return {
     body: buildShareBody(mediaType),
     mediaType,
-    mediaUrl: classified.permalink,
+    mediaUrl: permalink,
     shareMeta
   };
 };
 
+const logInstagramPostSharePayload = ({
+  parsed,
+  attachment,
+  shareMeta,
+  contentMediaType
+}: {
+  parsed?: ParsedInstagramWebhookEvent | null;
+  attachment?: InstagramWebhookAttachment | null;
+  shareMeta: Record<string, unknown>;
+  contentMediaType: InstagramShareMediaType;
+}): void => {
+  const message = parsed?.rawMessagingItem
+    ? asRecord(parsed.rawMessagingItem.message)
+    : null;
+  const sender = parsed?.rawMessagingItem
+    ? asRecord(parsed.rawMessagingItem.sender)
+    : null;
+  const recipient = parsed?.rawMessagingItem
+    ? asRecord(parsed.rawMessagingItem.recipient)
+    : null;
+
+  logger.info(
+    {
+      messageMid: parsed?.messageId ?? null,
+      senderId: sender?.id ?? parsed?.senderId ?? null,
+      recipientId: recipient?.id ?? parsed?.recipientId ?? null,
+      attachmentType: attachment?.type ?? shareMeta.attachmentType ?? null,
+      attachmentPayload: attachment?.payload ?? shareMeta.payload ?? null,
+      messageShare: message?.share ?? null,
+      messageReferral:
+        message?.referral ?? parsed?.rawMessagingItem?.referral ?? null,
+      messageText: message?.text ?? null,
+      mediaType: contentMediaType,
+      extractedAssetId: shareMeta.assetId ?? null,
+      extractedRawUrl: shareMeta.rawUrl ?? null,
+      extractedPermalink: shareMeta.permalink ?? null,
+      extractedShortcode: shareMeta.shortcode ?? null,
+      finalShareMeta: shareMeta
+    },
+    "[InstagramShare] post_payload"
+  );
+};
+
 const ProcessInstagramShareService = (
   attachment: InstagramWebhookAttachment,
-  caption: string | null
+  caption: string | null,
+  parsed?: ParsedInstagramWebhookEvent | null
 ): InstagramShareMessageContent | null => {
   if (!shouldTreatAttachmentAsShare(attachment)) {
     return null;
@@ -263,7 +331,9 @@ const ProcessInstagramShareService = (
     payload,
     url,
     caption,
-    source: "attachment"
+    source: "attachment",
+    parsed,
+    attachment
   });
 };
 
@@ -286,7 +356,8 @@ export const resolveInstagramShareFromMessageLevel = (
       payload: messageShare,
       url,
       caption: asString(messageShare.share_text) || caption,
-      source: "message.share"
+      source: "message.share",
+      parsed
     });
     if (content) {
       return content;
@@ -302,7 +373,8 @@ export const resolveInstagramShareFromMessageLevel = (
       payload: referral,
       url,
       caption,
-      source: "message.referral"
+      source: "message.referral",
+      parsed
     });
     if (content) {
       return content;
@@ -345,7 +417,7 @@ export const resolveInstagramShareContent = (
     : [];
 
   for (const attachment of attachments) {
-    const content = ProcessInstagramShareService(attachment, caption);
+    const content = ProcessInstagramShareService(attachment, caption, parsed);
     if (content) {
       return content;
     }

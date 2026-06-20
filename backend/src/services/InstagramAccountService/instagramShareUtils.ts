@@ -14,7 +14,228 @@ export interface ClassifiedShareUrls {
   assetUrl: string | null;
   thumbnailSourceUrl: string | null;
   assetId: string | null;
+  shortcode: string | null;
 }
+
+export type InstagramSharePermalinkKind =
+  | "post"
+  | "reel"
+  | "story"
+  | "profile";
+
+export interface ExtractedInstagramSharePermalink {
+  permalink: string | null;
+  shortcode: string | null;
+  kind: InstagramSharePermalinkKind | null;
+}
+
+const SHORTCODE_FIELD_NAMES = [
+  "shortcode",
+  "media_shortcode",
+  "share_shortcode",
+  "ig_shortcode",
+  "code"
+] as const;
+
+const SHORTCODE_VALUE_PATTERN = /^[A-Za-z0-9_-]{5,40}$/;
+
+const isLikelyInstagramShortcode = (value: string): boolean => {
+  if (!SHORTCODE_VALUE_PATTERN.test(value)) {
+    return false;
+  }
+
+  if (/^\d+$/.test(value)) {
+    return false;
+  }
+
+  return true;
+};
+
+const normalizeInstagramPermalink = (url: string): string => {
+  try {
+    const parsed = new URL(url);
+    parsed.hash = "";
+    parsed.search = "";
+    if (!parsed.pathname.endsWith("/")) {
+      parsed.pathname = `${parsed.pathname}/`;
+    }
+    return parsed.href;
+  } catch {
+    return url;
+  }
+};
+
+export const extractShortcodeFromInstagramUrl = (
+  url: string | null
+): { shortcode: string; kind: InstagramSharePermalinkKind } | null => {
+  if (!url || !isInstagramPublicLink(url)) {
+    return null;
+  }
+
+  const patterns: Array<{
+    regex: RegExp;
+    kind: InstagramSharePermalinkKind;
+  }> = [
+    { regex: /instagram\.com\/reels?\/([A-Za-z0-9_-]+)/i, kind: "reel" },
+    { regex: /instagram\.com\/(?:p|tv)\/([A-Za-z0-9_-]+)/i, kind: "post" },
+    {
+      regex: /instagram\.com\/stories\/[^/]+\/([A-Za-z0-9_-]+)/i,
+      kind: "story"
+    }
+  ];
+
+  for (const { regex, kind } of patterns) {
+    const match = url.match(regex);
+    const shortcode = match?.[1];
+    if (shortcode && isLikelyInstagramShortcode(shortcode)) {
+      return { shortcode, kind };
+    }
+  }
+
+  return null;
+};
+
+const buildPermalinkFromShortcode = (
+  shortcode: string,
+  kind: InstagramSharePermalinkKind
+): string | null => {
+  if (!isLikelyInstagramShortcode(shortcode)) {
+    return null;
+  }
+
+  switch (kind) {
+    case "post":
+      return normalizeInstagramPermalink(
+        `https://www.instagram.com/p/${shortcode}/`
+      );
+    case "reel":
+      return normalizeInstagramPermalink(
+        `https://www.instagram.com/reel/${shortcode}/`
+      );
+    case "story":
+      return null;
+    case "profile":
+      return normalizeInstagramPermalink(
+        `https://www.instagram.com/${shortcode}/`
+      );
+    default:
+      return null;
+  }
+};
+
+const collectPayloadStringValues = (
+  payload: Record<string, unknown>,
+  depth = 0
+): string[] => {
+  if (depth > 4) {
+    return [];
+  }
+
+  const values: string[] = [];
+
+  for (const value of Object.values(payload)) {
+    if (typeof value === "string" && value.trim()) {
+      values.push(value.trim());
+      continue;
+    }
+
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      values.push(
+        ...collectPayloadStringValues(value as Record<string, unknown>, depth + 1)
+      );
+    }
+  }
+
+  return values;
+};
+
+const inferPermalinkKindFromMediaType = (
+  mediaType: string | null | undefined
+): InstagramSharePermalinkKind => {
+  switch (mediaType) {
+    case "instagram_reel":
+      return "reel";
+    case "instagram_story":
+      return "story";
+    case "instagram_profile":
+      return "profile";
+    default:
+      return "post";
+  }
+};
+
+export const extractInstagramPermalinkFromSharePayload = (
+  payload: Record<string, unknown> | null,
+  mediaType?: string | null
+): ExtractedInstagramSharePermalink => {
+  if (!payload) {
+    return { permalink: null, shortcode: null, kind: null };
+  }
+
+  const directUrlFields = [
+    asString(payload.permalink),
+    asString(payload.link),
+    asString(payload.url),
+    asString(payload.share_url),
+    asString(payload.source_url)
+  ].filter((candidate): candidate is string => Boolean(candidate));
+
+  for (const candidate of directUrlFields) {
+    if (isLookasideCdnUrl(candidate)) {
+      continue;
+    }
+
+    if (isInstagramPublicLink(candidate)) {
+      const parsedShortcode = extractShortcodeFromInstagramUrl(candidate);
+      if (
+        isInstagramPermalinkUrl(candidate) ||
+        isInstagramProfileLink(candidate)
+      ) {
+        return {
+          permalink: normalizeInstagramPermalink(candidate),
+          shortcode: parsedShortcode?.shortcode ?? null,
+          kind: parsedShortcode?.kind ?? null
+        };
+      }
+    }
+  }
+
+  for (const fieldName of SHORTCODE_FIELD_NAMES) {
+    const shortcode = asString(payload[fieldName]);
+    if (!shortcode || !isLikelyInstagramShortcode(shortcode)) {
+      continue;
+    }
+
+    const kind = inferPermalinkKindFromMediaType(mediaType);
+    const permalink = buildPermalinkFromShortcode(shortcode, kind);
+    if (permalink) {
+      return { permalink, shortcode, kind };
+    }
+  }
+
+  for (const candidate of collectPayloadStringValues(payload)) {
+    if (isLookasideCdnUrl(candidate)) {
+      continue;
+    }
+
+    const parsedShortcode = extractShortcodeFromInstagramUrl(candidate);
+    if (parsedShortcode) {
+      const permalink = buildPermalinkFromShortcode(
+        parsedShortcode.shortcode,
+        parsedShortcode.kind
+      );
+      if (permalink) {
+        return {
+          permalink,
+          shortcode: parsedShortcode.shortcode,
+          kind: parsedShortcode.kind
+        };
+      }
+    }
+  }
+
+  return { permalink: null, shortcode: null, kind: null };
+};
 
 export const isLookasideCdnUrl = (url: string | null): boolean => {
   if (!url) {
@@ -82,11 +303,13 @@ export const collectShareUrlCandidates = (
 };
 
 export const classifyShareUrls = (
+  payload: Record<string, unknown> | null,
   ...candidates: Array<string | null | undefined>
 ): ClassifiedShareUrls => {
   let permalink: string | null = null;
   let assetUrl: string | null = null;
   let rawUrl: string | null = null;
+  let shortcode: string | null = null;
 
   for (const candidate of candidates) {
     const url = asString(candidate);
@@ -96,7 +319,9 @@ export const classifyShareUrls = (
 
     if (isInstagramPublicLink(url) && !isLookasideCdnUrl(url)) {
       if (isInstagramPermalinkUrl(url) || isInstagramProfileLink(url)) {
-        permalink = permalink || url;
+        permalink = permalink || normalizeInstagramPermalink(url);
+        const parsedShortcode = extractShortcodeFromInstagramUrl(url);
+        shortcode = shortcode || parsedShortcode?.shortcode || null;
       }
       rawUrl = rawUrl || url;
       continue;
@@ -117,7 +342,8 @@ export const classifyShareUrls = (
     rawUrl,
     assetUrl,
     thumbnailSourceUrl: assetUrl,
-    assetId
+    assetId,
+    shortcode
   };
 };
 

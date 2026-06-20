@@ -628,8 +628,24 @@ const MessagesList = forwardRef(function MessagesList(
     return extracted;
   };
 
+  const isValidInstagramSharePermalink = (mediaType, url) => {
+    if (!url || isLookasideCdnUrl(url) || !/instagram\.com/i.test(url)) {
+      return false;
+    }
+
+    if (mediaType === "instagram_profile") {
+      return (
+        !INSTAGRAM_PERMALINK_PATTERN.test(url) &&
+        /instagram\.com\/[^/?#]+\/?(?:$|[?#])/i.test(url)
+      );
+    }
+
+    return INSTAGRAM_PERMALINK_PATTERN.test(url);
+  };
+
   const resolveInstagramSharePermalink = (message) => {
     const meta = parseMessageMetaPayload(message);
+    const mediaType = message.mediaType;
     const candidates = [
       meta?.share?.permalink,
       meta?.permalink,
@@ -638,8 +654,38 @@ const MessagesList = forwardRef(function MessagesList(
 
     for (const candidate of candidates) {
       const resolved = resolveInstagramPublicPermalink(candidate);
-      if (resolved) {
+      if (resolved && isValidInstagramSharePermalink(mediaType, resolved)) {
         return resolved;
+      }
+    }
+
+    const shortcode = meta?.share?.shortcode;
+    if (shortcode && !/^\d+$/.test(String(shortcode))) {
+      if (mediaType === "instagram_reel") {
+        const reelUrl = resolveInstagramPublicPermalink(
+          `https://www.instagram.com/reel/${shortcode}/`
+        );
+        if (reelUrl && isValidInstagramSharePermalink(mediaType, reelUrl)) {
+          return reelUrl;
+        }
+      }
+
+      if (mediaType === "instagram_post") {
+        const postUrl = resolveInstagramPublicPermalink(
+          `https://www.instagram.com/p/${shortcode}/`
+        );
+        if (postUrl && isValidInstagramSharePermalink(mediaType, postUrl)) {
+          return postUrl;
+        }
+      }
+
+      if (mediaType === "instagram_profile") {
+        const profileUrl = resolveInstagramPublicPermalink(
+          `https://www.instagram.com/${String(shortcode).replace(/^@/, "")}/`
+        );
+        if (profileUrl && isValidInstagramSharePermalink(mediaType, profileUrl)) {
+          return profileUrl;
+        }
       }
     }
 
@@ -765,33 +811,20 @@ const MessagesList = forwardRef(function MessagesList(
             <span style={{ opacity: 0.85, fontSize: 13 }}>{noLinkFallback}</span>
           )}
         </div>
-        {(permalink || thumbnailUrl) && (
+        {permalink ? (
           <div className={classes.instagramShareCardActions}>
-            {permalink ? (
-              <Button
-                color="primary"
-                variant="outlined"
-                size="small"
-                target="_blank"
-                rel="noopener noreferrer"
-                href={permalink}
-              >
-                Abrir no Instagram
-              </Button>
-            ) : (
-              <Button
-                color="primary"
-                variant="outlined"
-                size="small"
-                target="_blank"
-                rel="noopener noreferrer"
-                href={thumbnailUrl}
-              >
-                Visualizar mídia
-              </Button>
-            )}
+            <Button
+              color="primary"
+              variant="outlined"
+              size="small"
+              target="_blank"
+              rel="noopener noreferrer"
+              href={permalink}
+            >
+              Abrir no Instagram
+            </Button>
           </div>
-        )}
+        ) : null}
       </div>
     );
   };
