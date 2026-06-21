@@ -1,5 +1,10 @@
 import crypto from "crypto";
 import AppError from "../errors/AppError";
+import {
+  getMissingMetaOAuthStateKeys,
+  logMetaOAuthConfigCheck,
+  logMetaOAuthConfigMissing
+} from "./metaOAuthConfigCheck";
 
 export interface MetaOAuthStatePayload {
   companyId: number;
@@ -12,8 +17,15 @@ export interface MetaOAuthStatePayload {
 const STATE_TTL_MS = 10 * 60 * 1000;
 
 const getStateSecret = (): string => {
+  const configFlags = logMetaOAuthConfigCheck("metaOAuthState", {
+    phase: "state_sign"
+  });
   const secret = process.env.META_APP_SECRET?.trim();
   if (!secret) {
+    logMetaOAuthConfigMissing(
+      "metaOAuthState",
+      getMissingMetaOAuthStateKeys(configFlags)
+    );
     throw new AppError(
       "ERR_META_APP_CONFIG_MISSING",
       500,

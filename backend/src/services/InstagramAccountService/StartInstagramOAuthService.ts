@@ -1,5 +1,10 @@
 import AppError from "../../errors/AppError";
 import { createMetaOAuthState } from "../../helpers/metaOAuthState";
+import {
+  getMissingMetaOAuthStartKeys,
+  logMetaOAuthConfigCheck,
+  logMetaOAuthConfigMissing
+} from "../../helpers/metaOAuthConfigCheck";
 import InstagramAccount from "../../models/InstagramAccount";
 import { REQUIRED_INSTAGRAM_SCOPES } from "./MetaGraphApiService";
 import { logger } from "../../utils/logger";
@@ -35,10 +40,16 @@ const StartInstagramOAuthService = async ({
   companyId,
   userId
 }: Request): Promise<{ authorizationUrl: string }> => {
+  const configFlags = logMetaOAuthConfigCheck("StartInstagramOAuthService", {
+    phase: "oauth_start"
+  });
+  const missingKeys = getMissingMetaOAuthStartKeys(configFlags);
+
   const appId = process.env.META_APP_ID?.trim();
   const redirectUri = process.env.META_OAUTH_REDIRECT_URI?.trim();
 
   if (!appId || !redirectUri || !process.env.META_APP_SECRET?.trim()) {
+    logMetaOAuthConfigMissing("StartInstagramOAuthService", missingKeys);
     throw new AppError(
       "ERR_META_APP_CONFIG_MISSING",
       500,
