@@ -12,6 +12,7 @@ import uploadConfig from "./config/upload";
 import AppError from "./errors/AppError";
 import routes from "./routes";
 import metaWebhookRoutes from "./routes/metaWebhookRoutes";
+import instagramOAuthCallbackRoutes from "./routes/instagramOAuthCallbackRoutes";
 import { logger } from "./utils/logger";
 import { messageQueue, sendScheduledMessages } from "./queues";
 import bodyParser from 'body-parser';
@@ -22,6 +23,9 @@ const app = express();
 
 /** Webhook Meta: raw body necessário para validar X-Hub-Signature-256 */
 app.use("/webhooks/meta", metaWebhookRoutes);
+
+/** OAuth Instagram callback: rota pública (Meta redireciona sem JWT) */
+app.use(instagramOAuthCallbackRoutes);
 
 app.set("queues", {
   messageQueue,

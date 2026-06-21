@@ -9,11 +9,6 @@ import * as MetaWebhookController from "../controllers/MetaWebhookController";
 const instagramAccountRoutes = express.Router();
 
 instagramAccountRoutes.get(
-  "/instagram/oauth/callback",
-  InstagramAccountController.oauthCallback
-);
-
-instagramAccountRoutes.get(
   "/instagram-accounts/webhook-info",
   isAuth,
   requireWhatsappBehaviorManager,
