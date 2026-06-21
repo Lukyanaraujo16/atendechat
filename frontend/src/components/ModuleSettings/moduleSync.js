@@ -71,6 +71,7 @@ export function legacyPlanFeatureValueFromColumns(plan, featureKey) {
     case "contacts.tags":
     case "contacts.files":
     case "settings.connections":
+    case "settings.instagram_integration":
     case "agenda.calendar":
     case "team.users":
     case "team.queues":

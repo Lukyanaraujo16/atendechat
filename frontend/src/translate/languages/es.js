@@ -1155,6 +1155,11 @@ const messages = {
               label: "API de mensajes",
               description: "Envío de mensajes por API externa.",
             },
+            instagram_integration: {
+              label: "Instagram",
+              description:
+                "Permite conectar cuentas de Instagram y responder Directs en AtendeChat.",
+            },
           },
         },
       },
@@ -1453,6 +1458,8 @@ const messages = {
                 "Esta cuenta de Instagram debe ser profesional Business o Creator.",
               user_denied: "Conexión cancelada en Instagram.",
               duplicate_account: "Esta cuenta de Instagram ya está conectada en esta empresa.",
+              plan_not_available:
+                "Su plan no incluye acceso a la integración con Instagram.",
               generic: "No se pudo conectar Instagram.",
             },
           },
@@ -5403,6 +5410,8 @@ const messages = {
         ERR_SESSION_EXPIRED: "Sesión expirada. Por favor inicie sesión.",
         ERR_USER_CREATION_DISABLED: "La creación de usuarios fue deshabilitada por el administrador.",
         ERR_NO_PERMISSION: "No tiene permiso para acceder a este recurso.",
+        ERR_INSTAGRAM_NOT_AVAILABLE_IN_PLAN:
+          "Su plan no incluye acceso a la integración con Instagram.",
         ERR_GROUP_PERMANENT_CONVERSATION:
           "Las conversaciones de grupo permanecen abiertas y no se pueden finalizar.",
         ERR_MODULE_NOT_ALLOWED:

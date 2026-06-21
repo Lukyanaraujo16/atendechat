@@ -1,5 +1,7 @@
-import React, { useState, useCallback, useContext } from "react";
+import React, { useState, useCallback, useContext, useEffect } from "react";
+import { useHistory, useLocation } from "react-router-dom";
 import useIsMobile from "../../hooks/useIsMobile";
+import usePlanFlags from "../../hooks/usePlanFlags";
 import { toast } from "react-toastify";
 import { format, parseISO } from "date-fns";
 
@@ -56,7 +58,13 @@ import {
 	MobileCardList,
 } from "../../ui";
 import InstagramConnectionsPanel from "../../components/InstagramConnectionsPanel";
-import { hasInstagramOAuthCallback } from "../../utils/instagramOAuth";
+import {
+	hasInstagramOAuthCallback,
+	clearInstagramOAuthQueryParams,
+	mapInstagramOAuthReason,
+	getInstagramOAuthCallbackParams,
+} from "../../utils/instagramOAuth";
+import { canUseInstagramIntegration } from "../../utils/canUseInstagramIntegration";
 
 const useStyles = makeStyles(theme => ({
 	mainPaper: {
@@ -162,6 +170,11 @@ const CustomToolTip = ({ title, content, children }) => {
 const Connections = () => {
 	const classes = useStyles();
 	const isMobile = useIsMobile();
+	const history = useHistory();
+	const location = useLocation();
+	const planFlags = usePlanFlags();
+	const showInstagramIntegration =
+		planFlags.loaded && canUseInstagramIntegration(planFlags);
 
 	const { user } = useContext(AuthContext);
 	const { whatsApps, loading } = useContext(WhatsAppsContext);
@@ -182,6 +195,36 @@ const Connections = () => {
 	const [activeChannelTab, setActiveChannelTab] = useState(() =>
 		hasInstagramOAuthCallback(window.location.search) ? "instagram" : "whatsapp"
 	);
+
+	useEffect(() => {
+		if (!planFlags.loaded) {
+			return;
+		}
+		if (!showInstagramIntegration) {
+			if (activeChannelTab === "instagram") {
+				setActiveChannelTab("whatsapp");
+			}
+			const callback = getInstagramOAuthCallbackParams(location.search);
+			if (callback) {
+				toast.error(
+					callback.result === "error"
+						? mapInstagramOAuthReason(callback.reason)
+						: i18n.t("backendErrors.ERR_INSTAGRAM_NOT_AVAILABLE_IN_PLAN")
+				);
+				clearInstagramOAuthQueryParams(history);
+			}
+			return;
+		}
+		if (hasInstagramOAuthCallback(location.search)) {
+			setActiveChannelTab("instagram");
+		}
+	}, [
+		planFlags.loaded,
+		showInstagramIntegration,
+		activeChannelTab,
+		location.search,
+		history,
+	]);
 
 	const handleStartWhatsAppSession = async whatsAppId => {
 		try {
@@ -560,16 +603,23 @@ const Connections = () => {
 			<Paper className={classes.mainPaper} variant="outlined">
 				<Tabs
 					value={activeChannelTab}
-					onChange={(_, value) => setActiveChannelTab(value)}
+					onChange={(_, value) => {
+						if (value === "instagram" && !showInstagramIntegration) {
+							return;
+						}
+						setActiveChannelTab(value);
+					}}
 					indicatorColor="primary"
 					textColor="primary"
 					variant={isMobile ? "fullWidth" : "standard"}
 					className={classes.channelTabs}
 				>
 					<Tab value="whatsapp" label={i18n.t("connections.tabs.whatsapp")} />
-					<Tab value="instagram" label={i18n.t("connections.tabs.instagram")} />
+					{showInstagramIntegration ? (
+						<Tab value="instagram" label={i18n.t("connections.tabs.instagram")} />
+					) : null}
 				</Tabs>
-				{activeChannelTab === "instagram" ? (
+				{showInstagramIntegration && activeChannelTab === "instagram" ? (
 					<InstagramConnectionsPanel />
 				) : (
 				<>

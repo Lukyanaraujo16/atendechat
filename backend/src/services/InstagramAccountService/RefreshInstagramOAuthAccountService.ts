@@ -14,6 +14,7 @@ import {
 import { refreshInstagramOAuthToken } from "./RefreshInstagramOAuthTokenService";
 import { subscribeInstagramAccountWebhook } from "./InstagramWebhookSubscriptionService";
 import { logger } from "../../utils/logger";
+import { isInstagramIntegrationEnabledForCompany } from "../../helpers/assertInstagramIntegrationInPlan";
 
 interface Request {
   instagramAccountId: string | number;
@@ -77,6 +78,17 @@ const RefreshInstagramOAuthAccountService = async ({
       400,
       "Esta conta não pode ser renovada automaticamente. Use o login Instagram ou token manual."
     );
+  }
+
+  const integrationEnabled = await isInstagramIntegrationEnabledForCompany(
+    account.companyId
+  );
+  if (!integrationEnabled) {
+    return {
+      account: sanitizeInstagramAccount(account),
+      refreshed: false,
+      skippedReason: "plan_disabled"
+    };
   }
 
   if (!force && !refreshMeta.refreshDue) {

@@ -8,6 +8,7 @@ const OAUTH_REASON_CODES = [
   "not_business",
   "user_denied",
   "duplicate_account",
+  "plan_not_available",
 ];
 
 export const mapInstagramOAuthReason = (reason) => {

@@ -178,6 +178,11 @@ export const FEATURES: Record<string, FeatureNode> = {
       api: {
         label: "API de mensagens",
         description: "Envio de mensagens por API externa."
+      },
+      instagram_integration: {
+        label: "Instagram",
+        description:
+          "Permite conectar contas do Instagram e responder Directs pelo AtendeChat."
       }
     }
   }

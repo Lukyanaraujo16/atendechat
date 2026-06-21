@@ -6,7 +6,8 @@ export const INSTAGRAM_OAUTH_REASON_CODES = {
   CONNECTION_FAILED: "generic",
   NO_CODE: "missing_code",
   USER_DENIED: "user_denied",
-  DUPLICATE_ACCOUNT: "duplicate_account"
+  DUPLICATE_ACCOUNT: "duplicate_account",
+  PLAN_NOT_AVAILABLE: "plan_not_available"
 } as const;
 
 export const INSTAGRAM_OAUTH_ERROR_MESSAGES = {
@@ -18,7 +19,9 @@ export const INSTAGRAM_OAUTH_ERROR_MESSAGES = {
   CONNECTION_FAILED: "Não foi possível concluir a conexão com o Instagram.",
   NO_CODE: "Não foi possível validar o retorno da Meta.",
   USER_DENIED: "Conexão cancelada no Instagram.",
-  DUPLICATE_ACCOUNT: "Esta conta Instagram já está conectada nesta empresa."
+  DUPLICATE_ACCOUNT: "Esta conta Instagram já está conectada nesta empresa.",
+  PLAN_NOT_AVAILABLE:
+    "Seu plano não possui acesso à integração com Instagram."
 } as const;
 
 export const oauthReasonCodeToMessage = (
@@ -39,6 +42,8 @@ export const oauthReasonCodeToMessage = (
       return INSTAGRAM_OAUTH_ERROR_MESSAGES.USER_DENIED;
     case INSTAGRAM_OAUTH_REASON_CODES.DUPLICATE_ACCOUNT:
       return INSTAGRAM_OAUTH_ERROR_MESSAGES.DUPLICATE_ACCOUNT;
+    case INSTAGRAM_OAUTH_REASON_CODES.PLAN_NOT_AVAILABLE:
+      return INSTAGRAM_OAUTH_ERROR_MESSAGES.PLAN_NOT_AVAILABLE;
     default:
       return INSTAGRAM_OAUTH_ERROR_MESSAGES.CONNECTION_FAILED;
   }

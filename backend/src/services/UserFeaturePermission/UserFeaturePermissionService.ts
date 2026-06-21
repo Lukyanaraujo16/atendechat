@@ -180,6 +180,7 @@ function buildDefaultPermissionState(
     setIfPlan("automation.integrations", false);
     setIfPlan("settings.api", false);
     setIfPlan("settings.connections", false);
+    setIfPlan("settings.instagram_integration", false);
     setIfPlan("finance.subscription", false);
     setIfPlan("finance.invoices", false);
     setIfPlan("team.ratings", false);

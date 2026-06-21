@@ -19,6 +19,7 @@ import {
   validateInstagramAccessToken
 } from "./MetaGraphApiService";
 import { logger } from "../../utils/logger";
+import { assertInstagramIntegrationInPlan } from "../../helpers/assertInstagramIntegrationInPlan";
 
 interface Request {
   code?: string;
@@ -46,6 +47,9 @@ const mapErrorToRedirectReason = (err: unknown): string => {
     }
     if (err.message === "ERR_INSTAGRAM_ACCOUNT_DUPLICATE") {
       return INSTAGRAM_OAUTH_REASON_CODES.DUPLICATE_ACCOUNT;
+    }
+    if (err.message === "ERR_INSTAGRAM_NOT_AVAILABLE_IN_PLAN") {
+      return INSTAGRAM_OAUTH_REASON_CODES.PLAN_NOT_AVAILABLE;
     }
   }
 
@@ -115,6 +119,8 @@ const HandleInstagramOAuthCallbackService = async ({
     if (!account) {
       throw new AppError("ERR_NO_INSTAGRAM_ACCOUNT_FOUND", 404);
     }
+
+    await assertInstagramIntegrationInPlan(statePayload.companyId);
 
     const shortLived = await exchangeInstagramOAuthCode(code);
     const longLived = await exchangeInstagramLongLivedToken(shortLived.accessToken);

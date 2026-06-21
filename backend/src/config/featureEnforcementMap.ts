@@ -150,5 +150,11 @@ export const FEATURE_ENFORCEMENT_MAP: Array<{
     menu: "CRM",
     frontendRoutes: ["/crm"],
     backendRoutes: ["/crm/*"]
+  },
+  {
+    feature: "settings.instagram_integration",
+    menu: "Configurações → Instagram",
+    frontendRoutes: ["/connections (aba Instagram)"],
+    backendRoutes: ["/instagram-accounts/*", "POST /instagram-accounts/*/oauth/*"]
   }
 ];

@@ -2,11 +2,14 @@ import express from "express";
 import isAuth from "../middleware/isAuth";
 import requireCompanyNotDelinquent from "../middleware/requireCompanyNotDelinquent";
 import requireWhatsappBehaviorManager from "../middleware/requireWhatsappBehaviorManager";
+import requireInstagramIntegration from "../middleware/requireInstagramIntegration";
 
 import * as InstagramAccountController from "../controllers/InstagramAccountController";
 import * as MetaWebhookController from "../controllers/MetaWebhookController";
 
 const instagramAccountRoutes = express.Router();
+
+instagramAccountRoutes.use(isAuth, requireInstagramIntegration);
 
 instagramAccountRoutes.get(
   "/instagram-accounts/webhook-info",
