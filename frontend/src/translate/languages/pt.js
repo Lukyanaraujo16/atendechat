@@ -1529,21 +1529,30 @@ const messages = {
             add: "Adicionar conta Instagram",
             connectInstagram: "Conectar com Instagram",
             reconnectInstagram: "Reconectar Instagram",
+            migrateToInstagram: "Migrar para login Instagram",
+            connectManually: "Conectar manualmente",
             connectToken: "Token manual (avançado)",
             disconnect: "Desconectar",
           },
+          advancedOptions: "Opções avançadas",
+          advancedOptionsHint:
+            "Use apenas se você recebeu um token gerado manualmente pela Meta.",
           oauth: {
             success: "Instagram conectado com sucesso.",
             expired: "Token expirado",
             expiresToday: "Expira hoje",
             expiresInDays: "Expira em {{days}} dias",
             connectedViaOAuth: "Conectado via Instagram",
+            connectedViaOAuthTooltip:
+              "Conexão feita pelo login oficial da Meta.",
             connectedViaManual: "Token manual",
             disconnected: "Desconectado",
             reconnect: "Reconectar",
             errorChip: "Erro",
+            attentionChip: "Atenção",
+            lastRefresh: "Última renovação",
             manualTokenHint:
-              "Esta conta foi conectada manualmente. Recomendamos reconectar com Instagram para renovação automática futura.",
+              "Recomendamos reconectar com Instagram para permitir renovação automática futuramente.",
             connecting: "Redirecionando para o Instagram…",
             errors: {
               state_invalid: "Não foi possível validar a conexão. Tente novamente.",
@@ -1553,6 +1562,7 @@ const messages = {
               not_business:
                 "Esta conta Instagram precisa ser profissional Business ou Creator.",
               user_denied: "Conexão cancelada no Instagram.",
+              duplicate_account: "Esta conta Instagram já está conectada nesta empresa.",
               generic: "Não foi possível conectar o Instagram.",
             },
           },
@@ -1560,7 +1570,7 @@ const messages = {
             title: "Token manual (avançado)",
             warning:
               "Use apenas tokens gerados no Meta for Developers. O token será armazenado de forma segura e não será exibido novamente.",
-            hint: "Cole abaixo o token de acesso da conta Instagram Business.",
+            hint: "Cole abaixo o token de acesso da conta Instagram Business. Use apenas se você recebeu um token gerado manualmente pela Meta.",
             tokenLabel: "Token de acesso",
             submit: "Validar e conectar",
             cancel: "Cancelar",
@@ -1592,9 +1602,10 @@ const messages = {
             defaultAccount: "Padrão",
             edit: "Editar",
             delete: "Excluir",
-            connectToken: "Token manual (avançado)",
+            connectToken: "Conectar manualmente",
             connectInstagram: "Conectar com Instagram",
             reconnectInstagram: "Reconectar Instagram",
+            migrateToInstagram: "Migrar para login Instagram",
             disconnect: "Desconectar",
             businessId: "Business ID",
             tokenStatus: "Token",
@@ -5867,6 +5878,8 @@ const messages = {
         ERR_NO_USER_FOUND: "Nenhum usuário encontrado com este ID.",
         ERR_NO_WAPP_FOUND: "Nenhum WhatsApp encontrado com este ID.",
         ERR_NO_INSTAGRAM_ACCOUNT_FOUND: "Conta Instagram não encontrada.",
+        ERR_INSTAGRAM_ACCOUNT_DUPLICATE:
+          "Esta conta Instagram já está conectada nesta empresa.",
         ERR_INSTAGRAM_TOKEN_INVALID:
           "Token inválido ou expirado. Gere um novo token no Meta for Developers.",
         ERR_INSTAGRAM_TOKEN_MISSING_SCOPES:

@@ -7,7 +7,7 @@ const OAUTH_REASON_CODES = [
   "missing_scopes",
   "not_business",
   "user_denied",
-  "generic",
+  "duplicate_account",
 ];
 
 export const mapInstagramOAuthReason = (reason) => {

@@ -5,7 +5,8 @@ export const INSTAGRAM_OAUTH_REASON_CODES = {
   NOT_BUSINESS: "not_business",
   CONNECTION_FAILED: "generic",
   NO_CODE: "missing_code",
-  USER_DENIED: "user_denied"
+  USER_DENIED: "user_denied",
+  DUPLICATE_ACCOUNT: "duplicate_account"
 } as const;
 
 export const INSTAGRAM_OAUTH_ERROR_MESSAGES = {
@@ -16,7 +17,8 @@ export const INSTAGRAM_OAUTH_ERROR_MESSAGES = {
     "Esta conta Instagram não é Business/Creator ou não está elegível.",
   CONNECTION_FAILED: "Não foi possível concluir a conexão com o Instagram.",
   NO_CODE: "Não foi possível validar o retorno da Meta.",
-  USER_DENIED: "Conexão cancelada no Instagram."
+  USER_DENIED: "Conexão cancelada no Instagram.",
+  DUPLICATE_ACCOUNT: "Esta conta Instagram já está conectada nesta empresa."
 } as const;
 
 export const oauthReasonCodeToMessage = (
@@ -35,6 +37,8 @@ export const oauthReasonCodeToMessage = (
       return INSTAGRAM_OAUTH_ERROR_MESSAGES.NO_CODE;
     case INSTAGRAM_OAUTH_REASON_CODES.USER_DENIED:
       return INSTAGRAM_OAUTH_ERROR_MESSAGES.USER_DENIED;
+    case INSTAGRAM_OAUTH_REASON_CODES.DUPLICATE_ACCOUNT:
+      return INSTAGRAM_OAUTH_ERROR_MESSAGES.DUPLICATE_ACCOUNT;
     default:
       return INSTAGRAM_OAUTH_ERROR_MESSAGES.CONNECTION_FAILED;
   }

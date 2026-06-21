@@ -18,6 +18,8 @@ import {
   Box,
   Chip,
   CircularProgress,
+  Collapse,
+  Tooltip,
 } from "@material-ui/core";
 import Alert from "@material-ui/lab/Alert";
 import {
@@ -150,6 +152,19 @@ const useStyles = makeStyles((theme) => ({
   oauthLoading: {
     marginLeft: theme.spacing(1),
   },
+  advancedToggle: {
+    textTransform: "none",
+    fontSize: "0.8rem",
+    padding: theme.spacing(0.5, 0),
+    minWidth: 0,
+  },
+  advancedBox: {
+    marginTop: theme.spacing(0.75),
+    width: "100%",
+  },
+  advancedHint: {
+    marginBottom: theme.spacing(0.75),
+  },
 }));
 
 const instagramStatusChip = (status) => {
@@ -186,6 +201,15 @@ const formatEventDate = (value) => {
   }
 };
 
+const isTokenExpired = (value) => {
+  if (!value) return false;
+  try {
+    return new Date(value).getTime() < Date.now();
+  } catch {
+    return false;
+  }
+};
+
 const InstagramConnectionsPanel = () => {
   const classes = useStyles();
   const isMobile = useIsMobile();
@@ -205,6 +229,7 @@ const InstagramConnectionsPanel = () => {
   const [oauthStatusByAccountId, setOauthStatusByAccountId] = useState({});
   const [webhookActionLoadingId, setWebhookActionLoadingId] = useState(null);
   const [oauthLoadingId, setOauthLoadingId] = useState(null);
+  const [advancedOpenByAccountId, setAdvancedOpenByAccountId] = useState({});
 
   const loadOAuthStatuses = useCallback(async (accountList) => {
     const targets = (accountList || []).filter((account) => account?.id);
@@ -398,23 +423,115 @@ const InstagramConnectionsPanel = () => {
       connectedVia: account.connectedVia || null,
       connectionError: account.connectionError || null,
       tokenExpiresAt: account.tokenExpiresAt || null,
+      tokenRefreshedAt: account.tokenRefreshedAt || null,
       status: account.status,
       hasToken: account.hasToken,
     };
 
-  const renderConnectionChips = (account) => {
+  const getConnectionContext = (account) => {
     const oauthStatus = getOAuthStatus(account);
+    const isConnected = account.status === "CONNECTED" && account.hasToken;
+    const needsAttention =
+      Boolean(oauthStatus.connectionError) ||
+      isTokenExpired(oauthStatus.tokenExpiresAt || account.tokenExpiresAt) ||
+      account.status === "ERROR";
+
+    return { oauthStatus, isConnected, needsAttention };
+  };
+
+  const getPrimaryOAuthLabel = (account) => {
+    const { oauthStatus, isConnected, needsAttention } = getConnectionContext(account);
+
+    if (needsAttention) {
+      return i18n.t("connections.instagram.buttons.reconnectInstagram");
+    }
+    if (isConnected && oauthStatus.connectedVia === "manual_token") {
+      return i18n.t("connections.instagram.buttons.migrateToInstagram");
+    }
+    if (isConnected) {
+      return i18n.t("connections.instagram.buttons.reconnectInstagram");
+    }
+    return i18n.t("connections.instagram.buttons.connectInstagram");
+  };
+
+  const toggleAdvancedOptions = (accountId) => {
+    setAdvancedOpenByAccountId((prev) => ({
+      ...prev,
+      [accountId]: !prev[accountId],
+    }));
+  };
+
+  const showAdvancedManualOption = (account) => {
+    const { oauthStatus, isConnected } = getConnectionContext(account);
+    if (!isConnected) return true;
+    return oauthStatus.connectedVia === "manual_token";
+  };
+
+  const renderAdvancedManualOptions = (account) => {
+    if (!showAdvancedManualOption(account)) {
+      return null;
+    }
+
+    const isOpen = Boolean(advancedOpenByAccountId[account.id]);
+    const isLoading = oauthLoadingId === account.id;
+
+    return (
+      <Box className={classes.advancedBox}>
+        <Button
+          className={classes.advancedToggle}
+          size="small"
+          color="default"
+          onClick={() => toggleAdvancedOptions(account.id)}
+        >
+          {i18n.t("connections.instagram.advancedOptions")}
+        </Button>
+        <Collapse in={isOpen}>
+          <Typography variant="caption" color="textSecondary" display="block" className={classes.advancedHint}>
+            {i18n.t("connections.instagram.advancedOptionsHint")}
+          </Typography>
+          <Button
+            variant="text"
+            color="default"
+            size="small"
+            disabled={isLoading}
+            onClick={() => handleOpenConnectToken(account)}
+          >
+            {i18n.t("connections.instagram.buttons.connectManually")}
+          </Button>
+        </Collapse>
+      </Box>
+    );
+  };
+
+  const renderConnectionChips = (account) => {
+    const { oauthStatus, isConnected, needsAttention } = getConnectionContext(account);
     const chips = [];
 
-    if (account.status === "CONNECTED" && account.hasToken) {
+    if (needsAttention) {
+      chips.push(
+        <Chip
+          key="attention"
+          size="small"
+          color="secondary"
+          label={i18n.t("connections.instagram.oauth.attentionChip")}
+        />
+      );
+    }
+
+    if (isConnected) {
       if (oauthStatus.connectedVia === "instagram_login") {
         chips.push(
-          <Chip
+          <Tooltip
             key="oauth"
-            size="small"
-            color="primary"
-            label={i18n.t("connections.instagram.oauth.connectedViaOAuth")}
-          />
+            title={i18n.t("connections.instagram.oauth.connectedViaOAuthTooltip")}
+            arrow
+          >
+            <Chip
+              size="small"
+              color="primary"
+              label={i18n.t("connections.instagram.oauth.connectedViaOAuth")}
+            />
+          </Tooltip>
         );
       } else if (oauthStatus.connectedVia === "manual_token") {
         chips.push(
@@ -453,7 +570,7 @@ const InstagramConnectionsPanel = () => {
       );
     }
 
-    if (oauthStatus.connectionError) {
+    if (oauthStatus.connectionError && !needsAttention) {
       chips.push(
         <Chip
           key="error"
@@ -496,51 +613,57 @@ const InstagramConnectionsPanel = () => {
     );
   };
 
+  const renderOAuthRefreshMeta = (account) => {
+    const oauthStatus = getOAuthStatus(account);
+    if (
+      oauthStatus.connectedVia !== "instagram_login" ||
+      !oauthStatus.tokenRefreshedAt
+    ) {
+      return null;
+    }
+
+    return (
+      <Typography variant="caption" color="textSecondary" display="block" className={classes.metaLine}>
+        {i18n.t("connections.instagram.oauth.lastRefresh")}:{" "}
+        {formatEventDate(oauthStatus.tokenRefreshedAt)}
+      </Typography>
+    );
+  };
+
   const renderConnectButtons = (account, { compact = false } = {}) => {
-    const isConnected = account.status === "CONNECTED" && account.hasToken;
+    const { isConnected } = getConnectionContext(account);
     const isLoading = oauthLoadingId === account.id;
-    const primaryLabel = isConnected
-      ? i18n.t("connections.instagram.buttons.reconnectInstagram")
-      : i18n.t("connections.instagram.buttons.connectInstagram");
-    const primaryAction = () => handleConnectInstagram(account);
+    const primaryLabel = getPrimaryOAuthLabel(account);
 
     if (compact) {
       return null;
     }
 
     return (
-      <Box className={classes.accountActions}>
-        <Button
-          variant="contained"
-          color="primary"
-          size="small"
-          disabled={isLoading}
-          onClick={primaryAction}
-        >
-          {isLoading ? i18n.t("connections.instagram.oauth.connecting") : primaryLabel}
-          {isLoading && <CircularProgress size={16} className={classes.oauthLoading} />}
-        </Button>
-        {!isConnected && (
+      <Box className={classes.accountActions} flexDirection="column" alignItems="center">
+        <Box className={classes.accountActions}>
           <Button
-            variant="outlined"
-            color="default"
+            variant="contained"
+            color="primary"
             size="small"
             disabled={isLoading}
-            onClick={() => handleOpenConnectToken(account)}
+            onClick={() => handleConnectInstagram(account)}
           >
-            {i18n.t("connections.instagram.buttons.connectToken")}
+            {isLoading ? i18n.t("connections.instagram.oauth.connecting") : primaryLabel}
+            {isLoading && <CircularProgress size={16} className={classes.oauthLoading} />}
           </Button>
-        )}
-        {isConnected && (
-          <Button
-            variant="outlined"
-            color="secondary"
-            size="small"
-            onClick={() => openConfirm("disconnect", account.id)}
-          >
-            {i18n.t("connections.instagram.buttons.disconnect")}
-          </Button>
-        )}
+          {isConnected && (
+            <Button
+              variant="outlined"
+              color="secondary"
+              size="small"
+              onClick={() => openConfirm("disconnect", account.id)}
+            >
+              {i18n.t("connections.instagram.buttons.disconnect")}
+            </Button>
+          )}
+        </Box>
+        {renderAdvancedManualOptions(account)}
       </Box>
     );
   };
@@ -614,11 +737,12 @@ const InstagramConnectionsPanel = () => {
       </Box>
       {renderConnectionError(account)}
       {renderManualTokenHint(account)}
+      {renderOAuthRefreshMeta(account)}
     </Box>
   );
 
   const buildActionItems = (account) => {
-    const isConnected = account.status === "CONNECTED" && account.hasToken;
+    const { oauthStatus, isConnected } = getConnectionContext(account);
     const items = [
       {
         label: i18n.t("connections.instagram.mobile.edit"),
@@ -628,15 +752,13 @@ const InstagramConnectionsPanel = () => {
     ];
 
     items.push({
-      label: isConnected
-        ? i18n.t("connections.instagram.mobile.reconnectInstagram")
-        : i18n.t("connections.instagram.mobile.connectInstagram"),
+      label: getPrimaryOAuthLabel(account),
       icon: <Instagram fontSize="small" />,
       onClick: () => handleConnectInstagram(account),
       disabled: oauthLoadingId === account.id,
     });
 
-    if (!isConnected) {
+    if (showAdvancedManualOption(account)) {
       items.push({
         label: i18n.t("connections.instagram.mobile.connectToken"),
         icon: <Link fontSize="small" />,
@@ -917,6 +1039,7 @@ const InstagramConnectionsPanel = () => {
                         </Box>
                         {renderConnectionError(account)}
                         {renderManualTokenHint(account)}
+                        {renderOAuthRefreshMeta(account)}
                         {account.hasToken && (
                           <Typography variant="caption" color="textSecondary" display="block">
                             {formatTokenExpiry(account.tokenExpiresAt)}

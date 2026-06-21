@@ -5,9 +5,11 @@ import {
   oauthReasonCodeToMessage
 } from "../../helpers/instagramOAuthRedirect";
 import { verifyMetaOAuthState } from "../../helpers/metaOAuthState";
+import { sanitizeInstagramAccount } from "../../helpers/sanitizeInstagramAccount";
 import { getIO } from "../../libs/socket";
 import InstagramAccount from "../../models/InstagramAccount";
 import ConnectInstagramTokenService from "./ConnectInstagramTokenService";
+import ShowInstagramAccountService from "./ShowInstagramAccountService";
 import {
   exchangeInstagramLongLivedToken,
   exchangeInstagramOAuthCode
@@ -41,6 +43,9 @@ const mapErrorToRedirectReason = (err: unknown): string => {
       err.message === "ERR_INSTAGRAM_TOKEN_INVALID"
     ) {
       return INSTAGRAM_OAUTH_REASON_CODES.NOT_BUSINESS;
+    }
+    if (err.message === "ERR_INSTAGRAM_ACCOUNT_DUPLICATE") {
+      return INSTAGRAM_OAUTH_REASON_CODES.DUPLICATE_ACCOUNT;
     }
   }
 
@@ -162,17 +167,34 @@ const HandleInstagramOAuthCallbackService = async ({
       }
     );
 
+    if (Number(connectedAccount.id) !== account.id) {
+      const clearedStarter = await ShowInstagramAccountService(
+        String(account.id),
+        statePayload.companyId
+      );
+      io.to(`company-${statePayload.companyId}-mainchannel`).emit(
+        `company-${statePayload.companyId}-instagramAccount`,
+        {
+          action: "update",
+          instagramAccount: sanitizeInstagramAccount(clearedStarter)
+        }
+      );
+    }
+
     logger.info(
       {
-        instagramAccountId: account.id,
-        companyId: statePayload.companyId
+        instagramAccountId: connectedAccount.id,
+        oauthStarterAccountId: account.id,
+        companyId: statePayload.companyId,
+        upgradedExisting:
+          Number(connectedAccount.id) !== account.id
       },
       "[InstagramOAuth] account_connected"
     );
 
     return buildInstagramOAuthRedirectUrl({
       success: true,
-      accountId: account.id
+      accountId: Number(connectedAccount.id)
     });
   } catch (err) {
     const reason = mapErrorToRedirectReason(err);

@@ -10,6 +10,10 @@ import {
   validateInstagramAccessToken
 } from "./MetaGraphApiService";
 import { subscribeInstagramAccountWebhook } from "./InstagramWebhookSubscriptionService";
+import {
+  clearDuplicateOAuthStarterAccount,
+  resolveInstagramAccountDuplicate
+} from "./resolveInstagramAccountDuplicate";
 import { logger } from "../../utils/logger";
 
 type InstagramConnectionVia = "manual_token" | "instagram_login" | "facebook_page";
@@ -56,28 +60,64 @@ const ConnectInstagramTokenService = async ({
   const validation =
     prevalidated ?? (await validateInstagramAccessToken(token));
 
+  const businessAccountId = validation.profile.instagramBusinessAccountId;
+  let duplicateStarterAccountId: number | null = null;
+  let targetAccount = account;
+
+  if (businessAccountId) {
+    const resolved = await resolveInstagramAccountDuplicate({
+      companyId,
+      requestedAccountId: account.id,
+      instagramBusinessAccountId: businessAccountId,
+      oauthFlow
+    });
+
+    if (resolved.upgraded) {
+      duplicateStarterAccountId = resolved.duplicateStarterAccountId;
+
+      if (duplicateStarterAccountId != null) {
+        await clearDuplicateOAuthStarterAccount(
+          duplicateStarterAccountId,
+          companyId
+        );
+      }
+
+      if (resolved.targetAccountId !== account.id) {
+        const existingAccount = await InstagramAccount.findOne({
+          where: { id: resolved.targetAccountId, companyId }
+        });
+
+        if (!existingAccount) {
+          throw new AppError("ERR_NO_INSTAGRAM_ACCOUNT_FOUND", 404);
+        }
+
+        targetAccount = existingAccount;
+      }
+    }
+  }
+
   const encryptedToken = encryptMetaToken(token);
   const connectedVia =
     connection?.connectedVia ?? ("manual_token" as InstagramConnectionVia);
   const now = new Date();
 
-  await account.update({
+  await targetAccount.update({
     status: "CONNECTED",
     pageAccessToken: encryptedToken,
     tokenExpiresAt: validation.expiresAt,
     scopes: JSON.stringify(validation.scopes),
     instagramBusinessAccountId: validation.profile.instagramBusinessAccountId,
     facebookPageId: validation.profile.facebookPageId,
-    profilePicUrl: validation.profile.profilePicUrl || account.profilePicUrl,
-    name: validation.profile.name || account.name,
+    profilePicUrl: validation.profile.profilePicUrl || targetAccount.profilePicUrl,
+    name: validation.profile.name || targetAccount.name,
     connectedVia,
-    metaUserId: connection?.metaUserId ?? account.metaUserId,
+    metaUserId: connection?.metaUserId ?? targetAccount.metaUserId,
     tokenRefreshedAt:
-      connectedVia === "instagram_login" ? now : account.tokenRefreshedAt,
+      connectedVia === "instagram_login" ? now : targetAccount.tokenRefreshedAt,
     connectionError: null
   });
 
-  await account.reload({
+  await targetAccount.reload({
     include: [
       {
         association: "queues",
@@ -86,18 +126,19 @@ const ConnectInstagramTokenService = async ({
     ]
   });
 
-  if (account.instagramBusinessAccountId) {
+  if (targetAccount.instagramBusinessAccountId) {
     try {
       await subscribeInstagramAccountWebhook(
-        account.instagramBusinessAccountId,
+        targetAccount.instagramBusinessAccountId,
         token
       );
 
       if (oauthFlow) {
         logger.info(
           {
-            instagramAccountId: account.id,
-            companyId
+            instagramAccountId: targetAccount.id,
+            companyId,
+            duplicateStarterAccountId
           },
           "[InstagramOAuth] webhook_subscribed"
         );
@@ -105,7 +146,7 @@ const ConnectInstagramTokenService = async ({
     } catch (err) {
       logger.warn(
         {
-          instagramAccountId: account.id,
+          instagramAccountId: targetAccount.id,
           companyId,
           error: err instanceof Error ? err.message : String(err)
         },
@@ -116,7 +157,7 @@ const ConnectInstagramTokenService = async ({
     }
   }
 
-  return sanitizeInstagramAccount(account);
+  return sanitizeInstagramAccount(targetAccount);
 };
 
 export default ConnectInstagramTokenService;
