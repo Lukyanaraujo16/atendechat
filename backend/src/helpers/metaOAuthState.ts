@@ -9,9 +9,15 @@ import { logger } from "../utils/logger";
 export interface MetaOAuthStatePayload {
   companyId: number;
   instagramAccountId: number;
-  userId: string;
+  userId: number;
   nonce: string;
   exp: number;
+}
+
+export interface MetaOAuthStateInput {
+  companyId: number | string;
+  instagramAccountId: number | string;
+  userId: number | string;
 }
 
 const STATE_TTL_MS = 10 * 60 * 1000;
@@ -54,6 +60,82 @@ const timingSafeEqualString = (left: string, right: string): boolean => {
   }
 
   return crypto.timingSafeEqual(leftBuf, rightBuf);
+};
+
+const coerceRequiredInt = (value: unknown, field: string): number => {
+  const num = typeof value === "number" ? value : Number(value);
+
+  if (!Number.isFinite(num) || Number.isNaN(num)) {
+    throw new Error(`invalid_${field}`);
+  }
+
+  return num;
+};
+
+const normalizeStateInput = (
+  input: MetaOAuthStateInput
+): Pick<MetaOAuthStatePayload, "companyId" | "instagramAccountId" | "userId"> => ({
+  companyId: coerceRequiredInt(input.companyId, "companyId"),
+  instagramAccountId: coerceRequiredInt(
+    input.instagramAccountId,
+    "instagramAccountId"
+  ),
+  userId: coerceRequiredInt(input.userId, "userId")
+});
+
+const logStatePayloadShape = (payload: Record<string, unknown>): void => {
+  logger.info(
+    {
+      keys: Object.keys(payload),
+      companyIdType: typeof payload.companyId,
+      instagramAccountIdType: typeof payload.instagramAccountId,
+      accountIdType: typeof payload.accountId,
+      userIdType: typeof payload.userId,
+      nonceType: typeof payload.nonce,
+      expType: typeof payload.exp,
+      hasCompanyId: payload.companyId != null,
+      hasInstagramAccountId: payload.instagramAccountId != null,
+      hasAccountId: payload.accountId != null,
+      hasUserId: payload.userId != null,
+      hasNonce: payload.nonce != null,
+      hasExp: payload.exp != null
+    },
+    "[InstagramOAuth] state_payload_shape"
+  );
+};
+
+const parseStatePayload = (raw: unknown): MetaOAuthStatePayload | null => {
+  if (!raw || typeof raw !== "object") {
+    return null;
+  }
+
+  const payload = raw as Record<string, unknown>;
+  logStatePayloadShape(payload);
+
+  try {
+    const instagramAccountId = payload.instagramAccountId ?? payload.accountId;
+    const nonce =
+      typeof payload.nonce === "string" && payload.nonce.trim()
+        ? payload.nonce.trim()
+        : null;
+
+    if (!nonce) {
+      return null;
+    }
+
+    return {
+      companyId: coerceRequiredInt(payload.companyId, "companyId"),
+      instagramAccountId: coerceRequiredInt(
+        instagramAccountId,
+        "instagramAccountId"
+      ),
+      userId: coerceRequiredInt(payload.userId, "userId"),
+      nonce,
+      exp: coerceRequiredInt(payload.exp, "exp")
+    };
+  } catch {
+    return null;
+  }
 };
 
 const analyzeStateStructure = (state: string) => ({
@@ -128,12 +210,11 @@ const failStateValidation = (
   );
 };
 
-export const createMetaOAuthState = (
-  payload: Pick<MetaOAuthStatePayload, "companyId" | "instagramAccountId" | "userId">
-): string => {
+export const createMetaOAuthState = (input: MetaOAuthStateInput): string => {
   const secret = readMetaAppSecret();
+  const normalized = normalizeStateInput(input);
   const full: MetaOAuthStatePayload = {
-    ...payload,
+    ...normalized,
     nonce: crypto.randomBytes(16).toString("hex"),
     exp: Date.now() + STATE_TTL_MS
   };
@@ -204,22 +285,17 @@ export const verifyMetaOAuthState = (state: string): MetaOAuthStatePayload => {
     return failStateValidation(debug, "ERR_META_OAUTH_STATE_INVALID");
   }
 
-  let payload: MetaOAuthStatePayload;
+  let parsedRaw: unknown;
   try {
-    payload = JSON.parse(payloadJson) as MetaOAuthStatePayload;
+    parsedRaw = JSON.parse(payloadJson);
   } catch {
     debug.verifyResult = "invalid";
     debug.failReason = "json_parse_failed";
     return failStateValidation(debug, "ERR_META_OAUTH_STATE_INVALID");
   }
 
-  if (
-    typeof payload.companyId !== "number" ||
-    typeof payload.instagramAccountId !== "number" ||
-    typeof payload.userId !== "string" ||
-    typeof payload.nonce !== "string" ||
-    typeof payload.exp !== "number"
-  ) {
+  const payload = parseStatePayload(parsedRaw);
+  if (!payload) {
     debug.verifyResult = "invalid";
     debug.failReason = "invalid_payload_shape";
     return failStateValidation(debug, "ERR_META_OAUTH_STATE_INVALID");
