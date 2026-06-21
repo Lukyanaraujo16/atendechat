@@ -15,6 +15,7 @@ import { startUserNotificationCleanupScheduler } from "./jobs/userNotificationCl
 import { startCompanyStorageRecalcScheduler } from "./jobs/companyStorageRecalcScheduler";
 import { startCrmFollowUpNotifierScheduler } from "./jobs/crmFollowUpNotifierJob";
 import { startCrmStaleDealAttentionScheduler } from "./jobs/crmStaleDealAttentionJob";
+import { startRefreshInstagramOAuthTokensScheduler } from "./jobs/RefreshInstagramOAuthTokensJob";
 import { logWhatsAppPolicyAtProcessBoot } from "./helpers/whatsappUnavailablePresence";
 
 const server = app.listen(process.env.PORT, async () => {
@@ -50,6 +51,7 @@ const server = app.listen(process.env.PORT, async () => {
   startCompanyStorageRecalcScheduler();
   startCrmFollowUpNotifierScheduler();
   startCrmStaleDealAttentionScheduler();
+  startRefreshInstagramOAuthTokensScheduler();
 });
 
 cron.schedule("* * * * *", async () => {

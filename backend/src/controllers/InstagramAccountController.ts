@@ -14,6 +14,7 @@ import SubscribeInstagramAccountWebhookService from "../services/InstagramAccoun
 import StartInstagramOAuthService from "../services/InstagramAccountService/StartInstagramOAuthService";
 import HandleInstagramOAuthCallbackService from "../services/InstagramAccountService/HandleInstagramOAuthCallbackService";
 import GetInstagramOAuthStatusService from "../services/InstagramAccountService/GetInstagramOAuthStatusService";
+import RefreshInstagramOAuthAccountService from "../services/InstagramAccountService/RefreshInstagramOAuthAccountService";
 
 interface InstagramAccountData {
   name: string;
@@ -250,4 +251,37 @@ export const oauthStatus = async (
   });
 
   return res.status(200).json(status);
+};
+
+export const oauthRefresh = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const { companyId } = req.user;
+  const { id } = req.params;
+
+  const { account } = await RefreshInstagramOAuthAccountService({
+    instagramAccountId: id,
+    companyId,
+    force: true
+  });
+
+  const status = await GetInstagramOAuthStatusService({
+    instagramAccountId: id,
+    companyId
+  });
+
+  const io = getIO();
+  io.to(`company-${companyId}-mainchannel`).emit(
+    `company-${companyId}-instagramAccount`,
+    {
+      action: "update",
+      instagramAccount: account
+    }
+  );
+
+  return res.status(200).json({
+    account,
+    status
+  });
 };

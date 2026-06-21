@@ -76,6 +76,13 @@ instagramAccountRoutes.get(
 );
 
 instagramAccountRoutes.post(
+  "/instagram-accounts/:id/oauth/refresh",
+  isAuth,
+  requireWhatsappBehaviorManager,
+  InstagramAccountController.oauthRefresh
+);
+
+instagramAccountRoutes.post(
   "/instagram-accounts/:id/disconnect",
   isAuth,
   requireWhatsappBehaviorManager,

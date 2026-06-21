@@ -68,7 +68,7 @@ export const refreshInstagramOAuthToken = async (
     throw new AppError(
       "ERR_INSTAGRAM_OAUTH_REFRESH_FAILED",
       400,
-      parseRefreshError(err)
+      "Não foi possível renovar a conexão com o Instagram."
     );
   }
 };

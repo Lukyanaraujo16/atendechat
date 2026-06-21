@@ -49,7 +49,7 @@ import {
   MobileEntityCard,
   MobileCardList,
 } from "../../ui";
-import { startInstagramOAuth, formatTokenExpiryDays } from "../../utils/instagramOAuth";
+import { startInstagramOAuth, formatTokenExpiryDays, refreshInstagramOAuth } from "../../utils/instagramOAuth";
 
 const useStyles = makeStyles((theme) => ({
   guideBox: {
@@ -173,6 +173,8 @@ const instagramStatusChip = (status) => {
       return { color: "primary", style: { backgroundColor: green[100], color: green[800] } };
     case "ERROR":
       return { color: "secondary", style: { backgroundColor: red[100], color: red[800] } };
+    case "EXPIRED":
+      return { color: "secondary", style: { backgroundColor: red[100], color: red[800] } };
     case "DISCONNECTED":
       return { color: "default", variant: "outlined" };
     case "PENDING":
@@ -229,6 +231,7 @@ const InstagramConnectionsPanel = () => {
   const [oauthStatusByAccountId, setOauthStatusByAccountId] = useState({});
   const [webhookActionLoadingId, setWebhookActionLoadingId] = useState(null);
   const [oauthLoadingId, setOauthLoadingId] = useState(null);
+  const [refreshLoadingId, setRefreshLoadingId] = useState(null);
   const [advancedOpenByAccountId, setAdvancedOpenByAccountId] = useState({});
 
   const loadOAuthStatuses = useCallback(async (accountList) => {
@@ -418,6 +421,20 @@ const InstagramConnectionsPanel = () => {
     }
   };
 
+  const handleRefreshOAuth = async (account) => {
+    setRefreshLoadingId(account.id);
+    try {
+      await refreshInstagramOAuth(api, account.id);
+      toast.success(i18n.t("connections.instagram.oauth.refreshSuccess"));
+      await fetchAccounts();
+    } catch (err) {
+      toastError(err);
+      await fetchAccounts();
+    } finally {
+      setRefreshLoadingId(null);
+    }
+  };
+
   const getOAuthStatus = (account) =>
     oauthStatusByAccountId[account.id] || {
       connectedVia: account.connectedVia || null,
@@ -426,6 +443,9 @@ const InstagramConnectionsPanel = () => {
       tokenRefreshedAt: account.tokenRefreshedAt || null,
       status: account.status,
       hasToken: account.hasToken,
+      daysUntilExpiration: null,
+      refreshDue: false,
+      canRefresh: account.connectedVia === "instagram_login" && account.hasToken,
     };
 
   const getConnectionContext = (account) => {
@@ -434,7 +454,8 @@ const InstagramConnectionsPanel = () => {
     const needsAttention =
       Boolean(oauthStatus.connectionError) ||
       isTokenExpired(oauthStatus.tokenExpiresAt || account.tokenExpiresAt) ||
-      account.status === "ERROR";
+      account.status === "ERROR" ||
+      account.status === "EXPIRED";
 
     return { oauthStatus, isConnected, needsAttention };
   };
@@ -563,6 +584,18 @@ const InstagramConnectionsPanel = () => {
       );
     }
 
+    if (oauthStatus.refreshDue && oauthStatus.connectedVia === "instagram_login") {
+      chips.push(
+        <Chip
+          key="refresh-due"
+          size="small"
+          color="default"
+          variant="outlined"
+          label={i18n.t("connections.instagram.oauth.refreshDueChip")}
+        />
+      );
+    }
+
     const expiryLabel = formatTokenExpiryDays(oauthStatus.tokenExpiresAt || account.tokenExpiresAt);
     if (account.hasToken && expiryLabel) {
       chips.push(
@@ -631,9 +664,12 @@ const InstagramConnectionsPanel = () => {
   };
 
   const renderConnectButtons = (account, { compact = false } = {}) => {
-    const { isConnected } = getConnectionContext(account);
+    const { oauthStatus, isConnected } = getConnectionContext(account);
     const isLoading = oauthLoadingId === account.id;
+    const isRefreshing = refreshLoadingId === account.id;
     const primaryLabel = getPrimaryOAuthLabel(account);
+    const showRefreshNow =
+      oauthStatus.canRefresh && oauthStatus.connectedVia === "instagram_login";
 
     if (compact) {
       return null;
@@ -646,17 +682,31 @@ const InstagramConnectionsPanel = () => {
             variant="contained"
             color="primary"
             size="small"
-            disabled={isLoading}
+            disabled={isLoading || isRefreshing}
             onClick={() => handleConnectInstagram(account)}
           >
             {isLoading ? i18n.t("connections.instagram.oauth.connecting") : primaryLabel}
             {isLoading && <CircularProgress size={16} className={classes.oauthLoading} />}
           </Button>
+          {showRefreshNow && (
+            <Button
+              variant="text"
+              color="primary"
+              size="small"
+              disabled={isLoading || isRefreshing}
+              onClick={() => handleRefreshOAuth(account)}
+            >
+              {isRefreshing
+                ? i18n.t("connections.instagram.oauth.refreshing")
+                : i18n.t("connections.instagram.oauth.refreshNow")}
+            </Button>
+          )}
           {isConnected && (
             <Button
               variant="outlined"
               color="secondary"
               size="small"
+              disabled={isLoading || isRefreshing}
               onClick={() => openConfirm("disconnect", account.id)}
             >
               {i18n.t("connections.instagram.buttons.disconnect")}
@@ -767,6 +817,14 @@ const InstagramConnectionsPanel = () => {
     }
 
     if (isConnected) {
+      if (oauthStatus.canRefresh && oauthStatus.connectedVia === "instagram_login") {
+        items.push({
+          label: i18n.t("connections.instagram.oauth.refreshNow"),
+          icon: <Sync fontSize="small" />,
+          onClick: () => handleRefreshOAuth(account),
+          disabled: refreshLoadingId === account.id,
+        });
+      }
       items.push({
         label: i18n.t("connections.instagram.webhook.verify"),
         icon: <Sync fontSize="small" />,

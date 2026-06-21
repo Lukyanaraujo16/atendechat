@@ -82,3 +82,8 @@ export const formatTokenExpiryDays = (value) => {
     return null;
   }
 };
+
+export const refreshInstagramOAuth = async (api, accountId) => {
+  const { data } = await api.post(`/instagram-accounts/${accountId}/oauth/refresh`);
+  return data;
+};

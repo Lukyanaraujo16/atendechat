@@ -1438,6 +1438,7 @@ const messages = {
 						CONNECTED: "Connected",
 						DISCONNECTED: "Disconnected",
 						ERROR: "Error",
+						EXPIRED: "Expired",
 						PENDING: "Pending",
 					},
 					toasts: {
@@ -1479,6 +1480,10 @@ const messages = {
 						manualTokenHint:
 							"We recommend reconnecting with Instagram to enable automatic renewal in the future.",
 						connecting: "Redirecting to Instagram…",
+						refreshNow: "Renew now",
+						refreshing: "Renewing…",
+						refreshSuccess: "Instagram connection renewed successfully.",
+						refreshDueChip: "Renewal due soon",
 						errors: {
 							state_invalid: "Could not validate the connection. Please try again.",
 							state_expired: "The connection expired. Click connect again.",
