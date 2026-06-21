@@ -1,3 +1,13 @@
+export const INSTAGRAM_OAUTH_REASON_CODES = {
+  EXPIRED: "state_expired",
+  INVALID_STATE: "state_invalid",
+  MISSING_SCOPES: "missing_scopes",
+  NOT_BUSINESS: "not_business",
+  CONNECTION_FAILED: "generic",
+  NO_CODE: "missing_code",
+  USER_DENIED: "user_denied"
+} as const;
+
 export const INSTAGRAM_OAUTH_ERROR_MESSAGES = {
   EXPIRED: "OAuth expirado. Tente conectar novamente.",
   INVALID_STATE: "Não foi possível validar o retorno da Meta.",
@@ -8,6 +18,27 @@ export const INSTAGRAM_OAUTH_ERROR_MESSAGES = {
   NO_CODE: "Não foi possível validar o retorno da Meta.",
   USER_DENIED: "Conexão cancelada no Instagram."
 } as const;
+
+export const oauthReasonCodeToMessage = (
+  code: string
+): string => {
+  switch (code) {
+    case INSTAGRAM_OAUTH_REASON_CODES.EXPIRED:
+      return INSTAGRAM_OAUTH_ERROR_MESSAGES.EXPIRED;
+    case INSTAGRAM_OAUTH_REASON_CODES.INVALID_STATE:
+      return INSTAGRAM_OAUTH_ERROR_MESSAGES.INVALID_STATE;
+    case INSTAGRAM_OAUTH_REASON_CODES.MISSING_SCOPES:
+      return INSTAGRAM_OAUTH_ERROR_MESSAGES.MISSING_SCOPES;
+    case INSTAGRAM_OAUTH_REASON_CODES.NOT_BUSINESS:
+      return INSTAGRAM_OAUTH_ERROR_MESSAGES.NOT_BUSINESS;
+    case INSTAGRAM_OAUTH_REASON_CODES.NO_CODE:
+      return INSTAGRAM_OAUTH_ERROR_MESSAGES.NO_CODE;
+    case INSTAGRAM_OAUTH_REASON_CODES.USER_DENIED:
+      return INSTAGRAM_OAUTH_ERROR_MESSAGES.USER_DENIED;
+    default:
+      return INSTAGRAM_OAUTH_ERROR_MESSAGES.CONNECTION_FAILED;
+  }
+};
 
 const getFrontendBaseUrl = (): string =>
   (process.env.FRONTEND_URL || "http://localhost:3000").replace(/\/$/, "");
@@ -28,7 +59,7 @@ export const buildInstagramOAuthRedirectUrl = (params: {
     url.searchParams.set("instagramOAuth", "error");
     url.searchParams.set(
       "reason",
-      params.reason || INSTAGRAM_OAUTH_ERROR_MESSAGES.CONNECTION_FAILED
+      params.reason || INSTAGRAM_OAUTH_REASON_CODES.CONNECTION_FAILED
     );
   }
 

@@ -1,7 +1,8 @@
 import AppError from "../../errors/AppError";
 import {
   buildInstagramOAuthRedirectUrl,
-  INSTAGRAM_OAUTH_ERROR_MESSAGES
+  INSTAGRAM_OAUTH_REASON_CODES,
+  oauthReasonCodeToMessage
 } from "../../helpers/instagramOAuthRedirect";
 import { verifyMetaOAuthState } from "../../helpers/metaOAuthState";
 import { getIO } from "../../libs/socket";
@@ -27,36 +28,33 @@ interface Request {
 const mapErrorToRedirectReason = (err: unknown): string => {
   if (err instanceof AppError) {
     if (err.message === "ERR_META_OAUTH_STATE_EXPIRED") {
-      return INSTAGRAM_OAUTH_ERROR_MESSAGES.EXPIRED;
+      return INSTAGRAM_OAUTH_REASON_CODES.EXPIRED;
     }
     if (err.message === "ERR_META_OAUTH_STATE_INVALID") {
-      return INSTAGRAM_OAUTH_ERROR_MESSAGES.INVALID_STATE;
+      return INSTAGRAM_OAUTH_REASON_CODES.INVALID_STATE;
     }
     if (err.message === "ERR_INSTAGRAM_TOKEN_MISSING_SCOPES") {
-      return INSTAGRAM_OAUTH_ERROR_MESSAGES.MISSING_SCOPES;
+      return INSTAGRAM_OAUTH_REASON_CODES.MISSING_SCOPES;
     }
     if (
       err.message === "ERR_INSTAGRAM_NOT_ELIGIBLE" ||
       err.message === "ERR_INSTAGRAM_TOKEN_INVALID"
     ) {
-      return INSTAGRAM_OAUTH_ERROR_MESSAGES.NOT_BUSINESS;
-    }
-    if (err.clientMessage) {
-      return err.clientMessage;
+      return INSTAGRAM_OAUTH_REASON_CODES.NOT_BUSINESS;
     }
   }
 
-  return INSTAGRAM_OAUTH_ERROR_MESSAGES.CONNECTION_FAILED;
+  return INSTAGRAM_OAUTH_REASON_CODES.CONNECTION_FAILED;
 };
 
 const persistConnectionError = async (
   instagramAccountId: number,
   companyId: number,
-  reason: string
+  reasonCode: string
 ): Promise<void> => {
   try {
     await InstagramAccount.update(
-      { connectionError: reason },
+      { connectionError: oauthReasonCodeToMessage(reasonCode) },
       { where: { id: instagramAccountId, companyId } }
     );
   } catch {
@@ -75,9 +73,8 @@ const HandleInstagramOAuthCallbackService = async ({
   if (oauthError) {
     const reason =
       oauthError === "access_denied"
-        ? INSTAGRAM_OAUTH_ERROR_MESSAGES.USER_DENIED
-        : oauthErrorDescription?.trim() ||
-          INSTAGRAM_OAUTH_ERROR_MESSAGES.CONNECTION_FAILED;
+        ? INSTAGRAM_OAUTH_REASON_CODES.USER_DENIED
+        : INSTAGRAM_OAUTH_REASON_CODES.CONNECTION_FAILED;
 
     logger.warn(
       { oauthError },
@@ -91,7 +88,7 @@ const HandleInstagramOAuthCallbackService = async ({
     logger.warn("[InstagramOAuth] failed");
     return buildInstagramOAuthRedirectUrl({
       success: false,
-      reason: INSTAGRAM_OAUTH_ERROR_MESSAGES.NO_CODE
+      reason: INSTAGRAM_OAUTH_REASON_CODES.NO_CODE
     });
   }
 
@@ -111,11 +108,7 @@ const HandleInstagramOAuthCallbackService = async ({
     });
 
     if (!account) {
-      throw new AppError(
-        "ERR_NO_INSTAGRAM_ACCOUNT_FOUND",
-        404,
-        INSTAGRAM_OAUTH_ERROR_MESSAGES.CONNECTION_FAILED
-      );
+      throw new AppError("ERR_NO_INSTAGRAM_ACCOUNT_FOUND", 404);
     }
 
     const shortLived = await exchangeInstagramOAuthCode(code);
@@ -137,11 +130,7 @@ const HandleInstagramOAuthCallbackService = async ({
     }
 
     if (!validation.profile.instagramBusinessAccountId) {
-      throw new AppError(
-        "ERR_INSTAGRAM_NOT_ELIGIBLE",
-        400,
-        INSTAGRAM_OAUTH_ERROR_MESSAGES.NOT_BUSINESS
-      );
+      throw new AppError("ERR_INSTAGRAM_NOT_ELIGIBLE", 400);
     }
 
     const tokenExpiresAt =

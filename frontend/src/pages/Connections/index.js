@@ -56,6 +56,7 @@ import {
 	MobileCardList,
 } from "../../ui";
 import InstagramConnectionsPanel from "../../components/InstagramConnectionsPanel";
+import { hasInstagramOAuthCallback } from "../../utils/instagramOAuth";
 
 const useStyles = makeStyles(theme => ({
 	mainPaper: {
@@ -178,7 +179,9 @@ const Connections = () => {
 	const [confirmModalInfo, setConfirmModalInfo] = useState(
 		confirmationModalInitialState
 	);
-	const [activeChannelTab, setActiveChannelTab] = useState("whatsapp");
+	const [activeChannelTab, setActiveChannelTab] = useState(() =>
+		hasInstagramOAuthCallback(window.location.search) ? "instagram" : "whatsapp"
+	);
 
 	const handleStartWhatsAppSession = async whatsAppId => {
 		try {
