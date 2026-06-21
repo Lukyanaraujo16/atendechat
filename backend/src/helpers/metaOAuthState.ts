@@ -1,15 +1,9 @@
 import crypto from "crypto";
 import AppError from "../errors/AppError";
 import {
-  decodeBase64UrlToBuffer,
-  decodeBase64UrlToUtf8,
-  encodeBase64Url
+  base64UrlDecodeToString,
+  base64UrlEncode
 } from "./base64Url";
-import {
-  getMissingMetaOAuthStateKeys,
-  logMetaOAuthConfigCheck,
-  logMetaOAuthConfigMissing
-} from "./metaOAuthConfigCheck";
 import { logger } from "../utils/logger";
 
 export interface MetaOAuthStatePayload {
@@ -23,29 +17,22 @@ export interface MetaOAuthStatePayload {
 const STATE_TTL_MS = 10 * 60 * 1000;
 const STATE_SEPARATOR = ".";
 
-type StateDebugCallback = {
+type StateDebugLog = {
   stateLength: number;
-  hasDot: boolean;
   partsCount: number;
-  receivedStatePreview: string;
-  signatureLength: number;
+  hasDot: boolean;
   payloadDecodeOk: boolean;
+  signatureLength?: number;
   exp: number | null;
   now: number;
-  expired: boolean;
+  expired?: boolean;
   verifyResult: string;
+  failReason?: string;
 };
 
-const getStateSecret = (): string => {
-  const configFlags = logMetaOAuthConfigCheck("metaOAuthState", {
-    phase: "state_sign"
-  });
+const readMetaAppSecret = (): string => {
   const secret = process.env.META_APP_SECRET?.trim();
   if (!secret) {
-    logMetaOAuthConfigMissing(
-      "metaOAuthState",
-      getMissingMetaOAuthStateKeys(configFlags)
-    );
     throw new AppError(
       "ERR_META_APP_CONFIG_MISSING",
       500,
@@ -55,61 +42,18 @@ const getStateSecret = (): string => {
   return secret;
 };
 
-const signPayloadBase64 = (payloadB64: string): string =>
-  crypto
-    .createHmac("sha256", getStateSecret())
-    .update(payloadB64, "utf8")
-    .digest("base64url");
+const signPayloadBase64 = (payloadB64: string, secret: string): string =>
+  crypto.createHmac("sha256", secret).update(payloadB64, "utf8").digest("base64url");
 
-const verifySignature = (payloadB64: string, signatureB64: string): boolean => {
-  const expectedSignatureB64 = signPayloadBase64(payloadB64);
+const timingSafeEqualString = (left: string, right: string): boolean => {
+  const leftBuf = Buffer.from(left, "utf8");
+  const rightBuf = Buffer.from(right, "utf8");
 
-  try {
-    const received = decodeBase64UrlToBuffer(signatureB64);
-    const expected = decodeBase64UrlToBuffer(expectedSignatureB64);
-
-    if (received.length !== expected.length) {
-      return false;
-    }
-
-    return crypto.timingSafeEqual(received, expected);
-  } catch {
+  if (leftBuf.length !== rightBuf.length) {
     return false;
   }
-};
 
-/**
- * Normaliza o parâmetro state recebido na query string.
- * - trim
- * - remove fragmento (#_ do Instagram não chega ao servidor, mas protege edge cases)
- * - decodeURIComponent apenas se ainda houver percent-encoding
- */
-export const normalizeOAuthStateParam = (raw: string | undefined): string => {
-  if (!raw) {
-    return "";
-  }
-
-  let state = raw.trim();
-
-  const hashIndex = state.indexOf("#");
-  if (hashIndex >= 0) {
-    state = state.slice(0, hashIndex);
-  }
-
-  if (state.includes("%")) {
-    try {
-      state = decodeURIComponent(state);
-    } catch {
-      // mantém valor original
-    }
-  }
-
-  return state.trim();
-};
-
-const buildStatePreview = (state: string): string => {
-  if (!state) return "";
-  return state.length <= 8 ? state : `${state.slice(0, 8)}…`;
+  return crypto.timingSafeEqual(leftBuf, rightBuf);
 };
 
 const analyzeStateStructure = (state: string) => ({
@@ -118,54 +62,96 @@ const analyzeStateStructure = (state: string) => ({
   partsCount: state ? state.split(STATE_SEPARATOR).length : 0
 });
 
-const logStateDebugStart = (state: string, exp: number): void => {
-  const now = Date.now();
+const splitStateParts = (
+  state: string
+): { payloadB64: string; signatureB64: string } | null => {
+  const dotIndex = state.indexOf(STATE_SEPARATOR);
+  if (dotIndex <= 0 || dotIndex >= state.length - 1) {
+    return null;
+  }
+
+  return {
+    payloadB64: state.slice(0, dotIndex),
+    signatureB64: state.slice(dotIndex + 1)
+  };
+};
+
+/**
+ * Normaliza state recebido na query string.
+ * Express já faz URL-decode; não aplicar decodeURIComponent no state inteiro.
+ */
+export const normalizeOAuthStateParam = (raw: string | undefined): string => {
+  if (!raw) {
+    return "";
+  }
+
+  let state = raw.trim();
+  const hashIndex = state.indexOf("#");
+  if (hashIndex >= 0) {
+    state = state.slice(0, hashIndex);
+  }
+
+  return state.trim();
+};
+
+const logStateDebugStart = (
+  state: string,
+  exp: number,
+  payloadDecodeOk: boolean
+): void => {
   logger.info(
     {
       ...analyzeStateStructure(state),
+      payloadDecodeOk,
       exp,
-      now
+      now: Date.now()
     },
     "[InstagramOAuth] state_debug_start"
   );
 };
 
-const logStateDebugCallback = (debug: StateDebugCallback): void => {
+const logStateDebugCallback = (debug: StateDebugLog): void => {
   logger.info(debug, "[InstagramOAuth] state_debug_callback");
 };
 
-const throwInvalidState = (debug: StateDebugCallback): never => {
+const failStateValidation = (
+  debug: StateDebugLog,
+  errorCode: "ERR_META_OAUTH_STATE_INVALID" | "ERR_META_OAUTH_STATE_EXPIRED"
+): never => {
   logStateDebugCallback(debug);
   throw new AppError(
-    "ERR_META_OAUTH_STATE_INVALID",
+    errorCode,
     400,
-    "Não foi possível validar o retorno da Meta."
-  );
-};
-
-const throwExpiredState = (debug: StateDebugCallback): never => {
-  logStateDebugCallback(debug);
-  throw new AppError(
-    "ERR_META_OAUTH_STATE_EXPIRED",
-    400,
-    "OAuth expirado. Tente conectar novamente."
+    errorCode === "ERR_META_OAUTH_STATE_EXPIRED"
+      ? "OAuth expirado. Tente conectar novamente."
+      : "Não foi possível validar o retorno da Meta."
   );
 };
 
 export const createMetaOAuthState = (
   payload: Pick<MetaOAuthStatePayload, "companyId" | "instagramAccountId" | "userId">
 ): string => {
+  const secret = readMetaAppSecret();
   const full: MetaOAuthStatePayload = {
     ...payload,
     nonce: crypto.randomBytes(16).toString("hex"),
     exp: Date.now() + STATE_TTL_MS
   };
 
-  const payloadB64 = encodeBase64Url(JSON.stringify(full));
-  const signatureB64 = signPayloadBase64(payloadB64);
+  const payloadJson = JSON.stringify(full);
+  const payloadB64 = base64UrlEncode(payloadJson);
+  const signatureB64 = signPayloadBase64(payloadB64, secret);
   const state = `${payloadB64}${STATE_SEPARATOR}${signatureB64}`;
 
-  logStateDebugStart(state, full.exp);
+  let payloadDecodeOk = false;
+  try {
+    base64UrlDecodeToString(payloadB64);
+    payloadDecodeOk = true;
+  } catch {
+    payloadDecodeOk = false;
+  }
+
+  logStateDebugStart(state, full.exp, payloadDecodeOk);
 
   return state;
 };
@@ -173,52 +159,58 @@ export const createMetaOAuthState = (
 export const verifyMetaOAuthState = (state: string): MetaOAuthStatePayload => {
   const now = Date.now();
   const normalized = normalizeOAuthStateParam(state);
-  const parts = normalized.split(STATE_SEPARATOR);
+  const secret = readMetaAppSecret();
 
-  const debug: StateDebugCallback = {
+  const debug: StateDebugLog = {
     ...analyzeStateStructure(normalized),
-    receivedStatePreview: buildStatePreview(normalized),
-    signatureLength: 0,
     payloadDecodeOk: false,
+    signatureLength: 0,
     exp: null,
     now,
-    expired: false,
-    verifyResult: "invalid"
+    verifyResult: "invalid",
+    failReason: undefined
   };
 
   if (!normalized) {
-    debug.verifyResult = "empty";
-    return throwInvalidState(debug);
+    debug.verifyResult = "invalid";
+    debug.failReason = "empty";
+    return failStateValidation(debug, "ERR_META_OAUTH_STATE_INVALID");
   }
 
-  if (parts.length !== 2 || !parts[0] || !parts[1]) {
-    debug.verifyResult = "invalid_format";
-    return throwInvalidState(debug);
+  const parts = splitStateParts(normalized);
+  if (!parts) {
+    debug.verifyResult = "invalid";
+    debug.failReason = "invalid_format";
+    return failStateValidation(debug, "ERR_META_OAUTH_STATE_INVALID");
   }
 
-  const [payloadB64, signatureB64] = parts;
+  const { payloadB64, signatureB64 } = parts;
   debug.signatureLength = signatureB64.length;
+
+  const expectedSignatureB64 = signPayloadBase64(payloadB64, secret);
+  if (!timingSafeEqualString(signatureB64.trim(), expectedSignatureB64)) {
+    debug.verifyResult = "invalid";
+    debug.failReason = "signature_mismatch";
+    return failStateValidation(debug, "ERR_META_OAUTH_STATE_INVALID");
+  }
 
   let payloadJson: string;
   try {
-    payloadJson = decodeBase64UrlToUtf8(payloadB64);
+    payloadJson = base64UrlDecodeToString(payloadB64);
     debug.payloadDecodeOk = true;
   } catch {
-    debug.verifyResult = "payload_decode_failed";
-    return throwInvalidState(debug);
-  }
-
-  if (!verifySignature(payloadB64, signatureB64)) {
-    debug.verifyResult = "signature_mismatch";
-    return throwInvalidState(debug);
+    debug.verifyResult = "invalid";
+    debug.failReason = "payload_decode_failed";
+    return failStateValidation(debug, "ERR_META_OAUTH_STATE_INVALID");
   }
 
   let payload: MetaOAuthStatePayload;
   try {
     payload = JSON.parse(payloadJson) as MetaOAuthStatePayload;
   } catch {
-    debug.verifyResult = "json_parse_failed";
-    return throwInvalidState(debug);
+    debug.verifyResult = "invalid";
+    debug.failReason = "json_parse_failed";
+    return failStateValidation(debug, "ERR_META_OAUTH_STATE_INVALID");
   }
 
   if (
@@ -228,8 +220,9 @@ export const verifyMetaOAuthState = (state: string): MetaOAuthStatePayload => {
     typeof payload.nonce !== "string" ||
     typeof payload.exp !== "number"
   ) {
-    debug.verifyResult = "invalid_payload_shape";
-    return throwInvalidState(debug);
+    debug.verifyResult = "invalid";
+    debug.failReason = "invalid_payload_shape";
+    return failStateValidation(debug, "ERR_META_OAUTH_STATE_INVALID");
   }
 
   debug.exp = payload.exp;
@@ -237,10 +230,12 @@ export const verifyMetaOAuthState = (state: string): MetaOAuthStatePayload => {
 
   if (debug.expired) {
     debug.verifyResult = "expired";
-    return throwExpiredState(debug);
+    debug.failReason = "expired";
+    return failStateValidation(debug, "ERR_META_OAUTH_STATE_EXPIRED");
   }
 
   debug.verifyResult = "ok";
+  debug.failReason = undefined;
   logStateDebugCallback(debug);
 
   return payload;

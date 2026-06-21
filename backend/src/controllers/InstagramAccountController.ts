@@ -215,15 +215,23 @@ export const oauthCallback = async (
   req: Request,
   res: Response
 ): Promise<void> => {
+  const readQueryString = (value: unknown): string | undefined => {
+    if (typeof value === "string") {
+      return value;
+    }
+
+    if (Array.isArray(value) && typeof value[0] === "string") {
+      return value[0];
+    }
+
+    return undefined;
+  };
+
   const redirectUrl = await HandleInstagramOAuthCallbackService({
-    code: typeof req.query.code === "string" ? req.query.code : undefined,
-    state: typeof req.query.state === "string" ? req.query.state : undefined,
-    oauthError:
-      typeof req.query.error === "string" ? req.query.error : undefined,
-    oauthErrorDescription:
-      typeof req.query.error_description === "string"
-        ? req.query.error_description
-        : undefined
+    code: readQueryString(req.query.code),
+    state: readQueryString(req.query.state),
+    oauthError: readQueryString(req.query.error),
+    oauthErrorDescription: readQueryString(req.query.error_description)
   });
 
   res.redirect(302, redirectUrl);

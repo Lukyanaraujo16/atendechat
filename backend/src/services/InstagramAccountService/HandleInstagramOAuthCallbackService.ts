@@ -181,7 +181,13 @@ const HandleInstagramOAuthCallbackService = async ({
       {
         instagramAccountId,
         companyId,
-        errorCode: err instanceof AppError ? err.message : "unknown"
+        errorCode: err instanceof AppError ? err.message : "unknown",
+        failReason:
+          err instanceof AppError && err.message === "ERR_META_OAUTH_STATE_INVALID"
+            ? "state_invalid"
+            : err instanceof AppError && err.message === "ERR_META_OAUTH_STATE_EXPIRED"
+              ? "state_expired"
+              : undefined
       },
       "[InstagramOAuth] failed"
     );
