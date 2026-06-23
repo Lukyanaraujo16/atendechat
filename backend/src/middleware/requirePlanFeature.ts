@@ -5,6 +5,7 @@ import { loadCompanyPlanContext } from "./loadCompanyEffectiveFeatures";
 import { isPlatformSuperUser } from "./platformSuperBypass";
 import {
   computeEffectiveUserFeatureMapForRequest,
+  logTicketsAccessDebug,
   USER_FEATURE_DISABLED_MSG
 } from "../services/UserFeaturePermission/UserFeaturePermissionService";
 
@@ -42,6 +43,23 @@ const requireAnyPlanFeature =
       );
       const userOk = featureKeys.some((k) => merged[k] === true);
       if (!userOk) {
+        const attendanceKeys = ["attendance.inbox", "attendance.kanban"];
+        if (featureKeys.some((k) => attendanceKeys.includes(k))) {
+          const planFeatureKey =
+            featureKeys.find((k) => ctx.featureMap[k] === true) ||
+            featureKeys[0];
+          logTicketsAccessDebug({
+            userId: Number(req.user.id),
+            companyId: Number(req.user.companyId),
+            profile: String(req.user.profile),
+            requestedFeature: featureKeys,
+            planFeatureKey,
+            planAllows: planOk,
+            userAllows: userOk,
+            finalAllows: false,
+            source: "requireAnyPlanFeature"
+          });
+        }
         return next(
           new AppError(
             "ERR_USER_FEATURE_DISABLED",

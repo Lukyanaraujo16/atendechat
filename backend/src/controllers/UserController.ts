@@ -160,7 +160,12 @@ export const show = async (req: Request, res: Response): Promise<Response> => {
           .map(([k]) => k);
         const state: Record<string, boolean> = {};
         for (const k of keys) {
-          state[k] = explicit === null ? true : explicit[k] === true;
+          state[k] =
+            explicit === null
+              ? true
+              : Object.prototype.hasOwnProperty.call(explicit, k)
+                ? explicit[k] === true
+                : true;
         }
         Object.assign(plain, {
           featurePermissionPlanKeys: keys,

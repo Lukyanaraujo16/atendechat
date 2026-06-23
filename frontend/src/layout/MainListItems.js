@@ -27,6 +27,7 @@ import { i18n } from "../translate/i18n";
 import {
   getAttendanceDefaultPath,
   hasAttendanceModuleAccess,
+  hasAttendanceInboxAccess,
   canAccessInternalChatModule,
 } from "../utils/attendanceAccess";
 import { WhatsAppsContext } from "../context/WhatsApp/WhatsAppsContext";
@@ -238,6 +239,23 @@ const MainListItems = (props) => {
   const showSchedules = planFlags.useSchedules;
   const showInternalChat = canAccessInternalChatModule(fx, user, planFlags);
   const showAtendimento = hasAttendanceModuleAccess(fx);
+  const canAccessInbox = hasAttendanceInboxAccess(fx);
+
+  useEffect(() => {
+    if (!planFlags.loaded) return;
+    console.info("[PermissionDebug] menu_tickets", {
+      profile: user?.profile,
+      planFlagsLoaded: planFlags.loaded,
+      canAccessTickets: showAtendimento,
+      canAccessInbox,
+      hiddenReason: showAtendimento
+        ? null
+        : !fx["attendance.inbox"] && !fx["attendance.kanban"] && !fx["contacts.tags"] && !fx["contacts.files"] && !fx["team.groups"]
+          ? "no_attendance_features"
+          : "attendance_module_denied",
+    });
+  }, [planFlags.loaded, showAtendimento, canAccessInbox, user?.profile, fx]);
+
   const atendimentoPath = getAttendanceDefaultPath({
     effectiveFeatures: fx,
     planFlags,

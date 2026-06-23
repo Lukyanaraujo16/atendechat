@@ -22,6 +22,44 @@ const CATALOG = new Set(getAllFeatureKeys());
 const LOG_TAG = "[UserPermissions]" as const;
 
 /**
+ * Com mapa explícito: chave ausente na tabela herda o plano (retrocompat ao expandir catálogo).
+ * Só `enabled === false` explícito nega acesso.
+ */
+export function resolveUserFeatureFromExplicitMap(
+  featureKey: string,
+  explicitMap: Record<string, boolean> | null,
+  planAllows: boolean
+): boolean {
+  if (!planAllows) return false;
+  if (explicitMap === null) return true;
+  if (Object.prototype.hasOwnProperty.call(explicitMap, featureKey)) {
+    return explicitMap[featureKey] === true;
+  }
+  return true;
+}
+
+export function logTicketsAccessDebug(meta: {
+  userId: number;
+  companyId: number;
+  profile: string;
+  requestedFeature: string[];
+  planFeatureKey: string;
+  planAllows: boolean;
+  userAllows: boolean;
+  finalAllows: boolean;
+  source: string;
+}): void {
+  logger.info(
+    {
+      tag: "[PermissionDebug]",
+      event: "tickets_access",
+      ...meta
+    },
+    "[PermissionDebug] tickets_access"
+  );
+}
+
+/**
  * Modo legado: sem linhas em `UserFeaturePermissions`, o utilizador não-admin herda
  * todas as features do plano até ser gravado explicitamente (ex.: primeiro save no modal).
  */
@@ -103,7 +141,7 @@ export function mergePlanWithUserFeatures(
     if (explicitMap === null) {
       out[k] = true;
     } else {
-      out[k] = explicitMap[k] === true;
+      out[k] = resolveUserFeatureFromExplicitMap(k, explicitMap, true);
     }
   }
   return out;

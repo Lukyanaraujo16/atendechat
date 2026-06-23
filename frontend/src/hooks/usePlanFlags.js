@@ -133,9 +133,7 @@ function usePlanFlagsState() {
           userFx &&
           typeof userFx === "object" &&
           Object.keys(userFx).length > 0;
-        const effectiveFeatures = hasUserFx
-          ? { ...planEffectiveFeatures, ...userFx }
-          : planEffectiveFeatures;
+        const effectiveFeatures = hasUserFx ? userFx : planEffectiveFeatures;
         const modulePerms = user?.company?.modulePermissions;
         const effFromFeatures = hasUserFx
           ? buildEffectiveModuleFlagsFromFeatureMap(
