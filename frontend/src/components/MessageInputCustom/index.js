@@ -869,28 +869,48 @@ const MessageInputCustom = (props) => {
     if (inputMessage.trim() === "") return;
     setLoading(true);
 
+    const channel = String(ticket?.channel || "whatsapp").toLowerCase();
+    const bodyText = signMessage
+      ? `*${user?.name}:*\n${inputMessage.trim()}`
+      : inputMessage.trim();
+
+    console.info("[MessageInput] send_start", {
+      ticketId,
+      channel,
+      hasText: Boolean(bodyText),
+      hasMedia: false,
+    });
+
     const message = {
       read: 1,
       fromMe: true,
       mediaUrl: "",
-      body: signMessage
-        ? `*${user?.name}:*\n${inputMessage.trim()}`
-        : inputMessage.trim(),
+      body: bodyText,
       quotedMsg: replyingMessage,
     };
     try {
       const { data } = await api.post(`/messages/${ticketId}`, message);
+      console.info("[MessageInput] send_success", {
+        ticketId,
+        channel,
+        returnedMessageId: data?.message?.id ?? null,
+      });
       if (data?.message && typeof onMessageSent === "function") {
         onMessageSent(data.message);
       }
+      setInputMessage("");
+      setComposerPanelOpen(false);
+      setReplyingMessage(null);
     } catch (err) {
+      console.warn("[MessageInput] send_failed", {
+        ticketId,
+        channel,
+        error: err?.response?.data?.error || err?.message || "unknown",
+      });
       toastError(err);
+    } finally {
+      setLoading(false);
     }
-
-    setInputMessage("");
-    setComposerPanelOpen(false);
-    setLoading(false);
-    setReplyingMessage(null);
   };
 
   const disableOption = () => {

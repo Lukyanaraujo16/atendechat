@@ -204,6 +204,22 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
 
   const ticket = await ShowTicketService(ticketId, companyId);
 
+  const isInstagram = isInstagramChannelTicket(ticket);
+  const isWhatsApp = !isInstagram;
+
+  logger.info(
+    {
+      ticketId: ticket.id,
+      channel: ticket.channel,
+      whatsappId: ticket.whatsappId,
+      hasBody: Boolean(body?.trim()),
+      mediasCount: medias.length,
+      isInstagram,
+      isWhatsApp
+    },
+    "[MessageController] create_start"
+  );
+
   await assertUserCanAccessTicketResource(
     { id, profile, supportMode },
     toTicketAccessPayload(ticket),
@@ -213,7 +229,7 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
   /** Mesma regra do GET da conversa: atendente humano no painel ao enviar resposta. */
   await SetTicketMessagesAsRead(ticket, HUMAN_PANEL_SEND_MESSAGE);
 
-  if (isInstagramChannelTicket(ticket)) {
+  if (isInstagram) {
     if (asSticker) {
       throw new AppError(
         "ERR_INSTAGRAM_STICKER_NOT_SUPPORTED",
@@ -382,7 +398,16 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
     });
   }
 
-  if (medias) {
+  if (medias.length > 0) {
+    logger.info(
+      {
+        ticketId: ticket.id,
+        whatsappId: ticket.whatsappId,
+        mediasCount: medias.length
+      },
+      "[MessageController] whatsapp_media_branch"
+    );
+
     await Promise.all(
       medias.map(async (media: Express.Multer.File, index) => {
         await SendWhatsAppMedia({
@@ -396,26 +421,56 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
     return res.send();
   }
 
-  const sentMessage = await SendWhatsAppMessage({ body, ticket, quotedMsg });
-  const bodyToSave = formatBody(body, ticket.contact);
-  const idToSave = (sentMessage as any)?.key?.id || uuidv4();
-  const savedMessage = await CreateMessageService({
-    messageData: {
-      id: idToSave,
+  logger.info(
+    {
       ticketId: ticket.id,
-      body: bodyToSave,
-      fromMe: true,
-      read: true,
-      ack: (sentMessage as any)?.status,
-      mediaType: "conversation",
-      ...(sentMessage ? { dataJson: JSON.stringify(sentMessage as any) } : {})
-    } as any,
-    companyId: ticket.companyId
-  });
+      whatsappId: ticket.whatsappId,
+      bodyLength: body?.length ?? 0
+    },
+    "[MessageController] whatsapp_branch"
+  );
 
-  return res.status(200).json({
-    message: serializeMessageForClient(savedMessage)
-  });
+  try {
+    const sentMessage = await SendWhatsAppMessage({ body, ticket, quotedMsg });
+    const bodyToSave = formatBody(body, ticket.contact);
+    const idToSave = (sentMessage as any)?.key?.id || uuidv4();
+    const savedMessage = await CreateMessageService({
+      messageData: {
+        id: idToSave,
+        ticketId: ticket.id,
+        body: bodyToSave,
+        fromMe: true,
+        read: true,
+        ack: (sentMessage as any)?.status,
+        mediaType: "conversation",
+        ...(sentMessage ? { dataJson: JSON.stringify(sentMessage as any) } : {})
+      } as any,
+      companyId: ticket.companyId
+    });
+
+    logger.info(
+      {
+        ticketId: ticket.id,
+        messageId: savedMessage.id
+      },
+      "[MessageController] whatsapp_sent"
+    );
+
+    return res.status(200).json({
+      message: serializeMessageForClient(savedMessage)
+    });
+  } catch (err) {
+    logger.warn(
+      {
+        ticketId: ticket.id,
+        channel: ticket.channel,
+        errorCode: err instanceof AppError ? err.message : "unknown",
+        errorMessage: err instanceof Error ? err.message : String(err)
+      },
+      "[MessageController] create_failed"
+    );
+    throw err;
+  }
 };
 
 export const remove = async (
