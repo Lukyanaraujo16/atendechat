@@ -1,5 +1,6 @@
 import PrivacyPolicy from "../pages/Legal/PrivacyPolicy";
 import TermsOfService from "../pages/Legal/TermsOfService";
+import DataDeletion from "../pages/Legal/DataDeletion";
 
 export const PUBLIC_LEGAL_PATHS = [
   "/privacy",
@@ -8,6 +9,7 @@ export const PUBLIC_LEGAL_PATHS = [
   "/terms",
   "/terms-of-service",
   "/termos-de-uso",
+  "/data-deletion",
 ];
 
 export const PUBLIC_LEGAL_ROUTES = [
@@ -17,6 +19,7 @@ export const PUBLIC_LEGAL_ROUTES = [
   { path: "/terms", component: TermsOfService },
   { path: "/terms-of-service", component: TermsOfService },
   { path: "/termos-de-uso", component: TermsOfService },
+  { path: "/data-deletion", component: DataDeletion },
 ];
 
 export function isPublicLegalPath(pathname) {

@@ -107,6 +107,9 @@ export default function LegalPageLayout({ title, updatedAt, children }) {
             <Link component={RouterLink} to="/terms" color="inherit" variant="body2">
               Termos de Uso
             </Link>
+            <Link component={RouterLink} to="/data-deletion" color="inherit" variant="body2">
+              Exclusão de Dados
+            </Link>
             <Link href="mailto:contato@streamhubinternet.com.br" color="inherit" variant="body2">
               contato@streamhubinternet.com.br
             </Link>
