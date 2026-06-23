@@ -50,6 +50,7 @@ import GetProfilePicUrl from "../services/WbotServices/GetProfilePicUrl";
 import CreateOrUpdateContactService from "../services/ContactServices/CreateOrUpdateContactService";
 import { v4 as uuidv4 } from "uuid";
 import { isInstagramChannelTicket } from "../helpers/ticketChannel";
+import { assertInstagramIntegrationInPlan } from "../helpers/assertInstagramIntegrationInPlan";
 import extractMessageUploadMedias from "../helpers/extractMessageUploadMedias";
 import SendInstagramTextMessageService from "../services/InstagramAccountService/SendInstagramTextMessageService";
 import SendInstagramImageMessageService from "../services/InstagramAccountService/SendInstagramImageMessageService";
@@ -230,6 +231,8 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
   await SetTicketMessagesAsRead(ticket, HUMAN_PANEL_SEND_MESSAGE);
 
   if (isInstagram) {
+    await assertInstagramIntegrationInPlan(companyId);
+
     if (asSticker) {
       throw new AppError(
         "ERR_INSTAGRAM_STICKER_NOT_SUPPORTED",

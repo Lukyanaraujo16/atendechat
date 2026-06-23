@@ -71,7 +71,6 @@ export function legacyPlanFeatureValueFromColumns(plan, featureKey) {
     case "contacts.tags":
     case "contacts.files":
     case "settings.connections":
-    case "settings.instagram_integration":
     case "agenda.calendar":
     case "team.users":
     case "team.queues":
@@ -81,6 +80,7 @@ export function legacyPlanFeatureValueFromColumns(plan, featureKey) {
     case "finance.invoices":
       return true;
     case "crm.pipeline":
+    case "settings.instagram_integration":
       return false;
     case "attendance.kanban":
       return asBool(plan.useKanban);

@@ -10,6 +10,7 @@ import {
 } from "./InstagramWebhookParser";
 import ProcessInstagramDirectMessageService from "./ProcessInstagramDirectMessageService";
 import ProcessInstagramReactionService from "./ProcessInstagramReactionService";
+import { isInstagramIntegrationEnabledForCompany } from "../../helpers/assertInstagramIntegrationInPlan";
 
 interface ProcessRequest {
   payload: Record<string, unknown>;
@@ -229,6 +230,21 @@ const processParsedEvent = async (
   }
 
   if (!mapped) {
+    return;
+  }
+
+  const integrationEnabled = await isInstagramIntegrationEnabledForCompany(
+    mapped.companyId
+  );
+  if (!integrationEnabled) {
+    logger.info(
+      {
+        companyId: mapped.companyId,
+        instagramAccountId: mapped.id,
+        eventType: parsed.eventType
+      },
+      "[InstagramPlan] webhook_ignored_plan_disabled"
+    );
     return;
   }
 

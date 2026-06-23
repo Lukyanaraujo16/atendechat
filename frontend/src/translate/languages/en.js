@@ -1190,8 +1190,7 @@ const messages = {
 						},
 						instagram_integration: {
 							label: "Instagram",
-							description:
-								"Allows connecting Instagram accounts and replying to Directs in AtendeChat.",
+							description: "Allows connecting Instagram and handling Directs.",
 						},
 					},
 				},

@@ -176,6 +176,10 @@ const Connections = () => {
 	const showInstagramIntegration =
 		planFlags.loaded && canUseInstagramIntegration(planFlags);
 
+	const instagramDirectAccessIntent =
+		hasInstagramOAuthCallback(location.search) ||
+		new URLSearchParams(location.search).get("tab") === "instagram";
+
 	const { user } = useContext(AuthContext);
 	const { whatsApps, loading } = useContext(WhatsAppsContext);
 	const [whatsAppModalOpen, setWhatsAppModalOpen] = useState(false);
@@ -559,6 +563,38 @@ const Connections = () => {
 			</div>
 		);
 	};
+
+	if (
+		planFlags.loaded &&
+		!showInstagramIntegration &&
+		instagramDirectAccessIntent
+	) {
+		return (
+			<MainContainer>
+				<MainHeader>
+					<Title>{i18n.t("connections.title")}</Title>
+				</MainHeader>
+				<Paper className={classes.mainPaper} variant="outlined">
+					<Box
+						display="flex"
+						flexDirection="column"
+						alignItems="center"
+						justifyContent="center"
+						minHeight={280}
+						p={4}
+						textAlign="center"
+					>
+						<Typography variant="h6" gutterBottom>
+							{i18n.t("connections.tabs.instagram")}
+						</Typography>
+						<Typography variant="body2" color="textSecondary">
+							{i18n.t("backendErrors.ERR_INSTAGRAM_NOT_AVAILABLE_IN_PLAN")}
+						</Typography>
+					</Box>
+				</Paper>
+			</MainContainer>
+		);
+	}
 
 	return (
 		<MainContainer>

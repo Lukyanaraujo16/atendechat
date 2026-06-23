@@ -182,7 +182,7 @@ export const FEATURES: Record<string, FeatureNode> = {
       instagram_integration: {
         label: "Instagram",
         description:
-          "Permite conectar contas do Instagram e responder Directs pelo AtendeChat."
+          "Permite conectar Instagram e atender Directs."
       }
     }
   }

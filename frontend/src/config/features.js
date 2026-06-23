@@ -163,8 +163,7 @@ export const FEATURES = {
       },
       instagram_integration: {
         label: "Instagram",
-        description:
-          "Permite conectar contas do Instagram e responder Directs pelo AtendeChat.",
+        description: "Permite conectar Instagram e atender Directs.",
       },
     },
   },
