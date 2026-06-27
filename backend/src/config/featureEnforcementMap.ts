@@ -156,5 +156,11 @@ export const FEATURE_ENFORCEMENT_MAP: Array<{
     menu: "Configurações → Instagram",
     frontendRoutes: ["/connections (aba Instagram)"],
     backendRoutes: ["/instagram-accounts/*", "POST /instagram-accounts/*/oauth/*"]
+  },
+  {
+    feature: "inventory.sales",
+    menu: "Estoque e Vendas",
+    frontendRoutes: ["/inventory-sales"],
+    backendRoutes: ["(futuro) /inventory/*"]
   }
 ];

@@ -107,6 +107,11 @@ const messages = {
 						"Ask an administrator to enable groups in Group Management or wait for new messages.",
 				},
 			},
+			inventorySales: {
+				title: "Inventory & Sales",
+				comingSoon:
+					"Module under development. Soon you will manage products, inventory and sales here.",
+			},
 			crm: {
 				common: { cancel: "Cancel", save: "Save" },
 				summary: {
@@ -1062,6 +1067,7 @@ const messages = {
 					campaigns: "Campaigns",
 					contacts: "Contacts",
 					crm: "CRM",
+					inventory: "Inventory & Sales",
 					settings: "Settings",
 				},
 				features: {
@@ -1177,6 +1183,13 @@ const messages = {
 						pipeline: {
 							label: "Sales funnel",
 							description: "CRM with opportunity funnel and sales stages.",
+						},
+					},
+					inventory: {
+						sales: {
+							label: "Inventory & Sales",
+							description:
+								"Product, inventory and sales management integrated with support.",
 						},
 					},
 					settings: {
@@ -2599,6 +2612,7 @@ const messages = {
 					tasks: "Task management",
 					agenda: "Agenda",
 					crm: "CRM",
+					inventorySales: "Inventory & Sales",
 					contacts: "Contacts",
 					contactLabels: "Labels",
 					queues: "Queues & Chatbot",

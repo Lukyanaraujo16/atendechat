@@ -23,6 +23,7 @@ import HelpOutlineIcon from "@material-ui/icons/HelpOutline";
 import NotificationsIcon from "@material-ui/icons/Notifications";
 import AssessmentOutlinedIcon from "@material-ui/icons/AssessmentOutlined";
 import { AccountTree, BusinessCenter } from "@material-ui/icons";
+import StoreIcon from "@material-ui/icons/Store";
 import { i18n } from "../translate/i18n";
 import {
   getAttendanceDefaultPath,
@@ -30,6 +31,7 @@ import {
   hasAttendanceInboxAccess,
   canAccessInternalChatModule,
 } from "../utils/attendanceAccess";
+import { canUseInventorySales } from "../utils/canUseInventorySales";
 import { WhatsAppsContext } from "../context/WhatsApp/WhatsAppsContext";
 import { AuthContext } from "../context/Auth/AuthContext";
 import { Can } from "../components/Can";
@@ -271,6 +273,8 @@ const MainListItems = (props) => {
   const showTagsNav = fx["contacts.tags"] === true;
   const showFilesNav = fx["contacts.files"] === true;
   const showCrmNav = fx["crm.pipeline"] === true;
+  const showInventorySalesNav =
+    planFlags.loaded && canUseInventorySales(planFlags);
   const showTeamUsersNav =
     fx["team.users"] === true || fx["team.queues"] === true;
 
@@ -389,6 +393,8 @@ const MainListItems = (props) => {
   const selAgenda = path === "/agenda";
   const selAgendamentos = path === "/schedules";
   const selCrm = path === "/crm" || path.startsWith("/crm/");
+  const selInventorySales =
+    path === "/inventory-sales" || path.startsWith("/inventory-sales/");
   const selAvaliacao = path === "/avaliacao";
   const selInformativos =
     path === "/announcements" || path.startsWith("/saas/announcements");
@@ -438,6 +444,17 @@ const MainListItems = (props) => {
           listItemIconClassName={classes.listItemIcon}
           listItemTextClassName={classes.listItemText}
           selected={selCrm}
+        />
+      )}
+      {showInventorySalesNav && (
+        <ListItemLink
+          to="/inventory-sales"
+          primary={i18n.t("mainDrawer.listItems.inventorySales")}
+          icon={<StoreIcon />}
+          listItemClassName={classes.listItem}
+          listItemIconClassName={classes.listItemIcon}
+          listItemTextClassName={classes.listItemText}
+          selected={selInventorySales}
         />
       )}
       {showSchedules && (

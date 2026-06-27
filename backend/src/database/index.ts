@@ -75,6 +75,13 @@ import CrmDealActivity from "../models/CrmDealActivity";
 import CrmDealStageHistory from "../models/CrmDealStageHistory";
 import CrmSavedView from "../models/CrmSavedView";
 import Sticker from "../models/Sticker";
+import InventorySettings from "../models/InventorySettings";
+import InventoryCategory from "../models/InventoryCategory";
+import InventoryProduct from "../models/InventoryProduct";
+import InventoryStockMovement from "../models/InventoryStockMovement";
+import InventorySellerProfile from "../models/InventorySellerProfile";
+import InventorySale from "../models/InventorySale";
+import InventorySaleItem from "../models/InventorySaleItem";
 import { logDbConnectionAtStartup } from "../helpers/dbConnectionInfo";
 import {
   assertContactLabelRelationModelRegistered,
@@ -163,7 +170,14 @@ const models = [
   CrmDealActivity,
   CrmDealStageHistory,
   CrmSavedView,
-  Sticker
+  Sticker,
+  InventorySettings,
+  InventoryCategory,
+  InventoryProduct,
+  InventoryStockMovement,
+  InventorySellerProfile,
+  InventorySale,
+  InventorySaleItem
 ];
 
 sequelize.addModels(models);

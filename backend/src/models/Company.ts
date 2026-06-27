@@ -10,7 +10,8 @@ import {
   BelongsTo,
   DataType,
   HasMany,
-  Default
+  Default,
+  HasOne
 } from "sequelize-typescript";
 import Contact from "./Contact";
 import Message from "./Message";
@@ -23,6 +24,13 @@ import TicketTraking from "./TicketTraking";
 import User from "./User";
 import UserRating from "./UserRating";
 import Whatsapp from "./Whatsapp";
+import InventorySettings from "./InventorySettings";
+import InventoryCategory from "./InventoryCategory";
+import InventoryProduct from "./InventoryProduct";
+import InventoryStockMovement from "./InventoryStockMovement";
+import InventorySellerProfile from "./InventorySellerProfile";
+import InventorySale from "./InventorySale";
+import InventorySaleItem from "./InventorySaleItem";
 
 @Table
 class Company extends Model<Company> {
@@ -196,6 +204,55 @@ class Company extends Model<Company> {
     hooks: true
   })
   ticketTrankins: TicketTraking[];
+
+  @HasOne(() => InventorySettings, {
+    onUpdate: "CASCADE",
+    onDelete: "CASCADE",
+    hooks: true
+  })
+  inventorySettings: InventorySettings;
+
+  @HasMany(() => InventoryCategory, {
+    onUpdate: "CASCADE",
+    onDelete: "CASCADE",
+    hooks: true
+  })
+  inventoryCategories: InventoryCategory[];
+
+  @HasMany(() => InventoryProduct, {
+    onUpdate: "CASCADE",
+    onDelete: "CASCADE",
+    hooks: true
+  })
+  inventoryProducts: InventoryProduct[];
+
+  @HasMany(() => InventoryStockMovement, {
+    onUpdate: "CASCADE",
+    onDelete: "CASCADE",
+    hooks: true
+  })
+  inventoryStockMovements: InventoryStockMovement[];
+
+  @HasMany(() => InventorySellerProfile, {
+    onUpdate: "CASCADE",
+    onDelete: "CASCADE",
+    hooks: true
+  })
+  inventorySellerProfiles: InventorySellerProfile[];
+
+  @HasMany(() => InventorySale, {
+    onUpdate: "CASCADE",
+    onDelete: "CASCADE",
+    hooks: true
+  })
+  inventorySales: InventorySale[];
+
+  @HasMany(() => InventorySaleItem, {
+    onUpdate: "CASCADE",
+    onDelete: "CASCADE",
+    hooks: true
+  })
+  inventorySaleItems: InventorySaleItem[];
 }
 
 export default Company;

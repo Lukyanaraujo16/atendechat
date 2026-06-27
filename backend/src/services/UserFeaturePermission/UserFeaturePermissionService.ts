@@ -219,6 +219,7 @@ function buildDefaultPermissionState(
     setIfPlan("settings.api", false);
     setIfPlan("settings.connections", false);
     setIfPlan("settings.instagram_integration", false);
+    setIfPlan("inventory.sales", false);
     setIfPlan("finance.subscription", false);
     setIfPlan("finance.invoices", false);
     setIfPlan("team.ratings", false);

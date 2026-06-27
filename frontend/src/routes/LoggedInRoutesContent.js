@@ -58,6 +58,7 @@ import Evaluation from "../pages/Evaluation";
 import Reports from "../pages/Reports";
 import UserNotifications from "../pages/UserNotifications";
 import CrmBoard from "../pages/CRM";
+import InventorySales from "../pages/InventorySales";
 import CRMReports from "../pages/CRMReports";
 import CrmAutomations from "../pages/CrmAutomations";
 
@@ -904,6 +905,21 @@ export default function LoggedInRoutesContent() {
             <CrmBoard />
           ) : (
             <FeatureBlocked planFlags={planFlags} anyOf={["crm.pipeline"]} />
+          );
+        }}
+      />
+
+      <Route
+        exact
+        path="/inventory-sales"
+        render={() => {
+          if (!planFlags.loaded) {
+            return <PlanFlagsLoadingState />;
+          }
+          return fx["inventory.sales"] === true ? (
+            <InventorySales />
+          ) : (
+            <FeatureBlocked planFlags={planFlags} anyOf={["inventory.sales"]} />
           );
         }}
       />

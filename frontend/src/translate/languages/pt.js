@@ -108,6 +108,11 @@ const messages = {
             "Peça ao administrador para liberar grupos em Gestão de Grupos ou aguarde novas mensagens.",
         },
       },
+      inventorySales: {
+        title: "Estoque e Vendas",
+        comingSoon:
+          "Módulo em implementação. Em breve você poderá gerenciar produtos, estoque e vendas por aqui.",
+      },
       crm: {
         common: {
           cancel: "Cancelar",
@@ -1132,6 +1137,7 @@ const messages = {
           campaigns: "Campanhas",
           contacts: "Contatos",
           crm: "CRM",
+          inventory: "Estoque e Vendas",
           settings: "Configurações",
         },
         features: {
@@ -1249,6 +1255,13 @@ const messages = {
             pipeline: {
               label: "Funil de vendas",
               description: "CRM com funil de oportunidades e etapas de venda.",
+            },
+          },
+          inventory: {
+            sales: {
+              label: "Estoque e Vendas",
+              description:
+                "Controle de produtos, estoque e vendas integrado ao atendimento.",
             },
           },
           settings: {
@@ -2689,6 +2702,7 @@ const messages = {
           tasks: "Gestão de tarefas",
           agenda: "Agenda",
           crm: "CRM",
+          inventorySales: "Estoque e Vendas",
           contacts: "Contatos",
           contactLabels: "Etiquetas",
           queues: "Setores & Chatbot",

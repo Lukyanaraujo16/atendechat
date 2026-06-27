@@ -100,6 +100,11 @@ const messages = {
             "Pida al administrador que libere grupos en Gestión de Grupos o espere nuevos mensajes.",
         },
       },
+      inventorySales: {
+        title: "Inventario y Ventas",
+        comingSoon:
+          "Módulo en implementación. Pronto podrá gestionar productos, inventario y ventas aquí.",
+      },
       crm: {
         common: { cancel: "Cancelar", save: "Guardar" },
         summary: {
@@ -1027,6 +1032,7 @@ const messages = {
           campaigns: "Campañas",
           contacts: "Contactos",
           crm: "CRM",
+          inventory: "Inventario y Ventas",
           settings: "Configuración",
         },
         features: {
@@ -1144,6 +1150,13 @@ const messages = {
             pipeline: {
               label: "Embudo de ventas",
               description: "CRM con embudo de oportunidades y etapas de venta.",
+            },
+          },
+          inventory: {
+            sales: {
+              label: "Inventario y Ventas",
+              description:
+                "Control de productos, inventario y ventas integrado al atendimiento.",
             },
           },
           settings: {
@@ -2540,6 +2553,7 @@ const messages = {
           tasks: "Gestión de tareas",
           agenda: "Agenda",
           crm: "CRM",
+          inventorySales: "Inventario y Ventas",
           contacts: "Contactos",
           contactLabels: "Etiquetas",
           queues: "Colas & Chatbot",

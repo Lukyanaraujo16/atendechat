@@ -168,6 +168,16 @@ export const FEATURES: Record<string, FeatureNode> = {
       }
     }
   },
+  inventory: {
+    label: "Estoque e Vendas",
+    children: {
+      sales: {
+        label: "Estoque e Vendas",
+        description:
+          "Controle de produtos, estoque e vendas integrado ao atendimento."
+      }
+    }
+  },
   settings: {
     label: "Configurações",
     children: {
