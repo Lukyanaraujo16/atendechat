@@ -8,7 +8,10 @@ import React, {
 } from "react";
 import { AuthContext } from "../context/Auth/AuthContext";
 import usePlans from "./usePlans";
-import { buildEffectiveModuleFlagsFromFeatureMap } from "../components/ModuleSettings/moduleSync";
+import {
+  buildEffectiveModuleFlagsFromFeatureMap,
+  mergeLiveEffectiveFeatures,
+} from "../components/ModuleSettings/moduleSync";
 import { countPostLogin } from "../utils/postLoginDebug";
 
 const PlanFlagsContext = createContext(null);
@@ -126,21 +129,16 @@ function usePlanFlagsState() {
         if (cancelled) return;
 
         const p = planConfigs?.plan;
-        const eff = planConfigs?.effectiveModules;
         const planEffectiveFeatures = planConfigs?.effectiveFeatures || {};
-        const userFx = user?.effectiveUserFeatures;
-        const hasUserFx =
-          userFx &&
-          typeof userFx === "object" &&
-          Object.keys(userFx).length > 0;
-        const effectiveFeatures = hasUserFx ? userFx : planEffectiveFeatures;
+        const effectiveFeatures = mergeLiveEffectiveFeatures(
+          planEffectiveFeatures,
+          user
+        );
         const modulePerms = user?.company?.modulePermissions;
-        const effFromFeatures = hasUserFx
-          ? buildEffectiveModuleFlagsFromFeatureMap(
-              effectiveFeatures,
-              modulePerms ?? {}
-            )
-          : null;
+        const effFromFeatures = buildEffectiveModuleFlagsFromFeatureMap(
+          effectiveFeatures,
+          modulePerms ?? {}
+        );
 
         const applyNext = (payload) => {
           setFlags((f) => {
@@ -167,58 +165,20 @@ function usePlanFlagsState() {
           return;
         }
 
-        if (effFromFeatures) {
-          applyNext({
-            useCampaigns: !!effFromFeatures.useCampaigns,
-            useFlowbuilders: !!effFromFeatures.useFlowbuilders,
-            useKanban: !!effFromFeatures.useKanban,
-            useOpenAi: !!effFromFeatures.useOpenAi,
-            useIntegrations: !!effFromFeatures.useIntegrations,
-            useSchedules: !!effFromFeatures.useSchedules,
-            useExternalApi: !!effFromFeatures.useExternalApi,
-            useGroups: effFromFeatures.useGroups !== false,
-            useInternalChat: !!effFromFeatures.useInternalChat,
-            loaded: true,
-            planTierEffectiveFeatures: planEffectiveFeatures,
-            effectiveFeatures,
-          });
-          return;
-        }
-
-        if (eff) {
-          applyNext({
-            useCampaigns: !!eff.useCampaigns,
-            useFlowbuilders: !!eff.useFlowbuilders,
-            useKanban: !!eff.useKanban,
-            useOpenAi: !!eff.useOpenAi,
-            useIntegrations: !!eff.useIntegrations,
-            useSchedules: !!eff.useSchedules,
-            useExternalApi: !!eff.useExternalApi,
-            useGroups: eff.useGroups !== false,
-            useInternalChat:
-              eff.useInternalChat !== undefined
-                ? !!eff.useInternalChat
-                : p.useInternalChat !== false,
-            loaded: true,
-            planTierEffectiveFeatures: planEffectiveFeatures,
-            effectiveFeatures,
-          });
-        } else {
-          applyNext({
-            useCampaigns: !!p.useCampaigns,
-            useFlowbuilders: !!(p.useFlowbuilders ?? p.useCampaigns),
-            useKanban: !!p.useKanban,
-            useOpenAi: !!p.useOpenAi,
-            useIntegrations: !!p.useIntegrations,
-            useSchedules: !!p.useSchedules,
-            useExternalApi: !!p.useExternalApi,
-            useGroups: true,
-            useInternalChat: p.useInternalChat !== false,
-            loaded: true,
-            planTierEffectiveFeatures: planEffectiveFeatures,
-            effectiveFeatures,
-          });
-        }
+        applyNext({
+          useCampaigns: !!effFromFeatures.useCampaigns,
+          useFlowbuilders: !!effFromFeatures.useFlowbuilders,
+          useKanban: !!effFromFeatures.useKanban,
+          useOpenAi: !!effFromFeatures.useOpenAi,
+          useIntegrations: !!effFromFeatures.useIntegrations,
+          useSchedules: !!effFromFeatures.useSchedules,
+          useExternalApi: !!effFromFeatures.useExternalApi,
+          useGroups: effFromFeatures.useGroups !== false,
+          useInternalChat: !!effFromFeatures.useInternalChat,
+          loaded: true,
+          planTierEffectiveFeatures: planEffectiveFeatures,
+          effectiveFeatures,
+        });
       } catch {
         if (!cancelled) {
           setFlags((f) => {

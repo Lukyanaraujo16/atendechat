@@ -188,6 +188,45 @@ export function mergeModulePermissions(raw) {
 }
 
 /** Espelha `buildEffectiveModuleFlagsFromFeatureMap` no backend. */
+/**
+ * Combina features do plano (API em tempo real) com o mapa do utilizador (JWT).
+ * Admin/super herda o plano atual; utilizadores com mapa explícito respeitam negações,
+ * mas chaves novas no plano (ex.: inventory.sales) herdam o plano até permissão explícita.
+ */
+export function mergeLiveEffectiveFeatures(planFeatures, user) {
+  const planFx =
+    planFeatures && typeof planFeatures === "object" ? planFeatures : {};
+  const userFx = user?.effectiveUserFeatures;
+  const bypass =
+    user?.super === true ||
+    user?.profile === "admin" ||
+    user?.profile === "superadmin";
+
+  if (
+    bypass ||
+    !userFx ||
+    typeof userFx !== "object" ||
+    Object.keys(userFx).length === 0
+  ) {
+    return { ...planFx };
+  }
+
+  const keys = new Set([...Object.keys(planFx), ...Object.keys(userFx)]);
+  const out = {};
+  keys.forEach((k) => {
+    if (planFx[k] !== true) {
+      out[k] = false;
+      return;
+    }
+    if (Object.prototype.hasOwnProperty.call(userFx, k)) {
+      out[k] = userFx[k] === true;
+    } else {
+      out[k] = true;
+    }
+  });
+  return out;
+}
+
 export function buildEffectiveModuleFlagsFromFeatureMap(featureMap, modulePermissions) {
   const m = mergeModulePermissions(modulePermissions);
   const fx = featureMap && typeof featureMap === "object" ? featureMap : {};

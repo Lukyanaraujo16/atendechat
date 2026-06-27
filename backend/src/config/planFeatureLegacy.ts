@@ -3,6 +3,11 @@ import { getAllFeatureKeys } from "./features";
 
 const asBool = (v: unknown): boolean => v === true || v === "true";
 
+/** Lê `enabled` de PlanFeatures (MySQL pode devolver 0/1). */
+export function planFeatureEnabled(v: unknown): boolean {
+  return v === true || v === 1 || v === "1" || v === "true";
+}
+
 /** Lê coluna do plano (instância Sequelize ou objeto plain vindo de `toJSON()`). */
 export function readPlanColumn(plan: Plan | Record<string, unknown> | null | undefined, key: string): unknown {
   if (!plan || typeof plan !== "object") return undefined;

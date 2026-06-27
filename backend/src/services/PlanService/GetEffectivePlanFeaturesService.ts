@@ -3,6 +3,7 @@ import PlanFeature from "../../models/PlanFeature";
 import { getAllFeatureKeys } from "../../config/features";
 import {
   legacyPlanFeatureValue,
+  planFeatureEnabled,
   planLegacyColumnsIndicateFullAccess
 } from "../../config/planFeatureLegacy";
 import { resolvePlanIdForQuery, logPlanFeaturesWarn } from "./planIdResolve";
@@ -21,7 +22,7 @@ export function applyPersistedPlanFeatureAliases(
     Object.prototype.hasOwnProperty.call(out, "contacts.crm") &&
     !Object.prototype.hasOwnProperty.call(out, "contacts.tags")
   ) {
-    out["contacts.tags"] = out["contacts.crm"] === true;
+    out["contacts.tags"] = planFeatureEnabled(out["contacts.crm"]);
   }
   return out;
 }
@@ -78,7 +79,7 @@ export async function loadPersistedPlanFeatureMap(
   });
   const persisted: PersistedPlanFeatureMap = {};
   for (const r of rows) {
-    persisted[r.featureKey] = r.enabled === true;
+    persisted[r.featureKey] = planFeatureEnabled(r.enabled);
   }
   return applyPersistedPlanFeatureAliases(persisted);
 }
@@ -138,7 +139,7 @@ export function resolvePlanFeature(
   }
   let v: boolean;
   if (Object.prototype.hasOwnProperty.call(persistedMap, featureKey)) {
-    v = persistedMap[featureKey] === true;
+    v = planFeatureEnabled(persistedMap[featureKey]);
   } else {
     v = legacyPlanFeatureValue(plan, featureKey);
   }
@@ -153,12 +154,19 @@ export function getEffectivePlanFeaturesMap(
   const keys = getAllFeatureKeys();
   const persistedAliased = applyPersistedPlanFeatureAliases(persistedMap);
   const nPersist = Object.keys(persistedAliased).length;
-  const nTruePersist = Object.values(persistedAliased).filter((x) => x === true).length;
+  const nTruePersist = Object.values(persistedAliased).filter((x) =>
+    planFeatureEnabled(x)
+  ).length;
   const trueRatio = nPersist > 0 ? nTruePersist / nPersist : 0;
+  /** Só ignora PlanFeatures em massa quando há cobertura ampla do catálogo (evita falsos positivos com seeds parciais). */
+  const minRowsForCorruptionCheck = Math.min(
+    keys.length,
+    Math.max(12, Math.floor(keys.length * 0.5))
+  );
   const corruptedPersisted =
     Boolean(plan) &&
     planLegacyColumnsIndicateFullAccess(plan) &&
-    nPersist > 0 &&
+    nPersist >= minRowsForCorruptionCheck &&
     trueRatio < 0.12;
 
   const effectivePersisted = corruptedPersisted ? {} : persistedAliased;
@@ -177,7 +185,7 @@ export function mergePlanPersistedWithLegacy(
 ): Record<string, boolean> {
   const persistedRaw: PersistedPlanFeatureMap = {};
   for (const r of rows) {
-    persistedRaw[r.featureKey] = r.enabled === true;
+    persistedRaw[r.featureKey] = planFeatureEnabled(r.enabled);
   }
   const persisted = applyPersistedPlanFeatureAliases(persistedRaw);
   const keys = getAllFeatureKeys();

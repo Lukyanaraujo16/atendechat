@@ -9,6 +9,7 @@ export const FEATURE_GROUP_ORDER = [
   "campaigns",
   "contacts",
   "crm",
+  "inventory",
   "settings",
 ];
 

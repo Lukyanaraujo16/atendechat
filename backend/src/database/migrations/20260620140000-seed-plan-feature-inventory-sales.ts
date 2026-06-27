@@ -8,24 +8,54 @@ const FEATURE_KEY = "inventory.sales";
  */
 module.exports = {
   up: async (queryInterface: QueryInterface) => {
+    const dialect = queryInterface.sequelize.getDialect();
+    const replacements = { featureKey: FEATURE_KEY };
+
+    if (dialect === "postgres") {
+      await queryInterface.sequelize.query(
+        `
+        INSERT INTO "PlanFeatures" ("planId", "featureKey", "enabled", "createdAt", "updatedAt")
+        SELECT p.id, :featureKey, false, NOW(), NOW()
+        FROM "Plans" p
+        WHERE NOT EXISTS (
+          SELECT 1 FROM "PlanFeatures" pf
+          WHERE pf."planId" = p.id AND pf."featureKey" = :featureKey
+        )
+        `,
+        { replacements }
+      );
+      return;
+    }
+
     await queryInterface.sequelize.query(
       `
-      INSERT INTO "PlanFeatures" ("planId", "featureKey", "enabled", "createdAt", "updatedAt")
-      SELECT p.id, :featureKey, false, NOW(), NOW()
-      FROM "Plans" p
+      INSERT INTO PlanFeatures (planId, featureKey, enabled, createdAt, updatedAt)
+      SELECT p.id, :featureKey, 0, NOW(), NOW()
+      FROM Plans p
       WHERE NOT EXISTS (
-        SELECT 1 FROM "PlanFeatures" pf
-        WHERE pf."planId" = p.id AND pf."featureKey" = :featureKey
+        SELECT 1 FROM PlanFeatures pf
+        WHERE pf.planId = p.id AND pf.featureKey = :featureKey
       )
       `,
-      { replacements: { featureKey: FEATURE_KEY } }
+      { replacements }
     );
   },
 
   down: async (queryInterface: QueryInterface) => {
+    const dialect = queryInterface.sequelize.getDialect();
+    const replacements = { featureKey: FEATURE_KEY };
+
+    if (dialect === "postgres") {
+      await queryInterface.sequelize.query(
+        `DELETE FROM "PlanFeatures" WHERE "featureKey" = :featureKey`,
+        { replacements }
+      );
+      return;
+    }
+
     await queryInterface.sequelize.query(
-      `DELETE FROM "PlanFeatures" WHERE "featureKey" = :featureKey`,
-      { replacements: { featureKey: FEATURE_KEY } }
+      `DELETE FROM PlanFeatures WHERE featureKey = :featureKey`,
+      { replacements }
     );
   }
 };

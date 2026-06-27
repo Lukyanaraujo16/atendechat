@@ -8,6 +8,7 @@ import AppError from "../../errors/AppError";
 import { getIO } from "../../libs/socket";
 import { logger } from "../../utils/logger";
 import { getAllFeatureKeys } from "../../config/features";
+import { planFeatureEnabled } from "../../config/planFeatureLegacy";
 import {
   loadPersistedPlanFeatureMap,
   getEffectivePlanFeaturesMap
@@ -112,7 +113,7 @@ export async function loadExplicitUserFeatureMap(
   const rows = await UserFeaturePermission.findAll({ where: { userId } });
   const m: Record<string, boolean> = {};
   for (const r of rows) {
-    m[r.featureKey] = r.enabled === true;
+    m[r.featureKey] = planFeatureEnabled(r.enabled);
   }
   return m;
 }
