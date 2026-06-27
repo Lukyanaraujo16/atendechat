@@ -158,6 +158,41 @@ export const FEATURES = {
         description:
           "Controle de produtos, estoque e vendas integrado ao atendimento.",
       },
+      "sales.view": {
+        label: "Visualizar estoque e vendas",
+        description:
+          "Consultar produtos, estoque, vendas e resumo do módulo.",
+      },
+      "sales.manageProducts": {
+        label: "Gerir produtos e categorias",
+        description: "Criar, editar e desactivar produtos e categorias.",
+      },
+      "sales.manageStock": {
+        label: "Gerir movimentações de estoque",
+        description: "Registar entradas, saídas e ajustes de stock.",
+      },
+      "sales.createSale": {
+        label: "Criar e concluir vendas",
+        description:
+          "Abrir vendas, editar itens, concluir e vender a partir do ticket.",
+      },
+      "sales.cancelSale": {
+        label: "Cancelar e excluir vendas",
+        description: "Cancelar vendas concluídas e excluir rascunhos.",
+      },
+      "sales.managePayments": {
+        label: "Gerir pagamentos de vendas",
+        description: "Actualizar estado e dados de pagamento das vendas.",
+      },
+      "sales.viewReports": {
+        label: "Ver relatórios",
+        description: "Aceder aos relatórios e exportação CSV do módulo.",
+      },
+      "sales.manageSettings": {
+        label: "Configurações do estoque",
+        description:
+          "Alterar definições do módulo e perfis de vendedor/comissão.",
+      },
     },
   },
   settings: {
@@ -203,20 +238,17 @@ export function getAllFeatureKeys() {
 function featureI18nKey(fullKey, field) {
   const parts = fullKey.split(".");
   if (parts.length < 2) return null;
-  return `plans.features.${parts[0]}.${parts[1]}.${field}`;
+  return `plans.features.${parts[0]}.${parts.slice(1).join(".")}.${field}`;
 }
 
 function resolveLeafFromCatalog(fullKey) {
-  const parts = fullKey.split(".");
-  let node = FEATURES[parts[0]];
-  if (!node) return null;
-  for (let i = 1; i < parts.length; i += 1) {
-    if (isBranch(node) && node.children[parts[i]]) {
-      node = node.children[parts[i]];
-    } else {
-      return null;
-    }
-  }
+  const dot = fullKey.indexOf(".");
+  if (dot < 0) return null;
+  const rootKey = fullKey.slice(0, dot);
+  const rest = fullKey.slice(dot + 1);
+  const root = FEATURES[rootKey];
+  if (!root?.children?.[rest]) return null;
+  const node = root.children[rest];
   return isBranch(node) ? null : node;
 }
 

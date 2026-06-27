@@ -34,6 +34,7 @@ import {
 import toastError from "../../errors/toastError";
 import { i18n } from "../../translate/i18n";
 import useIsMobile from "../../hooks/useIsMobile";
+import { useInventoryPermissions } from "../../utils/inventoryAccess";
 import StockMovementFormDialog from "./StockMovementFormDialog";
 import { STOCK_MOVEMENT_TYPES } from "./constants";
 import { formatQuantity } from "./utils";
@@ -52,6 +53,7 @@ const useStyles = makeStyles((theme) => ({
     flexWrap: "wrap",
     gap: theme.spacing(2),
     marginBottom: theme.spacing(2),
+    maxWidth: "100%",
   },
 }));
 
@@ -62,6 +64,7 @@ export default function InventoryStockTab({
 }) {
   const classes = useStyles();
   const isMobile = useIsMobile();
+  const perms = useInventoryPermissions();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [movements, setMovements] = useState([]);
@@ -111,11 +114,13 @@ export default function InventoryStockTab({
   }, [loadMovements]);
 
   useEffect(() => {
-    if (autoOpenCreate) {
+    if (autoOpenCreate && perms.canManageStock) {
       setFormOpen(true);
       if (onAutoOpenConsumed) onAutoOpenConsumed();
+    } else if (autoOpenCreate && onAutoOpenConsumed) {
+      onAutoOpenConsumed();
     }
-  }, [autoOpenCreate, onAutoOpenConsumed]);
+  }, [autoOpenCreate, onAutoOpenConsumed, perms.canManageStock]);
 
   const formatDate = (value) => {
     if (!value) return "—";
@@ -135,9 +140,11 @@ export default function InventoryStockTab({
         <Typography variant="h6" style={{ fontWeight: 600 }}>
           {i18n.t("inventorySales.stock.title")}
         </Typography>
-        <AppPrimaryButton startIcon={<AddIcon />} onClick={() => setFormOpen(true)}>
-          {i18n.t("inventorySales.stock.new")}
-        </AppPrimaryButton>
+        {perms.canManageStock ? (
+          <AppPrimaryButton startIcon={<AddIcon />} onClick={() => setFormOpen(true)}>
+            {i18n.t("inventorySales.stock.new")}
+          </AppPrimaryButton>
+        ) : null}
       </div>
 
       <div className={classes.filtersRow}>
@@ -193,9 +200,11 @@ export default function InventoryStockTab({
             title={i18n.t("inventorySales.stock.emptyTitle")}
             description={i18n.t("inventorySales.stock.emptyDescription")}
           >
-            <AppPrimaryButton startIcon={<AddIcon />} onClick={() => setFormOpen(true)}>
-              {i18n.t("inventorySales.stock.new")}
-            </AppPrimaryButton>
+            {perms.canManageStock ? (
+              <AppPrimaryButton startIcon={<AddIcon />} onClick={() => setFormOpen(true)}>
+                {i18n.t("inventorySales.stock.new")}
+              </AppPrimaryButton>
+            ) : null}
           </AppEmptyState>
         ) : isMobile ? (
           <MobileCardList>

@@ -10,6 +10,7 @@ import UpdateInventorySaleItemService from "../services/InventoryService/UpdateI
 import DeleteInventorySaleItemService from "../services/InventoryService/DeleteInventorySaleItemService";
 import CompleteInventorySaleService from "../services/InventoryService/CompleteInventorySaleService";
 import CancelInventorySaleService from "../services/InventoryService/CancelInventorySaleService";
+import UpdateInventorySalePaymentService from "../services/InventoryService/UpdateInventorySalePaymentService";
 
 function companyIdOrThrow(req: Request): number {
   const id = req.user?.companyId;
@@ -45,6 +46,7 @@ export const listSales = async (
     startDate: req.query.startDate,
     endDate: req.query.endDate,
     search: req.query.search,
+    paymentStatus: req.query.paymentStatus,
     page: req.query.page,
     limit: req.query.limit
   });
@@ -165,6 +167,19 @@ export const cancelSale = async (
     saleId: parseIdParam(req.params.id),
     cancelledBy: userIdOrNull(req),
     cancelReason: req.body?.cancelReason
+  });
+  return res.json(sale);
+};
+
+export const updateSalePayment = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const sale = await UpdateInventorySalePaymentService({
+    companyId,
+    saleId: parseIdParam(req.params.id),
+    body: req.body
   });
   return res.json(sale);
 };

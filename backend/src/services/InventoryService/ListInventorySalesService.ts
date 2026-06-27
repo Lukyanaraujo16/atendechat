@@ -6,6 +6,7 @@ import {
   parseOptionalId,
   resetInventorySaleIncludesContactFilter
 } from "./inventorySaleHelpers";
+import { isInventoryPaymentStatus } from "./inventoryPaymentHelpers";
 import { parseOptionalDateQuery, parsePaginationQuery } from "./inventoryTenant";
 
 export type ListSalesResult = {
@@ -25,6 +26,7 @@ export default async function ListInventorySalesService(input: {
   startDate?: unknown;
   endDate?: unknown;
   search?: unknown;
+  paymentStatus?: unknown;
   page?: unknown;
   limit?: unknown;
 }): Promise<ListSalesResult> {
@@ -37,6 +39,18 @@ export default async function ListInventorySalesService(input: {
       throw new AppError("ERR_VALIDATION_ERROR", 400, "status inválido.");
     }
     where.status = status;
+  }
+
+  if (
+    input.paymentStatus !== undefined &&
+    input.paymentStatus !== null &&
+    input.paymentStatus !== ""
+  ) {
+    const paymentStatus = String(input.paymentStatus).trim();
+    if (!isInventoryPaymentStatus(paymentStatus)) {
+      throw new AppError("ERR_VALIDATION_ERROR", 400, "paymentStatus inválido.");
+    }
+    where.paymentStatus = paymentStatus;
   }
 
   if (input.contactId !== undefined && input.contactId !== null && input.contactId !== "") {

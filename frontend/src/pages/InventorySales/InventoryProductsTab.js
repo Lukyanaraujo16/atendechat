@@ -49,6 +49,7 @@ import ConfirmationModal from "../../components/ConfirmationModal";
 import { formatCurrencyBRL } from "../../utils/brazilianCurrency";
 import { formatQuantity, isProductLowStock } from "./utils";
 import { toast } from "react-toastify";
+import { useInventoryPermissions } from "../../utils/inventoryAccess";
 
 const useStyles = makeStyles((theme) => ({
   filtersRow: {
@@ -57,6 +58,7 @@ const useStyles = makeStyles((theme) => ({
     gap: theme.spacing(2),
     marginBottom: theme.spacing(2),
     alignItems: "center",
+    maxWidth: "100%",
   },
   headerRow: {
     display: "flex",
@@ -80,6 +82,7 @@ export default function InventoryProductsTab({
 }) {
   const classes = useStyles();
   const isMobile = useIsMobile();
+  const perms = useInventoryPermissions();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [products, setProducts] = useState([]);
@@ -130,12 +133,14 @@ export default function InventoryProductsTab({
   }, [loadProducts, search]);
 
   useEffect(() => {
-    if (autoOpenCreate) {
+    if (autoOpenCreate && perms.canManageProducts) {
       setEditId(null);
       setFormOpen(true);
       if (onAutoOpenConsumed) onAutoOpenConsumed();
+    } else if (autoOpenCreate && onAutoOpenConsumed) {
+      onAutoOpenConsumed();
     }
-  }, [autoOpenCreate, onAutoOpenConsumed]);
+  }, [autoOpenCreate, onAutoOpenConsumed, perms.canManageProducts]);
 
   const openCreate = () => {
     setEditId(null);
@@ -197,19 +202,23 @@ export default function InventoryProductsTab({
           </IconButton>
         </Tooltip>
       ) : null}
-      <IconButton size="small" onClick={() => openEdit(product)}>
-        <EditIcon fontSize="small" />
-      </IconButton>
-      {product.active !== false ? (
-        <IconButton
-          size="small"
-          onClick={() => {
-            setDeleteTarget(product);
-            setConfirmOpen(true);
-          }}
-        >
-          <DeleteOutlineIcon fontSize="small" />
-        </IconButton>
+      {perms.canManageProducts ? (
+        <>
+          <IconButton size="small" onClick={() => openEdit(product)}>
+            <EditIcon fontSize="small" />
+          </IconButton>
+          {product.active !== false ? (
+            <IconButton
+              size="small"
+              onClick={() => {
+                setDeleteTarget(product);
+                setConfirmOpen(true);
+              }}
+            >
+              <DeleteOutlineIcon fontSize="small" />
+            </IconButton>
+          ) : null}
+        </>
       ) : null}
     </Box>
   );
@@ -220,9 +229,11 @@ export default function InventoryProductsTab({
         <Typography variant="h6" style={{ fontWeight: 600 }}>
           {i18n.t("inventorySales.products.title")}
         </Typography>
-        <AppPrimaryButton startIcon={<AddIcon />} onClick={openCreate}>
-          {i18n.t("inventorySales.products.new")}
-        </AppPrimaryButton>
+        {perms.canManageProducts ? (
+          <AppPrimaryButton startIcon={<AddIcon />} onClick={openCreate}>
+            {i18n.t("inventorySales.products.new")}
+          </AppPrimaryButton>
+        ) : null}
       </div>
 
       <div className={classes.filtersRow}>
@@ -294,9 +305,11 @@ export default function InventoryProductsTab({
             title={i18n.t("inventorySales.products.emptyTitle")}
             description={i18n.t("inventorySales.products.emptyDescription")}
           >
-            <AppPrimaryButton startIcon={<AddIcon />} onClick={openCreate}>
-              {i18n.t("inventorySales.products.new")}
-            </AppPrimaryButton>
+            {perms.canManageProducts ? (
+              <AppPrimaryButton startIcon={<AddIcon />} onClick={openCreate}>
+                {i18n.t("inventorySales.products.new")}
+              </AppPrimaryButton>
+            ) : null}
           </AppEmptyState>
         ) : isMobile ? (
           <MobileCardList>
@@ -343,9 +356,11 @@ export default function InventoryProductsTab({
                     {i18n.t("inventorySales.products.columns.price")}
                   </TableCell>
                   <TableCell>{i18n.t("inventorySales.products.columns.stock")}</TableCell>
-                  <TableCell align="right">
-                    {i18n.t("inventorySales.common.actions")}
-                  </TableCell>
+                  {perms.canManageProducts ? (
+                    <TableCell align="right">
+                      {i18n.t("inventorySales.common.actions")}
+                    </TableCell>
+                  ) : null}
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -368,7 +383,9 @@ export default function InventoryProductsTab({
                       {formatCurrencyBRL(product.salePrice)}
                     </TableCell>
                     <TableCell>{renderStockCell(product)}</TableCell>
-                    <TableCell align="right">{renderActions(product)}</TableCell>
+                    {perms.canManageProducts ? (
+                      <TableCell align="right">{renderActions(product)}</TableCell>
+                    ) : null}
                   </TableRow>
                 ))}
               </TableBody>

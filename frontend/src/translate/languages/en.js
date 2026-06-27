@@ -132,6 +132,11 @@ const messages = {
 					inactive: "Inactive",
 					actions: "Actions",
 				},
+				permissions: {
+					noTabAccessTitle: "No permission to access this module",
+					noTabAccessDescription:
+						"Ask your administrator to grant Inventory & Sales view access.",
+				},
 				summary: {
 					activeProducts: "Active products",
 					lowStock: "Low stock",
@@ -273,6 +278,7 @@ const messages = {
 					new: "New sale",
 					search: "Search number, customer or notes",
 					filterStatus: "Status",
+					filterPaymentStatus: "Payment",
 					filterSeller: "Seller",
 					startDate: "Start date",
 					endDate: "End date",
@@ -301,12 +307,68 @@ const messages = {
 						completed: "Completed",
 						cancelled: "Cancelled",
 					},
+					paymentStatus: {
+						unpaid: "Unpaid",
+						paid: "Paid",
+						partial: "Partial",
+						refunded: "Refunded",
+					},
+					paymentMethods: {
+						cash: "Cash",
+						pix: "PIX",
+						credit_card: "Credit card",
+						debit_card: "Debit card",
+						bank_transfer: "Bank transfer",
+						boleto: "Boleto",
+						other: "Other",
+					},
+					payment: {
+						sectionTitle: "Payment",
+						update: "Update payment",
+						savePayment: "Save payment",
+						paidAmount: "Amount paid",
+						paidAt: "Payment date",
+						noMethod: "No method set",
+					},
+					receipt: {
+						title: "Sale receipt",
+						open: "Receipt",
+						print: "Print",
+						saleNumber: "Number",
+						saleDate: "Date",
+						operationalStatus: "Sale status",
+						paymentStatus: "Payment status",
+						customer: "Customer",
+						seller: "Seller",
+						paymentMethod: "Payment method",
+						itemsTitle: "Items",
+						noItems: "No items recorded.",
+						noCustomer: "No customer",
+						noSeller: "No seller",
+						cancelled: "SALE CANCELLED",
+						subtotal: "Subtotal",
+						totalDiscount: "Discounts",
+						total: "Total",
+						paidAmount: "Amount paid",
+						pendingAmount: "Pending amount",
+						notes: "Notes",
+						paymentNotes: "Payment notes",
+						columns: {
+							product: "Product",
+							quantity: "Qty.",
+							unitPrice: "Unit price",
+							discount: "Discount",
+							total: "Total",
+						},
+					},
 					columns: {
 						number: "Number",
 						contact: "Customer",
 						seller: "Seller",
 						total: "Total",
 						commission: "Commission",
+						payment: "Payment",
+						paymentMethod: "Payment method",
 						date: "Date",
 					},
 					fields: {
@@ -314,10 +376,17 @@ const messages = {
 						seller: "Seller",
 						notes: "Notes",
 						cancelReason: "Cancellation reason",
+						paymentMethod: "Payment method",
+						paymentStatus: "Payment status",
+						paymentNotes: "Payment notes",
+						paidAmount: "Amount paid",
+						paidAt: "Payment date",
 					},
 					validation: {
 						sellerRequired: "Select a seller before completing.",
 						cancelReason: "Enter the cancellation reason.",
+						paidAmount: "Invalid amount paid.",
+						paidAmountMax: "Amount paid cannot exceed the total.",
 					},
 					totals: {
 						subtotal: "Subtotal",
@@ -353,6 +422,7 @@ const messages = {
 						completed: "Sale completed.",
 						cancelled: "Sale cancelled.",
 						deleted: "Draft deleted.",
+						paymentUpdated: "Payment updated.",
 					},
 				},
 				ticket: {
@@ -390,6 +460,8 @@ const messages = {
 						totalCommission: "Total commission",
 						cancelledCount: "Cancelled sales",
 						cancelledTotal: "Cancelled amount",
+						totalPaid: "Total paid",
+						totalPending: "Total pending",
 					},
 					columns: {
 						seller: "Seller",
@@ -401,6 +473,29 @@ const messages = {
 						quantitySold: "Qty sold",
 						customer: "Customer",
 						lastPurchase: "Last purchase",
+					},
+					export: {
+						button: "Export CSV",
+						all: "Export all",
+						summary: "Period summary",
+						sellers: "Sales by seller",
+						products: "Top products",
+						customers: "Sales by customer",
+						noData: "No data to export with the current filters.",
+						success: "CSV exported successfully.",
+						filters: {
+							startDate: "Start date",
+							endDate: "End date",
+							seller: "Seller",
+							allSellers: "All",
+						},
+						summaryColumns: {
+							metric: "Metric",
+							value: "Value",
+						},
+						columns: {
+							sku: "SKU",
+						},
 					},
 				},
 				settings: {
@@ -1499,6 +1594,41 @@ const messages = {
 							label: "Inventory & Sales",
 							description:
 								"Product, inventory and sales management integrated with support.",
+						},
+						"sales.view": {
+							label: "View inventory & sales",
+							description:
+								"Browse products, stock, sales and module summary.",
+						},
+						"sales.manageProducts": {
+							label: "Manage products & categories",
+							description: "Create, edit and deactivate products and categories.",
+						},
+						"sales.manageStock": {
+							label: "Manage stock movements",
+							description: "Record stock in, out and adjustment entries.",
+						},
+						"sales.createSale": {
+							label: "Create and complete sales",
+							description:
+								"Open sales, edit items, complete and sell from tickets.",
+						},
+						"sales.cancelSale": {
+							label: "Cancel and delete sales",
+							description: "Cancel completed sales and delete drafts.",
+						},
+						"sales.managePayments": {
+							label: "Manage sale payments",
+							description: "Update payment status and payment details.",
+						},
+						"sales.viewReports": {
+							label: "View reports",
+							description: "Access module reports and CSV export.",
+						},
+						"sales.manageSettings": {
+							label: "Inventory settings",
+							description:
+								"Change module settings and seller commission profiles.",
 						},
 					},
 					settings: {

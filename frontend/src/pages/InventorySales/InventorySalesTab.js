@@ -44,13 +44,15 @@ import {
 import toastError from "../../errors/toastError";
 import { i18n } from "../../translate/i18n";
 import useIsMobile from "../../hooks/useIsMobile";
+import { useInventoryPermissions } from "../../utils/inventoryAccess";
 import SaleDrawer from "./SaleDrawer";
 import { formatCurrencyBRL } from "../../utils/brazilianCurrency";
 import {
   formatSaleNumber,
   getSaleDisplayDate,
+  paymentStatusChipColor,
 } from "./utils";
-import { SALE_STATUSES } from "./constants";
+import { SALE_STATUSES, PAYMENT_STATUSES } from "./constants";
 
 const useStyles = makeStyles((theme) => ({
   headerRow: {
@@ -67,6 +69,7 @@ const useStyles = makeStyles((theme) => ({
     gap: theme.spacing(2),
     marginBottom: theme.spacing(2),
     alignItems: "center",
+    maxWidth: "100%",
   },
   paginationRow: {
     display: "flex",
@@ -87,6 +90,7 @@ function statusChipColor(status) {
 export default function InventorySalesTab() {
   const classes = useStyles();
   const isMobile = useIsMobile();
+  const perms = useInventoryPermissions();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -98,6 +102,7 @@ export default function InventorySalesTab() {
 
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
+  const [paymentStatus, setPaymentStatus] = useState("");
   const [sellerUserId, setSellerUserId] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -122,6 +127,7 @@ export default function InventorySalesTab() {
       const params = { page, limit };
       if (search.trim()) params.search = search.trim();
       if (status) params.status = status;
+      if (paymentStatus) params.paymentStatus = paymentStatus;
       if (sellerUserId) params.sellerUserId = sellerUserId;
       if (startDate) params.startDate = new Date(startDate).toISOString();
       if (endDate) {
@@ -139,7 +145,7 @@ export default function InventorySalesTab() {
     } finally {
       setLoading(false);
     }
-  }, [page, limit, search, status, sellerUserId, startDate, endDate]);
+  }, [page, limit, search, status, paymentStatus, sellerUserId, startDate, endDate]);
 
   useEffect(() => {
     loadUsers();
@@ -152,7 +158,7 @@ export default function InventorySalesTab() {
 
   useEffect(() => {
     setPage(1);
-  }, [status, sellerUserId, startDate, endDate, search]);
+  }, [status, paymentStatus, sellerUserId, startDate, endDate, search]);
 
   const openSale = (id) => {
     setSelectedSaleId(id);
@@ -186,6 +192,14 @@ export default function InventorySalesTab() {
   const statusLabel = (s) =>
     i18n.t(`inventorySales.sales.status.${s}`, s);
 
+  const paymentStatusLabel = (s) =>
+    i18n.t(`inventorySales.sales.paymentStatus.${s}`, s);
+
+  const paymentMethodLabel = (method) =>
+    method
+      ? i18n.t(`inventorySales.sales.paymentMethods.${method}`, method)
+      : "—";
+
   const renderRow = (sale) => {
     const displayDate = getSaleDisplayDate(sale);
     return (
@@ -198,11 +212,19 @@ export default function InventorySalesTab() {
               color={statusChipColor(sale.status)}
               label={statusLabel(sale.status)}
             />
+            {sale.status === "completed" && sale.paymentStatus ? (
+              <Chip
+                size="small"
+                color={paymentStatusChipColor(sale.paymentStatus)}
+                label={paymentStatusLabel(sale.paymentStatus)}
+              />
+            ) : null}
           </Box>
         </TableCell>
         <TableCell>{sale.contact?.name || "—"}</TableCell>
         <TableCell>{sale.seller?.name || "—"}</TableCell>
         <TableCell align="right">{formatCurrencyBRL(sale.totalAmount)}</TableCell>
+        <TableCell>{paymentMethodLabel(sale.paymentMethod)}</TableCell>
         <TableCell align="right">
           {sale.commissionAmount != null
             ? formatCurrencyBRL(sale.commissionAmount)
@@ -224,13 +246,15 @@ export default function InventorySalesTab() {
         <Typography variant="h6" style={{ fontWeight: 600 }}>
           {i18n.t("inventorySales.sales.title")}
         </Typography>
-        <AppPrimaryButton
-          startIcon={<AddIcon />}
-          onClick={handleNewSale}
-          disabled={creating}
-        >
-          {i18n.t("inventorySales.sales.new")}
-        </AppPrimaryButton>
+        {perms.canCreateSale ? (
+          <AppPrimaryButton
+            startIcon={<AddIcon />}
+            onClick={handleNewSale}
+            disabled={creating}
+          >
+            {i18n.t("inventorySales.sales.new")}
+          </AppPrimaryButton>
+        ) : null}
       </div>
 
       <div className={classes.filtersRow}>
@@ -263,6 +287,24 @@ export default function InventorySalesTab() {
             {SALE_STATUSES.map((s) => (
               <MenuItem key={s} value={s}>
                 {statusLabel(s)}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        <FormControl variant="outlined" size="small" style={{ minWidth: 150 }}>
+          <InputLabel id="sale-payment-status-filter">
+            {i18n.t("inventorySales.sales.filterPaymentStatus")}
+          </InputLabel>
+          <Select
+            labelId="sale-payment-status-filter"
+            value={paymentStatus}
+            onChange={(e) => setPaymentStatus(e.target.value)}
+            label={i18n.t("inventorySales.sales.filterPaymentStatus")}
+          >
+            <MenuItem value="">{i18n.t("inventorySales.common.all")}</MenuItem>
+            {PAYMENT_STATUSES.map((s) => (
+              <MenuItem key={s} value={s}>
+                {paymentStatusLabel(s)}
               </MenuItem>
             ))}
           </Select>
@@ -307,7 +349,7 @@ export default function InventorySalesTab() {
 
       <AppSectionCard variant="outlined" dense>
         {loading ? (
-          <AppTableRowSkeleton columns={isMobile ? 1 : 7} />
+          <AppTableRowSkeleton columns={isMobile ? 1 : 8} />
         ) : loadError ? (
           <AppEmptyState title={i18n.t("inventorySales.common.loadError")}>
             <AppSecondaryButton onClick={loadSales}>
@@ -319,13 +361,15 @@ export default function InventorySalesTab() {
             title={i18n.t("inventorySales.sales.emptyTitle")}
             description={i18n.t("inventorySales.sales.emptyDescription")}
           >
-            <AppPrimaryButton
-              startIcon={<AddIcon />}
-              onClick={handleNewSale}
-              disabled={creating}
-            >
-              {i18n.t("inventorySales.sales.new")}
-            </AppPrimaryButton>
+            {perms.canCreateSale ? (
+              <AppPrimaryButton
+                startIcon={<AddIcon />}
+                onClick={handleNewSale}
+                disabled={creating}
+              >
+                {i18n.t("inventorySales.sales.new")}
+              </AppPrimaryButton>
+            ) : null}
           </AppEmptyState>
         ) : isMobile ? (
           <MobileCardList>
@@ -335,11 +379,20 @@ export default function InventorySalesTab() {
                 title={formatSaleNumber(sale)}
                 subtitle={sale.contact?.name || "—"}
                 badges={
-                  <Chip
-                    size="small"
-                    color={statusChipColor(sale.status)}
-                    label={statusLabel(sale.status)}
-                  />
+                  <>
+                    <Chip
+                      size="small"
+                      color={statusChipColor(sale.status)}
+                      label={statusLabel(sale.status)}
+                    />
+                    {sale.status === "completed" && sale.paymentStatus ? (
+                      <Chip
+                        size="small"
+                        color={paymentStatusChipColor(sale.paymentStatus)}
+                        label={paymentStatusLabel(sale.paymentStatus)}
+                      />
+                    ) : null}
+                  </>
                 }
                 footer={
                   <IconButton size="small" onClick={() => openSale(sale.id)}>
@@ -349,6 +402,9 @@ export default function InventorySalesTab() {
               >
                 <Typography variant="body2">
                   {sale.seller?.name || "—"} · {formatCurrencyBRL(sale.totalAmount)}
+                </Typography>
+                <Typography variant="caption" color="textSecondary">
+                  {paymentMethodLabel(sale.paymentMethod)}
                 </Typography>
                 <Typography variant="caption" color="textSecondary">
                   {formatDate(getSaleDisplayDate(sale))}
@@ -366,6 +422,9 @@ export default function InventorySalesTab() {
                   <TableCell>{i18n.t("inventorySales.sales.columns.seller")}</TableCell>
                   <TableCell align="right">
                     {i18n.t("inventorySales.sales.columns.total")}
+                  </TableCell>
+                  <TableCell>
+                    {i18n.t("inventorySales.sales.columns.paymentMethod")}
                   </TableCell>
                   <TableCell align="right">
                     {i18n.t("inventorySales.sales.columns.commission")}

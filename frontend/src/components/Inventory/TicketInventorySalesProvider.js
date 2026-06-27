@@ -9,7 +9,10 @@ import { toast } from "react-toastify";
 
 import { AuthContext } from "../../context/Auth/AuthContext";
 import usePlanFlags from "../../hooks/usePlanFlags";
-import { canUseInventorySales } from "../../utils/canUseInventorySales";
+import {
+  canCreateInventorySale,
+  canViewInventory,
+} from "../../utils/inventoryAccess";
 import {
   createInventorySale,
   listInventorySales,
@@ -29,12 +32,19 @@ export function TicketInventorySalesProvider({ ticket, children }) {
   const { user } = useContext(AuthContext);
   const planFlags = usePlanFlags();
 
-  const enabled = useMemo(() => {
+  const canView = useMemo(() => {
     if (!planFlags.loaded) return false;
-    if (!canUseInventorySales(planFlags)) return false;
+    if (!canViewInventory(planFlags, user)) return false;
     if (!ticket?.id || !ticket?.contactId) return false;
     return true;
-  }, [planFlags.loaded, planFlags, ticket?.id, ticket?.contactId]);
+  }, [planFlags.loaded, planFlags, user, ticket?.id, ticket?.contactId]);
+
+  const canCreate = useMemo(() => {
+    if (!canView) return false;
+    return canCreateInventorySale(planFlags, user);
+  }, [canView, planFlags, user]);
+
+  const enabled = canCreate;
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [saleId, setSaleId] = useState(null);
@@ -44,13 +54,13 @@ export function TicketInventorySalesProvider({ ticket, children }) {
   const [opening, setOpening] = useState(false);
 
   const ticketLink = useMemo(() => {
-    if (!enabled) return null;
+    if (!canView) return null;
     return {
       ticketId: ticket.id,
       contactId: ticket.contactId,
       contactName: ticket.contact?.name || "",
     };
-  }, [enabled, ticket?.id, ticket?.contactId, ticket?.contact?.name]);
+  }, [canView, ticket?.id, ticket?.contactId, ticket?.contact?.name]);
 
   const refresh = useCallback(() => {
     setRefreshKey((k) => k + 1);
@@ -63,7 +73,7 @@ export function TicketInventorySalesProvider({ ticket, children }) {
   }, []);
 
   const createNewSale = useCallback(async () => {
-    if (!enabled || !ticketLink) return;
+    if (!canCreate || !ticketLink) return;
     setOpening(true);
     try {
       const sellerUserId =
@@ -84,7 +94,7 @@ export function TicketInventorySalesProvider({ ticket, children }) {
     } finally {
       setOpening(false);
     }
-  }, [enabled, ticketLink, user?.id, openSale, refresh]);
+  }, [canCreate, ticketLink, user?.id, openSale, refresh]);
 
   const handleSaleButtonClick = useCallback(async () => {
     if (!enabled || !ticket?.id) return;
@@ -112,6 +122,8 @@ export function TicketInventorySalesProvider({ ticket, children }) {
   const value = useMemo(
     () => ({
       enabled,
+      canView,
+      canCreate,
       opening,
       refreshKey,
       refresh,
@@ -121,6 +133,8 @@ export function TicketInventorySalesProvider({ ticket, children }) {
     }),
     [
       enabled,
+      canView,
+      canCreate,
       opening,
       refreshKey,
       refresh,
@@ -133,7 +147,7 @@ export function TicketInventorySalesProvider({ ticket, children }) {
   return (
     <TicketInventorySalesContext.Provider value={value}>
       {children}
-      {enabled ? (
+      {canView ? (
         <>
           <SaleDrawer
             open={drawerOpen}
@@ -145,13 +159,15 @@ export function TicketInventorySalesProvider({ ticket, children }) {
             }}
             onChanged={refresh}
           />
-          <TicketInventorySalesChoiceDialog
-            open={choiceOpen}
-            onClose={() => setChoiceOpen(false)}
-            sales={ticketSales}
-            onSelectSale={openSale}
-            onCreateNew={createNewSale}
-          />
+          {canCreate ? (
+            <TicketInventorySalesChoiceDialog
+              open={choiceOpen}
+              onClose={() => setChoiceOpen(false)}
+              sales={ticketSales}
+              onSelectSale={openSale}
+              onCreateNew={createNewSale}
+            />
+          ) : null}
         </>
       ) : null}
     </TicketInventorySalesContext.Provider>

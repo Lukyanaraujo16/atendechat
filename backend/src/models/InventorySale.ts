@@ -21,6 +21,15 @@ import InventorySaleItem from "./InventorySaleItem";
 
 export type InventorySaleStatus = "draft" | "completed" | "cancelled";
 export type InventorySaleSource = "manual" | "ticket" | "whatsapp";
+export type InventoryPaymentStatus = "unpaid" | "paid" | "partial" | "refunded";
+export type InventoryPaymentMethod =
+  | "cash"
+  | "pix"
+  | "credit_card"
+  | "debit_card"
+  | "bank_transfer"
+  | "boleto"
+  | "other";
 
 @Table({
   tableName: "InventorySales",
@@ -139,6 +148,26 @@ class InventorySale extends Model<InventorySale> {
   @AllowNull
   @Column(DataType.TEXT)
   cancelReason: string | null;
+
+  @Default("unpaid")
+  @Column(DataType.STRING(16))
+  paymentStatus: InventoryPaymentStatus;
+
+  @AllowNull
+  @Column(DataType.STRING(32))
+  paymentMethod: InventoryPaymentMethod | null;
+
+  @Default(0)
+  @Column(DataType.DECIMAL(12, 2))
+  paidAmount: string | number;
+
+  @AllowNull
+  @Column(DataType.DATE)
+  paidAt: Date | null;
+
+  @AllowNull
+  @Column(DataType.TEXT)
+  paymentNotes: string | null;
 
   @AllowNull
   @ForeignKey(() => User)

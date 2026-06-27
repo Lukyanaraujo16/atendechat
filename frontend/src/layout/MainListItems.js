@@ -274,7 +274,7 @@ const MainListItems = (props) => {
   const showFilesNav = fx["contacts.files"] === true;
   const showCrmNav = fx["crm.pipeline"] === true;
   const showInventorySalesNav =
-    planFlags.loaded && canUseInventorySales(planFlags);
+    planFlags.loaded && canUseInventorySales(planFlags, user);
   const showTeamUsersNav =
     fx["team.users"] === true || fx["team.queues"] === true;
 

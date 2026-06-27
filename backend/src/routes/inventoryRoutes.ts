@@ -1,218 +1,238 @@
 import express from "express";
 import isAuth from "../middleware/isAuth";
-import requireAnyPlanFeature from "../middleware/requirePlanFeature";
-import { INVENTORY_SALES_FEATURE_KEY } from "../config/inventorySalesFeature";
+import requireInventorySalesPermission from "../middleware/requireInventorySalesPermission";
+import {
+  INVENTORY_SALES_CANCEL_SALE,
+  INVENTORY_SALES_CREATE_SALE,
+  INVENTORY_SALES_MANAGE_PAYMENTS,
+  INVENTORY_SALES_MANAGE_PRODUCTS,
+  INVENTORY_SALES_MANAGE_SETTINGS,
+  INVENTORY_SALES_MANAGE_STOCK,
+  INVENTORY_SALES_VIEW,
+  INVENTORY_SALES_VIEW_REPORTS,
+  InventorySalesGranularKey,
+} from "../config/inventorySalesPermissions";
 import * as InventoryController from "../controllers/InventoryController";
 import * as InventorySaleController from "../controllers/InventorySaleController";
 import * as InventorySellerProfileController from "../controllers/InventorySellerProfileController";
 import * as InventoryReportController from "../controllers/InventoryReportController";
 
 const inventoryRoutes = express.Router();
-const requireInventorySales = requireAnyPlanFeature(INVENTORY_SALES_FEATURE_KEY);
+
+const viewOrStock: InventorySalesGranularKey[] = [
+  INVENTORY_SALES_VIEW,
+  INVENTORY_SALES_MANAGE_STOCK,
+];
 
 inventoryRoutes.get(
   "/inventory/settings",
   isAuth,
-  requireInventorySales,
+  requireInventorySalesPermission(INVENTORY_SALES_MANAGE_SETTINGS),
   InventoryController.getSettings
 );
 inventoryRoutes.put(
   "/inventory/settings",
   isAuth,
-  requireInventorySales,
+  requireInventorySalesPermission(INVENTORY_SALES_MANAGE_SETTINGS),
   InventoryController.updateSettings
 );
 
 inventoryRoutes.get(
   "/inventory/seller-profiles",
   isAuth,
-  requireInventorySales,
+  requireInventorySalesPermission(INVENTORY_SALES_MANAGE_SETTINGS),
   InventorySellerProfileController.listSellerProfiles
 );
 inventoryRoutes.post(
   "/inventory/seller-profiles",
   isAuth,
-  requireInventorySales,
+  requireInventorySalesPermission(INVENTORY_SALES_MANAGE_SETTINGS),
   InventorySellerProfileController.createSellerProfile
 );
 inventoryRoutes.put(
   "/inventory/seller-profiles/:id",
   isAuth,
-  requireInventorySales,
+  requireInventorySalesPermission(INVENTORY_SALES_MANAGE_SETTINGS),
   InventorySellerProfileController.updateSellerProfile
 );
 inventoryRoutes.delete(
   "/inventory/seller-profiles/:id",
   isAuth,
-  requireInventorySales,
+  requireInventorySalesPermission(INVENTORY_SALES_MANAGE_SETTINGS),
   InventorySellerProfileController.deleteSellerProfile
 );
 
 inventoryRoutes.get(
   "/inventory/categories",
   isAuth,
-  requireInventorySales,
+  requireInventorySalesPermission(INVENTORY_SALES_VIEW),
   InventoryController.listCategories
 );
 inventoryRoutes.post(
   "/inventory/categories",
   isAuth,
-  requireInventorySales,
+  requireInventorySalesPermission(INVENTORY_SALES_MANAGE_PRODUCTS),
   InventoryController.createCategory
 );
 inventoryRoutes.put(
   "/inventory/categories/:id",
   isAuth,
-  requireInventorySales,
+  requireInventorySalesPermission(INVENTORY_SALES_MANAGE_PRODUCTS),
   InventoryController.updateCategory
 );
 inventoryRoutes.delete(
   "/inventory/categories/:id",
   isAuth,
-  requireInventorySales,
+  requireInventorySalesPermission(INVENTORY_SALES_MANAGE_PRODUCTS),
   InventoryController.deleteCategory
 );
 
 inventoryRoutes.post(
   "/inventory/stock-movements",
   isAuth,
-  requireInventorySales,
+  requireInventorySalesPermission(INVENTORY_SALES_MANAGE_STOCK),
   InventoryController.createStockMovement
 );
 inventoryRoutes.get(
   "/inventory/stock-movements",
   isAuth,
-  requireInventorySales,
+  requireInventorySalesPermission(...viewOrStock),
   InventoryController.listStockMovements
 );
 
 inventoryRoutes.get(
   "/inventory/reports/summary",
   isAuth,
-  requireInventorySales,
+  requireInventorySalesPermission(INVENTORY_SALES_VIEW_REPORTS),
   InventoryReportController.getReportSummary
 );
 inventoryRoutes.get(
   "/inventory/reports/sellers",
   isAuth,
-  requireInventorySales,
+  requireInventorySalesPermission(INVENTORY_SALES_VIEW_REPORTS),
   InventoryReportController.getReportSellers
 );
 inventoryRoutes.get(
   "/inventory/reports/products",
   isAuth,
-  requireInventorySales,
+  requireInventorySalesPermission(INVENTORY_SALES_VIEW_REPORTS),
   InventoryReportController.getReportProducts
 );
 inventoryRoutes.get(
   "/inventory/reports/customers",
   isAuth,
-  requireInventorySales,
+  requireInventorySalesPermission(INVENTORY_SALES_VIEW_REPORTS),
   InventoryReportController.getReportCustomers
 );
 
 inventoryRoutes.get(
   "/inventory/sales",
   isAuth,
-  requireInventorySales,
+  requireInventorySalesPermission(INVENTORY_SALES_VIEW),
   InventorySaleController.listSales
 );
 inventoryRoutes.post(
   "/inventory/sales",
   isAuth,
-  requireInventorySales,
+  requireInventorySalesPermission(INVENTORY_SALES_CREATE_SALE),
   InventorySaleController.createSale
 );
 inventoryRoutes.get(
   "/inventory/sales/:id",
   isAuth,
-  requireInventorySales,
+  requireInventorySalesPermission(INVENTORY_SALES_VIEW),
   InventorySaleController.showSale
 );
 inventoryRoutes.put(
   "/inventory/sales/:id",
   isAuth,
-  requireInventorySales,
+  requireInventorySalesPermission(INVENTORY_SALES_CREATE_SALE),
   InventorySaleController.updateSale
 );
 inventoryRoutes.delete(
   "/inventory/sales/:id",
   isAuth,
-  requireInventorySales,
+  requireInventorySalesPermission(INVENTORY_SALES_CANCEL_SALE),
   InventorySaleController.deleteSale
 );
 inventoryRoutes.post(
   "/inventory/sales/:id/items",
   isAuth,
-  requireInventorySales,
+  requireInventorySalesPermission(INVENTORY_SALES_CREATE_SALE),
   InventorySaleController.addSaleItem
 );
 inventoryRoutes.put(
   "/inventory/sales/:id/items/:itemId",
   isAuth,
-  requireInventorySales,
+  requireInventorySalesPermission(INVENTORY_SALES_CREATE_SALE),
   InventorySaleController.updateSaleItem
 );
 inventoryRoutes.delete(
   "/inventory/sales/:id/items/:itemId",
   isAuth,
-  requireInventorySales,
+  requireInventorySalesPermission(INVENTORY_SALES_CREATE_SALE),
   InventorySaleController.deleteSaleItem
 );
 inventoryRoutes.post(
   "/inventory/sales/:id/complete",
   isAuth,
-  requireInventorySales,
+  requireInventorySalesPermission(INVENTORY_SALES_CREATE_SALE),
   InventorySaleController.completeSale
 );
 inventoryRoutes.post(
   "/inventory/sales/:id/cancel",
   isAuth,
-  requireInventorySales,
+  requireInventorySalesPermission(INVENTORY_SALES_CANCEL_SALE),
   InventorySaleController.cancelSale
+);
+inventoryRoutes.put(
+  "/inventory/sales/:id/payment",
+  isAuth,
+  requireInventorySalesPermission(INVENTORY_SALES_MANAGE_PAYMENTS),
+  InventorySaleController.updateSalePayment
 );
 
 inventoryRoutes.get(
   "/inventory/products/low-stock",
   isAuth,
-  requireInventorySales,
+  requireInventorySalesPermission(...viewOrStock),
   InventoryController.listLowStockProducts
 );
 
 inventoryRoutes.get(
   "/inventory/products",
   isAuth,
-  requireInventorySales,
+  requireInventorySalesPermission(INVENTORY_SALES_VIEW),
   InventoryController.listProducts
 );
 inventoryRoutes.post(
   "/inventory/products",
   isAuth,
-  requireInventorySales,
+  requireInventorySalesPermission(INVENTORY_SALES_MANAGE_PRODUCTS),
   InventoryController.createProduct
 );
 inventoryRoutes.get(
   "/inventory/products/:id/stock-movements",
   isAuth,
-  requireInventorySales,
+  requireInventorySalesPermission(...viewOrStock),
   InventoryController.listProductStockMovements
 );
 inventoryRoutes.get(
   "/inventory/products/:id",
   isAuth,
-  requireInventorySales,
+  requireInventorySalesPermission(INVENTORY_SALES_VIEW),
   InventoryController.showProduct
 );
 inventoryRoutes.put(
   "/inventory/products/:id",
   isAuth,
-  requireInventorySales,
+  requireInventorySalesPermission(INVENTORY_SALES_MANAGE_PRODUCTS),
   InventoryController.updateProduct
 );
 inventoryRoutes.delete(
   "/inventory/products/:id",
   isAuth,
-  requireInventorySales,
+  requireInventorySalesPermission(INVENTORY_SALES_MANAGE_PRODUCTS),
   InventoryController.deleteProduct
 );
 

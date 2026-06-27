@@ -10,6 +10,10 @@ import { logger } from "../../utils/logger";
 import { getAllFeatureKeys } from "../../config/features";
 import { planFeatureEnabled } from "../../config/planFeatureLegacy";
 import {
+  inventoryGranularKeysInPlan,
+  mergeInventoryGranularIntoFeatureMap
+} from "../../config/inventorySalesPermissions";
+import {
   loadPersistedPlanFeatureMap,
   getEffectivePlanFeaturesMap
 } from "../PlanService/GetEffectivePlanFeaturesService";
@@ -161,7 +165,19 @@ export async function computeEffectiveUserFeatureMapForRequest(
     );
   }
   const explicit = await loadExplicitUserFeatureMap(userRow.id);
-  return mergePlanWithUserFeatures(planMap, userRow, req.user as { supportMode?: boolean }, explicit);
+  const merged = mergePlanWithUserFeatures(
+    planMap,
+    userRow,
+    req.user as { supportMode?: boolean },
+    explicit
+  );
+  return mergeInventoryGranularIntoFeatureMap(
+    merged,
+    userRow,
+    req.user as { supportMode?: boolean },
+    explicit,
+    planMap
+  );
 }
 
 export async function computeEffectiveUserFeatureMapForUserId(
@@ -177,7 +193,14 @@ export async function computeEffectiveUserFeatureMapForUserId(
     );
   }
   const explicit = await loadExplicitUserFeatureMap(userId);
-  return mergePlanWithUserFeatures(planMap, userRow, {}, explicit);
+  const merged = mergePlanWithUserFeatures(planMap, userRow, {}, explicit);
+  return mergeInventoryGranularIntoFeatureMap(
+    merged,
+    userRow,
+    {},
+    explicit,
+    planMap
+  );
 }
 
 function buildDefaultPermissionState(
@@ -224,6 +247,12 @@ function buildDefaultPermissionState(
     setIfPlan("finance.subscription", false);
     setIfPlan("finance.invoices", false);
     setIfPlan("team.ratings", false);
+  }
+
+  if (planMap["inventory.sales"] === true) {
+    for (const key of inventoryGranularKeysInPlan(planMap)) {
+      out[key] = false;
+    }
   }
 
   return out;
@@ -308,12 +337,17 @@ export async function setUserFeaturePermissionsFromAdminInput(params: {
     if (!CATALOG.has(k)) {
       throw new AppError("ERR_INVALID_FEATURE_KEY", 400);
     }
-    if (raw === true && planMap[k] !== true) {
+    const granularAllowed =
+      inventoryGranularKeysInPlan(planMap).includes(k as never);
+    if (raw === true && planMap[k] !== true && !granularAllowed) {
       throw new AppError("ERR_PLAN_FEATURE_DISABLED", 403);
     }
   }
 
   const keysInPlan = getAllFeatureKeys().filter((k) => planMap[k] === true);
+  inventoryGranularKeysInPlan(planMap).forEach((k) => {
+    if (!keysInPlan.includes(k)) keysInPlan.push(k);
+  });
   const beforeExplicit = await loadExplicitUserFeatureMap(targetUserId);
   const beforeForLog: Record<string, boolean> = {};
   for (const k of keysInPlan) {

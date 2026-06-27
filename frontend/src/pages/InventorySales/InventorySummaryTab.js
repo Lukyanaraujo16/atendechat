@@ -22,6 +22,7 @@ import { i18n } from "../../translate/i18n";
 import { INVENTORY_TABS } from "./constants";
 import { formatQuantity } from "./utils";
 import { formatCurrencyBRL } from "../../utils/brazilianCurrency";
+import { useInventoryPermissions } from "../../utils/inventoryAccess";
 
 const useStyles = makeStyles((theme) => ({
   statCard: {
@@ -80,6 +81,7 @@ export default function InventorySummaryTab({
   onNewMovement,
 }) {
   const classes = useStyles();
+  const perms = useInventoryPermissions();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [stats, setStats] = useState({
@@ -160,12 +162,16 @@ export default function InventorySummaryTab({
       </Grid>
 
       <Box className={classes.actionsRow}>
-        <AppPrimaryButton startIcon={<AddIcon />} onClick={onNewProduct}>
-          {i18n.t("inventorySales.summary.actions.newProduct")}
-        </AppPrimaryButton>
-        <AppSecondaryButton startIcon={<SwapHorizIcon />} onClick={onNewMovement}>
-          {i18n.t("inventorySales.summary.actions.newMovement")}
-        </AppSecondaryButton>
+        {perms.canManageProducts ? (
+          <AppPrimaryButton startIcon={<AddIcon />} onClick={onNewProduct}>
+            {i18n.t("inventorySales.summary.actions.newProduct")}
+          </AppPrimaryButton>
+        ) : null}
+        {perms.canManageStock ? (
+          <AppSecondaryButton startIcon={<SwapHorizIcon />} onClick={onNewMovement}>
+            {i18n.t("inventorySales.summary.actions.newMovement")}
+          </AppSecondaryButton>
+        ) : null}
         <AppSecondaryButton onClick={() => onNavigateTab(INVENTORY_TABS.STOCK)}>
           {i18n.t("inventorySales.summary.actions.viewStock")}
         </AppSecondaryButton>

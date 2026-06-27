@@ -36,3 +36,15 @@ export function getSaleDisplayDate(sale) {
 export function isSaleEditable(sale) {
   return sale?.status === "draft";
 }
+
+export function paymentStatusChipColor(status) {
+  if (status === "paid") return "primary";
+  if (status === "partial") return "default";
+  if (status === "refunded") return "default";
+  return "default";
+}
+
+export function formatPaymentMethod(method) {
+  if (!method) return "—";
+  return method;
+}

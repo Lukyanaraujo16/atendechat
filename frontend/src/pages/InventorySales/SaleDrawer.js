@@ -14,6 +14,7 @@ import {
 } from "@material-ui/core";
 import { makeStyles } from "@material-ui/core/styles";
 import CloseIcon from "@material-ui/icons/Close";
+import ReceiptIcon from "@material-ui/icons/Receipt";
 import { toast } from "react-toastify";
 
 import {
@@ -35,13 +36,19 @@ import toastError from "../../errors/toastError";
 import { i18n } from "../../translate/i18n";
 import ConfirmationModal from "../../components/ConfirmationModal";
 import SaleItemsEditor from "./SaleItemsEditor";
+import SalePaymentDialog from "./SalePaymentDialog";
+import SaleReceiptDialog from "./SaleReceiptDialog";
+import { PAYMENT_METHODS } from "./constants";
 import {
   formatSaleNumber,
   getSaleDisplayDate,
   isSaleEditable,
+  paymentStatusChipColor,
 } from "./utils";
+import { formatCurrencyBRL } from "../../utils/brazilianCurrency";
 import { format } from "date-fns";
 import useIsMobile from "../../hooks/useIsMobile";
+import { useInventoryPermissions } from "../../utils/inventoryAccess";
 
 const useStyles = makeStyles((theme) => ({
   drawerPaper: {
@@ -89,6 +96,16 @@ const useStyles = makeStyles((theme) => ({
   cancelReasonField: {
     marginTop: theme.spacing(2),
   },
+  sectionTitle: {
+    fontWeight: 600,
+    marginBottom: theme.spacing(1),
+  },
+  paymentInfoRow: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: theme.spacing(1),
+    alignItems: "center",
+  },
 }));
 
 function statusChipColor(status) {
@@ -106,6 +123,7 @@ export default function SaleDrawer({
 }) {
   const classes = useStyles();
   const isMobile = useIsMobile();
+  const perms = useInventoryPermissions();
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -119,7 +137,12 @@ export default function SaleDrawer({
     contactId: "",
     sellerUserId: "",
     notes: "",
+    paymentMethod: "",
+    paymentNotes: "",
   });
+
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [receiptOpen, setReceiptOpen] = useState(false);
 
   const [confirmComplete, setConfirmComplete] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
@@ -139,6 +162,8 @@ export default function SaleDrawer({
         sellerUserId:
           data.sellerUserId != null ? String(data.sellerUserId) : "",
         notes: data.notes || "",
+        paymentMethod: data.paymentMethod || "",
+        paymentNotes: data.paymentNotes || "",
       });
       return data;
     } catch (err) {
@@ -194,7 +219,7 @@ export default function SaleDrawer({
     return () => clearTimeout(t);
   }, [open, contactSearch, loadContacts, ticketLink]);
 
-  const editable = isSaleEditable(sale);
+  const editable = isSaleEditable(sale) && perms.canCreateSale;
 
   const handleSaveHeader = async () => {
     if (!sale?.id || !editable) return;
@@ -211,6 +236,10 @@ export default function SaleDrawer({
             ? Number(headerForm.contactId)
             : null,
       };
+      if (perms.canManagePayments) {
+        payload.paymentMethod = headerForm.paymentMethod || null;
+        payload.paymentNotes = headerForm.paymentNotes.trim() || null;
+      }
       if (ticketLink?.ticketId != null) {
         payload.ticketId = ticketLink.ticketId;
       }
@@ -252,7 +281,7 @@ export default function SaleDrawer({
   };
 
   const handleCancel = async () => {
-    if (!sale?.id) return;
+    if (!sale?.id || !perms.canCancelSale) return;
     if (!cancelReason.trim()) {
       toast.error(i18n.t("inventorySales.sales.validation.cancelReason"));
       return;
@@ -275,7 +304,7 @@ export default function SaleDrawer({
   };
 
   const handleDelete = async () => {
-    if (!sale?.id) return;
+    if (!sale?.id || !perms.canCancelSale) return;
     setActionLoading(true);
     try {
       await deleteInventorySale(sale.id);
@@ -302,6 +331,14 @@ export default function SaleDrawer({
   const statusLabel = (status) =>
     i18n.t(`inventorySales.sales.status.${status}`, status);
 
+  const paymentStatusLabel = (status) =>
+    i18n.t(`inventorySales.sales.paymentStatus.${status}`, status);
+
+  const paymentMethodLabel = (method) =>
+    method
+      ? i18n.t(`inventorySales.sales.paymentMethods.${method}`, method)
+      : i18n.t("inventorySales.sales.payment.noMethod");
+
   const displayDate = getSaleDisplayDate(sale);
 
   return (
@@ -321,12 +358,19 @@ export default function SaleDrawer({
                   number: formatSaleNumber(sale),
                 })}
               </Typography>
-              <Box display="flex" alignItems="center" style={{ gap: 8, marginTop: 4 }}>
+              <Box display="flex" alignItems="center" style={{ gap: 8, marginTop: 4, flexWrap: "wrap" }}>
                 {sale?.status ? (
                   <Chip
                     size="small"
                     color={statusChipColor(sale.status)}
                     label={statusLabel(sale.status)}
+                  />
+                ) : null}
+                {sale?.status === "completed" && sale?.paymentStatus ? (
+                  <Chip
+                    size="small"
+                    color={paymentStatusChipColor(sale.paymentStatus)}
+                    label={paymentStatusLabel(sale.paymentStatus)}
                   />
                 ) : null}
                 {displayDate ? (
@@ -477,12 +521,6 @@ export default function SaleDrawer({
                     disabled={!editable}
                   />
 
-                  {editable ? (
-                    <Box>
-                      <AppSecondaryButton onClick={handleSaveHeader} disabled={saving}>
-                        {i18n.t("inventorySales.sales.saveHeader")}
-                      </AppSecondaryButton>
-                    </Box>
                   ) : null}
 
                   {sale.status === "cancelled" && sale.cancelReason ? (
@@ -491,6 +529,109 @@ export default function SaleDrawer({
                       {sale.cancelReason}
                     </Typography>
                   ) : null}
+                </div>
+
+                <Typography variant="subtitle1" className={classes.sectionTitle}>
+                  {i18n.t("inventorySales.sales.payment.sectionTitle")}
+                </Typography>
+                <div className={classes.fieldGroup}>
+                  {editable && perms.canManagePayments ? (
+                    <>
+                      <FormControl variant="outlined" size="small" fullWidth>
+                        <InputLabel id="sale-payment-method-label">
+                          {i18n.t("inventorySales.sales.fields.paymentMethod")}
+                        </InputLabel>
+                        <Select
+                          labelId="sale-payment-method-label"
+                          value={headerForm.paymentMethod}
+                          onChange={(e) =>
+                            setHeaderForm((prev) => ({
+                              ...prev,
+                              paymentMethod: e.target.value,
+                            }))
+                          }
+                          label={i18n.t("inventorySales.sales.fields.paymentMethod")}
+                        >
+                          <MenuItem value="">
+                            <em>{i18n.t("inventorySales.common.none")}</em>
+                          </MenuItem>
+                          {PAYMENT_METHODS.map((method) => (
+                            <MenuItem key={method} value={method}>
+                              {i18n.t(
+                                `inventorySales.sales.paymentMethods.${method}`,
+                                method
+                              )}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                      <TextField
+                        label={i18n.t("inventorySales.sales.fields.paymentNotes")}
+                        value={headerForm.paymentNotes}
+                        onChange={(e) =>
+                          setHeaderForm((prev) => ({
+                            ...prev,
+                            paymentNotes: e.target.value,
+                          }))
+                        }
+                        variant="outlined"
+                        size="small"
+                        fullWidth
+                        multiline
+                        rows={2}
+                      />
+                      <Box>
+                        <AppSecondaryButton onClick={handleSaveHeader} disabled={saving}>
+                          {i18n.t("inventorySales.sales.saveHeader")}
+                        </AppSecondaryButton>
+                      </Box>
+                    </>
+                  ) : sale.status === "completed" ? (
+                    <>
+                      <div className={classes.paymentInfoRow}>
+                        <Chip
+                          size="small"
+                          color={paymentStatusChipColor(sale.paymentStatus)}
+                          label={paymentStatusLabel(sale.paymentStatus)}
+                        />
+                        <Typography variant="body2">
+                          {paymentMethodLabel(sale.paymentMethod)}
+                        </Typography>
+                      </div>
+                      <Typography variant="body2">
+                        {i18n.t("inventorySales.sales.payment.paidAmount")}:{" "}
+                        {formatCurrencyBRL(sale.paidAmount)} /{" "}
+                        {formatCurrencyBRL(sale.totalAmount)}
+                      </Typography>
+                      {sale.paidAt ? (
+                        <Typography variant="body2" color="textSecondary">
+                          {i18n.t("inventorySales.sales.payment.paidAt")}:{" "}
+                          {formatDate(sale.paidAt)}
+                        </Typography>
+                      ) : null}
+                      {sale.paymentNotes ? (
+                        <Typography variant="body2" color="textSecondary">
+                          {sale.paymentNotes}
+                        </Typography>
+                      ) : null}
+                      <Box>
+                        {perms.canManagePayments ? (
+                          <AppSecondaryButton onClick={() => setPaymentDialogOpen(true)}>
+                            {i18n.t("inventorySales.sales.payment.update")}
+                          </AppSecondaryButton>
+                        ) : null}
+                      </Box>
+                    </>
+                  ) : sale.status === "cancelled" && sale.paymentStatus === "refunded" ? (
+                    <Chip
+                      size="small"
+                      label={paymentStatusLabel(sale.paymentStatus)}
+                    />
+                  ) : (
+                    <Typography variant="body2" color="textSecondary">
+                      {paymentMethodLabel(sale.paymentMethod)}
+                    </Typography>
+                  )}
                 </div>
 
                 <SaleItemsEditor
@@ -507,19 +648,42 @@ export default function SaleDrawer({
             <div className={classes.footer}>
               {editable ? (
                 <>
-                  <AppDangerAction onClick={() => setConfirmDelete(true)}>
-                    {i18n.t("inventorySales.sales.deleteDraft")}
-                  </AppDangerAction>
-                  <AppSecondaryButton onClick={() => setConfirmCancel(true)}>
-                    {i18n.t("inventorySales.sales.cancelSale")}
-                  </AppSecondaryButton>
-                  <AppPrimaryButton onClick={() => setConfirmComplete(true)}>
-                    {i18n.t("inventorySales.sales.complete")}
-                  </AppPrimaryButton>
+                  {perms.canCancelSale ? (
+                    <AppDangerAction onClick={() => setConfirmDelete(true)}>
+                      {i18n.t("inventorySales.sales.deleteDraft")}
+                    </AppDangerAction>
+                  ) : null}
+                  {perms.canCancelSale ? (
+                    <AppSecondaryButton onClick={() => setConfirmCancel(true)}>
+                      {i18n.t("inventorySales.sales.cancelSale")}
+                    </AppSecondaryButton>
+                  ) : null}
+                  {perms.canCreateSale ? (
+                    <AppPrimaryButton onClick={() => setConfirmComplete(true)}>
+                      {i18n.t("inventorySales.sales.complete")}
+                    </AppPrimaryButton>
+                  ) : null}
                 </>
               ) : sale.status === "completed" ? (
-                <AppSecondaryButton onClick={() => setConfirmCancel(true)}>
-                  {i18n.t("inventorySales.sales.cancelSale")}
+                <>
+                  <AppSecondaryButton
+                    startIcon={<ReceiptIcon />}
+                    onClick={() => setReceiptOpen(true)}
+                  >
+                    {i18n.t("inventorySales.sales.receipt.open")}
+                  </AppSecondaryButton>
+                  {perms.canCancelSale ? (
+                    <AppSecondaryButton onClick={() => setConfirmCancel(true)}>
+                      {i18n.t("inventorySales.sales.cancelSale")}
+                    </AppSecondaryButton>
+                  ) : null}
+                </>
+              ) : sale.status === "cancelled" ? (
+                <AppSecondaryButton
+                  startIcon={<ReceiptIcon />}
+                  onClick={() => setReceiptOpen(true)}
+                >
+                  {i18n.t("inventorySales.sales.receipt.open")}
                 </AppSecondaryButton>
               ) : null}
             </div>
@@ -590,6 +754,22 @@ export default function SaleDrawer({
           <CircularProgress />
         </Box>
       ) : null}
+
+      <SalePaymentDialog
+        open={paymentDialogOpen && perms.canManagePayments}
+        onClose={() => setPaymentDialogOpen(false)}
+        sale={sale}
+        onSaved={(data) => {
+          setSale(data);
+          if (onChanged) onChanged();
+        }}
+      />
+
+      <SaleReceiptDialog
+        open={receiptOpen}
+        onClose={() => setReceiptOpen(false)}
+        sale={sale}
+      />
     </>
   );
 }

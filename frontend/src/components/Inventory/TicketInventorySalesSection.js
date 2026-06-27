@@ -40,7 +40,7 @@ export default function TicketInventorySalesSection({ ticketId }) {
   const [loading, setLoading] = useState(false);
 
   const load = useCallback(async () => {
-    if (!ticketId || !ctx?.enabled) {
+    if (!ticketId || !ctx?.canView) {
       setSales([]);
       return;
     }
@@ -64,7 +64,7 @@ export default function TicketInventorySalesSection({ ticketId }) {
     load();
   }, [load, ctx?.refreshKey]);
 
-  if (!ctx?.enabled) {
+  if (!ctx?.canView) {
     return null;
   }
 
@@ -82,14 +82,16 @@ export default function TicketInventorySalesSection({ ticketId }) {
         <Typography variant="subtitle1" style={{ fontWeight: 600 }}>
           {i18n.t("inventorySales.ticket.sectionTitle")}
         </Typography>
-        <Button
-          size="small"
-          color="primary"
-          onClick={ctx.createNewSale}
-          disabled={ctx.opening}
-        >
-          {i18n.t("inventorySales.ticket.newSale")}
-        </Button>
+        {ctx.canCreate ? (
+          <Button
+            size="small"
+            color="primary"
+            onClick={ctx.createNewSale}
+            disabled={ctx.opening}
+          >
+            {i18n.t("inventorySales.ticket.newSale")}
+          </Button>
+        ) : null}
       </Box>
 
       {loading ? (

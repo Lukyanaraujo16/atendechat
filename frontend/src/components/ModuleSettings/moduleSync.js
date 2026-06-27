@@ -5,6 +5,7 @@
  */
 
 import { getAllFeatureKeys } from "../../config/features";
+import { mergeInventoryGranularFeatures } from "../../config/inventorySalesPermissions";
 
 export const MODULE_TOGGLE_KEYS = [
   "useKanban",
@@ -82,6 +83,14 @@ export function legacyPlanFeatureValueFromColumns(plan, featureKey) {
     case "crm.pipeline":
     case "settings.instagram_integration":
     case "inventory.sales":
+    case "inventory.sales.view":
+    case "inventory.sales.manageProducts":
+    case "inventory.sales.manageStock":
+    case "inventory.sales.createSale":
+    case "inventory.sales.cancelSale":
+    case "inventory.sales.managePayments":
+    case "inventory.sales.viewReports":
+    case "inventory.sales.manageSettings":
       return false;
     case "attendance.kanban":
       return asBool(plan.useKanban);
@@ -208,7 +217,10 @@ export function mergeLiveEffectiveFeatures(planFeatures, user) {
     typeof userFx !== "object" ||
     Object.keys(userFx).length === 0
   ) {
-    return { ...planFx };
+    return {
+      ...planFx,
+      ...mergeInventoryGranularFeatures(planFx, userFx, user),
+    };
   }
 
   const keys = new Set([...Object.keys(planFx), ...Object.keys(userFx)]);
@@ -224,7 +236,10 @@ export function mergeLiveEffectiveFeatures(planFeatures, user) {
       out[k] = true;
     }
   });
-  return out;
+  return {
+    ...out,
+    ...mergeInventoryGranularFeatures(planFx, userFx, user),
+  };
 }
 
 export function buildEffectiveModuleFlagsFromFeatureMap(featureMap, modulePermissions) {

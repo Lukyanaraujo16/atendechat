@@ -1,4 +1,4 @@
-import { fn, col } from "sequelize";
+import { fn, col, literal } from "sequelize";
 import InventorySale from "../../models/InventorySale";
 import {
   averageTicket,
@@ -16,6 +16,8 @@ export type InventoryReportSummary = {
   totalCommission: number;
   cancelledSalesCount: number;
   cancelledTotal: number;
+  totalPaid: number;
+  totalPending: number;
 };
 
 export default async function GetInventoryReportSummaryService(
@@ -29,7 +31,33 @@ export default async function GetInventoryReportSummaryService(
     attributes: [
       [fn("COUNT", col("id")), "salesCount"],
       [fn("COALESCE", fn("SUM", col("totalAmount")), 0), "totalSold"],
-      [fn("COALESCE", fn("SUM", col("commissionAmount")), 0), "totalCommission"]
+      [fn("COALESCE", fn("SUM", col("commissionAmount")), 0), "totalCommission"],
+      [
+        fn(
+          "COALESCE",
+          fn(
+            "SUM",
+            literal(
+              "CASE WHEN \"paymentStatus\" IN ('paid', 'partial') THEN \"paidAmount\" ELSE 0 END"
+            )
+          ),
+          0
+        ),
+        "totalPaid"
+      ],
+      [
+        fn(
+          "COALESCE",
+          fn(
+            "SUM",
+            literal(
+              "CASE WHEN \"paymentStatus\" IN ('unpaid', 'partial') THEN (\"totalAmount\" - \"paidAmount\") ELSE 0 END"
+            )
+          ),
+          0
+        ),
+        "totalPending"
+      ]
     ],
     raw: true
   })) as unknown as Record<string, unknown> | null;
@@ -54,6 +82,8 @@ export default async function GetInventoryReportSummaryService(
       toReportNumber(completedRow?.totalCommission)
     ),
     cancelledSalesCount: toReportNumber(cancelledRow?.salesCount),
-    cancelledTotal: roundReportMoney(toReportNumber(cancelledRow?.totalSold))
+    cancelledTotal: roundReportMoney(toReportNumber(cancelledRow?.totalSold)),
+    totalPaid: roundReportMoney(toReportNumber(completedRow?.totalPaid)),
+    totalPending: roundReportMoney(toReportNumber(completedRow?.totalPending))
   };
 }

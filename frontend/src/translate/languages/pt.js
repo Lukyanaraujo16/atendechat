@@ -133,6 +133,11 @@ const messages = {
           inactive: "Inativo",
           actions: "Ações",
         },
+        permissions: {
+          noTabAccessTitle: "Sem permissão para aceder ao módulo",
+          noTabAccessDescription:
+            "Peça ao administrador para liberar a visualização de Estoque e Vendas.",
+        },
         summary: {
           activeProducts: "Produtos ativos",
           lowStock: "Estoque baixo",
@@ -274,6 +279,7 @@ const messages = {
           new: "Nova venda",
           search: "Buscar número, cliente ou observação",
           filterStatus: "Status",
+          filterPaymentStatus: "Pagamento",
           filterSeller: "Vendedor",
           startDate: "Data inicial",
           endDate: "Data final",
@@ -302,12 +308,68 @@ const messages = {
             completed: "Concluída",
             cancelled: "Cancelada",
           },
+          paymentStatus: {
+            unpaid: "Não pago",
+            paid: "Pago",
+            partial: "Parcial",
+            refunded: "Reembolsado",
+          },
+          paymentMethods: {
+            cash: "Dinheiro",
+            pix: "PIX",
+            credit_card: "Cartão de crédito",
+            debit_card: "Cartão de débito",
+            bank_transfer: "Transferência",
+            boleto: "Boleto",
+            other: "Outro",
+          },
+          payment: {
+            sectionTitle: "Pagamento",
+            update: "Atualizar pagamento",
+            savePayment: "Guardar pagamento",
+            paidAmount: "Valor pago",
+            paidAt: "Data do pagamento",
+            noMethod: "Sem forma definida",
+          },
+          receipt: {
+            title: "Recibo de venda",
+            open: "Recibo",
+            print: "Imprimir",
+            saleNumber: "Número",
+            saleDate: "Data",
+            operationalStatus: "Status da venda",
+            paymentStatus: "Status financeiro",
+            customer: "Cliente",
+            seller: "Vendedor",
+            paymentMethod: "Forma de pagamento",
+            itemsTitle: "Itens",
+            noItems: "Nenhum item registrado.",
+            noCustomer: "Sem cliente",
+            noSeller: "Sem vendedor",
+            cancelled: "VENDA CANCELADA",
+            subtotal: "Subtotal",
+            totalDiscount: "Descontos",
+            total: "Total",
+            paidAmount: "Valor pago",
+            pendingAmount: "Valor pendente",
+            notes: "Observações",
+            paymentNotes: "Observações de pagamento",
+            columns: {
+              product: "Produto",
+              quantity: "Qtd.",
+              unitPrice: "Preço unit.",
+              discount: "Desconto",
+              total: "Total",
+            },
+          },
           columns: {
             number: "Número",
             contact: "Cliente",
             seller: "Vendedor",
             total: "Total",
             commission: "Comissão",
+            payment: "Pagamento",
+            paymentMethod: "Forma de pagamento",
             date: "Data",
           },
           fields: {
@@ -315,10 +377,17 @@ const messages = {
             seller: "Vendedor",
             notes: "Observação",
             cancelReason: "Motivo do cancelamento",
+            paymentMethod: "Forma de pagamento",
+            paymentStatus: "Status financeiro",
+            paymentNotes: "Observação de pagamento",
+            paidAmount: "Valor pago",
+            paidAt: "Data do pagamento",
           },
           validation: {
             sellerRequired: "Selecione o vendedor antes de concluir.",
             cancelReason: "Informe o motivo do cancelamento.",
+            paidAmount: "Valor pago inválido.",
+            paidAmountMax: "Valor pago não pode ser maior que o total.",
           },
           totals: {
             subtotal: "Subtotal",
@@ -354,6 +423,7 @@ const messages = {
             completed: "Venda concluída.",
             cancelled: "Venda cancelada.",
             deleted: "Rascunho excluído.",
+            paymentUpdated: "Pagamento atualizado.",
           },
         },
         ticket: {
@@ -391,6 +461,8 @@ const messages = {
             totalCommission: "Comissão total",
             cancelledCount: "Vendas canceladas",
             cancelledTotal: "Valor cancelado",
+            totalPaid: "Total pago",
+            totalPending: "Total pendente",
           },
           columns: {
             seller: "Vendedor",
@@ -402,6 +474,29 @@ const messages = {
             quantitySold: "Qtd. vendida",
             customer: "Cliente",
             lastPurchase: "Última compra",
+          },
+          export: {
+            button: "Exportar CSV",
+            all: "Exportar tudo",
+            summary: "Resumo geral",
+            sellers: "Vendas por vendedor",
+            products: "Produtos mais vendidos",
+            customers: "Vendas por cliente",
+            noData: "Não há dados para exportar com os filtros actuais.",
+            success: "CSV exportado com sucesso.",
+            filters: {
+              startDate: "Data inicial",
+              endDate: "Data final",
+              seller: "Vendedor",
+              allSellers: "Todos",
+            },
+            summaryColumns: {
+              metric: "Indicador",
+              value: "Valor",
+            },
+            columns: {
+              sku: "SKU",
+            },
           },
         },
         settings: {
@@ -1571,6 +1666,41 @@ const messages = {
               label: "Estoque e Vendas",
               description:
                 "Controle de produtos, estoque e vendas integrado ao atendimento.",
+            },
+            "sales.view": {
+              label: "Visualizar estoque e vendas",
+              description:
+                "Consultar produtos, estoque, vendas e resumo do módulo.",
+            },
+            "sales.manageProducts": {
+              label: "Gerir produtos e categorias",
+              description: "Criar, editar e desactivar produtos e categorias.",
+            },
+            "sales.manageStock": {
+              label: "Gerir movimentações de estoque",
+              description: "Registar entradas, saídas e ajustes de stock.",
+            },
+            "sales.createSale": {
+              label: "Criar e concluir vendas",
+              description:
+                "Abrir vendas, editar itens, concluir e vender a partir do ticket.",
+            },
+            "sales.cancelSale": {
+              label: "Cancelar e excluir vendas",
+              description: "Cancelar vendas concluídas e excluir rascunhos.",
+            },
+            "sales.managePayments": {
+              label: "Gerir pagamentos de vendas",
+              description: "Actualizar estado e dados de pagamento das vendas.",
+            },
+            "sales.viewReports": {
+              label: "Ver relatórios",
+              description: "Aceder aos relatórios e exportação CSV do módulo.",
+            },
+            "sales.manageSettings": {
+              label: "Configurações do estoque",
+              description:
+                "Alterar definições do módulo e perfis de vendedor/comissão.",
             },
           },
           settings: {

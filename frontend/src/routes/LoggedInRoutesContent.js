@@ -59,6 +59,7 @@ import Reports from "../pages/Reports";
 import UserNotifications from "../pages/UserNotifications";
 import CrmBoard from "../pages/CRM";
 import InventorySales from "../pages/InventorySales";
+import { canViewInventory, planHasInventoryModule } from "../utils/inventoryAccess";
 import CRMReports from "../pages/CRMReports";
 import CrmAutomations from "../pages/CrmAutomations";
 
@@ -916,11 +917,15 @@ export default function LoggedInRoutesContent() {
           if (!planFlags.loaded) {
             return <PlanFlagsLoadingState />;
           }
-          return fx["inventory.sales"] === true ? (
-            <InventorySales />
-          ) : (
-            <FeatureBlocked planFlags={planFlags} anyOf={["inventory.sales"]} />
-          );
+          if (!planHasInventoryModule(planFlags)) {
+            return (
+              <FeatureBlocked planFlags={planFlags} anyOf={["inventory.sales"]} />
+            );
+          }
+          if (!canViewInventory(planFlags, user)) {
+            return <PlanFeatureBlocked variant="user" />;
+          }
+          return <InventorySales />;
         }}
       />
 

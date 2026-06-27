@@ -36,6 +36,7 @@ import useIsMobile from "../../hooks/useIsMobile";
 import CategoryFormDialog from "./CategoryFormDialog";
 import ConfirmationModal from "../../components/ConfirmationModal";
 import { toast } from "react-toastify";
+import { useInventoryPermissions } from "../../utils/inventoryAccess";
 
 const useStyles = makeStyles((theme) => ({
   headerRow: {
@@ -51,6 +52,7 @@ const useStyles = makeStyles((theme) => ({
 export default function InventoryCategoriesTab() {
   const classes = useStyles();
   const isMobile = useIsMobile();
+  const perms = useInventoryPermissions();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [categories, setCategories] = useState([]);
@@ -96,30 +98,31 @@ export default function InventoryCategoriesTab() {
     }
   };
 
-  const renderActions = (cat) => (
-    <Box display="flex" justifyContent="flex-end">
-      <IconButton
-        size="small"
-        onClick={() => {
-          setEditCategory(cat);
-          setFormOpen(true);
-        }}
-      >
-        <EditIcon fontSize="small" />
-      </IconButton>
-      {cat.active !== false ? (
+  const renderActions = (cat) =>
+    perms.canManageProducts ? (
+      <Box display="flex" justifyContent="flex-end">
         <IconButton
           size="small"
           onClick={() => {
-            setDeleteTarget(cat);
-            setConfirmOpen(true);
+            setEditCategory(cat);
+            setFormOpen(true);
           }}
         >
-          <DeleteOutlineIcon fontSize="small" />
+          <EditIcon fontSize="small" />
         </IconButton>
-      ) : null}
-    </Box>
-  );
+        {cat.active !== false ? (
+          <IconButton
+            size="small"
+            onClick={() => {
+              setDeleteTarget(cat);
+              setConfirmOpen(true);
+            }}
+          >
+            <DeleteOutlineIcon fontSize="small" />
+          </IconButton>
+        ) : null}
+      </Box>
+    ) : null;
 
   return (
     <Box>
@@ -127,15 +130,17 @@ export default function InventoryCategoriesTab() {
         <Typography variant="h6" style={{ fontWeight: 600 }}>
           {i18n.t("inventorySales.categories.title")}
         </Typography>
-        <AppPrimaryButton
-          startIcon={<AddIcon />}
-          onClick={() => {
-            setEditCategory(null);
-            setFormOpen(true);
-          }}
-        >
-          {i18n.t("inventorySales.categories.new")}
-        </AppPrimaryButton>
+        {perms.canManageProducts ? (
+          <AppPrimaryButton
+            startIcon={<AddIcon />}
+            onClick={() => {
+              setEditCategory(null);
+              setFormOpen(true);
+            }}
+          >
+            {i18n.t("inventorySales.categories.new")}
+          </AppPrimaryButton>
+        ) : null}
       </div>
 
       <AppSectionCard variant="outlined" dense>
@@ -152,15 +157,17 @@ export default function InventoryCategoriesTab() {
             title={i18n.t("inventorySales.categories.emptyTitle")}
             description={i18n.t("inventorySales.categories.emptyDescription")}
           >
-            <AppPrimaryButton
-              startIcon={<AddIcon />}
-              onClick={() => {
-                setEditCategory(null);
-                setFormOpen(true);
-              }}
-            >
-              {i18n.t("inventorySales.categories.new")}
-            </AppPrimaryButton>
+            {perms.canManageProducts ? (
+              <AppPrimaryButton
+                startIcon={<AddIcon />}
+                onClick={() => {
+                  setEditCategory(null);
+                  setFormOpen(true);
+                }}
+              >
+                {i18n.t("inventorySales.categories.new")}
+              </AppPrimaryButton>
+            ) : null}
           </AppEmptyState>
         ) : isMobile ? (
           <MobileCardList>
@@ -194,9 +201,11 @@ export default function InventoryCategoriesTab() {
                   <TableCell>{i18n.t("inventorySales.categories.columns.parent")}</TableCell>
                   <TableCell>{i18n.t("inventorySales.categories.columns.position")}</TableCell>
                   <TableCell>{i18n.t("inventorySales.categories.columns.status")}</TableCell>
-                  <TableCell align="right">
-                    {i18n.t("inventorySales.common.actions")}
-                  </TableCell>
+                  {perms.canManageProducts ? (
+                    <TableCell align="right">
+                      {i18n.t("inventorySales.common.actions")}
+                    </TableCell>
+                  ) : null}
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -219,7 +228,9 @@ export default function InventoryCategoriesTab() {
                         />
                       )}
                     </TableCell>
-                    <TableCell align="right">{renderActions(cat)}</TableCell>
+                    {perms.canManageProducts ? (
+                      <TableCell align="right">{renderActions(cat)}</TableCell>
+                    ) : null}
                   </TableRow>
                 ))}
               </TableBody>

@@ -17,6 +17,10 @@ import {
   toMoney
 } from "./inventorySaleHelpers";
 import { toInventoryQuantity } from "./inventoryTenant";
+import {
+  derivePaymentStatusFromAmount,
+  resolvePaidAtForPaymentUpdate
+} from "./inventoryPaymentHelpers";
 
 export default async function CompleteInventorySaleService(input: {
   companyId: number;
@@ -170,6 +174,12 @@ export default async function CompleteInventorySaleService(input: {
 
     const totalAmount = toMoney(sale.totalAmount);
     const commissionAmount = roundMoney((totalAmount * commissionRate) / 100);
+    const paidAmount = toMoney(sale.paidAmount);
+    const paymentStatus = derivePaymentStatusFromAmount(paidAmount, totalAmount);
+    const paidAt = resolvePaidAtForPaymentUpdate({
+      paymentStatus,
+      existingPaidAt: sale.paidAt
+    });
 
     await settings.update({ nextSaleNumber: saleNumber + 1 }, { transaction: t });
 
@@ -180,7 +190,10 @@ export default async function CompleteInventorySaleService(input: {
         sellerUserId,
         commissionRate,
         commissionAmount,
-        completedAt: new Date()
+        completedAt: new Date(),
+        paymentStatus,
+        paidAmount,
+        paidAt
       },
       { transaction: t }
     );

@@ -175,6 +175,41 @@ export const FEATURES: Record<string, FeatureNode> = {
         label: "Estoque e Vendas",
         description:
           "Controle de produtos, estoque e vendas integrado ao atendimento."
+      },
+      "sales.view": {
+        label: "Visualizar estoque e vendas",
+        description:
+          "Consultar produtos, estoque, vendas e resumo do módulo."
+      },
+      "sales.manageProducts": {
+        label: "Gerir produtos e categorias",
+        description: "Criar, editar e desactivar produtos e categorias."
+      },
+      "sales.manageStock": {
+        label: "Gerir movimentações de estoque",
+        description: "Registar entradas, saídas e ajustes de stock."
+      },
+      "sales.createSale": {
+        label: "Criar e concluir vendas",
+        description:
+          "Abrir vendas, editar itens, concluir e vender a partir do ticket."
+      },
+      "sales.cancelSale": {
+        label: "Cancelar e excluir vendas",
+        description: "Cancelar vendas concluídas e excluir rascunhos."
+      },
+      "sales.managePayments": {
+        label: "Gerir pagamentos de vendas",
+        description: "Actualizar estado e dados de pagamento das vendas."
+      },
+      "sales.viewReports": {
+        label: "Ver relatórios",
+        description: "Aceder aos relatórios e exportação CSV do módulo."
+      },
+      "sales.manageSettings": {
+        label: "Configurações do estoque",
+        description:
+          "Alterar definições do módulo e perfis de vendedor/comissão."
       }
     }
   },

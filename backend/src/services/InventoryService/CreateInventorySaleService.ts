@@ -43,6 +43,8 @@ export default async function CreateInventorySaleService(input: {
     source = s;
   }
 
+  const notes = normalizeOptionalString(input.body.notes);
+
   return sequelize.transaction(async (t) => {
     const sale = await InventorySale.create(
       {
@@ -53,7 +55,7 @@ export default async function CreateInventorySaleService(input: {
         contactId,
         ticketId,
         sellerUserId,
-        notes: normalizeOptionalString(input.body.notes),
+        notes,
         createdBy: input.createdBy,
         subtotalAmount: 0,
         discountAmount: 0,

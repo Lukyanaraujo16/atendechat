@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Box,
   FormControl,
   Grid,
   InputLabel,
+  Menu,
   MenuItem,
   Paper,
   Select,
@@ -16,7 +17,9 @@ import {
   Typography,
 } from "@material-ui/core";
 import { makeStyles, alpha } from "@material-ui/core/styles";
+import GetAppIcon from "@material-ui/icons/GetApp";
 import { format } from "date-fns";
+import { toast } from "react-toastify";
 
 import {
   AppEmptyState,
@@ -38,16 +41,35 @@ import {
 import toastError from "../../errors/toastError";
 import { i18n } from "../../translate/i18n";
 import useIsMobile from "../../hooks/useIsMobile";
+import { useInventoryPermissions } from "../../utils/inventoryAccess";
 import { formatCurrencyBRL } from "../../utils/brazilianCurrency";
 import { formatQuantity } from "./utils";
+import {
+  canExportReportRows,
+  canExportSummary,
+  exportAllInventoryReportsCsv,
+  exportInventoryCustomersCsv,
+  exportInventoryProductsCsv,
+  exportInventorySellersCsv,
+  exportInventorySummaryCsv,
+} from "./exportCsv";
 
 const useStyles = makeStyles((theme) => ({
+  headerRow: {
+    display: "flex",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: theme.spacing(1.5),
+    marginBottom: theme.spacing(2),
+  },
   filtersRow: {
     display: "flex",
     flexWrap: "wrap",
     gap: theme.spacing(2),
     marginBottom: theme.spacing(2),
     alignItems: "center",
+    maxWidth: "100%",
   },
   statCard: {
     padding: theme.spacing(2),
@@ -109,6 +131,7 @@ function buildParams(startDate, endDate, sellerUserId) {
 export default function InventoryReportsTab() {
   const classes = useStyles();
   const isMobile = useIsMobile();
+  const perms = useInventoryPermissions();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [startDate, setStartDate] = useState("");
@@ -120,6 +143,28 @@ export default function InventoryReportsTab() {
   const [sellers, setSellers] = useState([]);
   const [products, setProducts] = useState([]);
   const [customers, setCustomers] = useState([]);
+  const [exportAnchor, setExportAnchor] = useState(null);
+
+  const exportFilters = useMemo(() => {
+    const seller = users.find((u) => String(u.id) === String(sellerUserId));
+    return {
+      startDate,
+      endDate,
+      sellerUserId,
+      sellerName: seller?.name || "",
+    };
+  }, [startDate, endDate, sellerUserId, users]);
+
+  const exportPayload = useMemo(
+    () => ({
+      summary,
+      sellers,
+      products,
+      customers,
+      filters: exportFilters,
+    }),
+    [summary, sellers, products, customers, exportFilters]
+  );
 
   useEffect(() => {
     api
@@ -164,6 +209,26 @@ export default function InventoryReportsTab() {
       products.length > 0 ||
       customers.length > 0);
 
+  const handleExportClick = (event) => {
+    if (!hasData) {
+      toast.info(i18n.t("inventorySales.reports.export.noData"));
+      return;
+    }
+    setExportAnchor(event.currentTarget);
+  };
+
+  const closeExportMenu = () => setExportAnchor(null);
+
+  const runExport = (fn) => {
+    closeExportMenu();
+    const ok = fn(exportPayload, i18n.t.bind(i18n));
+    if (ok) {
+      toast.success(i18n.t("inventorySales.reports.export.success"));
+    } else {
+      toast.info(i18n.t("inventorySales.reports.export.noData"));
+    }
+  };
+
   if (loading && !summary) {
     return (
       <AppLoadingState message={i18n.t("inventorySales.common.loading")} />
@@ -182,9 +247,75 @@ export default function InventoryReportsTab() {
 
   return (
     <Box>
-      <Typography variant="h6" style={{ fontWeight: 600, marginBottom: 16 }}>
-        {i18n.t("inventorySales.reports.title")}
-      </Typography>
+      <div className={classes.headerRow}>
+        <Typography variant="h6" style={{ fontWeight: 600 }}>
+          {i18n.t("inventorySales.reports.title")}
+        </Typography>
+        {perms.canViewReports ? (
+          <AppSecondaryButton
+            startIcon={<GetAppIcon />}
+            onClick={handleExportClick}
+            disabled={loading || !hasData}
+          >
+            {i18n.t("inventorySales.reports.export.button")}
+          </AppSecondaryButton>
+        ) : null}
+      </div>
+
+      <Menu
+        anchorEl={exportAnchor}
+        open={Boolean(exportAnchor)}
+        onClose={closeExportMenu}
+        keepMounted
+      >
+        <MenuItem
+          onClick={() =>
+            runExport(({ summary, filters }, t) =>
+              exportInventorySummaryCsv(summary, filters, t)
+            )
+          }
+          disabled={!canExportSummary(summary)}
+        >
+          {i18n.t("inventorySales.reports.export.summary")}
+        </MenuItem>
+        <MenuItem
+          onClick={() =>
+            runExport(({ sellers, filters }, t) =>
+              exportInventorySellersCsv(sellers, filters, t)
+            )
+          }
+          disabled={!canExportReportRows(sellers)}
+        >
+          {i18n.t("inventorySales.reports.export.sellers")}
+        </MenuItem>
+        <MenuItem
+          onClick={() =>
+            runExport(({ products, filters }, t) =>
+              exportInventoryProductsCsv(products, filters, t)
+            )
+          }
+          disabled={!canExportReportRows(products)}
+        >
+          {i18n.t("inventorySales.reports.export.products")}
+        </MenuItem>
+        <MenuItem
+          onClick={() =>
+            runExport(({ customers, filters }, t) =>
+              exportInventoryCustomersCsv(customers, filters, t)
+            )
+          }
+          disabled={!canExportReportRows(customers)}
+        >
+          {i18n.t("inventorySales.reports.export.customers")}
+        </MenuItem>
+        <MenuItem
+          onClick={() =>
+            runExport((payload, t) => exportAllInventoryReportsCsv(payload, t))
+          }
+        >
+          {i18n.t("inventorySales.reports.export.all")}
+        </MenuItem>
+      </Menu>
 
       <div className={classes.filtersRow}>
         <TextField
@@ -237,6 +368,18 @@ export default function InventoryReportsTab() {
               <StatCard
                 label={i18n.t("inventorySales.reports.summary.totalSold")}
                 value={formatCurrencyBRL(summary?.totalSold)}
+              />
+            </Grid>
+            <Grid item xs={6} sm={4} md={2}>
+              <StatCard
+                label={i18n.t("inventorySales.reports.summary.totalPaid")}
+                value={formatCurrencyBRL(summary?.totalPaid)}
+              />
+            </Grid>
+            <Grid item xs={6} sm={4} md={2}>
+              <StatCard
+                label={i18n.t("inventorySales.reports.summary.totalPending")}
+                value={formatCurrencyBRL(summary?.totalPending)}
               />
             </Grid>
             <Grid item xs={6} sm={4} md={2}>

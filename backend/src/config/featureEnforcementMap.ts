@@ -160,41 +160,73 @@ export const FEATURE_ENFORCEMENT_MAP: Array<{
   {
     feature: "inventory.sales",
     menu: "Estoque e Vendas",
+    notes: "Feature do plano (obrigatória). Permissões granulares por utilizador abaixo.",
     frontendRoutes: ["/inventory-sales"],
+  },
+  {
+    feature: "inventory.sales.view",
+    notes: "Plano inventory.sales + permissão view",
     backendRoutes: [
-      "GET /inventory/settings",
-      "PUT /inventory/settings",
-      "GET /inventory/seller-profiles",
-      "POST /inventory/seller-profiles",
-      "PUT /inventory/seller-profiles/:id",
-      "DELETE /inventory/seller-profiles/:id",
       "GET /inventory/categories",
-      "POST /inventory/categories",
-      "PUT /inventory/categories/:id",
-      "DELETE /inventory/categories/:id",
       "GET /inventory/products",
-      "POST /inventory/products",
       "GET /inventory/products/:id",
-      "PUT /inventory/products/:id",
-      "DELETE /inventory/products/:id",
-      "POST /inventory/stock-movements",
-      "GET /inventory/stock-movements",
-      "GET /inventory/products/:id/stock-movements",
-      "GET /inventory/products/low-stock",
       "GET /inventory/sales",
-      "POST /inventory/sales",
       "GET /inventory/sales/:id",
+    ],
+  },
+  {
+    feature: "inventory.sales.manageProducts",
+    backendRoutes: [
+      "POST/PUT/DELETE /inventory/categories/*",
+      "POST/PUT/DELETE /inventory/products/*",
+    ],
+  },
+  {
+    feature: "inventory.sales.manageStock",
+    backendRoutes: ["POST /inventory/stock-movements"],
+  },
+  {
+    feature: "inventory.sales.manageStock | inventory.sales.view",
+    backendRoutes: [
+      "GET /inventory/stock-movements",
+      "GET /inventory/products/low-stock",
+      "GET /inventory/products/:id/stock-movements",
+    ],
+  },
+  {
+    feature: "inventory.sales.createSale",
+    backendRoutes: [
+      "POST /inventory/sales",
       "PUT /inventory/sales/:id",
-      "DELETE /inventory/sales/:id",
-      "POST /inventory/sales/:id/items",
-      "PUT /inventory/sales/:id/items/:itemId",
-      "DELETE /inventory/sales/:id/items/:itemId",
+      "POST/PUT/DELETE /inventory/sales/:id/items/*",
       "POST /inventory/sales/:id/complete",
+    ],
+  },
+  {
+    feature: "inventory.sales.cancelSale",
+    backendRoutes: [
+      "DELETE /inventory/sales/:id",
       "POST /inventory/sales/:id/cancel",
+    ],
+  },
+  {
+    feature: "inventory.sales.managePayments",
+    backendRoutes: ["PUT /inventory/sales/:id/payment"],
+  },
+  {
+    feature: "inventory.sales.viewReports",
+    backendRoutes: [
       "GET /inventory/reports/summary",
       "GET /inventory/reports/sellers",
       "GET /inventory/reports/products",
-      "GET /inventory/reports/customers"
-    ]
-  }
+      "GET /inventory/reports/customers",
+    ],
+  },
+  {
+    feature: "inventory.sales.manageSettings",
+    backendRoutes: [
+      "GET/PUT /inventory/settings",
+      "GET/POST/PUT/DELETE /inventory/seller-profiles/*",
+    ],
+  },
 ];

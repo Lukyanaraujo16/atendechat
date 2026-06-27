@@ -48,6 +48,14 @@ export function legacyPlanFeatureValue(
     case "crm.pipeline":
     case "settings.instagram_integration":
     case "inventory.sales":
+    case "inventory.sales.view":
+    case "inventory.sales.manageProducts":
+    case "inventory.sales.manageStock":
+    case "inventory.sales.createSale":
+    case "inventory.sales.cancelSale":
+    case "inventory.sales.managePayments":
+    case "inventory.sales.viewReports":
+    case "inventory.sales.manageSettings":
       return false;
     case "attendance.kanban":
       return asBool(readPlanColumn(plan, "useKanban"));

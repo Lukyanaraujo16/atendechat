@@ -1,6 +1,6 @@
-import { INVENTORY_SALES_FEATURE_KEY } from "../config/inventorySalesFeature";
+import { canViewInventory } from "./inventoryAccess";
 
-export { INVENTORY_SALES_FEATURE_KEY };
+export { INVENTORY_SALES_FEATURE_KEY } from "../config/inventorySalesFeature";
 
-export const canUseInventorySales = (planFlags) =>
-  planFlags?.effectiveFeatures?.[INVENTORY_SALES_FEATURE_KEY] === true;
+export const canUseInventorySales = (planFlags, user) =>
+  canViewInventory(planFlags, user);

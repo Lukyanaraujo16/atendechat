@@ -74,6 +74,9 @@ export const completeInventorySale = (saleId, body) =>
 export const cancelInventorySale = (saleId, body) =>
   api.post(`/inventory/sales/${saleId}/cancel`, body);
 
+export const updateInventorySalePayment = (saleId, body) =>
+  api.put(`/inventory/sales/${saleId}/payment`, body);
+
 export const getInventoryReportSummary = (params) =>
   api.get("/inventory/reports/summary", { params });
 
