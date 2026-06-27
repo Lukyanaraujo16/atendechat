@@ -24,6 +24,7 @@ import usePlanFlags from "../../hooks/usePlanFlags";
 import CrmDealFormDialog from "../Crm/CrmDealFormDialog";
 import CrmOpenDealsChoiceDialog from "../Crm/CrmOpenDealsChoiceDialog";
 import ContactCrmSection from "../ContactCrmSection";
+import TicketInventorySalesSection from "../Inventory/TicketInventorySalesSection";
 import api from "../../services/api";
 import toastError from "../../errors/toastError";
 import { AuthContext } from "../../context/Auth/AuthContext";
@@ -258,6 +259,11 @@ const ContactDrawer = ({
 									}}
 									onCreateCrm={handleRequestAddCrm}
 								/>
+							</Paper>
+						) : null}
+						{ticket?.id ? (
+							<Paper square variant="outlined" className={classes.contactDetails}>
+								<TicketInventorySalesSection ticketId={ticket.id} />
 							</Paper>
 						) : null}
 						<Paper square variant="outlined" className={classes.contactDetails}>

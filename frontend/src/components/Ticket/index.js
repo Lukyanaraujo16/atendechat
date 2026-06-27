@@ -39,6 +39,7 @@ import getTicketViewState, {
 import TicketStateBanner from "../TicketStateBanner";
 import TicketOrphanComposer from "../TicketOrphanComposer";
 import { useAcceptTicket } from "../../hooks/useAcceptTicket";
+import { TicketInventorySalesProvider } from "../Inventory/TicketInventorySalesProvider";
 import {
   PANEL_RADIUS,
   getPanelElevation,
@@ -461,6 +462,7 @@ const Ticket = () => {
   };
 
   return (
+    <TicketInventorySalesProvider ticket={ticket}>
     <div className={classes.root} id="drawer-container">
       <Paper
         elevation={0}
@@ -539,6 +541,7 @@ const Ticket = () => {
         ticketid={ticket.id}
       />
     </div>
+    </TicketInventorySalesProvider>
   );
 };
 

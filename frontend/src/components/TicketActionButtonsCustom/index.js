@@ -21,6 +21,7 @@ import { TicketsInboxContext } from "../../context/TicketsInboxContext";
 import TicketConversationActionBar from "../TicketConversationActionBar";
 import usePlanFlags from "../../hooks/usePlanFlags";
 import TicketCrmDealButton from "../Crm/TicketCrmDealButton";
+import TicketInventorySaleButton from "../Inventory/TicketInventorySaleButton";
 import { TicketTagsButton } from "../TagsContainer";
 import { canDeleteTickets } from "../../utils/canDeleteTickets";
 import { useAcceptTicket } from "../../hooks/useAcceptTicket";
@@ -188,6 +189,7 @@ const TicketActionButtonsCustom = ({
       {ticket.status === "closed" && (
         <div className={classes.legacyCluster}>
           <TicketTagsButton ticket={ticket} disabled={loading} />
+          <TicketInventorySaleButton disabled={loading} />
           <ButtonWithSpinner
             loading={loading}
             startIcon={<Replay />}
@@ -255,6 +257,7 @@ const TicketActionButtonsCustom = ({
                       featureLoading={crmFeatureLoading}
                     />
                   ) : null}
+                  <TicketInventorySaleButton disabled={loading} />
                 </>
               }
             />
@@ -277,6 +280,7 @@ const TicketActionButtonsCustom = ({
           {({ openDelete }) => (
             <div className={classes.legacyCluster}>
               <TicketTagsButton ticket={ticket} disabled={loading} />
+              <TicketInventorySaleButton disabled={loading} />
               <ButtonWithSpinner
                 loading={loading}
                 size="small"

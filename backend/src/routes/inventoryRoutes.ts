@@ -1,0 +1,219 @@
+import express from "express";
+import isAuth from "../middleware/isAuth";
+import requireAnyPlanFeature from "../middleware/requirePlanFeature";
+import { INVENTORY_SALES_FEATURE_KEY } from "../config/inventorySalesFeature";
+import * as InventoryController from "../controllers/InventoryController";
+import * as InventorySaleController from "../controllers/InventorySaleController";
+import * as InventorySellerProfileController from "../controllers/InventorySellerProfileController";
+import * as InventoryReportController from "../controllers/InventoryReportController";
+
+const inventoryRoutes = express.Router();
+const requireInventorySales = requireAnyPlanFeature(INVENTORY_SALES_FEATURE_KEY);
+
+inventoryRoutes.get(
+  "/inventory/settings",
+  isAuth,
+  requireInventorySales,
+  InventoryController.getSettings
+);
+inventoryRoutes.put(
+  "/inventory/settings",
+  isAuth,
+  requireInventorySales,
+  InventoryController.updateSettings
+);
+
+inventoryRoutes.get(
+  "/inventory/seller-profiles",
+  isAuth,
+  requireInventorySales,
+  InventorySellerProfileController.listSellerProfiles
+);
+inventoryRoutes.post(
+  "/inventory/seller-profiles",
+  isAuth,
+  requireInventorySales,
+  InventorySellerProfileController.createSellerProfile
+);
+inventoryRoutes.put(
+  "/inventory/seller-profiles/:id",
+  isAuth,
+  requireInventorySales,
+  InventorySellerProfileController.updateSellerProfile
+);
+inventoryRoutes.delete(
+  "/inventory/seller-profiles/:id",
+  isAuth,
+  requireInventorySales,
+  InventorySellerProfileController.deleteSellerProfile
+);
+
+inventoryRoutes.get(
+  "/inventory/categories",
+  isAuth,
+  requireInventorySales,
+  InventoryController.listCategories
+);
+inventoryRoutes.post(
+  "/inventory/categories",
+  isAuth,
+  requireInventorySales,
+  InventoryController.createCategory
+);
+inventoryRoutes.put(
+  "/inventory/categories/:id",
+  isAuth,
+  requireInventorySales,
+  InventoryController.updateCategory
+);
+inventoryRoutes.delete(
+  "/inventory/categories/:id",
+  isAuth,
+  requireInventorySales,
+  InventoryController.deleteCategory
+);
+
+inventoryRoutes.post(
+  "/inventory/stock-movements",
+  isAuth,
+  requireInventorySales,
+  InventoryController.createStockMovement
+);
+inventoryRoutes.get(
+  "/inventory/stock-movements",
+  isAuth,
+  requireInventorySales,
+  InventoryController.listStockMovements
+);
+
+inventoryRoutes.get(
+  "/inventory/reports/summary",
+  isAuth,
+  requireInventorySales,
+  InventoryReportController.getReportSummary
+);
+inventoryRoutes.get(
+  "/inventory/reports/sellers",
+  isAuth,
+  requireInventorySales,
+  InventoryReportController.getReportSellers
+);
+inventoryRoutes.get(
+  "/inventory/reports/products",
+  isAuth,
+  requireInventorySales,
+  InventoryReportController.getReportProducts
+);
+inventoryRoutes.get(
+  "/inventory/reports/customers",
+  isAuth,
+  requireInventorySales,
+  InventoryReportController.getReportCustomers
+);
+
+inventoryRoutes.get(
+  "/inventory/sales",
+  isAuth,
+  requireInventorySales,
+  InventorySaleController.listSales
+);
+inventoryRoutes.post(
+  "/inventory/sales",
+  isAuth,
+  requireInventorySales,
+  InventorySaleController.createSale
+);
+inventoryRoutes.get(
+  "/inventory/sales/:id",
+  isAuth,
+  requireInventorySales,
+  InventorySaleController.showSale
+);
+inventoryRoutes.put(
+  "/inventory/sales/:id",
+  isAuth,
+  requireInventorySales,
+  InventorySaleController.updateSale
+);
+inventoryRoutes.delete(
+  "/inventory/sales/:id",
+  isAuth,
+  requireInventorySales,
+  InventorySaleController.deleteSale
+);
+inventoryRoutes.post(
+  "/inventory/sales/:id/items",
+  isAuth,
+  requireInventorySales,
+  InventorySaleController.addSaleItem
+);
+inventoryRoutes.put(
+  "/inventory/sales/:id/items/:itemId",
+  isAuth,
+  requireInventorySales,
+  InventorySaleController.updateSaleItem
+);
+inventoryRoutes.delete(
+  "/inventory/sales/:id/items/:itemId",
+  isAuth,
+  requireInventorySales,
+  InventorySaleController.deleteSaleItem
+);
+inventoryRoutes.post(
+  "/inventory/sales/:id/complete",
+  isAuth,
+  requireInventorySales,
+  InventorySaleController.completeSale
+);
+inventoryRoutes.post(
+  "/inventory/sales/:id/cancel",
+  isAuth,
+  requireInventorySales,
+  InventorySaleController.cancelSale
+);
+
+inventoryRoutes.get(
+  "/inventory/products/low-stock",
+  isAuth,
+  requireInventorySales,
+  InventoryController.listLowStockProducts
+);
+
+inventoryRoutes.get(
+  "/inventory/products",
+  isAuth,
+  requireInventorySales,
+  InventoryController.listProducts
+);
+inventoryRoutes.post(
+  "/inventory/products",
+  isAuth,
+  requireInventorySales,
+  InventoryController.createProduct
+);
+inventoryRoutes.get(
+  "/inventory/products/:id/stock-movements",
+  isAuth,
+  requireInventorySales,
+  InventoryController.listProductStockMovements
+);
+inventoryRoutes.get(
+  "/inventory/products/:id",
+  isAuth,
+  requireInventorySales,
+  InventoryController.showProduct
+);
+inventoryRoutes.put(
+  "/inventory/products/:id",
+  isAuth,
+  requireInventorySales,
+  InventoryController.updateProduct
+);
+inventoryRoutes.delete(
+  "/inventory/products/:id",
+  isAuth,
+  requireInventorySales,
+  InventoryController.deleteProduct
+);
+
+export default inventoryRoutes;

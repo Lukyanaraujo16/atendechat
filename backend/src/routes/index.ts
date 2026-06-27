@@ -41,6 +41,7 @@ import ratingTemplateRoutes from "./ratingTemplateRoutes";
 import groupRoutes from "./groupRoutes";
 import appointmentRoutes from "./appointmentRoutes";
 import crmRoutes from "./crmRoutes";
+import inventoryRoutes from "./inventoryRoutes";
 import notificationRoutes from "./notificationRoutes";
 import systemSettingRoutes from "./systemSettingRoutes";
 import platformSuperRoutes from "./platformSuperRoutes";
@@ -100,5 +101,6 @@ routes.use(ratingTemplateRoutes);
 routes.use(groupRoutes);
 routes.use(appointmentRoutes);
 routes.use(crmRoutes);
+routes.use(inventoryRoutes);
 
 export default routes;
