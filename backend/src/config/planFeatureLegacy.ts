@@ -56,6 +56,7 @@ export function legacyPlanFeatureValue(
     case "inventory.sales.managePayments":
     case "inventory.sales.viewReports":
     case "inventory.sales.manageSettings":
+    case "automation.ai_agent":
       return false;
     case "attendance.kanban":
       return asBool(readPlanColumn(plan, "useKanban"));

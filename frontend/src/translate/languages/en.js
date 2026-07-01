@@ -1512,6 +1512,11 @@ const messages = {
 							label: "Artificial intelligence (OpenAI)",
 							description: "AI-assisted prompts and replies.",
 						},
+						ai_agent: {
+							label: "AI Agent",
+							description:
+								"Enables virtual AI attendants to reply to customers automatically, interpret messages, and help qualify support conversations.",
+						},
 						keywords: {
 							label: "Keyword triggers",
 							description: "Trigger flows when contacts send specific words.",

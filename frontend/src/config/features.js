@@ -52,6 +52,11 @@ export const FEATURES = {
         label: "Inteligência artificial (OpenAI)",
         description: "Prompts e respostas assistidas por IA.",
       },
+      ai_agent: {
+        label: "Agente de IA",
+        description:
+          "Permite usar atendentes virtuais com inteligência artificial para responder clientes automaticamente, interpretar mensagens e auxiliar na qualificação de atendimentos.",
+      },
       keywords: {
         label: "Gatilhos por palavra-chave",
         description: "Dispara fluxos quando o contato envia palavras específicas.",

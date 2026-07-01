@@ -52,6 +52,12 @@ export const FEATURE_ENFORCEMENT_MAP: Array<{
     backendRoutes: ["/prompts/*"]
   },
   {
+    feature: "automation.ai_agent",
+    menu: "Automação → Agente de IA",
+    notes:
+      "Módulo comercial de agentes virtuais (fase 0.1: apenas gating por plano; runtime ainda não implementado)."
+  },
+  {
     feature: "automation.integrations",
     menu: "Automação → Integrações de fila",
     frontendRoutes: ["/queue-integration"],

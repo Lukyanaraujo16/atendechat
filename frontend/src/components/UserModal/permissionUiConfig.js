@@ -36,6 +36,7 @@ export const PERMISSION_UI_GROUPS = [
       "automation.quick_replies",
       "automation.integrations",
       "automation.openai",
+      "automation.ai_agent",
       "automation.keywords",
     ],
   },

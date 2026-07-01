@@ -239,6 +239,7 @@ function buildDefaultPermissionState(
     setIfPlan("automation.keywords", false);
     setIfPlan("automation.quick_replies", false);
     setIfPlan("automation.openai", false);
+    setIfPlan("automation.ai_agent", false);
     setIfPlan("automation.integrations", false);
     setIfPlan("settings.api", false);
     setIfPlan("settings.connections", false);

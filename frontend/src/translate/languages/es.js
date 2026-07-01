@@ -1477,6 +1477,11 @@ const messages = {
               label: "Inteligencia artificial (OpenAI)",
               description: "Prompts y respuestas asistidas por IA.",
             },
+            ai_agent: {
+              label: "Agente de IA",
+              description:
+                "Permite usar atendentes virtuales con inteligencia artificial para responder clientes automáticamente, interpretar mensajes y ayudar en la calificación de atenciones.",
+            },
             keywords: {
               label: "Disparadores por palabra clave",
               description: "Activa flujos cuando el contacto envía palabras específicas.",
