@@ -121,12 +121,16 @@ function applySafeColumnMerge(
   prev,
   apiTickets,
   recentMovesRef,
-  recentSocketIdsRef
+  recentSocketIdsRef,
+  { privileged = false } = {}
 ) {
   const apiList = Array.isArray(apiTickets) ? apiTickets : [];
   const safePrev = Array.isArray(prev) ? prev : [];
   if (apiList.length === 0) {
     if (safePrev.length === 0) {
+      return safePrev;
+    }
+    if (privileged) {
       return safePrev;
     }
     return safePrev.filter((t) => {
@@ -263,6 +267,11 @@ export function TicketsInboxProvider({
   const socketManager = useContext(SocketContext);
   const { profile, queues } = user || {};
   const safeQueues = Array.isArray(queues) ? queues : [];
+  const isPrivilegedProfile = profile !== "user";
+  const safeMergeOpts = useMemo(
+    () => ({ privileged: isPrivilegedProfile }),
+    [isPrivilegedProfile]
+  );
 
   const [openTicketsList, setOpenTicketsList] = useState([]);
   const [waitingTicketsList, setWaitingTicketsList] = useState([]);
@@ -333,6 +342,8 @@ export function TicketsInboxProvider({
   }, [fetchEnabled, loadPinnedTickets, user?.id, user?.companyId]);
 
   useEffect(() => {
+    const beforeOpen = openListRef.current?.length ?? 0;
+    const beforePending = waitingListRef.current?.length ?? 0;
     setOpenTicketsList([]);
     setWaitingTicketsList([]);
     setChatbotTicketsList([]);
@@ -344,7 +355,14 @@ export function TicketsInboxProvider({
     recentlyDeletedIdsRef.current = new Set();
     lastMismatchReloadAtRef.current = { open: 0, pending: 0, chatbot: 0 };
     mismatchRetryCountRef.current = { open: 0, pending: 0, chatbot: 0 };
-  }, [queueIdsJson, showAll]);
+    console.info("[DiagTicketsAdmin] list_cleared", {
+      profile,
+      beforeCount: beforeOpen + beforePending,
+      afterCount: 0,
+      source: "queueIds_or_showAll_change",
+      showAll,
+    });
+  }, [queueIdsJson, showAll, profile]);
 
   const fetchAllTicketsForColumn = useCallback(
     async (columnParams) => {
@@ -411,7 +429,8 @@ export function TicketsInboxProvider({
             prev,
             tickets,
             recentOptimisticMovesRef,
-            recentSocketPendingIdsRef
+            recentSocketPendingIdsRef,
+            safeMergeOpts
           );
           tickets.forEach((t) => {
             if (t?.id != null) {
@@ -452,7 +471,8 @@ export function TicketsInboxProvider({
             prev,
             tickets,
             recentOptimisticMovesRef,
-            recentSocketPendingIdsRef
+            recentSocketPendingIdsRef,
+            safeMergeOpts
           );
           chatbotListRef.current = next;
           return next;
@@ -696,12 +716,29 @@ export function TicketsInboxProvider({
       return;
     }
     setOpenTicketsList((prev) => {
+      const apiTickets = openFetch.tickets;
+      console.info("[DiagTicketsAdmin] api_loaded", {
+        profile,
+        companyId: user?.companyId,
+        status: "open",
+        count: Array.isArray(apiTickets) ? apiTickets.length : 0,
+        ticketIds: Array.isArray(apiTickets)
+          ? apiTickets.map((t) => t.id)
+          : [],
+        showAll,
+      });
       const next = applySafeColumnMerge(
         prev,
-        openFetch.tickets,
+        apiTickets,
         recentOptimisticMovesRef,
-        recentSocketPendingIdsRef
+        recentSocketPendingIdsRef,
+        safeMergeOpts
       );
+      console.info("[DiagTicketsAdmin] state_after_load", {
+        openCount: next.length,
+        pendingCount: waitingListRef.current?.length ?? 0,
+        ticketIds: next.map((t) => t.id),
+      });
       openListRef.current = next;
       return next;
     });
@@ -712,6 +749,10 @@ export function TicketsInboxProvider({
     openPage,
     reloadOpenList,
     scheduleMismatchReload,
+    profile,
+    user?.companyId,
+    showAll,
+    safeMergeOpts,
   ]);
 
   const userId = user?.id;
@@ -786,16 +827,22 @@ export function TicketsInboxProvider({
     setChatbotTicketsList(filterOut);
   }, []);
 
-  const removeTicket = useCallback((ticketId) => {
+  const removeTicket = useCallback((ticketId, reason = "unknown") => {
     if (ticketId == null) return;
     const id = Number(ticketId);
+    console.info("[DiagTicketsAdmin] removeTicket_called", {
+      profile,
+      ticketId: id,
+      reason,
+      stackHint: reason,
+    });
     recentlyDeletedIdsRef.current.add(id);
     setPinnedMeta((prev) => prev.filter((row) => row.ticketId !== id));
     setTimeout(() => {
       recentlyDeletedIdsRef.current.delete(id);
     }, 120000);
     removeTicketFromAllColumns(ticketId);
-  }, [removeTicketFromAllColumns]);
+  }, [removeTicketFromAllColumns, profile]);
 
   const removeTickets = useCallback((ticketIds) => {
     if (!Array.isArray(ticketIds) || ticketIds.length === 0) return;
@@ -1019,7 +1066,13 @@ export function TicketsInboxProvider({
           if (shouldShowTicket(t)) {
             moveTicketToColumn(normalized, { bumpToTop: false });
           } else {
-            removeTicket(t.id);
+            console.info("[DiagTicketsAdmin] socket_hidden", {
+              profile,
+              ticketId: t.id,
+              shouldShow: false,
+              reason: "ticket_update_shouldShow_false",
+            });
+            removeTicket(t.id, "socket_update_shouldShow_false");
           }
           if (t.status === "pending") {
             scheduleSyncBothPendingColumns();
@@ -1060,7 +1113,13 @@ export function TicketsInboxProvider({
         if (shouldShowTicket(t2)) {
           moveTicketToColumn(normalizedMsg, { bumpToTop: true });
         } else if (t2.id != null) {
-          removeTicket(t2.id);
+          console.info("[DiagTicketsAdmin] socket_hidden", {
+            profile,
+            ticketId: t2.id,
+            shouldShow: false,
+            reason: "appMessage_shouldShow_false",
+          });
+          removeTicket(t2.id, "socket_appMessage_shouldShow_false");
         }
         if (t2.status === "pending") {
           scheduleSyncBothPendingColumns();

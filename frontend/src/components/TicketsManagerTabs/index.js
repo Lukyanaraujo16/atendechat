@@ -775,13 +775,15 @@ const TicketsManagerTabs = () => {
   const [bulkLoading, setBulkLoading] = useState(false);
   const [bulkAssigning, setBulkAssigning] = useState(false);
   const [fabMenuAnchor, setFabMenuAnchor] = useState(null);
-  const [showAllTickets, setShowAllTickets] = useState(false);
-  const searchInputRef = useRef();
-  const searchDebounceRef = useRef(null);
-  const [compactList, setCompactList] = useState(() => localStorage.getItem("ticketsListCompact") === "1");
   const { user } = useContext(AuthContext);
   const { whatsApps } = useContext(WhatsAppsContext);
   const { profile } = user;
+  const [showAllTickets, setShowAllTickets] = useState(
+    () => String(user?.profile || "").toUpperCase() === "ADMIN"
+  );
+  const searchInputRef = useRef();
+  const searchDebounceRef = useRef(null);
+  const [compactList, setCompactList] = useState(() => localStorage.getItem("ticketsListCompact") === "1");
   const mayBulkDelete = canDeleteTickets(user);
   const [bulkSelectMode, setBulkSelectMode] = useState(false);
   const [bulkListApi, setBulkListApi] = useState(null);
@@ -825,13 +827,6 @@ const TicketsManagerTabs = () => {
   }, [location.search, location.pathname, history]);
 
   useTicketsKeyboardShortcuts({ searchInputRef, setTab });
-
-  useEffect(() => {
-    if (user.profile.toUpperCase() === "ADMIN") {
-      setShowAllTickets(true);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const activeSearchKey = useMemo(
     () => getActiveTicketSearchKey(tab, tabOpen),

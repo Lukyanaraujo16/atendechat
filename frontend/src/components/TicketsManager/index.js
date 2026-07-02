@@ -115,8 +115,10 @@ const TicketsManager = () => {
   const [tab, setTab] = useState("open");
   const [tabOpen] = useState("open");
   const [newTicketModalOpen, setNewTicketModalOpen] = useState(false);
-  const [showAllTickets, setShowAllTickets] = useState(false);
   const { user } = useContext(AuthContext);
+  const [showAllTickets, setShowAllTickets] = useState(
+    () => String(user?.profile || "").toUpperCase() === "ADMIN"
+  );
 
   const [openCount, setOpenCount] = useState(0);
   const [pendingCount, setPendingCount] = useState(0);
@@ -124,13 +126,6 @@ const TicketsManager = () => {
 
   const userQueueIds = Array.isArray(user?.queues) ? user.queues.map((q) => q.id) : [];
   const [selectedQueueIds, setSelectedQueueIds] = useState(userQueueIds || []);
-
-  useEffect(() => {
-    if (user.profile.toUpperCase() === "ADMIN") {
-      setShowAllTickets(true);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   const handleSearch = (e) => {
     const searchedTerm = e.target.value.toLowerCase();
