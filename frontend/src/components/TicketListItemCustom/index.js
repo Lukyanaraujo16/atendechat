@@ -34,6 +34,7 @@ import MarkdownWrapper from "../MarkdownWrapper";
 import AndroidIcon from "@material-ui/icons/Android";
 import VisibilityIcon from "@material-ui/icons/Visibility";
 import DeleteOutlineIcon from "@material-ui/icons/DeleteOutline";
+import SwapHorizIcon from "@material-ui/icons/SwapHoriz";
 import InstagramIcon from "@material-ui/icons/Instagram";
 import PushPinOutlinedIcon from "@mui/icons-material/PushPinOutlined";
 import PushPinIcon from "@mui/icons-material/PushPin";
@@ -41,6 +42,7 @@ import Checkbox from "@material-ui/core/Checkbox";
 import IconButton from "@material-ui/core/IconButton";
 import TicketMessagesDialog from "../TicketMessagesDialog";
 import ConfirmationModal from "../ConfirmationModal";
+import TransferTicketModalCustom from "../TransferTicketModalCustom";
 import { AuthContext } from "../../context/Auth/AuthContext";
 import { TicketsSetContext } from "../../context/Tickets/TicketsContext";
 import { TicketsInboxContext } from "../../context/TicketsInboxContext";
@@ -423,6 +425,14 @@ const useStyles = makeStyles((theme) => {
       transform: "translateY(-1px)",
     },
   },
+  actionTransfer: {
+    backgroundColor: alpha(theme.palette.primary.main, isDark ? 0.85 : 0.92),
+    color: theme.palette.primary.contrastText,
+    "&:hover": {
+      backgroundColor: theme.palette.primary.dark,
+      transform: "translateY(-1px)",
+    },
+  },
   listDeleteBtn: {
     padding: 4,
     flexShrink: 0,
@@ -487,6 +497,7 @@ const TicketListItemCustom = ({
   const [openTicketMessageDialog, setOpenTicketMessageDialog] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [transferModalOpen, setTransferModalOpen] = useState(false);
   const isMounted = useRef(true);
   const setCurrentTicket = useContext(TicketsSetContext);
   const inbox = useContext(TicketsInboxContext);
@@ -710,6 +721,11 @@ const TicketListItemCustom = ({
       >
         {i18n.t("ticket.delete.confirmMessage")}
       </ConfirmationModal>
+      <TransferTicketModalCustom
+        modalOpen={transferModalOpen}
+        onClose={() => setTransferModalOpen(false)}
+        ticketid={ticket.id}
+      />
       <ListItem
         dense
         button
@@ -942,6 +958,20 @@ const TicketListItemCustom = ({
                   {loading
                     ? i18n.t("ticketsList.buttons.accepting")
                     : i18n.t("ticketsList.buttons.accept")}
+                </ButtonWithSpinner>
+              )}
+              {ticket.status === "pending" && (
+                <ButtonWithSpinner
+                  variant="contained"
+                  size="small"
+                  className={clsx(classes.actionBtn, classes.actionTransfer)}
+                  startIcon={<SwapHorizIcon fontSize="small" />}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setTransferModalOpen(true);
+                  }}
+                >
+                  {i18n.t("ticketOptionsMenu.transfer")}
                 </ButtonWithSpinner>
               )}
               {ticket.status !== "closed" && (
