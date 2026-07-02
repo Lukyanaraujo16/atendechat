@@ -149,7 +149,7 @@ function DashboardRouteGuard() {
 
 function AttendanceModuleGuard({ planFlags, user, isAdmin, children }) {
   const fx = planFlags.effectiveFeatures || {};
-  if (!planFlags.loaded) {
+  if (!planFlags.ready) {
     return <PlanFlagsLoadingState />;
   }
   if (!hasAttendanceModuleAccess(fx)) {

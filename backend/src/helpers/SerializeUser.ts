@@ -4,6 +4,7 @@ import User from "../models/User";
 import { getCompanyFinanceFlags, CompanyFinanceFlags } from "./companyFinanceStatus";
 import { loadCompanyPlanContextByCompanyId } from "../middleware/loadCompanyEffectiveFeatures";
 import { computeEffectiveUserFeatureMapForUserId } from "../services/UserFeaturePermission/UserFeaturePermissionService";
+import { logger } from "../utils/logger";
 
 interface SerializedUser {
   id: number;
@@ -50,6 +51,24 @@ export const SerializeUser = async (
       : user.companyId ?? null;
 
   const effectiveUserFeatures = await resolveEffectiveUserFeatures(user, planCompanyId);
+
+  const attendanceInbox = effectiveUserFeatures["attendance.inbox"] === true;
+  const attendanceKanban = effectiveUserFeatures["attendance.kanban"] === true;
+  logger.info(
+    {
+      tag: "[DiagAttendanceAuth]",
+      event: "effective_features",
+      userId: user.id,
+      companyId: planCompanyId,
+      profile: user.profile,
+      hasAttendanceInbox: attendanceInbox,
+      attendanceInbox,
+      hasAttendanceKanban: attendanceKanban,
+      attendanceKanban,
+      keysCount: Object.keys(effectiveUserFeatures).length
+    },
+    "[DiagAttendanceAuth] effective_features"
+  );
 
   return {
     id: user.id,

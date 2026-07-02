@@ -252,19 +252,43 @@ const MainListItems = (props) => {
   const canAccessInbox = hasAttendanceInboxAccess(fx);
 
   useEffect(() => {
+    const userFx = user?.effectiveUserFeatures || {};
+    const hiddenReason = showAtendimento
+      ? null
+      : !fx["attendance.inbox"] &&
+          !fx["attendance.kanban"] &&
+          !fx["contacts.tags"] &&
+          !fx["contacts.files"] &&
+          !fx["team.groups"]
+        ? "no_attendance_features"
+        : "attendance_module_denied";
+    console.info("[DiagAttendanceMenu] user_features", {
+      profile: user?.profile,
+      userId: user?.id,
+      companyId: user?.companyId,
+      hasEffectiveUserFeatures:
+        userFx &&
+        typeof userFx === "object" &&
+        Object.keys(userFx).length > 0,
+      keys: Object.keys(userFx),
+      attendanceInbox: userFx["attendance.inbox"],
+      attendanceKanban: userFx["attendance.kanban"],
+      planFlagsLoaded: planFlags.loaded,
+      finalCanAccessTickets: showAtendimento,
+      finalCanAccessInbox: canAccessInbox,
+      hiddenReason,
+      planFxAttendanceInbox: fx["attendance.inbox"],
+      planFxAttendanceKanban: fx["attendance.kanban"],
+    });
     if (!planFlags.loaded) return;
     console.info("[PermissionDebug] menu_tickets", {
       profile: user?.profile,
       planFlagsLoaded: planFlags.loaded,
       canAccessTickets: showAtendimento,
       canAccessInbox,
-      hiddenReason: showAtendimento
-        ? null
-        : !fx["attendance.inbox"] && !fx["attendance.kanban"] && !fx["contacts.tags"] && !fx["contacts.files"] && !fx["team.groups"]
-          ? "no_attendance_features"
-          : "attendance_module_denied",
+      hiddenReason,
     });
-  }, [planFlags.loaded, showAtendimento, canAccessInbox, user?.profile, fx]);
+  }, [planFlags.loaded, showAtendimento, canAccessInbox, user?.profile, user?.id, user?.companyId, user?.effectiveUserFeatures, fx]);
 
   const atendimentoPath = getAttendanceDefaultPath({
     effectiveFeatures: fx,
@@ -538,7 +562,7 @@ const MainListItems = (props) => {
     user?.companyId != null &&
     user?.companyId !== "" &&
     !user?.super &&
-    !planFlags.loaded;
+    !planFlags.ready;
 
   if (tenantAwaitingPlanFlags) {
     return (

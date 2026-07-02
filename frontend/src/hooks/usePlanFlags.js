@@ -12,6 +12,7 @@ import {
   buildEffectiveModuleFlagsFromFeatureMap,
   mergeLiveEffectiveFeatures,
 } from "../components/ModuleSettings/moduleSync";
+import { hasAttendanceModuleAccess } from "../utils/attendanceAccess";
 import { countPostLogin } from "../utils/postLoginDebug";
 
 const PlanFlagsContext = createContext(null);
@@ -188,8 +189,16 @@ function usePlanFlagsState() {
             typeof window !== "undefined" ? window.location.pathname : null,
         });
         if (!cancelled) {
+          const jwtFx = readUserEffectiveFeatures(user);
           setFlags((f) => {
-            const next = applyCampaignsShowOverride({ ...f, loaded: true });
+            const next = applyCampaignsShowOverride({
+              ...f,
+              loaded: true,
+              effectiveFeatures:
+                jwtFx && Object.keys(jwtFx).length > 0
+                  ? jwtFx
+                  : f.effectiveFeatures,
+            });
             return flagsPayloadEqual(f, next) ? f : next;
           });
         }
@@ -210,13 +219,28 @@ function usePlanFlagsState() {
   );
 
   const effectiveFeaturesOut = useMemo(() => {
-    if (flags.loaded) {
-      return flags.effectiveFeatures;
+    const planFx = flags.effectiveFeatures || {};
+    if (!flags.loaded) {
+      if (userFxSync) {
+        return userFxSync;
+      }
+      return planFx;
     }
-    if (userFxSync) {
+    if (
+      userFxSync &&
+      hasAttendanceModuleAccess(userFxSync) &&
+      !hasAttendanceModuleAccess(planFx)
+    ) {
+      return { ...planFx, ...userFxSync };
+    }
+    if (
+      Object.keys(planFx).length === 0 &&
+      userFxSync &&
+      hasAttendanceModuleAccess(userFxSync)
+    ) {
       return userFxSync;
     }
-    return flags.effectiveFeatures;
+    return planFx;
   }, [flags.loaded, flags.effectiveFeatures, userFxSync]);
 
   const ready = flags.loaded || Boolean(userFxSync);
