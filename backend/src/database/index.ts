@@ -82,6 +82,7 @@ import InventoryStockMovement from "../models/InventoryStockMovement";
 import InventorySellerProfile from "../models/InventorySellerProfile";
 import InventorySale from "../models/InventorySale";
 import InventorySaleItem from "../models/InventorySaleItem";
+import AiAgent from "../models/AiAgent";
 import { logDbConnectionAtStartup } from "../helpers/dbConnectionInfo";
 import {
   assertContactLabelRelationModelRegistered,
@@ -177,7 +178,8 @@ const models = [
   InventoryStockMovement,
   InventorySellerProfile,
   InventorySale,
-  InventorySaleItem
+  InventorySaleItem,
+  AiAgent
 ];
 
 sequelize.addModels(models);

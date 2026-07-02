@@ -54,8 +54,15 @@ export const FEATURE_ENFORCEMENT_MAP: Array<{
   {
     feature: "automation.ai_agent",
     menu: "Automação → Agente de IA",
-    notes:
-      "Módulo comercial de agentes virtuais (fase 0.1: apenas gating por plano; runtime ainda não implementado)."
+    frontendRoutes: ["/ai-agent"],
+    backendRoutes: [
+      "GET /ai-agents",
+      "GET /ai-agents/:id",
+      "POST /ai-agents",
+      "PUT /ai-agents/:id",
+      "DELETE /ai-agents/:id"
+    ],
+    notes: "CRUD administrativo do agente (fase 1.0); sem runtime de mensagens."
   },
   {
     feature: "automation.integrations",

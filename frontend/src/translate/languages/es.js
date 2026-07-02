@@ -2509,6 +2509,81 @@ const messages = {
           subtitle: "Cree un prompt para vincularlo a la conexión WhatsApp, al sector o al flujo automatizado.",
         },
       },
+      aiAgent: {
+        title: "Agente de IA",
+        subtitle:
+          "Configure atendentes virtuales con inteligencia artificial para apoyar la atención.",
+        phaseWarning:
+          "En esta fase, el agente aún no responde atenciones automáticamente. La activación en canales se hará en una etapa posterior.",
+        buttons: {
+          new: "Nuevo agente",
+          save: "Guardar",
+          cancel: "Cancelar",
+          edit: "Editar",
+          delete: "Eliminar",
+          retry: "Reintentar",
+        },
+        table: {
+          name: "Nombre",
+          model: "Modelo",
+          enabled: "Estado",
+          temperature: "Temperatura",
+          maxTokens: "Máx. tokens",
+          actions: "Acciones",
+        },
+        status: {
+          active: "Activo",
+          inactive: "Inactivo",
+        },
+        fields: {
+          name: "Nombre del agente",
+          description: "Descripción",
+          enabled: "Activo",
+          model: "Modelo",
+          temperature: "Temperatura",
+          maxTokens: "Máximo de tokens",
+          systemPrompt: "Prompt principal / instrucciones del agente",
+          fallbackMessage: "Mensaje de respaldo",
+          handoffMessage: "Mensaje de transferencia a humano",
+          allowAudioInput: "Permitir entender audio",
+          allowAudioOutput: "Permitir responder audio",
+          audioComingSoon: "Próximamente",
+        },
+        modal: {
+          newTitle: "Nuevo agente de IA",
+          editTitle: "Editar agente de IA",
+        },
+        formErrors: {
+          name: {
+            required: "El nombre del agente es obligatorio",
+            long: "Nombre demasiado largo (máx. 120 caracteres)",
+          },
+          model: { required: "El modelo es obligatorio" },
+          temperature: {
+            required: "La temperatura es obligatoria",
+            range: "La temperatura debe estar entre 0 y 2",
+          },
+          maxTokens: {
+            required: "El máximo de tokens es obligatorio",
+            integer: "El máximo de tokens debe ser un entero",
+            range: "El máximo de tokens debe estar entre 16 y 4096",
+          },
+        },
+        toasts: {
+          created: "Agente creado con éxito",
+          updated: "Agente actualizado con éxito",
+          deleted: "Agente eliminado con éxito",
+        },
+        confirmDelete: {
+          title: "Eliminar agente",
+          message: "¿Seguro que desea eliminar este agente? Esta acción no se puede deshacer.",
+        },
+        empty: {
+          title: "Sin agentes registrados",
+          description: "Cree un agente para configurar instrucciones y parámetros de IA.",
+          loadError: "No se pudieron cargar los agentes",
+        },
+      },
       contactModal: {
         title: {
           add: "Agregar contacto",

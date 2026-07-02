@@ -2554,6 +2554,81 @@ const messages = {
 					subtitle: "Create a prompt to link to the WhatsApp connection, sector, or automated flow.",
 				},
 			},
+			aiAgent: {
+				title: "AI Agent",
+				subtitle:
+					"Configure virtual attendants with artificial intelligence to assist customer support.",
+				phaseWarning:
+					"In this phase, the agent does not reply to conversations automatically yet. Channel activation will come in a later step.",
+				buttons: {
+					new: "New agent",
+					save: "Save",
+					cancel: "Cancel",
+					edit: "Edit",
+					delete: "Delete",
+					retry: "Try again",
+				},
+				table: {
+					name: "Name",
+					model: "Model",
+					enabled: "Status",
+					temperature: "Temperature",
+					maxTokens: "Max tokens",
+					actions: "Actions",
+				},
+				status: {
+					active: "Active",
+					inactive: "Inactive",
+				},
+				fields: {
+					name: "Agent name",
+					description: "Description",
+					enabled: "Active",
+					model: "Model",
+					temperature: "Temperature",
+					maxTokens: "Max tokens",
+					systemPrompt: "Main prompt / agent instructions",
+					fallbackMessage: "Fallback message",
+					handoffMessage: "Handoff message to a human",
+					allowAudioInput: "Allow understanding audio",
+					allowAudioOutput: "Allow audio replies",
+					audioComingSoon: "Coming soon",
+				},
+				modal: {
+					newTitle: "New AI agent",
+					editTitle: "Edit AI agent",
+				},
+				formErrors: {
+					name: {
+						required: "Agent name is required",
+						long: "Name is too long (max 120 characters)",
+					},
+					model: { required: "Model is required" },
+					temperature: {
+						required: "Temperature is required",
+						range: "Temperature must be between 0 and 2",
+					},
+					maxTokens: {
+						required: "Max tokens is required",
+						integer: "Max tokens must be an integer",
+						range: "Max tokens must be between 16 and 4096",
+					},
+				},
+				toasts: {
+					created: "Agent created successfully",
+					updated: "Agent updated successfully",
+					deleted: "Agent deleted successfully",
+				},
+				confirmDelete: {
+					title: "Delete agent",
+					message: "Are you sure you want to delete this agent? This cannot be undone.",
+				},
+				empty: {
+					title: "No agents yet",
+					description: "Create an agent to configure AI instructions and parameters.",
+					loadError: "Could not load agents",
+				},
+			},
 			contactModal: {
 				title: {
 					add: "Add Contact",

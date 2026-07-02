@@ -8,4 +8,4 @@ export const AI_AGENT_ROUTE_PATH = "/ai-agent";
  * Controla exibição da aba/menu do Agente de IA.
  * Manter `false` até a fase com página funcional + backend.
  */
-export const AI_AGENT_UI_ENABLED = false;
+export const AI_AGENT_UI_ENABLED = true;

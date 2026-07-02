@@ -62,6 +62,7 @@ import InventorySales from "../pages/InventorySales";
 import { canViewInventory, planHasInventoryModule } from "../utils/inventoryAccess";
 import CRMReports from "../pages/CRMReports";
 import CrmAutomations from "../pages/CrmAutomations";
+import AiAgent from "../pages/AiAgent";
 import AiAgentRouteGuard from "../components/AiAgentRouteGuard";
 import {
   AI_AGENT_FEATURE_KEY,
@@ -440,7 +441,9 @@ function AutomacaoModule({ planFlags, isAdmin }) {
               planFlags={planFlags}
               user={user}
               fallbackPath={fallback}
-            />
+            >
+              {isAdmin && showAiAgent ? <AiAgent /> : null}
+            </AiAgentRouteGuard>
           )}
         />
         {showQuickReplies ? (
