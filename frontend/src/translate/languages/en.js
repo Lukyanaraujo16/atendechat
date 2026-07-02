@@ -2191,6 +2191,17 @@ const messages = {
 					close: "Close",
 				},
 				success: "WhatsApp saved successfully.",
+				aiAgent: {
+					title: "AI Agent",
+					selectAgent: "Select AI agent",
+					enableOnConnection: "Enable AI Agent on this connection",
+					none: "None",
+					noAgents:
+						"No AI agents configured. Create one under Automation > AI Agent.",
+					phaseWarning:
+						"Even when enabled here, the agent does not reply to messages automatically in this phase.",
+					planBlocked: "The AI Agent module is not available on your plan.",
+				},
 			},
 			qrCodeModal: {
 				title: "Connect WhatsApp via QR Code",

@@ -5,6 +5,7 @@ import AppError from "../../errors/AppError";
 import Whatsapp from "../../models/Whatsapp";
 import ShowWhatsAppService from "./ShowWhatsAppService";
 import AssociateWhatsappQueue from "./AssociateWhatsappQueue";
+import { applyAiAgentFieldsToWhatsappData } from "./applyAiAgentWhatsappFields";
 
 interface WhatsappData {
   name?: string;
@@ -22,6 +23,8 @@ interface WhatsappData {
   transferQueueId?: number; 
   timeToTransfer?: number;    
   promptId?: number;
+  aiAgentId?: number | null;
+  aiAgentEnabled?: boolean;
   maxUseBotQueues?: number;
   timeUseBotQueues?: number;
   expiresTicket?: number;
@@ -72,6 +75,8 @@ const UpdateWhatsAppService = async ({
     transferQueueId,	
 	  timeToTransfer,	
     promptId,
+    aiAgentId,
+    aiAgentEnabled,
     maxUseBotQueues,
     timeUseBotQueues,
     expiresTicket,
@@ -182,6 +187,19 @@ const UpdateWhatsAppService = async ({
   if (ticketVisibility !== undefined) {
     updateData.ticketVisibility =
       ticketVisibility === "admin_supervisor" ? "admin_supervisor" : "all";
+  }
+
+  const aiAgentResolved = await applyAiAgentFieldsToWhatsappData(
+    companyId,
+    { aiAgentId, aiAgentEnabled },
+    {
+      aiAgentId: whatsapp.aiAgentId,
+      aiAgentEnabled: whatsapp.aiAgentEnabled
+    }
+  );
+  if (aiAgentResolved) {
+    updateData.aiAgentId = aiAgentResolved.aiAgentId;
+    updateData.aiAgentEnabled = aiAgentResolved.aiAgentEnabled;
   }
 
   await whatsapp.update(updateData);

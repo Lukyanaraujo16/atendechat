@@ -4,6 +4,7 @@ import Queue from "../../models/Queue";
 import QueueOption from "../../models/QueueOption";
 import { FindOptions } from "sequelize/types";
 import Prompt from "../../models/Prompt";
+import AiAgent from "../../models/AiAgent";
 
 const ShowWhatsAppService = async (
   id: string | number,
@@ -21,6 +22,11 @@ const ShowWhatsAppService = async (
       {
         model: Prompt,
         as: "prompt",
+      },
+      {
+        model: AiAgent,
+        as: "aiAgent",
+        attributes: ["id", "name", "enabled"]
       }
     ],
     order: [["queues", "orderQueue", "ASC"]]

@@ -20,6 +20,7 @@ import Ticket from "./Ticket";
 import WhatsappQueue from "./WhatsappQueue";
 import Company from "./Company";
 import Prompt from "./Prompt";
+import AiAgent from "./AiAgent";
 import QueueIntegrations from "./QueueIntegrations";
 import {FlowBuilderModel} from "./FlowBuilder";
 
@@ -135,6 +136,18 @@ class Whatsapp extends Model<Whatsapp> {
 
   @BelongsTo(() => Prompt)
   prompt: Prompt;
+
+  @AllowNull
+  @ForeignKey(() => AiAgent)
+  @Column
+  aiAgentId: number | null;
+
+  @BelongsTo(() => AiAgent)
+  aiAgent: AiAgent;
+
+  @Default(false)
+  @Column
+  aiAgentEnabled: boolean;
 
   @ForeignKey(() => QueueIntegrations)
   @Column

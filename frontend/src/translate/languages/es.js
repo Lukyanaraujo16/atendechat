@@ -2152,6 +2152,17 @@ const messages = {
           close: "Cerrar",
         },
         success: "WhatsApp guardado con éxito.",
+        aiAgent: {
+          title: "Agente de IA",
+          selectAgent: "Seleccionar agente de IA",
+          enableOnConnection: "Activar Agente de IA en esta conexión",
+          none: "Ninguno",
+          noAgents:
+            "No hay agentes de IA registrados. Cree uno en Automatización > Agente de IA.",
+          phaseWarning:
+            "Aunque esté activado aquí, el agente aún no responde mensajes automáticamente en esta fase.",
+          planBlocked: "El módulo Agente de IA no está disponible en su plan.",
+        },
       },
       qrCodeModal: {
         title: "Conectar WhatsApp por código QR",

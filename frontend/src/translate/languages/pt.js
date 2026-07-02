@@ -2273,6 +2273,17 @@ const messages = {
           close: "Fechar",
         },
         success: "WhatsApp salvo com sucesso.",
+        aiAgent: {
+          title: "Agente de IA",
+          selectAgent: "Selecionar agente de IA",
+          enableOnConnection: "Ativar Agente de IA nesta conexão",
+          none: "Nenhum",
+          noAgents:
+            "Nenhum agente de IA cadastrado. Crie um agente no módulo Automação > Agente de IA.",
+          phaseWarning:
+            "Mesmo ativado aqui, o agente ainda não responde mensagens automaticamente nesta fase.",
+          planBlocked: "O módulo Agente de IA não está disponível no seu plano.",
+        },
       },
       qrCodeModal: {
         title: "Conectar WhatsApp por QR Code",
