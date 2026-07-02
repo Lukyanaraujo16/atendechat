@@ -5,6 +5,7 @@ import requireTenantAdminOrSupport from "../middleware/requireTenantAdminOrSuppo
 
 import * as CompanyController from "../controllers/CompanyController";
 import * as CompanyMediaController from "../controllers/CompanyMediaController";
+import { diagListPlanAfterAuth } from "../middleware/diagListPlanAccess";
 
 const companyRoutes = express.Router();
 
@@ -91,7 +92,12 @@ companyRoutes.post(
   CompanyController.bootstrapCrm
 );
 
-companyRoutes.get("/companies/listPlan/:id", isAuth, CompanyController.listPlan);
+companyRoutes.get(
+  "/companies/listPlan/:id",
+  isAuth,
+  diagListPlanAfterAuth,
+  CompanyController.listPlan
+);
 companyRoutes.get("/companiesPlan", isAuth, CompanyController.indexPlan);
 
 export default companyRoutes;

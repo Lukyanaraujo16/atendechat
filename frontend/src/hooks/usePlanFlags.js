@@ -179,7 +179,14 @@ function usePlanFlagsState() {
           planTierEffectiveFeatures: planEffectiveFeatures,
           effectiveFeatures,
         });
-      } catch {
+      } catch (err) {
+        console.error("[DiagListPlan] usePlanFlags fetch failed", {
+          status: err?.response?.status ?? null,
+          error: err?.response?.data?.error ?? null,
+          companyId: user?.companyId ?? null,
+          path:
+            typeof window !== "undefined" ? window.location.pathname : null,
+        });
         if (!cancelled) {
           setFlags((f) => {
             const next = applyCampaignsShowOverride({ ...f, loaded: true });

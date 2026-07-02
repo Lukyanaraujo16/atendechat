@@ -940,6 +940,17 @@ export const listCompanyLogs = async (
 export const listPlan = async (req: Request, res: Response): Promise<Response> => {
   const { id } = req.params;
 
+  logger.info(
+    {
+      tag: "[DiagListPlan]",
+      event: "controller_entered",
+      companyId: req.user?.companyId ?? null,
+      profile: req.user?.profile ?? null,
+      companyIdParam: String(id)
+    },
+    "[DiagListPlan] controller_entered"
+  );
+
   try {
     const token = parseListPlanAuthToken(req);
     if (!token) {
