@@ -2571,6 +2571,8 @@ const messages = {
 					"Configure virtual attendants with artificial intelligence to assist customer support.",
 				phaseWarning:
 					"In this phase, the agent does not reply to conversations automatically yet. Channel activation will come in a later step.",
+				dryRunWarning:
+					"Simulation mode is active: the system only evaluates and logs eligibility for inbound messages, without sending automatic replies.",
 				buttons: {
 					new: "New agent",
 					save: "Save",

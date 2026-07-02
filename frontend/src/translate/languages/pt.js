@@ -2656,6 +2656,8 @@ const messages = {
           "Configure atendentes virtuais com inteligência artificial para auxiliar no atendimento.",
         phaseWarning:
           "Nesta fase, o agente ainda não responde atendimentos automaticamente. A ativação nos canais será feita em uma próxima etapa.",
+        dryRunWarning:
+          "Modo simulação ativo: o sistema apenas avalia e registra elegibilidade nas mensagens recebidas, sem enviar respostas automáticas.",
         buttons: {
           new: "Novo agente",
           save: "Salvar",

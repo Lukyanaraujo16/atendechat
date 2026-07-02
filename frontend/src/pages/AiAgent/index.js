@@ -144,6 +144,9 @@ const AiAgent = () => {
         <Alert severity="info" className={classes.phaseAlert}>
           {i18n.t("aiAgent.phaseWarning")}
         </Alert>
+        <Alert severity="warning" className={classes.phaseAlert}>
+          {i18n.t("aiAgent.dryRunWarning")}
+        </Alert>
 
         {loading ? (
           <Table size="small">

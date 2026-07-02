@@ -86,6 +86,7 @@ import { WebhookModel } from "../../models/Webhook";
 import {differenceInMilliseconds} from "date-fns";
 import Whatsapp from "../../models/Whatsapp";
 import { shouldBypassChatbot } from "../../helpers/shouldBypassChatbot";
+import { runAiAgentDryRunHook } from "../AiAgentService/runAiAgentDryRunHook";
 import CreateTicketSystemMessageService from "../TicketServices/CreateTicketSystemMessageService";
 import Company from "../../models/Company";
 import { formatChatbotBypassSystemMessage } from "../../helpers/chatbotBypassMessages";
@@ -3322,6 +3323,33 @@ const handleMessage = async (
       );
     } else {
       await verifyMessage(msg, ticket, contact);
+    }
+
+    if (!msg.key.fromMe) {
+      const inboundMessageId =
+        msg.key?.id != null && String(msg.key.id).length > 0
+          ? String(msg.key.id)
+          : `fallback-${ticket.id}-${Date.now()}`;
+      void runAiAgentDryRunHook({
+        companyId,
+        ticket,
+        contact,
+        whatsapp,
+        messageId: inboundMessageId,
+        fromMe: false,
+        isGroup: !!ticket.isGroup,
+        body: bodyMessage ?? null
+      }).catch((err) => {
+        logger.warn(
+          {
+            err,
+            companyId,
+            ticketId: ticket.id,
+            messageId: inboundMessageId
+          },
+          "[AiAgent][dry_run] hook_failed"
+        );
+      });
     }
 
     if (ticket.isGroup) {
