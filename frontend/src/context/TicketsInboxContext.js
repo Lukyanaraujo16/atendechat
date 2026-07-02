@@ -719,11 +719,23 @@ export function TicketsInboxProvider({
     (ticket) => {
       if (!ticket) return false;
       const profile = user?.profile;
-      if (
-        profile !== "admin" &&
-        profile !== "supervisor" &&
-        user?.supportMode !== true
-      ) {
+
+      /** Alinhado a filterTicketsForProfile: admin/supervisor veem a base da empresa. */
+      if (profile !== "user") {
+        const ticketCompanyId =
+          ticket.companyId ?? ticket.contact?.companyId ?? null;
+        const actorCompanyId = user?.companyId ?? null;
+        if (
+          ticketCompanyId != null &&
+          actorCompanyId != null &&
+          Number(ticketCompanyId) !== Number(actorCompanyId)
+        ) {
+          return false;
+        }
+        return true;
+      }
+
+      if (user?.supportMode !== true) {
         const vis = ticket?.whatsapp?.ticketVisibility || "all";
         if (vis === "admin_supervisor") {
           return false;
@@ -751,7 +763,15 @@ export function TicketsInboxProvider({
       }
       return selected.indexOf(qid) > -1;
     },
-    [userId, showAll, selectedQueueIds, user?.allTicket, user?.profile, user?.supportMode]
+    [
+      userId,
+      showAll,
+      selectedQueueIds,
+      user?.allTicket,
+      user?.profile,
+      user?.supportMode,
+      user?.companyId,
+    ]
   );
 
   const isRecentlyDeleted = useCallback((ticketId) => {
