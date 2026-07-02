@@ -17,6 +17,7 @@ import { canDeleteTickets } from "../../utils/canDeleteTickets";
  * Preferir este componente a `TicketsList` (legado).
  */
 import TicketListItem from "../TicketListItemCustom";
+import TransferTicketModalCustom from "../TransferTicketModalCustom";
 import GroupInboxListItem from "../GroupInboxListItem";
 import TicketsListSkeleton from "../TicketsListSkeleton";
 
@@ -224,6 +225,8 @@ const TicketsListCustom = (props) => {
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [transferModalOpen, setTransferModalOpen] = useState(false);
+  const [selectedTransferTicket, setSelectedTransferTicket] = useState(null);
   const [ticketsList, dispatch] = useReducer(reducer, []);
   const { user } = useContext(AuthContext);
   const inbox = useContext(TicketsInboxContext);
@@ -687,6 +690,16 @@ const TicketsListCustom = (props) => {
     });
   }, []);
 
+  const handleOpenTransferTicket = useCallback((ticket) => {
+    setSelectedTransferTicket(ticket);
+    setTransferModalOpen(true);
+  }, []);
+
+  const handleCloseTransferModal = useCallback(() => {
+    setTransferModalOpen(false);
+    setSelectedTransferTicket(null);
+  }, []);
+
   const handleBulkDelete = async () => {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
@@ -748,6 +761,11 @@ const TicketsListCustom = (props) => {
       >
         {i18n.t("ticket.delete.bulkConfirmMessage", { count: selectedCount })}
       </ConfirmationModal>
+      <TransferTicketModalCustom
+        modalOpen={transferModalOpen}
+        onClose={handleCloseTransferModal}
+        ticketid={selectedTransferTicket?.id}
+      />
       <Paper
         square
         name="closed"
@@ -790,6 +808,7 @@ const TicketsListCustom = (props) => {
                   showPinInboxAction={showPinInboxAction}
                   onTogglePin={onTogglePin}
                   pinLoading={pinActionTicketId === ticket.id}
+                  onOpenTransferTicket={handleOpenTransferTicket}
                   onTicketDeleted={
                     !isControlled
                       ? (ticketId) => {

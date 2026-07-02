@@ -42,7 +42,6 @@ import Checkbox from "@material-ui/core/Checkbox";
 import IconButton from "@material-ui/core/IconButton";
 import TicketMessagesDialog from "../TicketMessagesDialog";
 import ConfirmationModal from "../ConfirmationModal";
-import TransferTicketModalCustom from "../TransferTicketModalCustom";
 import { AuthContext } from "../../context/Auth/AuthContext";
 import { TicketsSetContext } from "../../context/Tickets/TicketsContext";
 import { TicketsInboxContext } from "../../context/TicketsInboxContext";
@@ -485,6 +484,7 @@ const TicketListItemCustom = ({
   onTogglePin,
   pinLoading = false,
   onTicketDeleted,
+  onOpenTransferTicket,
 }) => {
   const classes = useStyles();
   const theme = useTheme();
@@ -497,7 +497,6 @@ const TicketListItemCustom = ({
   const [openTicketMessageDialog, setOpenTicketMessageDialog] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
-  const [transferModalOpen, setTransferModalOpen] = useState(false);
   const isMounted = useRef(true);
   const setCurrentTicket = useContext(TicketsSetContext);
   const inbox = useContext(TicketsInboxContext);
@@ -721,11 +720,6 @@ const TicketListItemCustom = ({
       >
         {i18n.t("ticket.delete.confirmMessage")}
       </ConfirmationModal>
-      <TransferTicketModalCustom
-        modalOpen={transferModalOpen}
-        onClose={() => setTransferModalOpen(false)}
-        ticketid={ticket.id}
-      />
       <ListItem
         dense
         button
@@ -968,7 +962,9 @@ const TicketListItemCustom = ({
                   startIcon={<SwapHorizIcon fontSize="small" />}
                   onClick={(e) => {
                     e.stopPropagation();
-                    setTransferModalOpen(true);
+                    if (typeof onOpenTransferTicket === "function") {
+                      onOpenTransferTicket(ticket);
+                    }
                   }}
                 >
                   {i18n.t("ticketOptionsMenu.transfer")}
@@ -1071,6 +1067,7 @@ function ticketListItemPropsAreEqual(prev, next) {
   if (prev.showPinInboxAction !== next.showPinInboxAction) return false;
   if (prev.pinLoading !== next.pinLoading) return false;
   if (prev.onTogglePin !== next.onTogglePin) return false;
+  if (prev.onOpenTransferTicket !== next.onOpenTransferTicket) return false;
   return prev.ticket === next.ticket;
 }
 
