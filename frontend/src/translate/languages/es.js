@@ -3025,6 +3025,7 @@ const messages = {
           finance: "Financiero",
           files: "Biblioteca de archivos",
           prompts: "OpenAI",
+          aiAgent: "Agente de IA",
           queueIntegration: "Automatizaciones por sector",
           notificationCenter: "Centro de notificaciones",
         },

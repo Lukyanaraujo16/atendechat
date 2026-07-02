@@ -62,6 +62,12 @@ import InventorySales from "../pages/InventorySales";
 import { canViewInventory, planHasInventoryModule } from "../utils/inventoryAccess";
 import CRMReports from "../pages/CRMReports";
 import CrmAutomations from "../pages/CrmAutomations";
+import AiAgentRouteGuard from "../components/AiAgentRouteGuard";
+import {
+  AI_AGENT_FEATURE_KEY,
+  AI_AGENT_ROUTE_PATH,
+  AI_AGENT_UI_ENABLED,
+} from "../config/aiAgentFeature";
 
 function PlanFlagsLoadingState() {
   return (
@@ -304,12 +310,15 @@ function AtendimentoModule({ planFlags, isAdmin, user }) {
 }
 
 function AutomacaoModule({ planFlags, isAdmin }) {
+  const { user } = useContext(AuthContext);
   const fx = planFlags.effectiveFeatures || {};
   const showChatbot = fx["automation.chatbot"] === true;
   const showKeywords = fx["automation.keywords"] === true;
   const showIntegrations = fx["automation.integrations"] === true;
   const showOpenAi = fx["automation.openai"] === true;
   const showQuickReplies = fx["automation.quick_replies"] === true;
+  const showAiAgent =
+    AI_AGENT_UI_ENABLED && isAdmin && fx[AI_AGENT_FEATURE_KEY] === true;
 
   const tabs = useMemo(() => {
     const t = [];
@@ -334,6 +343,12 @@ function AutomacaoModule({ planFlags, isAdmin }) {
     if (isAdmin && showOpenAi) {
       t.push({ path: "/prompts", label: i18n.t("mainDrawer.listItems.prompts") });
     }
+    if (showAiAgent) {
+      t.push({
+        path: AI_AGENT_ROUTE_PATH,
+        label: i18n.t("mainDrawer.listItems.aiAgent"),
+      });
+    }
     if (showQuickReplies) {
       t.push({
         path: "/quick-messages",
@@ -341,7 +356,16 @@ function AutomacaoModule({ planFlags, isAdmin }) {
       });
     }
     return t;
-  }, [isAdmin, showChatbot, showKeywords, showIntegrations, showOpenAi, showQuickReplies, i18n.language]);
+  }, [
+    isAdmin,
+    showChatbot,
+    showKeywords,
+    showIntegrations,
+    showOpenAi,
+    showAiAgent,
+    showQuickReplies,
+    i18n.language,
+  ]);
 
   if (!planFlags.loaded) {
     return <PlanFlagsLoadingState />;
@@ -356,6 +380,7 @@ function AutomacaoModule({ planFlags, isAdmin }) {
           "automation.keywords",
           "automation.integrations",
           "automation.openai",
+          AI_AGENT_FEATURE_KEY,
           "automation.quick_replies",
         ]}
       />
@@ -406,6 +431,17 @@ function AutomacaoModule({ planFlags, isAdmin }) {
               <FeatureBlocked planFlags={planFlags} anyOf={["automation.openai"]} />
             )
           }
+        />
+        <Route
+          exact
+          path={AI_AGENT_ROUTE_PATH}
+          render={() => (
+            <AiAgentRouteGuard
+              planFlags={planFlags}
+              user={user}
+              fallbackPath={fallback}
+            />
+          )}
         />
         {showQuickReplies ? (
           <Route exact path="/quick-messages" component={QuickMessages} />
@@ -604,6 +640,7 @@ export default function LoggedInRoutesContent() {
     "/phrase-lists",
     "/queue-integration",
     "/prompts",
+    AI_AGENT_ROUTE_PATH,
     "/quick-messages",
   ];
 
