@@ -28,6 +28,15 @@ import AiAgent from "./AiAgent";
     {
       name: "AiAgentRuntimeLogs_ticketId_createdAt_idx",
       fields: ["ticketId", "createdAt"]
+    },
+    {
+      name: "AiAgentRuntimeLogs_aiAgentId_createdAt_idx",
+      fields: ["aiAgentId", "createdAt"]
+    },
+    {
+      name: "AiAgentRuntimeLogs_idempotency_uq",
+      unique: true,
+      fields: ["companyId", "whatsappId", "channel", "messageId"]
     }
   ]
 })
@@ -90,6 +99,10 @@ class AiAgentRuntimeLog extends Model<AiAgentRuntimeLog> {
 
   @Column(DataType.STRING(64))
   reason: string;
+
+  @AllowNull(true)
+  @Column(DataType.STRING(191))
+  messageId: string | null;
 
   @AllowNull(true)
   @Column(DataType.JSON)

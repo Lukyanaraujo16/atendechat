@@ -4,13 +4,15 @@ import Whatsapp from "../../models/Whatsapp";
 import AiAgent from "../../models/AiAgent";
 import { loadCompanyPlanContextByCompanyId } from "../../middleware/loadCompanyEffectiveFeatures";
 import { AI_AGENT_PLAN_FEATURE_KEY } from "./resolveAiAgentWhatsappFields";
+import { InboundMessageClassification } from "./classifyInboundMessage";
 
 export type AiAgentInboundChannel = "whatsapp";
 
 export type AiAgentInboundMessageInput = {
-  id?: string;
+  id?: string | null;
   fromMe?: boolean;
   body?: string | null;
+  classification?: InboundMessageClassification;
 };
 
 export type AiAgentRuntimeContext = {

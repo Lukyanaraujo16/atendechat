@@ -15,6 +15,12 @@ export const AI_AGENT_EVALUATION_REASONS = {
   CAMPAIGN_OR_SYSTEM_MESSAGE: "campaign_or_system_message",
   TICKET_CLOSED: "ticket_closed",
   UNSUPPORTED_CHANNEL: "unsupported_channel",
+  DUPLICATE_MESSAGE: "duplicate_message",
+  MESSAGE_ID_MISSING: "message_id_missing",
+  AUDIO_NOT_SUPPORTED: "audio_not_supported",
+  MEDIA_NOT_SUPPORTED: "media_not_supported",
+  UNSUPPORTED_MESSAGE_TYPE: "unsupported_message_type",
+  EMPTY_MESSAGE_BODY: "empty_message_body",
   ELIGIBLE: "eligible",
   UNEXPECTED_ERROR: "unexpected_error"
 } as const;
@@ -29,4 +35,6 @@ export type AiAgentEvaluationResult = {
   reason: AiAgentEvaluationReason;
   aiAgentId?: number;
   mode: AiAgentEvaluationMode;
+  metadata?: Record<string, unknown>;
+  evaluationDurationMs?: number;
 };

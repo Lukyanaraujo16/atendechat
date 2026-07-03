@@ -86,7 +86,8 @@ import { WebhookModel } from "../../models/Webhook";
 import {differenceInMilliseconds} from "date-fns";
 import Whatsapp from "../../models/Whatsapp";
 import { shouldBypassChatbot } from "../../helpers/shouldBypassChatbot";
-import { runAiAgentDryRunHook } from "../AiAgentService/runAiAgentDryRunHook";
+import { scheduleAiAgentDryRunFromInbound } from "../AiAgentService/runAiAgentDryRunHook";
+import { classifyInboundMessageFromBaileys } from "../AiAgentService/classifyInboundMessage";
 import CreateTicketSystemMessageService from "../TicketServices/CreateTicketSystemMessageService";
 import Company from "../../models/Company";
 import { formatChatbotBypassSystemMessage } from "../../helpers/chatbotBypassMessages";
@@ -3326,29 +3327,23 @@ const handleMessage = async (
     }
 
     if (!msg.key.fromMe) {
-      const inboundMessageId =
-        msg.key?.id != null && String(msg.key.id).length > 0
-          ? String(msg.key.id)
-          : `fallback-${ticket.id}-${Date.now()}`;
-      void runAiAgentDryRunHook({
+      const classification = classifyInboundMessageFromBaileys(
+        msg,
+        bodyMessage ?? null
+      );
+      scheduleAiAgentDryRunFromInbound({
         companyId,
         ticket,
         contact,
         whatsapp,
-        messageId: inboundMessageId,
-        fromMe: false,
-        isGroup: !!ticket.isGroup,
-        body: bodyMessage ?? null
-      }).catch((err) => {
-        logger.warn(
-          {
-            err,
-            companyId,
-            ticketId: ticket.id,
-            messageId: inboundMessageId
-          },
-          "[AiAgent][dry_run] hook_failed"
-        );
+        msg,
+        bodyMessage: bodyMessage ?? null,
+        persistedMessageId:
+          mediaSent?.id ??
+          (msg.key?.id != null && String(msg.key.id).length > 0
+            ? String(msg.key.id)
+            : null),
+        classification
       });
     }
 
