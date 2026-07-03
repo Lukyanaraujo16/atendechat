@@ -436,6 +436,27 @@ const MessagesList = forwardRef(function MessagesList(
       }
       dispatch({ type: "ADD_MESSAGE", payload: message });
       scrollToBottom();
+      if (typeof window !== "undefined") {
+        const marker = window.__sendPerfByMessageId?.[message.id];
+        if (marker) {
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              const now =
+                typeof performance !== "undefined" && performance.now
+                  ? performance.now()
+                  : Date.now();
+              console.info("[SendPerf] frontend_message_rendered", {
+                ticketId: marker.ticketId,
+                channel: marker.channel,
+                messageId: message.id,
+                durationMs: Math.round(now - marker.startedAt),
+                afterApiMs: Math.round(now - marker.apiDoneAt),
+              });
+              delete window.__sendPerfByMessageId[message.id];
+            });
+          });
+        }
+      }
     },
     [scrollToBottom]
   );

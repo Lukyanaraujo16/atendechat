@@ -197,13 +197,39 @@ export const index = async (req: Request, res: Response): Promise<Response> => {
 };
 
 export const store = async (req: Request, res: Response): Promise<Response> => {
+  const sendPerfStartedAt = Date.now();
   const { ticketId } = req.params;
   const { body, quotedMsg }: MessageData = req.body;
   const asSticker = req.body.asSticker === "true" || req.body.asSticker === "1";
   const medias = extractMessageUploadMedias(req);
   const { companyId, profile, supportMode, id } = req.user;
+  const sendPerfLog = (
+    event: string,
+    extra: Record<string, unknown> = {}
+  ): void => {
+    logger.info(
+      {
+        ticketId,
+        companyId,
+        userId: id,
+        profile,
+        durationMs: Date.now() - sendPerfStartedAt,
+        ...extra
+      },
+      `[SendPerf] ${event}`
+    );
+  };
 
+  sendPerfLog("controller_start", {
+    hasBody: Boolean(body?.trim()),
+    mediasCount: medias.length
+  });
   const ticket = await ShowTicketService(ticketId, companyId);
+  sendPerfLog("after_show_ticket", {
+    resolvedTicketId: ticket.id,
+    channel: ticket.channel,
+    whatsappId: ticket.whatsappId
+  });
 
   const isInstagram = isInstagramChannelTicket(ticket);
   const isWhatsApp = !isInstagram;
@@ -228,7 +254,17 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
   );
 
   /** Mesma regra do GET da conversa: atendente humano no painel ao enviar resposta. */
+  sendPerfLog("before_read_receipt", {
+    resolvedTicketId: ticket.id,
+    channel: ticket.channel,
+    whatsappId: ticket.whatsappId
+  });
   await SetTicketMessagesAsRead(ticket, HUMAN_PANEL_SEND_MESSAGE);
+  sendPerfLog("after_read_receipt", {
+    resolvedTicketId: ticket.id,
+    channel: ticket.channel,
+    whatsappId: ticket.whatsappId
+  });
 
   if (isInstagram) {
     await assertInstagramIntegrationInPlan(companyId);
@@ -434,9 +470,24 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
   );
 
   try {
+    sendPerfLog("before_whatsapp_send", {
+      resolvedTicketId: ticket.id,
+      whatsappId: ticket.whatsappId,
+      bodyLength: body?.length ?? 0
+    });
     const sentMessage = await SendWhatsAppMessage({ body, ticket, quotedMsg });
+    sendPerfLog("after_whatsapp_send", {
+      resolvedTicketId: ticket.id,
+      whatsappId: ticket.whatsappId,
+      baileysMessageId: (sentMessage as any)?.key?.id ?? null,
+      baileysStatus: (sentMessage as any)?.status ?? null
+    });
     const bodyToSave = formatBody(body, ticket.contact);
     const idToSave = (sentMessage as any)?.key?.id || uuidv4();
+    sendPerfLog("before_persist_message", {
+      resolvedTicketId: ticket.id,
+      messageId: idToSave
+    });
     const savedMessage = await CreateMessageService({
       messageData: {
         id: idToSave,
@@ -450,6 +501,10 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
       } as any,
       companyId: ticket.companyId
     });
+    sendPerfLog("after_persist_message", {
+      resolvedTicketId: ticket.id,
+      messageId: savedMessage.id
+    });
 
     logger.info(
       {
@@ -459,10 +514,20 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
       "[MessageController] whatsapp_sent"
     );
 
+    sendPerfLog("response_sent", {
+      resolvedTicketId: ticket.id,
+      messageId: savedMessage.id
+    });
     return res.status(200).json({
       message: serializeMessageForClient(savedMessage)
     });
   } catch (err) {
+    sendPerfLog("create_failed", {
+      resolvedTicketId: ticket.id,
+      channel: ticket.channel,
+      errorCode: err instanceof AppError ? err.message : "unknown",
+      errorMessage: err instanceof Error ? err.message : String(err)
+    });
     logger.warn(
       {
         ticketId: ticket.id,

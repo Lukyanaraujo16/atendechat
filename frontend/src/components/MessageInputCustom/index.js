@@ -867,6 +867,10 @@ const MessageInputCustom = (props) => {
     if (isOrphanTicket(ticket)) return;
     if (loading) return;
     if (inputMessage.trim() === "") return;
+    const sendPerfStart =
+      typeof performance !== "undefined" && performance.now
+        ? performance.now()
+        : Date.now();
     setLoading(true);
 
     const channel = String(ticket?.channel || "whatsapp").toLowerCase();
@@ -880,6 +884,11 @@ const MessageInputCustom = (props) => {
       hasText: Boolean(bodyText),
       hasMedia: false,
     });
+    console.info("[SendPerf] frontend_send_start", {
+      ticketId,
+      channel,
+      bodyLength: bodyText.length,
+    });
 
     const message = {
       read: 1,
@@ -890,10 +899,34 @@ const MessageInputCustom = (props) => {
     };
     try {
       const { data } = await api.post(`/messages/${ticketId}`, message);
+      const apiDoneAt =
+        typeof performance !== "undefined" && performance.now
+          ? performance.now()
+          : Date.now();
+      const durationMs = Math.round(apiDoneAt - sendPerfStart);
+      const returnedMessageId = data?.message?.id ?? null;
+      console.info("[SendPerf] frontend_api_done", {
+        ticketId,
+        channel,
+        returnedMessageId,
+        durationMs,
+      });
+      if (
+        returnedMessageId &&
+        typeof window !== "undefined"
+      ) {
+        window.__sendPerfByMessageId = window.__sendPerfByMessageId || {};
+        window.__sendPerfByMessageId[returnedMessageId] = {
+          startedAt: sendPerfStart,
+          apiDoneAt,
+          ticketId,
+          channel,
+        };
+      }
       console.info("[MessageInput] send_success", {
         ticketId,
         channel,
-        returnedMessageId: data?.message?.id ?? null,
+        returnedMessageId,
       });
       if (data?.message && typeof onMessageSent === "function") {
         onMessageSent(data.message);

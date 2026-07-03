@@ -5,6 +5,7 @@ import GetTicketWbot from "../../helpers/GetTicketWbot";
 import { getTicketRemoteJid } from "../../helpers/GetTicketRemoteJid";
 import Message from "../../models/Message";
 import Ticket from "../../models/Ticket";
+import { logger } from "../../utils/logger";
 
 import formatBody from "../../helpers/Mustache";
 
@@ -72,10 +73,32 @@ const SendWhatsAppMessage = async ({
   try {
     const chatJid = number.includes("@") ? jidNormalizedUser(number) : number;
     const textPayload = { text: formatBody(body, ticket.contact) };
+    const sendStartedAt = Date.now();
+    logger.info(
+      {
+        ticketId: ticket.id,
+        companyId: ticket.companyId,
+        whatsappId: ticket.whatsappId,
+        chatJid,
+        hasQuotedMsg: Boolean(quotedMsg)
+      },
+      "[SendPerf] baileys_send_start"
+    );
     const sentMessage =
       Object.keys(options).length > 0
         ? await wbot.sendMessage(chatJid, textPayload, options)
         : await wbot.sendMessage(chatJid, textPayload);
+    logger.info(
+      {
+        ticketId: ticket.id,
+        companyId: ticket.companyId,
+        whatsappId: ticket.whatsappId,
+        chatJid,
+        baileysMessageId: (sentMessage as any)?.key?.id ?? null,
+        durationMs: Date.now() - sendStartedAt
+      },
+      "[SendPerf] baileys_send_done"
+    );
 
     await ticket.update({ lastMessage: formatBody(body, ticket.contact) });
     return sentMessage;
