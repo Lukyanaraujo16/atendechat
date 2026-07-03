@@ -28,6 +28,7 @@ interface WhatsappData {
   promptId?: number;
   aiAgentId?: number | null;
   aiAgentEnabled?: boolean;
+  aiAgentMode?: string;
   maxUseBotQueues?: number;
   timeUseBotQueues?: number;
   expiresTicket?: number;
@@ -69,6 +70,7 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
     promptId,
     aiAgentId,
     aiAgentEnabled,
+    aiAgentMode,
     maxUseBotQueues,
     timeUseBotQueues,
     expiresTicket,
@@ -99,6 +101,7 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
     promptId,
     aiAgentId,
     aiAgentEnabled,
+    aiAgentMode,
     maxUseBotQueues,
     timeUseBotQueues,
     expiresTicket,

@@ -21,6 +21,7 @@ import {
 } from "./classifyInboundMessage";
 import { resolveInboundMessageId } from "./resolveInboundMessageId";
 import { AI_AGENT_EVALUATOR_VERSION } from "./aiAgentDryRunConfig";
+import { resolveWhatsappAiAgentRuntimeMode, isAiAgentRuntimeActive } from "./aiAgentRuntimeMode";
 
 export type EvaluateInboundMessageInput = {
   companyId: number;
@@ -32,10 +33,16 @@ export type EvaluateInboundMessageInput = {
   persistedMessageId?: string | null;
 };
 
-const MODE: AiAgentEvaluationMode = "dry_run";
+function resolveEvaluationMode(
+  whatsapp: Whatsapp
+): AiAgentEvaluationMode {
+  const runtimeMode = resolveWhatsappAiAgentRuntimeMode(whatsapp);
+  return runtimeMode === "shadow" ? "shadow" : "dry_run";
+}
 
 function deny(
   reason: AiAgentEvaluationResult["reason"],
+  mode: AiAgentEvaluationMode,
   aiAgentId?: number,
   metadata?: Record<string, unknown>,
   evaluationDurationMs?: number
@@ -44,7 +51,7 @@ function deny(
     eligible: false,
     reason,
     aiAgentId,
-    mode: MODE,
+    mode,
     metadata,
     evaluationDurationMs
   };
@@ -52,6 +59,7 @@ function deny(
 
 function allow(
   aiAgentId: number,
+  mode: AiAgentEvaluationMode,
   metadata?: Record<string, unknown>,
   evaluationDurationMs?: number
 ): AiAgentEvaluationResult {
@@ -59,7 +67,7 @@ function allow(
     eligible: true,
     reason: AI_AGENT_EVALUATION_REASONS.ELIGIBLE,
     aiAgentId,
-    mode: MODE,
+    mode,
     metadata,
     evaluationDurationMs
   };
@@ -92,10 +100,13 @@ export default class AiAgentOrchestrator {
 
     try {
       const channel = input.channel ?? "whatsapp";
+      const evaluationMode = resolveEvaluationMode(input.whatsapp);
 
       // 1. Canal suportado
       if (channel !== "whatsapp") {
-        return finish(deny(AI_AGENT_EVALUATION_REASONS.UNSUPPORTED_CHANNEL));
+        return finish(
+          deny(AI_AGENT_EVALUATION_REASONS.UNSUPPORTED_CHANNEL, evaluationMode)
+        );
       }
 
       // 2. Identificação da mensagem
@@ -105,7 +116,7 @@ export default class AiAgentOrchestrator {
       });
       if (!resolvedId.messageId) {
         return finish(
-          deny(AI_AGENT_EVALUATION_REASONS.MESSAGE_ID_MISSING, undefined, {
+          deny(AI_AGENT_EVALUATION_REASONS.MESSAGE_ID_MISSING, evaluationMode, undefined, {
             messageIdSource: resolvedId.source,
             evaluatorVersion: AI_AGENT_EVALUATOR_VERSION
           })
@@ -115,7 +126,7 @@ export default class AiAgentOrchestrator {
       const classification =
         input.message.classification;
       if (!classification) {
-        return finish(deny(AI_AGENT_EVALUATION_REASONS.UNEXPECTED_ERROR));
+        return finish(deny(AI_AGENT_EVALUATION_REASONS.UNEXPECTED_ERROR, evaluationMode));
       }
 
       // 3. fromMe
@@ -123,6 +134,7 @@ export default class AiAgentOrchestrator {
         return finish(
           deny(
             AI_AGENT_EVALUATION_REASONS.MESSAGE_FROM_ME,
+            evaluationMode,
             undefined,
             baseMessageMetadata(classification, resolvedId.source)
           )
@@ -134,6 +146,7 @@ export default class AiAgentOrchestrator {
         return finish(
           deny(
             classification.blockReason,
+            evaluationMode,
             undefined,
             baseMessageMetadata(classification, resolvedId.source)
           )
@@ -144,6 +157,7 @@ export default class AiAgentOrchestrator {
         return finish(
           deny(
             AI_AGENT_EVALUATION_REASONS.CAMPAIGN_OR_SYSTEM_MESSAGE,
+            evaluationMode,
             undefined,
             baseMessageMetadata(classification, resolvedId.source)
           )
@@ -155,6 +169,7 @@ export default class AiAgentOrchestrator {
         return finish(
           deny(
             AI_AGENT_EVALUATION_REASONS.GROUP_MESSAGE,
+            evaluationMode,
             undefined,
             baseMessageMetadata(classification, resolvedId.source)
           )
@@ -171,23 +186,36 @@ export default class AiAgentOrchestrator {
       });
 
       const msgMeta = baseMessageMetadata(classification, resolvedId.source);
+      const runtimeMode = resolveWhatsappAiAgentRuntimeMode(ctx.whatsapp);
 
       // 6. Plano
       if (!ctx.planHasAiAgent) {
-        return finish(deny(AI_AGENT_EVALUATION_REASONS.PLAN_DISABLED, undefined, msgMeta));
+        return finish(
+          deny(AI_AGENT_EVALUATION_REASONS.PLAN_DISABLED, evaluationMode, undefined, msgMeta)
+        );
       }
 
-      // 7. Conexão habilitada
-      if (!ctx.whatsapp.aiAgentEnabled) {
+      // 7. Conexão habilitada (dry_run ou shadow)
+      if (!isAiAgentRuntimeActive(runtimeMode)) {
         return finish(
-          deny(AI_AGENT_EVALUATION_REASONS.WHATSAPP_AI_AGENT_DISABLED, undefined, msgMeta)
+          deny(
+            AI_AGENT_EVALUATION_REASONS.WHATSAPP_AI_AGENT_DISABLED,
+            evaluationMode,
+            undefined,
+            msgMeta
+          )
         );
       }
 
       // 8. Agente configurado
       if (ctx.whatsapp.aiAgentId == null) {
         return finish(
-          deny(AI_AGENT_EVALUATION_REASONS.WHATSAPP_AI_AGENT_MISSING, undefined, msgMeta)
+          deny(
+            AI_AGENT_EVALUATION_REASONS.WHATSAPP_AI_AGENT_MISSING,
+            evaluationMode,
+            undefined,
+            msgMeta
+          )
         );
       }
 
@@ -196,6 +224,7 @@ export default class AiAgentOrchestrator {
         return finish(
           deny(
             AI_AGENT_EVALUATION_REASONS.AI_AGENT_NOT_FOUND,
+            evaluationMode,
             ctx.whatsapp.aiAgentId,
             msgMeta
           )
@@ -204,14 +233,19 @@ export default class AiAgentOrchestrator {
 
       if (!ctx.aiAgent.enabled) {
         return finish(
-          deny(AI_AGENT_EVALUATION_REASONS.AI_AGENT_DISABLED, ctx.aiAgent.id, msgMeta)
+          deny(
+            AI_AGENT_EVALUATION_REASONS.AI_AGENT_DISABLED,
+            evaluationMode,
+            ctx.aiAgent.id,
+            msgMeta
+          )
         );
       }
 
       // 10. Ticket válido
       if (ctx.ticket.status === "closed") {
         return finish(
-          deny(AI_AGENT_EVALUATION_REASONS.TICKET_CLOSED, ctx.aiAgent.id, {
+          deny(AI_AGENT_EVALUATION_REASONS.TICKET_CLOSED, evaluationMode, ctx.aiAgent.id, {
             ...msgMeta,
             ticketStatus: ctx.ticket.status
           })
@@ -221,11 +255,16 @@ export default class AiAgentOrchestrator {
       // 11. Atendimento humano
       if (ctx.ticket.userId != null) {
         return finish(
-          deny(AI_AGENT_EVALUATION_REASONS.TICKET_HAS_HUMAN_USER, ctx.aiAgent.id, {
-            ...msgMeta,
-            ticketStatus: ctx.ticket.status,
-            hasUser: true
-          })
+          deny(
+            AI_AGENT_EVALUATION_REASONS.TICKET_HAS_HUMAN_USER,
+            evaluationMode,
+            ctx.aiAgent.id,
+            {
+              ...msgMeta,
+              ticketStatus: ctx.ticket.status,
+              hasUser: true
+            }
+          )
         );
       }
 
@@ -238,17 +277,27 @@ export default class AiAgentOrchestrator {
       });
       if (bypassDecision.bypass) {
         return finish(
-          deny(AI_AGENT_EVALUATION_REASONS.CHATBOT_BYPASS, ctx.aiAgent.id, msgMeta)
+          deny(
+            AI_AGENT_EVALUATION_REASONS.CHATBOT_BYPASS,
+            evaluationMode,
+            ctx.aiAgent.id,
+            msgMeta
+          )
         );
       }
 
       // 13. Chatbot tradicional
       if (ctx.ticket.chatbot === true) {
         return finish(
-          deny(AI_AGENT_EVALUATION_REASONS.TICKET_CHATBOT_ACTIVE, ctx.aiAgent.id, {
-            ...msgMeta,
-            ticketChatbot: true
-          })
+          deny(
+            AI_AGENT_EVALUATION_REASONS.TICKET_CHATBOT_ACTIVE,
+            evaluationMode,
+            ctx.aiAgent.id,
+            {
+              ...msgMeta,
+              ticketChatbot: true
+            }
+          )
         );
       }
 
@@ -256,12 +305,17 @@ export default class AiAgentOrchestrator {
       const flowState = isFlowAutomationActive(ctx.ticket);
       if (flowState.active) {
         return finish(
-          deny(AI_AGENT_EVALUATION_REASONS.TICKET_FLOW_ACTIVE, ctx.aiAgent.id, {
-            ...msgMeta,
-            flowWebhook: true,
-            hasFlowId: true,
-            flowEvidence: flowState.evidence
-          })
+          deny(
+            AI_AGENT_EVALUATION_REASONS.TICKET_FLOW_ACTIVE,
+            evaluationMode,
+            ctx.aiAgent.id,
+            {
+              ...msgMeta,
+              flowWebhook: true,
+              hasFlowId: true,
+              flowEvidence: flowState.evidence
+            }
+          )
         );
       }
 
@@ -271,6 +325,7 @@ export default class AiAgentOrchestrator {
         return finish(
           deny(
             AI_AGENT_EVALUATION_REASONS.TICKET_INTEGRATION_ACTIVE,
+            evaluationMode,
             ctx.aiAgent.id,
             {
               ...msgMeta,
@@ -283,7 +338,7 @@ export default class AiAgentOrchestrator {
 
       // 16. Elegível
       return finish(
-        allow(ctx.aiAgent.id, {
+        allow(ctx.aiAgent.id, evaluationMode, {
           ...msgMeta,
           ticketStatus: ctx.ticket.status,
           hasUser: false,
@@ -300,7 +355,12 @@ export default class AiAgentOrchestrator {
         },
         "[AiAgent][dry_run] evaluation_failed"
       );
-      return finish(deny(AI_AGENT_EVALUATION_REASONS.UNEXPECTED_ERROR));
+      return finish(
+        deny(
+          AI_AGENT_EVALUATION_REASONS.UNEXPECTED_ERROR,
+          resolveEvaluationMode(input.whatsapp)
+        )
+      );
     }
   }
 }

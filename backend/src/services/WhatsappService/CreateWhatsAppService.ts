@@ -26,6 +26,7 @@ interface Request {
   promptId?: number;
   aiAgentId?: number | null;
   aiAgentEnabled?: boolean;
+  aiAgentMode?: string;
   maxUseBotQueues?: number;
   timeUseBotQueues?: number;
   expiresTicket?: number;
@@ -62,6 +63,7 @@ const CreateWhatsAppService = async ({
   promptId,
   aiAgentId,
   aiAgentEnabled,
+  aiAgentMode,
   maxUseBotQueues = 3,
   timeUseBotQueues = 0,
   expiresTicket = 0,
@@ -179,7 +181,8 @@ const CreateWhatsAppService = async ({
 
   const aiAgentResolved = await applyAiAgentFieldsToWhatsappData(companyId, {
     aiAgentId,
-    aiAgentEnabled
+    aiAgentEnabled,
+    aiAgentMode
   });
 
   const whatsapp = await Whatsapp.create(
@@ -201,6 +204,7 @@ const CreateWhatsAppService = async ({
       promptId,
       aiAgentId: aiAgentResolved?.aiAgentId ?? null,
       aiAgentEnabled: aiAgentResolved?.aiAgentEnabled ?? false,
+      aiAgentMode: aiAgentResolved?.aiAgentMode ?? "disabled",
       maxUseBotQueues,
       timeUseBotQueues,
       expiresTicket,

@@ -48,10 +48,18 @@ export interface ExecuteOpenAiParams {
   model: string;
   maxTokens: number;
   temperature: number;
+  /** Origem da chamada para logs (ex.: ai_agent_shadow). */
+  source?: string;
 }
 
 export type ExecuteOpenAiResult =
-  | { ok: true; content: string; tokensUsed: number }
+  | {
+      ok: true;
+      content: string;
+      tokensUsed: number;
+      promptTokens?: number;
+      completionTokens?: number;
+    }
   | { ok: false; error: "OPENAI_LIMIT_REACHED" }
   | { ok: false; error: "OPENAI_API_ERROR" };
 
@@ -115,12 +123,13 @@ export async function executeOpenAi(params: ExecuteOpenAiParams): Promise<Execut
     messages,
     model,
     maxTokens,
-    temperature
+    temperature,
+    source
   } = params;
 
   if (!(await canMakeOpenAiCalls(companyId, 1))) {
     logger.warn(
-      { companyId, ticketId, limit: OPENAI_DAILY_CALL_LIMIT },
+      { companyId, ticketId, limit: OPENAI_DAILY_CALL_LIMIT, source },
       "[OpenAiManager] OPENAI_LIMIT_REACHED (chat)"
     );
     return { ok: false, error: "OPENAI_LIMIT_REACHED" };
@@ -130,7 +139,7 @@ export async function executeOpenAi(params: ExecuteOpenAiParams): Promise<Execut
   const safeModel = resolveOpenAiModel(model);
 
   logger.info(
-    { companyId, ticketId, model: safeModel },
+    { companyId, ticketId, model: safeModel, source: source ?? "legacy" },
     "[OpenAiManager] chamada OpenAI (chat)"
   );
 
@@ -153,7 +162,13 @@ export async function executeOpenAi(params: ExecuteOpenAiParams): Promise<Execut
 
     await assertUnderLimitAndLog(companyId, ticketId, tokensUsed);
 
-    return { ok: true, content, tokensUsed };
+    return {
+      ok: true,
+      content,
+      tokensUsed,
+      promptTokens: usage?.prompt_tokens,
+      completionTokens: usage?.completion_tokens
+    };
   } catch (err) {
     logger.error(
       { err, companyId, ticketId, phase: "chat" },

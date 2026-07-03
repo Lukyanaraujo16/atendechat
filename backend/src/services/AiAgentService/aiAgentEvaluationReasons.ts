@@ -28,7 +28,7 @@ export const AI_AGENT_EVALUATION_REASONS = {
 export type AiAgentEvaluationReason =
   (typeof AI_AGENT_EVALUATION_REASONS)[keyof typeof AI_AGENT_EVALUATION_REASONS];
 
-export type AiAgentEvaluationMode = "dry_run";
+export type AiAgentEvaluationMode = "dry_run" | "shadow";
 
 export type AiAgentEvaluationResult = {
   eligible: boolean;

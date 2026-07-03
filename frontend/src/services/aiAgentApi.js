@@ -19,3 +19,7 @@ export function updateAiAgent(id, data) {
 export function deleteAiAgent(id) {
   return api.delete(`/ai-agents/${id}`);
 }
+
+export function listAiAgentShadowSuggestions(params = {}) {
+  return api.get("/ai-agents/shadow-suggestions", { params });
+}

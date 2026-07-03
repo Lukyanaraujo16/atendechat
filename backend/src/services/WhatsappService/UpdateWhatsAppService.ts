@@ -25,6 +25,7 @@ interface WhatsappData {
   promptId?: number;
   aiAgentId?: number | null;
   aiAgentEnabled?: boolean;
+  aiAgentMode?: string;
   maxUseBotQueues?: number;
   timeUseBotQueues?: number;
   expiresTicket?: number;
@@ -77,6 +78,7 @@ const UpdateWhatsAppService = async ({
     promptId,
     aiAgentId,
     aiAgentEnabled,
+    aiAgentMode,
     maxUseBotQueues,
     timeUseBotQueues,
     expiresTicket,
@@ -191,15 +193,17 @@ const UpdateWhatsAppService = async ({
 
   const aiAgentResolved = await applyAiAgentFieldsToWhatsappData(
     companyId,
-    { aiAgentId, aiAgentEnabled },
+    { aiAgentId, aiAgentEnabled, aiAgentMode },
     {
       aiAgentId: whatsapp.aiAgentId,
-      aiAgentEnabled: whatsapp.aiAgentEnabled
+      aiAgentEnabled: whatsapp.aiAgentEnabled,
+      aiAgentMode: whatsapp.aiAgentMode
     }
   );
   if (aiAgentResolved) {
     updateData.aiAgentId = aiAgentResolved.aiAgentId;
     updateData.aiAgentEnabled = aiAgentResolved.aiAgentEnabled;
+    updateData.aiAgentMode = aiAgentResolved.aiAgentMode;
   }
 
   await whatsapp.update(updateData);

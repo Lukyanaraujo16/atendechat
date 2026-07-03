@@ -2276,13 +2276,21 @@ const messages = {
         aiAgent: {
           title: "Agente de IA",
           selectAgent: "Selecionar agente de IA",
+          runtimeMode: "Modo de operação",
           enableOnConnection: "Ativar Agente de IA nesta conexão",
           none: "Nenhum",
           noAgents:
             "Nenhum agente de IA cadastrado. Crie um agente no módulo Automação > Agente de IA.",
           phaseWarning:
-            "Mesmo ativado aqui, o agente ainda não responde mensagens automaticamente nesta fase.",
+            "Nesta fase, o agente não envia respostas automaticamente aos clientes.",
+          shadowWarning:
+            "Respostas serão geradas para avaliação interna, mas não serão enviadas aos clientes.",
           planBlocked: "O módulo Agente de IA não está disponível no seu plano.",
+          modes: {
+            disabled: "Desativado",
+            dryRun: "Simulação de elegibilidade",
+            shadow: "Shadow Mode — gera sugestões, mas não envia",
+          },
         },
       },
       qrCodeModal: {
@@ -2657,7 +2665,27 @@ const messages = {
         phaseWarning:
           "Nesta fase, o agente ainda não responde atendimentos automaticamente. A ativação nos canais será feita em uma próxima etapa.",
         dryRunWarning:
-          "Modo simulação ativo: o sistema apenas avalia e registra elegibilidade nas mensagens recebidas, sem enviar respostas automáticas.",
+          "Modo simulação: o sistema avalia e registra elegibilidade nas mensagens recebidas, sem enviar respostas automáticas.",
+        shadowSection: {
+          title: "Sugestões em Shadow Mode",
+          warning:
+            "Estas respostas foram geradas em modo de avaliação e não foram enviadas aos clientes.",
+          empty: "Nenhuma sugestão shadow registrada ainda.",
+          notSentBadge: "Não enviada ao cliente",
+          table: {
+            date: "Data",
+            agent: "Agente",
+            ticket: "Ticket",
+            status: "Status",
+            messageType: "Tipo",
+            suggestion: "Resposta sugerida",
+            model: "Modelo",
+            tokens: "Tokens",
+            latency: "Latência (ms)",
+            error: "Erro",
+          },
+          loadMore: "Carregar mais",
+        },
         buttons: {
           new: "Novo agente",
           save: "Salvar",

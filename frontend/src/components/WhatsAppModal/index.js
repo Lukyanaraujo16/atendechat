@@ -119,7 +119,7 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
   const [prompts, setPrompts] = useState([]);
   const [aiAgents, setAiAgents] = useState([]);
   const [selectedAiAgentId, setSelectedAiAgentId] = useState(null);
-  const [aiAgentEnabled, setAiAgentEnabled] = useState(false);
+  const [aiAgentMode, setAiAgentMode] = useState("disabled");
   const [integrations, setIntegrations] = useState([]);
   const [selectedIntegration, setSelectedIntegration] = useState(null);
   const [flows, setFlows] = useState([]);
@@ -177,7 +177,10 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
               ? data.aiAgentId
               : null
           );
-          setAiAgentEnabled(!!data.aiAgentEnabled);
+          const mode =
+            data.aiAgentMode ||
+            (data.aiAgentEnabled ? "dry_run" : "disabled");
+          setAiAgentMode(mode);
         } catch (err) {
           toastError(err);
         }
@@ -285,8 +288,14 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
         : whatsAppId && whatsApp?.aiAgentId != null
           ? whatsApp.aiAgentId
           : null,
+      aiAgentMode: aiAgentFeatureEnabled
+        ? aiAgentMode
+        : whatsAppId
+          ? whatsApp?.aiAgentMode ||
+            (whatsApp?.aiAgentEnabled ? "dry_run" : "disabled")
+          : "disabled",
       aiAgentEnabled: aiAgentFeatureEnabled
-        ? aiAgentEnabled
+        ? aiAgentMode !== "disabled"
         : whatsAppId
           ? !!whatsApp?.aiAgentEnabled
           : false,
@@ -342,7 +351,7 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
     setSelectedIntegration(null);
     setSelectedPrompt(null);
     setSelectedAiAgentId(null);
-    setAiAgentEnabled(false);
+    setAiAgentMode("disabled");
     setTokenDialogOpen(false);
     setCreatedToken("");
   };
@@ -674,7 +683,7 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
                                 value === "" || value == null ? null : value
                               );
                               if (!value) {
-                                setAiAgentEnabled(false);
+                                setAiAgentMode("disabled");
                               }
                             }}
                             label={i18n.t("whatsappModal.aiAgent.selectAgent")}
@@ -690,20 +699,40 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
                             ))}
                           </Select>
                         </FormControl>
-                        <FormControlLabel
+                        <FormControl
+                          margin="dense"
+                          variant="outlined"
+                          fullWidth
                           style={{ marginTop: 8 }}
-                          control={
-                            <Switch
-                              color="primary"
-                              checked={aiAgentEnabled}
-                              disabled={!selectedAiAgentId}
-                              onChange={(e) =>
-                                setAiAgentEnabled(e.target.checked)
-                              }
-                            />
-                          }
-                          label={i18n.t("whatsappModal.aiAgent.enableOnConnection")}
-                        />
+                        >
+                          <InputLabel>
+                            {i18n.t("whatsappModal.aiAgent.runtimeMode")}
+                          </InputLabel>
+                          <Select
+                            labelId="dialog-select-ai-agent-mode-label"
+                            id="dialog-select-ai-agent-mode"
+                            value={aiAgentMode}
+                            disabled={!selectedAiAgentId}
+                            onChange={(e) => setAiAgentMode(e.target.value)}
+                            label={i18n.t("whatsappModal.aiAgent.runtimeMode")}
+                            fullWidth
+                          >
+                            <MenuItem value="disabled">
+                              {i18n.t("whatsappModal.aiAgent.modes.disabled")}
+                            </MenuItem>
+                            <MenuItem value="dry_run">
+                              {i18n.t("whatsappModal.aiAgent.modes.dryRun")}
+                            </MenuItem>
+                            <MenuItem value="shadow">
+                              {i18n.t("whatsappModal.aiAgent.modes.shadow")}
+                            </MenuItem>
+                          </Select>
+                        </FormControl>
+                        {aiAgentMode === "shadow" && (
+                          <Alert severity="warning" style={{ marginTop: 8 }}>
+                            {i18n.t("whatsappModal.aiAgent.shadowWarning")}
+                          </Alert>
+                        )}
                       </>
                     )}
                   </Box>

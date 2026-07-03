@@ -12,6 +12,12 @@ import { sanitizeAiAgentRuntimeMetadata } from "./sanitizeAiAgentRuntimeMetadata
 import { logger } from "../../utils/logger";
 import { UniqueConstraintError } from "sequelize";
 
+import {
+  resolveWhatsappAiAgentRuntimeMode,
+  isAiAgentRuntimeActive
+} from "./aiAgentRuntimeMode";
+import { AI_AGENT_SHADOW_STATUSES } from "./aiAgentShadowErrors";
+
 export type PersistAiAgentRuntimeLogInput = {
   companyId: number;
   ticketId?: number | null;
@@ -21,10 +27,11 @@ export type PersistAiAgentRuntimeLogInput = {
   evaluation: AiAgentEvaluationResult;
   messageId?: string | null;
   metadata?: Record<string, unknown>;
+  runtimeMode?: "dry_run" | "shadow";
 };
 
 export function isWhatsappAiAgentConfigured(whatsapp: Whatsapp): boolean {
-  return whatsapp.aiAgentEnabled === true || whatsapp.aiAgentId != null;
+  return isAiAgentRuntimeActive(resolveWhatsappAiAgentRuntimeMode(whatsapp));
 }
 
 export function shouldPersistAiAgentRuntimeLog(
@@ -58,7 +65,10 @@ export async function findAiAgentRuntimeLogByMessageKey(input: {
 
 export async function persistAiAgentRuntimeLog(
   input: PersistAiAgentRuntimeLogInput
-): Promise<"created" | "duplicate" | "skipped"> {
+): Promise<
+  | { status: "created"; logId: number }
+  | { status: "duplicate" | "skipped" }
+> {
   const metadata = sanitizeAiAgentRuntimeMetadata({
     ...(input.metadata || {}),
     ...(input.evaluation.metadata || {}),
@@ -89,12 +99,20 @@ export async function persistAiAgentRuntimeLog(
         },
         "[AiAgent][dry_run] duplicate_message"
       );
-      return "duplicate";
+      return { status: "duplicate" };
     }
   }
 
+  const shadowStatus =
+    input.runtimeMode === "shadow" && input.evaluation.eligible
+      ? AI_AGENT_SHADOW_STATUSES.QUEUED
+      : input.runtimeMode === "shadow"
+        ? AI_AGENT_SHADOW_STATUSES.SKIPPED
+        : AI_AGENT_SHADOW_STATUSES.NOT_REQUESTED;
+
+  let created: AiAgentRuntimeLog;
   try {
-    await AiAgentRuntimeLog.create({
+    created = await AiAgentRuntimeLog.create({
       companyId: input.companyId,
       ticketId: input.ticketId ?? null,
       contactId: input.contactId ?? null,
@@ -105,7 +123,8 @@ export async function persistAiAgentRuntimeLog(
       eligible: input.evaluation.eligible,
       reason: input.evaluation.reason,
       messageId,
-      metadata
+      metadata,
+      shadowStatus
     });
   } catch (err) {
     if (err instanceof UniqueConstraintError) {
@@ -118,7 +137,7 @@ export async function persistAiAgentRuntimeLog(
         },
         "[AiAgent][dry_run] duplicate_message"
       );
-      return "duplicate";
+      return { status: "duplicate" };
     }
     throw err;
   }
@@ -133,10 +152,11 @@ export async function persistAiAgentRuntimeLog(
       eligible: input.evaluation.eligible,
       reason: input.evaluation.reason,
       mode: input.evaluation.mode,
+      shadowStatus,
       evaluationDurationMs: input.evaluation.evaluationDurationMs ?? null
     },
-    "[AiAgent][dry_run] evaluation_logged"
+    "[AiAgent][runtime] evaluation_logged"
   );
 
-  return "created";
+  return { status: "created", logId: created.id };
 }

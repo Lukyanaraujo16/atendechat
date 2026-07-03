@@ -13,6 +13,13 @@ aiAgentRoutes.get(
 );
 
 aiAgentRoutes.get(
+  "/ai-agents/shadow-suggestions",
+  isAuth,
+  requireEffectiveModule("automation.ai_agent"),
+  AiAgentController.shadowSuggestions
+);
+
+aiAgentRoutes.get(
   "/ai-agents/:id",
   isAuth,
   requireEffectiveModule("automation.ai_agent"),

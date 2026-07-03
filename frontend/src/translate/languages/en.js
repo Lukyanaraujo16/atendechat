@@ -2194,13 +2194,21 @@ const messages = {
 				aiAgent: {
 					title: "AI Agent",
 					selectAgent: "Select AI agent",
+					runtimeMode: "Runtime mode",
 					enableOnConnection: "Enable AI Agent on this connection",
 					none: "None",
 					noAgents:
 						"No AI agents configured. Create one under Automation > AI Agent.",
 					phaseWarning:
-						"Even when enabled here, the agent does not reply to messages automatically in this phase.",
+						"In this phase, the agent does not send replies to customers automatically.",
+					shadowWarning:
+						"Replies will be generated for internal evaluation only and will not be sent to customers.",
 					planBlocked: "The AI Agent module is not available on your plan.",
+					modes: {
+						disabled: "Disabled",
+						dryRun: "Eligibility simulation",
+						shadow: "Shadow Mode — generates suggestions, does not send",
+					},
 				},
 			},
 			qrCodeModal: {
@@ -2572,7 +2580,27 @@ const messages = {
 				phaseWarning:
 					"In this phase, the agent does not reply to conversations automatically yet. Channel activation will come in a later step.",
 				dryRunWarning:
-					"Simulation mode is active: the system only evaluates and logs eligibility for inbound messages, without sending automatic replies.",
+					"Simulation mode: the system evaluates and logs eligibility for inbound messages without sending automatic replies.",
+				shadowSection: {
+					title: "Shadow Mode suggestions",
+					warning:
+						"These replies were generated in evaluation mode and were not sent to customers.",
+					empty: "No shadow suggestions recorded yet.",
+					notSentBadge: "Not sent to customer",
+					table: {
+						date: "Date",
+						agent: "Agent",
+						ticket: "Ticket",
+						status: "Status",
+						messageType: "Type",
+						suggestion: "Suggested reply",
+						model: "Model",
+						tokens: "Tokens",
+						latency: "Latency (ms)",
+						error: "Error",
+					},
+					loadMore: "Load more",
+				},
 				buttons: {
 					new: "New agent",
 					save: "Save",

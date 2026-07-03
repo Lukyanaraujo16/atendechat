@@ -149,6 +149,10 @@ class Whatsapp extends Model<Whatsapp> {
   @Column
   aiAgentEnabled: boolean;
 
+  @Default("disabled")
+  @Column(DataType.STRING(32))
+  aiAgentMode: string;
+
   @ForeignKey(() => QueueIntegrations)
   @Column
   integrationId: number;

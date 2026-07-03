@@ -37,6 +37,10 @@ import AiAgent from "./AiAgent";
       name: "AiAgentRuntimeLogs_idempotency_uq",
       unique: true,
       fields: ["companyId", "whatsappId", "channel", "messageId"]
+    },
+    {
+      name: "AiAgentRuntimeLogs_company_shadowStatus_createdAt_idx",
+      fields: ["companyId", "shadowStatus", "createdAt"]
     }
   ]
 })
@@ -107,6 +111,54 @@ class AiAgentRuntimeLog extends Model<AiAgentRuntimeLog> {
   @AllowNull(true)
   @Column(DataType.JSON)
   metadata: Record<string, unknown> | null;
+
+  @Default("not_requested")
+  @Column(DataType.STRING(32))
+  shadowStatus: string;
+
+  @AllowNull(true)
+  @Column(DataType.TEXT)
+  suggestedReply: string | null;
+
+  @AllowNull(true)
+  @Column(DataType.STRING(64))
+  shadowModel: string | null;
+
+  @AllowNull(true)
+  @Column
+  promptTokens: number | null;
+
+  @AllowNull(true)
+  @Column
+  completionTokens: number | null;
+
+  @AllowNull(true)
+  @Column
+  totalTokens: number | null;
+
+  @AllowNull(true)
+  @Column
+  latencyMs: number | null;
+
+  @AllowNull(true)
+  @Column(DataType.STRING(64))
+  errorCode: string | null;
+
+  @AllowNull(true)
+  @Column
+  generatedAt: Date | null;
+
+  @AllowNull(true)
+  @Column
+  contextMessageCount: number | null;
+
+  @AllowNull(true)
+  @Column(DataType.STRING(64))
+  contextHash: string | null;
+
+  @AllowNull(true)
+  @Column(DataType.STRING(32))
+  suggestionSource: string | null;
 
   @CreatedAt
   createdAt: Date;

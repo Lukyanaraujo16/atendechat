@@ -1,7 +1,5 @@
-import { proto } from "@whiskeysockets/baileys";
-import Contact from "../../models/Contact";
-import Ticket from "../../models/Ticket";
-import Whatsapp from "../../models/Whatsapp";
+import { debounce } from "../../helpers/Debounce";
+import { logger } from "../../utils/logger";
 import AiAgentOrchestrator from "./AiAgentOrchestrator";
 import { InboundMessageClassification } from "./classifyInboundMessage";
 import {
@@ -10,8 +8,13 @@ import {
   shouldPersistAiAgentRuntimeLog
 } from "./AiAgentRuntimeLogService";
 import { resolveInboundMessageId } from "./resolveInboundMessageId";
+import { resolveWhatsappAiAgentRuntimeMode } from "./aiAgentRuntimeMode";
 import { sanitizeAiAgentRuntimeMetadata } from "./sanitizeAiAgentRuntimeMetadata";
-import { logger } from "../../utils/logger";
+import { scheduleShadowGeneration } from "./AiAgentShadowService";
+import Contact from "../../models/Contact";
+import Ticket from "../../models/Ticket";
+import Whatsapp from "../../models/Whatsapp";
+import { proto } from "@whiskeysockets/baileys";
 
 export type RunAiAgentDryRunHookInput = {
   companyId: number;
@@ -27,8 +30,8 @@ export type RunAiAgentDryRunHookInput = {
 };
 
 /**
- * Avalia elegibilidade do Agente de IA (dry-run) após persistir mensagem inbound.
- * Não altera ticket, não envia resposta e não chama OpenAI.
+ * Avalia elegibilidade do Agente de IA após persistir mensagem inbound.
+ * Em shadow mode, agenda geração de sugestão sem enviar ao cliente.
  */
 export async function runAiAgentDryRunHook(
   input: RunAiAgentDryRunHookInput
@@ -54,11 +57,13 @@ export async function runAiAgentDryRunHook(
           messageId: resolvedId.messageId,
           existingLogId: duplicate.id
         },
-        "[AiAgent][dry_run] duplicate_message"
+        "[AiAgent][runtime] duplicate_message"
       );
       return;
     }
   }
+
+  const runtimeMode = resolveWhatsappAiAgentRuntimeMode(input.whatsapp);
 
   const evaluation = await AiAgentOrchestrator.evaluateInboundMessage({
     companyId: input.companyId,
@@ -84,7 +89,8 @@ export async function runAiAgentDryRunHook(
     hasUser: input.ticket.userId != null,
     ticketChatbot: input.ticket.chatbot === true,
     ticketQueueId: input.ticket.queueId ?? null,
-    isGroup: input.isGroup
+    isGroup: input.isGroup,
+    runtimeMode
   });
 
   if (!shouldPersistAiAgentRuntimeLog(input.whatsapp, evaluation.reason)) {
@@ -97,12 +103,12 @@ export async function runAiAgentDryRunHook(
         eligible: evaluation.eligible,
         reason: evaluation.reason
       },
-      "[AiAgent][dry_run] evaluation_skipped_persist"
+      "[AiAgent][runtime] evaluation_skipped_persist"
     );
     return;
   }
 
-  await persistAiAgentRuntimeLog({
+  const persistResult = await persistAiAgentRuntimeLog({
     companyId: input.companyId,
     ticketId: input.ticket.id,
     contactId: input.contact.id,
@@ -110,11 +116,27 @@ export async function runAiAgentDryRunHook(
     channel: "whatsapp",
     evaluation,
     messageId: resolvedId.messageId,
-    metadata: baseMetadata
+    metadata: baseMetadata,
+    runtimeMode: runtimeMode === "shadow" ? "shadow" : "dry_run"
   });
+
+  if (
+    persistResult.status === "created" &&
+    evaluation.eligible &&
+    runtimeMode === "shadow" &&
+    input.classification.hasText
+  ) {
+    scheduleShadowGeneration({
+      logId: persistResult.logId,
+      companyId: input.companyId,
+      ticketId: input.ticket.id,
+      inboundText: String(input.body ?? "").trim(),
+      classification: input.classification
+    });
+  }
 }
 
-/** Helper para o hook no listener — classifica e dispara dry-run sem bloquear fluxo legado. */
+/** Helper para o hook no listener — classifica e dispara avaliação sem bloquear fluxo legado. */
 export function scheduleAiAgentDryRunFromInbound(params: {
   companyId: number;
   ticket: Ticket;
@@ -147,7 +169,7 @@ export function scheduleAiAgentDryRunFromInbound(params: {
         ticketId: params.ticket.id,
         messageId: params.msg.key?.id ?? null
       },
-      "[AiAgent][dry_run] hook_failed"
+      "[AiAgent][runtime] hook_failed"
     );
   });
 }
