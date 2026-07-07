@@ -37,6 +37,7 @@ export interface CreateCompanyResult {
   /** Resultado do convite por e-mail ao admin (quando a senha não é definida na criação). */
   primaryAdminInviteEmailSent?: boolean;
   primaryAdmin: {
+    userId: number;
     email: string;
     name: string;
     mustChangePassword: boolean;
@@ -401,6 +402,7 @@ const CreateCompanyService = async (
     company,
     primaryAdminInviteEmailSent: provisionResult.inviteEmailSent,
     primaryAdmin: {
+      userId: provisionResult.userId,
       email: provisionResult.email,
       name: provisionResult.name,
       temporaryPassword: provisionResult.temporaryPassword,

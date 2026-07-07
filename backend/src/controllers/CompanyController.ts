@@ -264,8 +264,28 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
       }
     : undefined;
 
+  if (setup?.userId) {
+    logger.info(
+      {
+        companyId: company.id,
+        adminUserId: setup.userId,
+        adminEmail: setup.email,
+        profile: "admin",
+        status: "active"
+      },
+      "[CompanyUsers] create_company_admin"
+    );
+  }
+
   return res.status(200).json({
     ...companyJson,
+    primaryAdmin: setup?.userId
+      ? {
+          id: setup.userId,
+          name: setup.name,
+          email: setup.email
+        }
+      : null,
     ...(primaryAdminSetup ? { primaryAdminSetup } : {})
   });
 };

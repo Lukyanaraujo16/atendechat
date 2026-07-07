@@ -22,6 +22,21 @@ import {
 } from "../services/UserFeaturePermission/UserFeaturePermissionService";
 import { logger } from "../utils/logger";
 
+async function resolveUserCompanyScope(
+  req: Request
+): Promise<{ skipCompanyScope: boolean; isPlatformSuper: boolean }> {
+  const { supportMode, id } = req.user;
+  const isSupportSelf =
+    supportMode === true &&
+    req.params.userId != null &&
+    Number(req.params.userId) === Number(id);
+  const isPlatformSuper = await isPlatformSuperUser(req);
+  return {
+    skipCompanyScope: isSupportSelf || isPlatformSuper,
+    isPlatformSuper
+  };
+}
+
 type IndexQuery = {
   searchParam: string;
   pageNumber: string;
@@ -130,15 +145,13 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
 
 export const show = async (req: Request, res: Response): Promise<Response> => {
   const { userId } = req.params;
-  const { companyId, supportMode, id } = req.user;
+  const { companyId, id } = req.user;
 
-  /** Modo suporte: JWT.companyId é o tenant visitado; o próprio utilizador (super admin) pertence a outra empresa */
-  const isSupportSelf =
-    supportMode === true && Number(userId) === Number(id);
+  const { skipCompanyScope } = await resolveUserCompanyScope(req);
 
   const user = await ShowUserService(
     userId,
-    isSupportSelf ? undefined : companyId
+    skipCompanyScope ? undefined : companyId
   );
 
   const plain = { ...user.get({ plain: true }) };
@@ -146,7 +159,7 @@ export const show = async (req: Request, res: Response): Promise<Response> => {
   if (
     Number(userId) !== Number(id) &&
     user.profile !== "admin" &&
-    !isSupportSelf
+    !skipCompanyScope
   ) {
     const actor = await User.findByPk(req.user.id, {
       attributes: ["id", "profile", "super"]
@@ -189,8 +202,7 @@ export const update = async (
   const { userId } = req.params;
   const userData = req.body;
 
-  const isSupportSelf =
-    supportMode === true && Number(userId) === Number(requestUserId);
+  const { skipCompanyScope, isPlatformSuper } = await resolveUserCompanyScope(req);
 
   const actor = await User.findByPk(requestUserId, {
     attributes: ["id", "profile", "super"]
@@ -198,7 +210,8 @@ export const update = async (
 
   const allow =
     actor?.profile === "admin" ||
-    isSupportSelf ||
+    skipCompanyScope ||
+    isPlatformSuper ||
     (actor?.profile === "supervisor" &&
       Number(userId) !== Number(requestUserId));
 
@@ -208,8 +221,10 @@ export const update = async (
 
   const targetBefore = await ShowUserService(
     userId,
-    isSupportSelf ? undefined : companyId
+    skipCompanyScope ? undefined : companyId
   );
+
+  const effectiveCompanyId = targetBefore.companyId ?? companyId;
 
   logger.info(
     {
@@ -219,7 +234,8 @@ export const update = async (
       targetUserId: userId,
       targetCompanyId: targetBefore.companyId ?? null,
       isSelf: Number(userId) === Number(requestUserId),
-      supportMode: supportMode === true
+      supportMode: supportMode === true,
+      isPlatformSuper
     },
     "[UserUpdate] start"
   );
@@ -233,7 +249,7 @@ export const update = async (
     throw new AppError("ERR_NO_PERMISSION", 403);
   }
 
-  if (!isSupportSelf && actor.profile === "supervisor") {
+  if (!skipCompanyScope && actor.profile === "supervisor") {
     const ctx = await loadCompanyPlanContext(req);
     if (!ctx) {
       throw new AppError("ERR_NO_PERMISSION", 403);
@@ -249,16 +265,19 @@ export const update = async (
   const user = await UpdateUserService({
     userData,
     userId,
-    companyId,
+    companyId: effectiveCompanyId,
     requestUserId: +requestUserId,
-    skipCompanyScopeForShow: isSupportSelf
+    skipCompanyScopeForShow: skipCompanyScope
   });
 
   const io = getIO();
-  io.to(`company-${companyId}-mainchannel`).emit(`company-${companyId}-user`, {
-    action: "update",
-    user
-  });
+  io.to(`company-${effectiveCompanyId}-mainchannel`).emit(
+    `company-${effectiveCompanyId}-user`,
+    {
+      action: "update",
+      user
+    }
+  );
 
   return res.status(200).json(user);
 };
@@ -282,24 +301,64 @@ export const remove = async (
   }
   await assertActorCanManageUsers(actor, featureMap);
 
-  await DeleteUserService(userId, companyId);
+  const isPlatformSuper = await isPlatformSuperUser(req);
+  const targetUser = await ShowUserService(
+    userId,
+    isPlatformSuper ? undefined : companyId
+  );
+  const effectiveCompanyId = targetUser.companyId ?? companyId;
+
+  await DeleteUserService(userId, effectiveCompanyId);
 
   const io = getIO();
-  io.to(`company-${companyId}-mainchannel`).emit(`company-${companyId}-user`, {
-    action: "delete",
-    userId
-  });
+  io.to(`company-${effectiveCompanyId}-mainchannel`).emit(
+    `company-${effectiveCompanyId}-user`,
+    {
+      action: "delete",
+      userId
+    }
+  );
 
   return res.status(200).json({ message: "User deleted" });
 };
 
 export const list = async (req: Request, res: Response): Promise<Response> => {
   const { companyId } = req.query;
-  const { companyId: userCompanyId } = req.user;
+  const { companyId: userCompanyId, id: requestUserId, supportMode } = req.user;
+  const targetCompanyId = companyId ? +companyId : userCompanyId;
+
+  const isPlatformSuper = await isPlatformSuperUser(req);
+  if (
+    !isPlatformSuper &&
+    targetCompanyId != null &&
+    Number(targetCompanyId) !== Number(userCompanyId)
+  ) {
+    throw new AppError("ERR_NO_PERMISSION", 403);
+  }
+
+  logger.info(
+    {
+      requesterId: requestUserId,
+      requesterProfile: req.user.profile,
+      requesterCompanyId: userCompanyId,
+      targetCompanyId,
+      supportMode: supportMode === true
+    },
+    "[CompanyUsers] list_start"
+  );
 
   const users = await SimpleListService({
-    companyId: companyId ? +companyId : userCompanyId
+    companyId: targetCompanyId
   });
+
+  logger.info(
+    {
+      targetCompanyId,
+      count: users.length,
+      userIds: users.map((u) => u.id)
+    },
+    "[CompanyUsers] list_result"
+  );
 
   return res.status(200).json(users);
 };

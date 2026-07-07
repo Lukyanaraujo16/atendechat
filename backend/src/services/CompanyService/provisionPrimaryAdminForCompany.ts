@@ -22,6 +22,7 @@ type ProvisionOpts = {
 };
 
 export type ProvisionPrimaryAdminResult = {
+  userId: number;
   email: string;
   name: string;
   mustChangePassword: boolean;
@@ -58,7 +59,8 @@ const provisionPrimaryAdminForCompany = async (
 
   const createUser = async (fields: Partial<User>) => {
     try {
-      await User.create(fields as User, { transaction: tx });
+      const created = await User.create(fields as User, { transaction: tx });
+      return created;
     } catch (err) {
       if (err instanceof UniqueConstraintError) {
         throw new AppError(
@@ -77,7 +79,7 @@ const provisionPrimaryAdminForCompany = async (
     } catch (err: unknown) {
       throw new AppError(getFirstYupErrorMessage(err), 400);
     }
-    await createUser({
+    const created = await createUser({
       name: adminName,
       email,
       password: pwdTrim,
@@ -86,6 +88,7 @@ const provisionPrimaryAdminForCompany = async (
       mustChangePassword: false
     });
     return {
+      userId: created.id,
       email,
       name: adminName,
       mustChangePassword: false
@@ -95,7 +98,7 @@ const provisionPrimaryAdminForCompany = async (
   const temporaryPassword = generateTemporaryPassword();
   const token = randomBytes(32).toString("hex");
 
-  await createUser({
+  const created = await createUser({
     name: adminName,
     email,
     password: temporaryPassword,
@@ -129,6 +132,7 @@ const provisionPrimaryAdminForCompany = async (
   }
 
   return {
+    userId: created.id,
     email,
     name: adminName,
     mustChangePassword: true,

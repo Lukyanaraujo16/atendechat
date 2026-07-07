@@ -932,17 +932,40 @@ export function CompanyForm(props) {
   };
 
   const handleOpenModalUsers = async () => {
+    const companyId = initialValue?.id;
+    const endpoint = "/users/list";
+    console.info("[CompanyUsers] open_manage_users", {
+      companyId,
+      companyName: initialValue?.name ?? null,
+      passedId: companyId,
+      routeOrEndpoint: endpoint
+    });
     try {
-      const { data } = await api.get("/users/list", {
+      console.info("[CompanyUsers] fetch_start", { companyId, endpoint });
+      const { data } = await api.get(endpoint, {
         params: {
-          companyId: initialValue.id,
+          companyId,
         },
       });
-      if (isArray(data) && data.length) {
-        setFirstUser(head(data));
+      const users = Array.isArray(data) ? data : [];
+      setCompanyUsers(users);
+      console.info("[CompanyUsers] fetch_success", {
+        companyId,
+        count: users.length,
+        userIds: users.map((u) => u.id)
+      });
+      if (users.length) {
+        setFirstUser(head(users));
+      } else {
+        setFirstUser({});
       }
       setModalUser(true);
     } catch (e) {
+      console.warn("[CompanyUsers] fetch_failed", {
+        companyId,
+        status: e?.response?.status ?? null,
+        error: e?.response?.data?.error || e?.message || "unknown"
+      });
       toast.error(e);
     }
   };
@@ -961,13 +984,33 @@ export function CompanyForm(props) {
     }
     let cancelled = false;
     setUsersLoading(true);
+    const endpoint = "/users/list";
+    console.info("[CompanyUsers] fetch_start", {
+      companyId: companyIdForUsers,
+      endpoint
+    });
     api
-      .get("/users/list", { params: { companyId: companyIdForUsers } })
+      .get(endpoint, { params: { companyId: companyIdForUsers } })
       .then(({ data }) => {
-        if (!cancelled) setCompanyUsers(Array.isArray(data) ? data : []);
+        const users = Array.isArray(data) ? data : [];
+        if (!cancelled) {
+          setCompanyUsers(users);
+          console.info("[CompanyUsers] fetch_success", {
+            companyId: companyIdForUsers,
+            count: users.length,
+            userIds: users.map((u) => u.id)
+          });
+        }
       })
-      .catch(() => {
-        if (!cancelled) setCompanyUsers([]);
+      .catch((err) => {
+        if (!cancelled) {
+          setCompanyUsers([]);
+          console.warn("[CompanyUsers] fetch_failed", {
+            companyId: companyIdForUsers,
+            status: err?.response?.status ?? null,
+            error: err?.response?.data?.error || err?.message || "unknown"
+          });
+        }
       })
       .finally(() => {
         if (!cancelled) setUsersLoading(false);
@@ -2633,6 +2676,8 @@ export default function CompaniesManager() {
     try {
       if (data.id !== 0 && data.id !== undefined) {
         await update(data);
+        await loadPlans();
+        handleCancel();
       } else {
         const created = await save(data);
         if (created?.primaryAdminSetup) {
@@ -2641,10 +2686,28 @@ export default function CompaniesManager() {
             setPrimaryAdminSetupDialog(s);
           }
         }
+        const companyList = await list();
+        setRecords(companyList);
+        const createdRow =
+          companyList.find((row) => row.id === created?.id) || created;
+        if (createdRow?.id) {
+          handleSelect({
+            ...createdRow,
+            primaryAdmin:
+              created?.primaryAdmin ??
+              createdRow.primaryAdmin ??
+              (created?.primaryAdminSetup?.userId
+                ? {
+                    id: created.primaryAdminSetup.userId,
+                    name: created.primaryAdminSetup.name,
+                    email: created.primaryAdminSetup.email
+                  }
+                : null)
+          });
+        } else {
+          handleCancel();
+        }
       }
-
-      await loadPlans();
-      handleCancel();
       toast.success(i18n.t("settings.company.toasts.success"));
     } catch (e) {
       toast.error(
