@@ -6067,6 +6067,9 @@ const messages = {
               "Deseja realmente desconectar {{name}} de todos os dispositivos?",
             usersForceLogoutSuccess: "Sessão do utilizador encerrada com sucesso.",
             modulesSectionTitle: "Módulos liberados (empresa)",
+            modulesFeaturesSectionTitle: "Módulos e funcionalidades da empresa",
+            modulesFeaturesSectionHint:
+              "Configure permissões específicas desta empresa. Essas opções podem sobrescrever o padrão definido no plano.",
             modulesSectionHint:
               "Complementa o plano: desligar aqui oculta o módulo e bloqueia o uso, quando o plano permitir o recurso.",
             modulesSectionHintV2:

@@ -7,7 +7,14 @@ import { getOrderedPlanFeatureRootKeys } from "./planFeatureUiUtils";
 /**
  * Grelha de cartões por categoria. Mantém o mesmo contrato: value = mapa featureKey → boolean, onChange recebe o mapa completo.
  */
-export default function PlanFeaturesTree({ value, onChange }) {
+export default function PlanFeaturesTree({
+  value,
+  onChange,
+  mode = "plan",
+  plan,
+  modulePermissions,
+  onModulePermissionsChange,
+}) {
   const [expanded, setExpanded] = useState({});
 
   const toggleExpanded = useCallback((rootKey) => {
@@ -28,6 +35,10 @@ export default function PlanFeaturesTree({ value, onChange }) {
             node={FEATURES[rootKey]}
             value={value || {}}
             onChange={onChange}
+            mode={mode}
+            plan={plan}
+            modulePermissions={modulePermissions}
+            onModulePermissionsChange={onModulePermissionsChange}
             expanded={Boolean(expanded[rootKey])}
             onToggleExpand={() => toggleExpanded(rootKey)}
           />

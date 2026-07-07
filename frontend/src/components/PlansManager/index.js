@@ -19,7 +19,6 @@ import {
     Select,
     InputAdornment,
     Tooltip,
-    LinearProgress,
     Divider,
 } from "@material-ui/core";
 import { alpha } from "@material-ui/core/styles";
@@ -42,7 +41,7 @@ import {
 } from "../../ui";
 import PlanModuleSaveDialog from "../ModuleSettings/PlanModuleSaveDialog";
 import { diffPlanFeatureMaps } from "../ModuleSettings/planFeatureSync";
-import PlanFeaturesTree from "./PlanFeaturesTree";
+import FeatureGroupsEditor from "../ModuleSettings/FeatureGroupsEditor";
 import PlanFeatureSummaryChips from "./PlanFeatureSummaryChips";
 import {
   parseBrazilianCurrencyToNumber,
@@ -325,12 +324,6 @@ export function PlanManagerForm(props) {
         >
             {(formik) => {
                 const { values, isSubmitting } = formik;
-                const featureKeys = getAllFeatureKeys();
-                const totalFeat = featureKeys.length;
-                const activeFeat = featureKeys.filter(
-                    (k) => values.planFeatures && values.planFeatures[k] === true
-                ).length;
-                const featPct = totalFeat ? Math.round((activeFeat / totalFeat) * 100) : 0;
 
                 return (
                 <Form className={classes.fullWidth}>
@@ -411,36 +404,12 @@ export function PlanManagerForm(props) {
                     <Divider style={{ margin: "8px 0 20px" }} />
 
                     <Box className={classes.modulesWrap}>
-                        <Box className={classes.featuresHero}>
-                        <Typography
-                            component="h3"
-                            className={classes.featuresTitle}
-                        >
-                            {i18n.t("plans.form.featuresSectionTitle")}
-                        </Typography>
-                        <Typography
-                            variant="body2"
-                            color="textSecondary"
-                            className={classes.featuresHint}
-                        >
-                            {i18n.t("plans.form.featuresSectionHint")}
-                        </Typography>
-                        <Typography className={classes.featuresProgressLabel} style={{ marginTop: 16 }}>
-                            {i18n.t("plans.form.featuresProgressSummary", {
-                                active: activeFeat,
-                                total: totalFeat,
-                            })}
-                        </Typography>
-                        <LinearProgress
-                            variant="determinate"
-                            value={featPct}
-                            className={classes.featuresProgressTrack}
-                            color="primary"
-                        />
-                        </Box>
                         <Field name="planFeatures">
                             {({ field, form }) => (
-                                <PlanFeaturesTree
+                                <FeatureGroupsEditor
+                                    mode="plan"
+                                    title={i18n.t("plans.form.featuresSectionTitle")}
+                                    hint={i18n.t("plans.form.featuresSectionHint")}
                                     value={field.value || {}}
                                     onChange={(next) =>
                                         form.setFieldValue("planFeatures", next)

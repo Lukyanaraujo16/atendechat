@@ -81,16 +81,12 @@ import {
   AppNeutralButton,
 } from "../../ui";
 import AppTableContainer from "../../ui/components/AppTableContainer";
-import ModuleToggleCard from "../ModuleSettings/ModuleToggleCard";
+import FeatureGroupsEditor from "../ModuleSettings/FeatureGroupsEditor";
 import CompanyPlanChangeDialog from "../ModuleSettings/CompanyPlanChangeDialog";
 import {
-  MODULE_TOGGLE_KEYS,
   defaultModulePermissions,
   mergeModulePermissions,
   mergeModulePermissionsFromPlan,
-  getCompanyModuleEffectiveEnabled,
-  getCompanyModuleOriginKey,
-  planBlocksCompanyModule,
 } from "../ModuleSettings/moduleSync";
 import { BUSINESS_SEGMENTS } from "../../config/businessSegment.js";
 
@@ -1710,81 +1706,27 @@ export function CompanyForm(props) {
                 </Grid>
               </AppSectionCard>
 
-              {/* Bloco 3 — Módulos liberados */}
+              {/* Bloco 3 — Módulos e funcionalidades */}
               <AppSectionCard>
-                <Typography className={classes.sectionTitle} component="h2">
-                  {i18n.t("settings.company.form.modulesSectionTitle")}
-                </Typography>
-                <Typography
-                  variant="body2"
-                  color="textSecondary"
-                  className={classes.sectionSubtitle}
-                >
-                  {i18n.t("settings.company.form.modulesSectionHintV2")}
-                </Typography>
-                <Grid container spacing={2}>
-                  {MODULE_TOGGLE_KEYS.map((key) => (
-                    <Grid item xs={12} md={6} key={key}>
-                      <Field name={`modulePermissions.${key}`}>
-                        {({ field, form }) => {
-                          const selectedPlan = plans.find(
-                            (p) =>
-                              String(p.id) === String(form.values.planId)
-                          );
-                          const noPlan =
-                            !form.values.planId ||
-                            form.values.planId === "" ||
-                            !selectedPlan;
-                          const isGroups = key === "useGroups";
-                          const blocked = planBlocksCompanyModule(
-                            key,
-                            selectedPlan
-                          );
-                          const toggleDisabled =
-                            blocked || (!isGroups && noPlan);
-                          const originKey = getCompanyModuleOriginKey(
-                            key,
-                            form.values.modulePermissions,
-                            selectedPlan
-                          );
-                          const originLabel = i18n.t(
-                            `platform.moduleSettings.origin.${originKey}`
-                          );
-                          const effectiveOn = getCompanyModuleEffectiveEnabled(
-                            key,
-                            form.values.modulePermissions,
-                            selectedPlan
-                          );
-                          return (
-                            <ModuleToggleCard
-                              title={i18n.t(
-                                `settings.company.form.modules.${key}`
-                              )}
-                              description={i18n.t(
-                                `settings.company.form.modules.${key}Help`
-                              )}
-                              originLabel={originLabel}
-                              checked={effectiveOn}
-                              disabled={toggleDisabled}
-                              onChange={(e) => {
-                                if (toggleDisabled) return;
-                                form.setFieldValue(
-                                  field.name,
-                                  e.target.checked
-                                );
-                              }}
-                              inputProps={{
-                                "aria-label": i18n.t(
-                                  `settings.company.form.modules.${key}`
-                                ),
-                              }}
-                            />
-                          );
-                        }}
-                      </Field>
-                    </Grid>
-                  ))}
-                </Grid>
+                <Field name="modulePermissions">
+                  {({ field, form }) => {
+                    const selectedPlan = plans.find(
+                      (p) => String(p.id) === String(form.values.planId)
+                    );
+                    return (
+                      <FeatureGroupsEditor
+                        mode="company"
+                        title={i18n.t("settings.company.form.modulesFeaturesSectionTitle")}
+                        hint={i18n.t("settings.company.form.modulesFeaturesSectionHint")}
+                        plan={selectedPlan}
+                        modulePermissions={field.value}
+                        onModulePermissionsChange={(next) =>
+                          form.setFieldValue("modulePermissions", next)
+                        }
+                      />
+                    );
+                  }}
+                </Field>
               </AppSectionCard>
 
               {/* Bloco 4 — Utilizadores */}

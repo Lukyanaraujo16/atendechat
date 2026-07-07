@@ -34,6 +34,23 @@ export const MODULE_PLAN_FEATURE_KEYS = {
   useGroups: ["team.groups"],
 };
 
+/** Feature leaf → chave legada em modulePermissions (retrocompat com toggles antigos). */
+export const FEATURE_TO_LEGACY_MODULE = {
+  "attendance.kanban": "useKanban",
+  "attendance.internal_chat": "useInternalChat",
+  "automation.openai": "useOpenAi",
+  "automation.integrations": "useIntegrations",
+  "agenda.appointments": "useSchedules",
+  "attendance.schedules": "useSchedules",
+  "settings.api": "useExternalApi",
+  "team.groups": "useGroups",
+  "campaigns.sends": "useCampaigns",
+  "campaigns.lists": "useCampaigns",
+  "automation.keywords": "useCampaigns",
+  "automation.quick_replies": "useCampaigns",
+  "automation.chatbot": "useFlowbuilders",
+};
+
 /** Chaves do plano que têm homónimo em modulePermissions da empresa. */
 export const PLAN_KEYS_SHARED_WITH_COMPANY = [
   "useKanban",
@@ -302,6 +319,139 @@ export function getCompanyModuleOriginKey(moduleKey, fullPermissions, plan) {
 /** @deprecated usar getCompanyModuleOriginKey */
 export function getModuleOriginKey(moduleKey, fullPermissions, plan) {
   return getCompanyModuleOriginKey(moduleKey, fullPermissions, plan);
+}
+
+/** Espelha `applyLegacyModulePermissionGates` do backend. */
+export function applyLegacyModulePermissionGates(modulePermissions, featureKey, base) {
+  const m = mergeModulePermissions(modulePermissions);
+  if (!base) return false;
+  const off = (k) => m[k] === false;
+
+  if (off("useKanban") && featureKey === "attendance.kanban") return false;
+  if (off("useInternalChat") && featureKey === "attendance.internal_chat") return false;
+  if (off("useOpenAi") && featureKey === "automation.openai") return false;
+  if (off("useIntegrations") && featureKey === "automation.integrations") return false;
+  if (
+    off("useSchedules") &&
+    (featureKey === "agenda.appointments" || featureKey === "attendance.schedules")
+  ) {
+    return false;
+  }
+  if (off("useExternalApi") && featureKey === "settings.api") return false;
+  if (off("useGroups") && featureKey === "team.groups") return false;
+
+  if (off("useCampaigns")) {
+    if (
+      featureKey === "campaigns.sends" ||
+      featureKey === "campaigns.lists" ||
+      featureKey === "automation.keywords" ||
+      featureKey === "automation.quick_replies"
+    ) {
+      return false;
+    }
+  }
+  if (off("useFlowbuilders") && featureKey === "automation.chatbot") return false;
+
+  return true;
+}
+
+/** Valor efetivo de uma feature para a empresa (plano + overrides). */
+export function resolveCompanyPlanFeature(plan, modulePermissions, featureKey) {
+  const m = mergeModulePermissions(modulePermissions);
+  if (m[featureKey] === false) return false;
+  if (
+    featureKey === "contacts.tags" &&
+    Object.prototype.hasOwnProperty.call(m, "contacts.crm") &&
+    m["contacts.crm"] === false
+  ) {
+    return false;
+  }
+  if (!plan || plan.id == null) {
+    if (featureKey === "team.groups") return m.useGroups !== false;
+    return false;
+  }
+  const planMap = getPlanLevelFeatureMap(plan);
+  const base = planMap[featureKey] === true;
+  return applyLegacyModulePermissionGates(m, featureKey, base);
+}
+
+export function getCompanyEffectiveFeatureMap(plan, modulePermissions) {
+  const keys = getAllFeatureKeys();
+  const out = {};
+  keys.forEach((k) => {
+    out[k] = resolveCompanyPlanFeature(plan, modulePermissions, k);
+  });
+  return out;
+}
+
+/** A empresa pode alterar esta feature (plano permite ou sem plano só grupos). */
+export function isCompanyFeatureEditable(featureKey, plan) {
+  if (!plan || plan.id == null) {
+    return featureKey === "team.groups";
+  }
+  const planMap = getPlanLevelFeatureMap(plan);
+  return planMap[featureKey] === true;
+}
+
+/**
+ * Origem visual de uma feature leaf na edição da empresa.
+ * @returns {'inherited'|'disabledOverride'|'blockedByPlan'|'companyOnly'|'noPlan'}
+ */
+export function getCompanyFeatureOriginKey(featureKey, modulePermissions, plan) {
+  if (!plan || plan.id == null) {
+    if (featureKey === "team.groups") return "companyOnly";
+    return "noPlan";
+  }
+  const planMap = getPlanLevelFeatureMap(plan);
+  if (planMap[featureKey] !== true) {
+    return "blockedByPlan";
+  }
+  const m = mergeModulePermissions(modulePermissions);
+  if (m[featureKey] === false) return "disabledOverride";
+  const legacyKey = FEATURE_TO_LEGACY_MODULE[featureKey];
+  if (legacyKey && m[legacyKey] === false) return "disabledOverride";
+  return "inherited";
+}
+
+/** Atualiza modulePermissions ao alternar uma feature na UI granular. */
+export function applyCompanyFeatureToggle(modulePermissions, plan, featureKey, enabled) {
+  const next = { ...mergeModulePermissions(modulePermissions) };
+
+  if (!plan || plan.id == null) {
+    if (featureKey === "team.groups") {
+      next.useGroups = enabled !== false;
+    }
+    return next;
+  }
+
+  if (!isCompanyFeatureEditable(featureKey, plan) && enabled) {
+    return next;
+  }
+
+  const legacyKey = FEATURE_TO_LEGACY_MODULE[featureKey];
+
+  if (enabled) {
+    delete next[featureKey];
+    if (legacyKey && MODULE_TOGGLE_KEYS.includes(legacyKey)) {
+      next[legacyKey] = true;
+    }
+  } else if (legacyKey && MODULE_TOGGLE_KEYS.includes(legacyKey)) {
+    next[legacyKey] = false;
+  } else {
+    next[featureKey] = false;
+  }
+
+  return next;
+}
+
+/** Aplica activar/desactivar em lote num grupo (só features editáveis). */
+export function applyCompanyFeatureGroupToggle(modulePermissions, plan, featureKeys, enabled) {
+  let next = { ...mergeModulePermissions(modulePermissions) };
+  featureKeys.forEach((featureKey) => {
+    if (!isCompanyFeatureEditable(featureKey, plan)) return;
+    next = applyCompanyFeatureToggle(next, plan, featureKey, enabled);
+  });
+  return next;
 }
 
 /**

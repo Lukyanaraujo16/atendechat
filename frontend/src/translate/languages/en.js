@@ -5921,6 +5921,9 @@ const messages = {
 							"Do you really want to disconnect {{name}} from all devices?",
 						usersForceLogoutSuccess: "User session ended successfully.",
 						modulesSectionTitle: "Enabled modules (company)",
+						modulesFeaturesSectionTitle: "Company modules and features",
+						modulesFeaturesSectionHint:
+							"Configure permissions specific to this company. These options may override the plan’s default settings.",
 						modulesSectionHint:
 							"Complements the plan: turning off hides the module and blocks use when the plan allows the feature.",
 						modulesSectionHintV2:

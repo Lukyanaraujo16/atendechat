@@ -17,6 +17,13 @@ import ExpandLessIcon from "@material-ui/icons/ExpandLess";
 import { makeStyles, alpha } from "@material-ui/core/styles";
 import { i18n } from "../../translate/i18n";
 import { getFeatureLabel, getFeatureDescription } from "../../config/features";
+import {
+  applyCompanyFeatureGroupToggle,
+  applyCompanyFeatureToggle,
+  getCompanyFeatureOriginKey,
+  isCompanyFeatureEditable,
+  resolveCompanyPlanFeature,
+} from "../ModuleSettings/moduleSync";
 
 function isBranch(n) {
   return n && typeof n.children === "object";
@@ -133,6 +140,14 @@ const useStyles = makeStyles((theme) => ({
     lineHeight: 1.4,
     color: theme.palette.text.primary,
   },
+  originHint: {
+    fontSize: "0.65rem",
+    lineHeight: 1.35,
+    color: theme.palette.text.secondary,
+    marginTop: 2,
+    paddingLeft: theme.spacing(3.25),
+    fontStyle: "italic",
+  },
   leafHint: {
     fontSize: "0.7rem",
     lineHeight: 1.35,
@@ -156,18 +171,36 @@ export default function PlanFeatureGroupCard({
   onChange,
   expanded,
   onToggleExpand,
+  mode = "plan",
+  plan,
+  modulePermissions,
+  onModulePermissionsChange,
 }) {
   const classes = useStyles();
   const { keys, leaves } = useMemo(() => collectLeaves(rootKey, node), [rootKey, node]);
+  const isCompanyMode = mode === "company";
+
+  const isFeatureOn = (featureKey) => {
+    if (isCompanyMode) {
+      return resolveCompanyPlanFeature(plan, modulePermissions, featureKey);
+    }
+    return value[featureKey] === true;
+  };
 
   const total = keys.length;
   const active = useMemo(
-    () => keys.filter((k) => value[k] === true).length,
-    [keys, value]
+    () => keys.filter((k) => isFeatureOn(k)).length,
+    [keys, value, modulePermissions, plan, isCompanyMode]
   );
   const progress = total ? Math.round((active / total) * 100) : 0;
 
   const setAll = (checked) => {
+    if (isCompanyMode) {
+      onModulePermissionsChange(
+        applyCompanyFeatureGroupToggle(modulePermissions, plan, keys, checked)
+      );
+      return;
+    }
     const next = { ...value };
     keys.forEach((k) => {
       next[k] = checked;
@@ -176,8 +209,18 @@ export default function PlanFeatureGroupCard({
   };
 
   const toggleOne = (path, checked) => {
+    if (isCompanyMode) {
+      onModulePermissionsChange(
+        applyCompanyFeatureToggle(modulePermissions, plan, path, checked)
+      );
+      return;
+    }
     onChange({ ...value, [path]: checked });
   };
+
+  const editableKeys = isCompanyMode
+    ? keys.filter((k) => isCompanyFeatureEditable(k, plan))
+    : keys;
 
   return (
     <Card className={classes.card} elevation={0}>
@@ -225,28 +268,40 @@ export default function PlanFeatureGroupCard({
         </Box>
 
         <Collapse in={expanded} timeout="auto" unmountOnExit>
-          <Box className={classes.actionsRow}>
-            <Link
-              component="button"
-              type="button"
-              className={classes.actionLink}
-              onClick={() => setAll(true)}
-            >
-              {i18n.t("plans.form.selectAllFeatures")}
-            </Link>
-            <Link
-              component="button"
-              type="button"
-              className={classes.actionLink}
-              onClick={() => setAll(false)}
-            >
-              {i18n.t("plans.form.clearAllFeatures")}
-            </Link>
-          </Box>
+          {editableKeys.length > 0 ? (
+            <Box className={classes.actionsRow}>
+              <Link
+                component="button"
+                type="button"
+                className={classes.actionLink}
+                onClick={() => setAll(true)}
+              >
+                {i18n.t("plans.form.selectAllFeatures")}
+              </Link>
+              <Link
+                component="button"
+                type="button"
+                className={classes.actionLink}
+                onClick={() => setAll(false)}
+              >
+                {i18n.t("plans.form.clearAllFeatures")}
+              </Link>
+            </Box>
+          ) : null}
           <Box display="flex" flexDirection="column">
             {leaves.map(({ key }) => {
               const label = getFeatureLabel(key);
               const description = getFeatureDescription(key);
+              const checked = isFeatureOn(key);
+              const disabled =
+                isCompanyMode && !isCompanyFeatureEditable(key, plan);
+              const originKey = isCompanyMode
+                ? getCompanyFeatureOriginKey(key, modulePermissions, plan)
+                : null;
+              const originLabel =
+                originKey != null
+                  ? i18n.t(`platform.moduleSettings.origin.${originKey}`)
+                  : null;
               return (
                 <Box key={key}>
                   <Tooltip
@@ -262,7 +317,8 @@ export default function PlanFeatureGroupCard({
                         <Checkbox
                           color="primary"
                           size="small"
-                          checked={value[key] === true}
+                          checked={checked}
+                          disabled={disabled}
                           onChange={(e) => toggleOne(key, e.target.checked)}
                         />
                       }
@@ -272,6 +328,11 @@ export default function PlanFeatureGroupCard({
                   {description ? (
                     <Typography className={classes.leafHint} component="p">
                       {description}
+                    </Typography>
+                  ) : null}
+                  {originLabel ? (
+                    <Typography className={classes.originHint} component="p">
+                      {originLabel}
                     </Typography>
                   ) : null}
                 </Box>
