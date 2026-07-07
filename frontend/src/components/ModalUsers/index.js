@@ -122,14 +122,17 @@ const ModalUsers = ({ open, onClose, userId, companyId, onSaved }) => {
   const handleSaveUser = async (values) => {
     const userData = { ...values, companyId, queueIds: selectedQueueIds };
     try {
+      let savedUser;
       if (userId) {
-        await api.put(`/users/${userId}`, userData);
+        const { data } = await api.put(`/users/${userId}`, userData);
+        savedUser = data;
       } else {
-        await api.post("/users", userData);
+        const { data } = await api.post("/users", userData);
+        savedUser = data;
       }
       toast.success(i18n.t("userModal.success"));
       if (typeof onSaved === "function") {
-        await onSaved();
+        await onSaved(savedUser);
       }
       handleClose();
     } catch (err) {

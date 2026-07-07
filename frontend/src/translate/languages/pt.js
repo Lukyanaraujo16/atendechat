@@ -6053,6 +6053,19 @@ const messages = {
               "Deseja inativar {{name}}? O utilizador não poderá iniciar sessão; histórico e tickets serão preservados.",
             usersActivated: "Utilizador ativado com sucesso.",
             usersDeactivated: "Utilizador inativado com sucesso.",
+            usersChangePasswordAction: "Trocar senha",
+            usersChangePasswordTitle: "Trocar senha",
+            usersChangePasswordHint: "Defina uma nova senha para {{name}}.",
+            usersPasswordNew: "Nova senha",
+            usersPasswordConfirm: "Confirmar senha",
+            usersPasswordConfirmRequired: "Confirme a nova senha.",
+            usersPasswordMismatch: "As senhas não coincidem.",
+            usersPasswordChanged: "Senha alterada com sucesso.",
+            usersForceLogoutAction: "Forçar logout",
+            usersForceLogoutTitle: "Forçar logout",
+            usersForceLogoutMessage:
+              "Deseja realmente desconectar {{name}} de todos os dispositivos?",
+            usersForceLogoutSuccess: "Sessão do utilizador encerrada com sucesso.",
             modulesSectionTitle: "Módulos liberados (empresa)",
             modulesSectionHint:
               "Complementa o plano: desligar aqui oculta o módulo e bloqueia o uso, quando o plano permitir o recurso.",
@@ -6480,6 +6493,11 @@ const messages = {
         ERR_NO_USER_FOUND: "Nenhum usuário encontrado com este ID.",
         ERR_USER_INACTIVE:
           "Esta conta está inativa. Contacte o administrador da empresa.",
+        ERR_LAST_ACTIVE_ADMIN:
+          "Não é possível inativar o último administrador da empresa.",
+        ERR_CANNOT_DEACTIVATE_SELF: "Não pode inativar a própria conta.",
+        ERR_CANNOT_DEMOTE_SELF_ADMIN:
+          "Não pode remover o seu próprio perfil de administrador.",
         ERR_NO_WAPP_FOUND: "Nenhum WhatsApp encontrado com este ID.",
         ERR_NO_INSTAGRAM_ACCOUNT_FOUND: "Conta Instagram não encontrada.",
         ERR_INSTAGRAM_ACCOUNT_DUPLICATE:

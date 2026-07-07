@@ -29,6 +29,7 @@ import { useTheme, alpha } from "@material-ui/core/styles";
 import SearchIcon from "@material-ui/icons/Search";
 import EditOutlined from "@material-ui/icons/EditOutlined";
 import DeleteOutline from "@material-ui/icons/DeleteOutline";
+import ExitToApp from "@material-ui/icons/ExitToApp";
 import Block from "@material-ui/icons/Block";
 import CheckCircleOutline from "@material-ui/icons/CheckCircleOutline";
 import HeadsetMic from "@material-ui/icons/HeadsetMic";
@@ -41,6 +42,8 @@ import { toast } from "react-toastify";
 import useCompanies from "../../hooks/useCompanies";
 import usePlans from "../../hooks/usePlans";
 import ModalUsers from "../ModalUsers";
+import CompanyUserPasswordDialog from "../CompanyUserPasswordDialog";
+import { SocketContext } from "../../context/Socket/SocketContext";
 import api from "../../services/api";
 import { isArray, has } from "lodash";
 import { useDate } from "../../hooks/useDate";
@@ -77,6 +80,7 @@ import {
   AppSecondaryButton,
   AppNeutralButton,
 } from "../../ui";
+import MobileActionsMenu from "../../ui/components/MobileActionsMenu";
 import AppTableContainer from "../../ui/components/AppTableContainer";
 import ModuleToggleCard from "../ModuleSettings/ModuleToggleCard";
 import CompanyPlanChangeDialog from "../ModuleSettings/CompanyPlanChangeDialog";
@@ -794,6 +798,7 @@ export function CompanyForm(props) {
     storageSnapshots = [],
   } = props;
   const { user } = useContext(AuthContext);
+  const socketManager = useContext(SocketContext);
   const classes = useStyles();
   const theme = useTheme();
   const [plans, setPlans] = useState([]);
@@ -803,6 +808,9 @@ export function CompanyForm(props) {
   const [usersLoading, setUsersLoading] = useState(false);
   const [userToggleConfirm, setUserToggleConfirm] = useState(null);
   const [userToggleLoading, setUserToggleLoading] = useState(false);
+  const [passwordDialogUser, setPasswordDialogUser] = useState(null);
+  const [forceLogoutConfirm, setForceLogoutConfirm] = useState(null);
+  const [forceLogoutLoading, setForceLogoutLoading] = useState(false);
   const [planChangeCtx, setPlanChangeCtx] = useState(null);
 
   const [record, setRecord] = useState(() => ({
@@ -937,6 +945,34 @@ export function CompanyForm(props) {
 
   const companyIdForUsers = initialValue && initialValue.id;
 
+  const patchCompanyUser = useCallback((userId, patch) => {
+    setCompanyUsers((prev) =>
+      prev.map((row) => (row.id === userId ? { ...row, ...patch } : row))
+    );
+  }, []);
+
+  const upsertCompanyUser = useCallback((savedUser) => {
+    if (!savedUser?.id) return;
+    setCompanyUsers((prev) => {
+      const idx = prev.findIndex((row) => row.id === savedUser.id);
+      const normalized = {
+        id: savedUser.id,
+        name: savedUser.name,
+        email: savedUser.email,
+        profile: savedUser.profile,
+        active: savedUser.active !== false,
+        online: savedUser.online === true,
+        queues: savedUser.queues || [],
+      };
+      if (idx === -1) {
+        return [...prev, normalized].sort((a, b) => a.id - b.id);
+      }
+      const next = [...prev];
+      next[idx] = { ...next[idx], ...normalized };
+      return next;
+    });
+  }, []);
+
   const fetchCompanyUsers = useCallback(async () => {
     if (!companyIdForUsers) {
       setCompanyUsers([]);
@@ -975,6 +1011,31 @@ export function CompanyForm(props) {
     fetchCompanyUsers();
   }, [fetchCompanyUsers]);
 
+  useEffect(() => {
+    if (!companyIdForUsers || !socketManager) return undefined;
+    const companyId = String(companyIdForUsers);
+    const socket = socketManager.getSocket(companyId);
+    const onUserEvent = (data) => {
+      if (!data?.user?.id) return;
+      if (data.action === "update") {
+        patchCompanyUser(data.user.id, {
+          name: data.user.name,
+          email: data.user.email,
+          profile: data.user.profile,
+          active: data.user.active !== false,
+          online: data.user.online === true,
+        });
+      }
+      if (data.action === "create") {
+        upsertCompanyUser(data.user);
+      }
+    };
+    socket.on(`company-${companyId}-user`, onUserEvent);
+    return () => {
+      socket.off(`company-${companyId}-user`, onUserEvent);
+    };
+  }, [companyIdForUsers, socketManager, patchCompanyUser, upsertCompanyUser]);
+
   const handleOpenCreateUser = () => {
     setSelectedUserId(null);
     setModalUser(true);
@@ -1001,19 +1062,86 @@ export function CompanyForm(props) {
     const { user: targetUser, nextActive } = userToggleConfirm;
     setUserToggleLoading(true);
     try {
-      await api.put(`/users/${targetUser.id}`, { active: nextActive });
+      const { data } = await api.put(`/users/${targetUser.id}`, { active: nextActive });
       toast.success(
         nextActive
           ? i18n.t("settings.company.form.usersActivated")
           : i18n.t("settings.company.form.usersDeactivated")
       );
+      patchCompanyUser(targetUser.id, {
+        active: data?.active !== false,
+        online: data?.online === true,
+      });
       setUserToggleConfirm(null);
-      await fetchCompanyUsers();
     } catch (err) {
       toastError(err);
     } finally {
       setUserToggleLoading(false);
     }
+  };
+
+  const handleConfirmForceLogout = async () => {
+    if (!forceLogoutConfirm?.id) return;
+    setForceLogoutLoading(true);
+    try {
+      const { data } = await api.put(`/users/${forceLogoutConfirm.id}`, {
+        forceLogout: true,
+      });
+      toast.success(i18n.t("settings.company.form.usersForceLogoutSuccess"));
+      patchCompanyUser(forceLogoutConfirm.id, {
+        online: data?.online === true,
+      });
+      setForceLogoutConfirm(null);
+    } catch (err) {
+      toastError(err);
+    } finally {
+      setForceLogoutLoading(false);
+    }
+  };
+
+  const handleUserSaved = async (savedUser) => {
+    upsertCompanyUser(savedUser);
+  };
+
+  const buildCompanyUserMenuItems = (row) => {
+    const isInactive = row.active === false;
+    return [
+      {
+        key: "edit",
+        label: i18n.t("users.buttons.edit"),
+        icon: <EditOutlined fontSize="small" />,
+        onClick: () => handleOpenEditUser(row),
+      },
+      {
+        key: "password",
+        label: i18n.t("settings.company.form.usersChangePasswordAction"),
+        icon: <LockOutlined fontSize="small" />,
+        onClick: () => setPasswordDialogUser(row),
+      },
+      {
+        key: "forceLogout",
+        label: i18n.t("settings.company.form.usersForceLogoutAction"),
+        icon: <ExitToApp fontSize="small" />,
+        onClick: () => setForceLogoutConfirm(row),
+      },
+      { divider: true },
+      {
+        key: "toggleActive",
+        label: isInactive
+          ? i18n.t("settings.company.form.usersActivateAction")
+          : i18n.t("settings.company.form.usersDeactivateAction"),
+        icon: isInactive ? (
+          <CheckCircleOutline fontSize="small" />
+        ) : (
+          <Block fontSize="small" />
+        ),
+        onClick: () =>
+          setUserToggleConfirm({
+            user: row,
+            nextActive: isInactive,
+          }),
+      },
+    ];
   };
 
   const formatUserProfile = (profile) => {
@@ -1081,6 +1209,13 @@ export function CompanyForm(props) {
         open={Boolean(userToggleConfirm)}
         onClose={() => !userToggleLoading && setUserToggleConfirm(null)}
         onConfirm={handleConfirmToggleUserActive}
+        loading={userToggleLoading}
+        asyncConfirm
+        confirmText={
+          userToggleConfirm?.nextActive
+            ? i18n.t("settings.company.form.usersActivateAction")
+            : i18n.t("settings.company.form.usersDeactivateAction")
+        }
       >
         {userToggleConfirm?.nextActive
           ? i18n.t("settings.company.form.usersActivateMessage", {
@@ -1090,12 +1225,30 @@ export function CompanyForm(props) {
               name: userToggleConfirm?.user?.name || userToggleConfirm?.user?.email
             })}
       </ConfirmationModal>
+      <ConfirmationModal
+        title={i18n.t("settings.company.form.usersForceLogoutTitle")}
+        open={Boolean(forceLogoutConfirm)}
+        onClose={() => !forceLogoutLoading && setForceLogoutConfirm(null)}
+        onConfirm={handleConfirmForceLogout}
+        loading={forceLogoutLoading}
+        asyncConfirm
+        confirmText={i18n.t("settings.company.form.usersForceLogoutAction")}
+      >
+        {i18n.t("settings.company.form.usersForceLogoutMessage", {
+          name: forceLogoutConfirm?.name || forceLogoutConfirm?.email,
+        })}
+      </ConfirmationModal>
+      <CompanyUserPasswordDialog
+        open={Boolean(passwordDialogUser)}
+        user={passwordDialogUser}
+        onClose={() => setPasswordDialogUser(null)}
+      />
       <ModalUsers
         userId={selectedUserId}
         companyId={initialValue?.id}
         open={modalUser}
         onClose={handleCloseUserModal}
-        onSaved={fetchCompanyUsers}
+        onSaved={handleUserSaved}
       />
       <Formik
         enableReinitialize
@@ -1757,43 +1910,12 @@ export function CompanyForm(props) {
                                 </Box>
                               </TableCell>
                               <TableCell align="right">
-                                <Tooltip title={i18n.t("users.buttons.edit")}>
-                                  <IconButton
-                                    size="small"
-                                    onClick={() => handleOpenEditUser(u)}
-                                    aria-label={i18n.t("users.buttons.edit")}
-                                  >
-                                    <EditOutlined fontSize="small" />
-                                  </IconButton>
-                                </Tooltip>
-                                <Tooltip
-                                  title={
-                                    u.active === false
-                                      ? i18n.t("settings.company.form.usersActivateAction")
-                                      : i18n.t("settings.company.form.usersDeactivateAction")
-                                  }
-                                >
+                                <Tooltip title={i18n.t("users.table.actions")}>
                                   <span>
-                                    <IconButton
-                                      size="small"
-                                      onClick={() =>
-                                        setUserToggleConfirm({
-                                          user: u,
-                                          nextActive: u.active === false
-                                        })
-                                      }
-                                      aria-label={
-                                        u.active === false
-                                          ? i18n.t("settings.company.form.usersActivateAction")
-                                          : i18n.t("settings.company.form.usersDeactivateAction")
-                                      }
-                                    >
-                                      {u.active === false ? (
-                                        <CheckCircleOutline fontSize="small" />
-                                      ) : (
-                                        <Block fontSize="small" />
-                                      )}
-                                    </IconButton>
+                                    <MobileActionsMenu
+                                      ariaLabel={i18n.t("users.table.actions")}
+                                      items={buildCompanyUserMenuItems(u)}
+                                    />
                                   </span>
                                 </Tooltip>
                               </TableCell>

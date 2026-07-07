@@ -37,6 +37,37 @@ interface UserData {
   allTicket?: string;
   featurePermissions?: Record<string, unknown>;
   active?: boolean;
+  forceLogout?: boolean;
+}
+
+async function countActiveCompanyAdmins(
+  companyId: number,
+  excludeUserId?: number
+): Promise<number> {
+  const where: Record<string, unknown> = {
+    companyId,
+    profile: "admin",
+    active: true
+  };
+  if (excludeUserId != null) {
+    where.id = { [Op.ne]: excludeUserId };
+  }
+  return User.count({ where });
+}
+
+async function assertRemainingActiveAdmin(
+  companyId: number | null | undefined,
+  excludeUserId: number
+): Promise<void> {
+  if (!companyId) return;
+  const remaining = await countActiveCompanyAdmins(companyId, excludeUserId);
+  if (remaining < 1) {
+    throw new AppError(
+      "ERR_LAST_ACTIVE_ADMIN",
+      400,
+      "Não é possível inativar o último administrador da empresa."
+    );
+  }
 }
 
 interface Request {
@@ -86,12 +117,19 @@ const UpdateUserService = async ({
     password,
     profile,
     name,
-    queueIds = [],
+    queueIds,
     whatsappId,
     allTicket,
     featurePermissions,
-    active
+    active,
+    forceLogout
   } = userData;
+
+  const queueIdsProvided = Object.prototype.hasOwnProperty.call(
+    userData,
+    "queueIds"
+  );
+  const isSelf = Number(userId) === Number(requestUserId);
 
   const schema = Yup.object().shape({
     email: Yup.string()
@@ -172,6 +210,27 @@ const UpdateUserService = async ({
     );
   }
 
+  if (isSelf && active === false) {
+    throw new AppError(
+      "ERR_CANNOT_DEACTIVATE_SELF",
+      403,
+      "Não pode inativar a própria conta."
+    );
+  }
+
+  if (
+    isSelf &&
+    profile !== undefined &&
+    user.profile === "admin" &&
+    profile !== "admin"
+  ) {
+    throw new AppError(
+      "ERR_CANNOT_DEMOTE_SELF_ADMIN",
+      403,
+      "Não pode remover o seu próprio perfil de administrador."
+    );
+  }
+
   if (active !== undefined) {
     const canManageStatus =
       requestUser.super === true ||
@@ -181,9 +240,33 @@ const UpdateUserService = async ({
     if (!canManageStatus) {
       throw new AppError("ERR_NO_PERMISSION", 403);
     }
-    if (Number(userId) === Number(requestUserId) && active === false) {
+  }
+
+  if (forceLogout === true) {
+    const canForceLogout =
+      requestUser.super === true ||
+      requestUser.profile === "admin" ||
+      requestUser.profile === "superadmin" ||
+      skipCompanyScopeForShow === true;
+    if (!canForceLogout) {
       throw new AppError("ERR_NO_PERMISSION", 403);
     }
+  }
+
+  const willDeactivate =
+    active !== undefined && active === false && user.active !== false;
+  const willDemoteAdmin =
+    profile !== undefined &&
+    user.profile === "admin" &&
+    profile !== "admin" &&
+    user.active !== false;
+
+  if (willDeactivate && user.profile === "admin") {
+    await assertRemainingActiveAdmin(user.companyId, user.id);
+  }
+
+  if (willDemoteAdmin) {
+    await assertRemainingActiveAdmin(user.companyId, user.id);
   }
 
   const emailNorm =
@@ -234,15 +317,23 @@ const UpdateUserService = async ({
       updates.active = nextActive;
       if (!nextActive) {
         updates.tokenVersion = (user.tokenVersion || 0) + 1;
+        updates.online = false;
       }
     }
+  }
+
+  if (forceLogout === true) {
+    updates.tokenVersion = (user.tokenVersion || 0) + 1;
+    updates.online = false;
   }
 
   if (Object.keys(updates).length > 0) {
     await user.update(updates);
   }
 
-  await user.$set("queues", queueIds);
+  if (queueIdsProvided) {
+    await user.$set("queues", queueIds ?? []);
+  }
 
   await user.reload();
 
@@ -285,6 +376,8 @@ const UpdateUserService = async ({
     email: user.email,
     profile: user.profile,
     companyId: user.companyId,
+    active: user.active,
+    online: user.online,
     company,
     queues: user.queues
   };

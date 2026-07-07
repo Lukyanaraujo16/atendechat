@@ -5907,6 +5907,19 @@ const messages = {
 							"Deactivate {{name}}? The user will not be able to sign in; history and tickets will be preserved.",
 						usersActivated: "User activated successfully.",
 						usersDeactivated: "User deactivated successfully.",
+						usersChangePasswordAction: "Change password",
+						usersChangePasswordTitle: "Change password",
+						usersChangePasswordHint: "Set a new password for {{name}}.",
+						usersPasswordNew: "New password",
+						usersPasswordConfirm: "Confirm password",
+						usersPasswordConfirmRequired: "Please confirm the new password.",
+						usersPasswordMismatch: "Passwords do not match.",
+						usersPasswordChanged: "Password changed successfully.",
+						usersForceLogoutAction: "Force logout",
+						usersForceLogoutTitle: "Force logout",
+						usersForceLogoutMessage:
+							"Do you really want to disconnect {{name}} from all devices?",
+						usersForceLogoutSuccess: "User session ended successfully.",
 						modulesSectionTitle: "Enabled modules (company)",
 						modulesSectionHint:
 							"Complements the plan: turning off hides the module and blocks use when the plan allows the feature.",
@@ -6308,6 +6321,11 @@ const messages = {
 				ERR_NO_USER_FOUND: "No user found with this ID.",
 				ERR_USER_INACTIVE:
 					"This account is inactive. Contact your company administrator.",
+				ERR_LAST_ACTIVE_ADMIN:
+					"Cannot deactivate the company's last active administrator.",
+				ERR_CANNOT_DEACTIVATE_SELF: "You cannot deactivate your own account.",
+				ERR_CANNOT_DEMOTE_SELF_ADMIN:
+					"You cannot remove your own administrator profile.",
 				ERR_NO_WAPP_FOUND: "No WhatsApp found with this ID.",
 				ERR_NO_INSTAGRAM_ACCOUNT_FOUND: "Instagram account not found.",
 				ERR_INSTAGRAM_ACCOUNT_DUPLICATE:

@@ -34,13 +34,22 @@ const ConfirmationModal = ({
   confirmText,
   cancelText,
   destructive,
+  loading = false,
+  asyncConfirm = false,
 }) => {
   const classes = useStyles();
+
+  const handleConfirm = () => {
+    onConfirm();
+    if (!asyncConfirm && !loading) {
+      onClose(false);
+    }
+  };
 
   return (
     <AppDialog
       open={open}
-      onClose={() => onClose(false)}
+      onClose={() => !loading && onClose(false)}
       aria-labelledby="confirm-dialog"
       maxWidth="xs"
     >
@@ -51,27 +60,20 @@ const ConfirmationModal = ({
         </Typography>
       </AppDialogContent>
       <AppDialogActions>
-        <AppNeutralButton onClick={() => onClose(false)}>
+        <AppNeutralButton onClick={() => onClose(false)} disabled={loading}>
           {cancelText || i18n.t("confirmationModal.buttons.cancel")}
         </AppNeutralButton>
         {destructive ? (
           <Button
             variant="contained"
             className={classes.confirmDanger}
-            onClick={() => {
-              onConfirm();
-              onClose(false);
-            }}
+            onClick={handleConfirm}
+            disabled={loading}
           >
             {confirmText || i18n.t("confirmationModal.buttons.confirm")}
           </Button>
         ) : (
-          <AppPrimaryButton
-            onClick={() => {
-              onConfirm();
-              onClose(false);
-            }}
-          >
+          <AppPrimaryButton onClick={handleConfirm} loading={loading}>
             {confirmText || i18n.t("confirmationModal.buttons.confirm")}
           </AppPrimaryButton>
         )}
