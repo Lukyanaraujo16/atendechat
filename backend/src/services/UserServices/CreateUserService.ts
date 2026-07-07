@@ -137,7 +137,7 @@ const CreateUserService = async ({
         User,
         "id" | "profile" | "super"
       >);
-    if (featurePermissions && typeof featurePermissions === "object") {
+    if (featurePermissions && typeof featurePermissions === "object" && Object.keys(featurePermissions).length > 0) {
       await setUserFeaturePermissionsFromAdminInput({
         targetUserId: user.id,
         companyId,

@@ -282,7 +282,10 @@ const UserModal = ({ open, onClose, userId, reload }) => {
 	const showSection = section => !isMobile || mobileTab === section;
 
 	const handleSaveUser = async values => {
-		const { permissionPreset: _preset, ...valuesRest } = values;
+		const { permissionPreset: _preset, featurePermissions, ...valuesRest } = values;
+		const step = userId ? "user_update" : "user_create";
+		console.info("[UserSave] submit_start", { userId: userId ?? null, profile: values.profile });
+
 		const userData = {
 			...valuesRest,
 			whatsappId,
@@ -292,21 +295,32 @@ const UserModal = ({ open, onClose, userId, reload }) => {
 		if (userId && (!userData.password || userData.password === "")) {
 			delete userData.password;
 		}
-		if (values.profile !== "admin" && values.featurePermissions) {
-			userData.featurePermissions = values.featurePermissions;
+		if (
+			values.profile !== "admin" &&
+			featurePermissions &&
+			Object.keys(featurePermissions).length > 0
+		) {
+			userData.featurePermissions = featurePermissions;
 		}
 		try {
+			console.info("[UserSave] request_start", { step });
 			if (userId) {
 				await api.put(`/users/${userId}`, userData);
 			} else {
 				await api.post("/users", userData);
 			}
+			console.info("[UserSave] request_success", { step });
 			toast.success(i18n.t("userModal.success"));
 			if (typeof reload === "function") {
 				reload();
 			}
 			handleClose();
 		} catch (err) {
+			console.warn("[UserSave] request_failed", {
+				step,
+				status: err?.response?.status ?? null,
+				error: err?.response?.data?.error || err?.message || "unknown"
+			});
 			toastError(err);
 		}
 	};

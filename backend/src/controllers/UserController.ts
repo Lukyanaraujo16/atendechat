@@ -20,6 +20,7 @@ import {
   assertSupervisorTargetRules,
   loadExplicitUserFeatureMap
 } from "../services/UserFeaturePermission/UserFeaturePermissionService";
+import { logger } from "../utils/logger";
 
 type IndexQuery = {
   searchParam: string;
@@ -205,6 +206,24 @@ export const update = async (
     throw new AppError("ERR_NO_PERMISSION", 403);
   }
 
+  const targetBefore = await ShowUserService(
+    userId,
+    isSupportSelf ? undefined : companyId
+  );
+
+  logger.info(
+    {
+      requesterId: requestUserId,
+      requesterProfile: actor.profile,
+      requesterCompanyId: companyId,
+      targetUserId: userId,
+      targetCompanyId: targetBefore.companyId ?? null,
+      isSelf: Number(userId) === Number(requestUserId),
+      supportMode: supportMode === true
+    },
+    "[UserUpdate] start"
+  );
+
   if (
     actor.profile === "supervisor" &&
     Number(userId) === Number(requestUserId) &&
@@ -220,7 +239,6 @@ export const update = async (
       throw new AppError("ERR_NO_PERMISSION", 403);
     }
     await assertActorCanManageUsers(actor, ctx.featureMap);
-    const targetBefore = await ShowUserService(userId, companyId);
     await assertSupervisorTargetRules({
       actor: { profile: actor.profile },
       targetProfile: targetBefore.profile,

@@ -12,6 +12,17 @@ import {
   seedDefaultUserFeaturePermissions,
   setUserFeaturePermissionsFromAdminInput
 } from "../UserFeaturePermission/UserFeaturePermissionService";
+import { logger } from "../../utils/logger";
+
+function hasFeaturePermissionPayload(
+  featurePermissions: Record<string, unknown> | undefined
+): boolean {
+  return (
+    featurePermissions != null &&
+    typeof featurePermissions === "object" &&
+    Object.keys(featurePermissions).length > 0
+  );
+}
 
 const ALLOWED_PROFILES = ["admin", "user", "supervisor"];
 
@@ -106,6 +117,59 @@ const UpdateUserService = async ({
     throw new AppError("ERR_INVALID_PROFILE", 400);
   }
 
+  const willUpdatePassword =
+    password !== undefined &&
+    password !== null &&
+    String(password).trim().length > 0;
+
+  const featurePermissionPayload = hasFeaturePermissionPayload(featurePermissions);
+
+  if (featurePermissionPayload && !skipCompanyScopeForShow) {
+    if (Number(userId) === Number(requestUserId)) {
+      logger.warn(
+        {
+          requesterId: requestUserId,
+          targetUserId: userId,
+          targetProfile: user.profile
+        },
+        "[UserUpdate] permission_denied"
+      );
+      throw new AppError("ERR_NO_PERMISSION", 403);
+    }
+    if (user.profile === "admin") {
+      logger.warn(
+        {
+          requesterId: requestUserId,
+          targetUserId: userId,
+          targetProfile: user.profile
+        },
+        "[UserUpdate] permission_denied"
+      );
+      throw new AppError("ERR_NO_PERMISSION", 403);
+    }
+    if (!user.companyId) {
+      logger.warn(
+        {
+          requesterId: requestUserId,
+          targetUserId: userId
+        },
+        "[UserUpdate] permission_denied"
+      );
+      throw new AppError("ERR_NO_PERMISSION", 403);
+    }
+  }
+
+  if (willUpdatePassword) {
+    logger.info(
+      {
+        requesterId: requestUserId,
+        targetUserId: userId,
+        isSelf: Number(userId) === Number(requestUserId)
+      },
+      "[UserUpdate] password_update_allowed"
+    );
+  }
+
   const emailNorm =
     email !== undefined && email !== null && String(email).trim() !== ""
       ? String(email).trim().toLowerCase()
@@ -144,11 +208,7 @@ const UpdateUserService = async ({
   if (allTicket !== undefined) {
     updates.allTicket = allTicket;
   }
-  if (
-    password !== undefined &&
-    password !== null &&
-    String(password).trim().length > 0
-  ) {
+  if (willUpdatePassword) {
     updates.password = password;
     updates.mustChangePassword = false;
   }
@@ -181,26 +241,13 @@ const UpdateUserService = async ({
     }
   }
 
-  if (
-    featurePermissions &&
-    typeof featurePermissions === "object" &&
-    !skipCompanyScopeForShow
-  ) {
-    if (Number(userId) === Number(requestUserId)) {
-      throw new AppError("ERR_NO_PERMISSION", 403);
-    }
-    if (user.profile === "admin") {
-      throw new AppError("ERR_NO_PERMISSION", 403);
-    }
-    if (!user.companyId) {
-      throw new AppError("ERR_NO_PERMISSION", 403);
-    }
-    const planMap = await loadPlanFeatureMapForCompanyId(user.companyId);
+  if (featurePermissionPayload && !skipCompanyScopeForShow) {
+    const planMap = await loadPlanFeatureMapForCompanyId(user.companyId!);
     await setUserFeaturePermissionsFromAdminInput({
       targetUserId: user.id,
-      companyId: user.companyId,
+      companyId: user.companyId!,
       planMap,
-      input: featurePermissions,
+      input: featurePermissions!,
       actor: requestUser
     });
   }
@@ -216,6 +263,15 @@ const UpdateUserService = async ({
     company,
     queues: user.queues
   };
+
+  logger.info(
+    {
+      requesterId: requestUserId,
+      targetUserId: user.id,
+      targetCompanyId: user.companyId
+    },
+    "[UserUpdate] saved"
+  );
 
   return serializedUser;
 };
