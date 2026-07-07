@@ -80,7 +80,6 @@ import {
   AppSecondaryButton,
   AppNeutralButton,
 } from "../../ui";
-import MobileActionsMenu from "../../ui/components/MobileActionsMenu";
 import AppTableContainer from "../../ui/components/AppTableContainer";
 import ModuleToggleCard from "../ModuleSettings/ModuleToggleCard";
 import CompanyPlanChangeDialog from "../ModuleSettings/CompanyPlanChangeDialog";
@@ -780,6 +779,15 @@ const useStyles = makeStyles((theme) => ({
     fontWeight: 500,
     maxWidth: "100%",
   },
+  userActionsCell: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: theme.spacing(0.25),
+    maxWidth: 220,
+    marginLeft: "auto",
+  },
   registeredSectionSubtitle: {
     marginBottom: theme.spacing(2),
     lineHeight: 1.55,
@@ -1101,47 +1109,6 @@ export function CompanyForm(props) {
 
   const handleUserSaved = async (savedUser) => {
     upsertCompanyUser(savedUser);
-  };
-
-  const buildCompanyUserMenuItems = (row) => {
-    const isInactive = row.active === false;
-    return [
-      {
-        key: "edit",
-        label: i18n.t("users.buttons.edit"),
-        icon: <EditOutlined fontSize="small" />,
-        onClick: () => handleOpenEditUser(row),
-      },
-      {
-        key: "password",
-        label: i18n.t("settings.company.form.usersChangePasswordAction"),
-        icon: <LockOutlined fontSize="small" />,
-        onClick: () => setPasswordDialogUser(row),
-      },
-      {
-        key: "forceLogout",
-        label: i18n.t("settings.company.form.usersForceLogoutAction"),
-        icon: <ExitToApp fontSize="small" />,
-        onClick: () => setForceLogoutConfirm(row),
-      },
-      { divider: true },
-      {
-        key: "toggleActive",
-        label: isInactive
-          ? i18n.t("settings.company.form.usersActivateAction")
-          : i18n.t("settings.company.form.usersDeactivateAction"),
-        icon: isInactive ? (
-          <CheckCircleOutline fontSize="small" />
-        ) : (
-          <Block fontSize="small" />
-        ),
-        onClick: () =>
-          setUserToggleConfirm({
-            user: row,
-            nextActive: isInactive,
-          }),
-      },
-    ];
   };
 
   const formatUserProfile = (profile) => {
@@ -1910,14 +1877,106 @@ export function CompanyForm(props) {
                                 </Box>
                               </TableCell>
                               <TableCell align="right">
-                                <Tooltip title={i18n.t("users.table.actions")}>
-                                  <span>
-                                    <MobileActionsMenu
-                                      ariaLabel={i18n.t("users.table.actions")}
-                                      items={buildCompanyUserMenuItems(u)}
-                                    />
-                                  </span>
-                                </Tooltip>
+                                <Box className={classes.userActionsCell}>
+                                  <Tooltip title={i18n.t("users.buttons.edit")}>
+                                    <span>
+                                      <IconButton
+                                        size="small"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleOpenEditUser(u);
+                                        }}
+                                        aria-label={i18n.t("users.buttons.edit")}
+                                        disabled={userToggleLoading || forceLogoutLoading}
+                                      >
+                                        <EditOutlined fontSize="small" />
+                                      </IconButton>
+                                    </span>
+                                  </Tooltip>
+                                  <Tooltip
+                                    title={i18n.t("settings.company.form.usersChangePasswordAction")}
+                                  >
+                                    <span>
+                                      <IconButton
+                                        size="small"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setPasswordDialogUser(u);
+                                        }}
+                                        aria-label={i18n.t(
+                                          "settings.company.form.usersChangePasswordAction"
+                                        )}
+                                        disabled={userToggleLoading || forceLogoutLoading}
+                                      >
+                                        <LockOutlined fontSize="small" />
+                                      </IconButton>
+                                    </span>
+                                  </Tooltip>
+                                  <Tooltip
+                                    title={i18n.t("settings.company.form.usersForceLogoutAction")}
+                                  >
+                                    <span>
+                                      <IconButton
+                                        size="small"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setForceLogoutConfirm(u);
+                                        }}
+                                        aria-label={i18n.t(
+                                          "settings.company.form.usersForceLogoutAction"
+                                        )}
+                                        disabled={
+                                          forceLogoutLoading ||
+                                          userToggleLoading
+                                        }
+                                      >
+                                        {forceLogoutLoading &&
+                                        forceLogoutConfirm?.id === u.id ? (
+                                          <CircularProgress size={18} />
+                                        ) : (
+                                          <ExitToApp fontSize="small" />
+                                        )}
+                                      </IconButton>
+                                    </span>
+                                  </Tooltip>
+                                  <Tooltip
+                                    title={
+                                      u.active === false
+                                        ? i18n.t("settings.company.form.usersActivateAction")
+                                        : i18n.t("settings.company.form.usersDeactivateAction")
+                                    }
+                                  >
+                                    <span>
+                                      <IconButton
+                                        size="small"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setUserToggleConfirm({
+                                            user: u,
+                                            nextActive: u.active === false,
+                                          });
+                                        }}
+                                        aria-label={
+                                          u.active === false
+                                            ? i18n.t("settings.company.form.usersActivateAction")
+                                            : i18n.t("settings.company.form.usersDeactivateAction")
+                                        }
+                                        disabled={
+                                          userToggleLoading || forceLogoutLoading
+                                        }
+                                      >
+                                        {userToggleLoading &&
+                                        userToggleConfirm?.user?.id === u.id ? (
+                                          <CircularProgress size={18} />
+                                        ) : u.active === false ? (
+                                          <CheckCircleOutline fontSize="small" />
+                                        ) : (
+                                          <Block fontSize="small" />
+                                        )}
+                                      </IconButton>
+                                    </span>
+                                  </Tooltip>
+                                </Box>
                               </TableCell>
                             </TableRow>
                           ))}
