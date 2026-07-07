@@ -6037,8 +6037,22 @@ const messages = {
               "Formato IANA, como na lista abaixo (ex.: America/Sao_Paulo).",
             usersSectionTitle: "Utilizadores da empresa",
             usersSectionHint:
-              "Lista informativa dos utilizadores vinculados a esta empresa (sem gestão aqui).",
+              "Gerir utilizadores vinculados a esta empresa: criar, editar, alterar senha ou ativar/inativar contas.",
             usersEmpty: "Nenhum utilizador encontrado nesta empresa.",
+            usersNewButton: "+ Novo utilizador",
+            usersAccountStatus: "Conta",
+            usersActive: "Ativo",
+            usersInactive: "Inativo",
+            usersActivateAction: "Ativar",
+            usersDeactivateAction: "Inativar",
+            usersActivateTitle: "Ativar utilizador",
+            usersDeactivateTitle: "Inativar utilizador",
+            usersActivateMessage:
+              "Deseja reativar o acesso de {{name}}? O histórico e os tickets serão preservados.",
+            usersDeactivateMessage:
+              "Deseja inativar {{name}}? O utilizador não poderá iniciar sessão; histórico e tickets serão preservados.",
+            usersActivated: "Utilizador ativado com sucesso.",
+            usersDeactivated: "Utilizador inativado com sucesso.",
             modulesSectionTitle: "Módulos liberados (empresa)",
             modulesSectionHint:
               "Complementa o plano: desligar aqui oculta o módulo e bloqueia o uso, quando o plano permitir o recurso.",
@@ -6464,6 +6478,8 @@ const messages = {
           "Só é possível fixar conversas em atendimento (aba Atendendo).",
         ERR_NO_TICKET_FOUND: "Nenhum tíquete encontrado com este ID.",
         ERR_NO_USER_FOUND: "Nenhum usuário encontrado com este ID.",
+        ERR_USER_INACTIVE:
+          "Esta conta está inativa. Contacte o administrador da empresa.",
         ERR_NO_WAPP_FOUND: "Nenhum WhatsApp encontrado com este ID.",
         ERR_NO_INSTAGRAM_ACCOUNT_FOUND: "Conta Instagram não encontrada.",
         ERR_INSTAGRAM_ACCOUNT_DUPLICATE:

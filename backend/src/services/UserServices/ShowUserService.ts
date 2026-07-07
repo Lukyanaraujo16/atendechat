@@ -19,6 +19,7 @@ const ShowUserService = async (
       "whatsappId",
       "allTicket",
       "online",
+      "active",
       "createdAt"
     ],
     include: [

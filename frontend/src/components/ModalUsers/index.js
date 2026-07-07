@@ -57,7 +57,7 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
-const ModalUsers = ({ open, onClose, userId, companyId }) => {
+const ModalUsers = ({ open, onClose, userId, companyId, onSaved }) => {
   const classes = useStyles();
 
   const validationSchema = useMemo(
@@ -92,18 +92,21 @@ const ModalUsers = ({ open, onClose, userId, companyId }) => {
 
   useEffect(() => {
     const fetchUser = async () => {
-      if (!userId) return;
-      if (open) {
-        try {
-          const { data } = await api.get(`/users/${userId}`);
-          setUser((prevState) => {
-            return { ...prevState, ...data };
-          });
-          const userQueueIds = data.queues?.map((queue) => queue.id);
-          setSelectedQueueIds(userQueueIds);
-        } catch (err) {
-          toastError(err);
-        }
+      if (!open) return;
+      if (!userId) {
+        setUser(initialState);
+        setSelectedQueueIds([]);
+        return;
+      }
+      try {
+        const { data } = await api.get(`/users/${userId}`);
+        setUser((prevState) => {
+          return { ...prevState, ...data };
+        });
+        const userQueueIds = data.queues?.map((queue) => queue.id);
+        setSelectedQueueIds(userQueueIds || []);
+      } catch (err) {
+        toastError(err);
       }
     };
 
@@ -113,6 +116,7 @@ const ModalUsers = ({ open, onClose, userId, companyId }) => {
   const handleClose = () => {
     onClose();
     setUser(initialState);
+    setSelectedQueueIds([]);
   };
 
   const handleSaveUser = async (values) => {
@@ -124,10 +128,13 @@ const ModalUsers = ({ open, onClose, userId, companyId }) => {
         await api.post("/users", userData);
       }
       toast.success(i18n.t("userModal.success"));
+      if (typeof onSaved === "function") {
+        await onSaved();
+      }
+      handleClose();
     } catch (err) {
       toastError(err);
     }
-    handleClose();
   };
 
   return (

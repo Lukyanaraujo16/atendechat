@@ -36,6 +36,7 @@ interface UserData {
   whatsappId?: number;
   allTicket?: string;
   featurePermissions?: Record<string, unknown>;
+  active?: boolean;
 }
 
 interface Request {
@@ -88,7 +89,8 @@ const UpdateUserService = async ({
     queueIds = [],
     whatsappId,
     allTicket,
-    featurePermissions
+    featurePermissions,
+    active
   } = userData;
 
   const schema = Yup.object().shape({
@@ -170,6 +172,20 @@ const UpdateUserService = async ({
     );
   }
 
+  if (active !== undefined) {
+    const canManageStatus =
+      requestUser.super === true ||
+      requestUser.profile === "admin" ||
+      requestUser.profile === "superadmin" ||
+      skipCompanyScopeForShow === true;
+    if (!canManageStatus) {
+      throw new AppError("ERR_NO_PERMISSION", 403);
+    }
+    if (Number(userId) === Number(requestUserId) && active === false) {
+      throw new AppError("ERR_NO_PERMISSION", 403);
+    }
+  }
+
   const emailNorm =
     email !== undefined && email !== null && String(email).trim() !== ""
       ? String(email).trim().toLowerCase()
@@ -211,6 +227,15 @@ const UpdateUserService = async ({
   if (willUpdatePassword) {
     updates.password = password;
     updates.mustChangePassword = false;
+  }
+  if (active !== undefined) {
+    const nextActive = active === true;
+    if (user.active !== nextActive) {
+      updates.active = nextActive;
+      if (!nextActive) {
+        updates.tokenVersion = (user.tokenVersion || 0) + 1;
+      }
+    }
   }
 
   if (Object.keys(updates).length > 0) {

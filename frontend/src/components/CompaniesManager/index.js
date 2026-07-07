@@ -29,6 +29,8 @@ import { useTheme, alpha } from "@material-ui/core/styles";
 import SearchIcon from "@material-ui/icons/Search";
 import EditOutlined from "@material-ui/icons/EditOutlined";
 import DeleteOutline from "@material-ui/icons/DeleteOutline";
+import Block from "@material-ui/icons/Block";
+import CheckCircleOutline from "@material-ui/icons/CheckCircleOutline";
 import HeadsetMic from "@material-ui/icons/HeadsetMic";
 import ChatBubbleOutline from "@material-ui/icons/ChatBubbleOutline";
 import { Formik, Form, Field } from "formik";
@@ -40,7 +42,7 @@ import useCompanies from "../../hooks/useCompanies";
 import usePlans from "../../hooks/usePlans";
 import ModalUsers from "../ModalUsers";
 import api from "../../services/api";
-import { head, isArray, has } from "lodash";
+import { isArray, has } from "lodash";
 import { useDate } from "../../hooks/useDate";
 
 import moment from "moment-timezone";
@@ -796,9 +798,11 @@ export function CompanyForm(props) {
   const theme = useTheme();
   const [plans, setPlans] = useState([]);
   const [modalUser, setModalUser] = useState(false);
-  const [firstUser, setFirstUser] = useState({});
+  const [selectedUserId, setSelectedUserId] = useState(null);
   const [companyUsers, setCompanyUsers] = useState([]);
   const [usersLoading, setUsersLoading] = useState(false);
+  const [userToggleConfirm, setUserToggleConfirm] = useState(null);
+  const [userToggleLoading, setUserToggleLoading] = useState(false);
   const [planChangeCtx, setPlanChangeCtx] = useState(null);
 
   const [record, setRecord] = useState(() => ({
@@ -931,94 +935,86 @@ export function CompanyForm(props) {
     onSubmit(outgoing);
   };
 
-  const handleOpenModalUsers = async () => {
-    const companyId = initialValue?.id;
-    const endpoint = "/users/list";
-    console.info("[CompanyUsers] open_manage_users", {
-      companyId,
-      companyName: initialValue?.name ?? null,
-      passedId: companyId,
-      routeOrEndpoint: endpoint
-    });
-    try {
-      console.info("[CompanyUsers] fetch_start", { companyId, endpoint });
-      const { data } = await api.get(endpoint, {
-        params: {
-          companyId,
-        },
-      });
-      const users = Array.isArray(data) ? data : [];
-      setCompanyUsers(users);
-      console.info("[CompanyUsers] fetch_success", {
-        companyId,
-        count: users.length,
-        userIds: users.map((u) => u.id)
-      });
-      if (users.length) {
-        setFirstUser(head(users));
-      } else {
-        setFirstUser({});
-      }
-      setModalUser(true);
-    } catch (e) {
-      console.warn("[CompanyUsers] fetch_failed", {
-        companyId,
-        status: e?.response?.status ?? null,
-        error: e?.response?.data?.error || e?.message || "unknown"
-      });
-      toast.error(e);
-    }
-  };
-
-  const handleCloseModalUsers = () => {
-    setFirstUser({});
-    setModalUser(false);
-  };
-
   const companyIdForUsers = initialValue && initialValue.id;
 
-  useEffect(() => {
+  const fetchCompanyUsers = useCallback(async () => {
     if (!companyIdForUsers) {
       setCompanyUsers([]);
-      return undefined;
+      return;
     }
-    let cancelled = false;
-    setUsersLoading(true);
     const endpoint = "/users/list";
+    setUsersLoading(true);
     console.info("[CompanyUsers] fetch_start", {
       companyId: companyIdForUsers,
       endpoint
     });
-    api
-      .get(endpoint, { params: { companyId: companyIdForUsers } })
-      .then(({ data }) => {
-        const users = Array.isArray(data) ? data : [];
-        if (!cancelled) {
-          setCompanyUsers(users);
-          console.info("[CompanyUsers] fetch_success", {
-            companyId: companyIdForUsers,
-            count: users.length,
-            userIds: users.map((u) => u.id)
-          });
-        }
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setCompanyUsers([]);
-          console.warn("[CompanyUsers] fetch_failed", {
-            companyId: companyIdForUsers,
-            status: err?.response?.status ?? null,
-            error: err?.response?.data?.error || err?.message || "unknown"
-          });
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setUsersLoading(false);
+    try {
+      const { data } = await api.get(endpoint, {
+        params: { companyId: companyIdForUsers }
       });
-    return () => {
-      cancelled = true;
-    };
+      const users = Array.isArray(data) ? data : [];
+      setCompanyUsers(users);
+      console.info("[CompanyUsers] fetch_success", {
+        companyId: companyIdForUsers,
+        count: users.length,
+        userIds: users.map((u) => u.id)
+      });
+    } catch (err) {
+      setCompanyUsers([]);
+      console.warn("[CompanyUsers] fetch_failed", {
+        companyId: companyIdForUsers,
+        status: err?.response?.status ?? null,
+        error: err?.response?.data?.error || err?.message || "unknown"
+      });
+    } finally {
+      setUsersLoading(false);
+    }
   }, [companyIdForUsers]);
+
+  useEffect(() => {
+    fetchCompanyUsers();
+  }, [fetchCompanyUsers]);
+
+  const handleOpenCreateUser = () => {
+    setSelectedUserId(null);
+    setModalUser(true);
+  };
+
+  const handleOpenEditUser = (userRow) => {
+    console.info("[CompanyUsers] open_manage_users", {
+      companyId: companyIdForUsers,
+      companyName: initialValue?.name ?? null,
+      passedId: userRow?.id ?? null,
+      routeOrEndpoint: `/users/${userRow?.id}`
+    });
+    setSelectedUserId(userRow.id);
+    setModalUser(true);
+  };
+
+  const handleCloseUserModal = () => {
+    setModalUser(false);
+    setSelectedUserId(null);
+  };
+
+  const handleConfirmToggleUserActive = async () => {
+    if (!userToggleConfirm?.user) return;
+    const { user: targetUser, nextActive } = userToggleConfirm;
+    setUserToggleLoading(true);
+    try {
+      await api.put(`/users/${targetUser.id}`, { active: nextActive });
+      toast.success(
+        nextActive
+          ? i18n.t("settings.company.form.usersActivated")
+          : i18n.t("settings.company.form.usersDeactivated")
+      );
+      setUserToggleConfirm(null);
+      await fetchCompanyUsers();
+    } catch (err) {
+      toastError(err);
+    } finally {
+      setUserToggleLoading(false);
+    }
+  };
 
   const formatUserProfile = (profile) => {
     const key = `users.profileLabels.${profile}`;
@@ -1076,11 +1072,30 @@ export function CompanyForm(props) {
 
   return (
     <>
+      <ConfirmationModal
+        title={
+          userToggleConfirm?.nextActive
+            ? i18n.t("settings.company.form.usersActivateTitle")
+            : i18n.t("settings.company.form.usersDeactivateTitle")
+        }
+        open={Boolean(userToggleConfirm)}
+        onClose={() => !userToggleLoading && setUserToggleConfirm(null)}
+        onConfirm={handleConfirmToggleUserActive}
+      >
+        {userToggleConfirm?.nextActive
+          ? i18n.t("settings.company.form.usersActivateMessage", {
+              name: userToggleConfirm?.user?.name || userToggleConfirm?.user?.email
+            })
+          : i18n.t("settings.company.form.usersDeactivateMessage", {
+              name: userToggleConfirm?.user?.name || userToggleConfirm?.user?.email
+            })}
+      </ConfirmationModal>
       <ModalUsers
-        userId={firstUser.id}
-        companyId={initialValue.id}
+        userId={selectedUserId}
+        companyId={initialValue?.id}
         open={modalUser}
-        onClose={handleCloseModalUsers}
+        onClose={handleCloseUserModal}
+        onSaved={fetchCompanyUsers}
       />
       <Formik
         enableReinitialize
@@ -1665,12 +1680,21 @@ export function CompanyForm(props) {
                   >
                     {i18n.t("settings.company.form.usersSectionHint")}
                   </Typography>
+                  <Box display="flex" justifyContent="flex-end" mb={2}>
+                    <AppSecondaryButton type="button" onClick={handleOpenCreateUser}>
+                      {i18n.t("settings.company.form.usersNewButton")}
+                    </AppSecondaryButton>
+                  </Box>
                   {usersLoading ? (
                     <Box display="flex" alignItems="center" py={3} justifyContent="center">
                       <CircularProgress size={32} />
                     </Box>
                   ) : companyUsers.length === 0 ? (
-                    <AppEmptyState title={i18n.t("settings.company.form.usersEmpty")} />
+                    <AppEmptyState title={i18n.t("settings.company.form.usersEmpty")}>
+                      <AppSecondaryButton type="button" onClick={handleOpenCreateUser}>
+                        {i18n.t("settings.company.form.usersNewButton")}
+                      </AppSecondaryButton>
+                    </AppEmptyState>
                   ) : (
                     <Box className={classes.usersScroll}>
                       <Table size="small" aria-label={i18n.t("settings.company.form.usersSectionTitle")}>
@@ -1679,7 +1703,9 @@ export function CompanyForm(props) {
                             <TableCell>{i18n.t("users.table.name")}</TableCell>
                             <TableCell>{i18n.t("users.table.email")}</TableCell>
                             <TableCell>{i18n.t("users.table.profile")}</TableCell>
+                            <TableCell>{i18n.t("settings.company.form.usersAccountStatus")}</TableCell>
                             <TableCell>{i18n.t("users.table.online")}</TableCell>
+                            <TableCell align="right">{i18n.t("users.table.actions")}</TableCell>
                           </TableRow>
                         </TableHead>
                         <TableBody>
@@ -1703,6 +1729,18 @@ export function CompanyForm(props) {
                                 />
                               </TableCell>
                               <TableCell>
+                                <Chip
+                                  size="small"
+                                  label={
+                                    u.active === false
+                                      ? i18n.t("settings.company.form.usersInactive")
+                                      : i18n.t("settings.company.form.usersActive")
+                                  }
+                                  color={u.active === false ? "default" : "primary"}
+                                  variant={u.active === false ? "outlined" : "default"}
+                                />
+                              </TableCell>
+                              <TableCell>
                                 <Box display="flex" alignItems="center">
                                   <Box
                                     className={classes.userOnlineDot}
@@ -1717,6 +1755,47 @@ export function CompanyForm(props) {
                                     {formatUserOnline(u.online)}
                                   </Typography>
                                 </Box>
+                              </TableCell>
+                              <TableCell align="right">
+                                <Tooltip title={i18n.t("users.buttons.edit")}>
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => handleOpenEditUser(u)}
+                                    aria-label={i18n.t("users.buttons.edit")}
+                                  >
+                                    <EditOutlined fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip
+                                  title={
+                                    u.active === false
+                                      ? i18n.t("settings.company.form.usersActivateAction")
+                                      : i18n.t("settings.company.form.usersDeactivateAction")
+                                  }
+                                >
+                                  <span>
+                                    <IconButton
+                                      size="small"
+                                      onClick={() =>
+                                        setUserToggleConfirm({
+                                          user: u,
+                                          nextActive: u.active === false
+                                        })
+                                      }
+                                      aria-label={
+                                        u.active === false
+                                          ? i18n.t("settings.company.form.usersActivateAction")
+                                          : i18n.t("settings.company.form.usersDeactivateAction")
+                                      }
+                                    >
+                                      {u.active === false ? (
+                                        <CheckCircleOutline fontSize="small" />
+                                      ) : (
+                                        <Block fontSize="small" />
+                                      )}
+                                    </IconButton>
+                                  </span>
+                                </Tooltip>
                               </TableCell>
                             </TableRow>
                           ))}
@@ -1734,14 +1813,9 @@ export function CompanyForm(props) {
                     {i18n.t("settings.company.buttons.clear")}
                   </AppNeutralButton>
                   {record.id !== undefined ? (
-                    <>
-                      <AppSecondaryButton type="button" onClick={() => handleOpenModalUsers()}>
-                        {i18n.t("settings.company.buttons.manageUsers")}
-                      </AppSecondaryButton>
                       <AppSecondaryButton type="button" onClick={() => incrementDueDate()}>
                         {i18n.t("settings.company.buttons.adjustDueDate")}
                       </AppSecondaryButton>
-                    </>
                   ) : null}
                 </Box>
                 <Box className={classes.rightActions}>

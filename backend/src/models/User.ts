@@ -60,6 +60,10 @@ class User extends Model<User> {
   @Column
   online: boolean;
 
+  @Default(true)
+  @Column
+  active: boolean;
+
   @CreatedAt
   createdAt: Date;
 

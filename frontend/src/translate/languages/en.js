@@ -5891,8 +5891,22 @@ const messages = {
 							"IANA format as in the list below (e.g. America/Sao_Paulo).",
 						usersSectionTitle: "Company users",
 						usersSectionHint:
-							"Read-only list of users linked to this company (no management here).",
+							"Manage users linked to this company: create, edit, change password, or activate/deactivate accounts.",
 						usersEmpty: "No users found for this company.",
+						usersNewButton: "+ New user",
+						usersAccountStatus: "Account",
+						usersActive: "Active",
+						usersInactive: "Inactive",
+						usersActivateAction: "Activate",
+						usersDeactivateAction: "Deactivate",
+						usersActivateTitle: "Activate user",
+						usersDeactivateTitle: "Deactivate user",
+						usersActivateMessage:
+							"Re-enable access for {{name}}? History and tickets will be preserved.",
+						usersDeactivateMessage:
+							"Deactivate {{name}}? The user will not be able to sign in; history and tickets will be preserved.",
+						usersActivated: "User activated successfully.",
+						usersDeactivated: "User deactivated successfully.",
 						modulesSectionTitle: "Enabled modules (company)",
 						modulesSectionHint:
 							"Complements the plan: turning off hides the module and blocks use when the plan allows the feature.",
@@ -6292,6 +6306,8 @@ const messages = {
 					"You can only pin conversations in progress (Attending tab).",
 				ERR_NO_TICKET_FOUND: "No ticket found with this ID.",
 				ERR_NO_USER_FOUND: "No user found with this ID.",
+				ERR_USER_INACTIVE:
+					"This account is inactive. Contact your company administrator.",
 				ERR_NO_WAPP_FOUND: "No WhatsApp found with this ID.",
 				ERR_NO_INSTAGRAM_ACCOUNT_FOUND: "Instagram account not found.",
 				ERR_INSTAGRAM_ACCOUNT_DUPLICATE:

@@ -47,6 +47,10 @@ const AuthUserService = async ({
     throw new AppError("ERR_INVALID_CREDENTIALS", 401);
   }
 
+  if (user.active === false) {
+    throw new AppError("ERR_USER_INACTIVE", 403);
+  }
+
   await MarkSignupRequestActivatedForUserService(user, "login");
 
   const token = createAccessToken(user);
