@@ -8,7 +8,8 @@ import {
   PrimaryKey,
   Default,
   BelongsTo,
-  ForeignKey
+  ForeignKey,
+  AllowNull
 } from "sequelize-typescript";
 import Contact from "./Contact";
 import Ticket from "./Ticket";
@@ -122,6 +123,18 @@ class Message extends Model<Message> {
 
   @Column(DataType.JSONB)
   metaPayload: Record<string, unknown> | null;
+
+  @AllowNull(true)
+  @Column(DataType.STRING(32))
+  messageOrigin: string | null;
+
+  @AllowNull(true)
+  @Column
+  aiAgentId: number | null;
+
+  @AllowNull(true)
+  @Column
+  aiAgentRuntimeLogId: number | null;
 }
 
 export default Message;

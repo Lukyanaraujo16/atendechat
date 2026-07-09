@@ -17,6 +17,7 @@ import {
   isAiAgentRuntimeActive
 } from "./aiAgentRuntimeMode";
 import { AI_AGENT_SHADOW_STATUSES } from "./aiAgentShadowErrors";
+import { AI_AGENT_LIVE_STATUSES } from "./aiAgentLiveErrors";
 
 export type PersistAiAgentRuntimeLogInput = {
   companyId: number;
@@ -27,7 +28,7 @@ export type PersistAiAgentRuntimeLogInput = {
   evaluation: AiAgentEvaluationResult;
   messageId?: string | null;
   metadata?: Record<string, unknown>;
-  runtimeMode?: "dry_run" | "shadow";
+  runtimeMode?: "dry_run" | "shadow" | "live";
 };
 
 export function isWhatsappAiAgentConfigured(whatsapp: Whatsapp): boolean {
@@ -110,6 +111,13 @@ export async function persistAiAgentRuntimeLog(
         ? AI_AGENT_SHADOW_STATUSES.SKIPPED
         : AI_AGENT_SHADOW_STATUSES.NOT_REQUESTED;
 
+  const liveStatus =
+    input.runtimeMode === "live" && input.evaluation.eligible
+      ? AI_AGENT_LIVE_STATUSES.QUEUED
+      : input.runtimeMode === "live"
+        ? AI_AGENT_LIVE_STATUSES.SKIPPED
+        : AI_AGENT_LIVE_STATUSES.NOT_REQUESTED;
+
   let created: AiAgentRuntimeLog;
   try {
     created = await AiAgentRuntimeLog.create({
@@ -124,7 +132,8 @@ export async function persistAiAgentRuntimeLog(
       reason: input.evaluation.reason,
       messageId,
       metadata,
-      shadowStatus
+      shadowStatus,
+      liveStatus
     });
   } catch (err) {
     if (err instanceof UniqueConstraintError) {

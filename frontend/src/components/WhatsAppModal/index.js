@@ -20,6 +20,7 @@ import {
   InputAdornment,
   Box,
   Typography,
+  Checkbox,
 } from "@material-ui/core";
 import { FileCopyOutlined, Refresh } from "@material-ui/icons";
 
@@ -120,6 +121,7 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
   const [aiAgents, setAiAgents] = useState([]);
   const [selectedAiAgentId, setSelectedAiAgentId] = useState(null);
   const [aiAgentMode, setAiAgentMode] = useState("disabled");
+  const [liveModeConfirm, setLiveModeConfirm] = useState(false);
   const [integrations, setIntegrations] = useState([]);
   const [selectedIntegration, setSelectedIntegration] = useState(null);
   const [flows, setFlows] = useState([]);
@@ -181,6 +183,7 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
             data.aiAgentMode ||
             (data.aiAgentEnabled ? "dry_run" : "disabled");
           setAiAgentMode(mode);
+          setLiveModeConfirm(mode === "live");
         } catch (err) {
           toastError(err);
         }
@@ -268,6 +271,10 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
   }, []);
 
   const handleSaveWhatsApp = async (values) => {
+    if (aiAgentFeatureEnabled && aiAgentMode === "live" && !liveModeConfirm) {
+      toast.error(i18n.t("whatsappModal.aiAgent.liveConfirmRequired"));
+      return;
+    }
     const whatsappData = {
       ...values, queueIds: selectedQueueIds, transferQueueId: selectedQueueId,
       promptId: openAiEnabled
@@ -713,7 +720,13 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
                             id="dialog-select-ai-agent-mode"
                             value={aiAgentMode}
                             disabled={!selectedAiAgentId}
-                            onChange={(e) => setAiAgentMode(e.target.value)}
+                            onChange={(e) => {
+                              const next = e.target.value;
+                              setAiAgentMode(next);
+                              if (next !== "live") {
+                                setLiveModeConfirm(false);
+                              }
+                            }}
                             label={i18n.t("whatsappModal.aiAgent.runtimeMode")}
                             fullWidth
                           >
@@ -726,12 +739,40 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
                             <MenuItem value="shadow">
                               {i18n.t("whatsappModal.aiAgent.modes.shadow")}
                             </MenuItem>
+                            <MenuItem value="live">
+                              {i18n.t("whatsappModal.aiAgent.modes.live")}
+                            </MenuItem>
                           </Select>
                         </FormControl>
                         {aiAgentMode === "shadow" && (
                           <Alert severity="warning" style={{ marginTop: 8 }}>
                             {i18n.t("whatsappModal.aiAgent.shadowWarning")}
                           </Alert>
+                        )}
+                        {aiAgentMode === "live" && (
+                          <>
+                            <Alert severity="error" style={{ marginTop: 8 }}>
+                              {i18n.t("whatsappModal.aiAgent.liveWarning")}
+                            </Alert>
+                            <Alert severity="info" style={{ marginTop: 8 }}>
+                              {i18n.t("whatsappModal.aiAgent.liveLimitations")}
+                            </Alert>
+                            <FormControlLabel
+                              style={{ marginTop: 8 }}
+                              control={
+                                <Checkbox
+                                  color="primary"
+                                  checked={liveModeConfirm}
+                                  onChange={(e) =>
+                                    setLiveModeConfirm(e.target.checked)
+                                  }
+                                />
+                              }
+                              label={i18n.t(
+                                "whatsappModal.aiAgent.liveConfirmLabel"
+                              )}
+                            />
+                          </>
                         )}
                       </>
                     )}

@@ -11,6 +11,7 @@ import { resolveInboundMessageId } from "./resolveInboundMessageId";
 import { resolveWhatsappAiAgentRuntimeMode } from "./aiAgentRuntimeMode";
 import { sanitizeAiAgentRuntimeMetadata } from "./sanitizeAiAgentRuntimeMetadata";
 import { scheduleShadowGeneration } from "./AiAgentShadowService";
+import { scheduleLiveResponse } from "./AiAgentLiveService";
 import Contact from "../../models/Contact";
 import Ticket from "../../models/Ticket";
 import Whatsapp from "../../models/Whatsapp";
@@ -117,7 +118,12 @@ export async function runAiAgentDryRunHook(
     evaluation,
     messageId: resolvedId.messageId,
     metadata: baseMetadata,
-    runtimeMode: runtimeMode === "shadow" ? "shadow" : "dry_run"
+    runtimeMode:
+      runtimeMode === "shadow"
+        ? "shadow"
+        : runtimeMode === "live"
+          ? "live"
+          : "dry_run"
   });
 
   if (
@@ -127,6 +133,21 @@ export async function runAiAgentDryRunHook(
     input.classification.hasText
   ) {
     scheduleShadowGeneration({
+      logId: persistResult.logId,
+      companyId: input.companyId,
+      ticketId: input.ticket.id,
+      inboundText: String(input.body ?? "").trim(),
+      classification: input.classification
+    });
+  }
+
+  if (
+    persistResult.status === "created" &&
+    evaluation.eligible &&
+    runtimeMode === "live" &&
+    input.classification.hasText
+  ) {
+    scheduleLiveResponse({
       logId: persistResult.logId,
       companyId: input.companyId,
       ticketId: input.ticket.id,

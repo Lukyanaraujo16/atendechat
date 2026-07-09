@@ -34,8 +34,16 @@ export type SerializedShadowSuggestion = {
   credentialSource: string | null;
   credentialId: number | null;
   evaluatorVersion: string | null;
-  deliveryStatus: "not_sent";
-  notSentToClient: true;
+  liveStatus: string | null;
+  deliveryStatus: string | null;
+  sentMessageId: string | null;
+  sentAt: Date | null;
+  sendErrorCode: string | null;
+  liveProvider: string | null;
+  liveModel: string | null;
+  liveLatencyMs: number | null;
+  runtimeMode: string;
+  notSentToClient: boolean;
   review: SerializedShadowReview | null;
 };
 
@@ -102,8 +110,17 @@ export function serializeShadowSuggestionRow(input: RowInput): SerializedShadowS
     credentialId,
     evaluatorVersion:
       typeof meta.evaluatorVersion === "string" ? meta.evaluatorVersion : null,
-    deliveryStatus: "not_sent",
-    notSentToClient: true,
+    liveStatus: log.liveStatus ?? null,
+    deliveryStatus: log.deliveryStatus ?? "not_sent",
+    sentMessageId: log.sentMessageId ?? null,
+    sentAt: log.sentAt ?? null,
+    sendErrorCode: log.sendErrorCode ?? null,
+    liveProvider: log.liveProvider ?? null,
+    liveModel: log.liveModel ?? null,
+    liveLatencyMs: log.liveLatencyMs ?? null,
+    runtimeMode: log.mode,
+    notSentToClient:
+      log.mode !== "live" || log.deliveryStatus !== "sent",
     review: review
       ? {
           id: review.id,

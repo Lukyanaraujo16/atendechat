@@ -389,6 +389,7 @@ const Ticket = () => {
         contact={contact}
         ticket={ticket}
         onClick={handleDrawerOpen}
+        onTicketUpdate={(updated) => setTicket((prev) => ({ ...prev, ...updated }))}
         onLabelsChange={(labels) => {
           setContact((prev) => ({ ...prev, labels }));
           setTicket((prev) => ({

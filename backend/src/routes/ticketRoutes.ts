@@ -1,6 +1,7 @@
 import express from "express";
 import isAuth from "../middleware/isAuth";
 import requireAnyPlanFeature from "../middleware/requirePlanFeature";
+import requireEffectiveModule from "../middleware/requireEffectiveModule";
 import noStoreCache from "../middleware/noStoreCache";
 
 import * as TicketController from "../controllers/TicketController";
@@ -39,6 +40,17 @@ ticketRoutes.post("/tickets/bulk-assign-connection", TicketController.bulkAssign
 ticketRoutes.post("/tickets/:ticketId/pin", TicketController.pin);
 ticketRoutes.delete("/tickets/:ticketId/pin", TicketController.unpin);
 ticketRoutes.post("/tickets/:ticketId/active-view", TicketController.registerActiveView);
+
+ticketRoutes.post(
+  "/tickets/:ticketId/ai-agent/pause",
+  requireEffectiveModule("automation.ai_agent"),
+  TicketController.pauseAiAgent
+);
+ticketRoutes.post(
+  "/tickets/:ticketId/ai-agent/resume",
+  requireEffectiveModule("automation.ai_agent"),
+  TicketController.resumeAiAgent
+);
 
 ticketRoutes.get("/tickets/:ticketId", TicketController.show);
 

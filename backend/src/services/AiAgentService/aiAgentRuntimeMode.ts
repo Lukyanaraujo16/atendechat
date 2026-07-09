@@ -1,11 +1,12 @@
 import Whatsapp from "../../models/Whatsapp";
 
-export type AiAgentRuntimeMode = "disabled" | "dry_run" | "shadow";
+export type AiAgentRuntimeMode = "disabled" | "dry_run" | "shadow" | "live";
 
 const VALID_MODES = new Set<AiAgentRuntimeMode>([
   "disabled",
   "dry_run",
-  "shadow"
+  "shadow",
+  "live"
 ]);
 
 export function parseAiAgentRuntimeMode(value: unknown): AiAgentRuntimeMode {
@@ -31,5 +32,5 @@ export function resolveWhatsappAiAgentRuntimeMode(
 }
 
 export function isAiAgentRuntimeActive(mode: AiAgentRuntimeMode): boolean {
-  return mode === "dry_run" || mode === "shadow";
+  return mode === "dry_run" || mode === "shadow" || mode === "live";
 }

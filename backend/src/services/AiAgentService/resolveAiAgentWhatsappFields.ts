@@ -108,7 +108,7 @@ export async function resolveAiAgentWhatsappFields(input: {
     };
   }
 
-  if (nextMode === "shadow" || nextMode === "dry_run") {
+  if (nextMode === "shadow" || nextMode === "dry_run" || nextMode === "live") {
     if (nextId == null) {
       throw new AppError(
         "ERR_VALIDATION_ERROR",

@@ -35,6 +35,8 @@ import {
 import ShowTicketUUIDService from "../services/TicketServices/ShowTicketFromUUIDService";
 import ShowTicketService from "../services/TicketServices/ShowTicketService";
 import UpdateTicketService from "../services/TicketServices/UpdateTicketService";
+import PauseTicketAiAgentService from "../services/TicketServices/PauseTicketAiAgentService";
+import ResumeTicketAiAgentService from "../services/TicketServices/ResumeTicketAiAgentService";
 import ListTicketsServiceKanban from "../services/TicketServices/ListTicketsServiceKanban";
 import ListTicketsWithoutConnectionService from "../services/TicketServices/ListTicketsWithoutConnectionService";
 import BulkAssignTicketsWhatsappService from "../services/TicketServices/BulkAssignTicketsWhatsappService";
@@ -639,4 +641,68 @@ export const unpin = async (req: Request, res: Response): Promise<Response> => {
     }
   });
   return res.status(204).send();
+};
+
+export const pauseAiAgent = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const ticketId = Number(req.params.ticketId);
+  if (!Number.isFinite(ticketId) || ticketId <= 0) {
+    throw new AppError("ERR_INVALID_TICKET_ID", 400);
+  }
+  const companyId = Number(req.user.companyId);
+  const userId = Number(req.user.id);
+  const { profile, supportMode } = req.user;
+
+  const existing = await ShowTicketService(ticketId, companyId);
+  await assertUserCanAccessTicketResource(
+    { id: userId, profile, supportMode },
+    toTicketAccessPayload(existing),
+    companyId
+  );
+
+  const ticket = await PauseTicketAiAgentService({
+    companyId,
+    ticketId,
+    userId
+  });
+
+  return res.status(200).json({
+    id: ticket.id,
+    aiAgentPaused: ticket.aiAgentPaused,
+    aiAgentPausedAt: ticket.aiAgentPausedAt,
+    aiAgentPausedBy: ticket.aiAgentPausedBy
+  });
+};
+
+export const resumeAiAgent = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const ticketId = Number(req.params.ticketId);
+  if (!Number.isFinite(ticketId) || ticketId <= 0) {
+    throw new AppError("ERR_INVALID_TICKET_ID", 400);
+  }
+  const companyId = Number(req.user.companyId);
+  const { profile, supportMode, id } = req.user;
+
+  const existing = await ShowTicketService(ticketId, companyId);
+  await assertUserCanAccessTicketResource(
+    { id, profile, supportMode },
+    toTicketAccessPayload(existing),
+    companyId
+  );
+
+  const ticket = await ResumeTicketAiAgentService({
+    companyId,
+    ticketId
+  });
+
+  return res.status(200).json({
+    id: ticket.id,
+    aiAgentPaused: ticket.aiAgentPaused,
+    aiAgentPausedAt: ticket.aiAgentPausedAt,
+    aiAgentPausedBy: ticket.aiAgentPausedBy
+  });
 };

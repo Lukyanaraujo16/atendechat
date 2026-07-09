@@ -2203,13 +2203,32 @@ const messages = {
 						"In this phase, the agent does not send replies to customers automatically.",
 					shadowWarning:
 						"Replies will be generated for internal evaluation only and will not be sent to customers.",
+					liveWarning:
+						"Warning: in this mode, the AI Agent will automatically reply to customers when the ticket is eligible.",
+					liveLimitations:
+						"Audio and media without text are not supported yet. Tickets with a human agent will not receive AI replies. Automatic handoff to humans will be implemented in a later phase.",
+					liveConfirmLabel:
+						"I understand that the AI will automatically reply to eligible customers.",
+					liveConfirmRequired:
+						"Confirm that you understand Live Mode before saving.",
 					planBlocked: "The AI Agent module is not available on your plan.",
 					modes: {
 						disabled: "Disabled",
 						dryRun: "Eligibility simulation",
 						shadow: "Shadow Mode — generates suggestions, does not send",
+						live: "Live Mode — replies automatically",
 					},
 				},
+			},
+			ticketAiAgent: {
+				active: "AI active",
+				pausedLabel: "AI paused",
+				unavailable: "AI unavailable",
+				pauseAction: "Pause AI for this ticket",
+				resumeAction: "Resume AI for this ticket",
+				paused: "AI paused for this ticket",
+				resumed: "AI resumed for this ticket",
+				messageBadge: "AI Agent",
 			},
 			qrCodeModal: {
 				title: "Connect WhatsApp via QR Code",

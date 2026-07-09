@@ -187,6 +187,19 @@ class Ticket extends Model<Ticket> {
 
   @Column(DataType.JSON)
   dataWebhook: {} | null;
+
+  @Default(false)
+  @Column
+  aiAgentPaused: boolean;
+
+  @AllowNull(true)
+  @Column
+  aiAgentPausedAt: Date | null;
+
+  @AllowNull(true)
+  @ForeignKey(() => User)
+  @Column
+  aiAgentPausedBy: number | null;
 }
 
 export default Ticket;

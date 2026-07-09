@@ -8,6 +8,7 @@ import useIsMobile from "../../hooks/useIsMobile";
 
 import { i18n } from "../../translate/i18n";
 import ContactLabelsBar from "../ContactLabelsBar";
+import TicketAiAgentControls from "../TicketAiAgentControls";
 
 const useStyles = makeStyles((theme) => ({
 	root: {
@@ -73,6 +74,7 @@ const TicketInfo = ({
 	ticket,
 	onClick,
 	onLabelsChange,
+	onTicketUpdate,
 }) => {
 	const classes = useStyles();
 	const theme = useTheme();
@@ -178,6 +180,7 @@ const TicketInfo = ({
 				</span>
 			}
 			/>
+			<TicketAiAgentControls ticket={ticket} onTicketUpdate={onTicketUpdate} />
 		</Box>
 	);
 };

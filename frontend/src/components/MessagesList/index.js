@@ -1284,6 +1284,11 @@ const MessagesList = forwardRef(function MessagesList(
                   {renderMessageBody(message)}
                   <span className={classes.timestamp}>
 				    {message.isEdited && <span>{i18n.t("messagesList.edited")}</span>}
+                    {message.messageOrigin === "ai_agent" && (
+                      <span style={{ marginRight: 4, opacity: 0.85 }}>
+                        {i18n.t("ticketAiAgent.messageBadge")} ·{" "}
+                      </span>
+                    )}
                     {format(parseISO(message.createdAt), "HH:mm")}
                     {renderMessageAck(message)}
                   </span>

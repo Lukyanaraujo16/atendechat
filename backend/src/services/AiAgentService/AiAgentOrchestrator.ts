@@ -22,6 +22,7 @@ import {
 import { resolveInboundMessageId } from "./resolveInboundMessageId";
 import { AI_AGENT_EVALUATOR_VERSION } from "./aiAgentDryRunConfig";
 import { resolveWhatsappAiAgentRuntimeMode, isAiAgentRuntimeActive } from "./aiAgentRuntimeMode";
+import { checkAiAgentLiveLimits } from "./checkAiAgentLiveLimits";
 
 export type EvaluateInboundMessageInput = {
   companyId: number;
@@ -37,7 +38,9 @@ function resolveEvaluationMode(
   whatsapp: Whatsapp
 ): AiAgentEvaluationMode {
   const runtimeMode = resolveWhatsappAiAgentRuntimeMode(whatsapp);
-  return runtimeMode === "shadow" ? "shadow" : "dry_run";
+  if (runtimeMode === "shadow") return "shadow";
+  if (runtimeMode === "live") return "live";
+  return "dry_run";
 }
 
 function deny(
@@ -336,7 +339,37 @@ export default class AiAgentOrchestrator {
         );
       }
 
-      // 16. Elegível
+      // 16. Live: IA pausada no ticket
+      if (runtimeMode === "live" && ctx.ticket.aiAgentPaused === true) {
+        return finish(
+          deny(
+            AI_AGENT_EVALUATION_REASONS.TICKET_AI_PAUSED,
+            evaluationMode,
+            ctx.aiAgent.id,
+            msgMeta
+          )
+        );
+      }
+
+      // 17. Live: limites de segurança por ticket
+      if (runtimeMode === "live") {
+        const liveLimits = await checkAiAgentLiveLimits({
+          companyId: input.companyId,
+          ticketId: ctx.ticket.id
+        });
+        if (liveLimits.allowed === false) {
+          return finish(
+            deny(
+              liveLimits.errorCode as AiAgentEvaluationResult["reason"],
+              evaluationMode,
+              ctx.aiAgent.id,
+              msgMeta
+            )
+          );
+        }
+      }
+
+      // 18. Elegível
       return finish(
         allow(ctx.aiAgent.id, evaluationMode, {
           ...msgMeta,

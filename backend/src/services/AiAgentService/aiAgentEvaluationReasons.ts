@@ -14,6 +14,9 @@ export const AI_AGENT_EVALUATION_REASONS = {
   CHATBOT_BYPASS: "chatbot_bypass",
   CAMPAIGN_OR_SYSTEM_MESSAGE: "campaign_or_system_message",
   TICKET_CLOSED: "ticket_closed",
+  TICKET_AI_PAUSED: "ticket_ai_paused",
+  LIVE_TICKET_LIMIT_REACHED: "live_ticket_limit_reached",
+  LIVE_COOLDOWN_ACTIVE: "live_cooldown_active",
   UNSUPPORTED_CHANNEL: "unsupported_channel",
   DUPLICATE_MESSAGE: "duplicate_message",
   MESSAGE_ID_MISSING: "message_id_missing",
@@ -28,7 +31,7 @@ export const AI_AGENT_EVALUATION_REASONS = {
 export type AiAgentEvaluationReason =
   (typeof AI_AGENT_EVALUATION_REASONS)[keyof typeof AI_AGENT_EVALUATION_REASONS];
 
-export type AiAgentEvaluationMode = "dry_run" | "shadow";
+export type AiAgentEvaluationMode = "dry_run" | "shadow" | "live";
 
 export type AiAgentEvaluationResult = {
   eligible: boolean;

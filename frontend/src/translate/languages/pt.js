@@ -2285,13 +2285,32 @@ const messages = {
             "Nesta fase, o agente não envia respostas automaticamente aos clientes.",
           shadowWarning:
             "Respostas serão geradas para avaliação interna, mas não serão enviadas aos clientes.",
+          liveWarning:
+            "Atenção: neste modo, o Agente de IA enviará respostas automaticamente aos clientes quando o ticket estiver elegível.",
+          liveLimitations:
+            "Áudio e mídia sem texto ainda não são suportados. Tickets com atendente humano não serão respondidos. O handoff automático para humano será implementado em fase posterior.",
+          liveConfirmLabel:
+            "Entendo que a IA responderá automaticamente os clientes elegíveis.",
+          liveConfirmRequired:
+            "Confirme que entende o Live Mode antes de salvar.",
           planBlocked: "O módulo Agente de IA não está disponível no seu plano.",
           modes: {
             disabled: "Desativado",
             dryRun: "Simulação de elegibilidade",
             shadow: "Shadow Mode — gera sugestões, mas não envia",
+            live: "Live Mode — responde automaticamente",
           },
         },
+      },
+      ticketAiAgent: {
+        active: "IA ativa",
+        pausedLabel: "IA pausada",
+        unavailable: "IA indisponível",
+        pauseAction: "Pausar IA neste atendimento",
+        resumeAction: "Reativar IA neste atendimento",
+        paused: "IA pausada neste ticket",
+        resumed: "IA reativada neste ticket",
+        messageBadge: "Agente de IA",
       },
       qrCodeModal: {
         title: "Conectar WhatsApp por QR Code",

@@ -168,6 +168,50 @@ class AiAgentRuntimeLog extends Model<AiAgentRuntimeLog> {
   @Column(DataType.STRING(32))
   suggestionSource: string | null;
 
+  @Default("not_requested")
+  @Column(DataType.STRING(32))
+  liveStatus: string;
+
+  @AllowNull(true)
+  @Column(DataType.STRING(191))
+  sentMessageId: string | null;
+
+  @AllowNull(true)
+  @Column
+  sentAt: Date | null;
+
+  @AllowNull(true)
+  @Column(DataType.STRING(64))
+  sendErrorCode: string | null;
+
+  @Default("not_sent")
+  @Column(DataType.STRING(32))
+  deliveryStatus: string;
+
+  @AllowNull(true)
+  @Column(DataType.STRING(32))
+  liveProvider: string | null;
+
+  @AllowNull(true)
+  @Column(DataType.STRING(64))
+  liveModel: string | null;
+
+  @AllowNull(true)
+  @Column
+  liveLatencyMs: number | null;
+
+  @AllowNull(true)
+  @Column
+  livePromptTokens: number | null;
+
+  @AllowNull(true)
+  @Column
+  liveCompletionTokens: number | null;
+
+  @AllowNull(true)
+  @Column
+  liveTotalTokens: number | null;
+
   @CreatedAt
   createdAt: Date;
 
