@@ -41,6 +41,10 @@ import AiAgent from "./AiAgent";
     {
       name: "AiAgentRuntimeLogs_company_shadowStatus_createdAt_idx",
       fields: ["companyId", "shadowStatus", "createdAt"]
+    },
+    {
+      name: "AiAgentRuntimeLogs_company_shadowProvider_createdAt_idx",
+      fields: ["companyId", "shadowProvider", "createdAt"]
     }
   ]
 })
@@ -123,6 +127,10 @@ class AiAgentRuntimeLog extends Model<AiAgentRuntimeLog> {
   @AllowNull(true)
   @Column(DataType.STRING(64))
   shadowModel: string | null;
+
+  @AllowNull(true)
+  @Column(DataType.STRING(32))
+  shadowProvider: string | null;
 
   @AllowNull(true)
   @Column

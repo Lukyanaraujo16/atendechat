@@ -4,11 +4,14 @@ import Contact from "../../models/Contact";
 import Ticket from "../../models/Ticket";
 import Whatsapp from "../../models/Whatsapp";
 import { debounce } from "../../helpers/Debounce";
-import { executeOpenAi } from "../OpenAi/OpenAiManager";
 import { logger } from "../../utils/logger";
+import { generateChatCompletionViaAdapter } from "../AiProviderService/AiProviderAdapterFactory";
 import { buildAiAgentPromptContext } from "./buildAiAgentPromptContext";
 import { buildAiAgentSystemPrompt } from "./buildAiAgentSystemPrompt";
-import { parseAiAgentMaxTokens, parseAiAgentModel } from "./aiAgentValidation";
+import {
+  parseAiAgentMaxTokens,
+  parseAiAgentModelForProvider
+} from "./aiAgentValidation";
 import { resolveAiAgentOpenAiApiKeyWithSource } from "./resolveAiAgentApiCredential";
 import {
   AI_AGENT_SHADOW_DEBOUNCE_MS,
@@ -29,21 +32,6 @@ import { resolveWhatsappAiAgentRuntimeMode } from "./aiAgentRuntimeMode";
 import { InboundMessageClassification } from "./classifyInboundMessage";
 
 const inFlightTickets = new Set<number>();
-
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("SHADOW_TIMEOUT")), ms);
-    promise
-      .then((value) => {
-        clearTimeout(timer);
-        resolve(value);
-      })
-      .catch((err) => {
-        clearTimeout(timer);
-        reject(err);
-      });
-  });
-}
 
 async function loadShadowEntities(log: AiAgentRuntimeLog): Promise<{
   ticket: Ticket;
@@ -151,7 +139,7 @@ export async function generateShadowSuggestionForLog(
       ticket,
       agent
     });
-    if (!resolved.apiKey) {
+    if (!resolved.apiKey || !resolved.provider) {
       await updateAiAgentShadowLog(logId, companyId, {
         shadowStatus: AI_AGENT_SHADOW_STATUSES.FAILED,
         errorCode: AI_AGENT_SHADOW_ERROR_CODES.AI_AUTH_ERROR,
@@ -182,7 +170,7 @@ export async function generateShadowSuggestionForLog(
     let model: string;
     let maxTokens: number;
     try {
-      model = parseAiAgentModel(agent.model);
+      model = parseAiAgentModelForProvider(agent.model, resolved.provider);
       maxTokens = Math.min(
         parseAiAgentMaxTokens(agent.maxTokens),
         AI_AGENT_SHADOW_MAX_TOKENS_CAP
@@ -191,39 +179,38 @@ export async function generateShadowSuggestionForLog(
       await updateAiAgentShadowLog(logId, companyId, {
         shadowStatus: AI_AGENT_SHADOW_STATUSES.FAILED,
         errorCode: AI_AGENT_SHADOW_ERROR_CODES.INVALID_MODEL,
+        shadowProvider: resolved.provider,
         latencyMs: Date.now() - startedAt
       });
       return;
     }
 
-    const result = await withTimeout(
-      executeOpenAi({
-        companyId,
-        ticketId: ticket.id,
-        apiKey: resolved.apiKey,
-        prompt: systemPrompt,
-        messages: promptContext.messages,
-        model,
-        maxTokens,
-        temperature: agent.temperature,
-        source: AI_AGENT_SHADOW_SOURCE
-      }),
-      AI_AGENT_SHADOW_TIMEOUT_MS
-    );
+    const result = await generateChatCompletionViaAdapter({
+      provider: resolved.provider,
+      companyId,
+      ticketId: ticket.id,
+      apiKey: resolved.apiKey,
+      model,
+      maxTokens,
+      temperature: agent.temperature,
+      systemPrompt,
+      messages: promptContext.messages,
+      timeoutMs: AI_AGENT_SHADOW_TIMEOUT_MS,
+      source: AI_AGENT_SHADOW_SOURCE
+    });
 
-    const latencyMs = Date.now() - startedAt;
+    const latencyMs = result.latencyMs ?? Date.now() - startedAt;
 
-    if (!result.ok) {
+    if (result.ok === false) {
       const isLimit =
-        "error" in result && result.error === "OPENAI_LIMIT_REACHED";
+        result.errorCode === AI_AGENT_SHADOW_ERROR_CODES.AI_USAGE_LIMIT_REACHED;
       await updateAiAgentShadowLog(logId, companyId, {
         shadowStatus: isLimit
           ? AI_AGENT_SHADOW_STATUSES.RATE_LIMITED
           : AI_AGENT_SHADOW_STATUSES.FAILED,
-        errorCode: isLimit
-          ? AI_AGENT_SHADOW_ERROR_CODES.AI_USAGE_LIMIT_REACHED
-          : AI_AGENT_SHADOW_ERROR_CODES.PROVIDER_UNAVAILABLE,
+        errorCode: result.errorCode,
         shadowModel: model,
+        shadowProvider: resolved.provider,
         contextMessageCount: promptContext.contextMessageCount,
         contextHash: promptContext.contextHash,
         latencyMs
@@ -239,12 +226,13 @@ export async function generateShadowSuggestionForLog(
       return;
     }
 
-    const content = result.content?.trim();
+    const content = result.text?.trim();
     if (!content) {
       await updateAiAgentShadowLog(logId, companyId, {
         shadowStatus: AI_AGENT_SHADOW_STATUSES.FAILED,
         errorCode: AI_AGENT_SHADOW_ERROR_CODES.EMPTY_AI_RESPONSE,
         shadowModel: model,
+        shadowProvider: resolved.provider,
         contextMessageCount: promptContext.contextMessageCount,
         contextHash: promptContext.contextHash,
         latencyMs
@@ -256,10 +244,11 @@ export async function generateShadowSuggestionForLog(
       shadowStatus: AI_AGENT_SHADOW_STATUSES.GENERATED,
       suggestedReply: content,
       suggestionSource: "model",
-      shadowModel: model,
+      shadowModel: result.model || model,
+      shadowProvider: result.provider,
       promptTokens: result.promptTokens ?? null,
       completionTokens: result.completionTokens ?? null,
-      totalTokens: result.tokensUsed ?? null,
+      totalTokens: result.totalTokens ?? null,
       contextMessageCount: promptContext.contextMessageCount,
       contextHash: promptContext.contextHash,
       latencyMs,
@@ -272,22 +261,19 @@ export async function generateShadowSuggestionForLog(
         companyId,
         ticketId: ticket.id,
         logId,
-        model,
+        model: result.model || model,
+        provider: result.provider,
         latencyMs,
         source: AI_AGENT_SHADOW_SOURCE,
-        totalTokens: result.tokensUsed ?? null
+        totalTokens: result.totalTokens ?? null
       },
       "[AiAgent][shadow] suggestion_generated"
     );
   } catch (err) {
     const latencyMs = Date.now() - startedAt;
-    const isTimeout =
-      err instanceof Error && err.message === "SHADOW_TIMEOUT";
     await updateAiAgentShadowLog(logId, companyId, {
       shadowStatus: AI_AGENT_SHADOW_STATUSES.FAILED,
-      errorCode: isTimeout
-        ? AI_AGENT_SHADOW_ERROR_CODES.PROVIDER_TIMEOUT
-        : AI_AGENT_SHADOW_ERROR_CODES.GENERATION_FAILED,
+      errorCode: AI_AGENT_SHADOW_ERROR_CODES.GENERATION_FAILED,
       latencyMs
     });
     logger.warn(

@@ -7,7 +7,7 @@ import { parseBooleanField } from "../AiAgentService/aiAgentTenant";
 import {
   parseCredentialName,
   parseProvider,
-  validateOpenAiApiKeyFormat
+  validateApiKeyForProvider
 } from "./aiProviderCredentialValidation";
 import { clearOtherDefaultCredentials } from "./clearOtherDefaultCredentials";
 import { serializeAiProviderCredential } from "./aiProviderCredentialSerialize";
@@ -20,7 +20,7 @@ export default async function CreateAiProviderCredentialService(input: {
 }) {
   const name = parseCredentialName(input.body.name);
   const provider = parseProvider(input.body.provider);
-  const apiKey = validateOpenAiApiKeyFormat(input.body.apiKey);
+  const apiKey = validateApiKeyForProvider(provider, input.body.apiKey);
   const enabled = parseBooleanField(input.body.enabled, true);
   const isDefault = parseBooleanField(input.body.isDefault, false);
 

@@ -1,6 +1,6 @@
-import { Configuration, OpenAIApi } from "openai";
 import AppError from "../../errors/AppError";
 import { decryptAiProviderApiKey } from "../../helpers/aiProviderCredentialCrypto";
+import { getAiProviderAdapter } from "../AiProviderService/AiProviderAdapterFactory";
 import { findAiProviderCredentialOrThrow } from "./aiProviderCredentialSerialize";
 
 export default async function TestAiProviderCredentialService(input: {
@@ -29,8 +29,8 @@ export default async function TestAiProviderCredentialService(input: {
   }
 
   try {
-    const openai = new OpenAIApi(new Configuration({ apiKey }));
-    await openai.listModels();
+    const adapter = getAiProviderAdapter(row.provider);
+    await adapter.testCredential(apiKey);
     return { ok: true, provider: row.provider };
   } catch {
     throw new AppError(

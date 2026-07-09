@@ -10,6 +10,7 @@ export type ShadowLogUpdateInput = {
   shadowStatus: AiAgentShadowStatus;
   suggestedReply?: string | null;
   shadowModel?: string | null;
+  shadowProvider?: string | null;
   promptTokens?: number | null;
   completionTokens?: number | null;
   totalTokens?: number | null;

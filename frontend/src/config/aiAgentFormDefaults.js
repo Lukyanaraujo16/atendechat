@@ -1,14 +1,16 @@
-export const AI_AGENT_MODELS = [
-  "gpt-4o-mini",
-  "gpt-4o",
-  "gpt-3.5-turbo-1106",
-];
+import {
+  DEFAULT_MODEL_BY_PROVIDER,
+  getAllModels,
+  AI_PROVIDER_OPENAI,
+} from "./aiProviderModels";
+
+export const AI_AGENT_MODELS = getAllModels();
 
 export const DEFAULT_AI_AGENT_FORM = {
   name: "",
   description: "",
   enabled: false,
-  model: "gpt-4o-mini",
+  model: DEFAULT_MODEL_BY_PROVIDER[AI_PROVIDER_OPENAI],
   temperature: 0.3,
   maxTokens: 512,
   systemPrompt: "",

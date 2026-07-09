@@ -2,6 +2,11 @@ import AiAgent from "../../models/AiAgent";
 import AiProviderCredential from "../../models/AiProviderCredential";
 import Ticket from "../../models/Ticket";
 import Whatsapp from "../../models/Whatsapp";
+import {
+  AI_PROVIDER_OPENAI,
+  AiProviderId,
+  isAiProviderId
+} from "../../config/aiProviderModels";
 import { decryptAiProviderApiKey } from "../../helpers/aiProviderCredentialCrypto";
 import { logger } from "../../utils/logger";
 import { resolveAiAgentOpenAiApiKey } from "./resolveAiAgentOpenAiApiKey";
@@ -14,8 +19,15 @@ export type AiCredentialResolutionSource =
 
 export type ResolvedAiApiCredential = {
   apiKey: string | null;
+  provider: AiProviderId | null;
   source: AiCredentialResolutionSource;
   credentialId?: number;
+};
+
+type LoadedCredential = {
+  apiKey: string;
+  credentialId: number;
+  provider: AiProviderId;
 };
 
 async function decryptCredentialKey(
@@ -33,7 +45,7 @@ async function decryptCredentialKey(
 async function loadAgentCredential(
   companyId: number,
   credentialId: number | null | undefined
-): Promise<{ apiKey: string; credentialId: number } | null> {
+): Promise<LoadedCredential | null> {
   if (credentialId == null) return null;
   const row = await AiProviderCredential.findOne({
     where: { id: credentialId, companyId, enabled: true }
@@ -41,12 +53,16 @@ async function loadAgentCredential(
   if (!row) return null;
   const apiKey = await decryptCredentialKey(row);
   if (!apiKey) return null;
-  return { apiKey, credentialId: row.id };
+  return {
+    apiKey,
+    credentialId: row.id,
+    provider: isAiProviderId(row.provider) ? row.provider : AI_PROVIDER_OPENAI
+  };
 }
 
 async function loadCompanyDefaultCredential(
   companyId: number
-): Promise<{ apiKey: string; credentialId: number } | null> {
+): Promise<LoadedCredential | null> {
   const row = await AiProviderCredential.findOne({
     where: { companyId, enabled: true, isDefault: true },
     order: [["id", "ASC"]]
@@ -54,11 +70,15 @@ async function loadCompanyDefaultCredential(
   if (!row) return null;
   const apiKey = await decryptCredentialKey(row);
   if (!apiKey) return null;
-  return { apiKey, credentialId: row.id };
+  return {
+    apiKey,
+    credentialId: row.id,
+    provider: isAiProviderId(row.provider) ? row.provider : AI_PROVIDER_OPENAI
+  };
 }
 
 /**
- * Resolve credencial OpenAI para o Agente de IA.
+ * Resolve credencial para o Agente de IA.
  * Ordem: credencial do agente → default da empresa → Prompt legado → ausente.
  */
 export async function resolveAiAgentApiCredential(input: {
@@ -74,6 +94,7 @@ export async function resolveAiAgentApiCredential(input: {
   if (agentCred) {
     return {
       apiKey: agentCred.apiKey,
+      provider: agentCred.provider,
       source: "agent_credential",
       credentialId: agentCred.credentialId
     };
@@ -83,6 +104,7 @@ export async function resolveAiAgentApiCredential(input: {
   if (defaultCred) {
     return {
       apiKey: defaultCred.apiKey,
+      provider: defaultCred.provider,
       source: "company_default",
       credentialId: defaultCred.credentialId
     };
@@ -94,10 +116,14 @@ export async function resolveAiAgentApiCredential(input: {
     ticket: input.ticket
   });
   if (legacyKey) {
-    return { apiKey: legacyKey, source: "legacy_prompt" };
+    return {
+      apiKey: legacyKey,
+      provider: AI_PROVIDER_OPENAI,
+      source: "legacy_prompt"
+    };
   }
 
-  return { apiKey: null, source: "missing" };
+  return { apiKey: null, provider: null, source: "missing" };
 }
 
 export async function resolveAiAgentOpenAiApiKeyWithSource(
@@ -109,7 +135,8 @@ export async function resolveAiAgentOpenAiApiKeyWithSource(
       companyId: input.companyId,
       agentId: input.agent.id,
       credentialSource: resolved.source,
-      credentialId: resolved.credentialId ?? null
+      credentialId: resolved.credentialId ?? null,
+      provider: resolved.provider
     },
     "[AiAgent] credential_resolved"
   );

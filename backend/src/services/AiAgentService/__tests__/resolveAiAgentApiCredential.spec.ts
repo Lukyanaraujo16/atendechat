@@ -40,6 +40,7 @@ describe("resolveAiAgentApiCredential", () => {
     (AiProviderCredential.findOne as jest.Mock).mockResolvedValue({
       id: 5,
       enabled: true,
+      provider: "openai",
       apiKeyEncrypted: "enc:sk-agent-key-12345678"
     });
 
@@ -51,6 +52,7 @@ describe("resolveAiAgentApiCredential", () => {
     });
 
     expect(result.source).toBe("agent_credential");
+    expect(result.provider).toBe("openai");
     expect(result.apiKey).toBe("sk-agent-key-12345678");
     expect(result.credentialId).toBe(5);
     expect(AiProviderCredential.findOne).toHaveBeenCalledWith({
@@ -62,7 +64,8 @@ describe("resolveAiAgentApiCredential", () => {
     (AiProviderCredential.findOne as jest.Mock).mockResolvedValue({
       id: 2,
       enabled: true,
-      apiKeyEncrypted: "enc:sk-default-key-12345678"
+      provider: "gemini",
+      apiKeyEncrypted: "enc:AIzaSyTestKey123456789012345"
     });
 
     const result = await resolveAiAgentApiCredential({
@@ -73,7 +76,8 @@ describe("resolveAiAgentApiCredential", () => {
     });
 
     expect(result.source).toBe("company_default");
-    expect(result.apiKey).toBe("sk-default-key-12345678");
+    expect(result.provider).toBe("gemini");
+    expect(result.apiKey).toBe("AIzaSyTestKey123456789012345");
   });
 
   it("faz fallback para Prompt legado", async () => {
@@ -92,6 +96,7 @@ describe("resolveAiAgentApiCredential", () => {
     });
 
     expect(result.source).toBe("legacy_prompt");
+    expect(result.provider).toBe("openai");
     expect(result.apiKey).toBe("sk-legacy-prompt-key123456");
   });
 

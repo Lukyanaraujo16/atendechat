@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import * as Yup from "yup";
 import { Formik, Form, Field } from "formik";
 import { toast } from "react-toastify";
@@ -18,6 +18,10 @@ import MenuItem from "@material-ui/core/MenuItem";
 
 import { i18n } from "../../translate/i18n";
 import toastError from "../../errors/toastError";
+import {
+  AI_PROVIDER_GEMINI,
+  AI_PROVIDER_OPENAI,
+} from "../../config/aiProviderModels";
 import {
   createAiProviderCredential,
   getAiProviderCredential,
@@ -47,42 +51,50 @@ const useStyles = makeStyles((theme) => ({
 
 const DEFAULT_VALUES = {
   name: "",
-  provider: "openai",
+  provider: AI_PROVIDER_OPENAI,
   apiKey: "",
   enabled: true,
   isDefault: false,
 };
 
-const schema = Yup.object().shape({
-  name: Yup.string()
-    .trim()
-    .min(1, i18n.t("aiAgent.credentials.formErrors.name.required"))
-    .max(120, i18n.t("aiAgent.credentials.formErrors.name.long"))
-    .required(i18n.t("aiAgent.credentials.formErrors.name.required")),
-  provider: Yup.string().required(),
-  apiKey: Yup.string().when("$isEdit", {
-    is: false,
-    then: (s) =>
-      s
-        .trim()
-        .min(20, i18n.t("aiAgent.credentials.formErrors.apiKey.invalid"))
-        .required(i18n.t("aiAgent.credentials.formErrors.apiKey.required")),
-    otherwise: (s) =>
-      s
-        .trim()
-        .test(
-          "optional-key",
-          i18n.t("aiAgent.credentials.formErrors.apiKey.invalid"),
-          (val) => !val || val.length >= 20
-        ),
-  }),
-});
+function buildSchema(isEdit) {
+  return Yup.object().shape({
+    name: Yup.string()
+      .trim()
+      .min(1, i18n.t("aiAgent.credentials.formErrors.name.required"))
+      .max(120, i18n.t("aiAgent.credentials.formErrors.name.long"))
+      .required(i18n.t("aiAgent.credentials.formErrors.name.required")),
+    provider: Yup.string().required(),
+    apiKey: Yup.string().when(["provider"], (provider, schema) => {
+      const base = isEdit
+        ? schema.trim()
+        : schema
+            .trim()
+            .required(i18n.t("aiAgent.credentials.formErrors.apiKey.required"));
+      return base.test(
+        "provider-key",
+        i18n.t("aiAgent.credentials.formErrors.apiKey.invalid"),
+        (val) => {
+          if (!val) return isEdit;
+          if (provider === AI_PROVIDER_OPENAI) {
+            return /^sk-[A-Za-z0-9_-]{8,}$/.test(val) && val.length >= 20;
+          }
+          if (provider === AI_PROVIDER_GEMINI) {
+            return /^[A-Za-z0-9_-]{20,256}$/.test(val);
+          }
+          return false;
+        }
+      );
+    }),
+  });
+}
 
 const AiProviderCredentialModal = ({ open, onClose, credentialId, onSaved }) => {
   const classes = useStyles();
   const [initialValues, setInitialValues] = useState(DEFAULT_VALUES);
   const [maskedKey, setMaskedKey] = useState("");
   const [loading, setLoading] = useState(false);
+  const schema = useMemo(() => buildSchema(Boolean(credentialId)), [credentialId]);
 
   useEffect(() => {
     if (!open) return;
@@ -99,7 +111,7 @@ const AiProviderCredentialModal = ({ open, onClose, credentialId, onSaved }) => 
         if (cancelled) return;
         setInitialValues({
           name: data.name || "",
-          provider: data.provider || "openai",
+          provider: data.provider || AI_PROVIDER_OPENAI,
           apiKey: "",
           enabled: !!data.enabled,
           isDefault: !!data.isDefault,
@@ -165,10 +177,9 @@ const AiProviderCredentialModal = ({ open, onClose, credentialId, onSaved }) => 
           enableReinitialize
           initialValues={initialValues}
           validationSchema={schema}
-          validationContext={{ isEdit: Boolean(credentialId) }}
           onSubmit={handleSubmit}
         >
-          {({ touched, errors, isSubmitting }) => (
+          {({ touched, errors, isSubmitting, values }) => (
             <Form>
               <DialogContent dividers>
                 <Typography variant="body2" className={classes.hint}>
@@ -193,9 +204,14 @@ const AiProviderCredentialModal = ({ open, onClose, credentialId, onSaved }) => 
                   fullWidth
                   variant="outlined"
                   margin="dense"
-                  disabled
+                  disabled={Boolean(credentialId)}
                 >
-                  <MenuItem value="openai">OpenAI</MenuItem>
+                  <MenuItem value={AI_PROVIDER_OPENAI}>
+                    {i18n.t("aiAgent.credentials.providers.openai")}
+                  </MenuItem>
+                  <MenuItem value={AI_PROVIDER_GEMINI}>
+                    {i18n.t("aiAgent.credentials.providers.gemini")}
+                  </MenuItem>
                 </Field>
                 {credentialId && maskedKey ? (
                   <Typography className={classes.maskedKey}>
@@ -215,7 +231,12 @@ const AiProviderCredentialModal = ({ open, onClose, credentialId, onSaved }) => 
                   variant="outlined"
                   margin="dense"
                   error={touched.apiKey && Boolean(errors.apiKey)}
-                  helperText={touched.apiKey && errors.apiKey}
+                  helperText={
+                    (touched.apiKey && errors.apiKey) ||
+                    (values.provider === AI_PROVIDER_OPENAI
+                      ? i18n.t("aiAgent.credentials.formErrors.apiKey.invalidOpenAi")
+                      : i18n.t("aiAgent.credentials.formErrors.apiKey.invalidGemini"))
+                  }
                 />
                 <FormControlLabel
                   control={<Field as={Switch} name="enabled" color="primary" type="checkbox" />}

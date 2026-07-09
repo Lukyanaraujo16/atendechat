@@ -3,8 +3,8 @@ jest.mock("@whiskeysockets/baileys", () => ({
   proto: {}
 }));
 
-jest.mock("../../OpenAi/OpenAiManager", () => ({
-  executeOpenAi: jest.fn()
+jest.mock("../../AiProviderService/AiProviderAdapterFactory", () => ({
+  generateChatCompletionViaAdapter: jest.fn()
 }));
 
 jest.mock("../../../models/Message", () => ({
@@ -47,7 +47,7 @@ import Ticket from "../../../models/Ticket";
 import Contact from "../../../models/Contact";
 import Whatsapp from "../../../models/Whatsapp";
 import AiAgent from "../../../models/AiAgent";
-import { executeOpenAi } from "../../OpenAi/OpenAiManager";
+import { generateChatCompletionViaAdapter } from "../../AiProviderService/AiProviderAdapterFactory";
 import { buildAiAgentSystemPrompt } from "../buildAiAgentSystemPrompt";
 import { buildAiAgentPromptContext } from "../buildAiAgentPromptContext";
 import { resolveWhatsappAiAgentRuntimeMode } from "../aiAgentRuntimeMode";
@@ -59,7 +59,7 @@ import AiAgentOrchestrator from "../AiAgentOrchestrator";
 import { scheduleShadowGeneration } from "../AiAgentShadowService";
 import { InboundMessageClassification } from "../classifyInboundMessage";
 
-const mockedExecuteOpenAi = executeOpenAi as jest.Mock;
+const mockedGenerate = generateChatCompletionViaAdapter as jest.Mock;
 
 function whatsapp(partial: Record<string, unknown>) {
   return partial as unknown as Whatsapp;
@@ -213,7 +213,7 @@ describe("AiAgent shadow mode 1.3", () => {
 
       await runAiAgentDryRunHook(baseInput);
 
-      expect(mockedExecuteOpenAi).not.toHaveBeenCalled();
+      expect(mockedGenerate).not.toHaveBeenCalled();
       expect(scheduleSpy).not.toHaveBeenCalled();
     });
 
@@ -242,7 +242,7 @@ describe("AiAgent shadow mode 1.3", () => {
       expect(scheduleSpy).toHaveBeenCalledWith(
         expect.objectContaining({ logId: 100, companyId: 1, ticketId: 1 })
       );
-      expect(mockedExecuteOpenAi).not.toHaveBeenCalled();
+      expect(mockedGenerate).not.toHaveBeenCalled();
     });
   });
 
@@ -290,37 +290,50 @@ describe("AiAgent shadow mode 1.3", () => {
       ]);
       jest
         .spyOn(require("../resolveAiAgentApiCredential"), "resolveAiAgentOpenAiApiKeyWithSource")
-        .mockResolvedValue({ apiKey: "sk-test", source: "legacy_prompt" });
+        .mockResolvedValue({
+          apiKey: "sk-test",
+          provider: "openai",
+          source: "legacy_prompt"
+        });
     });
 
     it("gera sugestão para texto válido", async () => {
-      mockedExecuteOpenAi.mockResolvedValue({
+      mockedGenerate.mockResolvedValue({
         ok: true,
-        content: "Olá! Como posso ajudar?",
-        tokensUsed: 42,
+        text: "Olá! Como posso ajudar?",
+        provider: "openai",
+        model: "gpt-4o-mini",
+        totalTokens: 42,
         promptTokens: 30,
-        completionTokens: 12
+        completionTokens: 12,
+        latencyMs: 100
       });
 
       await generateShadowSuggestionForLog(50, 1, "Preciso de ajuda", textClassification);
 
-      expect(mockedExecuteOpenAi).toHaveBeenCalledWith(
-        expect.objectContaining({ source: "ai_agent_shadow" })
+      expect(mockedGenerate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          provider: "openai",
+          source: "ai_agent_shadow"
+        })
       );
       expect(AiAgentRuntimeLog.update).toHaveBeenCalledWith(
         expect.objectContaining({
           shadowStatus: AI_AGENT_SHADOW_STATUSES.GENERATED,
-          suggestedReply: "Olá! Como posso ajudar?"
+          suggestedReply: "Olá! Como posso ajudar?",
+          shadowProvider: "openai"
         }),
         expect.any(Object)
       );
     });
 
     it("resposta vazia marca failed", async () => {
-      mockedExecuteOpenAi.mockResolvedValue({
+      mockedGenerate.mockResolvedValue({
         ok: true,
-        content: "   ",
-        tokensUsed: 10
+        text: "   ",
+        provider: "openai",
+        model: "gpt-4o-mini",
+        latencyMs: 50
       });
 
       await generateShadowSuggestionForLog(50, 1, "teste", textClassification);
@@ -335,9 +348,10 @@ describe("AiAgent shadow mode 1.3", () => {
     });
 
     it("limite diário marca rate_limited", async () => {
-      mockedExecuteOpenAi.mockResolvedValue({
+      mockedGenerate.mockResolvedValue({
         ok: false,
-        error: "OPENAI_LIMIT_REACHED"
+        errorCode: "ai_usage_limit_reached",
+        latencyMs: 10
       });
 
       await generateShadowSuggestionForLog(50, 1, "teste", textClassification);
@@ -351,10 +365,53 @@ describe("AiAgent shadow mode 1.3", () => {
       );
     });
 
+    it("agente com credencial Gemini chama adapter gemini", async () => {
+      jest
+        .spyOn(require("../resolveAiAgentApiCredential"), "resolveAiAgentOpenAiApiKeyWithSource")
+        .mockResolvedValue({
+          apiKey: "AIzaSyTestKey123456789012345",
+          provider: "gemini",
+          source: "agent_credential",
+          credentialId: 3
+        });
+      (AiAgent.findOne as jest.Mock).mockResolvedValue(
+        agent({
+          id: 9,
+          enabled: true,
+          model: "gemini-2.5-flash",
+          maxTokens: 256,
+          temperature: 0.3,
+          systemPrompt: "Seja cordial.",
+          fallbackMessage: null
+        })
+      );
+      mockedGenerate.mockResolvedValue({
+        ok: true,
+        text: "Olá via Gemini",
+        provider: "gemini",
+        model: "gemini-2.5-flash",
+        totalTokens: 20,
+        latencyMs: 80
+      });
+
+      await generateShadowSuggestionForLog(50, 1, "teste", textClassification);
+
+      expect(mockedGenerate).toHaveBeenCalledWith(
+        expect.objectContaining({ provider: "gemini", model: "gemini-2.5-flash" })
+      );
+      expect(AiAgentRuntimeLog.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          shadowProvider: "gemini",
+          shadowModel: "gemini-2.5-flash"
+        }),
+        expect.any(Object)
+      );
+    });
+
     it("áudio não gera sugestão", async () => {
       await generateShadowSuggestionForLog(50, 1, "", audioClassification);
 
-      expect(mockedExecuteOpenAi).not.toHaveBeenCalled();
+      expect(mockedGenerate).not.toHaveBeenCalled();
     });
   });
 });

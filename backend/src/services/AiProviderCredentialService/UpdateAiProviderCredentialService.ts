@@ -25,12 +25,14 @@ export default async function UpdateAiProviderCredentialService(input: {
   const row = await findAiProviderCredentialOrThrow(input.companyId, input.id);
   const body = input.body;
   const patch: Record<string, unknown> = {};
+  let effectiveProvider = parseProvider(row.provider);
 
   if (Object.prototype.hasOwnProperty.call(body, "name")) {
     patch.name = parseCredentialName(body.name);
   }
   if (Object.prototype.hasOwnProperty.call(body, "provider")) {
-    patch.provider = parseProvider(body.provider);
+    effectiveProvider = parseProvider(body.provider);
+    patch.provider = effectiveProvider;
   }
   if (Object.prototype.hasOwnProperty.call(body, "enabled")) {
     patch.enabled = parseBooleanField(body.enabled, row.enabled);
@@ -43,7 +45,7 @@ export default async function UpdateAiProviderCredentialService(input: {
     }
   }
 
-  const nextApiKey = parseOptionalApiKey(body.apiKey);
+  const nextApiKey = parseOptionalApiKey(body.apiKey, effectiveProvider);
   if (nextApiKey) {
     patch.apiKeyEncrypted = encryptAiProviderApiKey(nextApiKey);
     patch.apiKeyMasked = maskSecret(nextApiKey);

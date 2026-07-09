@@ -8,12 +8,14 @@ import {
   DEFAULT_AI_AGENT_MODEL,
   DEFAULT_AI_AGENT_TEMPERATURE
 } from "../../config/aiAgentDefaults";
+import {
+  AiProviderId,
+  getAllAllowedModels,
+  isModelAllowedForProvider,
+  resolveDefaultModelForProvider
+} from "../../config/aiProviderModels";
 
-const ALLOWED_MODELS = new Set([
-  "gpt-4o-mini",
-  "gpt-4o",
-  "gpt-3.5-turbo-1106"
-]);
+const ALL_ALLOWED_MODELS = new Set(getAllAllowedModels());
 
 export function parseAiAgentTemperature(value: unknown): number {
   const n =
@@ -51,12 +53,28 @@ export function parseAiAgentMaxTokens(value: unknown): number {
   return n;
 }
 
+/** Validação administrativa: aceita qualquer modelo da união de provedores. */
 export function parseAiAgentModel(value: unknown): string {
   const model =
     value === undefined || value === null || String(value).trim() === ""
       ? DEFAULT_AI_AGENT_MODEL
       : String(value).trim();
-  if (!ALLOWED_MODELS.has(model)) {
+  if (!ALL_ALLOWED_MODELS.has(model)) {
+    throw new AppError("ERR_VALIDATION_ERROR", 400, "Modelo inválido.");
+  }
+  return model;
+}
+
+/** Validação em runtime contra o provedor efetivo da credencial. */
+export function parseAiAgentModelForProvider(
+  value: unknown,
+  provider: AiProviderId
+): string {
+  const model =
+    value === undefined || value === null || String(value).trim() === ""
+      ? resolveDefaultModelForProvider(provider)
+      : String(value).trim();
+  if (!isModelAllowedForProvider(model, provider)) {
     throw new AppError("ERR_VALIDATION_ERROR", 400, "Modelo inválido.");
   }
   return model;

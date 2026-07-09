@@ -2595,6 +2595,7 @@ const messages = {
 						messageType: "Type",
 						suggestion: "Suggested reply",
 						model: "Model",
+						provider: "Provider",
 						tokens: "Tokens",
 						latency: "Latency (ms)",
 						error: "Error",
@@ -2638,6 +2639,10 @@ const messages = {
 					credentialDefault: "Use company default credential",
 					credentialHint:
 						"Optional. If not selected, uses the company default credential or the legacy OpenAI fallback.",
+					modelProviderWarning:
+						"The selected model is not compatible with the chosen credential provider.",
+					noDefaultCredential:
+						"No active default credential found. Configure one or select a specific credential.",
 				},
 				modal: {
 					newTitle: "New AI agent",
@@ -2711,7 +2716,13 @@ const messages = {
 						apiKey: {
 							required: "API Key is required",
 							invalid: "Invalid API Key format",
+							invalidOpenAi: "Invalid OpenAI API Key format (must start with sk-)",
+							invalidGemini: "Invalid Google Gemini API Key format",
 						},
+					},
+					providers: {
+						openai: "OpenAI",
+						gemini: "Google Gemini",
 					},
 					toasts: {
 						created: "Credential created successfully",

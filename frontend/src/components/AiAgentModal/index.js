@@ -24,11 +24,16 @@ import toastError from "../../errors/toastError";
 import {
   AI_AGENT_MAX_TOKENS_MAX,
   AI_AGENT_MAX_TOKENS_MIN,
-  AI_AGENT_MODELS,
   AI_AGENT_TEMPERATURE_MAX,
   AI_AGENT_TEMPERATURE_MIN,
   DEFAULT_AI_AGENT_FORM,
 } from "../../config/aiAgentFormDefaults";
+import {
+  DEFAULT_MODEL_BY_PROVIDER,
+  getModelsForProvider,
+  resolveEffectiveProvider,
+  resolveProviderLabel,
+} from "../../config/aiProviderModels";
 import { createAiAgent, getAiAgent, updateAiAgent } from "../../services/aiAgentApi";
 import { listAiProviderCredentials } from "../../services/aiProviderCredentialApi";
 
@@ -177,7 +182,20 @@ const AiAgentModal = ({ open, onClose, agentId, onSaved }) => {
         validationSchema={schema}
         onSubmit={handleSubmit}
       >
-        {({ touched, errors, isSubmitting, values, setFieldValue }) => (
+        {({ touched, errors, isSubmitting, values, setFieldValue }) => {
+          const effectiveProvider = resolveEffectiveProvider(
+            values.aiProviderCredentialId,
+            credentials
+          );
+          const availableModels = effectiveProvider
+            ? getModelsForProvider(effectiveProvider)
+            : getModelsForProvider("openai").concat(getModelsForProvider("gemini"));
+          const modelMismatch =
+            effectiveProvider &&
+            values.model &&
+            !availableModels.includes(values.model);
+
+          return (
           <Form>
             <DialogContent dividers>
               {loading ? (
@@ -232,6 +250,17 @@ const AiAgentModal = ({ open, onClose, agentId, onSaved }) => {
                       variant="outlined"
                       margin="dense"
                       helperText={i18n.t("aiAgent.fields.credentialHint")}
+                      onChange={(e) => {
+                        const nextId = e.target.value;
+                        setFieldValue("aiProviderCredentialId", nextId);
+                        const nextProvider = resolveEffectiveProvider(nextId, credentials);
+                        if (nextProvider) {
+                          const models = getModelsForProvider(nextProvider);
+                          if (!models.includes(values.model)) {
+                            setFieldValue("model", DEFAULT_MODEL_BY_PROVIDER[nextProvider]);
+                          }
+                        }
+                      }}
                     >
                       <MenuItem value="">
                         {i18n.t("aiAgent.fields.credentialDefault")}
@@ -240,10 +269,16 @@ const AiAgentModal = ({ open, onClose, agentId, onSaved }) => {
                         <MenuItem key={c.id} value={String(c.id)}>
                           {c.name}
                           {c.isDefault ? ` (${i18n.t("aiAgent.credentials.defaultBadge")})` : ""}
+                          {c.provider ? ` — ${resolveProviderLabel(c.provider)}` : ""}
                           {c.maskedKey ? ` — ${c.maskedKey}` : ""}
                         </MenuItem>
                       ))}
                     </Field>
+                    {!effectiveProvider && values.aiProviderCredentialId === "" ? (
+                      <Typography variant="caption" color="textSecondary">
+                        {i18n.t("aiAgent.fields.noDefaultCredential")}
+                      </Typography>
+                    ) : null}
                   </Grid>
                   <Grid item xs={12} sm={6}>
                     <Field
@@ -254,13 +289,19 @@ const AiAgentModal = ({ open, onClose, agentId, onSaved }) => {
                       fullWidth
                       variant="outlined"
                       margin="dense"
+                      onChange={(e) => setFieldValue("model", e.target.value)}
                     >
-                      {AI_AGENT_MODELS.map((m) => (
+                      {availableModels.map((m) => (
                         <MenuItem key={m} value={m}>
                           {m}
                         </MenuItem>
                       ))}
                     </Field>
+                    {modelMismatch ? (
+                      <Typography variant="caption" color="error">
+                        {i18n.t("aiAgent.fields.modelProviderWarning")}
+                      </Typography>
+                    ) : null}
                   </Grid>
                   <Grid item xs={6} sm={3}>
                     <Field
@@ -378,7 +419,8 @@ const AiAgentModal = ({ open, onClose, agentId, onSaved }) => {
               </div>
             </DialogActions>
           </Form>
-        )}
+          );
+        }}
       </Formik>
     </Dialog>
   );

@@ -30,6 +30,7 @@ import AiAgentModal from "../../components/AiAgentModal";
 import AiProviderCredentialModal from "../../components/AiProviderCredentialModal";
 import { AppEmptyState } from "../../ui";
 import { i18n } from "../../translate/i18n";
+import { resolveProviderLabel } from "../../config/aiProviderModels";
 import toastError from "../../errors/toastError";
 import { listAiAgents, deleteAiAgent, listAiAgentShadowSuggestions } from "../../services/aiAgentApi";
 import {
@@ -401,7 +402,7 @@ const AiAgent = () => {
                         />
                       ) : null}
                     </TableCell>
-                    <TableCell>{cred.provider}</TableCell>
+                    <TableCell>{resolveProviderLabel(cred.provider)}</TableCell>
                     <TableCell>{cred.maskedKey || "—"}</TableCell>
                     <TableCell align="center">
                       <Chip
@@ -477,7 +478,7 @@ const AiAgent = () => {
                     <TableCell>{i18n.t("aiAgent.shadowSection.table.status")}</TableCell>
                     <TableCell>{i18n.t("aiAgent.shadowSection.table.messageType")}</TableCell>
                     <TableCell>{i18n.t("aiAgent.shadowSection.table.suggestion")}</TableCell>
-                    <TableCell>{i18n.t("aiAgent.shadowSection.table.model")}</TableCell>
+                    <TableCell>{i18n.t("aiAgent.shadowSection.table.provider")}</TableCell>
                     <TableCell align="right">{i18n.t("aiAgent.shadowSection.table.tokens")}</TableCell>
                   </TableRow>
                 </TableHead>
@@ -513,7 +514,18 @@ const AiAgent = () => {
                           </Typography>
                         ) : null}
                       </TableCell>
-                      <TableCell>{row.model || "-"}</TableCell>
+                      <TableCell>
+                        {row.provider || row.model ? (
+                          <>
+                            <Typography variant="body2">
+                              {row.provider ? resolveProviderLabel(row.provider) : "-"}
+                              {row.model ? ` / ${row.model}` : ""}
+                            </Typography>
+                          </>
+                        ) : (
+                          "-"
+                        )}
+                      </TableCell>
                       <TableCell align="right">{row.totalTokens ?? "-"}</TableCell>
                     </TableRow>
                   ))}
