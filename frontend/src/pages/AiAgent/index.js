@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Box,
   Button,
@@ -14,11 +14,22 @@ import {
   Tooltip,
   Typography,
   CircularProgress,
+  TextField,
+  MenuItem,
+  Grid,
 } from "@material-ui/core";
 import Alert from "@material-ui/lab/Alert";
 import { makeStyles } from "@material-ui/core/styles";
-import { DeleteOutline, Edit } from "@material-ui/icons";
+import {
+  DeleteOutline,
+  Edit,
+  FileCopy,
+  OpenInNew,
+  RateReview,
+  Visibility,
+} from "@material-ui/icons";
 import { toast } from "react-toastify";
+import { useHistory } from "react-router-dom";
 
 import MainContainer from "../../components/MainContainer";
 import MainHeader from "../../components/MainHeader";
@@ -28,11 +39,22 @@ import TableRowSkeleton from "../../components/TableRowSkeleton";
 import ConfirmationModal from "../../components/ConfirmationModal";
 import AiAgentModal from "../../components/AiAgentModal";
 import AiProviderCredentialModal from "../../components/AiProviderCredentialModal";
+import AiAgentShadowDetailsModal from "../../components/AiAgentShadowDetailsModal";
+import AiAgentShadowReviewModal from "../../components/AiAgentShadowReviewModal";
 import { AppEmptyState } from "../../ui";
 import { i18n } from "../../translate/i18n";
 import { resolveProviderLabel } from "../../config/aiProviderModels";
+import {
+  resolveShadowErrorLabel,
+  resolveShadowStatusLabel,
+} from "../../config/aiAgentShadowObservability";
 import toastError from "../../errors/toastError";
-import { listAiAgents, deleteAiAgent, listAiAgentShadowSuggestions } from "../../services/aiAgentApi";
+import {
+  deleteAiAgent,
+  getAiAgentShadowSuggestionsSummary,
+  listAiAgentShadowSuggestions,
+  listAiAgents,
+} from "../../services/aiAgentApi";
 import {
   deleteAiProviderCredential,
   listAiProviderCredentials,
@@ -62,6 +84,16 @@ const useStyles = makeStyles((theme) => ({
   shadowBadge: {
     marginLeft: theme.spacing(1),
   },
+  summaryCard: {
+    padding: theme.spacing(1.5),
+    border: `1px solid ${theme.palette.divider}`,
+    borderRadius: theme.shape.borderRadius,
+    height: "100%",
+  },
+  filterBar: {
+    marginBottom: theme.spacing(2),
+    marginTop: theme.spacing(1),
+  },
   actionIcon: {
     opacity: 0.55,
     "&:hover": {
@@ -70,8 +102,18 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
+const DEFAULT_SHADOW_FILTERS = {
+  shadowStatus: "",
+  shadowProvider: "",
+  shadowModel: "",
+  aiAgentId: "",
+  errorCode: "",
+  suggestionSource: "",
+};
+
 const AiAgent = () => {
   const classes = useStyles();
+  const history = useHistory();
   const [agents, setAgents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -90,6 +132,45 @@ const AiAgent = () => {
   const [credentialDeleteId, setCredentialDeleteId] = useState(null);
   const [credentialConfirmOpen, setCredentialConfirmOpen] = useState(false);
   const [credentialTestLoadingId, setCredentialTestLoadingId] = useState(null);
+  const [shadowFilters, setShadowFilters] = useState(DEFAULT_SHADOW_FILTERS);
+  const [shadowSummary, setShadowSummary] = useState(null);
+  const [shadowDetailsRow, setShadowDetailsRow] = useState(null);
+  const [shadowReviewRow, setShadowReviewRow] = useState(null);
+
+  const shadowQueryParams = useMemo(() => {
+    const params = { pageNumber: 1 };
+    Object.entries(shadowFilters).forEach(([key, value]) => {
+      if (value !== "" && value != null) params[key] = value;
+    });
+    return params;
+  }, [shadowFilters]);
+
+  const fetchShadowSummary = useCallback(async () => {
+    try {
+      const { data } = await getAiAgentShadowSuggestionsSummary(shadowQueryParams);
+      setShadowSummary(data || null);
+    } catch {
+      setShadowSummary(null);
+    }
+  }, [shadowQueryParams]);
+
+  const fetchShadowSuggestions = useCallback(async (page = 1, append = false) => {
+    setShadowLoading(true);
+    try {
+      const { data } = await listAiAgentShadowSuggestions({
+        ...shadowQueryParams,
+        pageNumber: page,
+      });
+      const records = Array.isArray(data?.records) ? data.records : [];
+      setShadowRows((prev) => (append ? [...prev, ...records] : records));
+      setShadowHasMore(!!data?.hasMore);
+      setShadowPage(page);
+    } catch (err) {
+      toastError(err);
+    } finally {
+      setShadowLoading(false);
+    }
+  }, [shadowQueryParams]);
 
   const fetchCredentials = useCallback(async () => {
     setCredentialsLoading(true);
@@ -101,21 +182,6 @@ const AiAgent = () => {
       setCredentials([]);
     } finally {
       setCredentialsLoading(false);
-    }
-  }, []);
-
-  const fetchShadowSuggestions = useCallback(async (page = 1, append = false) => {
-    setShadowLoading(true);
-    try {
-      const { data } = await listAiAgentShadowSuggestions({ pageNumber: page });
-      const records = Array.isArray(data?.records) ? data.records : [];
-      setShadowRows((prev) => (append ? [...prev, ...records] : records));
-      setShadowHasMore(!!data?.hasMore);
-      setShadowPage(page);
-    } catch (err) {
-      toastError(err);
-    } finally {
-      setShadowLoading(false);
     }
   }, []);
 
@@ -135,9 +201,13 @@ const AiAgent = () => {
 
   useEffect(() => {
     fetchAgents();
-    fetchShadowSuggestions(1, false);
     fetchCredentials();
-  }, [fetchAgents, fetchShadowSuggestions, fetchCredentials]);
+  }, [fetchAgents, fetchCredentials]);
+
+  useEffect(() => {
+    fetchShadowSuggestions(1, false);
+    fetchShadowSummary();
+  }, [fetchShadowSuggestions, fetchShadowSummary]);
 
   const handleOpenNew = () => {
     setSelectedId(null);
@@ -207,6 +277,30 @@ const AiAgent = () => {
     }
   };
 
+  const handleCopySuggestion = async (text) => {
+    if (!text?.trim()) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(i18n.t("aiAgent.shadowSection.actions.copySuccess"));
+    } catch {
+      toast.error(i18n.t("aiAgent.shadowSection.actions.copyError"));
+    }
+  };
+
+  const handleOpenTicket = (row) => {
+    if (!row?.ticketUuid) return;
+    history.push(`/tickets/${row.ticketUuid}`);
+  };
+
+  const handleShadowFilterChange = (field, value) => {
+    setShadowFilters((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleRefreshShadow = () => {
+    fetchShadowSuggestions(1, false);
+    fetchShadowSummary();
+  };
+
   return (
     <MainContainer>
       <ConfirmationModal
@@ -239,6 +333,19 @@ const AiAgent = () => {
         onClose={() => setModalOpen(false)}
         agentId={selectedId}
         onSaved={fetchAgents}
+      />
+
+      <AiAgentShadowDetailsModal
+        open={Boolean(shadowDetailsRow)}
+        onClose={() => setShadowDetailsRow(null)}
+        row={shadowDetailsRow}
+      />
+
+      <AiAgentShadowReviewModal
+        open={Boolean(shadowReviewRow)}
+        onClose={() => setShadowReviewRow(null)}
+        row={shadowReviewRow}
+        onSaved={handleRefreshShadow}
       />
 
       <MainHeader>
@@ -457,10 +564,103 @@ const AiAgent = () => {
           <Alert severity="warning" className={classes.phaseAlert}>
             {i18n.t("aiAgent.shadowSection.warning")}
           </Alert>
+          <Typography variant="body2" color="textSecondary" gutterBottom>
+            {i18n.t("aiAgent.shadowSection.evaluationHint")}
+          </Typography>
+
+          <Grid container spacing={2} className={classes.filterBar}>
+            {[
+              { key: "total", label: i18n.t("aiAgent.shadowSection.summary.total"), value: shadowSummary?.total },
+              { key: "generated", label: i18n.t("aiAgent.shadowSection.summary.generated"), value: shadowSummary?.generated },
+              { key: "failed", label: i18n.t("aiAgent.shadowSection.summary.failed"), value: shadowSummary?.failed },
+              { key: "openai", label: "OpenAI", value: shadowSummary?.providers?.openai },
+              { key: "gemini", label: "Google Gemini", value: shadowSummary?.providers?.gemini },
+              { key: "good", label: i18n.t("aiAgent.shadowSection.summary.goodReviews"), value: shadowSummary?.reviews?.good },
+              { key: "bad", label: i18n.t("aiAgent.shadowSection.summary.badReviews"), value: shadowSummary?.reviews?.bad },
+            ].map((card) => (
+              <Grid item xs={6} sm={4} md={3} lg={2} key={card.key}>
+                <Box className={classes.summaryCard}>
+                  <Typography variant="caption" color="textSecondary">
+                    {card.label}
+                  </Typography>
+                  <Typography variant="h6">{card.value ?? 0}</Typography>
+                </Box>
+              </Grid>
+            ))}
+          </Grid>
+
+          <Grid container spacing={1} className={classes.filterBar}>
+            <Grid item xs={12} sm={6} md={3}>
+              <TextField
+                select
+                fullWidth
+                size="small"
+                variant="outlined"
+                label={i18n.t("aiAgent.shadowSection.filters.provider")}
+                value={shadowFilters.shadowProvider}
+                onChange={(e) => handleShadowFilterChange("shadowProvider", e.target.value)}
+              >
+                <MenuItem value="">{i18n.t("aiAgent.shadowSection.filters.all")}</MenuItem>
+                <MenuItem value="openai">OpenAI</MenuItem>
+                <MenuItem value="gemini">Google Gemini</MenuItem>
+              </TextField>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <TextField
+                select
+                fullWidth
+                size="small"
+                variant="outlined"
+                label={i18n.t("aiAgent.shadowSection.filters.status")}
+                value={shadowFilters.shadowStatus}
+                onChange={(e) => handleShadowFilterChange("shadowStatus", e.target.value)}
+              >
+                <MenuItem value="">{i18n.t("aiAgent.shadowSection.filters.all")}</MenuItem>
+                <MenuItem value="generated">{resolveShadowStatusLabel("generated")}</MenuItem>
+                <MenuItem value="failed">{resolveShadowStatusLabel("failed")}</MenuItem>
+                <MenuItem value="skipped">{resolveShadowStatusLabel("skipped")}</MenuItem>
+                <MenuItem value="rate_limited">{resolveShadowStatusLabel("rate_limited")}</MenuItem>
+              </TextField>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <TextField
+                select
+                fullWidth
+                size="small"
+                variant="outlined"
+                label={i18n.t("aiAgent.shadowSection.filters.agent")}
+                value={shadowFilters.aiAgentId}
+                onChange={(e) => handleShadowFilterChange("aiAgentId", e.target.value)}
+              >
+                <MenuItem value="">{i18n.t("aiAgent.shadowSection.filters.all")}</MenuItem>
+                {agents.map((agent) => (
+                  <MenuItem key={agent.id} value={String(agent.id)}>
+                    {agent.name}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <TextField
+                select
+                fullWidth
+                size="small"
+                variant="outlined"
+                label={i18n.t("aiAgent.shadowSection.filters.source")}
+                value={shadowFilters.suggestionSource}
+                onChange={(e) => handleShadowFilterChange("suggestionSource", e.target.value)}
+              >
+                <MenuItem value="">{i18n.t("aiAgent.shadowSection.filters.all")}</MenuItem>
+                <MenuItem value="model">model</MenuItem>
+                <MenuItem value="fallback">fallback</MenuItem>
+              </TextField>
+            </Grid>
+          </Grid>
+
           {shadowLoading && shadowRows.length === 0 ? (
             <Table size="small">
               <TableBody>
-                <TableRowSkeleton columns={8} />
+                <TableRowSkeleton columns={10} />
               </TableBody>
             </Table>
           ) : shadowRows.length === 0 ? (
@@ -475,58 +675,95 @@ const AiAgent = () => {
                     <TableCell>{i18n.t("aiAgent.shadowSection.table.date")}</TableCell>
                     <TableCell>{i18n.t("aiAgent.shadowSection.table.agent")}</TableCell>
                     <TableCell>{i18n.t("aiAgent.shadowSection.table.ticket")}</TableCell>
-                    <TableCell>{i18n.t("aiAgent.shadowSection.table.status")}</TableCell>
-                    <TableCell>{i18n.t("aiAgent.shadowSection.table.messageType")}</TableCell>
-                    <TableCell>{i18n.t("aiAgent.shadowSection.table.suggestion")}</TableCell>
                     <TableCell>{i18n.t("aiAgent.shadowSection.table.provider")}</TableCell>
+                    <TableCell>{i18n.t("aiAgent.shadowSection.table.status")}</TableCell>
+                    <TableCell>{i18n.t("aiAgent.shadowSection.table.error")}</TableCell>
+                    <TableCell>{i18n.t("aiAgent.shadowSection.table.suggestion")}</TableCell>
                     <TableCell align="right">{i18n.t("aiAgent.shadowSection.table.tokens")}</TableCell>
+                    <TableCell align="right">{i18n.t("aiAgent.shadowSection.table.latency")}</TableCell>
+                    <TableCell align="center">{i18n.t("aiAgent.table.actions")}</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {shadowRows.map((row) => (
                     <TableRow key={row.id}>
                       <TableCell>
-                        {row.createdAt
-                          ? new Date(row.createdAt).toLocaleString()
-                          : "-"}
+                        {row.createdAt ? new Date(row.createdAt).toLocaleString() : "-"}
                       </TableCell>
                       <TableCell>{row.aiAgentName || row.aiAgentId || "-"}</TableCell>
                       <TableCell>#{row.ticketId ?? "-"}</TableCell>
                       <TableCell>
-                        <Chip size="small" label={row.shadowStatus || "-"} />
-                        {row.notSentToClient ? (
-                          <Chip
-                            size="small"
-                            color="default"
-                            className={classes.shadowBadge}
-                            label={i18n.t("aiAgent.shadowSection.notSentBadge")}
-                          />
-                        ) : null}
-                      </TableCell>
-                      <TableCell>{row.messageType || "-"}</TableCell>
-                      <TableCell style={{ maxWidth: 280 }}>
-                        <Typography variant="body2" noWrap title={row.suggestedReply || ""}>
-                          {row.suggestedReply || row.errorCode || "-"}
-                        </Typography>
-                        {row.suggestionSource === "fallback" ? (
-                          <Typography variant="caption" color="textSecondary">
-                            (fallback)
+                        {row.provider ? resolveProviderLabel(row.provider) : "-"}
+                        {row.model ? (
+                          <Typography variant="caption" display="block" color="textSecondary">
+                            {row.model}
                           </Typography>
                         ) : null}
                       </TableCell>
                       <TableCell>
-                        {row.provider || row.model ? (
-                          <>
-                            <Typography variant="body2">
-                              {row.provider ? resolveProviderLabel(row.provider) : "-"}
-                              {row.model ? ` / ${row.model}` : ""}
-                            </Typography>
-                          </>
-                        ) : (
-                          "-"
-                        )}
+                        <Chip size="small" label={resolveShadowStatusLabel(row.shadowStatus)} />
+                        <Chip
+                          size="small"
+                          color="default"
+                          className={classes.shadowBadge}
+                          label={i18n.t("aiAgent.shadowSection.notSentBadge")}
+                        />
+                        {row.review?.rating ? (
+                          <Chip
+                            size="small"
+                            color={row.review.rating === "good" ? "primary" : "default"}
+                            className={classes.shadowBadge}
+                            label={row.review.rating}
+                          />
+                        ) : null}
+                      </TableCell>
+                      <TableCell>{resolveShadowErrorLabel(row.errorCode)}</TableCell>
+                      <TableCell style={{ maxWidth: 240 }}>
+                        <Typography variant="body2" noWrap title={row.suggestedReply || ""}>
+                          {row.suggestedReply || "-"}
+                        </Typography>
+                        {row.suggestionSource === "fallback" ? (
+                          <Typography variant="caption" color="textSecondary">
+                            ({i18n.t("aiAgent.shadowSection.fallbackSource")})
+                          </Typography>
+                        ) : null}
                       </TableCell>
                       <TableCell align="right">{row.totalTokens ?? "-"}</TableCell>
+                      <TableCell align="right">{row.latencyMs ?? "-"}</TableCell>
+                      <TableCell align="center">
+                        <Tooltip title={i18n.t("aiAgent.shadowSection.actions.copy")}>
+                          <span>
+                            <IconButton
+                              size="small"
+                              disabled={!row.suggestedReply}
+                              onClick={() => handleCopySuggestion(row.suggestedReply)}
+                            >
+                              <FileCopy fontSize="small" />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                        <Tooltip title={i18n.t("aiAgent.shadowSection.actions.openTicket")}>
+                          <span>
+                            <IconButton
+                              size="small"
+                              disabled={!row.ticketUuid}
+                              onClick={() => handleOpenTicket(row)}
+                            >
+                              <OpenInNew fontSize="small" />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                        <Tooltip title={i18n.t("aiAgent.shadowSection.actions.details")}>
+                          <IconButton size="small" onClick={() => setShadowDetailsRow(row)}>
+                            <Visibility fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title={i18n.t("aiAgent.shadowSection.actions.review")}>
+                          <IconButton size="small" onClick={() => setShadowReviewRow(row)}>
+                            <RateReview fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

@@ -15,6 +15,8 @@ const ALLOWED_KEYS = new Set([
   "hasFlowId",
   "evaluationDurationMs",
   "evaluatorVersion",
+  "credentialSource",
+  "credentialId",
   "flowEvidence",
   "integrationEvidence"
 ]);
@@ -53,6 +55,23 @@ export function sanitizeAiAgentRuntimeMetadata(
   for (const [key, value] of Object.entries(input)) {
     if (!ALLOWED_KEYS.has(key)) continue;
     if (key === "evaluatorVersion") continue;
+    if (key === "credentialId") {
+      if (typeof value === "number" && Number.isFinite(value)) {
+        out.credentialId = Math.floor(value);
+      }
+      continue;
+    }
+    if (key === "credentialSource") {
+      if (
+        value === "agent_credential" ||
+        value === "company_default" ||
+        value === "legacy_prompt" ||
+        value === "missing"
+      ) {
+        out.credentialSource = value;
+      }
+      continue;
+    }
     if (key === "flowEvidence" || key === "integrationEvidence") {
       const sanitized = sanitizeEvidence(value);
       if (sanitized) out[key] = sanitized;

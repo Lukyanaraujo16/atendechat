@@ -23,3 +23,11 @@ export function deleteAiAgent(id) {
 export function listAiAgentShadowSuggestions(params = {}) {
   return api.get("/ai-agents/shadow-suggestions", { params });
 }
+
+export function getAiAgentShadowSuggestionsSummary(params = {}) {
+  return api.get("/ai-agents/shadow-suggestions/summary", { params });
+}
+
+export function upsertAiAgentShadowSuggestionReview(logId, data) {
+  return api.post(`/ai-agents/shadow-suggestions/${logId}/review`, data);
+}

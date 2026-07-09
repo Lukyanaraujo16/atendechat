@@ -13,10 +13,24 @@ aiAgentRoutes.get(
 );
 
 aiAgentRoutes.get(
+  "/ai-agents/shadow-suggestions/summary",
+  isAuth,
+  requireEffectiveModule("automation.ai_agent"),
+  AiAgentController.shadowSuggestionsSummary
+);
+
+aiAgentRoutes.get(
   "/ai-agents/shadow-suggestions",
   isAuth,
   requireEffectiveModule("automation.ai_agent"),
   AiAgentController.shadowSuggestions
+);
+
+aiAgentRoutes.post(
+  "/ai-agents/shadow-suggestions/:id/review",
+  isAuth,
+  requireEffectiveModule("automation.ai_agent"),
+  AiAgentController.upsertShadowSuggestionReview
 );
 
 aiAgentRoutes.get(

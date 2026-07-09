@@ -84,6 +84,7 @@ import InventorySale from "../models/InventorySale";
 import InventorySaleItem from "../models/InventorySaleItem";
 import AiAgent from "../models/AiAgent";
 import AiAgentRuntimeLog from "../models/AiAgentRuntimeLog";
+import AiAgentSuggestionReview from "../models/AiAgentSuggestionReview";
 import AiProviderCredential from "../models/AiProviderCredential";
 import { logDbConnectionAtStartup } from "../helpers/dbConnectionInfo";
 import {
@@ -183,6 +184,7 @@ const models = [
   InventorySaleItem,
   AiAgent,
   AiAgentRuntimeLog,
+  AiAgentSuggestionReview,
   AiProviderCredential
 ];
 

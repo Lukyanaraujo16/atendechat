@@ -1,3 +1,4 @@
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { ChatCompletionRequestMessage } from "openai";
 import {
   AI_PROVIDER_GEMINI,
@@ -12,6 +13,15 @@ import {
 } from "./aiProviderTypes";
 
 type GeminiRole = "user" | "model";
+
+type GeminiGenerateResponse = {
+  text(): string;
+  usageMetadata?: {
+    promptTokenCount?: number;
+    candidatesTokenCount?: number;
+    totalTokenCount?: number;
+  };
+};
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -88,7 +98,6 @@ export class GeminiProviderAdapter implements AiProviderAdapter {
     const modelName = input.model || resolveDefaultModelForProvider(this.provider);
 
     try {
-      const { GoogleGenerativeAI } = await import("@google/generative-ai");
       const genAI = new GoogleGenerativeAI(input.apiKey);
       const model = genAI.getGenerativeModel({
         model: modelName,
@@ -109,17 +118,19 @@ export class GeminiProviderAdapter implements AiProviderAdapter {
         maxOutputTokens: input.maxTokens
       };
 
-      const response = await withTimeout(
+      const response = await withTimeout<GeminiGenerateResponse>(
         history.length > 0
           ? (async () => {
               const chat = model.startChat({ history, generationConfig });
               const result = await chat.sendMessage(lastUserText);
-              return result.response;
+              return result.response as GeminiGenerateResponse;
             })()
-          : model.generateContent({
-              contents: [{ role: "user", parts: [{ text: lastUserText }] }],
-              generationConfig
-            }).then((r) => r.response),
+          : model
+              .generateContent({
+                contents: [{ role: "user", parts: [{ text: lastUserText }] }],
+                generationConfig
+              })
+              .then((r) => r.response as GeminiGenerateResponse),
         input.timeoutMs
       );
 
@@ -134,15 +145,7 @@ export class GeminiProviderAdapter implements AiProviderAdapter {
         };
       }
 
-      const usage = (
-        response as unknown as {
-          usageMetadata?: {
-            promptTokenCount?: number;
-            candidatesTokenCount?: number;
-            totalTokenCount?: number;
-          };
-        }
-      ).usageMetadata;
+      const usage = response.usageMetadata;
 
       return {
         ok: true,
@@ -172,7 +175,6 @@ export class GeminiProviderAdapter implements AiProviderAdapter {
   }
 
   async testCredential(apiKey: string): Promise<void> {
-    const { GoogleGenerativeAI } = await import("@google/generative-ai");
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({
       model: resolveDefaultModelForProvider(this.provider)

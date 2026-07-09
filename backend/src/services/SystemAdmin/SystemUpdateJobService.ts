@@ -94,7 +94,12 @@ function sudoHintLine(message: string): string | null {
   return null;
 }
 
-async function runSingleStep(
+const BACKEND_ACTIONS_REQUIRING_INSTALL = new Set<SystemUpdateAction>([
+  "backend_build",
+  "backend_migrate"
+]);
+
+async function runWhitelistedStep(
   userId: number,
   jobId: string,
   action: SystemUpdateAction
@@ -105,6 +110,21 @@ async function runSingleStep(
   await runWhitelistedCommand(resolved, (line) => {
     pushJobLog(userId, jobId, line);
   });
+}
+
+async function runSingleStep(
+  userId: number,
+  jobId: string,
+  action: SystemUpdateAction,
+  options?: { ensureBackendDeps?: boolean }
+): Promise<void> {
+  if (
+    options?.ensureBackendDeps &&
+    BACKEND_ACTIONS_REQUIRING_INSTALL.has(action)
+  ) {
+    await runWhitelistedStep(userId, jobId, "backend_npm_install");
+  }
+  await runWhitelistedStep(userId, jobId, action);
 }
 
 async function runFullUpdateJob(
@@ -295,7 +315,7 @@ async function runSingleActionJob(
 
   const started = Date.now();
   try {
-    await runSingleStep(userId, jobId, action);
+    await runSingleStep(userId, jobId, action, { ensureBackendDeps: true });
 
     const durationMs = Date.now() - started;
     pushJobLog(

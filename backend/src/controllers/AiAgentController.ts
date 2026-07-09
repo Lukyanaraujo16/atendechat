@@ -6,10 +6,23 @@ import CreateAiAgentService from "../services/AiAgentService/CreateAiAgentServic
 import UpdateAiAgentService from "../services/AiAgentService/UpdateAiAgentService";
 import DeleteAiAgentService from "../services/AiAgentService/DeleteAiAgentService";
 import ListAiAgentShadowSuggestionsService from "../services/AiAgentService/ListAiAgentShadowSuggestionsService";
+import GetAiAgentShadowSuggestionsSummaryService from "../services/AiAgentService/GetAiAgentShadowSuggestionsSummaryService";
+import UpsertAiAgentSuggestionReviewService from "../services/AiAgentService/UpsertAiAgentSuggestionReviewService";
+import {
+  parseOptionalBoolean,
+  parseOptionalPositiveInt,
+  ShadowSuggestionListFilters
+} from "../services/AiAgentService/shadowSuggestionFilters";
 
 function companyIdOrThrow(req: Request): number {
   const id = req.user?.companyId;
   if (id == null) throw new AppError("ERR_NO_PERMISSION", 403);
+  return id;
+}
+
+function userIdOrThrow(req: Request): number {
+  const id = Number(req.user?.id);
+  if (!Number.isFinite(id)) throw new AppError("ERR_NO_PERMISSION", 403);
   return id;
 }
 
@@ -19,6 +32,24 @@ function parseIdParam(raw: string): number {
     throw new AppError("ERR_VALIDATION_ERROR", 400, "ID inválido.");
   }
   return id;
+}
+
+function parseShadowFilters(req: Request, companyId: number): ShadowSuggestionListFilters {
+  const query = req.query;
+  return {
+    companyId,
+    pageNumber: query.pageNumber as string | undefined,
+    aiAgentId: parseOptionalPositiveInt(query.aiAgentId, "aiAgentId"),
+    shadowStatus: query.shadowStatus as string | undefined,
+    shadowProvider: query.shadowProvider as string | undefined,
+    shadowModel: query.shadowModel as string | undefined,
+    eligible: parseOptionalBoolean(query.eligible),
+    errorCode: query.errorCode as string | undefined,
+    suggestionSource: query.suggestionSource as string | undefined,
+    ticketId: parseOptionalPositiveInt(query.ticketId, "ticketId"),
+    dateFrom: query.dateFrom as string | undefined,
+    dateTo: query.dateTo as string | undefined
+  };
 }
 
 export const index = async (req: Request, res: Response): Promise<Response> => {
@@ -63,27 +94,34 @@ export const shadowSuggestions = async (
   res: Response
 ): Promise<Response> => {
   const companyId = companyIdOrThrow(req);
-  const { pageNumber, aiAgentId, shadowStatus, eligible } = req.query;
-
-  let parsedAgentId: number | undefined;
-  if (aiAgentId != null && String(aiAgentId).trim() !== "") {
-    parsedAgentId = Number(aiAgentId);
-    if (!Number.isFinite(parsedAgentId)) {
-      throw new AppError("ERR_VALIDATION_ERROR", 400, "aiAgentId inválido.");
-    }
-  }
-
-  let parsedEligible: boolean | undefined;
-  if (eligible === "true") parsedEligible = true;
-  if (eligible === "false") parsedEligible = false;
-
-  const result = await ListAiAgentShadowSuggestionsService({
-    companyId,
-    pageNumber: pageNumber as string | undefined,
-    aiAgentId: parsedAgentId,
-    shadowStatus: shadowStatus as string | undefined,
-    eligible: parsedEligible
-  });
-
+  const result = await ListAiAgentShadowSuggestionsService(
+    parseShadowFilters(req, companyId)
+  );
   return res.json(result);
+};
+
+export const shadowSuggestionsSummary = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const summary = await GetAiAgentShadowSuggestionsSummaryService(
+    parseShadowFilters(req, companyId)
+  );
+  return res.json(summary);
+};
+
+export const upsertShadowSuggestionReview = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const runtimeLogId = parseIdParam(req.params.id);
+  const review = await UpsertAiAgentSuggestionReviewService({
+    companyId,
+    runtimeLogId,
+    reviewedBy: userIdOrThrow(req),
+    body: req.body
+  });
+  return res.json(review);
 };

@@ -26,6 +26,7 @@ import {
 import {
   claimShadowGeneration,
   markSupersededShadowLogs,
+  mergeAiAgentShadowLogMetadata,
   updateAiAgentShadowLog
 } from "./AiAgentShadowLogService";
 import { resolveWhatsappAiAgentRuntimeMode } from "./aiAgentRuntimeMode";
@@ -139,6 +140,12 @@ export async function generateShadowSuggestionForLog(
       ticket,
       agent
     });
+
+    await mergeAiAgentShadowLogMetadata(logId, companyId, {
+      credentialSource: resolved.source,
+      credentialId: resolved.credentialId ?? null
+    });
+
     if (!resolved.apiKey || !resolved.provider) {
       await updateAiAgentShadowLog(logId, companyId, {
         shadowStatus: AI_AGENT_SHADOW_STATUSES.FAILED,
