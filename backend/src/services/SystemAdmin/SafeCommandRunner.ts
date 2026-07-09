@@ -66,7 +66,7 @@ export const SYSTEM_UPDATE_COMMANDS: Record<
   },
   backend_npm_install: {
     cmd: "npm",
-    args: ["install"],
+    args: ["install", "--production=false"],
     timeoutMs: 300_000,
     label: "npm install (backend)",
     cwdKey: "backend"
@@ -95,7 +95,7 @@ export const SYSTEM_UPDATE_COMMANDS: Record<
   },
   frontend_npm_install: {
     cmd: "npm",
-    args: ["install"],
+    args: ["install", "--production=false"],
     timeoutMs: 300_000,
     label: "npm install (frontend)",
     cwdKey: "frontend"
