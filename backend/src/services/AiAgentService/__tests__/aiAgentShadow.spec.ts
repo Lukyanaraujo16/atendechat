@@ -289,8 +289,8 @@ describe("AiAgent shadow mode 1.3", () => {
         }
       ]);
       jest
-        .spyOn(require("../resolveAiAgentOpenAiApiKey"), "resolveAiAgentOpenAiApiKey")
-        .mockResolvedValue("sk-test");
+        .spyOn(require("../resolveAiAgentApiCredential"), "resolveAiAgentOpenAiApiKeyWithSource")
+        .mockResolvedValue({ apiKey: "sk-test", source: "legacy_prompt" });
     });
 
     it("gera sugestão para texto válido", async () => {

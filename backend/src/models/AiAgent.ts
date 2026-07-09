@@ -13,6 +13,7 @@ import {
   UpdatedAt
 } from "sequelize-typescript";
 import Company from "./Company";
+import AiProviderCredential from "./AiProviderCredential";
 import {
   DEFAULT_AI_AGENT_MAX_TOKENS,
   DEFAULT_AI_AGENT_MODEL,
@@ -76,6 +77,14 @@ class AiAgent extends Model<AiAgent> {
   @AllowNull(true)
   @Column(DataType.TEXT)
   handoffMessage: string | null;
+
+  @ForeignKey(() => AiProviderCredential)
+  @AllowNull(true)
+  @Column
+  aiProviderCredentialId: number | null;
+
+  @BelongsTo(() => AiProviderCredential)
+  aiProviderCredential: AiProviderCredential;
 
   @Default(false)
   @Column

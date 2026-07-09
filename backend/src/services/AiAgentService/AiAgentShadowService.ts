@@ -9,7 +9,7 @@ import { logger } from "../../utils/logger";
 import { buildAiAgentPromptContext } from "./buildAiAgentPromptContext";
 import { buildAiAgentSystemPrompt } from "./buildAiAgentSystemPrompt";
 import { parseAiAgentMaxTokens, parseAiAgentModel } from "./aiAgentValidation";
-import { resolveAiAgentOpenAiApiKey } from "./resolveAiAgentOpenAiApiKey";
+import { resolveAiAgentOpenAiApiKeyWithSource } from "./resolveAiAgentApiCredential";
 import {
   AI_AGENT_SHADOW_DEBOUNCE_MS,
   AI_AGENT_SHADOW_MAX_TOKENS_CAP,
@@ -145,12 +145,13 @@ export async function generateShadowSuggestionForLog(
   const startedAt = Date.now();
 
   try {
-    const apiKey = await resolveAiAgentOpenAiApiKey({
+    const resolved = await resolveAiAgentOpenAiApiKeyWithSource({
       companyId,
       whatsapp,
-      ticket
+      ticket,
+      agent
     });
-    if (!apiKey) {
+    if (!resolved.apiKey) {
       await updateAiAgentShadowLog(logId, companyId, {
         shadowStatus: AI_AGENT_SHADOW_STATUSES.FAILED,
         errorCode: AI_AGENT_SHADOW_ERROR_CODES.AI_AUTH_ERROR,
@@ -199,7 +200,7 @@ export async function generateShadowSuggestionForLog(
       executeOpenAi({
         companyId,
         ticketId: ticket.id,
-        apiKey,
+        apiKey: resolved.apiKey,
         prompt: systemPrompt,
         messages: promptContext.messages,
         model,

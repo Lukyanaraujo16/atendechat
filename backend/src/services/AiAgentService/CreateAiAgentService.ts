@@ -9,6 +9,7 @@ import {
   parseAiAgentModel,
   parseAiAgentTemperature
 } from "./aiAgentValidation";
+import { parseAiProviderCredentialId } from "./parseAiProviderCredentialId";
 
 type CreateBody = Record<string, unknown>;
 
@@ -17,6 +18,10 @@ export default async function CreateAiAgentService(input: {
   body: CreateBody;
 }): Promise<AiAgent> {
   const name = parseRequiredName(input.body.name);
+  const aiProviderCredentialId = await parseAiProviderCredentialId(
+    input.companyId,
+    input.body.aiProviderCredentialId ?? null
+  );
 
   return AiAgent.create({
     companyId: input.companyId,
@@ -29,6 +34,7 @@ export default async function CreateAiAgentService(input: {
     systemPrompt: normalizeOptionalString(input.body.systemPrompt),
     fallbackMessage: normalizeOptionalString(input.body.fallbackMessage),
     handoffMessage: normalizeOptionalString(input.body.handoffMessage),
+    aiProviderCredentialId,
     allowAudioInput: false,
     allowAudioOutput: false
   });

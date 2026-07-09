@@ -43,6 +43,7 @@ import appointmentRoutes from "./appointmentRoutes";
 import crmRoutes from "./crmRoutes";
 import inventoryRoutes from "./inventoryRoutes";
 import aiAgentRoutes from "./aiAgentRoutes";
+import aiProviderCredentialRoutes from "./aiProviderCredentialRoutes";
 import notificationRoutes from "./notificationRoutes";
 import systemSettingRoutes from "./systemSettingRoutes";
 import platformSuperRoutes from "./platformSuperRoutes";
@@ -104,5 +105,6 @@ routes.use(appointmentRoutes);
 routes.use(crmRoutes);
 routes.use(inventoryRoutes);
 routes.use(aiAgentRoutes);
+routes.use(aiProviderCredentialRoutes);
 
 export default routes;

@@ -30,6 +30,7 @@ import {
   DEFAULT_AI_AGENT_FORM,
 } from "../../config/aiAgentFormDefaults";
 import { createAiAgent, getAiAgent, updateAiAgent } from "../../services/aiAgentApi";
+import { listAiProviderCredentials } from "../../services/aiProviderCredentialApi";
 
 const useStyles = makeStyles((theme) => ({
   btnWrapper: {
@@ -71,6 +72,23 @@ const AiAgentModal = ({ open, onClose, agentId, onSaved }) => {
   const classes = useStyles();
   const [initialValues, setInitialValues] = useState(DEFAULT_AI_AGENT_FORM);
   const [loading, setLoading] = useState(false);
+  const [credentials, setCredentials] = useState([]);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await listAiProviderCredentials();
+        if (!cancelled) setCredentials(Array.isArray(data) ? data : []);
+      } catch {
+        if (!cancelled) setCredentials([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -94,6 +112,10 @@ const AiAgentModal = ({ open, onClose, agentId, onSaved }) => {
           systemPrompt: data.systemPrompt || "",
           fallbackMessage: data.fallbackMessage || "",
           handoffMessage: data.handoffMessage || "",
+          aiProviderCredentialId:
+            data.aiProviderCredentialId != null
+              ? String(data.aiProviderCredentialId)
+              : "",
           allowAudioInput: false,
           allowAudioOutput: false,
         });
@@ -120,6 +142,10 @@ const AiAgentModal = ({ open, onClose, agentId, onSaved }) => {
       systemPrompt: values.systemPrompt?.trim() || null,
       fallbackMessage: values.fallbackMessage?.trim() || null,
       handoffMessage: values.handoffMessage?.trim() || null,
+      aiProviderCredentialId:
+        values.aiProviderCredentialId === "" || values.aiProviderCredentialId == null
+          ? null
+          : Number(values.aiProviderCredentialId),
     };
     try {
       if (agentId) {
@@ -195,6 +221,29 @@ const AiAgentModal = ({ open, onClose, agentId, onSaved }) => {
                       variant="outlined"
                       margin="dense"
                     />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Field
+                      as={TextField}
+                      select
+                      name="aiProviderCredentialId"
+                      label={i18n.t("aiAgent.fields.credential")}
+                      fullWidth
+                      variant="outlined"
+                      margin="dense"
+                      helperText={i18n.t("aiAgent.fields.credentialHint")}
+                    >
+                      <MenuItem value="">
+                        {i18n.t("aiAgent.fields.credentialDefault")}
+                      </MenuItem>
+                      {credentials.map((c) => (
+                        <MenuItem key={c.id} value={String(c.id)}>
+                          {c.name}
+                          {c.isDefault ? ` (${i18n.t("aiAgent.credentials.defaultBadge")})` : ""}
+                          {c.maskedKey ? ` — ${c.maskedKey}` : ""}
+                        </MenuItem>
+                      ))}
+                    </Field>
                   </Grid>
                   <Grid item xs={12} sm={6}>
                     <Field

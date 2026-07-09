@@ -14,6 +14,7 @@ export const DEFAULT_AI_AGENT_FORM = {
   systemPrompt: "",
   fallbackMessage: "",
   handoffMessage: "",
+  aiProviderCredentialId: "",
   allowAudioInput: false,
   allowAudioOutput: false,
 };

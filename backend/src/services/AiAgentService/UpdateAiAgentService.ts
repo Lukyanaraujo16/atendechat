@@ -9,6 +9,7 @@ import {
   parseAiAgentModel,
   parseAiAgentTemperature
 } from "./aiAgentValidation";
+import { parseAiProviderCredentialId } from "./parseAiProviderCredentialId";
 
 type UpdateBody = Record<string, unknown>;
 
@@ -48,6 +49,12 @@ export default async function UpdateAiAgentService(input: {
   }
   if (Object.prototype.hasOwnProperty.call(body, "handoffMessage")) {
     patch.handoffMessage = normalizeOptionalString(body.handoffMessage);
+  }
+  if (Object.prototype.hasOwnProperty.call(body, "aiProviderCredentialId")) {
+    patch.aiProviderCredentialId = await parseAiProviderCredentialId(
+      input.companyId,
+      body.aiProviderCredentialId
+    );
   }
 
   // Áudio reservado para fase futura — ignorar alterações do cliente.

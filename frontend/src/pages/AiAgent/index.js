@@ -13,6 +13,7 @@ import {
   TableRow,
   Tooltip,
   Typography,
+  CircularProgress,
 } from "@material-ui/core";
 import Alert from "@material-ui/lab/Alert";
 import { makeStyles } from "@material-ui/core/styles";
@@ -26,10 +27,16 @@ import Title from "../../components/Title";
 import TableRowSkeleton from "../../components/TableRowSkeleton";
 import ConfirmationModal from "../../components/ConfirmationModal";
 import AiAgentModal from "../../components/AiAgentModal";
+import AiProviderCredentialModal from "../../components/AiProviderCredentialModal";
 import { AppEmptyState } from "../../ui";
 import { i18n } from "../../translate/i18n";
 import toastError from "../../errors/toastError";
 import { listAiAgents, deleteAiAgent, listAiAgentShadowSuggestions } from "../../services/aiAgentApi";
+import {
+  deleteAiProviderCredential,
+  listAiProviderCredentials,
+  testAiProviderCredential,
+} from "../../services/aiProviderCredentialApi";
 
 const useStyles = makeStyles((theme) => ({
   mainPaper: {
@@ -46,6 +53,9 @@ const useStyles = makeStyles((theme) => ({
     color: theme.palette.text.secondary,
   },
   shadowSection: {
+    marginTop: theme.spacing(3),
+  },
+  credentialsSection: {
     marginTop: theme.spacing(3),
   },
   shadowBadge: {
@@ -72,6 +82,26 @@ const AiAgent = () => {
   const [shadowLoading, setShadowLoading] = useState(true);
   const [shadowPage, setShadowPage] = useState(1);
   const [shadowHasMore, setShadowHasMore] = useState(false);
+  const [credentials, setCredentials] = useState([]);
+  const [credentialsLoading, setCredentialsLoading] = useState(true);
+  const [credentialModalOpen, setCredentialModalOpen] = useState(false);
+  const [selectedCredentialId, setSelectedCredentialId] = useState(null);
+  const [credentialDeleteId, setCredentialDeleteId] = useState(null);
+  const [credentialConfirmOpen, setCredentialConfirmOpen] = useState(false);
+  const [credentialTestLoadingId, setCredentialTestLoadingId] = useState(null);
+
+  const fetchCredentials = useCallback(async () => {
+    setCredentialsLoading(true);
+    try {
+      const { data } = await listAiProviderCredentials();
+      setCredentials(Array.isArray(data) ? data : []);
+    } catch (err) {
+      toastError(err);
+      setCredentials([]);
+    } finally {
+      setCredentialsLoading(false);
+    }
+  }, []);
 
   const fetchShadowSuggestions = useCallback(async (page = 1, append = false) => {
     setShadowLoading(true);
@@ -105,7 +135,8 @@ const AiAgent = () => {
   useEffect(() => {
     fetchAgents();
     fetchShadowSuggestions(1, false);
-  }, [fetchAgents, fetchShadowSuggestions]);
+    fetchCredentials();
+  }, [fetchAgents, fetchShadowSuggestions, fetchCredentials]);
 
   const handleOpenNew = () => {
     setSelectedId(null);
@@ -135,6 +166,46 @@ const AiAgent = () => {
     }
   };
 
+  const handleOpenNewCredential = () => {
+    setSelectedCredentialId(null);
+    setCredentialModalOpen(true);
+  };
+
+  const handleEditCredential = (id) => {
+    setSelectedCredentialId(id);
+    setCredentialModalOpen(true);
+  };
+
+  const handleAskDeleteCredential = (id) => {
+    setCredentialDeleteId(id);
+    setCredentialConfirmOpen(true);
+  };
+
+  const handleConfirmDeleteCredential = async () => {
+    if (!credentialDeleteId) return;
+    try {
+      await deleteAiProviderCredential(credentialDeleteId);
+      toast.success(i18n.t("aiAgent.credentials.toasts.deleted"));
+      setCredentialConfirmOpen(false);
+      setCredentialDeleteId(null);
+      await fetchCredentials();
+    } catch (err) {
+      toastError(err);
+    }
+  };
+
+  const handleTestCredential = async (id) => {
+    setCredentialTestLoadingId(id);
+    try {
+      await testAiProviderCredential(id);
+      toast.success(i18n.t("aiAgent.credentials.toasts.testOk"));
+    } catch (err) {
+      toastError(err);
+    } finally {
+      setCredentialTestLoadingId(null);
+    }
+  };
+
   return (
     <MainContainer>
       <ConfirmationModal
@@ -145,6 +216,22 @@ const AiAgent = () => {
       >
         {i18n.t("aiAgent.confirmDelete.message")}
       </ConfirmationModal>
+
+      <ConfirmationModal
+        title={i18n.t("aiAgent.credentials.confirmDelete.title")}
+        open={credentialConfirmOpen}
+        onClose={() => setCredentialConfirmOpen(false)}
+        onConfirm={handleConfirmDeleteCredential}
+      >
+        {i18n.t("aiAgent.credentials.confirmDelete.message")}
+      </ConfirmationModal>
+
+      <AiProviderCredentialModal
+        open={credentialModalOpen}
+        onClose={() => setCredentialModalOpen(false)}
+        credentialId={selectedCredentialId}
+        onSaved={fetchCredentials}
+      />
 
       <AiAgentModal
         open={modalOpen}
@@ -266,6 +353,100 @@ const AiAgent = () => {
             </TableBody>
           </Table>
         )}
+
+        <Divider className={classes.credentialsSection} />
+        <Box className={classes.credentialsSection}>
+          <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+            <Box>
+              <Typography variant="h6">{i18n.t("aiAgent.credentials.title")}</Typography>
+              <Typography variant="body2" color="textSecondary">
+                {i18n.t("aiAgent.credentials.subtitle")}
+              </Typography>
+            </Box>
+            <Button variant="outlined" color="primary" onClick={handleOpenNewCredential}>
+              {i18n.t("aiAgent.credentials.buttons.new")}
+            </Button>
+          </Box>
+          {credentialsLoading ? (
+            <Table size="small">
+              <TableBody>
+                <TableRowSkeleton columns={5} />
+              </TableBody>
+            </Table>
+          ) : credentials.length === 0 ? (
+            <Typography variant="body2" color="textSecondary">
+              {i18n.t("aiAgent.credentials.empty")}
+            </Typography>
+          ) : (
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>{i18n.t("aiAgent.credentials.table.name")}</TableCell>
+                  <TableCell>{i18n.t("aiAgent.credentials.table.provider")}</TableCell>
+                  <TableCell>{i18n.t("aiAgent.credentials.table.key")}</TableCell>
+                  <TableCell align="center">{i18n.t("aiAgent.credentials.table.status")}</TableCell>
+                  <TableCell align="center">{i18n.t("aiAgent.table.actions")}</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {credentials.map((cred) => (
+                  <TableRow key={cred.id}>
+                    <TableCell>
+                      {cred.name}
+                      {cred.isDefault ? (
+                        <Chip
+                          size="small"
+                          label={i18n.t("aiAgent.credentials.defaultBadge")}
+                          className={classes.shadowBadge}
+                        />
+                      ) : null}
+                    </TableCell>
+                    <TableCell>{cred.provider}</TableCell>
+                    <TableCell>{cred.maskedKey || "—"}</TableCell>
+                    <TableCell align="center">
+                      <Chip
+                        size="small"
+                        label={
+                          cred.enabled
+                            ? i18n.t("aiAgent.status.active")
+                            : i18n.t("aiAgent.status.inactive")
+                        }
+                        color={cred.enabled ? "primary" : "default"}
+                      />
+                    </TableCell>
+                    <TableCell align="center">
+                      <Tooltip title={i18n.t("aiAgent.credentials.buttons.test")}>
+                        <span>
+                          <IconButton
+                            size="small"
+                            disabled={credentialTestLoadingId === cred.id}
+                            onClick={() => handleTestCredential(cred.id)}
+                          >
+                            {credentialTestLoadingId === cred.id ? (
+                              <CircularProgress size={18} />
+                            ) : (
+                              <Typography variant="caption">✓</Typography>
+                            )}
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                      <Tooltip title={i18n.t("aiAgent.buttons.edit")}>
+                        <IconButton size="small" onClick={() => handleEditCredential(cred.id)}>
+                          <Edit fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title={i18n.t("aiAgent.buttons.delete")}>
+                        <IconButton size="small" onClick={() => handleAskDeleteCredential(cred.id)}>
+                          <DeleteOutline fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </Box>
 
         <Divider className={classes.shadowSection} />
         <Box className={classes.shadowSection}>

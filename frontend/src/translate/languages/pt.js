@@ -2719,6 +2719,10 @@ const messages = {
           allowAudioInput: "Permitir entender áudio",
           allowAudioOutput: "Permitir responder áudio",
           audioComingSoon: "Em breve",
+          credential: "Credencial de IA",
+          credentialDefault: "Usar credencial padrão da empresa",
+          credentialHint:
+            "Opcional. Se não selecionar, usa a credencial padrão da empresa ou o fallback legado do OpenAI.",
         },
         modal: {
           newTitle: "Novo agente de IA",
@@ -2753,6 +2757,57 @@ const messages = {
           title: "Nenhum agente cadastrado",
           description: "Crie um agente para configurar instruções e parâmetros de IA.",
           loadError: "Não foi possível carregar os agentes",
+        },
+        credentials: {
+          title: "Credenciais de IA",
+          subtitle:
+            "A credencial conecta o AtendeChat ao provedor de IA. O comportamento, modelo e instruções continuam configurados no Agente de IA.",
+          empty: "Nenhuma credencial cadastrada.",
+          defaultBadge: "Padrão",
+          buttons: {
+            new: "Nova credencial",
+            test: "Testar conexão",
+          },
+          table: {
+            name: "Nome",
+            provider: "Provedor",
+            key: "Chave",
+            status: "Status",
+          },
+          fields: {
+            name: "Nome da credencial",
+            provider: "Provedor",
+            apiKey: "API Key",
+            apiKeyReplace: "Nova API Key (opcional)",
+            currentKey: "Chave atual",
+            enabled: "Ativa",
+            isDefault: "Credencial padrão da empresa",
+          },
+          modal: {
+            newTitle: "Nova credencial de IA",
+            editTitle: "Editar credencial de IA",
+            hint: "Somente autenticação com o provedor. Modelo, temperatura e instruções são configurados no agente.",
+          },
+          formErrors: {
+            name: {
+              required: "Nome é obrigatório",
+              long: "Nome muito longo (máx. 120 caracteres)",
+            },
+            apiKey: {
+              required: "API Key é obrigatória",
+              invalid: "Formato de API Key inválido",
+            },
+          },
+          toasts: {
+            created: "Credencial criada com sucesso",
+            updated: "Credencial atualizada com sucesso",
+            deleted: "Credencial excluída com sucesso",
+            testOk: "Conexão com o provedor validada com sucesso",
+          },
+          confirmDelete: {
+            title: "Excluir credencial",
+            message: "Tem certeza que deseja excluir esta credencial?",
+          },
         },
       },
       contactModal: {
@@ -6496,6 +6551,16 @@ const messages = {
         ERR_NO_USER_FOUND: "Nenhum usuário encontrado com este ID.",
         ERR_USER_INACTIVE:
           "Esta conta está inativa. Contacte o administrador da empresa.",
+        ERR_AI_PROVIDER_CREDENTIAL_NOT_FOUND: "Credencial de IA não encontrada.",
+        ERR_AI_PROVIDER_CREDENTIAL_IN_USE:
+          "Não é possível excluir uma credencial vinculada a agentes.",
+        ERR_AI_PROVIDER_CREDENTIAL_DISABLED: "Credencial de IA desativada.",
+        ERR_AI_PROVIDER_TEST_FAILED:
+          "Falha ao validar a credencial com o provedor.",
+        ERR_AI_CREDENTIAL_ENCRYPTION_KEY_MISSING:
+          "Chave de criptografia de credenciais de IA não configurada no servidor.",
+        ERR_AI_CREDENTIAL_DECRYPT_FAILED:
+          "Não foi possível ler a credencial de IA.",
         ERR_LAST_ACTIVE_ADMIN:
           "Não é possível inativar o último administrador da empresa.",
         ERR_CANNOT_DEACTIVATE_SELF: "Não pode inativar a própria conta.",

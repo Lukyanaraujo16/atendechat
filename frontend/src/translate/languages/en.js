@@ -2634,6 +2634,10 @@ const messages = {
 					allowAudioInput: "Allow understanding audio",
 					allowAudioOutput: "Allow audio replies",
 					audioComingSoon: "Coming soon",
+					credential: "AI credential",
+					credentialDefault: "Use company default credential",
+					credentialHint:
+						"Optional. If not selected, uses the company default credential or the legacy OpenAI fallback.",
 				},
 				modal: {
 					newTitle: "New AI agent",
@@ -2668,6 +2672,57 @@ const messages = {
 					title: "No agents yet",
 					description: "Create an agent to configure AI instructions and parameters.",
 					loadError: "Could not load agents",
+				},
+				credentials: {
+					title: "AI credentials",
+					subtitle:
+						"The credential connects AtendeChat to the AI provider. Behavior, model, and instructions remain configured in the AI Agent.",
+					empty: "No credentials yet.",
+					defaultBadge: "Default",
+					buttons: {
+						new: "New credential",
+						test: "Test connection",
+					},
+					table: {
+						name: "Name",
+						provider: "Provider",
+						key: "Key",
+						status: "Status",
+					},
+					fields: {
+						name: "Credential name",
+						provider: "Provider",
+						apiKey: "API Key",
+						apiKeyReplace: "New API Key (optional)",
+						currentKey: "Current key",
+						enabled: "Active",
+						isDefault: "Company default credential",
+					},
+					modal: {
+						newTitle: "New AI credential",
+						editTitle: "Edit AI credential",
+						hint: "Authentication only. Model, temperature, and instructions are configured in the agent.",
+					},
+					formErrors: {
+						name: {
+							required: "Name is required",
+							long: "Name is too long (max 120 characters)",
+						},
+						apiKey: {
+							required: "API Key is required",
+							invalid: "Invalid API Key format",
+						},
+					},
+					toasts: {
+						created: "Credential created successfully",
+						updated: "Credential updated successfully",
+						deleted: "Credential deleted successfully",
+						testOk: "Provider connection validated successfully",
+					},
+					confirmDelete: {
+						title: "Delete credential",
+						message: "Are you sure you want to delete this credential?",
+					},
 				},
 			},
 			contactModal: {
@@ -6324,6 +6379,16 @@ const messages = {
 				ERR_NO_USER_FOUND: "No user found with this ID.",
 				ERR_USER_INACTIVE:
 					"This account is inactive. Contact your company administrator.",
+				ERR_AI_PROVIDER_CREDENTIAL_NOT_FOUND: "AI credential not found.",
+				ERR_AI_PROVIDER_CREDENTIAL_IN_USE:
+					"Cannot delete a credential linked to agents.",
+				ERR_AI_PROVIDER_CREDENTIAL_DISABLED: "AI credential is disabled.",
+				ERR_AI_PROVIDER_TEST_FAILED:
+					"Failed to validate the credential with the provider.",
+				ERR_AI_CREDENTIAL_ENCRYPTION_KEY_MISSING:
+					"AI credential encryption key not configured on the server.",
+				ERR_AI_CREDENTIAL_DECRYPT_FAILED:
+					"Could not read the AI credential.",
 				ERR_LAST_ACTIVE_ADMIN:
 					"Cannot deactivate the company's last active administrator.",
 				ERR_CANNOT_DEACTIVATE_SELF: "You cannot deactivate your own account.",
