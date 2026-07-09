@@ -94,9 +94,10 @@ function sudoHintLine(message: string): string | null {
   return null;
 }
 
-const BACKEND_ACTIONS_REQUIRING_INSTALL = new Set<SystemUpdateAction>([
-  "backend_build",
-  "backend_migrate"
+const INSTALL_BEFORE_ACTION = new Map<SystemUpdateAction, SystemUpdateAction>([
+  ["backend_build", "backend_npm_install"],
+  ["backend_migrate", "backend_npm_install"],
+  ["frontend_build", "frontend_npm_install"]
 ]);
 
 async function runWhitelistedStep(
@@ -116,13 +117,13 @@ async function runSingleStep(
   userId: number,
   jobId: string,
   action: SystemUpdateAction,
-  options?: { ensureBackendDeps?: boolean }
+  options?: { ensureDepsInstall?: boolean }
 ): Promise<void> {
-  if (
-    options?.ensureBackendDeps &&
-    BACKEND_ACTIONS_REQUIRING_INSTALL.has(action)
-  ) {
-    await runWhitelistedStep(userId, jobId, "backend_npm_install");
+  if (options?.ensureDepsInstall) {
+    const installAction = INSTALL_BEFORE_ACTION.get(action);
+    if (installAction) {
+      await runWhitelistedStep(userId, jobId, installAction);
+    }
   }
   await runWhitelistedStep(userId, jobId, action);
 }
@@ -315,7 +316,7 @@ async function runSingleActionJob(
 
   const started = Date.now();
   try {
-    await runSingleStep(userId, jobId, action, { ensureBackendDeps: true });
+    await runSingleStep(userId, jobId, action, { ensureDepsInstall: true });
 
     const durationMs = Date.now() - started;
     pushJobLog(
