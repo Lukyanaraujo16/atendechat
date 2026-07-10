@@ -20,6 +20,17 @@ export function isPendingWaitingTicket(ticket) {
 export function resolveAutomationStatusChip(ticket, { theme, i18n }) {
   const isDark = theme.palette.type === "dark";
 
+  if (ticket?.aiAgentHandoffRequested) {
+    return {
+      label: i18n.t("ticketAiAgent.handoffNeeded"),
+      tone: "handoff",
+      style: {
+        backgroundColor: alpha(theme.palette.error.main, isDark ? 0.22 : 0.12),
+        color: isDark ? theme.palette.error.light : theme.palette.error.dark,
+      },
+    };
+  }
+
   if (ticket?.aiAgentPaused && !ticket?.automationActive) {
     return {
       label: i18n.t("ticketAiAgent.pausedLabel"),

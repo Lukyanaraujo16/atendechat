@@ -14,7 +14,11 @@ export default async function ResumeTicketAiAgentService(input: {
   await ticket.update({
     aiAgentPaused: false,
     aiAgentPausedAt: null,
-    aiAgentPausedBy: null
+    aiAgentPausedBy: null,
+    aiAgentHandoffRequested: false,
+    aiAgentHandoffRequestedAt: null,
+    aiAgentHandoffReason: null,
+    aiAgentHandoffBy: null
   });
 
   return ticket;

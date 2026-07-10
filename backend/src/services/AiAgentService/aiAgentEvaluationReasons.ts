@@ -15,6 +15,7 @@ export const AI_AGENT_EVALUATION_REASONS = {
   CAMPAIGN_OR_SYSTEM_MESSAGE: "campaign_or_system_message",
   TICKET_CLOSED: "ticket_closed",
   TICKET_AI_PAUSED: "ticket_ai_paused",
+  AI_AGENT_HANDOFF_REQUESTED: "ai_agent_handoff_requested",
   LIVE_TICKET_LIMIT_REACHED: "live_ticket_limit_reached",
   LIVE_COOLDOWN_ACTIVE: "live_cooldown_active",
   UNSUPPORTED_CHANNEL: "unsupported_channel",

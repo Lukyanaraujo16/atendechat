@@ -2206,7 +2206,7 @@ const messages = {
 					liveWarning:
 						"Warning: in this mode, the AI Agent will automatically reply to customers when the ticket is eligible.",
 					liveLimitations:
-						"Audio and media without text are not supported yet. Tickets with a human agent will not receive AI replies. Automatic handoff to humans will be implemented in a later phase.",
+						"Audio and media without text are not supported yet. Tickets with a human agent will not receive AI replies. Handoff uses the [HANDOFF_HUMAN] marker and pauses AI on the ticket.",
 					liveConfirmLabel:
 						"I understand that the AI will automatically reply to eligible customers.",
 					liveConfirmRequired:
@@ -2225,6 +2225,12 @@ const messages = {
 				activeAgent: "AI Agent active",
 				pausedLabel: "AI paused",
 				pausedInTicket: "AI paused in this ticket",
+				handoffNeeded: "Needs human",
+				handoffRequested: "AI requested human",
+				handoffTooltip: "AI agent requested human assistance",
+				resumeConfirmTitle: "Resume AI Agent",
+				resumeConfirmBody:
+					"This ticket was handed off for human assistance. Resuming the AI will enable automatic replies again. Continue?",
 				humanAssumed: "AI inactive — human agent assigned",
 				unavailable: "AI unavailable",
 				pauseAction: "Pause AI for this ticket",

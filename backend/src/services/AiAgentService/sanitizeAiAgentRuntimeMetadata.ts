@@ -18,7 +18,12 @@ const ALLOWED_KEYS = new Set([
   "credentialSource",
   "credentialId",
   "flowEvidence",
-  "integrationEvidence"
+  "integrationEvidence",
+  "handoffRequested",
+  "handoffReason",
+  "handoffMarkerDetected",
+  "handoffAppliedAt",
+  "cleanResponseLength"
 ]);
 
 const SENSITIVE_KEY_PATTERN =

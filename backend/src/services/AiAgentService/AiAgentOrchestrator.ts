@@ -23,6 +23,7 @@ import { resolveInboundMessageId } from "./resolveInboundMessageId";
 import { AI_AGENT_EVALUATOR_VERSION } from "./aiAgentDryRunConfig";
 import { resolveWhatsappAiAgentRuntimeMode, isAiAgentRuntimeActive } from "./aiAgentRuntimeMode";
 import { checkAiAgentLiveLimits } from "./checkAiAgentLiveLimits";
+import { maybeApplySafetyHandoffForLiveBlock } from "./maybeApplySafetyHandoffForLiveBlock";
 
 export type EvaluateInboundMessageInput = {
   companyId: number;
@@ -339,7 +340,22 @@ export default class AiAgentOrchestrator {
         );
       }
 
-      // 16. Live: IA pausada no ticket
+      // 16. Live: handoff solicitado
+      if (
+        runtimeMode === "live" &&
+        ctx.ticket.aiAgentHandoffRequested === true
+      ) {
+        return finish(
+          deny(
+            AI_AGENT_EVALUATION_REASONS.AI_AGENT_HANDOFF_REQUESTED,
+            evaluationMode,
+            ctx.aiAgent.id,
+            msgMeta
+          )
+        );
+      }
+
+      // 17. Live: IA pausada no ticket
       if (runtimeMode === "live" && ctx.ticket.aiAgentPaused === true) {
         return finish(
           deny(
@@ -351,13 +367,18 @@ export default class AiAgentOrchestrator {
         );
       }
 
-      // 17. Live: limites de segurança por ticket
+      // 18. Live: limites de segurança por ticket
       if (runtimeMode === "live") {
         const liveLimits = await checkAiAgentLiveLimits({
           companyId: input.companyId,
           ticketId: ctx.ticket.id
         });
         if (liveLimits.allowed === false) {
+          await maybeApplySafetyHandoffForLiveBlock({
+            ticket: ctx.ticket,
+            companyId: input.companyId,
+            errorCode: liveLimits.errorCode
+          });
           return finish(
             deny(
               liveLimits.errorCode as AiAgentEvaluationResult["reason"],
@@ -369,7 +390,7 @@ export default class AiAgentOrchestrator {
         }
       }
 
-      // 18. Elegível
+      // 19. Elegível
       return finish(
         allow(ctx.aiAgent.id, evaluationMode, {
           ...msgMeta,

@@ -200,6 +200,22 @@ class Ticket extends Model<Ticket> {
   @ForeignKey(() => User)
   @Column
   aiAgentPausedBy: number | null;
+
+  @Default(false)
+  @Column
+  aiAgentHandoffRequested: boolean;
+
+  @AllowNull(true)
+  @Column
+  aiAgentHandoffRequestedAt: Date | null;
+
+  @AllowNull(true)
+  @Column(DataType.STRING(120))
+  aiAgentHandoffReason: string | null;
+
+  @AllowNull(true)
+  @Column(DataType.STRING(64))
+  aiAgentHandoffBy: string | null;
 }
 
 export default Ticket;

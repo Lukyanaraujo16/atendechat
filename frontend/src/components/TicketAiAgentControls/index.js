@@ -7,6 +7,7 @@ import api from "../../services/api";
 import toastError from "../../errors/toastError";
 import { toast } from "react-toastify";
 import useFeature from "../../hooks/useFeature";
+import ConfirmationModal from "../ConfirmationModal";
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -26,6 +27,7 @@ const TicketAiAgentControls = ({ ticket, onTicketUpdate }) => {
   const classes = useStyles();
   const aiAgentFeatureEnabled = useFeature("automation.ai_agent");
   const [loading, setLoading] = useState(false);
+  const [resumeConfirmOpen, setResumeConfirmOpen] = useState(false);
 
   const whatsappMode =
     ticket?.aiAgentMode ||
@@ -37,13 +39,15 @@ const TicketAiAgentControls = ({ ticket, onTicketUpdate }) => {
     ticket?.id &&
     (whatsappMode === "live" ||
       ticket?.automationType === "ai_agent" ||
-      ticket?.aiAgentPaused === true);
+      ticket?.aiAgentPaused === true ||
+      ticket?.aiAgentHandoffRequested === true);
 
   if (!showControls) {
     return null;
   }
 
   const paused = ticket.aiAgentPaused === true;
+  const handoffRequested = ticket.aiAgentHandoffRequested === true;
   const humanAssigned = ticket.userId != null;
 
   const handlePause = async () => {
@@ -73,7 +77,16 @@ const TicketAiAgentControls = ({ ticket, onTicketUpdate }) => {
       toastError(err);
     } finally {
       setLoading(false);
+      setResumeConfirmOpen(false);
     }
+  };
+
+  const requestResume = () => {
+    if (handoffRequested) {
+      setResumeConfirmOpen(true);
+      return;
+    }
+    handleResume();
   };
 
   let label = i18n.t("ticketAiAgent.activeAgent");
@@ -81,47 +94,68 @@ const TicketAiAgentControls = ({ ticket, onTicketUpdate }) => {
   if (humanAssigned) {
     label = i18n.t("ticketAiAgent.humanAssumed");
     chipColor = "default";
+  } else if (handoffRequested) {
+    label = i18n.t("ticketAiAgent.handoffRequested");
+    chipColor = "secondary";
   } else if (paused) {
     label = i18n.t("ticketAiAgent.pausedInTicket");
     chipColor = "default";
   }
 
   return (
-    <div className={classes.root}>
-      <Chip
-        size="small"
-        label={label}
-        color={chipColor}
-        className={classes.chip}
-      />
-      {!humanAssigned && (
+    <>
+      <div className={classes.root}>
         <Tooltip
           title={
-            paused
-              ? i18n.t("ticketAiAgent.resumeAction")
-              : i18n.t("ticketAiAgent.pauseAction")
+            handoffRequested
+              ? i18n.t("ticketAiAgent.handoffTooltip")
+              : label
           }
         >
-          <span>
-            <IconButton
-              size="small"
-              disabled={loading}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (paused) handleResume();
-                else handlePause();
-              }}
-            >
-              {paused ? (
-                <PlayCircleOutlineIcon fontSize="small" />
-              ) : (
-                <PauseCircleOutlineIcon fontSize="small" />
-              )}
-            </IconButton>
-          </span>
+          <Chip
+            size="small"
+            label={label}
+            color={chipColor}
+            className={classes.chip}
+          />
         </Tooltip>
-      )}
-    </div>
+        {!humanAssigned && (
+          <Tooltip
+            title={
+              paused
+                ? i18n.t("ticketAiAgent.resumeAction")
+                : i18n.t("ticketAiAgent.pauseAction")
+            }
+          >
+            <span>
+              <IconButton
+                size="small"
+                disabled={loading}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (paused) requestResume();
+                  else handlePause();
+                }}
+              >
+                {paused ? (
+                  <PlayCircleOutlineIcon fontSize="small" />
+                ) : (
+                  <PauseCircleOutlineIcon fontSize="small" />
+                )}
+              </IconButton>
+            </span>
+          </Tooltip>
+        )}
+      </div>
+      <ConfirmationModal
+        title={i18n.t("ticketAiAgent.resumeConfirmTitle")}
+        open={resumeConfirmOpen}
+        onClose={() => setResumeConfirmOpen(false)}
+        onConfirm={handleResume}
+      >
+        {i18n.t("ticketAiAgent.resumeConfirmBody")}
+      </ConfirmationModal>
+    </>
   );
 };
 

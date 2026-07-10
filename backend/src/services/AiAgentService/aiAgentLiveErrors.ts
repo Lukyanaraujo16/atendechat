@@ -34,6 +34,7 @@ export const AI_AGENT_LIVE_ERROR_CODES = {
   NOT_LIVE_MODE: "not_live_mode",
   NOT_ELIGIBLE: "not_eligible",
   LIVE_PAUSED_FOR_TICKET: "live_paused_for_ticket",
+  LIVE_HANDOFF_REQUESTED: "live_handoff_requested",
   LIVE_TICKET_LIMIT_REACHED: "live_ticket_limit_reached",
   LIVE_COOLDOWN_ACTIVE: "live_cooldown_active",
   LIVE_RESPONSE_TOO_LONG: "live_response_too_long",

@@ -106,6 +106,28 @@ describe("ticketAutomationState", () => {
       expect(state.automationType).toBe("flowbuilder");
       expect(state.automationLabel).toBe("Fluxo");
     });
+
+    it("IA com handoff solicitado exibe Precisa humano", () => {
+      const state = resolveTicketAutomationState({
+        ticket: ticket({
+          status: "pending",
+          userId: null,
+          aiAgentPaused: true,
+          aiAgentHandoffRequested: true,
+          aiAgentHandoffReason: "model_requested_handoff"
+        }),
+        whatsapp: whatsapp({
+          aiAgentMode: "live",
+          aiAgentId: 7,
+          aiAgentEnabled: true
+        }),
+        hasAiAgentOutboundMessage: true
+      });
+      expect(state.automationActive).toBe(false);
+      expect(state.automationLabel).toBe("Precisa humano");
+      expect(state.aiAgentHandoffRequested).toBe(true);
+      expect(state.reason).toBe("ai_handoff");
+    });
   });
 
   describe("isTicketAiAgentAutomationCandidate", () => {

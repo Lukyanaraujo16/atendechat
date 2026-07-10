@@ -2288,7 +2288,7 @@ const messages = {
           liveWarning:
             "Atenção: neste modo, o Agente de IA enviará respostas automaticamente aos clientes quando o ticket estiver elegível.",
           liveLimitations:
-            "Áudio e mídia sem texto ainda não são suportados. Tickets com atendente humano não serão respondidos. O handoff automático para humano será implementado em fase posterior.",
+            "Áudio e mídia sem texto ainda não são suportados. Tickets com atendente humano não serão respondidos. O handoff para humano usa o marcador [HANDOFF_HUMAN] e pausa a IA no ticket.",
           liveConfirmLabel:
             "Entendo que a IA responderá automaticamente os clientes elegíveis.",
           liveConfirmRequired:
@@ -2307,6 +2307,12 @@ const messages = {
         activeAgent: "Agente de IA ativo",
         pausedLabel: "IA pausada",
         pausedInTicket: "IA pausada neste atendimento",
+        handoffNeeded: "Precisa humano",
+        handoffRequested: "IA solicitou humano",
+        handoffTooltip: "Agente de IA solicitou atendimento humano",
+        resumeConfirmTitle: "Reativar Agente de IA",
+        resumeConfirmBody:
+          "Este atendimento foi encaminhado para um humano. Reativar a IA fará o agente voltar a responder automaticamente. Deseja continuar?",
         humanAssumed: "IA inativa — atendimento humano assumido",
         unavailable: "IA indisponível",
         pauseAction: "Pausar IA neste atendimento",

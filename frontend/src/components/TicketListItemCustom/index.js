@@ -692,6 +692,7 @@ const TicketListItemCustom = ({
     ticket.automationLabel,
     ticket.automationType,
     ticket.aiAgentPaused,
+    ticket.aiAgentHandoffRequested,
     theme,
   ]);
 

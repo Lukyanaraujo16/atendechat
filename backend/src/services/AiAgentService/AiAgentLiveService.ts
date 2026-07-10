@@ -31,6 +31,9 @@ import sendAiAgentWhatsappMessage from "./sendAiAgentWhatsappMessage";
 import { validateAiAgentLiveResponse } from "./validateAiAgentLiveResponse";
 import { isFlowAutomationActive } from "./isFlowAutomationActive";
 import { isTicketIntegrationActive } from "./isTicketIntegrationActive";
+import { parseAiAgentHandoffSignal } from "./parseAiAgentHandoffSignal";
+import applyAiAgentHandoffToTicket from "./applyAiAgentHandoffToTicket";
+import { maybeApplySafetyHandoffForLiveBlock } from "./maybeApplySafetyHandoffForLiveBlock";
 
 const inFlightLiveTickets = new Set<number>();
 
@@ -74,6 +77,9 @@ async function assertTicketStillEligibleForLive(
   }
   if (ticket.userId != null) {
     return AI_AGENT_LIVE_ERROR_CODES.LIVE_HUMAN_ASSUMED;
+  }
+  if (ticket.aiAgentHandoffRequested === true) {
+    return AI_AGENT_LIVE_ERROR_CODES.LIVE_HANDOFF_REQUESTED;
   }
   if (ticket.aiAgentPaused === true) {
     return AI_AGENT_LIVE_ERROR_CODES.LIVE_PAUSED_FOR_TICKET;
@@ -158,6 +164,11 @@ export async function generateAndSendLiveResponseForLog(
     ticketId: ticket.id
   });
   if (limits.allowed === false) {
+    await maybeApplySafetyHandoffForLiveBlock({
+      ticket,
+      companyId,
+      errorCode: limits.errorCode
+    });
     await updateAiAgentLiveLog(logId, companyId, {
       liveStatus: AI_AGENT_LIVE_STATUSES.SKIPPED,
       errorCode: limits.errorCode
@@ -235,8 +246,24 @@ export async function generateAndSendLiveResponseForLog(
       return;
     }
 
-    const validated = validateAiAgentLiveResponse(generation.text);
+    const handoffSignal = parseAiAgentHandoffSignal(generation.text);
+    const validated = validateAiAgentLiveResponse(handoffSignal.cleanText);
     if (validated.ok === false) {
+      if (handoffSignal.handoffRequested) {
+        await applyAiAgentHandoffToTicket({
+          ticket: freshTicket,
+          companyId,
+          reason: handoffSignal.handoffReason ?? "model_requested_handoff",
+          by: "ai_agent"
+        });
+        await mergeAiAgentLiveLogMetadata(logId, companyId, {
+          handoffRequested: true,
+          handoffReason: handoffSignal.handoffReason,
+          handoffMarkerDetected: true,
+          handoffAppliedAt: new Date().toISOString(),
+          cleanResponseLength: 0
+        });
+      }
       await updateAiAgentLiveLog(logId, companyId, {
         liveStatus: AI_AGENT_LIVE_STATUSES.FAILED,
         errorCode: validated.errorCode,
@@ -254,6 +281,13 @@ export async function generateAndSendLiveResponseForLog(
       });
       return;
     }
+
+    await mergeAiAgentLiveLogMetadata(logId, companyId, {
+      handoffRequested: handoffSignal.handoffRequested,
+      handoffReason: handoffSignal.handoffReason,
+      handoffMarkerDetected: handoffSignal.handoffRequested,
+      cleanResponseLength: validated.text.length
+    });
 
     await updateAiAgentLiveLog(logId, companyId, {
       liveStatus: AI_AGENT_LIVE_STATUSES.GENERATED,
@@ -307,6 +341,17 @@ export async function generateAndSendLiveResponseForLog(
     });
 
     if (sendResult.ok === false) {
+      if (handoffSignal.handoffRequested) {
+        await applyAiAgentHandoffToTicket({
+          ticket: ticketBeforeSend,
+          companyId,
+          reason: "handoff_pending_send_failed",
+          by: "ai_agent"
+        });
+        await mergeAiAgentLiveLogMetadata(logId, companyId, {
+          handoffAppliedAt: new Date().toISOString()
+        });
+      }
       await updateAiAgentLiveLog(logId, companyId, {
         liveStatus: AI_AGENT_LIVE_STATUSES.FAILED,
         sendErrorCode: AI_AGENT_LIVE_ERROR_CODES.LIVE_SEND_FAILED,
@@ -318,6 +363,18 @@ export async function generateAndSendLiveResponseForLog(
         "[AiAgent][live] send_failed"
       );
       return;
+    }
+
+    if (handoffSignal.handoffRequested) {
+      await applyAiAgentHandoffToTicket({
+        ticket: ticketBeforeSend,
+        companyId,
+        reason: handoffSignal.handoffReason ?? "model_requested_handoff",
+        by: "ai_agent"
+      });
+      await mergeAiAgentLiveLogMetadata(logId, companyId, {
+        handoffAppliedAt: new Date().toISOString()
+      });
     }
 
     await updateAiAgentLiveLog(logId, companyId, {

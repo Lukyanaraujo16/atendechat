@@ -19,6 +19,8 @@ export type TicketAutomationState = {
   automationLabel: string | null;
   aiAgentActive: boolean;
   aiAgentPaused: boolean;
+  aiAgentHandoffRequested: boolean;
+  aiAgentHandoffReason: string | null;
   aiAgentMode: "disabled" | "dry_run" | "shadow" | "live" | null;
   aiAgentId: number | null;
   aiAgentName: string | null;
@@ -88,13 +90,14 @@ function automationLabelForType(type: TicketAutomationType): string | null {
 export function isTicketAiAgentAutomationCandidate(
   ticket: Pick<
     Ticket,
-    "userId" | "status" | "isGroup" | "aiAgentPaused"
+    "userId" | "status" | "isGroup" | "aiAgentPaused" | "aiAgentHandoffRequested"
   >,
   whatsapp?: Pick<Whatsapp, "aiAgentMode" | "aiAgentId" | "aiAgentEnabled"> | null
 ): boolean {
   if (ticket.userId != null) return false;
   if (ticket.isGroup) return false;
   if (ticket.status === "closed") return false;
+  if (ticket.aiAgentHandoffRequested === true) return false;
   if (ticket.aiAgentPaused === true) return false;
   const mode = resolveWhatsappMode(whatsapp);
   if (mode !== "live") return false;
@@ -123,6 +126,7 @@ export function resolveTicketAutomationState(
   const { ticket, whatsapp, aiAgentName } = input;
   const aiAgentMode = resolveWhatsappMode(whatsapp);
   const paused = ticket.aiAgentPaused === true;
+  const handoffRequested = ticket.aiAgentHandoffRequested === true;
 
   const base: TicketAutomationState = {
     automationActive: false,
@@ -130,6 +134,8 @@ export function resolveTicketAutomationState(
     automationLabel: null,
     aiAgentActive: false,
     aiAgentPaused: paused,
+    aiAgentHandoffRequested: handoffRequested,
+    aiAgentHandoffReason: ticket.aiAgentHandoffReason ?? null,
     aiAgentMode,
     aiAgentId: whatsapp?.aiAgentId ?? null,
     aiAgentName: aiAgentName ?? null
@@ -143,6 +149,14 @@ export function resolveTicketAutomationState(
   }
   if (ticket.status === "closed") {
     return { ...base, reason: "closed" };
+  }
+
+  if (handoffRequested && aiAgentMode === "live") {
+    return {
+      ...base,
+      automationLabel: "Precisa humano",
+      reason: "ai_handoff"
+    };
   }
 
   if (paused && aiAgentMode === "live") {
@@ -194,6 +208,7 @@ export function buildAiAutomationTicketExistsSql(companyId: number): string {
   return `(
     "Ticket"."userId" IS NULL
     AND ("Ticket"."aiAgentPaused" = false OR "Ticket"."aiAgentPaused" IS NULL)
+    AND ("Ticket"."aiAgentHandoffRequested" = false OR "Ticket"."aiAgentHandoffRequested" IS NULL)
     AND EXISTS (
       SELECT 1 FROM "Whatsapps" AS w
       WHERE w.id = "Ticket"."whatsappId"
