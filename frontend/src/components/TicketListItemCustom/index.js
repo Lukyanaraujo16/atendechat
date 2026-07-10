@@ -26,12 +26,14 @@ import Chip from "@material-ui/core/Chip";
 import Badge from "@material-ui/core/Badge";
 import { Tooltip } from "@material-ui/core";
 
+import { resolveAutomationStatusChip } from "../../utils/ticketAutomationUi";
 import { i18n } from "../../translate/i18n";
 
 import api from "../../services/api";
 import ButtonWithSpinner from "../ButtonWithSpinner";
 import MarkdownWrapper from "../MarkdownWrapper";
 import AndroidIcon from "@material-ui/icons/Android";
+import MemoryIcon from "@material-ui/icons/Memory";
 import VisibilityIcon from "@material-ui/icons/Visibility";
 import DeleteOutlineIcon from "@material-ui/icons/DeleteOutline";
 import SwapHorizIcon from "@material-ui/icons/SwapHoriz";
@@ -651,14 +653,18 @@ const TicketListItemCustom = ({
       };
     }
     if (ticket.status === "pending") {
-      if (ticket.chatbot) {
+      const automationChip = resolveAutomationStatusChip(ticket, { theme, i18n });
+      if (automationChip) {
+        const icon =
+          automationChip.tone === "ai" ? (
+            <MemoryIcon style={{ fontSize: 14 }} />
+          ) : (
+            <AndroidIcon style={{ fontSize: 14 }} />
+          );
         return {
-          label: i18n.t("ticketsListItem.tooltip.chatbot"),
-          icon: <AndroidIcon style={{ fontSize: 14 }} />,
-          style: {
-            backgroundColor: alpha(theme.palette.info.main, isDark ? 0.22 : 0.12),
-            color: isDark ? theme.palette.info.light : theme.palette.info.dark,
-          },
+          label: automationChip.label,
+          icon,
+          style: automationChip.style,
         };
       }
       return {
@@ -679,7 +685,15 @@ const TicketListItemCustom = ({
       };
     }
     return null;
-  }, [ticket.status, ticket.chatbot, theme]);
+  }, [
+    ticket.status,
+    ticket.chatbot,
+    ticket.automationActive,
+    ticket.automationLabel,
+    ticket.automationType,
+    ticket.aiAgentPaused,
+    theme,
+  ]);
 
   const lastMessagePreview = useMemo(
     () => formatTicketLastMessagePreview(ticket),

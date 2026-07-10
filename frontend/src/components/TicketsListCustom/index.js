@@ -26,6 +26,7 @@ import { i18n } from "../../translate/i18n";
 import { AuthContext } from "../../context/Auth/AuthContext";
 import { TicketsInboxContext } from "../../context/TicketsInboxContext";
 import { SocketContext } from "../../context/Socket/SocketContext";
+import { isPendingAutomationTicket } from "../../utils/ticketAutomationUi";
 import {
   PANEL_RADIUS,
   getTicketPanelScrollbarStyles,
@@ -420,10 +421,11 @@ const TicketsListCustom = (props) => {
       return selectedQueueIds.indexOf(ticket.queueId) > -1;
     };
 
-    /** Mesma regra da lista inicial: em pending, Chatbot vs Aguardando são mutuamente exclusivos */
+    /** Mesma regra da lista inicial: em pending, Automações vs Aguardando são mutuamente exclusivos */
     const matchesPendingChatbotTab = (ticket) => {
       if (groupsOnly || status !== "pending") return true;
-      return chatbotOnly ? !!ticket.chatbot : !ticket.chatbot;
+      const inAutomations = isPendingAutomationTicket(ticket);
+      return chatbotOnly ? inAutomations : !inAutomations;
     };
 
     const matchesTabStatus = (ticket) => {

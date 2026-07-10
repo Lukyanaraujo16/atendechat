@@ -26,6 +26,7 @@ import {
 import { isGroupTicket } from "../helpers/groupTicketRules";
 import ListTicketsService from "../services/TicketServices/ListTicketsService";
 import attachContactLabelsToTickets from "../helpers/attachContactLabelsToTickets";
+import enrichTicketsWithAutomationState from "../helpers/enrichTicketsWithAutomationState";
 import { parseArrayQueryParam } from "../utils/parseArrayQueryParam";
 import {
   getOpenTicketElapsedMs,
@@ -130,8 +131,12 @@ export const index = async (req: Request, res: Response): Promise<Response> => {
       supportMode
     });
     await attachContactLabelsToTickets(tickets, companyId);
+    const enrichedTickets = await enrichTicketsWithAutomationState(
+      tickets,
+      companyId
+    );
 
-    return res.status(200).json({ tickets, count, hasMore });
+    return res.status(200).json({ tickets: enrichedTickets, count, hasMore });
   } catch (error) {
     const err = error as {
       message?: string;
@@ -263,7 +268,12 @@ export const show = async (req: Request, res: Response): Promise<Response> => {
     companyId
   );
 
-  return res.status(200).json(ticket);
+  const [enrichedTicket] = await enrichTicketsWithAutomationState(
+    [ticket],
+    companyId
+  );
+
+  return res.status(200).json(enrichedTicket);
 };
 
 export const showFromUUID = async (
@@ -668,11 +678,22 @@ export const pauseAiAgent = async (
     userId
   });
 
+  const refreshed = await ShowTicketService(ticketId, companyId);
+  const [enriched] = await enrichTicketsWithAutomationState(
+    [refreshed],
+    companyId
+  );
+
   return res.status(200).json({
     id: ticket.id,
     aiAgentPaused: ticket.aiAgentPaused,
     aiAgentPausedAt: ticket.aiAgentPausedAt,
-    aiAgentPausedBy: ticket.aiAgentPausedBy
+    aiAgentPausedBy: ticket.aiAgentPausedBy,
+    automationActive: enriched.automationActive,
+    automationType: enriched.automationType,
+    automationLabel: enriched.automationLabel,
+    aiAgentActive: enriched.aiAgentActive,
+    aiAgentMode: enriched.aiAgentMode
   });
 };
 
@@ -699,10 +720,21 @@ export const resumeAiAgent = async (
     ticketId
   });
 
+  const refreshed = await ShowTicketService(ticketId, companyId);
+  const [enriched] = await enrichTicketsWithAutomationState(
+    [refreshed],
+    companyId
+  );
+
   return res.status(200).json({
     id: ticket.id,
     aiAgentPaused: ticket.aiAgentPaused,
     aiAgentPausedAt: ticket.aiAgentPausedAt,
-    aiAgentPausedBy: ticket.aiAgentPausedBy
+    aiAgentPausedBy: ticket.aiAgentPausedBy,
+    automationActive: enriched.automationActive,
+    automationType: enriched.automationType,
+    automationLabel: enriched.automationLabel,
+    aiAgentActive: enriched.aiAgentActive,
+    aiAgentMode: enriched.aiAgentMode
   });
 };

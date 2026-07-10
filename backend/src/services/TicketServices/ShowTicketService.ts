@@ -5,6 +5,7 @@ import User from "../../models/User";
 import Queue from "../../models/Queue";
 import Tag from "../../models/Tag";
 import Whatsapp from "../../models/Whatsapp";
+import AiAgent from "../../models/AiAgent";
 import InstagramAccount from "../../models/InstagramAccount";
 import Prompt from "../../models/Prompt";
 import {
@@ -49,8 +50,23 @@ const ShowTicketService = async (
       {
         model: Whatsapp,
         as: "whatsapp",
-        attributes: ["name", "status", "ticketVisibility"],
-        required: false
+        attributes: [
+          "name",
+          "status",
+          "ticketVisibility",
+          "aiAgentMode",
+          "aiAgentId",
+          "aiAgentEnabled"
+        ],
+        required: false,
+        include: [
+          {
+            model: AiAgent,
+            as: "aiAgent",
+            attributes: ["id", "name"],
+            required: false
+          }
+        ]
       },
       {
         model: InstagramAccount,

@@ -2914,13 +2914,21 @@ const messages = {
           closed: { title: "Resueltos" },
           search: { title: "Búsqueda" },
         },
+        inbox: {
+          automations: {
+            label: "AUTOMATIZACIONES",
+            short: "AUTO",
+            tooltip:
+              "Atenciones conducidas por chatbot, agente de IA u otras automatizaciones.",
+          },
+        },
         search: {
           placeholder: "Buscar por contacto, número o texto del mensaje…",
           clear: "Limpiar búsqueda",
           placeholders: {
             open: "Buscar conversaciones en atención",
             pending: "Buscar conversaciones en espera",
-            chatbot: "Buscar conversaciones del chatbot",
+            chatbot: "Buscar conversaciones en automatizaciones",
             closed: "Buscar conversaciones resueltas",
             groups: "Buscar grupos",
             filters: "Buscar usando filtros",
@@ -3027,6 +3035,7 @@ const messages = {
         ariaTicketRow: "Atención",
         tooltip: {
           chatbot: "Chatbot",
+          aiAgent: "IA atendiendo",
           peek: "Espiar Conversación",
         },
         noQueue: "SIN COLA",

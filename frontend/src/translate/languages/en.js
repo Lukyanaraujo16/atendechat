@@ -2222,7 +2222,10 @@ const messages = {
 			},
 			ticketAiAgent: {
 				active: "AI active",
+				activeAgent: "AI Agent active",
 				pausedLabel: "AI paused",
+				pausedInTicket: "AI paused in this ticket",
+				humanAssumed: "AI inactive — human agent assigned",
 				unavailable: "AI unavailable",
 				pauseAction: "Pause AI for this ticket",
 				resumeAction: "Resume AI for this ticket",
@@ -3144,13 +3147,21 @@ const messages = {
 					closed: { title: "Resolved" },
 					search: { title: "Search" },
 				},
+				inbox: {
+					automations: {
+						label: "AUTOMATIONS",
+						short: "AUTO",
+						tooltip:
+							"Tickets handled by chatbot, AI agent, or other automations.",
+					},
+				},
 				search: {
 					placeholder: "Search by contact, phone number, or message text…",
 					clear: "Clear search",
 					placeholders: {
 						open: "Search conversations in progress",
 						pending: "Search waiting conversations",
-						chatbot: "Search chatbot conversations",
+						chatbot: "Search automation conversations",
 						closed: "Search resolved conversations",
 						groups: "Search groups",
 						filters: "Search using filters",
@@ -3255,6 +3266,7 @@ const messages = {
 				ariaTicketRow: "Ticket",
 				tooltip: {
 					chatbot: "Chatbot",
+					aiAgent: "AI handling",
 					peek: "Peek Conversation",
 				},
 				noQueue: "NO QUEUE",

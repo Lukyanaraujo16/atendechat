@@ -3,6 +3,7 @@ import { useHistory, useLocation } from "react-router-dom";
 import clsx from "clsx";
 
 import { makeStyles } from "@material-ui/core/styles";
+import useMediaQuery from "@material-ui/core/useMediaQuery";
 import Paper from "@material-ui/core/Paper";
 import SearchIcon from "@material-ui/icons/Search";
 import CloseIcon from "@material-ui/icons/Close";
@@ -530,6 +531,10 @@ const InboxSubTabsPills = memo(function InboxSubTabsPills({
   classes,
 }) {
   const { openCount, pendingCount, chatbotCount } = useTicketsInboxMetrics();
+  const isNarrow = useMediaQuery("(max-width:560px)");
+  const automationsLabel = isNarrow
+    ? i18n.t("tickets.inbox.automations.short")
+    : i18n.t("tickets.inbox.automations.label");
 
   const selectTab = (tab) => {
     setTabOpen(tab);
@@ -571,22 +576,25 @@ const InboxSubTabsPills = memo(function InboxSubTabsPills({
         </span>
       </ButtonBase>
 
-      <ButtonBase
-        className={`${classes.statusPill} ${classes.statusPillBtn} ${classes.statusPillGreen} ${
-          tabOpen === "chatbot" ? classes.statusPillGreenActive : ""
-        }`}
-        onClick={() => selectTab("chatbot")}
-      >
-        <span className={classes.statusCountGreen}>{chatbotCount}</span>
-        <AndroidIcon className={clsx(classes.statusPillIcon, classes.statusIconGreen)} />
-        <span
-          className={
-            tabOpen === "chatbot" ? classes.statusPillTextActive : classes.statusPillText
-          }
+      <Tooltip title={i18n.t("tickets.inbox.automations.tooltip")}>
+        <ButtonBase
+          className={`${classes.statusPill} ${classes.statusPillBtn} ${classes.statusPillGreen} ${
+            tabOpen === "chatbot" ? classes.statusPillGreenActive : ""
+          }`}
+          onClick={() => selectTab("chatbot")}
+          aria-label={i18n.t("tickets.inbox.automations.label")}
         >
-          CHATBOT
-        </span>
-      </ButtonBase>
+          <span className={classes.statusCountGreen}>{chatbotCount}</span>
+          <AndroidIcon className={clsx(classes.statusPillIcon, classes.statusIconGreen)} />
+          <span
+            className={
+              tabOpen === "chatbot" ? classes.statusPillTextActive : classes.statusPillText
+            }
+          >
+            {automationsLabel}
+          </span>
+        </ButtonBase>
+      </Tooltip>
     </div>
   );
 });

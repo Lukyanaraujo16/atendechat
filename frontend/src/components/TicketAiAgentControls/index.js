@@ -28,10 +28,18 @@ const TicketAiAgentControls = ({ ticket, onTicketUpdate }) => {
   const [loading, setLoading] = useState(false);
 
   const whatsappMode =
+    ticket?.aiAgentMode ||
     ticket?.whatsapp?.aiAgentMode ||
     (ticket?.whatsapp?.aiAgentEnabled ? "dry_run" : "disabled");
 
-  if (!aiAgentFeatureEnabled || whatsappMode !== "live" || !ticket?.id) {
+  const showControls =
+    aiAgentFeatureEnabled &&
+    ticket?.id &&
+    (whatsappMode === "live" ||
+      ticket?.automationType === "ai_agent" ||
+      ticket?.aiAgentPaused === true);
+
+  if (!showControls) {
     return null;
   }
 
@@ -68,13 +76,13 @@ const TicketAiAgentControls = ({ ticket, onTicketUpdate }) => {
     }
   };
 
-  let label = i18n.t("ticketAiAgent.active");
+  let label = i18n.t("ticketAiAgent.activeAgent");
   let chipColor = "primary";
   if (humanAssigned) {
-    label = i18n.t("ticketAiAgent.unavailable");
+    label = i18n.t("ticketAiAgent.humanAssumed");
     chipColor = "default";
   } else if (paused) {
-    label = i18n.t("ticketAiAgent.pausedLabel");
+    label = i18n.t("ticketAiAgent.pausedInTicket");
     chipColor = "default";
   }
 

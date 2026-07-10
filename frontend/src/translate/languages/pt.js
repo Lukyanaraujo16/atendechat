@@ -2304,7 +2304,10 @@ const messages = {
       },
       ticketAiAgent: {
         active: "IA ativa",
+        activeAgent: "Agente de IA ativo",
         pausedLabel: "IA pausada",
+        pausedInTicket: "IA pausada neste atendimento",
+        humanAssumed: "IA inativa — atendimento humano assumido",
         unavailable: "IA indisponível",
         pauseAction: "Pausar IA neste atendimento",
         resumeAction: "Reativar IA neste atendimento",
@@ -3230,13 +3233,21 @@ const messages = {
           closed: { title: "Resolvidos" },
           search: { title: "Busca" },
         },
+        inbox: {
+          automations: {
+            label: "AUTOMAÇÕES",
+            short: "AUTO",
+            tooltip:
+              "Atendimentos conduzidos por chatbot, agente de IA ou outras automações.",
+          },
+        },
         search: {
           placeholder: "Buscar por contato, número ou texto da mensagem…",
           clear: "Limpar busca",
           placeholders: {
             open: "Buscar conversas em atendimento",
             pending: "Buscar conversas aguardando",
-            chatbot: "Buscar conversas do chatbot",
+            chatbot: "Buscar conversas em automações",
             closed: "Buscar conversas resolvidas",
             groups: "Buscar grupos",
             filters: "Pesquisar usando filtros",
@@ -3344,6 +3355,7 @@ const messages = {
         ariaTicketRow: "Atendimento",
         tooltip: {
           chatbot: "Chatbot",
+          aiAgent: "IA atendendo",
           peek: "Espiar Conversa",
         },
         noQueue: "SEM SETOR",

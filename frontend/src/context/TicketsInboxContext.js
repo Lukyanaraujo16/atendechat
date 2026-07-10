@@ -17,6 +17,7 @@ import {
   isValidTicketsApiResponse,
   TICKETS_NO_CACHE_HEADERS,
 } from "../utils/ticketsApiResponse";
+import { isPendingAutomationTicket } from "../utils/ticketAutomationUi";
 
 /** Mantém a mesma referência de array se todos os elementos forem === aos anteriores (ordem e tamanho iguais). */
 function stabilizeListByRef(prevList, nextList) {
@@ -65,7 +66,7 @@ function mergeLoadBatch(prev, batch) {
  * Páginas seguintes: apenas mescla.
  */
 function isPendingChatbotTicket(ticket) {
-  return !!ticket?.chatbot;
+  return isPendingAutomationTicket(ticket);
 }
 
 function countVisibleTickets(list) {
@@ -107,6 +108,10 @@ function markOptimisticMove(recentMovesRef, ticket) {
     at: Date.now(),
     status: String(ticket.status || "").toLowerCase(),
     chatbot: !!ticket.chatbot,
+    automationActive:
+      typeof ticket.automationActive === "boolean"
+        ? ticket.automationActive
+        : !!ticket.chatbot,
   });
 }
 

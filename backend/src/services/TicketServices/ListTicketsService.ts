@@ -12,7 +12,9 @@ import TicketTag from "../../models/TicketTag";
 import ContactLabelRelation from "../../models/ContactLabelRelation";
 import { intersection } from "lodash";
 import Whatsapp from "../../models/Whatsapp";
+import AiAgent from "../../models/AiAgent";
 import InstagramAccount from "../../models/InstagramAccount";
+import { buildAiAutomationTicketExistsSql } from "../../helpers/ticketAutomationState";
 import { parseTruthyQuery } from "../../utils/parseQueryBoolean";
 import { attachTicketIsOrphanFlag } from "../../helpers/ticketOrphan";
 import {
@@ -156,8 +158,23 @@ const ListTicketsService = async ({
     {
       model: Whatsapp,
       as: "whatsapp",
-      attributes: ["name", "status", "ticketVisibility"],
-      required: false
+      attributes: [
+        "name",
+        "status",
+        "ticketVisibility",
+        "aiAgentMode",
+        "aiAgentId",
+        "aiAgentEnabled"
+      ],
+      required: false,
+      include: [
+        {
+          model: AiAgent,
+          as: "aiAgent",
+          attributes: ["id", "name"],
+          required: false
+        }
+      ]
     },
     {
       model: InstagramAccount,
@@ -353,12 +370,18 @@ const ListTicketsService = async ({
   if (chatbot === "true") {
     whereCondition = {
       ...whereCondition,
-      chatbot: true
+      [Op.or]: [
+        { chatbot: true },
+        literal(buildAiAutomationTicketExistsSql(companyId))
+      ]
     };
   } else if (chatbot === "false") {
     whereCondition = {
       ...whereCondition,
-      [Op.or]: [{ chatbot: false }, { chatbot: null }]
+      [Op.and]: [
+        { [Op.or]: [{ chatbot: false }, { chatbot: null }] },
+        literal(`NOT ${buildAiAutomationTicketExistsSql(companyId)}`)
+      ]
     };
   }
 
