@@ -29,7 +29,10 @@ export default async function GetInventoryReportProductsService(
       "productName",
       "productSku",
       [fn("SUM", col("quantity")), "quantitySold"],
-      [fn("COALESCE", fn("SUM", col("totalAmount")), 0), "totalSold"],
+      [
+        fn("COALESCE", fn("SUM", col("InventorySaleItem.totalAmount")), 0),
+        "totalSold"
+      ],
       [fn("COUNT", fn("DISTINCT", col("saleId"))), "salesCount"]
     ],
     include: [
