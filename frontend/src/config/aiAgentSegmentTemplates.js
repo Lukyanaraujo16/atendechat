@@ -55,6 +55,7 @@ export const AI_AGENT_SEGMENT_TEMPLATE_KEYS = {
       "visitPreference",
     ],
     suggestedFaqKeys: ["financing", "tradeIn", "location", "documents", "visit"],
+    simulationPromptKeys: ["priceBudget", "tradeIn", "financingApproval", "talkToSeller"],
   },
   internet_provider: {
     suggestedDepartments: ["sales", "support", "billing", "qualification"],
@@ -354,6 +355,7 @@ const GENERIC_SEGMENT = {
   businessInfoKeys: ["mainOfferings", "businessHours", "serviceArea"],
   qualificationKeys: ["customerNeed"],
   suggestedFaqKeys: [],
+  simulationPromptKeys: [],
 };
 
 export function getSegmentTemplate(segment) {

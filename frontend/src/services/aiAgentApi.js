@@ -43,3 +43,34 @@ export function updateAiAgentProfile(agentId, data) {
 export function previewAiAgentProfilePrompt(agentId, data) {
   return api.post(`/ai-agents/${agentId}/profile/preview`, data);
 }
+
+export function checkAiAgentSimulatorCredential(agentId) {
+  return api.get(`/ai-agents/${agentId}/simulator/credential-check`);
+}
+
+export function createAiAgentSimulatorSession(agentId) {
+  return api.post(`/ai-agents/${agentId}/simulator/sessions`);
+}
+
+export function listAiAgentSimulatorSessions(agentId, params = {}) {
+  return api.get(`/ai-agents/${agentId}/simulator/sessions`, { params });
+}
+
+export function getAiAgentSimulatorSession(agentId, sessionId) {
+  return api.get(`/ai-agents/${agentId}/simulator/sessions/${sessionId}`);
+}
+
+export function sendAiAgentSimulatorMessage(agentId, sessionId, data) {
+  return api.post(`/ai-agents/${agentId}/simulator/sessions/${sessionId}/messages`, data);
+}
+
+export function endAiAgentSimulatorSession(agentId, sessionId) {
+  return api.post(`/ai-agents/${agentId}/simulator/sessions/${sessionId}/end`);
+}
+
+export function upsertAiAgentSimulatorMessageReview(agentId, sessionId, messageId, data) {
+  return api.post(
+    `/ai-agents/${agentId}/simulator/sessions/${sessionId}/messages/${messageId}/review`,
+    data
+  );
+}

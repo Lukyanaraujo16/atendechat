@@ -29,6 +29,7 @@ import {
   Visibility,
   Stars as GuidedIcon,
   Settings,
+  ChatBubbleOutline,
 } from "@material-ui/icons";
 import { toast } from "react-toastify";
 import { useHistory } from "react-router-dom";
@@ -59,7 +60,7 @@ import {
   listAiAgentShadowSuggestions,
   listAiAgents,
 } from "../../services/aiAgentApi";
-import { AI_AGENT_WIZARD_ROUTE_PATH } from "../../config/aiAgentFeature";
+import { AI_AGENT_SIMULATOR_ROUTE_PATH, AI_AGENT_WIZARD_ROUTE_PATH } from "../../config/aiAgentFeature";
 import {
   deleteAiProviderCredential,
   listAiProviderCredentials,
@@ -253,6 +254,10 @@ const AiAgent = () => {
   const handleEditAdvanced = (id) => {
     setSelectedId(id);
     setModalOpen(true);
+  };
+
+  const handleSimulate = (id) => {
+    history.push(AI_AGENT_SIMULATOR_ROUTE_PATH.replace(":agentId", String(id)));
   };
 
   const handleConfirmLegacyConvert = () => {
@@ -513,6 +518,15 @@ const AiAgent = () => {
                         className={classes.actionIcon}
                       >
                         <Settings fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title={i18n.t("aiAgent.buttons.simulateConversation")}>
+                      <IconButton
+                        size="small"
+                        onClick={() => handleSimulate(agent.id)}
+                        className={classes.actionIcon}
+                      >
+                        <ChatBubbleOutline fontSize="small" />
                       </IconButton>
                     </Tooltip>
                     <Tooltip title={i18n.t("aiAgent.buttons.delete")}>

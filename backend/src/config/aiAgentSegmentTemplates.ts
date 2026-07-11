@@ -10,6 +10,7 @@ export type AiAgentSegmentTemplate = {
   businessInfoKeys: string[];
   qualificationKeys: string[];
   suggestedFaqKeys: string[];
+  simulationPromptKeys: string[];
   generatedPromptInstructions: string[];
 };
 
@@ -38,6 +39,7 @@ function tpl(
     businessInfoKeys: partial.businessInfoKeys ?? [],
     qualificationKeys: partial.qualificationKeys ?? [],
     suggestedFaqKeys: partial.suggestedFaqKeys ?? [],
+    simulationPromptKeys: partial.simulationPromptKeys ?? [],
     generatedPromptInstructions: partial.generatedPromptInstructions
   };
 }
@@ -92,6 +94,7 @@ export const AI_AGENT_SEGMENT_TEMPLATES: Record<string, AiAgentSegmentTemplate> 
       "visitPreference"
     ],
     suggestedFaqKeys: ["financing", "tradeIn", "location", "documents", "visit"],
+    simulationPromptKeys: ["priceBudget", "tradeIn", "financingApproval", "talkToSeller"],
     generatedPromptInstructions: [
       "Pergunte qual veículo ou categoria o cliente procura antes de sugerir opções.",
       "Colete faixa de preço, cidade, interesse em financiamento e veículo na troca quando relevante.",
@@ -151,6 +154,7 @@ export const AI_AGENT_SEGMENT_TEMPLATES: Record<string, AiAgentSegmentTemplate> 
       "issueOrSales"
     ],
     suggestedFaqKeys: ["coverage", "plans", "installation", "support", "billing"],
+    simulationPromptKeys: ["coverage", "businessPlan", "technicalIssue", "cancel"],
     generatedPromptInstructions: [
       "Pergunte cidade, bairro e se o interesse é residencial ou empresarial.",
       "Nunca afirme cobertura sem consulta confiável cadastrada.",
@@ -206,6 +210,7 @@ export const AI_AGENT_SEGMENT_TEMPLATES: Record<string, AiAgentSegmentTemplate> 
       "visitSchedule"
     ],
     suggestedFaqKeys: ["services", "visit", "monitoring", "contracts", "area"],
+    simulationPromptKeys: ["residentialQuote", "businessSecurity", "technicalVisit", "urgentIncident"],
     generatedPromptInstructions: [
       "Qualifique se o atendimento é residencial ou empresarial e qual serviço é desejado.",
       "Não prometa segurança absoluta ou resultados garantidos.",
@@ -254,6 +259,7 @@ export const AI_AGENT_SEGMENT_TEMPLATES: Record<string, AiAgentSegmentTemplate> 
       "fullQuoteNeed"
     ],
     suggestedFaqKeys: ["delivery", "pickup", "quote", "payment", "catalog"],
+    simulationPromptKeys: ["materialQuote", "deliveryArea", "stockCheck", "discountRequest"],
     generatedPromptInstructions: [
       "Pergunte material, quantidade e se a necessidade é entrega ou retirada.",
       "Não confirme estoque sem dado atualizado cadastrado.",
@@ -301,6 +307,7 @@ export const AI_AGENT_SEGMENT_TEMPLATES: Record<string, AiAgentSegmentTemplate> 
       "preferredSchedule"
     ],
     suggestedFaqKeys: ["warranty", "visit", "brands", "quote", "hours"],
+    simulationPromptKeys: ["equipmentBroken", "repairPrice", "warrantyCheck", "talkToTechnician"],
     generatedPromptInstructions: [
       "Colete equipamento, marca/modelo e descrição do problema.",
       "Não forneça diagnóstico definitivo sem análise técnica.",
@@ -539,6 +546,7 @@ export const AI_AGENT_SEGMENT_TEMPLATES: Record<string, AiAgentSegmentTemplate> 
     businessInfoKeys: ["howItWorks", "mainOfferings", "commonQuestions", "qualificationNeeds", "humanHandoffCases"],
     qualificationKeys: ["customerNeed", "timeline", "contactPreference"],
     suggestedFaqKeys: [],
+    simulationPromptKeys: ["generalInquiry", "pricingQuestion", "humanRequest", "serviceArea"],
     generatedPromptInstructions: [
       "Adapte o atendimento ao segmento informado pelo administrador.",
       "Pergunte o que o cliente precisa antes de assumir produtos ou serviços.",

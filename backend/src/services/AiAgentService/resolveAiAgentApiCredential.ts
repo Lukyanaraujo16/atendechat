@@ -126,6 +126,40 @@ export async function resolveAiAgentApiCredential(input: {
   return { apiKey: null, provider: null, source: "missing" };
 }
 
+/**
+ * Resolve credencial para o simulador (sem ticket/WhatsApp legado).
+ * Ordem: credencial do agente → default da empresa.
+ */
+export async function resolveAiAgentApiCredentialForSimulation(input: {
+  companyId: number;
+  agent: AiAgent;
+}): Promise<ResolvedAiApiCredential> {
+  const agentCred = await loadAgentCredential(
+    input.companyId,
+    input.agent.aiProviderCredentialId
+  );
+  if (agentCred) {
+    return {
+      apiKey: agentCred.apiKey,
+      provider: agentCred.provider,
+      source: "agent_credential",
+      credentialId: agentCred.credentialId
+    };
+  }
+
+  const defaultCred = await loadCompanyDefaultCredential(input.companyId);
+  if (defaultCred) {
+    return {
+      apiKey: defaultCred.apiKey,
+      provider: defaultCred.provider,
+      source: "company_default",
+      credentialId: defaultCred.credentialId
+    };
+  }
+
+  return { apiKey: null, provider: null, source: "missing" };
+}
+
 export async function resolveAiAgentOpenAiApiKeyWithSource(
   input: Parameters<typeof resolveAiAgentApiCredential>[0]
 ): Promise<ResolvedAiApiCredential> {

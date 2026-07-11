@@ -11,6 +11,15 @@ import ShowAiAgentProfileService from "../services/AiAgentService/ShowAiAgentPro
 import UpsertAiAgentProfileService from "../services/AiAgentService/UpsertAiAgentProfileService";
 import GenerateAiAgentPromptPreviewService from "../services/AiAgentService/GenerateAiAgentPromptPreviewService";
 import UpsertAiAgentSuggestionReviewService from "../services/AiAgentService/UpsertAiAgentSuggestionReviewService";
+import UpsertAiAgentSimulationMessageReviewService from "../services/AiAgentService/UpsertAiAgentSimulationMessageReviewService";
+import {
+  checkAiAgentSimulatorCredential,
+  createAiAgentSimulationSession,
+  endAiAgentSimulationSession,
+  listAiAgentSimulationSessions,
+  sendAiAgentSimulationMessage,
+  showAiAgentSimulationSession
+} from "../services/AiAgentService/AiAgentSimulationService";
 import {
   parseOptionalBoolean,
   parseOptionalPositiveInt,
@@ -165,4 +174,107 @@ export const previewProfilePrompt = async (
     body: req.body
   });
   return res.json(preview);
+};
+
+export const simulatorCredentialCheck = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const aiAgentId = parseIdParam(req.params.id);
+  const result = await checkAiAgentSimulatorCredential({ companyId, aiAgentId });
+  return res.json(result);
+};
+
+export const createSimulatorSession = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const aiAgentId = parseIdParam(req.params.id);
+  const session = await createAiAgentSimulationSession({
+    companyId,
+    aiAgentId,
+    createdBy: userIdOrThrow(req)
+  });
+  return res.status(201).json(session);
+};
+
+export const listSimulatorSessions = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const aiAgentId = parseIdParam(req.params.id);
+  const result = await listAiAgentSimulationSessions({
+    companyId,
+    aiAgentId,
+    pageNumber: req.query.pageNumber as string | undefined
+  });
+  return res.json(result);
+};
+
+export const showSimulatorSession = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const aiAgentId = parseIdParam(req.params.id);
+  const sessionId = parseIdParam(req.params.sessionId);
+  const session = await showAiAgentSimulationSession({
+    companyId,
+    aiAgentId,
+    sessionId
+  });
+  return res.json(session);
+};
+
+export const sendSimulatorMessage = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const aiAgentId = parseIdParam(req.params.id);
+  const sessionId = parseIdParam(req.params.sessionId);
+  const result = await sendAiAgentSimulationMessage({
+    companyId,
+    aiAgentId,
+    sessionId,
+    content: req.body?.content
+  });
+  return res.json(result);
+};
+
+export const endSimulatorSession = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const aiAgentId = parseIdParam(req.params.id);
+  const sessionId = parseIdParam(req.params.sessionId);
+  const result = await endAiAgentSimulationSession({
+    companyId,
+    aiAgentId,
+    sessionId
+  });
+  return res.json(result);
+};
+
+export const upsertSimulatorMessageReview = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const aiAgentId = parseIdParam(req.params.id);
+  const sessionId = parseIdParam(req.params.sessionId);
+  const messageId = parseIdParam(req.params.messageId);
+  const review = await UpsertAiAgentSimulationMessageReviewService({
+    companyId,
+    aiAgentId,
+    sessionId,
+    messageId,
+    reviewedBy: userIdOrThrow(req),
+    body: req.body
+  });
+  return res.json(review);
 };

@@ -8,6 +8,9 @@ export const AI_AGENT_ROUTE_PATH = "/ai-agent";
 export const AI_AGENT_WIZARD_ROUTE_PATH = "/ai-agent/wizard";
 export const AI_AGENT_WIZARD_EDIT_ROUTE_PATH = "/ai-agent/wizard/:agentId";
 
+/** Simulador de conversa do atendente virtual. */
+export const AI_AGENT_SIMULATOR_ROUTE_PATH = "/ai-agent/:agentId/simulator";
+
 /**
  * Controla exibição da aba/menu do Agente de IA.
  * Manter `false` até a fase com página funcional + backend.

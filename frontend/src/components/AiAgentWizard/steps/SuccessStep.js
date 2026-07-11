@@ -41,6 +41,7 @@ export default function SuccessStep({
   onViewAgent,
   onConfigureCredential,
   onBackToList,
+  onTestAttendant,
 }) {
   const classes = useStyles();
 
@@ -92,6 +93,11 @@ export default function SuccessStep({
       )}
 
       <div className={classes.actions}>
+        {hasCredentials && agentId ? (
+          <Button variant="contained" color="primary" onClick={onTestAttendant}>
+            {i18n.t("aiAgent.wizard.buttons.testAttendant")}
+          </Button>
+        ) : null}
         <Button variant="contained" color="primary" onClick={onViewAgent}>
           {i18n.t("aiAgent.wizard.buttons.viewAgent")}
         </Button>

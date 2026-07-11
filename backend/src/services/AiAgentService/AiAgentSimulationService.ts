@@ -1,0 +1,445 @@
+import AppError from "../../errors/AppError";
+import AiAgent from "../../models/AiAgent";
+import AiAgentSimulationSession from "../../models/AiAgentSimulationSession";
+import { Op } from "sequelize";
+import { generateChatCompletionViaAdapter } from "../AiProviderService/AiProviderAdapterFactory";
+import { buildAiAgentSystemPrompt } from "./buildAiAgentSystemPrompt";
+import { loadAiAgentProfileForRuntime } from "./resolveAiAgentBusinessPrompt";
+import { resolveAiAgentApiCredentialForSimulation } from "./resolveAiAgentApiCredential";
+import {
+  parseAiAgentMaxTokens,
+  parseAiAgentModelForProvider
+} from "./aiAgentValidation";
+import { parseAiAgentHandoffSignal } from "./parseAiAgentHandoffSignal";
+import { buildSimulationContextMessages } from "./buildSimulationContextMessages";
+import { findSimulationSessionOrThrow } from "./aiAgentSimulationSerialization";
+import AiAgentSimulationMessage from "../../models/AiAgentSimulationMessage";
+import AiAgentSimulationMessageReview from "../../models/AiAgentSimulationMessageReview";
+import {
+  AI_AGENT_SIMULATOR_MAX_MESSAGE_CHARS,
+  AI_AGENT_SIMULATOR_MAX_MESSAGES_PER_SESSION,
+  AI_AGENT_SIMULATOR_MAX_OPEN_SESSIONS,
+  AI_AGENT_SIMULATOR_MAX_TOKENS_CAP,
+  AI_AGENT_SIMULATOR_MAX_USER_MESSAGES,
+  AI_AGENT_SIMULATOR_SOURCE,
+  AI_AGENT_SIMULATOR_TIMEOUT_MS
+} from "./aiAgentSimulatorConfig";
+import { AI_AGENT_SHADOW_ERROR_CODES } from "./aiAgentShadowErrors";
+import { findAiAgentOrThrow } from "./aiAgentTenant";
+
+const SIMULATOR_ERROR_CODES = {
+  MISSING_CREDENTIAL: "missing_credential",
+  SESSION_ENDED: "session_ended",
+  SESSION_MESSAGE_LIMIT: "session_message_limit",
+  SESSION_USER_MESSAGE_LIMIT: "session_user_message_limit",
+  MESSAGE_TOO_LONG: "message_too_long",
+  OPEN_SESSION_LIMIT: "open_session_limit"
+} as const;
+
+function parseUserMessage(value: unknown): string {
+  const content = String(value ?? "").trim();
+  if (!content) {
+    throw new AppError("ERR_VALIDATION_ERROR", 400, "Mensagem é obrigatória.");
+  }
+  if (content.length > AI_AGENT_SIMULATOR_MAX_MESSAGE_CHARS) {
+    throw new AppError(
+      "ERR_VALIDATION_ERROR",
+      400,
+      `Mensagem deve ter no máximo ${AI_AGENT_SIMULATOR_MAX_MESSAGE_CHARS} caracteres.`,
+      { errorCode: SIMULATOR_ERROR_CODES.MESSAGE_TOO_LONG }
+    );
+  }
+  return content;
+}
+
+async function assertResolvableCredential(companyId: number, agent: AiAgent) {
+  const resolved = await resolveAiAgentApiCredentialForSimulation({
+    companyId,
+    agent
+  });
+  if (!resolved.apiKey || !resolved.provider) {
+    throw new AppError(
+      "ERR_AI_AGENT_SIMULATOR_MISSING_CREDENTIAL",
+      400,
+      "Configure uma credencial OpenAI ou Google Gemini antes de simular.",
+      { errorCode: SIMULATOR_ERROR_CODES.MISSING_CREDENTIAL }
+    );
+  }
+  return resolved;
+}
+
+export async function createAiAgentSimulationSession(input: {
+  companyId: number;
+  aiAgentId: number;
+  createdBy: number;
+}) {
+  const agent = await findAiAgentOrThrow(input.companyId, input.aiAgentId);
+  const resolved = await assertResolvableCredential(input.companyId, agent);
+
+  const openCount = await AiAgentSimulationSession.count({
+    where: {
+      companyId: input.companyId,
+      aiAgentId: input.aiAgentId,
+      createdBy: input.createdBy,
+      status: "active"
+    }
+  });
+
+  if (openCount >= AI_AGENT_SIMULATOR_MAX_OPEN_SESSIONS) {
+    throw new AppError(
+      "ERR_AI_AGENT_SIMULATOR_OPEN_SESSION_LIMIT",
+      400,
+      "Encerre uma sessão ativa antes de iniciar outra simulação.",
+      { errorCode: SIMULATOR_ERROR_CODES.OPEN_SESSION_LIMIT }
+    );
+  }
+
+  let model: string;
+  try {
+    model = parseAiAgentModelForProvider(agent.model, resolved.provider);
+  } catch {
+    throw new AppError(
+      "ERR_VALIDATION_ERROR",
+      400,
+      "Modelo incompatível com o provedor da credencial."
+    );
+  }
+
+  const now = new Date();
+  const session = await AiAgentSimulationSession.create({
+    companyId: input.companyId,
+    aiAgentId: input.aiAgentId,
+    createdBy: input.createdBy,
+    status: "active",
+    provider: resolved.provider,
+    model,
+    messageCount: 0,
+    totalPromptTokens: 0,
+    totalCompletionTokens: 0,
+    totalTokens: 0,
+    totalLatencyMs: 0,
+    startedAt: now
+  });
+
+  return {
+    id: session.id,
+    aiAgentId: session.aiAgentId,
+    status: session.status,
+    provider: session.provider,
+    model: session.model,
+    messageCount: session.messageCount,
+    totalTokens: session.totalTokens,
+    startedAt: session.startedAt,
+    messages: []
+  };
+}
+
+export async function listAiAgentSimulationSessions(input: {
+  companyId: number;
+  aiAgentId: number;
+  pageNumber?: string;
+}) {
+  await findAiAgentOrThrow(input.companyId, input.aiAgentId);
+
+  const page = Math.max(1, Number(input.pageNumber) || 1);
+  const limit = 10;
+  const offset = (page - 1) * limit;
+
+  const { rows, count } = await AiAgentSimulationSession.findAndCountAll({
+    where: {
+      companyId: input.companyId,
+      aiAgentId: input.aiAgentId
+    },
+    order: [["createdAt", "DESC"]],
+    limit,
+    offset
+  });
+
+  return {
+    sessions: rows.map((session) => ({
+      id: session.id,
+      status: session.status,
+      provider: session.provider,
+      model: session.model,
+      messageCount: session.messageCount,
+      totalTokens: session.totalTokens,
+      startedAt: session.startedAt,
+      endedAt: session.endedAt,
+      createdAt: session.createdAt
+    })),
+    count,
+    hasMore: count > offset + rows.length
+  };
+}
+
+export async function showAiAgentSimulationSession(input: {
+  companyId: number;
+  aiAgentId: number;
+  sessionId: number;
+}) {
+  const session = await findSimulationSessionOrThrow(input);
+  const messages = await AiAgentSimulationMessage.findAll({
+    where: { companyId: input.companyId, sessionId: session.id },
+    order: [["createdAt", "ASC"]],
+    include: [
+      {
+        model: AiAgentSimulationMessageReview,
+        as: "review",
+        required: false
+      }
+    ]
+  });
+
+  const { serializeSimulationSession } = await import("./aiAgentSimulationSerialization");
+  return serializeSimulationSession(session, messages);
+}
+
+export async function endAiAgentSimulationSession(input: {
+  companyId: number;
+  aiAgentId: number;
+  sessionId: number;
+}) {
+  const session = await findSimulationSessionOrThrow(input);
+  if (session.status === "ended") {
+    return { id: session.id, status: session.status, endedAt: session.endedAt };
+  }
+
+  const endedAt = new Date();
+  await session.update({ status: "ended", endedAt });
+  return { id: session.id, status: "ended", endedAt };
+}
+
+export async function sendAiAgentSimulationMessage(input: {
+  companyId: number;
+  aiAgentId: number;
+  sessionId: number;
+  content: unknown;
+}) {
+  const session = await findSimulationSessionOrThrow(input);
+  if (session.status !== "active") {
+    throw new AppError(
+      "ERR_AI_AGENT_SIMULATOR_SESSION_ENDED",
+      400,
+      "Esta sessão de simulação já foi encerrada.",
+      { errorCode: SIMULATOR_ERROR_CODES.SESSION_ENDED }
+    );
+  }
+
+  const content = parseUserMessage(input.content);
+  const agent = await findAiAgentOrThrow(input.companyId, input.aiAgentId);
+
+  if (session.messageCount >= AI_AGENT_SIMULATOR_MAX_MESSAGES_PER_SESSION) {
+    throw new AppError(
+      "ERR_AI_AGENT_SIMULATOR_MESSAGE_LIMIT",
+      400,
+      "Limite de mensagens da sessão atingido. Reinicie a conversa.",
+      { errorCode: SIMULATOR_ERROR_CODES.SESSION_MESSAGE_LIMIT }
+    );
+  }
+
+  const userMessageCount = await AiAgentSimulationMessage.count({
+    where: {
+      companyId: input.companyId,
+      sessionId: session.id,
+      role: "user"
+    }
+  });
+
+  if (userMessageCount >= AI_AGENT_SIMULATOR_MAX_USER_MESSAGES) {
+    throw new AppError(
+      "ERR_AI_AGENT_SIMULATOR_USER_MESSAGE_LIMIT",
+      400,
+      "Limite de mensagens do usuário atingido. Reinicie a conversa.",
+      { errorCode: SIMULATOR_ERROR_CODES.SESSION_USER_MESSAGE_LIMIT }
+    );
+  }
+
+  const resolved = await assertResolvableCredential(input.companyId, agent);
+  const userRow = await AiAgentSimulationMessage.create({
+    companyId: input.companyId,
+    sessionId: session.id,
+    role: "user",
+    content,
+    handoffSuggested: false
+  });
+
+  const historyRows = await AiAgentSimulationMessage.findAll({
+    where: {
+      companyId: input.companyId,
+      sessionId: session.id,
+      role: { [Op.in]: ["user", "assistant"] }
+    },
+    order: [["createdAt", "ASC"]],
+    attributes: ["role", "content"]
+  });
+
+  const profile = await loadAiAgentProfileForRuntime({
+    companyId: input.companyId,
+    aiAgentId: agent.id
+  });
+  const systemPrompt = buildAiAgentSystemPrompt(agent, profile);
+  const messages = buildSimulationContextMessages(historyRows);
+
+  let model: string;
+  let maxTokens: number;
+  try {
+    model = parseAiAgentModelForProvider(agent.model, resolved.provider!);
+    maxTokens = Math.min(
+      parseAiAgentMaxTokens(agent.maxTokens),
+      AI_AGENT_SIMULATOR_MAX_TOKENS_CAP
+    );
+  } catch {
+    throw new AppError(
+      "ERR_VALIDATION_ERROR",
+      400,
+      "Modelo incompatível com o provedor da credencial."
+    );
+  }
+
+  const startedAt = Date.now();
+  const result = await generateChatCompletionViaAdapter({
+    provider: resolved.provider!,
+    companyId: input.companyId,
+    ticketId: null,
+    apiKey: resolved.apiKey!,
+    model,
+    maxTokens,
+    temperature: agent.temperature,
+    systemPrompt,
+    messages,
+    timeoutMs: AI_AGENT_SIMULATOR_TIMEOUT_MS,
+    source: AI_AGENT_SIMULATOR_SOURCE
+  });
+
+  const latencyMs = result.latencyMs ?? Date.now() - startedAt;
+
+  if (result.ok === false) {
+    const assistantRow = await AiAgentSimulationMessage.create({
+      companyId: input.companyId,
+      sessionId: session.id,
+      role: "assistant",
+      content: "",
+      provider: resolved.provider,
+      model,
+      latencyMs,
+      errorCode: result.errorCode,
+      handoffSuggested: false
+    });
+
+    await session.update({
+      messageCount: session.messageCount + 2,
+      totalLatencyMs: session.totalLatencyMs + latencyMs
+    });
+
+    return {
+      userMessage: {
+        id: userRow.id,
+        role: userRow.role,
+        content: userRow.content,
+        createdAt: userRow.createdAt
+      },
+      assistantMessage: {
+        id: assistantRow.id,
+        role: assistantRow.role,
+        content: assistantRow.content,
+        errorCode: assistantRow.errorCode,
+        provider: assistantRow.provider,
+        model: assistantRow.model,
+        latencyMs: assistantRow.latencyMs,
+        handoffSuggested: false,
+        handoffReason: null,
+        createdAt: assistantRow.createdAt
+      },
+      session: {
+        id: session.id,
+        messageCount: session.messageCount,
+        totalTokens: session.totalTokens,
+        totalLatencyMs: session.totalLatencyMs
+      }
+    };
+  }
+
+  const handoff = parseAiAgentHandoffSignal(result.text);
+  const assistantRow = await AiAgentSimulationMessage.create({
+    companyId: input.companyId,
+    sessionId: session.id,
+    role: "assistant",
+    content: handoff.cleanText,
+    provider: result.provider || resolved.provider,
+    model: result.model || model,
+    promptTokens: result.promptTokens ?? null,
+    completionTokens: result.completionTokens ?? null,
+    totalTokens: result.totalTokens ?? null,
+    latencyMs,
+    handoffSuggested: handoff.handoffRequested,
+    handoffReason: handoff.handoffReason
+  });
+
+  await session.update({
+    messageCount: session.messageCount + 2,
+    totalPromptTokens: session.totalPromptTokens + (result.promptTokens || 0),
+    totalCompletionTokens:
+      session.totalCompletionTokens + (result.completionTokens || 0),
+    totalTokens: session.totalTokens + (result.totalTokens || 0),
+    totalLatencyMs: session.totalLatencyMs + latencyMs,
+    provider: result.provider || session.provider,
+    model: result.model || session.model
+  });
+
+  return {
+    userMessage: {
+      id: userRow.id,
+      role: userRow.role,
+      content: userRow.content,
+      createdAt: userRow.createdAt
+    },
+    assistantMessage: {
+      id: assistantRow.id,
+      role: assistantRow.role,
+      content: assistantRow.content,
+      provider: assistantRow.provider,
+      model: assistantRow.model,
+      promptTokens: assistantRow.promptTokens,
+      completionTokens: assistantRow.completionTokens,
+      totalTokens: assistantRow.totalTokens,
+      latencyMs: assistantRow.latencyMs,
+      handoffSuggested: assistantRow.handoffSuggested,
+      handoffReason: assistantRow.handoffReason,
+      createdAt: assistantRow.createdAt
+    },
+    session: {
+      id: session.id,
+      messageCount: session.messageCount,
+      totalTokens: session.totalTokens,
+      totalLatencyMs: session.totalLatencyMs
+    }
+  };
+}
+
+export async function checkAiAgentSimulatorCredential(input: {
+  companyId: number;
+  aiAgentId: number;
+}) {
+  const agent = await findAiAgentOrThrow(input.companyId, input.aiAgentId);
+  const resolved = await resolveAiAgentApiCredentialForSimulation({
+    companyId: input.companyId,
+    agent
+  });
+
+  return {
+    canSimulate: Boolean(resolved.apiKey && resolved.provider),
+    credentialSource: resolved.source,
+    provider: resolved.provider,
+    model: resolved.provider
+      ? (() => {
+          try {
+            return parseAiAgentModelForProvider(agent.model, resolved.provider!);
+          } catch {
+            return null;
+          }
+        })()
+      : null
+  };
+}
+
+export { SIMULATOR_ERROR_CODES, AI_AGENT_SHADOW_ERROR_CODES };

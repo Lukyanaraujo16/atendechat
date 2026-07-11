@@ -86,6 +86,9 @@ import AiAgent from "../models/AiAgent";
 import AiAgentProfile from "../models/AiAgentProfile";
 import AiAgentRuntimeLog from "../models/AiAgentRuntimeLog";
 import AiAgentSuggestionReview from "../models/AiAgentSuggestionReview";
+import AiAgentSimulationSession from "../models/AiAgentSimulationSession";
+import AiAgentSimulationMessage from "../models/AiAgentSimulationMessage";
+import AiAgentSimulationMessageReview from "../models/AiAgentSimulationMessageReview";
 import AiProviderCredential from "../models/AiProviderCredential";
 import { logDbConnectionAtStartup } from "../helpers/dbConnectionInfo";
 import {
@@ -187,6 +190,9 @@ const models = [
   AiAgentProfile,
   AiAgentRuntimeLog,
   AiAgentSuggestionReview,
+  AiAgentSimulationSession,
+  AiAgentSimulationMessage,
+  AiAgentSimulationMessageReview,
   AiProviderCredential
 ];
 

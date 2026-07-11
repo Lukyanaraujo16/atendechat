@@ -55,6 +55,55 @@ aiAgentRoutes.post(
 );
 
 aiAgentRoutes.get(
+  "/ai-agents/:id/simulator/credential-check",
+  isAuth,
+  requireEffectiveModule("automation.ai_agent"),
+  AiAgentController.simulatorCredentialCheck
+);
+
+aiAgentRoutes.post(
+  "/ai-agents/:id/simulator/sessions",
+  isAuth,
+  requireEffectiveModule("automation.ai_agent"),
+  AiAgentController.createSimulatorSession
+);
+
+aiAgentRoutes.get(
+  "/ai-agents/:id/simulator/sessions",
+  isAuth,
+  requireEffectiveModule("automation.ai_agent"),
+  AiAgentController.listSimulatorSessions
+);
+
+aiAgentRoutes.get(
+  "/ai-agents/:id/simulator/sessions/:sessionId",
+  isAuth,
+  requireEffectiveModule("automation.ai_agent"),
+  AiAgentController.showSimulatorSession
+);
+
+aiAgentRoutes.post(
+  "/ai-agents/:id/simulator/sessions/:sessionId/messages",
+  isAuth,
+  requireEffectiveModule("automation.ai_agent"),
+  AiAgentController.sendSimulatorMessage
+);
+
+aiAgentRoutes.post(
+  "/ai-agents/:id/simulator/sessions/:sessionId/end",
+  isAuth,
+  requireEffectiveModule("automation.ai_agent"),
+  AiAgentController.endSimulatorSession
+);
+
+aiAgentRoutes.post(
+  "/ai-agents/:id/simulator/sessions/:sessionId/messages/:messageId/review",
+  isAuth,
+  requireEffectiveModule("automation.ai_agent"),
+  AiAgentController.upsertSimulatorMessageReview
+);
+
+aiAgentRoutes.get(
   "/ai-agents/:id",
   isAuth,
   requireEffectiveModule("automation.ai_agent"),

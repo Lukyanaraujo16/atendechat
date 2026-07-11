@@ -45,7 +45,7 @@ import {
   updateAiAgentProfile,
 } from "../../services/aiAgentApi";
 import { listAiProviderCredentials } from "../../services/aiProviderCredentialApi";
-import { AI_AGENT_ROUTE_PATH } from "../../config/aiAgentFeature";
+import { AI_AGENT_ROUTE_PATH, AI_AGENT_SIMULATOR_ROUTE_PATH } from "../../config/aiAgentFeature";
 
 const CONTENT_STEP_IDS = WIZARD_STEP_IDS.filter((id) => id !== "welcome");
 
@@ -332,6 +332,9 @@ export default function AiAgentWizard({ agentId: initialAgentId = null, mode = "
           onViewAgent={() => history.push(AI_AGENT_ROUTE_PATH)}
           onConfigureCredential={() => history.push(AI_AGENT_ROUTE_PATH)}
           onBackToList={() => history.push(AI_AGENT_ROUTE_PATH)}
+          onTestAttendant={() =>
+            history.push(AI_AGENT_SIMULATOR_ROUTE_PATH.replace(":agentId", String(agentId)))
+          }
         />
       );
     }
