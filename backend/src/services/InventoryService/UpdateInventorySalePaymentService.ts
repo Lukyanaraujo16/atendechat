@@ -44,23 +44,60 @@ export default async function UpdateInventorySalePaymentService(input: {
     paymentStatus
   });
 
-  const totalAmount = toMoney(sale.totalAmount);
-  const paidAmount =
-    input.body.paidAmount !== undefined && input.body.paidAmount !== null
-      ? parsePaidAmount(input.body.paidAmount)
-      : toMoney(sale.paidAmount);
+  const patch: Partial<InventorySale> = {};
 
-  validatePaymentConsistency({
-    saleStatus: sale.status,
-    totalAmount,
-    paymentStatus,
-    paidAmount
-  });
+  if (sale.status === "draft") {
+    // Em rascunho só é permitido gravar metadados de pagamento
+    // (paymentMethod/paymentNotes). O financeiro permanece zerado:
+    // paymentStatus = unpaid, paidAmount = 0, paidAt = null.
+    if (
+      input.body.paidAmount !== undefined &&
+      input.body.paidAmount !== null &&
+      parsePaidAmount(input.body.paidAmount) > 0
+    ) {
+      throw new AppError(
+        "ERR_INVENTORY_SALE_PAYMENT_DRAFT_AMOUNT",
+        400,
+        "Venda em rascunho não pode ter valor pago."
+      );
+    }
+    if (
+      input.body.paidAt !== undefined &&
+      input.body.paidAt !== null &&
+      input.body.paidAt !== ""
+    ) {
+      throw new AppError(
+        "ERR_INVENTORY_SALE_PAYMENT_DRAFT_PAID_AT",
+        400,
+        "Venda em rascunho não pode ter data de pagamento."
+      );
+    }
 
-  const patch: Partial<InventorySale> = {
-    paymentStatus,
-    paidAmount
-  };
+    patch.paymentStatus = "unpaid";
+    patch.paidAmount = 0;
+    patch.paidAt = null;
+  } else {
+    const totalAmount = toMoney(sale.totalAmount);
+    const paidAmount =
+      input.body.paidAmount !== undefined && input.body.paidAmount !== null
+        ? parsePaidAmount(input.body.paidAmount)
+        : toMoney(sale.paidAmount);
+
+    validatePaymentConsistency({
+      saleStatus: sale.status,
+      totalAmount,
+      paymentStatus,
+      paidAmount
+    });
+
+    patch.paymentStatus = paymentStatus;
+    patch.paidAmount = paidAmount;
+    patch.paidAt = resolvePaidAtForPaymentUpdate({
+      paymentStatus,
+      paidAt: input.body.paidAt,
+      existingPaidAt: sale.paidAt
+    });
+  }
 
   if (input.body.paymentMethod !== undefined) {
     patch.paymentMethod = parseOptionalPaymentMethod(input.body.paymentMethod);
@@ -69,12 +106,6 @@ export default async function UpdateInventorySalePaymentService(input: {
   if (input.body.paymentNotes !== undefined) {
     patch.paymentNotes = normalizeOptionalString(input.body.paymentNotes);
   }
-
-  patch.paidAt = resolvePaidAtForPaymentUpdate({
-    paymentStatus,
-    paidAt: input.body.paidAt,
-    existingPaidAt: sale.paidAt
-  });
 
   await sale.update(patch);
   return sale.reload({ include: inventorySaleIncludes });

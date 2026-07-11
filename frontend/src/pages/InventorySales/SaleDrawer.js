@@ -31,6 +31,7 @@ import {
   getInventorySale,
   listInventoryProducts,
   updateInventorySale,
+  updateInventorySalePayment,
 } from "../../services/inventoryApi";
 import toastError from "../../errors/toastError";
 import { i18n } from "../../translate/i18n";
@@ -150,6 +151,17 @@ export default function SaleDrawer({
   const [cancelReason, setCancelReason] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
 
+  const applySaleToForm = useCallback((data) => {
+    setHeaderForm({
+      contactId: data.contactId != null ? String(data.contactId) : "",
+      sellerUserId:
+        data.sellerUserId != null ? String(data.sellerUserId) : "",
+      notes: data.notes || "",
+      paymentMethod: data.paymentMethod || "",
+      paymentNotes: data.paymentNotes || "",
+    });
+  }, []);
+
   const loadSale = useCallback(async () => {
     if (!saleId) return null;
     setLoading(true);
@@ -157,14 +169,7 @@ export default function SaleDrawer({
     try {
       const { data } = await getInventorySale(saleId);
       setSale(data);
-      setHeaderForm({
-        contactId: data.contactId != null ? String(data.contactId) : "",
-        sellerUserId:
-          data.sellerUserId != null ? String(data.sellerUserId) : "",
-        notes: data.notes || "",
-        paymentMethod: data.paymentMethod || "",
-        paymentNotes: data.paymentNotes || "",
-      });
+      applySaleToForm(data);
       return data;
     } catch (err) {
       setLoadError(true);
@@ -173,6 +178,20 @@ export default function SaleDrawer({
       return null;
     } finally {
       setLoading(false);
+    }
+  }, [saleId, applySaleToForm]);
+
+  // Atualiza a venda (ex.: após alterar itens) sem sobrescrever os campos que o
+  // utilizador ainda não guardou (cliente, vendedor, pagamento, notas).
+  const refreshSale = useCallback(async () => {
+    if (!saleId) return null;
+    try {
+      const { data } = await getInventorySale(saleId);
+      setSale(data);
+      return data;
+    } catch (err) {
+      toastError(err);
+      return null;
     }
   }, [saleId]);
 
@@ -221,30 +240,49 @@ export default function SaleDrawer({
 
   const editable = isSaleEditable(sale) && perms.canCreateSale;
 
+  // Persiste apenas o cabeçalho da venda (rascunho). Nunca envia campos
+  // financeiros pelo endpoint geral — pagamento só vai pela rota protegida.
+  const persistHeader = async () => {
+    const payload = {
+      notes: headerForm.notes.trim() || null,
+      sellerUserId: headerForm.sellerUserId
+        ? Number(headerForm.sellerUserId)
+        : null,
+      contactId: ticketLink
+        ? ticketLink.contactId
+        : headerForm.contactId
+          ? Number(headerForm.contactId)
+          : null,
+    };
+    if (ticketLink?.ticketId != null) {
+      payload.ticketId = ticketLink.ticketId;
+    }
+    const { data } = await updateInventorySale(sale.id, payload);
+    return data;
+  };
+
+  // Grava os metadados de pagamento do rascunho pela rota protegida
+  // (exige managePayments). Financeiro permanece zerado em rascunho.
+  const persistDraftPayment = async () => {
+    const { data } = await updateInventorySalePayment(sale.id, {
+      paymentMethod: headerForm.paymentMethod || null,
+      paymentNotes: headerForm.paymentNotes.trim() || null,
+      paymentStatus: "unpaid",
+      paidAmount: 0,
+    });
+    return data;
+  };
+
   const handleSaveHeader = async () => {
     if (!sale?.id || !editable) return;
     setSaving(true);
     try {
-      const payload = {
-        notes: headerForm.notes.trim() || null,
-        sellerUserId: headerForm.sellerUserId
-          ? Number(headerForm.sellerUserId)
-          : null,
-        contactId: ticketLink
-          ? ticketLink.contactId
-          : headerForm.contactId
-            ? Number(headerForm.contactId)
-            : null,
-      };
+      await persistHeader();
       if (perms.canManagePayments) {
-        payload.paymentMethod = headerForm.paymentMethod || null;
-        payload.paymentNotes = headerForm.paymentNotes.trim() || null;
+        await persistDraftPayment();
       }
-      if (ticketLink?.ticketId != null) {
-        payload.ticketId = ticketLink.ticketId;
-      }
-      const { data } = await updateInventorySale(sale.id, payload);
-      setSale(data);
+      const fresh = await refreshSale();
+      if (fresh) applySaleToForm(fresh);
       toast.success(i18n.t("inventorySales.sales.toasts.saved"));
       if (onChanged) onChanged();
     } catch (err) {
@@ -266,10 +304,24 @@ export default function SaleDrawer({
 
     setActionLoading(true);
     try {
+      // 1) Salva o cabeçalho pendente (cliente/vendedor/notas) e aguarda o PUT
+      // terminar antes de concluir — evita depender de setState e não limpa os
+      // campos preenchidos.
+      if (editable) {
+        await persistHeader();
+        // 2) Grava a forma de pagamento do rascunho pela rota protegida,
+        // apenas quando o utilizador tem permissão de gerir pagamentos.
+        if (perms.canManagePayments) {
+          await persistDraftPayment();
+        }
+      }
+      // 3) Conclui a venda; o backend valida itens/estoque/permissão.
       const { data } = await completeInventorySale(sale.id, {
         sellerUserId: Number(sellerUserId),
       });
+      // 4) Sincroniza a UI com a venda concluída, sem apagar dados.
       setSale(data);
+      applySaleToForm(data);
       setConfirmComplete(false);
       toast.success(i18n.t("inventorySales.sales.toasts.completed"));
       if (onChanged) onChanged();
@@ -638,7 +690,7 @@ export default function SaleDrawer({
                   sale={sale}
                   products={products}
                   readOnly={!editable}
-                  onSaleUpdated={loadSale}
+                  onSaleUpdated={refreshSale}
                 />
               </>
             ) : null}

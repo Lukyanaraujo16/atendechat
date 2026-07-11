@@ -145,11 +145,11 @@ export function assertSaleAllowsPaymentUpdate(input: {
   saleStatus: InventorySaleStatus;
   paymentStatus: InventoryPaymentStatus;
 }): void {
-  if (input.saleStatus === "draft") {
+  if (input.saleStatus === "draft" && input.paymentStatus !== "unpaid") {
     throw new AppError(
-      "ERR_INVENTORY_SALE_PAYMENT_DRAFT",
+      "ERR_INVENTORY_SALE_PAYMENT_DRAFT_STATUS",
       400,
-      "Não é possível alterar pagamento de venda em rascunho."
+      "Venda em rascunho só aceita pagamento com status não pago (unpaid)."
     );
   }
 
