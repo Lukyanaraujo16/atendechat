@@ -42,7 +42,7 @@ export default async function GetInventoryReportProductsService(
       }
     ],
     group: ["productId", "productName", "productSku"],
-    order: [[literal("totalSold"), "DESC"]],
+    order: [[literal('"totalSold"'), "DESC"]],
     raw: true
   })) as unknown as Array<Record<string, unknown>>;
 

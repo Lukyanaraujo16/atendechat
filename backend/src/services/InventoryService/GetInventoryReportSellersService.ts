@@ -32,7 +32,7 @@ export default async function GetInventoryReportSellersService(
       [fn("COALESCE", fn("SUM", col("commissionAmount")), 0), "totalCommission"]
     ],
     group: ["sellerUserId"],
-    order: [[literal("totalSold"), "DESC"]],
+    order: [[literal('"totalSold"'), "DESC"]],
     raw: true
   })) as unknown as Array<Record<string, unknown>>;
 

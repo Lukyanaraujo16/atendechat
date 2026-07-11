@@ -33,7 +33,7 @@ export default async function GetInventoryReportCustomersService(
       [fn("MAX", col("completedAt")), "lastPurchaseAt"]
     ],
     group: ["contactId"],
-    order: [[literal("totalSold"), "DESC"]],
+    order: [[literal('"totalSold"'), "DESC"]],
     raw: true
   })) as unknown as Array<Record<string, unknown>>;
 
