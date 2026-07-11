@@ -2346,10 +2346,10 @@ const messages = {
 					deleteSelected: "Delete selected",
 					clearSelection: "Clear selection",
 					deleteConfirm:
-						"Delete {{count}} selected contacts? This action may be irreversible.",
+						"Delete the selected contacts? Contacts with attendance history will not be deleted.",
 					deleteSuccess: "{{count}} contact(s) deleted successfully.",
 					deleteBlocked:
-						"{{count}} contact(s) could not be deleted due to permissions or linked history.",
+						"{{count}} were not deleted because they have attendance history.",
 					deleteFailed: "Could not delete the selected contacts.",
 				},
 				retry: "Try again",
@@ -6978,6 +6978,8 @@ const messages = {
 				ERR_SENDING_WAPP_MSG: "Error sending WhatsApp message. Check the connections page.",
 				ERR_DELETE_WAPP_MSG: "Couldn't delete WhatsApp message.",
 				ERR_OTHER_OPEN_TICKET: "There's already an open ticket for this contact.",
+				ERR_CONTACT_HAS_HISTORY:
+					"This contact cannot be deleted because it has attendance history.",
 				ERR_SESSION_EXPIRED: "Session expired. Please log in.",
 				ERR_USER_CREATION_DISABLED: "User creation has been disabled by the administrator.",
 				ERR_NO_PERMISSION: "You don't have permission to access this resource.",

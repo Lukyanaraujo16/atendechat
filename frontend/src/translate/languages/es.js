@@ -2273,10 +2273,10 @@ const messages = {
           deleteSelected: "Eliminar seleccionados",
           clearSelection: "Limpiar selección",
           deleteConfirm:
-            "¿Desea eliminar {{count}} contactos seleccionados? Esta acción puede ser irreversible.",
+            "¿Desea eliminar los contactos seleccionados? Los contactos con historial de atención no se eliminarán.",
           deleteSuccess: "{{count}} contacto(s) eliminado(s) con éxito.",
           deleteBlocked:
-            "{{count}} contacto(s) no pudieron eliminarse por permisos o historial vinculado.",
+            "{{count}} no se eliminaron porque tienen historial de atención.",
           deleteFailed: "No se pudieron eliminar los contactos seleccionados.",
         },
         retry: "Intentar de nuevo",
@@ -6229,6 +6229,8 @@ const messages = {
         ERR_SENDING_WAPP_MSG: "Error al enviar mensaje de WhatsApp. Verifique la página de conexiones.",
         ERR_DELETE_WAPP_MSG: "No fue posible eliminar el mensaje de WhatsApp.",
         ERR_OTHER_OPEN_TICKET: "Ya existe un ticket abierto para este contacto.",
+        ERR_CONTACT_HAS_HISTORY:
+            "Este contacto no puede eliminarse porque tiene historial de atención.",
         ERR_SESSION_EXPIRED: "Sesión expirada. Por favor inicie sesión.",
         ERR_USER_CREATION_DISABLED: "La creación de usuarios fue deshabilitada por el administrador.",
         ERR_NO_PERMISSION: "No tiene permiso para acceder a este recurso.",

@@ -364,7 +364,7 @@ export const remove = async (
     super: (req.user as { super?: boolean }).super
   });
 
-  await DeleteContactService(contactId);
+  await DeleteContactService(contactId, companyId);
 
   const io = getIO();
   io.to(`company-${companyId}-mainchannel`).emit(`company-${companyId}-contact`, {

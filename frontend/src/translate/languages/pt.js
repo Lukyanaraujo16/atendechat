@@ -2431,10 +2431,10 @@ const messages = {
           deleteSelected: "Excluir selecionados",
           clearSelection: "Limpar seleção",
           deleteConfirm:
-            "Deseja excluir {{count}} contatos selecionados? Esta ação pode ser irreversível.",
+            "Deseja excluir os contatos selecionados? Contatos que possuam histórico de atendimento não serão apagados.",
           deleteSuccess: "{{count}} contato(s) excluído(s) com sucesso.",
           deleteBlocked:
-            "{{count}} contato(s) não puderam ser excluídos por falta de permissão ou histórico vinculado.",
+            "{{count}} não foram excluídos porque possuem histórico de atendimento.",
           deleteFailed: "Não foi possível excluir os contatos selecionados.",
         },
         retry: "Tentar novamente",
@@ -7151,6 +7151,8 @@ const messages = {
             "Erro ao enviar mensagem do WhatsApp. Verifique a página de conexões.",
         ERR_DELETE_WAPP_MSG: "Não foi possível excluir a mensagem do WhatsApp.",
         ERR_OTHER_OPEN_TICKET: "Já existe um tíquete aberto para este contato.",
+        ERR_CONTACT_HAS_HISTORY:
+            "Este contato não pode ser excluído porque possui histórico de atendimento.",
         ERR_SESSION_EXPIRED: "Sessão expirada. Por favor entre.",
         ERR_USER_CREATION_DISABLED:
             "A criação do usuário foi desabilitada pelo administrador.",
