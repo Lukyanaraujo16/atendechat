@@ -3,14 +3,26 @@ import Grid from "@material-ui/core/Grid";
 import TextField from "@material-ui/core/TextField";
 import { AI_AGENT_BUSINESS_SEGMENTS } from "../../../config/aiAgentProfileOptions";
 import SelectableOptionCard from "../SelectableOptionCard";
+import SegmentRecommendationsPanel from "../SegmentRecommendationsPanel";
 import { i18n } from "../../../translate/i18n";
 
-export default function CompanyStep({ formState, onChange, errors = {} }) {
+export default function CompanyStep({
+  formState,
+  onChange,
+  errors = {},
+  onSegmentSelect,
+  segmentChanged = false,
+  onDismissSegmentChange,
+  onApplyRecommendations,
+}) {
   const handleField = (field) => (event) => {
     onChange({ [field]: event.target.value });
   };
 
   const handleSegment = (value) => {
+    if (onSegmentSelect) {
+      onSegmentSelect(value, formState.businessSegment);
+    }
     onChange({
       businessSegment: value,
       customBusinessSegment: value === "other" ? formState.customBusinessSegment : "",
@@ -41,7 +53,7 @@ export default function CompanyStep({ formState, onChange, errors = {} }) {
           fullWidth
           label={i18n.t("aiAgent.wizard.fields.businessSegment")}
           value={formState.businessSegment}
-          onChange={handleField("businessSegment")}
+          onChange={(event) => handleSegment(event.target.value)}
           SelectProps={{ native: true }}
           error={Boolean(errors.businessSegment)}
           helperText={
@@ -73,6 +85,18 @@ export default function CompanyStep({ formState, onChange, errors = {} }) {
                 ? i18n.t(`aiAgent.wizard.errors.${errors.customBusinessSegment}`)
                 : ""
             }
+          />
+        </Grid>
+      ) : null}
+
+      {formState.businessSegment ? (
+        <Grid item xs={12}>
+          <SegmentRecommendationsPanel
+            segment={formState.businessSegment}
+            formState={formState}
+            onApply={onApplyRecommendations}
+            segmentChanged={segmentChanged}
+            onDismissSegmentChange={onDismissSegmentChange}
           />
         </Grid>
       ) : null}

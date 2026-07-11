@@ -1,16 +1,26 @@
-import React from "react";
+import React, { useState } from "react";
 import Grid from "@material-ui/core/Grid";
 import TextField from "@material-ui/core/TextField";
 import Button from "@material-ui/core/Button";
 import IconButton from "@material-ui/core/IconButton";
 import Box from "@material-ui/core/Box";
 import Typography from "@material-ui/core/Typography";
+import Alert from "@material-ui/lab/Alert";
 import DeleteOutlineIcon from "@material-ui/icons/DeleteOutline";
 import { AI_AGENT_PROFILE_LIMITS } from "../../../config/aiAgentProfileOptions";
 import { createEmptyFaqItem } from "../aiAgentWizardDefaults";
+import SegmentRecommendationsPanel from "../SegmentRecommendationsPanel";
+import { suggestFaqsFromSegment } from "../aiAgentWizardSegmentHelpers";
 import { i18n } from "../../../translate/i18n";
 
-export default function BusinessKnowledgeStep({ formState, onChange, errors = {} }) {
+export default function BusinessKnowledgeStep({
+  formState,
+  onChange,
+  errors = {},
+  onApplyRecommendations,
+}) {
+  const [faqSuggestNotice, setFaqSuggestNotice] = useState(false);
+
   const handleField = (field) => (event) => {
     onChange({ [field]: event.target.value });
   };
@@ -36,8 +46,28 @@ export default function BusinessKnowledgeStep({ formState, onChange, errors = {}
     });
   };
 
+  const handleSuggestFaqs = () => {
+    const next = suggestFaqsFromSegment(
+      formState.businessSegment,
+      formState.frequentlyAskedQuestions
+    );
+    onChange({ frequentlyAskedQuestions: next });
+    setFaqSuggestNotice(true);
+  };
+
   return (
     <Grid container spacing={2}>
+      {formState.businessSegment ? (
+        <Grid item xs={12}>
+          <SegmentRecommendationsPanel
+            segment={formState.businessSegment}
+            formState={formState}
+            onApply={onApplyRecommendations}
+            showChecklist
+          />
+        </Grid>
+      ) : null}
+
       <Grid item xs={12}>
         <TextField
           fullWidth
@@ -72,9 +102,25 @@ export default function BusinessKnowledgeStep({ formState, onChange, errors = {}
       </Grid>
 
       <Grid item xs={12}>
-        <Typography variant="subtitle2" gutterBottom>
-          {i18n.t("aiAgent.wizard.sections.faq")}
-        </Typography>
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+          <Typography variant="subtitle2">
+            {i18n.t("aiAgent.wizard.sections.faq")}
+          </Typography>
+          <Button
+            size="small"
+            variant="outlined"
+            color="primary"
+            onClick={handleSuggestFaqs}
+            disabled={!formState.businessSegment}
+          >
+            {i18n.t("aiAgent.wizard.buttons.suggestFaqs")}
+          </Button>
+        </Box>
+        {faqSuggestNotice ? (
+          <Alert severity="info" style={{ marginBottom: 12 }}>
+            {i18n.t("aiAgent.wizard.hints.suggestedFaqsReview")}
+          </Alert>
+        ) : null}
         {(formState.frequentlyAskedQuestions || []).map((item, index) => (
           <Box
             key={`faq-${index}`}

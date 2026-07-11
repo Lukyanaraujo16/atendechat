@@ -12,6 +12,7 @@ import {
 import AiAgentProfile, {
   AiAgentProfileFaqItem
 } from "../../models/AiAgentProfile";
+import { buildSegmentSpecificPromptInstructions } from "./buildSegmentSpecificPromptInstructions";
 import { ValidatedAiAgentProfileInput } from "./aiAgentProfileValidation";
 
 type PromptProfileInput = ValidatedAiAgentProfileInput | AiAgentProfile;
@@ -152,6 +153,9 @@ export function buildAiAgentPromptFromProfile(
     ]);
     if (handoffSection) sections.push(handoffSection);
   }
+
+  const segmentSpecific = buildSegmentSpecificPromptInstructions(profile);
+  if (segmentSpecific) sections.push(segmentSpecific);
 
   const custom = nonEmpty(profile.customInstructions);
   if (custom) {

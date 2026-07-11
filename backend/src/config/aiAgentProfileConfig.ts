@@ -1,5 +1,5 @@
 export const AI_AGENT_PROFILE_SCHEMA_VERSION = 1;
-export const AI_AGENT_GENERATED_PROMPT_VERSION = "1.0";
+export const AI_AGENT_GENERATED_PROMPT_VERSION = "1.1";
 
 export const AI_AGENT_SETUP_MODES = ["guided", "advanced", "legacy"] as const;
 export type AiAgentSetupMode = (typeof AI_AGENT_SETUP_MODES)[number];

@@ -84,6 +84,7 @@ export default function AiAgentWizard({ agentId: initialAgentId = null, mode = "
   const [hasCredentials, setHasCredentials] = useState(false);
   const [confirmExitOpen, setConfirmExitOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [segmentChanged, setSegmentChanged] = useState(false);
   const initialSnapshotRef = useRef(JSON.stringify(createDefaultWizardFormState()));
 
   const activeIndex = stepIndexById(activeStepId);
@@ -200,6 +201,22 @@ export default function AiAgentWizard({ agentId: initialAgentId = null, mode = "
       return next;
     });
     setErrors({});
+  };
+
+  const handleSegmentSelect = (newSegment, previousSegment) => {
+    if (previousSegment && previousSegment !== newSegment) {
+      setSegmentChanged(true);
+    }
+  };
+
+  const handleApplyRecommendations = (nextState) => {
+    setFormState((prev) => {
+      const merged = { ...prev, ...nextState };
+      setDirty(JSON.stringify(merged) !== initialSnapshotRef.current);
+      return merged;
+    });
+    setSegmentChanged(false);
+    toast.success(i18n.t("aiAgent.wizard.segment.applySuccess"));
   };
 
   const ensureDraftAgent = async () => {
@@ -323,7 +340,17 @@ export default function AiAgentWizard({ agentId: initialAgentId = null, mode = "
       case "welcome":
         return <WelcomeStep />;
       case "company":
-        return <CompanyStep formState={formState} onChange={patchFormState} errors={errors} />;
+        return (
+          <CompanyStep
+            formState={formState}
+            onChange={patchFormState}
+            errors={errors}
+            onSegmentSelect={handleSegmentSelect}
+            segmentChanged={segmentChanged}
+            onDismissSegmentChange={() => setSegmentChanged(false)}
+            onApplyRecommendations={handleApplyRecommendations}
+          />
+        );
       case "attendant":
         return <AttendantStep formState={formState} onChange={patchFormState} errors={errors} />;
       case "personality":
@@ -342,6 +369,7 @@ export default function AiAgentWizard({ agentId: initialAgentId = null, mode = "
             formState={formState}
             onChange={patchFormState}
             errors={errors}
+            onApplyRecommendations={handleApplyRecommendations}
           />
         );
       case "policies":
