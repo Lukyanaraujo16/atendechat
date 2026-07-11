@@ -27,6 +27,8 @@ import {
   OpenInNew,
   RateReview,
   Visibility,
+  Stars as GuidedIcon,
+  Settings,
 } from "@material-ui/icons";
 import { toast } from "react-toastify";
 import { useHistory } from "react-router-dom";
@@ -38,6 +40,7 @@ import Title from "../../components/Title";
 import TableRowSkeleton from "../../components/TableRowSkeleton";
 import ConfirmationModal from "../../components/ConfirmationModal";
 import AiAgentModal from "../../components/AiAgentModal";
+import AiAgentCreateChoiceModal from "../../components/AiAgentCreateChoiceModal";
 import AiProviderCredentialModal from "../../components/AiProviderCredentialModal";
 import AiAgentShadowDetailsModal from "../../components/AiAgentShadowDetailsModal";
 import AiAgentShadowReviewModal from "../../components/AiAgentShadowReviewModal";
@@ -51,10 +54,12 @@ import {
 import toastError from "../../errors/toastError";
 import {
   deleteAiAgent,
+  getAiAgentProfile,
   getAiAgentShadowSuggestionsSummary,
   listAiAgentShadowSuggestions,
   listAiAgents,
 } from "../../services/aiAgentApi";
+import { AI_AGENT_WIZARD_ROUTE_PATH } from "../../config/aiAgentFeature";
 import {
   deleteAiProviderCredential,
   listAiProviderCredentials,
@@ -118,6 +123,9 @@ const AiAgent = () => {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
+  const [createChoiceOpen, setCreateChoiceOpen] = useState(false);
+  const [legacyConvertOpen, setLegacyConvertOpen] = useState(false);
+  const [legacyConvertAgentId, setLegacyConvertAgentId] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
@@ -209,14 +217,50 @@ const AiAgent = () => {
     fetchShadowSummary();
   }, [fetchShadowSuggestions, fetchShadowSummary]);
 
+  const handleOpenCreateChoice = () => {
+    setCreateChoiceOpen(true);
+  };
+
   const handleOpenNew = () => {
     setSelectedId(null);
     setModalOpen(true);
   };
 
-  const handleEdit = (id) => {
+  const handleStartGuidedWizard = () => {
+    setCreateChoiceOpen(false);
+    history.push(AI_AGENT_WIZARD_ROUTE_PATH);
+  };
+
+  const handleStartAdvancedCreate = () => {
+    setCreateChoiceOpen(false);
+    handleOpenNew();
+  };
+
+  const handleEditGuided = async (id) => {
+    try {
+      const { data } = await getAiAgentProfile(id);
+      if (data?.profile?.setupMode === "guided") {
+        history.push(`${AI_AGENT_WIZARD_ROUTE_PATH}/${id}`);
+        return;
+      }
+      setLegacyConvertAgentId(id);
+      setLegacyConvertOpen(true);
+    } catch (err) {
+      toastError(err);
+    }
+  };
+
+  const handleEditAdvanced = (id) => {
     setSelectedId(id);
     setModalOpen(true);
+  };
+
+  const handleConfirmLegacyConvert = () => {
+    if (!legacyConvertAgentId) return;
+    const id = legacyConvertAgentId;
+    setLegacyConvertOpen(false);
+    setLegacyConvertAgentId(null);
+    history.push(`${AI_AGENT_WIZARD_ROUTE_PATH}/${id}`);
   };
 
   const handleAskDelete = (id) => {
@@ -328,6 +372,22 @@ const AiAgent = () => {
         onSaved={fetchCredentials}
       />
 
+      <AiAgentCreateChoiceModal
+        open={createChoiceOpen}
+        onClose={() => setCreateChoiceOpen(false)}
+        onChooseGuided={handleStartGuidedWizard}
+        onChooseAdvanced={handleStartAdvancedCreate}
+      />
+
+      <ConfirmationModal
+        title={i18n.t("aiAgent.wizard.choice.convertConfirmTitle")}
+        open={legacyConvertOpen}
+        onClose={() => setLegacyConvertOpen(false)}
+        onConfirm={handleConfirmLegacyConvert}
+      >
+        {i18n.t("aiAgent.wizard.choice.convertConfirmMessage")}
+      </ConfirmationModal>
+
       <AiAgentModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
@@ -356,8 +416,8 @@ const AiAgent = () => {
           </Typography>
         </Box>
         <MainHeaderButtonsWrapper>
-          <Button variant="contained" color="primary" onClick={handleOpenNew}>
-            {i18n.t("aiAgent.buttons.new")}
+          <Button variant="contained" color="primary" onClick={handleOpenCreateChoice}>
+            {i18n.t("aiAgent.buttons.createAttendant")}
           </Button>
         </MainHeaderButtonsWrapper>
       </MainHeader>
@@ -387,8 +447,8 @@ const AiAgent = () => {
             title={i18n.t("aiAgent.empty.title")}
             description={i18n.t("aiAgent.empty.description")}
           >
-            <Button color="primary" variant="contained" onClick={handleOpenNew}>
-              {i18n.t("aiAgent.buttons.new")}
+            <Button color="primary" variant="contained" onClick={handleOpenCreateChoice}>
+              {i18n.t("aiAgent.buttons.createAttendant")}
             </Button>
           </AppEmptyState>
         ) : (
@@ -437,13 +497,22 @@ const AiAgent = () => {
                   <TableCell align="right">{agent.temperature}</TableCell>
                   <TableCell align="right">{agent.maxTokens}</TableCell>
                   <TableCell align="center">
-                    <Tooltip title={i18n.t("aiAgent.buttons.edit")}>
+                    <Tooltip title={i18n.t("aiAgent.buttons.editGuided")}>
                       <IconButton
                         size="small"
-                        onClick={() => handleEdit(agent.id)}
+                        onClick={() => handleEditGuided(agent.id)}
                         className={classes.actionIcon}
                       >
-                        <Edit fontSize="small" />
+                        <GuidedIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title={i18n.t("aiAgent.buttons.editAdvanced")}>
+                      <IconButton
+                        size="small"
+                        onClick={() => handleEditAdvanced(agent.id)}
+                        className={classes.actionIcon}
+                      >
+                        <Settings fontSize="small" />
                       </IconButton>
                     </Tooltip>
                     <Tooltip title={i18n.t("aiAgent.buttons.delete")}>

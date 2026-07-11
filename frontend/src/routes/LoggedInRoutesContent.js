@@ -63,10 +63,12 @@ import { canViewInventory, planHasInventoryModule } from "../utils/inventoryAcce
 import CRMReports from "../pages/CRMReports";
 import CrmAutomations from "../pages/CrmAutomations";
 import AiAgent from "../pages/AiAgent";
+import AiAgentWizardPage from "../pages/AiAgentWizard";
 import AiAgentRouteGuard from "../components/AiAgentRouteGuard";
 import {
   AI_AGENT_FEATURE_KEY,
   AI_AGENT_ROUTE_PATH,
+  AI_AGENT_WIZARD_ROUTE_PATH,
   AI_AGENT_UI_ENABLED,
 } from "../config/aiAgentFeature";
 
@@ -432,6 +434,32 @@ function AutomacaoModule({ planFlags, isAdmin }) {
               <FeatureBlocked planFlags={planFlags} anyOf={["automation.openai"]} />
             )
           }
+        />
+        <Route
+          exact
+          path={`${AI_AGENT_WIZARD_ROUTE_PATH}/:agentId`}
+          render={() => (
+            <AiAgentRouteGuard
+              planFlags={planFlags}
+              user={user}
+              fallbackPath={fallback}
+            >
+              {isAdmin && showAiAgent ? <AiAgentWizardPage /> : null}
+            </AiAgentRouteGuard>
+          )}
+        />
+        <Route
+          exact
+          path={AI_AGENT_WIZARD_ROUTE_PATH}
+          render={() => (
+            <AiAgentRouteGuard
+              planFlags={planFlags}
+              user={user}
+              fallbackPath={fallback}
+            >
+              {isAdmin && showAiAgent ? <AiAgentWizardPage /> : null}
+            </AiAgentRouteGuard>
+          )}
         />
         <Route
           exact

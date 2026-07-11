@@ -2,6 +2,27 @@ export const AI_AGENT_PROFILE_SCHEMA_VERSION = 1;
 
 export const AI_AGENT_SETUP_MODES = ["guided", "advanced", "legacy"];
 
+export const AI_AGENT_PROFILE_LIMITS = {
+  companyName: 100,
+  customBusinessSegment: 100,
+  attendantName: 100,
+  attendantRole: 120,
+  customTone: 200,
+  serviceArea: 200,
+  sourceWebsite: 500,
+  companyDescription: 4000,
+  customInstructions: 4000,
+  productsAndServices: 8000,
+  importantInformation: 8000,
+  businessHours: 2000,
+  pricingPolicy: 2000,
+  negotiationPolicy: 2000,
+  schedulingPolicy: 2000,
+  faqMaxItems: 50,
+  faqAnswerMax: 2000,
+  faqQuestionMax: 500,
+};
+
 export const AI_AGENT_BUSINESS_SEGMENTS = [
   { value: "car_dealership", label: "Concessionária / veículos" },
   { value: "internet_provider", label: "Provedor de internet" },
@@ -68,7 +89,7 @@ export const AI_AGENT_ALLOWED_ACTIONS = [
   { value: "inform_registered_prices", label: "Informar preços cadastrados" },
   { value: "qualify_lead", label: "Qualificar lead" },
   { value: "collect_contact_data", label: "Coletar dados de contato" },
-  { value: "schedule", label: "Agendar / coletar preferência" },
+  { value: "schedule", label: "Coletar preferência de agendamento" },
   { value: "send_catalog", label: "Enviar catálogo" },
   { value: "answer_faq", label: "Responder FAQ" },
   { value: "provide_location", label: "Informar localização" },
@@ -103,5 +124,10 @@ export const AI_AGENT_HANDOFF_RULES = [
   { value: "sensitive_subject", label: "Assunto sensível" },
   { value: "qualified_lead", label: "Lead qualificado" },
   { value: "repeated_failure", label: "Falhas repetidas" },
-  { value: "custom", label: "Personalizado" },
+  { value: "custom", label: "Outra situação" },
 ];
+
+export function findOptionLabel(options, value) {
+  const match = options.find((item) => item.value === value);
+  return match?.label || value;
+}

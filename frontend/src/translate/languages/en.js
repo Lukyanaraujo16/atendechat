@@ -2687,11 +2687,217 @@ const messages = {
 				},
 				buttons: {
 					new: "New agent",
+					createAttendant: "Create attendant",
 					save: "Save",
 					cancel: "Cancel",
 					edit: "Edit",
+					editGuided: "Edit with Guided Assistant",
+					editAdvanced: "Advanced configuration",
+					configureGuided: "Set up with Guided Assistant",
 					delete: "Delete",
 					retry: "Try again",
+				},
+				wizard: {
+					pageTitleCreate: "Guided Assistant",
+					pageTitleEdit: "Edit guided profile",
+					pageSubtitle:
+						"Configure your virtual attendant by answering simple questions about your business.",
+					progress: "Step {{current}} of {{total}}",
+					buttons: {
+						start: "Start setup",
+						continue: "Continue",
+						back: "Back",
+						cancel: "Cancel",
+						createAgent: "Create attendant",
+						saveChanges: "Save changes",
+						suggestName: "Suggest name",
+						addFaq: "Add question",
+						editSection: "Edit",
+						viewGeneratedConfig: "View generated configuration",
+						copyPrompt: "Copy",
+						backToList: "Back to list",
+						viewAgent: "View attendant",
+						configureCredential: "Configure AI credential",
+					},
+					choice: {
+						title: "How do you want to create the attendant?",
+						description: "Choose the setup style that fits your team.",
+						guidedTitle: "Guided Assistant — Recommended",
+						guidedDescription:
+							"Answer a few questions and set up your attendant in minutes.",
+						advancedTitle: "Advanced configuration",
+						advancedDescription:
+							"Manually define instructions, model, and technical parameters.",
+						convertTitle: "Set up with Guided Assistant",
+						convertDescription:
+							"Create a guided profile without removing the existing manual prompt.",
+						convertConfirmTitle: "Set up with Guided Assistant",
+						convertConfirmMessage:
+							"The guided profile will become the business configuration. The existing manual prompt is preserved for advanced mode.",
+					},
+					confirmExit: {
+						title: "Leave without saving?",
+						message:
+							"You have unsaved changes. If you leave now, progress from this session will be lost.",
+					},
+					preview: {
+						title: "Generated configuration",
+						warning:
+							"This is an advanced preview. Internal product safety rules are not shown.",
+						empty: "No generated configuration to display.",
+					},
+					toasts: {
+						created: "Virtual attendant created successfully",
+						updated: "Guided profile updated successfully",
+						promptCopied: "Configuration copied",
+					},
+					labels: {
+						required: "required",
+						none: "None selected",
+						faqItem: "Question {{index}}",
+						faqCount: "{{count}} FAQ item(s)",
+						policiesConfigured: "Commercial policies configured",
+						guidedSetup: "Guided Assistant",
+						virtualAttendant: "Virtual attendant",
+					},
+					sections: {
+						company: "Company",
+						attendant: "Attendant",
+						personality: "Personality",
+						allowedActions: "Allowed actions",
+						forbiddenActions: "Restrictions",
+						handoff: "Handoff",
+						businessKnowledge: "Business information",
+						policies: "Policies",
+						faq: "Frequently asked questions",
+					},
+					fields: {
+						companyName: "Company name",
+						businessSegment: "Segment",
+						customBusinessSegment: "What is your company segment?",
+						companyDescription: "Brief company description",
+						serviceArea: "Service area",
+						sourceWebsite: "Company website",
+						attendantName: "Virtual attendant name",
+						attendantRole: "Role / title",
+						customTone: "Describe how the attendant should speak",
+						clientAddressStyle: "How to address the customer",
+						productsAndServices: "Products and services",
+						importantInformation: "Important information",
+						businessHours: "Business hours",
+						faqQuestion: "Question",
+						faqAnswer: "Answer",
+						handoffCustomText: "Describe the other situation",
+						pricingPolicy: "Pricing policy",
+						pricingPolicyCustom: "Custom pricing policy",
+						negotiationPolicy: "Negotiation policy",
+						negotiationPolicyCustom: "Custom negotiation policy",
+						schedulingPolicy: "Scheduling policy",
+						schedulingPolicyCustom: "Custom scheduling policy",
+					},
+					hints: {
+						businessSegment: "Choose the segment that best represents your company.",
+						sourceWebsiteFuture:
+							"The address will be saved for future knowledge base use. The site is not read automatically in this phase.",
+						attendantName: "Use a friendly name. It does not need to be a real person.",
+						allowedActions: "Select only what the attendant can safely do.",
+						forbiddenActions:
+							"Set clear limits to avoid promises the attendant cannot keep.",
+						forbiddenActionsSecurity:
+							"Some restrictions are mandatory for safety and cannot be removed.",
+						handoff:
+							"In these situations, the attendant pauses and leaves the conversation available for your team.",
+						handoffFooter:
+							"The system handles transfer internally; you do not need technical markers.",
+						productsAndServices:
+							"List what your company offers, key differentiators, and important details.",
+						importantInformation:
+							"E.g. no delivery, limited cities, new products only.",
+						reviewActivation:
+							"Nothing will be activated automatically. You can link the attendant to a connection later.",
+						missingCredential:
+							"Before using the attendant, configure an OpenAI or Google Gemini credential.",
+						nextStepsConnection:
+							"Now link the attendant to a connection and choose Shadow or Live Mode.",
+						toneFormal: "Respectful and objective language.",
+						toneProfessional: "Clear, polite, and business-appropriate.",
+						toneFriendly: "Hi! Sure, I can help you with that.",
+						toneCasual: "Light conversation without losing professionalism.",
+					},
+					policies: {
+						custom: "Custom",
+						pricing: {
+							registeredOnly: "May share only registered prices",
+							noPrices: "Do not share prices",
+						},
+						negotiation: {
+							handoff: "Does not negotiate; hands off to human",
+							collectOnly: "May collect proposal, but not confirm",
+						},
+						scheduling: {
+							collectPreference: "Collects preference without confirming",
+							noScheduling: "Does not schedule",
+						},
+					},
+					errors: {
+						required: "Required field",
+						tooLong: "Text is too long",
+						invalidUrl: "Enter a valid URL (http:// or https://)",
+						incomplete: "Fill in both question and answer",
+						tooMany: "FAQ item limit exceeded",
+					},
+					steps: {
+						welcome: {
+							title: "Let's create your virtual attendant",
+							description:
+								"Answer a few questions about your company and we'll configure service automatically.",
+							bullet1: "Takes about 5 minutes",
+							bullet2: "No AI knowledge required",
+							bullet3: "Nothing is activated automatically",
+							bullet4: "You can review everything before finishing",
+						},
+						company: {
+							title: "Company and segment",
+							description: "Tell us about your company and market.",
+						},
+						attendant: {
+							title: "Attendant and role",
+							description: "Define how your virtual attendant will be presented.",
+						},
+						personality: {
+							title: "Personality and language",
+							description: "Choose tone and communication style.",
+						},
+						allowedActions: {
+							title: "What it can do",
+							description: "Select safely allowed actions.",
+						},
+						forbiddenActions: {
+							title: "What it cannot do",
+							description: "Define important limits and restrictions.",
+						},
+						handoff: {
+							title: "When to call a human",
+							description: "Choose when the attendant should transfer to your team.",
+						},
+						businessKnowledge: {
+							title: "Business information",
+							description: "Share knowledge the attendant can use.",
+						},
+						policies: {
+							title: "Commercial policies",
+							description: "Set rules for pricing, negotiation, and scheduling.",
+						},
+						review: {
+							title: "Review",
+							description: "Check everything before finishing.",
+						},
+						success: {
+							title: "Your virtual attendant is ready",
+							description:
+								"The attendant was saved as inactive. Configure credential and connection when you want to use it.",
+						},
+					},
 				},
 				table: {
 					name: "Name",
@@ -2715,7 +2921,7 @@ const messages = {
 					systemPrompt: "Main prompt / agent instructions",
 					systemPromptAdvanced: "Advanced configuration (manual prompt)",
 					systemPromptAdvancedHint:
-						"For manually created agents or advanced mode. The Guided Assistant will use a structured profile in a future phase.",
+						"For manually created agents or advanced mode. Guided Assistant agents use the structured profile as the main instruction.",
 					fallbackMessage: "Fallback message",
 					handoffMessage: "Handoff message to a human",
 					allowAudioInput: "Allow understanding audio",

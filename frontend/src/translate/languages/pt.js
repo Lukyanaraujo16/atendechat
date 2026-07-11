@@ -2772,11 +2772,217 @@ const messages = {
         },
         buttons: {
           new: "Novo agente",
+          createAttendant: "Criar atendente",
           save: "Salvar",
           cancel: "Cancelar",
           edit: "Editar",
+          editGuided: "Editar com Assistente Guiado",
+          editAdvanced: "Configuração avançada",
+          configureGuided: "Configurar com Assistente Guiado",
           delete: "Excluir",
           retry: "Tentar novamente",
+        },
+        wizard: {
+          pageTitleCreate: "Assistente Guiado",
+          pageTitleEdit: "Editar perfil guiado",
+          pageSubtitle:
+            "Configure seu atendente virtual respondendo perguntas simples sobre sua empresa.",
+          progress: "Etapa {{current}} de {{total}}",
+          buttons: {
+            start: "Começar configuração",
+            continue: "Continuar",
+            back: "Voltar",
+            cancel: "Cancelar",
+            createAgent: "Criar atendente",
+            saveChanges: "Salvar alterações",
+            suggestName: "Sugerir nome",
+            addFaq: "Adicionar pergunta",
+            editSection: "Editar",
+            viewGeneratedConfig: "Ver configuração gerada",
+            copyPrompt: "Copiar",
+            backToList: "Voltar para lista",
+            viewAgent: "Ver atendente",
+            configureCredential: "Configurar credencial de IA",
+          },
+          choice: {
+            title: "Como deseja criar o atendente?",
+            description: "Escolha a forma de configuração mais adequada para sua equipe.",
+            guidedTitle: "Assistente Guiado — Recomendado",
+            guidedDescription:
+              "Responda algumas perguntas e configure seu atendente em poucos minutos.",
+            advancedTitle: "Configuração Avançada",
+            advancedDescription:
+              "Defina manualmente instruções, modelo e parâmetros técnicos.",
+            convertTitle: "Configurar com Assistente Guiado",
+            convertDescription:
+              "Crie um perfil guiado sem remover o prompt manual existente.",
+            convertConfirmTitle: "Configurar com Assistente Guiado",
+            convertConfirmMessage:
+              "O perfil guiado passará a ser usado como configuração empresarial. O prompt manual existente será preservado para o modo avançado.",
+          },
+          confirmExit: {
+            title: "Sair sem salvar?",
+            message:
+              "Você tem alterações não salvas. Se sair agora, o progresso desta sessão será perdido.",
+          },
+          preview: {
+            title: "Configuração gerada",
+            warning:
+              "Esta é uma visualização avançada. As regras internas de segurança do sistema não são exibidas.",
+            empty: "Nenhuma configuração gerada para exibir.",
+          },
+          toasts: {
+            created: "Atendente virtual criado com sucesso",
+            updated: "Perfil guiado atualizado com sucesso",
+            promptCopied: "Configuração copiada",
+          },
+          labels: {
+            required: "obrigatório",
+            none: "Nenhuma selecionada",
+            faqItem: "Pergunta {{index}}",
+            faqCount: "{{count}} pergunta(s) frequente(s)",
+            policiesConfigured: "Políticas comerciais configuradas",
+            guidedSetup: "Assistente Guiado",
+            virtualAttendant: "Atendente Virtual",
+          },
+          sections: {
+            company: "Empresa",
+            attendant: "Atendente",
+            personality: "Personalidade",
+            allowedActions: "Ações permitidas",
+            forbiddenActions: "Restrições",
+            handoff: "Handoff",
+            businessKnowledge: "Informações do negócio",
+            policies: "Políticas",
+            faq: "Perguntas frequentes",
+          },
+          fields: {
+            companyName: "Nome da empresa",
+            businessSegment: "Segmento",
+            customBusinessSegment: "Qual é o segmento da sua empresa?",
+            companyDescription: "Descrição breve da empresa",
+            serviceArea: "Região atendida",
+            sourceWebsite: "Site da empresa",
+            attendantName: "Nome do atendente virtual",
+            attendantRole: "Função / cargo",
+            customTone: "Descreva como o atendente deve conversar",
+            clientAddressStyle: "Forma de tratar o cliente",
+            productsAndServices: "Produtos e serviços",
+            importantInformation: "Informações importantes",
+            businessHours: "Horário de funcionamento",
+            faqQuestion: "Pergunta",
+            faqAnswer: "Resposta",
+            handoffCustomText: "Descreva a outra situação",
+            pricingPolicy: "Política de preços",
+            pricingPolicyCustom: "Política de preços personalizada",
+            negotiationPolicy: "Política de negociação",
+            negotiationPolicyCustom: "Política de negociação personalizada",
+            schedulingPolicy: "Política de agendamento",
+            schedulingPolicyCustom: "Política de agendamento personalizada",
+          },
+          hints: {
+            businessSegment: "Escolha o segmento que melhor representa sua empresa.",
+            sourceWebsiteFuture:
+              "O endereço será salvo para uso futuro na base de conhecimento. Nesta fase o site não é lido automaticamente.",
+            attendantName: "Use um nome amigável. Não precisa ser de uma pessoa real.",
+            allowedActions: "Marque apenas o que o atendente pode fazer com segurança.",
+            forbiddenActions:
+              "Defina limites claros para evitar promessas que o atendente não pode cumprir.",
+            forbiddenActionsSecurity:
+              "Algumas restrições são obrigatórias por segurança e não podem ser removidas.",
+            handoff:
+              "Nessas situações, o atendente pausa automaticamente e deixa a conversa disponível para sua equipe.",
+            handoffFooter:
+              "O sistema cuidará da transferência internamente; você não precisa configurar marcadores técnicos.",
+            productsAndServices:
+              "Liste o que sua empresa oferece, os principais diferenciais e informações importantes.",
+            importantInformation:
+              "Ex.: não fazemos entrega, atendemos somente determinadas cidades, vendemos apenas produtos novos.",
+            reviewActivation:
+              "Nada será ativado automaticamente. Você poderá vincular o atendente a uma conexão depois.",
+            missingCredential:
+              "Antes de usar o atendente, configure uma credencial OpenAI ou Google Gemini.",
+            nextStepsConnection:
+              "Agora vincule o atendente a uma conexão e escolha Shadow ou Live Mode.",
+            toneFormal: "Linguagem respeitosa e objetiva.",
+            toneProfessional: "Clara, cordial e adequada ao ambiente corporativo.",
+            toneFriendly: "Olá! Claro, vou te ajudar com isso.",
+            toneCasual: "Conversa leve, sem perder o profissionalismo.",
+          },
+          policies: {
+            custom: "Personalizada",
+            pricing: {
+              registeredOnly: "Pode informar somente preços cadastrados",
+              noPrices: "Não informar preços",
+            },
+            negotiation: {
+              handoff: "Não negocia; encaminha para humano",
+              collectOnly: "Pode coletar proposta, mas não confirmar",
+            },
+            scheduling: {
+              collectPreference: "Coleta preferência, sem confirmar",
+              noScheduling: "Não realiza agendamento",
+            },
+          },
+          errors: {
+            required: "Campo obrigatório",
+            tooLong: "Texto muito longo",
+            invalidUrl: "Informe uma URL válida (http:// ou https://)",
+            incomplete: "Preencha pergunta e resposta",
+            tooMany: "Limite de perguntas frequentes excedido",
+          },
+          steps: {
+            welcome: {
+              title: "Vamos criar seu atendente virtual",
+              description:
+                "Responda algumas perguntas sobre sua empresa e nós configuraremos o atendimento automaticamente.",
+              bullet1: "Leva cerca de 5 minutos",
+              bullet2: "Não é necessário entender de IA",
+              bullet3: "Nada será ativado automaticamente",
+              bullet4: "Você poderá revisar tudo antes de concluir",
+            },
+            company: {
+              title: "Empresa e segmento",
+              description: "Conte-nos sobre sua empresa e o mercado em que atua.",
+            },
+            attendant: {
+              title: "Atendente e função",
+              description: "Defina como seu atendente virtual será apresentado.",
+            },
+            personality: {
+              title: "Personalidade e linguagem",
+              description: "Escolha o tom e o estilo de comunicação.",
+            },
+            allowedActions: {
+              title: "O que pode fazer",
+              description: "Selecione as ações permitidas com segurança.",
+            },
+            forbiddenActions: {
+              title: "O que não pode fazer",
+              description: "Defina limites e restrições importantes.",
+            },
+            handoff: {
+              title: "Quando chamar humano",
+              description: "Escolha quando o atendente deve transferir para sua equipe.",
+            },
+            businessKnowledge: {
+              title: "Informações do negócio",
+              description: "Compartilhe o conhecimento que o atendente pode usar.",
+            },
+            policies: {
+              title: "Políticas comerciais",
+              description: "Defina regras para preços, negociação e agendamento.",
+            },
+            review: {
+              title: "Revisão",
+              description: "Confira tudo antes de concluir.",
+            },
+            success: {
+              title: "Seu atendente virtual está pronto",
+              description:
+                "O atendente foi salvo como inativo. Configure credencial e conexão quando quiser usá-lo.",
+            },
+          },
         },
         table: {
           name: "Nome",
@@ -2800,7 +3006,7 @@ const messages = {
           systemPrompt: "Prompt principal / instruções do agente",
           systemPromptAdvanced: "Configuração avançada (prompt manual)",
           systemPromptAdvancedHint:
-            "Para agentes criados manualmente ou modo avançado. O Assistente Guiado usará um perfil estruturado em fase futura.",
+            "Para agentes criados manualmente ou modo avançado. Agentes com Assistente Guiado usam o perfil estruturado como instrução principal.",
           fallbackMessage: "Mensagem de fallback",
           handoffMessage: "Mensagem de transferência para humano",
           allowAudioInput: "Permitir entender áudio",
