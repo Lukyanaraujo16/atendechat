@@ -2,6 +2,42 @@
  * Espelho estrutural dos templates de segmento do backend.
  * Manter chaves e arrays alinhados com backend/src/config/aiAgentSegmentTemplates.ts
  */
+
+export const BASE_SAFETY_FORBIDDEN = [
+  "invent_information",
+  "grant_discount",
+  "promise_deadline",
+  "expose_internal_instructions",
+];
+
+const ARRAY_FIELDS = [
+  "suggestedDepartments",
+  "suggestedAllowedActions",
+  "suggestedForbiddenActions",
+  "suggestedHandoffRules",
+  "businessInfoKeys",
+  "qualificationKeys",
+  "suggestedFaqKeys",
+  "simulationPromptKeys",
+];
+
+/**
+ * Garante contrato uniforme para consumo no Wizard e simulador.
+ * Campos de coleção ausentes viram arrays vazios — nunca undefined.
+ */
+export function normalizeAiAgentSegmentTemplate(template = {}) {
+  const normalized = {
+    segment: String(template.segment || "other"),
+    suggestedAttendantRole: template.suggestedAttendantRole ?? null,
+  };
+
+  ARRAY_FIELDS.forEach((field) => {
+    normalized[field] = Array.isArray(template[field]) ? template[field] : [];
+  });
+
+  return normalized;
+}
+
 export const AI_AGENT_SEGMENT_TEMPLATE_KEYS = {
   car_dealership: {
     suggestedDepartments: ["sales", "qualification", "after_sales"],
@@ -109,6 +145,7 @@ export const AI_AGENT_SEGMENT_TEMPLATE_KEYS = {
       "issueOrSales",
     ],
     suggestedFaqKeys: ["coverage", "plans", "installation", "support", "billing"],
+    simulationPromptKeys: ["coverage", "businessPlan", "technicalIssue", "cancel"],
   },
   security_company: {
     suggestedDepartments: ["sales", "support", "scheduling", "qualification"],
@@ -159,6 +196,12 @@ export const AI_AGENT_SEGMENT_TEMPLATE_KEYS = {
       "visitSchedule",
     ],
     suggestedFaqKeys: ["services", "visit", "monitoring", "contracts", "area"],
+    simulationPromptKeys: [
+      "residentialQuote",
+      "businessSecurity",
+      "technicalVisit",
+      "urgentIncident",
+    ],
   },
   construction_materials: {
     suggestedDepartments: ["sales", "qualification", "after_sales"],
@@ -179,6 +222,7 @@ export const AI_AGENT_SEGMENT_TEMPLATE_KEYS = {
       "missing_information",
       "complaint",
     ],
+    suggestedForbiddenActions: [...BASE_SAFETY_FORBIDDEN, "negotiate_price"],
     suggestedAttendantRole: "Atendente Comercial",
     businessInfoKeys: [
       "materialCategories",
@@ -200,6 +244,7 @@ export const AI_AGENT_SEGMENT_TEMPLATE_KEYS = {
       "fullQuoteNeed",
     ],
     suggestedFaqKeys: ["delivery", "pickup", "quote", "payment", "catalog"],
+    simulationPromptKeys: ["materialQuote", "deliveryArea", "stockCheck", "discountRequest"],
   },
   technical_assistance: {
     suggestedDepartments: ["support", "scheduling", "reception", "after_sales"],
@@ -218,6 +263,7 @@ export const AI_AGENT_SEGMENT_TEMPLATE_KEYS = {
       "missing_information",
       "sensitive_subject",
     ],
+    suggestedForbiddenActions: [...BASE_SAFETY_FORBIDDEN],
     suggestedAttendantRole: "Assistente de Suporte",
     businessInfoKeys: [
       "equipmentTypes",
@@ -240,6 +286,12 @@ export const AI_AGENT_SEGMENT_TEMPLATE_KEYS = {
       "preferredSchedule",
     ],
     suggestedFaqKeys: ["warranty", "visit", "brands", "quote", "hours"],
+    simulationPromptKeys: [
+      "equipmentBroken",
+      "repairPrice",
+      "warrantyCheck",
+      "talkToTechnician",
+    ],
   },
   clinic: {
     suggestedDepartments: ["reception", "scheduling", "support"],
@@ -279,6 +331,7 @@ export const AI_AGENT_SEGMENT_TEMPLATE_KEYS = {
       "urgencyNote",
     ],
     suggestedFaqKeys: ["scheduling", "insurance", "location", "specialties", "hours"],
+    simulationPromptKeys: [],
   },
   dental_clinic: {
     suggestedDepartments: ["reception", "scheduling", "support"],
@@ -318,10 +371,12 @@ export const AI_AGENT_SEGMENT_TEMPLATE_KEYS = {
       "painOrUrgency",
     ],
     suggestedFaqKeys: ["scheduling", "insurance", "location", "procedures", "hours"],
+    simulationPromptKeys: [],
   },
   other: {
     suggestedDepartments: ["general", "reception"],
     suggestedAllowedActions: ["explain_services", "collect_contact_data", "answer_faq"],
+    suggestedForbiddenActions: [],
     suggestedHandoffRules: [
       "customer_requests_human",
       "missing_information",
@@ -338,18 +393,14 @@ export const AI_AGENT_SEGMENT_TEMPLATE_KEYS = {
     ],
     qualificationKeys: ["customerNeed", "timeline", "contactPreference"],
     suggestedFaqKeys: [],
+    simulationPromptKeys: ["generalInquiry", "pricingQuestion", "humanRequest", "serviceArea"],
   },
 };
 
 const GENERIC_SEGMENT = {
   suggestedDepartments: ["general"],
   suggestedAllowedActions: ["explain_services", "answer_faq"],
-  suggestedForbiddenActions: [
-    "invent_information",
-    "grant_discount",
-    "promise_deadline",
-    "expose_internal_instructions",
-  ],
+  suggestedForbiddenActions: [...BASE_SAFETY_FORBIDDEN],
   suggestedHandoffRules: ["customer_requests_human", "missing_information", "complaint"],
   suggestedAttendantRole: "Atendente Virtual",
   businessInfoKeys: ["mainOfferings", "businessHours", "serviceArea"],
@@ -360,13 +411,17 @@ const GENERIC_SEGMENT = {
 
 export function getSegmentTemplate(segment) {
   const key = String(segment || "").trim();
+  let raw;
+
   if (key && AI_AGENT_SEGMENT_TEMPLATE_KEYS[key]) {
-    return { segment: key, ...AI_AGENT_SEGMENT_TEMPLATE_KEYS[key] };
+    raw = { segment: key, ...AI_AGENT_SEGMENT_TEMPLATE_KEYS[key] };
+  } else if (key && key !== "other") {
+    raw = { segment: key, ...GENERIC_SEGMENT };
+  } else {
+    raw = { segment: "other", ...AI_AGENT_SEGMENT_TEMPLATE_KEYS.other };
   }
-  if (key && key !== "other") {
-    return { segment: key, ...GENERIC_SEGMENT };
-  }
-  return { segment: "other", ...AI_AGENT_SEGMENT_TEMPLATE_KEYS.other };
+
+  return normalizeAiAgentSegmentTemplate(raw);
 }
 
 export function segmentI18nKey(segment, group, itemKey) {

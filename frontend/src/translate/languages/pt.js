@@ -3001,6 +3001,8 @@ const messages = {
             applySuccess: "Recomendações aplicadas",
             changedWarning:
               "O segmento foi alterado. Deseja revisar as novas recomendações?",
+            otherCustomHint:
+              "Como seu segmento é personalizado, preencha as informações do negócio para configurarmos o atendimento.",
             chipDepartments: "{{count}} departamentos",
             chipActions: "{{count}} ações",
             chipHandoffs: "{{count}} handoffs",

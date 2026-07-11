@@ -12,7 +12,14 @@ import {
   previewApplySegmentRecommendations,
   suggestFaqsFromSegment,
 } from "../aiAgentWizardSegmentHelpers";
-import { getSegmentTemplate } from "../../../config/aiAgentSegmentTemplates";
+import {
+  getSegmentTemplate,
+  normalizeAiAgentSegmentTemplate,
+  segmentI18nKey,
+  AI_AGENT_SEGMENT_TEMPLATE_KEYS,
+} from "../../../config/aiAgentSegmentTemplates";
+import { getSimulationPrompts } from "../../AiAgentSimulator/aiAgentSimulatorHelpers";
+import { AI_AGENT_BUSINESS_SEGMENTS } from "../../../config/aiAgentProfileOptions";
 import {
   hasWizardValidationErrors,
   isForbiddenActionLocked,
@@ -185,5 +192,108 @@ describe("aiAgentWizard segment helpers", () => {
     const checklist = buildBusinessInfoChecklist(base, "internet_provider");
     const informed = checklist.filter((item) => item.informed);
     expect(informed.length).toBeGreaterThan(0);
+  });
+});
+
+describe("aiAgent segment template contract", () => {
+  const ARRAY_FIELDS = [
+    "suggestedDepartments",
+    "suggestedAllowedActions",
+    "suggestedForbiddenActions",
+    "suggestedHandoffRules",
+    "businessInfoKeys",
+    "qualificationKeys",
+    "suggestedFaqKeys",
+    "simulationPromptKeys",
+  ];
+
+  it("other retorna objeto com suggestedForbiddenActions como array", () => {
+    const template = getSegmentTemplate("other");
+    expect(template).toBeTruthy();
+    expect(Array.isArray(template.suggestedForbiddenActions)).toBe(true);
+  });
+
+  it("todos os campos de coleção de other são arrays", () => {
+    const template = getSegmentTemplate("other");
+    ARRAY_FIELDS.forEach((field) => {
+      expect(Array.isArray(template[field])).toBe(true);
+    });
+  });
+
+  it("segmento desconhecido retorna template normalizado", () => {
+    const template = getSegmentTemplate("unknown_segment_xyz");
+    expect(template.segment).toBe("unknown_segment_xyz");
+    ARRAY_FIELDS.forEach((field) => {
+      expect(Array.isArray(template[field])).toBe(true);
+    });
+  });
+
+  it("segmento undefined retorna other normalizado", () => {
+    const template = getSegmentTemplate(undefined);
+    expect(template.segment).toBe("other");
+    expect(Array.isArray(template.suggestedForbiddenActions)).toBe(true);
+  });
+
+  it("previewApplySegmentRecommendations com other não lança erro", () => {
+    const base = createDefaultWizardFormState();
+    expect(() => previewApplySegmentRecommendations(base, "other")).not.toThrow();
+    const preview = previewApplySegmentRecommendations(base, "other");
+    expect(preview).toEqual(
+      expect.objectContaining({
+        departments: expect.any(Number),
+        allowedActions: expect.any(Number),
+        forbiddenActions: expect.any(Number),
+        handoffRules: expect.any(Number),
+      })
+    );
+  });
+
+  it("applySegmentRecommendations com other não lança erro", () => {
+    const base = createDefaultWizardFormState();
+    expect(() => applySegmentRecommendations(base, "other")).not.toThrow();
+  });
+
+  it("trocar de car_dealership para other não quebra preview", () => {
+    const base = createDefaultWizardFormState();
+    previewApplySegmentRecommendations(base, "car_dealership");
+    expect(() => previewApplySegmentRecommendations(base, "other")).not.toThrow();
+  });
+
+  it("todos os 16 segmentos possuem arrays obrigatórios via getSegmentTemplate", () => {
+    AI_AGENT_BUSINESS_SEGMENTS.forEach(({ value }) => {
+      const template = getSegmentTemplate(value);
+      ARRAY_FIELDS.forEach((field) => {
+        expect(Array.isArray(template[field])).toBe(true);
+      });
+    });
+  });
+
+  it("normalizeAiAgentSegmentTemplate trata objeto parcial", () => {
+    const normalized = normalizeAiAgentSegmentTemplate({ segment: "other" });
+    ARRAY_FIELDS.forEach((field) => {
+      expect(Array.isArray(normalized[field])).toBe(true);
+    });
+  });
+
+  it("FAQs sugeridas para other não quebram", () => {
+    expect(() => suggestFaqsFromSegment("other", [])).not.toThrow();
+    const faqs = suggestFaqsFromSegment("other", []);
+    expect(Array.isArray(faqs)).toBe(true);
+  });
+
+  it("cenários do simulador para other não quebram", () => {
+    expect(() => getSimulationPrompts("other")).not.toThrow();
+    const prompts = getSimulationPrompts("other");
+    expect(Array.isArray(prompts)).toBe(true);
+  });
+
+  it("templates definidos em AI_AGENT_SEGMENT_TEMPLATE_KEYS não deixam coleções undefined", () => {
+    Object.entries(AI_AGENT_SEGMENT_TEMPLATE_KEYS).forEach(([segment, partial]) => {
+      const template = normalizeAiAgentSegmentTemplate({ segment, ...partial });
+      ARRAY_FIELDS.forEach((field) => {
+        expect(template[field]).toBeDefined();
+        expect(Array.isArray(template[field])).toBe(true);
+      });
+    });
   });
 });

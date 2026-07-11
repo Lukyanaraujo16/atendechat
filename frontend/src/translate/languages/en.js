@@ -2910,6 +2910,8 @@ const messages = {
 						applySuccess: "Recommendations applied",
 						changedWarning:
 							"The segment was changed. Would you like to review the new recommendations?",
+						otherCustomHint:
+							"Because your segment is custom, fill in your business information so we can configure service appropriately.",
 						chipDepartments: "{{count}} departments",
 						chipActions: "{{count}} actions",
 						chipHandoffs: "{{count}} handoffs",

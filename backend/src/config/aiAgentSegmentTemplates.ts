@@ -556,14 +556,63 @@ export const AI_AGENT_SEGMENT_TEMPLATES: Record<string, AiAgentSegmentTemplate> 
   })
 };
 
+const ARRAY_FIELDS: (keyof Pick<
+  AiAgentSegmentTemplate,
+  | "suggestedDepartments"
+  | "suggestedAllowedActions"
+  | "suggestedForbiddenActions"
+  | "suggestedHandoffRules"
+  | "businessInfoKeys"
+  | "qualificationKeys"
+  | "suggestedFaqKeys"
+  | "simulationPromptKeys"
+  | "generatedPromptInstructions"
+>)[] = [
+  "suggestedDepartments",
+  "suggestedAllowedActions",
+  "suggestedForbiddenActions",
+  "suggestedHandoffRules",
+  "businessInfoKeys",
+  "qualificationKeys",
+  "suggestedFaqKeys",
+  "simulationPromptKeys",
+  "generatedPromptInstructions"
+];
+
+export function normalizeAiAgentSegmentTemplate(
+  template: Partial<AiAgentSegmentTemplate> & { segment?: string }
+): AiAgentSegmentTemplate {
+  const segment = String(template.segment || "other");
+  const normalized: AiAgentSegmentTemplate = {
+    segment,
+    suggestedDepartments: [],
+    suggestedAllowedActions: [],
+    suggestedForbiddenActions: [],
+    suggestedHandoffRules: [],
+    suggestedAttendantRole: template.suggestedAttendantRole ?? null,
+    businessInfoKeys: [],
+    qualificationKeys: [],
+    suggestedFaqKeys: [],
+    simulationPromptKeys: [],
+    generatedPromptInstructions: []
+  };
+
+  ARRAY_FIELDS.forEach((field) => {
+    const value = template[field];
+    normalized[field] = Array.isArray(value) ? [...value] : [];
+  });
+
+  return normalized;
+}
+
 export function getAiAgentSegmentTemplate(
   segment: string | null | undefined
 ): AiAgentSegmentTemplate {
   const key = String(segment || "").trim();
   if (key && AI_AGENT_SEGMENT_TEMPLATES[key]) {
-    return AI_AGENT_SEGMENT_TEMPLATES[key];
+    return normalizeAiAgentSegmentTemplate(AI_AGENT_SEGMENT_TEMPLATES[key]);
   }
-  return AI_AGENT_SEGMENT_TEMPLATES.other;
+  return normalizeAiAgentSegmentTemplate(AI_AGENT_SEGMENT_TEMPLATES.other);
 }
 
 export function buildSegmentSpecificPromptInstructions(input: {

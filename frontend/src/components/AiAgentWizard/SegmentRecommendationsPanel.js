@@ -136,6 +136,12 @@ export default function SegmentRecommendationsPanel({
           {i18n.t("aiAgent.wizard.segment.panelHint")}
         </Typography>
 
+        {segment === "other" ? (
+          <Typography variant="body2" color="textSecondary" style={{ marginTop: 8 }}>
+            {i18n.t("aiAgent.wizard.segment.otherCustomHint")}
+          </Typography>
+        ) : null}
+
         <Collapse in={open}>
           <div className={classes.chips}>
             {preview.departments > 0 ? (

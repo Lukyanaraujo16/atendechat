@@ -3,6 +3,7 @@ import {
   AI_AGENT_SEGMENT_TEMPLATES,
   buildSegmentSpecificPromptInstructions,
   getAiAgentSegmentTemplate,
+  normalizeAiAgentSegmentTemplate,
 } from "../../../config/aiAgentSegmentTemplates";
 import { buildAiAgentPromptFromProfile } from "../buildAiAgentPromptFromProfile";
 import { validateAiAgentProfileInput } from "../aiAgentProfileValidation";
@@ -121,5 +122,41 @@ describe("AiAgent segment templates 1.5.1C", () => {
     keys.forEach((key) => {
       expect(AI_AGENT_SEGMENT_TEMPLATES[key]).toBeDefined();
     });
+  });
+
+  it("todos os templates satisfazem contrato completo após normalização", () => {
+    const arrayFields = [
+      "suggestedDepartments",
+      "suggestedAllowedActions",
+      "suggestedForbiddenActions",
+      "suggestedHandoffRules",
+      "businessInfoKeys",
+      "qualificationKeys",
+      "suggestedFaqKeys",
+      "simulationPromptKeys",
+      "generatedPromptInstructions"
+    ] as const;
+
+    Object.values(AI_AGENT_SEGMENT_TEMPLATES).forEach((template) => {
+      const normalized = normalizeAiAgentSegmentTemplate(template);
+      arrayFields.forEach((field) => {
+        expect(Array.isArray(normalized[field])).toBe(true);
+      });
+    });
+  });
+
+  it("segmento desconhecido usa fallback other normalizado", () => {
+    const template = getAiAgentSegmentTemplate("segmento_inexistente");
+    expect(template.segment).toBe("other");
+    expect(Array.isArray(template.suggestedForbiddenActions)).toBe(true);
+  });
+
+  it("buildSegmentSpecificPromptInstructions com other não lança", () => {
+    expect(() =>
+      buildSegmentSpecificPromptInstructions({
+        businessSegment: "other",
+        customBusinessSegment: "Pet shop"
+      })
+    ).not.toThrow();
   });
 });
