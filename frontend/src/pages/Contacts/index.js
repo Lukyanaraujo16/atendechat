@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useReducer, useContext, useMemo } from "react";
+import React, { useState, useEffect, useReducer, useContext, useMemo, useCallback, useRef } from "react";
 
 import { useHistory } from "react-router-dom";
 import { Tooltip } from "@material-ui/core";
@@ -8,6 +8,9 @@ import TableBody from "@material-ui/core/TableBody";
 import TableCell from "@material-ui/core/TableCell";
 import TableHead from "@material-ui/core/TableHead";
 import TableRow from "@material-ui/core/TableRow";
+import TablePagination from "@material-ui/core/TablePagination";
+import Checkbox from "@material-ui/core/Checkbox";
+import Button from "@material-ui/core/Button";
 import Avatar from "@material-ui/core/Avatar";
 import WhatsAppIcon from "@material-ui/icons/WhatsApp";
 import AccessTimeIcon from "@material-ui/icons/AccessTime";
@@ -57,7 +60,7 @@ import {
 	MobileCardList,
 } from "../../ui";
 import toastError from "../../errors/toastError";
-import { showSuccessToast } from "../../errors/feedbackToasts";
+import { showSuccessToast, showWarningToast } from "../../errors/feedbackToasts";
 import { AuthContext } from "../../context/Auth/AuthContext";
 import { Can } from "../../components/Can";
 import NewTicketModal from "../../components/NewTicketModal";
@@ -71,13 +74,32 @@ import FilterListIcon from "@material-ui/icons/FilterList";
 import GroupIcon from "@material-ui/icons/Group";
 import Badge from "@material-ui/core/Badge";
 import CircularProgress from "@material-ui/core/CircularProgress";
+import { Pagination } from "@material-ui/lab";
 
 import { CSVLink } from "react-csv";
 import useIsMobile from "../../hooks/useIsMobile";
 import ImportContactsModal from "../../components/ImportContactsModal";
 import ScheduleModal from "../../components/ScheduleModal";
 
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
+const PAGE_SIZE_STORAGE_KEY = "contacts.pageSize";
+const DEFAULT_PAGE_SIZE = 25;
+
+function readStoredPageSize() {
+	try {
+		const n = parseInt(localStorage.getItem(PAGE_SIZE_STORAGE_KEY), 10);
+		if (PAGE_SIZE_OPTIONS.includes(n)) return n;
+	} catch {
+		/* ignore */
+	}
+	return DEFAULT_PAGE_SIZE;
+}
+
 const reducer = (state, action) => {
+	if (action.type === "SET_CONTACTS") {
+		return action.payload;
+	}
+
 	if (action.type === "LOAD_CONTACTS") {
 		const contacts = action.payload;
 		const newContacts = [];
@@ -101,9 +123,8 @@ const reducer = (state, action) => {
 		if (contactIndex !== -1) {
 			state[contactIndex] = contact;
 			return [...state];
-		} else {
-			return [contact, ...state];
 		}
+		return state;
 	}
 
 	if (action.type === "DELETE_CONTACT") {
@@ -332,6 +353,41 @@ const useStyles = makeStyles((theme) => ({
 		gap: theme.spacing(0.5),
 		maxWidth: "100%",
 	},
+	bulkBar: {
+		display: "flex",
+		flexWrap: "wrap",
+		alignItems: "center",
+		gap: theme.spacing(1),
+		padding: theme.spacing(1.5),
+		marginBottom: theme.spacing(1),
+		borderRadius: theme.shape.borderRadius,
+		backgroundColor:
+			theme.palette.type === "dark"
+				? "rgba(144, 202, 249, 0.12)"
+				: theme.palette.primary.light,
+		border: `1px solid ${theme.palette.divider}`,
+	},
+	paginationBar: {
+		display: "flex",
+		flexWrap: "wrap",
+		alignItems: "center",
+		justifyContent: "space-between",
+		gap: theme.spacing(1),
+		paddingTop: theme.spacing(1),
+		borderTop: `1px solid ${theme.palette.divider}`,
+		marginTop: theme.spacing(1),
+	},
+	paginationPages: {
+		display: "flex",
+		alignItems: "center",
+	},
+	mobilePagination: {
+		display: "flex",
+		flexDirection: "column",
+		alignItems: "center",
+		gap: theme.spacing(1),
+		padding: theme.spacing(2, 0, 1),
+	},
 }));
 
 const Contacts = () => {
@@ -342,20 +398,27 @@ const Contacts = () => {
 	const { user } = useContext(AuthContext);
 
 	const [loading, setLoading] = useState(false);
-	const [pageNumber, setPageNumber] = useState(1);
+	const [loadError, setLoadError] = useState(false);
+	const [page, setPage] = useState(1);
+	const [pageSize, setPageSize] = useState(readStoredPageSize);
+	const [totalCount, setTotalCount] = useState(0);
+	const [totalPages, setTotalPages] = useState(0);
 	const [searchParam, setSearchParam] = useState("");
+	const [searchDebounced, setSearchDebounced] = useState("");
 	const [tagFilter, setTagFilter] = useState("");
 	const [labelFilter, setLabelFilter] = useState("");
 	const [dateFrom, setDateFrom] = useState("");
 	const [dateTo, setDateTo] = useState("");
 	const [contacts, dispatch] = useReducer(reducer, []);
+	const [selectedMap, setSelectedMap] = useState({});
 	const [selectedContactId, setSelectedContactId] = useState(null);
 	const [contactModalOpen, setContactModalOpen] = useState(false);
 	const [newTicketModalOpen, setNewTicketModalOpen] = useState(false);
 	const [contactTicket, setContactTicket] = useState({});
 	const [deletingContact, setDeletingContact] = useState(null);
 	const [confirmOpen, setConfirmOpen] = useState(false);
-	const [hasMore, setHasMore] = useState(false);
+	const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+	const [bulkDeleting, setBulkDeleting] = useState(false);
 	const [openModalImport, setOpenModalImport] = useState(false);
 	const [tagOptions, setTagOptions] = useState([]);
 	const [labelOptions, setLabelOptions] = useState([]);
@@ -368,6 +431,12 @@ const Contacts = () => {
 
 	const socketManager = useContext(SocketContext);
 	const canManageAssignments = canManageContactAssignments(user);
+	const fetchAbortRef = useRef(null);
+
+	useEffect(() => {
+		const t = setTimeout(() => setSearchDebounced(searchParam.trim()), 300);
+		return () => clearTimeout(t);
+	}, [searchParam]);
 
 	useEffect(() => {
 		api
@@ -385,39 +454,69 @@ const Contacts = () => {
 	}, []);
 
 	useEffect(() => {
-		dispatch({ type: "RESET" });
-		setPageNumber(1);
-	}, [searchParam, tagFilter, labelFilter, dateFrom, dateTo]);
+		setPage(1);
+		setSelectedMap({});
+	}, [searchDebounced, tagFilter, labelFilter, dateFrom, dateTo]);
 
 	useEffect(() => {
-		setLoading(true);
-		const delayDebounceFn = setTimeout(() => {
-			const fetchContacts = async () => {
-				try {
-					const params = {
-						searchParam,
-						pageNumber,
-					};
-					if (tagFilter) params.tagId = tagFilter;
-					if (labelFilter) params.labelId = labelFilter;
-					if (dateFrom) params.dateFrom = dateFrom;
-					if (dateTo) params.dateTo = dateTo;
+		setPage(1);
+	}, [pageSize]);
 
-					const { data } = await api.get("/contacts/", {
-						params,
-					});
-					dispatch({ type: "LOAD_CONTACTS", payload: data.contacts });
-					setHasMore(data.hasMore);
-					setLoading(false);
-				} catch (err) {
-					toastError(err);
-					setLoading(false);
-				}
+	const fetchContacts = useCallback(async () => {
+		if (fetchAbortRef.current) {
+			fetchAbortRef.current.abort();
+		}
+		const controller = new AbortController();
+		fetchAbortRef.current = controller;
+
+		setLoading(true);
+		setLoadError(false);
+		try {
+			const params = {
+				searchParam: searchDebounced,
+				pageNumber: page,
+				limit: pageSize,
 			};
-			fetchContacts();
-		}, 300);
-		return () => clearTimeout(delayDebounceFn);
-	}, [searchParam, pageNumber, tagFilter, labelFilter, dateFrom, dateTo]);
+			if (tagFilter) params.tagId = tagFilter;
+			if (labelFilter) params.labelId = labelFilter;
+			if (dateFrom) params.dateFrom = dateFrom;
+			if (dateTo) params.dateTo = dateTo;
+
+			const { data } = await api.get("/contacts/", {
+				params,
+				signal: controller.signal,
+			});
+
+			if (controller.signal.aborted) return;
+
+			dispatch({
+				type: "SET_CONTACTS",
+				payload: Array.isArray(data.contacts) ? data.contacts : [],
+			});
+			setTotalCount(Number(data.count) || 0);
+			setTotalPages(Number(data.totalPages) || 0);
+		} catch (err) {
+			if (controller.signal.aborted) return;
+			toastError(err);
+			setLoadError(true);
+			dispatch({ type: "SET_CONTACTS", payload: [] });
+			setTotalCount(0);
+			setTotalPages(0);
+		} finally {
+			if (!controller.signal.aborted) {
+				setLoading(false);
+			}
+		}
+	}, [searchDebounced, page, pageSize, tagFilter, labelFilter, dateFrom, dateTo]);
+
+	useEffect(() => {
+		fetchContacts();
+		return () => {
+			if (fetchAbortRef.current) {
+				fetchAbortRef.current.abort();
+			}
+		};
+	}, [fetchContacts]);
 
 	useEffect(() => {
 		const companyId = localStorage.getItem("companyId");
@@ -430,6 +529,13 @@ const Contacts = () => {
 
 			if (data.action === "delete") {
 				dispatch({ type: "DELETE_CONTACT", payload: +data.contactId });
+				setTotalCount((prev) => Math.max(0, prev - 1));
+				setSelectedMap((prev) => {
+					if (!prev[data.contactId]) return prev;
+					const next = { ...prev };
+					delete next[data.contactId];
+					return next;
+				});
 			}
 		};
 
@@ -470,12 +576,59 @@ const Contacts = () => {
 		try {
 			await api.delete(`/contacts/${contactId}`);
 			showSuccessToast("contacts.toasts.deleted");
+			setSelectedMap((prev) => {
+				if (!prev[contactId]) return prev;
+				const next = { ...prev };
+				delete next[contactId];
+				return next;
+			});
+			if (contacts.length <= 1 && page > 1) {
+				setPage((prev) => prev - 1);
+			} else {
+				await fetchContacts();
+			}
 		} catch (err) {
 			toastError(err);
 		}
 		setDeletingContact(null);
-		setSearchParam("");
-		setPageNumber(1);
+		setConfirmOpen(false);
+	};
+
+	const handleBulkDeleteContacts = async () => {
+		const contactIds = Object.keys(selectedMap).map((id) => Number(id));
+		if (!contactIds.length) return;
+
+		setBulkDeleting(true);
+		try {
+			const { data } = await api.post("/contacts/bulk-delete", { contactIds });
+			const deleted = Number(data?.deletedCount) || 0;
+			const blocked = Number(data?.blockedCount) || 0;
+			const failed = Number(data?.failedCount) || 0;
+
+			if (deleted > 0) {
+				showSuccessToast("contacts.bulk.deleteSuccess", { count: deleted });
+			}
+			if (blocked > 0) {
+				showWarningToast("contacts.bulk.deleteBlocked", { count: blocked });
+			}
+			if (failed > 0 && deleted === 0 && blocked === 0) {
+				showWarningToast("contacts.bulk.deleteFailed");
+			}
+
+			setSelectedMap({});
+			setBulkDeleteOpen(false);
+
+			const remainingOnPage = contacts.length - deleted;
+			if (remainingOnPage <= 0 && page > 1) {
+				setPage((prev) => prev - 1);
+			} else {
+				await fetchContacts();
+			}
+		} catch (err) {
+			toastError(err);
+		} finally {
+			setBulkDeleting(false);
+		}
 	};
 
 	const handleimportContact = async () => {
@@ -491,17 +644,78 @@ const Contacts = () => {
 		setOpenModalImport(true);
 	};
 
-	const loadMore = () => {
-		setPageNumber((prevState) => prevState + 1);
-	};
-
-	const handleScroll = (e) => {
-		if (!hasMore || loading) return;
-		const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
-		if (scrollHeight - (scrollTop + 100) < clientHeight) {
-			loadMore();
+	const handlePageSizeChange = (event) => {
+		const next = parseInt(event.target.value, 10);
+		if (!PAGE_SIZE_OPTIONS.includes(next)) return;
+		setPageSize(next);
+		try {
+			localStorage.setItem(PAGE_SIZE_STORAGE_KEY, String(next));
+		} catch {
+			/* ignore */
 		}
 	};
+
+	const handleTablePageChange = (_, newPage) => {
+		setPage(newPage + 1);
+	};
+
+	const handleNumberedPageChange = (_, value) => {
+		setPage(value);
+	};
+
+	const selectedCount = useMemo(
+		() => Object.keys(selectedMap).length,
+		[selectedMap]
+	);
+
+	const allPageSelected =
+		contacts.length > 0 && contacts.every((contact) => Boolean(selectedMap[contact.id]));
+	const somePageSelected =
+		contacts.some((contact) => Boolean(selectedMap[contact.id])) && !allPageSelected;
+
+	const toggleRowSelection = (contactId) => {
+		setSelectedMap((prev) => {
+			const next = { ...prev };
+			if (next[contactId]) delete next[contactId];
+			else next[contactId] = true;
+			return next;
+		});
+	};
+
+	const handleSelectAllPage = () => {
+		if (allPageSelected) {
+			setSelectedMap((prev) => {
+				const next = { ...prev };
+				contacts.forEach((contact) => {
+					delete next[contact.id];
+				});
+				return next;
+			});
+			return;
+		}
+		setSelectedMap((prev) => {
+			const next = { ...prev };
+			contacts.forEach((contact) => {
+				next[contact.id] = true;
+			});
+			return next;
+		});
+	};
+
+	const rangeLabel = useMemo(() => {
+		if (totalCount <= 0 || !contacts.length) {
+			return i18n.t("contacts.pagination.empty");
+		}
+		const from = (page - 1) * pageSize + 1;
+		const to = (page - 1) * pageSize + contacts.length;
+		return i18n.t("contacts.pagination.range", { from, to, count: totalCount });
+	}, [contacts.length, page, pageSize, totalCount]);
+
+	const hasActiveFilters = useMemo(() => {
+		return Boolean(
+			searchDebounced || tagFilter || labelFilter || dateFrom || dateTo
+		);
+	}, [searchDebounced, tagFilter, labelFilter, dateFrom, dateTo]);
 
 	const handleCloseModalImport = () => {
 		setOpenModalImport(false);
@@ -908,6 +1122,18 @@ const Contacts = () => {
 					: `${i18n.t("contacts.confirmationModal.importMessage")}`}
 			</ConfirmationModal>
 
+			<ConfirmationModal
+				title={i18n.t("contacts.bulk.deleteSelected")}
+				open={bulkDeleteOpen}
+				onClose={() => setBulkDeleteOpen(false)}
+				destructive
+				loading={bulkDeleting}
+				asyncConfirm
+				onConfirm={handleBulkDeleteContacts}
+			>
+				{i18n.t("contacts.bulk.deleteConfirm", { count: selectedCount })}
+			</ConfirmationModal>
+
 			<AppPageHeader
 				title={
 					<Typography variant="h5" color="primary" component="h1">
@@ -1100,43 +1326,119 @@ const Contacts = () => {
 				scrollable
 				className={classes.tableCard}
 				variant="outlined"
-				onScroll={handleScroll}
 			>
+				{selectedCount > 0 ? (
+					<Box className={classes.bulkBar}>
+						<Typography variant="body2" style={{ flex: 1, fontWeight: 600 }}>
+							{i18n.t("contacts.bulk.selectedCount", { count: selectedCount })}
+						</Typography>
+						<Can
+							role={user.profile}
+							perform="contacts-page:deleteContact"
+							yes={() => (
+								<Button
+									color="secondary"
+									variant="contained"
+									size="small"
+									onClick={() => setBulkDeleteOpen(true)}
+									disabled={bulkDeleting}
+								>
+									{i18n.t("contacts.bulk.deleteSelected")}
+								</Button>
+							)}
+						/>
+						<Button size="small" onClick={() => setSelectedMap({})}>
+							{i18n.t("contacts.bulk.clearSelection")}
+						</Button>
+					</Box>
+				) : null}
+
 				{loading && contacts.length === 0 ? (
 					<AppLoadingState message={i18n.t("contacts.loading")} />
+				) : loadError ? (
+					<AppEmptyState
+						title={i18n.t("contacts.bulk.deleteFailed")}
+						description={i18n.t("contacts.retry")}
+					>
+						<AppPrimaryButton onClick={fetchContacts}>
+							{i18n.t("contacts.retry")}
+						</AppPrimaryButton>
+					</AppEmptyState>
 				) : !loading && contacts.length === 0 ? (
 					<AppEmptyState
-						title={i18n.t("contacts.empty.title")}
-						description={i18n.t("contacts.empty.subtitle")}
+						title={
+							hasActiveFilters
+								? i18n.t("contacts.empty.filtered")
+								: i18n.t("contacts.empty.title")
+						}
+						description={
+							hasActiveFilters ? undefined : i18n.t("contacts.empty.subtitle")
+						}
 					>
-						<AppPrimaryButton onClick={handleOpenContactModal}>
-							{i18n.t("contacts.buttons.add")}
-						</AppPrimaryButton>
+						{!hasActiveFilters ? (
+							<AppPrimaryButton onClick={handleOpenContactModal}>
+								{i18n.t("contacts.buttons.add")}
+							</AppPrimaryButton>
+						) : null}
 					</AppEmptyState>
 				) : isMobile ? (
 					<>
 						<MobileCardList>
-							{contacts.map((contact) => renderContactMobileCard(contact))}
+							{contacts.map((contact) => (
+								<Box key={contact.id} display="flex" alignItems="flex-start" gridGap={8}>
+									<Checkbox
+										checked={Boolean(selectedMap[contact.id])}
+										onChange={() => toggleRowSelection(contact.id)}
+										onClick={(e) => e.stopPropagation()}
+										inputProps={{
+											"aria-label": contact.name,
+										}}
+										style={{ marginTop: 8 }}
+									/>
+									<Box flex={1} minWidth={0}>
+										{renderContactMobileCard(contact)}
+									</Box>
+								</Box>
+							))}
 						</MobileCardList>
 						{loading ? (
 							<Box className={classes.mobileLoadMore}>
 								<CircularProgress size={28} />
 							</Box>
 						) : null}
-						{hasMore && !loading ? (
-							<Box className={classes.mobileLoadMore}>
-								<AppSecondaryButton onClick={loadMore}>
-									{i18n.t("contacts.mobile.loadMore")}
-								</AppSecondaryButton>
-							</Box>
-						) : null}
+						<Box className={classes.mobilePagination}>
+							<Typography variant="caption" color="textSecondary">
+								{rangeLabel}
+							</Typography>
+							{totalPages > 1 ? (
+								<Pagination
+									color="primary"
+									size="small"
+									count={totalPages}
+									page={page}
+									onChange={handleNumberedPageChange}
+									disabled={loading}
+								/>
+							) : null}
+						</Box>
 					</>
 				) : (
 					<AppTableContainer nested>
 						<Table size="medium">
 							<TableHead>
 								<TableRow>
-									<TableCell padding="checkbox" className={classes.tableHeadCell} />
+									<TableCell padding="checkbox" className={classes.tableHeadCell}>
+										<Tooltip title={i18n.t("contacts.table.selectAll")}>
+											<Checkbox
+												indeterminate={somePageSelected}
+												checked={allPageSelected}
+												onChange={handleSelectAllPage}
+												inputProps={{
+													"aria-label": i18n.t("contacts.table.selectAll"),
+												}}
+											/>
+										</Tooltip>
+									</TableCell>
 									<TableCell className={classes.tableHeadCell}>
 										{i18n.t("contacts.table.contact")}
 									</TableCell>
@@ -1168,14 +1470,20 @@ const Contacts = () => {
 								<>
 									{contacts.map((contact) => (
 										<TableRow key={contact.id} hover className={classes.dataRow}>
-											<TableCell className={classes.avatarCell}>
-												<Avatar src={contact.profilePicUrl} />
+											<TableCell padding="checkbox">
+												<Checkbox
+													checked={Boolean(selectedMap[contact.id])}
+													onChange={() => toggleRowSelection(contact.id)}
+													inputProps={{ "aria-label": contact.name }}
+												/>
 											</TableCell>
 											<TableCell align="left">
-												<Box
-													className={classes.contactCell}
-													onClick={() => handleEditContact(contact.id)}
-												>
+												<Box display="flex" alignItems="center" gridGap={8}>
+													<Avatar src={contact.profilePicUrl} />
+													<Box
+														className={classes.contactCell}
+														onClick={() => handleEditContact(contact.id)}
+													>
 													<Tooltip title={contact.name} placement="top-start">
 														<Typography
 															variant="subtitle1"
@@ -1213,6 +1521,7 @@ const Contacts = () => {
 															</Typography>
 														</Tooltip>
 													) : null}
+												</Box>
 												</Box>
 											</TableCell>
 											<TableCell>
@@ -1376,6 +1685,36 @@ const Contacts = () => {
 						</Table>
 					</AppTableContainer>
 				)}
+
+				{!isMobile && contacts.length > 0 ? (
+					<Box className={classes.paginationBar}>
+						<TablePagination
+							component="div"
+							count={totalCount}
+							page={Math.max(0, page - 1)}
+							onChangePage={handleTablePageChange}
+							rowsPerPage={pageSize}
+							onChangeRowsPerPage={handlePageSizeChange}
+							rowsPerPageOptions={PAGE_SIZE_OPTIONS}
+							labelRowsPerPage={i18n.t("contacts.pagination.rowsPerPage")}
+							labelDisplayedRows={() => rangeLabel}
+						/>
+						{totalPages > 1 ? (
+							<Box className={classes.paginationPages}>
+								<Pagination
+									color="primary"
+									size="small"
+									count={totalPages}
+									page={page}
+									onChange={handleNumberedPageChange}
+									showFirstButton
+									showLastButton
+									disabled={loading}
+								/>
+							</Box>
+						) : null}
+					</Box>
+				) : null}
 			</AppSectionCard>
 		</MainContainer>
 	);

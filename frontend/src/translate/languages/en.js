@@ -2314,6 +2314,7 @@ const messages = {
 					lastInteraction: "Last interaction",
 					createdAt: "Created",
 					actions: "Actions",
+					selectAll: "Select all on this page",
 				},
 				filters: {
 					sectionLabel: "Contact filters",
@@ -2331,8 +2332,27 @@ const messages = {
 					title: "No contacts to show",
 					subtitle:
 						"Adjust search or filters, import a list, or add a contact to get started.",
+					filtered: "No contacts found for the selected filters.",
 				},
 				loading: "Loading contacts…",
+				pagination: {
+					rowsPerPage: "Rows per page",
+					range: "Showing {{from}}–{{to}} of {{count}} contacts",
+					empty: "No contacts to display",
+					pageOf: "Page {{page}} of {{totalPages}}",
+				},
+				bulk: {
+					selectedCount: "{{count}} contacts selected",
+					deleteSelected: "Delete selected",
+					clearSelection: "Clear selection",
+					deleteConfirm:
+						"Delete {{count}} selected contacts? This action may be irreversible.",
+					deleteSuccess: "{{count}} contact(s) deleted successfully.",
+					deleteBlocked:
+						"{{count}} contact(s) could not be deleted due to permissions or linked history.",
+					deleteFailed: "Could not delete the selected contacts.",
+				},
+				retry: "Try again",
 				mobile: {
 					filtersButton: "Filters",
 					applyFilters: "Apply",

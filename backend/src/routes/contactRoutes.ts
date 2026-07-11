@@ -15,6 +15,8 @@ contactRoutes.post("/contacts/import", ImportPhoneContactsController.store);
 
 contactRoutes.get("/contacts", ContactController.index);
 
+contactRoutes.post("/contacts/bulk-delete", ContactController.bulkRemove);
+
 contactRoutes.get("/contacts/list", ContactController.list);
 
 contactRoutes.get("/contacts/:contactId/summary", ContactController.summary);

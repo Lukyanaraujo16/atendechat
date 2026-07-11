@@ -13,9 +13,38 @@ import {
   ContactAccessUser
 } from "../../helpers/contactAccess";
 
+const ALLOWED_PAGE_LIMITS = [10, 25, 50, 100] as const;
+const DEFAULT_PAGE_LIMIT = 25;
+
+function parsePageLimit(
+  pageNumber?: string,
+  limit?: string
+): { page: number; limit: number; offset: number } {
+  const page = Math.max(1, Number(pageNumber) || 1);
+  const rawLimit = Number(limit);
+  const normalizedLimit = ALLOWED_PAGE_LIMITS.includes(
+    rawLimit as (typeof ALLOWED_PAGE_LIMITS)[number]
+  )
+    ? rawLimit
+    : DEFAULT_PAGE_LIMIT;
+  return { page, limit: normalizedLimit, offset: (page - 1) * normalizedLimit };
+}
+
+function emptyListResult(page: number, limit: number) {
+  return {
+    contacts: [] as any[],
+    count: 0,
+    hasMore: false,
+    page,
+    limit,
+    totalPages: 0
+  };
+}
+
 interface Request {
   searchParam?: string;
   pageNumber?: string;
+  limit?: string;
   companyId: number;
   tagId?: string;
   labelId?: string;
@@ -115,6 +144,7 @@ const enrichContacts = async (
 const ListContactsService = async ({
   searchParam = "",
   pageNumber = "1",
+  limit: limitParam,
   companyId,
   tagId,
   labelId,
@@ -125,7 +155,11 @@ const ListContactsService = async ({
   contacts: any[];
   count: number;
   hasMore: boolean;
+  page: number;
+  limit: number;
+  totalPages: number;
 }> => {
+  const { page, limit, offset } = parsePageLimit(pageNumber, limitParam);
   const whereClause: any = {
     companyId: {
       [Op.eq]: companyId
@@ -180,7 +214,7 @@ const ListContactsService = async ({
     });
     const allowedContactIds = [...new Set(relRows.map((r) => r.contactId))];
     if (!allowedContactIds.length) {
-      return { contacts: [], count: 0, hasMore: false };
+      return emptyListResult(page, limit);
     }
     whereClause.id = { [Op.in]: allowedContactIds };
   }
@@ -192,7 +226,7 @@ const ListContactsService = async ({
     });
     const ticketIds = ttRows.map(x => x.ticketId);
     if (!ticketIds.length) {
-      return { contacts: [], count: 0, hasMore: false };
+      return emptyListResult(page, limit);
     }
     const tickets = await Ticket.findAll({
       where: { id: { [Op.in]: ticketIds }, companyId },
@@ -200,7 +234,7 @@ const ListContactsService = async ({
     });
     const allowedContactIds = [...new Set(tickets.map(t => t.contactId))];
     if (!allowedContactIds.length) {
-      return { contacts: [], count: 0, hasMore: false };
+      return emptyListResult(page, limit);
     }
     whereClause.id = { [Op.in]: allowedContactIds };
   }
@@ -214,24 +248,28 @@ const ListContactsService = async ({
     );
   }
 
-  const limit = 30;
-  const offset = limit * (+pageNumber - 1);
-
   const { count, rows: contactRows } = await Contact.findAndCountAll({
     where: finalWhere,
     limit,
     offset,
-    order: [["name", "ASC"]]
+    order: [
+      ["updatedAt", "DESC"],
+      ["id", "DESC"]
+    ]
   });
 
   const contacts = await enrichContacts(contactRows, companyId);
 
   const hasMore = count > offset + contactRows.length;
+  const totalPages = count > 0 ? Math.ceil(count / limit) : 0;
 
   return {
     contacts,
     count,
-    hasMore
+    hasMore,
+    page,
+    limit,
+    totalPages
   };
 };
 

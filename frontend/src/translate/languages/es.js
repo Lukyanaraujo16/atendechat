@@ -2241,6 +2241,7 @@ const messages = {
           lastInteraction: "Última interacción",
           createdAt: "Creado",
           actions: "Acciones",
+          selectAll: "Seleccionar todos en esta página",
         },
         filters: {
           sectionLabel: "Filtros de contactos",
@@ -2258,8 +2259,36 @@ const messages = {
           title: "No hay contactos para mostrar",
           subtitle:
             "Ajuste la búsqueda o filtros, importe una lista o agregue un contacto.",
+          filtered: "No se encontraron contactos para los filtros seleccionados.",
         },
         loading: "Cargando contactos…",
+        pagination: {
+          rowsPerPage: "Filas por página",
+          range: "Mostrando {{from}}–{{to}} de {{count}} contactos",
+          empty: "No hay contactos para mostrar",
+          pageOf: "Página {{page}} de {{totalPages}}",
+        },
+        bulk: {
+          selectedCount: "{{count}} contactos seleccionados",
+          deleteSelected: "Eliminar seleccionados",
+          clearSelection: "Limpiar selección",
+          deleteConfirm:
+            "¿Desea eliminar {{count}} contactos seleccionados? Esta acción puede ser irreversible.",
+          deleteSuccess: "{{count}} contacto(s) eliminado(s) con éxito.",
+          deleteBlocked:
+            "{{count}} contacto(s) no pudieron eliminarse por permisos o historial vinculado.",
+          deleteFailed: "No se pudieron eliminar los contactos seleccionados.",
+        },
+        retry: "Intentar de nuevo",
+        mobile: {
+          filtersButton: "Filtros",
+          applyFilters: "Aplicar",
+          clearFilters: "Limpiar filtros",
+          activeFilters: "{{count}} filtro(s) activo(s)",
+          loadMore: "Cargar más",
+          actions: "Acciones del contacto",
+          groupBadge: "Grupo",
+        },
         assignments: {
           title: "Responsables del contacto",
           hint: "Defina quién puede ver y gestionar este contacto.",

@@ -2398,6 +2398,7 @@ const messages = {
           lastInteraction: "Última interação",
           createdAt: "Criado em",
           actions: "Ações",
+          selectAll: "Selecionar todos desta página",
         },
         filters: {
           sectionLabel: "Filtros de contatos",
@@ -2415,8 +2416,28 @@ const messages = {
           title: "Nenhum contato por aqui",
           subtitle:
             "Ajuste a pesquisa ou os filtros, importe uma lista ou adicione um contato para começar.",
+          filtered:
+            "Nenhum contato encontrado para os filtros selecionados.",
         },
         loading: "Carregando contatos…",
+        pagination: {
+          rowsPerPage: "Linhas por página",
+          range: "Mostrando {{from}}–{{to}} de {{count}} contatos",
+          empty: "Nenhum contato a exibir",
+          pageOf: "Página {{page}} de {{totalPages}}",
+        },
+        bulk: {
+          selectedCount: "{{count}} contatos selecionados",
+          deleteSelected: "Excluir selecionados",
+          clearSelection: "Limpar seleção",
+          deleteConfirm:
+            "Deseja excluir {{count}} contatos selecionados? Esta ação pode ser irreversível.",
+          deleteSuccess: "{{count}} contato(s) excluído(s) com sucesso.",
+          deleteBlocked:
+            "{{count}} contato(s) não puderam ser excluídos por falta de permissão ou histórico vinculado.",
+          deleteFailed: "Não foi possível excluir os contatos selecionados.",
+        },
+        retry: "Tentar novamente",
         mobile: {
           filtersButton: "Filtros",
           applyFilters: "Aplicar",

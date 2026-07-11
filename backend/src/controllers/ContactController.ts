@@ -7,6 +7,7 @@ import CreateContactService from "../services/ContactServices/CreateContactServi
 import ShowContactService from "../services/ContactServices/ShowContactService";
 import UpdateContactService from "../services/ContactServices/UpdateContactService";
 import DeleteContactService from "../services/ContactServices/DeleteContactService";
+import BatchDeleteContactsService from "../services/ContactServices/BatchDeleteContactsService";
 import GetContactService from "../services/ContactServices/GetContactService";
 import ContactSummaryService from "../services/ContactServices/ContactSummaryService";
 import AddTagToContactService from "../services/ContactServices/AddTagToContactService";
@@ -36,6 +37,7 @@ import {
 type IndexQuery = {
   searchParam: string;
   pageNumber: string;
+  limit?: string;
   tagId?: string;
   labelId?: string;
   dateFrom?: string;
@@ -61,13 +63,15 @@ interface ContactData {
 }
 
 export const index = async (req: Request, res: Response): Promise<Response> => {
-  const { searchParam, pageNumber, tagId, labelId, dateFrom, dateTo } =
+  const { searchParam, pageNumber, limit, tagId, labelId, dateFrom, dateTo } =
     req.query as IndexQuery;
   const { companyId, id, profile, supportMode } = req.user;
 
-  const { contacts, count, hasMore } = await ListContactsService({
+  const { contacts, count, hasMore, page, limit: pageLimit, totalPages } =
+    await ListContactsService({
     searchParam,
     pageNumber,
+    limit,
     companyId,
     tagId,
     labelId,
@@ -81,7 +85,14 @@ export const index = async (req: Request, res: Response): Promise<Response> => {
     }
   });
 
-  return res.json({ contacts, count, hasMore });
+  return res.json({
+    contacts,
+    count,
+    hasMore,
+    page,
+    limit: pageLimit,
+    totalPages
+  });
 };
 
 export const getContact = async (
@@ -362,6 +373,40 @@ export const remove = async (
   });
 
   return res.status(200).json({ message: "Contact deleted" });
+};
+
+const MAX_BULK_DELETE = 200;
+
+export const bulkRemove = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const { companyId, id, profile, supportMode } = req.user;
+  const contactIds = req.body?.contactIds;
+
+  if (!Array.isArray(contactIds) || contactIds.length === 0) {
+    throw new AppError("ERR_VALIDATION", 400);
+  }
+  if (contactIds.length > MAX_BULK_DELETE) {
+    throw new AppError("ERR_VALIDATION", 400);
+  }
+
+  const ids = contactIds
+    .map((rawId: unknown) => Number(rawId))
+    .filter((rawId: number) => Number.isFinite(rawId) && rawId > 0);
+
+  if (!ids.length) {
+    throw new AppError("ERR_VALIDATION", 400);
+  }
+
+  const result = await BatchDeleteContactsService(ids, companyId, {
+    id,
+    profile,
+    supportMode,
+    super: (req.user as { super?: boolean }).super
+  });
+
+  return res.status(200).json(result);
 };
 
 export const list = async (req: Request, res: Response): Promise<Response> => {
