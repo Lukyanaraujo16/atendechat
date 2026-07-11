@@ -1,4 +1,6 @@
 import AiAgent from "../../models/AiAgent";
+import { resolveAiAgentBusinessPrompt } from "./resolveAiAgentBusinessPrompt";
+import AiAgentProfile from "../../models/AiAgentProfile";
 
 const HANDOFF_RULES = `Quando for necessário chamar um atendente humano:
 - Responda ao cliente de forma curta, educada e natural.
@@ -36,8 +38,11 @@ Evite excesso de emojis e markdown complexo.
 
 ${HANDOFF_RULES}`;
 
-export function buildAiAgentSystemPrompt(agent: AiAgent): string {
-  const custom = agent.systemPrompt?.trim();
+export function buildAiAgentSystemPrompt(
+  agent: AiAgent,
+  profile?: AiAgentProfile | null
+): string {
+  const custom = resolveAiAgentBusinessPrompt(agent, profile)?.trim();
   const parts = [PRODUCT_RULES];
   if (custom) {
     parts.push(

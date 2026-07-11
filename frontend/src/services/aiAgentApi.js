@@ -31,3 +31,15 @@ export function getAiAgentShadowSuggestionsSummary(params = {}) {
 export function upsertAiAgentShadowSuggestionReview(logId, data) {
   return api.post(`/ai-agents/shadow-suggestions/${logId}/review`, data);
 }
+
+export function getAiAgentProfile(agentId) {
+  return api.get(`/ai-agents/${agentId}/profile`);
+}
+
+export function updateAiAgentProfile(agentId, data) {
+  return api.put(`/ai-agents/${agentId}/profile`, data);
+}
+
+export function previewAiAgentProfilePrompt(agentId, data) {
+  return api.post(`/ai-agents/${agentId}/profile/preview`, data);
+}

@@ -8,6 +8,7 @@ import { logger } from "../../utils/logger";
 import { generateChatCompletionViaAdapter } from "../AiProviderService/AiProviderAdapterFactory";
 import { buildAiAgentPromptContext } from "./buildAiAgentPromptContext";
 import { buildAiAgentSystemPrompt } from "./buildAiAgentSystemPrompt";
+import { loadAiAgentProfileForRuntime } from "./resolveAiAgentBusinessPrompt";
 import {
   parseAiAgentMaxTokens,
   parseAiAgentModelForProvider
@@ -173,7 +174,11 @@ export async function generateShadowSuggestionForLog(
       return;
     }
 
-    const systemPrompt = buildAiAgentSystemPrompt(agent);
+    const profile = await loadAiAgentProfileForRuntime({
+      companyId,
+      aiAgentId: agent.id
+    });
+    const systemPrompt = buildAiAgentSystemPrompt(agent, profile);
     let model: string;
     let maxTokens: number;
     try {

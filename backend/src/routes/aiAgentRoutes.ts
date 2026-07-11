@@ -34,6 +34,27 @@ aiAgentRoutes.post(
 );
 
 aiAgentRoutes.get(
+  "/ai-agents/:id/profile",
+  isAuth,
+  requireEffectiveModule("automation.ai_agent"),
+  AiAgentController.showProfile
+);
+
+aiAgentRoutes.put(
+  "/ai-agents/:id/profile",
+  isAuth,
+  requireEffectiveModule("automation.ai_agent"),
+  AiAgentController.upsertProfile
+);
+
+aiAgentRoutes.post(
+  "/ai-agents/:id/profile/preview",
+  isAuth,
+  requireEffectiveModule("automation.ai_agent"),
+  AiAgentController.previewProfilePrompt
+);
+
+aiAgentRoutes.get(
   "/ai-agents/:id",
   isAuth,
   requireEffectiveModule("automation.ai_agent"),

@@ -48,6 +48,11 @@ jest.mock("../../../models/AiAgent", () => ({
   default: { findOne: jest.fn() }
 }));
 
+jest.mock("../resolveAiAgentBusinessPrompt", () => ({
+  ...jest.requireActual("../resolveAiAgentBusinessPrompt"),
+  loadAiAgentProfileForRuntime: jest.fn().mockResolvedValue(null)
+}));
+
 jest.mock("../../../helpers/shouldBypassChatbot", () => ({
   shouldBypassChatbot: jest.fn().mockResolvedValue({ bypass: false })
 }));

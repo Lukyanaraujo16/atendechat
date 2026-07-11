@@ -7,6 +7,9 @@ import UpdateAiAgentService from "../services/AiAgentService/UpdateAiAgentServic
 import DeleteAiAgentService from "../services/AiAgentService/DeleteAiAgentService";
 import ListAiAgentShadowSuggestionsService from "../services/AiAgentService/ListAiAgentShadowSuggestionsService";
 import GetAiAgentShadowSuggestionsSummaryService from "../services/AiAgentService/GetAiAgentShadowSuggestionsSummaryService";
+import ShowAiAgentProfileService from "../services/AiAgentService/ShowAiAgentProfileService";
+import UpsertAiAgentProfileService from "../services/AiAgentService/UpsertAiAgentProfileService";
+import GenerateAiAgentPromptPreviewService from "../services/AiAgentService/GenerateAiAgentPromptPreviewService";
 import UpsertAiAgentSuggestionReviewService from "../services/AiAgentService/UpsertAiAgentSuggestionReviewService";
 import {
   parseOptionalBoolean,
@@ -124,4 +127,42 @@ export const upsertShadowSuggestionReview = async (
     body: req.body
   });
   return res.json(review);
+};
+
+export const showProfile = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const aiAgentId = parseIdParam(req.params.id);
+  const profile = await ShowAiAgentProfileService({ companyId, aiAgentId });
+  return res.json({ profile });
+};
+
+export const upsertProfile = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const aiAgentId = parseIdParam(req.params.id);
+  const profile = await UpsertAiAgentProfileService({
+    companyId,
+    aiAgentId,
+    body: req.body
+  });
+  return res.json({ profile });
+};
+
+export const previewProfilePrompt = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const aiAgentId = parseIdParam(req.params.id);
+  const preview = await GenerateAiAgentPromptPreviewService({
+    companyId,
+    aiAgentId,
+    body: req.body
+  });
+  return res.json(preview);
 };

@@ -343,7 +343,8 @@ const AiAgentModal = ({ open, onClose, agentId, onSaved }) => {
                     <Field
                       as={TextField}
                       name="systemPrompt"
-                      label={i18n.t("aiAgent.fields.systemPrompt")}
+                      label={i18n.t("aiAgent.fields.systemPromptAdvanced")}
+                      helperText={i18n.t("aiAgent.fields.systemPromptAdvancedHint")}
                       fullWidth
                       multiline
                       rows={4}

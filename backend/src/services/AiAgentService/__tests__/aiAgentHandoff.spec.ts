@@ -53,6 +53,11 @@ jest.mock("../../../models/AiAgent", () => ({
   default: { findOne: jest.fn() }
 }));
 
+jest.mock("../resolveAiAgentBusinessPrompt", () => ({
+  ...jest.requireActual("../resolveAiAgentBusinessPrompt"),
+  loadAiAgentProfileForRuntime: jest.fn().mockResolvedValue(null)
+}));
+
 jest.mock("../isTicketIntegrationActive", () => ({
   isTicketIntegrationActive: jest.fn().mockResolvedValue({ active: false })
 }));

@@ -7,6 +7,7 @@ import {
   DataType,
   Default,
   ForeignKey,
+  HasOne,
   Model,
   PrimaryKey,
   Table,
@@ -14,6 +15,7 @@ import {
 } from "sequelize-typescript";
 import Company from "./Company";
 import AiProviderCredential from "./AiProviderCredential";
+import AiAgentProfile from "./AiAgentProfile";
 import {
   DEFAULT_AI_AGENT_MAX_TOKENS,
   DEFAULT_AI_AGENT_MODEL,
@@ -85,6 +87,9 @@ class AiAgent extends Model<AiAgent> {
 
   @BelongsTo(() => AiProviderCredential)
   aiProviderCredential: AiProviderCredential;
+
+  @HasOne(() => AiAgentProfile)
+  profile: AiAgentProfile;
 
   @Default(false)
   @Column

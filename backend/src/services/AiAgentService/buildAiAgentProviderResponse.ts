@@ -5,6 +5,7 @@ import Whatsapp from "../../models/Whatsapp";
 import { generateChatCompletionViaAdapter } from "../AiProviderService/AiProviderAdapterFactory";
 import { buildAiAgentPromptContext } from "./buildAiAgentPromptContext";
 import { buildAiAgentSystemPrompt } from "./buildAiAgentSystemPrompt";
+import { loadAiAgentProfileForRuntime } from "./resolveAiAgentBusinessPrompt";
 import {
   parseAiAgentMaxTokens,
   parseAiAgentModelForProvider
@@ -99,7 +100,11 @@ export async function buildAiAgentProviderResponse(
     };
   }
 
-  const systemPrompt = buildAiAgentSystemPrompt(input.agent);
+  const profile = await loadAiAgentProfileForRuntime({
+    companyId: input.companyId,
+    aiAgentId: input.agent.id
+  });
+  const systemPrompt = buildAiAgentSystemPrompt(input.agent, profile);
   let model: string;
   let maxTokens: number;
   try {

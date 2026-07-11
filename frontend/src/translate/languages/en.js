@@ -2713,6 +2713,9 @@ const messages = {
 					temperature: "Temperature",
 					maxTokens: "Max tokens",
 					systemPrompt: "Main prompt / agent instructions",
+					systemPromptAdvanced: "Advanced configuration (manual prompt)",
+					systemPromptAdvancedHint:
+						"For manually created agents or advanced mode. The Guided Assistant will use a structured profile in a future phase.",
 					fallbackMessage: "Fallback message",
 					handoffMessage: "Handoff message to a human",
 					allowAudioInput: "Allow understanding audio",

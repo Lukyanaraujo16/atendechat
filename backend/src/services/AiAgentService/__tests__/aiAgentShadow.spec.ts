@@ -7,6 +7,11 @@ jest.mock("../../AiProviderService/AiProviderAdapterFactory", () => ({
   generateChatCompletionViaAdapter: jest.fn()
 }));
 
+jest.mock("../sendAiAgentWhatsappMessage", () => ({
+  __esModule: true,
+  default: jest.fn()
+}));
+
 jest.mock("../../../models/Message", () => ({
   __esModule: true,
   default: { findAll: jest.fn() }
@@ -39,6 +44,11 @@ jest.mock("../../../models/Whatsapp", () => ({
 jest.mock("../../../models/AiAgent", () => ({
   __esModule: true,
   default: { findOne: jest.fn() }
+}));
+
+jest.mock("../resolveAiAgentBusinessPrompt", () => ({
+  ...jest.requireActual("../resolveAiAgentBusinessPrompt"),
+  loadAiAgentProfileForRuntime: jest.fn().mockResolvedValue(null)
 }));
 
 import Message from "../../../models/Message";
