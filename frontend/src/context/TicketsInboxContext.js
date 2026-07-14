@@ -18,6 +18,9 @@ import {
   TICKETS_NO_CACHE_HEADERS,
 } from "../utils/ticketsApiResponse";
 import { isPendingAutomationTicket } from "../utils/ticketAutomationUi";
+import {
+  decideUserTicketInboxVisibility,
+} from "../utils/ticketInboxVisibility";
 
 /** Mantém a mesma referência de array se todos os elementos forem === aos anteriores (ordem e tamanho iguais). */
 function stabilizeListByRef(prevList, nextList) {
@@ -776,47 +779,48 @@ export function TicketsInboxProvider({
           actorCompanyId != null &&
           Number(ticketCompanyId) !== Number(actorCompanyId)
         ) {
+          console.info("[TicketVisibilityDebug] socket_decision", {
+            ticketId: ticket.id,
+            status: ticket.status,
+            ticketQueueId: ticket.queueId ?? null,
+            ticketUserId: ticket.userId ?? null,
+            myUserId: user?.id ?? null,
+            userQueueIds: safeQueues.map((q) => q.id),
+            selectedQueueIds,
+            showAll,
+            allowed: false,
+            reason: "company_mismatch",
+          });
           return false;
         }
         return true;
       }
 
-      if (user?.supportMode !== true) {
-        const vis = ticket?.whatsapp?.ticketVisibility || "all";
-        if (vis === "admin_supervisor") {
-          return false;
-        }
-      }
-      if (showAll) return true;
-      const myId = Number(userId);
-      const assigneeRaw = ticket.userId;
-      const assignee =
-        assigneeRaw != null && assigneeRaw !== ""
-          ? Number(assigneeRaw)
-          : null;
-      const selected = Array.isArray(selectedQueueIds) ? selectedQueueIds : [];
-
-      if (assignee != null && !Number.isNaN(assignee) && assignee > 0) {
-        return assignee === myId;
-      }
-      const qidRaw = ticket.queueId;
-      const qid =
-        qidRaw != null && qidRaw !== "" && !Number.isNaN(Number(qidRaw))
-          ? Number(qidRaw)
-          : null;
-      if (qid == null) {
-        return user?.allTicket === "enabled";
-      }
-      return selected.indexOf(qid) > -1;
+      // Usuário comum: showAll nunca amplia a autorização.
+      const decision = decideUserTicketInboxVisibility(
+        user,
+        ticket,
+        selectedQueueIds
+      );
+      console.info("[TicketVisibilityDebug] socket_decision", {
+        ticketId: ticket.id,
+        status: ticket.status,
+        ticketQueueId: ticket.queueId ?? null,
+        ticketUserId: ticket.userId ?? null,
+        myUserId: user?.id ?? null,
+        userQueueIds: safeQueues.map((q) => q.id),
+        selectedQueueIds,
+        showAll: false,
+        allowed: decision.allowed,
+        reason: decision.reason,
+      });
+      return decision.allowed;
     },
     [
-      userId,
-      showAll,
+      user,
       selectedQueueIds,
-      user?.allTicket,
-      user?.profile,
-      user?.supportMode,
-      user?.companyId,
+      showAll,
+      safeQueues,
     ]
   );
 
@@ -1183,36 +1187,12 @@ export function TicketsInboxProvider({
       if (profile !== "user") {
         return base;
       }
-      const queueIds = safeQueues.map((q) => q.id);
-      const myId = Number(user?.id);
-      return base.filter((t) => {
-        const vis = t?.whatsapp?.ticketVisibility || "all";
-        if (vis === "admin_supervisor") {
-          return false;
-        }
-        const assigneeRaw = t.userId;
-        const assignee =
-          assigneeRaw != null && assigneeRaw !== ""
-            ? Number(assigneeRaw)
-            : null;
-        if (assignee != null && !Number.isNaN(assignee) && assignee === myId) {
-          return true;
-        }
-        if (assignee != null && !Number.isNaN(assignee)) {
-          return false;
-        }
-        const qidRaw = t.queueId;
-        const qid =
-          qidRaw != null && qidRaw !== "" && !Number.isNaN(Number(qidRaw))
-            ? Number(qidRaw)
-            : null;
-        if (qid == null) {
-          return user?.allTicket === "enabled";
-        }
-        return queueIds.indexOf(qid) > -1;
-      });
+      // Membership ∩ selectedQueueIds (selected vazio = todas as filas do user).
+      return base.filter((t) =>
+        decideUserTicketInboxVisibility(user, t, selectedQueueIds).allowed
+      );
     },
-    [profile, safeQueues, user?.id, user?.allTicket]
+    [profile, user, selectedQueueIds]
   );
 
   const tickets = useMemo(
@@ -1228,15 +1208,15 @@ export function TicketsInboxProvider({
     return sortOpenTicketsWithPins(withPinFlag, pinnedOrderIds);
   }, [openTicketsList, filterTicketsForProfile, pinnedOrderIds, pinnedIdSet]);
 
-  /** API já aplica visibilidade; só exclui grupos da coluna 1:1. */
+  /** Mesma regra da API + membership: não confiar só no payload da listagem. */
   const pendingTickets = useMemo(
-    () => (waitingTicketsList || []).filter((t) => !t.isGroup),
-    [waitingTicketsList]
+    () => filterTicketsForProfile(waitingTicketsList),
+    [waitingTicketsList, filterTicketsForProfile]
   );
 
   const chatbotTickets = useMemo(
-    () => (chatbotTicketsList || []).filter((t) => !t.isGroup),
-    [chatbotTicketsList]
+    () => filterTicketsForProfile(chatbotTicketsList),
+    [chatbotTicketsList, filterTicketsForProfile]
   );
 
   const openStableRef = useRef(null);

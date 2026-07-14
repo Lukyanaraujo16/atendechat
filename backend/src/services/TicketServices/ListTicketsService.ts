@@ -35,6 +35,7 @@ import {
   isGroupVisibilityPrivileged,
   loadUserQueueIds
 } from "../../helpers/groupVisibility";
+import { resolveEffectiveQueueIdsForAgent } from "../../helpers/agentTicketListWhere";
 
 interface Request {
   searchParam?: string;
@@ -94,17 +95,63 @@ const ListTicketsService = async ({
     supportMode
   };
 
-  if (parseTruthyQuery(showAll)) {
-    whereCondition = buildShowAllTicketListWhere(actor, queueIds, companyId);
+  // Usuário comum: selectedQueueIds é filtro visual — nunca amplia membership.
+  // showAll não se aplica a profile=user (só admin/supervisor/support).
+  const isCommonAgent =
+    String(userProfile || "") === "user" && supportMode !== true;
+
+  let effectiveQueueIds = Array.isArray(queueIds) ? queueIds : [];
+  let effectiveShowAll = parseTruthyQuery(showAll);
+  let membershipQueueIds: number[] = [];
+  let allTicketEnabled = false;
+
+  if (isCommonAgent) {
+    effectiveShowAll = false;
+    membershipQueueIds = await loadUserQueueIds(userId);
+    effectiveQueueIds = resolveEffectiveQueueIdsForAgent(
+      membershipQueueIds,
+      queueIds
+    );
+  }
+
+  const userRow = await User.findByPk(userId, {
+    attributes: ["allTicket"]
+  });
+  allTicketEnabled = userRow?.allTicket === "enabled";
+
+  logger.info(
+    {
+      tag: "[TicketVisibilityDebug]",
+      event: "list_request",
+      userId: Number(userId),
+      companyId,
+      profile: userProfile,
+      status: status || null,
+      showAll: effectiveShowAll,
+      requestedQueueIds: Array.isArray(queueIds) ? queueIds : [],
+      userQueueIds: isCommonAgent
+        ? membershipQueueIds
+        : Array.isArray(queueIds)
+          ? queueIds
+          : [],
+      selectedEffectiveQueueIds: effectiveQueueIds,
+      allTicket: allTicketEnabled
+    },
+    "[TicketVisibilityDebug] list_request"
+  );
+
+  if (effectiveShowAll) {
+    whereCondition = buildShowAllTicketListWhere(
+      actor,
+      effectiveQueueIds,
+      companyId
+    );
   } else {
-    const userRow = await User.findByPk(userId, {
-      attributes: ["allTicket"]
-    });
     whereCondition = buildAgentTicketListWhere(
       actor,
       userId,
-      queueIds,
-      userRow?.allTicket === "enabled",
+      effectiveQueueIds,
+      allTicketEnabled,
       companyId
     );
   }
@@ -467,6 +514,22 @@ const ListTicketsService = async ({
       "[ListTicketsService] pending result ids"
     );
   }
+
+  logger.info(
+    {
+      tag: "[TicketVisibilityDebug]",
+      event: "list_result",
+      userId: Number(userId),
+      status: status || null,
+      count,
+      tickets: tickets.map((t) => ({
+        id: t.id,
+        queueId: t.queueId ?? null,
+        assignedUserId: t.userId ?? null
+      }))
+    },
+    "[TicketVisibilityDebug] list_result"
+  );
 
   return {
     tickets,

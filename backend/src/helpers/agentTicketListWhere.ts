@@ -11,6 +11,27 @@ export function queueInAllowedOrUnassigned(queueIds: number[]): Filterable["wher
 }
 
 /**
+ * Limite de segurança: selectedQueueIds do cliente nunca amplia além das filas
+ * reais do utilizador. Se o request não filtrar (vazio), usa membership.
+ */
+export function resolveEffectiveQueueIdsForAgent(
+  membershipQueueIds: number[],
+  requestedQueueIds: number[] | undefined | null
+): number[] {
+  const membership = (membershipQueueIds || [])
+    .map((id) => Number(id))
+    .filter((id) => Number.isFinite(id));
+  const requested = (requestedQueueIds || [])
+    .map((id) => Number(id))
+    .filter((id) => Number.isFinite(id));
+  if (!requested.length) {
+    return membership;
+  }
+  const set = new Set(membership);
+  return requested.filter((id) => set.has(id));
+}
+
+/**
  * Visibilidade para atendente (não showAll):
  * - tickets com userId = eu (qualquer fila / null / status filtrado pela query);
  * - tickets pending sem responsável, na “piscina” das filas do utilizador (e opcionalmente sem fila se allTicket).

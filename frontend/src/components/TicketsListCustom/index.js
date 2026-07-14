@@ -27,6 +27,7 @@ import { AuthContext } from "../../context/Auth/AuthContext";
 import { TicketsInboxContext } from "../../context/TicketsInboxContext";
 import { SocketContext } from "../../context/Socket/SocketContext";
 import { isPendingAutomationTicket } from "../../utils/ticketAutomationUi";
+import { canUserViewTicketInInbox } from "../../utils/ticketInboxVisibility";
 import {
   PANEL_RADIUS,
   getTicketPanelScrollbarStyles,
@@ -295,25 +296,9 @@ const TicketsListCustom = (props) => {
 
   useEffect(() => {
     if (isControlled) return;
-    const qIds = safeQueues.map((q) => q.id);
     const filteredTickets = tickets.filter((t) => {
       if (profile !== "user" || groupsOnly) return true;
-      const myId = Number(user?.id);
-      const assigneeRaw = t.userId;
-      const assignee =
-        assigneeRaw != null && assigneeRaw !== ""
-          ? Number(assigneeRaw)
-          : null;
-      if (assignee != null && !Number.isNaN(assignee) && assignee === myId) {
-        return true;
-      }
-      if (assignee != null && !Number.isNaN(assignee)) {
-        return false;
-      }
-      if (!t.queueId) {
-        return user?.allTicket === "enabled";
-      }
-      return qIds.indexOf(t.queueId) > -1;
+      return canUserViewTicketInInbox(user, t, selectedQueueIds);
     });
 
     let base =
@@ -336,7 +321,7 @@ const TicketsListCustom = (props) => {
       type: "LOAD_TICKETS",
       payload: applyPendingChatbotSplit(base),
     });
-  }, [isControlled, tickets, status, searchParam, safeQueues, profile, chatbotOnly, groupsOnly, user?.id, user?.allTicket]);
+  }, [isControlled, tickets, status, searchParam, selectedQueueIds, profile, chatbotOnly, groupsOnly, user]);
 
   const rawDisplayTickets = isControlled ? controlledTickets : ticketsList;
   const displayTickets = useMemo(() => {
@@ -402,23 +387,11 @@ const TicketsListCustom = (props) => {
 
     const shouldUpdateTicket = (ticket) => {
       if (groupsOnly) return true;
-      const myId = Number(user?.id);
-      if (showAll) return true;
-      const assigneeRaw = ticket?.userId;
-      const assignee =
-        assigneeRaw != null && assigneeRaw !== ""
-          ? Number(assigneeRaw)
-          : null;
-      if (assignee != null && !Number.isNaN(assignee) && assignee === myId) {
-        return true;
+      if (profile !== "user") {
+        if (showAll) return true;
       }
-      if (assignee != null && !Number.isNaN(assignee)) {
-        return false;
-      }
-      if (!ticket.queueId) {
-        return user?.allTicket === "enabled";
-      }
-      return selectedQueueIds.indexOf(ticket.queueId) > -1;
+      // Usuário comum: showAll nunca amplia; membership ∩ selected.
+      return canUserViewTicketInInbox(user, ticket, selectedQueueIds);
     };
 
     /** Mesma regra da lista inicial: em pending, Automações vs Aguardando são mutuamente exclusivos */

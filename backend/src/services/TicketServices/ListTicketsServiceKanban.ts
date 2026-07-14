@@ -23,6 +23,7 @@ import {
   isGroupVisibilityPrivileged,
   loadUserQueueIds
 } from "../../helpers/groupVisibility";
+import { resolveEffectiveQueueIdsForAgent } from "../../helpers/agentTicketListWhere";
 import {
   buildKanbanClosedStatusWhere,
   parseKanbanClosedPeriod
@@ -132,7 +133,7 @@ const ListTicketsServiceKanban = async ({
           ]
         };
 
-  if (parseTruthyQuery(showAll)) {
+  if (parseTruthyQuery(showAll) && String(userProfile || "") !== "user") {
     if (isWhatsappTicketVisibilityPrivileged(actor)) {
       whereCondition = statusKanbanFilter;
     } else {
@@ -147,12 +148,24 @@ const ListTicketsServiceKanban = async ({
     const userRow = await User.findByPk(userId, {
       attributes: ["allTicket"]
     });
+    const isCommonAgent =
+      String(userProfile || "") === "user" && supportMode !== true;
+    const membershipQueueIds = isCommonAgent
+      ? await loadUserQueueIds(userId)
+      : Array.isArray(queueIds)
+        ? queueIds
+        : [];
+    const effectiveQueueIds = isCommonAgent
+      ? resolveEffectiveQueueIdsForAgent(membershipQueueIds, queueIds)
+      : Array.isArray(queueIds)
+        ? queueIds
+        : [];
     whereCondition = {
       [Op.and]: [
         buildAgentTicketListWhere(
           actor,
           userId,
-          queueIds,
+          effectiveQueueIds,
           userRow?.allTicket === "enabled",
           companyId
         ),
