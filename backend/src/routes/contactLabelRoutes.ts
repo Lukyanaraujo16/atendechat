@@ -8,8 +8,18 @@ import * as ContactLabelController from "../controllers/ContactLabelController";
 
 const contactLabelRoutes = express.Router();
 
-contactLabelRoutes.use(isAuth);
-contactLabelRoutes.use(requireAnyPlanFeature("attendance.inbox"));
+// Escopado aos prefixos servidos por este router (/contact-labels e
+// /contacts/:contactId/labels) para não vazar o gate para routers posteriores.
+contactLabelRoutes.use(
+  "/contact-labels",
+  isAuth,
+  requireAnyPlanFeature("attendance.inbox")
+);
+contactLabelRoutes.use(
+  "/contacts",
+  isAuth,
+  requireAnyPlanFeature("attendance.inbox")
+);
 
 contactLabelRoutes.get(
   "/contact-labels/stats",

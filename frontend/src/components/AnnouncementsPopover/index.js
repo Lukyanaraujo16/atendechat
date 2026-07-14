@@ -1,6 +1,5 @@
 import React, { useEffect, useReducer, useState, useContext } from "react";
 import { makeStyles } from "@material-ui/core/styles";
-import toastError from "../../errors/toastError";
 import Popover from "@material-ui/core/Popover";
 import AnnouncementIcon from "@material-ui/icons/Announcement";
 import Tooltip from "@material-ui/core/Tooltip";
@@ -187,7 +186,9 @@ export default function AnnouncementsPopover() {
       setHasMore(data.hasMore);
       setLoading(false);
     } catch (err) {
-      toastError(err);
+      // Informativos são passivos: falha (ex.: permissão) não deve gerar
+      // toast global logo após o login.
+      console.debug("[Announcements] fetch failed", err?.response?.status);
     }
   };
 

@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useContext } from "react";
 import api from "../../services/api";
-import toastError from "../../errors/toastError";
 import { SocketContext } from "../../context/Socket/SocketContext";
 import { resolveBackendBaseURL } from "../../config/backendUrl";
 
@@ -28,7 +27,9 @@ export default function useStickers() {
       const { data } = await api.get("/stickers");
       setStickers(Array.isArray(data?.stickers) ? data.stickers : []);
     } catch (err) {
-      toastError(err);
+      // Stickers são opcionais: uma falha aqui não deve gerar toast global
+      // nem impedir o carregamento da conversa/mensagens.
+      console.debug("[useStickers] load failed", err?.response?.status);
       setStickers([]);
     } finally {
       setLoading(false);

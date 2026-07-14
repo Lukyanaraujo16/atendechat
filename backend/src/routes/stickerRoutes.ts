@@ -8,8 +8,10 @@ import AppError from "../errors/AppError";
 
 const stickerRoutes = Router();
 
-stickerRoutes.use(isAuth);
-stickerRoutes.use(requireAnyPlanFeature("attendance.inbox"));
+// Escopado aos prefixos servidos por este router (/stickers e
+// /messages/:ticketId/sticker) para não vazar o gate para routers posteriores.
+stickerRoutes.use("/stickers", isAuth, requireAnyPlanFeature("attendance.inbox"));
+stickerRoutes.use("/messages", isAuth, requireAnyPlanFeature("attendance.inbox"));
 
 stickerRoutes.get("/stickers", noStoreCache, StickerController.index);
 stickerRoutes.post(

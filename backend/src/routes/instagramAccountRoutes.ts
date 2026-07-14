@@ -9,7 +9,11 @@ import * as MetaWebhookController from "../controllers/MetaWebhookController";
 
 const instagramAccountRoutes = express.Router();
 
-instagramAccountRoutes.use(isAuth, requireInstagramIntegration);
+// Escopado ao prefixo do próprio router. Sem o path, este middleware rodaria
+// para TODAS as rotas montadas depois em routes/index.ts (messages, stickers,
+// queue, companies/listPlan, announcements), bloqueando-as com
+// ERR_USER_FEATURE_DISABLED para quem não tem a integração do Instagram.
+instagramAccountRoutes.use("/instagram-accounts", isAuth, requireInstagramIntegration);
 
 instagramAccountRoutes.get(
   "/instagram-accounts/webhook-info",

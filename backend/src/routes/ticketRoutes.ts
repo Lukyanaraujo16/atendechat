@@ -25,8 +25,9 @@ ticketRoutes.put(
   TicketController.update
 );
 
-ticketRoutes.use(isAuth);
-ticketRoutes.use(requireAnyPlanFeature("attendance.inbox"));
+// Escopado a /tickets para não vazar o gate para routers montados depois.
+// (/ticket/kanban já tem isAuth + gate próprios acima.)
+ticketRoutes.use("/tickets", isAuth, requireAnyPlanFeature("attendance.inbox"));
 
 ticketRoutes.get("/tickets", noStoreCache, TicketController.index);
 ticketRoutes.get("/tickets/pinned", noStoreCache, TicketController.listPinned);

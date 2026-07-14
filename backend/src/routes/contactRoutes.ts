@@ -8,8 +8,8 @@ import * as ImportPhoneContactsController from "../controllers/ImportPhoneContac
 
 const contactRoutes = express.Router();
 
-contactRoutes.use(isAuth);
-contactRoutes.use(requireAnyPlanFeature("attendance.inbox"));
+// Escopado a /contacts para não vazar o gate para routers montados depois.
+contactRoutes.use("/contacts", isAuth, requireAnyPlanFeature("attendance.inbox"));
 
 contactRoutes.post("/contacts/import", ImportPhoneContactsController.store);
 
