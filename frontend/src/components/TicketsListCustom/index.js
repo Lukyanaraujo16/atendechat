@@ -764,6 +764,7 @@ const TicketsListCustom = (props) => {
         {i18n.t("ticket.delete.bulkConfirmMessage", { count: selectedCount })}
       </ConfirmationModal>
       <TransferTicketModalCustom
+        key={selectedTransferTicket?.id || "transfer-modal"}
         modalOpen={transferModalOpen}
         onClose={handleCloseTransferModal}
         ticketid={selectedTransferTicket?.id}

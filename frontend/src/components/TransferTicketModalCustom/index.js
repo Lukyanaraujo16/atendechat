@@ -67,6 +67,20 @@ const TransferTicketModalCustom = ({ modalOpen, onClose, ticketid }) => {
   const inbox = useContext(TicketsInboxContext);
   const { companyId, whatsappId } = user;
 
+  // Reset central e determinístico do estado por-ticket do modal. Não mexe em
+  // dados de referência (queues/allQueues/whatsapps), apenas no que pertence à
+  // transferência atual — evita que o estado de um ticket vaze para o próximo.
+  const resetTransferModalState = useCallback(() => {
+    setSaving(false);
+    setSelectedUser(null);
+    setSelectedQueue("");
+    setSelectedWhatsapp("");
+    setSearchDraft("");
+    setSearchQuery("");
+    setOptions([]);
+    setUsersLoading(false);
+  }, []);
+
   useEffect(() => {
     return () => {
       isMounted.current = false;
@@ -79,10 +93,7 @@ const TransferTicketModalCustom = ({ modalOpen, onClose, ticketid }) => {
       return undefined;
     }
 
-    setSearchDraft("");
-    setSearchQuery("");
-    setSelectedUser(null);
-    setUsersLoading(false);
+    resetTransferModalState();
 
     const previous = focusBeforeOpenRef.current;
     focusBeforeOpenRef.current = null;
@@ -96,7 +107,7 @@ const TransferTicketModalCustom = ({ modalOpen, onClose, ticketid }) => {
       });
     }
     return undefined;
-  }, [modalOpen]);
+  }, [modalOpen, resetTransferModalState]);
 
   useEffect(() => {
     if (!modalOpen) return undefined;
@@ -104,6 +115,23 @@ const TransferTicketModalCustom = ({ modalOpen, onClose, ticketid }) => {
     return () => clearTimeout(t);
   }, [searchDraft, modalOpen]);
 
+  // Abertura/troca de ticket: começa limpo e aplica os defaults de abertura
+  // (conexão e fila única). Depende só de modalOpen/ticketid, então não apaga
+  // o que o usuário já preencheu enquanto o mesmo ticket está aberto.
+  useEffect(() => {
+    if (!modalOpen || !ticketid) return;
+    resetTransferModalState();
+    if (whatsappId !== null && whatsappId !== undefined) {
+      setSelectedWhatsapp(whatsappId);
+    }
+    const userQueues = Array.isArray(user?.queues) ? user.queues : [];
+    if (userQueues.length === 1) {
+      setSelectedQueue(userQueues[0].id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modalOpen, ticketid]);
+
+  // Carregamento de dados de referência (conexões) — separado do reset.
   useEffect(() => {
     if (!modalOpen) return;
     const fetchContacts = async () => {
@@ -114,17 +142,8 @@ const TransferTicketModalCustom = ({ modalOpen, onClose, ticketid }) => {
         toastError(err);
       }
     };
-
-    if (whatsappId !== null && whatsappId !== undefined) {
-      setSelectedWhatsapp(whatsappId);
-    }
-
-    const userQueues = Array.isArray(user?.queues) ? user.queues : [];
-    if (userQueues.length === 1) {
-      setSelectedQueue(userQueues[0].id);
-    }
     fetchContacts();
-  }, [modalOpen, companyId, whatsappId, user?.queues]);
+  }, [modalOpen, companyId]);
 
   useEffect(() => {
     if (isMounted.current) {
@@ -228,6 +247,7 @@ const TransferTicketModalCustom = ({ modalOpen, onClose, ticketid }) => {
 
   const handleSaveTicket = async (e) => {
     e.preventDefault();
+    if (saving) return;
     if (!ticketid) return;
     if (!selectedQueue || selectedQueue === "") return;
     setSaving(true);
@@ -266,8 +286,9 @@ const TransferTicketModalCustom = ({ modalOpen, onClose, ticketid }) => {
       onClose();
       history.push(`/tickets`);
     } catch (err) {
-      setSaving(false);
       toastError(err);
+    } finally {
+      if (isMounted.current) setSaving(false);
     }
   };
 
