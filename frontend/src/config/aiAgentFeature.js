@@ -11,6 +11,9 @@ export const AI_AGENT_WIZARD_EDIT_ROUTE_PATH = "/ai-agent/wizard/:agentId";
 /** Simulador de conversa do atendente virtual. */
 export const AI_AGENT_SIMULATOR_ROUTE_PATH = "/ai-agent/:agentId/simulator";
 
+/** Analytics / Observabilidade / Aprendizado assistido (Fase IA 1.5.3). */
+export const AI_AGENT_ANALYTICS_ROUTE_PATH = "/ai-agent/analytics";
+
 /**
  * Controla exibição da aba/menu do Agente de IA.
  * Manter `false` até a fase com página funcional + backend.

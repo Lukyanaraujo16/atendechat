@@ -37,6 +37,8 @@ import {
   buildKnowledgeRuntimeMetadata,
   safeRetrieveKnowledgeForAgent
 } from "./knowledge/integrateKnowledgeIntoRuntime";
+import { safeEmitKnowledgeObservability } from "./analytics/emitKnowledgeObservability";
+import { safeRecordAgentAnalyticsEvent } from "./analytics/recordAgentAnalyticsEvent";
 import {
   acquireAiAgentGenerationLock,
   releaseAiAgentGenerationLock
@@ -275,6 +277,23 @@ export async function generateShadowSuggestionForLog(
           shadowStatus: AI_AGENT_SHADOW_STATUSES.FAILED
         });
       }
+      void safeEmitKnowledgeObservability({
+        companyId,
+        aiAgentId: agent.id,
+        channel: "shadow",
+        query: inboundText,
+        retrieval,
+        decision: knowledgeApplied.decision,
+        ticketId: ticket.id,
+        runtimeLogId: logId,
+        messageId: log.messageId || null,
+        requestId: `shadow-${logId}`,
+        provider: resolved.provider,
+        model,
+        latencyMs,
+        systemPrompt,
+        interaction: true
+      });
       return;
     }
 
@@ -288,6 +307,23 @@ export async function generateShadowSuggestionForLog(
         contextMessageCount: promptContext.contextMessageCount,
         contextHash: promptContext.contextHash,
         latencyMs
+      });
+      void safeEmitKnowledgeObservability({
+        companyId,
+        aiAgentId: agent.id,
+        channel: "shadow",
+        query: inboundText,
+        retrieval,
+        decision: knowledgeApplied.decision,
+        ticketId: ticket.id,
+        runtimeLogId: logId,
+        messageId: log.messageId || null,
+        requestId: `shadow-${logId}`,
+        provider: resolved.provider,
+        model,
+        latencyMs,
+        systemPrompt,
+        interaction: true
       });
       return;
     }
@@ -306,6 +342,38 @@ export async function generateShadowSuggestionForLog(
       latencyMs,
       generatedAt: new Date(),
       errorCode: null
+    });
+
+    void safeEmitKnowledgeObservability({
+      companyId,
+      aiAgentId: agent.id,
+      channel: "shadow",
+      query: inboundText,
+      retrieval,
+      decision: knowledgeApplied.decision,
+      ticketId: ticket.id,
+      runtimeLogId: logId,
+      messageId: log.messageId || null,
+      requestId: `shadow-${logId}`,
+      provider: result.provider || resolved.provider,
+      model: result.model || model,
+      latencyMs,
+      responseText: content,
+      systemPrompt,
+      tokensInput: result.promptTokens,
+      tokensOutput: result.completionTokens,
+      interaction: true
+    });
+    void safeRecordAgentAnalyticsEvent({
+      companyId,
+      aiAgentId: agent.id,
+      channel: "shadow",
+      kind: "generation",
+      tokensInput: result.promptTokens,
+      tokensOutput: result.completionTokens,
+      provider: result.provider || resolved.provider,
+      model: result.model || model,
+      generationTimeMs: latencyMs
     });
 
     logger.info(

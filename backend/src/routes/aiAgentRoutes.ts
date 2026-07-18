@@ -1,12 +1,15 @@
 import { Router } from "express";
 import isAuth from "../middleware/isAuth";
 import requireEffectiveModule from "../middleware/requireEffectiveModule";
+import requireTenantAdminOrSupport from "../middleware/requireTenantAdminOrSupport";
 import * as AiAgentController from "../controllers/AiAgentController";
+import * as AiAgentAnalyticsController from "../controllers/AiAgentAnalyticsController";
 import { KNOWLEDGE_BASE_FEATURE_KEY } from "../config/knowledgeBaseConstants";
 
 const aiAgentRoutes = Router();
 const requireAiAgent = requireEffectiveModule("automation.ai_agent");
 const requireKnowledgeBase = requireEffectiveModule(KNOWLEDGE_BASE_FEATURE_KEY);
+const requireAdmin = requireTenantAdminOrSupport;
 
 aiAgentRoutes.get(
   "/ai-agents",
@@ -34,6 +37,137 @@ aiAgentRoutes.post(
   isAuth,
   requireAiAgent,
   AiAgentController.upsertShadowSuggestionReview
+);
+
+/* —— Fase IA 1.5.3: Analytics / Observabilidade (admin) —— */
+aiAgentRoutes.get(
+  "/ai-agents/analytics/dashboard",
+  isAuth,
+  requireAiAgent,
+  requireKnowledgeBase,
+  requireAdmin,
+  AiAgentAnalyticsController.dashboard
+);
+
+aiAgentRoutes.get(
+  "/ai-agents/analytics/agents",
+  isAuth,
+  requireAiAgent,
+  requireAdmin,
+  AiAgentAnalyticsController.agentAnalytics
+);
+
+aiAgentRoutes.get(
+  "/ai-agents/analytics/knowledge-bases",
+  isAuth,
+  requireAiAgent,
+  requireKnowledgeBase,
+  requireAdmin,
+  AiAgentAnalyticsController.knowledgeBaseAnalytics
+);
+
+aiAgentRoutes.get(
+  "/ai-agents/analytics/documents",
+  isAuth,
+  requireAiAgent,
+  requireKnowledgeBase,
+  requireAdmin,
+  AiAgentAnalyticsController.documentAnalytics
+);
+
+aiAgentRoutes.get(
+  "/ai-agents/analytics/health",
+  isAuth,
+  requireAiAgent,
+  requireKnowledgeBase,
+  requireAdmin,
+  AiAgentAnalyticsController.health
+);
+
+aiAgentRoutes.get(
+  "/ai-agents/analytics/health-score",
+  isAuth,
+  requireAiAgent,
+  requireKnowledgeBase,
+  requireAdmin,
+  AiAgentAnalyticsController.healthScore
+);
+
+aiAgentRoutes.get(
+  "/ai-agents/analytics/knowledge-gaps",
+  isAuth,
+  requireAiAgent,
+  requireKnowledgeBase,
+  requireAdmin,
+  AiAgentAnalyticsController.listGaps
+);
+
+aiAgentRoutes.patch(
+  "/ai-agents/analytics/knowledge-gaps/:id",
+  isAuth,
+  requireAiAgent,
+  requireKnowledgeBase,
+  requireAdmin,
+  AiAgentAnalyticsController.updateGap
+);
+
+aiAgentRoutes.get(
+  "/ai-agents/analytics/knowledge-suggestions",
+  isAuth,
+  requireAiAgent,
+  requireKnowledgeBase,
+  requireAdmin,
+  AiAgentAnalyticsController.listSuggestions
+);
+
+aiAgentRoutes.post(
+  "/ai-agents/analytics/knowledge-suggestions",
+  isAuth,
+  requireAiAgent,
+  requireKnowledgeBase,
+  requireAdmin,
+  AiAgentAnalyticsController.createSuggestion
+);
+
+aiAgentRoutes.patch(
+  "/ai-agents/analytics/knowledge-suggestions/:id",
+  isAuth,
+  requireAiAgent,
+  requireKnowledgeBase,
+  requireAdmin,
+  AiAgentAnalyticsController.updateSuggestion
+);
+
+aiAgentRoutes.get(
+  "/ai-agents/analytics/replays",
+  isAuth,
+  requireAiAgent,
+  requireAdmin,
+  AiAgentAnalyticsController.listReplays
+);
+
+aiAgentRoutes.get(
+  "/ai-agents/analytics/replays/:id",
+  isAuth,
+  requireAiAgent,
+  requireAdmin,
+  AiAgentAnalyticsController.showReplay
+);
+
+aiAgentRoutes.get(
+  "/ai-agents/analytics/prompt-diff",
+  isAuth,
+  requireAiAgent,
+  requireAdmin,
+  AiAgentAnalyticsController.promptDiff
+);
+
+aiAgentRoutes.post(
+  "/ai-agents/analytics/prompt-diff",
+  isAuth,
+  requireAiAgent,
+  requireAdmin,
+  AiAgentAnalyticsController.promptDiff
 );
 
 aiAgentRoutes.get(

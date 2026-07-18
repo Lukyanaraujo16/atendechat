@@ -18,6 +18,8 @@ import {
   safeRetrieveKnowledgeForAgent
 } from "./knowledge/integrateKnowledgeIntoRuntime";
 import type { KnowledgeRetrievalResult } from "./knowledge/knowledgeRetrievalTypes";
+import { safeEmitKnowledgeObservability } from "./analytics/emitKnowledgeObservability";
+import { safeRecordAgentAnalyticsEvent } from "./analytics/recordAgentAnalyticsEvent";
 
 export type BuildAiAgentProviderResponseInput = {
   companyId: number;
@@ -175,6 +177,29 @@ export async function buildAiAgentProviderResponse(
   const latencyMs = result.latencyMs ?? Date.now() - startedAt;
 
   if (result.ok === false) {
+    void safeEmitKnowledgeObservability({
+      companyId: input.companyId,
+      aiAgentId: input.agent.id,
+      channel: knowledgeChannel,
+      query: input.inboundText,
+      retrieval,
+      decision: knowledgeApplied.decision,
+      ticketId: input.ticket.id,
+      runtimeLogId: input.logId ?? null,
+      messageId: input.messageId,
+      requestId: input.logId
+        ? `${knowledgeChannel}-${input.logId}`
+        : null,
+      provider: resolved.provider,
+      model,
+      latencyMs,
+      systemPrompt,
+      historySummary: {
+        contextMessageCount: promptContext.contextMessageCount,
+        contextHash: promptContext.contextHash
+      },
+      interaction: true
+    });
     return {
       ok: false,
       errorCode: result.errorCode,
@@ -194,6 +219,29 @@ export async function buildAiAgentProviderResponse(
 
   const text = result.text?.trim() || "";
   if (!text) {
+    void safeEmitKnowledgeObservability({
+      companyId: input.companyId,
+      aiAgentId: input.agent.id,
+      channel: knowledgeChannel,
+      query: input.inboundText,
+      retrieval,
+      decision: knowledgeApplied.decision,
+      ticketId: input.ticket.id,
+      runtimeLogId: input.logId ?? null,
+      messageId: input.messageId,
+      requestId: input.logId
+        ? `${knowledgeChannel}-${input.logId}`
+        : null,
+      provider: result.provider || resolved.provider,
+      model: result.model || model,
+      latencyMs,
+      systemPrompt,
+      historySummary: {
+        contextMessageCount: promptContext.contextMessageCount,
+        contextHash: promptContext.contextHash
+      },
+      interaction: true
+    });
     return {
       ok: false,
       errorCode: AI_AGENT_SHADOW_ERROR_CODES.EMPTY_AI_RESPONSE,
@@ -207,6 +255,45 @@ export async function buildAiAgentProviderResponse(
       knowledge: retrieval,
       knowledgeMeta
     };
+  }
+
+  void safeEmitKnowledgeObservability({
+    companyId: input.companyId,
+    aiAgentId: input.agent.id,
+    channel: knowledgeChannel,
+    query: input.inboundText,
+    retrieval,
+    decision: knowledgeApplied.decision,
+    ticketId: input.ticket.id,
+    runtimeLogId: input.logId ?? null,
+    messageId: input.messageId,
+    requestId: input.logId ? `${knowledgeChannel}-${input.logId}` : null,
+    provider: result.provider || resolved.provider,
+    model: result.model || model,
+    latencyMs,
+    responseText: text,
+    systemPrompt,
+    historySummary: {
+      contextMessageCount: promptContext.contextMessageCount,
+      contextHash: promptContext.contextHash
+    },
+    tokensInput: result.promptTokens,
+    tokensOutput: result.completionTokens,
+    interaction: true
+  });
+
+  if (knowledgeChannel === "live") {
+    void safeRecordAgentAnalyticsEvent({
+      companyId: input.companyId,
+      aiAgentId: input.agent.id,
+      channel: "live",
+      kind: "generation",
+      tokensInput: result.promptTokens,
+      tokensOutput: result.completionTokens,
+      provider: result.provider || resolved.provider,
+      model: result.model || model,
+      generationTimeMs: latencyMs
+    });
   }
 
   return {

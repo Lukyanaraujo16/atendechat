@@ -3707,6 +3707,7 @@ const messages = {
           files: "Biblioteca de archivos",
           prompts: "OpenAI",
           aiAgent: "Agente de IA",
+          aiAgentAnalytics: "Analytics IA",
           knowledgeBase: "Base de Conocimiento",
           queueIntegration: "Automatizaciones por sector",
           notificationCenter: "Centro de notificaciones",

@@ -8,6 +8,8 @@ import {
   AiAgentReviewRating,
   AiAgentReviewTag
 } from "./aiAgentSuggestionReviewConfig";
+import CreateAiKnowledgeSuggestionFromReviewService from "./analytics/CreateAiKnowledgeSuggestionFromReviewService";
+import { previewText } from "./analytics/analyticsHelpers";
 
 type ReviewBody = {
   rating?: unknown;
@@ -76,6 +78,21 @@ export default async function UpsertAiAgentSuggestionReviewService(input: {
     }
   });
 
+  const emitSuggestion = () => {
+    void CreateAiKnowledgeSuggestionFromReviewService({
+      companyId: input.companyId,
+      aiAgentId: log.aiAgentId,
+      ticketId: log.ticketId,
+      runtimeLogId: input.runtimeLogId,
+      rating,
+      tags,
+      note,
+      aiReplyPreview: log.suggestedReply,
+      questionPreview: previewText(log.messageId || "", 120),
+      reviewedBy: input.reviewedBy
+    });
+  };
+
   if (existing) {
     await existing.update({
       rating,
@@ -85,6 +102,7 @@ export default async function UpsertAiAgentSuggestionReviewService(input: {
       aiAgentId: log.aiAgentId,
       ticketId: log.ticketId
     });
+    emitSuggestion();
     return {
       id: existing.id,
       rating: existing.rating,
@@ -105,6 +123,8 @@ export default async function UpsertAiAgentSuggestionReviewService(input: {
     note,
     reviewedBy: input.reviewedBy
   });
+
+  emitSuggestion();
 
   return {
     id: created.id,

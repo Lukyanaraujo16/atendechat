@@ -4310,6 +4310,7 @@ const messages = {
           files: "Biblioteca de arquivos",
           prompts: "OpenAI",
           aiAgent: "Agente de IA",
+          aiAgentAnalytics: "Analytics IA",
           knowledgeBase: "Base de Conhecimento",
           queueIntegration: "Automações por setor",
           notificationCenter: "Central de notificações",

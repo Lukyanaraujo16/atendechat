@@ -31,6 +31,8 @@ import {
   buildKnowledgeRuntimeMetadata,
   safeRetrieveKnowledgeForAgent
 } from "./knowledge/integrateKnowledgeIntoRuntime";
+import { safeEmitKnowledgeObservability } from "./analytics/emitKnowledgeObservability";
+import { safeRecordAgentAnalyticsEvent } from "./analytics/recordAgentAnalyticsEvent";
 
 const SIMULATOR_ERROR_CODES = {
   MISSING_CREDENTIAL: "missing_credential",
@@ -419,6 +421,37 @@ export async function sendAiAgentSimulationMessage(input: {
     totalLatencyMs: session.totalLatencyMs + latencyMs,
     provider: result.provider || session.provider,
     model: result.model || session.model
+  });
+
+  void safeEmitKnowledgeObservability({
+    companyId: input.companyId,
+    aiAgentId: agent.id,
+    channel: "simulator",
+    query: content,
+    retrieval,
+    decision: knowledgeApplied.decision,
+    simulationId: session.id,
+    requestId: `sim-${session.id}-${userRow.id}`,
+    provider: result.provider || resolved.provider,
+    model: result.model || model,
+    latencyMs,
+    responseText: handoff.cleanText,
+    systemPrompt,
+    tokensInput: result.promptTokens,
+    tokensOutput: result.completionTokens,
+    interaction: true
+  });
+  void safeRecordAgentAnalyticsEvent({
+    companyId: input.companyId,
+    aiAgentId: agent.id,
+    channel: "simulator",
+    kind: "generation",
+    handoff: handoffSuggested,
+    tokensInput: result.promptTokens,
+    tokensOutput: result.completionTokens,
+    provider: result.provider || resolved.provider,
+    model: result.model || model,
+    generationTimeMs: latencyMs
   });
 
   return {

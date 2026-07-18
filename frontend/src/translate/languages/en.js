@@ -4207,6 +4207,7 @@ const messages = {
 					files: "File library",
 					prompts: "OpenAI",
 					aiAgent: "AI Agent",
+					aiAgentAnalytics: "AI Analytics",
 					knowledgeBase: "Knowledge Base",
 					queueIntegration: "Automations by queue",
 					notificationCenter: "Notification center",

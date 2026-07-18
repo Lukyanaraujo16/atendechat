@@ -1,4 +1,4 @@
-import React, { useContext, useMemo } from "react";
+import React, { Suspense, useContext, useMemo } from "react";
 import { Switch, Route, Redirect } from "react-router-dom";
 import Box from "@material-ui/core/Box";
 import CircularProgress from "@material-ui/core/CircularProgress";
@@ -69,6 +69,7 @@ import AiAgentRouteGuard from "../components/AiAgentRouteGuard";
 import {
   AI_AGENT_FEATURE_KEY,
   AI_AGENT_ROUTE_PATH,
+  AI_AGENT_ANALYTICS_ROUTE_PATH,
   AI_AGENT_SIMULATOR_ROUTE_PATH,
   AI_AGENT_WIZARD_ROUTE_PATH,
   AI_AGENT_UI_ENABLED,
@@ -81,6 +82,10 @@ import {
   KNOWLEDGE_BASE_ROUTE_PATH,
   KNOWLEDGE_BASE_UI_ENABLED,
 } from "../config/knowledgeBaseFeature";
+
+const AiAgentAnalyticsPage = React.lazy(() =>
+  import("../pages/AiAgentAnalytics")
+);
 
 function PlanFlagsLoadingState() {
   return (
@@ -334,6 +339,7 @@ function AutomacaoModule({ planFlags, isAdmin }) {
     AI_AGENT_UI_ENABLED && isAdmin && fx[AI_AGENT_FEATURE_KEY] === true;
   const showKnowledgeBase =
     KNOWLEDGE_BASE_UI_ENABLED && isAdmin && fx[KNOWLEDGE_BASE_FEATURE_KEY] === true;
+  const showAiAgentAnalytics = showAiAgent && showKnowledgeBase;
 
   const tabs = useMemo(() => {
     const t = [];
@@ -364,6 +370,12 @@ function AutomacaoModule({ planFlags, isAdmin }) {
         label: i18n.t("mainDrawer.listItems.aiAgent"),
       });
     }
+    if (showAiAgentAnalytics) {
+      t.push({
+        path: AI_AGENT_ANALYTICS_ROUTE_PATH,
+        label: i18n.t("mainDrawer.listItems.aiAgentAnalytics"),
+      });
+    }
     if (showKnowledgeBase) {
       t.push({
         path: KNOWLEDGE_BASE_ROUTE_PATH,
@@ -384,6 +396,7 @@ function AutomacaoModule({ planFlags, isAdmin }) {
     showIntegrations,
     showOpenAi,
     showAiAgent,
+    showAiAgentAnalytics,
     showKnowledgeBase,
     showQuickReplies,
     i18n.language,
@@ -491,6 +504,23 @@ function AutomacaoModule({ planFlags, isAdmin }) {
               fallbackPath={fallback}
             >
               {isAdmin && showAiAgent ? <AiAgentSimulatorPage /> : null}
+            </AiAgentRouteGuard>
+          )}
+        />
+        <Route
+          exact
+          path={AI_AGENT_ANALYTICS_ROUTE_PATH}
+          render={() => (
+            <AiAgentRouteGuard
+              planFlags={planFlags}
+              user={user}
+              fallbackPath={fallback}
+            >
+              {isAdmin && showAiAgentAnalytics ? (
+                <Suspense fallback={<PlanFlagsLoadingState />}>
+                  <AiAgentAnalyticsPage />
+                </Suspense>
+              ) : null}
             </AiAgentRouteGuard>
           )}
         />
@@ -731,6 +761,7 @@ export default function LoggedInRoutesContent() {
     "/queue-integration",
     "/prompts",
     AI_AGENT_ROUTE_PATH,
+    AI_AGENT_ANALYTICS_ROUTE_PATH,
     KNOWLEDGE_BASE_ROUTE_PATH,
     "/quick-messages",
   ];

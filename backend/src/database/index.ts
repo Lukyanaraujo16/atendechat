@@ -98,6 +98,11 @@ import AiKnowledgeEmbeddingSettings from "../models/AiKnowledgeEmbeddingSettings
 import AiAgentKnowledgeBase from "../models/AiAgentKnowledgeBase";
 import AiAgentKnowledgeSettings from "../models/AiAgentKnowledgeSettings";
 import AiKnowledgeRetrieval from "../models/AiKnowledgeRetrieval";
+import AiAgentAnalyticsDaily from "../models/AiAgentAnalyticsDaily";
+import AiKnowledgeDocumentStats from "../models/AiKnowledgeDocumentStats";
+import AiKnowledgeGap from "../models/AiKnowledgeGap";
+import AiKnowledgeSuggestion from "../models/AiKnowledgeSuggestion";
+import AiAgentExecutionReplay from "../models/AiAgentExecutionReplay";
 import AiProviderCredential from "../models/AiProviderCredential";
 import { logDbConnectionAtStartup } from "../helpers/dbConnectionInfo";
 import {
@@ -211,6 +216,11 @@ const models = [
   AiAgentKnowledgeBase,
   AiAgentKnowledgeSettings,
   AiKnowledgeRetrieval,
+  AiAgentAnalyticsDaily,
+  AiKnowledgeDocumentStats,
+  AiKnowledgeGap,
+  AiKnowledgeSuggestion,
+  AiAgentExecutionReplay,
   AiProviderCredential
 ];
 
