@@ -135,6 +135,44 @@ const useAuth = () => {
     socket.on(`company-${companyId}-user`, onCompanyUser);
     socket.on("user-permissions-updated", onPermissionsUpdated);
 
+    const onUnassignedQueue = (data) => {
+      if (data?.action !== "update") return;
+      setUser((prev) => {
+        if (!prev?.company) {
+          return {
+            ...prev,
+            company: {
+              unassignedTicketsQueueId:
+                data.unassignedTicketsQueueId ?? null,
+            },
+          };
+        }
+        return {
+          ...prev,
+          company: {
+            ...prev.company,
+            unassignedTicketsQueueId:
+              data.unassignedTicketsQueueId ?? null,
+          },
+        };
+      });
+      // Rejoin rooms: o estado React sozinho não atualiza Socket.IO.
+      // leave + join força o backend a recomputar allowNullQueueTickets.
+      try {
+        socket.emit("leaveTickets", "pending");
+        socket.emit("leaveNotification");
+        socket.emit("joinTickets", "pending");
+        socket.emit("joinTickets", "open");
+        socket.emit("joinNotification");
+      } catch (_) {
+        // fail-open
+      }
+    };
+    socket.on(
+      `company-${companyId}-unassignedTicketsQueue`,
+      onUnassignedQueue
+    );
+
     return () => {
       if (permRefreshTimerRef.current) {
         clearTimeout(permRefreshTimerRef.current);
@@ -142,6 +180,10 @@ const useAuth = () => {
       }
       socket.off(`company-${companyId}-user`, onCompanyUser);
       socket.off("user-permissions-updated", onPermissionsUpdated);
+      socket.off(
+        `company-${companyId}-unassignedTicketsQueue`,
+        onUnassignedQueue
+      );
     };
   }, [socketManager, user?.id, user?.companyId, refreshSessionAfterPermissionChange]);
 

@@ -34,23 +34,24 @@ export function resolveEffectiveQueueIdsForAgent(
 /**
  * Visibilidade para atendente (não showAll):
  * - tickets com userId = eu (qualquer fila / null / status filtrado pela query);
- * - tickets pending sem responsável, na “piscina” das filas do utilizador (e opcionalmente sem fila se allTicket).
+ * - tickets pending sem responsável, na “piscina” das filas do utilizador
+ *   (e opcionalmente sem fila se allTicket ou setor de contingência da empresa).
  */
 export function buildNonAdminTicketListWhere(
   userPk: string | number,
   queueIds: number[],
-  allTicketEnabled: boolean
+  allowNullQueueTickets: boolean
 ): Filterable["where"] {
   const me = Number(userPk);
 
   const unassignedQueueClause: Filterable["where"] = (() => {
     if (!queueIds?.length) {
-      if (allTicketEnabled) {
+      if (allowNullQueueTickets) {
         return { queueId: null };
       }
       return { id: { [Op.in]: [] as number[] } };
     }
-    if (allTicketEnabled) {
+    if (allowNullQueueTickets) {
       return {
         [Op.or]: [{ queueId: { [Op.in]: queueIds } }, { queueId: null }]
       };

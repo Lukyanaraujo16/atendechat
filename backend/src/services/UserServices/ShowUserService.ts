@@ -24,7 +24,7 @@ const ShowUserService = async (
     ],
     include: [
       { model: Queue, as: "queues", attributes: ["id", "name", "color"] },
-      { model: Company, as: "company", attributes: ["id", "name", "dueDate", "timezone", "businessSegment", "crmVisibilityMode"] }
+      { model: Company, as: "company", attributes: ["id", "name", "dueDate", "timezone", "businessSegment", "crmVisibilityMode", "unassignedTicketsQueueId"] }
     ]
   });
 

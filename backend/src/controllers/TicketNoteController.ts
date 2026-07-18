@@ -10,6 +10,12 @@ import ShowTicketNoteService from "../services/TicketNoteService/ShowTicketNoteS
 import FindAllTicketNotesService from "../services/TicketNoteService/FindAllTicketNotesService";
 import DeleteTicketNoteService from "../services/TicketNoteService/DeleteTicketNoteService";
 import FindNotesByContactIdAndTicketId from "../services/TicketNoteService/FindNotesByContactIdAndTicketId";
+import ShowTicketService from "../services/TicketServices/ShowTicketService";
+import {
+  assertUserCanAccessTicketResource,
+  toTicketAccessPayload
+} from "../helpers/ticketAccess";
+import { isTruthySupportMode } from "../helpers/groupVisibility";
 
 type IndexQuery = {
   searchParam: string;
@@ -56,7 +62,8 @@ export const list = async (req: Request, res: Response): Promise<Response> => {
 
 export const store = async (req: Request, res: Response): Promise<Response> => {
   const newTicketNote: StoreTicketNoteData = req.body;
-  const { id: userId } = req.user;
+  const { id: userId, companyId, profile } = req.user;
+  const supportMode = isTruthySupportMode((req.user as any).supportMode);
 
   const schema = Yup.object().shape({
     note: Yup.string().required()
@@ -66,6 +73,16 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
     await schema.validate(newTicketNote);
   } catch (err) {
     throw new AppError(err.message);
+  }
+
+  if (newTicketNote.ticketId) {
+    const ticket = await ShowTicketService(newTicketNote.ticketId, companyId);
+    await assertUserCanAccessTicketResource(
+      { id: userId, profile, supportMode },
+      toTicketAccessPayload(ticket),
+      companyId,
+      "TicketNoteController.store"
+    );
   }
 
   const ticketNote = await CreateTicketNoteService({
@@ -126,6 +143,19 @@ export const findFilteredList = async (
 ): Promise<Response> => {
   try {
     const { contactId, ticketId } = req.query as QueryFilteredNotes;
+    const { companyId, id: userId, profile } = req.user;
+    const supportMode = isTruthySupportMode((req.user as any).supportMode);
+
+    if (ticketId) {
+      const ticket = await ShowTicketService(ticketId, companyId);
+      await assertUserCanAccessTicketResource(
+        { id: userId, profile, supportMode },
+        toTicketAccessPayload(ticket),
+        companyId,
+        "TicketNoteController.findFilteredList"
+      );
+    }
+
     const notes: TicketNote[] = await FindNotesByContactIdAndTicketId({
       contactId,
       ticketId
@@ -133,6 +163,9 @@ export const findFilteredList = async (
 
     return res.status(200).json(notes);
   } catch (e) {
+    if (e instanceof AppError) {
+      throw e;
+    }
     return res.status(500).json({ message: e });
   }
 };

@@ -98,13 +98,13 @@ export function buildAgentTicketListWhere(
   actor: WhatsappTicketVisibilityActor,
   userPk: string | number,
   queueIds: number[],
-  allTicketEnabled: boolean,
+  allowNullQueueTickets: boolean,
   companyId: number
 ): Filterable["where"] {
   const base = buildNonAdminTicketListWhere(
     userPk,
     queueIds,
-    allTicketEnabled
+    allowNullQueueTickets
   );
 
   if (!isWhatsappTicketVisibilityPrivileged(actor)) {

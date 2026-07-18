@@ -3763,11 +3763,20 @@ const messages = {
 					chatbotDisabled: "Disable chatbot in this queue",
 					chatbotDisabledHint:
 						"When enabled, tickets routed to this queue go straight to human handling (pending), without automations.",
+					receiveUnassignedTickets: "Receive tickets without a defined queue",
+					receiveUnassignedTicketsHint:
+						"Users in this queue will be able to view conversations that do not yet have a responsible queue.",
+					currentUnassignedTicketsQueue:
+						"Currently configured queue: {{name}}",
 				},
+				replaceUnassignedTitle: "Replace contingency queue",
+				replaceUnassignedConfirm:
+					"Queue {{name}} is already configured to receive tickets without a queue. Do you want to replace it with the current one?",
 				buttons: {
 					okAdd: "Add",
 					okEdit: "Save",
 					cancel: "Cancel",
+					confirmReplace: "Replace",
 				},
 				toasts: {
 					success: "Queue saved successfully.",
@@ -7299,6 +7308,12 @@ const messages = {
 				ERR_SESSION_EXPIRED: "Session expired. Please log in.",
 				ERR_USER_CREATION_DISABLED: "User creation has been disabled by the administrator.",
 				ERR_NO_PERMISSION: "You don't have permission to access this resource.",
+				ERR_UNASSIGNED_TICKETS_QUEUE_NOT_FOUND:
+					"Contingency queue for tickets without a queue was not found.",
+				ERR_UNASSIGNED_TICKETS_QUEUE_INVALID_COMPANY:
+					"The selected queue does not belong to this company.",
+				ERR_NO_PERMISSION_TO_CONFIGURE_UNASSIGNED_QUEUE:
+					"You don't have permission to configure the queue for tickets without a sector.",
 				ERR_INSTAGRAM_NOT_AVAILABLE_IN_PLAN:
 					"Your plan does not include access to Instagram integration.",
 				ERR_GROUP_PERMANENT_CONVERSATION:

@@ -4,6 +4,11 @@ import UserQueue from "../../models/UserQueue";
 import WhatsappQueue from "../../models/WhatsappQueue";
 import QueueOption from "../../models/QueueOption";
 import AppError from "../../errors/AppError";
+import SetCompanyUnassignedTicketsQueueService, {
+  emitUnassignedTicketsQueueChanged
+} from "./SetCompanyUnassignedTicketsQueueService";
+import { loadCompanyUnassignedTicketsQueueId } from "../../helpers/unassignedTicketsVisibility";
+import sequelize from "../../database";
 
 const DeleteQueueService = async (
   queueId: number | string,
@@ -41,7 +46,25 @@ const DeleteQueueService = async (
     );
   }
 
-  await queue.destroy();
+  const currentUnassigned = await loadCompanyUnassignedTicketsQueueId(
+    companyId
+  );
+  const wasContingency = Number(currentUnassigned) === qid;
+
+  await sequelize.transaction(async transaction => {
+    if (wasContingency) {
+      await SetCompanyUnassignedTicketsQueueService({
+        companyId,
+        queueId: null,
+        transaction
+      });
+    }
+    await queue.destroy({ transaction });
+  });
+
+  if (wasContingency) {
+    await emitUnassignedTicketsQueueChanged(companyId, null);
+  }
 };
 
 export default DeleteQueueService;

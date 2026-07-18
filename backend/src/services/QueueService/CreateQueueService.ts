@@ -1,10 +1,14 @@
 import * as Yup from "yup";
-import { Op, Sequelize } from "sequelize";
+import { Op, Sequelize, Transaction } from "sequelize";
 import AppError from "../../errors/AppError";
 import Queue from "../../models/Queue";
 import Company from "../../models/Company";
 import Plan from "../../models/Plan";
+import sequelize from "../../database";
 import { rethrowIfQueueUniqueConstraint } from "./queueUniqueErrors";
+import SetCompanyUnassignedTicketsQueueService, {
+  emitUnassignedTicketsQueueChanged
+} from "./SetCompanyUnassignedTicketsQueueService";
 
 interface QueueData {
   name: string;
@@ -17,10 +21,14 @@ interface QueueData {
   orderQueue?: number;
   integrationId?: number;
   promptId?: number;
+  receiveUnassignedTickets?: boolean;
 }
 
-const CreateQueueService = async (queueData: QueueData): Promise<Queue> => {
-  const { color, name, companyId } = queueData;
+const CreateQueueService = async (
+  queueData: QueueData
+): Promise<Queue & { isUnassignedTicketsQueue?: boolean }> => {
+  const { color, name, companyId, receiveUnassignedTickets, ...rest } =
+    queueData;
 
   const company = await Company.findOne({
     where: {
@@ -95,15 +103,51 @@ const CreateQueueService = async (queueData: QueueData): Promise<Queue> => {
     );
   }
 
+  let created: Queue;
+  let unassignedTicketsQueueId: number | null =
+    company?.unassignedTicketsQueueId != null
+      ? Number(company.unassignedTicketsQueueId)
+      : null;
+
   try {
-    const queue = await Queue.create({
-      ...queueData,
-      name: trimmed
+    await sequelize.transaction(async (transaction: Transaction) => {
+      created = await Queue.create(
+        {
+          ...rest,
+          color,
+          companyId,
+          name: trimmed
+        },
+        { transaction }
+      );
+
+      if (receiveUnassignedTickets === true) {
+        unassignedTicketsQueueId =
+          await SetCompanyUnassignedTicketsQueueService({
+            companyId,
+            queueId: Number(created.id),
+            transaction
+          });
+      }
     });
-    return queue;
   } catch (err) {
     rethrowIfQueueUniqueConstraint(err);
   }
+
+  if (receiveUnassignedTickets === true) {
+    await emitUnassignedTicketsQueueChanged(
+      companyId,
+      unassignedTicketsQueueId
+    );
+  }
+
+  const plain = created!.toJSON() as Queue & {
+    isUnassignedTicketsQueue?: boolean;
+  };
+  (plain as any).isUnassignedTicketsQueue =
+    Number(unassignedTicketsQueueId) === Number(created!.id);
+
+  return plain as Queue & { isUnassignedTicketsQueue?: boolean };
 };
 
 export default CreateQueueService;

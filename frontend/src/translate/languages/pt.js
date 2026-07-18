@@ -3861,11 +3861,20 @@ const messages = {
           chatbotDisabled: "Desativar chatbot neste setor",
           chatbotDisabledHint:
             "Quando ativo, tickets direcionados a este setor irão direto para atendimento humano (pending), sem automações.",
+          receiveUnassignedTickets: "Receber tickets sem setor definido",
+          receiveUnassignedTicketsHint:
+            "Usuários deste setor poderão visualizar atendimentos que ainda não possuem um setor responsável.",
+          currentUnassignedTicketsQueue:
+            "Setor atual configurado: {{name}}",
         },
+        replaceUnassignedTitle: "Substituir setor de contingência",
+        replaceUnassignedConfirm:
+          "O setor {{name}} já está configurado para receber tickets sem setor. Deseja substituir pelo setor atual?",
         buttons: {
           okAdd: "Adicionar",
           okEdit: "Salvar",
           cancel: "Cancelar",
+          confirmReplace: "Substituir",
         },
         toasts: {
           success: "Setor salvo com sucesso.",
@@ -7492,6 +7501,12 @@ const messages = {
         ERR_USER_CREATION_DISABLED:
             "A criação do usuário foi desabilitada pelo administrador.",
         ERR_NO_PERMISSION: "Você não tem permissão para acessar este recurso.",
+        ERR_UNASSIGNED_TICKETS_QUEUE_NOT_FOUND:
+          "Setor de contingência para tickets sem setor não encontrado.",
+        ERR_UNASSIGNED_TICKETS_QUEUE_INVALID_COMPANY:
+          "O setor selecionado não pertence a esta empresa.",
+        ERR_NO_PERMISSION_TO_CONFIGURE_UNASSIGNED_QUEUE:
+          "Você não tem permissão para configurar o setor de tickets sem fila.",
         ERR_INSTAGRAM_NOT_AVAILABLE_IN_PLAN:
           "Seu plano não possui acesso à integração com Instagram.",
         ERR_GROUP_PERMANENT_CONVERSATION:

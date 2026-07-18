@@ -129,6 +129,20 @@ class Company extends Model<Company> {
   @Column(DataType.STRING(16))
   crmVisibilityMode: string;
 
+  /**
+   * Setor de contingência: utilizadores deste setor visualizam tickets com queueId null.
+   * Não atribui o ticket — só amplia visibilidade operacional.
+   */
+  @ForeignKey(() => Queue)
+  @Column({ allowNull: true, defaultValue: null })
+  unassignedTicketsQueueId: number | null;
+
+  @BelongsTo(() => Queue, {
+    foreignKey: "unassignedTicketsQueueId",
+    as: "unassignedTicketsQueue"
+  })
+  unassignedTicketsQueue: Queue;
+
   @ForeignKey(() => Plan)
   @Column
   planId: number;

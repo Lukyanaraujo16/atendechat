@@ -502,7 +502,9 @@ const TicketsListCustom = (props) => {
               ? Number(qidRaw)
               : null;
           if (qid == null) {
-            if (user?.allTicket !== "enabled") return;
+            if (!canUserViewTicketInInbox(user, data.ticket, selectedQueueIds)) {
+              return;
+            }
           } else if (queueIds.indexOf(qid) === -1) {
             return;
           }
@@ -561,6 +563,7 @@ const TicketsListCustom = (props) => {
     chatbotOnly,
     groupsOnly,
     user?.allTicket,
+    user?.company?.unassignedTicketsQueueId,
     queueIdsKey,
     fetchAvailableGroups,
   ]);

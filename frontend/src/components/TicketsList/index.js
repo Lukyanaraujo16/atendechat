@@ -20,6 +20,7 @@ import api from "../../services/api";
 import toastError from "../../errors/toastError";
 import { toast } from "react-toastify";
 import { useHistory } from "react-router-dom";
+import { canUserSeeNullQueueTickets } from "../../utils/ticketInboxVisibility";
 
 const useStyles = makeStyles((theme) => ({
 	ticketsListWrapper: {
@@ -248,7 +249,7 @@ const TicketsList = (props) => {
 				return false;
 			}
 			if (!t.queueId) {
-				return user.allTicket === "enabled";
+				return canUserSeeNullQueueTickets(user);
 			}
 			return queueIds.indexOf(t.queueId) > -1;
 		});
@@ -271,7 +272,7 @@ const TicketsList = (props) => {
 
 
 
-	}, [tickets, status, searchParam, safeQueues, profile]);
+	}, [tickets, status, searchParam, safeQueues, profile, user]);
 
 	useEffect(() => {
 		const socket = openSocket();
@@ -294,7 +295,7 @@ const TicketsList = (props) => {
 				return false;
 			}
 			if (!ticket.queueId) {
-				return user?.allTicket === "enabled";
+				return canUserSeeNullQueueTickets(user);
 			}
 			return selectedQueueIds.indexOf(ticket.queueId) > -1;
 		};

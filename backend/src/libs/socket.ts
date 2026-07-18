@@ -12,9 +12,14 @@ import authConfig from "../config/auth";
 import { CounterManager } from "./counter";
 import {
   assertUserCanAccessTicketResource,
+  getUserQueueIdsFromQueues,
   toTicketAccessPayload
 } from "../helpers/ticketAccess";
 import { isTruthySupportMode } from "../helpers/groupVisibility";
+import {
+  allowsNullQueueVisibility,
+  loadCompanyUnassignedTicketsQueueId
+} from "../helpers/unassignedTicketsVisibility";
 
 let io: SocketIO;
 
@@ -94,6 +99,53 @@ export const initIO = (httpServer: Server): SocketIO => {
     ) {
       socket.join(`company-${effCompany}-mainchannel`);
     }
+
+    const userQueueIds = getUserQueueIdsFromQueues(user.queues);
+    (socket.data as {
+      atendeUser?: {
+        id: number;
+        profile: string;
+        allTicket: string;
+        queueIds: number[];
+      };
+    }).atendeUser = {
+      id: Number(user.id),
+      profile: String(user.profile || ""),
+      allTicket: String(user.allTicket || "disabled"),
+      queueIds: userQueueIds
+    };
+
+    const resolveAllowNullQueueTickets = async (): Promise<boolean> => {
+      if (user.profile === "admin") {
+        return true;
+      }
+      const meta = socket.data.atendeUser;
+      const queueIds =
+        Array.isArray(meta?.queueIds) && meta.queueIds.length
+          ? meta.queueIds
+          : userQueueIds;
+      const allTicketEnabled =
+        (meta?.allTicket ?? user.allTicket) === "enabled";
+      if (
+        effCompany === undefined ||
+        effCompany === null ||
+        Number.isNaN(Number(effCompany))
+      ) {
+        return allTicketEnabled;
+      }
+      try {
+        const contingencyQueueId = await loadCompanyUnassignedTicketsQueueId(
+          Number(effCompany)
+        );
+        return allowsNullQueueVisibility(
+          queueIds,
+          allTicketEnabled,
+          contingencyQueueId
+        );
+      } catch {
+        return allTicketEnabled;
+      }
+    };
 
     socket.on("joinChatBox", async (ticketId: string) => {
       if (!ticketId || ticketId === "undefined") {
@@ -183,10 +235,9 @@ export const initIO = (httpServer: Server): SocketIO => {
             logger.debug(`User ${user.id} of company ${user.companyId} joined queue ${queue.id} channel.`);
             socket.join(`queue-${queue.id}-notification`);
           });
-          if (user.allTicket === "enabled") {
+          if (await resolveAllowNullQueueTickets()) {
             socket.join("queue-null-notification");
           }
-
         }
       }
       logger.debug(`joinNotification[${c}]: User: ${user.id}`);
@@ -202,15 +253,13 @@ export const initIO = (httpServer: Server): SocketIO => {
             logger.debug(`User ${user.id} of company ${user.companyId} leaved queue ${queue.id} channel.`);
             socket.leave(`queue-${queue.id}-notification`);
           });
-          if (user.allTicket === "enabled") {
-            socket.leave("queue-null-notification");
-          }
+          socket.leave("queue-null-notification");
         }
       }
       logger.debug(`leaveNotification[${c}]: User: ${user.id}`);
     });
  
-    socket.on("joinTickets", (status: string) => {
+    socket.on("joinTickets", async (status: string) => {
       if (counters.incrementCounter(`status-${status}`) === 1) {
         if (user.profile === "admin") {
           logger.debug(`Admin ${user.id} of company ${effectiveCompanyIdForSocket} joined ${status} tickets channel.`);
@@ -220,7 +269,7 @@ export const initIO = (httpServer: Server): SocketIO => {
             logger.debug(`User ${user.id} of company ${user.companyId} joined queue ${queue.id} pending tickets channel.`);
             socket.join(`queue-${queue.id}-pending`);
           });
-          if (user.allTicket === "enabled") {
+          if (await resolveAllowNullQueueTickets()) {
             socket.join("queue-null-pending");
           }
         } else {
@@ -239,9 +288,7 @@ export const initIO = (httpServer: Server): SocketIO => {
             logger.debug(`User ${user.id} of company ${user.companyId} leaved queue ${queue.id} pending tickets channel.`);
             socket.leave(`queue-${queue.id}-pending`);
           });
-          if (user.allTicket === "enabled") {
-            socket.leave("queue-null-pending");
-          }
+          socket.leave("queue-null-pending");
         }
       }
     });

@@ -130,6 +130,7 @@ const QueueModal = ({ open, onClose, queueId, reload }) => {
     greetingMessage: "",
     outOfHoursMessage: "",
     chatbotDisabled: false,
+    receiveUnassignedTickets: false,
     orderQueue: "",
     integrationId: "",
     promptId: "",
@@ -141,6 +142,9 @@ const QueueModal = ({ open, onClose, queueId, reload }) => {
   const [schedulesEnabled, setSchedulesEnabled] = useState(false);
   const greetingRef = useRef();
   const [integrations, setIntegrations] = useState([]);
+  const [otherUnassignedQueue, setOtherUnassignedQueue] = useState(null);
+  const [confirmReplaceOpen, setConfirmReplaceOpen] = useState(false);
+  const [pendingSave, setPendingSave] = useState(null);
 
   const [schedules, setSchedules] = useState([
     {
@@ -238,11 +242,38 @@ const QueueModal = ({ open, onClose, queueId, reload }) => {
 
   useEffect(() => {
     (async () => {
+      if (!open) {
+        setOtherUnassignedQueue(null);
+        return;
+      }
+      try {
+        const { data } = await api.get("/queue");
+        const list = Array.isArray(data) ? data : [];
+        const current = list.find(
+          (q) =>
+            q.isUnassignedTicketsQueue === true &&
+            (!queueId || Number(q.id) !== Number(queueId))
+        );
+        setOtherUnassignedQueue(current || null);
+      } catch (err) {
+        // lista auxiliar — não bloqueia o modal
+      }
+    })();
+  }, [open, queueId]);
+
+  useEffect(() => {
+    (async () => {
       if (!queueId) return;
       try {
         const { data } = await api.get(`/queue/${queueId}`);
         setQueue((prevState) => {
-          return { ...prevState, ...data };
+          return {
+            ...prevState,
+            ...data,
+            receiveUnassignedTickets: Boolean(
+              data.receiveUnassignedTickets || data.isUnassignedTicketsQueue
+            ),
+          };
         });
         data.promptId
           ? setSelectedPrompt(data.promptId)
@@ -261,6 +292,7 @@ const QueueModal = ({ open, onClose, queueId, reload }) => {
         greetingMessage: "",
         outOfHoursMessage: "",
         chatbotDisabled: false,
+        receiveUnassignedTickets: false,
         orderQueue: "",
         integrationId: "",
       });
@@ -270,27 +302,27 @@ const QueueModal = ({ open, onClose, queueId, reload }) => {
   const handleClose = () => {
     onClose();
     setQueue(initialState);
+    setConfirmReplaceOpen(false);
+    setPendingSave(null);
   };
 
-  const handleSaveQueue = async (values) => {
+  const persistQueue = async (values) => {
     try {
       const promptIdPayload = openAiEnabled
         ? (selectedPrompt != null && selectedPrompt !== "" ? selectedPrompt : null)
         : (queueId && queue?.promptId != null && queue.promptId !== ""
             ? queue.promptId
             : null);
+      const payload = {
+        ...values,
+        schedules,
+        promptId: promptIdPayload,
+        receiveUnassignedTickets: Boolean(values.receiveUnassignedTickets),
+      };
       if (queueId) {
-        await api.put(`/queue/${queueId}`, {
-          ...values,
-          schedules,
-          promptId: promptIdPayload,
-        });
+        await api.put(`/queue/${queueId}`, payload);
       } else {
-        await api.post("/queue", {
-          ...values,
-          schedules,
-          promptId: promptIdPayload,
-        });
+        await api.post("/queue", payload);
       }
       toast.success(i18n.t("queueModal.toasts.success"));
       if (typeof reload === "function") {
@@ -300,6 +332,26 @@ const QueueModal = ({ open, onClose, queueId, reload }) => {
     } catch (err) {
       toastError(err);
     }
+  };
+
+  const handleSaveQueue = async (values) => {
+    const enabling =
+      Boolean(values.receiveUnassignedTickets) &&
+      !Boolean(queue.receiveUnassignedTickets);
+    if (enabling && otherUnassignedQueue) {
+      setPendingSave(values);
+      setConfirmReplaceOpen(true);
+      return;
+    }
+    await persistQueue(values);
+  };
+
+  const handleConfirmReplace = async () => {
+    setConfirmReplaceOpen(false);
+    if (pendingSave) {
+      await persistQueue(pendingSave);
+    }
+    setPendingSave(null);
   };
 
   const handleSaveSchedules = async (values) => {
@@ -464,6 +516,44 @@ const QueueModal = ({ open, onClose, queueId, reload }) => {
                         {i18n.t("queueModal.form.chatbotDisabledHint")}
                       </Typography>
                     </Box>
+                    <Box mt={1}>
+                      <FormControlLabel
+                        control={
+                          <Field
+                            as={Checkbox}
+                            name="receiveUnassignedTickets"
+                            color="primary"
+                            checked={Boolean(values.receiveUnassignedTickets)}
+                          />
+                        }
+                        label={i18n.t(
+                          "queueModal.form.receiveUnassignedTickets"
+                        )}
+                      />
+                      <Typography
+                        variant="caption"
+                        color="textSecondary"
+                        display="block"
+                      >
+                        {i18n.t(
+                          "queueModal.form.receiveUnassignedTicketsHint"
+                        )}
+                      </Typography>
+                      {otherUnassignedQueue &&
+                        !values.receiveUnassignedTickets && (
+                          <Typography
+                            variant="caption"
+                            color="textSecondary"
+                            display="block"
+                            style={{ marginTop: 4 }}
+                          >
+                            {i18n.t(
+                              "queueModal.form.currentUnassignedTicketsQueue",
+                              { name: otherUnassignedQueue.name }
+                            )}
+                          </Typography>
+                        )}
+                    </Box>
                     <div>
                       <FormControl
                         variant="outlined"
@@ -626,6 +716,39 @@ const QueueModal = ({ open, onClose, queueId, reload }) => {
             />
           </Paper>
         )}
+      </AppDialog>
+      <AppDialog
+        open={confirmReplaceOpen}
+        onClose={() => {
+          setConfirmReplaceOpen(false);
+          setPendingSave(null);
+        }}
+        maxWidth="sm"
+        fullWidth
+      >
+        <AppDialogTitle>
+          {i18n.t("queueModal.replaceUnassignedTitle")}
+        </AppDialogTitle>
+        <AppDialogContent>
+          <Typography>
+            {i18n.t("queueModal.replaceUnassignedConfirm", {
+              name: otherUnassignedQueue?.name || "",
+            })}
+          </Typography>
+        </AppDialogContent>
+        <AppDialogActions>
+          <AppSecondaryButton
+            onClick={() => {
+              setConfirmReplaceOpen(false);
+              setPendingSave(null);
+            }}
+          >
+            {i18n.t("queueModal.buttons.cancel")}
+          </AppSecondaryButton>
+          <AppPrimaryButton onClick={handleConfirmReplace}>
+            {i18n.t("queueModal.buttons.confirmReplace")}
+          </AppPrimaryButton>
+        </AppDialogActions>
       </AppDialog>
     </div>
   );

@@ -1,8 +1,13 @@
-import { Op, Sequelize } from "sequelize";
+import { Op, Sequelize, Transaction } from "sequelize";
 import AppError from "../../errors/AppError";
 import Queue from "../../models/Queue";
+import sequelize from "../../database";
 import ShowQueueService from "./ShowQueueService";
 import { rethrowIfQueueUniqueConstraint } from "./queueUniqueErrors";
+import SetCompanyUnassignedTicketsQueueService, {
+  emitUnassignedTicketsQueueChanged
+} from "./SetCompanyUnassignedTicketsQueueService";
+import { loadCompanyUnassignedTicketsQueueId } from "../../helpers/unassignedTicketsVisibility";
 
 interface QueueData {
   name?: string;
@@ -14,6 +19,8 @@ interface QueueData {
   orderQueue?: number;
   integrationId?: number;
   promptId?: number;
+  /** Quando true, este setor passa a ser o de contingência da empresa. */
+  receiveUnassignedTickets?: boolean;
 }
 
 const colorRegex = /^#[0-9a-f]{3,6}$/i;
@@ -22,8 +29,8 @@ const UpdateQueueService = async (
   queueId: number | string,
   queueData: QueueData,
   companyId: number
-): Promise<Queue> => {
-  const { color, name } = queueData;
+): Promise<Queue & { isUnassignedTicketsQueue?: boolean }> => {
+  const { color, name, receiveUnassignedTickets, ...rest } = queueData;
 
   const queue = await ShowQueueService(queueId, companyId);
 
@@ -80,17 +87,56 @@ const UpdateQueueService = async (
   }
 
   const payload = {
-    ...queueData,
+    ...rest,
+    ...(color !== undefined ? { color } : {}),
     ...(name !== undefined && { name: name.trim() })
   };
 
-  try {
-    await queue.update(payload);
-  } catch (err) {
-    rethrowIfQueueUniqueConstraint(err);
+  let unassignedTicketsQueueId: number | null =
+    await loadCompanyUnassignedTicketsQueueId(companyId);
+
+  await sequelize.transaction(async (transaction: Transaction) => {
+    try {
+      await queue.update(payload, { transaction });
+    } catch (err) {
+      rethrowIfQueueUniqueConstraint(err);
+    }
+
+    if (receiveUnassignedTickets !== undefined) {
+      if (receiveUnassignedTickets === true) {
+        unassignedTicketsQueueId =
+          await SetCompanyUnassignedTicketsQueueService({
+            companyId,
+            queueId: Number(queue.id),
+            transaction
+          });
+      } else if (Number(unassignedTicketsQueueId) === Number(queue.id)) {
+        unassignedTicketsQueueId =
+          await SetCompanyUnassignedTicketsQueueService({
+            companyId,
+            queueId: null,
+            transaction
+          });
+      }
+    }
+  });
+
+  await queue.reload();
+
+  if (receiveUnassignedTickets !== undefined) {
+    await emitUnassignedTicketsQueueChanged(
+      companyId,
+      unassignedTicketsQueueId
+    );
   }
 
-  return queue;
+  const plain = queue.toJSON() as Queue & {
+    isUnassignedTicketsQueue?: boolean;
+  };
+  (plain as any).isUnassignedTicketsQueue =
+    Number(unassignedTicketsQueueId) === Number(queue.id);
+
+  return plain as Queue & { isUnassignedTicketsQueue?: boolean };
 };
 
 export default UpdateQueueService;

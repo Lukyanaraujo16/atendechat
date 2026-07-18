@@ -5,6 +5,7 @@ import {
   filterUserIdsByWhatsappTicketVisibility,
   isWhatsappTicketVisibilityPrivileged
 } from "../../helpers/whatsappTicketVisibility";
+import { loadCompanyUnassignedTicketsQueueId } from "../../helpers/unassignedTicketsVisibility";
 
 const nonSuperTenantClause = {
   [Op.or]: [{ super: false }, { super: null }]
@@ -71,6 +72,19 @@ async function listUserIdsAllTicketNoQueue(companyId: number): Promise<number[]>
   return rows.map(u => u.id);
 }
 
+/** Utilizadores do setor de contingência da empresa (visibilidade de queueId null). */
+async function listUserIdsInUnassignedContingencyQueue(
+  companyId: number
+): Promise<number[]> {
+  const contingencyQueueId = await loadCompanyUnassignedTicketsQueueId(
+    companyId
+  );
+  if (contingencyQueueId == null) {
+    return [];
+  }
+  return listUserIdsInQueue(companyId, contingencyQueueId);
+}
+
 function uniqueIds(ids: number[]): number[] {
   return [...new Set(ids.filter(id => id != null && !Number.isNaN(Number(id))))];
 }
@@ -105,7 +119,15 @@ export async function resolveRecipientsForPendingOrQueue(
     ids = uniqueIds([...adminIds, ...supervisorIds, ...inQueue]);
   } else {
     const noSector = await listUserIdsAllTicketNoQueue(companyId);
-    ids = uniqueIds([...adminIds, ...supervisorIds, ...noSector]);
+    const contingency = await listUserIdsInUnassignedContingencyQueue(
+      companyId
+    );
+    ids = uniqueIds([
+      ...adminIds,
+      ...supervisorIds,
+      ...noSector,
+      ...contingency
+    ]);
   }
 
   return applyWhatsappVisibilityFilter(companyId, whatsappId, ids);

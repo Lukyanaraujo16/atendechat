@@ -1,6 +1,7 @@
 /**
  * Espelha a semântica de listagem/agência do backend (agentTicketListWhere +
- * resolveEffectiveQueueIdsForAgent) para decisão de socket/coluna no cliente.
+ * resolveEffectiveQueueIdsForAgent + unassignedTicketsVisibility) para
+ * decisão de socket/coluna no cliente.
  * selectedQueueIds é só filtro visual — nunca amplia membership.
  */
 
@@ -21,6 +22,22 @@ export function resolveEffectiveSelectedQueueIds(user, selectedQueueIds) {
   }
   const set = new Set(membership);
   return selected.filter((id) => set.has(id));
+}
+
+/**
+ * allTicket enabled OU membership contém o setor de contingência da empresa.
+ */
+export function canUserSeeNullQueueTickets(user) {
+  if (!user) return false;
+  if (user.allTicket === "enabled") return true;
+  const contingencyRaw =
+    user.company?.unassignedTicketsQueueId ??
+    user.unassignedTicketsQueueId ??
+    null;
+  if (contingencyRaw == null || contingencyRaw === "") return false;
+  const contingencyId = Number(contingencyRaw);
+  if (!Number.isFinite(contingencyId)) return false;
+  return getMembershipQueueIds(user).indexOf(contingencyId) > -1;
 }
 
 /**
@@ -77,7 +94,7 @@ export function decideUserTicketInboxVisibility(
       : null;
 
   if (qid == null) {
-    if (user.allTicket === "enabled") {
+    if (canUserSeeNullQueueTickets(user)) {
       return { allowed: true, reason: "queue_null_allowed" };
     }
     return { allowed: false, reason: "queue_null_denied" };

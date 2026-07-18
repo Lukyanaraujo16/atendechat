@@ -36,6 +36,10 @@ import {
   loadUserQueueIds
 } from "../../helpers/groupVisibility";
 import { resolveEffectiveQueueIdsForAgent } from "../../helpers/agentTicketListWhere";
+import {
+  allowsNullQueueVisibility,
+  loadCompanyUnassignedTicketsQueueId
+} from "../../helpers/unassignedTicketsVisibility";
 
 interface Request {
   searchParam?: string;
@@ -104,6 +108,7 @@ const ListTicketsService = async ({
   let effectiveShowAll = parseTruthyQuery(showAll);
   let membershipQueueIds: number[] = [];
   let allTicketEnabled = false;
+  let allowNullQueueTickets = false;
 
   if (isCommonAgent) {
     effectiveShowAll = false;
@@ -118,6 +123,18 @@ const ListTicketsService = async ({
     attributes: ["allTicket"]
   });
   allTicketEnabled = userRow?.allTicket === "enabled";
+
+  const contingencyQueueId = await loadCompanyUnassignedTicketsQueueId(
+    companyId
+  );
+  const queuesForNullVisibility = isCommonAgent
+    ? membershipQueueIds
+    : await loadUserQueueIds(userId);
+  allowNullQueueTickets = allowsNullQueueVisibility(
+    queuesForNullVisibility,
+    allTicketEnabled,
+    contingencyQueueId
+  );
 
   logger.info(
     {
@@ -135,7 +152,9 @@ const ListTicketsService = async ({
           ? queueIds
           : [],
       selectedEffectiveQueueIds: effectiveQueueIds,
-      allTicket: allTicketEnabled
+      allTicket: allTicketEnabled,
+      contingencyQueueId,
+      allowNullQueueTickets
     },
     "[TicketVisibilityDebug] list_request"
   );
@@ -151,7 +170,7 @@ const ListTicketsService = async ({
       actor,
       userId,
       effectiveQueueIds,
-      allTicketEnabled,
+      allowNullQueueTickets,
       companyId
     );
   }
@@ -303,13 +322,18 @@ const ListTicketsService = async ({
   if (withUnreadMessages === "true") {
     const user = await ShowUserService(userId);
     const userQueueIds = user.queues.map(queue => queue.id);
+    const unreadAllowNull = allowsNullQueueVisibility(
+      userQueueIds,
+      user?.allTicket === "enabled",
+      contingencyQueueId
+    );
 
     whereCondition = {
       ...buildAgentTicketListWhere(
         actor,
         userId,
         userQueueIds,
-        user?.allTicket === "enabled",
+        unreadAllowNull,
         companyId
       ),
       unreadMessages: { [Op.gt]: 0 }

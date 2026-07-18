@@ -2,6 +2,7 @@ import { Op, fn, col } from "sequelize";
 import Queue from "../../models/Queue";
 import Ticket from "../../models/Ticket";
 import UserQueue from "../../models/UserQueue";
+import { loadCompanyUnassignedTicketsQueueId } from "../../helpers/unassignedTicketsVisibility";
 
 interface Request {
   companyId: number;
@@ -19,6 +20,9 @@ const ListQueuesService = async ({
       ["name", "ASC"]
     ]
   });
+
+  const unassignedTicketsQueueId =
+    await loadCompanyUnassignedTicketsQueueId(companyId);
 
   const ids = queues.map(q => q.id);
   const ticketMap = new Map<number, number>();
@@ -64,7 +68,11 @@ const ListQueuesService = async ({
     return {
       ...plain,
       ticketsCount: ticketMap.get(q.id) || 0,
-      usersCount: userMap.get(q.id) || 0
+      usersCount: userMap.get(q.id) || 0,
+      isUnassignedTicketsQueue:
+        unassignedTicketsQueueId != null &&
+        Number(unassignedTicketsQueueId) === Number(q.id),
+      unassignedTicketsQueueId
     };
   });
 };

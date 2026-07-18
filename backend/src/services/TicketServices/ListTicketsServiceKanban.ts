@@ -25,6 +25,10 @@ import {
 } from "../../helpers/groupVisibility";
 import { resolveEffectiveQueueIdsForAgent } from "../../helpers/agentTicketListWhere";
 import {
+  allowsNullQueueVisibility,
+  loadCompanyUnassignedTicketsQueueId
+} from "../../helpers/unassignedTicketsVisibility";
+import {
   buildKanbanClosedStatusWhere,
   parseKanbanClosedPeriod
 } from "../../helpers/kanbanClosedPeriod";
@@ -160,13 +164,24 @@ const ListTicketsServiceKanban = async ({
       : Array.isArray(queueIds)
         ? queueIds
         : [];
+    const contingencyQueueId = await loadCompanyUnassignedTicketsQueueId(
+      companyId
+    );
+    const queuesForNull = isCommonAgent
+      ? membershipQueueIds
+      : await loadUserQueueIds(userId);
+    const allowNullQueueTickets = allowsNullQueueVisibility(
+      queuesForNull,
+      userRow?.allTicket === "enabled",
+      contingencyQueueId
+    );
     whereCondition = {
       [Op.and]: [
         buildAgentTicketListWhere(
           actor,
           userId,
           effectiveQueueIds,
-          userRow?.allTicket === "enabled",
+          allowNullQueueTickets,
           companyId
         ),
         statusKanbanFilter
@@ -239,13 +254,21 @@ const ListTicketsServiceKanban = async ({
   if (withUnreadMessages === "true") {
     const user = await ShowUserService(userId);
     const userQueueIds = user.queues.map(queue => queue.id);
+    const contingencyQueueId = await loadCompanyUnassignedTicketsQueueId(
+      companyId
+    );
+    const unreadAllowNull = allowsNullQueueVisibility(
+      userQueueIds,
+      user?.allTicket === "enabled",
+      contingencyQueueId
+    );
 
     whereCondition = {
       ...buildAgentTicketListWhere(
         actor,
         userId,
         userQueueIds,
-        user?.allTicket === "enabled",
+        unreadAllowNull,
         companyId
       ),
       unreadMessages: { [Op.gt]: 0 }

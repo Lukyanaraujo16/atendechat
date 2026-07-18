@@ -6,6 +6,7 @@ import ListQueuesService from "../services/QueueService/ListQueuesService";
 import ListQueueUsersService from "../services/QueueService/ListQueueUsersService";
 import ShowQueueService from "../services/QueueService/ShowQueueService";
 import UpdateQueueService from "../services/QueueService/UpdateQueueService";
+import { loadCompanyUnassignedTicketsQueueId } from "../helpers/unassignedTicketsVisibility";
 import { isNil } from "lodash";
 
 type QueueFilter = {
@@ -36,7 +37,8 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
     orderQueue,
     integrationId,
     promptId,
-    chatbotDisabled
+    chatbotDisabled,
+    receiveUnassignedTickets
   } =
     req.body;
   const { companyId } = req.user;
@@ -51,7 +53,10 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
     chatbotDisabled: Boolean(chatbotDisabled),
     orderQueue: orderQueue === "" ? null : orderQueue,
     integrationId: integrationId === "" ? null : integrationId,
-    promptId: promptId === "" ? null : promptId
+    promptId: promptId === "" ? null : promptId,
+    ...(receiveUnassignedTickets !== undefined
+      ? { receiveUnassignedTickets: Boolean(receiveUnassignedTickets) }
+      : {})
   });
 
   const io = getIO();
@@ -68,8 +73,18 @@ export const show = async (req: Request, res: Response): Promise<Response> => {
   const { companyId } = req.user;
 
   const queue = await ShowQueueService(queueId, companyId);
+  const unassignedTicketsQueueId =
+    await loadCompanyUnassignedTicketsQueueId(companyId);
+  const isUnassignedTicketsQueue =
+    unassignedTicketsQueueId != null &&
+    Number(unassignedTicketsQueueId) === Number(queue.id);
 
-  return res.status(200).json(queue);
+  return res.status(200).json({
+    ...queue.toJSON(),
+    isUnassignedTicketsQueue,
+    receiveUnassignedTickets: isUnassignedTicketsQueue,
+    unassignedTicketsQueueId
+  });
 };
 
 export const listUsers = async (req: Request, res: Response): Promise<Response> => {
@@ -96,7 +111,8 @@ export const update = async (
     orderQueue,
     integrationId,
     promptId,
-    chatbotDisabled
+    chatbotDisabled,
+    receiveUnassignedTickets
   } =
     req.body;
   const queue = await UpdateQueueService(queueId, {
@@ -108,7 +124,10 @@ export const update = async (
     ...(chatbotDisabled !== undefined ? { chatbotDisabled: Boolean(chatbotDisabled) } : {}),
     orderQueue: orderQueue === "" ? null : orderQueue,
     integrationId: integrationId === "" ? null : integrationId,
-    promptId: promptId === "" ? null : promptId
+    promptId: promptId === "" ? null : promptId,
+    ...(receiveUnassignedTickets !== undefined
+      ? { receiveUnassignedTickets: Boolean(receiveUnassignedTickets) }
+      : {})
   }, companyId);
 
   const io = getIO();

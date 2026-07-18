@@ -3274,11 +3274,20 @@ const messages = {
           chatbotDisabled: "Desactivar chatbot en este sector",
           chatbotDisabledHint:
             "Cuando está activo, los tickets dirigidos a este sector van directo a atención humana (pending), sin automatizaciones.",
+          receiveUnassignedTickets: "Recibir tickets sin sector definido",
+          receiveUnassignedTicketsHint:
+            "Los usuarios de este sector podrán ver atenciones que aún no tienen un sector responsable.",
+          currentUnassignedTicketsQueue:
+            "Sector configurado actualmente: {{name}}",
         },
+        replaceUnassignedTitle: "Reemplazar sector de contingencia",
+        replaceUnassignedConfirm:
+          "El sector {{name}} ya está configurado para recibir tickets sin sector. ¿Desea reemplazarlo por el sector actual?",
         buttons: {
           okAdd: "Agregar",
           okEdit: "Guardar",
           cancel: "Cancelar",
+          confirmReplace: "Reemplazar",
         },
         toasts: {
           success: "Cola guardada con éxito.",
@@ -6554,6 +6563,12 @@ const messages = {
         ERR_SESSION_EXPIRED: "Sesión expirada. Por favor inicie sesión.",
         ERR_USER_CREATION_DISABLED: "La creación de usuarios fue deshabilitada por el administrador.",
         ERR_NO_PERMISSION: "No tiene permiso para acceder a este recurso.",
+        ERR_UNASSIGNED_TICKETS_QUEUE_NOT_FOUND:
+          "No se encontró el sector de contingencia para tickets sin sector.",
+        ERR_UNASSIGNED_TICKETS_QUEUE_INVALID_COMPANY:
+          "El sector seleccionado no pertenece a esta empresa.",
+        ERR_NO_PERMISSION_TO_CONFIGURE_UNASSIGNED_QUEUE:
+          "No tiene permiso para configurar el sector de tickets sin fila.",
         ERR_INSTAGRAM_NOT_AVAILABLE_IN_PLAN:
           "Su plan no incluye acceso a la integración con Instagram.",
         ERR_GROUP_PERMANENT_CONVERSATION:

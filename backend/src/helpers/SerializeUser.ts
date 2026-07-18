@@ -116,7 +116,8 @@ export const serializeUserForSession = async (
       "dueDate",
       "timezone",
       "businessSegment",
-      "crmVisibilityMode"
+      "crmVisibilityMode",
+      "unassignedTicketsQueueId"
     ]
   });
   if (!target) {

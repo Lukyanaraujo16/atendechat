@@ -12,6 +12,10 @@ import {
   normalizeWhatsappTicketVisibility,
   WHATSAPP_TICKET_VISIBILITY_ADMIN_SUPERVISOR
 } from "./whatsappTicketVisibility";
+import {
+  allowsNullQueueVisibility,
+  loadCompanyUnassignedTicketsQueueId
+} from "./unassignedTicketsVisibility";
 
 export type TicketAccessUser = {
   id: string | number;
@@ -67,12 +71,15 @@ export function getUserQueueIdsFromQueues(
 /**
  * Regra de acesso a um ticket (não-admin / sem supportMode):
  * - atribuído diretamente ao utilizador (qualquer queueId, inclusive null);
- * - ou sem responsável e queueId numa fila do utilizador.
+ * - ou sem responsável e queueId numa fila do utilizador;
+ * - ou sem responsável, queueId null e allowNullQueueTickets
+ *   (allTicket ou setor de contingência da empresa).
  */
 export function canAccessTicket(
   user: TicketAccessUser,
   ticket: TicketAccessTicket,
-  userQueueIds: number[] = []
+  userQueueIds: number[] = [],
+  allowNullQueueTickets = false
 ): boolean {
   if (user.profile === "admin" || user.supportMode === true) {
     return true;
@@ -96,6 +103,12 @@ export function canAccessTicket(
     if (qid != null && !Number.isNaN(qid) && userQueueIds.includes(qid)) {
       return true;
     }
+    if (
+      (qid == null || Number.isNaN(qid)) &&
+      allowNullQueueTickets === true
+    ) {
+      return true;
+    }
   }
 
   return false;
@@ -109,6 +122,34 @@ export async function loadUserQueueIds(
     include: [{ model: Queue, as: "queues", attributes: ["id"] }]
   });
   return getUserQueueIdsFromQueues(userRow?.queues);
+}
+
+export async function loadUserAllTicketEnabled(
+  userId: string | number
+): Promise<boolean> {
+  const userRow = await User.findByPk(userId, {
+    attributes: ["allTicket"]
+  });
+  return userRow?.allTicket === "enabled";
+}
+
+export async function resolveAllowNullQueueTickets(
+  userId: string | number,
+  companyId: number,
+  userQueueIds?: number[]
+): Promise<boolean> {
+  const [queues, allTicketEnabled, contingencyQueueId] = await Promise.all([
+    userQueueIds != null
+      ? Promise.resolve(userQueueIds)
+      : loadUserQueueIds(userId),
+    loadUserAllTicketEnabled(userId),
+    loadCompanyUnassignedTicketsQueueId(companyId)
+  ]);
+  return allowsNullQueueVisibility(
+    queues,
+    allTicketEnabled,
+    contingencyQueueId
+  );
 }
 
 async function resolveGroupContactForAccess(
@@ -265,11 +306,17 @@ export async function assertUserCanAccessTicketResource(
   }
 
   const userQueueIds = await loadUserQueueIds(user.id);
-  if (!canAccessTicket(user, ticket, userQueueIds)) {
+  const allowNullQueueTickets = await resolveAllowNullQueueTickets(
+    user.id,
+    numericCid,
+    userQueueIds
+  );
+  if (!canAccessTicket(user, ticket, userQueueIds, allowNullQueueTickets)) {
     logGroupTicketAccessDebug(debugEndpoint, "assert_deny", {
       branch: "normal",
       denyReason: "canAccessTicket_failed",
       userQueueIds,
+      allowNullQueueTickets,
       ticketUserId: ticket.userId,
       ticketQueueId: ticket.queueId,
       profile: user.profile,
@@ -281,7 +328,8 @@ export async function assertUserCanAccessTicketResource(
   logGroupTicketAccessDebug(debugEndpoint, "assert_allow", {
     branch: "normal",
     subReason: "canAccessTicket_with_queues",
-    userQueueIds
+    userQueueIds,
+    allowNullQueueTickets
   });
 }
 
