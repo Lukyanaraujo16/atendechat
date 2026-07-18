@@ -12,6 +12,7 @@ import { resolveWhatsappAiAgentRuntimeMode } from "./aiAgentRuntimeMode";
 import { sanitizeAiAgentRuntimeMetadata } from "./sanitizeAiAgentRuntimeMetadata";
 import { scheduleShadowGeneration } from "./AiAgentShadowService";
 import { scheduleLiveResponse } from "./AiAgentLiveService";
+import { scheduleAutomationObserveFromInbound } from "../AutomationOrchestrator/scheduleAutomationObserveFromInbound";
 import Contact from "../../models/Contact";
 import Ticket from "../../models/Ticket";
 import Whatsapp from "../../models/Whatsapp";
@@ -193,4 +194,24 @@ export function scheduleAiAgentDryRunFromInbound(params: {
       "[AiAgent][runtime] hook_failed"
     );
   });
+
+  // Fase IA 2.0: Orchestrator observe — não assume chatbot/flow/live.
+  const orchMessageId =
+    params.persistedMessageId ||
+    (params.msg.key?.id != null && String(params.msg.key.id).length > 0
+      ? String(params.msg.key.id)
+      : null);
+  void scheduleAutomationObserveFromInbound({
+    companyId: params.companyId,
+    ticket: params.ticket as unknown as Record<string, unknown>,
+    contact: params.contact as unknown as Record<string, unknown>,
+    whatsapp: params.whatsapp as unknown as Record<string, unknown>,
+    messageId: orchMessageId,
+    body: params.bodyMessage ?? null,
+    fromMe: false,
+    hasText: params.classification?.hasText === true,
+    isGroup: !!params.ticket.isGroup,
+    channel: "whatsapp",
+    metadata: { source: "inbound_observe" }
+  }).catch(() => undefined);
 }

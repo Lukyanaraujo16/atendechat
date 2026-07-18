@@ -103,6 +103,11 @@ import AiKnowledgeDocumentStats from "../models/AiKnowledgeDocumentStats";
 import AiKnowledgeGap from "../models/AiKnowledgeGap";
 import AiKnowledgeSuggestion from "../models/AiKnowledgeSuggestion";
 import AiAgentExecutionReplay from "../models/AiAgentExecutionReplay";
+import AutomationExecution from "../models/AutomationExecution";
+import AutomationExecutionStep from "../models/AutomationExecutionStep";
+import AutomationExecutionEvent from "../models/AutomationExecutionEvent";
+import AutomationOrchestratorSettings from "../models/AutomationOrchestratorSettings";
+import AutomationPlannerValidation from "../models/AutomationPlannerValidation";
 import AiProviderCredential from "../models/AiProviderCredential";
 import { logDbConnectionAtStartup } from "../helpers/dbConnectionInfo";
 import {
@@ -221,6 +226,11 @@ const models = [
   AiKnowledgeGap,
   AiKnowledgeSuggestion,
   AiAgentExecutionReplay,
+  AutomationExecution,
+  AutomationExecutionStep,
+  AutomationExecutionEvent,
+  AutomationOrchestratorSettings,
+  AutomationPlannerValidation,
   AiProviderCredential
 ];
 

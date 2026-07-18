@@ -4311,6 +4311,7 @@ const messages = {
           prompts: "OpenAI",
           aiAgent: "Agente de IA",
           aiAgentAnalytics: "Analytics IA",
+          automationMonitor: "Automation Monitor",
           knowledgeBase: "Base de Conhecimento",
           queueIntegration: "Automações por setor",
           notificationCenter: "Central de notificações",

@@ -70,6 +70,7 @@ import {
   AI_AGENT_FEATURE_KEY,
   AI_AGENT_ROUTE_PATH,
   AI_AGENT_ANALYTICS_ROUTE_PATH,
+  AUTOMATION_MONITOR_ROUTE_PATH,
   AI_AGENT_SIMULATOR_ROUTE_PATH,
   AI_AGENT_WIZARD_ROUTE_PATH,
   AI_AGENT_UI_ENABLED,
@@ -85,6 +86,9 @@ import {
 
 const AiAgentAnalyticsPage = React.lazy(() =>
   import("../pages/AiAgentAnalytics")
+);
+const AutomationMonitorPage = React.lazy(() =>
+  import("../pages/AutomationMonitor")
 );
 
 function PlanFlagsLoadingState() {
@@ -375,6 +379,10 @@ function AutomacaoModule({ planFlags, isAdmin }) {
         path: AI_AGENT_ANALYTICS_ROUTE_PATH,
         label: i18n.t("mainDrawer.listItems.aiAgentAnalytics"),
       });
+      t.push({
+        path: AUTOMATION_MONITOR_ROUTE_PATH,
+        label: i18n.t("mainDrawer.listItems.automationMonitor"),
+      });
     }
     if (showKnowledgeBase) {
       t.push({
@@ -519,6 +527,23 @@ function AutomacaoModule({ planFlags, isAdmin }) {
               {isAdmin && showAiAgentAnalytics ? (
                 <Suspense fallback={<PlanFlagsLoadingState />}>
                   <AiAgentAnalyticsPage />
+                </Suspense>
+              ) : null}
+            </AiAgentRouteGuard>
+          )}
+        />
+        <Route
+          exact
+          path={AUTOMATION_MONITOR_ROUTE_PATH}
+          render={() => (
+            <AiAgentRouteGuard
+              planFlags={planFlags}
+              user={user}
+              fallbackPath={fallback}
+            >
+              {isAdmin && showAiAgentAnalytics ? (
+                <Suspense fallback={<PlanFlagsLoadingState />}>
+                  <AutomationMonitorPage />
                 </Suspense>
               ) : null}
             </AiAgentRouteGuard>
@@ -762,6 +787,7 @@ export default function LoggedInRoutesContent() {
     "/prompts",
     AI_AGENT_ROUTE_PATH,
     AI_AGENT_ANALYTICS_ROUTE_PATH,
+    AUTOMATION_MONITOR_ROUTE_PATH,
     KNOWLEDGE_BASE_ROUTE_PATH,
     "/quick-messages",
   ];
