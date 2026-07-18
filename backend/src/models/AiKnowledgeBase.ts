@@ -8,6 +8,7 @@ import {
   Default,
   DeletedAt,
   ForeignKey,
+  BelongsToMany,
   HasMany,
   Model,
   PrimaryKey,
@@ -17,10 +18,12 @@ import {
 import Company from "./Company";
 import User from "./User";
 import AiKnowledgeDocument from "./AiKnowledgeDocument";
+import AiAgent from "./AiAgent";
+import AiAgentKnowledgeBase from "./AiAgentKnowledgeBase";
 
 /**
  * Coleção lógica de conhecimento por empresa.
- * Relacionamento futuro com agentes: AiAgentKnowledgeBases (fase posterior).
+ * Relação com agentes via AiAgentKnowledgeBases (fase 1.5.2D).
  */
 @Table({
   tableName: "AiKnowledgeBases",
@@ -82,6 +85,9 @@ class AiKnowledgeBase extends Model<AiKnowledgeBase> {
 
   @HasMany(() => AiKnowledgeDocument)
   documents: AiKnowledgeDocument[];
+
+  @BelongsToMany(() => AiAgent, () => AiAgentKnowledgeBase)
+  agents: AiAgent[];
 }
 
 export default AiKnowledgeBase;

@@ -7,6 +7,7 @@ import {
   DataType,
   Default,
   ForeignKey,
+  BelongsToMany,
   HasOne,
   Model,
   PrimaryKey,
@@ -16,6 +17,9 @@ import {
 import Company from "./Company";
 import AiProviderCredential from "./AiProviderCredential";
 import AiAgentProfile from "./AiAgentProfile";
+import AiKnowledgeBase from "./AiKnowledgeBase";
+import AiAgentKnowledgeBase from "./AiAgentKnowledgeBase";
+import AiAgentKnowledgeSettings from "./AiAgentKnowledgeSettings";
 import {
   DEFAULT_AI_AGENT_MAX_TOKENS,
   DEFAULT_AI_AGENT_MODEL,
@@ -90,6 +94,12 @@ class AiAgent extends Model<AiAgent> {
 
   @HasOne(() => AiAgentProfile)
   profile: AiAgentProfile;
+
+  @HasOne(() => AiAgentKnowledgeSettings)
+  knowledgeSettings: AiAgentKnowledgeSettings;
+
+  @BelongsToMany(() => AiKnowledgeBase, () => AiAgentKnowledgeBase)
+  knowledgeBases: AiKnowledgeBase[];
 
   @Default(false)
   @Column

@@ -2211,6 +2211,8 @@ const messages = {
 						"I understand that the AI will automatically reply to eligible customers.",
 					liveConfirmRequired:
 						"Confirm that you understand Live Mode before saving.",
+					liveKnowledgeHint:
+						"Knowledge Base retrieval (RAG) in Live requires separate opt-in in the agent's Knowledge settings — it is not enabled automatically when choosing Live Mode.",
 					planBlocked: "The AI Agent module is not available on your plan.",
 					modes: {
 						disabled: "Disabled",
@@ -2717,6 +2719,104 @@ const messages = {
 					delete: "Delete",
 					retry: "Try again",
 					simulateConversation: "Simulate conversation",
+					configureKnowledge: "Knowledge base",
+				},
+				knowledge: {
+					title: "Agent knowledge base",
+					loading: "Loading settings…",
+					hint:
+						"Link indexed bases and configure retrieval (RAG) per channel. Live requires prior validation in simulator and shadow.",
+					fields: {
+						enabled: "Enable Knowledge Base for this agent",
+						enabledInSimulator: "Use in simulator",
+						enabledInShadow: "Use in Shadow Mode",
+						enabledInLive: "Use in Live Mode",
+						topK: "Top K (chunks)",
+						minimumScore: "Minimum score",
+						maxContextCharacters: "Max context characters",
+						maxContextTokens: "Max context tokens",
+						maxChunksPerDocument: "Max chunks per document",
+						maxChunksPerBase: "Max chunks per base",
+						allowAnswerWithoutKnowledge:
+							"Allow answer without retrieved knowledge",
+						handoffWhenKnowledgeMissing:
+							"Suggest handoff when knowledge is missing",
+					},
+					channels: {
+						title: "Usage channels",
+					},
+					alerts: {
+						noLinkedBases:
+							"No linked bases. Link at least one base to retrieve knowledge.",
+						liveWithoutChannels:
+							"Live enabled without simulator and/or shadow. Validate retrieval there before production.",
+					},
+					bases: {
+						title: "Linked bases",
+						empty: "No knowledge bases registered for this company.",
+						disabled: "base disabled",
+						priority: "Priority",
+						linkEnabled: "Active for agent",
+					},
+					retrieval: {
+						title: "Retrieval parameters",
+					},
+					test: {
+						title: "Test this agent's knowledge",
+						subtitle:
+							"Runs semantic search only — does not generate a model answer.",
+						queryLabel: "Test query",
+						run: "Run test",
+						status: "Status",
+						skipReason: "Skip reason",
+						queryUsed: "Query used",
+						error: "Error",
+						metrics: "Metrics",
+						chunks: "chunks",
+						sources: "Retrieved sources",
+						contextText: "Built context",
+					},
+					status: {
+						skipped: "Skipped",
+						completed: "Completed",
+						empty: "Empty",
+						failed: "Failed",
+						searching: "Searching",
+					},
+					skipReasons: {
+						disabled: "Disabled",
+						channel_disabled: "Channel disabled",
+						no_linked_bases: "No linked bases",
+						no_active_bases: "No active bases",
+						missing_embedding_settings: "Embeddings not configured",
+						invalid_credential: "Invalid credential",
+						empty_query: "Empty query",
+						feature_blocked: "Feature blocked on plan",
+						context_budget_unavailable: "Context budget unavailable",
+						document_not_indexed: "Document not indexed",
+					},
+					liveConfirm: {
+						title: "Enable knowledge in Live",
+						message:
+							"We recommend validating retrieval in simulator and Shadow Mode before enabling Live. Continue anyway?",
+					},
+					buttons: {
+						saveSettings: "Save parameters",
+						saveLinks: "Save links",
+					},
+					toasts: {
+						settingsSaved: "Knowledge parameters saved",
+						linksSaved: "Linked bases updated",
+					},
+					shadow: {
+						used: "Used knowledge · {{count}} source(s) · score {{score}}",
+                  filterWith: "With knowledge",
+                  filterWithout: "Without knowledge",
+                  filterEmpty: "Empty retrieval",
+                  filterError: "Retrieval error",
+                  knowledgeFilter: "Knowledge",
+						detailsTitle: "Retrieved knowledge",
+					},
 				},
 				simulator: {
 					title: "Attendant simulator",
@@ -2725,6 +2825,15 @@ const messages = {
 					warning:
 						"This conversation is for testing only and will not be sent to any customer.",
 					handoffBadge: "The attendant would request human help here",
+					knowledge: {
+						title: "Retrieved knowledge",
+						status: "Status",
+						skipReason: "Skip reason",
+						queryUsed: "Query",
+						maxScore: "Max score",
+						error: "Error",
+						metrics: "Metrics",
+					},
 					buttons: {
 						back: "Back",
 						restart: "Restart conversation",

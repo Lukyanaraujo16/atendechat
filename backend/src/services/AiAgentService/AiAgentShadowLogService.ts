@@ -107,14 +107,19 @@ export async function claimShadowGeneration(
       where: {
         id: logId,
         companyId,
-        shadowStatus: {
-          [Op.in]: [
-            AI_AGENT_SHADOW_STATUSES.NOT_REQUESTED,
-            AI_AGENT_SHADOW_STATUSES.QUEUED
-          ]
-        }
+        shadowStatus: AI_AGENT_SHADOW_STATUSES.NOT_REQUESTED
       }
     }
   );
-  return affected > 0;
+  if (affected > 0) return true;
+
+  const row = await AiAgentRuntimeLog.findOne({
+    where: {
+      id: logId,
+      companyId,
+      shadowStatus: AI_AGENT_SHADOW_STATUSES.QUEUED
+    },
+    attributes: ["id"]
+  });
+  return Boolean(row);
 }

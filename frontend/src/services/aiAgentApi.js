@@ -74,3 +74,27 @@ export function upsertAiAgentSimulatorMessageReview(agentId, sessionId, messageI
     data
   );
 }
+
+export function getAiAgentKnowledgeBases(agentId) {
+  return api.get(`/ai-agents/${agentId}/knowledge-bases`);
+}
+
+export function syncAiAgentKnowledgeBases(agentId, { links }) {
+  return api.put(`/ai-agents/${agentId}/knowledge-bases`, { links });
+}
+
+export function getAiAgentKnowledgeSettings(agentId) {
+  return api.get(`/ai-agents/${agentId}/knowledge-settings`);
+}
+
+export function updateAiAgentKnowledgeSettings(agentId, data) {
+  return api.put(`/ai-agents/${agentId}/knowledge-settings`, data);
+}
+
+export function testAiAgentKnowledgeRetrieval(agentId, data) {
+  return api.post(`/ai-agents/${agentId}/knowledge-retrieval/test`, data);
+}
+
+export function listAiAgentKnowledgeRetrievals(agentId, params = {}) {
+  return api.get(`/ai-agents/${agentId}/knowledge-retrievals`, { params });
+}

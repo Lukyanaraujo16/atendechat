@@ -26,6 +26,11 @@ import {
 } from "./aiAgentSimulatorConfig";
 import { AI_AGENT_SHADOW_ERROR_CODES } from "./aiAgentShadowErrors";
 import { findAiAgentOrThrow } from "./aiAgentTenant";
+import {
+  applyKnowledgeToSystemPrompt,
+  buildKnowledgeRuntimeMetadata,
+  safeRetrieveKnowledgeForAgent
+} from "./knowledge/integrateKnowledgeIntoRuntime";
 
 const SIMULATOR_ERROR_CODES = {
   MISSING_CREDENTIAL: "missing_credential",
@@ -277,8 +282,27 @@ export async function sendAiAgentSimulationMessage(input: {
     companyId: input.companyId,
     aiAgentId: agent.id
   });
-  const systemPrompt = buildAiAgentSystemPrompt(agent, profile);
+  let systemPrompt = buildAiAgentSystemPrompt(agent, profile);
   const messages = buildSimulationContextMessages(historyRows);
+
+  const retrieval = await safeRetrieveKnowledgeForAgent({
+    companyId: input.companyId,
+    aiAgentId: agent.id,
+    query: content,
+    channel: "simulator",
+    conversationContext: historyRows.map(r => ({
+      role: r.role,
+      content: r.content
+    })),
+    simulationSessionId: session.id,
+    requestId: `sim-${session.id}-${userRow.id}`
+  });
+  const knowledgeApplied = applyKnowledgeToSystemPrompt(
+    systemPrompt,
+    retrieval
+  );
+  systemPrompt = knowledgeApplied.systemPrompt;
+  const knowledgeMeta = buildKnowledgeRuntimeMetadata(retrieval);
 
   let model: string;
   let maxTokens: number;
@@ -323,7 +347,8 @@ export async function sendAiAgentSimulationMessage(input: {
       model,
       latencyMs,
       errorCode: result.errorCode,
-      handoffSuggested: false
+      handoffSuggested: false,
+      metadata: knowledgeMeta
     });
 
     await session.update({
@@ -336,7 +361,8 @@ export async function sendAiAgentSimulationMessage(input: {
         id: userRow.id,
         role: userRow.role,
         content: userRow.content,
-        createdAt: userRow.createdAt
+        createdAt: userRow.createdAt,
+        knowledge: knowledgeMeta?.knowledge || null
       },
       assistantMessage: {
         id: assistantRow.id,
@@ -348,8 +374,10 @@ export async function sendAiAgentSimulationMessage(input: {
         latencyMs: assistantRow.latencyMs,
         handoffSuggested: false,
         handoffReason: null,
-        createdAt: assistantRow.createdAt
+        createdAt: assistantRow.createdAt,
+        knowledge: knowledgeMeta?.knowledge || null
       },
+      knowledge: knowledgeMeta?.knowledge || null,
       session: {
         id: session.id,
         messageCount: session.messageCount,
@@ -360,6 +388,8 @@ export async function sendAiAgentSimulationMessage(input: {
   }
 
   const handoff = parseAiAgentHandoffSignal(result.text);
+  const handoffSuggested =
+    handoff.handoffRequested || knowledgeApplied.forceHandoff;
   const assistantRow = await AiAgentSimulationMessage.create({
     companyId: input.companyId,
     sessionId: session.id,
@@ -371,9 +401,14 @@ export async function sendAiAgentSimulationMessage(input: {
     completionTokens: result.completionTokens ?? null,
     totalTokens: result.totalTokens ?? null,
     latencyMs,
-    handoffSuggested: handoff.handoffRequested,
-    handoffReason: handoff.handoffReason
+    handoffSuggested,
+    handoffReason: handoff.handoffReason || (knowledgeApplied.forceHandoff
+      ? "knowledge_missing"
+      : null),
+    metadata: knowledgeMeta
   });
+
+  await userRow.update({ metadata: knowledgeMeta });
 
   await session.update({
     messageCount: session.messageCount + 2,
@@ -391,7 +426,8 @@ export async function sendAiAgentSimulationMessage(input: {
       id: userRow.id,
       role: userRow.role,
       content: userRow.content,
-      createdAt: userRow.createdAt
+      createdAt: userRow.createdAt,
+      knowledge: knowledgeMeta?.knowledge || null
     },
     assistantMessage: {
       id: assistantRow.id,
@@ -405,8 +441,10 @@ export async function sendAiAgentSimulationMessage(input: {
       latencyMs: assistantRow.latencyMs,
       handoffSuggested: assistantRow.handoffSuggested,
       handoffReason: assistantRow.handoffReason,
-      createdAt: assistantRow.createdAt
+      createdAt: assistantRow.createdAt,
+      knowledge: knowledgeMeta?.knowledge || null
     },
+    knowledge: knowledgeMeta?.knowledge || null,
     session: {
       id: session.id,
       messageCount: session.messageCount,

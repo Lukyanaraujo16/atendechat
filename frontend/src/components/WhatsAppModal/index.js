@@ -757,6 +757,14 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
                             <Alert severity="info" style={{ marginTop: 8 }}>
                               {i18n.t("whatsappModal.aiAgent.liveLimitations")}
                             </Alert>
+                            <Typography
+                              variant="caption"
+                              color="textSecondary"
+                              display="block"
+                              style={{ marginTop: 8 }}
+                            >
+                              {i18n.t("whatsappModal.aiAgent.liveKnowledgeHint")}
+                            </Typography>
                             <FormControlLabel
                               style={{ marginTop: 8 }}
                               control={

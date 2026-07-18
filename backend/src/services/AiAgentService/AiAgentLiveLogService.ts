@@ -106,6 +106,7 @@ export async function claimLiveGeneration(
   logId: number,
   companyId: number
 ): Promise<boolean> {
+  // Apenas not_requested → queued (evita re-claim de jobs já em andamento).
   const [affected] = await AiAgentRuntimeLog.update(
     { liveStatus: AI_AGENT_LIVE_STATUSES.QUEUED },
     {
@@ -113,17 +114,26 @@ export async function claimLiveGeneration(
         id: logId,
         companyId,
         mode: "live",
-        liveStatus: {
-          [Op.in]: [
-            AI_AGENT_LIVE_STATUSES.NOT_REQUESTED,
-            AI_AGENT_LIVE_STATUSES.QUEUED
-          ]
-        },
+        liveStatus: AI_AGENT_LIVE_STATUSES.NOT_REQUESTED,
         deliveryStatus: AI_AGENT_LIVE_DELIVERY_STATUSES.NOT_SENT
       }
     }
   );
-  return affected > 0;
+  if (affected > 0) return true;
+
+  // Aceita claim se já estiver queued por este fluxo (debounce agendou)
+  // e ainda não enviado — exclusivo via Redis lock no caller.
+  const row = await AiAgentRuntimeLog.findOne({
+    where: {
+      id: logId,
+      companyId,
+      mode: "live",
+      liveStatus: AI_AGENT_LIVE_STATUSES.QUEUED,
+      deliveryStatus: AI_AGENT_LIVE_DELIVERY_STATUSES.NOT_SENT
+    },
+    attributes: ["id"]
+  });
+  return Boolean(row);
 }
 
 export async function claimLiveSending(

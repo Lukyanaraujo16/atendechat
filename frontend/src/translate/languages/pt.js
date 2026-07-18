@@ -2293,6 +2293,8 @@ const messages = {
             "Entendo que a IA responderá automaticamente os clientes elegíveis.",
           liveConfirmRequired:
             "Confirme que entende o Live Mode antes de salvar.",
+          liveKnowledgeHint:
+            "A recuperação de Base de Conhecimento (RAG) no Live exige opt-in separado nas configurações de Conhecimento do agente — não é ativada automaticamente ao escolher Live Mode.",
           planBlocked: "O módulo Agente de IA não está disponível no seu plano.",
           modes: {
             disabled: "Desativado",
@@ -2803,6 +2805,104 @@ const messages = {
           delete: "Excluir",
           retry: "Tentar novamente",
           simulateConversation: "Simular conversa",
+          configureKnowledge: "Base de conhecimento",
+        },
+        knowledge: {
+          title: "Base de conhecimento do agente",
+          loading: "Carregando configurações…",
+          hint:
+            "Vincule bases indexadas e configure a recuperação (RAG) por canal. O Live exige validação prévia no simulador e shadow.",
+          fields: {
+            enabled: "Ativar Base de Conhecimento neste agente",
+            enabledInSimulator: "Usar no simulador",
+            enabledInShadow: "Usar no Shadow Mode",
+            enabledInLive: "Usar no Live Mode",
+            topK: "Top K (trechos)",
+            minimumScore: "Score mínimo",
+            maxContextCharacters: "Máx. caracteres no contexto",
+            maxContextTokens: "Máx. tokens no contexto",
+            maxChunksPerDocument: "Máx. trechos por documento",
+            maxChunksPerBase: "Máx. trechos por base",
+            allowAnswerWithoutKnowledge:
+              "Permitir resposta sem conhecimento recuperado",
+            handoffWhenKnowledgeMissing:
+              "Sugerir handoff quando não houver conhecimento",
+          },
+          channels: {
+            title: "Canais de uso",
+          },
+          alerts: {
+            noLinkedBases:
+              "Nenhuma base vinculada. Vincule ao menos uma base para recuperar conhecimento.",
+            liveWithoutChannels:
+              "Live ativo sem simulador e/ou shadow. Valide a recuperação nesses ambientes antes de produção.",
+          },
+          bases: {
+            title: "Bases vinculadas",
+            empty: "Nenhuma base de conhecimento cadastrada na empresa.",
+            disabled: "base desativada",
+            priority: "Prioridade",
+            linkEnabled: "Ativa no agente",
+          },
+          retrieval: {
+            title: "Parâmetros de recuperação",
+          },
+          test: {
+            title: "Testar conhecimento deste Agente",
+            subtitle:
+              "Executa apenas a busca semântica — não gera resposta do modelo.",
+            queryLabel: "Consulta de teste",
+            run: "Executar teste",
+            status: "Status",
+            skipReason: "Motivo de skip",
+            queryUsed: "Consulta usada",
+            error: "Erro",
+            metrics: "Métricas",
+            chunks: "trechos",
+            sources: "Fontes recuperadas",
+            contextText: "Contexto montado",
+          },
+          status: {
+            skipped: "Ignorado",
+            completed: "Concluído",
+            empty: "Vazio",
+            failed: "Falhou",
+            searching: "Buscando",
+          },
+          skipReasons: {
+            disabled: "Desativado",
+            channel_disabled: "Canal desativado",
+            no_linked_bases: "Sem bases vinculadas",
+            no_active_bases: "Sem bases ativas",
+            missing_embedding_settings: "Embeddings não configurados",
+            invalid_credential: "Credencial inválida",
+            empty_query: "Consulta vazia",
+            feature_blocked: "Recurso bloqueado no plano",
+            context_budget_unavailable: "Orçamento de contexto indisponível",
+            document_not_indexed: "Documento não indexado",
+          },
+          liveConfirm: {
+            title: "Ativar conhecimento no Live",
+            message:
+              "Recomendamos validar a recuperação no simulador e no Shadow Mode antes de habilitar no Live. Deseja continuar mesmo assim?",
+          },
+          buttons: {
+            saveSettings: "Salvar parâmetros",
+            saveLinks: "Salvar vínculos",
+          },
+          toasts: {
+            settingsSaved: "Parâmetros de conhecimento salvos",
+            linksSaved: "Bases vinculadas atualizadas",
+          },
+          shadow: {
+            used: "Usou conhecimento · {{count}} fonte(s) · score {{score}}",
+                  filterWith: "Com conhecimento",
+                  filterWithout: "Sem conhecimento",
+                  filterEmpty: "Recuperação vazia",
+                  filterError: "Falha na recuperação",
+                  knowledgeFilter: "Conhecimento",
+            detailsTitle: "Conhecimento recuperado",
+          },
         },
         simulator: {
           title: "Simulador do atendente",
@@ -2811,6 +2911,15 @@ const messages = {
           warning:
             "Esta conversa é apenas uma simulação e não será enviada a nenhum cliente.",
           handoffBadge: "O atendente pediria ajuda humana aqui",
+          knowledge: {
+            title: "Conhecimento recuperado",
+            status: "Status",
+            skipReason: "Motivo de skip",
+            queryUsed: "Consulta",
+            maxScore: "Score máximo",
+            error: "Erro",
+            metrics: "Métricas",
+          },
           buttons: {
             back: "Voltar",
             restart: "Reiniciar conversa",

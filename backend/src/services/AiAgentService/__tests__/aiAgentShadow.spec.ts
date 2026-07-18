@@ -3,6 +3,26 @@ jest.mock("@whiskeysockets/baileys", () => ({
   proto: {}
 }));
 
+/** Evita carregar database via PgVectorStore nos testes de Shadow. */
+jest.mock("../knowledge/integrateKnowledgeIntoRuntime", () => ({
+  safeRetrieveKnowledgeForAgent: jest.fn().mockResolvedValue(null),
+  applyKnowledgeToSystemPrompt: jest.fn((sys: string) => ({
+    systemPrompt: sys,
+    knowledgeBlocked: false,
+    forceHandoff: false,
+    decision: { decision: "skip", injectKnowledgeContext: false, reason: "disabled" }
+  })),
+  buildKnowledgeRuntimeMetadata: jest.fn().mockReturnValue(null),
+  resolveKnowledgeRuntimeDecision: jest.fn()
+}));
+
+jest.mock("../knowledge/aiAgentGenerationLock", () => ({
+  acquireAiAgentGenerationLock: jest
+    .fn()
+    .mockResolvedValue({ acquired: true, key: "test-shadow-lock", redisUnavailable: false }),
+  releaseAiAgentGenerationLock: jest.fn().mockResolvedValue(undefined)
+}));
+
 jest.mock("../../AiProviderService/AiProviderAdapterFactory", () => ({
   generateChatCompletionViaAdapter: jest.fn()
 }));

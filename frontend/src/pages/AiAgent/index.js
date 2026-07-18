@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import {
   Box,
   Button,
@@ -30,6 +30,7 @@ import {
   Stars as GuidedIcon,
   Settings,
   ChatBubbleOutline,
+  MenuBook,
 } from "@material-ui/icons";
 import { toast } from "react-toastify";
 import { useHistory } from "react-router-dom";
@@ -45,7 +46,15 @@ import AiAgentCreateChoiceModal from "../../components/AiAgentCreateChoiceModal"
 import AiProviderCredentialModal from "../../components/AiProviderCredentialModal";
 import AiAgentShadowDetailsModal from "../../components/AiAgentShadowDetailsModal";
 import AiAgentShadowReviewModal from "../../components/AiAgentShadowReviewModal";
+import AiAgentKnowledgePanel from "../../components/AiAgentKnowledgePanel";
 import { AppEmptyState } from "../../ui";
+import { AuthContext } from "../../context/Auth/AuthContext";
+import usePlanFlags from "../../hooks/usePlanFlags";
+import { canUseKnowledgeBase } from "../../utils/canUseKnowledgeBase";
+import {
+  extractShadowKnowledge,
+  shadowKnowledgeSummary,
+} from "../../utils/aiAgentKnowledgeObservability";
 import { i18n } from "../../translate/i18n";
 import { resolveProviderLabel } from "../../config/aiProviderModels";
 import {
@@ -115,11 +124,15 @@ const DEFAULT_SHADOW_FILTERS = {
   aiAgentId: "",
   errorCode: "",
   suggestionSource: "",
+  knowledgeUsage: "",
 };
 
 const AiAgent = () => {
   const classes = useStyles();
   const history = useHistory();
+  const { user } = useContext(AuthContext);
+  const planFlags = usePlanFlags();
+  const knowledgeBaseAvailable = canUseKnowledgeBase(user, planFlags);
   const [agents, setAgents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -145,6 +158,7 @@ const AiAgent = () => {
   const [shadowSummary, setShadowSummary] = useState(null);
   const [shadowDetailsRow, setShadowDetailsRow] = useState(null);
   const [shadowReviewRow, setShadowReviewRow] = useState(null);
+  const [knowledgePanelAgent, setKnowledgePanelAgent] = useState(null);
 
   const shadowQueryParams = useMemo(() => {
     const params = { pageNumber: 1 };
@@ -413,6 +427,13 @@ const AiAgent = () => {
         onSaved={handleRefreshShadow}
       />
 
+      <AiAgentKnowledgePanel
+        open={Boolean(knowledgePanelAgent)}
+        onClose={() => setKnowledgePanelAgent(null)}
+        agentId={knowledgePanelAgent?.id}
+        agentName={knowledgePanelAgent?.name}
+      />
+
       <MainHeader>
         <Box>
           <Title>{i18n.t("aiAgent.title")}</Title>
@@ -529,6 +550,17 @@ const AiAgent = () => {
                         <ChatBubbleOutline fontSize="small" />
                       </IconButton>
                     </Tooltip>
+                    {knowledgeBaseAvailable ? (
+                      <Tooltip title={i18n.t("aiAgent.buttons.configureKnowledge")}>
+                        <IconButton
+                          size="small"
+                          onClick={() => setKnowledgePanelAgent(agent)}
+                          className={classes.actionIcon}
+                        >
+                          <MenuBook fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    ) : null}
                     <Tooltip title={i18n.t("aiAgent.buttons.delete")}>
                       <IconButton
                         size="small"
@@ -738,6 +770,35 @@ const AiAgent = () => {
                 <MenuItem value="fallback">fallback</MenuItem>
               </TextField>
             </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <TextField
+                select
+                fullWidth
+                size="small"
+                variant="outlined"
+                label={i18n.t("aiAgent.knowledge.shadow.knowledgeFilter")}
+                value={shadowFilters.knowledgeUsage || ""}
+                onChange={(e) =>
+                  handleShadowFilterChange("knowledgeUsage", e.target.value)
+                }
+              >
+                <MenuItem value="">
+                  {i18n.t("aiAgent.shadowSection.filters.all")}
+                </MenuItem>
+                <MenuItem value="with">
+                  {i18n.t("aiAgent.knowledge.shadow.filterWith")}
+                </MenuItem>
+                <MenuItem value="without">
+                  {i18n.t("aiAgent.knowledge.shadow.filterWithout")}
+                </MenuItem>
+                <MenuItem value="empty">
+                  {i18n.t("aiAgent.knowledge.shadow.filterEmpty")}
+                </MenuItem>
+                <MenuItem value="error">
+                  {i18n.t("aiAgent.knowledge.shadow.filterError")}
+                </MenuItem>
+              </TextField>
+            </Grid>
           </Grid>
 
           {shadowLoading && shadowRows.length === 0 ? (
@@ -768,7 +829,10 @@ const AiAgent = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {shadowRows.map((row) => (
+                  {shadowRows.map((row) => {
+                    const shadowKnowledge = extractShadowKnowledge(row);
+                    const knowledgeInfo = shadowKnowledgeSummary(shadowKnowledge);
+                    return (
                     <TableRow key={row.id}>
                       <TableCell>
                         {row.createdAt ? new Date(row.createdAt).toLocaleString() : "-"}
@@ -797,6 +861,20 @@ const AiAgent = () => {
                             color={row.review.rating === "good" ? "primary" : "default"}
                             className={classes.shadowBadge}
                             label={row.review.rating}
+                          />
+                        ) : null}
+                        {knowledgeInfo ? (
+                          <Chip
+                            size="small"
+                            color="default"
+                            className={classes.shadowBadge}
+                            label={i18n.t("aiAgent.knowledge.shadow.used", {
+                              count: knowledgeInfo.sourceCount ?? 0,
+                              score:
+                                knowledgeInfo.maxScore != null
+                                  ? Number(knowledgeInfo.maxScore).toFixed(2)
+                                  : "—",
+                            })}
                           />
                         ) : null}
                       </TableCell>
@@ -848,7 +926,8 @@ const AiAgent = () => {
                         </Tooltip>
                       </TableCell>
                     </TableRow>
-                  ))}
+                    );
+                  })}
                 </TableBody>
               </Table>
               {shadowHasMore ? (

@@ -34,6 +34,10 @@ import { isTicketIntegrationActive } from "./isTicketIntegrationActive";
 import { parseAiAgentHandoffSignal } from "./parseAiAgentHandoffSignal";
 import applyAiAgentHandoffToTicket from "./applyAiAgentHandoffToTicket";
 import { maybeApplySafetyHandoffForLiveBlock } from "./maybeApplySafetyHandoffForLiveBlock";
+import {
+  acquireAiAgentGenerationLock,
+  releaseAiAgentGenerationLock
+} from "./knowledge/aiAgentGenerationLock";
 
 const inFlightLiveTickets = new Set<number>();
 
@@ -189,6 +193,15 @@ export async function generateAndSendLiveResponseForLog(
     return;
   }
 
+  const lock = await acquireAiAgentGenerationLock({
+    channel: "live",
+    companyId,
+    logId
+  });
+  if (!lock.acquired) {
+    return;
+  }
+
   inFlightLiveTickets.add(ticket.id);
   const startedAt = Date.now();
 
@@ -223,12 +236,15 @@ export async function generateAndSendLiveResponseForLog(
       source: AI_AGENT_LIVE_SOURCE,
       timeoutMs: AI_AGENT_LIVE_TIMEOUT_MS,
       maxTokensCap: AI_AGENT_LIVE_MAX_TOKENS_CAP,
-      logId
+      logId,
+      knowledgeChannel: "live",
+      messageId: log.messageId || null
     });
 
     await mergeAiAgentLiveLogMetadata(logId, companyId, {
       credentialSource: generation.credentialSource ?? "missing",
-      credentialId: generation.credentialId ?? null
+      credentialId: generation.credentialId ?? null,
+      ...(generation.knowledgeMeta || {})
     });
 
     if (generation.ok === false) {
@@ -247,6 +263,11 @@ export async function generateAndSendLiveResponseForLog(
     }
 
     const handoffSignal = parseAiAgentHandoffSignal(generation.text);
+    if (generation.forceHandoff && !handoffSignal.handoffRequested) {
+      handoffSignal.handoffRequested = true;
+      handoffSignal.handoffReason =
+        handoffSignal.handoffReason || "knowledge_missing";
+    }
     const validated = validateAiAgentLiveResponse(handoffSignal.cleanText);
     if (validated.ok === false) {
       if (handoffSignal.handoffRequested) {
@@ -408,6 +429,7 @@ export async function generateAndSendLiveResponseForLog(
     );
   } finally {
     inFlightLiveTickets.delete(log.ticketId ?? 0);
+    await releaseAiAgentGenerationLock(lock.key);
   }
 }
 

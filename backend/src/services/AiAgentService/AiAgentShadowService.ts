@@ -32,6 +32,15 @@ import {
 } from "./AiAgentShadowLogService";
 import { resolveWhatsappAiAgentRuntimeMode } from "./aiAgentRuntimeMode";
 import { InboundMessageClassification } from "./classifyInboundMessage";
+import {
+  applyKnowledgeToSystemPrompt,
+  buildKnowledgeRuntimeMetadata,
+  safeRetrieveKnowledgeForAgent
+} from "./knowledge/integrateKnowledgeIntoRuntime";
+import {
+  acquireAiAgentGenerationLock,
+  releaseAiAgentGenerationLock
+} from "./knowledge/aiAgentGenerationLock";
 
 const inFlightTickets = new Set<number>();
 
@@ -131,6 +140,15 @@ export async function generateShadowSuggestionForLog(
     return;
   }
 
+  const lock = await acquireAiAgentGenerationLock({
+    channel: "shadow",
+    companyId,
+    logId
+  });
+  if (!lock.acquired) {
+    return;
+  }
+
   inFlightTickets.add(ticket.id);
   const startedAt = Date.now();
 
@@ -178,7 +196,29 @@ export async function generateShadowSuggestionForLog(
       companyId,
       aiAgentId: agent.id
     });
-    const systemPrompt = buildAiAgentSystemPrompt(agent, profile);
+    let systemPrompt = buildAiAgentSystemPrompt(agent, profile);
+
+    const retrieval = await safeRetrieveKnowledgeForAgent({
+      companyId,
+      aiAgentId: agent.id,
+      query: inboundText,
+      channel: "shadow",
+      conversationContext: promptContext.messages,
+      ticketId: ticket.id,
+      messageId: log.messageId || null,
+      shadowSuggestionId: logId,
+      requestId: `shadow-${logId}`
+    });
+    const knowledgeApplied = applyKnowledgeToSystemPrompt(
+      systemPrompt,
+      retrieval
+    );
+    systemPrompt = knowledgeApplied.systemPrompt;
+    const knowledgeMeta = buildKnowledgeRuntimeMetadata(retrieval);
+    if (knowledgeMeta) {
+      await mergeAiAgentShadowLogMetadata(logId, companyId, knowledgeMeta);
+    }
+
     let model: string;
     let maxTokens: number;
     try {
@@ -294,6 +334,7 @@ export async function generateShadowSuggestionForLog(
     );
   } finally {
     inFlightTickets.delete(log.ticketId ?? 0);
+    await releaseAiAgentGenerationLock(lock.key);
   }
 }
 

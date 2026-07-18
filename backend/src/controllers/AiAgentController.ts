@@ -25,6 +25,16 @@ import {
   parseOptionalPositiveInt,
   ShadowSuggestionListFilters
 } from "../services/AiAgentService/shadowSuggestionFilters";
+import ListAiAgentKnowledgeBasesService from "../services/AiAgentService/knowledge/ListAiAgentKnowledgeBasesService";
+import SyncAiAgentKnowledgeBasesService from "../services/AiAgentService/knowledge/SyncAiAgentKnowledgeBasesService";
+import ShowAiAgentKnowledgeSettingsService, {
+  serializeAiAgentKnowledgeSettings
+} from "../services/AiAgentService/knowledge/ShowAiAgentKnowledgeSettingsService";
+import UpsertAiAgentKnowledgeSettingsService from "../services/AiAgentService/knowledge/UpsertAiAgentKnowledgeSettingsService";
+import RetrieveKnowledgeForAgentService from "../services/AiAgentService/knowledge/RetrieveKnowledgeForAgentService";
+import ListKnowledgeRetrievalsService, {
+  ShowKnowledgeRetrievalService
+} from "../services/AiAgentService/knowledge/ListKnowledgeRetrievalsService";
 
 function companyIdOrThrow(req: Request): number {
   const id = req.user?.companyId;
@@ -60,7 +70,8 @@ function parseShadowFilters(req: Request, companyId: number): ShadowSuggestionLi
     suggestionSource: query.suggestionSource as string | undefined,
     ticketId: parseOptionalPositiveInt(query.ticketId, "ticketId"),
     dateFrom: query.dateFrom as string | undefined,
-    dateTo: query.dateTo as string | undefined
+    dateTo: query.dateTo as string | undefined,
+    knowledgeUsage: query.knowledgeUsage as string | undefined
   };
 }
 
@@ -277,4 +288,147 @@ export const upsertSimulatorMessageReview = async (
     body: req.body
   });
   return res.json(review);
+};
+
+export const listKnowledgeBases = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const aiAgentId = parseIdParam(req.params.id);
+  const result = await ListAiAgentKnowledgeBasesService({
+    companyId,
+    aiAgentId
+  });
+  return res.json(result);
+};
+
+export const syncKnowledgeBases = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const aiAgentId = parseIdParam(req.params.id);
+  const result = await SyncAiAgentKnowledgeBasesService({
+    companyId,
+    aiAgentId,
+    userId: userIdOrThrow(req),
+    links: Array.isArray(req.body?.links) ? req.body.links : []
+  });
+  return res.json(result);
+};
+
+export const showKnowledgeSettings = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const aiAgentId = parseIdParam(req.params.id);
+  const row = await ShowAiAgentKnowledgeSettingsService({
+    companyId,
+    aiAgentId,
+    userId: userIdOrThrow(req)
+  });
+  return res.json({ settings: serializeAiAgentKnowledgeSettings(row) });
+};
+
+export const upsertKnowledgeSettings = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const aiAgentId = parseIdParam(req.params.id);
+  const settings = await UpsertAiAgentKnowledgeSettingsService({
+    companyId,
+    aiAgentId,
+    userId: userIdOrThrow(req),
+    body: req.body || {}
+  });
+  return res.json({ settings });
+};
+
+export const testKnowledgeRetrieval = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const aiAgentId = parseIdParam(req.params.id);
+  const query = String(req.body?.query || "").trim();
+  const result = await RetrieveKnowledgeForAgentService({
+    companyId,
+    aiAgentId,
+    query,
+    channel: "test",
+    forceEnabled: true,
+    topK: req.body?.topK != null ? Number(req.body.topK) : undefined,
+    minimumScore:
+      req.body?.minimumScore != null
+        ? Number(req.body.minimumScore)
+        : undefined,
+    documentTypes: Array.isArray(req.body?.documentTypes)
+      ? req.body.documentTypes.map(String)
+      : undefined,
+    language: req.body?.language ? String(req.body.language) : null,
+    requestId: `test-${aiAgentId}-${Date.now()}`
+  });
+  return res.json({
+    enabled: result.enabled,
+    performed: result.performed,
+    skippedReason: result.skippedReason,
+    status: result.status,
+    queryUsed: result.queryUsed,
+    results: result.results.map(r => ({
+      knowledgeBaseId: r.knowledgeBaseId,
+      knowledgeBaseName: r.knowledgeBaseName,
+      documentId: r.documentId,
+      documentTitle: r.documentTitle,
+      documentType: r.documentType,
+      chunkId: r.chunkId,
+      sectionTitle: r.sectionTitle,
+      content: r.content,
+      similarityScore: r.similarityScore,
+      sourceType: r.sourceType,
+      sourceUrl: r.sourceUrl,
+      language: r.language,
+      priority: r.priority
+    })),
+    contextText: result.contextText,
+    sources: result.sources,
+    metrics: result.metrics,
+    errorCode: result.errorCode || null,
+    errorMessage: result.errorMessage || null,
+    knowledgeMissing: result.knowledgeMissing,
+    retrievalId: result.retrievalId || null
+  });
+};
+
+export const listKnowledgeRetrievals = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const aiAgentId = parseIdParam(req.params.id);
+  const result = await ListKnowledgeRetrievalsService({
+    companyId,
+    aiAgentId,
+    channel: req.query.channel as string | undefined,
+    status: req.query.status as string | undefined,
+    pageNumber: req.query.pageNumber as string | undefined
+  });
+  return res.json(result);
+};
+
+export const showKnowledgeRetrieval = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const aiAgentId = parseIdParam(req.params.id);
+  const retrievalId = parseIdParam(req.params.retrievalId);
+  const retrieval = await ShowKnowledgeRetrievalService({
+    companyId,
+    aiAgentId,
+    retrievalId
+  });
+  return res.json({ retrieval });
 };

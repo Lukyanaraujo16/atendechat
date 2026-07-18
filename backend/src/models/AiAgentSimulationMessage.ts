@@ -86,6 +86,10 @@ class AiAgentSimulationMessage extends Model<AiAgentSimulationMessage> {
   @Column(DataType.STRING(64))
   handoffReason: string | null;
 
+  @AllowNull(true)
+  @Column(DataType.JSON)
+  metadata: Record<string, unknown> | null;
+
   @HasOne(() => AiAgentSimulationMessageReview)
   review: AiAgentSimulationMessageReview;
 

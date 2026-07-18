@@ -9,6 +9,9 @@ import FileCopyOutlinedIcon from "@material-ui/icons/FileCopyOutlined";
 import RateReviewOutlinedIcon from "@material-ui/icons/RateReviewOutlined";
 import ReplayIcon from "@material-ui/icons/Replay";
 import { i18n } from "../../translate/i18n";
+import SimulatorKnowledgePanel, {
+  extractMessageKnowledge,
+} from "./SimulatorKnowledgePanel";
 
 const useStyles = makeStyles((theme) => {
   const isDark = theme.palette.type === "dark";
@@ -60,6 +63,7 @@ export default function SimulatorMessage({
 }) {
   const isUser = message.role === "user";
   const classes = useStyles({ isUser });
+  const knowledge = !isUser ? extractMessageKnowledge(message) : null;
 
   return (
     <div className={classes.row}>
@@ -107,6 +111,7 @@ export default function SimulatorMessage({
             </Tooltip>
           </div>
         ) : null}
+        {knowledge ? <SimulatorKnowledgePanel knowledge={knowledge} /> : null}
       </Paper>
     </div>
   );

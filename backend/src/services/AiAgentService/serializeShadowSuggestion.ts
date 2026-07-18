@@ -44,6 +44,7 @@ export type SerializedShadowSuggestion = {
   liveLatencyMs: number | null;
   runtimeMode: string;
   notSentToClient: boolean;
+  knowledge: Record<string, unknown> | null;
   review: SerializedShadowReview | null;
 };
 
@@ -121,6 +122,10 @@ export function serializeShadowSuggestionRow(input: RowInput): SerializedShadowS
     runtimeMode: log.mode,
     notSentToClient:
       log.mode !== "live" || log.deliveryStatus !== "sent",
+    knowledge:
+      meta.knowledge && typeof meta.knowledge === "object"
+        ? (meta.knowledge as Record<string, unknown>)
+        : null,
     review: review
       ? {
           id: review.id,

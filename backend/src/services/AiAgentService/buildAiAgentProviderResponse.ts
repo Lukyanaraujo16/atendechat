@@ -12,6 +12,12 @@ import {
 } from "./aiAgentValidation";
 import { resolveAiAgentOpenAiApiKeyWithSource } from "./resolveAiAgentApiCredential";
 import { AI_AGENT_SHADOW_ERROR_CODES } from "./aiAgentShadowErrors";
+import {
+  applyKnowledgeToSystemPrompt,
+  buildKnowledgeRuntimeMetadata,
+  safeRetrieveKnowledgeForAgent
+} from "./knowledge/integrateKnowledgeIntoRuntime";
+import type { KnowledgeRetrievalResult } from "./knowledge/knowledgeRetrievalTypes";
 
 export type BuildAiAgentProviderResponseInput = {
   companyId: number;
@@ -24,6 +30,9 @@ export type BuildAiAgentProviderResponseInput = {
   timeoutMs: number;
   maxTokensCap: number;
   logId?: number;
+  /** simulator | shadow | live */
+  knowledgeChannel?: "shadow" | "live";
+  messageId?: string | null;
 };
 
 export type BuildAiAgentProviderResponseSuccess = {
@@ -39,6 +48,9 @@ export type BuildAiAgentProviderResponseSuccess = {
   contextHash: string;
   credentialSource: string;
   credentialId: number | null;
+  knowledge?: KnowledgeRetrievalResult | null;
+  knowledgeMeta?: Record<string, unknown> | null;
+  forceHandoff?: boolean;
 };
 
 export type BuildAiAgentProviderResponseFailure = {
@@ -52,6 +64,8 @@ export type BuildAiAgentProviderResponseFailure = {
   credentialSource?: string;
   credentialId?: number | null;
   isRateLimited?: boolean;
+  knowledge?: KnowledgeRetrievalResult | null;
+  knowledgeMeta?: Record<string, unknown> | null;
 };
 
 export type BuildAiAgentProviderResponseResult =
@@ -104,7 +118,30 @@ export async function buildAiAgentProviderResponse(
     companyId: input.companyId,
     aiAgentId: input.agent.id
   });
-  const systemPrompt = buildAiAgentSystemPrompt(input.agent, profile);
+  let systemPrompt = buildAiAgentSystemPrompt(input.agent, profile);
+
+  const knowledgeChannel = input.knowledgeChannel || "live";
+  const retrieval = await safeRetrieveKnowledgeForAgent({
+    companyId: input.companyId,
+    aiAgentId: input.agent.id,
+    query: input.inboundText,
+    channel: knowledgeChannel,
+    conversationContext: promptContext.messages,
+    ticketId: input.ticket.id,
+    messageId: input.messageId || null,
+    shadowSuggestionId:
+      knowledgeChannel === "shadow" ? input.logId ?? null : null,
+    requestId: input.logId
+      ? `${knowledgeChannel}-${input.logId}`
+      : `ticket-${input.ticket.id}-${Date.now()}`
+  });
+  const knowledgeApplied = applyKnowledgeToSystemPrompt(
+    systemPrompt,
+    retrieval
+  );
+  systemPrompt = knowledgeApplied.systemPrompt;
+  const knowledgeMeta = buildKnowledgeRuntimeMetadata(retrieval);
+
   let model: string;
   let maxTokens: number;
   try {
@@ -149,7 +186,9 @@ export async function buildAiAgentProviderResponse(
       credentialSource: resolved.source,
       credentialId: resolved.credentialId ?? null,
       isRateLimited:
-        result.errorCode === AI_AGENT_SHADOW_ERROR_CODES.AI_USAGE_LIMIT_REACHED
+        result.errorCode === AI_AGENT_SHADOW_ERROR_CODES.AI_USAGE_LIMIT_REACHED,
+      knowledge: retrieval,
+      knowledgeMeta
     };
   }
 
@@ -164,7 +203,9 @@ export async function buildAiAgentProviderResponse(
       contextMessageCount: promptContext.contextMessageCount,
       contextHash: promptContext.contextHash,
       credentialSource: resolved.source,
-      credentialId: resolved.credentialId ?? null
+      credentialId: resolved.credentialId ?? null,
+      knowledge: retrieval,
+      knowledgeMeta
     };
   }
 
@@ -180,6 +221,9 @@ export async function buildAiAgentProviderResponse(
     contextMessageCount: promptContext.contextMessageCount,
     contextHash: promptContext.contextHash,
     credentialSource: resolved.source,
-    credentialId: resolved.credentialId ?? null
+    credentialId: resolved.credentialId ?? null,
+    knowledge: retrieval,
+    knowledgeMeta,
+    forceHandoff: knowledgeApplied.forceHandoff
   };
 }

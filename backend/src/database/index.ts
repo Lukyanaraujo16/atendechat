@@ -95,6 +95,9 @@ import AiKnowledgeDocumentProcessing from "../models/AiKnowledgeDocumentProcessi
 import AiKnowledgeDocumentIndexing from "../models/AiKnowledgeDocumentIndexing";
 import AiKnowledgeDocumentChunk from "../models/AiKnowledgeDocumentChunk";
 import AiKnowledgeEmbeddingSettings from "../models/AiKnowledgeEmbeddingSettings";
+import AiAgentKnowledgeBase from "../models/AiAgentKnowledgeBase";
+import AiAgentKnowledgeSettings from "../models/AiAgentKnowledgeSettings";
+import AiKnowledgeRetrieval from "../models/AiKnowledgeRetrieval";
 import AiProviderCredential from "../models/AiProviderCredential";
 import { logDbConnectionAtStartup } from "../helpers/dbConnectionInfo";
 import {
@@ -205,6 +208,9 @@ const models = [
   AiKnowledgeDocumentIndexing,
   AiKnowledgeDocumentChunk,
   AiKnowledgeEmbeddingSettings,
+  AiAgentKnowledgeBase,
+  AiAgentKnowledgeSettings,
+  AiKnowledgeRetrieval,
   AiProviderCredential
 ];
 

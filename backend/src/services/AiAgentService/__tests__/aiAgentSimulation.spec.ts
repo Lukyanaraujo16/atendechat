@@ -1,3 +1,16 @@
+/** Evita carregar database via PgVectorStore nos testes de Simulador. */
+jest.mock("../knowledge/integrateKnowledgeIntoRuntime", () => ({
+  safeRetrieveKnowledgeForAgent: jest.fn().mockResolvedValue(null),
+  applyKnowledgeToSystemPrompt: jest.fn((sys: string) => ({
+    systemPrompt: sys,
+    knowledgeBlocked: false,
+    forceHandoff: false,
+    decision: { decision: "skip", injectKnowledgeContext: false, reason: "disabled" }
+  })),
+  buildKnowledgeRuntimeMetadata: jest.fn().mockReturnValue(null),
+  resolveKnowledgeRuntimeDecision: jest.fn()
+}));
+
 jest.mock("../../../models/AiAgent", () => ({
   __esModule: true,
   default: { findOne: jest.fn() }
@@ -202,7 +215,13 @@ describe("AiAgent simulation 1.5.1D", () => {
     (AiAgentSimulationMessage.count as jest.Mock).mockResolvedValue(0);
     (AiAgentSimulationMessage.findAll as jest.Mock).mockResolvedValue([]);
     (AiAgentSimulationMessage.create as jest.Mock)
-      .mockResolvedValueOnce({ id: 1, role: "user", content: "Olá", createdAt: new Date() })
+      .mockResolvedValueOnce({
+        id: 1,
+        role: "user",
+        content: "Olá",
+        createdAt: new Date(),
+        update: jest.fn().mockResolvedValue(undefined)
+      })
       .mockResolvedValueOnce({
         id: 2,
         role: "assistant",
@@ -215,7 +234,8 @@ describe("AiAgent simulation 1.5.1D", () => {
         latencyMs: 120,
         handoffSuggested: false,
         handoffReason: null,
-        createdAt: new Date()
+        createdAt: new Date(),
+        update: jest.fn().mockResolvedValue(undefined)
       });
     mockedAdapter.mockResolvedValue({
       ok: true,

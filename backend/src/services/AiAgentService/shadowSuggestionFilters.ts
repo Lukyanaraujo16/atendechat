@@ -1,7 +1,11 @@
-import { Op, WhereOptions } from "sequelize";
+import { Op, Sequelize, WhereOptions } from "sequelize";
 import AppError from "../../errors/AppError";
 import { AI_PROVIDERS, isAiProviderId } from "../../config/aiProviderModels";
 import { AI_AGENT_SHADOW_STATUSES } from "./aiAgentShadowErrors";
+
+function getDbDialect(): string {
+  return String(process.env.DB_DIALECT || "mysql").toLowerCase();
+}
 
 export type ShadowSuggestionListFilters = {
   companyId: number;
@@ -16,6 +20,8 @@ export type ShadowSuggestionListFilters = {
   ticketId?: number;
   dateFrom?: string;
   dateTo?: string;
+  /** with | without | empty | error */
+  knowledgeUsage?: string;
 };
 
 const DEFAULT_LIMIT = 20;
@@ -135,6 +141,52 @@ export function buildShadowSuggestionWhere(
     if (dateFrom) createdAt[Op.gte] = dateFrom;
     if (dateTo) createdAt[Op.lte] = dateTo;
     where.createdAt = createdAt;
+  }
+
+  const knowledgeUsage = String(input.knowledgeUsage || "")
+    .trim()
+    .toLowerCase();
+  if (knowledgeUsage) {
+    const dialect = getDbDialect();
+    const statusPath =
+      dialect === "postgres"
+        ? `(metadata->'knowledge'->>'status')`
+        : `JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.knowledge.status'))`;
+    const performedPath =
+      dialect === "postgres"
+        ? `(metadata->'knowledge'->>'performed')`
+        : `JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.knowledge.performed'))`;
+    const missingPath =
+      dialect === "postgres"
+        ? `(metadata->'knowledge'->>'knowledgeMissing')`
+        : `JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.knowledge.knowledgeMissing'))`;
+
+    const knowledgeAnd: ReturnType<typeof Sequelize.literal>[] = [];
+    if (knowledgeUsage === "with") {
+      knowledgeAnd.push(
+        Sequelize.literal(`${statusPath} = 'completed'`),
+        Sequelize.literal(
+          `(${missingPath} = 'false' OR ${missingPath} = '0')`
+        )
+      );
+    } else if (knowledgeUsage === "empty") {
+      knowledgeAnd.push(Sequelize.literal(`${statusPath} = 'empty'`));
+    } else if (knowledgeUsage === "error") {
+      knowledgeAnd.push(Sequelize.literal(`${statusPath} = 'failed'`));
+    } else if (knowledgeUsage === "without") {
+      knowledgeAnd.push(
+        Sequelize.literal(
+          `(metadata IS NULL OR ${performedPath} IS NULL OR ${performedPath} IN ('false','0') OR ${statusPath} IN ('skipped','empty') OR ${missingPath} IN ('true','1'))`
+        )
+      );
+    } else {
+      throw new AppError(
+        "ERR_VALIDATION_ERROR",
+        400,
+        "knowledgeUsage inválido (with|without|empty|error)."
+      );
+    }
+    Object.assign(where, { [Op.and]: knowledgeAnd });
   }
 
   return where as WhereOptions;
