@@ -109,6 +109,7 @@ export function legacyPlanFeatureValueFromColumns(plan, featureKey) {
     case "inventory.sales.viewReports":
     case "inventory.sales.manageSettings":
     case "automation.ai_agent":
+    case "automation.knowledge_base":
       return false;
     case "attendance.kanban":
       return asBool(plan.useKanban);

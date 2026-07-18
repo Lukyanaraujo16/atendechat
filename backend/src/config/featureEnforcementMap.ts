@@ -65,6 +65,22 @@ export const FEATURE_ENFORCEMENT_MAP: Array<{
     notes: "CRUD administrativo do agente (fase 1.0); sem runtime de mensagens."
   },
   {
+    feature: "automation.knowledge_base",
+    menu: "Automação → Base de Conhecimento",
+    frontendRoutes: ["/knowledge-base"],
+    backendRoutes: [
+      "GET /knowledge-bases",
+      "GET /knowledge-bases/:id",
+      "POST /knowledge-bases",
+      "PUT /knowledge-bases/:id",
+      "DELETE /knowledge-bases/:id",
+      "GET /knowledge-bases/:id/documents",
+      "POST /knowledge-bases/:id/documents"
+    ],
+    notes:
+      "CRUD de bases e documentos (fase 1.5.2A); sem RAG, embeddings ou extração."
+  },
+  {
     feature: "automation.integrations",
     menu: "Automação → Integrações de fila",
     frontendRoutes: ["/queue-integration"],

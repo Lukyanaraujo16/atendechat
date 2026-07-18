@@ -34,6 +34,7 @@ import { addSeconds, differenceInSeconds } from "date-fns";
 import formatBody from "./helpers/Mustache";
 import { ClosedAllOpenTickets } from "./services/WbotServices/wbotClosedTickets";
 import { flowMenuTimeoutQueue } from "./libs/flowMenuTimeoutQueue";
+import { knowledgeDocumentQueue } from "./libs/knowledgeDocumentQueue";
 import { getCompanyEffectivePlanValue } from "./helpers/getCompanyEffectivePlanValue";
 import { resolvePlanIdForQuery } from "./services/PlanService/planIdResolve";
 
@@ -1389,6 +1390,13 @@ export async function startQueueProcess() {
       "./services/FlowBuilderService/ProcessFlowMenuTimeout"
     );
     return processFlowMenuTimeout(job);
+  });
+
+  knowledgeDocumentQueue.process("ProcessKnowledgeDocument", 1, async job => {
+    const { processKnowledgeDocumentJob } = await import(
+      "./services/KnowledgeBaseService/ProcessKnowledgeDocumentJob"
+    );
+    return processKnowledgeDocumentJob(job);
   });
 
   scheduleMonitor.process("Verify", handleVerifySchedules);

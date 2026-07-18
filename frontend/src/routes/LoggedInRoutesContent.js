@@ -73,6 +73,14 @@ import {
   AI_AGENT_WIZARD_ROUTE_PATH,
   AI_AGENT_UI_ENABLED,
 } from "../config/aiAgentFeature";
+import KnowledgeBase from "../pages/KnowledgeBase";
+import KnowledgeBaseDetail from "../pages/KnowledgeBaseDetail";
+import KnowledgeBaseRouteGuard from "../components/KnowledgeBaseRouteGuard";
+import {
+  KNOWLEDGE_BASE_FEATURE_KEY,
+  KNOWLEDGE_BASE_ROUTE_PATH,
+  KNOWLEDGE_BASE_UI_ENABLED,
+} from "../config/knowledgeBaseFeature";
 
 function PlanFlagsLoadingState() {
   return (
@@ -324,6 +332,8 @@ function AutomacaoModule({ planFlags, isAdmin }) {
   const showQuickReplies = fx["automation.quick_replies"] === true;
   const showAiAgent =
     AI_AGENT_UI_ENABLED && isAdmin && fx[AI_AGENT_FEATURE_KEY] === true;
+  const showKnowledgeBase =
+    KNOWLEDGE_BASE_UI_ENABLED && isAdmin && fx[KNOWLEDGE_BASE_FEATURE_KEY] === true;
 
   const tabs = useMemo(() => {
     const t = [];
@@ -354,6 +364,12 @@ function AutomacaoModule({ planFlags, isAdmin }) {
         label: i18n.t("mainDrawer.listItems.aiAgent"),
       });
     }
+    if (showKnowledgeBase) {
+      t.push({
+        path: KNOWLEDGE_BASE_ROUTE_PATH,
+        label: i18n.t("mainDrawer.listItems.knowledgeBase"),
+      });
+    }
     if (showQuickReplies) {
       t.push({
         path: "/quick-messages",
@@ -368,6 +384,7 @@ function AutomacaoModule({ planFlags, isAdmin }) {
     showIntegrations,
     showOpenAi,
     showAiAgent,
+    showKnowledgeBase,
     showQuickReplies,
     i18n.language,
   ]);
@@ -386,6 +403,7 @@ function AutomacaoModule({ planFlags, isAdmin }) {
           "automation.integrations",
           "automation.openai",
           AI_AGENT_FEATURE_KEY,
+          KNOWLEDGE_BASE_FEATURE_KEY,
           "automation.quick_replies",
         ]}
       />
@@ -487,6 +505,32 @@ function AutomacaoModule({ planFlags, isAdmin }) {
             >
               {isAdmin && showAiAgent ? <AiAgent /> : null}
             </AiAgentRouteGuard>
+          )}
+        />
+        <Route
+          exact
+          path={`${KNOWLEDGE_BASE_ROUTE_PATH}/:baseId`}
+          render={() => (
+            <KnowledgeBaseRouteGuard
+              planFlags={planFlags}
+              user={user}
+              fallbackPath={fallback}
+            >
+              {isAdmin && showKnowledgeBase ? <KnowledgeBaseDetail /> : null}
+            </KnowledgeBaseRouteGuard>
+          )}
+        />
+        <Route
+          exact
+          path={KNOWLEDGE_BASE_ROUTE_PATH}
+          render={() => (
+            <KnowledgeBaseRouteGuard
+              planFlags={planFlags}
+              user={user}
+              fallbackPath={fallback}
+            >
+              {isAdmin && showKnowledgeBase ? <KnowledgeBase /> : null}
+            </KnowledgeBaseRouteGuard>
           )}
         />
         {showQuickReplies ? (
@@ -687,6 +731,7 @@ export default function LoggedInRoutesContent() {
     "/queue-integration",
     "/prompts",
     AI_AGENT_ROUTE_PATH,
+    KNOWLEDGE_BASE_ROUTE_PATH,
     "/quick-messages",
   ];
 

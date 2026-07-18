@@ -37,6 +37,7 @@ export const PERMISSION_UI_GROUPS = [
       "automation.integrations",
       "automation.openai",
       "automation.ai_agent",
+      "automation.knowledge_base",
       "automation.keywords",
     ],
   },

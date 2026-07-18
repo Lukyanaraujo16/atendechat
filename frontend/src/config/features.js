@@ -57,6 +57,11 @@ export const FEATURES = {
         description:
           "Permite usar atendentes virtuais com inteligência artificial para responder clientes automaticamente, interpretar mensagens e auxiliar na qualificação de atendimentos.",
       },
+      knowledge_base: {
+        label: "Base de Conhecimento",
+        description:
+          "Organiza documentos e bases de conhecimento da empresa para uso futuro por agentes de IA (cadastro e armazenamento nesta fase).",
+      },
       keywords: {
         label: "Gatilhos por palavra-chave",
         description: "Dispara fluxos quando o contato envia palavras específicas.",

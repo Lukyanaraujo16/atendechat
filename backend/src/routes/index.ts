@@ -44,6 +44,7 @@ import crmRoutes from "./crmRoutes";
 import inventoryRoutes from "./inventoryRoutes";
 import aiAgentRoutes from "./aiAgentRoutes";
 import aiProviderCredentialRoutes from "./aiProviderCredentialRoutes";
+import knowledgeBaseRoutes from "./knowledgeBaseRoutes";
 import notificationRoutes from "./notificationRoutes";
 import systemSettingRoutes from "./systemSettingRoutes";
 import platformSuperRoutes from "./platformSuperRoutes";
@@ -106,5 +107,6 @@ routes.use(crmRoutes);
 routes.use(inventoryRoutes);
 routes.use(aiAgentRoutes);
 routes.use(aiProviderCredentialRoutes);
+routes.use(knowledgeBaseRoutes);
 
 export default routes;

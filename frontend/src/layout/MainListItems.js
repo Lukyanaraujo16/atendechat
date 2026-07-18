@@ -36,6 +36,11 @@ import {
   AI_AGENT_ROUTE_PATH,
   AI_AGENT_UI_ENABLED,
 } from "../config/aiAgentFeature";
+import {
+  KNOWLEDGE_BASE_FEATURE_KEY,
+  KNOWLEDGE_BASE_ROUTE_PATH,
+  KNOWLEDGE_BASE_UI_ENABLED,
+} from "../config/knowledgeBaseFeature";
 import { canUseInventorySales } from "../utils/canUseInventorySales";
 import { WhatsAppsContext } from "../context/WhatsApp/WhatsAppsContext";
 import { AuthContext } from "../context/Auth/AuthContext";
@@ -180,6 +185,9 @@ function defaultAutomacaoPath(planFlags, isTenantManager, user) {
   if (planFlags.useOpenAi || fx["automation.openai"] === true) return "/prompts";
   if (AI_AGENT_UI_ENABLED && fx[AI_AGENT_FEATURE_KEY] === true) {
     return AI_AGENT_ROUTE_PATH;
+  }
+  if (KNOWLEDGE_BASE_UI_ENABLED && fx[KNOWLEDGE_BASE_FEATURE_KEY] === true) {
+    return KNOWLEDGE_BASE_ROUTE_PATH;
   }
   if (fx["automation.quick_replies"] === true) return "/quick-messages";
   return getAttendanceDefaultPath({
@@ -403,6 +411,8 @@ const MainListItems = (props) => {
     path === "/queue-integration" ||
     path === "/prompts" ||
     path === AI_AGENT_ROUTE_PATH ||
+    path === KNOWLEDGE_BASE_ROUTE_PATH ||
+    path.startsWith(`${KNOWLEDGE_BASE_ROUTE_PATH}/`) ||
     path === "/quick-messages";
   const selCampanhas =
     path === "/campaigns" ||
@@ -445,6 +455,7 @@ const MainListItems = (props) => {
       fx["automation.integrations"] === true ||
       fx["automation.openai"] === true ||
       fx[AI_AGENT_FEATURE_KEY] === true ||
+      fx[KNOWLEDGE_BASE_FEATURE_KEY] === true ||
       fx["automation.quick_replies"] === true);
 
   const standaloneAfterConfig = (
