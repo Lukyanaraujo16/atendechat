@@ -24,15 +24,6 @@ jest.mock("../../../models/AiKnowledgeDocumentProcessing", () => ({
   }
 }));
 
-import AiKnowledgeDocument from "../../../models/AiKnowledgeDocument";
-import AiKnowledgeDocumentProcessing from "../../../models/AiKnowledgeDocumentProcessing";
-import { knowledgeDocumentQueue } from "../../../libs/knowledgeDocumentQueue";
-import EnqueueKnowledgeDocumentProcessingService from "../EnqueueKnowledgeDocumentProcessingService";
-import ReprocessKnowledgeDocumentService from "../ReprocessKnowledgeDocumentService";
-import ListKnowledgeDocumentProcessingsService from "../ListKnowledgeDocumentProcessingsService";
-import GetKnowledgeBaseDashboardService from "../GetKnowledgeBaseDashboardService";
-import AiKnowledgeBase from "../../../models/AiKnowledgeBase";
-
 jest.mock("../../../models/AiKnowledgeBase", () => ({
   __esModule: true,
   default: {
@@ -40,6 +31,30 @@ jest.mock("../../../models/AiKnowledgeBase", () => ({
   }
 }));
 
+jest.mock("../../../models/AiKnowledgeDocumentChunk", () => ({
+  __esModule: true,
+  default: {
+    count: jest.fn()
+  }
+}));
+
+jest.mock("../../../models/AiKnowledgeEmbeddingSettings", () => ({
+  __esModule: true,
+  default: {
+    findOne: jest.fn()
+  }
+}));
+
+import AiKnowledgeDocument from "../../../models/AiKnowledgeDocument";
+import AiKnowledgeDocumentProcessing from "../../../models/AiKnowledgeDocumentProcessing";
+import AiKnowledgeBase from "../../../models/AiKnowledgeBase";
+import AiKnowledgeDocumentChunk from "../../../models/AiKnowledgeDocumentChunk";
+import AiKnowledgeEmbeddingSettings from "../../../models/AiKnowledgeEmbeddingSettings";
+import { knowledgeDocumentQueue } from "../../../libs/knowledgeDocumentQueue";
+import EnqueueKnowledgeDocumentProcessingService from "../EnqueueKnowledgeDocumentProcessingService";
+import ReprocessKnowledgeDocumentService from "../ReprocessKnowledgeDocumentService";
+import ListKnowledgeDocumentProcessingsService from "../ListKnowledgeDocumentProcessingsService";
+import GetKnowledgeBaseDashboardService from "../GetKnowledgeBaseDashboardService";
 describe("Knowledge processing pipeline", () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -180,6 +195,12 @@ describe("Knowledge processing pipeline", () => {
     (AiKnowledgeDocument.findOne as jest.Mock).mockResolvedValue({
       lastProcessedAt: new Date("2026-07-18T10:00:00Z")
     });
+    (AiKnowledgeDocumentChunk.count as jest.Mock).mockResolvedValue(12);
+    (AiKnowledgeEmbeddingSettings.findOne as jest.Mock).mockResolvedValue({
+      provider: "openai",
+      model: "text-embedding-3-small",
+      enabled: true
+    });
 
     const dash = await GetKnowledgeBaseDashboardService({ companyId: 1 });
     expect(dash).toHaveProperty("documentsProcessed");
@@ -187,6 +208,9 @@ describe("Knowledge processing pipeline", () => {
     expect(dash).toHaveProperty("documentsProcessing");
     expect(dash).toHaveProperty("documentsError");
     expect(dash).toHaveProperty("lastProcessingAt");
+    expect(dash).toHaveProperty("indexPending");
+    expect(dash).toHaveProperty("chunksTotal");
+    expect(dash.chunksTotal).toBe(12);
   });
 
   it("blocks enqueue when already processing", async () => {

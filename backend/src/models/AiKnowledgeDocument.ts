@@ -51,6 +51,10 @@ import type {
       fields: ["companyId", "uploadStatus"]
     },
     {
+      name: "AiKnowledgeDocuments_companyId_indexStatus_idx",
+      fields: ["companyId", "indexStatus"]
+    },
+    {
       name: "AiKnowledgeDocuments_companyId_documentType_idx",
       fields: ["companyId", "documentType"]
     },
@@ -172,6 +176,46 @@ class AiKnowledgeDocument extends Model<AiKnowledgeDocument> {
   @AllowNull(true)
   @Column
   lastProcessingDurationMs: number | null;
+
+  @AllowNull(true)
+  @Column
+  lastIndexedAt: Date | null;
+
+  @AllowNull(true)
+  @Column(DataType.TEXT)
+  lastIndexingError: string | null;
+
+  @AllowNull(true)
+  @Column(DataType.STRING(128))
+  lastIndexedChecksum: string | null;
+
+  @AllowNull(true)
+  @Column
+  lastIndexingDurationMs: number | null;
+
+  @AllowNull(true)
+  @Column(DataType.STRING(40))
+  lastEmbeddingProvider: string | null;
+
+  @AllowNull(true)
+  @Column(DataType.STRING(120))
+  lastEmbeddingModel: string | null;
+
+  @AllowNull(true)
+  @Column
+  lastEmbeddingDimensions: number | null;
+
+  @AllowNull(true)
+  @Column(DataType.STRING(40))
+  lastChunkingVersion: string | null;
+
+  @Default(0)
+  @Column
+  chunkCount: number;
+
+  @AllowNull(true)
+  @Column
+  activeIndexingId: number | null;
 
   @AllowNull(true)
   @Column(DataType.JSON)

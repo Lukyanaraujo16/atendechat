@@ -1,23 +1,12 @@
 import { Op } from "sequelize";
 import AiKnowledgeBase from "../../models/AiKnowledgeBase";
 import AiKnowledgeDocument from "../../models/AiKnowledgeDocument";
+import AiKnowledgeDocumentChunk from "../../models/AiKnowledgeDocumentChunk";
+import AiKnowledgeEmbeddingSettings from "../../models/AiKnowledgeEmbeddingSettings";
 
 export default async function GetKnowledgeBaseDashboardService(input: {
   companyId: number;
-}): Promise<{
-  basesTotal: number;
-  basesActive: number;
-  basesInactive: number;
-  documentsTotal: number;
-  uploadsTotal: number;
-  websitesTotal: number;
-  manualsTotal: number;
-  documentsProcessed: number;
-  documentsPending: number;
-  documentsProcessing: number;
-  documentsError: number;
-  lastProcessingAt: Date | null;
-}> {
+}): Promise<Record<string, unknown>> {
   const companyId = input.companyId;
   const [
     basesTotal,
@@ -30,7 +19,16 @@ export default async function GetKnowledgeBaseDashboardService(input: {
     documentsPending,
     documentsProcessing,
     documentsError,
-    lastProcessedDoc
+    lastProcessedDoc,
+    indexPending,
+    indexQueued,
+    indexIndexing,
+    indexCompleted,
+    indexFailed,
+    indexOutdated,
+    chunksTotal,
+    lastIndexedDoc,
+    embeddingSettings
   ] = await Promise.all([
     AiKnowledgeBase.count({ where: { companyId } }),
     AiKnowledgeBase.count({ where: { companyId, enabled: true } }),
@@ -66,7 +64,37 @@ export default async function GetKnowledgeBaseDashboardService(input: {
       },
       order: [["lastProcessedAt", "DESC"]],
       attributes: ["lastProcessedAt"]
-    })
+    }),
+    AiKnowledgeDocument.count({
+      where: { companyId, indexStatus: "pending" }
+    }),
+    AiKnowledgeDocument.count({
+      where: { companyId, indexStatus: "queued" }
+    }),
+    AiKnowledgeDocument.count({
+      where: { companyId, indexStatus: "indexing" }
+    }),
+    AiKnowledgeDocument.count({
+      where: { companyId, indexStatus: "completed" }
+    }),
+    AiKnowledgeDocument.count({
+      where: { companyId, indexStatus: "failed" }
+    }),
+    AiKnowledgeDocument.count({
+      where: { companyId, indexStatus: "outdated" }
+    }),
+    AiKnowledgeDocumentChunk.count({
+      where: { companyId, enabled: true }
+    }),
+    AiKnowledgeDocument.findOne({
+      where: {
+        companyId,
+        lastIndexedAt: { [Op.ne]: null }
+      },
+      order: [["lastIndexedAt", "DESC"]],
+      attributes: ["lastIndexedAt"]
+    }),
+    AiKnowledgeEmbeddingSettings.findOne({ where: { companyId } })
   ]);
 
   return {
@@ -81,6 +109,17 @@ export default async function GetKnowledgeBaseDashboardService(input: {
     documentsPending,
     documentsProcessing,
     documentsError,
-    lastProcessingAt: lastProcessedDoc?.lastProcessedAt || null
+    lastProcessingAt: lastProcessedDoc?.lastProcessedAt || null,
+    indexPending,
+    indexQueued,
+    indexIndexing,
+    indexCompleted,
+    indexFailed,
+    indexOutdated,
+    chunksTotal,
+    lastIndexingAt: lastIndexedDoc?.lastIndexedAt || null,
+    embeddingProvider: embeddingSettings?.provider || null,
+    embeddingModel: embeddingSettings?.model || null,
+    embeddingEnabled: embeddingSettings?.enabled ?? null
   };
 }

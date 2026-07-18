@@ -14,6 +14,34 @@ knowledgeBaseRoutes.get(
   KnowledgeBaseController.dashboard
 );
 
+knowledgeBaseRoutes.post(
+  "/knowledge-bases/index-batch",
+  isAuth,
+  gate,
+  KnowledgeBaseController.batchIndexDocuments
+);
+
+knowledgeBaseRoutes.get(
+  "/knowledge-base/embedding-settings",
+  isAuth,
+  gate,
+  KnowledgeBaseController.showEmbeddingSettings
+);
+
+knowledgeBaseRoutes.put(
+  "/knowledge-base/embedding-settings",
+  isAuth,
+  gate,
+  KnowledgeBaseController.updateEmbeddingSettings
+);
+
+knowledgeBaseRoutes.post(
+  "/knowledge-base/embedding-settings/test",
+  isAuth,
+  gate,
+  KnowledgeBaseController.testEmbeddingSettings
+);
+
 knowledgeBaseRoutes.get(
   "/knowledge-bases",
   isAuth,
@@ -54,6 +82,13 @@ knowledgeBaseRoutes.post(
   isAuth,
   gate,
   KnowledgeBaseController.duplicateBase
+);
+
+knowledgeBaseRoutes.post(
+  "/knowledge-bases/:id/search",
+  isAuth,
+  gate,
+  KnowledgeBaseController.searchChunks
 );
 
 knowledgeBaseRoutes.get(
@@ -125,6 +160,34 @@ knowledgeBaseRoutes.get(
   isAuth,
   gate,
   KnowledgeBaseController.listDocumentProcessings
+);
+
+knowledgeBaseRoutes.post(
+  "/knowledge-bases/:id/documents/:documentId/index",
+  isAuth,
+  gate,
+  KnowledgeBaseController.indexDocument
+);
+
+knowledgeBaseRoutes.post(
+  "/knowledge-bases/:id/documents/:documentId/reindex",
+  isAuth,
+  gate,
+  KnowledgeBaseController.reindexDocument
+);
+
+knowledgeBaseRoutes.get(
+  "/knowledge-bases/:id/documents/:documentId/indexings",
+  isAuth,
+  gate,
+  KnowledgeBaseController.listDocumentIndexings
+);
+
+knowledgeBaseRoutes.get(
+  "/knowledge-bases/:id/documents/:documentId/indexings/:indexingId",
+  isAuth,
+  gate,
+  KnowledgeBaseController.showDocumentIndexing
 );
 
 export default knowledgeBaseRoutes;

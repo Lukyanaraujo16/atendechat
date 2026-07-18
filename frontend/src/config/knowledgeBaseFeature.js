@@ -49,4 +49,13 @@ export const KNOWLEDGE_PROCESSING_STATUSES = [
   "failed",
 ];
 
+export const KNOWLEDGE_INDEX_STATUSES = [
+  "pending",
+  "queued",
+  "indexing",
+  "completed",
+  "failed",
+  "outdated",
+];
+
 export const KNOWLEDGE_LANGUAGES = ["pt-BR", "en-US", "es"];

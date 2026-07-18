@@ -92,6 +92,9 @@ import AiAgentSimulationMessageReview from "../models/AiAgentSimulationMessageRe
 import AiKnowledgeBase from "../models/AiKnowledgeBase";
 import AiKnowledgeDocument from "../models/AiKnowledgeDocument";
 import AiKnowledgeDocumentProcessing from "../models/AiKnowledgeDocumentProcessing";
+import AiKnowledgeDocumentIndexing from "../models/AiKnowledgeDocumentIndexing";
+import AiKnowledgeDocumentChunk from "../models/AiKnowledgeDocumentChunk";
+import AiKnowledgeEmbeddingSettings from "../models/AiKnowledgeEmbeddingSettings";
 import AiProviderCredential from "../models/AiProviderCredential";
 import { logDbConnectionAtStartup } from "../helpers/dbConnectionInfo";
 import {
@@ -199,6 +202,9 @@ const models = [
   AiKnowledgeBase,
   AiKnowledgeDocument,
   AiKnowledgeDocumentProcessing,
+  AiKnowledgeDocumentIndexing,
+  AiKnowledgeDocumentChunk,
+  AiKnowledgeEmbeddingSettings,
   AiProviderCredential
 ];
 

@@ -26,6 +26,8 @@ import {
   Edit,
   FileCopy,
   OpenInNew,
+  Settings as SettingsIcon,
+  Search as SearchIcon,
 } from "@material-ui/icons";
 import { toast } from "react-toastify";
 import { useHistory } from "react-router-dom";
@@ -46,8 +48,11 @@ import {
   getKnowledgeBaseDashboard,
   listKnowledgeBases,
   updateKnowledgeBase,
+  batchIndexKnowledgeDocuments,
 } from "../../services/knowledgeBaseApi";
 import { KNOWLEDGE_BASE_ROUTE_PATH } from "../../config/knowledgeBaseFeature";
+import KnowledgeEmbeddingSettingsDialog from "../../components/KnowledgeEmbeddingSettingsDialog";
+import KnowledgeSemanticSearchPanel from "../../components/KnowledgeSemanticSearchPanel";
 
 const useStyles = makeStyles((theme) => ({
   mainPaper: {
@@ -181,6 +186,8 @@ const KnowledgeBase = () => {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -240,6 +247,53 @@ const KnowledgeBase = () => {
         <Title>{i18n.t("knowledgeBase.title")}</Title>
         <MainHeaderButtonsWrapper>
           <Button
+            variant="outlined"
+            startIcon={<SearchIcon />}
+            onClick={() => setShowSearch((v) => !v)}
+          >
+            {i18n.t("knowledgeBase.buttons.searchTest")}
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<SettingsIcon />}
+            onClick={() => setSettingsOpen(true)}
+          >
+            {i18n.t("knowledgeBase.buttons.embeddingSettings")}
+          </Button>
+          <Button
+            variant="outlined"
+            onClick={async () => {
+              const count = dashboard?.indexPending || 0;
+              if (!count) {
+                toast.info(i18n.t("knowledgeBase.toasts.nothingToIndex"));
+                return;
+              }
+              if (
+                !window.confirm(
+                  i18n.t("knowledgeBase.confirmBatchIndex", { count })
+                )
+              ) {
+                return;
+              }
+              try {
+                const res = await batchIndexKnowledgeDocuments({
+                  mode: "pending",
+                  confirmCount: count,
+                });
+                toast.success(
+                  i18n.t("knowledgeBase.toasts.batchQueued", {
+                    count: res.data?.enqueued || 0,
+                  })
+                );
+                load();
+              } catch (err) {
+                toastError(err);
+              }
+            }}
+          >
+            {i18n.t("knowledgeBase.buttons.indexPending")}
+          </Button>
+          <Button
             variant="contained"
             color="primary"
             onClick={() => {
@@ -270,6 +324,13 @@ const KnowledgeBase = () => {
               ["documentsPending", dashboard.documentsPending],
               ["documentsProcessing", dashboard.documentsProcessing],
               ["documentsError", dashboard.documentsError],
+              ["indexPending", dashboard.indexPending],
+              ["indexQueued", dashboard.indexQueued],
+              ["indexIndexing", dashboard.indexIndexing],
+              ["indexCompleted", dashboard.indexCompleted],
+              ["indexFailed", dashboard.indexFailed],
+              ["indexOutdated", dashboard.indexOutdated],
+              ["chunksTotal", dashboard.chunksTotal],
             ].map(([key, value]) => (
               <Grid item xs={6} sm={4} md={2} key={key}>
                 <Paper className={classes.summaryCard} variant="outlined">
@@ -280,6 +341,25 @@ const KnowledgeBase = () => {
                 </Paper>
               </Grid>
             ))}
+            {(dashboard.embeddingProvider || dashboard.lastIndexingAt) && (
+              <Grid item xs={12} sm={6} md={4}>
+                <Paper className={classes.summaryCard} variant="outlined">
+                  <Typography variant="caption" color="textSecondary">
+                    {i18n.t("knowledgeBase.dashboard.embeddingConfig")}
+                  </Typography>
+                  <Typography variant="body2">
+                    {dashboard.embeddingProvider || "—"} /{" "}
+                    {dashboard.embeddingModel || "—"}
+                  </Typography>
+                  {dashboard.lastIndexingAt ? (
+                    <Typography variant="caption" display="block">
+                      {i18n.t("knowledgeBase.dashboard.lastIndexingAt")}:{" "}
+                      {new Date(dashboard.lastIndexingAt).toLocaleString()}
+                    </Typography>
+                  ) : null}
+                </Paper>
+              </Grid>
+            )}
             {dashboard.lastProcessingAt ? (
               <Grid item xs={12} sm={6} md={4}>
                 <Paper className={classes.summaryCard} variant="outlined">
@@ -293,6 +373,15 @@ const KnowledgeBase = () => {
               </Grid>
             ) : null}
           </Grid>
+        ) : null}
+
+        {showSearch ? (
+          <KnowledgeSemanticSearchPanel
+            bases={bases.filter((b) => b.enabled !== false)}
+            onOpenDocument={({ baseId }) =>
+              history.push(`${KNOWLEDGE_BASE_ROUTE_PATH}/${baseId}`)
+            }
+          />
         ) : null}
 
         <div className={classes.filterBar}>
@@ -424,6 +513,13 @@ const KnowledgeBase = () => {
       >
         {i18n.t("knowledgeBase.confirmDeleteBaseMessage")}
       </ConfirmationModal>
+
+      <KnowledgeEmbeddingSettingsDialog
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        outdatedCount={dashboard?.indexOutdated || 0}
+        onSaved={load}
+      />
     </MainContainer>
   );
 };

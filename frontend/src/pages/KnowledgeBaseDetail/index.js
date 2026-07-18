@@ -56,6 +56,8 @@ import {
   reprocessKnowledgeDocument,
   updateKnowledgeDocument,
   uploadKnowledgeDocument,
+  indexKnowledgeDocument,
+  reindexKnowledgeDocument,
 } from "../../services/knowledgeBaseApi";
 import {
   KNOWLEDGE_BASE_ROUTE_PATH,
@@ -63,6 +65,7 @@ import {
   KNOWLEDGE_DOCUMENT_TYPES,
   KNOWLEDGE_LANGUAGES,
   KNOWLEDGE_PROCESSING_STATUSES,
+  KNOWLEDGE_INDEX_STATUSES,
 } from "../../config/knowledgeBaseFeature";
 
 const useStyles = makeStyles((theme) => ({
@@ -432,6 +435,16 @@ function PreviewDialog({ open, onClose, document: doc, baseId, onReprocessed }) 
           )}
         </Typography>
         <Typography variant="body2">
+          {i18n.t("knowledgeBase.fields.indexStatus")}:{" "}
+          {i18n.t(
+            `knowledgeBase.indexStatuses.${view.indexStatus}`,
+            view.indexStatus || "—"
+          )}
+        </Typography>
+        <Typography variant="body2">
+          {i18n.t("knowledgeBase.fields.chunkCount")}: {view.chunkCount ?? 0}
+        </Typography>
+        <Typography variant="body2">
           {i18n.t("knowledgeBase.fields.processor")}:{" "}
           {view.lastProcessor || "—"}
         </Typography>
@@ -440,6 +453,16 @@ function PreviewDialog({ open, onClose, document: doc, baseId, onReprocessed }) 
           {view.lastProcessedAt
             ? new Date(view.lastProcessedAt).toLocaleString()
             : "—"}
+        </Typography>
+        <Typography variant="body2">
+          {i18n.t("knowledgeBase.fields.lastIndexedAt")}:{" "}
+          {view.lastIndexedAt
+            ? new Date(view.lastIndexedAt).toLocaleString()
+            : "—"}
+        </Typography>
+        <Typography variant="body2">
+          Embedding: {view.lastEmbeddingProvider || "—"} /{" "}
+          {view.lastEmbeddingModel || "—"} ({view.lastEmbeddingDimensions || "—"}d)
         </Typography>
         <Typography variant="body2">
           {i18n.t("knowledgeBase.fields.durationMs")}:{" "}
@@ -502,6 +525,26 @@ function PreviewDialog({ open, onClose, document: doc, baseId, onReprocessed }) 
           onClick={handleReprocess}
         >
           {i18n.t("knowledgeBase.buttons.reprocess")}
+        </Button>
+        <Button
+          color="primary"
+          disabled={busy || view.processingStatus !== "completed"}
+          onClick={async () => {
+            setBusy(true);
+            try {
+              await reindexKnowledgeDocument(baseId, doc.id);
+              toast.success(i18n.t("knowledgeBase.toasts.reindexQueued"));
+              const docRes = await getKnowledgeDocument(baseId, doc.id);
+              setFullDoc(docRes.data);
+              if (onReprocessed) onReprocessed();
+            } catch (err) {
+              toastError(err);
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          {i18n.t("knowledgeBase.buttons.reindex")}
         </Button>
         <Button onClick={onClose}>{i18n.t("knowledgeBase.buttons.close")}</Button>
       </DialogActions>
@@ -718,6 +761,9 @@ const KnowledgeBaseDetail = () => {
                 <TableCell>
                   {i18n.t("knowledgeBase.fields.processingStatus")}
                 </TableCell>
+                <TableCell>
+                  {i18n.t("knowledgeBase.fields.indexStatus")}
+                </TableCell>
                 <TableCell>{i18n.t("knowledgeBase.fields.language")}</TableCell>
                 <TableCell align="right">
                   {i18n.t("knowledgeBase.fields.actions")}
@@ -763,6 +809,15 @@ const KnowledgeBaseDetail = () => {
                       )}
                     />
                   </TableCell>
+                  <TableCell>
+                    <Chip
+                      size="small"
+                      label={i18n.t(
+                        `knowledgeBase.indexStatuses.${doc.indexStatus}`,
+                        doc.indexStatus || "—"
+                      )}
+                    />
+                  </TableCell>
                   <TableCell>{doc.language || "—"}</TableCell>
                   <TableCell align="right">
                     <IconButton
@@ -771,6 +826,25 @@ const KnowledgeBaseDetail = () => {
                       onClick={() => setPreviewDoc(doc)}
                     >
                       <Visibility fontSize="small" />
+                    </IconButton>
+                    <IconButton
+                      size="small"
+                      className={classes.actionIcon}
+                      title={i18n.t("knowledgeBase.buttons.index")}
+                      disabled={doc.processingStatus !== "completed"}
+                      onClick={async () => {
+                        try {
+                          await indexKnowledgeDocument(baseId, doc.id);
+                          toast.success(
+                            i18n.t("knowledgeBase.toasts.indexQueued")
+                          );
+                          load();
+                        } catch (err) {
+                          toastError(err);
+                        }
+                      }}
+                    >
+                      <CloudUpload fontSize="small" />
                     </IconButton>
                     <IconButton
                       size="small"

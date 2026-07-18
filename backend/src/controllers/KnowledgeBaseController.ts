@@ -19,6 +19,22 @@ import GetKnowledgeBaseDashboardService from "../services/KnowledgeBaseService/G
 import EnqueueKnowledgeDocumentProcessingService from "../services/KnowledgeBaseService/EnqueueKnowledgeDocumentProcessingService";
 import ReprocessKnowledgeDocumentService from "../services/KnowledgeBaseService/ReprocessKnowledgeDocumentService";
 import ListKnowledgeDocumentProcessingsService from "../services/KnowledgeBaseService/ListKnowledgeDocumentProcessingsService";
+import EnqueueKnowledgeDocumentIndexingService from "../services/KnowledgeBaseService/EnqueueKnowledgeDocumentIndexingService";
+import ReindexKnowledgeDocumentService from "../services/KnowledgeBaseService/ReindexKnowledgeDocumentService";
+import ListKnowledgeDocumentIndexingsService, {
+  ShowKnowledgeDocumentIndexingService
+} from "../services/KnowledgeBaseService/ListKnowledgeDocumentIndexingsService";
+import SearchKnowledgeChunksService from "../services/KnowledgeBaseService/SearchKnowledgeChunksService";
+import UpsertKnowledgeEmbeddingSettingsService, {
+  ShowKnowledgeEmbeddingSettingsService
+} from "../services/KnowledgeBaseService/UpsertKnowledgeEmbeddingSettingsService";
+import { ValidateKnowledgeEmbeddingCredentialService } from "../services/KnowledgeBaseService/ResolveKnowledgeEmbeddingSettingsService";
+import EnqueueKnowledgeDocumentsBatchIndexingService from "../services/KnowledgeBaseService/EnqueueKnowledgeDocumentsBatchIndexingService";
+import {
+  OPENAI_EMBEDDING_MODELS,
+  GEMINI_EMBEDDING_MODELS
+} from "../config/knowledgeEmbeddingModels";
+import { resolveKnowledgeVectorStoreDriver } from "../config/knowledgeBaseConstants";
 
 function companyIdOrThrow(req: Request): number {
   const id = req.user?.companyId;
@@ -271,4 +287,137 @@ export const listDocumentProcessings = async (
     knowledgeDocumentId: parseIdParam(req.params.documentId)
   });
   return res.json(result);
+};
+
+export const indexDocument = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const result = await EnqueueKnowledgeDocumentIndexingService({
+    companyId,
+    knowledgeDocumentId: parseIdParam(req.params.documentId),
+    force: false
+  });
+  return res.status(202).json(result);
+};
+
+export const reindexDocument = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const result = await ReindexKnowledgeDocumentService({
+    companyId,
+    knowledgeDocumentId: parseIdParam(req.params.documentId)
+  });
+  return res.status(202).json(result);
+};
+
+export const listDocumentIndexings = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const result = await ListKnowledgeDocumentIndexingsService({
+    companyId,
+    knowledgeDocumentId: parseIdParam(req.params.documentId)
+  });
+  return res.json(result);
+};
+
+export const showDocumentIndexing = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const indexing = await ShowKnowledgeDocumentIndexingService({
+    companyId,
+    knowledgeDocumentId: parseIdParam(req.params.documentId),
+    indexingId: parseIdParam(req.params.indexingId)
+  });
+  return res.json(indexing);
+};
+
+export const searchChunks = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const body = req.body || {};
+  const result = await SearchKnowledgeChunksService({
+    companyId,
+    query: body.query,
+    knowledgeBaseIds: Array.isArray(body.knowledgeBaseIds)
+      ? body.knowledgeBaseIds.map(Number)
+      : body.knowledgeBaseId
+        ? [Number(body.knowledgeBaseId)]
+        : req.params.id
+          ? [parseIdParam(req.params.id)]
+          : undefined,
+    documentTypes: body.documentTypes,
+    languages: body.languages,
+    limit: body.limit,
+    minimumScore: body.minimumScore
+  });
+  return res.json(result);
+};
+
+export const showEmbeddingSettings = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const settings = await ShowKnowledgeEmbeddingSettingsService({
+    companyId,
+    userId: userIdOrNull(req)
+  });
+  return res.json({
+    settings,
+    availableModels: [...OPENAI_EMBEDDING_MODELS, ...GEMINI_EMBEDDING_MODELS],
+    vectorStoreDriver: resolveKnowledgeVectorStoreDriver()
+  });
+};
+
+export const updateEmbeddingSettings = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const result = await UpsertKnowledgeEmbeddingSettingsService({
+    companyId,
+    userId: userIdOrNull(req),
+    body: req.body || {}
+  });
+  return res.json(result);
+};
+
+export const testEmbeddingSettings = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const body = req.body || {};
+  const result = await ValidateKnowledgeEmbeddingCredentialService({
+    companyId,
+    credentialId: body.credentialId,
+    provider: body.provider,
+    model: body.model
+  });
+  return res.json(result);
+};
+
+export const batchIndexDocuments = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const body = req.body || {};
+  const result = await EnqueueKnowledgeDocumentsBatchIndexingService({
+    companyId,
+    mode: body.mode || "pending",
+    documentIds: body.documentIds,
+    confirmCount: body.confirmCount
+  });
+  return res.status(202).json(result);
 };

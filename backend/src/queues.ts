@@ -35,6 +35,7 @@ import formatBody from "./helpers/Mustache";
 import { ClosedAllOpenTickets } from "./services/WbotServices/wbotClosedTickets";
 import { flowMenuTimeoutQueue } from "./libs/flowMenuTimeoutQueue";
 import { knowledgeDocumentQueue } from "./libs/knowledgeDocumentQueue";
+import { knowledgeDocumentIndexQueue } from "./libs/knowledgeDocumentIndexQueue";
 import { getCompanyEffectivePlanValue } from "./helpers/getCompanyEffectivePlanValue";
 import { resolvePlanIdForQuery } from "./services/PlanService/planIdResolve";
 
@@ -1398,6 +1399,17 @@ export async function startQueueProcess() {
     );
     return processKnowledgeDocumentJob(job);
   });
+
+  knowledgeDocumentIndexQueue.process(
+    "ProcessKnowledgeDocumentIndex",
+    1,
+    async job => {
+      const { processKnowledgeDocumentIndexJob } = await import(
+        "./services/KnowledgeBaseService/ProcessKnowledgeDocumentIndexJob"
+      );
+      return processKnowledgeDocumentIndexJob(job);
+    }
+  );
 
   scheduleMonitor.process("Verify", handleVerifySchedules);
 

@@ -29,7 +29,7 @@ export default async function UpdateKnowledgeDocumentService(input: {
   body: UpdateBody;
 }): Promise<AiKnowledgeDocument> {
   const row = await findKnowledgeDocumentOrThrow(input.companyId, input.id);
-  const patch: Partial<AiKnowledgeDocument> = {
+  const patch: Partial<AiKnowledgeDocument> & Record<string, unknown> = {
     updatedBy: input.userId
   };
 
@@ -54,6 +54,21 @@ export default async function UpdateKnowledgeDocumentService(input: {
   if (input.body.contentMarkdown !== undefined) {
     patch.contentMarkdown = normalizeOptionalString(input.body.contentMarkdown);
   }
+
+  const contentChanging =
+    (input.body.contentText !== undefined &&
+      patch.contentText !== row.contentText) ||
+    (input.body.contentMarkdown !== undefined &&
+      patch.contentMarkdown !== row.contentMarkdown);
+
+  if (contentChanging && row.indexStatus === "completed") {
+    patch.indexStatus = "outdated";
+    patch.lastIndexingError =
+      "Conteúdo alterado — reindexação necessária.";
+  } else if (contentChanging && row.processingStatus === "completed") {
+    patch.indexStatus = "pending";
+  }
+
   if (input.body.sourceUrl !== undefined) {
     if (row.sourceType === "website") {
       const url = parseOptionalUrl(input.body.sourceUrl);

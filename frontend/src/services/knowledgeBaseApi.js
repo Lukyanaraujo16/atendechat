@@ -77,3 +77,39 @@ export function listKnowledgeDocumentProcessings(baseId, documentId) {
     `/knowledge-bases/${baseId}/documents/${documentId}/processings`
   );
 }
+
+export function indexKnowledgeDocument(baseId, documentId) {
+  return api.post(`/knowledge-bases/${baseId}/documents/${documentId}/index`);
+}
+
+export function reindexKnowledgeDocument(baseId, documentId) {
+  return api.post(
+    `/knowledge-bases/${baseId}/documents/${documentId}/reindex`
+  );
+}
+
+export function listKnowledgeDocumentIndexings(baseId, documentId) {
+  return api.get(
+    `/knowledge-bases/${baseId}/documents/${documentId}/indexings`
+  );
+}
+
+export function searchKnowledgeChunks(baseId, data) {
+  return api.post(`/knowledge-bases/${baseId}/search`, data);
+}
+
+export function getKnowledgeEmbeddingSettings() {
+  return api.get("/knowledge-base/embedding-settings");
+}
+
+export function updateKnowledgeEmbeddingSettings(data) {
+  return api.put("/knowledge-base/embedding-settings", data);
+}
+
+export function testKnowledgeEmbeddingSettings(data) {
+  return api.post("/knowledge-base/embedding-settings/test", data);
+}
+
+export function batchIndexKnowledgeDocuments(data) {
+  return api.post("/knowledge-bases/index-batch", data);
+}

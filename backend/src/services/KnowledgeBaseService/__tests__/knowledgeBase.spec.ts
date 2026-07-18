@@ -22,8 +22,26 @@ jest.mock("../../../models/AiKnowledgeDocument", () => ({
   }
 }));
 
+jest.mock("../../../models/AiKnowledgeDocumentChunk", () => ({
+  __esModule: true,
+  default: {
+    update: jest.fn().mockResolvedValue([1]),
+    destroy: jest.fn().mockResolvedValue(1),
+    count: jest.fn()
+  }
+}));
+
+jest.mock("../../../models/AiKnowledgeDocumentIndexing", () => ({
+  __esModule: true,
+  default: {
+    update: jest.fn().mockResolvedValue([1])
+  }
+}));
+
 import AiKnowledgeBase from "../../../models/AiKnowledgeBase";
 import AiKnowledgeDocument from "../../../models/AiKnowledgeDocument";
+import AiKnowledgeDocumentChunk from "../../../models/AiKnowledgeDocumentChunk";
+import AiKnowledgeDocumentIndexing from "../../../models/AiKnowledgeDocumentIndexing";
 import CreateKnowledgeBaseService from "../CreateKnowledgeBaseService";
 import DeleteKnowledgeBaseService from "../DeleteKnowledgeBaseService";
 import DuplicateKnowledgeBaseService from "../DuplicateKnowledgeBaseService";
@@ -230,6 +248,8 @@ describe("KnowledgeBaseService", () => {
       companyId: 1,
       id: 8
     });
+    expect(AiKnowledgeDocumentChunk.update).toHaveBeenCalled();
+    expect(AiKnowledgeDocumentIndexing.update).toHaveBeenCalled();
     expect(destroy).toHaveBeenCalled();
     expect(result.deleted).toBe(true);
   });
