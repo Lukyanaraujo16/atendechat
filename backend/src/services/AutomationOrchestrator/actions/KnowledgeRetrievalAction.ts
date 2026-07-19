@@ -1,4 +1,4 @@
-import { AutomationAction } from "../ActionRegistry";
+import { defineAction } from "../AutomationActionRuntime";
 import { ActionResult, ExecutionContext } from "../types";
 
 function isObserveLike(ctx: ExecutionContext): boolean {
@@ -9,49 +9,53 @@ function isObserveLike(ctx: ExecutionContext): boolean {
   );
 }
 
-const KnowledgeRetrievalAction: AutomationAction = {
-  name: "KnowledgeRetrievalAction",
-  sideEffects: false,
-  supportsShadow: true,
-  supportsObserve: true,
-  supportsActive: true,
-  capability: "knowledge",
-
-  supports(ctx: ExecutionContext): boolean {
-    return ctx.aiAgent != null;
+const KnowledgeRetrievalAction = defineAction(
+  {
+    id: "KnowledgeRetrievalAction",
+    name: "KnowledgeRetrievalAction",
+    version: "1.0.0",
+    category: "knowledge",
+    capabilities: ["knowledge"],
+    description: "Recuperação de conhecimento (stub seguro, sem side effects).",
+    sideEffects: false,
+    tags: ["core", "knowledge"],
+    owner: "atendechat.core"
   },
-
-  validate(_ctx: ExecutionContext): void {},
-
-  async execute(ctx: ExecutionContext): Promise<ActionResult> {
-    // observe/shadow: sem side effects; active ainda não chama retrieval real.
-    if (isObserveLike(ctx) || ctx.controlMode === "active_partial" || ctx.controlMode === "active") {
-      if (ctx.aiAgent == null) {
+  {
+    supports: (ctx: ExecutionContext) => ctx.aiAgent != null,
+    async execute(ctx: ExecutionContext): Promise<ActionResult> {
+      if (
+        isObserveLike(ctx) ||
+        ctx.controlMode === "active_partial" ||
+        ctx.controlMode === "active"
+      ) {
+        if (ctx.aiAgent == null) {
+          return {
+            status: "skip",
+            message: "no_ai_agent",
+            data: { mode: ctx.controlMode, wouldRetrieve: false },
+            nextHint: "continue"
+          };
+        }
         return {
-          status: "skip",
-          message: "no_ai_agent",
-          data: { mode: ctx.controlMode, wouldRetrieve: false },
+          status: "success",
+          message:
+            ctx.controlMode === "observe" || ctx.controlMode === "shadow_execute"
+              ? "observe_would_retrieve"
+              : "retrieval_deferred_safe",
+          data: { mode: ctx.controlMode, wouldRetrieve: true },
           nextHint: "continue"
         };
       }
+
       return {
         status: "success",
-        message:
-          ctx.controlMode === "observe" || ctx.controlMode === "shadow_execute"
-            ? "observe_would_retrieve"
-            : "retrieval_deferred_safe",
+        message: "observe_only_retrieval_deferred",
         data: { mode: ctx.controlMode, wouldRetrieve: true },
         nextHint: "continue"
       };
     }
-
-    return {
-      status: "success",
-      message: "observe_only_retrieval_deferred",
-      data: { mode: ctx.controlMode, wouldRetrieve: true },
-      nextHint: "continue"
-    };
   }
-};
+);
 
 export default KnowledgeRetrievalAction;

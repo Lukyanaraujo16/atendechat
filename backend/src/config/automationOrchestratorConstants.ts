@@ -1,9 +1,11 @@
 /**
- * Fase IA 2.0.1 — Ativação segura do Automation Orchestrator.
- * Legado permanece fallback padrão. Ownership único. Sem side effects duplicados.
+ * Fase IA 2.0.2 — Action Contract + Runtime universal.
+ * Comportamento das Actions existentes preservado; legado permanece fallback.
  */
 
-export const AUTOMATION_PLANNER_VERSION = "2.0.1";
+export const AUTOMATION_PLANNER_VERSION = "2.0.2";
+
+export const AUTOMATION_ACTION_RUNTIME_VERSION = "2.0.2";
 
 export const AUTOMATION_EXECUTION_STATUSES = [
   "queued",
@@ -71,6 +73,55 @@ export const AUTOMATION_CAPABILITY_KEYS = [
 
 export type AutomationCapabilityKey =
   (typeof AUTOMATION_CAPABILITY_KEYS)[number];
+
+/** Capabilities futuras (registry); ainda não ativas no engine. */
+export const AUTOMATION_FUTURE_CAPABILITY_KEYS = [
+  "future.http",
+  "future.erp",
+  "future.mcp",
+  "future.payment",
+  "future.webhook",
+  "future.crm",
+  "future.inventory",
+  "future.calendar"
+] as const;
+
+export type AutomationFutureCapabilityKey =
+  (typeof AUTOMATION_FUTURE_CAPABILITY_KEYS)[number];
+
+export type AutomationCapabilityId =
+  | AutomationCapabilityKey
+  | AutomationFutureCapabilityKey
+  | string;
+
+export const AUTOMATION_ACTION_CATEGORIES = [
+  "planner",
+  "knowledge",
+  "chatbot",
+  "flow",
+  "integration",
+  "communication",
+  "human",
+  "system",
+  "future"
+] as const;
+
+export type AutomationActionCategory =
+  (typeof AUTOMATION_ACTION_CATEGORIES)[number];
+
+export const AUTOMATION_ACTION_ERROR_CODES = [
+  "validation",
+  "runtime",
+  "timeout",
+  "permission",
+  "capability",
+  "unexpected",
+  "not_found",
+  "rollback_failed"
+] as const;
+
+export type AutomationActionErrorCode =
+  (typeof AUTOMATION_ACTION_ERROR_CODES)[number];
 
 export const AUTOMATION_CAPABILITY_MODES = [
   "legacy",

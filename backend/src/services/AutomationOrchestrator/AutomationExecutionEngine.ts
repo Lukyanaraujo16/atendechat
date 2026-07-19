@@ -7,7 +7,6 @@ import AutomationExecutionStep from "../../models/AutomationExecutionStep";
 import { logger } from "../../utils/logger";
 import { getAction } from "./ActionRegistry";
 import {
-  canExecuteAction,
   mergeCapabilities,
   CapabilityMap
 } from "./activation/capabilityPolicy";
@@ -16,6 +15,7 @@ import {
   recordSuccess,
   safeRecordFailure
 } from "./activation/circuitBreaker";
+import { runActionViaRuntime } from "./AutomationActionRuntime";
 import { emitAutomationEvent } from "./EventBus";
 import { registerBuiltinActions } from "./registerBuiltinActions";
 import { sanitizeAutomationPayload } from "./sanitizeAutomationPayload";
@@ -116,34 +116,22 @@ async function findOrCreateStep(input: {
 }
 
 async function tryFinishFallback(
-  ctx: ExecutionContext
+  ctx: ExecutionContext,
+  capabilities: CapabilityMap
 ): Promise<ActionResult | null> {
   const finish = getAction("FinishExecution");
   if (!finish) return null;
   try {
-    await finish.validate(ctx);
-    return finish.execute(ctx);
+    const runtimeResult = await runActionViaRuntime({
+      action: finish,
+      ctx,
+      controlMode: ctx.controlMode,
+      capabilities,
+      timeoutCeilingMs: AUTOMATION_CIRCUIT_BREAKER.maxLatencyMs
+    });
+    return runtimeResult.legacyResult;
   } catch {
     return null;
-  }
-}
-
-async function executeWithTimeout(
-  fn: () => Promise<ActionResult>,
-  timeoutMs: number
-): Promise<ActionResult> {
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  try {
-    return await Promise.race([
-      fn(),
-      new Promise<ActionResult>((_resolve, reject) => {
-        timer = setTimeout(() => {
-          reject(new Error("ACTION_TIMEOUT"));
-        }, timeoutMs);
-      })
-    ]);
-  } finally {
-    if (timer) clearTimeout(timer);
   }
 }
 
@@ -317,6 +305,7 @@ export async function runAutomationExecution(
 
     const action = getAction(actionName);
     let result: ActionResult;
+    let runtimeMeta: Record<string, unknown> | null = null;
 
     if (!action) {
       result = {
@@ -325,52 +314,57 @@ export async function runAutomationExecution(
         nextHint: "fallback"
       };
     } else {
-      const gate = canExecuteAction({
-        controlMode,
-        capabilities,
-        actionName,
-        actionMeta: action
-      });
-
-      if (!gate.allowed) {
-        result = {
-          status: "skip",
-          message: gate.reason,
-          data: {
-            effectiveMode: gate.effectiveMode,
-            capabilityBlocked: true
-          },
-          nextHint: "continue"
-        };
-        await emitAutomationEvent({
-          companyId,
-          executionId,
-          stepId: step.id,
-          eventName: "CapabilityBlocked",
-          payload: {
-            actionName,
-            reason: gate.reason,
-            effectiveMode: gate.effectiveMode
-          }
+      try {
+        const runtimeResult = await runActionViaRuntime({
+          action,
+          ctx,
+          params: planStep.params,
+          controlMode,
+          capabilities,
+          timeoutCeilingMs: AUTOMATION_CIRCUIT_BREAKER.maxLatencyMs
         });
-      } else {
-        try {
-          await action.validate(ctx, planStep.params);
-          result = await executeWithTimeout(
-            () => action.execute(ctx, planStep.params),
-            AUTOMATION_CIRCUIT_BREAKER.maxLatencyMs
-          );
-          recordSuccess(companyId);
-        } catch (err) {
-          const message = err instanceof Error ? err.message : String(err);
-          const isTimeout = message === "ACTION_TIMEOUT";
+        result = runtimeResult.legacyResult;
+        runtimeMeta = {
+          actionId: runtimeResult.manifest.id,
+          actionVersion: runtimeResult.manifest.version,
+          actionCategory: runtimeResult.manifest.category,
+          capabilities: runtimeResult.manifest.capabilities,
+          timeoutMs: runtimeResult.manifest.timeoutMs,
+          retryPolicy: runtimeResult.manifest.retryPolicy,
+          runtimeMetrics: runtimeResult.metrics,
+          runtimeLogs: runtimeResult.logs,
+          runtimeErrors: runtimeResult.errors
+        };
+
+        if (result.data?.capabilityBlocked === true) {
+          await emitAutomationEvent({
+            companyId,
+            executionId,
+            stepId: step.id,
+            eventName: "CapabilityBlocked",
+            payload: {
+              actionName,
+              reason: result.message,
+              effectiveMode: result.data?.effectiveMode
+            }
+          });
+        } else if (result.status === "failure") {
+          const isTimeout =
+            result.message === "ACTION_TIMEOUT" ||
+            runtimeResult.metrics.timedOut === true;
           safeRecordFailure(companyId, isTimeout ? "timeout" : "failure");
-          result = {
-            status: "failure",
-            message: message.slice(0, 500),
-            nextHint: "fallback"
-          };
+        } else {
+          recordSuccess(companyId);
         }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        const isTimeout = message === "ACTION_TIMEOUT";
+        safeRecordFailure(companyId, isTimeout ? "timeout" : "failure");
+        result = {
+          status: "failure",
+          message: message.slice(0, 500),
+          nextHint: "fallback"
+        };
       }
     }
 
@@ -383,7 +377,8 @@ export async function runAutomationExecution(
       status: result.status,
       message: result.message,
       ...(result.data || {}),
-      nextHint: result.nextHint
+      nextHint: result.nextHint,
+      ...(runtimeMeta || {})
     });
 
     try {
@@ -509,7 +504,7 @@ export async function runAutomationExecution(
     }
 
     if (result.status === "failure") {
-      const fallback = await tryFinishFallback(ctx);
+      const fallback = await tryFinishFallback(ctx, capabilities);
       if (fallback && fallback.status !== "failure") {
         await execution.update({
           status: "completed",

@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import AppError from "../errors/AppError";
 import {
   AUTOMATION_CONTROL_MODES,
+  AUTOMATION_ACTION_RUNTIME_VERSION,
   AutomationControlMode
 } from "../config/automationOrchestratorConstants";
 import ListAutomationExecutionsService from "../services/AutomationOrchestrator/ListAutomationExecutionsService";
@@ -10,7 +11,11 @@ import GetAutomationOrchestratorDashboardService from "../services/AutomationOrc
 import { ContinueAutomationExecutionService } from "../services/AutomationOrchestrator/ContinueAutomationExecutionService";
 import { StartAutomationExecutionService } from "../services/AutomationOrchestrator/StartAutomationExecutionService";
 import { buildExecutionContextFromInbound } from "../services/AutomationOrchestrator/buildExecutionContext";
-import { listActions as listRegisteredActionNames } from "../services/AutomationOrchestrator/ActionRegistry";
+import {
+  getActionManifest,
+  listActionManifests
+} from "../services/AutomationOrchestrator/ActionRegistry";
+import { listCapabilities } from "../services/AutomationOrchestrator/CapabilityRegistry";
 import { registerBuiltinActions } from "../services/AutomationOrchestrator/registerBuiltinActions";
 import {
   ResolveOrchestratorSettingsService,
@@ -128,13 +133,40 @@ export const replayExecution = async (
       graph: execution.graph,
       steps,
       events,
-      timeline: steps.map(s => ({
-        at: s.startedAt || s.createdAt,
-        action: s.actionName,
-        result: s.resultStatus,
-        durationMs: s.durationMs,
-        errorCode: s.errorCode
-      })),
+      timeline: steps.map(s => {
+        const preview =
+          s.outputPreview && typeof s.outputPreview === "object"
+            ? (s.outputPreview as Record<string, unknown>)
+            : {};
+        const manifest =
+          getActionManifest(String(s.actionName || "")) || null;
+        return {
+          at: s.startedAt || s.createdAt,
+          action: s.actionName,
+          result: s.resultStatus,
+          durationMs: s.durationMs,
+          errorCode: s.errorCode,
+          manifest: manifest
+            ? {
+                id: manifest.id,
+                version: manifest.version,
+                category: manifest.category,
+                capabilities: manifest.capabilities,
+                timeoutMs: manifest.timeoutMs,
+                retryPolicy: manifest.retryPolicy
+              }
+            : null,
+          runtime: {
+            version: AUTOMATION_ACTION_RUNTIME_VERSION,
+            timeoutMs: preview.timeoutMs ?? null,
+            retryPolicy: preview.retryPolicy ?? null,
+            metrics: preview.runtimeMetrics ?? null,
+            actionVersion: preview.actionVersion ?? null,
+            actionCategory: preview.actionCategory ?? null,
+            capabilities: preview.capabilities ?? null
+          }
+        };
+      }),
       startedAt: execution.startedAt,
       finishedAt: execution.finishedAt
     }
@@ -248,8 +280,31 @@ export const listActionsCatalog = async (
   res: Response
 ): Promise<Response> => {
   registerBuiltinActions();
+  const manifests = listActionManifests();
+  const capabilities = listCapabilities({ includeFuture: true });
   return res.json({
-    actions: listRegisteredActionNames().map(name => ({ name }))
+    runtimeVersion: AUTOMATION_ACTION_RUNTIME_VERSION,
+    actions: manifests.map(m => ({
+      id: m.id,
+      name: m.name,
+      version: m.version,
+      category: m.category,
+      capabilities: m.capabilities,
+      description: m.description,
+      sideEffects: m.sideEffects,
+      supportsObserve: m.supportsObserve,
+      supportsShadow: m.supportsShadow,
+      supportsActive: m.supportsActive,
+      timeoutMs: m.timeoutMs,
+      retryPolicy: m.retryPolicy,
+      rollbackSupported: m.rollbackSupported,
+      deprecated: m.deprecated,
+      experimental: m.experimental,
+      owner: m.owner,
+      tags: m.tags,
+      manifest: m
+    })),
+    capabilities
   });
 };
 

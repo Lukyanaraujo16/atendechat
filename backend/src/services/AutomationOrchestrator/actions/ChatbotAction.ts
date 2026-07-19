@@ -1,49 +1,48 @@
-import { AutomationAction } from "../ActionRegistry";
+import { defineAction } from "../AutomationActionRuntime";
 import { ActionResult, ExecutionContext } from "../types";
 
-/**
- * Side effects = true (mutaria ticket/chatbot). Em observe/shadow/capability não-active
- * apenas avalia estado — nunca chama WhatsApp nem módulos legados.
- */
-const ChatbotAction: AutomationAction = {
-  name: "ChatbotAction",
-  sideEffects: true,
-  supportsShadow: false,
-  supportsObserve: true,
-  supportsActive: true,
-  capability: "chatbot",
-
-  supports(_ctx: ExecutionContext): boolean {
-    return true;
+const ChatbotAction = defineAction(
+  {
+    id: "ChatbotAction",
+    name: "ChatbotAction",
+    version: "1.0.0",
+    category: "chatbot",
+    capabilities: ["chatbot"],
+    description: "Observa estado do chatbot legado sem mutar.",
+    sideEffects: true,
+    supportsShadow: false,
+    supportsObserve: true,
+    supportsActive: true,
+    tags: ["core", "chatbot"],
+    owner: "atendechat.core"
   },
-
-  validate(_ctx: ExecutionContext): void {},
-
-  async execute(ctx: ExecutionContext): Promise<ActionResult> {
-    // Sempre observe-only: não muta chatbot legado.
-    if (ctx.chatbotState.active) {
+  {
+    supports: () => true,
+    async execute(ctx: ExecutionContext): Promise<ActionResult> {
+      if (ctx.chatbotState.active) {
+        return {
+          status: "success",
+          message: "chatbot_active_observe",
+          data: {
+            mode: ctx.controlMode,
+            chatbotActive: true,
+            sideEffectsBlocked: true
+          },
+          nextHint: "continue"
+        };
+      }
       return {
-        status: "success",
-        message: "chatbot_active_observe",
+        status: "skip",
+        message: "chatbot_inactive",
         data: {
           mode: ctx.controlMode,
-          chatbotActive: true,
+          chatbotActive: false,
           sideEffectsBlocked: true
         },
         nextHint: "continue"
       };
     }
-    return {
-      status: "skip",
-      message: "chatbot_inactive",
-      data: {
-        mode: ctx.controlMode,
-        chatbotActive: false,
-        sideEffectsBlocked: true
-      },
-      nextHint: "continue"
-    };
   }
-};
+);
 
 export default ChatbotAction;

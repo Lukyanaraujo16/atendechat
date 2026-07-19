@@ -76,7 +76,14 @@ export function resolveActionCapability(
   actionName: string,
   actionMeta?: Pick<AutomationAction, "capability"> | null
 ): AutomationCapabilityKey {
-  if (actionMeta?.capability) return actionMeta.capability;
+  if (actionMeta?.capability) {
+    const cap = String(actionMeta.capability);
+    if (
+      (Object.keys(AUTOMATION_DEFAULT_CAPABILITIES) as string[]).includes(cap)
+    ) {
+      return cap as AutomationCapabilityKey;
+    }
+  }
 
   const direct = AUTOMATION_ACTION_CAPABILITY_MAP[actionName];
   if (direct) return direct;

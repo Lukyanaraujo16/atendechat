@@ -1,4 +1,5 @@
 import { registerAction } from "./ActionRegistry";
+import { ensureCapabilityRegistrySeeded } from "./CapabilityRegistry";
 import ClassifyIntentAction from "./actions/ClassifyIntentAction";
 import KnowledgeRetrievalAction from "./actions/KnowledgeRetrievalAction";
 import GenerateAIResponseAction from "./actions/GenerateAIResponseAction";
@@ -13,6 +14,7 @@ let registered = false;
 
 export function registerBuiltinActions(): void {
   if (registered) return;
+  ensureCapabilityRegistrySeeded();
   registerAction(ClassifyIntentAction);
   registerAction(LogExecutionAction);
   registerAction(KnowledgeRetrievalAction);

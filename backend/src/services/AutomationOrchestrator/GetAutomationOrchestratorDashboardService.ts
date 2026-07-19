@@ -2,6 +2,9 @@ import { Op } from "sequelize";
 import AutomationExecution from "../../models/AutomationExecution";
 import AutomationExecutionStep from "../../models/AutomationExecutionStep";
 import AutomationPlannerValidation from "../../models/AutomationPlannerValidation";
+import { registerBuiltinActions } from "./registerBuiltinActions";
+import { listActionManifests } from "./ActionRegistry";
+import { listCapabilities } from "./CapabilityRegistry";
 
 export type GetAutomationOrchestratorDashboardInput = {
   companyId: number;
@@ -131,6 +134,71 @@ export default async function GetAutomationOrchestratorDashboardService(
     // fail-open: métricas de validação opcionais
   }
 
+  registerBuiltinActions();
+  const manifests = listActionManifests();
+  const capabilities = listCapabilities({ includeFuture: true });
+  const avgDurationByAction: Record<string, number | null> = {};
+  for (const name of Object.keys(actionUsage)) {
+    avgDurationByAction[name] = null;
+  }
+
+  try {
+    if (executionIds.length > 0) {
+      const timedSteps = await AutomationExecutionStep.findAll({
+        where: {
+          companyId: input.companyId,
+          executionId: { [Op.in]: executionIds },
+          durationMs: { [Op.ne]: null }
+        },
+        attributes: ["actionName", "durationMs"],
+        raw: true
+      });
+      const sum: Record<string, number> = {};
+      const cnt: Record<string, number> = {};
+      for (const step of timedSteps) {
+        const name = String(step.actionName || "unknown");
+        const ms = Number(step.durationMs);
+        if (!Number.isFinite(ms) || ms < 0) continue;
+        sum[name] = (sum[name] || 0) + ms;
+        cnt[name] = (cnt[name] || 0) + 1;
+      }
+      for (const name of Object.keys(sum)) {
+        avgDurationByAction[name] = Math.round(sum[name] / cnt[name]);
+      }
+    }
+  } catch {
+    // fail-open
+  }
+
+  const actionCatalog = {
+    installed: manifests.length,
+    experimental: manifests.filter(m => m.experimental).length,
+    deprecated: manifests.filter(m => m.deprecated).length,
+    capabilities: capabilities.length,
+    futureCapabilities: capabilities.filter(c => c.future).length,
+    manifests: manifests.map(m => ({
+      id: m.id,
+      name: m.name,
+      version: m.version,
+      category: m.category,
+      capabilities: m.capabilities,
+      sideEffects: m.sideEffects,
+      deprecated: m.deprecated,
+      experimental: m.experimental,
+      timeoutMs: m.timeoutMs,
+      usage: actionUsage[m.name] || 0,
+      avgDurationMs: avgDurationByAction[m.name] ?? null
+    })),
+    capabilityDefs: capabilities.map(c => ({
+      id: c.id,
+      name: c.name,
+      future: c.future,
+      experimental: c.experimental,
+      deprecated: c.deprecated
+    })),
+    avgDurationByAction
+  };
+
   return {
     total: executions.length,
     byStatus,
@@ -150,6 +218,7 @@ export default async function GetAutomationOrchestratorDashboardService(
     activeExecutions,
     fallbackExecutions,
     circuitBreakerTrips,
-    ownershipTransfers
+    ownershipTransfers,
+    actionCatalog
   };
 }

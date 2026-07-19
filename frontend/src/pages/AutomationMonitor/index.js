@@ -37,6 +37,7 @@ import {
   getAutomationExecutionReplay,
   getAutomationOrchestratorDashboard,
   getAutomationOrchestratorSettings,
+  listAutomationActions,
   listAutomationExecutions,
   listAutomationPlannerValidations,
   simulateAutomationPlan,
@@ -132,6 +133,7 @@ const AutomationMonitorPage = () => {
   const [capabilities, setCapabilities] = useState({});
   const [enabled, setEnabled] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [actionCatalog, setActionCatalog] = useState(null);
 
   const loadDashboard = useCallback(async () => {
     setLoading(true);
@@ -190,12 +192,32 @@ const AutomationMonitorPage = () => {
     }
   }, []);
 
+  const loadActionsCatalog = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data } = await listAutomationActions();
+      setActionCatalog(data);
+    } catch (err) {
+      toastError(err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (tab === 0) loadDashboard();
     if (tab === 1) loadExecutions();
     if (tab === 2) loadValidations();
-    if (tab === 3) loadSettings();
-  }, [tab, loadDashboard, loadExecutions, loadValidations, loadSettings]);
+    if (tab === 3) loadActionsCatalog();
+    if (tab === 4) loadSettings();
+  }, [
+    tab,
+    loadDashboard,
+    loadExecutions,
+    loadValidations,
+    loadActionsCatalog,
+    loadSettings,
+  ]);
 
   const openReplay = async (id) => {
     try {
@@ -247,7 +269,7 @@ const AutomationMonitorPage = () => {
       </MainHeader>
       <Paper className={classes.mainPaper} variant="outlined">
         <Typography variant="body2" color="textSecondary" paragraph>
-          Ativação segura (2.0.1). Ownership padrão = legado. Observe e
+          Action Runtime (2.0.2). Ownership padrão = legado. Observe e
           shadow_execute nunca enviam mensagem. Active exige capabilities
           consistentes e circuit breaker fechado.
         </Typography>
@@ -268,6 +290,7 @@ const AutomationMonitorPage = () => {
           <Tab label="Dashboard" />
           <Tab label="Execuções" />
           <Tab label="Planner Accuracy" />
+          <Tab label="Actions" />
           <Tab label="Configuração" />
         </Tabs>
 
@@ -332,6 +355,18 @@ const AutomationMonitorPage = () => {
                     }
                   />
                 </Grid>
+                <Grid item xs={6} md={3}>
+                  <MetricCard
+                    label="Actions instaladas"
+                    value={dashboard?.actionCatalog?.installed}
+                  />
+                </Grid>
+                <Grid item xs={6} md={3}>
+                  <MetricCard
+                    label="Capabilities"
+                    value={dashboard?.actionCatalog?.capabilities}
+                  />
+                </Grid>
                 <Grid item xs={12} md={6}>
                   <Typography variant="subtitle2" gutterBottom>
                     Por intent
@@ -342,7 +377,7 @@ const AutomationMonitorPage = () => {
                 </Grid>
                 <Grid item xs={12} md={6}>
                   <Typography variant="subtitle2" gutterBottom>
-                    Actions
+                    Uso por Action
                   </Typography>
                   <pre className={classes.mono}>
                     {JSON.stringify(dashboard?.actionUsage || {}, null, 2)}
@@ -455,7 +490,76 @@ const AutomationMonitorPage = () => {
               </Table>
             ))}
 
-          {tab === 3 && (
+          {tab === 3 &&
+            (loading && !actionCatalog ? (
+              <TableRowSkeleton columns={6} />
+            ) : (
+              <>
+                <Typography variant="body2" color="textSecondary" gutterBottom>
+                  Runtime {actionCatalog?.runtimeVersion || "—"} ·{" "}
+                  {(actionCatalog?.actions || []).length} actions ·{" "}
+                  {(actionCatalog?.capabilities || []).length} capabilities
+                </Typography>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Action</TableCell>
+                      <TableCell>Versão</TableCell>
+                      <TableCell>Categoria</TableCell>
+                      <TableCell>Capabilities</TableCell>
+                      <TableCell>Timeout</TableCell>
+                      <TableCell>Flags</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {(actionCatalog?.actions || []).map((a) => (
+                      <TableRow key={a.id || a.name}>
+                        <TableCell>
+                          <strong>{a.name}</strong>
+                          <Typography variant="caption" display="block">
+                            {a.description}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>{a.version}</TableCell>
+                        <TableCell>{a.category}</TableCell>
+                        <TableCell>
+                          {(a.capabilities || []).join(", ")}
+                        </TableCell>
+                        <TableCell>{a.timeoutMs}ms</TableCell>
+                        <TableCell>
+                          {a.sideEffects ? "sideEffects " : ""}
+                          {a.experimental ? "experimental " : ""}
+                          {a.deprecated ? "deprecated" : ""}
+                          {!a.sideEffects &&
+                          !a.experimental &&
+                          !a.deprecated
+                            ? "—"
+                            : ""}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                <Box mt={2}>
+                  <Typography variant="subtitle2" gutterBottom>
+                    Capabilities (incl. future)
+                  </Typography>
+                  <pre className={classes.mono}>
+                    {JSON.stringify(
+                      (actionCatalog?.capabilities || []).map((c) => ({
+                        id: c.id,
+                        future: c.future,
+                        experimental: c.experimental,
+                      })),
+                      null,
+                      2
+                    )}
+                  </pre>
+                </Box>
+              </>
+            ))}
+
+          {tab === 4 && (
             <>
               <Typography className={classes.warn} variant="body2">
                 send_message=active exige planner ativo. Config inconsistente é
@@ -594,6 +698,22 @@ const AutomationMonitorPage = () => {
                       <strong>{item.action}</strong>
                       {item.durationMs != null ? ` · ${item.durationMs}ms` : ""}
                     </Typography>
+                    {(item.manifest || item.runtime) && (
+                      <Typography variant="caption" color="textSecondary">
+                        v{item.manifest?.version || item.runtime?.actionVersion || "—"}
+                        {item.manifest?.category
+                          ? ` · ${item.manifest.category}`
+                          : ""}
+                        {item.runtime?.timeoutMs != null
+                          ? ` · timeout ${item.runtime.timeoutMs}ms`
+                          : ""}
+                        {item.manifest?.capabilities
+                          ? ` · caps [${(item.manifest.capabilities || []).join(
+                              ", "
+                            )}]`
+                          : ""}
+                      </Typography>
+                    )}
                   </Box>
                 </div>
               ))}

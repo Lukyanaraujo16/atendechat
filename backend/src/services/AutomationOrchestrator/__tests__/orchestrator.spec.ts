@@ -91,6 +91,7 @@ import {
   registerAction,
   getAction
 } from "../ActionRegistry";
+import { defineAction } from "../AutomationActionRuntime";
 import {
   registerBuiltinActions,
   resetBuiltinActionsRegistration
@@ -383,12 +384,20 @@ describe("GetAutomationExecutionService tenant", () => {
 
 describe("ActionRegistry plugin", () => {
   it("permite registrar action custom", () => {
-    registerAction({
-      name: "CustomAction",
-      supports: () => true,
-      validate: () => undefined,
-      execute: async () => ({ status: "success", nextHint: "continue" })
-    });
+    registerAction(
+      defineAction(
+        {
+          id: "CustomAction",
+          name: "CustomAction",
+          category: "future",
+          capabilities: ["planner"],
+          experimental: true
+        },
+        {
+          execute: async () => ({ status: "success", nextHint: "continue" })
+        }
+      )
+    );
     expect(listActions()).toContain("CustomAction");
   });
 });

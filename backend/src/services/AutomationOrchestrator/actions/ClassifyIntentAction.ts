@@ -1,30 +1,35 @@
-import { AutomationAction } from "../ActionRegistry";
+import { defineAction } from "../AutomationActionRuntime";
 import { classifyIntent } from "../classifyIntent";
 import { ActionResult, ExecutionContext } from "../types";
 
-const ClassifyIntentAction: AutomationAction = {
-  name: "ClassifyIntent",
-  sideEffects: false,
-  supportsShadow: true,
-  supportsObserve: true,
-  supportsActive: true,
-  capability: "classification",
-
-  supports(_ctx: ExecutionContext): boolean {
-    return true;
+const ClassifyIntentAction = defineAction(
+  {
+    id: "ClassifyIntent",
+    name: "ClassifyIntent",
+    version: "1.0.0",
+    category: "planner",
+    capabilities: ["classification"],
+    description: "Classifica a intenção do inbound sem side effects.",
+    sideEffects: false,
+    supportsShadow: true,
+    supportsObserve: true,
+    supportsActive: true,
+    tags: ["core", "classification"],
+    owner: "atendechat.core"
   },
-
-  validate(_ctx: ExecutionContext): void {},
-
-  async execute(ctx: ExecutionContext): Promise<ActionResult> {
-    const result = classifyIntent(ctx);
-    return {
-      status: "success",
-      message: result.reason,
-      data: { intent: result.intent, reason: result.reason },
-      nextHint: "continue"
-    };
+  {
+    supports: () => true,
+    validate: () => undefined,
+    async execute(ctx: ExecutionContext): Promise<ActionResult> {
+      const result = classifyIntent(ctx);
+      return {
+        status: "success",
+        message: result.reason,
+        data: { intent: result.intent, reason: result.reason },
+        nextHint: "continue"
+      };
+    }
   }
-};
+);
 
 export default ClassifyIntentAction;
