@@ -1482,6 +1482,11 @@ const messages = {
               description:
                 "Permite usar atendentes virtuales con inteligencia artificial para responder clientes automáticamente, interpretar mensajes y ayudar en la calificación de atenciones.",
             },
+            ai_tools: {
+              label: "Herramientas IA (Tools)",
+              description:
+                "Capa de Tools del Automation Orchestrator para capacidades operativas gobernadas (fundación; sin ejecución productiva automática en esta fase).",
+            },
             keywords: {
               label: "Disparadores por palabra clave",
               description: "Activa flujos cuando el contacto envía palabras específicas.",
@@ -3718,6 +3723,7 @@ const messages = {
           aiAgent: "Agente de IA",
           aiAgentAnalytics: "Analytics IA",
           automationMonitor: "Automation Monitor",
+          automationTools: "Herramientas IA",
           knowledgeBase: "Base de Conocimiento",
           queueIntegration: "Automatizaciones por sector",
           notificationCenter: "Centro de notificaciones",

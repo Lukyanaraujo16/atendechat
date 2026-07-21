@@ -116,6 +116,47 @@ export const replayExecution = async (
   const validation = (
     execution as unknown as { plannerValidation?: unknown }
   ).plannerValidation;
+
+  let toolExecutions: Array<Record<string, unknown>> = [];
+  try {
+    const { ListToolExecutionsForAutomationReplay } = await import(
+      "../services/AutomationOrchestrator/tools/ToolAdminServices"
+    );
+    const rows = await ListToolExecutionsForAutomationReplay({
+      companyId,
+      automationExecutionId: id
+    });
+    toolExecutions = rows.map(r => ({
+      id: r.id,
+      toolId: r.toolId,
+      toolVersion: r.toolVersion,
+      status: r.status,
+      controlMode: r.controlMode,
+      executionOwner: r.executionOwner,
+      riskLevel: r.riskLevel,
+      sideEffectType: r.sideEffectType,
+      source: r.source,
+      attemptCount: r.attemptCount,
+      durationMs: r.durationMs,
+      confirmationStatus: r.confirmationStatus,
+      rollbackStatus: r.rollbackStatus,
+      sideEffectCommitted: r.sideEffectCommitted,
+      policyDecision:
+        (r.outputSnapshot as Record<string, unknown> | null)?.reason || null,
+      outputSnapshot: r.outputSnapshot,
+      modelResult:
+        (r.outputSnapshot as Record<string, unknown> | null)?.modelResult ||
+        null,
+      resultDiff:
+        (r.outputSnapshot as Record<string, unknown> | null)?.resultDiff ||
+        null,
+      startedAt: r.startedAt,
+      finishedAt: r.finishedAt
+    }));
+  } catch {
+    toolExecutions = [];
+  }
+
   return res.json({
     replay: {
       id: execution.id,
@@ -133,6 +174,7 @@ export const replayExecution = async (
       graph: execution.graph,
       steps,
       events,
+      tools: toolExecutions,
       timeline: steps.map(s => {
         const preview =
           s.outputPreview && typeof s.outputPreview === "object"
@@ -140,12 +182,18 @@ export const replayExecution = async (
             : {};
         const manifest =
           getActionManifest(String(s.actionName || "")) || null;
+        const relatedTools = toolExecutions.filter(
+          t =>
+            t.actionExecutionId === s.id ||
+            String(preview.toolId || "") === String(t.toolId || "")
+        );
         return {
           at: s.startedAt || s.createdAt,
           action: s.actionName,
           result: s.resultStatus,
           durationMs: s.durationMs,
           errorCode: s.errorCode,
+          tools: relatedTools,
           manifest: manifest
             ? {
                 id: manifest.id,

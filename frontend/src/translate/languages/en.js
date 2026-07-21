@@ -1517,6 +1517,11 @@ const messages = {
 							description:
 								"Enables virtual AI attendants to reply to customers automatically, interpret messages, and help qualify support conversations.",
 						},
+						ai_tools: {
+							label: "AI Tools",
+							description:
+								"Automation Orchestrator Tools layer for governed operational capabilities (foundation; no automatic productive execution in this phase).",
+						},
 						keywords: {
 							label: "Keyword triggers",
 							description: "Trigger flows when contacts send specific words.",
@@ -4218,6 +4223,7 @@ const messages = {
 					aiAgent: "AI Agent",
 					aiAgentAnalytics: "AI Analytics",
 					automationMonitor: "Automation Monitor",
+					automationTools: "AI Tools",
 					knowledgeBase: "Knowledge Base",
 					queueIntegration: "Automations by queue",
 					notificationCenter: "Notification center",

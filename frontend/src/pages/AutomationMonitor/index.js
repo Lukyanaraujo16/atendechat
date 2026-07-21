@@ -43,6 +43,10 @@ import {
   simulateAutomationPlan,
   updateAutomationOrchestratorSettings,
 } from "../../services/automationOrchestratorApi";
+import {
+  getAutomationToolMetrics,
+  getAutomationToolsCatalog,
+} from "../../services/automationToolsApi";
 
 const CAPABILITY_KEYS = [
   "planner",
@@ -134,6 +138,8 @@ const AutomationMonitorPage = () => {
   const [enabled, setEnabled] = useState(true);
   const [saving, setSaving] = useState(false);
   const [actionCatalog, setActionCatalog] = useState(null);
+  const [toolCatalog, setToolCatalog] = useState(null);
+  const [toolMetrics, setToolMetrics] = useState(null);
 
   const loadDashboard = useCallback(async () => {
     setLoading(true);
@@ -204,18 +210,36 @@ const AutomationMonitorPage = () => {
     }
   }, []);
 
+  const loadToolsTab = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [catalogRes, metricsRes] = await Promise.all([
+        getAutomationToolsCatalog().catch(() => ({ data: null })),
+        getAutomationToolMetrics().catch(() => ({ data: null })),
+      ]);
+      setToolCatalog(catalogRes.data);
+      setToolMetrics(metricsRes.data);
+    } catch (err) {
+      toastError(err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (tab === 0) loadDashboard();
     if (tab === 1) loadExecutions();
     if (tab === 2) loadValidations();
     if (tab === 3) loadActionsCatalog();
-    if (tab === 4) loadSettings();
+    if (tab === 4) loadToolsTab();
+    if (tab === 5) loadSettings();
   }, [
     tab,
     loadDashboard,
     loadExecutions,
     loadValidations,
     loadActionsCatalog,
+    loadToolsTab,
     loadSettings,
   ]);
 
@@ -291,6 +315,7 @@ const AutomationMonitorPage = () => {
           <Tab label="Execuções" />
           <Tab label="Planner Accuracy" />
           <Tab label="Actions" />
+          <Tab label="Tools" />
           <Tab label="Configuração" />
         </Tabs>
 
@@ -559,7 +584,110 @@ const AutomationMonitorPage = () => {
               </>
             ))}
 
-          {tab === 4 && (
+          {tab === 4 &&
+            (loading && !toolCatalog ? (
+              <TableRowSkeleton columns={6} />
+            ) : (
+              <>
+                <Typography variant="body2" color="textSecondary" paragraph>
+                  Tools 2.1B — Read Tools. Sem escrita. Métricas de uso, latência e
+                  empty results.
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="Execuções Tool"
+                      value={toolMetrics?.metrics?.toolExecutions}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="Empty results"
+                      value={toolMetrics?.metrics?.emptyResults}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="Cache hits"
+                      value={toolMetrics?.metrics?.cacheHits}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="Duração média"
+                      value={toolMetrics?.metrics?.averageToolDuration}
+                    />
+                  </Grid>
+                </Grid>
+                <Box mt={2}>
+                  <Typography variant="subtitle2" gutterBottom>
+                    Mais utilizadas
+                  </Typography>
+                  <pre className={classes.mono}>
+                    {JSON.stringify(
+                      toolMetrics?.metrics?.topToolsByUsage || [],
+                      null,
+                      2
+                    )}
+                  </pre>
+                  <Typography variant="subtitle2" gutterBottom>
+                    Latência média por Tool
+                  </Typography>
+                  <pre className={classes.mono}>
+                    {JSON.stringify(
+                      toolMetrics?.metrics?.averageLatencyByTool || {},
+                      null,
+                      2
+                    )}
+                  </pre>
+                </Box>
+                <Box mt={2}>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>ID</TableCell>
+                        <TableCell>Versão</TableCell>
+                        <TableCell>Risco</TableCell>
+                        <TableCell>Side effect</TableCell>
+                        <TableCell>Capabilities</TableCell>
+                        <TableCell>Circuit</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {(toolCatalog?.tools || []).map((t) => {
+                        const circ = (toolMetrics?.catalog || []).find(
+                          (c) => c.id === t.id
+                        )?.circuit;
+                        return (
+                          <TableRow key={`${t.id}@${t.version}`}>
+                            <TableCell>{t.id}</TableCell>
+                            <TableCell>{t.version}</TableCell>
+                            <TableCell>{t.riskLevel}</TableCell>
+                            <TableCell>{t.sideEffectType}</TableCell>
+                            <TableCell>
+                              {(t.capabilities || []).join(", ")}
+                            </TableCell>
+                            <TableCell>
+                              {circ?.open ? "open" : "ok"}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                      {!(toolCatalog?.tools || []).length && (
+                        <TableRow>
+                          <TableCell colSpan={6}>
+                            Feature automation.ai_tools desabilitada ou sem
+                            Tools.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </Box>
+              </>
+            ))}
+
+          {tab === 5 && (
             <>
               <Typography className={classes.warn} variant="body2">
                 send_message=active exige planner ativo. Config inconsistente é
@@ -714,9 +842,51 @@ const AutomationMonitorPage = () => {
                           : ""}
                       </Typography>
                     )}
+                    {(item.tools || []).length > 0 && (
+                      <Typography variant="caption" display="block">
+                        Tools:{" "}
+                        {(item.tools || [])
+                          .map(
+                            (t) =>
+                              `${t.toolId}@${t.toolVersion} (${t.status}/${t.riskLevel})`
+                          )
+                          .join("; ")}
+                      </Typography>
+                    )}
                   </Box>
                 </div>
               ))}
+              {(replay.tools || []).length > 0 && (
+                <>
+                  <Typography variant="subtitle2" gutterBottom>
+                    Tools invocadas (interno → modelo)
+                  </Typography>
+                  {(replay.tools || []).map((t, i) => (
+                    <Box key={i} mb={1}>
+                      <Typography variant="caption" display="block">
+                        {t.toolId}@{t.toolVersion} · {t.status} · risco{" "}
+                        {t.riskLevel} · {t.durationMs ?? "—"}ms
+                      </Typography>
+                      {t.outputSnapshot && (
+                        <pre className={classes.mono}>
+                          {JSON.stringify(
+                            {
+                              internal: t.outputSnapshot?.data || t.outputSnapshot,
+                              model: t.outputSnapshot?.modelResult || null,
+                              diff: t.outputSnapshot?.resultDiff || null,
+                            },
+                            null,
+                            2
+                          )}
+                        </pre>
+                      )}
+                    </Box>
+                  ))}
+                  <pre className={classes.mono}>
+                    {JSON.stringify(replay.tools, null, 2)}
+                  </pre>
+                </>
+              )}
               <pre className={classes.mono}>
                 {JSON.stringify(
                   {

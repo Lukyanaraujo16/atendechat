@@ -17,6 +17,10 @@ export const AI_AGENT_ANALYTICS_ROUTE_PATH = "/ai-agent/analytics";
 /** Automation Orchestrator Monitor (Fase IA 2.0). */
 export const AUTOMATION_MONITOR_ROUTE_PATH = "/automation/monitor";
 
+/** Ferramentas IA / Tools foundation (Fase IA 2.1A). */
+export const AUTOMATION_TOOLS_ROUTE_PATH = "/automation/tools";
+export const AUTOMATION_AI_TOOLS_FEATURE_KEY = "automation.ai_tools";
+
 /**
  * Controla exibição da aba/menu do Agente de IA.
  * Manter `false` até a fase com página funcional + backend.

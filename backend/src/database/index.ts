@@ -108,6 +108,9 @@ import AutomationExecutionStep from "../models/AutomationExecutionStep";
 import AutomationExecutionEvent from "../models/AutomationExecutionEvent";
 import AutomationOrchestratorSettings from "../models/AutomationOrchestratorSettings";
 import AutomationPlannerValidation from "../models/AutomationPlannerValidation";
+import AutomationToolExecution from "../models/AutomationToolExecution";
+import AutomationToolPolicy from "../models/AutomationToolPolicy";
+import AutomationToolConfirmation from "../models/AutomationToolConfirmation";
 import AiProviderCredential from "../models/AiProviderCredential";
 import { logDbConnectionAtStartup } from "../helpers/dbConnectionInfo";
 import {
@@ -231,6 +234,9 @@ const models = [
   AutomationExecutionEvent,
   AutomationOrchestratorSettings,
   AutomationPlannerValidation,
+  AutomationToolExecution,
+  AutomationToolPolicy,
+  AutomationToolConfirmation,
   AiProviderCredential
 ];
 

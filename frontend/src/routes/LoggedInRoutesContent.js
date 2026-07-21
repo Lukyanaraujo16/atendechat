@@ -71,6 +71,8 @@ import {
   AI_AGENT_ROUTE_PATH,
   AI_AGENT_ANALYTICS_ROUTE_PATH,
   AUTOMATION_MONITOR_ROUTE_PATH,
+  AUTOMATION_TOOLS_ROUTE_PATH,
+  AUTOMATION_AI_TOOLS_FEATURE_KEY,
   AI_AGENT_SIMULATOR_ROUTE_PATH,
   AI_AGENT_WIZARD_ROUTE_PATH,
   AI_AGENT_UI_ENABLED,
@@ -89,6 +91,9 @@ const AiAgentAnalyticsPage = React.lazy(() =>
 );
 const AutomationMonitorPage = React.lazy(() =>
   import("../pages/AutomationMonitor")
+);
+const AutomationToolsPage = React.lazy(() =>
+  import("../pages/AutomationTools")
 );
 
 function PlanFlagsLoadingState() {
@@ -344,6 +349,8 @@ function AutomacaoModule({ planFlags, isAdmin }) {
   const showKnowledgeBase =
     KNOWLEDGE_BASE_UI_ENABLED && isAdmin && fx[KNOWLEDGE_BASE_FEATURE_KEY] === true;
   const showAiAgentAnalytics = showAiAgent && showKnowledgeBase;
+  const showAiTools =
+    showAiAgent && fx[AUTOMATION_AI_TOOLS_FEATURE_KEY] === true;
 
   const tabs = useMemo(() => {
     const t = [];
@@ -384,6 +391,12 @@ function AutomacaoModule({ planFlags, isAdmin }) {
         label: i18n.t("mainDrawer.listItems.automationMonitor"),
       });
     }
+    if (showAiTools) {
+      t.push({
+        path: AUTOMATION_TOOLS_ROUTE_PATH,
+        label: i18n.t("mainDrawer.listItems.automationTools"),
+      });
+    }
     if (showKnowledgeBase) {
       t.push({
         path: KNOWLEDGE_BASE_ROUTE_PATH,
@@ -405,6 +418,7 @@ function AutomacaoModule({ planFlags, isAdmin }) {
     showOpenAi,
     showAiAgent,
     showAiAgentAnalytics,
+    showAiTools,
     showKnowledgeBase,
     showQuickReplies,
     i18n.language,
@@ -424,6 +438,7 @@ function AutomacaoModule({ planFlags, isAdmin }) {
           "automation.integrations",
           "automation.openai",
           AI_AGENT_FEATURE_KEY,
+          AUTOMATION_AI_TOOLS_FEATURE_KEY,
           KNOWLEDGE_BASE_FEATURE_KEY,
           "automation.quick_replies",
         ]}
@@ -544,6 +559,23 @@ function AutomacaoModule({ planFlags, isAdmin }) {
               {isAdmin && showAiAgentAnalytics ? (
                 <Suspense fallback={<PlanFlagsLoadingState />}>
                   <AutomationMonitorPage />
+                </Suspense>
+              ) : null}
+            </AiAgentRouteGuard>
+          )}
+        />
+        <Route
+          exact
+          path={AUTOMATION_TOOLS_ROUTE_PATH}
+          render={() => (
+            <AiAgentRouteGuard
+              planFlags={planFlags}
+              user={user}
+              fallbackPath={fallback}
+            >
+              {isAdmin && showAiTools ? (
+                <Suspense fallback={<PlanFlagsLoadingState />}>
+                  <AutomationToolsPage />
                 </Suspense>
               ) : null}
             </AiAgentRouteGuard>
@@ -788,6 +820,7 @@ export default function LoggedInRoutesContent() {
     AI_AGENT_ROUTE_PATH,
     AI_AGENT_ANALYTICS_ROUTE_PATH,
     AUTOMATION_MONITOR_ROUTE_PATH,
+    AUTOMATION_TOOLS_ROUTE_PATH,
     KNOWLEDGE_BASE_ROUTE_PATH,
     "/quick-messages",
   ];
