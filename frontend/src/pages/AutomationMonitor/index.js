@@ -871,8 +871,21 @@ const AutomationMonitorPage = () => {
                         <pre className={classes.mono}>
                           {JSON.stringify(
                             {
-                              internal: t.outputSnapshot?.data || t.outputSnapshot,
-                              model: t.outputSnapshot?.modelResult || null,
+                              operationStatus:
+                                t.outputSnapshot?.data?.operationStatus || null,
+                              preview: t.outputSnapshot?.data?.preview || null,
+                              before: t.outputSnapshot?.data?.before || null,
+                              after: t.outputSnapshot?.data?.after || null,
+                              changedFields:
+                                t.outputSnapshot?.data?.changedFields || null,
+                              dryRun: t.outputSnapshot?.data?.dryRun ?? null,
+                              transaction:
+                                t.outputSnapshot?.data?.transaction || null,
+                              rollback: t.outputSnapshot?.data?.rollback || null,
+                              model:
+                                t.outputSnapshot?.modelResult ||
+                                t.outputSnapshot?.data?.modelResult ||
+                                null,
                               diff: t.outputSnapshot?.resultDiff || null,
                             },
                             null,

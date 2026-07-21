@@ -5,6 +5,7 @@ import {
   SystemHealthCheckTool
 } from "./tools/SystemTechnicalTools";
 import { READ_TOOLS } from "./tools/ReadOnlyBusinessTools";
+import { WRITE_TOOLS } from "./tools/WriteBusinessTools";
 import {
   AUTOMATION_TOOL_CAPABILITY_KEYS,
   AUTOMATION_TOOL_DEFAULT_CAPABILITIES
@@ -34,6 +35,9 @@ export function registerBuiltinTools(): void {
   registerTool(SystemContextSummaryTool);
   registerTool(SystemHealthCheckTool);
   for (const tool of READ_TOOLS) {
+    registerTool(tool);
+  }
+  for (const tool of WRITE_TOOLS) {
     registerTool(tool);
   }
   seeded = true;

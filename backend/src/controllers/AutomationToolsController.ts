@@ -87,6 +87,11 @@ export const testTool = async (
   }
 
   const body = (req.body || {}) as Record<string, unknown>;
+  const modeRaw = body.mode != null ? String(body.mode) : undefined;
+  const mode =
+    modeRaw === "preview" || modeRaw === "dry_run" || modeRaw === "execute"
+      ? modeRaw
+      : undefined;
   const result = await TestToolService({
     companyId,
     userId,
@@ -95,7 +100,9 @@ export const testTool = async (
       body.input && typeof body.input === "object"
         ? (body.input as Record<string, unknown>)
         : {},
-    adminTestMode: body.adminTestMode === true
+    adminTestMode: body.adminTestMode === true,
+    mode,
+    confirmed: body.confirmed === true
   });
   return res.json({ result });
 };
@@ -121,7 +128,7 @@ export const updatePolicies = async (
     userId,
     enabled: body.enabled === true,
     maxRiskLevel: body.maxRiskLevel ? String(body.maxRiskLevel) : undefined,
-    allowWrite: false,
+    allowWrite: body.allowWrite === true,
     requireConfirmationFor: Array.isArray(body.requireConfirmationFor)
       ? (body.requireConfirmationFor as string[])
       : [],

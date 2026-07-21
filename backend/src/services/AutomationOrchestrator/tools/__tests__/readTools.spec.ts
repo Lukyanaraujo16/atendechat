@@ -267,10 +267,16 @@ describe("Read Tools 2.1B", () => {
       ])
     );
     expect(
-      listTools({ includeExperimental: true }).every(
-        t =>
-          t.riskLevel === "read_only" &&
-          (t.sideEffectType === "none" || t.sideEffectType === "database_read")
+      listTools({ includeExperimental: true })
+        .filter(t => t.riskLevel === "read_only")
+        .every(
+          t =>
+            t.sideEffectType === "none" || t.sideEffectType === "database_read"
+        )
+    ).toBe(true);
+    expect(
+      listTools({ includeExperimental: true }).some(
+        t => t.sideEffectType === "database_write"
       )
     ).toBe(true);
   });

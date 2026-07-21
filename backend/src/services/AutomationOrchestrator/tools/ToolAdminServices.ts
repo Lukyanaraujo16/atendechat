@@ -126,6 +126,9 @@ export async function TestToolService(input: {
   toolId: string;
   toolInput?: Record<string, unknown>;
   adminTestMode: boolean;
+  /** preview | dry_run | execute — obrigatório para Tools de escrita */
+  mode?: "preview" | "dry_run" | "execute";
+  confirmed?: boolean;
 }): Promise<unknown> {
   await ensureToolsReady();
 
@@ -142,12 +145,27 @@ export async function TestToolService(input: {
     throw new AppError("ERR_NO_PERMISSION", 404, "Tool não encontrada.");
   }
   const manifest = tool.manifest();
-  if (manifest.riskLevel !== "read_only") {
+  const isWrite = manifest.sideEffectType === "database_write";
+  const mode =
+    input.mode ||
+    (isWrite
+      ? input.toolInput?.previewOnly === true
+        ? "preview"
+        : input.toolInput?.dryRun === true || input.toolInput?.execute !== true
+          ? "dry_run"
+          : "execute"
+      : "execute");
+
+  if (isWrite && !["preview", "dry_run", "execute"].includes(mode)) {
     throw new AppError(
-      "ERR_NO_PERMISSION",
-      403,
-      "Tester só permite Tools read_only nesta fase."
+      "ERR_VALIDATION_ERROR",
+      400,
+      "Tools de escrita exigem mode=preview|dry_run|execute."
     );
+  }
+
+  if (isWrite && mode === "execute" && input.confirmed !== true && input.toolInput?.confirmed !== true) {
+    // execute real ainda pode retornar waiting_confirmation via Operation Runtime
   }
 
   const [hasAgent, hasTools, hasKnowledge] = await Promise.all([
@@ -157,13 +175,56 @@ export async function TestToolService(input: {
   ]);
 
   const companyPolicy = await getCompanyToolPolicy(input.companyId);
-  // Tester técnico: policy enabled local para teste se feature ok
+  const maxRiskForWrite: ToolRiskLevel =
+    mode === "execute" ? "medium" : "medium";
   const effectivePolicy = {
     ...companyPolicy,
     enabled: companyPolicy.enabled || (hasAgent && hasTools),
-    maxRiskLevel: "read_only" as ToolRiskLevel,
-    allowWrite: false
+    maxRiskLevel: (isWrite
+      ? maxRiskForWrite
+      : companyPolicy.maxRiskLevel || "read_only") as ToolRiskLevel,
+    allowWrite:
+      isWrite && mode === "execute"
+        ? companyPolicy.allowWrite === true
+        : isWrite
+          ? false
+          : false
   };
+
+  // Para preview/dry_run de escrita, elevar maxRisk sem allowWrite real
+  if (isWrite && (mode === "preview" || mode === "dry_run")) {
+    effectivePolicy.maxRiskLevel = "medium";
+  }
+
+  const permissions = [
+    "aiTools.view",
+    "aiTools.test",
+    "aiTools.executeRead",
+    ...(isWrite ? ["aiTools.executeWrite"] : [])
+  ];
+
+  const toolInput: Record<string, unknown> = {
+    ...(input.toolInput || {})
+  };
+  if (isWrite) {
+    if (mode === "preview") {
+      toolInput.previewOnly = true;
+      toolInput.dryRun = false;
+      toolInput.execute = false;
+    } else if (mode === "dry_run") {
+      toolInput.previewOnly = false;
+      toolInput.dryRun = true;
+      toolInput.execute = false;
+    } else {
+      toolInput.previewOnly = false;
+      toolInput.dryRun = false;
+      toolInput.execute = true;
+      if (input.confirmed === true) toolInput.confirmed = true;
+    }
+  }
+
+  const confirmed =
+    input.confirmed === true || toolInput.confirmed === true;
 
   const ctx = buildToolExecutionContext({
     companyId: input.companyId,
@@ -174,37 +235,44 @@ export async function TestToolService(input: {
     executionOwner: "orchestrator",
     capabilities: {
       "tool.read": true,
+      "tool.write": isWrite,
       "tool.internal": true,
       "contact.read": true,
+      "contact.write": isWrite,
       "ticket.read": true,
+      "ticket.write": isWrite,
+      "tag.write": isWrite,
+      "note.write": isWrite,
       "queue.read": true,
       "user.read": true
     },
-    permissions: [
-      "aiTools.view",
-      "aiTools.test",
-      "aiTools.executeRead"
-    ],
+    permissions,
     featureFlags: {
       [AUTOMATION_ORCHESTRATOR_FEATURE_KEY]: hasAgent,
       [AUTOMATION_AI_TOOLS_FEATURE_KEY]: hasTools,
       "automation.knowledge_base": hasKnowledge
     },
     requestId: `admin-test-${Date.now()}`,
-    correlationId: `admin-test-${input.companyId}-${input.toolId}`
+    correlationId: `admin-test-${input.companyId}-${input.toolId}`,
+    metadata: {
+      writeMode: isWrite ? mode : undefined,
+      operationRuntime: isWrite,
+      confirmationStatus: confirmed ? "approved" : undefined
+    }
   });
 
-  // Discovery elegível (não executa fora do runtime)
   discoverTools({
     ctx,
     includeExperimental: true,
-    capabilities: ["tool.read", "tool.internal"]
+    capabilities: isWrite
+      ? ["tool.read", "tool.write", "tool.internal"]
+      : ["tool.read", "tool.internal"]
   });
 
   const result = await runToolViaRuntime({
     toolId: input.toolId,
     ctx,
-    input: input.toolInput || {},
+    input: toolInput,
     companyPolicy: effectivePolicy,
     persist: true
   });
@@ -216,7 +284,10 @@ export async function TestToolService(input: {
     result.modelResult ||
     (toModelResult(result, input.toolId) as unknown as Record<string, unknown>);
 
+  const data = (result.data || {}) as Record<string, unknown>;
+
   return {
+    mode,
     internal: {
       status: result.status,
       data: result.data,
@@ -230,6 +301,25 @@ export async function TestToolService(input: {
     },
     model: modelResult,
     diff: diffInternalVsModel(result, modelResult as any),
+    operation: isWrite
+      ? {
+          status: data.operationStatus,
+          preview: data.preview,
+          before: data.before,
+          after: data.after,
+          changedFields: data.changedFields,
+          dryRun: data.dryRun,
+          previewOnly: data.previewOnly,
+          transaction: data.transaction,
+          rollback: data.rollback,
+          modelResult: data.modelResult,
+          resultDiff: data.resultDiff
+        }
+      : null,
+    comparison:
+      isWrite && data.before && data.after
+        ? { before: data.before, after: data.after, changedFields: data.changedFields }
+        : null,
     manifest: {
       id: manifest.id,
       version: manifest.version,
@@ -263,12 +353,18 @@ export async function UpsertToolPoliciesService(input: {
   allowedToolIds?: string[] | null;
   metadata?: Record<string, unknown>;
 }): Promise<ReturnType<typeof getCompanyToolPolicy>> {
-  // Nesta fase: nunca ativar escrita via API admin
-  const allowWrite = false;
-  const maxRiskLevel =
-    input.maxRiskLevel === "low" || input.maxRiskLevel === "read_only"
-      ? input.maxRiskLevel
-      : "read_only";
+  const allowedRisk: ToolRiskLevel[] = [
+    "read_only",
+    "low",
+    "medium"
+  ];
+  const maxRiskLevel = allowedRisk.includes(
+    input.maxRiskLevel as ToolRiskLevel
+  )
+    ? (input.maxRiskLevel as ToolRiskLevel)
+    : "read_only";
+  // 2.1C: allowWrite explícito permitido (ainda deny-by-default se omitido)
+  const allowWrite = input.allowWrite === true;
 
   const [row] = await AutomationToolPolicy.findOrCreate({
     where: { companyId: input.companyId },

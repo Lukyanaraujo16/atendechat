@@ -3,7 +3,7 @@
  * Deny-by-default. Nenhuma Tool operacional de negócio nesta fase.
  */
 
-export const AUTOMATION_TOOL_RUNTIME_VERSION = "2.1.0-b";
+export const AUTOMATION_TOOL_RUNTIME_VERSION = "2.1.0-c";
 
 export const AUTOMATION_AI_TOOLS_FEATURE_KEY = "automation.ai_tools";
 

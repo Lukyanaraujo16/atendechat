@@ -563,17 +563,13 @@ describe("Automation Tools 2.1A foundation", () => {
     expect(AUTOMATION_TOOL_DEFAULT_CAPABILITIES["message.send"]).toBe(false);
   });
 
-  it("nenhuma Tool operacional de escrita registrada", () => {
+  it("Write Tools registradas via Operation Runtime (2.1C)", () => {
     const tools = listTools({ includeExperimental: true });
-    expect(
-      tools.every(
-        t =>
-          t.riskLevel === "read_only" &&
-          (t.sideEffectType === "none" || t.sideEffectType === "database_read")
-      )
-    ).toBe(true);
+    const writes = tools.filter(t => t.sideEffectType === "database_write");
+    expect(writes.length).toBe(5);
+    expect(writes.every(t => t.metadata?.operationRuntime === true)).toBe(true);
     expect(tools.some(t => t.id === "message.send")).toBe(false);
-    expect(tools.some(t => t.sideEffectType === "database_write")).toBe(false);
+    expect(tools.some(t => t.id === "contact.update_allowed_fields")).toBe(true);
   });
 
   it("isWriteSideEffect classificação", () => {

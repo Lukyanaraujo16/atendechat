@@ -145,13 +145,15 @@ export function evaluateToolPolicy(input: {
     return deny("admin_test_mode_required");
   }
 
-  // Admin tester: somente read_only nesta fase.
-  if (ctx.source === "admin_test" && manifest.riskLevel !== "read_only") {
-    return deny("admin_test_read_only_only");
-  }
-
+  // Admin tester 2.1C: leitura livre; escrita só em preview/dry_run/execute explícito.
   if (ctx.source === "admin_test" && isWriteSideEffect(manifest.sideEffectType)) {
-    return deny("admin_test_no_write");
+    const writeMode = String(ctx.metadata?.writeMode || "");
+    if (!["preview", "dry_run", "execute"].includes(writeMode)) {
+      return deny("admin_test_write_mode_required");
+    }
+    if (writeMode === "execute" && companyPolicy?.allowWrite !== true) {
+      return deny("admin_test_execute_requires_allow_write");
+    }
   }
 
   const featureRequired = [
@@ -202,12 +204,20 @@ export function evaluateToolPolicy(input: {
     return deny(`risk_exceeded:${manifest.riskLevel}`);
   }
 
-  // Escrita exige policy explícita (deny-by-default). Nenhuma Tool de escrita nesta fase.
+  // Escrita exige policy explícita (deny-by-default), exceto preview/dry_run no admin tester.
   if (
     isWriteSideEffect(manifest.sideEffectType) &&
     companyPolicy?.allowWrite !== true
   ) {
-    return deny("write_not_explicitly_allowed");
+    const writeMode = String(ctx.metadata?.writeMode || "");
+    if (
+      !(
+        ctx.source === "admin_test" &&
+        (writeMode === "preview" || writeMode === "dry_run")
+      )
+    ) {
+      return deny("write_not_explicitly_allowed");
+    }
   }
 
   const requireOwnership =
@@ -236,8 +246,12 @@ export function evaluateToolPolicy(input: {
     requireConfirmation = true;
   }
 
-  // Confirmação: nesta fase bloqueia escrita se exigida (sem autoaprovação).
-  if (requireConfirmation && isWriteSideEffect(manifest.sideEffectType)) {
+  // Confirmação de escrita: Operation Runtime gera preview e waiting_confirmation.
+  if (
+    requireConfirmation &&
+    isWriteSideEffect(manifest.sideEffectType) &&
+    manifest.metadata?.operationRuntime !== true
+  ) {
     const confStatus = ctx.metadata?.confirmationStatus;
     if (confStatus !== "approved") {
       return {

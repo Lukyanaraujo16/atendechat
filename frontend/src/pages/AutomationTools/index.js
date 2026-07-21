@@ -75,6 +75,7 @@ const AutomationToolsPage = () => {
   const [selectedToolId, setSelectedToolId] = useState("system.info");
   const [inputJson, setInputJson] = useState("{}");
   const [adminTestMode, setAdminTestMode] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
   const [testResult, setTestResult] = useState(null);
   const [testing, setTesting] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -140,14 +141,19 @@ const AutomationToolsPage = () => {
   const selectedManifest = (catalog?.tools || []).find(
     (t) => t.id === selectedToolId
   );
+  const isWriteTool = selectedManifest?.sideEffectType === "database_write";
 
-  const runTest = async () => {
+  const runTest = async (mode) => {
     if (!adminTestMode) {
       toast.error("Ative o modo de teste explícito.");
       return;
     }
-    if (selectedManifest && selectedManifest.riskLevel !== "read_only") {
-      toast.error("Tester só permite Tools read_only nesta fase.");
+    if (isWriteTool && !["preview", "dry_run", "execute"].includes(mode)) {
+      toast.error("Tools de escrita exigem Preview, Dry Run ou Execute.");
+      return;
+    }
+    if (isWriteTool && mode === "execute" && policy?.allowWrite !== true) {
+      toast.error("Execute real exige allowWrite na política da empresa.");
       return;
     }
     let parsed = {};
@@ -161,10 +167,16 @@ const AutomationToolsPage = () => {
     try {
       const { data } = await testAutomationTool(selectedToolId, {
         adminTestMode: true,
+        mode: isWriteTool ? mode : undefined,
+        confirmed: isWriteTool && mode === "execute" ? confirmed : false,
         input: parsed,
       });
       setTestResult(data?.result || data);
-      toast.success("Teste registrado via Tool Runtime.");
+      toast.success(
+        isWriteTool
+          ? `Operation ${mode} via Tool → Operation Runtime.`
+          : "Teste registrado via Tool Runtime."
+      );
     } catch (err) {
       toastError(err);
     } finally {
@@ -178,13 +190,13 @@ const AutomationToolsPage = () => {
       const { data } = await updateAutomationToolPolicies({
         enabled: policy?.enabled === true,
         maxRiskLevel: policy?.maxRiskLevel || "read_only",
-        allowWrite: false,
+        allowWrite: policy?.allowWrite === true,
         requireConfirmationFor: policy?.requireConfirmationFor || [],
         deniedToolIds: policy?.deniedToolIds || [],
         allowedToolIds: policy?.allowedToolIds || null,
       });
       setPolicy(data?.policy || null);
-      toast.success("Política salva (deny-by-default; escrita bloqueada).");
+      toast.success("Política salva (deny-by-default).");
     } catch (err) {
       toastError(err);
     } finally {
@@ -199,8 +211,8 @@ const AutomationToolsPage = () => {
       </MainHeader>
       <Paper className={classes.mainPaper} variant="outlined">
         <Typography variant="body2" color="textSecondary" paragraph>
-          Fundação Tools 2.1A. Sem Tools operacionais de negócio. Sem execução
-          produtiva. Tester apenas read_only via Runtime.
+          Tools 2.1C — leitura + escrita via Operation Runtime. Agente Live ainda
+          não executa Tools. Write Tools nunca bypassam o Runtime.
         </Typography>
 
         <Tabs
@@ -235,7 +247,7 @@ const AutomationToolsPage = () => {
                       <TableCell>Categoria</TableCell>
                       <TableCell>Risco</TableCell>
                       <TableCell>Side effect</TableCell>
-                      <TableCell>Modos</TableCell>
+                      <TableCell>Runtime</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -248,41 +260,14 @@ const AutomationToolsPage = () => {
                         <TableCell>{t.riskLevel}</TableCell>
                         <TableCell>{t.sideEffectType}</TableCell>
                         <TableCell>
-                          {[
-                            t.supportsObserve && "observe",
-                            t.supportsShadow && "shadow",
-                            t.supportsActive && "active",
-                          ]
-                            .filter(Boolean)
-                            .join(", ") || "—"}
+                          {t.metadata?.operationRuntime
+                            ? "Operation"
+                            : "Tool"}
                         </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
-                {selectedManifest && (
-                  <Box mt={2}>
-                    <Typography variant="subtitle2">Manifest (amostra)</Typography>
-                    <pre className={classes.mono}>
-                      {JSON.stringify(
-                        {
-                          id: selectedManifest.id,
-                          version: selectedManifest.version,
-                          capabilities: selectedManifest.capabilities,
-                          permissions: selectedManifest.requiredPermissions,
-                          features: selectedManifest.requiredFeatures,
-                          timeout: selectedManifest.timeoutPolicy,
-                          retry: selectedManifest.retryPolicy,
-                          experimental: selectedManifest.experimental,
-                          deprecated: selectedManifest.deprecated,
-                          exposeToModel: selectedManifest.exposeToModel,
-                        },
-                        null,
-                        2
-                      )}
-                    </pre>
-                  </Box>
-                )}
               </>
             ))}
 
@@ -328,24 +313,22 @@ const AutomationToolsPage = () => {
           {tab === 2 && (
             <>
               <Typography className={classes.warn} variant="body2">
-                Tester exige modo explícito. Somente Tools read_only. Sem bypass
-                do Runtime. Sem escrita nesta fase.
+                Tester via Tool Runtime. Write Tools: Preview → Dry Run →
+                Execute (exige allowWrite + confirmação quando aplicável).
               </Typography>
               <div className={classes.filters}>
-                <FormControl variant="outlined" size="small" style={{ minWidth: 240 }}>
+                <FormControl variant="outlined" size="small" style={{ minWidth: 280 }}>
                   <InputLabel>Tool</InputLabel>
                   <Select
                     label="Tool"
                     value={selectedToolId}
                     onChange={(e) => setSelectedToolId(e.target.value)}
                   >
-                    {(catalog?.tools || [])
-                      .filter((t) => t.riskLevel === "read_only")
-                      .map((t) => (
-                        <MenuItem key={t.id} value={t.id}>
-                          {t.id}@{t.version}
-                        </MenuItem>
-                      ))}
+                    {(catalog?.tools || []).map((t) => (
+                      <MenuItem key={t.id} value={t.id}>
+                        {t.id}@{t.version} ({t.sideEffectType})
+                      </MenuItem>
+                    ))}
                   </Select>
                 </FormControl>
                 <FormControlLabel
@@ -358,14 +341,56 @@ const AutomationToolsPage = () => {
                   }
                   label="Modo de teste explícito"
                 />
-                <Button
-                  variant="contained"
-                  color="primary"
-                  disabled={testing || !adminTestMode}
-                  onClick={runTest}
-                >
-                  Executar teste
-                </Button>
+                {isWriteTool && (
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={confirmed}
+                        onChange={(e) => setConfirmed(e.target.checked)}
+                        color="primary"
+                      />
+                    }
+                    label="Confirmado"
+                  />
+                )}
+                {!isWriteTool && (
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    disabled={testing || !adminTestMode}
+                    onClick={() => runTest("execute")}
+                  >
+                    Executar leitura
+                  </Button>
+                )}
+                {isWriteTool && (
+                  <>
+                    <Button
+                      variant="outlined"
+                      color="primary"
+                      disabled={testing || !adminTestMode}
+                      onClick={() => runTest("preview")}
+                    >
+                      Preview
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      color="primary"
+                      disabled={testing || !adminTestMode}
+                      onClick={() => runTest("dry_run")}
+                    >
+                      Dry Run
+                    </Button>
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      disabled={testing || !adminTestMode}
+                      onClick={() => runTest("execute")}
+                    >
+                      Execute
+                    </Button>
+                  </>
+                )}
               </div>
               {selectedManifest && (
                 <Box mb={2}>
@@ -377,6 +402,8 @@ const AutomationToolsPage = () => {
                         version: selectedManifest.version,
                         riskLevel: selectedManifest.riskLevel,
                         sideEffectType: selectedManifest.sideEffectType,
+                        operationRuntime:
+                          selectedManifest.metadata?.operationRuntime || false,
                         permissions: selectedManifest.requiredPermissions,
                         features: selectedManifest.requiredFeatures,
                         inputSchema: selectedManifest.inputSchema,
@@ -400,8 +427,42 @@ const AutomationToolsPage = () => {
               {testResult && (
                 <Box mt={2}>
                   <Typography variant="subtitle2" gutterBottom>
-                    Tempo: {testResult.durationMs ?? testResult?.internal?.metrics?.durationMs ?? "—"}ms
+                    Modo: {testResult.mode || "—"} · Tempo:{" "}
+                    {testResult.durationMs ??
+                      testResult?.internal?.metrics?.durationMs ??
+                      "—"}
+                    ms
                   </Typography>
+                  {testResult.comparison && (
+                    <>
+                      <Typography variant="subtitle2">
+                        Comparação Before → After
+                      </Typography>
+                      <pre className={classes.mono}>
+                        {JSON.stringify(testResult.comparison, null, 2)}
+                      </pre>
+                    </>
+                  )}
+                  {testResult.operation && (
+                    <>
+                      <Typography variant="subtitle2">Operation</Typography>
+                      <pre className={classes.mono}>
+                        {JSON.stringify(
+                          {
+                            status: testResult.operation.status,
+                            preview: testResult.operation.preview,
+                            changedFields: testResult.operation.changedFields,
+                            dryRun: testResult.operation.dryRun,
+                            transaction: testResult.operation.transaction,
+                            rollback: testResult.operation.rollback,
+                            modelResult: testResult.operation.modelResult,
+                          },
+                          null,
+                          2
+                        )}
+                      </pre>
+                    </>
+                  )}
                   <Typography variant="subtitle2">Output interno</Typography>
                   <pre className={classes.mono}>
                     {JSON.stringify(
@@ -412,13 +473,7 @@ const AutomationToolsPage = () => {
                   </pre>
                   <Typography variant="subtitle2">Output modelo</Typography>
                   <pre className={classes.mono}>
-                    {JSON.stringify(
-                      testResult.model ||
-                        testResult?.result?.modelResult ||
-                        null,
-                      null,
-                      2
-                    )}
+                    {JSON.stringify(testResult.model || null, null, 2)}
                   </pre>
                   <Typography variant="subtitle2">Diferenças</Typography>
                   <pre className={classes.mono}>
@@ -432,7 +487,8 @@ const AutomationToolsPage = () => {
           {tab === 3 && (
             <>
               <Typography className={classes.warn} variant="body2">
-                Deny-by-default. allowWrite permanece false nesta fase.
+                Deny-by-default. allowWrite necessário para Execute real de
+                escrita.
               </Typography>
               {policy && (
                 <Grid container spacing={2}>
@@ -450,6 +506,23 @@ const AutomationToolsPage = () => {
                       label="Policy enabled"
                     />
                   </Grid>
+                  <Grid item xs={12}>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={policy.allowWrite === true}
+                          onChange={(e) =>
+                            setPolicy({
+                              ...policy,
+                              allowWrite: e.target.checked,
+                            })
+                          }
+                          color="primary"
+                        />
+                      }
+                      label="allowWrite (Execute real)"
+                    />
+                  </Grid>
                   <Grid item xs={12} md={4}>
                     <FormControl variant="outlined" size="small" fullWidth>
                       <InputLabel>Max risk</InputLabel>
@@ -465,6 +538,7 @@ const AutomationToolsPage = () => {
                       >
                         <MenuItem value="read_only">read_only</MenuItem>
                         <MenuItem value="low">low</MenuItem>
+                        <MenuItem value="medium">medium</MenuItem>
                       </Select>
                     </FormControl>
                   </Grid>
