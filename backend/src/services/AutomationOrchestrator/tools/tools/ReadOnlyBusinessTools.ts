@@ -95,7 +95,7 @@ function readToolBase(partial: {
     supportsObserve: false,
     supportsShadow: true,
     supportsActive: true,
-    exposeToModel: false,
+    exposeToModel: true,
     experimental: false,
     requiredPermissions: partial.requiredPermissions,
     requiredFeatures: partial.requiredFeatures || [],

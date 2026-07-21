@@ -99,10 +99,26 @@ export class GeminiProviderAdapter implements AiProviderAdapter {
 
     try {
       const genAI = new GoogleGenerativeAI(input.apiKey);
-      const model = genAI.getGenerativeModel({
+      const modelConfig: Record<string, unknown> = {
         model: modelName,
         systemInstruction: input.systemPrompt?.trim() || undefined
-      });
+      };
+      if (
+        input.geminiFunctionDeclarations &&
+        input.geminiFunctionDeclarations.length > 0
+      ) {
+        modelConfig.tools = [
+          {
+            functionDeclarations: input.geminiFunctionDeclarations.map(fd => ({
+              name: fd.name,
+              description: fd.description,
+              parameters: fd.parameters
+            }))
+          }
+        ];
+      }
+
+      const model = genAI.getGenerativeModel(modelConfig as any);
 
       const { history, lastUserText } = splitGeminiConversation(input.messages);
       if (!lastUserText) {
@@ -118,26 +134,47 @@ export class GeminiProviderAdapter implements AiProviderAdapter {
         maxOutputTokens: input.maxTokens
       };
 
-      const response = await withTimeout<GeminiGenerateResponse>(
+      const response = await withTimeout<any>(
         history.length > 0
           ? (async () => {
               const chat = model.startChat({ history, generationConfig });
               const result = await chat.sendMessage(lastUserText);
-              return result.response as GeminiGenerateResponse;
+              return result.response;
             })()
           : model
               .generateContent({
                 contents: [{ role: "user", parts: [{ text: lastUserText }] }],
                 generationConfig
               })
-              .then((r) => r.response as GeminiGenerateResponse),
+              .then((r: any) => r.response),
         input.timeoutMs
       );
 
-      const text = response.text()?.trim() || "";
+      const text = (typeof response.text === "function"
+        ? response.text()
+        : ""
+      )?.trim() || "";
       const latencyMs = Date.now() - startedAt;
 
-      if (!text) {
+      const toolCalls: Array<{ id: string; name: string; arguments: string }> =
+        [];
+      const parts =
+        response?.candidates?.[0]?.content?.parts ||
+        response?.functionCalls?.() ||
+        [];
+      const partList = Array.isArray(parts) ? parts : [];
+      for (const part of partList) {
+        const fc = part?.functionCall;
+        if (fc?.name) {
+          toolCalls.push({
+            id: `gemini_${fc.name}_${toolCalls.length}`,
+            name: String(fc.name),
+            arguments: JSON.stringify(fc.args || {})
+          });
+        }
+      }
+
+      if (!text && !toolCalls.length) {
         return {
           ok: false,
           errorCode: AI_AGENT_SHADOW_ERROR_CODES.EMPTY_AI_RESPONSE,
@@ -155,7 +192,8 @@ export class GeminiProviderAdapter implements AiProviderAdapter {
         promptTokens: usage?.promptTokenCount,
         completionTokens: usage?.candidatesTokenCount,
         totalTokens: usage?.totalTokenCount,
-        latencyMs
+        latencyMs,
+        toolCalls: toolCalls.length ? toolCalls : undefined
       };
     } catch (err) {
       const latencyMs = Date.now() - startedAt;

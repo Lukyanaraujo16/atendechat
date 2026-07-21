@@ -590,8 +590,8 @@ const AutomationMonitorPage = () => {
             ) : (
               <>
                 <Typography variant="body2" color="textSecondary" paragraph>
-                  Tools 2.1B — Read Tools. Sem escrita. Métricas de uso, latência e
-                  empty results.
+                  Tools 2.1D — Read Tools + Function Calling (Simulador). Write
+                  Tools não expostas ao modelo.
                 </Typography>
                 <Grid container spacing={2}>
                   <Grid item xs={6} md={3}>
@@ -608,6 +608,33 @@ const AutomationMonitorPage = () => {
                   </Grid>
                   <Grid item xs={6} md={3}>
                     <MetricCard
+                      label="FC tool calls"
+                      value={toolMetrics?.functionCalling?.toolCalls}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="FC denials / invalid"
+                      value={
+                        (toolMetrics?.functionCalling?.toolDenials || 0) +
+                        (toolMetrics?.functionCalling?.invalidCalls || 0)
+                      }
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="FC loops stopped"
+                      value={toolMetrics?.functionCalling?.loopStops}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="FC avg tool latency"
+                      value={toolMetrics?.functionCalling?.averageToolLatencyMs}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
                       label="Cache hits"
                       value={toolMetrics?.metrics?.cacheHits}
                     />
@@ -619,6 +646,22 @@ const AutomationMonitorPage = () => {
                     />
                   </Grid>
                 </Grid>
+                <Box mt={2}>
+                  <Typography variant="subtitle2" gutterBottom>
+                    FC — Top Tools / nunca usadas
+                  </Typography>
+                  <pre className={classes.mono}>
+                    {JSON.stringify(
+                      {
+                        topTools: toolMetrics?.functionCalling?.topTools || [],
+                        neverUsed:
+                          toolMetrics?.functionCalling?.neverUsedTools || [],
+                      },
+                      null,
+                      2
+                    )}
+                  </pre>
+                </Box>
                 <Box mt={2}>
                   <Typography variant="subtitle2" gutterBottom>
                     Mais utilizadas
@@ -865,7 +908,8 @@ const AutomationMonitorPage = () => {
                     <Box key={i} mb={1}>
                       <Typography variant="caption" display="block">
                         {t.toolId}@{t.toolVersion} · {t.status} · risco{" "}
-                        {t.riskLevel} · {t.durationMs ?? "—"}ms
+                        {t.riskLevel} · {t.durationMs ?? "—"}ms · source{" "}
+                        {t.source || "—"}
                       </Typography>
                       {t.outputSnapshot && (
                         <pre className={classes.mono}>
@@ -895,6 +939,18 @@ const AutomationMonitorPage = () => {
                       )}
                     </Box>
                   ))}
+                  {(replay.messages || [])
+                    .filter((m) => m?.metadata?.functionCalling)
+                    .map((m, i) => (
+                      <Box key={`fc-${i}`} mb={1}>
+                        <Typography variant="subtitle2">
+                          Function Calling (mensagem {m.id})
+                        </Typography>
+                        <pre className={classes.mono}>
+                          {JSON.stringify(m.metadata.functionCalling, null, 2)}
+                        </pre>
+                      </Box>
+                    ))}
                   <pre className={classes.mono}>
                     {JSON.stringify(replay.tools, null, 2)}
                   </pre>

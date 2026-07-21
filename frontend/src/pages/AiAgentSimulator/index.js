@@ -72,6 +72,7 @@ export default function AiAgentSimulatorPage() {
   const [bootLoading, setBootLoading] = useState(true);
   const [credentialBlocked, setCredentialBlocked] = useState(false);
   const [reviewMessage, setReviewMessage] = useState(null);
+  const [functionCalling, setFunctionCalling] = useState(false);
 
   const segment = profile?.businessSegment || "other";
   const scenarioPrompts = useMemo(() => getSimulationPrompts(segment), [segment]);
@@ -125,6 +126,7 @@ export default function AiAgentSimulatorPage() {
     try {
       const { data } = await sendAiAgentSimulatorMessage(numericAgentId, session.id, {
         content,
+        functionCalling: functionCalling === true,
       });
       setMessages((prev) => [
         ...prev,
@@ -230,6 +232,8 @@ export default function AiAgentSimulatorPage() {
           agentName={agent?.name || i18n.t("aiAgent.simulator.untitled")}
           provider={session?.provider}
           model={session?.model}
+          functionCalling={functionCalling}
+          onFunctionCallingChange={setFunctionCalling}
           onBack={() => history.push(AI_AGENT_ROUTE_PATH)}
           onRestart={handleRestart}
           onEdit={handleEdit}
@@ -237,6 +241,9 @@ export default function AiAgentSimulatorPage() {
 
         <Alert severity="info" style={{ marginBottom: 16 }}>
           {i18n.t("aiAgent.simulator.warning")}
+          {functionCalling
+            ? " Function Calling ativo: somente Read Tools via Tool Runtime."
+            : ""}
         </Alert>
 
         {credentialBlocked ? (

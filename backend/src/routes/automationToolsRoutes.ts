@@ -74,4 +74,13 @@ automationToolsRoutes.get(
   AutomationToolsController.metrics
 );
 
+automationToolsRoutes.post(
+  "/automation/tools/function-calling/test",
+  isAuth,
+  requireAiAgent,
+  requireAiTools,
+  requireAdmin,
+  AutomationToolsController.testFunctionCalling
+);
+
 export default automationToolsRoutes;

@@ -530,10 +530,13 @@ describe("Automation Tools 2.1A foundation", () => {
   it("provider schema adapters (sem dispatch)", () => {
     const tools = listTools({ includeExperimental: true });
     const defs = buildProviderToolDefinitions(tools);
-    // Tools técnicas têm exposeToModel=false
-    expect(defs.openai).toEqual([]);
-    expect(defs.gemini).toEqual([]);
-    expect(defs.allowlist).toEqual([]);
+    // 2.1D: Read Tools com exposeToModel=true entram nos schemas
+    expect(defs.openai.length).toBeGreaterThan(0);
+    expect(defs.gemini.length).toBe(defs.openai.length);
+    expect(defs.allowlist.every(a => !a.id.includes("transfer"))).toBe(true);
+    expect(
+      defs.allowlist.some(a => a.id === "contact.search")
+    ).toBe(true);
 
     const exposed = buildToolManifest({
       id: "future.demo",

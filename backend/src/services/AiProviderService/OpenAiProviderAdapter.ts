@@ -43,7 +43,8 @@ export class OpenAiProviderAdapter implements AiProviderAdapter {
           model: input.model,
           maxTokens: input.maxTokens,
           temperature: input.temperature,
-          source: input.source
+          source: input.source,
+          tools: input.tools
         }),
         input.timeoutMs
       );
@@ -61,7 +62,8 @@ export class OpenAiProviderAdapter implements AiProviderAdapter {
       }
 
       const text = result.content?.trim() || "";
-      if (!text) {
+      const toolCalls = result.toolCalls;
+      if (!text && !(toolCalls && toolCalls.length)) {
         return {
           ok: false,
           errorCode: AI_AGENT_SHADOW_ERROR_CODES.EMPTY_AI_RESPONSE,
@@ -77,7 +79,8 @@ export class OpenAiProviderAdapter implements AiProviderAdapter {
         promptTokens: result.promptTokens,
         completionTokens: result.completionTokens,
         totalTokens: result.tokensUsed,
-        latencyMs
+        latencyMs,
+        toolCalls
       };
     } catch (err) {
       const latencyMs = Date.now() - startedAt;

@@ -27,3 +27,7 @@ export function updateAutomationToolPolicies(data = {}) {
 export function getAutomationToolMetrics() {
   return api.get("/automation/tools/metrics");
 }
+
+export function testAutomationFunctionCalling(data = {}) {
+  return api.post("/automation/tools/function-calling/test", data);
+}

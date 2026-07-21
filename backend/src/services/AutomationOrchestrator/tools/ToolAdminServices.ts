@@ -398,6 +398,9 @@ export async function GetToolMetricsService(input: {
   companyId: number;
 }): Promise<{
   metrics: ReturnType<typeof getToolMetricsSnapshot>;
+  functionCalling: ReturnType<
+    typeof import("./functionCalling/FunctionCallingMetrics").getFunctionCallingMetricsSnapshot
+  >;
   catalog: Array<{
     id: string;
     version: string;
@@ -405,20 +408,138 @@ export async function GetToolMetricsService(input: {
     sideEffectType: string;
     versions: string[];
     circuit: ReturnType<typeof getToolCircuitSnapshot>;
+    exposeToModel: boolean;
   }>;
 }> {
   await ensureToolsReady();
   const tools = listTools({ includeExperimental: true });
+  const { getFunctionCallingMetricsSnapshot } = await import(
+    "./functionCalling/FunctionCallingMetrics"
+  );
   return {
     metrics: getToolMetricsSnapshot(input.companyId),
+    functionCalling: getFunctionCallingMetricsSnapshot(input.companyId),
     catalog: tools.map(t => ({
       id: t.id,
       version: t.version,
       riskLevel: t.riskLevel,
       sideEffectType: t.sideEffectType,
       versions: listToolVersions(t.id),
-      circuit: getToolCircuitSnapshot(input.companyId, t.id, t.version)
+      circuit: getToolCircuitSnapshot(input.companyId, t.id, t.version),
+      exposeToModel: t.exposeToModel === true
     }))
+  };
+}
+
+/**
+ * Tester de Function Calling (sem LLM obrigatório):
+ * pergunta → tools selecionadas → schemas → payload → (opcional) resolve call.
+ */
+export async function TestFunctionCallingService(input: {
+  companyId: number;
+  userId: number;
+  provider?: string;
+  plannerCategories?: string[];
+  question?: string;
+  /** Se informado, resolve via Runtime (dry path de 1 call). */
+  simulateCall?: {
+    name: string;
+    arguments?: Record<string, unknown>;
+  } | null;
+  adminTestMode: boolean;
+}): Promise<unknown> {
+  if (!input.adminTestMode) {
+    throw new AppError(
+      "ERR_VALIDATION_ERROR",
+      400,
+      "Modo de teste explícito obrigatório."
+    );
+  }
+  await ensureToolsReady();
+  const { selectToolsForFunctionCalling } = await import(
+    "./functionCalling/AutomationToolSelectionEngine"
+  );
+  const { buildProviderToolPayload } = await import(
+    "./functionCalling/AutomationProviderToolAdapter"
+  );
+  const {
+    buildSimulatorToolContext,
+    resolveProviderToolCall
+  } = await import("./functionCalling/AutomationFunctionCallResolver");
+
+  const [hasAgent, hasTools, hasKnowledge] = await Promise.all([
+    hasPlanFeature(input.companyId, AUTOMATION_ORCHESTRATOR_FEATURE_KEY),
+    hasPlanFeature(input.companyId, AUTOMATION_AI_TOOLS_FEATURE_KEY),
+    hasPlanFeature(input.companyId, "automation.knowledge_base")
+  ]);
+
+  const ctx = buildSimulatorToolContext({
+    companyId: input.companyId,
+    userId: input.userId,
+    allowedToolKeys: [],
+    featureFlags: {
+      [AUTOMATION_ORCHESTRATOR_FEATURE_KEY]: hasAgent,
+      [AUTOMATION_AI_TOOLS_FEATURE_KEY]: hasTools,
+      "automation.knowledge_base": hasKnowledge
+    }
+  });
+
+  // Tester usa origin admin_test com source simulator no ctx de seleção —
+  // origem do selection engine: admin_test
+  const selection = selectToolsForFunctionCalling({
+    ctx: { ...ctx, source: "admin_test", adminTestMode: true },
+    provider: input.provider || "openai",
+    origin: "admin_test",
+    plannerCategories: (input.plannerCategories || []) as any,
+    companyPolicy: {
+      enabled: hasAgent && hasTools,
+      maxRiskLevel: "read_only",
+      allowWrite: false
+    }
+  });
+
+  // Re-build ctx with allowlist for resolve
+  const ctxWithAllow = {
+    ...ctx,
+    source: "simulator" as const,
+    allowedToolKeys: selection.allowedToolKeys
+  };
+
+  const payload = buildProviderToolPayload({
+    manifests: selection.tools,
+    provider: input.provider || "openai"
+  });
+
+  let resolution = null;
+  if (input.simulateCall?.name) {
+    resolution = await resolveProviderToolCall({
+      call: {
+        id: "tester-call-1",
+        name: input.simulateCall.name,
+        arguments: input.simulateCall.arguments || {}
+      },
+      ctx: ctxWithAllow,
+      allowlist: selection.allowlist
+    });
+  }
+
+  return {
+    question: input.question || null,
+    selectedTools: selection.tools.map(t => ({
+      id: t.id,
+      version: t.version,
+      description: t.description,
+      riskLevel: t.riskLevel,
+      sideEffectType: t.sideEffectType
+    })),
+    rejected: selection.rejected.slice(0, 50),
+    schemas: payload.definitions.neutral,
+    providerPayload: payload.providerPayload,
+    allowlist: selection.allowlist,
+    toolCall: resolution,
+    writeToolsExposed: selection.tools.some(t =>
+      t.sideEffectType === "database_write"
+    )
   };
 }
 

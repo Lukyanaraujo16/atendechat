@@ -221,6 +221,12 @@ export async function sendAiAgentSimulationMessage(input: {
   aiAgentId: number;
   sessionId: number;
   content: unknown;
+  /** 2.1D — Function Calling somente no Simulador. */
+  functionCalling?: boolean;
+  plannerCategories?: Array<
+    "system" | "contact" | "ticket" | "queue" | "user" | "knowledge" | "automation"
+  >;
+  userId?: number | null;
 }) {
   const session = await findSimulationSessionOrThrow(input);
   if (session.status !== "active") {
@@ -323,23 +329,107 @@ export async function sendAiAgentSimulationMessage(input: {
   }
 
   const startedAt = Date.now();
-  const result = await generateChatCompletionViaAdapter({
-    provider: resolved.provider!,
-    companyId: input.companyId,
-    ticketId: null,
-    apiKey: resolved.apiKey!,
-    model,
-    maxTokens,
-    temperature: agent.temperature,
-    systemPrompt,
-    messages,
-    timeoutMs: AI_AGENT_SIMULATOR_TIMEOUT_MS,
-    source: AI_AGENT_SIMULATOR_SOURCE
-  });
+  const functionCalling = input.functionCalling === true;
+
+  let result: Awaited<ReturnType<typeof generateChatCompletionViaAdapter>>;
+  let functionCallingTrace: Record<string, unknown> | null = null;
+
+  if (functionCalling) {
+    const { runFunctionCallingLoop } = await import(
+      "../AutomationOrchestrator/tools/functionCalling/AutomationToolCallLoop"
+    );
+    const trace = await runFunctionCallingLoop({
+      companyId: input.companyId,
+      userId: input.userId ?? null,
+      aiAgentId: agent.id,
+      provider: resolved.provider!,
+      apiKey: resolved.apiKey!,
+      model,
+      maxTokens,
+      temperature: agent.temperature,
+      systemPrompt,
+      messages,
+      timeoutMs: AI_AGENT_SIMULATOR_TIMEOUT_MS,
+      source: AI_AGENT_SIMULATOR_SOURCE,
+      origin: "simulator",
+      plannerCategories: input.plannerCategories
+    });
+    functionCallingTrace = {
+      version: trace.version,
+      provider: trace.provider,
+      selectedTools: trace.selectedTools,
+      allowlist: trace.allowlist,
+      providerPayload: trace.providerPayload,
+      iterations: trace.iterations.map(it => ({
+        index: it.index,
+        providerLatencyMs: it.providerLatencyMs,
+        toolCalls: it.toolCalls,
+        resolutions: it.resolutions.map(r => ({
+          callId: r.callId,
+          toolId: r.toolId,
+          status: r.status,
+          arguments: r.arguments,
+          modelResult: r.modelResult,
+          durationMs: r.durationMs,
+          error: r.error
+        })),
+        assistantText: it.assistantText
+      })),
+      loopStopReason: trace.loopStopReason || null,
+      totalLoops: trace.totalLoops,
+      totalProviderLatencyMs: trace.totalProviderLatencyMs,
+      totalToolLatencyMs: trace.totalToolLatencyMs
+    };
+
+    if (trace.loopStopReason?.startsWith("provider_error:")) {
+      result = {
+        ok: false,
+        errorCode: "GENERATION_FAILED" as any,
+        latencyMs: trace.totalProviderLatencyMs || Date.now() - startedAt
+      };
+    } else {
+      result = {
+        ok: true,
+        text: trace.finalText || "",
+        provider: resolved.provider!,
+        model,
+        latencyMs: Date.now() - startedAt,
+        promptTokens: trace.iterations.reduce(
+          (n, i) => n + (i.promptTokens || 0),
+          0
+        ),
+        completionTokens: trace.iterations.reduce(
+          (n, i) => n + (i.completionTokens || 0),
+          0
+        ),
+        totalTokens: undefined
+      };
+    }
+  } else {
+    result = await generateChatCompletionViaAdapter({
+      provider: resolved.provider!,
+      companyId: input.companyId,
+      ticketId: null,
+      apiKey: resolved.apiKey!,
+      model,
+      maxTokens,
+      temperature: agent.temperature,
+      systemPrompt,
+      messages,
+      timeoutMs: AI_AGENT_SIMULATOR_TIMEOUT_MS,
+      source: AI_AGENT_SIMULATOR_SOURCE
+    });
+  }
 
   const latencyMs = result.latencyMs ?? Date.now() - startedAt;
 
   if (result.ok === false) {
+    const failMeta = {
+      ...(knowledgeMeta || {}),
+      ...(functionCallingTrace
+        ? { functionCalling: functionCallingTrace }
+        : {})
+    };
     const assistantRow = await AiAgentSimulationMessage.create({
       companyId: input.companyId,
       sessionId: session.id,
@@ -350,7 +440,7 @@ export async function sendAiAgentSimulationMessage(input: {
       latencyMs,
       errorCode: result.errorCode,
       handoffSuggested: false,
-      metadata: knowledgeMeta
+      metadata: failMeta
     });
 
     await session.update({
@@ -377,9 +467,11 @@ export async function sendAiAgentSimulationMessage(input: {
         handoffSuggested: false,
         handoffReason: null,
         createdAt: assistantRow.createdAt,
-        knowledge: knowledgeMeta?.knowledge || null
+        knowledge: knowledgeMeta?.knowledge || null,
+        functionCalling: functionCallingTrace
       },
       knowledge: knowledgeMeta?.knowledge || null,
+      functionCalling: functionCallingTrace,
       session: {
         id: session.id,
         messageCount: session.messageCount,
@@ -392,6 +484,12 @@ export async function sendAiAgentSimulationMessage(input: {
   const handoff = parseAiAgentHandoffSignal(result.text);
   const handoffSuggested =
     handoff.handoffRequested || knowledgeApplied.forceHandoff;
+  const successMeta = {
+    ...(knowledgeMeta || {}),
+    ...(functionCallingTrace
+      ? { functionCalling: functionCallingTrace }
+      : {})
+  };
   const assistantRow = await AiAgentSimulationMessage.create({
     companyId: input.companyId,
     sessionId: session.id,
@@ -407,7 +505,7 @@ export async function sendAiAgentSimulationMessage(input: {
     handoffReason: handoff.handoffReason || (knowledgeApplied.forceHandoff
       ? "knowledge_missing"
       : null),
-    metadata: knowledgeMeta
+    metadata: successMeta
   });
 
   await userRow.update({ metadata: knowledgeMeta });
@@ -475,9 +573,11 @@ export async function sendAiAgentSimulationMessage(input: {
       handoffSuggested: assistantRow.handoffSuggested,
       handoffReason: assistantRow.handoffReason,
       createdAt: assistantRow.createdAt,
-      knowledge: knowledgeMeta?.knowledge || null
+      knowledge: knowledgeMeta?.knowledge || null,
+      functionCalling: functionCallingTrace
     },
     knowledge: knowledgeMeta?.knowledge || null,
+    functionCalling: functionCallingTrace,
     session: {
       id: session.id,
       messageCount: session.messageCount,

@@ -251,7 +251,12 @@ export const sendSimulatorMessage = async (
     companyId,
     aiAgentId,
     sessionId,
-    content: req.body?.content
+    content: req.body?.content,
+    functionCalling: req.body?.functionCalling === true,
+    plannerCategories: Array.isArray(req.body?.plannerCategories)
+      ? req.body.plannerCategories
+      : undefined,
+    userId: userIdOrThrow(req)
   });
   return res.json(result);
 };

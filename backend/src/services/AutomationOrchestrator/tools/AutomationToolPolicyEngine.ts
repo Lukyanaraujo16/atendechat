@@ -145,7 +145,7 @@ export function evaluateToolPolicy(input: {
     return deny("admin_test_mode_required");
   }
 
-  // Admin tester 2.1C: leitura livre; escrita só em preview/dry_run/execute explícito.
+  // Admin tester: leitura livre; escrita só em preview/dry_run/execute explícito.
   if (ctx.source === "admin_test" && isWriteSideEffect(manifest.sideEffectType)) {
     const writeMode = String(ctx.metadata?.writeMode || "");
     if (!["preview", "dry_run", "execute"].includes(writeMode)) {
@@ -153,6 +153,19 @@ export function evaluateToolPolicy(input: {
     }
     if (writeMode === "execute" && companyPolicy?.allowWrite !== true) {
       return deny("admin_test_execute_requires_allow_write");
+    }
+  }
+
+  // Simulador Function Calling: somente leitura; nunca escrita.
+  if (ctx.source === "simulator") {
+    if (isWriteSideEffect(manifest.sideEffectType)) {
+      return deny("simulator_no_write");
+    }
+    if (manifest.riskLevel !== "read_only") {
+      return deny("simulator_read_only_only");
+    }
+    if (manifest.exposeToModel !== true) {
+      return deny("simulator_not_exposed");
     }
   }
 

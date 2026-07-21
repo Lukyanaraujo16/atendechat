@@ -50,6 +50,15 @@ export interface ExecuteOpenAiParams {
   temperature: number;
   /** Origem da chamada para logs (ex.: ai_agent_shadow). */
   source?: string;
+  /** Function calling opcional — ausente = chat legado. */
+  tools?: Array<{
+    type: "function";
+    function: {
+      name: string;
+      description: string;
+      parameters: Record<string, unknown>;
+    };
+  }>;
 }
 
 export type ExecuteOpenAiResult =
@@ -59,6 +68,7 @@ export type ExecuteOpenAiResult =
       tokensUsed: number;
       promptTokens?: number;
       completionTokens?: number;
+      toolCalls?: Array<{ id: string; name: string; arguments: string }>;
     }
   | { ok: false; error: "OPENAI_LIMIT_REACHED" }
   | { ok: false; error: "OPENAI_API_ERROR" };
@@ -124,7 +134,8 @@ export async function executeOpenAi(params: ExecuteOpenAiParams): Promise<Execut
     model,
     maxTokens,
     temperature,
-    source
+    source,
+    tools
   } = params;
 
   if (!(await canMakeOpenAiCalls(companyId, 1))) {
@@ -139,7 +150,13 @@ export async function executeOpenAi(params: ExecuteOpenAiParams): Promise<Execut
   const safeModel = resolveOpenAiModel(model);
 
   logger.info(
-    { companyId, ticketId, model: safeModel, source: source ?? "legacy" },
+    {
+      companyId,
+      ticketId,
+      model: safeModel,
+      source: source ?? "legacy",
+      tools: tools?.length || 0
+    },
     "[OpenAiManager] chamada OpenAI (chat)"
   );
 
@@ -147,14 +164,32 @@ export async function executeOpenAi(params: ExecuteOpenAiParams): Promise<Execut
     const configuration = new Configuration({ apiKey });
     const openai = new OpenAIApi(configuration);
 
-    const chat = await openai.createChatCompletion({
+    const requestBody: Record<string, unknown> = {
       model: safeModel,
       messages: finalMessages,
       max_tokens: maxTokens,
       temperature
-    });
+    };
+    if (tools && tools.length > 0) {
+      requestBody.tools = tools;
+      requestBody.tool_choice = "auto";
+    }
 
-    const content = chat.data.choices[0]?.message?.content ?? "";
+    const chat = await openai.createChatCompletion(requestBody as any);
+
+    const message = chat.data.choices[0]?.message;
+    const content = message?.content ?? "";
+    const rawToolCalls = (message as any)?.tool_calls;
+    const toolCalls = Array.isArray(rawToolCalls)
+      ? rawToolCalls
+          .filter((tc: any) => tc?.function?.name)
+          .map((tc: any) => ({
+            id: String(tc.id || `call_${Date.now()}`),
+            name: String(tc.function.name),
+            arguments: String(tc.function.arguments || "{}")
+          }))
+      : undefined;
+
     const usage = chat.data.usage;
     const tokensUsed =
       usage?.total_tokens ??
@@ -167,7 +202,8 @@ export async function executeOpenAi(params: ExecuteOpenAiParams): Promise<Execut
       content,
       tokensUsed,
       promptTokens: usage?.prompt_tokens,
-      completionTokens: usage?.completion_tokens
+      completionTokens: usage?.completion_tokens,
+      toolCalls
     };
   } catch (err) {
     logger.error(

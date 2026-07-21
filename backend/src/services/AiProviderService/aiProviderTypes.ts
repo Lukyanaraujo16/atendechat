@@ -13,6 +13,26 @@ export type GenerateChatCompletionInput = {
   messages: ChatCompletionRequestMessage[];
   timeoutMs: number;
   source: string;
+  /** Function calling — opcional; ausente = comportamento legado (Live/Shadow). */
+  tools?: Array<{
+    type: "function";
+    function: {
+      name: string;
+      description: string;
+      parameters: Record<string, unknown>;
+    };
+  }>;
+  geminiFunctionDeclarations?: Array<{
+    name: string;
+    description: string;
+    parameters: Record<string, unknown>;
+  }>;
+};
+
+export type ProviderToolCallResult = {
+  id: string;
+  name: string;
+  arguments: string;
 };
 
 export type GenerateChatCompletionSuccess = {
@@ -24,6 +44,7 @@ export type GenerateChatCompletionSuccess = {
   completionTokens?: number;
   totalTokens?: number;
   latencyMs: number;
+  toolCalls?: ProviderToolCallResult[];
 };
 
 export type GenerateChatCompletionFailure = {

@@ -7,7 +7,8 @@ import {
   TestToolService,
   GetToolPoliciesService,
   UpsertToolPoliciesService,
-  GetToolMetricsService
+  GetToolMetricsService,
+  TestFunctionCallingService
 } from "../services/AutomationOrchestrator/tools/ToolAdminServices";
 
 function companyIdOrThrow(req: Request): number {
@@ -153,4 +154,31 @@ export const metrics = async (
   const companyId = companyIdOrThrow(req);
   const result = await GetToolMetricsService({ companyId });
   return res.json(result);
+};
+
+export const testFunctionCalling = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const userId = userIdOrThrow(req);
+  const body = (req.body || {}) as Record<string, unknown>;
+  const result = await TestFunctionCallingService({
+    companyId,
+    userId,
+    provider: body.provider ? String(body.provider) : "openai",
+    plannerCategories: Array.isArray(body.plannerCategories)
+      ? (body.plannerCategories as string[])
+      : undefined,
+    question: body.question ? String(body.question) : undefined,
+    simulateCall:
+      body.simulateCall && typeof body.simulateCall === "object"
+        ? (body.simulateCall as {
+            name: string;
+            arguments?: Record<string, unknown>;
+          })
+        : null,
+    adminTestMode: body.adminTestMode === true
+  });
+  return res.json({ result });
 };

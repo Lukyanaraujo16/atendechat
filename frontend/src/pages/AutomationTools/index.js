@@ -34,6 +34,7 @@ import {
   getAutomationToolsCatalog,
   listAutomationToolExecutions,
   testAutomationTool,
+  testAutomationFunctionCalling,
   updateAutomationToolPolicies,
 } from "../../services/automationToolsApi";
 
@@ -78,6 +79,12 @@ const AutomationToolsPage = () => {
   const [confirmed, setConfirmed] = useState(false);
   const [testResult, setTestResult] = useState(null);
   const [testing, setTesting] = useState(false);
+  const [fcResult, setFcResult] = useState(null);
+  const [fcQuestion, setFcQuestion] = useState("Liste as filas disponíveis");
+  const [fcProvider, setFcProvider] = useState("openai");
+  const [fcCallName, setFcCallName] = useState("queue_list");
+  const [fcCallArgs, setFcCallArgs] = useState('{"limit":10}');
+  const [fcTesting, setFcTesting] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const loadCatalog = useCallback(async () => {
@@ -135,13 +142,43 @@ const AutomationToolsPage = () => {
     }
     if (tab === 1) loadExecutions();
     if (tab === 2) loadCatalog();
-    if (tab === 3) loadPolicies();
+    if (tab === 3) loadCatalog();
+    if (tab === 4) loadPolicies();
   }, [tab, loadCatalog, loadExecutions, loadPolicies, loadMetrics]);
 
   const selectedManifest = (catalog?.tools || []).find(
     (t) => t.id === selectedToolId
   );
   const isWriteTool = selectedManifest?.sideEffectType === "database_write";
+
+  const runFcTest = async () => {
+    if (!adminTestMode) {
+      toast.error("Ative o modo de teste explícito.");
+      return;
+    }
+    let args = {};
+    try {
+      args = fcCallArgs.trim() ? JSON.parse(fcCallArgs) : {};
+    } catch {
+      toast.error("JSON de argumentos inválido.");
+      return;
+    }
+    setFcTesting(true);
+    try {
+      const { data } = await testAutomationFunctionCalling({
+        adminTestMode: true,
+        provider: fcProvider,
+        question: fcQuestion,
+        simulateCall: { name: fcCallName, arguments: args },
+      });
+      setFcResult(data?.result || data);
+      toast.success("Function Calling tester executado.");
+    } catch (err) {
+      toastError(err);
+    } finally {
+      setFcTesting(false);
+    }
+  };
 
   const runTest = async (mode) => {
     if (!adminTestMode) {
@@ -225,6 +262,7 @@ const AutomationToolsPage = () => {
           <Tab label="Catálogo" />
           <Tab label="Execuções" />
           <Tab label="Tester" />
+          <Tab label="Function Calling" />
           <Tab label="Políticas" />
         </Tabs>
 
@@ -485,6 +523,81 @@ const AutomationToolsPage = () => {
           )}
 
           {tab === 3 && (
+            <>
+              <Typography className={classes.warn} variant="body2">
+                Tester Function Calling (2.1D): seleção → schemas → payload →
+                resolve (somente Read Tools). Sem Shadow/Live.
+              </Typography>
+              <div className={classes.filters}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={adminTestMode}
+                      onChange={(e) => setAdminTestMode(e.target.checked)}
+                      color="primary"
+                    />
+                  }
+                  label="Modo de teste explícito"
+                />
+                <FormControl variant="outlined" size="small" style={{ minWidth: 140 }}>
+                  <InputLabel>Provider</InputLabel>
+                  <Select
+                    label="Provider"
+                    value={fcProvider}
+                    onChange={(e) => setFcProvider(e.target.value)}
+                  >
+                    <MenuItem value="openai">OpenAI</MenuItem>
+                    <MenuItem value="gemini">Gemini</MenuItem>
+                  </Select>
+                </FormControl>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  disabled={fcTesting || !adminTestMode}
+                  onClick={runFcTest}
+                >
+                  Testar FC
+                </Button>
+              </div>
+              <TextField
+                label="Pergunta"
+                variant="outlined"
+                fullWidth
+                value={fcQuestion}
+                onChange={(e) => setFcQuestion(e.target.value)}
+                style={{ marginBottom: 8 }}
+              />
+              <TextField
+                label="Tool call name (ex: queue_list)"
+                variant="outlined"
+                fullWidth
+                value={fcCallName}
+                onChange={(e) => setFcCallName(e.target.value)}
+                style={{ marginBottom: 8 }}
+              />
+              <TextField
+                label="Argumentos JSON"
+                variant="outlined"
+                fullWidth
+                multiline
+                rows={3}
+                value={fcCallArgs}
+                onChange={(e) => setFcCallArgs(e.target.value)}
+              />
+              {fcResult && (
+                <Box mt={2}>
+                  <Typography variant="subtitle2">
+                    Tools selecionadas → Schemas → Payload → Call
+                  </Typography>
+                  <pre className={classes.mono}>
+                    {JSON.stringify(fcResult, null, 2)}
+                  </pre>
+                </Box>
+              )}
+            </>
+          )}
+
+          {tab === 4 && (
             <>
               <Typography className={classes.warn} variant="body2">
                 Deny-by-default. allowWrite necessário para Execute real de
