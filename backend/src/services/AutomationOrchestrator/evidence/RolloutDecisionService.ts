@@ -42,8 +42,8 @@ export function decideRolloutAptitude(input: {
   const blockers: string[] = [];
   const reasons = [...(input.readiness.reasons || [])];
 
-  reasons.push("Live Function Calling permanece desabilitado (fase 2.1F).");
-  reasons.push("Write Tools no Shadow permanecem bloqueadas.");
+  reasons.push("Live Function Calling só via Rollout Stages + Eligibility (sem botão global).");
+  reasons.push("Write Tools no Live permanecem desabilitadas por padrão.");
 
   if (input.rates.sampleCount < input.thresholds.minSamples) {
     blockers.push("insufficient_samples");

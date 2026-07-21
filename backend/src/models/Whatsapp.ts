@@ -157,6 +157,10 @@ class Whatsapp extends Model<Whatsapp> {
   @Column
   functionCallingShadow: boolean;
 
+  @Default(false)
+  @Column
+  functionCallingLive: boolean;
+
   @ForeignKey(() => QueueIntegrations)
   @Column
   integrationId: number;

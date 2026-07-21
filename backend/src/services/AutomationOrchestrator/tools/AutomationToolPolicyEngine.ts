@@ -156,8 +156,13 @@ export function evaluateToolPolicy(input: {
     }
   }
 
-  // Simulador / Shadow Function Calling: somente leitura; nunca escrita.
-  if (ctx.source === "simulator" || ctx.source === "shadow") {
+  // Simulador / Shadow / Live Function Calling: somente leitura nesta fase.
+  // Write Tools em Live exigem fase futura + allowWriteToolsLive (ainda bloqueadas no Selection).
+  if (
+    ctx.source === "simulator" ||
+    ctx.source === "shadow" ||
+    ctx.source === "live"
+  ) {
     if (isWriteSideEffect(manifest.sideEffectType)) {
       return deny(`${ctx.source}_no_write`);
     }

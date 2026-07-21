@@ -4329,6 +4329,7 @@ const messages = {
           automationTools: "Ferramentas IA",
           aiAgentShadowFc: "FC Shadow",
           automationEvidence: "Evidence",
+          automationLiveRollout: "Live Rollout",
           knowledgeBase: "Base de Conhecimento",
           queueIntegration: "Automações por setor",
           notificationCenter: "Central de notificações",

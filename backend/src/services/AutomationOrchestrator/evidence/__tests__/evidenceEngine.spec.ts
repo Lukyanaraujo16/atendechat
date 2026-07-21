@@ -275,7 +275,9 @@ describe("Evidence Engine 2.1F", () => {
       thresholds: thresholds()
     });
     expect(decision.liveFunctionCallingEnabled).toBe(false);
-    expect(decision.reasons.some(r => /desabilitado/i.test(r))).toBe(true);
+    expect(
+      decision.reasons.some(r => /Write Tools|desabilitad/i.test(r))
+    ).toBe(true);
   });
 
   it("métricas e scores por provider/agent/connection", () => {

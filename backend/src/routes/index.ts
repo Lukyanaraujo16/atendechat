@@ -47,6 +47,7 @@ import aiProviderCredentialRoutes from "./aiProviderCredentialRoutes";
 import automationOrchestratorRoutes from "./automationOrchestratorRoutes";
 import automationToolsRoutes from "./automationToolsRoutes";
 import automationEvidenceRoutes from "./automationEvidenceRoutes";
+import automationLiveRolloutRoutes from "./automationLiveRolloutRoutes";
 import knowledgeBaseRoutes from "./knowledgeBaseRoutes";
 import notificationRoutes from "./notificationRoutes";
 import systemSettingRoutes from "./systemSettingRoutes";
@@ -113,6 +114,7 @@ routes.use(aiProviderCredentialRoutes);
 routes.use(automationOrchestratorRoutes);
 routes.use(automationToolsRoutes);
 routes.use(automationEvidenceRoutes);
+routes.use(automationLiveRolloutRoutes);
 routes.use(knowledgeBaseRoutes);
 
 export default routes;

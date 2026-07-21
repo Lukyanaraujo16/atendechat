@@ -5,12 +5,9 @@ import Ticket from "../../models/Ticket";
 import Whatsapp from "../../models/Whatsapp";
 import { debounce } from "../../helpers/Debounce";
 import { logger } from "../../utils/logger";
-import { buildAiAgentProviderResponse } from "./buildAiAgentProviderResponse";
 import {
   AI_AGENT_LIVE_DEBOUNCE_MS,
-  AI_AGENT_LIVE_MAX_TOKENS_CAP,
-  AI_AGENT_LIVE_SOURCE,
-  AI_AGENT_LIVE_TIMEOUT_MS
+  AI_AGENT_LIVE_SOURCE
 } from "./aiAgentLiveConfig";
 import {
   AI_AGENT_LIVE_DELIVERY_STATUSES,
@@ -38,6 +35,7 @@ import {
   acquireAiAgentGenerationLock,
   releaseAiAgentGenerationLock
 } from "./knowledge/aiAgentGenerationLock";
+import { generateLiveResponseWithOptionalFc } from "../AutomationOrchestrator/liveRollout/LiveFunctionCallingService";
 
 const inFlightLiveTickets = new Set<number>();
 
@@ -226,25 +224,31 @@ export async function generateAndSendLiveResponseForLog(
       return;
     }
 
-    const generation = await buildAiAgentProviderResponse({
+    const generation = await generateLiveResponseWithOptionalFc({
       companyId,
       ticket: freshTicket,
       contact,
       whatsapp,
       agent,
       inboundText,
-      source: AI_AGENT_LIVE_SOURCE,
-      timeoutMs: AI_AGENT_LIVE_TIMEOUT_MS,
-      maxTokensCap: AI_AGENT_LIVE_MAX_TOKENS_CAP,
       logId,
-      knowledgeChannel: "live",
-      messageId: log.messageId || null
+      messageId: log.messageId || null,
+      messageHints: {
+        fromMe: false,
+        mediaType: "chat",
+        ticketStatus: freshTicket.status,
+        userId: freshTicket.userId ?? null
+      }
     });
 
     await mergeAiAgentLiveLogMetadata(logId, companyId, {
       credentialSource: generation.credentialSource ?? "missing",
       credentialId: generation.credentialId ?? null,
-      ...(generation.knowledgeMeta || {})
+      ...(generation.knowledgeMeta || {}),
+      liveFc: generation.liveFcMeta || null,
+      usedFunctionCalling: generation.usedFunctionCalling === true,
+      liveFcFallback: generation.fallback === true,
+      liveFcFallbackReason: generation.fallbackReason || null
     });
 
     if (generation.ok === false) {
@@ -262,8 +266,26 @@ export async function generateAndSendLiveResponseForLog(
       return;
     }
 
-    const handoffSignal = parseAiAgentHandoffSignal(generation.text);
-    if (generation.forceHandoff && !handoffSignal.handoffRequested) {
+    // Adaptar shape esperado pelo fluxo restante (mesmos campos de buildAiAgentProviderResponse)
+    const generationAdapted = {
+      ok: true as const,
+      text: generation.text || "",
+      model: generation.model || "unknown",
+      provider: generation.provider || "unknown",
+      promptTokens: generation.promptTokens,
+      completionTokens: generation.completionTokens,
+      totalTokens: generation.totalTokens,
+      latencyMs: generation.latencyMs,
+      contextMessageCount: generation.contextMessageCount || 0,
+      contextHash: generation.contextHash || "",
+      credentialSource: generation.credentialSource || "missing",
+      credentialId: generation.credentialId ?? null,
+      knowledgeMeta: generation.knowledgeMeta,
+      forceHandoff: generation.forceHandoff
+    };
+
+    const handoffSignal = parseAiAgentHandoffSignal(generationAdapted.text);
+    if (generationAdapted.forceHandoff && !handoffSignal.handoffRequested) {
       handoffSignal.handoffRequested = true;
       handoffSignal.handoffReason =
         handoffSignal.handoffReason || "knowledge_missing";
@@ -288,16 +310,16 @@ export async function generateAndSendLiveResponseForLog(
       await updateAiAgentLiveLog(logId, companyId, {
         liveStatus: AI_AGENT_LIVE_STATUSES.FAILED,
         errorCode: validated.errorCode,
-        suggestedReply: generation.text,
+        suggestedReply: generationAdapted.text,
         suggestionSource: "model",
-        liveModel: generation.model,
-        liveProvider: generation.provider,
-        livePromptTokens: generation.promptTokens ?? null,
-        liveCompletionTokens: generation.completionTokens ?? null,
-        liveTotalTokens: generation.totalTokens ?? null,
-        liveLatencyMs: generation.latencyMs,
-        contextMessageCount: generation.contextMessageCount,
-        contextHash: generation.contextHash,
+        liveModel: generationAdapted.model,
+        liveProvider: generationAdapted.provider,
+        livePromptTokens: generationAdapted.promptTokens ?? null,
+        liveCompletionTokens: generationAdapted.completionTokens ?? null,
+        liveTotalTokens: generationAdapted.totalTokens ?? null,
+        liveLatencyMs: generationAdapted.latencyMs,
+        contextMessageCount: generationAdapted.contextMessageCount,
+        contextHash: generationAdapted.contextHash,
         generatedAt: new Date()
       });
       return;
@@ -314,14 +336,14 @@ export async function generateAndSendLiveResponseForLog(
       liveStatus: AI_AGENT_LIVE_STATUSES.GENERATED,
       suggestedReply: validated.text,
       suggestionSource: "model",
-      liveModel: generation.model,
-      liveProvider: generation.provider,
-      livePromptTokens: generation.promptTokens ?? null,
-      liveCompletionTokens: generation.completionTokens ?? null,
-      liveTotalTokens: generation.totalTokens ?? null,
-      liveLatencyMs: generation.latencyMs,
-      contextMessageCount: generation.contextMessageCount,
-      contextHash: generation.contextHash,
+      liveModel: generationAdapted.model,
+      liveProvider: generationAdapted.provider,
+      livePromptTokens: generationAdapted.promptTokens ?? null,
+      liveCompletionTokens: generationAdapted.completionTokens ?? null,
+      liveTotalTokens: generationAdapted.totalTokens ?? null,
+      liveLatencyMs: generationAdapted.latencyMs,
+      contextMessageCount: generationAdapted.contextMessageCount,
+      contextHash: generationAdapted.contextHash,
       generatedAt: new Date(),
       errorCode: null
     });
@@ -411,9 +433,11 @@ export async function generateAndSendLiveResponseForLog(
         companyId,
         ticketId: ticket.id,
         logId,
-        model: generation.model,
-        provider: generation.provider,
-        messageId: sendResult.messageId
+        model: generationAdapted.model,
+        provider: generationAdapted.provider,
+        messageId: sendResult.messageId,
+        usedFunctionCalling: generation.usedFunctionCalling === true,
+        fallback: generation.fallback === true
       },
       "[AiAgent][live] response_sent"
     );

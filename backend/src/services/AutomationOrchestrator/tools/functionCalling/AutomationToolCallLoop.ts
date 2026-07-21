@@ -48,7 +48,7 @@ export type FunctionCallingLoopTrace = {
 
 /**
  * Ciclo LLM → Tool Call → Runtime → Result → LLM (máx. FC_MAX_LOOPS).
- * Somente Simulador / admin_test.
+ * Origins: simulator | admin_test | shadow | live.
  */
 export async function runFunctionCallingLoop(input: {
   companyId: number;
@@ -66,9 +66,11 @@ export async function runFunctionCallingLoop(input: {
   plannerCategories?: Array<
     "system" | "contact" | "ticket" | "queue" | "user" | "knowledge" | "automation"
   >;
-  origin?: "simulator" | "admin_test" | "shadow";
+  origin?: "simulator" | "admin_test" | "shadow" | "live";
   ticketId?: number | null;
   contactId?: number | null;
+  /** Live only — default false. Nunca liga Write Tools automaticamente. */
+  allowWriteTools?: boolean;
 }): Promise<FunctionCallingLoopTrace> {
   const origin = input.origin || "simulator";
   const [hasAgent, hasTools, hasKnowledge] = await Promise.all([
@@ -84,7 +86,12 @@ export async function runFunctionCallingLoop(input: {
     ticketId: input.ticketId,
     contactId: input.contactId,
     allowedToolKeys: [],
-    source: origin === "admin_test" ? "admin_test" : origin,
+    source:
+      origin === "admin_test"
+        ? "admin_test"
+        : origin === "live"
+          ? "live"
+          : origin,
     channel: origin === "shadow" ? "shadow" : origin,
     featureFlags: {
       [AUTOMATION_ORCHESTRATOR_FEATURE_KEY]: hasAgent,
@@ -94,6 +101,8 @@ export async function runFunctionCallingLoop(input: {
     requestId: `fc-${origin}-${Date.now()}`
   });
 
+  const allowWrite = origin === "live" && input.allowWriteTools === true;
+
   const selection = selectToolsForFunctionCalling({
     ctx: ctxSeed,
     provider: input.provider,
@@ -101,8 +110,8 @@ export async function runFunctionCallingLoop(input: {
     origin,
     companyPolicy: {
       enabled: hasAgent && hasTools,
-      maxRiskLevel: "read_only",
-      allowWrite: false
+      maxRiskLevel: allowWrite ? "medium" : "read_only",
+      allowWrite
     }
   });
 

@@ -38,6 +38,7 @@ import {
   updateAutomationToolPolicies,
 } from "../../services/automationToolsApi";
 import { testEvidence } from "../../services/automationEvidenceApi";
+import { testLiveRollout } from "../../services/automationLiveRolloutApi";
 
 const useStyles = makeStyles((theme) => ({
   mainPaper: {
@@ -93,6 +94,7 @@ const AutomationToolsPage = () => {
     "O telefone do João é 11999887766."
   );
   const [evidencePhone, setEvidencePhone] = useState("11999887766");
+  const [liveTestResult, setLiveTestResult] = useState(null);
 
   const loadCatalog = useCallback(async () => {
     setLoading(true);
@@ -151,7 +153,8 @@ const AutomationToolsPage = () => {
     if (tab === 2) loadCatalog();
     if (tab === 3) loadCatalog();
     if (tab === 4) loadCatalog();
-    if (tab === 5) loadPolicies();
+    if (tab === 5) loadCatalog();
+    if (tab === 6) loadPolicies();
   }, [tab, loadCatalog, loadExecutions, loadPolicies, loadMetrics]);
 
   const selectedManifest = (catalog?.tools || []).find(
@@ -312,6 +315,7 @@ const AutomationToolsPage = () => {
           <Tab label="Tester" />
           <Tab label="Function Calling" />
           <Tab label="Evidence" />
+          <Tab label="Live Rollout" />
           <Tab label="Políticas" />
         </Tabs>
 
@@ -701,6 +705,62 @@ const AutomationToolsPage = () => {
           )}
 
           {tab === 5 && (
+            <>
+              <Typography className={classes.warn} variant="body2">
+                Live Rollout Tester (2.2): Eligibility + Canary hash. Write Tools
+                OFF.
+              </Typography>
+              <div className={classes.filters}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={adminTestMode}
+                      onChange={(e) => setAdminTestMode(e.target.checked)}
+                      color="primary"
+                    />
+                  }
+                  label="Modo de teste explícito"
+                />
+                <Button
+                  variant="contained"
+                  color="primary"
+                  disabled={!adminTestMode}
+                  onClick={async () => {
+                    try {
+                      const { data } = await testLiveRollout({
+                        adminTestMode: true,
+                        skipReadiness: true,
+                        whatsappId: 1,
+                        aiAgentId: 1,
+                        ticketId: 42,
+                        messageId: "tools-tester",
+                        provider: "openai",
+                        message: {
+                          fromMe: false,
+                          mediaType: "chat",
+                          ticketStatus: "open",
+                          userId: null,
+                        },
+                      });
+                      setLiveTestResult(data);
+                      toast.success("Live eligibility testado.");
+                    } catch (err) {
+                      toastError(err);
+                    }
+                  }}
+                >
+                  Testar Eligibility/Canary
+                </Button>
+              </div>
+              {liveTestResult && (
+                <pre className={classes.mono}>
+                  {JSON.stringify(liveTestResult, null, 2)}
+                </pre>
+              )}
+            </>
+          )}
+
+          {tab === 6 && (
             <>
               <Typography className={classes.warn} variant="body2">
                 Deny-by-default. allowWrite necessário para Execute real de

@@ -49,6 +49,7 @@ import {
 } from "../../services/automationToolsApi";
 import { getAiAgentShadowFcDashboard } from "../../services/aiAgentApi";
 import { getEvidenceDashboard } from "../../services/automationEvidenceApi";
+import { getLiveRolloutDashboard } from "../../services/automationLiveRolloutApi";
 
 const CAPABILITY_KEYS = [
   "planner",
@@ -144,6 +145,7 @@ const AutomationMonitorPage = () => {
   const [toolMetrics, setToolMetrics] = useState(null);
   const [shadowFc, setShadowFc] = useState(null);
   const [evidenceDash, setEvidenceDash] = useState(null);
+  const [liveRollout, setLiveRollout] = useState(null);
 
   const loadDashboard = useCallback(async () => {
     setLoading(true);
@@ -254,6 +256,18 @@ const AutomationMonitorPage = () => {
     }
   }, []);
 
+  const loadLiveRolloutTab = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data } = await getLiveRolloutDashboard();
+      setLiveRollout(data);
+    } catch (err) {
+      toastError(err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (tab === 0) loadDashboard();
     if (tab === 1) loadExecutions();
@@ -262,7 +276,8 @@ const AutomationMonitorPage = () => {
     if (tab === 4) loadToolsTab();
     if (tab === 5) loadShadowFcTab();
     if (tab === 6) loadEvidenceTab();
-    if (tab === 7) loadSettings();
+    if (tab === 7) loadLiveRolloutTab();
+    if (tab === 8) loadSettings();
   }, [
     tab,
     loadDashboard,
@@ -272,6 +287,7 @@ const AutomationMonitorPage = () => {
     loadToolsTab,
     loadShadowFcTab,
     loadEvidenceTab,
+    loadLiveRolloutTab,
     loadSettings,
   ]);
 
@@ -350,6 +366,7 @@ const AutomationMonitorPage = () => {
           <Tab label="Tools" />
           <Tab label="Shadow FC" />
           <Tab label="Evidence" />
+          <Tab label="Live FC" />
           <Tab label="Configuração" />
         </Tabs>
 
@@ -907,7 +924,73 @@ const AutomationMonitorPage = () => {
               </>
             ))}
 
-          {tab === 7 && (
+          {tab === 7 &&
+            (loading && !liveRollout ? (
+              <TableRowSkeleton columns={4} />
+            ) : (
+              <>
+                <Typography variant="body2" color="textSecondary" paragraph>
+                  Live FC (2.2) — Eligibility, Canary, Kill Switch, Fallback,
+                  Rollback. Write Tools OFF.
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="Stage"
+                      value={liveRollout?.config?.stage}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="Percent"
+                      value={liveRollout?.config?.percent}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="Live execs"
+                      value={liveRollout?.metrics?.liveExecutions}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="Fallbacks"
+                      value={liveRollout?.metrics?.fallbacks}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="Rollbacks"
+                      value={liveRollout?.metrics?.rollbacks}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="Canary %"
+                      value={Math.round(
+                        (liveRollout?.metrics?.canaryRate || 0) * 100
+                      )}
+                    />
+                  </Grid>
+                </Grid>
+                <Box mt={2}>
+                  <pre className={classes.mono}>
+                    {JSON.stringify(
+                      {
+                        killSwitch: liveRollout?.killSwitch,
+                        readiness: liveRollout?.readiness,
+                        comparison: liveRollout?.comparison,
+                        config: liveRollout?.config,
+                      },
+                      null,
+                      2
+                    )}
+                  </pre>
+                </Box>
+              </>
+            ))}
+
+          {tab === 8 && (
             <>
               <Typography className={classes.warn} variant="body2">
                 send_message=active exige planner ativo. Config inconsistente é

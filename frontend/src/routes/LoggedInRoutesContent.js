@@ -72,6 +72,7 @@ import {
   AI_AGENT_ANALYTICS_ROUTE_PATH,
   AI_AGENT_SHADOW_FC_ROUTE_PATH,
   AUTOMATION_EVIDENCE_ROUTE_PATH,
+  AUTOMATION_LIVE_ROLLOUT_ROUTE_PATH,
   AUTOMATION_MONITOR_ROUTE_PATH,
   AUTOMATION_TOOLS_ROUTE_PATH,
   AUTOMATION_AI_TOOLS_FEATURE_KEY,
@@ -102,6 +103,9 @@ const AiAgentShadowFcPage = React.lazy(() =>
 );
 const AutomationEvidencePage = React.lazy(() =>
   import("../pages/AutomationEvidence")
+);
+const AutomationLiveRolloutPage = React.lazy(() =>
+  import("../pages/AutomationLiveRollout")
 );
 
 function PlanFlagsLoadingState() {
@@ -409,6 +413,10 @@ function AutomacaoModule({ planFlags, isAdmin }) {
         label: i18n.t("mainDrawer.listItems.automationEvidence"),
       });
       t.push({
+        path: AUTOMATION_LIVE_ROLLOUT_ROUTE_PATH,
+        label: i18n.t("mainDrawer.listItems.automationLiveRollout"),
+      });
+      t.push({
         path: AUTOMATION_TOOLS_ROUTE_PATH,
         label: i18n.t("mainDrawer.listItems.automationTools"),
       });
@@ -609,6 +617,23 @@ function AutomacaoModule({ planFlags, isAdmin }) {
               {isAdmin && showAiTools ? (
                 <Suspense fallback={<PlanFlagsLoadingState />}>
                   <AutomationEvidencePage />
+                </Suspense>
+              ) : null}
+            </AiAgentRouteGuard>
+          )}
+        />
+        <Route
+          exact
+          path={AUTOMATION_LIVE_ROLLOUT_ROUTE_PATH}
+          render={() => (
+            <AiAgentRouteGuard
+              planFlags={planFlags}
+              user={user}
+              fallbackPath={fallback}
+            >
+              {isAdmin && showAiTools ? (
+                <Suspense fallback={<PlanFlagsLoadingState />}>
+                  <AutomationLiveRolloutPage />
                 </Suspense>
               ) : null}
             </AiAgentRouteGuard>
@@ -871,6 +896,7 @@ export default function LoggedInRoutesContent() {
     AI_AGENT_ANALYTICS_ROUTE_PATH,
     AI_AGENT_SHADOW_FC_ROUTE_PATH,
     AUTOMATION_EVIDENCE_ROUTE_PATH,
+    AUTOMATION_LIVE_ROLLOUT_ROUTE_PATH,
     AUTOMATION_MONITOR_ROUTE_PATH,
     AUTOMATION_TOOLS_ROUTE_PATH,
     KNOWLEDGE_BASE_ROUTE_PATH,

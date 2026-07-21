@@ -319,7 +319,8 @@ export async function runToolViaRuntime(
     if (
       input.ctx.source === "ai_function_call" ||
       input.ctx.source === "simulator" ||
-      input.ctx.source === "shadow"
+      input.ctx.source === "shadow" ||
+      input.ctx.source === "live"
     ) {
       assertToolInAllowlist({
         toolId: manifest.id,

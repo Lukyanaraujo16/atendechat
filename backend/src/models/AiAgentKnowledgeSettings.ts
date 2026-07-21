@@ -69,6 +69,10 @@ class AiAgentKnowledgeSettings extends Model<AiAgentKnowledgeSettings> {
   @Column
   functionCallingShadow: boolean;
 
+  @Default(false)
+  @Column
+  functionCallingLive: boolean;
+
   @Default(AI_AGENT_KNOWLEDGE_DEFAULTS.topK)
   @Column
   topK: number;

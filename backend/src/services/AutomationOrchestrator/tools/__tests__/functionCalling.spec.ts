@@ -175,13 +175,35 @@ describe("Function Calling 2.1D", () => {
     expect(selection.tools.every(t => t.id.startsWith("contact."))).toBe(true);
   });
 
-  it("Selection rejeita origin live", () => {
+  it("Selection rejeita origin desconhecido", () => {
     const selection = selectToolsForFunctionCalling({
       ctx: fcCtx(),
-      origin: "live" as any,
+      origin: "workflow" as any,
       provider: "openai"
     });
     expect(selection.tools.length).toBe(0);
+  });
+
+  it("Selection aceita origin live (read-only)", () => {
+    const selection = selectToolsForFunctionCalling({
+      ctx: buildFunctionCallingToolContext({
+        companyId: 1,
+        allowedToolKeys: [],
+        source: "live",
+        featureFlags: {
+          [AUTOMATION_ORCHESTRATOR_FEATURE_KEY]: true,
+          [AUTOMATION_AI_TOOLS_FEATURE_KEY]: true,
+          "automation.knowledge_base": true
+        }
+      }),
+      origin: "live",
+      provider: "openai",
+      companyPolicy: { enabled: true, maxRiskLevel: "read_only" }
+    });
+    expect(selection.tools.length).toBeGreaterThan(0);
+    expect(
+      selection.tools.every(t => t.sideEffectType !== "database_write")
+    ).toBe(true);
   });
 
   it("Selection aceita origin shadow", () => {

@@ -20,6 +20,9 @@ export const AI_AGENT_SHADOW_FC_ROUTE_PATH = "/ai-agent/shadow-fc";
 /** Evidence Engine dashboard (Fase IA 2.1F). */
 export const AUTOMATION_EVIDENCE_ROUTE_PATH = "/automation/evidence";
 
+/** Live Rollout dashboard (Fase IA 2.2). */
+export const AUTOMATION_LIVE_ROLLOUT_ROUTE_PATH = "/automation/live-rollout";
+
 /** Automation Orchestrator Monitor (Fase IA 2.0). */
 export const AUTOMATION_MONITOR_ROUTE_PATH = "/automation/monitor";
 

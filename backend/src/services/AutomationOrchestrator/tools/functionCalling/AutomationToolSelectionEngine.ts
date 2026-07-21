@@ -27,7 +27,7 @@ export type ToolSelectionInput = {
   /** Categorias sugeridas pelo planner (opcional). */
   plannerCategories?: FcPlannerCategory[];
   /** Origem explícita do FC. */
-  origin: "simulator" | "admin_test" | "shadow";
+  origin: "simulator" | "admin_test" | "shadow" | "live";
 };
 
 export type ToolSelectionResult = {
@@ -42,7 +42,8 @@ export type ToolSelectionResult = {
 const FC_ORIGINS: ToolInvocationSource[] = [
   "simulator",
   "admin_test",
-  "shadow"
+  "shadow",
+  "live"
 ];
 
 /**

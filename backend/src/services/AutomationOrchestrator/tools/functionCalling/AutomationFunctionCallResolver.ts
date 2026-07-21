@@ -265,7 +265,7 @@ export function buildSimulatorToolContext(input: {
   });
 }
 
-/** Contexto FC genérico — simulator ou shadow (somente read). */
+/** Contexto FC — simulator, shadow (observacional) ou live (produção controlada). */
 export function buildFunctionCallingToolContext(input: {
   companyId: number;
   userId?: number | null;
@@ -275,7 +275,7 @@ export function buildFunctionCallingToolContext(input: {
   allowedToolKeys: string[];
   featureFlags?: Record<string, boolean>;
   requestId?: string;
-  source: "simulator" | "shadow" | "admin_test";
+  source: "simulator" | "shadow" | "admin_test" | "live";
   channel?: string;
 }): ToolExecutionContext {
   const source = input.source;
@@ -286,7 +286,12 @@ export function buildFunctionCallingToolContext(input: {
     ticketId: input.ticketId ?? null,
     contactId: input.contactId ?? null,
     controlMode: source === "shadow" ? "shadow_execute" : "active",
-    source: source === "admin_test" ? "admin_test" : source,
+    source:
+      source === "admin_test"
+        ? "admin_test"
+        : source === "live"
+          ? "live"
+          : source,
     adminTestMode: source === "admin_test",
     executionOwner: "orchestrator",
     channel: input.channel || source,
@@ -314,7 +319,8 @@ export function buildFunctionCallingToolContext(input: {
     metadata: {
       functionCalling: true,
       channel: input.channel || source,
-      observational: source === "shadow"
+      observational: source === "shadow",
+      live: source === "live"
     }
   });
 }
