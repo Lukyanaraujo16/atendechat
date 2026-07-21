@@ -37,6 +37,7 @@ import {
   testAutomationFunctionCalling,
   updateAutomationToolPolicies,
 } from "../../services/automationToolsApi";
+import { testEvidence } from "../../services/automationEvidenceApi";
 
 const useStyles = makeStyles((theme) => ({
   mainPaper: {
@@ -86,6 +87,12 @@ const AutomationToolsPage = () => {
   const [fcCallArgs, setFcCallArgs] = useState('{"limit":10}');
   const [fcTesting, setFcTesting] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [evidenceResult, setEvidenceResult] = useState(null);
+  const [evidenceTesting, setEvidenceTesting] = useState(false);
+  const [evidenceReply, setEvidenceReply] = useState(
+    "O telefone do João é 11999887766."
+  );
+  const [evidencePhone, setEvidencePhone] = useState("11999887766");
 
   const loadCatalog = useCallback(async () => {
     setLoading(true);
@@ -143,7 +150,8 @@ const AutomationToolsPage = () => {
     if (tab === 1) loadExecutions();
     if (tab === 2) loadCatalog();
     if (tab === 3) loadCatalog();
-    if (tab === 4) loadPolicies();
+    if (tab === 4) loadCatalog();
+    if (tab === 5) loadPolicies();
   }, [tab, loadCatalog, loadExecutions, loadPolicies, loadMetrics]);
 
   const selectedManifest = (catalog?.tools || []).find(
@@ -177,6 +185,46 @@ const AutomationToolsPage = () => {
       toastError(err);
     } finally {
       setFcTesting(false);
+    }
+  };
+
+  const runEvidenceTest = async () => {
+    if (!adminTestMode) {
+      toast.error("Ative o modo de teste explícito.");
+      return;
+    }
+    setEvidenceTesting(true);
+    try {
+      const { data } = await testEvidence({
+        adminTestMode: true,
+        shadowReply: evidenceReply,
+        toolCallCount: 1,
+        usedTools: true,
+        provider: "openai",
+        trace: {
+          iterations: [
+            {
+              resolutions: [
+                {
+                  toolId: "contact.read",
+                  status: "success",
+                  modelResult: {
+                    status: "success",
+                    tool: "contact.read",
+                    item: { phone: evidencePhone, name: "João" },
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      });
+      setEvidenceResult(data);
+      toast.success("Evidence tester executado.");
+    } catch (err) {
+      toastError(err);
+    } finally {
+      setEvidenceTesting(false);
     }
   };
 
@@ -263,6 +311,7 @@ const AutomationToolsPage = () => {
           <Tab label="Execuções" />
           <Tab label="Tester" />
           <Tab label="Function Calling" />
+          <Tab label="Evidence" />
           <Tab label="Políticas" />
         </Tabs>
 
@@ -598,6 +647,60 @@ const AutomationToolsPage = () => {
           )}
 
           {tab === 4 && (
+            <>
+              <Typography className={classes.warn} variant="body2">
+                Evidence Tester (2.1F): fatos observáveis, readiness e
+                recommendations. Live permanece OFF.
+              </Typography>
+              <div className={classes.filters}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={adminTestMode}
+                      onChange={(e) => setAdminTestMode(e.target.checked)}
+                      color="primary"
+                    />
+                  }
+                  label="Modo de teste explícito"
+                />
+                <Button
+                  variant="contained"
+                  color="primary"
+                  disabled={evidenceTesting || !adminTestMode}
+                  onClick={runEvidenceTest}
+                >
+                  Testar Evidence
+                </Button>
+              </div>
+              <TextField
+                label="Resposta Shadow"
+                variant="outlined"
+                fullWidth
+                value={evidenceReply}
+                onChange={(e) => setEvidenceReply(e.target.value)}
+                style={{ marginBottom: 8 }}
+              />
+              <TextField
+                label="Telefone no ToolModelResult"
+                variant="outlined"
+                fullWidth
+                value={evidencePhone}
+                onChange={(e) => setEvidencePhone(e.target.value)}
+              />
+              {evidenceResult && (
+                <Box mt={2}>
+                  <Typography variant="subtitle2">
+                    Evidence / Readiness / Recommendations / Thresholds
+                  </Typography>
+                  <pre className={classes.mono}>
+                    {JSON.stringify(evidenceResult, null, 2)}
+                  </pre>
+                </Box>
+              )}
+            </>
+          )}
+
+          {tab === 5 && (
             <>
               <Typography className={classes.warn} variant="body2">
                 Deny-by-default. allowWrite necessário para Execute real de

@@ -97,6 +97,8 @@ import AiKnowledgeDocumentChunk from "../models/AiKnowledgeDocumentChunk";
 import AiKnowledgeEmbeddingSettings from "../models/AiKnowledgeEmbeddingSettings";
 import AiAgentKnowledgeBase from "../models/AiAgentKnowledgeBase";
 import AiAgentKnowledgeSettings from "../models/AiAgentKnowledgeSettings";
+import AiAgentShadowEvaluation from "../models/AiAgentShadowEvaluation";
+import AiAgentEvidenceReport from "../models/AiAgentEvidenceReport";
 import AiKnowledgeRetrieval from "../models/AiKnowledgeRetrieval";
 import AiAgentAnalyticsDaily from "../models/AiAgentAnalyticsDaily";
 import AiKnowledgeDocumentStats from "../models/AiKnowledgeDocumentStats";
@@ -223,6 +225,8 @@ const models = [
   AiKnowledgeEmbeddingSettings,
   AiAgentKnowledgeBase,
   AiAgentKnowledgeSettings,
+  AiAgentShadowEvaluation,
+  AiAgentEvidenceReport,
   AiKnowledgeRetrieval,
   AiAgentAnalyticsDaily,
   AiKnowledgeDocumentStats,

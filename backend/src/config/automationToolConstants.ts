@@ -3,7 +3,7 @@
  * Deny-by-default. Nenhuma Tool operacional de negócio nesta fase.
  */
 
-export const AUTOMATION_TOOL_RUNTIME_VERSION = "2.1.0-d";
+export const AUTOMATION_TOOL_RUNTIME_VERSION = "2.1.0-e";
 
 export const AUTOMATION_AI_TOOLS_FEATURE_KEY = "automation.ai_tools";
 
@@ -70,6 +70,7 @@ export const AUTOMATION_TOOL_INVOCATION_SOURCES = [
   "workflow",
   "admin_test",
   "simulator",
+  "shadow",
   "system"
 ] as const;
 
@@ -78,13 +79,14 @@ export type ToolInvocationSource =
 
 /**
  * Fontes autorizadas a executar Tools.
- * 2.1D: simulator + admin_test para Function Calling (somente read).
- * Shadow/Live/workflow NÃO estão aqui.
+ * 2.1E: shadow = somente Read Tools / observacional.
+ * Live NÃO está aqui.
  */
 export const AUTOMATION_TOOL_PRODUCTIVE_SOURCES: ToolInvocationSource[] = [
   "action",
   "admin_test",
-  "simulator"
+  "simulator",
+  "shadow"
 ];
 
 export const AUTOMATION_TOOL_ERROR_TYPES = [

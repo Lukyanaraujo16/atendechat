@@ -156,16 +156,16 @@ export function evaluateToolPolicy(input: {
     }
   }
 
-  // Simulador Function Calling: somente leitura; nunca escrita.
-  if (ctx.source === "simulator") {
+  // Simulador / Shadow Function Calling: somente leitura; nunca escrita.
+  if (ctx.source === "simulator" || ctx.source === "shadow") {
     if (isWriteSideEffect(manifest.sideEffectType)) {
-      return deny("simulator_no_write");
+      return deny(`${ctx.source}_no_write`);
     }
     if (manifest.riskLevel !== "read_only") {
-      return deny("simulator_read_only_only");
+      return deny(`${ctx.source}_read_only_only`);
     }
     if (manifest.exposeToModel !== true) {
-      return deny("simulator_not_exposed");
+      return deny(`${ctx.source}_not_exposed`);
     }
   }
 

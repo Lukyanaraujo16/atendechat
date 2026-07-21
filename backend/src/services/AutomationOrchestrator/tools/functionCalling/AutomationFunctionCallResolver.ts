@@ -142,6 +142,18 @@ export async function resolveProviderToolCall(input: {
   if (manifest.exposeToModel !== true) {
     return deny("denied", "tool_not_exposed", resolved.id, resolved.version);
   }
+  // Shadow / FC: nunca Write Tools nem Operation Runtime
+  if (
+    manifest.sideEffectType === "database_write" ||
+    (manifest.metadata as any)?.operationRuntime === true
+  ) {
+    return deny(
+      "denied",
+      "write_or_operation_blocked",
+      resolved.id,
+      resolved.version
+    );
+  }
 
   const argsParsed = parseArguments(input.call.arguments);
   if (argsParsed.ok === false) {
@@ -246,14 +258,38 @@ export function buildSimulatorToolContext(input: {
   featureFlags?: Record<string, boolean>;
   requestId?: string;
 }): ToolExecutionContext {
+  return buildFunctionCallingToolContext({
+    ...input,
+    source: "simulator",
+    channel: "simulator"
+  });
+}
+
+/** Contexto FC genérico — simulator ou shadow (somente read). */
+export function buildFunctionCallingToolContext(input: {
+  companyId: number;
+  userId?: number | null;
+  aiAgentId?: number | null;
+  ticketId?: number | null;
+  contactId?: number | null;
+  allowedToolKeys: string[];
+  featureFlags?: Record<string, boolean>;
+  requestId?: string;
+  source: "simulator" | "shadow" | "admin_test";
+  channel?: string;
+}): ToolExecutionContext {
+  const source = input.source;
   return buildToolExecutionContext({
     companyId: input.companyId,
     userId: input.userId ?? null,
     aiAgentId: input.aiAgentId ?? null,
-    controlMode: "active",
-    source: "simulator",
+    ticketId: input.ticketId ?? null,
+    contactId: input.contactId ?? null,
+    controlMode: source === "shadow" ? "shadow_execute" : "active",
+    source: source === "admin_test" ? "admin_test" : source,
+    adminTestMode: source === "admin_test",
     executionOwner: "orchestrator",
-    channel: "simulator",
+    channel: input.channel || source,
     allowedToolKeys: input.allowedToolKeys,
     capabilities: {
       "tool.read": true,
@@ -273,9 +309,13 @@ export function buildSimulatorToolContext(input: {
       "automation.knowledge_base": true,
       ...(input.featureFlags || {})
     },
-    requestId: input.requestId || `fc-sim-${Date.now()}`,
-    correlationId: `fc-sim-${input.companyId}`,
-    metadata: { functionCalling: true, channel: "simulator" }
+    requestId: input.requestId || `fc-${source}-${Date.now()}`,
+    correlationId: `fc-${source}-${input.companyId}`,
+    metadata: {
+      functionCalling: true,
+      channel: input.channel || source,
+      observational: source === "shadow"
+    }
   });
 }
 

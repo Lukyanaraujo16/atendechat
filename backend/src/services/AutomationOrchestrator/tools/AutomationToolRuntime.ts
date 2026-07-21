@@ -315,10 +315,11 @@ export async function runToolViaRuntime(
       payload: { source: input.ctx.source, executionId }
     });
 
-    // Allowlist obrigatória para Function Calling (simulator / ai_function_call)
+    // Allowlist obrigatória para Function Calling
     if (
       input.ctx.source === "ai_function_call" ||
-      input.ctx.source === "simulator"
+      input.ctx.source === "simulator" ||
+      input.ctx.source === "shadow"
     ) {
       assertToolInAllowlist({
         toolId: manifest.id,

@@ -70,6 +70,8 @@ import {
   AI_AGENT_FEATURE_KEY,
   AI_AGENT_ROUTE_PATH,
   AI_AGENT_ANALYTICS_ROUTE_PATH,
+  AI_AGENT_SHADOW_FC_ROUTE_PATH,
+  AUTOMATION_EVIDENCE_ROUTE_PATH,
   AUTOMATION_MONITOR_ROUTE_PATH,
   AUTOMATION_TOOLS_ROUTE_PATH,
   AUTOMATION_AI_TOOLS_FEATURE_KEY,
@@ -94,6 +96,12 @@ const AutomationMonitorPage = React.lazy(() =>
 );
 const AutomationToolsPage = React.lazy(() =>
   import("../pages/AutomationTools")
+);
+const AiAgentShadowFcPage = React.lazy(() =>
+  import("../pages/AiAgentShadowFc")
+);
+const AutomationEvidencePage = React.lazy(() =>
+  import("../pages/AutomationEvidence")
 );
 
 function PlanFlagsLoadingState() {
@@ -393,6 +401,14 @@ function AutomacaoModule({ planFlags, isAdmin }) {
     }
     if (showAiTools) {
       t.push({
+        path: AI_AGENT_SHADOW_FC_ROUTE_PATH,
+        label: i18n.t("mainDrawer.listItems.aiAgentShadowFc"),
+      });
+      t.push({
+        path: AUTOMATION_EVIDENCE_ROUTE_PATH,
+        label: i18n.t("mainDrawer.listItems.automationEvidence"),
+      });
+      t.push({
         path: AUTOMATION_TOOLS_ROUTE_PATH,
         label: i18n.t("mainDrawer.listItems.automationTools"),
       });
@@ -559,6 +575,40 @@ function AutomacaoModule({ planFlags, isAdmin }) {
               {isAdmin && showAiAgentAnalytics ? (
                 <Suspense fallback={<PlanFlagsLoadingState />}>
                   <AutomationMonitorPage />
+                </Suspense>
+              ) : null}
+            </AiAgentRouteGuard>
+          )}
+        />
+        <Route
+          exact
+          path={AI_AGENT_SHADOW_FC_ROUTE_PATH}
+          render={() => (
+            <AiAgentRouteGuard
+              planFlags={planFlags}
+              user={user}
+              fallbackPath={fallback}
+            >
+              {isAdmin && showAiTools ? (
+                <Suspense fallback={<PlanFlagsLoadingState />}>
+                  <AiAgentShadowFcPage />
+                </Suspense>
+              ) : null}
+            </AiAgentRouteGuard>
+          )}
+        />
+        <Route
+          exact
+          path={AUTOMATION_EVIDENCE_ROUTE_PATH}
+          render={() => (
+            <AiAgentRouteGuard
+              planFlags={planFlags}
+              user={user}
+              fallbackPath={fallback}
+            >
+              {isAdmin && showAiTools ? (
+                <Suspense fallback={<PlanFlagsLoadingState />}>
+                  <AutomationEvidencePage />
                 </Suspense>
               ) : null}
             </AiAgentRouteGuard>
@@ -819,6 +869,8 @@ export default function LoggedInRoutesContent() {
     "/prompts",
     AI_AGENT_ROUTE_PATH,
     AI_AGENT_ANALYTICS_ROUTE_PATH,
+    AI_AGENT_SHADOW_FC_ROUTE_PATH,
+    AUTOMATION_EVIDENCE_ROUTE_PATH,
     AUTOMATION_MONITOR_ROUTE_PATH,
     AUTOMATION_TOOLS_ROUTE_PATH,
     KNOWLEDGE_BASE_ROUTE_PATH,

@@ -376,6 +376,43 @@ export async function generateShadowSuggestionForLog(
       generationTimeMs: latencyMs
     });
 
+    // 2.1E — Shadow Function Calling evaluation (observacional, async)
+    void (async () => {
+      try {
+        const { scheduleShadowFcEvaluation } = await import(
+          "./shadowFc/ShadowFcEvaluationService"
+        );
+        await scheduleShadowFcEvaluation({
+          companyId,
+          runtimeLogId: logId,
+          aiAgentId: agent.id,
+          whatsappId: whatsapp.id,
+          ticketId: ticket.id,
+          contactId: contact.id,
+          messageId: log.messageId || null,
+          officialReply: content,
+          officialLatencyMs: latencyMs,
+          officialTokens: result.totalTokens ?? null,
+          provider: resolved.provider!,
+          apiKey: resolved.apiKey!,
+          model: result.model || model,
+          temperature: agent.temperature,
+          maxTokens,
+          systemPrompt,
+          messages: promptContext.messages,
+          knowledgeMeta: knowledgeMeta || null,
+          usedKnowledgeOfficial: Boolean(
+            (knowledgeMeta as any)?.knowledge?.used === true
+          )
+        });
+      } catch (fcErr) {
+        logger.warn(
+          { fcErr, logId, companyId },
+          "[AiAgent][shadow] fc_schedule_failed"
+        );
+      }
+    })();
+
     logger.info(
       {
         companyId,

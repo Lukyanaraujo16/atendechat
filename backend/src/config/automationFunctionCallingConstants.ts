@@ -1,5 +1,5 @@
 /**
- * Fase IA 2.1D — Function Calling (somente Simulador / admin_test).
+ * Fase IA 2.1D/E — Function Calling (Simulator + Shadow observacional).
  */
 
 export const AUTOMATION_FUNCTION_CALLING_VERSION = "2.1.0-d";

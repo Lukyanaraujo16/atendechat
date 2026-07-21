@@ -437,3 +437,104 @@ export const showKnowledgeRetrieval = async (
   });
   return res.json({ retrieval });
 };
+
+export const listShadowEvaluations = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const page = Math.max(1, Number(req.query.pageNumber) || 1);
+  const limit = 20;
+  const { ListShadowEvaluationsService } = await import(
+    "../services/AiAgentService/shadowFc/ShadowFcAdminServices"
+  );
+  const result = await ListShadowEvaluationsService({
+    companyId,
+    aiAgentId: req.query.aiAgentId
+      ? Number(req.query.aiAgentId)
+      : undefined,
+    status: req.query.status ? String(req.query.status) : undefined,
+    limit,
+    offset: (page - 1) * limit
+  });
+  return res.json({
+    records: result.rows,
+    count: result.count,
+    hasMore: result.count > (page - 1) * limit + result.rows.length
+  });
+};
+
+export const showShadowEvaluation = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const id = parseIdParam(req.params.id);
+  const { GetShadowEvaluationService } = await import(
+    "../services/AiAgentService/shadowFc/ShadowFcAdminServices"
+  );
+  const evaluation = await GetShadowEvaluationService({ companyId, id });
+  return res.json({ evaluation });
+};
+
+export const shadowFcDashboard = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const { GetShadowFcDashboardService } = await import(
+    "../services/AiAgentService/shadowFc/ShadowFcAdminServices"
+  );
+  const dashboard = await GetShadowFcDashboardService({ companyId });
+  return res.json(dashboard);
+};
+
+export const upsertShadowFcCompanySetting = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const { UpsertShadowFcCompanySettingService } = await import(
+    "../services/AiAgentService/shadowFc/ShadowFcAdminServices"
+  );
+  const result = await UpsertShadowFcCompanySettingService({
+    companyId,
+    enabled: req.body?.enabled === true
+  });
+  return res.json(result);
+};
+
+export const upsertShadowFcAgentSetting = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const aiAgentId = parseIdParam(req.params.id);
+  const { UpsertShadowFcAgentSettingService } = await import(
+    "../services/AiAgentService/shadowFc/ShadowFcAdminServices"
+  );
+  const result = await UpsertShadowFcAgentSettingService({
+    companyId,
+    aiAgentId,
+    enabled: req.body?.enabled === true,
+    userId: userIdOrThrow(req)
+  });
+  return res.json(result);
+};
+
+export const upsertShadowFcConnectionSetting = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const whatsappId = parseIdParam(req.params.whatsappId);
+  const { UpsertShadowFcConnectionSettingService } = await import(
+    "../services/AiAgentService/shadowFc/ShadowFcAdminServices"
+  );
+  const result = await UpsertShadowFcConnectionSettingService({
+    companyId,
+    whatsappId,
+    enabled: req.body?.enabled === true
+  });
+  return res.json(result);
+};

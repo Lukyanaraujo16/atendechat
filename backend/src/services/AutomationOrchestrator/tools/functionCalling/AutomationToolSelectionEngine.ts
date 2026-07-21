@@ -26,8 +26,8 @@ export type ToolSelectionInput = {
   provider?: "openai" | "gemini" | "claude" | string;
   /** Categorias sugeridas pelo planner (opcional). */
   plannerCategories?: FcPlannerCategory[];
-  /** Origem explícita do FC — deve ser simulator ou admin_test. */
-  origin: "simulator" | "admin_test";
+  /** Origem explícita do FC. */
+  origin: "simulator" | "admin_test" | "shadow";
 };
 
 export type ToolSelectionResult = {
@@ -39,7 +39,11 @@ export type ToolSelectionResult = {
   origin: string;
 };
 
-const FC_ORIGINS: ToolInvocationSource[] = ["simulator", "admin_test"];
+const FC_ORIGINS: ToolInvocationSource[] = [
+  "simulator",
+  "admin_test",
+  "shadow"
+];
 
 /**
  * Selection Engine — nunca expõe o Registry completo ao modelo.

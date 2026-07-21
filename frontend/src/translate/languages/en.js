@@ -4224,6 +4224,8 @@ const messages = {
 					aiAgentAnalytics: "AI Analytics",
 					automationMonitor: "Automation Monitor",
 					automationTools: "AI Tools",
+					aiAgentShadowFc: "FC Shadow",
+					automationEvidence: "Evidence",
 					knowledgeBase: "Knowledge Base",
 					queueIntegration: "Automations by queue",
 					notificationCenter: "Notification center",

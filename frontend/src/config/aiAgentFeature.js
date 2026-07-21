@@ -14,6 +14,12 @@ export const AI_AGENT_SIMULATOR_ROUTE_PATH = "/ai-agent/:agentId/simulator";
 /** Analytics / Observabilidade / Aprendizado assistido (Fase IA 1.5.3). */
 export const AI_AGENT_ANALYTICS_ROUTE_PATH = "/ai-agent/analytics";
 
+/** Function Calling Shadow dashboard (Fase IA 2.1E). */
+export const AI_AGENT_SHADOW_FC_ROUTE_PATH = "/ai-agent/shadow-fc";
+
+/** Evidence Engine dashboard (Fase IA 2.1F). */
+export const AUTOMATION_EVIDENCE_ROUTE_PATH = "/automation/evidence";
+
 /** Automation Orchestrator Monitor (Fase IA 2.0). */
 export const AUTOMATION_MONITOR_ROUTE_PATH = "/automation/monitor";
 

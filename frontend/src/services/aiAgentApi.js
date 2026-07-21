@@ -32,6 +32,30 @@ export function upsertAiAgentShadowSuggestionReview(logId, data) {
   return api.post(`/ai-agents/shadow-suggestions/${logId}/review`, data);
 }
 
+export function listAiAgentShadowEvaluations(params = {}) {
+  return api.get("/ai-agents/shadow-evaluations", { params });
+}
+
+export function getAiAgentShadowEvaluation(id) {
+  return api.get(`/ai-agents/shadow-evaluations/${id}`);
+}
+
+export function getAiAgentShadowFcDashboard() {
+  return api.get("/ai-agents/shadow-evaluations/dashboard");
+}
+
+export function updateShadowFcCompanySetting(data = {}) {
+  return api.put("/ai-agents/shadow-fc/company-setting", data);
+}
+
+export function updateShadowFcAgentSetting(agentId, data = {}) {
+  return api.put(`/ai-agents/${agentId}/shadow-fc/setting`, data);
+}
+
+export function updateShadowFcConnectionSetting(whatsappId, data = {}) {
+  return api.put(`/ai-agents/shadow-fc/connections/${whatsappId}`, data);
+}
+
 export function getAiAgentProfile(agentId) {
   return api.get(`/ai-agents/${agentId}/profile`);
 }

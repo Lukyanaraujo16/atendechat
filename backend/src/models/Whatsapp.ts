@@ -153,6 +153,10 @@ class Whatsapp extends Model<Whatsapp> {
   @Column(DataType.STRING(32))
   aiAgentMode: string;
 
+  @Default(false)
+  @Column
+  functionCallingShadow: boolean;
+
   @ForeignKey(() => QueueIntegrations)
   @Column
   integrationId: number;

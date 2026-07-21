@@ -240,6 +240,47 @@ aiAgentRoutes.post(
   AiAgentController.upsertSimulatorMessageReview
 );
 
+/* —— Fase IA 2.1E: Function Calling Shadow (antes de /:id) —— */
+aiAgentRoutes.get(
+  "/ai-agents/shadow-evaluations/dashboard",
+  isAuth,
+  requireAiAgent,
+  requireAdmin,
+  AiAgentController.shadowFcDashboard
+);
+
+aiAgentRoutes.get(
+  "/ai-agents/shadow-evaluations",
+  isAuth,
+  requireAiAgent,
+  requireAdmin,
+  AiAgentController.listShadowEvaluations
+);
+
+aiAgentRoutes.get(
+  "/ai-agents/shadow-evaluations/:id",
+  isAuth,
+  requireAiAgent,
+  requireAdmin,
+  AiAgentController.showShadowEvaluation
+);
+
+aiAgentRoutes.put(
+  "/ai-agents/shadow-fc/company-setting",
+  isAuth,
+  requireAiAgent,
+  requireAdmin,
+  AiAgentController.upsertShadowFcCompanySetting
+);
+
+aiAgentRoutes.put(
+  "/ai-agents/shadow-fc/connections/:whatsappId",
+  isAuth,
+  requireAiAgent,
+  requireAdmin,
+  AiAgentController.upsertShadowFcConnectionSetting
+);
+
 aiAgentRoutes.get(
   "/ai-agents/:id",
   isAuth,
@@ -315,6 +356,14 @@ aiAgentRoutes.get(
   requireAiAgent,
   requireKnowledgeBase,
   AiAgentController.listKnowledgeRetrievals
+);
+
+aiAgentRoutes.put(
+  "/ai-agents/:id/shadow-fc/setting",
+  isAuth,
+  requireAiAgent,
+  requireAdmin,
+  AiAgentController.upsertShadowFcAgentSetting
 );
 
 aiAgentRoutes.get(

@@ -11,7 +11,7 @@ import { buildProviderToolPayload } from "./AutomationProviderToolAdapter";
 import {
   hashToolCall,
   resolveProviderToolCall,
-  buildSimulatorToolContext,
+  buildFunctionCallingToolContext,
   ProviderToolCall,
   ResolvedToolCall
 } from "./AutomationFunctionCallResolver";
@@ -66,7 +66,9 @@ export async function runFunctionCallingLoop(input: {
   plannerCategories?: Array<
     "system" | "contact" | "ticket" | "queue" | "user" | "knowledge" | "automation"
   >;
-  origin?: "simulator" | "admin_test";
+  origin?: "simulator" | "admin_test" | "shadow";
+  ticketId?: number | null;
+  contactId?: number | null;
 }): Promise<FunctionCallingLoopTrace> {
   const origin = input.origin || "simulator";
   const [hasAgent, hasTools, hasKnowledge] = await Promise.all([
@@ -75,17 +77,21 @@ export async function runFunctionCallingLoop(input: {
     hasPlanFeature(input.companyId, "automation.knowledge_base")
   ]);
 
-  const ctxSeed = buildSimulatorToolContext({
+  const ctxSeed = buildFunctionCallingToolContext({
     companyId: input.companyId,
     userId: input.userId,
     aiAgentId: input.aiAgentId,
+    ticketId: input.ticketId,
+    contactId: input.contactId,
     allowedToolKeys: [],
+    source: origin === "admin_test" ? "admin_test" : origin,
+    channel: origin === "shadow" ? "shadow" : origin,
     featureFlags: {
       [AUTOMATION_ORCHESTRATOR_FEATURE_KEY]: hasAgent,
       [AUTOMATION_AI_TOOLS_FEATURE_KEY]: hasTools,
       "automation.knowledge_base": hasKnowledge
     },
-    requestId: `fc-${Date.now()}`
+    requestId: `fc-${origin}-${Date.now()}`
   });
 
   const selection = selectToolsForFunctionCalling({

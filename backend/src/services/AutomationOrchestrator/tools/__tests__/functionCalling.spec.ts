@@ -18,6 +18,7 @@ import { selectToolsForFunctionCalling } from "../functionCalling/AutomationTool
 import { buildProviderToolPayload } from "../functionCalling/AutomationProviderToolAdapter";
 import {
   buildSimulatorToolContext,
+  buildFunctionCallingToolContext,
   hashToolCall,
   resolveProviderToolCall
 } from "../functionCalling/AutomationFunctionCallResolver";
@@ -174,13 +175,32 @@ describe("Function Calling 2.1D", () => {
     expect(selection.tools.every(t => t.id.startsWith("contact."))).toBe(true);
   });
 
-  it("Selection rejeita origin live/shadow", () => {
+  it("Selection rejeita origin live", () => {
     const selection = selectToolsForFunctionCalling({
       ctx: fcCtx(),
       origin: "live" as any,
       provider: "openai"
     });
     expect(selection.tools.length).toBe(0);
+  });
+
+  it("Selection aceita origin shadow", () => {
+    const selection = selectToolsForFunctionCalling({
+      ctx: buildFunctionCallingToolContext({
+        companyId: 1,
+        allowedToolKeys: [],
+        source: "shadow",
+        featureFlags: {
+          [AUTOMATION_ORCHESTRATOR_FEATURE_KEY]: true,
+          [AUTOMATION_AI_TOOLS_FEATURE_KEY]: true,
+          "automation.knowledge_base": true
+        }
+      }),
+      origin: "shadow",
+      provider: "openai",
+      companyPolicy: { enabled: true, maxRiskLevel: "read_only" }
+    });
+    expect(selection.tools.length).toBeGreaterThan(0);
   });
 
   it("Provider Adapter OpenAI e Gemini", () => {

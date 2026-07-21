@@ -47,6 +47,8 @@ import {
   getAutomationToolMetrics,
   getAutomationToolsCatalog,
 } from "../../services/automationToolsApi";
+import { getAiAgentShadowFcDashboard } from "../../services/aiAgentApi";
+import { getEvidenceDashboard } from "../../services/automationEvidenceApi";
 
 const CAPABILITY_KEYS = [
   "planner",
@@ -140,6 +142,8 @@ const AutomationMonitorPage = () => {
   const [actionCatalog, setActionCatalog] = useState(null);
   const [toolCatalog, setToolCatalog] = useState(null);
   const [toolMetrics, setToolMetrics] = useState(null);
+  const [shadowFc, setShadowFc] = useState(null);
+  const [evidenceDash, setEvidenceDash] = useState(null);
 
   const loadDashboard = useCallback(async () => {
     setLoading(true);
@@ -226,13 +230,39 @@ const AutomationMonitorPage = () => {
     }
   }, []);
 
+  const loadShadowFcTab = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data } = await getAiAgentShadowFcDashboard();
+      setShadowFc(data);
+    } catch (err) {
+      toastError(err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const loadEvidenceTab = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data } = await getEvidenceDashboard();
+      setEvidenceDash(data);
+    } catch (err) {
+      toastError(err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (tab === 0) loadDashboard();
     if (tab === 1) loadExecutions();
     if (tab === 2) loadValidations();
     if (tab === 3) loadActionsCatalog();
     if (tab === 4) loadToolsTab();
-    if (tab === 5) loadSettings();
+    if (tab === 5) loadShadowFcTab();
+    if (tab === 6) loadEvidenceTab();
+    if (tab === 7) loadSettings();
   }, [
     tab,
     loadDashboard,
@@ -240,6 +270,8 @@ const AutomationMonitorPage = () => {
     loadValidations,
     loadActionsCatalog,
     loadToolsTab,
+    loadShadowFcTab,
+    loadEvidenceTab,
     loadSettings,
   ]);
 
@@ -316,6 +348,8 @@ const AutomationMonitorPage = () => {
           <Tab label="Planner Accuracy" />
           <Tab label="Actions" />
           <Tab label="Tools" />
+          <Tab label="Shadow FC" />
+          <Tab label="Evidence" />
           <Tab label="Configuração" />
         </Tabs>
 
@@ -730,7 +764,150 @@ const AutomationMonitorPage = () => {
               </>
             ))}
 
-          {tab === 5 && (
+          {tab === 5 &&
+            (loading && !shadowFc ? (
+              <TableRowSkeleton columns={4} />
+            ) : (
+              <>
+                <Typography variant="body2" color="textSecondary" paragraph>
+                  Function Calling Shadow (2.1E) — observacional. Sem envio de
+                  mensagem, sem Write Tools, sem Operation Runtime.
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="Execuções Shadow FC"
+                      value={shadowFc?.metrics?.shadowExecutions}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="Tool usage %"
+                      value={Math.round(
+                        (shadowFc?.metrics?.toolUsageRate || 0) * 100
+                      )}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="Knowledge %"
+                      value={Math.round(
+                        (shadowFc?.metrics?.knowledgeUsageRate || 0) * 100
+                      )}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="Latência média"
+                      value={shadowFc?.metrics?.averageLatencyMs}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="Tokens médios"
+                      value={shadowFc?.metrics?.averageTokens}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="Custo médio USD"
+                      value={shadowFc?.metrics?.averageCostUsd}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="Loop stops"
+                      value={shadowFc?.metrics?.loopStops}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="Denial rate %"
+                      value={Math.round(
+                        (shadowFc?.metrics?.toolDeniedRate || 0) * 100
+                      )}
+                    />
+                  </Grid>
+                </Grid>
+                <Box mt={2}>
+                  <Typography variant="subtitle2" gutterBottom>
+                    Top Tools / Failures / Denials / Providers
+                  </Typography>
+                  <pre className={classes.mono}>
+                    {JSON.stringify(
+                      {
+                        topTools: shadowFc?.metrics?.topTools,
+                        topFailures: shadowFc?.metrics?.topFailures,
+                        topDenials: shadowFc?.metrics?.topDenials,
+                        neverUsed: shadowFc?.metrics?.neverUsedTools,
+                        byProvider: shadowFc?.metrics?.byProvider,
+                        config: shadowFc?.config,
+                      },
+                      null,
+                      2
+                    )}
+                  </pre>
+                </Box>
+              </>
+            ))}
+
+          {tab === 6 &&
+            (loading && !evidenceDash ? (
+              <TableRowSkeleton columns={4} />
+            ) : (
+              <>
+                <Typography variant="body2" color="textSecondary" paragraph>
+                  Evidence Engine (2.1F) — fatos observáveis. Live FC OFF.
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="Verification %"
+                      value={Math.round(
+                        (evidenceDash?.rates?.verificationRate || 0) * 100
+                      )}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="Hallucination %"
+                      value={Math.round(
+                        (evidenceDash?.rates?.hallucinationRate || 0) * 100
+                      )}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="Readiness"
+                      value={evidenceDash?.readiness?.level}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="Score"
+                      value={evidenceDash?.readiness?.score}
+                    />
+                  </Grid>
+                </Grid>
+                <Box mt={2}>
+                  <pre className={classes.mono}>
+                    {JSON.stringify(
+                      {
+                        typeCounts: evidenceDash?.typeCounts,
+                        recommendations: evidenceDash?.recommendations,
+                        providers: evidenceDash?.providers,
+                        thresholds: evidenceDash?.thresholds,
+                        topProblems: evidenceDash?.topProblems,
+                      },
+                      null,
+                      2
+                    )}
+                  </pre>
+                </Box>
+              </>
+            ))}
+
+          {tab === 7 && (
             <>
               <Typography className={classes.warn} variant="body2">
                 send_message=active exige planner ativo. Config inconsistente é
