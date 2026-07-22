@@ -158,3 +158,121 @@ export const cacheLayer = {
   delFromParams,
   delFromPattern
 };
+
+/** Acesso direto ao cliente ioredis (hardening / métricas distribuídas). */
+export function getRedisClient(): Redis {
+  return redis;
+}
+
+const REDIS_OP_TIMEOUT_MS = Number(process.env.REDIS_OP_TIMEOUT_MS || 250);
+/** Após timeout/falha, pula Redis por este intervalo (fail-fast → memória). */
+const REDIS_COOLDOWN_MS = Number(process.env.REDIS_COOLDOWN_MS || 5_000);
+let redisDownUntil = 0;
+
+export async function withRedisTimeout<T>(
+  op: () => Promise<T>,
+  ms = REDIS_OP_TIMEOUT_MS
+): Promise<T> {
+  if (Date.now() < redisDownUntil) {
+    throw new Error("redis_cooldown");
+  }
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const result = await Promise.race([
+      op(),
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error("redis_op_timeout")),
+          ms
+        );
+      })
+    ]);
+    return result;
+  } catch (err) {
+    redisDownUntil = Date.now() + REDIS_COOLDOWN_MS;
+    throw err;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+export async function redisGet(key: string): Promise<string | null> {
+  return withRedisTimeout(() => redis.get(key));
+}
+
+export async function redisSet(
+  key: string,
+  value: string,
+  ttlSeconds?: number
+): Promise<"OK" | null> {
+  if (ttlSeconds != null) {
+    return withRedisTimeout(() => redis.set(key, value, "EX", ttlSeconds));
+  }
+  return withRedisTimeout(() => redis.set(key, value));
+}
+
+export async function redisIncr(key: string): Promise<number> {
+  return withRedisTimeout(() => redis.incr(key));
+}
+
+export async function redisIncrBy(key: string, n: number): Promise<number> {
+  return withRedisTimeout(() => redis.incrby(key, n));
+}
+
+export async function redisExpire(
+  key: string,
+  ttlSeconds: number
+): Promise<number> {
+  return withRedisTimeout(() => redis.expire(key, ttlSeconds));
+}
+
+export async function redisHIncrBy(
+  key: string,
+  field: string,
+  n: number
+): Promise<number> {
+  return withRedisTimeout(() => redis.hincrby(key, field, n));
+}
+
+export async function redisHGetAll(
+  key: string
+): Promise<Record<string, string>> {
+  return withRedisTimeout(() => redis.hgetall(key));
+}
+
+export async function redisZAdd(
+  key: string,
+  score: number,
+  member: string
+): Promise<number> {
+  return withRedisTimeout(() => redis.zadd(key, score, member));
+}
+
+export async function redisZRemRangeByScore(
+  key: string,
+  min: number | string,
+  max: number | string
+): Promise<number> {
+  return withRedisTimeout(() => redis.zremrangebyscore(key, min, max));
+}
+
+export async function redisZCard(key: string): Promise<number> {
+  return withRedisTimeout(() => redis.zcard(key));
+}
+
+export async function redisZCount(
+  key: string,
+  min: number | string,
+  max: number | string
+): Promise<number> {
+  return withRedisTimeout(() => redis.zcount(key, min, max));
+}
+
+export async function redisPing(): Promise<boolean> {
+  try {
+    const r = await withRedisTimeout(() => redis.ping(), 300);
+    return r === "PONG";
+  } catch {
+    return false;
+  }
+}

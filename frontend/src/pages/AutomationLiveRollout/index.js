@@ -117,6 +117,15 @@ export default function AutomationLiveRolloutPage() {
           Function Calling Live via estágios (DISABLED → CANARY → PARTIAL →
           FULL). Sem botão global. Write Tools OFF. Fallback legado automático.
         </Typography>
+        {dash?.hardening && (
+          <Typography variant="caption" color="textSecondary" paragraph>
+            Hardening {dash.hardening.version}: {dash.hardening.status}
+            {dash.hardening.redis ? " · Redis OK" : " · métricas locais"}
+            {dash.hardening.circuit?.state
+              ? ` · circuit ${dash.hardening.circuit.state}`
+              : ""}
+          </Typography>
+        )}
         <FormControlLabel
           control={
             <Switch

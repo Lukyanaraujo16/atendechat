@@ -33,6 +33,21 @@ import { estimateCostUsd } from "../../AiAgentService/shadowFc/shadowFcCompariso
 import { buildEvidenceReport } from "../evidence/AutomationEvidenceEngine";
 import { recordEvidenceReport } from "../evidence/EvidenceMetrics";
 import { AUTOMATION_LIVE_ROLLOUT_VERSION } from "../../../config/automationLiveRolloutConstants";
+import { buildExecutionPolicySnapshot } from "./hardening/ExecutionPolicySnapshot";
+import {
+  recordDistributedMetric,
+  recordDistributedLatency
+} from "./hardening/DistributedMetricsStore";
+import {
+  isCircuitBlocking,
+  recordCircuitFailure,
+  recordCircuitSuccess
+} from "./hardening/DistributedCircuitBreaker";
+import { assertLiveRateLimits } from "./hardening/DistributedRateLimiter";
+import { pushSample } from "./hardening/SampleWindowEngine";
+import { recordFailureAggregate } from "./hardening/FailureAggregator";
+import { evaluateProductionAlerts } from "./hardening/ProductionAlerts";
+import { createHash } from "crypto";
 
 export type LiveFcGenerationResult = {
   ok: boolean;
@@ -80,6 +95,15 @@ export async function generateLiveResponseWithOptionalFc(input: {
   } | null;
 }): Promise<LiveFcGenerationResult> {
   const started = Date.now();
+  const executionId = createHash("sha256")
+    .update(
+      `${input.companyId}:${input.ticket.id}:${input.logId || ""}:${input.messageId || ""}:${started}`
+    )
+    .digest("hex")
+    .slice(0, 24);
+
+  // Config lida UMA vez — congelada no snapshot
+  const config = await loadLiveRolloutConfig(input.companyId);
 
   const resolved = await resolveAiAgentOpenAiApiKeyWithSource({
     companyId: input.companyId,
@@ -105,12 +129,66 @@ export async function generateLiveResponseWithOptionalFc(input: {
     }
   });
 
+  const policySnapshot = buildExecutionPolicySnapshot({
+    executionId,
+    companyId: input.companyId,
+    ticketId: input.ticket.id,
+    connectionId: input.whatsapp.id,
+    agentId: input.agent.id,
+    messageId: input.messageId,
+    provider: resolved.provider || null,
+    eligibility,
+    config,
+    featureFlags: {
+      liveFc: true,
+      writeTools: false
+    },
+    availableTools: []
+  });
+
   recordLiveEligibility({
     companyId: input.companyId,
     eligible: eligibility.eligible,
     canaryIn: eligibility.gates.canary,
     stage: eligibility.stage
   });
+  void recordDistributedMetric({
+    companyId: input.companyId,
+    field: eligibility.eligible ? "eligible" : "ineligible"
+  });
+
+  // Hardening gates (além da eligibility) — usam snapshot, não re-lêem config
+  if (eligibility.eligible && resolved.apiKey && resolved.provider) {
+    const circuitOpen = await isCircuitBlocking({
+      scope: "company",
+      id: String(input.companyId)
+    });
+    const providerCircuit = await isCircuitBlocking({
+      scope: "provider",
+      id: String(resolved.provider)
+    });
+    if (circuitOpen || providerCircuit) {
+      eligibility.eligible = false;
+      eligibility.blockers.push(
+        circuitOpen ? "circuit_company_open" : "circuit_provider_open"
+      );
+      void recordDistributedMetric({
+        companyId: input.companyId,
+        field: "circuitOpens"
+      });
+    } else {
+      const rl = await assertLiveRateLimits({
+        companyId: input.companyId,
+        connectionId: input.whatsapp.id,
+        agentId: input.agent.id,
+        provider: resolved.provider
+      });
+      if (!rl.allowed) {
+        eligibility.eligible = false;
+        eligibility.blockers.push(`rate_limit:${rl.blockedBy}`);
+      }
+    }
+  }
 
   if (!eligibility.eligible || !resolved.apiKey || !resolved.provider) {
     const legacy = await buildAiAgentProviderResponse({
@@ -145,7 +223,8 @@ export async function generateLiveResponseWithOptionalFc(input: {
         liveFcMeta: {
           version: AUTOMATION_LIVE_ROLLOUT_VERSION,
           usedFunctionCalling: false,
-          eligibility
+          eligibility,
+          policySnapshot
         }
       };
     }
@@ -173,7 +252,8 @@ export async function generateLiveResponseWithOptionalFc(input: {
       liveFcMeta: {
         version: AUTOMATION_LIVE_ROLLOUT_VERSION,
         usedFunctionCalling: false,
-        eligibility
+        eligibility,
+        policySnapshot
       }
     };
   }
@@ -219,9 +299,8 @@ export async function generateLiveResponseWithOptionalFc(input: {
       AI_AGENT_LIVE_MAX_TOKENS_CAP
     );
 
-    const config = await loadLiveRolloutConfig(input.companyId);
-    // Selection Engine continua com allowWrite: false por padrão (safety)
-    const allowWrite = config.allowWriteToolsLive === true;
+    // Snapshot garante Write Tools OFF — nunca relê config
+    const allowWrite = false;
 
     const trace = await runFunctionCallingLoop({
       companyId: input.companyId,
@@ -273,6 +352,42 @@ export async function generateLiveResponseWithOptionalFc(input: {
       fallback: false,
       timeout: Boolean(trace.loopStopReason?.includes("timeout"))
     });
+
+    void recordDistributedMetric({
+      companyId: input.companyId,
+      field: "liveExecutions"
+    });
+    void recordDistributedMetric({
+      companyId: input.companyId,
+      field: "tokens",
+      n: totalTokens
+    });
+    if (toolFailures) {
+      void recordDistributedMetric({
+        companyId: input.companyId,
+        field: "toolFailures",
+        n: toolFailures
+      });
+      void recordFailureAggregate({
+        companyId: input.companyId,
+        dimension: "company",
+        id: input.companyId,
+        kind: "tool_failure"
+      });
+    }
+    void recordDistributedLatency(input.companyId, latencyMs);
+    void pushSample({ companyId: input.companyId, metric: "latency", value: latencyMs });
+    void recordCircuitSuccess({
+      scope: "company",
+      id: String(input.companyId)
+    });
+    if (resolved.provider) {
+      void recordCircuitSuccess({
+        scope: "provider",
+        id: String(resolved.provider)
+      });
+    }
+    void evaluateProductionAlerts(input.companyId);
 
     // Live Evidence (source=live) — métricas separadas via primaryType + metadata
     try {
@@ -344,14 +459,15 @@ export async function generateLiveResponseWithOptionalFc(input: {
       liveFcMeta: {
         version: AUTOMATION_LIVE_ROLLOUT_VERSION,
         usedFunctionCalling: true,
-        stage: eligibility.stage,
-        canaryBucket: eligibility.canaryBucket,
-        effectivePercent: eligibility.effectivePercent,
+        stage: policySnapshot.stage,
+        canaryBucket: policySnapshot.canaryBucket,
+        effectivePercent: policySnapshot.effectivePercent,
         allowWriteToolsLive: false,
         loopStopReason: trace.loopStopReason || null,
         toolCallCount: resolutions.length,
         selectedTools: trace.selectedTools,
-        eligibility
+        eligibility,
+        policySnapshot
       }
     };
   } catch (err) {
@@ -366,6 +482,38 @@ export async function generateLiveResponseWithOptionalFc(input: {
       fallback: true,
       timeout: /timeout/i.test(err instanceof Error ? err.message : "")
     });
+    void recordDistributedMetric({
+      companyId: input.companyId,
+      field: "fallbacks"
+    });
+    if (/timeout/i.test(err instanceof Error ? err.message : "")) {
+      void recordDistributedMetric({
+        companyId: input.companyId,
+        field: "timeouts"
+      });
+    }
+    void recordCircuitFailure({
+      scope: "company",
+      id: String(input.companyId)
+    });
+    if (resolved.provider) {
+      void recordCircuitFailure({
+        scope: "provider",
+        id: String(resolved.provider)
+      });
+      void recordDistributedMetric({
+        companyId: input.companyId,
+        field: "providerFailures"
+      });
+      void recordFailureAggregate({
+        companyId: input.companyId,
+        dimension: "provider",
+        id: String(resolved.provider),
+        kind: "fc_failure"
+      });
+    }
+    void pushSample({ companyId: input.companyId, metric: "fallback", value: 1 });
+    void evaluateProductionAlerts(input.companyId);
 
     const legacy = await buildAiAgentProviderResponse({
       companyId: input.companyId,
@@ -396,7 +544,8 @@ export async function generateLiveResponseWithOptionalFc(input: {
           version: AUTOMATION_LIVE_ROLLOUT_VERSION,
           usedFunctionCalling: false,
           fallback: true,
-          eligibility
+          eligibility,
+          policySnapshot
         }
       };
     }
@@ -425,7 +574,8 @@ export async function generateLiveResponseWithOptionalFc(input: {
         usedFunctionCalling: false,
         fallback: true,
         fallbackReason: err instanceof Error ? err.message : "fc_failed",
-        eligibility
+        eligibility,
+        policySnapshot
       }
     };
   }

@@ -6,10 +6,19 @@ import { recordLiveRollback } from "./LiveRolloutMetrics";
 import { LiveRolloutStage } from "../../../config/automationLiveRolloutConstants";
 import { getEvidenceMetricsSnapshot } from "../evidence/EvidenceMetrics";
 import { getLiveRolloutMetricsSnapshot } from "./LiveRolloutMetrics";
+import {
+  canApplyRollback,
+  canPromoteRollout,
+  markPromotionApplied,
+  markRollbackApplied
+} from "./hardening/RolloutGuards";
+import { recordDistributedMetric } from "./hardening/DistributedMetricsStore";
+import { emitProductionAlert } from "./hardening/ProductionAlerts";
 
 /**
  * Auto Rollback — baixa percentual/stage com base em métricas.
  * Sem scheduler; invocável via API ou após execução.
+ * Rollback Guard impede oscilação promoção↔rollback.
  */
 export async function evaluateAndApplyAutoRollback(input: {
   companyId: number;
@@ -32,6 +41,18 @@ export async function evaluateAndApplyAutoRollback(input: {
       previousStage: config.stage,
       nextStage: config.stage,
       reasons: ["auto_rollback_disabled"]
+    };
+  }
+
+  const guard = await canApplyRollback(input.companyId);
+  if (!guard.allowed) {
+    return {
+      applied: false,
+      previousPercent: config.percent,
+      nextPercent: config.percent,
+      previousStage: config.stage,
+      nextStage: config.stage,
+      reasons: [guard.reason]
     };
   }
 
@@ -80,9 +101,7 @@ export async function evaluateAndApplyAutoRollback(input: {
     (a, b) => b - a
   );
   const current = config.stage === "FULL" ? 100 : config.percent;
-  const next =
-    steps.find(s => s < current) ??
-    (current > 0 ? 0 : 0);
+  const next = steps.find(s => s < current) ?? (current > 0 ? 0 : 0);
 
   let nextStage: LiveRolloutStage = config.stage;
   if (next <= 0) {
@@ -98,6 +117,17 @@ export async function evaluateAndApplyAutoRollback(input: {
     stage: nextStage
   });
   recordLiveRollback(input.companyId);
+  await markRollbackApplied(input.companyId);
+  void recordDistributedMetric({
+    companyId: input.companyId,
+    field: "rollbacks"
+  });
+  emitProductionAlert({
+    companyId: input.companyId,
+    kind: "rollback",
+    message: `Auto rollback ${current}% → ${next}% (${reasons.join(",")})`,
+    meta: { previousPercent: current, nextPercent: next, reasons }
+  });
 
   return {
     applied: true,
@@ -111,7 +141,7 @@ export async function evaluateAndApplyAutoRollback(input: {
 
 /**
  * Progressive rollout step — infraestrutura apenas (sem scheduler).
- * Avança um degrau do plano se progressive.enabled.
+ * Promotion Guard exige amostras mínimas antes de avançar.
  */
 export async function advanceProgressiveRolloutStep(input: {
   companyId: number;
@@ -120,6 +150,7 @@ export async function advanceProgressiveRolloutStep(input: {
   percent: number;
   stage: LiveRolloutStage;
   reason: string;
+  blockers?: string[];
 }> {
   const config = await loadLiveRolloutConfig(input.companyId);
   if (!config.progressive.enabled) {
@@ -130,6 +161,18 @@ export async function advanceProgressiveRolloutStep(input: {
       reason: "progressive_disabled"
     };
   }
+
+  const promo = await canPromoteRollout(input.companyId);
+  if (!promo.allowed) {
+    return {
+      applied: false,
+      percent: config.percent,
+      stage: config.stage,
+      reason: "promotion_guard_blocked",
+      blockers: promo.blockers
+    };
+  }
+
   const plan = config.progressive.plan || [];
   const current = config.percent;
   const nextStep = plan.find(p => p.percent > current);
@@ -137,6 +180,11 @@ export async function advanceProgressiveRolloutStep(input: {
     await saveLiveRolloutConfig(input.companyId, {
       percent: 100,
       stage: "FULL"
+    });
+    await markPromotionApplied(input.companyId);
+    void recordDistributedMetric({
+      companyId: input.companyId,
+      field: "rollouts"
     });
     return {
       applied: true,
@@ -154,6 +202,11 @@ export async function advanceProgressiveRolloutStep(input: {
   await saveLiveRolloutConfig(input.companyId, {
     percent: nextStep.percent,
     stage
+  });
+  await markPromotionApplied(input.companyId);
+  void recordDistributedMetric({
+    companyId: input.companyId,
+    field: "rollouts"
   });
   return {
     applied: true,

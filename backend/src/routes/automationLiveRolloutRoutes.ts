@@ -90,4 +90,10 @@ automationLiveRolloutRoutes.post(
   LiveCtrl.advanceProgressive
 );
 
+automationLiveRolloutRoutes.get(
+  "/automation/live/health",
+  ...mw,
+  LiveCtrl.liveHealth
+);
+
 export default automationLiveRolloutRoutes;

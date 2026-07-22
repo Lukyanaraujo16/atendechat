@@ -51,6 +51,17 @@ export async function GetLiveRolloutDashboardService(input: {
   ]);
 
   const metrics = getLiveRolloutMetricsSnapshot(input.companyId);
+  const { getDistributedMetricsSnapshot } = await import(
+    "./hardening/DistributedMetricsStore"
+  );
+  const { listRecentAlerts } = await import("./hardening/ProductionAlerts");
+  const { getLiveHardeningHealth } = await import(
+    "./hardening/LiveHardeningHealth"
+  );
+  const metricsDistributed = await getDistributedMetricsSnapshot(input.companyId);
+  const hardeningHealth = await getLiveHardeningHealth({
+    companyId: input.companyId
+  });
   const evidence = getEvidenceMetricsSnapshot(input.companyId);
   const thresholds = await loadEvidenceThresholds(input.companyId);
   const rates = {
@@ -78,6 +89,16 @@ export async function GetLiveRolloutDashboardService(input: {
     agentsEnabled: agentsOn,
     connectionsEnabled: connectionsOn,
     metrics,
+    metricsDistributed,
+    alerts: listRecentAlerts(input.companyId).slice(0, 10),
+    hardening: {
+      version: hardeningHealth.version,
+      status: hardeningHealth.status,
+      redis: hardeningHealth.redis,
+      multiInstance: hardeningHealth.multiInstance,
+      circuit: hardeningHealth.circuit,
+      allowWriteToolsLive: false
+    },
     readiness,
     killSwitch: getKillSwitchSnapshot(input.companyId),
     comparison: {

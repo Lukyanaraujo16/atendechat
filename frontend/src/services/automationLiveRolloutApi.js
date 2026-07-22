@@ -51,3 +51,7 @@ export function getLiveTargets() {
 export function advanceLiveProgressive() {
   return api.post("/automation/live/progressive/advance");
 }
+
+export function getLiveHealth() {
+  return api.get("/automation/live/health");
+}

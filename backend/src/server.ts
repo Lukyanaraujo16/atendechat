@@ -12,6 +12,7 @@ import { cleanupOrphanBackupArtifacts, ensureBackupDirs } from "./config/backup"
 import { startBillingAutomationScheduler } from "./jobs/billingAutomationScheduler";
 import { startSignupCriticalSocketScheduler } from "./jobs/signupCriticalSocketScheduler";
 import { startUserNotificationCleanupScheduler } from "./jobs/userNotificationCleanupScheduler";
+import { startLiveHardeningCleanupScheduler } from "./jobs/liveHardeningCleanupScheduler";
 import { startCompanyStorageRecalcScheduler } from "./jobs/companyStorageRecalcScheduler";
 import { startCrmFollowUpNotifierScheduler } from "./jobs/crmFollowUpNotifierJob";
 import { startCrmStaleDealAttentionScheduler } from "./jobs/crmStaleDealAttentionJob";
@@ -48,6 +49,7 @@ const server = app.listen(process.env.PORT, async () => {
   startBillingAutomationScheduler();
   startSignupCriticalSocketScheduler();
   startUserNotificationCleanupScheduler();
+  startLiveHardeningCleanupScheduler();
   startCompanyStorageRecalcScheduler();
   startCrmFollowUpNotifierScheduler();
   startCrmStaleDealAttentionScheduler();

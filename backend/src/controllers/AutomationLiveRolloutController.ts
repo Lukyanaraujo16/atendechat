@@ -212,3 +212,14 @@ export const advanceProgressive = async (
   );
   return res.json(await AdvanceProgressiveService({ companyId }));
 };
+
+export const liveHealth = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const { getLiveHardeningHealth } = await import(
+    "../services/AutomationOrchestrator/liveRollout/hardening/LiveHardeningHealth"
+  );
+  return res.json(await getLiveHardeningHealth({ companyId }));
+};
