@@ -73,7 +73,19 @@ import {
   AI_AGENT_SHADOW_FC_ROUTE_PATH,
   AUTOMATION_EVIDENCE_ROUTE_PATH,
   AUTOMATION_LIVE_ROLLOUT_ROUTE_PATH,
+  AUTOMATION_PLANNING_ROUTE_PATH,
+  AUTOMATION_PLAN_EVALUATION_ROUTE_PATH,
+  AUTOMATION_EXECUTION_SESSIONS_ROUTE_PATH,
+  AUTOMATION_ACTION_EXECUTION_ROUTE_PATH,
+  AUTOMATION_RUNTIME_INTEGRATION_ROUTE_PATH,
+  AUTOMATION_EXECUTION_FEEDBACK_ROUTE_PATH,
+  AUTOMATION_COGNITIVE_MEMORY_ROUTE_PATH,
+  AUTOMATION_MCP_RUNTIME_ROUTE_PATH,
+  AUTOMATION_LEARNING_ENGINE_ROUTE_PATH,
+  AUTOMATION_MULTI_AGENT_ROUTE_PATH,
   AUTOMATION_MONITOR_ROUTE_PATH,
+  AUTOMATION_OBSERVABILITY_ROUTE_PATH,
+  AUTOMATION_PRODUCTION_ROUTE_PATH,
   AUTOMATION_TOOLS_ROUTE_PATH,
   AUTOMATION_AI_TOOLS_FEATURE_KEY,
   AI_AGENT_SIMULATOR_ROUTE_PATH,
@@ -95,6 +107,12 @@ const AiAgentAnalyticsPage = React.lazy(() =>
 const AutomationMonitorPage = React.lazy(() =>
   import("../pages/AutomationMonitor")
 );
+const AutomationObservabilityPage = React.lazy(() =>
+  import("../pages/AutomationObservability")
+);
+const AutomationProductionPage = React.lazy(() =>
+  import("../pages/AutomationProduction")
+);
 const AutomationToolsPage = React.lazy(() =>
   import("../pages/AutomationTools")
 );
@@ -106,6 +124,36 @@ const AutomationEvidencePage = React.lazy(() =>
 );
 const AutomationLiveRolloutPage = React.lazy(() =>
   import("../pages/AutomationLiveRollout")
+);
+const AutomationPlanningPage = React.lazy(() =>
+  import("../pages/AutomationPlanning")
+);
+const AutomationPlanEvaluationPage = React.lazy(() =>
+  import("../pages/AutomationPlanEvaluation")
+);
+const AutomationExecutionSessionsPage = React.lazy(() =>
+  import("../pages/AutomationExecutionSessions")
+);
+const AutomationActionExecutionPage = React.lazy(() =>
+  import("../pages/AutomationActionExecution")
+);
+const AutomationRuntimeIntegrationPage = React.lazy(() =>
+  import("../pages/AutomationRuntimeIntegration")
+);
+const AutomationExecutionFeedbackPage = React.lazy(() =>
+  import("../pages/AutomationExecutionFeedback")
+);
+const AutomationCognitiveMemoryPage = React.lazy(() =>
+  import("../pages/AutomationCognitiveMemory")
+);
+const AutomationMcpRuntimePage = React.lazy(() =>
+  import("../pages/AutomationMcpRuntime")
+);
+const AutomationLearningEnginePage = React.lazy(() =>
+  import("../pages/AutomationLearningEngine")
+);
+const AutomationMultiAgentPage = React.lazy(() =>
+  import("../pages/AutomationMultiAgent")
 );
 
 function PlanFlagsLoadingState() {
@@ -402,6 +450,14 @@ function AutomacaoModule({ planFlags, isAdmin }) {
         path: AUTOMATION_MONITOR_ROUTE_PATH,
         label: i18n.t("mainDrawer.listItems.automationMonitor"),
       });
+      t.push({
+        path: AUTOMATION_OBSERVABILITY_ROUTE_PATH,
+        label: "Observability",
+      });
+      t.push({
+        path: AUTOMATION_PRODUCTION_ROUTE_PATH,
+        label: i18n.t("mainDrawer.listItems.automationProduction"),
+      });
     }
     if (showAiTools) {
       t.push({
@@ -415,6 +471,46 @@ function AutomacaoModule({ planFlags, isAdmin }) {
       t.push({
         path: AUTOMATION_LIVE_ROLLOUT_ROUTE_PATH,
         label: i18n.t("mainDrawer.listItems.automationLiveRollout"),
+      });
+      t.push({
+        path: AUTOMATION_PLANNING_ROUTE_PATH,
+        label: i18n.t("mainDrawer.listItems.automationPlanning"),
+      });
+      t.push({
+        path: AUTOMATION_PLAN_EVALUATION_ROUTE_PATH,
+        label: i18n.t("mainDrawer.listItems.automationPlanEvaluation"),
+      });
+      t.push({
+        path: AUTOMATION_EXECUTION_SESSIONS_ROUTE_PATH,
+        label: i18n.t("mainDrawer.listItems.automationExecutionSessions"),
+      });
+      t.push({
+        path: AUTOMATION_ACTION_EXECUTION_ROUTE_PATH,
+        label: i18n.t("mainDrawer.listItems.automationActionExecution"),
+      });
+      t.push({
+        path: AUTOMATION_RUNTIME_INTEGRATION_ROUTE_PATH,
+        label: i18n.t("mainDrawer.listItems.automationRuntimeIntegration"),
+      });
+      t.push({
+        path: AUTOMATION_EXECUTION_FEEDBACK_ROUTE_PATH,
+        label: i18n.t("mainDrawer.listItems.automationExecutionFeedback"),
+      });
+      t.push({
+        path: AUTOMATION_COGNITIVE_MEMORY_ROUTE_PATH,
+        label: i18n.t("mainDrawer.listItems.automationCognitiveMemory"),
+      });
+      t.push({
+        path: AUTOMATION_MCP_RUNTIME_ROUTE_PATH,
+        label: i18n.t("mainDrawer.listItems.automationMcpRuntime"),
+      });
+      t.push({
+        path: AUTOMATION_LEARNING_ENGINE_ROUTE_PATH,
+        label: i18n.t("mainDrawer.listItems.automationLearningEngine"),
+      });
+      t.push({
+        path: AUTOMATION_MULTI_AGENT_ROUTE_PATH,
+        label: i18n.t("mainDrawer.listItems.automationMultiAgent"),
       });
       t.push({
         path: AUTOMATION_TOOLS_ROUTE_PATH,
@@ -590,6 +686,40 @@ function AutomacaoModule({ planFlags, isAdmin }) {
         />
         <Route
           exact
+          path={AUTOMATION_OBSERVABILITY_ROUTE_PATH}
+          render={() => (
+            <AiAgentRouteGuard
+              planFlags={planFlags}
+              user={user}
+              fallbackPath={fallback}
+            >
+              {isAdmin && showAiAgentAnalytics ? (
+                <Suspense fallback={<PlanFlagsLoadingState />}>
+                  <AutomationObservabilityPage />
+                </Suspense>
+              ) : null}
+            </AiAgentRouteGuard>
+          )}
+        />
+        <Route
+          exact
+          path={AUTOMATION_PRODUCTION_ROUTE_PATH}
+          render={() => (
+            <AiAgentRouteGuard
+              planFlags={planFlags}
+              user={user}
+              fallbackPath={fallback}
+            >
+              {isAdmin && showAiAgentAnalytics ? (
+                <Suspense fallback={<PlanFlagsLoadingState />}>
+                  <AutomationProductionPage />
+                </Suspense>
+              ) : null}
+            </AiAgentRouteGuard>
+          )}
+        />
+        <Route
+          exact
           path={AI_AGENT_SHADOW_FC_ROUTE_PATH}
           render={() => (
             <AiAgentRouteGuard
@@ -634,6 +764,176 @@ function AutomacaoModule({ planFlags, isAdmin }) {
               {isAdmin && showAiTools ? (
                 <Suspense fallback={<PlanFlagsLoadingState />}>
                   <AutomationLiveRolloutPage />
+                </Suspense>
+              ) : null}
+            </AiAgentRouteGuard>
+          )}
+        />
+        <Route
+          exact
+          path={AUTOMATION_PLANNING_ROUTE_PATH}
+          render={() => (
+            <AiAgentRouteGuard
+              planFlags={planFlags}
+              user={user}
+              fallbackPath={fallback}
+            >
+              {isAdmin && showAiTools ? (
+                <Suspense fallback={<PlanFlagsLoadingState />}>
+                  <AutomationPlanningPage />
+                </Suspense>
+              ) : null}
+            </AiAgentRouteGuard>
+          )}
+        />
+        <Route
+          exact
+          path={AUTOMATION_PLAN_EVALUATION_ROUTE_PATH}
+          render={() => (
+            <AiAgentRouteGuard
+              planFlags={planFlags}
+              user={user}
+              fallbackPath={fallback}
+            >
+              {isAdmin && showAiTools ? (
+                <Suspense fallback={<PlanFlagsLoadingState />}>
+                  <AutomationPlanEvaluationPage />
+                </Suspense>
+              ) : null}
+            </AiAgentRouteGuard>
+          )}
+        />
+        <Route
+          exact
+          path={AUTOMATION_EXECUTION_SESSIONS_ROUTE_PATH}
+          render={() => (
+            <AiAgentRouteGuard
+              planFlags={planFlags}
+              user={user}
+              fallbackPath={fallback}
+            >
+              {isAdmin && showAiTools ? (
+                <Suspense fallback={<PlanFlagsLoadingState />}>
+                  <AutomationExecutionSessionsPage />
+                </Suspense>
+              ) : null}
+            </AiAgentRouteGuard>
+          )}
+        />
+        <Route
+          exact
+          path={AUTOMATION_ACTION_EXECUTION_ROUTE_PATH}
+          render={() => (
+            <AiAgentRouteGuard
+              planFlags={planFlags}
+              user={user}
+              fallbackPath={fallback}
+            >
+              {isAdmin && showAiTools ? (
+                <Suspense fallback={<PlanFlagsLoadingState />}>
+                  <AutomationActionExecutionPage />
+                </Suspense>
+              ) : null}
+            </AiAgentRouteGuard>
+          )}
+        />
+        <Route
+          exact
+          path={AUTOMATION_RUNTIME_INTEGRATION_ROUTE_PATH}
+          render={() => (
+            <AiAgentRouteGuard
+              planFlags={planFlags}
+              user={user}
+              fallbackPath={fallback}
+            >
+              {isAdmin && showAiTools ? (
+                <Suspense fallback={<PlanFlagsLoadingState />}>
+                  <AutomationRuntimeIntegrationPage />
+                </Suspense>
+              ) : null}
+            </AiAgentRouteGuard>
+          )}
+        />
+        <Route
+          exact
+          path={AUTOMATION_EXECUTION_FEEDBACK_ROUTE_PATH}
+          render={() => (
+            <AiAgentRouteGuard
+              planFlags={planFlags}
+              user={user}
+              fallbackPath={fallback}
+            >
+              {isAdmin && showAiTools ? (
+                <Suspense fallback={<PlanFlagsLoadingState />}>
+                  <AutomationExecutionFeedbackPage />
+                </Suspense>
+              ) : null}
+            </AiAgentRouteGuard>
+          )}
+        />
+        <Route
+          exact
+          path={AUTOMATION_COGNITIVE_MEMORY_ROUTE_PATH}
+          render={() => (
+            <AiAgentRouteGuard
+              planFlags={planFlags}
+              user={user}
+              fallbackPath={fallback}
+            >
+              {isAdmin && showAiTools ? (
+                <Suspense fallback={<PlanFlagsLoadingState />}>
+                  <AutomationCognitiveMemoryPage />
+                </Suspense>
+              ) : null}
+            </AiAgentRouteGuard>
+          )}
+        />
+        <Route
+          exact
+          path={AUTOMATION_MCP_RUNTIME_ROUTE_PATH}
+          render={() => (
+            <AiAgentRouteGuard
+              planFlags={planFlags}
+              user={user}
+              fallbackPath={fallback}
+            >
+              {isAdmin && showAiTools ? (
+                <Suspense fallback={<PlanFlagsLoadingState />}>
+                  <AutomationMcpRuntimePage />
+                </Suspense>
+              ) : null}
+            </AiAgentRouteGuard>
+          )}
+        />
+        <Route
+          exact
+          path={AUTOMATION_LEARNING_ENGINE_ROUTE_PATH}
+          render={() => (
+            <AiAgentRouteGuard
+              planFlags={planFlags}
+              user={user}
+              fallbackPath={fallback}
+            >
+              {isAdmin && showAiTools ? (
+                <Suspense fallback={<PlanFlagsLoadingState />}>
+                  <AutomationLearningEnginePage />
+                </Suspense>
+              ) : null}
+            </AiAgentRouteGuard>
+          )}
+        />
+        <Route
+          exact
+          path={AUTOMATION_MULTI_AGENT_ROUTE_PATH}
+          render={() => (
+            <AiAgentRouteGuard
+              planFlags={planFlags}
+              user={user}
+              fallbackPath={fallback}
+            >
+              {isAdmin && showAiTools ? (
+                <Suspense fallback={<PlanFlagsLoadingState />}>
+                  <AutomationMultiAgentPage />
                 </Suspense>
               ) : null}
             </AiAgentRouteGuard>
@@ -897,7 +1197,16 @@ export default function LoggedInRoutesContent() {
     AI_AGENT_SHADOW_FC_ROUTE_PATH,
     AUTOMATION_EVIDENCE_ROUTE_PATH,
     AUTOMATION_LIVE_ROLLOUT_ROUTE_PATH,
+    AUTOMATION_PLANNING_ROUTE_PATH,
+    AUTOMATION_PLAN_EVALUATION_ROUTE_PATH,
+    AUTOMATION_EXECUTION_SESSIONS_ROUTE_PATH,
+    AUTOMATION_ACTION_EXECUTION_ROUTE_PATH,
+    AUTOMATION_RUNTIME_INTEGRATION_ROUTE_PATH,
+    AUTOMATION_EXECUTION_FEEDBACK_ROUTE_PATH,
+    AUTOMATION_COGNITIVE_MEMORY_ROUTE_PATH,
     AUTOMATION_MONITOR_ROUTE_PATH,
+    AUTOMATION_OBSERVABILITY_ROUTE_PATH,
+    AUTOMATION_PRODUCTION_ROUTE_PATH,
     AUTOMATION_TOOLS_ROUTE_PATH,
     KNOWLEDGE_BASE_ROUTE_PATH,
     "/quick-messages",

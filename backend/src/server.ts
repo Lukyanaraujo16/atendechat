@@ -18,6 +18,10 @@ import { startCrmFollowUpNotifierScheduler } from "./jobs/crmFollowUpNotifierJob
 import { startCrmStaleDealAttentionScheduler } from "./jobs/crmStaleDealAttentionJob";
 import { startRefreshInstagramOAuthTokensScheduler } from "./jobs/RefreshInstagramOAuthTokensJob";
 import { logWhatsAppPolicyAtProcessBoot } from "./helpers/whatsappUnavailablePresence";
+import {
+  startAgentOsScalabilityRuntime,
+  stopAgentOsScalabilityRuntime
+} from "./services/AutomationOrchestrator/scalability/Lifecycle";
 
 const server = app.listen(process.env.PORT, async () => {
   const companies = await Company.findAll();
@@ -54,6 +58,7 @@ const server = app.listen(process.env.PORT, async () => {
   startCrmFollowUpNotifierScheduler();
   startCrmStaleDealAttentionScheduler();
   startRefreshInstagramOAuthTokensScheduler();
+  void startAgentOsScalabilityRuntime();
 });
 
 cron.schedule("* * * * *", async () => {
@@ -71,4 +76,8 @@ cron.schedule("* * * * *", async () => {
 });
 
 initIO(server);
-gracefulShutdown(server);
+gracefulShutdown(server, {
+  onShutdown: async () => {
+    await stopAgentOsScalabilityRuntime();
+  }
+});

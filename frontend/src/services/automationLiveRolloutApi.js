@@ -5,7 +5,7 @@ export function getLiveRolloutDashboard() {
 }
 
 export function updateLiveRollout(config) {
-  return api.put("/automation/live-rollout", { config });
+  return api.put("/automation/live-rollout", { config, confirm: true });
 }
 
 export function getLiveReadiness() {
@@ -21,7 +21,7 @@ export function testLiveRollout(data) {
 }
 
 export function postLiveRollback() {
-  return api.post("/automation/live/rollback");
+  return api.post("/automation/live/rollback", { confirm: true });
 }
 
 export function postLiveFallback(data = {}) {
@@ -33,15 +33,15 @@ export function postLiveKillSwitch(data) {
 }
 
 export function updateLiveCompanySetting(data) {
-  return api.put("/automation/live/company-setting", data);
+  return api.put("/automation/live/company-setting", { ...data, confirm: true });
 }
 
 export function updateLiveAgentSetting(agentId, data) {
-  return api.put(`/automation/live/agents/${agentId}`, data);
+  return api.put(`/automation/live/agents/${agentId}`, { ...data, confirm: true });
 }
 
 export function updateLiveConnectionSetting(whatsappId, data) {
-  return api.put(`/automation/live/connections/${whatsappId}`, data);
+  return api.put(`/automation/live/connections/${whatsappId}`, { ...data, confirm: true });
 }
 
 export function getLiveTargets() {

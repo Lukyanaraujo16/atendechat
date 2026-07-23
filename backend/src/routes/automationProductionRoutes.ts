@@ -1,0 +1,142 @@
+import { Router } from "express";
+import { agentOsStacks } from "../middleware/agentOsAdminStack";
+import { requireAgentOsPermission } from "../middleware/requireAgentOsPermission";
+import * as Ctrl from "../controllers/AutomationProductionController";
+
+const routes = Router();
+const mw = agentOsStacks.monitor();
+
+routes.get(
+  "/automation/production",
+  ...mw,
+  requireAgentOsPermission("automation.agentos.view"),
+  Ctrl.productionDashboard
+);
+routes.get(
+  "/automation/production-readiness",
+  ...mw,
+  requireAgentOsPermission("automation.agentos.health.view"),
+  Ctrl.productionReadiness
+);
+routes.get(
+  "/automation/rollout",
+  ...mw,
+  requireAgentOsPermission("automation.agentos.rollout.view"),
+  Ctrl.getRollout
+);
+routes.get(
+  "/automation/rollout/history",
+  ...mw,
+  requireAgentOsPermission("automation.agentos.rollout.view"),
+  Ctrl.rolloutHistory
+);
+routes.post(
+  "/automation/rollout/preflight",
+  ...mw,
+  requireAgentOsPermission("automation.agentos.rollout.manage"),
+  Ctrl.preflight
+);
+routes.post(
+  "/automation/rollout/transition",
+  ...mw,
+  requireAgentOsPermission("automation.agentos.rollout.manage"),
+  Ctrl.transition
+);
+routes.post(
+  "/automation/rollout/suspend",
+  ...mw,
+  requireAgentOsPermission("automation.agentos.rollout.manage"),
+  Ctrl.suspend
+);
+routes.post(
+  "/automation/rollout/resume",
+  ...mw,
+  requireAgentOsPermission("automation.agentos.rollout.manage"),
+  Ctrl.resume
+);
+routes.post(
+  "/automation/rollout/rollback",
+  ...mw,
+  requireAgentOsPermission("automation.agentos.rollout.manage"),
+  Ctrl.rollback
+);
+routes.get(
+  "/automation/kill-switches",
+  ...mw,
+  requireAgentOsPermission("automation.agentos.view"),
+  Ctrl.listKill
+);
+routes.post(
+  "/automation/kill-switches",
+  ...mw,
+  requireAgentOsPermission("automation.agentos.rollout.manage"),
+  Ctrl.setKill
+);
+routes.get(
+  "/automation/kill-switches/resolved",
+  ...mw,
+  requireAgentOsPermission("automation.agentos.view"),
+  Ctrl.resolveKill
+);
+routes.post(
+  "/automation/emergency-stop",
+  ...mw,
+  requireAgentOsPermission("automation.agentos.emergencyStop"),
+  Ctrl.emergencyStop
+);
+routes.get(
+  "/automation/incidents",
+  ...mw,
+  requireAgentOsPermission("automation.agentos.audit.view"),
+  Ctrl.listIncidents
+);
+routes.get(
+  "/automation/incidents/:id",
+  ...mw,
+  requireAgentOsPermission("automation.agentos.audit.view"),
+  Ctrl.getIncident
+);
+routes.post(
+  "/automation/incidents/:id/acknowledge",
+  ...mw,
+  requireAgentOsPermission("automation.agentos.configure"),
+  Ctrl.ackIncident
+);
+routes.post(
+  "/automation/incidents/:id/resolve",
+  ...mw,
+  requireAgentOsPermission("automation.agentos.configure"),
+  Ctrl.resolveIncident
+);
+routes.get(
+  "/automation/release-readiness",
+  ...mw,
+  requireAgentOsPermission("automation.agentos.health.detailed"),
+  Ctrl.releaseReadiness
+);
+routes.post(
+  "/automation/release-readiness/check",
+  ...mw,
+  requireAgentOsPermission("automation.agentos.health.detailed"),
+  Ctrl.checkReleaseReadiness
+);
+routes.get(
+  "/automation/environment-validation",
+  ...mw,
+  requireAgentOsPermission("automation.agentos.health.detailed"),
+  Ctrl.environmentValidation
+);
+routes.get(
+  "/automation/evidence-package",
+  ...mw,
+  requireAgentOsPermission("automation.agentos.audit.view"),
+  Ctrl.evidencePackage
+);
+routes.post(
+  "/automation/hydrate",
+  ...mw,
+  requireAgentOsPermission("automation.agentos.configure"),
+  Ctrl.hydrate
+);
+
+export default routes;

@@ -50,6 +50,16 @@ import {
 import { getAiAgentShadowFcDashboard } from "../../services/aiAgentApi";
 import { getEvidenceDashboard } from "../../services/automationEvidenceApi";
 import { getLiveRolloutDashboard } from "../../services/automationLiveRolloutApi";
+import { getCognitivePlanningDashboard } from "../../services/automationCognitivePlanningApi";
+import { getPlanEvaluationDashboard } from "../../services/automationCognitivePlanningApi";
+import { getExecutionSessionsDashboard } from "../../services/automationExecutionOrchestratorApi";
+import { getActionExecutionDashboard } from "../../services/automationActionExecutionApi";
+import { getRuntimeIntegrationDashboard } from "../../services/automationRuntimeIntegrationApi";
+import { getExecutionFeedbackDashboard } from "../../services/automationExecutionFeedbackApi";
+import { getCognitiveMemoryDashboard } from "../../services/automationCognitiveMemoryApi";
+import { getMcpDashboard } from "../../services/automationMcpApi";
+import { getLearningDashboard } from "../../services/automationLearningApi";
+import { getMultiAgentDashboard } from "../../services/automationMultiAgentApi";
 
 const CAPABILITY_KEYS = [
   "planner",
@@ -146,6 +156,16 @@ const AutomationMonitorPage = () => {
   const [shadowFc, setShadowFc] = useState(null);
   const [evidenceDash, setEvidenceDash] = useState(null);
   const [liveRollout, setLiveRollout] = useState(null);
+  const [cognitivePlanning, setCognitivePlanning] = useState(null);
+  const [planEvaluation, setPlanEvaluation] = useState(null);
+  const [executionSessions, setExecutionSessions] = useState(null);
+  const [actionExecution, setActionExecution] = useState(null);
+  const [runtimeIntegration, setRuntimeIntegration] = useState(null);
+  const [executionFeedback, setExecutionFeedback] = useState(null);
+  const [cognitiveMemory, setCognitiveMemory] = useState(null);
+  const [mcpRuntime, setMcpRuntime] = useState(null);
+  const [learningEngine, setLearningEngine] = useState(null);
+  const [multiAgent, setMultiAgent] = useState(null);
 
   const loadDashboard = useCallback(async () => {
     setLoading(true);
@@ -268,6 +288,126 @@ const AutomationMonitorPage = () => {
     }
   }, []);
 
+  const loadCognitivePlanningTab = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data } = await getCognitivePlanningDashboard();
+      setCognitivePlanning(data);
+    } catch (err) {
+      toastError(err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const loadPlanEvaluationTab = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data } = await getPlanEvaluationDashboard();
+      setPlanEvaluation(data);
+    } catch (err) {
+      toastError(err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const loadExecutionSessionsTab = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data } = await getExecutionSessionsDashboard();
+      setExecutionSessions(data);
+    } catch (err) {
+      toastError(err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const loadActionExecutionTab = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data } = await getActionExecutionDashboard();
+      setActionExecution(data);
+    } catch (err) {
+      toastError(err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const loadRuntimeIntegrationTab = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data } = await getRuntimeIntegrationDashboard();
+      setRuntimeIntegration(data);
+    } catch (err) {
+      toastError(err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const loadExecutionFeedbackTab = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data } = await getExecutionFeedbackDashboard();
+      setExecutionFeedback(data);
+    } catch (err) {
+      toastError(err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const loadCognitiveMemoryTab = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data } = await getCognitiveMemoryDashboard();
+      setCognitiveMemory(data);
+    } catch (err) {
+      toastError(err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const loadMcpRuntimeTab = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data } = await getMcpDashboard();
+      setMcpRuntime(data);
+    } catch (err) {
+      toastError(err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const loadLearningEngineTab = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data } = await getLearningDashboard();
+      setLearningEngine(data);
+    } catch (err) {
+      toastError(err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const loadMultiAgentTab = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data } = await getMultiAgentDashboard();
+      setMultiAgent(data);
+    } catch (err) {
+      toastError(err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (tab === 0) loadDashboard();
     if (tab === 1) loadExecutions();
@@ -277,7 +417,17 @@ const AutomationMonitorPage = () => {
     if (tab === 5) loadShadowFcTab();
     if (tab === 6) loadEvidenceTab();
     if (tab === 7) loadLiveRolloutTab();
-    if (tab === 8) loadSettings();
+    if (tab === 8) loadCognitivePlanningTab();
+    if (tab === 9) loadPlanEvaluationTab();
+    if (tab === 10) loadExecutionSessionsTab();
+    if (tab === 11) loadActionExecutionTab();
+    if (tab === 12) loadRuntimeIntegrationTab();
+    if (tab === 13) loadExecutionFeedbackTab();
+    if (tab === 14) loadCognitiveMemoryTab();
+    if (tab === 15) loadMcpRuntimeTab();
+    if (tab === 16) loadLearningEngineTab();
+    if (tab === 17) loadMultiAgentTab();
+    if (tab === 18) loadSettings();
   }, [
     tab,
     loadDashboard,
@@ -288,6 +438,16 @@ const AutomationMonitorPage = () => {
     loadShadowFcTab,
     loadEvidenceTab,
     loadLiveRolloutTab,
+    loadCognitivePlanningTab,
+    loadPlanEvaluationTab,
+    loadExecutionSessionsTab,
+    loadActionExecutionTab,
+    loadRuntimeIntegrationTab,
+    loadExecutionFeedbackTab,
+    loadCognitiveMemoryTab,
+    loadMcpRuntimeTab,
+    loadLearningEngineTab,
+    loadMultiAgentTab,
     loadSettings,
   ]);
 
@@ -367,6 +527,16 @@ const AutomationMonitorPage = () => {
           <Tab label="Shadow FC" />
           <Tab label="Evidence" />
           <Tab label="Live FC" />
+          <Tab label="Planner" />
+          <Tab label="Evaluation" />
+          <Tab label="Execution" />
+          <Tab label="Action Exec" />
+          <Tab label="Runtime" />
+          <Tab label="Feedback" />
+          <Tab label="Memory" />
+          <Tab label="MCP" />
+          <Tab label="Learning" />
+          <Tab label="Multi-Agent" />
           <Tab label="Configuração" />
         </Tabs>
 
@@ -990,7 +1160,592 @@ const AutomationMonitorPage = () => {
               </>
             ))}
 
-          {tab === 8 && (
+          {tab === 8 &&
+            (loading && !cognitivePlanning ? (
+              <TableRowSkeleton columns={4} />
+            ) : (
+              <>
+                <Typography variant="body2" color="textSecondary" paragraph>
+                  Cognitive Planner (V2.0) — Goal → Execution Plan. Não executa
+                  Tools. Live/Shadow inalterados.
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="Plans"
+                      value={cognitivePlanning?.metrics?.plansGenerated}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="Avg steps"
+                      value={cognitivePlanning?.metrics?.averageSteps}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="Recovery rate"
+                      value={cognitivePlanning?.metrics?.recoveryRate}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="Validation fails"
+                      value={cognitivePlanning?.metrics?.validationFailures}
+                    />
+                  </Grid>
+                </Grid>
+                <Box mt={2}>
+                  <pre className={classes.mono}>
+                    {JSON.stringify(
+                      {
+                        guarantees: cognitivePlanning?.guarantees,
+                        recentGoals: cognitivePlanning?.recentGoals?.slice(0, 3),
+                        recentPlans: cognitivePlanning?.recentPlans?.slice(0, 3),
+                        recentRecoveries:
+                          cognitivePlanning?.recentRecoveries?.slice(0, 3),
+                      },
+                      null,
+                      2
+                    )}
+                  </pre>
+                </Box>
+              </>
+            ))}
+
+          {tab === 9 &&
+            (loading && !planEvaluation ? (
+              <TableRowSkeleton columns={4} />
+            ) : (
+              <>
+                <Typography variant="body2" color="textSecondary" paragraph>
+                  Plan Evaluation (V2.1) — qualidade do plano antes do Executor.
+                  Sem Tools. Live/Shadow inalterados.
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="Evaluated"
+                      value={planEvaluation?.metrics?.plansEvaluated}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="Approval %"
+                      value={Math.round(
+                        (planEvaluation?.metrics?.approvalRate || 0) * 100
+                      )}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="Avg quality"
+                      value={planEvaluation?.metrics?.averageQuality}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="Critical rate"
+                      value={planEvaluation?.metrics?.criticalRate}
+                    />
+                  </Grid>
+                </Grid>
+                <Box mt={2}>
+                  <pre className={classes.mono}>
+                    {JSON.stringify(
+                      {
+                        guarantees: planEvaluation?.guarantees,
+                        topValidators: planEvaluation?.topValidators,
+                        topProblems: planEvaluation?.topProblems,
+                        recent: planEvaluation?.recentEvaluations?.slice(0, 3),
+                      },
+                      null,
+                      2
+                    )}
+                  </pre>
+                </Box>
+              </>
+            ))}
+
+          {tab === 10 &&
+            (loading && !executionSessions ? (
+              <TableRowSkeleton columns={4} />
+            ) : (
+              <>
+                <Typography variant="body2" color="textSecondary" paragraph>
+                  Execution Orchestrator (V2.2) — sessão e state machine. Sem
+                  Tools. Live/Shadow inalterados.
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="Running"
+                      value={executionSessions?.counts?.running}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="Completed"
+                      value={executionSessions?.counts?.completed}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="Failed"
+                      value={executionSessions?.counts?.failed}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="Waiting confirm"
+                      value={executionSessions?.counts?.waitingConfirmation}
+                    />
+                  </Grid>
+                </Grid>
+                <Box mt={2}>
+                  <pre className={classes.mono}>
+                    {JSON.stringify(
+                      {
+                        guarantees: executionSessions?.guarantees,
+                        metrics: executionSessions?.metrics,
+                        recent: executionSessions?.recentSessions?.slice(0, 2),
+                      },
+                      null,
+                      2
+                    )}
+                  </pre>
+                </Box>
+              </>
+            ))}
+
+          {tab === 11 &&
+            (loading && !actionExecution ? (
+              <TableRowSkeleton columns={4} />
+            ) : (
+              <>
+                <Typography variant="body2" color="textSecondary" paragraph>
+                  Action Execution Engine (V2.3) — Strategy simulada por action.
+                  Sem Tool Runtime. Live/Shadow inalterados.
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="Strategies"
+                      value={actionExecution?.strategies}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="Success rate"
+                      value={
+                        actionExecution?.successRate != null
+                          ? `${Math.round(actionExecution.successRate * 100)}%`
+                          : "—"
+                      }
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="Failures"
+                      value={actionExecution?.failures}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="Waiting"
+                      value={actionExecution?.waiting}
+                    />
+                  </Grid>
+                </Grid>
+                <Box mt={2}>
+                  <Typography variant="subtitle2" gutterBottom>
+                    Timeline recente (results)
+                  </Typography>
+                  <pre className={classes.mono}>
+                    {JSON.stringify(
+                      {
+                        validation: actionExecution?.validation,
+                        metrics: actionExecution?.metrics,
+                        usesToolRuntime: actionExecution?.usesToolRuntime,
+                      },
+                      null,
+                      2
+                    )}
+                  </pre>
+                </Box>
+              </>
+            ))}
+
+          {tab === 12 &&
+            (loading && !runtimeIntegration ? (
+              <TableRowSkeleton columns={4} />
+            ) : (
+              <>
+                <Typography variant="body2" color="textSecondary" paragraph>
+                  Runtime Integration (V2.4) — Request, Dispatcher, Policy,
+                  Adapter e Result. Reutiliza runtime existente.
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="Requests"
+                      value={runtimeIntegration?.requests}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="Latency"
+                      value={
+                        runtimeIntegration?.latency != null
+                          ? `${Math.round(runtimeIntegration.latency)}ms`
+                          : "—"
+                      }
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="Policy warnings"
+                      value={runtimeIntegration?.policies?.warnings}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="Failures"
+                      value={runtimeIntegration?.failures}
+                    />
+                  </Grid>
+                </Grid>
+                <Box mt={2}>
+                  <pre className={classes.mono}>
+                    {JSON.stringify(
+                      {
+                        dispatcher: runtimeIntegration?.dispatcher,
+                        metrics: runtimeIntegration?.metrics,
+                        reusedExistingRuntime:
+                          runtimeIntegration?.reusedExistingRuntime,
+                      },
+                      null,
+                      2
+                    )}
+                  </pre>
+                </Box>
+              </>
+            ))}
+
+          {tab === 13 &&
+            (loading && !executionFeedback ? (
+              <TableRowSkeleton columns={4} />
+            ) : (
+              <>
+                <Typography variant="body2" color="textSecondary" paragraph>
+                  Execution Feedback (V2.5) — Runtime Result → Feedback → Goal
+                  Progress → Session Update. Sem Tool/Planner.
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="Goal Progress"
+                      value={
+                        executionFeedback?.goalProgress != null
+                          ? `${Math.round(executionFeedback.goalProgress)}%`
+                          : "—"
+                      }
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="Recovery"
+                      value={
+                        executionFeedback?.recovery != null
+                          ? `${Math.round(executionFeedback.recovery * 100)}%`
+                          : "—"
+                      }
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="Replans"
+                      value={
+                        executionFeedback?.replans != null
+                          ? `${Math.round(executionFeedback.replans * 100)}%`
+                          : "—"
+                      }
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <MetricCard
+                      label="Human"
+                      value={
+                        executionFeedback?.humanIntervention != null
+                          ? `${Math.round(
+                              executionFeedback.humanIntervention * 100
+                            )}%`
+                          : "—"
+                      }
+                    />
+                  </Grid>
+                </Grid>
+                <Box mt={2}>
+                  <pre className={classes.mono}>
+                    {JSON.stringify(
+                      {
+                        completion: executionFeedback?.completion,
+                        metrics: executionFeedback?.metrics,
+                        executesTools: executionFeedback?.executesTools,
+                        callsPlanner: executionFeedback?.callsPlanner,
+                      },
+                      null,
+                      2
+                    )}
+                  </pre>
+                </Box>
+              </>
+            ))}
+
+          {tab === 14 &&
+            (loading && !cognitiveMemory ? (
+              <TableRowSkeleton columns={4} />
+            ) : (
+              <>
+                <Typography variant="body2" color="textSecondary" paragraph>
+                  Cognitive Memory (V2.6) — Knowledge, Memory Type, Retrieval,
+                  Score. SQL Provider. Sem Vector DB / embeddings.
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={6} md={2}>
+                    <MetricCard label="Working" value={cognitiveMemory?.working} />
+                  </Grid>
+                  <Grid item xs={6} md={2}>
+                    <MetricCard
+                      label="Episodic"
+                      value={cognitiveMemory?.episodic}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={2}>
+                    <MetricCard
+                      label="Semantic"
+                      value={cognitiveMemory?.semantic}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={2}>
+                    <MetricCard
+                      label="Procedural"
+                      value={cognitiveMemory?.procedural}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={2}>
+                    <MetricCard
+                      label="Reflection"
+                      value={cognitiveMemory?.reflection}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={2}>
+                    <MetricCard
+                      label="Growth"
+                      value={cognitiveMemory?.knowledgeGrowth}
+                    />
+                  </Grid>
+                </Grid>
+                <Box mt={2}>
+                  <pre className={classes.mono}>
+                    {JSON.stringify(
+                      {
+                        metrics: cognitiveMemory?.metrics,
+                        storageProvider: cognitiveMemory?.storageProvider,
+                        vectorEnabled: cognitiveMemory?.vectorEnabled,
+                        usesEmbeddings: cognitiveMemory?.usesEmbeddings,
+                      },
+                      null,
+                      2
+                    )}
+                  </pre>
+                </Box>
+              </>
+            ))}
+
+          {tab === 15 &&
+            (loading && !mcpRuntime ? (
+              <TableRowSkeleton columns={4} />
+            ) : (
+              <>
+                <Typography variant="body2" color="textSecondary" gutterBottom>
+                  MCP Runtime (V2.7) — Request, Dispatch Decision, Server,
+                  Tool, Policy, Result, Fallback. Sem Live.
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={6} md={2}>
+                    <MetricCard label="Servers" value={mcpRuntime?.servers} />
+                  </Grid>
+                  <Grid item xs={6} md={2}>
+                    <MetricCard label="Healthy" value={mcpRuntime?.healthy} />
+                  </Grid>
+                  <Grid item xs={6} md={2}>
+                    <MetricCard label="Tools" value={mcpRuntime?.tools} />
+                  </Grid>
+                  <Grid item xs={6} md={2}>
+                    <MetricCard label="Requests" value={mcpRuntime?.requests} />
+                  </Grid>
+                  <Grid item xs={6} md={2}>
+                    <MetricCard
+                      label="Success"
+                      value={
+                        mcpRuntime?.successRate != null
+                          ? `${Math.round(mcpRuntime.successRate * 100)}%`
+                          : "—"
+                      }
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={2}>
+                    <MetricCard
+                      label="Policy Denials"
+                      value={mcpRuntime?.policyDenials}
+                    />
+                  </Grid>
+                </Grid>
+                <Box mt={2}>
+                  <pre className={classes.mono}>
+                    {JSON.stringify(
+                      {
+                        metrics: mcpRuntime?.metrics,
+                        sdk: mcpRuntime?.sdk,
+                        liveIntegrationEnabled:
+                          mcpRuntime?.liveIntegrationEnabled,
+                      },
+                      null,
+                      2
+                    )}
+                  </pre>
+                </Box>
+              </>
+            ))}
+
+          {tab === 16 &&
+            (loading && !learningEngine ? (
+              <TableRowSkeleton columns={4} />
+            ) : (
+              <>
+                <Typography variant="body2" color="textSecondary" gutterBottom>
+                  Learning Engine (V2.8) — Dataset, Patterns, Candidates,
+                  Evaluation, Approval, Artifact, Shadow. Sem Live /
+                  auto-promotion.
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={6} md={2}>
+                    <MetricCard
+                      label="Analyses"
+                      value={learningEngine?.analyses}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={2}>
+                    <MetricCard
+                      label="Patterns"
+                      value={learningEngine?.patterns}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={2}>
+                    <MetricCard
+                      label="Candidates"
+                      value={learningEngine?.candidates}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={2}>
+                    <MetricCard
+                      label="Ready"
+                      value={learningEngine?.readyForReview}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={2}>
+                    <MetricCard
+                      label="Promoted"
+                      value={learningEngine?.promoted}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={2}>
+                    <MetricCard
+                      label="Conflicts"
+                      value={learningEngine?.conflicts}
+                    />
+                  </Grid>
+                </Grid>
+                <Box mt={2}>
+                  <pre className={classes.mono}>
+                    {JSON.stringify(
+                      {
+                        metrics: learningEngine?.metrics,
+                        autoPromotionEnabled:
+                          learningEngine?.autoPromotionEnabled,
+                        liveIntegrationEnabled:
+                          learningEngine?.liveIntegrationEnabled,
+                        executesTools: learningEngine?.executesTools,
+                        executesMcp: learningEngine?.executesMcp,
+                        modifiesPlanner: learningEngine?.modifiesPlanner,
+                      },
+                      null,
+                      2
+                    )}
+                  </pre>
+                </Box>
+              </>
+            ))}
+
+          {tab === 17 &&
+            (loading && !multiAgent ? (
+              <TableRowSkeleton columns={4} />
+            ) : (
+              <>
+                <Typography variant="body2" color="textSecondary" gutterBottom>
+                  Multi-Agent Runtime (V2.9) — Routing, Selection, Boundaries,
+                  Delegation, Handoff, Coordinator. Kernel compartilhado. Sem
+                  Live / autonomia contínua.
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={6} md={2}>
+                    <MetricCard label="Agents" value={multiAgent?.agents} />
+                  </Grid>
+                  <Grid item xs={6} md={2}>
+                    <MetricCard label="Active" value={multiAgent?.active} />
+                  </Grid>
+                  <Grid item xs={6} md={2}>
+                    <MetricCard label="Healthy" value={multiAgent?.healthy} />
+                  </Grid>
+                  <Grid item xs={6} md={2}>
+                    <MetricCard
+                      label="Delegations"
+                      value={multiAgent?.delegations}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={2}>
+                    <MetricCard label="Handoffs" value={multiAgent?.handoffs} />
+                  </Grid>
+                  <Grid item xs={6} md={2}>
+                    <MetricCard
+                      label="Loops"
+                      value={multiAgent?.loopsBlocked}
+                    />
+                  </Grid>
+                </Grid>
+                <Box mt={2}>
+                  <pre className={classes.mono}>
+                    {JSON.stringify(
+                      {
+                        metrics: multiAgent?.metrics,
+                        liveIntegrationEnabled:
+                          multiAgent?.liveIntegrationEnabled,
+                        sharedKernel: multiAgent?.sharedKernel,
+                        coordinatorSimulationOnly:
+                          multiAgent?.coordinatorSimulationOnly,
+                        duplicatesPlanner: multiAgent?.duplicatesPlanner,
+                        duplicatesRuntime: multiAgent?.duplicatesRuntime,
+                      },
+                      null,
+                      2
+                    )}
+                  </pre>
+                </Box>
+              </>
+            ))}
+
+          {tab === 18 && (
             <>
               <Typography className={classes.warn} variant="body2">
                 send_message=active exige planner ativo. Config inconsistente é

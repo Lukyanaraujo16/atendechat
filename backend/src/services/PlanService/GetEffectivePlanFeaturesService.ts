@@ -24,6 +24,42 @@ export function applyPersistedPlanFeatureAliases(
   ) {
     out["contacts.tags"] = planFeatureEnabled(out["contacts.crm"]);
   }
+
+  /** Wave 2: automation.ai espelha ai_agent quando ainda não há linha própria. */
+  if (
+    !Object.prototype.hasOwnProperty.call(out, "automation.ai") &&
+    Object.prototype.hasOwnProperty.call(out, "automation.ai_agent")
+  ) {
+    out["automation.ai"] = planFeatureEnabled(out["automation.ai_agent"]);
+  }
+
+  /**
+   * Wave 2: módulos AgentOS herdam de ai_tools (ou ai_agent) apenas quando
+   * a chave ainda não existe em PlanFeatures — sem soft-bypass de disabled.
+   */
+  const parentOn =
+    (Object.prototype.hasOwnProperty.call(out, "automation.ai_tools") &&
+      planFeatureEnabled(out["automation.ai_tools"])) ||
+    (Object.prototype.hasOwnProperty.call(out, "automation.ai_agent") &&
+      planFeatureEnabled(out["automation.ai_agent"]));
+  const agentOsChildren = [
+    "automation.memory",
+    "automation.learning",
+    "automation.mcp",
+    "automation.multi_agent",
+    "automation.runtime",
+    "automation.replay",
+    "automation.monitor",
+    "automation.dashboard",
+    "automation.tester"
+  ];
+  if (parentOn) {
+    for (const key of agentOsChildren) {
+      if (!Object.prototype.hasOwnProperty.call(out, key)) {
+        out[key] = true;
+      }
+    }
+  }
   return out;
 }
 

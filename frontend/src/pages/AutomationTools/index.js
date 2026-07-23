@@ -39,6 +39,7 @@ import {
 } from "../../services/automationToolsApi";
 import { testEvidence } from "../../services/automationEvidenceApi";
 import { testLiveRollout } from "../../services/automationLiveRolloutApi";
+import { replayCognitivePlan } from "../../services/automationCognitivePlanningApi";
 
 const useStyles = makeStyles((theme) => ({
   mainPaper: {
@@ -95,6 +96,10 @@ const AutomationToolsPage = () => {
   );
   const [evidencePhone, setEvidencePhone] = useState("11999887766");
   const [liveTestResult, setLiveTestResult] = useState(null);
+  const [planningResult, setPlanningResult] = useState(null);
+  const [planningText, setPlanningText] = useState(
+    "Quero transferir para um atendente humano"
+  );
 
   const loadCatalog = useCallback(async () => {
     setLoading(true);
@@ -316,6 +321,7 @@ const AutomationToolsPage = () => {
           <Tab label="Function Calling" />
           <Tab label="Evidence" />
           <Tab label="Live Rollout" />
+          <Tab label="Planning" />
           <Tab label="Políticas" />
         </Tabs>
 
@@ -761,6 +767,48 @@ const AutomationToolsPage = () => {
           )}
 
           {tab === 6 && (
+            <>
+              <Typography className={classes.warn} variant="body2">
+                Planning Tester (V2.0): Goal → Plan → Replay. Não executa Tools.
+              </Typography>
+              <TextField
+                label="Mensagem"
+                value={planningText}
+                onChange={(e) => setPlanningText(e.target.value)}
+                fullWidth
+                variant="outlined"
+                size="small"
+                style={{ marginBottom: 12 }}
+              />
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={async () => {
+                  try {
+                    const { data } = await replayCognitivePlan({
+                      text: planningText,
+                      simulatedOutcomes: {
+                        s2: { partial: true, note: "awaiting_confirmation" },
+                      },
+                    });
+                    setPlanningResult(data);
+                    toast.success("Planning replay executado (sem tools).");
+                  } catch (err) {
+                    toastError(err);
+                  }
+                }}
+              >
+                Replay Cognitive Plan
+              </Button>
+              {planningResult && (
+                <pre className={classes.mono} style={{ marginTop: 12 }}>
+                  {JSON.stringify(planningResult, null, 2)}
+                </pre>
+              )}
+            </>
+          )}
+
+          {tab === 7 && (
             <>
               <Typography className={classes.warn} variant="body2">
                 Deny-by-default. allowWrite necessário para Execute real de

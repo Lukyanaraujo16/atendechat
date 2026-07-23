@@ -114,6 +114,20 @@ import AutomationToolExecution from "../models/AutomationToolExecution";
 import AutomationToolPolicy from "../models/AutomationToolPolicy";
 import AutomationToolConfirmation from "../models/AutomationToolConfirmation";
 import AiProviderCredential from "../models/AiProviderCredential";
+import AutomationCognitiveMemory from "../models/AutomationCognitiveMemory";
+import AutomationMultiAgent from "../models/AutomationMultiAgent";
+import AutomationMultiAgentVersion from "../models/AutomationMultiAgentVersion";
+import AutomationMultiAgentSession from "../models/AutomationMultiAgentSession";
+import AutomationMcpServer from "../models/AutomationMcpServer";
+import AutomationMcpCredential from "../models/AutomationMcpCredential";
+import AutomationMcpTool from "../models/AutomationMcpTool";
+import AutomationAgentOsDocument from "../models/AutomationAgentOsDocument";
+import AutomationAgentOsAudit from "../models/AutomationAgentOsAudit";
+import AutomationAgentOsEvent from "../models/AutomationAgentOsEvent";
+import AutomationAgentOsMetric from "../models/AutomationAgentOsMetric";
+import AutomationAgentOsReplay from "../models/AutomationAgentOsReplay";
+import AutomationAgentOsSetting from "../models/AutomationAgentOsSetting";
+import AutomationAgentOsIdempotency from "../models/AutomationAgentOsIdempotency";
 import { logDbConnectionAtStartup } from "../helpers/dbConnectionInfo";
 import {
   assertContactLabelRelationModelRegistered,
@@ -241,7 +255,21 @@ const models = [
   AutomationToolExecution,
   AutomationToolPolicy,
   AutomationToolConfirmation,
-  AiProviderCredential
+  AiProviderCredential,
+  AutomationCognitiveMemory,
+  AutomationMultiAgent,
+  AutomationMultiAgentVersion,
+  AutomationMultiAgentSession,
+  AutomationMcpServer,
+  AutomationMcpCredential,
+  AutomationMcpTool,
+  AutomationAgentOsDocument,
+  AutomationAgentOsAudit,
+  AutomationAgentOsEvent,
+  AutomationAgentOsMetric,
+  AutomationAgentOsReplay,
+  AutomationAgentOsSetting,
+  AutomationAgentOsIdempotency
 ];
 
 sequelize.addModels(models);

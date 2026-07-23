@@ -1,16 +1,9 @@
 import { Router } from "express";
-import isAuth from "../middleware/isAuth";
-import requireEffectiveModule from "../middleware/requireEffectiveModule";
-import requireTenantAdminOrSupport from "../middleware/requireTenantAdminOrSupport";
+import { agentOsStacks } from "../middleware/agentOsAdminStack";
 import * as LiveCtrl from "../controllers/AutomationLiveRolloutController";
-import { AUTOMATION_ORCHESTRATOR_FEATURE_KEY } from "../config/automationOrchestratorConstants";
-import { AUTOMATION_AI_TOOLS_FEATURE_KEY } from "../config/automationToolConstants";
 
 const automationLiveRolloutRoutes = Router();
-const requireAiAgent = requireEffectiveModule(AUTOMATION_ORCHESTRATOR_FEATURE_KEY);
-const requireAiTools = requireEffectiveModule(AUTOMATION_AI_TOOLS_FEATURE_KEY);
-const requireAdmin = requireTenantAdminOrSupport;
-const mw = [isAuth, requireAiAgent, requireAiTools, requireAdmin] as const;
+const mw = agentOsStacks.core()
 
 automationLiveRolloutRoutes.get(
   "/automation/live-rollout",

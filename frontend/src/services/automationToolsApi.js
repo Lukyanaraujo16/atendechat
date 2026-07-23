@@ -21,7 +21,7 @@ export function getAutomationToolPolicies() {
 }
 
 export function updateAutomationToolPolicies(data = {}) {
-  return api.put("/automation/tools/policies", data);
+  return api.put("/automation/tools/policies", { ...data, confirm: true });
 }
 
 export function getAutomationToolMetrics() {

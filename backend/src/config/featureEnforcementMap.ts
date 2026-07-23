@@ -258,4 +258,58 @@ export const FEATURE_ENFORCEMENT_MAP: Array<{
       "GET/POST/PUT/DELETE /inventory/seller-profiles/*",
     ],
   },
+  {
+    feature: "automation.ai",
+    notes: "AgentOS Wave 2 — núcleo; alias de superfície automation.ai_agent",
+    backendRoutes: ["/automation/*"]
+  },
+  {
+    feature: "automation.memory",
+    frontendRoutes: ["/automation/cognitive-memory"],
+    backendRoutes: ["/automation/memory/*"],
+    notes: "Cognitive Memory — RBAC + plano + tenant (Wave 2)"
+  },
+  {
+    feature: "automation.learning",
+    frontendRoutes: ["/automation/learning-engine"],
+    backendRoutes: ["/automation/learning/*"],
+    notes: "Learning consultivo; sem auto-promotion (Wave 2)"
+  },
+  {
+    feature: "automation.mcp",
+    frontendRoutes: ["/automation/mcp-runtime"],
+    backendRoutes: ["/automation/mcp/*"],
+    notes: "MCP Runtime — credentials masked; fail-closed plan (Wave 2)"
+  },
+  {
+    feature: "automation.multi_agent",
+    frontendRoutes: ["/automation/multi-agent"],
+    backendRoutes: ["/automation/agents/*"],
+    notes: "Multi-Agent simulation only; Live desabilitado (Wave 2)"
+  },
+  {
+    feature: "automation.runtime",
+    frontendRoutes: ["/automation/runtime-integration"],
+    backendRoutes: ["/automation/runtime/*", "/automation/execution/*"]
+  },
+  {
+    feature: "automation.replay",
+    backendRoutes: ["*/replay*", "/automation/orchestrator/executions/:id/replay"],
+    notes: "Replay administrativo protegido"
+  },
+  {
+    feature: "automation.monitor",
+    frontendRoutes: ["/automation/monitor", "/automation/observability"],
+    backendRoutes: ["/automation/evidence/*", "/automation/monitor*", "/automation/observability/*"]
+  },
+  {
+    feature: "automation.dashboard",
+    backendRoutes: ["/automation/*/dashboard", "/automation/orchestrator/*"]
+  },
+  {
+    feature: "automation.tester",
+    frontendRoutes: ["/automation/tools"],
+    backendRoutes: ["/automation/tools/*", "*/simulate*"],
+    notes: "Tester/simulation — sem alteração de produção"
+  },
 ];

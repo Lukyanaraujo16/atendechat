@@ -80,6 +80,49 @@ export const FEATURES: Record<string, FeatureNode> = {
         description:
           "Camada de Tools do Automation Orchestrator para capacidades operacionais governadas (fundação; sem execução produtiva automática nesta fase)."
       },
+      ai: {
+        label: "AgentOS (núcleo)",
+        description:
+          "Módulo AgentOS / Automation AI (Wave 2). Alias oficial de superfície automation.ai."
+      },
+      memory: {
+        label: "Memória cognitiva",
+        description: "Memória cognitiva do AgentOS (escopo, políticas e boundaries)."
+      },
+      learning: {
+        label: "Aprendizado assistido",
+        description:
+          "Learning consultivo do AgentOS (sem promoção automática para produção)."
+      },
+      mcp: {
+        label: "MCP Runtime",
+        description: "Model Context Protocol — servidores, tools e credenciais governadas."
+      },
+      multi_agent: {
+        label: "Multi-Agent",
+        description:
+          "Runtime multi-agente (simulação/coordenação; Live desabilitado)."
+      },
+      runtime: {
+        label: "Runtime Integration",
+        description: "Integração de runtime do AgentOS (adapters e policies)."
+      },
+      replay: {
+        label: "Replay administrativo",
+        description: "Replay administrativo de planos/sessões AgentOS."
+      },
+      monitor: {
+        label: "Monitor AgentOS",
+        description: "Monitoração administrativa do AgentOS."
+      },
+      dashboard: {
+        label: "Dashboard AgentOS",
+        description: "Dashboards administrativos do AgentOS."
+      },
+      tester: {
+        label: "Tester / Simulation",
+        description: "Tester e simulações administrativas (sem alterar produção)."
+      },
       knowledge_base: {
         label: "Base de Conhecimento",
         description:

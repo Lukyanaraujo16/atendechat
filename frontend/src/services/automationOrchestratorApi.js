@@ -33,7 +33,7 @@ export function getAutomationOrchestratorSettings(params = {}) {
 }
 
 export function updateAutomationOrchestratorSettings(data = {}) {
-  return api.put("/automation/orchestrator/settings", data);
+  return api.put("/automation/orchestrator/settings", { ...data, confirm: true });
 }
 
 export function listAutomationPlannerValidations(params = {}) {

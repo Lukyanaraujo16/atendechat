@@ -37,7 +37,7 @@ export function getEvidenceThresholds() {
 }
 
 export function updateEvidenceThresholds(thresholds) {
-  return api.put("/automation/evidence/thresholds", { thresholds });
+  return api.put("/automation/evidence/thresholds", { thresholds, confirm: true });
 }
 
 export function getEvidenceReport(id) {

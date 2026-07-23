@@ -1,85 +1,55 @@
 import { Router } from "express";
-import isAuth from "../middleware/isAuth";
-import requireEffectiveModule from "../middleware/requireEffectiveModule";
-import requireTenantAdminOrSupport from "../middleware/requireTenantAdminOrSupport";
+import { agentOsStacks } from "../middleware/agentOsAdminStack";
 import * as AutomationToolsController from "../controllers/AutomationToolsController";
-import { AUTOMATION_ORCHESTRATOR_FEATURE_KEY } from "../config/automationOrchestratorConstants";
-import { AUTOMATION_AI_TOOLS_FEATURE_KEY } from "../config/automationToolConstants";
 
 const automationToolsRoutes = Router();
-const requireAiAgent = requireEffectiveModule(AUTOMATION_ORCHESTRATOR_FEATURE_KEY);
-const requireAiTools = requireEffectiveModule(AUTOMATION_AI_TOOLS_FEATURE_KEY);
-const requireAdmin = requireTenantAdminOrSupport;
+const mw = agentOsStacks.tester()
 
 automationToolsRoutes.get(
   "/automation/tools/catalog",
-  isAuth,
-  requireAiAgent,
-  requireAiTools,
-  requireAdmin,
+  ...mw,
   AutomationToolsController.catalog
 );
 
 automationToolsRoutes.get(
   "/automation/tools/executions",
-  isAuth,
-  requireAiAgent,
-  requireAiTools,
-  requireAdmin,
+  ...mw,
   AutomationToolsController.listExecutions
 );
 
 automationToolsRoutes.get(
   "/automation/tools/executions/:id",
-  isAuth,
-  requireAiAgent,
-  requireAiTools,
-  requireAdmin,
+  ...mw,
   AutomationToolsController.showExecution
 );
 
 automationToolsRoutes.post(
   "/automation/tools/test/:toolId",
-  isAuth,
-  requireAiAgent,
-  requireAiTools,
-  requireAdmin,
+  ...mw,
   AutomationToolsController.testTool
 );
 
 automationToolsRoutes.get(
   "/automation/tools/policies",
-  isAuth,
-  requireAiAgent,
-  requireAiTools,
-  requireAdmin,
+  ...mw,
   AutomationToolsController.getPolicies
 );
 
 automationToolsRoutes.put(
   "/automation/tools/policies",
-  isAuth,
-  requireAiAgent,
-  requireAiTools,
-  requireAdmin,
+  ...mw,
   AutomationToolsController.updatePolicies
 );
 
 automationToolsRoutes.get(
   "/automation/tools/metrics",
-  isAuth,
-  requireAiAgent,
-  requireAiTools,
-  requireAdmin,
+  ...mw,
   AutomationToolsController.metrics
 );
 
 automationToolsRoutes.post(
   "/automation/tools/function-calling/test",
-  isAuth,
-  requireAiAgent,
-  requireAiTools,
-  requireAdmin,
+  ...mw,
   AutomationToolsController.testFunctionCalling
 );
 

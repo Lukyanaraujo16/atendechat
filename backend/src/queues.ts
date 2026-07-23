@@ -1384,6 +1384,13 @@ export async function startQueueProcess() {
 
   logger.info("[🏁] - Iniciando processamento de filas");
 
+  try {
+    const { startAgentOsQueueWorkers } = await import("./libs/agentOsQueue");
+    startAgentOsQueueWorkers();
+  } catch (err) {
+    logger.warn("[AgentOS] falha ao iniciar workers Bull:", err);
+  }
+
   messageQueue.process("SendMessage", handleSendMessage);
 
   flowMenuTimeoutQueue.process(async job => {

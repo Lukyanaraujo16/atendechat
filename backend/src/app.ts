@@ -16,6 +16,8 @@ import instagramOAuthCallbackRoutes from "./routes/instagramOAuthCallbackRoutes"
 import { logger } from "./utils/logger";
 import { messageQueue, sendScheduledMessages } from "./queues";
 import bodyParser from 'body-parser';
+import agentOsSecurityHeaders from "./middleware/agentOsSecurityHeaders";
+import { AGENTOS_SECRET_KEY_RE } from "./config/automationAgentOsSecurityConstants";
 
 Sentry.init({ dsn: process.env.SENTRY_DSN });
 
@@ -65,6 +67,7 @@ app.use(cookieParser());
 app.use(express.json());
 app.use(Sentry.Handlers.requestHandler());
 app.use("/public", express.static(uploadConfig.directory));
+app.use(agentOsSecurityHeaders);
 app.use(routes);
 
 app.use(Sentry.Handlers.errorHandler());
@@ -72,11 +75,23 @@ app.use(Sentry.Handlers.errorHandler());
 app.use(async (err: Error, req: Request, res: Response, _: NextFunction) => {
 
   if (err instanceof AppError) {
-    logger.warn(err);
+    const safeData =
+      err.data && typeof err.data === "object"
+        ? Object.fromEntries(
+            Object.entries(err.data as Record<string, unknown>).filter(
+              ([k]) => !AGENTOS_SECRET_KEY_RE.test(k)
+            )
+          )
+        : err.data;
+    logger.warn({
+      error: err.message,
+      statusCode: err.statusCode,
+      path: req.originalUrl || req.url
+    });
     return res.status(err.statusCode).json({
       error: err.message,
       ...(err.clientMessage ? { message: err.clientMessage } : {}),
-      ...(err.data ?? {})
+      ...(safeData ?? {})
     });
   }
 

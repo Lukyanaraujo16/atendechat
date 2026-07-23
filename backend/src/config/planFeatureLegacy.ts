@@ -58,6 +58,17 @@ export function legacyPlanFeatureValue(
     case "inventory.sales.manageSettings":
     case "automation.ai_agent":
     case "automation.knowledge_base":
+    case "automation.ai":
+    case "automation.ai_tools":
+    case "automation.memory":
+    case "automation.learning":
+    case "automation.mcp":
+    case "automation.multi_agent":
+    case "automation.runtime":
+    case "automation.replay":
+    case "automation.monitor":
+    case "automation.dashboard":
+    case "automation.tester":
       return false;
     case "attendance.kanban":
       return asBool(readPlanColumn(plan, "useKanban"));

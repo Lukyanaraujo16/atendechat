@@ -1,99 +1,75 @@
 import { Router } from "express";
-import isAuth from "../middleware/isAuth";
-import requireEffectiveModule from "../middleware/requireEffectiveModule";
-import requireTenantAdminOrSupport from "../middleware/requireTenantAdminOrSupport";
+import { agentOsStacks } from "../middleware/agentOsAdminStack";
 import * as AutomationOrchestratorController from "../controllers/AutomationOrchestratorController";
-import { AUTOMATION_ORCHESTRATOR_FEATURE_KEY } from "../config/automationOrchestratorConstants";
 
 const automationOrchestratorRoutes = Router();
-const requireAiAgent = requireEffectiveModule(AUTOMATION_ORCHESTRATOR_FEATURE_KEY);
-const requireAdmin = requireTenantAdminOrSupport;
+const mw = agentOsStacks.dashboard()
+const mwReplay = agentOsStacks.replay()
+const mwTester = agentOsStacks.tester()
 
 automationOrchestratorRoutes.get(
   "/automation/orchestrator/dashboard",
-  isAuth,
-  requireAiAgent,
-  requireAdmin,
+  ...mw,
   AutomationOrchestratorController.dashboard
 );
 
 automationOrchestratorRoutes.get(
   "/automation/orchestrator/executions",
-  isAuth,
-  requireAiAgent,
-  requireAdmin,
+  ...mw,
   AutomationOrchestratorController.listExecutions
 );
 
 automationOrchestratorRoutes.get(
   "/automation/orchestrator/executions/:id",
-  isAuth,
-  requireAiAgent,
-  requireAdmin,
+  ...mw,
   AutomationOrchestratorController.showExecution
 );
 
 automationOrchestratorRoutes.get(
   "/automation/orchestrator/executions/:id/replay",
-  isAuth,
-  requireAiAgent,
-  requireAdmin,
+  ...mwReplay,
   AutomationOrchestratorController.replayExecution
 );
 
 automationOrchestratorRoutes.post(
   "/automation/orchestrator/executions/:id/continue",
-  isAuth,
-  requireAiAgent,
-  requireAdmin,
+  ...mw,
   AutomationOrchestratorController.continueExecution
 );
 
 automationOrchestratorRoutes.get(
   "/automation/orchestrator/actions",
-  isAuth,
-  requireAiAgent,
-  requireAdmin,
+  ...mw,
   AutomationOrchestratorController.listActionsCatalog
 );
 
 automationOrchestratorRoutes.post(
   "/automation/orchestrator/simulate",
-  isAuth,
-  requireAiAgent,
-  requireAdmin,
+  ...mwTester,
   AutomationOrchestratorController.simulatePlan
 );
 
 automationOrchestratorRoutes.get(
   "/automation/orchestrator/settings",
-  isAuth,
-  requireAiAgent,
-  requireAdmin,
+  ...mw,
   AutomationOrchestratorController.getSettings
 );
 
 automationOrchestratorRoutes.put(
   "/automation/orchestrator/settings",
-  isAuth,
-  requireAiAgent,
-  requireAdmin,
+  ...mw,
   AutomationOrchestratorController.updateSettings
 );
 
 automationOrchestratorRoutes.get(
   "/automation/orchestrator/validations",
-  isAuth,
-  requireAiAgent,
-  requireAdmin,
+  ...mw,
   AutomationOrchestratorController.listValidations
 );
 
 automationOrchestratorRoutes.get(
   "/automation/orchestrator/activation-metrics",
-  isAuth,
-  requireAiAgent,
-  requireAdmin,
+  ...mw,
   AutomationOrchestratorController.activationMetrics
 );
 
