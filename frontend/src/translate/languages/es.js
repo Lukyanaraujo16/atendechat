@@ -58,9 +58,82 @@ const messages = {
         },
         landing: {
           title: "Consola Técnica",
+          subtitle:
+            "Entorno interno de operación y observabilidad del AgentOS.",
           authorized: "Acceso interno autorizado.",
+          internalNotice:
+            "Área restringida a operadores internos. No sustituye el producto comercial.",
           nextSteps:
-            "La navegación técnica estará disponible en las próximas etapas.",
+            "Use la navegación interna para abrir los módulos técnicos.",
+        },
+        shell: {
+          title: "Consola Técnica",
+          home: "Inicio",
+          internalBadge: "Entorno interno",
+          activeCompany: "Empresa activa: {{name}}",
+          supportContext: "Contexto de soporte",
+          backToProduct: "Volver al producto",
+          openModules: "Abrir módulos",
+          navAria: "Navegación de la Consola Técnica",
+        },
+        groups: {
+          operation: "Operación",
+          quality: "Calidad y análisis",
+          intelligence: "Inteligencia",
+          tools: "Herramientas e integraciones internas",
+          delivery: "Entrega y producción",
+        },
+        nav: {
+          monitor: "Monitor",
+          observability: "Observabilidad",
+          executionSessions: "Sesiones de ejecución",
+          runtime: "Runtime",
+          actions: "Acciones",
+          analytics: "Analytics",
+          evaluation: "Evaluation",
+          evidence: "Evidence",
+          feedback: "Feedback",
+          shadowFc: "Shadow FC",
+          planning: "Planning",
+          memory: "Memory",
+          learning: "Learning",
+          multiAgent: "Multi-Agent",
+          tools: "Tools",
+          mcp: "MCP",
+          rollout: "Rollout",
+          production: "Production",
+        },
+        readOnly: {
+          banner:
+            "Acceso de solo lectura. Las acciones sensibles requieren un permiso adicional.",
+        },
+        actionDenied: {
+          message: "No tiene autorización para ejecutar esta acción.",
+        },
+        empty: {
+          executions: "No se encontraron ejecuciones para el contexto actual.",
+          evidence: "No se registró evidencia para el contexto actual.",
+          incidents: "No hay incidentes activos en el contexto actual.",
+          actions: "No hay acciones técnicas disponibles en el contexto actual.",
+          memory: "No hay memoria registrada para el contexto actual.",
+        },
+        confirm: {
+          killTitle: "Activar kill switch",
+          killBody:
+            "Esto detiene Function Calling Live para la empresa activa ({{company}}). Confirme solo si es intencional.",
+          killConfirm: "Activar kill switch",
+          rollbackTitle: "Ejecutar rollback Live",
+          rollbackBody:
+            "Esto revierte la etapa Live de la empresa activa ({{company}}). El cambio es inmediato.",
+          rollbackConfirm: "Ejecutar rollback",
+          emergencyTitle: "Emergency stop",
+          emergencyBody:
+            "Parada de emergencia en la empresa activa ({{company}}). Úselo solo en incidentes críticos.",
+          emergencyConfirm: "Confirmar emergency stop",
+        },
+        notFound: {
+          title: "Página técnica no encontrada",
+          description: "Esta ruta no existe en la Consola Técnica.",
         },
       },
       groups: {

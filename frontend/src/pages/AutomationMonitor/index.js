@@ -32,7 +32,10 @@ import MainHeader from "../../components/MainHeader";
 import Title from "../../components/Title";
 import TableRowSkeleton from "../../components/TableRowSkeleton";
 import { AppEmptyState } from "../../ui";
-import toastError from "../../errors/toastError";
+import AgentOsReadOnlyBanner from "../../components/AgentOsReadOnlyBanner";
+import AgentOsIf from "../../components/AgentOsIf";
+import useAgentOsConsolePermissions from "../../hooks/useAgentOsConsolePermissions";
+import { toastAgentOsActionError } from "../../utils/agentOsActionError";
 import {
   getAutomationExecutionReplay,
   getAutomationOrchestratorDashboard,
@@ -138,6 +141,7 @@ function MetricCard({ label, value }) {
 
 const AutomationMonitorPage = () => {
   const classes = useStyles();
+  const { canManage, canReplay, readOnlyManage } = useAgentOsConsolePermissions();
   const [tab, setTab] = useState(0);
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(false);
@@ -173,7 +177,7 @@ const AutomationMonitorPage = () => {
       const { data } = await getAutomationOrchestratorDashboard();
       setDashboard(data);
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     } finally {
       setLoading(false);
     }
@@ -188,7 +192,7 @@ const AutomationMonitorPage = () => {
       });
       setExecutions(data?.records || []);
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     } finally {
       setLoading(false);
     }
@@ -202,7 +206,7 @@ const AutomationMonitorPage = () => {
       });
       setValidations(data?.records || data?.rows || []);
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     } finally {
       setLoading(false);
     }
@@ -218,7 +222,7 @@ const AutomationMonitorPage = () => {
       setCapabilities(s?.capabilities || {});
       setEnabled(s?.enabled !== false);
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     } finally {
       setLoading(false);
     }
@@ -230,7 +234,7 @@ const AutomationMonitorPage = () => {
       const { data } = await listAutomationActions();
       setActionCatalog(data);
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     } finally {
       setLoading(false);
     }
@@ -246,7 +250,7 @@ const AutomationMonitorPage = () => {
       setToolCatalog(catalogRes.data);
       setToolMetrics(metricsRes.data);
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     } finally {
       setLoading(false);
     }
@@ -258,7 +262,7 @@ const AutomationMonitorPage = () => {
       const { data } = await getAiAgentShadowFcDashboard();
       setShadowFc(data);
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     } finally {
       setLoading(false);
     }
@@ -270,7 +274,7 @@ const AutomationMonitorPage = () => {
       const { data } = await getEvidenceDashboard();
       setEvidenceDash(data);
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     } finally {
       setLoading(false);
     }
@@ -282,7 +286,7 @@ const AutomationMonitorPage = () => {
       const { data } = await getLiveRolloutDashboard();
       setLiveRollout(data);
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     } finally {
       setLoading(false);
     }
@@ -294,7 +298,7 @@ const AutomationMonitorPage = () => {
       const { data } = await getCognitivePlanningDashboard();
       setCognitivePlanning(data);
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     } finally {
       setLoading(false);
     }
@@ -306,7 +310,7 @@ const AutomationMonitorPage = () => {
       const { data } = await getPlanEvaluationDashboard();
       setPlanEvaluation(data);
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     } finally {
       setLoading(false);
     }
@@ -318,7 +322,7 @@ const AutomationMonitorPage = () => {
       const { data } = await getExecutionSessionsDashboard();
       setExecutionSessions(data);
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     } finally {
       setLoading(false);
     }
@@ -330,7 +334,7 @@ const AutomationMonitorPage = () => {
       const { data } = await getActionExecutionDashboard();
       setActionExecution(data);
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     } finally {
       setLoading(false);
     }
@@ -342,7 +346,7 @@ const AutomationMonitorPage = () => {
       const { data } = await getRuntimeIntegrationDashboard();
       setRuntimeIntegration(data);
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     } finally {
       setLoading(false);
     }
@@ -354,7 +358,7 @@ const AutomationMonitorPage = () => {
       const { data } = await getExecutionFeedbackDashboard();
       setExecutionFeedback(data);
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     } finally {
       setLoading(false);
     }
@@ -366,7 +370,7 @@ const AutomationMonitorPage = () => {
       const { data } = await getCognitiveMemoryDashboard();
       setCognitiveMemory(data);
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     } finally {
       setLoading(false);
     }
@@ -378,7 +382,7 @@ const AutomationMonitorPage = () => {
       const { data } = await getMcpDashboard();
       setMcpRuntime(data);
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     } finally {
       setLoading(false);
     }
@@ -390,7 +394,7 @@ const AutomationMonitorPage = () => {
       const { data } = await getLearningDashboard();
       setLearningEngine(data);
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     } finally {
       setLoading(false);
     }
@@ -402,7 +406,7 @@ const AutomationMonitorPage = () => {
       const { data } = await getMultiAgentDashboard();
       setMultiAgent(data);
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     } finally {
       setLoading(false);
     }
@@ -456,7 +460,7 @@ const AutomationMonitorPage = () => {
       const { data } = await getAutomationExecutionReplay(id);
       setReplay(data?.replay || null);
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     }
   };
 
@@ -471,7 +475,7 @@ const AutomationMonitorPage = () => {
       setTab(1);
       loadExecutions();
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     }
   };
 
@@ -486,7 +490,7 @@ const AutomationMonitorPage = () => {
       setSettings(data?.settings || data);
       toast.success("Configuração salva (sem deploy)");
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     } finally {
       setSaving(false);
     }
@@ -499,6 +503,7 @@ const AutomationMonitorPage = () => {
       <MainHeader>
         <Title>Automation Monitor</Title>
       </MainHeader>
+      <AgentOsReadOnlyBanner visible={readOnlyManage} />
       <Paper className={classes.mainPaper} variant="outlined">
         <Typography variant="body2" color="textSecondary" paragraph>
           Action Runtime (2.0.2). Ownership padrão = legado. Observe e
@@ -507,9 +512,11 @@ const AutomationMonitorPage = () => {
         </Typography>
 
         <div className={classes.filters}>
-          <Button variant="outlined" color="primary" onClick={runSimulate}>
-            Simular plano
-          </Button>
+          <AgentOsIf when={canManage}>
+            <Button variant="outlined" color="primary" onClick={runSimulate}>
+              Simular plano
+            </Button>
+          </AgentOsIf>
         </div>
 
         <Tabs
@@ -688,9 +695,11 @@ const AutomationMonitorPage = () => {
                           {ex.fallbackToLegacy ? "sim" : "não"}
                         </TableCell>
                         <TableCell align="right">
-                          <Button size="small" onClick={() => openReplay(ex.id)}>
-                            Replay
-                          </Button>
+                          <AgentOsIf when={canReplay}>
+                            <Button size="small" onClick={() => openReplay(ex.id)}>
+                              Replay
+                            </Button>
+                          </AgentOsIf>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -1759,6 +1768,7 @@ const AutomationMonitorPage = () => {
                     control={
                       <Switch
                         checked={enabled}
+                        disabled={!canManage}
                         onChange={(e) => setEnabled(e.target.checked)}
                         color="primary"
                       />
@@ -1770,11 +1780,13 @@ const AutomationMonitorPage = () => {
                       variant="outlined"
                       size="small"
                       style={{ minWidth: 200 }}
+                      disabled={!canManage}
                     >
                       <InputLabel>Control Mode</InputLabel>
                       <Select
                         label="Control Mode"
                         value={controlMode}
+                        disabled={!canManage}
                         onChange={(e) => setControlMode(e.target.value)}
                       >
                         {CONTROL_MODES.map((m) => (
@@ -1795,11 +1807,13 @@ const AutomationMonitorPage = () => {
                           variant="outlined"
                           size="small"
                           fullWidth
+                          disabled={!canManage}
                         >
                           <InputLabel>{key}</InputLabel>
                           <Select
                             label={key}
                             value={capabilities[key] || "legacy"}
+                            disabled={!canManage}
                             onChange={(e) =>
                               setCapabilities((prev) => ({
                                 ...prev,
@@ -1817,16 +1831,18 @@ const AutomationMonitorPage = () => {
                       </Grid>
                     ))}
                   </Grid>
-                  <Box mt={2}>
-                    <Button
-                      variant="contained"
-                      color="primary"
-                      disabled={saving}
-                      onClick={saveSettings}
-                    >
-                      Salvar configuração
-                    </Button>
-                  </Box>
+                  <AgentOsIf when={canManage}>
+                    <Box mt={2}>
+                      <Button
+                        variant="contained"
+                        color="primary"
+                        disabled={saving}
+                        onClick={saveSettings}
+                      >
+                        Salvar configuração
+                      </Button>
+                    </Box>
+                  </AgentOsIf>
                   {settings?.circuitBreakerOpenUntil && (
                     <Typography variant="caption" color="error" display="block">
                       Circuit breaker aberto até{" "}

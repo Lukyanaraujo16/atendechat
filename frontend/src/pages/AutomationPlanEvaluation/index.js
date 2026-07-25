@@ -14,7 +14,11 @@ import { toast } from "react-toastify";
 import MainContainer from "../../components/MainContainer";
 import MainHeader from "../../components/MainHeader";
 import Title from "../../components/Title";
+import AgentOsReadOnlyBanner from "../../components/AgentOsReadOnlyBanner";
+import AgentOsIf from "../../components/AgentOsIf";
+import useAgentOsConsolePermissions from "../../hooks/useAgentOsConsolePermissions";
 import toastError from "../../errors/toastError";
+import { toastAgentOsActionError } from "../../utils/agentOsActionError";
 import {
   diffCognitivePlans,
   evaluateCognitivePlan,
@@ -53,6 +57,7 @@ function Metric({ label, value, classes }) {
 
 export default function AutomationPlanEvaluationPage() {
   const classes = useStyles();
+  const { canManage, readOnlyManage } = useAgentOsConsolePermissions();
   const [tab, setTab] = useState(0);
   const [dash, setDash] = useState(null);
   const [text, setText] = useState("Quero transferir para um atendente humano");
@@ -84,6 +89,8 @@ export default function AutomationPlanEvaluationPage() {
       <MainHeader>
         <Title>Plan Evaluation (V2.1)</Title>
       </MainHeader>
+
+      <AgentOsReadOnlyBanner visible={readOnlyManage} />
 
       <Paper className={classes.paper} variant="outlined">
         <Typography variant="body2" color="textSecondary">
@@ -160,92 +167,100 @@ export default function AutomationPlanEvaluationPage() {
           )}
 
           {tab === 1 && (
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={async () => {
-                try {
-                  const { data } = await evaluateCognitivePlan({ text });
-                  setResult(data);
-                  toast.success("Plano inspecionado/avaliado");
-                  await load();
-                } catch (err) {
-                  toastError(err);
-                }
-              }}
-            >
-              Inspecionar / Avaliar
-            </Button>
+            <AgentOsIf when={canManage}>
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={async () => {
+                  try {
+                    const { data } = await evaluateCognitivePlan({ text });
+                    setResult(data);
+                    toast.success("Plano inspecionado/avaliado");
+                    await load();
+                  } catch (err) {
+                    toastAgentOsActionError(err);
+                  }
+                }}
+              >
+                Inspecionar / Avaliar
+              </Button>
+            </AgentOsIf>
           )}
 
           {tab === 2 && (
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={async () => {
-                try {
-                  const { data } = await evaluateCognitivePlan({ text });
-                  setResult({
-                    validationSummary: data.evaluation?.validationSummary,
-                    validatorResults: data.evaluation?.validatorResults,
-                  });
-                  toast.success("Validators executados");
-                  await load();
-                } catch (err) {
-                  toastError(err);
-                }
-              }}
-            >
-              Rodar Validators
-            </Button>
+            <AgentOsIf when={canManage}>
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={async () => {
+                  try {
+                    const { data } = await evaluateCognitivePlan({ text });
+                    setResult({
+                      validationSummary: data.evaluation?.validationSummary,
+                      validatorResults: data.evaluation?.validatorResults,
+                    });
+                    toast.success("Validators executados");
+                    await load();
+                  } catch (err) {
+                    toastAgentOsActionError(err);
+                  }
+                }}
+              >
+                Rodar Validators
+              </Button>
+            </AgentOsIf>
           )}
 
           {tab === 3 && (
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={async () => {
-                try {
-                  const { data } = await evaluateCognitivePlan({ text });
-                  setResult({
-                    approval: data.evaluation?.approval,
-                    score: data.evaluation?.score,
-                    scoreBreakdown: data.evaluation?.scoreBreakdown,
-                    quality: data.evaluation?.quality,
-                    risk: data.evaluation?.risk,
-                  });
-                  toast.success("Score/Approval simulados");
-                  await load();
-                } catch (err) {
-                  toastError(err);
-                }
-              }}
-            >
-              Simular Score / Approval
-            </Button>
+            <AgentOsIf when={canManage}>
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={async () => {
+                  try {
+                    const { data } = await evaluateCognitivePlan({ text });
+                    setResult({
+                      approval: data.evaluation?.approval,
+                      score: data.evaluation?.score,
+                      scoreBreakdown: data.evaluation?.scoreBreakdown,
+                      quality: data.evaluation?.quality,
+                      risk: data.evaluation?.risk,
+                    });
+                    toast.success("Score/Approval simulados");
+                    await load();
+                  } catch (err) {
+                    toastAgentOsActionError(err);
+                  }
+                }}
+              >
+                Simular Score / Approval
+              </Button>
+            </AgentOsIf>
           )}
 
           {tab === 4 && (
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={async () => {
-                try {
-                  const { data } = await evaluateCognitivePlan({ text });
-                  setResult({
-                    recommendations: data.evaluation?.recommendations,
-                    issues: data.evaluation?.issues,
-                    warnings: data.evaluation?.warnings,
-                  });
-                  toast.success("Recommendations geradas");
-                  await load();
-                } catch (err) {
-                  toastError(err);
-                }
-              }}
-            >
-              Ver Recommendations
-            </Button>
+            <AgentOsIf when={canManage}>
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={async () => {
+                  try {
+                    const { data } = await evaluateCognitivePlan({ text });
+                    setResult({
+                      recommendations: data.evaluation?.recommendations,
+                      issues: data.evaluation?.issues,
+                      warnings: data.evaluation?.warnings,
+                    });
+                    toast.success("Recommendations geradas");
+                    await load();
+                  } catch (err) {
+                    toastAgentOsActionError(err);
+                  }
+                }}
+              >
+                Ver Recommendations
+              </Button>
+            </AgentOsIf>
           )}
 
           {tab === 5 && (
@@ -268,25 +283,27 @@ export default function AutomationPlanEvaluationPage() {
                 variant="outlined"
                 style={{ marginBottom: 8 }}
               />
-              <Button
-                variant="contained"
-                color="primary"
-                onClick={async () => {
-                  try {
-                    const { data } = await diffCognitivePlans({
-                      previousText: text,
-                      nextText,
-                    });
-                    setResult(data);
-                    toast.success("Plan Diff gerado");
-                    await load();
-                  } catch (err) {
-                    toastError(err);
-                  }
-                }}
-              >
-                Comparar planos
-              </Button>
+              <AgentOsIf when={canManage}>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  onClick={async () => {
+                    try {
+                      const { data } = await diffCognitivePlans({
+                        previousText: text,
+                        nextText,
+                      });
+                      setResult(data);
+                      toast.success("Plan Diff gerado");
+                      await load();
+                    } catch (err) {
+                      toastAgentOsActionError(err);
+                    }
+                  }}
+                >
+                  Comparar planos
+                </Button>
+              </AgentOsIf>
             </Box>
           )}
 
@@ -301,24 +318,27 @@ export default function AutomationPlanEvaluationPage() {
                 rows={12}
                 variant="outlined"
                 className={classes.mono}
+                disabled={!canManage}
               />
-              <Button
-                style={{ marginTop: 8 }}
-                variant="contained"
-                color="primary"
-                onClick={async () => {
-                  try {
-                    const parsed = JSON.parse(configJson);
-                    await updatePlanEvaluationConfig(parsed);
-                    toast.success("Config salva (sem hardcode no engine)");
-                    await load();
-                  } catch (err) {
-                    toastError(err);
-                  }
-                }}
-              >
-                Salvar config
-              </Button>
+              <AgentOsIf when={canManage}>
+                <Button
+                  style={{ marginTop: 8 }}
+                  variant="contained"
+                  color="primary"
+                  onClick={async () => {
+                    try {
+                      const parsed = JSON.parse(configJson);
+                      await updatePlanEvaluationConfig(parsed);
+                      toast.success("Config salva (sem hardcode no engine)");
+                      await load();
+                    } catch (err) {
+                      toastAgentOsActionError(err);
+                    }
+                  }}
+                >
+                  Salvar config
+                </Button>
+              </AgentOsIf>
               <Button
                 style={{ marginTop: 8, marginLeft: 8 }}
                 variant="outlined"

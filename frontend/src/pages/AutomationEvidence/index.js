@@ -16,7 +16,11 @@ import { makeStyles } from "@material-ui/core/styles";
 import MainContainer from "../../components/MainContainer";
 import MainHeader from "../../components/MainHeader";
 import Title from "../../components/Title";
+import AgentOsReadOnlyBanner from "../../components/AgentOsReadOnlyBanner";
+import AgentOsIf from "../../components/AgentOsIf";
+import useAgentOsConsolePermissions from "../../hooks/useAgentOsConsolePermissions";
 import toastError from "../../errors/toastError";
+import { toastAgentOsActionError } from "../../utils/agentOsActionError";
 import { toast } from "react-toastify";
 import {
   getEvidenceByShadowEvaluation,
@@ -55,6 +59,7 @@ function Metric({ label, value, classes }) {
 
 export default function AutomationEvidencePage() {
   const classes = useStyles();
+  const { canManage, readOnlyManage } = useAgentOsConsolePermissions();
   const [dash, setDash] = useState(null);
   const [detail, setDetail] = useState(null);
   const [thresholdsJson, setThresholdsJson] = useState("");
@@ -87,7 +92,7 @@ export default function AutomationEvidencePage() {
       toast.success("Thresholds salvos (Live permanece OFF).");
       await load();
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     }
   };
 
@@ -117,6 +122,8 @@ export default function AutomationEvidencePage() {
       <MainHeader>
         <Title>Evidence Dashboard</Title>
       </MainHeader>
+
+      <AgentOsReadOnlyBanner visible={readOnlyManage} />
 
       <Paper className={classes.paper} variant="outlined">
         <Typography variant="body2" color="textSecondary">
@@ -171,17 +178,19 @@ export default function AutomationEvidencePage() {
           variant="outlined"
           value={thresholdsJson}
           onChange={(e) => setThresholdsJson(e.target.value)}
-          disabled={loading}
+          disabled={loading || !canManage}
         />
         <Box mt={1}>
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={saveThresholds}
-            disabled={loading}
-          >
-            Salvar thresholds
-          </Button>
+          <AgentOsIf when={canManage}>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={saveThresholds}
+              disabled={loading}
+            >
+              Salvar thresholds
+            </Button>
+          </AgentOsIf>
         </Box>
       </Paper>
 
@@ -221,7 +230,9 @@ export default function AutomationEvidencePage() {
             ))}
             {!(dash?.recent || []).length && (
               <TableRow>
-                <TableCell colSpan={5}>Nenhum report ainda.</TableCell>
+                <TableCell colSpan={5}>
+                  Nenhuma evidência foi registrada para o contexto atual.
+                </TableCell>
               </TableRow>
             )}
           </TableBody>

@@ -30,9 +30,13 @@ import MainContainer from "../../components/MainContainer";
 import MainHeader from "../../components/MainHeader";
 import Title from "../../components/Title";
 import TableRowSkeleton from "../../components/TableRowSkeleton";
+import AgentOsReadOnlyBanner from "../../components/AgentOsReadOnlyBanner";
+import AgentOsIf from "../../components/AgentOsIf";
+import useAgentOsConsolePermissions from "../../hooks/useAgentOsConsolePermissions";
 import { AppEmptyState } from "../../ui";
 import { i18n } from "../../translate/i18n";
 import toastError from "../../errors/toastError";
+import { toastAgentOsActionError } from "../../utils/agentOsActionError";
 import { listAiAgents } from "../../services/aiAgentApi";
 import {
   getAiAgentAnalyticsDashboard,
@@ -89,6 +93,7 @@ function MetricCard({ label, value }) {
 
 const AiAgentAnalyticsPage = () => {
   const classes = useStyles();
+  const { canManage, readOnlyManage } = useAgentOsConsolePermissions();
   const [tab, setTab] = useState(0);
   const [agents, setAgents] = useState([]);
   const [aiAgentId, setAiAgentId] = useState("");
@@ -215,7 +220,7 @@ const AiAgentAnalyticsPage = () => {
       toast.success(t("gapUpdated", "Gap atualizado"));
       loadGaps();
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     }
   };
 
@@ -225,7 +230,7 @@ const AiAgentAnalyticsPage = () => {
       toast.success(t("suggestionUpdated", "Sugestão atualizada"));
       loadSuggestions();
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     }
   };
 
@@ -268,6 +273,7 @@ const AiAgentAnalyticsPage = () => {
       <MainHeader>
         <Title>{t("title", "Analytics IA")}</Title>
       </MainHeader>
+      <AgentOsReadOnlyBanner visible={readOnlyManage} />
       <Paper className={classes.mainPaper} variant="outlined">
         <Typography variant="body2" color="textSecondary" paragraph>
           {t(
@@ -423,12 +429,14 @@ const AiAgentAnalyticsPage = () => {
                         <TableCell>{g.frequency}</TableCell>
                         <TableCell>{g.channel}</TableCell>
                         <TableCell align="right">
-                          <Button
-                            size="small"
-                            onClick={() => handleResolveGap(g, "ignore")}
-                          >
-                            {t("ignore", "Ignorar")}
-                          </Button>
+                          <AgentOsIf when={canManage}>
+                            <Button
+                              size="small"
+                              onClick={() => handleResolveGap(g, "ignore")}
+                            >
+                              {t("ignore", "Ignorar")}
+                            </Button>
+                          </AgentOsIf>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -463,23 +471,25 @@ const AiAgentAnalyticsPage = () => {
                         <TableCell>{s.questionPreview}</TableCell>
                         <TableCell>{s.reason}</TableCell>
                         <TableCell align="right">
-                          <Button
-                            size="small"
-                            color="primary"
-                            onClick={() =>
-                              handleSuggestionStatus(s, "accepted")
-                            }
-                          >
-                            {t("accept", "Aceitar")}
-                          </Button>
-                          <Button
-                            size="small"
-                            onClick={() =>
-                              handleSuggestionStatus(s, "rejected")
-                            }
-                          >
-                            {t("reject", "Rejeitar")}
-                          </Button>
+                          <AgentOsIf when={canManage}>
+                            <Button
+                              size="small"
+                              color="primary"
+                              onClick={() =>
+                                handleSuggestionStatus(s, "accepted")
+                              }
+                            >
+                              {t("accept", "Aceitar")}
+                            </Button>
+                            <Button
+                              size="small"
+                              onClick={() =>
+                                handleSuggestionStatus(s, "rejected")
+                              }
+                            >
+                              {t("reject", "Rejeitar")}
+                            </Button>
+                          </AgentOsIf>
                         </TableCell>
                       </TableRow>
                     ))}

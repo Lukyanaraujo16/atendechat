@@ -14,7 +14,10 @@ import { toast } from "react-toastify";
 import MainContainer from "../../components/MainContainer";
 import MainHeader from "../../components/MainHeader";
 import Title from "../../components/Title";
-import toastError from "../../errors/toastError";
+import AgentOsReadOnlyBanner from "../../components/AgentOsReadOnlyBanner";
+import AgentOsIf from "../../components/AgentOsIf";
+import useAgentOsConsolePermissions from "../../hooks/useAgentOsConsolePermissions";
+import { toastAgentOsActionError } from "../../utils/agentOsActionError";
 import {
   analyzeCognitiveGoal,
   generateCognitivePlan,
@@ -62,6 +65,7 @@ function Metric({ label, value, classes }) {
 
 export default function AutomationPlanningPage() {
   const classes = useStyles();
+  const { canManage, canReplay, readOnlyManage } = useAgentOsConsolePermissions();
   const [tab, setTab] = useState(0);
   const [dash, setDash] = useState(null);
   const [text, setText] = useState(
@@ -74,7 +78,7 @@ export default function AutomationPlanningPage() {
       const { data } = await getCognitivePlanningDashboard();
       setDash(data);
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     }
   }, []);
 
@@ -89,7 +93,7 @@ export default function AutomationPlanningPage() {
       toast.success(okMsg);
       await load();
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     }
   };
 
@@ -100,6 +104,8 @@ export default function AutomationPlanningPage() {
       <MainHeader>
         <Title>Planning (Cognitive V2)</Title>
       </MainHeader>
+
+      <AgentOsReadOnlyBanner visible={readOnlyManage} />
 
       <Paper className={classes.paper} variant="outlined">
         <Typography variant="body2" color="textSecondary">
@@ -178,88 +184,100 @@ export default function AutomationPlanningPage() {
         )}
 
         {tab === 1 && (
-          <Box>
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={() => run(analyzeCognitiveGoal, "Goal analisado")}
-            >
-              Analisar Goal
-            </Button>
-          </Box>
+          <AgentOsIf when={canManage}>
+            <Box>
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={() => run(analyzeCognitiveGoal, "Goal analisado")}
+              >
+                Analisar Goal
+              </Button>
+            </Box>
+          </AgentOsIf>
         )}
 
         {tab === 2 && (
-          <Box>
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={() => run(generateCognitivePlan, "Plan gerado")}
-            >
-              Gerar Execution Plan
-            </Button>
-          </Box>
+          <AgentOsIf when={canManage}>
+            <Box>
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={() => run(generateCognitivePlan, "Plan gerado")}
+              >
+                Gerar Execution Plan
+              </Button>
+            </Box>
+          </AgentOsIf>
         )}
 
         {tab === 3 && (
-          <Box>
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={() =>
-                run(inspectCognitiveDependencies, "Dependências resolvidas")
-              }
-            >
-              Ver dependências
-            </Button>
-          </Box>
+          <AgentOsIf when={canManage}>
+            <Box>
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={() =>
+                  run(inspectCognitiveDependencies, "Dependências resolvidas")
+                }
+              >
+                Ver dependências
+              </Button>
+            </Box>
+          </AgentOsIf>
         )}
 
         {tab === 4 && (
-          <Box>
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={() =>
-                run(simulateCognitiveRecovery, "Recovery simulado")
-              }
-            >
-              Simular Recovery
-            </Button>
-            <Button
-              style={{ marginLeft: 8 }}
-              variant="outlined"
-              onClick={() =>
-                run(simulateCognitiveValidation, "Validação simulada")
-              }
-            >
-              Simular Validation
-            </Button>
-          </Box>
+          <AgentOsIf when={canManage}>
+            <Box>
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={() =>
+                  run(simulateCognitiveRecovery, "Recovery simulado")
+                }
+              >
+                Simular Recovery
+              </Button>
+              <Button
+                style={{ marginLeft: 8 }}
+                variant="outlined"
+                onClick={() =>
+                  run(simulateCognitiveValidation, "Validação simulada")
+                }
+              >
+                Simular Validation
+              </Button>
+            </Box>
+          </AgentOsIf>
         )}
 
         {tab === 5 && (
-          <Box>
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={() => run(replayCognitivePlan, "Replay completo")}
-            >
-              Replay completo
-            </Button>
-          </Box>
+          <AgentOsIf when={canReplay}>
+            <Box>
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={() => run(replayCognitivePlan, "Replay completo")}
+              >
+                Replay completo
+              </Button>
+            </Box>
+          </AgentOsIf>
         )}
 
         {tab === 6 && (
-          <Box>
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={() => run(evaluateCognitivePlan, "Plan Evaluation")}
-            >
-              Avaliar plano (V2.1)
-            </Button>
-          </Box>
+          <AgentOsIf when={canManage}>
+            <Box>
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={() => run(evaluateCognitivePlan, "Plan Evaluation")}
+              >
+                Avaliar plano (V2.1)
+              </Button>
+            </Box>
+          </AgentOsIf>
         )}
 
         {result && (

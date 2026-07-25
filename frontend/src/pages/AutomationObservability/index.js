@@ -19,7 +19,10 @@ import MainContainer from "../../components/MainContainer";
 import MainHeader from "../../components/MainHeader";
 import Title from "../../components/Title";
 import TableRowSkeleton from "../../components/TableRowSkeleton";
-import toastError from "../../errors/toastError";
+import AgentOsReadOnlyBanner from "../../components/AgentOsReadOnlyBanner";
+import AgentOsIf from "../../components/AgentOsIf";
+import useAgentOsConsolePermissions from "../../hooks/useAgentOsConsolePermissions";
+import { toastAgentOsActionError } from "../../utils/agentOsActionError";
 import {
   getObservabilityDashboard,
   probeObservability,
@@ -42,6 +45,7 @@ function statusColor(status) {
 
 const AutomationObservability = () => {
   const classes = useStyles();
+  const { canManage, readOnlyManage } = useAgentOsConsolePermissions();
   const [loading, setLoading] = useState(true);
   const [dash, setDash] = useState(null);
 
@@ -51,7 +55,7 @@ const AutomationObservability = () => {
       const { data } = await getObservabilityDashboard();
       setDash(data);
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     } finally {
       setLoading(false);
     }
@@ -67,7 +71,7 @@ const AutomationObservability = () => {
       toast.success(`Probe ok: ${data.traceId}`);
       load();
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     }
   };
 
@@ -77,7 +81,7 @@ const AutomationObservability = () => {
       toast.success("Health check executado");
       load();
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     }
   };
 
@@ -97,7 +101,7 @@ const AutomationObservability = () => {
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     }
   };
 
@@ -109,17 +113,23 @@ const AutomationObservability = () => {
           <Button color="primary" variant="outlined" onClick={load} style={{ marginRight: 8 }}>
             Atualizar
           </Button>
-          <Button color="primary" variant="outlined" onClick={onProbe} style={{ marginRight: 8 }}>
-            Probe
-          </Button>
-          <Button color="primary" variant="outlined" onClick={onHealthOp} style={{ marginRight: 8 }}>
-            Health check
-          </Button>
+          <AgentOsIf when={canManage}>
+            <Button color="primary" variant="outlined" onClick={onProbe} style={{ marginRight: 8 }}>
+              Probe
+            </Button>
+          </AgentOsIf>
+          <AgentOsIf when={canManage}>
+            <Button color="primary" variant="outlined" onClick={onHealthOp} style={{ marginRight: 8 }}>
+              Health check
+            </Button>
+          </AgentOsIf>
           <Button color="primary" variant="contained" onClick={onExportMetrics}>
             Export metrics
           </Button>
         </Box>
       </MainHeader>
+
+      <AgentOsReadOnlyBanner visible={readOnlyManage} />
 
       {loading && !dash ? (
         <Paper className={classes.paper}>

@@ -14,7 +14,10 @@ import { makeStyles } from "@material-ui/core/styles";
 import MainContainer from "../../components/MainContainer";
 import MainHeader from "../../components/MainHeader";
 import Title from "../../components/Title";
-import toastError from "../../errors/toastError";
+import AgentOsReadOnlyBanner from "../../components/AgentOsReadOnlyBanner";
+import AgentOsIf from "../../components/AgentOsIf";
+import useAgentOsConsolePermissions from "../../hooks/useAgentOsConsolePermissions";
+import { toastAgentOsActionError } from "../../utils/agentOsActionError";
 import {
   buildCognitiveKnowledge,
   createCognitiveMemory,
@@ -63,6 +66,7 @@ function Metric({ label, value, classes }) {
 
 export default function AutomationCognitiveMemoryPage() {
   const classes = useStyles();
+  const { canManage, canReplay, readOnlyManage } = useAgentOsConsolePermissions();
   const [tab, setTab] = useState(0);
   const [dash, setDash] = useState(null);
   const [memoryType, setMemoryType] = useState("EPISODIC");
@@ -80,7 +84,7 @@ export default function AutomationCognitiveMemoryPage() {
       setDash(d.data);
       setConfigJson(JSON.stringify(cfg.data?.config || {}, null, 2));
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     }
   }, []);
 
@@ -93,6 +97,8 @@ export default function AutomationCognitiveMemoryPage() {
       <MainHeader>
         <Title>Cognitive Memory (V2.6)</Title>
       </MainHeader>
+
+      <AgentOsReadOnlyBanner visible={readOnlyManage} />
 
       <Paper className={classes.paper} variant="outlined">
         <Typography variant="body2" color="textSecondary">
@@ -153,27 +159,29 @@ export default function AutomationCognitiveMemoryPage() {
 
           {tab === 1 && (
             <Box>
-              <Button
-                variant="contained"
-                color="primary"
-                onClick={async () => {
-                  try {
-                    const built = await buildCognitiveKnowledge({
-                      runtimeStatus: "success",
-                    });
-                    setResult(built.data);
-                    const saved = await createCognitiveMemory({
-                      feedback: built.data?.feedback,
-                    });
-                    setResult({ built: built.data, saved: saved.data });
-                    load();
-                  } catch (err) {
-                    toastError(err);
-                  }
-                }}
-              >
-                Build + Save Knowledge
-              </Button>
+              <AgentOsIf when={canManage}>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  onClick={async () => {
+                    try {
+                      const built = await buildCognitiveKnowledge({
+                        runtimeStatus: "success",
+                      });
+                      setResult(built.data);
+                      const saved = await createCognitiveMemory({
+                        feedback: built.data?.feedback,
+                      });
+                      setResult({ built: built.data, saved: saved.data });
+                      load();
+                    } catch (err) {
+                      toastAgentOsActionError(err);
+                    }
+                  }}
+                >
+                  Build + Save Knowledge
+                </Button>
+              </AgentOsIf>
             </Box>
           )}
 
@@ -206,7 +214,7 @@ export default function AutomationCognitiveMemoryPage() {
                       ),
                     });
                   } catch (err) {
-                    toastError(err);
+                    toastAgentOsActionError(err);
                   }
                 }}
               >
@@ -238,23 +246,25 @@ export default function AutomationCognitiveMemoryPage() {
                   </MenuItem>
                 ))}
               </TextField>
-              <Button
-                variant="contained"
-                color="primary"
-                style={{ marginTop: 8 }}
-                onClick={async () => {
-                  try {
-                    const { data } = await queryCognitiveMemory({
-                      query: { text: queryText, memoryType, limit: 20 },
-                    });
-                    setResult(data);
-                  } catch (err) {
-                    toastError(err);
-                  }
-                }}
-              >
-                Executar Query
-              </Button>
+              <AgentOsIf when={canManage}>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  style={{ marginTop: 8 }}
+                  onClick={async () => {
+                    try {
+                      const { data } = await queryCognitiveMemory({
+                        query: { text: queryText, memoryType, limit: 20 },
+                      });
+                      setResult(data);
+                    } catch (err) {
+                      toastAgentOsActionError(err);
+                    }
+                  }}
+                >
+                  Executar Query
+                </Button>
+              </AgentOsIf>
             </Box>
           )}
 
@@ -295,24 +305,26 @@ export default function AutomationCognitiveMemoryPage() {
                 onChange={(e) => setReplayText(e.target.value)}
                 margin="dense"
               />
-              <Button
-                variant="contained"
-                color="primary"
-                style={{ marginTop: 8 }}
-                onClick={async () => {
-                  try {
-                    const { data } = await replayCognitiveMemory({
-                      text: replayText,
-                    });
-                    setResult(data);
-                    load();
-                  } catch (err) {
-                    toastError(err);
-                  }
-                }}
-              >
-                Replay Feedback→Memory
-              </Button>
+              <AgentOsIf when={canReplay}>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  style={{ marginTop: 8 }}
+                  onClick={async () => {
+                    try {
+                      const { data } = await replayCognitiveMemory({
+                        text: replayText,
+                      });
+                      setResult(data);
+                      load();
+                    } catch (err) {
+                      toastAgentOsActionError(err);
+                    }
+                  }}
+                >
+                  Replay Feedback→Memory
+                </Button>
+              </AgentOsIf>
             </Box>
           )}
 
@@ -326,22 +338,24 @@ export default function AutomationCognitiveMemoryPage() {
                 onChange={(e) => setConfigJson(e.target.value)}
                 className={classes.mono}
               />
-              <Button
-                variant="contained"
-                color="primary"
-                style={{ marginTop: 8 }}
-                onClick={async () => {
-                  try {
-                    const parsed = JSON.parse(configJson);
-                    await updateCognitiveMemoryConfig(parsed);
-                    load();
-                  } catch (err) {
-                    toastError(err);
-                  }
-                }}
-              >
-                Salvar Config
-              </Button>
+              <AgentOsIf when={canManage}>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  style={{ marginTop: 8 }}
+                  onClick={async () => {
+                    try {
+                      const parsed = JSON.parse(configJson);
+                      await updateCognitiveMemoryConfig(parsed);
+                      load();
+                    } catch (err) {
+                      toastAgentOsActionError(err);
+                    }
+                  }}
+                >
+                  Salvar Config
+                </Button>
+              </AgentOsIf>
             </Box>
           )}
 

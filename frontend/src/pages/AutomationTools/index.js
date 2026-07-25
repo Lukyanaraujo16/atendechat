@@ -27,7 +27,11 @@ import MainContainer from "../../components/MainContainer";
 import MainHeader from "../../components/MainHeader";
 import Title from "../../components/Title";
 import TableRowSkeleton from "../../components/TableRowSkeleton";
+import AgentOsReadOnlyBanner from "../../components/AgentOsReadOnlyBanner";
+import AgentOsIf from "../../components/AgentOsIf";
+import useAgentOsConsolePermissions from "../../hooks/useAgentOsConsolePermissions";
 import toastError from "../../errors/toastError";
+import { toastAgentOsActionError } from "../../utils/agentOsActionError";
 import {
   getAutomationToolMetrics,
   getAutomationToolPolicies,
@@ -70,6 +74,10 @@ const useStyles = makeStyles((theme) => ({
 
 const AutomationToolsPage = () => {
   const classes = useStyles();
+  const { canManage, canReplay, canRollout, canView, readOnlyManage } =
+    useAgentOsConsolePermissions();
+  const showWriteBanner =
+    readOnlyManage || (canView && (!canRollout || !canReplay));
   const [tab, setTab] = useState(0);
   const [loading, setLoading] = useState(false);
   const [catalog, setCatalog] = useState(null);
@@ -190,7 +198,7 @@ const AutomationToolsPage = () => {
       setFcResult(data?.result || data);
       toast.success("Function Calling tester executado.");
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     } finally {
       setFcTesting(false);
     }
@@ -230,7 +238,7 @@ const AutomationToolsPage = () => {
       setEvidenceResult(data);
       toast.success("Evidence tester executado.");
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     } finally {
       setEvidenceTesting(false);
     }
@@ -271,7 +279,7 @@ const AutomationToolsPage = () => {
           : "Teste registrado via Tool Runtime."
       );
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     } finally {
       setTesting(false);
     }
@@ -291,7 +299,7 @@ const AutomationToolsPage = () => {
       setPolicy(data?.policy || null);
       toast.success("Política salva (deny-by-default).");
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     } finally {
       setSaving(false);
     }
@@ -302,6 +310,7 @@ const AutomationToolsPage = () => {
       <MainHeader>
         <Title>Ferramentas IA</Title>
       </MainHeader>
+      <AgentOsReadOnlyBanner visible={showWriteBanner} />
       <Paper className={classes.mainPaper} variant="outlined">
         <Typography variant="body2" color="textSecondary" paragraph>
           Tools 2.1C — leitura + escrita via Operation Runtime. Agente Live ainda
@@ -434,6 +443,7 @@ const AutomationToolsPage = () => {
                       checked={adminTestMode}
                       onChange={(e) => setAdminTestMode(e.target.checked)}
                       color="primary"
+                      disabled={!canManage}
                     />
                   }
                   label="Modo de teste explícito"
@@ -445,49 +455,52 @@ const AutomationToolsPage = () => {
                         checked={confirmed}
                         onChange={(e) => setConfirmed(e.target.checked)}
                         color="primary"
+                        disabled={!canManage}
                       />
                     }
                     label="Confirmado"
                   />
                 )}
-                {!isWriteTool && (
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    disabled={testing || !adminTestMode}
-                    onClick={() => runTest("execute")}
-                  >
-                    Executar leitura
-                  </Button>
-                )}
-                {isWriteTool && (
-                  <>
-                    <Button
-                      variant="outlined"
-                      color="primary"
-                      disabled={testing || !adminTestMode}
-                      onClick={() => runTest("preview")}
-                    >
-                      Preview
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      color="primary"
-                      disabled={testing || !adminTestMode}
-                      onClick={() => runTest("dry_run")}
-                    >
-                      Dry Run
-                    </Button>
+                <AgentOsIf when={canManage}>
+                  {!isWriteTool && (
                     <Button
                       variant="contained"
                       color="primary"
                       disabled={testing || !adminTestMode}
                       onClick={() => runTest("execute")}
                     >
-                      Execute
+                      Executar leitura
                     </Button>
-                  </>
-                )}
+                  )}
+                  {isWriteTool && (
+                    <>
+                      <Button
+                        variant="outlined"
+                        color="primary"
+                        disabled={testing || !adminTestMode}
+                        onClick={() => runTest("preview")}
+                      >
+                        Preview
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        color="primary"
+                        disabled={testing || !adminTestMode}
+                        onClick={() => runTest("dry_run")}
+                      >
+                        Dry Run
+                      </Button>
+                      <Button
+                        variant="contained"
+                        color="primary"
+                        disabled={testing || !adminTestMode}
+                        onClick={() => runTest("execute")}
+                      >
+                        Execute
+                      </Button>
+                    </>
+                  )}
+                </AgentOsIf>
               </div>
               {selectedManifest && (
                 <Box mb={2}>
@@ -594,6 +607,7 @@ const AutomationToolsPage = () => {
                       checked={adminTestMode}
                       onChange={(e) => setAdminTestMode(e.target.checked)}
                       color="primary"
+                      disabled={!canManage}
                     />
                   }
                   label="Modo de teste explícito"
@@ -604,19 +618,22 @@ const AutomationToolsPage = () => {
                     label="Provider"
                     value={fcProvider}
                     onChange={(e) => setFcProvider(e.target.value)}
+                    disabled={!canManage}
                   >
                     <MenuItem value="openai">OpenAI</MenuItem>
                     <MenuItem value="gemini">Gemini</MenuItem>
                   </Select>
                 </FormControl>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  disabled={fcTesting || !adminTestMode}
-                  onClick={runFcTest}
-                >
-                  Testar FC
-                </Button>
+                <AgentOsIf when={canManage}>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    disabled={fcTesting || !adminTestMode}
+                    onClick={runFcTest}
+                  >
+                    Testar FC
+                  </Button>
+                </AgentOsIf>
               </div>
               <TextField
                 label="Pergunta"
@@ -669,18 +686,21 @@ const AutomationToolsPage = () => {
                       checked={adminTestMode}
                       onChange={(e) => setAdminTestMode(e.target.checked)}
                       color="primary"
+                      disabled={!canManage}
                     />
                   }
                   label="Modo de teste explícito"
                 />
-                <Button
-                  variant="contained"
-                  color="primary"
-                  disabled={evidenceTesting || !adminTestMode}
-                  onClick={runEvidenceTest}
-                >
-                  Testar Evidence
-                </Button>
+                <AgentOsIf when={canManage}>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    disabled={evidenceTesting || !adminTestMode}
+                    onClick={runEvidenceTest}
+                  >
+                    Testar Evidence
+                  </Button>
+                </AgentOsIf>
               </div>
               <TextField
                 label="Resposta Shadow"
@@ -723,40 +743,43 @@ const AutomationToolsPage = () => {
                       checked={adminTestMode}
                       onChange={(e) => setAdminTestMode(e.target.checked)}
                       color="primary"
+                      disabled={!canRollout}
                     />
                   }
                   label="Modo de teste explícito"
                 />
-                <Button
-                  variant="contained"
-                  color="primary"
-                  disabled={!adminTestMode}
-                  onClick={async () => {
-                    try {
-                      const { data } = await testLiveRollout({
-                        adminTestMode: true,
-                        skipReadiness: true,
-                        whatsappId: 1,
-                        aiAgentId: 1,
-                        ticketId: 42,
-                        messageId: "tools-tester",
-                        provider: "openai",
-                        message: {
-                          fromMe: false,
-                          mediaType: "chat",
-                          ticketStatus: "open",
-                          userId: null,
-                        },
-                      });
-                      setLiveTestResult(data);
-                      toast.success("Live eligibility testado.");
-                    } catch (err) {
-                      toastError(err);
-                    }
-                  }}
-                >
-                  Testar Eligibility/Canary
-                </Button>
+                <AgentOsIf when={canRollout}>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    disabled={!adminTestMode}
+                    onClick={async () => {
+                      try {
+                        const { data } = await testLiveRollout({
+                          adminTestMode: true,
+                          skipReadiness: true,
+                          whatsappId: 1,
+                          aiAgentId: 1,
+                          ticketId: 42,
+                          messageId: "tools-tester",
+                          provider: "openai",
+                          message: {
+                            fromMe: false,
+                            mediaType: "chat",
+                            ticketStatus: "open",
+                            userId: null,
+                          },
+                        });
+                        setLiveTestResult(data);
+                        toast.success("Live eligibility testado.");
+                      } catch (err) {
+                        toastAgentOsActionError(err);
+                      }
+                    }}
+                  >
+                    Testar Eligibility/Canary
+                  </Button>
+                </AgentOsIf>
               </div>
               {liveTestResult && (
                 <pre className={classes.mono}>
@@ -780,26 +803,28 @@ const AutomationToolsPage = () => {
                 size="small"
                 style={{ marginBottom: 12 }}
               />
-              <Button
-                variant="contained"
-                color="primary"
-                onClick={async () => {
-                  try {
-                    const { data } = await replayCognitivePlan({
-                      text: planningText,
-                      simulatedOutcomes: {
-                        s2: { partial: true, note: "awaiting_confirmation" },
-                      },
-                    });
-                    setPlanningResult(data);
-                    toast.success("Planning replay executado (sem tools).");
-                  } catch (err) {
-                    toastError(err);
-                  }
-                }}
-              >
-                Replay Cognitive Plan
-              </Button>
+              <AgentOsIf when={canReplay}>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  onClick={async () => {
+                    try {
+                      const { data } = await replayCognitivePlan({
+                        text: planningText,
+                        simulatedOutcomes: {
+                          s2: { partial: true, note: "awaiting_confirmation" },
+                        },
+                      });
+                      setPlanningResult(data);
+                      toast.success("Planning replay executado (sem tools).");
+                    } catch (err) {
+                      toastAgentOsActionError(err);
+                    }
+                  }}
+                >
+                  Replay Cognitive Plan
+                </Button>
+              </AgentOsIf>
               {planningResult && (
                 <pre className={classes.mono} style={{ marginTop: 12 }}>
                   {JSON.stringify(planningResult, null, 2)}
@@ -825,6 +850,7 @@ const AutomationToolsPage = () => {
                             setPolicy({ ...policy, enabled: e.target.checked })
                           }
                           color="primary"
+                          disabled={!canManage}
                         />
                       }
                       label="Policy enabled"
@@ -842,13 +868,14 @@ const AutomationToolsPage = () => {
                             })
                           }
                           color="primary"
+                          disabled={!canManage}
                         />
                       }
                       label="allowWrite (Execute real)"
                     />
                   </Grid>
                   <Grid item xs={12} md={4}>
-                    <FormControl variant="outlined" size="small" fullWidth>
+                    <FormControl variant="outlined" size="small" fullWidth disabled={!canManage}>
                       <InputLabel>Max risk</InputLabel>
                       <Select
                         label="Max risk"
@@ -867,14 +894,16 @@ const AutomationToolsPage = () => {
                     </FormControl>
                   </Grid>
                   <Grid item xs={12}>
-                    <Button
-                      variant="contained"
-                      color="primary"
-                      disabled={saving}
-                      onClick={savePolicy}
-                    >
-                      Salvar política
-                    </Button>
+                    <AgentOsIf when={canManage}>
+                      <Button
+                        variant="contained"
+                        color="primary"
+                        disabled={saving}
+                        onClick={savePolicy}
+                      >
+                        Salvar política
+                      </Button>
+                    </AgentOsIf>
                   </Grid>
                   <Grid item xs={12}>
                     <pre className={classes.mono}>

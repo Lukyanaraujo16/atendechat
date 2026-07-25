@@ -58,9 +58,81 @@ const messages = {
 				},
 				landing: {
 					title: "Technical Console",
+					subtitle:
+						"Internal environment for AgentOS operations and observability.",
 					authorized: "Authorized internal access.",
-					nextSteps:
-						"Technical navigation will be available in upcoming steps.",
+					internalNotice:
+						"Restricted to internal operators. Does not replace the commercial product.",
+					nextSteps: "Use the internal navigation to open technical modules.",
+				},
+				shell: {
+					title: "Technical Console",
+					home: "Home",
+					internalBadge: "Internal environment",
+					activeCompany: "Active company: {{name}}",
+					supportContext: "Support context",
+					backToProduct: "Back to product",
+					openModules: "Open modules",
+					navAria: "Technical Console navigation",
+				},
+				groups: {
+					operation: "Operations",
+					quality: "Quality and analysis",
+					intelligence: "Intelligence",
+					tools: "Internal tools and integrations",
+					delivery: "Delivery and production",
+				},
+				nav: {
+					monitor: "Monitor",
+					observability: "Observability",
+					executionSessions: "Execution sessions",
+					runtime: "Runtime",
+					actions: "Actions",
+					analytics: "Analytics",
+					evaluation: "Evaluation",
+					evidence: "Evidence",
+					feedback: "Feedback",
+					shadowFc: "Shadow FC",
+					planning: "Planning",
+					memory: "Memory",
+					learning: "Learning",
+					multiAgent: "Multi-Agent",
+					tools: "Tools",
+					mcp: "MCP",
+					rollout: "Rollout",
+					production: "Production",
+				},
+				readOnly: {
+					banner:
+						"Read-only access. Sensitive actions require an additional permission.",
+				},
+				actionDenied: {
+					message: "You are not authorized to perform this action.",
+				},
+				empty: {
+					executions: "No executions found for the current context.",
+					evidence: "No evidence has been recorded for the current context.",
+					incidents: "No active incidents in the current context.",
+					actions: "No technical actions available in the current context.",
+					memory: "No memory recorded for the current context.",
+				},
+				confirm: {
+					killTitle: "Enable kill switch",
+					killBody:
+						"This stops Live Function Calling for the active company ({{company}}). Confirm only if intentional.",
+					killConfirm: "Enable kill switch",
+					rollbackTitle: "Run Live rollback",
+					rollbackBody:
+						"This reverts the Live stage for the active company ({{company}}). The change is immediate.",
+					rollbackConfirm: "Run rollback",
+					emergencyTitle: "Emergency stop",
+					emergencyBody:
+						"Emergency stop for the active company ({{company}}). Use only for critical incidents.",
+					emergencyConfirm: "Confirm emergency stop",
+				},
+				notFound: {
+					title: "Technical page not found",
+					description: "This path does not exist in the Technical Console.",
 				},
 			},
 			groups: {

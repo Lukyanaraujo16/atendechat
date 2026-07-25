@@ -14,7 +14,10 @@ import { makeStyles } from "@material-ui/core/styles";
 import MainContainer from "../../components/MainContainer";
 import MainHeader from "../../components/MainHeader";
 import Title from "../../components/Title";
-import toastError from "../../errors/toastError";
+import AgentOsReadOnlyBanner from "../../components/AgentOsReadOnlyBanner";
+import AgentOsIf from "../../components/AgentOsIf";
+import useAgentOsConsolePermissions from "../../hooks/useAgentOsConsolePermissions";
+import { toastAgentOsActionError } from "../../utils/agentOsActionError";
 import {
   executeRuntimeIntegration,
   getRuntimeIntegrationConfig,
@@ -84,6 +87,7 @@ function buildAction(actionType, objective) {
 
 export default function AutomationRuntimeIntegrationPage() {
   const classes = useStyles();
+  const { canManage, canReplay, readOnlyManage } = useAgentOsConsolePermissions();
   const [tab, setTab] = useState(0);
   const [dash, setDash] = useState(null);
   const [actionType, setActionType] = useState("SEARCH");
@@ -101,7 +105,7 @@ export default function AutomationRuntimeIntegrationPage() {
       setDash(d.data);
       setConfigJson(JSON.stringify(cfg.data?.config || {}, null, 2));
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     }
   }, []);
 
@@ -114,6 +118,8 @@ export default function AutomationRuntimeIntegrationPage() {
       <MainHeader>
         <Title>Runtime Integration (V2.4)</Title>
       </MainHeader>
+
+      <AgentOsReadOnlyBanner visible={readOnlyManage} />
 
       <Paper className={classes.paper} variant="outlined">
         <Typography variant="body2" color="textSecondary">
@@ -222,103 +228,111 @@ export default function AutomationRuntimeIntegrationPage() {
                 onChange={(e) => setObjective(e.target.value)}
                 margin="dense"
               />
-              <Button
-                variant="outlined"
-                style={{ marginRight: 8, marginTop: 8 }}
-                onClick={async () => {
-                  try {
-                    const action = buildAction(actionType, objective);
-                    const { data } = await previewRuntimeRequest({ action });
-                    setResult(data);
-                  } catch (err) {
-                    toastError(err);
-                  }
-                }}
-              >
-                Preview Request
-              </Button>
-              <Button
-                variant="contained"
-                color="primary"
-                style={{ marginTop: 8 }}
-                onClick={async () => {
-                  try {
-                    const { data } = await executeRuntimeIntegration({
-                      action: buildAction(actionType, objective),
-                    });
-                    setResult(data);
-                    load();
-                  } catch (err) {
-                    toastError(err);
-                  }
-                }}
-              >
-                Execute Runtime
-              </Button>
+              <AgentOsIf when={canManage}>
+                <Button
+                  variant="outlined"
+                  style={{ marginRight: 8, marginTop: 8 }}
+                  onClick={async () => {
+                    try {
+                      const action = buildAction(actionType, objective);
+                      const { data } = await previewRuntimeRequest({ action });
+                      setResult(data);
+                    } catch (err) {
+                      toastAgentOsActionError(err);
+                    }
+                  }}
+                >
+                  Preview Request
+                </Button>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  style={{ marginTop: 8 }}
+                  onClick={async () => {
+                    try {
+                      const { data } = await executeRuntimeIntegration({
+                        action: buildAction(actionType, objective),
+                      });
+                      setResult(data);
+                      load();
+                    } catch (err) {
+                      toastAgentOsActionError(err);
+                    }
+                  }}
+                >
+                  Execute Runtime
+                </Button>
+              </AgentOsIf>
             </Box>
           )}
 
           {tab === 2 && (
             <Box>
-              <Button
-                variant="outlined"
-                onClick={async () => {
-                  try {
-                    const { data } = await inspectRuntimeDispatcher({
-                      actionType,
-                      operation: "search",
-                    });
-                    setResult(data);
-                  } catch (err) {
-                    toastError(err);
-                  }
-                }}
-              >
-                Inspecionar Dispatcher
-              </Button>
+              <AgentOsIf when={canManage}>
+                <Button
+                  variant="outlined"
+                  onClick={async () => {
+                    try {
+                      const { data } = await inspectRuntimeDispatcher({
+                        actionType,
+                        operation: "search",
+                      });
+                      setResult(data);
+                    } catch (err) {
+                      toastAgentOsActionError(err);
+                    }
+                  }}
+                >
+                  Inspecionar Dispatcher
+                </Button>
+              </AgentOsIf>
             </Box>
           )}
 
           {tab === 3 && (
             <Box>
-              <Button
-                variant="outlined"
-                onClick={async () => {
-                  try {
-                    const { data } = await simulateRuntimePolicy({
-                      action: buildAction(actionType, objective),
-                    });
-                    setResult(data);
-                  } catch (err) {
-                    toastError(err);
-                  }
-                }}
-              >
-                Simular Policy
-              </Button>
+              <AgentOsIf when={canManage}>
+                <Button
+                  variant="outlined"
+                  onClick={async () => {
+                    try {
+                      const { data } = await simulateRuntimePolicy({
+                        action: buildAction(actionType, objective),
+                      });
+                      setResult(data);
+                    } catch (err) {
+                      toastAgentOsActionError(err);
+                    }
+                  }}
+                >
+                  Simular Policy
+                </Button>
+              </AgentOsIf>
             </Box>
           )}
 
           {tab === 4 && (
             <Box>
-              <Button
-                variant="outlined"
-                onClick={async () => {
-                  try {
-                    const action = buildAction("SEARCH", objective);
-                    const { data } = await previewRuntimeRequest({ action });
-                    setResult({
-                      adapter: data?.adapter,
-                      capability: data?.capability,
-                      request: data?.request,
-                    });
-                  } catch (err) {
-                    toastError(err);
-                  }
-                }}
-              >
-                Inspecionar Adapter
-              </Button>
+              <AgentOsIf when={canManage}>
+                <Button
+                  variant="outlined"
+                  onClick={async () => {
+                    try {
+                      const action = buildAction("SEARCH", objective);
+                      const { data } = await previewRuntimeRequest({ action });
+                      setResult({
+                        adapter: data?.adapter,
+                        capability: data?.capability,
+                        request: data?.request,
+                      });
+                    } catch (err) {
+                      toastAgentOsActionError(err);
+                    }
+                  }}
+                >
+                  Inspecionar Adapter
+                </Button>
+              </AgentOsIf>
             </Box>
           )}
 
@@ -331,7 +345,7 @@ export default function AutomationRuntimeIntegrationPage() {
                     const { data } = await listRuntimeRequests({ limit: 20 });
                     setResult(data);
                   } catch (err) {
-                    toastError(err);
+                    toastAgentOsActionError(err);
                   }
                 }}
               >
@@ -349,23 +363,25 @@ export default function AutomationRuntimeIntegrationPage() {
                 onChange={(e) => setReplayText(e.target.value)}
                 margin="dense"
               />
-              <Button
-                variant="contained"
-                color="primary"
-                style={{ marginTop: 8 }}
-                onClick={async () => {
-                  try {
-                    const { data } = await replayRuntimeIntegration({
-                      text: replayText,
-                    });
-                    setResult(data);
-                  } catch (err) {
-                    toastError(err);
-                  }
-                }}
-              >
-                Replay Goal→Runtime
-              </Button>
+              <AgentOsIf when={canReplay}>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  style={{ marginTop: 8 }}
+                  onClick={async () => {
+                    try {
+                      const { data } = await replayRuntimeIntegration({
+                        text: replayText,
+                      });
+                      setResult(data);
+                    } catch (err) {
+                      toastAgentOsActionError(err);
+                    }
+                  }}
+                >
+                  Replay Goal→Runtime
+                </Button>
+              </AgentOsIf>
             </Box>
           )}
 
@@ -379,22 +395,24 @@ export default function AutomationRuntimeIntegrationPage() {
                 onChange={(e) => setConfigJson(e.target.value)}
                 className={classes.mono}
               />
-              <Button
-                variant="contained"
-                color="primary"
-                style={{ marginTop: 8 }}
-                onClick={async () => {
-                  try {
-                    const parsed = JSON.parse(configJson);
-                    await updateRuntimeIntegrationConfig(parsed);
-                    load();
-                  } catch (err) {
-                    toastError(err);
-                  }
-                }}
-              >
-                Salvar Config
-              </Button>
+              <AgentOsIf when={canManage}>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  style={{ marginTop: 8 }}
+                  onClick={async () => {
+                    try {
+                      const parsed = JSON.parse(configJson);
+                      await updateRuntimeIntegrationConfig(parsed);
+                      load();
+                    } catch (err) {
+                      toastAgentOsActionError(err);
+                    }
+                  }}
+                >
+                  Salvar Config
+                </Button>
+              </AgentOsIf>
             </Box>
           )}
 

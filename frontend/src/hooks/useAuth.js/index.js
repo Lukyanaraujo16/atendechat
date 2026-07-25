@@ -15,6 +15,7 @@ import { canAccessSaasPlatform } from "../../utils/platformUser";
 import { getPostLoginHomePath } from "../../utils/attendanceAccess";
 import { setAuthSessionInvalidHandler } from "../../services/authApiInterceptors";
 import { countPostLogin, debugPostLogin } from "../../utils/postLoginDebug";
+import { resetTechnicalConsoleAccessCache } from "../../services/technicalConsoleAccessProbe";
 
 const useAuth = () => {
   const history = useHistory();
@@ -23,7 +24,10 @@ const useAuth = () => {
   const [user, setUser] = useState({});
 
   useEffect(() => {
-    setAuthSessionInvalidHandler(() => setIsAuth(false));
+    setAuthSessionInvalidHandler(() => {
+      resetTechnicalConsoleAccessCache();
+      setIsAuth(false);
+    });
     return () => setAuthSessionInvalidHandler(null);
   }, []);
 
@@ -294,6 +298,7 @@ const useAuth = () => {
     try {
       await oneSignalLogout();
       await api.delete("/auth/logout");
+      resetTechnicalConsoleAccessCache();
       setIsAuth(false);
       setUser({});
       localStorage.removeItem("token");

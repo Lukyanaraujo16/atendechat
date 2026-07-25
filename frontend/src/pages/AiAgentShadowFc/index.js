@@ -18,7 +18,10 @@ import { toast } from "react-toastify";
 import MainContainer from "../../components/MainContainer";
 import MainHeader from "../../components/MainHeader";
 import Title from "../../components/Title";
+import AgentOsReadOnlyBanner from "../../components/AgentOsReadOnlyBanner";
+import useAgentOsConsolePermissions from "../../hooks/useAgentOsConsolePermissions";
 import toastError from "../../errors/toastError";
+import { toastAgentOsActionError } from "../../utils/agentOsActionError";
 import {
   getAiAgentShadowEvaluation,
   getAiAgentShadowFcDashboard,
@@ -60,6 +63,7 @@ function MetricCard({ label, value, classes }) {
 
 export default function AiAgentShadowFcDashboardPage() {
   const classes = useStyles();
+  const { canManage, readOnlyManage } = useAgentOsConsolePermissions();
   const [dashboard, setDashboard] = useState(null);
   const [detail, setDetail] = useState(null);
   const [evidence, setEvidence] = useState(null);
@@ -89,7 +93,7 @@ export default function AiAgentShadowFcDashboardPage() {
       toast.success("Configuração da empresa salva.");
       await load();
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     } finally {
       setSaving(false);
     }
@@ -101,7 +105,7 @@ export default function AiAgentShadowFcDashboardPage() {
       await updateShadowFcAgentSetting(agentId, { enabled });
       await load();
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     } finally {
       setSaving(false);
     }
@@ -113,7 +117,7 @@ export default function AiAgentShadowFcDashboardPage() {
       await updateShadowFcConnectionSetting(whatsappId, { enabled });
       await load();
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     } finally {
       setSaving(false);
     }
@@ -143,6 +147,8 @@ export default function AiAgentShadowFcDashboardPage() {
         <Title>Function Calling Shadow</Title>
       </MainHeader>
 
+      <AgentOsReadOnlyBanner visible={readOnlyManage} />
+
       <Paper className={classes.paper} variant="outlined">
         <Typography variant="body2" color="textSecondary" paragraph>
           Avaliações observacionais. Nenhuma mensagem enviada. Nenhuma Write
@@ -153,7 +159,7 @@ export default function AiAgentShadowFcDashboardPage() {
             <Switch
               checked={cfg.companyEnabled === true}
               onChange={(e) => toggleCompany(e.target.checked)}
-              disabled={saving || loading}
+              disabled={saving || loading || !canManage}
               color="primary"
             />
           }
@@ -176,7 +182,7 @@ export default function AiAgentShadowFcDashboardPage() {
                   <Switch
                     checked={a.functionCallingShadow === true}
                     onChange={(e) => toggleAgent(a.id, e.target.checked)}
-                    disabled={saving}
+                    disabled={saving || !canManage}
                     color="primary"
                     size="small"
                   />
@@ -199,7 +205,7 @@ export default function AiAgentShadowFcDashboardPage() {
                   <Switch
                     checked={c.functionCallingShadow === true}
                     onChange={(e) => toggleConnection(c.id, e.target.checked)}
-                    disabled={saving}
+                    disabled={saving || !canManage}
                     color="primary"
                     size="small"
                   />

@@ -1,12 +1,14 @@
 /**
- * Flatten route entries so react-router Switch sees direct Route children.
+ * Namespace /technical-console/agentos + aliases (Fase 1.5 — shell).
  */
 import React, { Suspense } from "react";
 import { Switch, Route } from "react-router-dom";
 import Box from "@material-ui/core/Box";
 import CircularProgress from "@material-ui/core/CircularProgress";
 import AgentOsRouteGuard from "../components/AgentOsRouteGuard";
+import AgentOsConsoleLayout from "../components/AgentOsConsoleLayout";
 import TechnicalConsoleLanding from "../pages/TechnicalConsoleLanding";
+import TechnicalConsoleNotFound from "../pages/TechnicalConsoleNotFound";
 import {
   AGENTOS_TECHNICAL_ROUTE_ENTRIES,
   TECHNICAL_CONSOLE_ROOT_PATH,
@@ -52,55 +54,53 @@ function RouteLoading() {
   );
 }
 
-function buildTechnicalRoutes() {
-  const routes = [
-    <Route
-      key="technical-console-root"
-      exact
-      path={TECHNICAL_CONSOLE_ROOT_PATH}
-      render={() => (
-        <AgentOsRouteGuard>
-          <TechnicalConsoleLanding />
-        </AgentOsRouteGuard>
-      )}
-    />,
-  ];
-
-  AGENTOS_TECHNICAL_ROUTE_ENTRIES.forEach((entry) => {
-    const Page = lazyPages[entry.pageKey];
-    routes.push(
-      <Route
-        key={`canonical-${entry.pageKey}`}
-        exact
-        path={entry.canonicalPath}
-        render={() => (
-          <AgentOsRouteGuard>
-            <Suspense fallback={<RouteLoading />}>
-              <Page />
-            </Suspense>
-          </AgentOsRouteGuard>
-        )}
-      />
-    );
-    routes.push(
-      <Route
-        key={`legacy-${entry.pageKey}`}
-        exact
-        path={entry.legacyPath}
-        render={() => (
-          <AgentOsRouteGuard redirectToCanonical={entry.canonicalPath} />
-        )}
-      />
-    );
-  });
-
-  return routes;
+function ConsoleShellRoutes() {
+  return (
+    <AgentOsRouteGuard>
+      <AgentOsConsoleLayout>
+        <Suspense fallback={<RouteLoading />}>
+          <Switch>
+            <Route
+              exact
+              path={TECHNICAL_CONSOLE_ROOT_PATH}
+              component={TechnicalConsoleLanding}
+            />
+            {AGENTOS_TECHNICAL_ROUTE_ENTRIES.map((entry) => {
+              const Page = lazyPages[entry.pageKey];
+              return (
+                <Route
+                  key={`canonical-${entry.pageKey}`}
+                  exact
+                  path={entry.canonicalPath}
+                  component={Page}
+                />
+              );
+            })}
+            <Route path={TECHNICAL_CONSOLE_ROOT_PATH} component={TechnicalConsoleNotFound} />
+          </Switch>
+        </Suspense>
+      </AgentOsConsoleLayout>
+    </AgentOsRouteGuard>
+  );
 }
 
 /**
- * Namespace /technical-console/agentos + aliases legados.
- * Páginas existentes reutilizadas sem redesign.
+ * Aliases legados fora do shell; canônicos dentro do AgentOsConsoleLayout.
  */
 export default function TechnicalAgentOsRoutes() {
-  return <Switch>{buildTechnicalRoutes()}</Switch>;
+  return (
+    <Switch>
+      {AGENTOS_TECHNICAL_ROUTE_ENTRIES.map((entry) => (
+        <Route
+          key={`legacy-${entry.pageKey}`}
+          exact
+          path={entry.legacyPath}
+          render={() => (
+            <AgentOsRouteGuard redirectToCanonical={entry.canonicalPath} />
+          )}
+        />
+      ))}
+      <Route path={TECHNICAL_CONSOLE_ROOT_PATH} component={ConsoleShellRoutes} />
+    </Switch>
+  );
 }

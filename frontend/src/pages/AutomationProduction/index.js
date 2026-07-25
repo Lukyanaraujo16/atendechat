@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useContext, useEffect, useState } from "react";
 import {
   Box,
   Button,
@@ -24,7 +24,15 @@ import MainContainer from "../../components/MainContainer";
 import MainHeader from "../../components/MainHeader";
 import Title from "../../components/Title";
 import TableRowSkeleton from "../../components/TableRowSkeleton";
-import toastError from "../../errors/toastError";
+import AgentOsReadOnlyBanner from "../../components/AgentOsReadOnlyBanner";
+import { AuthContext } from "../../context/Auth/AuthContext";
+import {
+  canManageAgentOsConsole,
+  canManageAgentOsProduction,
+  canManageAgentOsRollout,
+} from "../../config/agentOsPlatformPermissions";
+import { toastAgentOsActionError } from "../../utils/agentOsActionError";
+import { i18n } from "../../translate/i18n";
 import {
   getProductionDashboard,
   runRolloutPreflight,
@@ -41,15 +49,30 @@ const useStyles = makeStyles((theme) => ({
   paper: { padding: theme.spacing(2), marginBottom: theme.spacing(2) },
   chip: { marginRight: theme.spacing(1), marginBottom: theme.spacing(1) },
   mono: { fontFamily: "monospace", fontSize: 12 },
+  tableScroll: {
+    width: "100%",
+    overflowX: "auto",
+    WebkitOverflowScrolling: "touch",
+  },
   warn: { color: theme.palette.error.main },
 }));
 
 const AutomationProduction = () => {
   const classes = useStyles();
+  const { user } = useContext(AuthContext);
+  const canWriteRollout = canManageAgentOsRollout(user);
+  const canWriteProduction = canManageAgentOsProduction(user);
+  const canManage = canManageAgentOsConsole(user);
+  const readOnly = !canWriteRollout && !canWriteProduction && !canManage;
+  const companyLabel =
+    user?.company?.name ||
+    user?.companyName ||
+    (user?.companyId != null ? `#${user.companyId}` : "—");
   const [loading, setLoading] = useState(true);
   const [dash, setDash] = useState(null);
   const [reason, setReason] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(null);
+  const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -57,7 +80,7 @@ const AutomationProduction = () => {
       const { data } = await getProductionDashboard();
       setDash(data);
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     } finally {
       setLoading(false);
     }
@@ -72,6 +95,8 @@ const AutomationProduction = () => {
       toast.error("Informe um motivo (mín. 3 caracteres)");
       return;
     }
+    if (busy) return;
+    setBusy(true);
     try {
       await fn(reason.trim());
       toast.success("Operação concluída");
@@ -79,7 +104,9 @@ const AutomationProduction = () => {
       setReason("");
       load();
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -89,7 +116,7 @@ const AutomationProduction = () => {
       toast.info(`Preflight: ${data.status}`);
       load();
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     }
   };
 
@@ -99,7 +126,7 @@ const AutomationProduction = () => {
       toast.info(`Readiness: ${data.status}`);
       load();
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     }
   };
 
@@ -116,7 +143,7 @@ const AutomationProduction = () => {
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     }
   };
 
@@ -131,17 +158,23 @@ const AutomationProduction = () => {
           <Button variant="outlined" color="primary" onClick={load} style={{ marginRight: 8 }}>
             Atualizar
           </Button>
-          <Button variant="outlined" onClick={onPreflight} style={{ marginRight: 8 }}>
-            Preflight
-          </Button>
-          <Button variant="outlined" onClick={onReadiness} style={{ marginRight: 8 }}>
-            Readiness
-          </Button>
+          {canWriteRollout && (
+            <Button variant="outlined" onClick={onPreflight} style={{ marginRight: 8 }}>
+              Preflight
+            </Button>
+          )}
+          {canManage && (
+            <Button variant="outlined" onClick={onReadiness} style={{ marginRight: 8 }}>
+              Readiness
+            </Button>
+          )}
           <Button variant="contained" color="primary" onClick={onEvidence}>
             Evidence
           </Button>
         </Box>
       </MainHeader>
+
+      <AgentOsReadOnlyBanner visible={readOnly} />
 
       {loading && !dash ? (
         <Paper className={classes.paper}>
@@ -184,6 +217,8 @@ const AutomationProduction = () => {
                   Transições: {(dash?.transitionsAllowed || []).join(", ") || "—"}
                 </Typography>
                 <Box mt={2}>
+                  {canWriteRollout && (
+                    <>
                   <Button
                     size="small"
                     variant="outlined"
@@ -217,6 +252,8 @@ const AutomationProduction = () => {
                   >
                     Rollback
                   </Button>
+                    </>
+                  )}
                 </Box>
               </Paper>
             </Grid>
@@ -266,28 +303,33 @@ const AutomationProduction = () => {
               tenant: {(dash?.killSwitches?.tenant || []).filter((e) => e.enabled).length}
             </Typography>
             <Box mt={1}>
-              <Button
-                size="small"
-                variant="outlined"
-                color="secondary"
-                style={{ marginRight: 8 }}
-                onClick={() => setConfirmOpen("kill")}
-              >
-                Kill tenant
-              </Button>
-              <Button
-                size="small"
-                variant="contained"
-                color="secondary"
-                onClick={() => setConfirmOpen("emergency")}
-              >
-                Emergency stop
-              </Button>
+              {canWriteRollout && (
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color="secondary"
+                  style={{ marginRight: 8 }}
+                  onClick={() => setConfirmOpen("kill")}
+                >
+                  Kill tenant
+                </Button>
+              )}
+              {canWriteProduction && (
+                <Button
+                  size="small"
+                  variant="contained"
+                  color="secondary"
+                  onClick={() => setConfirmOpen("emergency")}
+                >
+                  Emergency stop
+                </Button>
+              )}
             </Box>
           </Paper>
 
           <Paper className={classes.paper}>
             <Typography variant="h6">Incidents</Typography>
+            <div className={classes.tableScroll}>
             <Table size="small">
               <TableHead>
                 <TableRow>
@@ -308,11 +350,14 @@ const AutomationProduction = () => {
                 ))}
                 {!(dash?.incidents || []).length ? (
                   <TableRow>
-                    <TableCell colSpan={4}>Nenhum incidente</TableCell>
+                    <TableCell colSpan={4}>
+                      {i18n.t("technicalConsole.empty.incidents")}
+                    </TableCell>
                   </TableRow>
                 ) : null}
               </TableBody>
             </Table>
+            </div>
           </Paper>
 
           <Paper className={classes.paper}>
@@ -324,11 +369,36 @@ const AutomationProduction = () => {
         </>
       )}
 
-      <Dialog open={Boolean(confirmOpen)} onClose={() => setConfirmOpen(null)} maxWidth="sm" fullWidth>
-        <DialogTitle>Confirmar operação crítica</DialogTitle>
+      <Dialog
+        open={Boolean(confirmOpen)}
+        onClose={() => !busy && setConfirmOpen(null)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          {confirmOpen === "emergency"
+            ? i18n.t("technicalConsole.confirm.emergencyTitle")
+            : confirmOpen === "kill"
+            ? i18n.t("technicalConsole.confirm.killTitle")
+            : confirmOpen === "rollback"
+            ? i18n.t("technicalConsole.confirm.rollbackTitle")
+            : "Confirmar operação crítica"}
+        </DialogTitle>
         <DialogContent>
           <Typography gutterBottom>
-            Ação: {confirmOpen}. Informe o motivo obrigatório.
+            {confirmOpen === "emergency"
+              ? i18n.t("technicalConsole.confirm.emergencyBody", {
+                  company: companyLabel,
+                })
+              : confirmOpen === "kill"
+              ? i18n.t("technicalConsole.confirm.killBody", {
+                  company: companyLabel,
+                })
+              : confirmOpen === "rollback"
+              ? i18n.t("technicalConsole.confirm.rollbackBody", {
+                  company: companyLabel,
+                })
+              : `Ação: ${confirmOpen}. Empresa ativa: ${companyLabel}. Informe o motivo obrigatório.`}
           </Typography>
           <TextField
             fullWidth
@@ -337,13 +407,17 @@ const AutomationProduction = () => {
             label="Motivo"
             value={reason}
             onChange={(e) => setReason(e.target.value)}
+            disabled={busy}
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setConfirmOpen(null)}>Cancelar</Button>
+          <Button onClick={() => setConfirmOpen(null)} disabled={busy}>
+            Cancelar
+          </Button>
           <Button
             color="primary"
             variant="contained"
+            disabled={busy}
             onClick={() =>
               withReason(async (r) => {
                 if (confirmOpen === "INTERNAL_ONLY" || confirmOpen === "SHADOW") {
@@ -376,7 +450,13 @@ const AutomationProduction = () => {
               })
             }
           >
-            Confirmar
+            {confirmOpen === "emergency"
+              ? i18n.t("technicalConsole.confirm.emergencyConfirm")
+              : confirmOpen === "kill"
+              ? i18n.t("technicalConsole.confirm.killConfirm")
+              : confirmOpen === "rollback"
+              ? i18n.t("technicalConsole.confirm.rollbackConfirm")
+              : "Confirmar"}
           </Button>
         </DialogActions>
       </Dialog>

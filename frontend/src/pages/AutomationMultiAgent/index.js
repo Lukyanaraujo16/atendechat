@@ -13,7 +13,11 @@ import { makeStyles } from "@material-ui/core/styles";
 import MainContainer from "../../components/MainContainer";
 import MainHeader from "../../components/MainHeader";
 import Title from "../../components/Title";
+import AgentOsReadOnlyBanner from "../../components/AgentOsReadOnlyBanner";
+import AgentOsIf from "../../components/AgentOsIf";
+import useAgentOsConsolePermissions from "../../hooks/useAgentOsConsolePermissions";
 import toastError from "../../errors/toastError";
+import { toastAgentOsActionError } from "../../utils/agentOsActionError";
 import {
   activateAgent,
   archiveAgent,
@@ -70,6 +74,7 @@ function Metric({ label, value, classes }) {
 
 export default function AutomationMultiAgentPage() {
   const classes = useStyles();
+  const { canManage, canReplay, readOnlyManage } = useAgentOsConsolePermissions();
   const [tab, setTab] = useState(0);
   const [dash, setDash] = useState(null);
   const [agents, setAgents] = useState([]);
@@ -109,7 +114,7 @@ export default function AutomationMultiAgentPage() {
       setResult(data?.data ?? data);
       await load();
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     }
   };
 
@@ -118,6 +123,8 @@ export default function AutomationMultiAgentPage() {
       <MainHeader>
         <Title>Multi-Agent Runtime (V2.9)</Title>
       </MainHeader>
+
+      <AgentOsReadOnlyBanner visible={readOnlyManage} />
 
       <Paper className={classes.paper} variant="outlined">
         <Typography variant="body2" color="textSecondary">
@@ -193,62 +200,64 @@ export default function AutomationMultiAgentPage() {
                   value={specialization}
                   onChange={(e) => setSpecialization(e.target.value)}
                 />
-                <Button
-                  variant="contained"
-                  color="primary"
-                  onClick={() =>
-                    run(() =>
-                      createAgent({
-                        name: agentName,
-                        slug: agentSlug,
-                        specialization,
-                        role: "SPECIALIST",
-                        status: "ACTIVE",
-                        capabilities: ["SEARCH_CONTACT"],
-                        allowedToolIds: ["tool_search"],
-                        allowedMcpServerIds: ["mcp_demo"],
-                        isDefault: agents.length === 0,
-                      })
-                    )
-                  }
-                >
-                  Criar
-                </Button>
-                <Button
-                  variant="outlined"
-                  disabled={!selectedId}
-                  onClick={() => run(() => activateAgent(selectedId))}
-                >
-                  Ativar
-                </Button>
-                <Button
-                  variant="outlined"
-                  disabled={!selectedId}
-                  onClick={() => run(() => deactivateAgent(selectedId))}
-                >
-                  Desativar
-                </Button>
-                <Button
-                  variant="outlined"
-                  disabled={!selectedId}
-                  onClick={() => run(() => suspendAgent(selectedId))}
-                >
-                  Suspender
-                </Button>
-                <Button
-                  variant="outlined"
-                  disabled={!selectedId}
-                  onClick={() => run(() => archiveAgent(selectedId))}
-                >
-                  Arquivar
-                </Button>
-                <Button
-                  variant="outlined"
-                  disabled={!selectedId}
-                  onClick={() => run(() => healthAgent(selectedId))}
-                >
-                  Health
-                </Button>
+                <AgentOsIf when={canManage}>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={() =>
+                      run(() =>
+                        createAgent({
+                          name: agentName,
+                          slug: agentSlug,
+                          specialization,
+                          role: "SPECIALIST",
+                          status: "ACTIVE",
+                          capabilities: ["SEARCH_CONTACT"],
+                          allowedToolIds: ["tool_search"],
+                          allowedMcpServerIds: ["mcp_demo"],
+                          isDefault: agents.length === 0,
+                        })
+                      )
+                    }
+                  >
+                    Criar
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    disabled={!selectedId}
+                    onClick={() => run(() => activateAgent(selectedId))}
+                  >
+                    Ativar
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    disabled={!selectedId}
+                    onClick={() => run(() => deactivateAgent(selectedId))}
+                  >
+                    Desativar
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    disabled={!selectedId}
+                    onClick={() => run(() => suspendAgent(selectedId))}
+                  >
+                    Suspender
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    disabled={!selectedId}
+                    onClick={() => run(() => archiveAgent(selectedId))}
+                  >
+                    Arquivar
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    disabled={!selectedId}
+                    onClick={() => run(() => healthAgent(selectedId))}
+                  >
+                    Health
+                  </Button>
+                </AgentOsIf>
               </Box>
               <Typography variant="subtitle2">Selecionado: {selectedId || "—"}</Typography>
               <Typography variant="subtitle2">Destino: {targetId || "—"}</Typography>
@@ -273,22 +282,24 @@ export default function AutomationMultiAgentPage() {
 
           {tab === 1 && (
             <Box className={classes.row}>
-              <Button
-                variant="contained"
-                color="primary"
-                onClick={() =>
-                  run(() =>
-                    simulateRouting({
-                      sourceType: "ADMIN_SIMULATION",
-                      requiredCapabilities: ["SEARCH_CONTACT"],
-                      preferredSpecialization: "SUPPORT",
-                      requestedAgentId: selectedId || undefined,
-                    })
-                  )
-                }
-              >
-                Simular routing
-              </Button>
+              <AgentOsIf when={canManage}>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  onClick={() =>
+                    run(() =>
+                      simulateRouting({
+                        sourceType: "ADMIN_SIMULATION",
+                        requiredCapabilities: ["SEARCH_CONTACT"],
+                        preferredSpecialization: "SUPPORT",
+                        requestedAgentId: selectedId || undefined,
+                      })
+                    )
+                  }
+                >
+                  Simular routing
+                </Button>
+              </AgentOsIf>
               <Button
                 variant="outlined"
                 onClick={() =>
@@ -302,73 +313,75 @@ export default function AutomationMultiAgentPage() {
 
           {tab === 2 && (
             <Box className={classes.row}>
-              <Button
-                variant="outlined"
-                disabled={!selectedId || !targetId}
-                onClick={() =>
-                  run(() =>
-                    previewDelegation({
-                      sourceAgentId: selectedId,
-                      requestedTargetAgentId: targetId,
-                      requiredCapabilities: ["SEARCH_CONTACT"],
-                      task: "Buscar contato",
-                      goal: "Suporte",
-                    })
-                  )
-                }
-              >
-                Preview delegation
-              </Button>
-              <Button
-                variant="contained"
-                color="primary"
-                disabled={!selectedId || !targetId}
-                onClick={() =>
-                  run(() =>
-                    simulateDelegation({
-                      sourceAgentId: selectedId,
-                      requestedTargetAgentId: targetId,
-                      requiredCapabilities: ["SEARCH_CONTACT"],
-                      task: "Buscar contato",
-                      goal: "Suporte",
-                      approved: true,
-                    })
-                  )
-                }
-              >
-                Simular delegation
-              </Button>
-              <Button
-                variant="outlined"
-                disabled={!selectedId || !targetId}
-                onClick={() =>
-                  run(() =>
-                    previewHandoff({
-                      sourceAgentId: selectedId,
-                      requestedTargetAgentId: targetId,
-                      reason: "especialista",
-                    })
-                  )
-                }
-              >
-                Preview handoff
-              </Button>
-              <Button
-                variant="contained"
-                disabled={!selectedId || !targetId}
-                onClick={() =>
-                  run(() =>
-                    simulateHandoff({
-                      sourceAgentId: selectedId,
-                      requestedTargetAgentId: targetId,
-                      reason: "especialista",
-                      approved: true,
-                    })
-                  )
-                }
-              >
-                Simular handoff
-              </Button>
+              <AgentOsIf when={canManage}>
+                <Button
+                  variant="outlined"
+                  disabled={!selectedId || !targetId}
+                  onClick={() =>
+                    run(() =>
+                      previewDelegation({
+                        sourceAgentId: selectedId,
+                        requestedTargetAgentId: targetId,
+                        requiredCapabilities: ["SEARCH_CONTACT"],
+                        task: "Buscar contato",
+                        goal: "Suporte",
+                      })
+                    )
+                  }
+                >
+                  Preview delegation
+                </Button>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  disabled={!selectedId || !targetId}
+                  onClick={() =>
+                    run(() =>
+                      simulateDelegation({
+                        sourceAgentId: selectedId,
+                        requestedTargetAgentId: targetId,
+                        requiredCapabilities: ["SEARCH_CONTACT"],
+                        task: "Buscar contato",
+                        goal: "Suporte",
+                        approved: true,
+                      })
+                    )
+                  }
+                >
+                  Simular delegation
+                </Button>
+                <Button
+                  variant="outlined"
+                  disabled={!selectedId || !targetId}
+                  onClick={() =>
+                    run(() =>
+                      previewHandoff({
+                        sourceAgentId: selectedId,
+                        requestedTargetAgentId: targetId,
+                        reason: "especialista",
+                      })
+                    )
+                  }
+                >
+                  Preview handoff
+                </Button>
+                <Button
+                  variant="contained"
+                  disabled={!selectedId || !targetId}
+                  onClick={() =>
+                    run(() =>
+                      simulateHandoff({
+                        sourceAgentId: selectedId,
+                        requestedTargetAgentId: targetId,
+                        reason: "especialista",
+                        approved: true,
+                      })
+                    )
+                  }
+                >
+                  Simular handoff
+                </Button>
+              </AgentOsIf>
               <Button variant="outlined" onClick={() => run(() => listDelegations())}>
                 Listar delegações
               </Button>
@@ -379,68 +392,70 @@ export default function AutomationMultiAgentPage() {
           )}
 
           {tab === 3 && (
-            <Box className={classes.row}>
-              <Button
-                variant="contained"
-                color="primary"
-                onClick={() => run(() => simulateFullFlow({}))}
-              >
-                Fluxo completo (sim)
-              </Button>
-              <Button
-                variant="outlined"
-                disabled={!selectedId}
-                onClick={() =>
-                  run(() =>
-                    createCoordination({
-                      coordinatorAgentId: selectedId,
-                      rootGoalId: "goal_demo",
-                      tasks: [
-                        {
-                          title: "Vendas",
-                          requiredCapabilities: ["SEARCH_CONTACT"],
-                          preferredSpecialization: "SALES",
-                        },
-                        {
-                          title: "Suporte",
-                          requiredCapabilities: ["SEARCH_CONTACT"],
-                          preferredSpecialization: "SUPPORT",
-                        },
-                      ],
-                    })
-                  )
-                }
-              >
-                Coordination plan
-              </Button>
-              <Button
-                variant="outlined"
-                disabled={!selectedId}
-                onClick={() =>
-                  run(() =>
-                    simulateMemoryPolicy({
-                      agentId: selectedId,
-                      scope: "AGENT_PRIVATE",
-                    })
-                  )
-                }
-              >
-                Memory policy
-              </Button>
-              <Button
-                variant="outlined"
-                onClick={() =>
-                  run(() =>
-                    simulateFallback({
-                      preferredAgentId: selectedId || null,
-                      capability: "SEARCH_CONTACT",
-                    })
-                  )
-                }
-              >
-                Fallback
-              </Button>
-            </Box>
+            <AgentOsIf when={canManage}>
+              <Box className={classes.row}>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  onClick={() => run(() => simulateFullFlow({}))}
+                >
+                  Fluxo completo (sim)
+                </Button>
+                <Button
+                  variant="outlined"
+                  disabled={!selectedId}
+                  onClick={() =>
+                    run(() =>
+                      createCoordination({
+                        coordinatorAgentId: selectedId,
+                        rootGoalId: "goal_demo",
+                        tasks: [
+                          {
+                            title: "Vendas",
+                            requiredCapabilities: ["SEARCH_CONTACT"],
+                            preferredSpecialization: "SALES",
+                          },
+                          {
+                            title: "Suporte",
+                            requiredCapabilities: ["SEARCH_CONTACT"],
+                            preferredSpecialization: "SUPPORT",
+                          },
+                        ],
+                      })
+                    )
+                  }
+                >
+                  Coordination plan
+                </Button>
+                <Button
+                  variant="outlined"
+                  disabled={!selectedId}
+                  onClick={() =>
+                    run(() =>
+                      simulateMemoryPolicy({
+                        agentId: selectedId,
+                        scope: "AGENT_PRIVATE",
+                      })
+                    )
+                  }
+                >
+                  Memory policy
+                </Button>
+                <Button
+                  variant="outlined"
+                  onClick={() =>
+                    run(() =>
+                      simulateFallback({
+                        preferredAgentId: selectedId || null,
+                        capability: "SEARCH_CONTACT",
+                      })
+                    )
+                  }
+                >
+                  Fallback
+                </Button>
+              </Box>
+            </AgentOsIf>
           )}
 
           {tab === 4 && (
@@ -452,32 +467,37 @@ export default function AutomationMultiAgentPage() {
                 variant="outlined"
                 value={configJson}
                 onChange={(e) => setConfigJson(e.target.value)}
+                disabled={!canManage}
               />
               <Box className={classes.row} style={{ marginTop: 8 }}>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  onClick={() =>
-                    run(() =>
-                      updateMultiAgentConfig(JSON.parse(configJson || "{}"))
-                    )
-                  }
-                >
-                  Salvar config
-                </Button>
+                <AgentOsIf when={canManage}>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={() =>
+                      run(() =>
+                        updateMultiAgentConfig(JSON.parse(configJson || "{}"))
+                      )
+                    }
+                  >
+                    Salvar config
+                  </Button>
+                </AgentOsIf>
               </Box>
             </>
           )}
 
           {tab === 5 && (
             <Box className={classes.row}>
-              <Button
-                variant="contained"
-                disabled={!selectedId}
-                onClick={() => run(() => getMultiAgentReplay(selectedId))}
-              >
-                Replay do agente selecionado
-              </Button>
+              <AgentOsIf when={canReplay}>
+                <Button
+                  variant="contained"
+                  disabled={!selectedId}
+                  onClick={() => run(() => getMultiAgentReplay(selectedId))}
+                >
+                  Replay do agente selecionado
+                </Button>
+              </AgentOsIf>
             </Box>
           )}
         </Box>

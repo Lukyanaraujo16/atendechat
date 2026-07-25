@@ -14,7 +14,10 @@ import { makeStyles } from "@material-ui/core/styles";
 import MainContainer from "../../components/MainContainer";
 import MainHeader from "../../components/MainHeader";
 import Title from "../../components/Title";
-import toastError from "../../errors/toastError";
+import AgentOsReadOnlyBanner from "../../components/AgentOsReadOnlyBanner";
+import AgentOsIf from "../../components/AgentOsIf";
+import useAgentOsConsolePermissions from "../../hooks/useAgentOsConsolePermissions";
+import { toastAgentOsActionError } from "../../utils/agentOsActionError";
 import {
   getExecutionFeedbackConfig,
   getExecutionFeedbackDashboard,
@@ -56,6 +59,7 @@ function Metric({ label, value, classes }) {
 
 export default function AutomationExecutionFeedbackPage() {
   const classes = useStyles();
+  const { canManage, canReplay, readOnlyManage } = useAgentOsConsolePermissions();
   const [tab, setTab] = useState(0);
   const [dash, setDash] = useState(null);
   const [runtimeStatus, setRuntimeStatus] = useState("success");
@@ -73,7 +77,7 @@ export default function AutomationExecutionFeedbackPage() {
       setDash(d.data);
       setConfigJson(JSON.stringify(cfg.data?.config || {}, null, 2));
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     }
   }, []);
 
@@ -89,6 +93,8 @@ export default function AutomationExecutionFeedbackPage() {
       <MainHeader>
         <Title>Execution Feedback (V2.5)</Title>
       </MainHeader>
+
+      <AgentOsReadOnlyBanner visible={readOnlyManage} />
 
       <Paper className={classes.paper} variant="outlined">
         <Typography variant="body2" color="textSecondary">
@@ -191,53 +197,55 @@ export default function AutomationExecutionFeedbackPage() {
                 onChange={(e) => setObjective(e.target.value)}
                 margin="dense"
               />
-              <Button
-                variant="contained"
-                color="primary"
-                style={{ marginTop: 8, marginRight: 8 }}
-                onClick={async () => {
-                  try {
-                    const { data } = await simulateExecutionFeedback({
-                      runtimeStatus,
-                      objective,
-                    });
-                    setResult(data);
-                    load();
-                  } catch (err) {
-                    toastError(err);
-                  }
-                }}
-              >
-                Simular Feedback
-              </Button>
-              <Button
-                variant="outlined"
-                style={{ marginTop: 8 }}
-                onClick={async () => {
-                  try {
-                    const { data } = await processExecutionFeedback({
-                      runtimeResult: {
-                        status: runtimeStatus,
-                        errors: [],
-                        warnings: [],
-                        modelResult: { data: { query: objective } },
-                      },
-                      actionResult: {
-                        status:
-                          runtimeStatus === "success" ? "SUCCESS" : "FAILED",
-                        validation:
-                          runtimeStatus === "waiting" ? "WAITING" : "VALID",
-                      },
-                    });
-                    setResult(data);
-                    load();
-                  } catch (err) {
-                    toastError(err);
-                  }
-                }}
-              >
-                Processar Feedback
-              </Button>
+              <AgentOsIf when={canManage}>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  style={{ marginTop: 8, marginRight: 8 }}
+                  onClick={async () => {
+                    try {
+                      const { data } = await simulateExecutionFeedback({
+                        runtimeStatus,
+                        objective,
+                      });
+                      setResult(data);
+                      load();
+                    } catch (err) {
+                      toastAgentOsActionError(err);
+                    }
+                  }}
+                >
+                  Simular Feedback
+                </Button>
+                <Button
+                  variant="outlined"
+                  style={{ marginTop: 8 }}
+                  onClick={async () => {
+                    try {
+                      const { data } = await processExecutionFeedback({
+                        runtimeResult: {
+                          status: runtimeStatus,
+                          errors: [],
+                          warnings: [],
+                          modelResult: { data: { query: objective } },
+                        },
+                        actionResult: {
+                          status:
+                            runtimeStatus === "success" ? "SUCCESS" : "FAILED",
+                          validation:
+                            runtimeStatus === "waiting" ? "WAITING" : "VALID",
+                        },
+                      });
+                      setResult(data);
+                      load();
+                    } catch (err) {
+                      toastAgentOsActionError(err);
+                    }
+                  }}
+                >
+                  Processar Feedback
+                </Button>
+              </AgentOsIf>
             </Box>
           )}
 
@@ -283,7 +291,7 @@ export default function AutomationExecutionFeedbackPage() {
                     const { data } = await listExecutionFeedback({ limit: 10 });
                     setResult(data);
                   } catch (err) {
-                    toastError(err);
+                    toastAgentOsActionError(err);
                   }
                 }}
               >
@@ -310,23 +318,25 @@ export default function AutomationExecutionFeedbackPage() {
                 onChange={(e) => setReplayText(e.target.value)}
                 margin="dense"
               />
-              <Button
-                variant="contained"
-                color="primary"
-                style={{ marginTop: 8 }}
-                onClick={async () => {
-                  try {
-                    const { data } = await replayExecutionFeedback({
-                      text: replayText,
-                    });
-                    setResult(data);
-                  } catch (err) {
-                    toastError(err);
-                  }
-                }}
-              >
-                Replay Goal→Feedback
-              </Button>
+              <AgentOsIf when={canReplay}>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  style={{ marginTop: 8 }}
+                  onClick={async () => {
+                    try {
+                      const { data } = await replayExecutionFeedback({
+                        text: replayText,
+                      });
+                      setResult(data);
+                    } catch (err) {
+                      toastAgentOsActionError(err);
+                    }
+                  }}
+                >
+                  Replay Goal→Feedback
+                </Button>
+              </AgentOsIf>
             </Box>
           )}
 
@@ -340,22 +350,24 @@ export default function AutomationExecutionFeedbackPage() {
                 onChange={(e) => setConfigJson(e.target.value)}
                 className={classes.mono}
               />
-              <Button
-                variant="contained"
-                color="primary"
-                style={{ marginTop: 8 }}
-                onClick={async () => {
-                  try {
-                    const parsed = JSON.parse(configJson);
-                    await updateExecutionFeedbackConfig(parsed);
-                    load();
-                  } catch (err) {
-                    toastError(err);
-                  }
-                }}
-              >
-                Salvar Config
-              </Button>
+              <AgentOsIf when={canManage}>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  style={{ marginTop: 8 }}
+                  onClick={async () => {
+                    try {
+                      const parsed = JSON.parse(configJson);
+                      await updateExecutionFeedbackConfig(parsed);
+                      load();
+                    } catch (err) {
+                      toastAgentOsActionError(err);
+                    }
+                  }}
+                >
+                  Salvar Config
+                </Button>
+              </AgentOsIf>
             </Box>
           )}
 

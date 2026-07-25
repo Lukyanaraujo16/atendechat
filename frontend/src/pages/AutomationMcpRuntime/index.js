@@ -14,7 +14,11 @@ import { makeStyles } from "@material-ui/core/styles";
 import MainContainer from "../../components/MainContainer";
 import MainHeader from "../../components/MainHeader";
 import Title from "../../components/Title";
+import AgentOsReadOnlyBanner from "../../components/AgentOsReadOnlyBanner";
+import AgentOsIf from "../../components/AgentOsIf";
+import useAgentOsConsolePermissions from "../../hooks/useAgentOsConsolePermissions";
 import toastError from "../../errors/toastError";
+import { toastAgentOsActionError } from "../../utils/agentOsActionError";
 import {
   connectMcpServer,
   createMcpServer,
@@ -65,6 +69,7 @@ function Metric({ label, value, classes }) {
 
 export default function AutomationMcpRuntimePage() {
   const classes = useStyles();
+  const { canManage, canReplay, readOnlyManage } = useAgentOsConsolePermissions();
   const [tab, setTab] = useState(0);
   const [dash, setDash] = useState(null);
   const [servers, setServers] = useState([]);
@@ -122,7 +127,7 @@ export default function AutomationMcpRuntimePage() {
       });
       await load();
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     }
   };
 
@@ -132,7 +137,7 @@ export default function AutomationMcpRuntimePage() {
       setResult(data?.data ?? data);
       await load();
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     }
   };
 
@@ -141,6 +146,8 @@ export default function AutomationMcpRuntimePage() {
       <MainHeader>
         <Title>MCP Runtime (V2.7)</Title>
       </MainHeader>
+
+      <AgentOsReadOnlyBanner visible={readOnlyManage} />
 
       <Paper className={classes.paper} variant="outlined">
         <Typography variant="body2" color="textSecondary">
@@ -245,9 +252,11 @@ export default function AutomationMcpRuntimePage() {
                   value={endpoint}
                   onChange={(e) => setEndpoint(e.target.value)}
                 />
-                <Button variant="contained" color="primary" onClick={createServer}>
-                  Create STREAMABLE_HTTP
-                </Button>
+                <AgentOsIf when={canManage}>
+                  <Button variant="contained" color="primary" onClick={createServer}>
+                    Create STREAMABLE_HTTP
+                  </Button>
+                </AgentOsIf>
               </div>
               <pre className={classes.mono}>
                 {JSON.stringify(servers, null, 2)}
@@ -296,72 +305,74 @@ export default function AutomationMcpRuntimePage() {
                 style={{ marginBottom: 12 }}
               />
               <div className={classes.row}>
-                <Button
-                  variant="outlined"
-                  onClick={() =>
-                    run(() => connectMcpServer(selectedServerId))
-                  }
-                >
-                  Connect
-                </Button>
-                <Button
-                  variant="outlined"
-                  onClick={() => run(() => healthMcpServer(selectedServerId))}
-                >
-                  Health
-                </Button>
-                <Button
-                  variant="outlined"
-                  onClick={() => run(() => syncMcpServer(selectedServerId))}
-                >
-                  Sync Catalog
-                </Button>
-                <Button
-                  variant="outlined"
-                  onClick={() =>
-                    run(() =>
-                      previewMcpTool({
-                        serverId: selectedServerId,
-                        toolName,
-                        args: parseArgs(),
-                      })
-                    )
-                  }
-                >
-                  Preview
-                </Button>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  onClick={() =>
-                    run(() =>
-                      executeMcpTool({
-                        serverId: selectedServerId,
-                        toolName,
-                        args: parseArgs(),
-                        mode: "dry_run",
-                      })
-                    )
-                  }
-                >
-                  Dry-run READ
-                </Button>
-                <Button
-                  variant="contained"
-                  onClick={() =>
-                    run(() =>
-                      executeMcpTool({
-                        serverId: selectedServerId,
-                        toolName,
-                        args: parseArgs(),
-                        mode: "execute",
-                        confirmed: true,
-                      })
-                    )
-                  }
-                >
-                  Execute (confirm)
-                </Button>
+                <AgentOsIf when={canManage}>
+                  <Button
+                    variant="outlined"
+                    onClick={() =>
+                      run(() => connectMcpServer(selectedServerId))
+                    }
+                  >
+                    Connect
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    onClick={() => run(() => healthMcpServer(selectedServerId))}
+                  >
+                    Health
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    onClick={() => run(() => syncMcpServer(selectedServerId))}
+                  >
+                    Sync Catalog
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    onClick={() =>
+                      run(() =>
+                        previewMcpTool({
+                          serverId: selectedServerId,
+                          toolName,
+                          args: parseArgs(),
+                        })
+                      )
+                    }
+                  >
+                    Preview
+                  </Button>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={() =>
+                      run(() =>
+                        executeMcpTool({
+                          serverId: selectedServerId,
+                          toolName,
+                          args: parseArgs(),
+                          mode: "dry_run",
+                        })
+                      )
+                    }
+                  >
+                    Dry-run READ
+                  </Button>
+                  <Button
+                    variant="contained"
+                    onClick={() =>
+                      run(() =>
+                        executeMcpTool({
+                          serverId: selectedServerId,
+                          toolName,
+                          args: parseArgs(),
+                          mode: "execute",
+                          confirmed: true,
+                        })
+                      )
+                    }
+                  >
+                    Execute (confirm)
+                  </Button>
+                </AgentOsIf>
               </div>
               <pre className={classes.mono}>
                 {JSON.stringify(result, null, 2)}
@@ -372,61 +383,63 @@ export default function AutomationMcpRuntimePage() {
           {tab === 3 && (
             <>
               <div className={classes.row}>
-                <Button
-                  variant="outlined"
-                  onClick={() =>
-                    run(() =>
-                      simulateMcpPolicy({
-                        serverId: selectedServerId,
-                        toolName,
-                        args: parseArgs(),
-                        mode: "execute",
-                      })
-                    )
-                  }
-                >
-                  Policy Simulator
-                </Button>
-                <Button
-                  variant="outlined"
-                  onClick={() =>
-                    run(() =>
-                      simulateMcpFallback({
-                        classification: "WRITE",
-                        mcpStartedExecution: true,
-                        mcpResultAmbiguous: true,
-                      })
-                    )
-                  }
-                >
-                  Fallback Simulator
-                </Button>
-                <Button
-                  variant="outlined"
-                  onClick={() =>
-                    run(() =>
-                      normalizeMcpResult({
-                        content: [{ type: "text", text: "ok" }],
-                      })
-                    )
-                  }
-                >
-                  Result Normalizer
-                </Button>
-                <Button
-                  variant="outlined"
-                  onClick={() =>
-                    run(() =>
-                      inspectMcpDispatch({
-                        actionType: "SEARCH",
-                        objective: "customer ana",
-                        metadata: { capability: "SEARCH_CUSTOMER" },
-                      })
-                    )
-                  }
-                >
-                  Dispatch Inspector
-                </Button>
+                <AgentOsIf when={canManage}>
+                  <Button
+                    variant="outlined"
+                    onClick={() =>
+                      run(() =>
+                        simulateMcpPolicy({
+                          serverId: selectedServerId,
+                          toolName,
+                          args: parseArgs(),
+                          mode: "execute",
+                        })
+                      )
+                    }
+                  >
+                    Policy Simulator
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    onClick={() =>
+                      run(() =>
+                        simulateMcpFallback({
+                          classification: "WRITE",
+                          mcpStartedExecution: true,
+                          mcpResultAmbiguous: true,
+                        })
+                      )
+                    }
+                  >
+                    Fallback Simulator
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    onClick={() =>
+                      run(() =>
+                        normalizeMcpResult({
+                          content: [{ type: "text", text: "ok" }],
+                        })
+                      )
+                    }
+                  >
+                    Result Normalizer
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    onClick={() =>
+                      run(() =>
+                        inspectMcpDispatch({
+                          actionType: "SEARCH",
+                          objective: "customer ana",
+                          metadata: { capability: "SEARCH_CUSTOMER" },
+                        })
+                      )
+                    }
+                  >
+                    Dispatch Inspector
+                  </Button>
+                </AgentOsIf>
               </div>
               <pre className={classes.mono}>
                 {JSON.stringify(result, null, 2)}
@@ -451,22 +464,24 @@ export default function AutomationMcpRuntimePage() {
                   value={replayGoal}
                   onChange={(e) => setReplayGoal(e.target.value)}
                 />
-                <Button
-                  variant="contained"
-                  color="primary"
-                  onClick={() =>
-                    run(() =>
-                      replayMcpRuntime({
-                        goalText: replayGoal,
-                        serverId: selectedServerId,
-                        toolName,
-                        args: parseArgs(),
-                      })
-                    )
-                  }
-                >
-                  Replay MCP
-                </Button>
+                <AgentOsIf when={canReplay}>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={() =>
+                      run(() =>
+                        replayMcpRuntime({
+                          goalText: replayGoal,
+                          serverId: selectedServerId,
+                          toolName,
+                          args: parseArgs(),
+                        })
+                      )
+                    }
+                  >
+                    Replay MCP
+                  </Button>
+                </AgentOsIf>
               </div>
               <pre className={classes.mono}>
                 {JSON.stringify(result, null, 2)}
@@ -484,20 +499,23 @@ export default function AutomationMcpRuntimePage() {
                 variant="outlined"
                 value={configJson}
                 onChange={(e) => setConfigJson(e.target.value)}
+                disabled={!canManage}
               />
-              <Button
-                style={{ marginTop: 12 }}
-                variant="contained"
-                color="primary"
-                onClick={() =>
-                  run(async () => {
-                    const config = JSON.parse(configJson);
-                    return updateMcpConfig(config);
-                  })
-                }
-              >
-                Save Config
-              </Button>
+              <AgentOsIf when={canManage}>
+                <Button
+                  style={{ marginTop: 12 }}
+                  variant="contained"
+                  color="primary"
+                  onClick={() =>
+                    run(async () => {
+                      const config = JSON.parse(configJson);
+                      return updateMcpConfig(config);
+                    })
+                  }
+                >
+                  Save Config
+                </Button>
+              </AgentOsIf>
               <Typography
                 variant="caption"
                 color="textSecondary"

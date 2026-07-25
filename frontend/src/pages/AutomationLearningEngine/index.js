@@ -13,7 +13,11 @@ import { makeStyles } from "@material-ui/core/styles";
 import MainContainer from "../../components/MainContainer";
 import MainHeader from "../../components/MainHeader";
 import Title from "../../components/Title";
+import AgentOsReadOnlyBanner from "../../components/AgentOsReadOnlyBanner";
+import AgentOsIf from "../../components/AgentOsIf";
+import useAgentOsConsolePermissions from "../../hooks/useAgentOsConsolePermissions";
 import toastError from "../../errors/toastError";
+import { toastAgentOsActionError } from "../../utils/agentOsActionError";
 import {
   analyzeLearning,
   approveLearningCandidate,
@@ -119,6 +123,7 @@ const DEMO_SAMPLES = [
 
 export default function AutomationLearningEnginePage() {
   const classes = useStyles();
+  const { canManage, canReplay, readOnlyManage } = useAgentOsConsolePermissions();
   const [tab, setTab] = useState(0);
   const [dash, setDash] = useState(null);
   const [candidates, setCandidates] = useState([]);
@@ -160,7 +165,7 @@ export default function AutomationLearningEnginePage() {
       setResult(data?.data ?? data);
       await load();
     } catch (err) {
-      toastError(err);
+      toastAgentOsActionError(err);
     }
   };
 
@@ -169,6 +174,8 @@ export default function AutomationLearningEnginePage() {
       <MainHeader>
         <Title>Learning Engine (V2.8)</Title>
       </MainHeader>
+
+      <AgentOsReadOnlyBanner visible={readOnlyManage} />
 
       <Paper className={classes.paper} variant="outlined">
         <Typography variant="body2" color="textSecondary">
@@ -229,24 +236,26 @@ export default function AutomationLearningEnginePage() {
         <Box style={{ marginTop: 16 }}>
           {tab === 0 && (
             <>
-              <div className={classes.row}>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  onClick={() =>
-                    run(() =>
-                      analyzeLearning({
-                        mode: "MANUAL",
-                        scopeType: "TENANT",
-                        scopeId: "demo",
-                        samples: DEMO_SAMPLES,
-                      })
-                    )
-                  }
-                >
-                  Run Manual Analysis
-                </Button>
-              </div>
+              <AgentOsIf when={canManage}>
+                <div className={classes.row}>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={() =>
+                      run(() =>
+                        analyzeLearning({
+                          mode: "MANUAL",
+                          scopeType: "TENANT",
+                          scopeId: "demo",
+                          samples: DEMO_SAMPLES,
+                        })
+                      )
+                    }
+                  >
+                    Run Manual Analysis
+                  </Button>
+                </div>
+              </AgentOsIf>
               <pre className={classes.mono}>
                 {JSON.stringify(result, null, 2)}
               </pre>
@@ -271,31 +280,33 @@ export default function AutomationLearningEnginePage() {
                 style={{ marginBottom: 12 }}
               />
               <div className={classes.row}>
-                <Button
-                  variant="outlined"
-                  onClick={() =>
-                    run(() => evaluateLearningCandidate(selectedId))
-                  }
-                >
-                  Evaluate
-                </Button>
-                <Button
-                  variant="outlined"
-                  color="primary"
-                  onClick={() =>
-                    run(() => approveLearningCandidate(selectedId))
-                  }
-                >
-                  Approve
-                </Button>
-                <Button
-                  variant="outlined"
-                  onClick={() =>
-                    run(() => rejectLearningCandidate(selectedId, "tester"))
-                  }
-                >
-                  Reject
-                </Button>
+                <AgentOsIf when={canManage}>
+                  <Button
+                    variant="outlined"
+                    onClick={() =>
+                      run(() => evaluateLearningCandidate(selectedId))
+                    }
+                  >
+                    Evaluate
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    color="primary"
+                    onClick={() =>
+                      run(() => approveLearningCandidate(selectedId))
+                    }
+                  >
+                    Approve
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    onClick={() =>
+                      run(() => rejectLearningCandidate(selectedId, "tester"))
+                    }
+                  >
+                    Reject
+                  </Button>
+                </AgentOsIf>
               </div>
               <pre className={classes.mono}>
                 {JSON.stringify(candidates, null, 2)}
@@ -306,37 +317,41 @@ export default function AutomationLearningEnginePage() {
           {tab === 3 && (
             <>
               <div className={classes.row}>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  onClick={() =>
-                    run(() => promoteLearningCandidate(selectedId, "SHADOW"))
-                  }
-                >
-                  Promote Shadow
-                </Button>
-                <Button
-                  variant="outlined"
-                  onClick={() =>
-                    run(() =>
-                      runLearningShadow({
-                        candidateId: selectedId,
-                        sourceExecutionId: "e1",
-                        originalDecision: { runtimeType: "MCP" },
-                      })
-                    )
-                  }
-                >
-                  Shadow Compare
-                </Button>
-                <Button
-                  variant="outlined"
-                  onClick={() =>
-                    run(() => getLearningReplay(selectedId))
-                  }
-                >
-                  Replay
-                </Button>
+                <AgentOsIf when={canManage}>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={() =>
+                      run(() => promoteLearningCandidate(selectedId, "SHADOW"))
+                    }
+                  >
+                    Promote Shadow
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    onClick={() =>
+                      run(() =>
+                        runLearningShadow({
+                          candidateId: selectedId,
+                          sourceExecutionId: "e1",
+                          originalDecision: { runtimeType: "MCP" },
+                        })
+                      )
+                    }
+                  >
+                    Shadow Compare
+                  </Button>
+                </AgentOsIf>
+                <AgentOsIf when={canReplay}>
+                  <Button
+                    variant="outlined"
+                    onClick={() =>
+                      run(() => getLearningReplay(selectedId))
+                    }
+                  >
+                    Replay
+                  </Button>
+                </AgentOsIf>
               </div>
               <pre className={classes.mono}>
                 {JSON.stringify(result, null, 2)}
@@ -346,21 +361,23 @@ export default function AutomationLearningEnginePage() {
 
           {tab === 4 && (
             <>
-              <div className={classes.row}>
-                <Button
-                  variant="outlined"
-                  onClick={() =>
-                    run(() =>
-                      rollbackLearningArtifact(
-                        artifacts[0]?.id,
-                        "tester rollback"
+              <AgentOsIf when={canManage}>
+                <div className={classes.row}>
+                  <Button
+                    variant="outlined"
+                    onClick={() =>
+                      run(() =>
+                        rollbackLearningArtifact(
+                          artifacts[0]?.id,
+                          "tester rollback"
+                        )
                       )
-                    )
-                  }
-                >
-                  Rollback first artifact
-                </Button>
-              </div>
+                    }
+                  >
+                    Rollback first artifact
+                  </Button>
+                </div>
+              </AgentOsIf>
               <pre className={classes.mono}>
                 {JSON.stringify(artifacts, null, 2)}
               </pre>
@@ -369,64 +386,66 @@ export default function AutomationLearningEnginePage() {
 
           {tab === 5 && (
             <>
-              <div className={classes.row}>
-                <Button
-                  variant="outlined"
-                  onClick={() =>
-                    run(() =>
-                      simulateLearningQuality({
-                        sampleSize: 2,
-                        successCount: 1,
-                        failureCount: 1,
-                        evidence: [],
-                        uniqueSessions: 1,
-                        uniqueCapabilities: 1,
-                      })
-                    )
-                  }
-                >
-                  Quality (insufficient)
-                </Button>
-                <Button
-                  variant="outlined"
-                  onClick={() =>
-                    run(() =>
-                      simulateLearningConflicts({ candidateId: selectedId })
-                    )
-                  }
-                >
-                  Conflicts
-                </Button>
-                <Button
-                  variant="outlined"
-                  onClick={() =>
-                    run(() =>
-                      simulateLearningPromotion({
-                        candidateId: selectedId,
-                        requestedMode: "SHADOW",
-                      })
-                    )
-                  }
-                >
-                  Promotion Policy
-                </Button>
-                <Button
-                  variant="outlined"
-                  onClick={() =>
-                    run(() =>
-                      simulateLearningDecay({ candidateId: selectedId })
-                    )
-                  }
-                >
-                  Decay
-                </Button>
-                <Button
-                  variant="outlined"
-                  onClick={() => run(() => listLearningGuidance())}
-                >
-                  Guidance Preview
-                </Button>
-              </div>
+              <AgentOsIf when={canManage}>
+                <div className={classes.row}>
+                  <Button
+                    variant="outlined"
+                    onClick={() =>
+                      run(() =>
+                        simulateLearningQuality({
+                          sampleSize: 2,
+                          successCount: 1,
+                          failureCount: 1,
+                          evidence: [],
+                          uniqueSessions: 1,
+                          uniqueCapabilities: 1,
+                        })
+                      )
+                    }
+                  >
+                    Quality (insufficient)
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    onClick={() =>
+                      run(() =>
+                        simulateLearningConflicts({ candidateId: selectedId })
+                      )
+                    }
+                  >
+                    Conflicts
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    onClick={() =>
+                      run(() =>
+                        simulateLearningPromotion({
+                          candidateId: selectedId,
+                          requestedMode: "SHADOW",
+                        })
+                      )
+                    }
+                  >
+                    Promotion Policy
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    onClick={() =>
+                      run(() =>
+                        simulateLearningDecay({ candidateId: selectedId })
+                      )
+                    }
+                  >
+                    Decay
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    onClick={() => run(() => listLearningGuidance())}
+                  >
+                    Guidance Preview
+                  </Button>
+                </div>
+              </AgentOsIf>
               <pre className={classes.mono}>
                 {JSON.stringify(result, null, 2)}
               </pre>
@@ -443,20 +462,23 @@ export default function AutomationLearningEnginePage() {
                 variant="outlined"
                 value={configJson}
                 onChange={(e) => setConfigJson(e.target.value)}
+                disabled={!canManage}
               />
-              <Button
-                style={{ marginTop: 12 }}
-                variant="contained"
-                color="primary"
-                onClick={() =>
-                  run(async () => {
-                    const config = JSON.parse(configJson);
-                    return updateLearningConfig(config);
-                  })
-                }
-              >
-                Save Config
-              </Button>
+              <AgentOsIf when={canManage}>
+                <Button
+                  style={{ marginTop: 12 }}
+                  variant="contained"
+                  color="primary"
+                  onClick={() =>
+                    run(async () => {
+                      const config = JSON.parse(configJson);
+                      return updateLearningConfig(config);
+                    })
+                  }
+                >
+                  Save Config
+                </Button>
+              </AgentOsIf>
               <Typography variant="caption" display="block" style={{ marginTop: 8 }}>
                 autoPromotionEnabled e liveIntegrationEnabled sempre forçados
                 para false no backend.
