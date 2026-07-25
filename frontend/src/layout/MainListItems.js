@@ -23,6 +23,10 @@ import HelpOutlineIcon from "@material-ui/icons/HelpOutline";
 import NotificationsIcon from "@material-ui/icons/Notifications";
 import AssessmentOutlinedIcon from "@material-ui/icons/AssessmentOutlined";
 import { AccountTree, BusinessCenter } from "@material-ui/icons";
+import MemoryIcon from "@material-ui/icons/Memory";
+import ReplyIcon from "@material-ui/icons/Reply";
+import LibraryBooksIcon from "@material-ui/icons/LibraryBooks";
+import CodeIcon from "@material-ui/icons/Code";
 import StoreIcon from "@material-ui/icons/Store";
 import { i18n } from "../translate/i18n";
 import {
@@ -32,15 +36,15 @@ import {
   canAccessInternalChatModule,
 } from "../utils/attendanceAccess";
 import {
-  AI_AGENT_FEATURE_KEY,
   AI_AGENT_ROUTE_PATH,
   AI_AGENT_UI_ENABLED,
 } from "../config/aiAgentFeature";
 import {
-  KNOWLEDGE_BASE_FEATURE_KEY,
   KNOWLEDGE_BASE_ROUTE_PATH,
   KNOWLEDGE_BASE_UI_ENABLED,
 } from "../config/knowledgeBaseFeature";
+import { canUseAiAgent } from "../utils/canUseAiAgent";
+import { canUseKnowledgeBase } from "../utils/canUseKnowledgeBase";
 import { canUseInventorySales } from "../utils/canUseInventorySales";
 import { WhatsAppsContext } from "../context/WhatsApp/WhatsAppsContext";
 import { AuthContext } from "../context/Auth/AuthContext";
@@ -174,22 +178,14 @@ const reducer = (state, action) => {
   }
 };
 
+/** Path default do módulo Automações (somente Fluxos / Gatilhos / Integrações). */
 function defaultAutomacaoPath(planFlags, isTenantManager, user) {
-  if (!isTenantManager) return "/quick-messages";
   const fx = planFlags.effectiveFeatures || {};
   if (fx["automation.chatbot"] === true) return "/flowbuilders";
   if (fx["automation.keywords"] === true) return "/phrase-lists";
   if (planFlags.useIntegrations || fx["automation.integrations"] === true) {
     return "/queue-integration";
   }
-  if (planFlags.useOpenAi || fx["automation.openai"] === true) return "/prompts";
-  if (AI_AGENT_UI_ENABLED && fx[AI_AGENT_FEATURE_KEY] === true) {
-    return AI_AGENT_ROUTE_PATH;
-  }
-  if (KNOWLEDGE_BASE_UI_ENABLED && fx[KNOWLEDGE_BASE_FEATURE_KEY] === true) {
-    return KNOWLEDGE_BASE_ROUTE_PATH;
-  }
-  if (fx["automation.quick_replies"] === true) return "/quick-messages";
   return getAttendanceDefaultPath({
     effectiveFeatures: fx,
     planFlags,
@@ -404,16 +400,18 @@ const MainListItems = (props) => {
     path === "/contacts" ||
     path === "/contacts/labels" ||
     path === "/group-manager";
+  const selAiAgent =
+    path === AI_AGENT_ROUTE_PATH || path.startsWith(`${AI_AGENT_ROUTE_PATH}/`);
   const selAutomacao =
     path.startsWith("/flowbuilder") ||
     path === "/flowbuilders" ||
     path === "/phrase-lists" ||
-    path === "/queue-integration" ||
-    path === "/prompts" ||
-    path === AI_AGENT_ROUTE_PATH ||
+    path === "/queue-integration";
+  const selQuickMessages = path === "/quick-messages";
+  const selPrompts = path === "/prompts";
+  const selKnowledgeBase =
     path === KNOWLEDGE_BASE_ROUTE_PATH ||
-    path.startsWith(`${KNOWLEDGE_BASE_ROUTE_PATH}/`) ||
-    path === "/quick-messages";
+    path.startsWith(`${KNOWLEDGE_BASE_ROUTE_PATH}/`);
   const selCampanhas =
     path === "/campaigns" ||
     path.startsWith("/contact-lists") ||
@@ -448,15 +446,35 @@ const MainListItems = (props) => {
   const selSaaS = path.startsWith("/saas") || path.startsWith("/platform");
 
   const toAutomacao = defaultAutomacaoPath(planFlags, isTenantManager, user);
+  /** Automações comerciais: apenas Fluxos, Gatilhos e Integrações. */
   const automacaoVisible =
     isTenantManager &&
+    planFlags.loaded &&
     (fx["automation.chatbot"] === true ||
       fx["automation.keywords"] === true ||
-      fx["automation.integrations"] === true ||
-      fx["automation.openai"] === true ||
-      fx[AI_AGENT_FEATURE_KEY] === true ||
-      fx[KNOWLEDGE_BASE_FEATURE_KEY] === true ||
-      fx["automation.quick_replies"] === true);
+      fx["automation.integrations"] === true);
+  /**
+   * Agente de IA — item de 1º nível (feature comercial; não usa agentOS.console.*).
+   * Perfil admin alinhado às rotas do AutomacaoModule / AiAgentRouteGuard.
+   */
+  const aiAgentVisible =
+    isAdmin &&
+    planFlags.loaded &&
+    AI_AGENT_UI_ENABLED &&
+    canUseAiAgent(user, planFlags);
+  const quickMessagesVisible =
+    isTenantManager &&
+    planFlags.loaded &&
+    fx["automation.quick_replies"] === true;
+  const promptsVisible =
+    isAdmin &&
+    planFlags.loaded &&
+    (planFlags.useOpenAi || fx["automation.openai"] === true);
+  const knowledgeBaseVisible =
+    isAdmin &&
+    planFlags.loaded &&
+    KNOWLEDGE_BASE_UI_ENABLED &&
+    canUseKnowledgeBase(user, planFlags);
 
   const standaloneAfterConfig = (
     <>
@@ -657,7 +675,19 @@ const MainListItems = (props) => {
         />
       ) : null}
 
-      {planFlags.loaded && automacaoVisible ? (
+      {aiAgentVisible ? (
+        <ListItemLink
+          to={AI_AGENT_ROUTE_PATH}
+          primary={i18n.t("mainDrawer.sections.aiAgent")}
+          icon={<MemoryIcon />}
+          listItemClassName={classes.listItem}
+          listItemIconClassName={classes.listItemIcon}
+          listItemTextClassName={classes.listItemText}
+          selected={selAiAgent}
+        />
+      ) : null}
+
+      {automacaoVisible ? (
         <ListItemLink
           to={toAutomacao}
           primary={i18n.t("mainDrawer.sections.automacao")}
@@ -666,6 +696,42 @@ const MainListItems = (props) => {
           listItemIconClassName={classes.listItemIcon}
           listItemTextClassName={classes.listItemText}
           selected={selAutomacao}
+        />
+      ) : null}
+
+      {quickMessagesVisible ? (
+        <ListItemLink
+          to="/quick-messages"
+          primary={i18n.t("mainDrawer.listItems.quickMessages")}
+          icon={<ReplyIcon />}
+          listItemClassName={classes.listItem}
+          listItemIconClassName={classes.listItemIcon}
+          listItemTextClassName={classes.listItemText}
+          selected={selQuickMessages}
+        />
+      ) : null}
+
+      {promptsVisible ? (
+        <ListItemLink
+          to="/prompts"
+          primary={i18n.t("mainDrawer.listItems.prompts")}
+          icon={<CodeIcon />}
+          listItemClassName={classes.listItem}
+          listItemIconClassName={classes.listItemIcon}
+          listItemTextClassName={classes.listItemText}
+          selected={selPrompts}
+        />
+      ) : null}
+
+      {knowledgeBaseVisible ? (
+        <ListItemLink
+          to={KNOWLEDGE_BASE_ROUTE_PATH}
+          primary={i18n.t("mainDrawer.listItems.knowledgeBase")}
+          icon={<LibraryBooksIcon />}
+          listItemClassName={classes.listItem}
+          listItemIconClassName={classes.listItemIcon}
+          listItemTextClassName={classes.listItemText}
+          selected={selKnowledgeBase}
         />
       ) : null}
 

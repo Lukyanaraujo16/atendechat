@@ -1,5 +1,5 @@
 import React, { Suspense, useContext, useMemo } from "react";
-import { Switch, Route, Redirect } from "react-router-dom";
+import { Switch, Route, Redirect, useLocation } from "react-router-dom";
 import Box from "@material-ui/core/Box";
 import CircularProgress from "@material-ui/core/CircularProgress";
 import Typography from "@material-ui/core/Typography";
@@ -20,6 +20,7 @@ import {
   canAccessInternalChatModule,
   INTERNAL_CHAT_FEATURE_KEY,
 } from "../utils/attendanceAccess";
+import { isCommercialAutomationsPath } from "../utils/commercialAutomationsNav";
 
 import Dashboard from "../pages/Dashboard/";
 import TicketResponsiveContainer from "../pages/TicketResponsiveContainer";
@@ -398,6 +399,8 @@ function AtendimentoModule({ planFlags, isAdmin, user }) {
 
 function AutomacaoModule({ planFlags, isAdmin }) {
   const { user } = useContext(AuthContext);
+  const location = useLocation();
+  const pathname = location.pathname;
   const fx = planFlags.effectiveFeatures || {};
   const showChatbot = fx["automation.chatbot"] === true;
   const showKeywords = fx["automation.keywords"] === true;
@@ -412,7 +415,11 @@ function AutomacaoModule({ planFlags, isAdmin }) {
   const showAiTools =
     showAiAgent && fx[AUTOMATION_AI_TOOLS_FEATURE_KEY] === true;
 
-  const tabs = useMemo(() => {
+  /**
+   * Abas comerciais de Automações: somente Fluxos, Gatilhos e Integrações.
+   * Agente de IA, KB, Prompts, Quick Replies e AgentOS saem do agrupamento visual.
+   */
+  const commercialTabs = useMemo(() => {
     const t = [];
     if (isAdmin && showChatbot) {
       t.push({
@@ -432,123 +439,32 @@ function AutomacaoModule({ planFlags, isAdmin }) {
         label: i18n.t("mainDrawer.listItems.integrations"),
       });
     }
-    if (isAdmin && showOpenAi) {
-      t.push({ path: "/prompts", label: i18n.t("mainDrawer.listItems.prompts") });
-    }
-    if (showAiAgent) {
-      t.push({
-        path: AI_AGENT_ROUTE_PATH,
-        label: i18n.t("mainDrawer.listItems.aiAgent"),
-      });
-    }
-    if (showAiAgentAnalytics) {
-      t.push({
-        path: AI_AGENT_ANALYTICS_ROUTE_PATH,
-        label: i18n.t("mainDrawer.listItems.aiAgentAnalytics"),
-      });
-      t.push({
-        path: AUTOMATION_MONITOR_ROUTE_PATH,
-        label: i18n.t("mainDrawer.listItems.automationMonitor"),
-      });
-      t.push({
-        path: AUTOMATION_OBSERVABILITY_ROUTE_PATH,
-        label: "Observability",
-      });
-      t.push({
-        path: AUTOMATION_PRODUCTION_ROUTE_PATH,
-        label: i18n.t("mainDrawer.listItems.automationProduction"),
-      });
-    }
-    if (showAiTools) {
-      t.push({
-        path: AI_AGENT_SHADOW_FC_ROUTE_PATH,
-        label: i18n.t("mainDrawer.listItems.aiAgentShadowFc"),
-      });
-      t.push({
-        path: AUTOMATION_EVIDENCE_ROUTE_PATH,
-        label: i18n.t("mainDrawer.listItems.automationEvidence"),
-      });
-      t.push({
-        path: AUTOMATION_LIVE_ROLLOUT_ROUTE_PATH,
-        label: i18n.t("mainDrawer.listItems.automationLiveRollout"),
-      });
-      t.push({
-        path: AUTOMATION_PLANNING_ROUTE_PATH,
-        label: i18n.t("mainDrawer.listItems.automationPlanning"),
-      });
-      t.push({
-        path: AUTOMATION_PLAN_EVALUATION_ROUTE_PATH,
-        label: i18n.t("mainDrawer.listItems.automationPlanEvaluation"),
-      });
-      t.push({
-        path: AUTOMATION_EXECUTION_SESSIONS_ROUTE_PATH,
-        label: i18n.t("mainDrawer.listItems.automationExecutionSessions"),
-      });
-      t.push({
-        path: AUTOMATION_ACTION_EXECUTION_ROUTE_PATH,
-        label: i18n.t("mainDrawer.listItems.automationActionExecution"),
-      });
-      t.push({
-        path: AUTOMATION_RUNTIME_INTEGRATION_ROUTE_PATH,
-        label: i18n.t("mainDrawer.listItems.automationRuntimeIntegration"),
-      });
-      t.push({
-        path: AUTOMATION_EXECUTION_FEEDBACK_ROUTE_PATH,
-        label: i18n.t("mainDrawer.listItems.automationExecutionFeedback"),
-      });
-      t.push({
-        path: AUTOMATION_COGNITIVE_MEMORY_ROUTE_PATH,
-        label: i18n.t("mainDrawer.listItems.automationCognitiveMemory"),
-      });
-      t.push({
-        path: AUTOMATION_MCP_RUNTIME_ROUTE_PATH,
-        label: i18n.t("mainDrawer.listItems.automationMcpRuntime"),
-      });
-      t.push({
-        path: AUTOMATION_LEARNING_ENGINE_ROUTE_PATH,
-        label: i18n.t("mainDrawer.listItems.automationLearningEngine"),
-      });
-      t.push({
-        path: AUTOMATION_MULTI_AGENT_ROUTE_PATH,
-        label: i18n.t("mainDrawer.listItems.automationMultiAgent"),
-      });
-      t.push({
-        path: AUTOMATION_TOOLS_ROUTE_PATH,
-        label: i18n.t("mainDrawer.listItems.automationTools"),
-      });
-    }
-    if (showKnowledgeBase) {
-      t.push({
-        path: KNOWLEDGE_BASE_ROUTE_PATH,
-        label: i18n.t("mainDrawer.listItems.knowledgeBase"),
-      });
-    }
-    if (showQuickReplies) {
-      t.push({
-        path: "/quick-messages",
-        label: i18n.t("mainDrawer.listItems.quickMessages"),
-      });
-    }
     return t;
   }, [
     isAdmin,
     showChatbot,
     showKeywords,
     showIntegrations,
-    showOpenAi,
-    showAiAgent,
-    showAiAgentAnalytics,
-    showAiTools,
-    showKnowledgeBase,
-    showQuickReplies,
     i18n.language,
   ]);
+
+  const tabs = isCommercialAutomationsPath(pathname) ? commercialTabs : [];
+
+  const hasAnyHostedSurface =
+    showChatbot ||
+    showKeywords ||
+    showIntegrations ||
+    showOpenAi ||
+    showAiAgent ||
+    showKnowledgeBase ||
+    showQuickReplies ||
+    showAiTools;
 
   if (!planFlags.loaded) {
     return <PlanFlagsLoadingState />;
   }
 
-  if (!tabs.length) {
+  if (!hasAnyHostedSurface) {
     return (
       <FeatureBlocked
         planFlags={planFlags}
@@ -566,7 +482,13 @@ function AutomacaoModule({ planFlags, isAdmin }) {
     );
   }
 
-  const fallback = tabs[0]?.path || "/quick-messages";
+  const fallback =
+    commercialTabs[0]?.path ||
+    (showAiAgent ? AI_AGENT_ROUTE_PATH : null) ||
+    (showKnowledgeBase ? KNOWLEDGE_BASE_ROUTE_PATH : null) ||
+    (showOpenAi ? "/prompts" : null) ||
+    (showQuickReplies ? "/quick-messages" : null) ||
+    "/tickets";
 
   return (
     <ModuleTabsLayout tabs={tabs}>
@@ -1193,6 +1115,9 @@ export default function LoggedInRoutesContent() {
     "/queue-integration",
     "/prompts",
     AI_AGENT_ROUTE_PATH,
+    AI_AGENT_WIZARD_ROUTE_PATH,
+    `${AI_AGENT_WIZARD_ROUTE_PATH}/:agentId`,
+    AI_AGENT_SIMULATOR_ROUTE_PATH,
     AI_AGENT_ANALYTICS_ROUTE_PATH,
     AI_AGENT_SHADOW_FC_ROUTE_PATH,
     AUTOMATION_EVIDENCE_ROUTE_PATH,
@@ -1204,11 +1129,15 @@ export default function LoggedInRoutesContent() {
     AUTOMATION_RUNTIME_INTEGRATION_ROUTE_PATH,
     AUTOMATION_EXECUTION_FEEDBACK_ROUTE_PATH,
     AUTOMATION_COGNITIVE_MEMORY_ROUTE_PATH,
+    AUTOMATION_MCP_RUNTIME_ROUTE_PATH,
+    AUTOMATION_LEARNING_ENGINE_ROUTE_PATH,
+    AUTOMATION_MULTI_AGENT_ROUTE_PATH,
     AUTOMATION_MONITOR_ROUTE_PATH,
     AUTOMATION_OBSERVABILITY_ROUTE_PATH,
     AUTOMATION_PRODUCTION_ROUTE_PATH,
     AUTOMATION_TOOLS_ROUTE_PATH,
     KNOWLEDGE_BASE_ROUTE_PATH,
+    `${KNOWLEDGE_BASE_ROUTE_PATH}/:baseId`,
     "/quick-messages",
   ];
 
