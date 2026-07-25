@@ -45,7 +45,14 @@ export const list = async (req: Request, res: Response): Promise<Response> => {
     "../services/AutomationOrchestrator/cognitive/feedback/ExecutionFeedbackAdminServices"
   );
   const limit = req.query.limit ? Number(req.query.limit) : 50;
-  return res.json(await ListExecutionFeedbackService({ companyId, limit }));
+  const out = await ListExecutionFeedbackService({ companyId, limit });
+  const { filterRecordsOwnedByCompany } = await import(
+    "../helpers/agentOsTenantOwnership"
+  );
+  return res.json({
+    ...out,
+    feedbacks: filterRecordsOwnedByCompany(out?.feedbacks, companyId)
+  });
 };
 
 export const show = async (req: Request, res: Response): Promise<Response> => {
@@ -53,9 +60,15 @@ export const show = async (req: Request, res: Response): Promise<Response> => {
   const { GetExecutionFeedbackService } = await import(
     "../services/AutomationOrchestrator/cognitive/feedback/ExecutionFeedbackAdminServices"
   );
-  return res.json(
-    await GetExecutionFeedbackService({ companyId, id: String(req.params.id) })
+  const out = await GetExecutionFeedbackService({
+    companyId,
+    id: String(req.params.id)
+  });
+  const { assertRecordOwnedByCompany } = await import(
+    "../helpers/agentOsTenantOwnership"
   );
+  assertRecordOwnedByCompany(out?.feedback, companyId);
+  return res.json(out);
 };
 
 export const metrics = async (_req: Request, res: Response): Promise<Response> => {

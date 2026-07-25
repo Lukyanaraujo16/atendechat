@@ -157,6 +157,13 @@ export const agentSetting = async (
   if (!Number.isFinite(aiAgentId) || aiAgentId < 1) {
     throw new AppError("ERR_VALIDATION_ERROR", 400, "agentId inválido.");
   }
+  const AiAgent = (await import("../models/AiAgent")).default;
+  const agent = await AiAgent.findOne({
+    where: { id: aiAgentId, companyId }
+  });
+  if (!agent) {
+    throw new AppError("ERR_NOT_FOUND", 404);
+  }
   const { UpsertLiveFcAgentSettingService } = await import(
     "../services/AutomationOrchestrator/liveRollout/LiveRolloutAdminServices"
   );

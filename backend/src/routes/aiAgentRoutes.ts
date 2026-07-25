@@ -1,7 +1,12 @@
 import { Router } from "express";
 import isAuth from "../middleware/isAuth";
 import requireEffectiveModule from "../middleware/requireEffectiveModule";
-import requireTenantAdminOrSupport from "../middleware/requireTenantAdminOrSupport";
+import requireAgentOsTenantContext from "../middleware/requireAgentOsTenantContext";
+import {
+  requireAgentOsConsole,
+  requireAgentOsManage
+} from "../middleware/requirePlatformPermission";
+import { logAgentOsTechnicalWrite } from "../middleware/logAgentOsTechnicalWrite";
 import * as AiAgentController from "../controllers/AiAgentController";
 import * as AiAgentAnalyticsController from "../controllers/AiAgentAnalyticsController";
 import { KNOWLEDGE_BASE_FEATURE_KEY } from "../config/knowledgeBaseConstants";
@@ -9,7 +14,25 @@ import { KNOWLEDGE_BASE_FEATURE_KEY } from "../config/knowledgeBaseConstants";
 const aiAgentRoutes = Router();
 const requireAiAgent = requireEffectiveModule("automation.ai_agent");
 const requireKnowledgeBase = requireEffectiveModule(KNOWLEDGE_BASE_FEATURE_KEY);
-const requireAdmin = requireTenantAdminOrSupport;
+/** Técnico: Console (Fase 1.4) — analytics / shadow-fc UI. */
+const techRead = [
+  isAuth,
+  requireAgentOsConsole,
+  requireAgentOsTenantContext,
+  requireAiAgent
+];
+const techReadKb = [...techRead, requireKnowledgeBase];
+const techManage = [
+  ...techRead,
+  requireAgentOsManage,
+  logAgentOsTechnicalWrite("agentOS.console.manage")
+];
+const techManageKb = [
+  ...techReadKb,
+  requireAgentOsManage,
+  logAgentOsTechnicalWrite("agentOS.console.manage")
+];
+
 
 aiAgentRoutes.get(
   "/ai-agents",
@@ -39,134 +62,94 @@ aiAgentRoutes.post(
   AiAgentController.upsertShadowSuggestionReview
 );
 
-/* —— Fase IA 1.5.3: Analytics / Observabilidade (admin) —— */
+/* —— Fase IA 1.5.3: Analytics (técnico — Console Fase 1.4) —— */
 aiAgentRoutes.get(
   "/ai-agents/analytics/dashboard",
-  isAuth,
-  requireAiAgent,
-  requireKnowledgeBase,
-  requireAdmin,
+  ...techReadKb,
   AiAgentAnalyticsController.dashboard
 );
 
 aiAgentRoutes.get(
   "/ai-agents/analytics/agents",
-  isAuth,
-  requireAiAgent,
-  requireAdmin,
+  ...techRead,
   AiAgentAnalyticsController.agentAnalytics
 );
 
 aiAgentRoutes.get(
   "/ai-agents/analytics/knowledge-bases",
-  isAuth,
-  requireAiAgent,
-  requireKnowledgeBase,
-  requireAdmin,
+  ...techReadKb,
   AiAgentAnalyticsController.knowledgeBaseAnalytics
 );
 
 aiAgentRoutes.get(
   "/ai-agents/analytics/documents",
-  isAuth,
-  requireAiAgent,
-  requireKnowledgeBase,
-  requireAdmin,
+  ...techReadKb,
   AiAgentAnalyticsController.documentAnalytics
 );
 
 aiAgentRoutes.get(
   "/ai-agents/analytics/health",
-  isAuth,
-  requireAiAgent,
-  requireKnowledgeBase,
-  requireAdmin,
+  ...techReadKb,
   AiAgentAnalyticsController.health
 );
 
 aiAgentRoutes.get(
   "/ai-agents/analytics/health-score",
-  isAuth,
-  requireAiAgent,
-  requireKnowledgeBase,
-  requireAdmin,
+  ...techReadKb,
   AiAgentAnalyticsController.healthScore
 );
 
 aiAgentRoutes.get(
   "/ai-agents/analytics/knowledge-gaps",
-  isAuth,
-  requireAiAgent,
-  requireKnowledgeBase,
-  requireAdmin,
+  ...techReadKb,
   AiAgentAnalyticsController.listGaps
 );
 
 aiAgentRoutes.patch(
   "/ai-agents/analytics/knowledge-gaps/:id",
-  isAuth,
-  requireAiAgent,
-  requireKnowledgeBase,
-  requireAdmin,
+  ...techManageKb,
   AiAgentAnalyticsController.updateGap
 );
 
 aiAgentRoutes.get(
   "/ai-agents/analytics/knowledge-suggestions",
-  isAuth,
-  requireAiAgent,
-  requireKnowledgeBase,
-  requireAdmin,
+  ...techReadKb,
   AiAgentAnalyticsController.listSuggestions
 );
 
 aiAgentRoutes.post(
   "/ai-agents/analytics/knowledge-suggestions",
-  isAuth,
-  requireAiAgent,
-  requireKnowledgeBase,
-  requireAdmin,
+  ...techManageKb,
   AiAgentAnalyticsController.createSuggestion
 );
 
 aiAgentRoutes.patch(
   "/ai-agents/analytics/knowledge-suggestions/:id",
-  isAuth,
-  requireAiAgent,
-  requireKnowledgeBase,
-  requireAdmin,
+  ...techManageKb,
   AiAgentAnalyticsController.updateSuggestion
 );
 
 aiAgentRoutes.get(
   "/ai-agents/analytics/replays",
-  isAuth,
-  requireAiAgent,
-  requireAdmin,
+  ...techRead,
   AiAgentAnalyticsController.listReplays
 );
 
 aiAgentRoutes.get(
   "/ai-agents/analytics/replays/:id",
-  isAuth,
-  requireAiAgent,
-  requireAdmin,
+  ...techRead,
   AiAgentAnalyticsController.showReplay
 );
 
 aiAgentRoutes.get(
   "/ai-agents/analytics/prompt-diff",
-  isAuth,
-  requireAiAgent,
-  requireAdmin,
+  ...techRead,
   AiAgentAnalyticsController.promptDiff
 );
 
 aiAgentRoutes.post(
   "/ai-agents/analytics/prompt-diff",
-  isAuth,
-  requireAiAgent,
-  requireAdmin,
+  ...techManage,
   AiAgentAnalyticsController.promptDiff
 );
 
@@ -240,44 +223,34 @@ aiAgentRoutes.post(
   AiAgentController.upsertSimulatorMessageReview
 );
 
-/* —— Fase IA 2.1E: Function Calling Shadow (antes de /:id) —— */
+/* —— Fase IA 2.1E: Function Calling Shadow (técnico — Console) —— */
 aiAgentRoutes.get(
   "/ai-agents/shadow-evaluations/dashboard",
-  isAuth,
-  requireAiAgent,
-  requireAdmin,
+  ...techRead,
   AiAgentController.shadowFcDashboard
 );
 
 aiAgentRoutes.get(
   "/ai-agents/shadow-evaluations",
-  isAuth,
-  requireAiAgent,
-  requireAdmin,
+  ...techRead,
   AiAgentController.listShadowEvaluations
 );
 
 aiAgentRoutes.get(
   "/ai-agents/shadow-evaluations/:id",
-  isAuth,
-  requireAiAgent,
-  requireAdmin,
+  ...techRead,
   AiAgentController.showShadowEvaluation
 );
 
 aiAgentRoutes.put(
   "/ai-agents/shadow-fc/company-setting",
-  isAuth,
-  requireAiAgent,
-  requireAdmin,
+  ...techManage,
   AiAgentController.upsertShadowFcCompanySetting
 );
 
 aiAgentRoutes.put(
   "/ai-agents/shadow-fc/connections/:whatsappId",
-  isAuth,
-  requireAiAgent,
-  requireAdmin,
+  ...techManage,
   AiAgentController.upsertShadowFcConnectionSetting
 );
 
@@ -360,9 +333,7 @@ aiAgentRoutes.get(
 
 aiAgentRoutes.put(
   "/ai-agents/:id/shadow-fc/setting",
-  isAuth,
-  requireAiAgent,
-  requireAdmin,
+  ...techManage,
   AiAgentController.upsertShadowFcAgentSetting
 );
 

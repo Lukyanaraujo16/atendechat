@@ -192,12 +192,19 @@ export const emergencyStop = async (req: Request, res: Response) => {
 
 export const listIncidents = async (req: Request, res: Response) => {
   try {
-    return res.json(
-      await Svc.ListIncidentsService({
-        companyId: companyIdOrThrow(req),
-        limit: req.query.limit ? Number(req.query.limit) : undefined
-      })
+    const companyId = companyIdOrThrow(req);
+    const out = await Svc.ListIncidentsService({
+      companyId,
+      limit: req.query.limit ? Number(req.query.limit) : undefined
+    });
+    const { filterRecordsOwnedByCompany } = await import(
+      "../helpers/agentOsTenantOwnership"
     );
+    // companyId null = global/shared — never expose across tenants
+    return res.json({
+      ...out,
+      incidents: filterRecordsOwnedByCompany(out?.incidents, companyId)
+    });
   } catch (e) {
     mapErr(e);
   }
@@ -205,12 +212,16 @@ export const listIncidents = async (req: Request, res: Response) => {
 
 export const getIncident = async (req: Request, res: Response) => {
   try {
-    return res.json(
-      await Svc.GetIncidentService({
-        companyId: companyIdOrThrow(req),
-        incidentId: String(req.params.id)
-      })
+    const companyId = companyIdOrThrow(req);
+    const out = await Svc.GetIncidentService({
+      companyId,
+      incidentId: String(req.params.id)
+    });
+    const { assertRecordOwnedByCompany } = await import(
+      "../helpers/agentOsTenantOwnership"
     );
+    assertRecordOwnedByCompany(out, companyId);
+    return res.json(out);
   } catch (e) {
     mapErr(e);
   }
@@ -218,9 +229,18 @@ export const getIncident = async (req: Request, res: Response) => {
 
 export const ackIncident = async (req: Request, res: Response) => {
   try {
+    const companyId = companyIdOrThrow(req);
+    const preview = await Svc.GetIncidentService({
+      companyId,
+      incidentId: String(req.params.id)
+    });
+    const { assertRecordOwnedByCompany } = await import(
+      "../helpers/agentOsTenantOwnership"
+    );
+    assertRecordOwnedByCompany(preview, companyId);
     return res.json(
       await Svc.AcknowledgeIncidentService({
-        companyId: companyIdOrThrow(req),
+        companyId,
         incidentId: String(req.params.id),
         userId: Number(req.user!.id)
       })
@@ -232,9 +252,18 @@ export const ackIncident = async (req: Request, res: Response) => {
 
 export const resolveIncident = async (req: Request, res: Response) => {
   try {
+    const companyId = companyIdOrThrow(req);
+    const preview = await Svc.GetIncidentService({
+      companyId,
+      incidentId: String(req.params.id)
+    });
+    const { assertRecordOwnedByCompany } = await import(
+      "../helpers/agentOsTenantOwnership"
+    );
+    assertRecordOwnedByCompany(preview, companyId);
     return res.json(
       await Svc.ResolveIncidentService({
-        companyId: companyIdOrThrow(req),
+        companyId,
         incidentId: String(req.params.id),
         resolution: String(req.body?.resolution || ""),
         confirm: req.body?.confirm === true

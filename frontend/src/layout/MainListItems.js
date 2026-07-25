@@ -27,6 +27,7 @@ import MemoryIcon from "@material-ui/icons/Memory";
 import ReplyIcon from "@material-ui/icons/Reply";
 import LibraryBooksIcon from "@material-ui/icons/LibraryBooks";
 import CodeIcon from "@material-ui/icons/Code";
+import BuildOutlinedIcon from "@material-ui/icons/BuildOutlined";
 import StoreIcon from "@material-ui/icons/Store";
 import { i18n } from "../translate/i18n";
 import {
@@ -39,12 +40,14 @@ import {
   AI_AGENT_ROUTE_PATH,
   AI_AGENT_UI_ENABLED,
 } from "../config/aiAgentFeature";
+import { TECHNICAL_CONSOLE_ROOT_PATH } from "../config/agentOsConsoleRoutes";
 import {
   KNOWLEDGE_BASE_ROUTE_PATH,
   KNOWLEDGE_BASE_UI_ENABLED,
 } from "../config/knowledgeBaseFeature";
 import { canUseAiAgent } from "../utils/canUseAiAgent";
 import { canUseKnowledgeBase } from "../utils/canUseKnowledgeBase";
+import { canShowTechnicalConsoleNav } from "../utils/agentOsConsoleAccess";
 import { canUseInventorySales } from "../utils/canUseInventorySales";
 import { WhatsAppsContext } from "../context/WhatsApp/WhatsAppsContext";
 import { AuthContext } from "../context/Auth/AuthContext";
@@ -401,7 +404,12 @@ const MainListItems = (props) => {
     path === "/contacts/labels" ||
     path === "/group-manager";
   const selAiAgent =
-    path === AI_AGENT_ROUTE_PATH || path.startsWith(`${AI_AGENT_ROUTE_PATH}/`);
+    path === AI_AGENT_ROUTE_PATH ||
+    path.startsWith(`${AI_AGENT_ROUTE_PATH}/wizard`) ||
+    /^\/ai-agent\/[^/]+\/simulator$/.test(path);
+  const selTechnicalConsole =
+    path === TECHNICAL_CONSOLE_ROOT_PATH ||
+    path.startsWith(`${TECHNICAL_CONSOLE_ROOT_PATH}/`);
   const selAutomacao =
     path.startsWith("/flowbuilder") ||
     path === "/flowbuilders" ||
@@ -475,6 +483,8 @@ const MainListItems = (props) => {
     planFlags.loaded &&
     KNOWLEDGE_BASE_UI_ENABLED &&
     canUseKnowledgeBase(user, planFlags);
+  /** Console Técnico — identidade interna + agentOS.console.view (sessão). */
+  const technicalConsoleVisible = canShowTechnicalConsoleNav(user);
 
   const standaloneAfterConfig = (
     <>
@@ -732,6 +742,18 @@ const MainListItems = (props) => {
           listItemIconClassName={classes.listItemIcon}
           listItemTextClassName={classes.listItemText}
           selected={selKnowledgeBase}
+        />
+      ) : null}
+
+      {technicalConsoleVisible ? (
+        <ListItemLink
+          to={TECHNICAL_CONSOLE_ROOT_PATH}
+          primary={i18n.t("mainDrawer.sections.technicalConsole")}
+          icon={<BuildOutlinedIcon />}
+          listItemClassName={classes.listItem}
+          listItemIconClassName={classes.listItemIcon}
+          listItemTextClassName={classes.listItemText}
+          selected={selTechnicalConsole}
         />
       ) : null}
 

@@ -38,7 +38,14 @@ export const requests = async (req: Request, res: Response): Promise<Response> =
     "../services/AutomationOrchestrator/runtimeIntegration/RuntimeIntegrationAdminServices"
   );
   const limit = req.query.limit ? Number(req.query.limit) : 50;
-  return res.json(await ListRuntimeRequestsService({ companyId, limit }));
+  const out = await ListRuntimeRequestsService({ companyId, limit });
+  const { filterRecordsOwnedByCompany } = await import(
+    "../helpers/agentOsTenantOwnership"
+  );
+  return res.json({
+    ...out,
+    requests: filterRecordsOwnedByCompany(out?.requests, companyId)
+  });
 };
 
 export const requestById = async (req: Request, res: Response): Promise<Response> => {
@@ -46,9 +53,15 @@ export const requestById = async (req: Request, res: Response): Promise<Response
   const { GetRuntimeRequestService } = await import(
     "../services/AutomationOrchestrator/runtimeIntegration/RuntimeIntegrationAdminServices"
   );
-  return res.json(
-    await GetRuntimeRequestService({ companyId, id: String(req.params.id) })
+  const out = await GetRuntimeRequestService({
+    companyId,
+    id: String(req.params.id)
+  });
+  const { assertRecordOwnedByCompany } = await import(
+    "../helpers/agentOsTenantOwnership"
   );
+  assertRecordOwnedByCompany(out?.request, companyId);
+  return res.json(out);
 };
 
 export const metrics = async (req: Request, res: Response): Promise<Response> => {

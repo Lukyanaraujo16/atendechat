@@ -1,4 +1,4 @@
-import React, { Suspense, useContext, useMemo } from "react";
+import React, { useContext, useMemo } from "react";
 import { Switch, Route, Redirect, useLocation } from "react-router-dom";
 import Box from "@material-ui/core/Box";
 import CircularProgress from "@material-ui/core/CircularProgress";
@@ -70,29 +70,11 @@ import AiAgentRouteGuard from "../components/AiAgentRouteGuard";
 import {
   AI_AGENT_FEATURE_KEY,
   AI_AGENT_ROUTE_PATH,
-  AI_AGENT_ANALYTICS_ROUTE_PATH,
-  AI_AGENT_SHADOW_FC_ROUTE_PATH,
-  AUTOMATION_EVIDENCE_ROUTE_PATH,
-  AUTOMATION_LIVE_ROLLOUT_ROUTE_PATH,
-  AUTOMATION_PLANNING_ROUTE_PATH,
-  AUTOMATION_PLAN_EVALUATION_ROUTE_PATH,
-  AUTOMATION_EXECUTION_SESSIONS_ROUTE_PATH,
-  AUTOMATION_ACTION_EXECUTION_ROUTE_PATH,
-  AUTOMATION_RUNTIME_INTEGRATION_ROUTE_PATH,
-  AUTOMATION_EXECUTION_FEEDBACK_ROUTE_PATH,
-  AUTOMATION_COGNITIVE_MEMORY_ROUTE_PATH,
-  AUTOMATION_MCP_RUNTIME_ROUTE_PATH,
-  AUTOMATION_LEARNING_ENGINE_ROUTE_PATH,
-  AUTOMATION_MULTI_AGENT_ROUTE_PATH,
-  AUTOMATION_MONITOR_ROUTE_PATH,
-  AUTOMATION_OBSERVABILITY_ROUTE_PATH,
-  AUTOMATION_PRODUCTION_ROUTE_PATH,
-  AUTOMATION_TOOLS_ROUTE_PATH,
-  AUTOMATION_AI_TOOLS_FEATURE_KEY,
   AI_AGENT_SIMULATOR_ROUTE_PATH,
   AI_AGENT_WIZARD_ROUTE_PATH,
   AI_AGENT_UI_ENABLED,
 } from "../config/aiAgentFeature";
+import { getAgentOsRouterPaths } from "../config/agentOsConsoleRoutes";
 import KnowledgeBase from "../pages/KnowledgeBase";
 import KnowledgeBaseDetail from "../pages/KnowledgeBaseDetail";
 import KnowledgeBaseRouteGuard from "../components/KnowledgeBaseRouteGuard";
@@ -101,61 +83,7 @@ import {
   KNOWLEDGE_BASE_ROUTE_PATH,
   KNOWLEDGE_BASE_UI_ENABLED,
 } from "../config/knowledgeBaseFeature";
-
-const AiAgentAnalyticsPage = React.lazy(() =>
-  import("../pages/AiAgentAnalytics")
-);
-const AutomationMonitorPage = React.lazy(() =>
-  import("../pages/AutomationMonitor")
-);
-const AutomationObservabilityPage = React.lazy(() =>
-  import("../pages/AutomationObservability")
-);
-const AutomationProductionPage = React.lazy(() =>
-  import("../pages/AutomationProduction")
-);
-const AutomationToolsPage = React.lazy(() =>
-  import("../pages/AutomationTools")
-);
-const AiAgentShadowFcPage = React.lazy(() =>
-  import("../pages/AiAgentShadowFc")
-);
-const AutomationEvidencePage = React.lazy(() =>
-  import("../pages/AutomationEvidence")
-);
-const AutomationLiveRolloutPage = React.lazy(() =>
-  import("../pages/AutomationLiveRollout")
-);
-const AutomationPlanningPage = React.lazy(() =>
-  import("../pages/AutomationPlanning")
-);
-const AutomationPlanEvaluationPage = React.lazy(() =>
-  import("../pages/AutomationPlanEvaluation")
-);
-const AutomationExecutionSessionsPage = React.lazy(() =>
-  import("../pages/AutomationExecutionSessions")
-);
-const AutomationActionExecutionPage = React.lazy(() =>
-  import("../pages/AutomationActionExecution")
-);
-const AutomationRuntimeIntegrationPage = React.lazy(() =>
-  import("../pages/AutomationRuntimeIntegration")
-);
-const AutomationExecutionFeedbackPage = React.lazy(() =>
-  import("../pages/AutomationExecutionFeedback")
-);
-const AutomationCognitiveMemoryPage = React.lazy(() =>
-  import("../pages/AutomationCognitiveMemory")
-);
-const AutomationMcpRuntimePage = React.lazy(() =>
-  import("../pages/AutomationMcpRuntime")
-);
-const AutomationLearningEnginePage = React.lazy(() =>
-  import("../pages/AutomationLearningEngine")
-);
-const AutomationMultiAgentPage = React.lazy(() =>
-  import("../pages/AutomationMultiAgent")
-);
+import TechnicalAgentOsRoutes from "./TechnicalAgentOsRoutes";
 
 function PlanFlagsLoadingState() {
   return (
@@ -411,13 +339,11 @@ function AutomacaoModule({ planFlags, isAdmin }) {
     AI_AGENT_UI_ENABLED && isAdmin && fx[AI_AGENT_FEATURE_KEY] === true;
   const showKnowledgeBase =
     KNOWLEDGE_BASE_UI_ENABLED && isAdmin && fx[KNOWLEDGE_BASE_FEATURE_KEY] === true;
-  const showAiAgentAnalytics = showAiAgent && showKnowledgeBase;
-  const showAiTools =
-    showAiAgent && fx[AUTOMATION_AI_TOOLS_FEATURE_KEY] === true;
 
   /**
    * Abas comerciais de Automações: somente Fluxos, Gatilhos e Integrações.
    * Agente de IA, KB, Prompts, Quick Replies e AgentOS saem do agrupamento visual.
+   * Páginas técnicas AgentOS vivem em TechnicalAgentOsRoutes (Fase 1.3).
    */
   const commercialTabs = useMemo(() => {
     const t = [];
@@ -457,8 +383,7 @@ function AutomacaoModule({ planFlags, isAdmin }) {
     showOpenAi ||
     showAiAgent ||
     showKnowledgeBase ||
-    showQuickReplies ||
-    showAiTools;
+    showQuickReplies;
 
   if (!planFlags.loaded) {
     return <PlanFlagsLoadingState />;
@@ -474,7 +399,6 @@ function AutomacaoModule({ planFlags, isAdmin }) {
           "automation.integrations",
           "automation.openai",
           AI_AGENT_FEATURE_KEY,
-          AUTOMATION_AI_TOOLS_FEATURE_KEY,
           KNOWLEDGE_BASE_FEATURE_KEY,
           "automation.quick_replies",
         ]}
@@ -569,312 +493,6 @@ function AutomacaoModule({ planFlags, isAdmin }) {
               fallbackPath={fallback}
             >
               {isAdmin && showAiAgent ? <AiAgentSimulatorPage /> : null}
-            </AiAgentRouteGuard>
-          )}
-        />
-        <Route
-          exact
-          path={AI_AGENT_ANALYTICS_ROUTE_PATH}
-          render={() => (
-            <AiAgentRouteGuard
-              planFlags={planFlags}
-              user={user}
-              fallbackPath={fallback}
-            >
-              {isAdmin && showAiAgentAnalytics ? (
-                <Suspense fallback={<PlanFlagsLoadingState />}>
-                  <AiAgentAnalyticsPage />
-                </Suspense>
-              ) : null}
-            </AiAgentRouteGuard>
-          )}
-        />
-        <Route
-          exact
-          path={AUTOMATION_MONITOR_ROUTE_PATH}
-          render={() => (
-            <AiAgentRouteGuard
-              planFlags={planFlags}
-              user={user}
-              fallbackPath={fallback}
-            >
-              {isAdmin && showAiAgentAnalytics ? (
-                <Suspense fallback={<PlanFlagsLoadingState />}>
-                  <AutomationMonitorPage />
-                </Suspense>
-              ) : null}
-            </AiAgentRouteGuard>
-          )}
-        />
-        <Route
-          exact
-          path={AUTOMATION_OBSERVABILITY_ROUTE_PATH}
-          render={() => (
-            <AiAgentRouteGuard
-              planFlags={planFlags}
-              user={user}
-              fallbackPath={fallback}
-            >
-              {isAdmin && showAiAgentAnalytics ? (
-                <Suspense fallback={<PlanFlagsLoadingState />}>
-                  <AutomationObservabilityPage />
-                </Suspense>
-              ) : null}
-            </AiAgentRouteGuard>
-          )}
-        />
-        <Route
-          exact
-          path={AUTOMATION_PRODUCTION_ROUTE_PATH}
-          render={() => (
-            <AiAgentRouteGuard
-              planFlags={planFlags}
-              user={user}
-              fallbackPath={fallback}
-            >
-              {isAdmin && showAiAgentAnalytics ? (
-                <Suspense fallback={<PlanFlagsLoadingState />}>
-                  <AutomationProductionPage />
-                </Suspense>
-              ) : null}
-            </AiAgentRouteGuard>
-          )}
-        />
-        <Route
-          exact
-          path={AI_AGENT_SHADOW_FC_ROUTE_PATH}
-          render={() => (
-            <AiAgentRouteGuard
-              planFlags={planFlags}
-              user={user}
-              fallbackPath={fallback}
-            >
-              {isAdmin && showAiTools ? (
-                <Suspense fallback={<PlanFlagsLoadingState />}>
-                  <AiAgentShadowFcPage />
-                </Suspense>
-              ) : null}
-            </AiAgentRouteGuard>
-          )}
-        />
-        <Route
-          exact
-          path={AUTOMATION_EVIDENCE_ROUTE_PATH}
-          render={() => (
-            <AiAgentRouteGuard
-              planFlags={planFlags}
-              user={user}
-              fallbackPath={fallback}
-            >
-              {isAdmin && showAiTools ? (
-                <Suspense fallback={<PlanFlagsLoadingState />}>
-                  <AutomationEvidencePage />
-                </Suspense>
-              ) : null}
-            </AiAgentRouteGuard>
-          )}
-        />
-        <Route
-          exact
-          path={AUTOMATION_LIVE_ROLLOUT_ROUTE_PATH}
-          render={() => (
-            <AiAgentRouteGuard
-              planFlags={planFlags}
-              user={user}
-              fallbackPath={fallback}
-            >
-              {isAdmin && showAiTools ? (
-                <Suspense fallback={<PlanFlagsLoadingState />}>
-                  <AutomationLiveRolloutPage />
-                </Suspense>
-              ) : null}
-            </AiAgentRouteGuard>
-          )}
-        />
-        <Route
-          exact
-          path={AUTOMATION_PLANNING_ROUTE_PATH}
-          render={() => (
-            <AiAgentRouteGuard
-              planFlags={planFlags}
-              user={user}
-              fallbackPath={fallback}
-            >
-              {isAdmin && showAiTools ? (
-                <Suspense fallback={<PlanFlagsLoadingState />}>
-                  <AutomationPlanningPage />
-                </Suspense>
-              ) : null}
-            </AiAgentRouteGuard>
-          )}
-        />
-        <Route
-          exact
-          path={AUTOMATION_PLAN_EVALUATION_ROUTE_PATH}
-          render={() => (
-            <AiAgentRouteGuard
-              planFlags={planFlags}
-              user={user}
-              fallbackPath={fallback}
-            >
-              {isAdmin && showAiTools ? (
-                <Suspense fallback={<PlanFlagsLoadingState />}>
-                  <AutomationPlanEvaluationPage />
-                </Suspense>
-              ) : null}
-            </AiAgentRouteGuard>
-          )}
-        />
-        <Route
-          exact
-          path={AUTOMATION_EXECUTION_SESSIONS_ROUTE_PATH}
-          render={() => (
-            <AiAgentRouteGuard
-              planFlags={planFlags}
-              user={user}
-              fallbackPath={fallback}
-            >
-              {isAdmin && showAiTools ? (
-                <Suspense fallback={<PlanFlagsLoadingState />}>
-                  <AutomationExecutionSessionsPage />
-                </Suspense>
-              ) : null}
-            </AiAgentRouteGuard>
-          )}
-        />
-        <Route
-          exact
-          path={AUTOMATION_ACTION_EXECUTION_ROUTE_PATH}
-          render={() => (
-            <AiAgentRouteGuard
-              planFlags={planFlags}
-              user={user}
-              fallbackPath={fallback}
-            >
-              {isAdmin && showAiTools ? (
-                <Suspense fallback={<PlanFlagsLoadingState />}>
-                  <AutomationActionExecutionPage />
-                </Suspense>
-              ) : null}
-            </AiAgentRouteGuard>
-          )}
-        />
-        <Route
-          exact
-          path={AUTOMATION_RUNTIME_INTEGRATION_ROUTE_PATH}
-          render={() => (
-            <AiAgentRouteGuard
-              planFlags={planFlags}
-              user={user}
-              fallbackPath={fallback}
-            >
-              {isAdmin && showAiTools ? (
-                <Suspense fallback={<PlanFlagsLoadingState />}>
-                  <AutomationRuntimeIntegrationPage />
-                </Suspense>
-              ) : null}
-            </AiAgentRouteGuard>
-          )}
-        />
-        <Route
-          exact
-          path={AUTOMATION_EXECUTION_FEEDBACK_ROUTE_PATH}
-          render={() => (
-            <AiAgentRouteGuard
-              planFlags={planFlags}
-              user={user}
-              fallbackPath={fallback}
-            >
-              {isAdmin && showAiTools ? (
-                <Suspense fallback={<PlanFlagsLoadingState />}>
-                  <AutomationExecutionFeedbackPage />
-                </Suspense>
-              ) : null}
-            </AiAgentRouteGuard>
-          )}
-        />
-        <Route
-          exact
-          path={AUTOMATION_COGNITIVE_MEMORY_ROUTE_PATH}
-          render={() => (
-            <AiAgentRouteGuard
-              planFlags={planFlags}
-              user={user}
-              fallbackPath={fallback}
-            >
-              {isAdmin && showAiTools ? (
-                <Suspense fallback={<PlanFlagsLoadingState />}>
-                  <AutomationCognitiveMemoryPage />
-                </Suspense>
-              ) : null}
-            </AiAgentRouteGuard>
-          )}
-        />
-        <Route
-          exact
-          path={AUTOMATION_MCP_RUNTIME_ROUTE_PATH}
-          render={() => (
-            <AiAgentRouteGuard
-              planFlags={planFlags}
-              user={user}
-              fallbackPath={fallback}
-            >
-              {isAdmin && showAiTools ? (
-                <Suspense fallback={<PlanFlagsLoadingState />}>
-                  <AutomationMcpRuntimePage />
-                </Suspense>
-              ) : null}
-            </AiAgentRouteGuard>
-          )}
-        />
-        <Route
-          exact
-          path={AUTOMATION_LEARNING_ENGINE_ROUTE_PATH}
-          render={() => (
-            <AiAgentRouteGuard
-              planFlags={planFlags}
-              user={user}
-              fallbackPath={fallback}
-            >
-              {isAdmin && showAiTools ? (
-                <Suspense fallback={<PlanFlagsLoadingState />}>
-                  <AutomationLearningEnginePage />
-                </Suspense>
-              ) : null}
-            </AiAgentRouteGuard>
-          )}
-        />
-        <Route
-          exact
-          path={AUTOMATION_MULTI_AGENT_ROUTE_PATH}
-          render={() => (
-            <AiAgentRouteGuard
-              planFlags={planFlags}
-              user={user}
-              fallbackPath={fallback}
-            >
-              {isAdmin && showAiTools ? (
-                <Suspense fallback={<PlanFlagsLoadingState />}>
-                  <AutomationMultiAgentPage />
-                </Suspense>
-              ) : null}
-            </AiAgentRouteGuard>
-          )}
-        />
-        <Route
-          exact
-          path={AUTOMATION_TOOLS_ROUTE_PATH}
-          render={() => (
-            <AiAgentRouteGuard
-              planFlags={planFlags}
-              user={user}
-              fallbackPath={fallback}
-            >
-              {isAdmin && showAiTools ? (
-                <Suspense fallback={<PlanFlagsLoadingState />}>
-                  <AutomationToolsPage />
-                </Suspense>
-              ) : null}
             </AiAgentRouteGuard>
           )}
         />
@@ -1118,28 +736,12 @@ export default function LoggedInRoutesContent() {
     AI_AGENT_WIZARD_ROUTE_PATH,
     `${AI_AGENT_WIZARD_ROUTE_PATH}/:agentId`,
     AI_AGENT_SIMULATOR_ROUTE_PATH,
-    AI_AGENT_ANALYTICS_ROUTE_PATH,
-    AI_AGENT_SHADOW_FC_ROUTE_PATH,
-    AUTOMATION_EVIDENCE_ROUTE_PATH,
-    AUTOMATION_LIVE_ROLLOUT_ROUTE_PATH,
-    AUTOMATION_PLANNING_ROUTE_PATH,
-    AUTOMATION_PLAN_EVALUATION_ROUTE_PATH,
-    AUTOMATION_EXECUTION_SESSIONS_ROUTE_PATH,
-    AUTOMATION_ACTION_EXECUTION_ROUTE_PATH,
-    AUTOMATION_RUNTIME_INTEGRATION_ROUTE_PATH,
-    AUTOMATION_EXECUTION_FEEDBACK_ROUTE_PATH,
-    AUTOMATION_COGNITIVE_MEMORY_ROUTE_PATH,
-    AUTOMATION_MCP_RUNTIME_ROUTE_PATH,
-    AUTOMATION_LEARNING_ENGINE_ROUTE_PATH,
-    AUTOMATION_MULTI_AGENT_ROUTE_PATH,
-    AUTOMATION_MONITOR_ROUTE_PATH,
-    AUTOMATION_OBSERVABILITY_ROUTE_PATH,
-    AUTOMATION_PRODUCTION_ROUTE_PATH,
-    AUTOMATION_TOOLS_ROUTE_PATH,
     KNOWLEDGE_BASE_ROUTE_PATH,
     `${KNOWLEDGE_BASE_ROUTE_PATH}/:baseId`,
     "/quick-messages",
   ];
+
+  const technicalConsolePaths = getAgentOsRouterPaths();
 
   const campanhasPaths = [
     "/campaigns",
@@ -1277,6 +879,8 @@ export default function LoggedInRoutesContent() {
           );
         }}
       />
+
+      <Route path={technicalConsolePaths} component={TechnicalAgentOsRoutes} />
 
       <Route path={automacaoPaths} render={() => <AutomacaoModule planFlags={planFlags} isAdmin={isAdmin} />} />
 

@@ -1,16 +1,26 @@
 import { RequestHandler } from "express";
 import isAuth from "./isAuth";
 import requireEffectiveModule from "./requireEffectiveModule";
-import requireTenantAdminOrSupport from "./requireTenantAdminOrSupport";
 import { agentOsAutoRateLimit } from "./agentOsRateLimit";
 import agentOsPayloadGuard from "./agentOsPayloadGuard";
 import requireAgentOsConfirmation from "./requireAgentOsConfirmation";
+import requireAgentOsTenantContext from "./requireAgentOsTenantContext";
+import requireAgentOsMutationGate from "./requireAgentOsMutationGate";
+import { requireAgentOsConsole } from "./requirePlatformPermission";
 import { AUTOMATION_ORCHESTRATOR_FEATURE_KEY } from "../config/automationOrchestratorConstants";
 import { AUTOMATION_AI_TOOLS_FEATURE_KEY } from "../config/automationToolConstants";
 import { AGENTOS_FEATURE_KEYS } from "../config/automationAgentOsSecurityConstants";
 
 /**
- * Stack padrão AgentOS Wave 2: auth → plano → rate → payload → admin → confirmação.
+ * Stack AgentOS Console (Fase 1.4):
+ * auth → plataforma (interno + console.view) → tenant context → features de plano
+ * → rate → payload → mutação (chave específica) → confirmação sensível.
+ *
+ * Features usam req.user.companyId (empresa ativa, incl. supportMode).
+ * Internos passam isPlatformSuperUser e bypassam feature de plano (capacidade
+ * comercial do tenant não bloqueia o Console; documentado na matriz 1.4.1).
+ *
+ * NÃO usa admin tenant / supportMode como autorização de entrada.
  */
 export function agentOsAdminStack(
   moduleFeatures: string[] = [
@@ -20,10 +30,12 @@ export function agentOsAdminStack(
 ): RequestHandler[] {
   return [
     isAuth,
+    requireAgentOsConsole,
+    requireAgentOsTenantContext,
     ...moduleFeatures.map(f => requireEffectiveModule(f)),
     agentOsAutoRateLimit,
     agentOsPayloadGuard,
-    requireTenantAdminOrSupport,
+    requireAgentOsMutationGate,
     requireAgentOsConfirmation
   ];
 }

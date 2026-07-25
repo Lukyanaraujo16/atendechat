@@ -1,141 +1,117 @@
 import { Router } from "express";
 import { agentOsStacks } from "../middleware/agentOsAdminStack";
-import { requireAgentOsPermission } from "../middleware/requireAgentOsPermission";
+import {
+  requireAgentOsManage,
+  requireAgentOsRolloutManage,
+  requireAgentOsProductionManage,
+  requireAgentOsIncidentsManage
+} from "../middleware/requirePlatformPermission";
+import { logAgentOsTechnicalWrite } from "../middleware/logAgentOsTechnicalWrite";
 import * as Ctrl from "../controllers/AutomationProductionController";
 
 const routes = Router();
 const mw = agentOsStacks.monitor();
+const audit = (action: string) => logAgentOsTechnicalWrite(action);
 
-routes.get(
-  "/automation/production",
-  ...mw,
-  requireAgentOsPermission("automation.agentos.view"),
-  Ctrl.productionDashboard
-);
+/**
+ * Production / rollout / incidents — technical_read = console.view (stack);
+ * mutações exigem chaves específicas de plataforma (Fase 1.4).
+ * RBAC antigo (admin tenant) removido.
+ */
+routes.get("/automation/production", ...mw, Ctrl.productionDashboard);
 routes.get(
   "/automation/production-readiness",
   ...mw,
-  requireAgentOsPermission("automation.agentos.health.view"),
   Ctrl.productionReadiness
 );
-routes.get(
-  "/automation/rollout",
-  ...mw,
-  requireAgentOsPermission("automation.agentos.rollout.view"),
-  Ctrl.getRollout
-);
-routes.get(
-  "/automation/rollout/history",
-  ...mw,
-  requireAgentOsPermission("automation.agentos.rollout.view"),
-  Ctrl.rolloutHistory
-);
+routes.get("/automation/rollout", ...mw, Ctrl.getRollout);
+routes.get("/automation/rollout/history", ...mw, Ctrl.rolloutHistory);
 routes.post(
   "/automation/rollout/preflight",
   ...mw,
-  requireAgentOsPermission("automation.agentos.rollout.manage"),
+  requireAgentOsRolloutManage,
+  audit("agentOS.rollout.manage"),
   Ctrl.preflight
 );
 routes.post(
   "/automation/rollout/transition",
   ...mw,
-  requireAgentOsPermission("automation.agentos.rollout.manage"),
+  requireAgentOsRolloutManage,
+  audit("agentOS.rollout.manage"),
   Ctrl.transition
 );
 routes.post(
   "/automation/rollout/suspend",
   ...mw,
-  requireAgentOsPermission("automation.agentos.rollout.manage"),
+  requireAgentOsRolloutManage,
+  audit("agentOS.rollout.manage"),
   Ctrl.suspend
 );
 routes.post(
   "/automation/rollout/resume",
   ...mw,
-  requireAgentOsPermission("automation.agentos.rollout.manage"),
+  requireAgentOsRolloutManage,
+  audit("agentOS.rollout.manage"),
   Ctrl.resume
 );
 routes.post(
   "/automation/rollout/rollback",
   ...mw,
-  requireAgentOsPermission("automation.agentos.rollout.manage"),
+  requireAgentOsRolloutManage,
+  audit("agentOS.rollout.manage"),
   Ctrl.rollback
 );
-routes.get(
-  "/automation/kill-switches",
-  ...mw,
-  requireAgentOsPermission("automation.agentos.view"),
-  Ctrl.listKill
-);
+routes.get("/automation/kill-switches", ...mw, Ctrl.listKill);
 routes.post(
   "/automation/kill-switches",
   ...mw,
-  requireAgentOsPermission("automation.agentos.rollout.manage"),
+  requireAgentOsRolloutManage,
+  audit("agentOS.rollout.manage"),
   Ctrl.setKill
 );
-routes.get(
-  "/automation/kill-switches/resolved",
-  ...mw,
-  requireAgentOsPermission("automation.agentos.view"),
-  Ctrl.resolveKill
-);
+routes.get("/automation/kill-switches/resolved", ...mw, Ctrl.resolveKill);
 routes.post(
   "/automation/emergency-stop",
   ...mw,
-  requireAgentOsPermission("automation.agentos.emergencyStop"),
+  requireAgentOsProductionManage,
+  audit("agentOS.production.manage"),
   Ctrl.emergencyStop
 );
-routes.get(
-  "/automation/incidents",
-  ...mw,
-  requireAgentOsPermission("automation.agentos.audit.view"),
-  Ctrl.listIncidents
-);
-routes.get(
-  "/automation/incidents/:id",
-  ...mw,
-  requireAgentOsPermission("automation.agentos.audit.view"),
-  Ctrl.getIncident
-);
+routes.get("/automation/incidents", ...mw, Ctrl.listIncidents);
+routes.get("/automation/incidents/:id", ...mw, Ctrl.getIncident);
 routes.post(
   "/automation/incidents/:id/acknowledge",
   ...mw,
-  requireAgentOsPermission("automation.agentos.configure"),
+  requireAgentOsIncidentsManage,
+  audit("agentOS.incidents.manage"),
   Ctrl.ackIncident
 );
 routes.post(
   "/automation/incidents/:id/resolve",
   ...mw,
-  requireAgentOsPermission("automation.agentos.configure"),
+  requireAgentOsIncidentsManage,
+  audit("agentOS.incidents.manage"),
   Ctrl.resolveIncident
 );
-routes.get(
-  "/automation/release-readiness",
-  ...mw,
-  requireAgentOsPermission("automation.agentos.health.detailed"),
-  Ctrl.releaseReadiness
-);
+routes.get("/automation/release-readiness", ...mw, Ctrl.releaseReadiness);
 routes.post(
   "/automation/release-readiness/check",
   ...mw,
-  requireAgentOsPermission("automation.agentos.health.detailed"),
+  requireAgentOsManage,
+  audit("agentOS.console.manage"),
   Ctrl.checkReleaseReadiness
 );
 routes.get(
   "/automation/environment-validation",
   ...mw,
-  requireAgentOsPermission("automation.agentos.health.detailed"),
   Ctrl.environmentValidation
 );
-routes.get(
-  "/automation/evidence-package",
-  ...mw,
-  requireAgentOsPermission("automation.agentos.audit.view"),
-  Ctrl.evidencePackage
-);
+routes.get("/automation/evidence-package", ...mw, Ctrl.evidencePackage);
 routes.post(
   "/automation/hydrate",
   ...mw,
-  requireAgentOsPermission("automation.agentos.configure"),
+  requireAgentOsProductionManage,
+  audit("agentOS.production.manage"),
   Ctrl.hydrate
 );
 

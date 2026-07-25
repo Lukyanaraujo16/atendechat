@@ -50,6 +50,19 @@ const messages = {
       planFlags: {
         loadingPermissions: "Cargando permisos…",
       },
+      technicalConsole: {
+        accessDenied: {
+          title: "Acceso restringido",
+          description:
+            "Esta área está disponible solo para usuarios internos autorizados.",
+        },
+        landing: {
+          title: "Consola Técnica",
+          authorized: "Acceso interno autorizado.",
+          nextSteps:
+            "La navegación técnica estará disponible en las próximas etapas.",
+        },
+      },
       groups: {
         manager: {
           selectConnection: "Seleccione una conexión de WhatsApp.",
@@ -3680,6 +3693,7 @@ const messages = {
           equipe: "Equipo",
           automacao: "Automatizaciones",
           aiAgent: "Agente de IA",
+          technicalConsole: "Consola Técnica",
           campanhas: "Campañas",
           financeiro: "Financiero",
           configuracoes: "Configuración",
