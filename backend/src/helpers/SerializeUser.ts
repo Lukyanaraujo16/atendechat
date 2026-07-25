@@ -4,6 +4,8 @@ import User from "../models/User";
 import { getCompanyFinanceFlags, CompanyFinanceFlags } from "./companyFinanceStatus";
 import { loadCompanyPlanContextByCompanyId } from "../middleware/loadCompanyEffectiveFeatures";
 import { computeEffectiveUserFeatureMapForUserId } from "../services/UserFeaturePermission/UserFeaturePermissionService";
+import { listEnabledPlatformPermissions } from "../services/PlatformUserPermissionService";
+import { isInternalUser } from "./isInternalUser";
 import { logger } from "../utils/logger";
 
 interface SerializedUser {
@@ -19,6 +21,10 @@ interface SerializedUser {
   finance: CompanyFinanceFlags;
   /** Mapa final: plano da empresa ∧ permissões individuais (admin/super ignora granularidade). */
   effectiveUserFeatures: Record<string, boolean>;
+  /** Identidade interna da plataforma (Architecture Lock §19). */
+  isInternalUser: boolean;
+  /** Permissões de plataforma habilitadas (não inclui disabled; deny by default). */
+  platformPermissions: string[];
   /** Primeiro acesso: o frontend deve pedir alteração de palavra-passe. */
   mustChangePassword?: boolean;
   /** Modo suporte: sessão atua no tenant `companyId`; casa em `supportHomeCompanyId`. */
@@ -51,6 +57,10 @@ export const SerializeUser = async (
       : user.companyId ?? null;
 
   const effectiveUserFeatures = await resolveEffectiveUserFeatures(user, planCompanyId);
+  const internal = isInternalUser(user);
+  const platformPermissions = internal
+    ? await listEnabledPlatformPermissions(user.id)
+    : [];
 
   const attendanceInbox = effectiveUserFeatures["attendance.inbox"] === true;
   const attendanceKanban = effectiveUserFeatures["attendance.kanban"] === true;
@@ -89,7 +99,9 @@ export const SerializeUser = async (
           dueDate: null,
           daysPastDue: null
         },
-    effectiveUserFeatures
+    effectiveUserFeatures,
+    isInternalUser: internal,
+    platformPermissions
   };
 };
 

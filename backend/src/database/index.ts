@@ -1,6 +1,7 @@
 import { Sequelize } from "sequelize-typescript";
 import User from "../models/User";
 import UserFeaturePermission from "../models/UserFeaturePermission";
+import PlatformUserPermission from "../models/PlatformUserPermission";
 import UserNotificationPreferences from "../models/UserNotificationPreferences";
 import UserNotification from "../models/UserNotification";
 import Setting from "../models/Setting";
@@ -144,6 +145,7 @@ const models = [
   Company,
   User,
   UserFeaturePermission,
+  PlatformUserPermission,
   UserNotificationPreferences,
   UserNotification,
   Contact,

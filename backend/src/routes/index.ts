@@ -66,6 +66,7 @@ import knowledgeBaseRoutes from "./knowledgeBaseRoutes";
 import notificationRoutes from "./notificationRoutes";
 import systemSettingRoutes from "./systemSettingRoutes";
 import platformSuperRoutes from "./platformSuperRoutes";
+import technicalConsoleRoutes from "./technicalConsoleRoutes";
 import backupRoutes from "./backupRoutes";
 import stickerRoutes from "./stickerRoutes";
 import systemAdminRoutes from "./systemAdminRoutes";
@@ -74,6 +75,7 @@ const routes = Router();
 routes.use(systemSettingRoutes);
 routes.use(systemAdminRoutes);
 routes.use(platformSuperRoutes);
+routes.use(technicalConsoleRoutes);
 /** Alias para proxies/Nginx que montam a API em `/api` (ex.: POST /api/platform/super-admins). */
 routes.use("/api", platformSuperRoutes);
 routes.use(backupRoutes);
