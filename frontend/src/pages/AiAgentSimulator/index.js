@@ -1,8 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { useHistory, useParams } from "react-router-dom";
+import React, { useEffect, useMemo, useState } from "react";
+import { useHistory } from "react-router-dom";
 import { makeStyles } from "@material-ui/core/styles";
 import Container from "@material-ui/core/Container";
 import Alert from "@material-ui/lab/Alert";
+import Button from "@material-ui/core/Button";
 import Paper from "@material-ui/core/Paper";
 import { toast } from "react-toastify";
 import MainContainer from "../../components/MainContainer";
@@ -22,16 +23,7 @@ import {
   AI_AGENT_ROUTE_PATH,
   AI_AGENT_WIZARD_ROUTE_PATH,
 } from "../../config/aiAgentFeature";
-import {
-  checkAiAgentSimulatorCredential,
-  createAiAgentSimulatorSession,
-  endAiAgentSimulatorSession,
-  getAiAgent,
-  getAiAgentProfile,
-  getAiAgentSimulatorSession,
-  sendAiAgentSimulatorMessage,
-  upsertAiAgentSimulatorMessageReview,
-} from "../../services/aiAgentApi";
+import { useAiAgentProductSimulator } from "../../hooks/useAiAgentProductSimulator";
 import { i18n } from "../../translate/i18n";
 import toastError from "../../errors/toastError";
 
@@ -55,107 +47,101 @@ const useStyles = makeStyles((theme) => ({
       order: -1,
     },
   },
+  unavailableActions: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: theme.spacing(1),
+    marginTop: theme.spacing(2),
+  },
 }));
+
+function unavailableReasonKey(reason) {
+  const known = [
+    "not_created",
+    "ambiguous",
+    "credential_not_selected",
+    "credential_disabled",
+    "provider_unsupported",
+    "model_incompatible",
+    "simulator_not_configured",
+  ];
+  if (known.includes(reason)) {
+    return `aiAgentProduct.simulator.reasons.${reason}`;
+  }
+  return "aiAgentProduct.simulator.reasons.simulator_not_configured";
+}
 
 export default function AiAgentSimulatorPage() {
   const classes = useStyles();
   const history = useHistory();
-  const { agentId } = useParams();
-  const numericAgentId = Number(agentId);
+  const {
+    bootstrap,
+    session,
+    messages,
+    loading,
+    bootLoading,
+    loadBootstrap,
+    startSession,
+    sendMessage,
+    restartSession,
+    reviewMessage,
+  } = useAiAgentProductSimulator();
 
-  const [agent, setAgent] = useState(null);
-  const [profile, setProfile] = useState(null);
-  const [session, setSession] = useState(null);
-  const [messages, setMessages] = useState([]);
   const [composer, setComposer] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [bootLoading, setBootLoading] = useState(true);
-  const [credentialBlocked, setCredentialBlocked] = useState(false);
-  const [reviewMessage, setReviewMessage] = useState(null);
-  const [functionCalling, setFunctionCalling] = useState(false);
+  const [reviewMessageItem, setReviewMessageItem] = useState(null);
+  const [blocked, setBlocked] = useState(false);
 
-  const segment = profile?.businessSegment || "other";
+  const available = bootstrap?.available === true;
+  const canSimulate = bootstrap?.capabilities?.canSimulate === true;
+  const segment = bootstrap?.scenarioSegment || "other";
   const scenarioPrompts = useMemo(() => getSimulationPrompts(segment), [segment]);
-
-  const bootstrapSession = useCallback(async () => {
-    const { data: created } = await createAiAgentSimulatorSession(numericAgentId);
-    const { data: full } = await getAiAgentSimulatorSession(numericAgentId, created.id);
-    setSession(full);
-    setMessages(full.messages || []);
-  }, [numericAgentId]);
 
   useEffect(() => {
     const load = async () => {
       try {
-        setBootLoading(true);
-        const [{ data: agentData }, credentialResult] = await Promise.all([
-          getAiAgent(numericAgentId),
-          checkAiAgentSimulatorCredential(numericAgentId),
-        ]);
-
-        setAgent(agentData);
-        if (!credentialResult.data?.canSimulate) {
-          setCredentialBlocked(true);
-          return;
+        const data = await loadBootstrap();
+        if (data?.available && data?.capabilities?.canSimulate) {
+          setBlocked(false);
+          await startSession();
+        } else {
+          setBlocked(true);
         }
-
-        try {
-          const { data: profileData } = await getAiAgentProfile(numericAgentId);
-          setProfile(profileData?.profile || null);
-        } catch {
-          setProfile(null);
-        }
-
-        await bootstrapSession();
       } catch (err) {
         toastError(err);
-      } finally {
-        setBootLoading(false);
+        setBlocked(true);
       }
     };
-
-    if (Number.isFinite(numericAgentId)) load();
-  }, [numericAgentId, bootstrapSession]);
+    load();
+  }, [loadBootstrap, startSession]);
 
   const handleSend = async (textOverride) => {
     const content = String(textOverride ?? composer).trim();
-    if (!content || !session?.id || loading || credentialBlocked) return;
+    if (!content || !session?.ref || loading || blocked || !canSimulate) return;
 
-    setLoading(true);
     setComposer("");
     try {
-      const { data } = await sendAiAgentSimulatorMessage(numericAgentId, session.id, {
-        content,
-        functionCalling: functionCalling === true,
-      });
-      setMessages((prev) => [
-        ...prev,
-        data.userMessage,
-        data.assistantMessage,
-      ]);
-      setSession((prev) => ({ ...prev, ...data.session }));
+      await sendMessage(session.ref, content);
     } catch (err) {
       const mapped = mapSimulatorError(err);
-      if (mapped === "missingCredential") {
-        setCredentialBlocked(true);
+      const productCode = err?.response?.data?.error;
+      if (
+        mapped === "missingCredential" ||
+        productCode === "ERR_AI_AGENT_PRODUCT_SIMULATOR_UNAVAILABLE"
+      ) {
+        setBlocked(true);
       }
       toast.error(
         mapped === "custom"
-          ? err?.response?.data?.message
+          ? err?.response?.data?.message || err?.response?.data?.clientMessage
           : i18n.t(`aiAgent.simulator.errors.${mapped}`)
       );
       if (composer === "" && textOverride) setComposer(textOverride);
-    } finally {
-      setLoading(false);
     }
   };
 
   const handleRestart = async () => {
     try {
-      if (session?.id && session.status === "active") {
-        await endAiAgentSimulatorSession(numericAgentId, session.id);
-      }
-      await bootstrapSession();
+      await restartSession(session);
       setComposer("");
       toast.success(i18n.t("aiAgent.simulator.toasts.restarted"));
     } catch (err) {
@@ -173,20 +159,10 @@ export default function AiAgentSimulatorPage() {
   };
 
   const handleReviewSubmit = async (body) => {
-    if (!reviewMessage?.id || !session?.id) return;
+    if (!reviewMessageItem?.ref) return;
     try {
-      const { data } = await upsertAiAgentSimulatorMessageReview(
-        numericAgentId,
-        session.id,
-        reviewMessage.id,
-        body
-      );
-      setMessages((prev) =>
-        prev.map((item) =>
-          item.id === reviewMessage.id ? { ...item, review: data } : item
-        )
-      );
-      setReviewMessage(null);
+      await reviewMessage(reviewMessageItem.ref, body);
+      setReviewMessageItem(null);
       toast.success(i18n.t("aiAgent.simulator.toasts.reviewSaved"));
     } catch (err) {
       toastError(err);
@@ -194,7 +170,10 @@ export default function AiAgentSimulatorPage() {
   };
 
   const handleRepeat = (assistantMessage) => {
-    const index = messages.findIndex((item) => item.id === assistantMessage.id);
+    const key = assistantMessage.ref || assistantMessage.id;
+    const index = messages.findIndex(
+      (item) => (item.ref || item.id) === key
+    );
     if (index <= 0) return;
     for (let i = index - 1; i >= 0; i -= 1) {
       if (messages[i].role === "user") {
@@ -205,11 +184,7 @@ export default function AiAgentSimulatorPage() {
   };
 
   const handleEdit = () => {
-    if (profile?.setupMode === "guided") {
-      history.push(`${AI_AGENT_WIZARD_ROUTE_PATH}/${numericAgentId}`);
-      return;
-    }
-    history.push(AI_AGENT_ROUTE_PATH);
+    history.push(AI_AGENT_WIZARD_ROUTE_PATH);
   };
 
   if (bootLoading) {
@@ -222,6 +197,36 @@ export default function AiAgentSimulatorPage() {
     );
   }
 
+  if (!available || blocked) {
+    return (
+      <MainContainer>
+        <MainHeader>
+          <Title>{i18n.t("aiAgent.simulator.title")}</Title>
+        </MainHeader>
+        <Container maxWidth="md">
+          <Alert severity="warning">
+            {i18n.t(unavailableReasonKey(bootstrap?.reason))}
+          </Alert>
+          <div className={classes.unavailableActions}>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={() => history.push(AI_AGENT_WIZARD_ROUTE_PATH)}
+            >
+              {i18n.t("aiAgentProduct.simulator.cta.configure")}
+            </Button>
+            <Button
+              variant="outlined"
+              onClick={() => history.push(AI_AGENT_ROUTE_PATH)}
+            >
+              {i18n.t("aiAgentProduct.simulator.cta.hub")}
+            </Button>
+          </div>
+        </Container>
+      </MainContainer>
+    );
+  }
+
   return (
     <MainContainer>
       <MainHeader>
@@ -229,11 +234,15 @@ export default function AiAgentSimulatorPage() {
       </MainHeader>
       <Container maxWidth="lg">
         <SimulatorHeader
-          agentName={agent?.name || i18n.t("aiAgent.simulator.untitled")}
-          provider={session?.provider}
-          model={session?.model}
-          functionCalling={functionCalling}
-          onFunctionCallingChange={setFunctionCalling}
+          agentName={
+            bootstrap?.agent?.name || i18n.t("aiAgent.simulator.untitled")
+          }
+          provider={
+            session?.providerLabel || bootstrap?.provider?.label || null
+          }
+          model={
+            session?.modelLabel || bootstrap?.provider?.modelLabel || null
+          }
           onBack={() => history.push(AI_AGENT_ROUTE_PATH)}
           onRestart={handleRestart}
           onEdit={handleEdit}
@@ -241,47 +250,48 @@ export default function AiAgentSimulatorPage() {
 
         <Alert severity="info" style={{ marginBottom: 16 }}>
           {i18n.t("aiAgent.simulator.warning")}
-          {functionCalling
-            ? " Function Calling ativo: somente Read Tools via Tool Runtime."
-            : ""}
         </Alert>
-
-        {credentialBlocked ? (
-          <Alert severity="warning">{i18n.t("aiAgent.simulator.errors.missingCredential")}</Alert>
-        ) : null}
 
         <div className={classes.layout}>
           <Paper className={classes.mainPanel} variant="outlined">
             <SimulatorScenarioChips
               prompts={scenarioPrompts}
-              disabled={loading || credentialBlocked}
+              disabled={loading || blocked}
               onSelect={(text) => setComposer(text)}
             />
             <SimulatorChat
               messages={messages}
               loading={loading}
               onCopy={handleCopy}
-              onReview={setReviewMessage}
+              onReview={setReviewMessageItem}
               onRepeat={handleRepeat}
             />
             <SimulatorComposer
               value={composer}
               onChange={setComposer}
               onSend={() => handleSend()}
-              disabled={loading || credentialBlocked || session?.status !== "active"}
+              disabled={
+                loading || blocked || session?.status !== "active"
+              }
             />
           </Paper>
           <div className={classes.sidePanel}>
-            <SimulatorSessionSummary session={session} />
+            <SimulatorSessionSummary
+              session={{
+                ...(session || {}),
+                averageLatencyMs: session?.averageResponseTimeMs,
+                totalTokens: 0,
+              }}
+            />
           </div>
         </div>
       </Container>
 
       <SimulatorReviewDialog
-        open={Boolean(reviewMessage)}
-        onClose={() => setReviewMessage(null)}
+        open={Boolean(reviewMessageItem)}
+        onClose={() => setReviewMessageItem(null)}
         onSubmit={handleReviewSubmit}
-        initialReview={reviewMessage?.review}
+        initialReview={reviewMessageItem?.review}
       />
     </MainContainer>
   );

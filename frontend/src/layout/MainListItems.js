@@ -406,6 +406,7 @@ const MainListItems = (props) => {
   const selAiAgent =
     path === AI_AGENT_ROUTE_PATH ||
     path.startsWith(`${AI_AGENT_ROUTE_PATH}/wizard`) ||
+    path === "/ai-agent/simulator" ||
     /^\/ai-agent\/[^/]+\/simulator$/.test(path);
   const selTechnicalConsole =
     path === TECHNICAL_CONSOLE_ROOT_PATH ||

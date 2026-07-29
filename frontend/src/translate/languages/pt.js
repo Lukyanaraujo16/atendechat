@@ -2986,6 +2986,28 @@ const messages = {
           openSimulator: "Abrir simulador",
           openConnections: "Conexões WhatsApp",
         },
+        simulator: {
+          reasons: {
+            not_created:
+              "Crie o Agente de IA antes de testar o atendimento.",
+            ambiguous:
+              "Existem várias configurações de Agente de IA. Resolva antes de simular.",
+            credential_not_selected:
+              "Selecione uma credencial de provedor no assistente para usar o simulador.",
+            credential_disabled:
+              "A credencial vinculada está desabilitada. Ative-a ou escolha outra.",
+            provider_unsupported:
+              "O provedor configurado não é suportado pelo simulador comercial.",
+            model_incompatible:
+              "O modelo configurado é incompatível com o provedor selecionado.",
+            simulator_not_configured:
+              "Conclua a configuração do Agente de IA para usar o simulador.",
+          },
+          cta: {
+            configure: "Configurar agente",
+            hub: "Voltar ao Agente de IA",
+          },
+        },
         meta: {
           agent: "Agente: {{name}}",
           connection: "Conexão: {{name}} ({{state}})",

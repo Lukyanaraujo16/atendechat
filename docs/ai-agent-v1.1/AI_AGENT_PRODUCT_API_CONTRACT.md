@@ -22,6 +22,7 @@ Alinhado ao padrão do projeto (`/inventory/*`, `/ai-agents/*`), **sem** prefixo
 |----------|----------|-------|
 | `GET /product/ai-agent/summary` | **Implementado** | Visão agregada da empresa ativa |
 | `GET /product/ai-agent/readiness` | **Implementado** | Mesmo resolver; subset serializado |
+| `GET /product/ai-agent/simulator` | **Implementado (2.5)** | Bootstrap do simulador comercial |
 | `GET /product/ai-agent/agents` | Conceitual | Não migrar CRUD nesta fase |
 | `GET /product/ai-agent/agents/:id` | Conceitual | Idem |
 
@@ -742,3 +743,48 @@ Regras:
 
 - Não migrada nesta fase
 - `configuration.instructions.configured` indica presença de prompt compilado
+
+---
+
+## 14. Simulator comercial (Fase 2.5)
+
+Contrato detalhado: `AI_AGENT_PRODUCT_SIMULATOR_CONTRACT.md`.
+
+### Namespace
+
+```
+/product/ai-agent/simulator/*
+```
+
+| Método | Path | Status |
+|--------|------|--------|
+| GET | `/product/ai-agent/simulator` | **Implementado** — bootstrap |
+| POST | `/product/ai-agent/simulator/sessions` | **Implementado** |
+| GET | `/product/ai-agent/simulator/sessions` | **Implementado** |
+| GET | `/product/ai-agent/simulator/sessions/:sessionRef` | **Implementado** |
+| POST | `/product/ai-agent/simulator/sessions/:sessionRef/messages` | **Implementado** |
+| POST | `/product/ai-agent/simulator/sessions/:sessionRef/end` | **Implementado** |
+| POST | `/product/ai-agent/simulator/messages/:messageRef/review` | **Implementado** |
+
+### Regras
+
+- Sem `agentId` / `companyId` / `aiAgentId` no contrato HTTP
+- Refs: `sim_s_{id}`, `sim_m_{id}`
+- `canSimulate` exige credencial **vinculada** (sem company_default)
+- Sem `functionCalling` na Product API
+- Endpoints legados `/ai-agents/:id/simulator/*` permanecem
+- UI canônica: `/ai-agent/simulator` (legado redireciona)
+
+### Erros comerciais
+
+| Código | HTTP | Quando |
+|--------|------|--------|
+| `ERR_AI_AGENT_PRODUCT_SIMULATOR_UNAVAILABLE` | 400 | Gate canSimulate / not_created |
+| `ERR_AI_AGENT_PRODUCT_SIMULATOR_SESSION_NOT_FOUND` | 404 | Sessão inválida / outro agente |
+| `ERR_AI_AGENT_PRODUCT_SIMULATOR_MESSAGE_NOT_FOUND` | 404 | Mensagem inválida |
+| `ERR_AI_AGENT_PRODUCT_SIMULATOR_SESSION_ENDED` | 400 | Sessão já encerrada |
+| `ERR_AI_AGENT_PRODUCT_SIMULATOR_MESSAGE_LIMIT` | 400 | Limite de mensagens |
+| `ERR_AI_AGENT_PRODUCT_SIMULATOR_OPEN_SESSION_LIMIT` | 400 | Limite de sessões abertas |
+| `ERR_AI_AGENT_PRODUCT_SIMULATOR_INVALID` | 400 | Payload / review inválido |
+| `ERR_AI_AGENT_PRODUCT_CONTEXT_AMBIGUOUS` | 409 | Múltiplos agentes |
+| `ERR_AI_AGENT_PRODUCT_CONTEXT_INVALID` | 403 | Ids técnicos no request |

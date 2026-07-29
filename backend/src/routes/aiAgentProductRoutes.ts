@@ -4,7 +4,7 @@ import requireAiAgentProductView from "../middleware/requireAiAgentProductView";
 import * as AiAgentProductController from "../controllers/AiAgentProductController";
 
 /**
- * Product API — Agente de IA (Fases 2.0–2.3).
+ * Product API — Agente de IA (Fases 2.0–2.5).
  * isAuth + admin. Sem permissões AgentOS. supportMode não autoriza.
  */
 const aiAgentProductRoutes = Router();
@@ -70,6 +70,55 @@ aiAgentProductRoutes.put(
   isAuth,
   requireAiAgentProductView,
   AiAgentProductController.updateConnections
+);
+
+aiAgentProductRoutes.get(
+  "/product/ai-agent/simulator",
+  isAuth,
+  requireAiAgentProductView,
+  AiAgentProductController.simulatorBootstrap
+);
+
+aiAgentProductRoutes.post(
+  "/product/ai-agent/simulator/sessions",
+  isAuth,
+  requireAiAgentProductView,
+  AiAgentProductController.simulatorCreateSession
+);
+
+aiAgentProductRoutes.get(
+  "/product/ai-agent/simulator/sessions",
+  isAuth,
+  requireAiAgentProductView,
+  AiAgentProductController.simulatorListSessions
+);
+
+aiAgentProductRoutes.get(
+  "/product/ai-agent/simulator/sessions/:sessionRef",
+  isAuth,
+  requireAiAgentProductView,
+  AiAgentProductController.simulatorGetSession
+);
+
+aiAgentProductRoutes.post(
+  "/product/ai-agent/simulator/sessions/:sessionRef/messages",
+  isAuth,
+  requireAiAgentProductView,
+  AiAgentProductController.simulatorSendMessage
+);
+
+aiAgentProductRoutes.post(
+  "/product/ai-agent/simulator/sessions/:sessionRef/end",
+  isAuth,
+  requireAiAgentProductView,
+  AiAgentProductController.simulatorEndSession
+);
+
+aiAgentProductRoutes.post(
+  "/product/ai-agent/simulator/messages/:messageRef/review",
+  isAuth,
+  requireAiAgentProductView,
+  AiAgentProductController.simulatorReviewMessage
 );
 
 export default aiAgentProductRoutes;

@@ -450,7 +450,7 @@ export default function AiAgentWizard() {
           onConfigureCredential={() => history.push(AI_AGENT_ROUTE_PATH)}
           onBackToList={() => history.push(AI_AGENT_ROUTE_PATH)}
           onTestAttendant={() =>
-            history.push(AI_AGENT_SIMULATOR_ROUTE_PATH.replace(":agentId", String(agentId)))
+            history.push(AI_AGENT_SIMULATOR_ROUTE_PATH)
           }
         />
       );

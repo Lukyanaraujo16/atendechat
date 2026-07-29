@@ -71,6 +71,7 @@ import {
   AI_AGENT_FEATURE_KEY,
   AI_AGENT_ROUTE_PATH,
   AI_AGENT_SIMULATOR_ROUTE_PATH,
+  AI_AGENT_SIMULATOR_LEGACY_ROUTE_PATH,
   AI_AGENT_WIZARD_ROUTE_PATH,
   AI_AGENT_UI_ENABLED,
 } from "../config/aiAgentFeature";
@@ -498,6 +499,11 @@ function AutomacaoModule({ planFlags, isAdmin }) {
         />
         <Route
           exact
+          path={AI_AGENT_SIMULATOR_LEGACY_ROUTE_PATH}
+          render={() => <Redirect to={AI_AGENT_SIMULATOR_ROUTE_PATH} />}
+        />
+        <Route
+          exact
           path={AI_AGENT_ROUTE_PATH}
           render={() => (
             <AiAgentRouteGuard
@@ -736,6 +742,7 @@ export default function LoggedInRoutesContent() {
     AI_AGENT_WIZARD_ROUTE_PATH,
     `${AI_AGENT_WIZARD_ROUTE_PATH}/:agentId`,
     AI_AGENT_SIMULATOR_ROUTE_PATH,
+    AI_AGENT_SIMULATOR_LEGACY_ROUTE_PATH,
     KNOWLEDGE_BASE_ROUTE_PATH,
     `${KNOWLEDGE_BASE_ROUTE_PATH}/:baseId`,
     "/quick-messages",

@@ -36,7 +36,7 @@ Este inventário descreve o que o produto comercial usa **hoje**, antes da Produ
 | Knowledge settings | `GET/PUT .../knowledge-settings` | Panel | Upsert/Show settings | Settings | Técnico demais para home do produto | Permanecer / Console analytics |
 | Knowledge retrieval test | `POST .../knowledge-retrieval/test` | Panel | Retrieve service | Hits | Operacional | Permanecer |
 | Shadow suggestions | `GET /ai-agents/shadow-suggestions*` | `pages/AiAgent` | Shadow suggestion services | Logs/sugestões | Observabilidade embutida na página comercial | Futuro: Experience metrics leves; técnico → Console |
-| Simulator | `/ai-agents/:id/simulator/*` | Simulator page | `AiAgentSimulationService` | Sessões/mensagens | Credential-check no FE | Permanecer; readiness não exige simulator |
+| Simulator | `/ai-agents/:id/simulator/*` | Simulator page (legado) | `AiAgentSimulationService` | Sessões/mensagens | Credential-check no FE | **Product 2.5:** `/product/ai-agent/simulator/*` (legado permanece) |
 | Pause / resume ticket | `POST /tickets/:id/ai-agent/pause\|resume` | Ticket controls | Pause/Resume services | Ticket flags | Pause é **por ticket**, não do agente global | Não marcar agente “paused” só por ticket |
 | Handoff | Runtime + profile `handoffRules` / `handoffMessage` | Live/Shadow | `applyAiAgentHandoffToTicket` | Ticket | Elegibilidade por mensagem | Runtime only; não readiness estrutural |
 | Estado na listagem | — (derivado no FE) | `pages/AiAgent` | — | Chip `enabled` | **FE calcula estado** | Product summary/status |
@@ -173,4 +173,5 @@ Endpoints `/ai-agents*` **não são removidos** nesta fase.
 - **Fase 2.4 concluída:** Wizard migrado para Product API; ver `AI_AGENT_WIZARD_MIGRATION_INVENTORY.md`
 - **Hardening 2.4.1:** edição de identidade com agente ativo; provider/model/credential obrigatórios no Review; `createMinimalAiAgentPayload` removido; testes `aiAgentWizardActiveIdentityPhase241`
 - **Hardening 2.4.2:** agente ativo usa tela identity-only dedicada, sem steps/Review/preview estruturais; identidade e profile têm hidratação separada; Success específico; teste anti-descarte `aiAgentWizardActiveIdentityModePhase242`
+- **Fase 2.5 (parcial):** Product Simulator em `/product/ai-agent/simulator/*` + UI `/ai-agent/simulator`; ver `AI_AGENT_PRODUCT_SIMULATOR_CONTRACT.md`. Legado `/ai-agents/:id/simulator/*` permanece.
 - **Próximo passo:** Fase 2.5+ — AiAgentModal, Knowledge Base, WhatsApp settings

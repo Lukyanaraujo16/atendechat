@@ -4,8 +4,6 @@ import Box from "@material-ui/core/Box";
 import Typography from "@material-ui/core/Typography";
 import Button from "@material-ui/core/Button";
 import Chip from "@material-ui/core/Chip";
-import FormControlLabel from "@material-ui/core/FormControlLabel";
-import Switch from "@material-ui/core/Switch";
 import ArrowBackIcon from "@material-ui/icons/ArrowBack";
 import RefreshIcon from "@material-ui/icons/Refresh";
 import EditIcon from "@material-ui/icons/Edit";
@@ -35,8 +33,6 @@ export default function SimulatorHeader({
   agentName,
   provider,
   model,
-  functionCalling,
-  onFunctionCallingChange,
   onBack,
   onRestart,
   onEdit,
@@ -58,26 +54,9 @@ export default function SimulatorHeader({
           {provider ? (
             <Chip size="small" variant="outlined" label={`${provider} · ${model || "—"}`} />
           ) : null}
-          {functionCalling ? (
-            <Chip size="small" color="primary" label="Function Calling ON" />
-          ) : null}
         </Box>
       </Box>
       <Box className={classes.actions}>
-        <FormControlLabel
-          control={
-            <Switch
-              checked={Boolean(functionCalling)}
-              onChange={(e) =>
-                onFunctionCallingChange &&
-                onFunctionCallingChange(e.target.checked)
-              }
-              color="primary"
-              size="small"
-            />
-          }
-          label="Function Calling"
-        />
         <Button size="small" startIcon={<ArrowBackIcon />} onClick={onBack}>
           {i18n.t("aiAgent.simulator.buttons.back")}
         </Button>

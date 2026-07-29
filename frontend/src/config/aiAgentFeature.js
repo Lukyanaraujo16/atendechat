@@ -8,8 +8,15 @@ export const AI_AGENT_ROUTE_PATH = "/ai-agent";
 export const AI_AGENT_WIZARD_ROUTE_PATH = "/ai-agent/wizard";
 export const AI_AGENT_WIZARD_EDIT_ROUTE_PATH = "/ai-agent/wizard/:agentId";
 
-/** Simulador de conversa do atendente virtual. */
-export const AI_AGENT_SIMULATOR_ROUTE_PATH = "/ai-agent/:agentId/simulator";
+/** Simulador comercial (Fase 2.5) — rota canônica sem agentId. */
+export const AI_AGENT_SIMULATOR_ROUTE_PATH = "/ai-agent/simulator";
+
+/** Rota legada do simulador (redirect → canônica). */
+export const AI_AGENT_SIMULATOR_LEGACY_ROUTE_PATH = "/ai-agent/:agentId/simulator";
+
+/** Alias explícito da rota canônica. */
+export const AI_AGENT_SIMULATOR_CANONICAL_ROUTE_PATH =
+  AI_AGENT_SIMULATOR_ROUTE_PATH;
 
 /** Analytics / Observabilidade / Aprendizado assistido (Fase IA 1.5.3). */
 export const AI_AGENT_ANALYTICS_ROUTE_PATH = "/ai-agent/analytics";

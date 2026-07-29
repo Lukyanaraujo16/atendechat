@@ -10,10 +10,30 @@ import CreateAiAgentProductConfigurationService from "../services/AiAgentProduct
 import UpdateAiAgentProductConfigurationService from "../services/AiAgentProductService/UpdateAiAgentProductConfigurationService";
 import UpdateAiAgentProductConnectionsService from "../services/AiAgentProductService/UpdateAiAgentProductConnectionsService";
 import PreviewAiAgentProductConfigurationService from "../services/AiAgentProductService/PreviewAiAgentProductConfigurationService";
+import GetAiAgentProductSimulatorService from "../services/AiAgentProductService/GetAiAgentProductSimulatorService";
+import CreateAiAgentProductSimulatorSessionService from "../services/AiAgentProductService/CreateAiAgentProductSimulatorSessionService";
+import ListAiAgentProductSimulatorSessionsService from "../services/AiAgentProductService/ListAiAgentProductSimulatorSessionsService";
+import GetAiAgentProductSimulatorSessionService from "../services/AiAgentProductService/GetAiAgentProductSimulatorSessionService";
+import SendAiAgentProductSimulatorMessageService from "../services/AiAgentProductService/SendAiAgentProductSimulatorMessageService";
+import EndAiAgentProductSimulatorSessionService from "../services/AiAgentProductService/EndAiAgentProductSimulatorSessionService";
+import ReviewAiAgentProductSimulatorMessageService from "../services/AiAgentProductService/ReviewAiAgentProductSimulatorMessageService";
+import { rejectProductSimulatorForbiddenIds } from "../services/AiAgentProductService/aiAgentProductSimulatorHelpers";
 import { logger } from "../utils/logger";
 
 function companyIdOrThrow(req: Request): number {
   const id = req.user?.companyId;
+  if (id == null || !Number.isFinite(Number(id))) {
+    throw new AppError(
+      "ERR_AI_AGENT_PRODUCT_CONTEXT_INVALID",
+      403,
+      "Contexto da empresa inválido."
+    );
+  }
+  return Number(id);
+}
+
+function userIdOrThrow(req: Request): number {
+  const id = req.user?.id;
   if (id == null || !Number.isFinite(Number(id))) {
     throw new AppError(
       "ERR_AI_AGENT_PRODUCT_CONTEXT_INVALID",
@@ -281,6 +301,226 @@ export const updateConnections = async (
       "ERR_AI_AGENT_PRODUCT_CONFIGURATION_INVALID",
       500,
       "Não foi possível atualizar as conexões do Agente de IA."
+    );
+  }
+};
+
+export const simulatorBootstrap = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  try {
+    rejectArbitraryCompanyId(req);
+    rejectProductSimulatorForbiddenIds(req);
+    const companyId = companyIdOrThrow(req);
+    const data = await GetAiAgentProductSimulatorService({ companyId, req });
+    return res.json(data);
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    logger.error(
+      {
+        err: err instanceof Error ? err.message : "unknown",
+        surface: "ai_agent_product_simulator"
+      },
+      "ai_agent_product_simulator_bootstrap_failed"
+    );
+    throw new AppError(
+      "ERR_AI_AGENT_PRODUCT_NOT_AVAILABLE",
+      500,
+      "Não foi possível carregar o simulador do Agente de IA."
+    );
+  }
+};
+
+export const simulatorCreateSession = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  try {
+    rejectArbitraryCompanyId(req);
+    rejectProductSimulatorForbiddenIds(req);
+    const companyId = companyIdOrThrow(req);
+    const userId = userIdOrThrow(req);
+    const data = await CreateAiAgentProductSimulatorSessionService({
+      companyId,
+      userId,
+      req
+    });
+    return res.status(201).json(data);
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    logger.error(
+      {
+        err: err instanceof Error ? err.message : "unknown",
+        surface: "ai_agent_product_simulator"
+      },
+      "ai_agent_product_simulator_create_session_failed"
+    );
+    throw new AppError(
+      "ERR_AI_AGENT_PRODUCT_SIMULATOR_UNAVAILABLE",
+      500,
+      "Não foi possível iniciar a sessão do simulador."
+    );
+  }
+};
+
+export const simulatorListSessions = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  try {
+    rejectArbitraryCompanyId(req);
+    rejectProductSimulatorForbiddenIds(req);
+    const companyId = companyIdOrThrow(req);
+    const data = await ListAiAgentProductSimulatorSessionsService({
+      companyId,
+      req,
+      pageNumber: req.query.pageNumber as string | undefined
+    });
+    return res.json(data);
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    logger.error(
+      {
+        err: err instanceof Error ? err.message : "unknown",
+        surface: "ai_agent_product_simulator"
+      },
+      "ai_agent_product_simulator_list_sessions_failed"
+    );
+    throw new AppError(
+      "ERR_AI_AGENT_PRODUCT_NOT_AVAILABLE",
+      500,
+      "Não foi possível listar as sessões do simulador."
+    );
+  }
+};
+
+export const simulatorGetSession = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  try {
+    rejectArbitraryCompanyId(req);
+    rejectProductSimulatorForbiddenIds(req);
+    const companyId = companyIdOrThrow(req);
+    const data = await GetAiAgentProductSimulatorSessionService({
+      companyId,
+      sessionRef: String(req.params.sessionRef || ""),
+      req
+    });
+    return res.json(data);
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    logger.error(
+      {
+        err: err instanceof Error ? err.message : "unknown",
+        surface: "ai_agent_product_simulator"
+      },
+      "ai_agent_product_simulator_get_session_failed"
+    );
+    throw new AppError(
+      "ERR_AI_AGENT_PRODUCT_SIMULATOR_SESSION_NOT_FOUND",
+      500,
+      "Não foi possível carregar a sessão do simulador."
+    );
+  }
+};
+
+export const simulatorSendMessage = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  try {
+    rejectArbitraryCompanyId(req);
+    rejectProductSimulatorForbiddenIds(req);
+    const companyId = companyIdOrThrow(req);
+    const userId = userIdOrThrow(req);
+    const data = await SendAiAgentProductSimulatorMessageService({
+      companyId,
+      sessionRef: String(req.params.sessionRef || ""),
+      content: (req.body as Record<string, unknown>)?.content,
+      userId,
+      req
+    });
+    return res.json(data);
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    logger.error(
+      {
+        err: err instanceof Error ? err.message : "unknown",
+        surface: "ai_agent_product_simulator"
+      },
+      "ai_agent_product_simulator_send_message_failed"
+    );
+    throw new AppError(
+      "ERR_AI_AGENT_PRODUCT_SIMULATOR_INVALID",
+      500,
+      "Não foi possível enviar a mensagem no simulador."
+    );
+  }
+};
+
+export const simulatorEndSession = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  try {
+    rejectArbitraryCompanyId(req);
+    rejectProductSimulatorForbiddenIds(req);
+    const companyId = companyIdOrThrow(req);
+    const data = await EndAiAgentProductSimulatorSessionService({
+      companyId,
+      sessionRef: String(req.params.sessionRef || ""),
+      req
+    });
+    return res.json(data);
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    logger.error(
+      {
+        err: err instanceof Error ? err.message : "unknown",
+        surface: "ai_agent_product_simulator"
+      },
+      "ai_agent_product_simulator_end_session_failed"
+    );
+    throw new AppError(
+      "ERR_AI_AGENT_PRODUCT_SIMULATOR_SESSION_ENDED",
+      500,
+      "Não foi possível encerrar a sessão do simulador."
+    );
+  }
+};
+
+export const simulatorReviewMessage = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  try {
+    rejectArbitraryCompanyId(req);
+    rejectProductSimulatorForbiddenIds(req);
+    const companyId = companyIdOrThrow(req);
+    const userId = userIdOrThrow(req);
+    const data = await ReviewAiAgentProductSimulatorMessageService({
+      companyId,
+      messageRef: String(req.params.messageRef || ""),
+      userId,
+      body: (req.body || {}) as Record<string, unknown>,
+      req
+    });
+    return res.json(data);
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    logger.error(
+      {
+        err: err instanceof Error ? err.message : "unknown",
+        surface: "ai_agent_product_simulator"
+      },
+      "ai_agent_product_simulator_review_failed"
+    );
+    throw new AppError(
+      "ERR_AI_AGENT_PRODUCT_SIMULATOR_INVALID",
+      500,
+      "Não foi possível salvar a avaliação."
     );
   }
 };

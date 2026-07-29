@@ -258,3 +258,58 @@ export type AiAgentProductConfigurationOptions = {
 export type AiAgentProductConfigurationPreview = {
   preview: string;
 };
+
+/** Simulator comercial (Fase 2.5). */
+export type AiAgentProductSimulatorUnavailableReason =
+  | "not_created"
+  | "ambiguous"
+  | "credential_not_selected"
+  | "credential_disabled"
+  | "provider_unsupported"
+  | "model_incompatible"
+  | "simulator_not_configured";
+
+export type AiAgentProductSimulatorReview = {
+  rating: string;
+  tags: string[];
+  note: string | null;
+  reviewedAt: string | null;
+};
+
+export type AiAgentProductSimulatorMessage = {
+  ref: string;
+  role: string;
+  content: string;
+  createdAt: string | null;
+  responseTimeMs: number | null;
+  handoffSuggested: boolean;
+  review: AiAgentProductSimulatorReview | null;
+};
+
+export type AiAgentProductSimulatorSession = {
+  ref: string;
+  status: string;
+  providerLabel: string | null;
+  modelLabel: string | null;
+  messageCount: number;
+  startedAt: string | null;
+  endedAt: string | null;
+  averageResponseTimeMs: number | null;
+  messages?: AiAgentProductSimulatorMessage[];
+};
+
+export type AiAgentProductSimulatorBootstrap = {
+  available: boolean;
+  reason: AiAgentProductSimulatorUnavailableReason | null;
+  agentScope: AiAgentProductAgentScope;
+  agent: {
+    name: string | null;
+    description: string | null;
+    status: AgentProductStatus | null;
+    mode: AiAgentProductMode | null;
+  };
+  capabilities: { canSimulate: boolean; canReview: boolean };
+  provider: { label: string | null; modelLabel: string | null };
+  scenarioSegment: string | null;
+  sessions: AiAgentProductSimulatorSession[];
+};

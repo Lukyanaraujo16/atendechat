@@ -2899,6 +2899,27 @@ const messages = {
 					openSimulator: "Open simulator",
 					openConnections: "WhatsApp connections",
 				},
+				simulator: {
+					reasons: {
+						not_created: "Create the AI Agent before testing conversations.",
+						ambiguous:
+							"Multiple AI Agent configurations were found. Resolve them before simulating.",
+						credential_not_selected:
+							"Select a provider credential in the wizard to use the simulator.",
+						credential_disabled:
+							"The linked credential is disabled. Enable it or choose another.",
+						provider_unsupported:
+							"The configured provider is not supported by the commercial simulator.",
+						model_incompatible:
+							"The configured model is incompatible with the selected provider.",
+						simulator_not_configured:
+							"Finish AI Agent setup to use the simulator.",
+					},
+					cta: {
+						configure: "Configure agent",
+						hub: "Back to AI Agent",
+					},
+				},
 				meta: {
 					agent: "Agent: {{name}}",
 					connection: "Connection: {{name}} ({{state}})",

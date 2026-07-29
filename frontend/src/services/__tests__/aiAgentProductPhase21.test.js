@@ -107,13 +107,16 @@ describe("Fase 2.1 — mapper Experience", () => {
     expect(mapAiAgentNextAction("explode").type).toBe("none");
   });
 
-  it("secondary inclui simulator quando há agentId", () => {
+  it("secondary inclui simulator na rota canônica (sem agentId)", () => {
     const actions = buildAiAgentSecondaryActions({
       agent: { exists: true, id: 42 },
     });
     expect(actions.some((a) => a.id === "open_simulator")).toBe(true);
-    expect(actions.find((a) => a.id === "open_simulator").path).toContain(
-      "/42/simulator"
+    expect(actions.find((a) => a.id === "open_simulator").path).toBe(
+      "/ai-agent/simulator"
+    );
+    expect(actions.find((a) => a.id === "open_simulator").path).not.toMatch(
+      /\/\d+\/simulator/
     );
   });
 

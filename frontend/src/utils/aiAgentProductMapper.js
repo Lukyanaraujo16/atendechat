@@ -129,9 +129,8 @@ function wizardPath(agentId) {
   return AI_AGENT_WIZARD_ROUTE_PATH;
 }
 
-function simulatorPath(agentId) {
-  if (agentId == null || !Number.isFinite(Number(agentId))) return null;
-  return AI_AGENT_SIMULATOR_ROUTE_PATH.replace(":agentId", String(agentId));
+function simulatorPath() {
+  return AI_AGENT_SIMULATOR_ROUTE_PATH;
 }
 
 function commandActionBase(command) {
@@ -296,15 +295,13 @@ export function buildAiAgentSecondaryActions(summary) {
       enabled: true,
     },
   ];
-  const sim = simulatorPath(agentId);
-  if (sim) {
-    actions.unshift({
-      id: "open_simulator",
-      labelKey: "aiAgentProduct.secondary.openSimulator",
-      path: sim,
-      enabled: true,
-    });
-  }
+  const sim = simulatorPath();
+  actions.unshift({
+    id: "open_simulator",
+    labelKey: "aiAgentProduct.secondary.openSimulator",
+    path: sim,
+    enabled: true,
+  });
   return actions;
 }
 

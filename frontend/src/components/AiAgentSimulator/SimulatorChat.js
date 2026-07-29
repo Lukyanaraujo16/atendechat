@@ -46,7 +46,7 @@ export default function SimulatorChat({
       {!messages.length && !loading ? <SimulatorEmptyState /> : null}
       {messages.map((message) => (
         <SimulatorMessage
-          key={message.id || `${message.role}-${message.createdAt}`}
+          key={message.ref || message.id || `${message.role}-${message.createdAt}`}
           message={message}
           onCopy={onCopy}
           onReview={onReview}

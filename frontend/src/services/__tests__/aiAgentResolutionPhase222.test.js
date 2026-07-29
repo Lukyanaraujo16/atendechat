@@ -85,7 +85,9 @@ describe("aiAgentResolutionPhase222", () => {
     expect(secondary.find((a) => a.id === "open_wizard")?.path).toBe(
       AI_AGENT_WIZARD_ROUTE_PATH
     );
-    expect(secondary.some((a) => a.id === "open_simulator")).toBe(false);
+    expect(secondary.find((a) => a.id === "open_simulator")?.path).toBe(
+      "/ai-agent/simulator"
+    );
 
     render(
       <MemoryRouter>
