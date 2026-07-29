@@ -58,6 +58,13 @@ aiAgentProductRoutes.get(
   AiAgentProductController.getConfigurationOptions
 );
 
+aiAgentProductRoutes.post(
+  "/product/ai-agent/configuration/preview",
+  isAuth,
+  requireAiAgentProductView,
+  AiAgentProductController.previewConfiguration
+);
+
 aiAgentProductRoutes.put(
   "/product/ai-agent/configuration/connections",
   isAuth,

@@ -38,12 +38,17 @@ export default function SuccessStep({
   formState,
   agentId,
   hasCredentials,
+  summary,
   onViewAgent,
   onConfigureCredential,
   onBackToList,
   onTestAttendant,
 }) {
   const classes = useStyles();
+  const status = summary?.status || "setup_incomplete";
+  const canTest =
+    Boolean(agentId) &&
+    (status === "ready_to_activate" || status === "active");
 
   return (
     <Box className={classes.root}>
@@ -71,8 +76,8 @@ export default function SuccessStep({
         <Box mt={1} display="flex" flexWrap="wrap" gridGap={8}>
           <Chip
             size="small"
-            label={i18n.t("aiAgent.status.inactive")}
-            color="default"
+            label={i18n.t(`aiAgentProduct.status.${status}`)}
+            color={status === "ready_to_activate" ? "primary" : "default"}
           />
           <Chip
             size="small"
@@ -82,9 +87,17 @@ export default function SuccessStep({
         </Box>
       </Box>
 
-      {!hasCredentials ? (
+      {status === "attention_required" ? (
         <Alert severity="warning" style={{ textAlign: "left" }}>
-          {i18n.t("aiAgent.wizard.hints.missingCredential")}
+          {i18n.t("aiAgent.wizard.product.saveAttentionRequired")}
+        </Alert>
+      ) : status === "ready_to_activate" ? (
+        <Alert severity="success" style={{ textAlign: "left" }}>
+          {i18n.t("aiAgent.wizard.product.saveReadyToActivate")}
+        </Alert>
+      ) : !hasCredentials ? (
+        <Alert severity="warning" style={{ textAlign: "left" }}>
+          {i18n.t("aiAgent.wizard.product.saveSetupIncomplete")}
         </Alert>
       ) : (
         <Alert severity="info" style={{ textAlign: "left" }}>
@@ -93,7 +106,7 @@ export default function SuccessStep({
       )}
 
       <div className={classes.actions}>
-        {hasCredentials && agentId ? (
+        {canTest ? (
           <Button variant="contained" color="primary" onClick={onTestAttendant}>
             {i18n.t("aiAgent.wizard.buttons.testAttendant")}
           </Button>

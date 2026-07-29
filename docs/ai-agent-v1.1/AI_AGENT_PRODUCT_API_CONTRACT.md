@@ -520,6 +520,7 @@ agentScope: { type: "none" | "single" | "ambiguous"; count: number }
 | PUT | `/product/ai-agent/configuration` | Atualização comercial |
 | GET | `/product/ai-agent/configuration/options` | Opções disponíveis |
 | PUT | `/product/ai-agent/configuration/connections` | Vincular/desvincular conexões |
+| POST | `/product/ai-agent/configuration/preview` | Preview do prompt (sem agentId) |
 
 ### Autorização
 
@@ -561,6 +562,7 @@ Retorna:
     "identity": { "name": "...", "description": "..." },
     "messages": { "fallbackMessage": "...", "handoffMessage": "..." },
     "model": { "name": "gpt-4o-mini", "temperature": 0.3, "maxTokens": 512 },
+    "profile": { "companyName": "...", "attendantName": "...", "tone": "friendly" },
     "instructions": { "configured": true, "preview": "..." },
     "provider": { "configured": true, "type": "openai", "label": "..." },
     "credential": { "configured": true, "label": "...", "maskedKey": "sk-...XXX" },
@@ -592,6 +594,10 @@ Para `agentScope.type === "ambiguous"`:
   "providers": [
     { "value": "openai", "label": "OpenAI", "available": true },
     { "value": "gemini", "label": "Google Gemini", "available": true }
+  ],
+  "models": [
+    { "value": "gpt-4o-mini", "label": "gpt-4o-mini", "provider": "openai" },
+    { "value": "gemini-2.5-flash", "label": "gemini-2.5-flash", "provider": "gemini" }
   ],
   "credentials": [{ "ref": "...", "name": "...", "provider": "openai", "maskedKey": "...", "enabled": true, "isDefault": true }],
   "connections": [{ "ref": "...", "name": "...", "status": "CONNECTED", "selected": true, "eligible": true, "ineligibleReason": null }]
@@ -638,11 +644,26 @@ Regras:
 - `deactivate` permanece permitido com configuração inválida (redução de risco).
 - Checks comerciais: `provider`, `credential`, `model` (além dos existentes). Sem IDs, secrets ou companyId.
 
-#### Compatibilidade Wizard legado (Fase 2.4)
+#### Wizard comercial (Fase 2.4 — concluída; Hardening 2.4.2)
 
-- Wizard guiado **não** seleciona provider/modelo/credencial; cria `gpt-4o-mini` com `aiProviderCredentialId: null`.
-- AiAgentModal avançado já filtra modelos por provider da credencial.
-- Divergência a resolver na 2.4: Wizard deve passar a consumir Product API options (openai + gemini).
+- Wizard consome exclusivamente `/product/ai-agent/configuration*` (sem `/ai-agents*` nem `/ai-provider-credentials`).
+- Hidratação guiada via `configuration.profile` (allowlist comercial; sem `generatedPrompt`).
+- Provider, modelos e credenciais vêm de `GET .../options` (`providers` + `models` + `credentials`).
+- Preview usa `POST .../configuration/preview` com payload de profile (sem `agentId`).
+- Credencial exibida somente quando vinculada ao agente (`aiProviderCredentialId` + tenant); sem fallback da credencial default da empresa.
+- Create e edição estrutural Off exigem `provider` + `model` + `credentialRef` no Review (validação local antes do POST/PUT).
+- Com `editableWhileActive === false`, o Wizard entra em modo dedicado de
+  identidade: não renderiza steps, Review ou preview estruturais; envia somente
+  identity (`name`, `description`, `fallbackMessage`, `handoffMessage`) e
+  **não** chama PUT connections.
+- `identity.name`/`identity.description` são hidratados separadamente de
+  `profile.attendantName`/`profile.companyName`; profile antigo não sobrescreve
+  identidade no reload e permanece intacto no update ativo.
+- Success e toast do modo ativo são específicos e confirmam que o agente
+  continua ativo.
+- `setup_incomplete` permanece autoridade do backend; o Wizard não recalcula readiness.
+- Rota `/ai-agent/wizard/:agentId` é residual de navegação; o param não resolve agente nem entra em payload.
+- AiAgentModal avançado permanece no legado até Fase 2.5/2.6.
 
 ### POST `/product/ai-agent/configuration` (criação)
 
@@ -660,6 +681,14 @@ Regras:
 - Idempotência: `changed: false` se valores iguais
 - Agente ativo (shadow/live): somente identity (`name`, `description`, `fallbackMessage`, `handoffMessage`) permitidos → outros campos retornam `ERR_AI_AGENT_PRODUCT_UPDATE_NOT_ALLOWED_WHILE_ACTIVE`
 - Resposta: `{ "changed": true|false, "configuration": {...}, "summary": {...} }`
+
+### POST `/product/ai-agent/configuration/preview`
+
+- Não exige `agentId` nem agente persistido
+- Payload: campos de profile da allowlist comercial (mesmos de create/update)
+- Resposta: `{ "preview": "..." }` — prompt compilado a partir do profile
+- Não persiste agente, profile nem credencial
+- Campos proibidos rejeitados como nas demais mutações de configuração
 
 ### PUT `/product/ai-agent/configuration/connections`
 

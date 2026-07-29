@@ -895,6 +895,7 @@ describe("AiAgent Product Configuration (Fase 2.3)", () => {
         identity: { name: "Bot", description: null },
         messages: { fallbackMessage: null, handoffMessage: null },
         model: { name: "gpt-4o-mini", temperature: 0.3, maxTokens: 512 },
+        profile: null,
         instructions: { configured: true, preview: "preview only" },
         provider: { configured: true, type: "openai", label: "OpenAI" },
         credential: {
@@ -928,6 +929,7 @@ describe("AiAgent Product Configuration (Fase 2.3)", () => {
         identity: { name: "Bot", description: null },
         messages: { fallbackMessage: null, handoffMessage: null },
         model: { name: "gpt-4o-mini", temperature: 0.3, maxTokens: 512 },
+        profile: null,
         instructions: { configured: true, preview: long },
         provider: { configured: false, type: null, label: null },
         credential: { configured: false, label: null, maskedKey: null },

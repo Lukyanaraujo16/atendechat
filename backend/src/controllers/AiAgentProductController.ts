@@ -9,6 +9,7 @@ import GetAiAgentProductConfigurationOptionsService from "../services/AiAgentPro
 import CreateAiAgentProductConfigurationService from "../services/AiAgentProductService/CreateAiAgentProductConfigurationService";
 import UpdateAiAgentProductConfigurationService from "../services/AiAgentProductService/UpdateAiAgentProductConfigurationService";
 import UpdateAiAgentProductConnectionsService from "../services/AiAgentProductService/UpdateAiAgentProductConnectionsService";
+import PreviewAiAgentProductConfigurationService from "../services/AiAgentProductService/PreviewAiAgentProductConfigurationService";
 import { logger } from "../utils/logger";
 
 function companyIdOrThrow(req: Request): number {
@@ -220,6 +221,36 @@ export const getConfigurationOptions = async (
       "ERR_AI_AGENT_PRODUCT_NOT_AVAILABLE",
       500,
       "Não foi possível carregar as opções de configuração do Agente de IA."
+    );
+  }
+};
+
+export const previewConfiguration = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  try {
+    rejectArbitraryCompanyId(req);
+    const companyId = companyIdOrThrow(req);
+    const data = await PreviewAiAgentProductConfigurationService({
+      companyId,
+      req,
+      body: req.body as Record<string, unknown>
+    });
+    return res.json(data);
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    logger.error(
+      {
+        err: err instanceof Error ? err.message : "unknown",
+        surface: "ai_agent_product"
+      },
+      "ai_agent_product_configuration_preview_failed"
+    );
+    throw new AppError(
+      "ERR_AI_AGENT_PRODUCT_CONFIGURATION_INVALID",
+      500,
+      "Não foi possível gerar a prévia da configuração do Agente de IA."
     );
   }
 };

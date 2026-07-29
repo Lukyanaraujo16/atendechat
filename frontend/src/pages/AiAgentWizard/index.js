@@ -1,5 +1,5 @@
 import React from "react";
-import { useHistory, useParams } from "react-router-dom";
+import { useHistory } from "react-router-dom";
 import Box from "@material-ui/core/Box";
 import IconButton from "@material-ui/core/IconButton";
 import Typography from "@material-ui/core/Typography";
@@ -26,8 +26,6 @@ const useStyles = makeStyles((theme) => ({
 export default function AiAgentWizardPage() {
   const classes = useStyles();
   const history = useHistory();
-  const { agentId } = useParams();
-  const isEdit = Boolean(agentId);
 
   return (
     <MainContainer>
@@ -42,9 +40,7 @@ export default function AiAgentWizardPage() {
           </IconButton>
           <Box>
             <Title>
-              {isEdit
-                ? i18n.t("aiAgent.wizard.pageTitleEdit")
-                : i18n.t("aiAgent.wizard.pageTitleCreate")}
+              {i18n.t("aiAgent.wizard.pageTitleCreate")}
             </Title>
             <Typography variant="body2" className={classes.subtitle}>
               {i18n.t("aiAgent.wizard.pageSubtitle")}
@@ -53,7 +49,7 @@ export default function AiAgentWizardPage() {
         </Box>
       </MainHeader>
 
-      <AiAgentWizard agentId={agentId ? Number(agentId) : null} mode={isEdit ? "edit" : "create"} />
+      <AiAgentWizard />
     </MainContainer>
   );
 }

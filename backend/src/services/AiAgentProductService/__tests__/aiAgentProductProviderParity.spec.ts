@@ -632,6 +632,7 @@ describe("aiAgentProductProviderParity (2.3.1)", () => {
         identity: { name: "G", description: null },
         messages: { fallbackMessage: null, handoffMessage: null },
         model: { name: "gemini-2.5-flash", temperature: 0.3, maxTokens: 512 },
+        profile: null,
         instructions: { configured: true, preview: "oi" },
         provider: {
           configured: true,

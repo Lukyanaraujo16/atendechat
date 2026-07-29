@@ -203,6 +203,8 @@ export type AiAgentProductConfiguration = {
   identity: AiAgentProductConfigurationIdentity;
   messages: AiAgentProductConfigurationMessages;
   model: AiAgentProductConfigurationModel;
+  /** Somente os campos comerciais definidos em PROFILE_FIELD_KEYS. */
+  profile: Record<string, unknown> | null;
   instructions: AiAgentProductConfigurationInstructions;
   provider: AiAgentProductConfigurationProvider;
   credential: AiAgentProductConfigurationCredential;
@@ -230,6 +232,11 @@ export type AiAgentProductConfigurationOptions = {
     available: boolean;
     unavailableReason?: string | null;
   }>;
+  models: Array<{
+    value: string;
+    label: string;
+    provider: string;
+  }>;
   credentials: Array<{
     ref: string;
     name: string;
@@ -246,4 +253,8 @@ export type AiAgentProductConfigurationOptions = {
     eligible: boolean;
     ineligibleReason: string | null;
   }>;
+};
+
+export type AiAgentProductConfigurationPreview = {
+  preview: string;
 };

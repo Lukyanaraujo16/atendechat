@@ -3029,8 +3029,55 @@ const messages = {
           loadError: "No se pudieron cargar los agentes",
         },
         wizard: {
+          toasts: {
+            identityUpdated: "Identidad del agente actualizada correctamente",
+          },
           buttons: {
             suggestFaqs: "Sugerir preguntas frecuentes",
+            saveIdentity: "Guardar identidad",
+            configureCredential: "Configurar credencial de IA",
+          },
+          sections: {
+            commercialSetup: "Configuración de IA y conexiones",
+            identityMessages: "Mensajes comerciales",
+          },
+          fields: {
+            provider: "Proveedor",
+            model: "Modelo",
+            credential: "Credencial",
+            connections: "Conexiones",
+            fallbackMessage: "Mensaje de respaldo",
+            handoffMessage: "Mensaje de transferencia",
+          },
+          product: {
+            ambiguous:
+              "Existen múltiples agentes para esta empresa. Resuelva la configuración en la central del Agente de IA antes de continuar.",
+            providerRequired: "Seleccione un proveedor para continuar.",
+            providerUnsupported: "Proveedor no soportado",
+            credentialRequired: "Seleccione una credencial activa para el proveedor.",
+            credentialMissing:
+              "No hay una credencial compatible disponible. Registre una credencial y vuelva al asistente.",
+            modelRequired: "Seleccione un modelo compatible con el proveedor.",
+            modelIncompatible: "El modelo seleccionado no es compatible con el proveedor.",
+            connectionIneligible: "Conexión vinculada a otro agente",
+            structuralLocked:
+              "El agente está activo. Puede editar la identidad y los mensajes. Para cambiar proveedor, modelo, credencial, instrucciones o conexiones, desactive el agente en el Hub.",
+            saveSetupIncomplete:
+              "Configuración guardada. Aún faltan elementos antes de la activación.",
+            saveReadyToActivate:
+              "Configuración guardada y lista para activar.",
+            saveAttentionRequired:
+              "Configuración guardada, pero requiere atención antes de activar.",
+          },
+          activeIdentity: {
+            notice:
+              "Este agente está activo. Solo puede cambiar la identidad y los mensajes. Para modificar proveedor, modelo, credencial, comportamiento, instrucciones o conexiones, desactive el agente en el Hub.",
+            name: "Nombre del agente",
+            description: "Descripción",
+            successTitle: "Identidad actualizada",
+            successDescription:
+              "El nombre, la descripción y los mensajes del agente fueron actualizados.",
+            stillActive: "El agente continúa activo.",
           },
           hints: {
             suggestedFaqsReview:

@@ -1,6 +1,7 @@
 import { Request } from "express";
 import AiAgent from "../../models/AiAgent";
 import AiAgentProfile from "../../models/AiAgentProfile";
+import AiProviderCredential from "../../models/AiProviderCredential";
 import Whatsapp from "../../models/Whatsapp";
 import AppError from "../../errors/AppError";
 import { AiAgentProductConfigurationView } from "../../types/aiAgentProduct";
@@ -10,8 +11,7 @@ import {
 import GetAiAgentProductSummaryService from "./GetAiAgentProductSummaryService";
 import {
   assertAiAgentProductConfigurationAccess,
-  buildAiAgentProductConfiguration,
-  resolveEffectiveCredential
+  buildAiAgentProductConfiguration
 } from "./aiAgentProductConfigurationHelpers";
 import {
   serializeAiAgentProductConfigurationView
@@ -88,10 +88,15 @@ export default async function GetAiAgentProductConfigurationService(input: {
     order: [["id", "ASC"]]
   });
 
-  const credential = await resolveEffectiveCredential(
-    companyId,
-    agentRow.aiProviderCredentialId
-  );
+  const credential =
+    agentRow.aiProviderCredentialId != null
+      ? await AiProviderCredential.findOne({
+          where: {
+            id: agentRow.aiProviderCredentialId,
+            companyId
+          }
+        })
+      : null;
 
   const configuration = buildAiAgentProductConfiguration({
     agent: agentRow,

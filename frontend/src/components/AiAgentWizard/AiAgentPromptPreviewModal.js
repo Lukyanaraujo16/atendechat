@@ -10,18 +10,18 @@ import Alert from "@material-ui/lab/Alert";
 import { toast } from "react-toastify";
 import { i18n } from "../../translate/i18n";
 import toastError from "../../errors/toastError";
-import { previewAiAgentProfilePrompt } from "../../services/aiAgentApi";
 
 export default function AiAgentPromptPreviewModal({
   open,
   onClose,
-  agentId,
   profilePayload,
+  loadPreview,
+  onUnavailable,
 }) {
   const [loading, setLoading] = useState(false);
   const [prompt, setPrompt] = useState("");
 
-  const canLoad = Boolean(open && agentId && profilePayload);
+  const canLoad = Boolean(open && profilePayload && loadPreview);
 
   React.useEffect(() => {
     let active = true;
@@ -33,12 +33,17 @@ export default function AiAgentPromptPreviewModal({
     const load = async () => {
       setLoading(true);
       try {
-        const { data } = await previewAiAgentProfilePrompt(agentId, profilePayload);
-        if (active) setPrompt(data?.generatedPrompt || "");
+        const data = await loadPreview(profilePayload);
+        if (active) setPrompt(data?.generatedPrompt || data?.preview || "");
       } catch (err) {
         if (active) {
           setPrompt("");
-          toastError(err);
+          if (err?.response?.status === 404) {
+            onUnavailable();
+            onClose();
+          } else {
+            toastError(err);
+          }
         }
       } finally {
         if (active) setLoading(false);
@@ -50,7 +55,7 @@ export default function AiAgentPromptPreviewModal({
       active = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canLoad, agentId, open ? JSON.stringify(profilePayload) : null]);
+  }, [canLoad, open ? JSON.stringify(profilePayload) : null]);
 
   const handleCopy = async () => {
     if (!prompt?.trim()) return;

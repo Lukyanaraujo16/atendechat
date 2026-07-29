@@ -116,27 +116,14 @@ export function createDefaultWizardFormState() {
     schedulingPolicyPreset: "collect_preference",
     schedulingPolicyCustom: "",
     customInstructions: "",
-  };
-}
-
-export function createMinimalAiAgentPayload(formState) {
-  const name =
-    String(formState.attendantName || formState.companyName || "").trim() ||
-    "Atendente virtual";
-
-  return {
-    name,
-    description: formState.companyName
-      ? `Atendente virtual — ${formState.companyName}`
-      : null,
-    enabled: false,
-    model: DEFAULT_AI_AGENT_FORM.model,
-    temperature: DEFAULT_AI_AGENT_FORM.temperature,
-    maxTokens: DEFAULT_AI_AGENT_FORM.maxTokens,
-    systemPrompt: "",
-    fallbackMessage: DEFAULT_AI_AGENT_FORM.fallbackMessage,
-    handoffMessage: DEFAULT_AI_AGENT_FORM.handoffMessage,
-    aiProviderCredentialId: null,
+    identityName: "",
+    identityDescription: "",
+    fallbackMessage: DEFAULT_AI_AGENT_FORM.fallbackMessage || "",
+    handoffMessage: DEFAULT_AI_AGENT_FORM.handoffMessage || "",
+    provider: "",
+    model: "",
+    credentialRef: "",
+    connectionRefs: [],
   };
 }
 

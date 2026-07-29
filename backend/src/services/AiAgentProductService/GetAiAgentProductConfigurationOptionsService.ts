@@ -11,6 +11,10 @@ import {
   listAiAgentProductProviderOptions
 } from "./aiAgentProductConfigurationHelpers";
 import {
+  AI_AGENT_PRODUCT_PROVIDER_CAPABILITIES,
+  listModelsForCommercialProvider
+} from "./aiAgentProductProviderCapabilities";
+import {
   serializeAiAgentProductConfigurationOptions
 } from "./serializeAiAgentProduct";
 
@@ -74,6 +78,13 @@ export default async function GetAiAgentProductConfigurationOptionsService(input
         ? { unavailableReason: p.unavailableReason }
         : {})
     })),
+    models: AI_AGENT_PRODUCT_PROVIDER_CAPABILITIES.flatMap(capability =>
+      listModelsForCommercialProvider(capability.provider).map(model => ({
+        value: model,
+        label: model,
+        provider: capability.provider
+      }))
+    ),
     credentials: credentials.map(c => ({
       ref: String(c.id),
       name: String(c.name || ""),

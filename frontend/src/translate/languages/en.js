@@ -3199,6 +3199,7 @@ const messages = {
 						cancel: "Cancel",
 						createAgent: "Create attendant",
 						saveChanges: "Save changes",
+						saveIdentity: "Save identity",
 						suggestName: "Suggest name",
 						addFaq: "Add question",
 						suggestFaqs: "Suggest frequently asked questions",
@@ -3240,6 +3241,7 @@ const messages = {
 					toasts: {
 						created: "Virtual attendant created successfully",
 						updated: "Guided profile updated successfully",
+						identityUpdated: "Agent identity updated successfully",
 						promptCopied: "Configuration copied",
 					},
 					labels: {
@@ -3261,6 +3263,8 @@ const messages = {
 						businessKnowledge: "Business information",
 						policies: "Policies",
 						faq: "Frequently asked questions",
+						commercialSetup: "AI and connection setup",
+						identityMessages: "Commercial messages",
 					},
 					fields: {
 						companyName: "Company name",
@@ -3285,6 +3289,42 @@ const messages = {
 						negotiationPolicyCustom: "Custom negotiation policy",
 						schedulingPolicy: "Scheduling policy",
 						schedulingPolicyCustom: "Custom scheduling policy",
+						provider: "Provider",
+						model: "Model",
+						credential: "Credential",
+						connections: "Connections",
+						fallbackMessage: "Fallback message",
+						handoffMessage: "Handoff message",
+					},
+					product: {
+						ambiguous:
+							"Multiple agents exist for this company. Resolve the setup in the AI Agent hub before continuing.",
+						providerRequired: "Select a provider to continue.",
+						providerUnsupported: "Unsupported provider",
+						credentialRequired: "Select an active credential for the provider.",
+						credentialMissing:
+							"No compatible credential is available. Register a credential and return to the wizard.",
+						modelRequired: "Select a model compatible with the provider.",
+						modelIncompatible: "The selected model is incompatible with the provider.",
+						connectionIneligible: "Connection assigned to another agent",
+						structuralLocked:
+							"The agent is active. You can edit identity and messages. To change provider, model, credential, instructions, or connections, deactivate the agent in the Hub.",
+						saveSetupIncomplete:
+							"Configuration saved. Some items are still required before activation.",
+						saveReadyToActivate:
+							"Configuration saved and ready to activate.",
+						saveAttentionRequired:
+							"Configuration saved, but it needs attention before activation.",
+					},
+					activeIdentity: {
+						notice:
+							"This agent is active. You can only change identity and messages. To modify provider, model, credential, behavior, instructions, or connections, deactivate the agent in the Hub.",
+						name: "Agent name",
+						description: "Description",
+						successTitle: "Identity updated",
+						successDescription:
+							"The agent name, description, and messages were updated.",
+						stillActive: "The agent remains active.",
 					},
 					hints: {
 						businessSegment: "Choose the segment that best represents your company.",

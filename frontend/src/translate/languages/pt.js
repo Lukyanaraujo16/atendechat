@@ -3292,6 +3292,7 @@ const messages = {
             cancel: "Cancelar",
             createAgent: "Criar atendente",
             saveChanges: "Salvar alterações",
+            saveIdentity: "Salvar identidade",
             suggestName: "Sugerir nome",
             addFaq: "Adicionar pergunta",
             suggestFaqs: "Sugerir perguntas frequentes",
@@ -3333,6 +3334,7 @@ const messages = {
           toasts: {
             created: "Atendente virtual criado com sucesso",
             updated: "Perfil guiado atualizado com sucesso",
+            identityUpdated: "Identidade do agente atualizada com sucesso",
             promptCopied: "Configuração copiada",
           },
           labels: {
@@ -3354,6 +3356,8 @@ const messages = {
             businessKnowledge: "Informações do negócio",
             policies: "Políticas",
             faq: "Perguntas frequentes",
+            commercialSetup: "Configuração de IA e conexões",
+            identityMessages: "Mensagens comerciais",
           },
           fields: {
             companyName: "Nome da empresa",
@@ -3378,6 +3382,42 @@ const messages = {
             negotiationPolicyCustom: "Política de negociação personalizada",
             schedulingPolicy: "Política de agendamento",
             schedulingPolicyCustom: "Política de agendamento personalizada",
+            provider: "Provedor",
+            model: "Modelo",
+            credential: "Credencial",
+            connections: "Conexões",
+            fallbackMessage: "Mensagem de fallback",
+            handoffMessage: "Mensagem de transferência",
+          },
+          product: {
+            ambiguous:
+              "Existem múltiplos agentes para esta empresa. Resolva a configuração na central do Agente de IA antes de continuar.",
+            providerRequired: "Selecione um provedor para continuar.",
+            providerUnsupported: "Provedor não suportado",
+            credentialRequired: "Selecione uma credencial ativa para o provedor.",
+            credentialMissing:
+              "Nenhuma credencial compatível está disponível. Cadastre uma credencial e volte ao assistente.",
+            modelRequired: "Selecione um modelo compatível com o provedor.",
+            modelIncompatible: "O modelo selecionado não é compatível com o provedor.",
+            connectionIneligible: "Conexão vinculada a outro agente",
+            structuralLocked:
+              "O agente está ativo. Você pode editar a identidade e as mensagens. Para alterar provedor, modelo, credencial, instruções ou conexões, desative o agente no Hub.",
+            saveSetupIncomplete:
+              "Configuração salva. Ainda há itens pendentes antes da ativação.",
+            saveReadyToActivate:
+              "Configuração salva e pronta para ativação.",
+            saveAttentionRequired:
+              "Configuração salva, mas requer atenção antes da ativação.",
+          },
+          activeIdentity: {
+            notice:
+              "Este agente está ativo. Você pode alterar apenas a identidade e as mensagens. Para modificar provedor, modelo, credencial, comportamento, instruções ou conexões, desative o agente no Hub.",
+            name: "Nome do agente",
+            description: "Descrição",
+            successTitle: "Identidade atualizada",
+            successDescription:
+              "O nome, a descrição e as mensagens do agente foram atualizados.",
+            stillActive: "O agente continua ativo.",
           },
           hints: {
             businessSegment: "Escolha o segmento que melhor representa sua empresa.",

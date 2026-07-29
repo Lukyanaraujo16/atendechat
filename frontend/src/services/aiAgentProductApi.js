@@ -30,6 +30,14 @@ export async function postAiAgentProductConfiguration(payload) {
   return data;
 }
 
+export async function postAiAgentProductConfigurationPreview(payload) {
+  const { data } = await api.post(
+    "/product/ai-agent/configuration/preview",
+    payload
+  );
+  return data;
+}
+
 export async function putAiAgentProductConfiguration(payload) {
   const { data } = await api.put("/product/ai-agent/configuration", payload);
   return data;

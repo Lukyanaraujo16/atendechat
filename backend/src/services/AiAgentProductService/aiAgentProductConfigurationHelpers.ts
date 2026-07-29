@@ -310,6 +310,7 @@ export function buildAiAgentProductConfiguration(input: {
           ? Number(agent.maxTokens)
           : DEFAULT_AI_AGENT_MAX_TOKENS
     },
+    profile: profile ? profileFieldsFromExisting(profile) : null,
     instructions: {
       configured: Boolean(prompt && String(prompt).trim()),
       preview: buildInstructionsPreview(agent, profile)

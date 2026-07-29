@@ -1,8 +1,17 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { makeStyles } from "@material-ui/core/styles";
 import Paper from "@material-ui/core/Paper";
 import CircularProgress from "@material-ui/core/CircularProgress";
 import Box from "@material-ui/core/Box";
+import Button from "@material-ui/core/Button";
+import Alert from "@material-ui/lab/Alert";
 import { useHistory } from "react-router-dom";
 import { toast } from "react-toastify";
 
@@ -21,15 +30,25 @@ import BusinessKnowledgeStep from "./steps/BusinessKnowledgeStep";
 import PoliciesStep from "./steps/PoliciesStep";
 import ReviewStep from "./steps/ReviewStep";
 import SuccessStep from "./steps/SuccessStep";
+import ActiveAgentIdentityStep from "./steps/ActiveAgentIdentityStep";
+import ActiveAgentIdentitySuccess from "./steps/ActiveAgentIdentitySuccess";
 import {
   WIZARD_STEP_IDS,
   createDefaultWizardFormState,
-  createMinimalAiAgentPayload,
 } from "./aiAgentWizardDefaults";
+import { wizardFormStateToProfilePayload } from "./aiAgentWizardMappers";
 import {
-  profileToWizardFormState,
-  wizardFormStateToProfilePayload,
-} from "./aiAgentWizardMappers";
+  aiAgentProductConfigurationToWizardFormState,
+  aiAgentWizardIdentitySnapshot,
+  isAiAgentWizardScopeBlocked,
+  isAiAgentWizardActiveIdentityMode,
+  mapAiAgentWizardProductOptions,
+  validateAiAgentWizardIdentity,
+  validateAiAgentWizardCommercialSetup,
+  wizardFormStateToProductConfigurationPayload,
+  wizardFormStateToProductConnectionsPayload,
+  wizardFormStateToProductIdentityPayload,
+} from "./aiAgentWizardProductMapper";
 import {
   hasWizardValidationErrors,
   mapBackendErrorToWizardFields,
@@ -37,15 +56,9 @@ import {
 } from "./aiAgentWizardValidation";
 import { i18n } from "../../translate/i18n";
 import toastError from "../../errors/toastError";
-import {
-  createAiAgent,
-  deleteAiAgent,
-  getAiAgent,
-  getAiAgentProfile,
-  updateAiAgentProfile,
-} from "../../services/aiAgentApi";
-import { listAiProviderCredentials } from "../../services/aiProviderCredentialApi";
+import { useAiAgentProductConfiguration } from "../../hooks/useAiAgentProductConfiguration";
 import { AI_AGENT_ROUTE_PATH, AI_AGENT_SIMULATOR_ROUTE_PATH } from "../../config/aiAgentFeature";
+import { AuthContext } from "../../context/Auth/AuthContext";
 
 const CONTENT_STEP_IDS = WIZARD_STEP_IDS.filter((id) => id !== "welcome");
 
@@ -67,23 +80,48 @@ function stepIndexById(stepId) {
   return WIZARD_STEP_IDS.indexOf(stepId);
 }
 
-export default function AiAgentWizard({ agentId: initialAgentId = null, mode = "create" }) {
+function productConfigurationErrorKey(err) {
+  const code = String(err?.response?.data?.error || err?.message || "");
+  if (code.includes("AMBIGUOUS")) return "ambiguous";
+  if (code.includes("ALREADY_EXISTS")) return "alreadyExists";
+  if (code.includes("UPDATE_NOT_ALLOWED")) return "updateNotAllowed";
+  if (code.includes("CONNECTION_ALREADY_ASSIGNED")) return "connectionAssigned";
+  if (code.includes("CONNECTION")) return "connectionInvalid";
+  if (code.includes("CREDENTIAL")) return "credentialInvalid";
+  if (code.includes("PROVIDER") || code.includes("MODEL")) return "providerInvalid";
+  return null;
+}
+
+export default function AiAgentWizard() {
   const classes = useStyles();
   const history = useHistory();
-  const isEditMode = mode === "edit" && Boolean(initialAgentId);
-
-  const [loading, setLoading] = useState(isEditMode);
+  const { user } = useContext(AuthContext) || {};
+  const tenantId = user?.companyId ?? null;
+  const {
+    loading,
+    loadAll,
+    create,
+    update,
+    updateConnections,
+    preview,
+  } = useAiAgentProductConfiguration(tenantId);
   const [saving, setSaving] = useState(false);
   const [activeStepId, setActiveStepId] = useState("welcome");
   const [formState, setFormState] = useState(createDefaultWizardFormState);
   const [errors, setErrors] = useState({});
   const [dirty, setDirty] = useState(false);
-  const [agentId, setAgentId] = useState(initialAgentId);
-  const [draftAgentCreated, setDraftAgentCreated] = useState(false);
+  const [wizardMode, setWizardMode] = useState("create");
+  const [agentScope, setAgentScope] = useState(null);
+  const [productOptions, setProductOptions] = useState(
+    mapAiAgentWizardProductOptions(null)
+  );
+  const [editableWhileActive, setEditableWhileActive] = useState(true);
+  const [summary, setSummary] = useState(null);
   const [completed, setCompleted] = useState(false);
-  const [hasCredentials, setHasCredentials] = useState(false);
   const [confirmExitOpen, setConfirmExitOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewAvailable, setPreviewAvailable] = useState(true);
+  const [commercialError, setCommercialError] = useState("");
   const [segmentChanged, setSegmentChanged] = useState(false);
   const initialSnapshotRef = useRef(JSON.stringify(createDefaultWizardFormState()));
 
@@ -91,6 +129,17 @@ export default function AiAgentWizard({ agentId: initialAgentId = null, mode = "
   const isWelcome = activeStepId === "welcome";
   const isReview = activeStepId === "review";
   const isSuccess = completed;
+  const isEditMode = wizardMode === "edit";
+  const activeIdentityMode = isAiAgentWizardActiveIdentityMode({
+    isEditMode,
+    editableWhileActive,
+  });
+  const isAmbiguous = isAiAgentWizardScopeBlocked(agentScope);
+  const agentId =
+    summary?.agentScope?.type === "single" ? summary?.agent?.id : null;
+  const hasCredentials = productOptions.credentials.some(
+    (credential) => credential.enabled
+  );
 
   const progressIndex = useMemo(() => {
     if (isWelcome) return 0;
@@ -150,57 +199,67 @@ export default function AiAgentWizard({ agentId: initialAgentId = null, mode = "
   );
 
   const loadInitialData = useCallback(async () => {
-    if (!isEditMode) {
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
     try {
-      const [{ data: agentData }, { data: profileData }] = await Promise.all([
-        getAiAgent(initialAgentId),
-        getAiAgentProfile(initialAgentId),
-      ]);
-      const nextState = profileData?.profile
-        ? profileToWizardFormState(profileData.profile)
-        : {
-            ...createDefaultWizardFormState(),
-            attendantName: agentData?.name || "",
-          };
+      const loaded = await loadAll();
+      const view = loaded.configuration || {};
+      const mappedOptions = mapAiAgentWizardProductOptions(loaded.options);
+      const scope = view.agentScope || { type: "none", count: 0 };
+      setAgentScope(scope);
+      setProductOptions(mappedOptions);
+      setSummary(view.summary || null);
+      setEditableWhileActive(view.editableWhileActive !== false);
+
+      if (scope.type === "ambiguous") return;
+
+      const nextState =
+        scope.type === "single" && view.configuration
+          ? aiAgentProductConfigurationToWizardFormState(
+              view.configuration,
+              loaded.options
+            )
+          : createDefaultWizardFormState();
+      const nextIsEditMode = scope.type === "single";
+      const nextActiveIdentityMode =
+        nextIsEditMode && view.editableWhileActive === false;
       setFormState(nextState);
-      initialSnapshotRef.current = JSON.stringify(nextState);
-      setAgentId(initialAgentId);
+      initialSnapshotRef.current = nextActiveIdentityMode
+        ? aiAgentWizardIdentitySnapshot(nextState)
+        : JSON.stringify(nextState);
+      setWizardMode(nextIsEditMode ? "edit" : "create");
+      setActiveStepId(nextActiveIdentityMode ? "activeIdentity" : "welcome");
+      setCompleted(false);
+      setDirty(false);
     } catch (err) {
       toastError(err);
       history.push(AI_AGENT_ROUTE_PATH);
-    } finally {
-      setLoading(false);
     }
-  }, [history, initialAgentId, isEditMode]);
+  }, [history, loadAll, tenantId]);
 
   useEffect(() => {
     loadInitialData();
   }, [loadInitialData]);
 
   useEffect(() => {
-    const loadCredentials = async () => {
-      try {
-        const { data } = await listAiProviderCredentials();
-        setHasCredentials(Array.isArray(data) && data.length > 0);
-      } catch {
-        setHasCredentials(false);
-      }
-    };
-    loadCredentials();
-  }, []);
+    if (
+      activeIdentityMode &&
+      !completed &&
+      activeStepId !== "activeIdentity"
+    ) {
+      setActiveStepId("activeIdentity");
+    }
+  }, [activeIdentityMode, activeStepId, completed]);
 
   const patchFormState = (patch) => {
     setFormState((prev) => {
       const next = { ...prev, ...patch };
-      setDirty(JSON.stringify(next) !== initialSnapshotRef.current);
+      const snapshot = activeIdentityMode
+        ? aiAgentWizardIdentitySnapshot(next)
+        : JSON.stringify(next);
+      setDirty(snapshot !== initialSnapshotRef.current);
       return next;
     });
     setErrors({});
+    setCommercialError("");
   };
 
   const handleSegmentSelect = (newSegment, previousSegment) => {
@@ -219,25 +278,6 @@ export default function AiAgentWizard({ agentId: initialAgentId = null, mode = "
     toast.success(i18n.t("aiAgent.wizard.segment.applySuccess"));
   };
 
-  const ensureDraftAgent = async () => {
-    if (agentId) return agentId;
-    const created = await createAiAgent(createMinimalAiAgentPayload(formState));
-    const newId = created?.data?.id;
-    if (!newId) throw new Error("missing_agent_id");
-    setAgentId(newId);
-    setDraftAgentCreated(true);
-    return newId;
-  };
-
-  const cleanupDraftAgent = async () => {
-    if (!draftAgentCreated || !agentId || isEditMode) return;
-    try {
-      await deleteAiAgent(agentId);
-    } catch {
-      // best effort
-    }
-  };
-
   const requestExit = () => {
     if (dirty && !isSuccess) {
       setConfirmExitOpen(true);
@@ -248,11 +288,15 @@ export default function AiAgentWizard({ agentId: initialAgentId = null, mode = "
 
   const handleConfirmExit = async () => {
     setConfirmExitOpen(false);
-    await cleanupDraftAgent();
     history.push(AI_AGENT_ROUTE_PATH);
   };
 
   const validateCurrentStep = () => {
+    if (activeIdentityMode) {
+      const identityErrors = validateAiAgentWizardIdentity(formState);
+      setErrors(identityErrors);
+      return !hasWizardValidationErrors(identityErrors);
+    }
     if (isWelcome || isReview || isSuccess) {
       setErrors({});
       return true;
@@ -263,17 +307,28 @@ export default function AiAgentWizard({ agentId: initialAgentId = null, mode = "
   };
 
   const goToStep = (stepId) => {
+    if (activeIdentityMode) {
+      setActiveStepId("activeIdentity");
+      setErrors({});
+      return;
+    }
     setActiveStepId(stepId);
     setErrors({});
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleBack = () => {
+    if (activeIdentityMode) return;
     if (activeIndex <= 0) return;
     goToStep(WIZARD_STEP_IDS[activeIndex - 1]);
   };
 
   const handleContinue = async () => {
+    if (activeIdentityMode) {
+      if (!validateCurrentStep()) return;
+      await handleSubmit();
+      return;
+    }
     if (isWelcome) {
       goToStep("company");
       return;
@@ -289,52 +344,124 @@ export default function AiAgentWizard({ agentId: initialAgentId = null, mode = "
   };
 
   const handleSubmit = async () => {
+    if (saving) return;
+
+    const identityOnly = activeIdentityMode;
+
+    if (identityOnly) {
+      const identityErrors = validateAiAgentWizardIdentity(formState);
+      if (hasWizardValidationErrors(identityErrors)) {
+        setErrors(identityErrors);
+        return;
+      }
+    } else {
+      const commercialErrorResult = validateAiAgentWizardCommercialSetup(
+        formState,
+        productOptions
+      );
+      if (commercialErrorResult) {
+        setCommercialError(commercialErrorResult.errorKey);
+        return;
+      }
+    }
+
     setSaving(true);
     try {
-      const targetAgentId = isEditMode ? agentId : await ensureDraftAgent();
-      await updateAiAgentProfile(targetAgentId, profilePayload);
-      setDraftAgentCreated(false);
-      initialSnapshotRef.current = JSON.stringify(formState);
+      let result;
+      if (identityOnly) {
+        result = await update(
+          wizardFormStateToProductIdentityPayload(formState)
+        );
+      } else if (isEditMode) {
+        result = await update(
+          wizardFormStateToProductConfigurationPayload(formState)
+        );
+        result = await updateConnections(
+          wizardFormStateToProductConnectionsPayload(formState)
+        );
+      } else {
+        result = await create(
+          wizardFormStateToProductConfigurationPayload(formState, {
+            forCreate: true,
+            includeConnections: true,
+          })
+        );
+        setWizardMode("edit");
+        setAgentScope({ type: "single", count: 1 });
+      }
+      setSummary(result?.summary || null);
+      initialSnapshotRef.current = identityOnly
+        ? aiAgentWizardIdentitySnapshot(formState)
+        : JSON.stringify(formState);
       setDirty(false);
       setCompleted(true);
       toast.success(
-        isEditMode
+        identityOnly
+          ? i18n.t("aiAgent.wizard.toasts.identityUpdated")
+          : isEditMode
           ? i18n.t("aiAgent.wizard.toasts.updated")
           : i18n.t("aiAgent.wizard.toasts.created")
       );
     } catch (err) {
+      const code = String(err?.response?.data?.error || "");
+      if (!isEditMode && code.includes("ALREADY_EXISTS")) {
+        await loadInitialData();
+        toast.info(i18n.t("aiAgentProduct.configurationErrors.alreadyExists"));
+        return;
+      }
       const mapped = mapBackendErrorToWizardFields(err);
       if (Object.keys(mapped.fields).length) setErrors(mapped.fields);
-      toastError(err);
+      const productErrorKey = productConfigurationErrorKey(err);
+      if (productErrorKey) {
+        toast.error(
+          i18n.t(`aiAgentProduct.configurationErrors.${productErrorKey}`)
+        );
+      } else {
+        toastError(err);
+      }
     } finally {
       setSaving(false);
     }
   };
 
-  const handlePreview = async () => {
-    try {
-      const targetAgentId = isEditMode ? agentId : await ensureDraftAgent();
-      if (!targetAgentId) return;
-      setAgentId(targetAgentId);
-      setPreviewOpen(true);
-    } catch (err) {
-      toastError(err);
-    }
+  const handlePreview = () => {
+    setPreviewOpen(true);
   };
 
   const renderStep = () => {
+    if (isSuccess && activeIdentityMode) {
+      return (
+        <ActiveAgentIdentitySuccess
+          formState={formState}
+          summary={summary}
+          onBackToHub={() => history.push(AI_AGENT_ROUTE_PATH)}
+        />
+      );
+    }
+
     if (isSuccess) {
       return (
         <SuccessStep
           formState={formState}
           agentId={agentId}
           hasCredentials={hasCredentials}
+          summary={summary}
           onViewAgent={() => history.push(AI_AGENT_ROUTE_PATH)}
           onConfigureCredential={() => history.push(AI_AGENT_ROUTE_PATH)}
           onBackToList={() => history.push(AI_AGENT_ROUTE_PATH)}
           onTestAttendant={() =>
             history.push(AI_AGENT_SIMULATOR_ROUTE_PATH.replace(":agentId", String(agentId)))
           }
+        />
+      );
+    }
+
+    if (activeIdentityMode) {
+      return (
+        <ActiveAgentIdentityStep
+          formState={formState}
+          onChange={patchFormState}
+          errors={errors}
         />
       );
     }
@@ -381,8 +508,14 @@ export default function AiAgentWizard({ agentId: initialAgentId = null, mode = "
         return (
           <ReviewStep
             formState={formState}
+            onChange={patchFormState}
             onEditStep={goToStep}
             onPreviewPrompt={handlePreview}
+            options={productOptions}
+            editableWhileActive={editableWhileActive}
+            previewAvailable={previewAvailable}
+            commercialError={commercialError}
+            onConfigureCredential={() => history.push(AI_AGENT_ROUTE_PATH)}
           />
         );
       default:
@@ -398,13 +531,35 @@ export default function AiAgentWizard({ agentId: initialAgentId = null, mode = "
     );
   }
 
+  if (isAmbiguous) {
+    return (
+      <Paper className={classes.paper} variant="outlined">
+        <Alert severity="warning" style={{ marginBottom: 16 }}>
+          {i18n.t("aiAgent.wizard.product.ambiguous")}
+        </Alert>
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={() => history.push(AI_AGENT_ROUTE_PATH)}
+        >
+          {i18n.t("aiAgent.wizard.buttons.backToList")}
+        </Button>
+      </Paper>
+    );
+  }
+
   const continueLabel = isWelcome
     ? i18n.t("aiAgent.wizard.buttons.start")
     : isReview
-      ? isEditMode
-        ? i18n.t("aiAgent.wizard.buttons.saveChanges")
-        : i18n.t("aiAgent.wizard.buttons.createAgent")
+      ? isEditMode && editableWhileActive === false
+        ? i18n.t("aiAgent.wizard.buttons.saveIdentity")
+        : isEditMode
+          ? i18n.t("aiAgent.wizard.buttons.saveChanges")
+          : i18n.t("aiAgent.wizard.buttons.createAgent")
       : i18n.t("aiAgent.wizard.buttons.continue");
+  const effectiveContinueLabel = activeIdentityMode
+    ? i18n.t("aiAgent.wizard.buttons.saveIdentity")
+    : continueLabel;
 
   return (
     <>
@@ -417,15 +572,18 @@ export default function AiAgentWizard({ agentId: initialAgentId = null, mode = "
         {i18n.t("aiAgent.wizard.confirmExit.message")}
       </ConfirmationModal>
 
-      <AiAgentPromptPreviewModal
-        open={previewOpen}
-        onClose={() => setPreviewOpen(false)}
-        agentId={agentId}
-        profilePayload={profilePayload}
-      />
+      {!activeIdentityMode ? (
+        <AiAgentPromptPreviewModal
+          open={previewOpen}
+          onClose={() => setPreviewOpen(false)}
+          profilePayload={profilePayload}
+          loadPreview={preview}
+          onUnavailable={() => setPreviewAvailable(false)}
+        />
+      ) : null}
 
       <Paper className={classes.paper} variant="outlined">
-        {!isSuccess && !isWelcome ? (
+        {!activeIdentityMode && !isSuccess && !isWelcome ? (
           <AiAgentWizardProgress
             currentIndex={progressIndex}
             totalSteps={CONTENT_STEP_IDS.length}
@@ -438,13 +596,18 @@ export default function AiAgentWizard({ agentId: initialAgentId = null, mode = "
 
         {!isSuccess ? (
           <AiAgentWizardNavigation
-            showBack={activeIndex > 0 && activeStepId !== "welcome"}
+            showBack={
+              !activeIdentityMode &&
+              activeIndex > 0 &&
+              activeStepId !== "welcome"
+            }
             showCancel
             onBack={handleBack}
             onCancel={requestExit}
             onContinue={handleContinue}
             loading={saving}
-            continueLabel={continueLabel}
+            continueLabel={effectiveContinueLabel}
+            continueDisabled={false}
           />
         ) : null}
       </Paper>

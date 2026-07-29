@@ -14,10 +14,12 @@ import {
   AiAgentProductConfigurationResult,
   AiAgentProductConfigurationView,
   AiAgentProductConfigurationOptions,
-  AiAgentProductConfigurationConnection
+  AiAgentProductConfigurationConnection,
+  AiAgentProductConfigurationPreview
 } from "../../types/aiAgentProduct";
 import { emptyConnectionScope } from "./aiAgentProductConnectionScope";
 import { emptyAgentScope } from "./ResolveAiAgentProductContextService";
+import { PROFILE_FIELD_KEYS } from "./aiAgentProductConfigurationHelpers";
 
 const ALLOWED_SUMMARY_ROOT = new Set([
   "availability",
@@ -325,6 +327,7 @@ const ALLOWED_CONFIGURATION_ROOT = new Set([
   "identity",
   "messages",
   "model",
+  "profile",
   "instructions",
   "provider",
   "credential",
@@ -340,6 +343,7 @@ const ALLOWED_CONFIGURATION_MODEL = new Set([
   "temperature",
   "maxTokens"
 ]);
+const ALLOWED_CONFIGURATION_PROFILE = new Set<string>(PROFILE_FIELD_KEYS);
 const ALLOWED_CONFIGURATION_INSTRUCTIONS = new Set(["configured", "preview"]);
 const ALLOWED_CONFIGURATION_PROVIDER = new Set([
   "configured",
@@ -371,6 +375,7 @@ const ALLOWED_CONFIGURATION_RESULT = new Set([
 ]);
 const ALLOWED_CONFIGURATION_OPTIONS = new Set([
   "providers",
+  "models",
   "credentials",
   "connections"
 ]);
@@ -388,6 +393,7 @@ const ALLOWED_OPTIONS_CREDENTIAL = new Set([
   "enabled",
   "isDefault"
 ]);
+const ALLOWED_OPTIONS_MODEL = new Set(["value", "label", "provider"]);
 const ALLOWED_OPTIONS_CONNECTION = new Set([
   "ref",
   "name",
@@ -458,6 +464,15 @@ function serializeConfigurationConnection(
 export function serializeAiAgentProductConfiguration(
   configuration: AiAgentProductConfiguration
 ): AiAgentProductConfiguration {
+  const profile =
+    configuration.profile == null
+      ? null
+      : PROFILE_FIELD_KEYS.reduce<Record<string, unknown>>((out, key) => {
+          if (Object.prototype.hasOwnProperty.call(configuration.profile, key)) {
+            out[key] = configuration.profile![key];
+          }
+          return out;
+        }, {});
   const out: AiAgentProductConfiguration = {
     identity: {
       name: String(configuration.identity?.name || ""),
@@ -481,6 +496,7 @@ export function serializeAiAgentProductConfiguration(
       temperature: Number(configuration.model?.temperature),
       maxTokens: Number(configuration.model?.maxTokens)
     },
+    profile,
     instructions: {
       configured: configuration.instructions?.configured === true,
       preview:
@@ -535,6 +551,13 @@ export function serializeAiAgentProductConfiguration(
     ALLOWED_CONFIGURATION_MODEL,
     "configuration.model"
   );
+  if (out.profile != null) {
+    assertConfigurationAllowlisted(
+      out.profile,
+      ALLOWED_CONFIGURATION_PROFILE,
+      "configuration.profile"
+    );
+  }
   assertConfigurationAllowlisted(
     out.instructions as unknown as Record<string, unknown>,
     ALLOWED_CONFIGURATION_INSTRUCTIONS,
@@ -631,6 +654,19 @@ export function serializeAiAgentProductConfigurationOptions(
       );
       return row;
     }),
+    models: (options.models || []).map(model => {
+      const row = {
+        value: String(model.value || ""),
+        label: String(model.label || ""),
+        provider: String(model.provider || "")
+      };
+      assertConfigurationAllowlisted(
+        row as unknown as Record<string, unknown>,
+        ALLOWED_OPTIONS_MODEL,
+        "options.models[]"
+      );
+      return row;
+    }),
     credentials: (options.credentials || []).map(c => {
       const row = {
         ref: String(c.ref),
@@ -669,6 +705,22 @@ export function serializeAiAgentProductConfigurationOptions(
     out as unknown as Record<string, unknown>,
     ALLOWED_CONFIGURATION_OPTIONS,
     "configurationOptions"
+  );
+  return out;
+}
+
+const ALLOWED_CONFIGURATION_PREVIEW = new Set(["preview"]);
+
+export function serializeAiAgentProductConfigurationPreview(
+  input: Record<string, unknown>
+): AiAgentProductConfigurationPreview {
+  const out: AiAgentProductConfigurationPreview = {
+    preview: String(input.preview || "")
+  };
+  assertConfigurationAllowlisted(
+    out as unknown as Record<string, unknown>,
+    ALLOWED_CONFIGURATION_PREVIEW,
+    "configurationPreview"
   );
   return out;
 }
