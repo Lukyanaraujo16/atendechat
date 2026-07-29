@@ -24,31 +24,29 @@ import {
   AiAgentProductReadiness,
   AiAgentProductSummary
 } from "../../types/aiAgentProduct";
+import { resolveAiAgentProductProviderCompatibility } from "./aiAgentProductProviderCapabilities";
 
 const FEATURE_KEY = "automation.ai_agent";
 
-async function resolveHasProvider(
+/**
+ * Resolve a credencial **selecionada** pelo agente (Hardening 2.3.2).
+ * Sem fallback para default/qualquer enabled da empresa.
+ * Cross-tenant / inexistente → null (sem revelar existência).
+ */
+async function resolveLinkedCredentialForReadiness(
   companyId: number,
   agentCredentialId: number | null
-): Promise<boolean> {
-  if (agentCredentialId != null) {
-    const linked = await AiProviderCredential.findOne({
-      where: { id: agentCredentialId, companyId, enabled: true },
-      attributes: ["id"]
-    });
-    if (linked) return true;
-  }
-  const companyDefault = await AiProviderCredential.findOne({
-    where: { companyId, enabled: true, isDefault: true },
-    attributes: ["id"]
+): Promise<{ provider: string; enabled: boolean } | null> {
+  if (agentCredentialId == null) return null;
+  const linked = await AiProviderCredential.findOne({
+    where: { id: agentCredentialId, companyId },
+    attributes: ["id", "provider", "enabled"]
   });
-  if (companyDefault) return true;
-  const anyEnabled = await AiProviderCredential.findOne({
-    where: { companyId, enabled: true },
-    attributes: ["id"],
-    order: [["id", "ASC"]]
-  });
-  return !!anyEnabled;
+  if (!linked) return null;
+  return {
+    provider: String(linked.provider || ""),
+    enabled: linked.enabled === true
+  };
 }
 
 function hasInstructions(
@@ -103,6 +101,7 @@ export async function buildAiAgentProductSnapshot(input: {
       "id",
       "name",
       "enabled",
+      "model",
       "aiProviderCredentialId",
       "systemPrompt",
       "companyId"
@@ -125,17 +124,22 @@ export async function buildAiAgentProductSnapshot(input: {
   const agentSnapshots = [];
   for (const agent of agents) {
     const profile = profileByAgent.get(agent.id) || null;
-    const hasProvider = await resolveHasProvider(
+    const linkedCredential = await resolveLinkedCredentialForReadiness(
       input.companyId,
       agent.aiProviderCredentialId
     );
+    const providerCompatibility = resolveAiAgentProductProviderCompatibility({
+      model: agent.model,
+      linkedCredential
+    });
     agentSnapshots.push({
       id: agent.id,
       name: agent.name,
       enabled: agent.enabled === true,
-      hasProvider,
+      hasProvider: providerCompatibility.ready === true,
       hasInstructions: hasInstructions(agent, profile),
-      explicitlyPaused: false
+      explicitlyPaused: false,
+      providerCompatibility
     });
   }
 

@@ -2,6 +2,7 @@ import {
   AiAgentNextAction,
   AiAgentProductAgentScope,
   AiAgentProductCheck,
+  AiAgentProductCheckStatus,
   AiAgentProductMode,
   AiAgentProductReadiness,
   AgentProductStatus,
@@ -9,11 +10,16 @@ import {
 } from "../../types/aiAgentProduct";
 import { AiAgentRuntimeMode } from "../AiAgentService/aiAgentRuntimeMode";
 import { resolveAiAgentProductAgentContext } from "./ResolveAiAgentProductContextService";
+import type { AiAgentProductProviderCompatibility } from "./aiAgentProductProviderCapabilities";
 
 export type AiAgentProductAgentSnapshot = {
   id: number;
   name: string;
   enabled: boolean;
+  /**
+   * true somente quando provider + credencial selecionada + modelo
+   * estão comercialmente compatíveis (Hardening 2.3.2).
+   */
   hasProvider: boolean;
   hasInstructions: boolean;
   /**
@@ -22,6 +28,11 @@ export type AiAgentProductAgentSnapshot = {
    * Sem sinal inequívoco, permanece false — status `paused` não é emitido.
    */
   explicitlyPaused?: boolean;
+  /**
+   * Detalhe de compatibilidade provider/credencial/modelo.
+   * Ausente em snapshots legados de teste → deriva de hasProvider.
+   */
+  providerCompatibility?: AiAgentProductProviderCompatibility;
 };
 
 export type AiAgentProductConnectionSnapshot = {
@@ -41,6 +52,27 @@ export type AiAgentProductSnapshot = {
 
 function labelKeyForCheck(key: string): string {
   return `aiAgentProduct.checks.${key}`;
+}
+
+function compatibilityOf(
+  agent: AiAgentProductAgentSnapshot | null
+): AiAgentProductProviderCompatibility | null {
+  if (!agent) return null;
+  if (agent.providerCompatibility) return agent.providerCompatibility;
+  // Fallback legado (testes 2.0): hasProvider booleano único
+  const status: AiAgentProductCheckStatus = agent.hasProvider
+    ? "complete"
+    : "pending";
+  return {
+    ready: agent.hasProvider === true,
+    hasConflict: false,
+    providerStatus: status,
+    credentialStatus: status,
+    modelStatus: status,
+    providerLabelKey: labelKeyForCheck("provider"),
+    credentialLabelKey: labelKeyForCheck("credential"),
+    modelLabelKey: labelKeyForCheck("model")
+  };
 }
 
 /**
@@ -113,11 +145,17 @@ function buildChecks(input: {
       ? ("complete" as const)
       : ("pending" as const);
 
-  const providerStatus = !agent
-    ? ("pending" as const)
-    : agent.hasProvider
-      ? ("complete" as const)
-      : ("pending" as const);
+  const compat = compatibilityOf(agent);
+
+  const providerStatus: AiAgentProductCheckStatus = !agent
+    ? "pending"
+    : compat!.providerStatus;
+  const credentialStatus: AiAgentProductCheckStatus = !agent
+    ? "pending"
+    : compat!.credentialStatus;
+  const modelStatus: AiAgentProductCheckStatus = !agent
+    ? "pending"
+    : compat!.modelStatus;
 
   const instructionsStatus = !agent
     ? ("pending" as const)
@@ -131,15 +169,15 @@ function buildChecks(input: {
       ? ("complete" as const)
       : ("pending" as const);
 
+  const providerReady =
+    providerStatus === "complete" &&
+    credentialStatus === "complete" &&
+    modelStatus === "complete";
+
   let modeStatus: AiAgentProductCheck["status"] = "pending";
   if (mode === "live" || mode === "shadow") modeStatus = "complete";
   else if (mode === "paused") modeStatus = "warning";
-  else if (
-    agent &&
-    agent.hasProvider &&
-    agent.hasInstructions &&
-    linked.length > 0
-  ) {
+  else if (agent && providerReady && agent.hasInstructions && linked.length > 0) {
     modeStatus = "pending";
   }
 
@@ -155,7 +193,17 @@ function buildChecks(input: {
     {
       key: "provider",
       status: providerStatus,
-      labelKey: labelKeyForCheck("provider")
+      labelKey: compat?.providerLabelKey || labelKeyForCheck("provider")
+    },
+    {
+      key: "credential",
+      status: credentialStatus,
+      labelKey: compat?.credentialLabelKey || labelKeyForCheck("credential")
+    },
+    {
+      key: "model",
+      status: modelStatus,
+      labelKey: compat?.modelLabelKey || labelKeyForCheck("model")
     },
     {
       key: "instructions",
@@ -176,6 +224,8 @@ function isSetupComplete(checks: AiAgentProductCheck[]): boolean {
     "plan",
     "agent",
     "provider",
+    "credential",
+    "model",
     "instructions",
     "connection"
   ];
@@ -183,6 +233,14 @@ function isSetupComplete(checks: AiAgentProductCheck[]): boolean {
     const c = checks.find(x => x.key === key);
     return c?.status === "complete";
   });
+}
+
+function hasConfigurationConflict(checks: AiAgentProductCheck[]): boolean {
+  return checks.some(
+    c =>
+      (c.key === "provider" || c.key === "credential" || c.key === "model") &&
+      c.status === "blocked"
+  );
 }
 
 function resolveNextAction(input: {
@@ -197,7 +255,9 @@ function resolveNextAction(input: {
   if (status === "not_created") return "create_agent";
   if (status === "paused") return "resume_agent";
   if (agentAmbiguous) return "configure_agent";
+
   if (status === "attention_required") {
+    if (hasConfigurationConflict(checks)) return "resolve_conflict";
     const conn = checks.find(c => c.key === "connection");
     if (conn && conn.status !== "complete") return "connect_whatsapp";
     return "fix_connection";
@@ -211,6 +271,8 @@ function resolveNextAction(input: {
   }> = [
     { key: "agent", action: "create_agent" },
     { key: "provider", action: "configure_provider" },
+    { key: "credential", action: "configure_provider" },
+    { key: "model", action: "configure_agent" },
     { key: "instructions", action: "configure_agent" },
     { key: "connection", action: "connect_whatsapp" }
   ];
@@ -260,6 +322,7 @@ function hasAttention(input: {
 /**
  * Única fonte oficial de readiness comercial (Architecture Lock §12).
  * Resolução do agente: ResolveAiAgentProductContextService (Estratégia A).
+ * Compatibilidade provider/credencial/modelo: Hardening 2.3.2.
  */
 export function computeAiAgentProductReadiness(
   snapshot: AiAgentProductSnapshot
@@ -309,6 +372,9 @@ export function computeAiAgentProductReadiness(
   } else if (resolvedCtx.resolution === "not_created") {
     status = "not_created";
   } else if (agentAmbiguous) {
+    status = "attention_required";
+  } else if (hasConfigurationConflict(checks)) {
+    // Configuração contraditória prevalece sobre setup_incomplete / ready
     status = "attention_required";
   } else if (!setupComplete) {
     status = "setup_incomplete";

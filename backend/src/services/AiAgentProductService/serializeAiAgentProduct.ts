@@ -9,7 +9,12 @@ import {
   AiAgentProductCommandResult,
   AiAgentProductConnectionScope,
   AiAgentProductAffectedConnections,
-  AiAgentProductAgentScope
+  AiAgentProductAgentScope,
+  AiAgentProductConfiguration,
+  AiAgentProductConfigurationResult,
+  AiAgentProductConfigurationView,
+  AiAgentProductConfigurationOptions,
+  AiAgentProductConfigurationConnection
 } from "../../types/aiAgentProduct";
 import { emptyConnectionScope } from "./aiAgentProductConnectionScope";
 import { emptyAgentScope } from "./ResolveAiAgentProductContextService";
@@ -315,3 +320,359 @@ export function serializeAiAgentProductCommandResult(input: {
 
 /** Lista de chaves raiz permitidas — para testes de contrato. */
 export const AI_AGENT_PRODUCT_SUMMARY_ALLOWED_KEYS = [...ALLOWED_SUMMARY_ROOT];
+
+const ALLOWED_CONFIGURATION_ROOT = new Set([
+  "identity",
+  "messages",
+  "model",
+  "instructions",
+  "provider",
+  "credential",
+  "connections"
+]);
+const ALLOWED_CONFIGURATION_IDENTITY = new Set(["name", "description"]);
+const ALLOWED_CONFIGURATION_MESSAGES = new Set([
+  "fallbackMessage",
+  "handoffMessage"
+]);
+const ALLOWED_CONFIGURATION_MODEL = new Set([
+  "name",
+  "temperature",
+  "maxTokens"
+]);
+const ALLOWED_CONFIGURATION_INSTRUCTIONS = new Set(["configured", "preview"]);
+const ALLOWED_CONFIGURATION_PROVIDER = new Set([
+  "configured",
+  "type",
+  "label"
+]);
+const ALLOWED_CONFIGURATION_CREDENTIAL = new Set([
+  "configured",
+  "label",
+  "maskedKey"
+]);
+const ALLOWED_CONFIGURATION_CONNECTION = new Set([
+  "ref",
+  "name",
+  "status",
+  "selected"
+]);
+const ALLOWED_CONFIGURATION_VIEW = new Set([
+  "agentScope",
+  "configuration",
+  "editableWhileActive",
+  "summary"
+]);
+const ALLOWED_CONFIGURATION_RESULT = new Set([
+  "changed",
+  "created",
+  "configuration",
+  "summary"
+]);
+const ALLOWED_CONFIGURATION_OPTIONS = new Set([
+  "providers",
+  "credentials",
+  "connections"
+]);
+const ALLOWED_OPTIONS_PROVIDER = new Set([
+  "value",
+  "label",
+  "available",
+  "unavailableReason"
+]);
+const ALLOWED_OPTIONS_CREDENTIAL = new Set([
+  "ref",
+  "name",
+  "provider",
+  "maskedKey",
+  "enabled",
+  "isDefault"
+]);
+const ALLOWED_OPTIONS_CONNECTION = new Set([
+  "ref",
+  "name",
+  "status",
+  "selected",
+  "eligible",
+  "ineligibleReason"
+]);
+
+/**
+ * Fragmentos proibidos na Configuration API.
+ * Não inclui "token"/"prompt" genéricos — allowlist usa maxTokens e preview.
+ */
+const CONFIGURATION_FORBIDDEN_KEY_FRAGMENTS = [
+  "apikeyencrypted",
+  "apikey",
+  "systemprompt",
+  "generatedprompt",
+  "credentialid",
+  "companyid",
+  "whatsappid",
+  "aiagentid",
+  "password",
+  "secret",
+  "stack",
+  "session",
+  "platformpermission",
+  "trace",
+  "execution",
+  "planning"
+];
+
+function assertConfigurationAllowlisted(
+  value: Record<string, unknown>,
+  allowed: Set<string>,
+  path: string
+): void {
+  for (const key of Object.keys(value)) {
+    if (!allowed.has(key)) {
+      throw new Error(`Serializer leak: unexpected key ${path}.${key}`);
+    }
+    const lower = key.toLowerCase();
+    for (const bad of CONFIGURATION_FORBIDDEN_KEY_FRAGMENTS) {
+      if (lower.includes(bad)) {
+        throw new Error(`Serializer leak: forbidden key ${path}.${key}`);
+      }
+    }
+  }
+}
+
+function serializeConfigurationConnection(
+  row: AiAgentProductConfigurationConnection
+): AiAgentProductConfigurationConnection {
+  const out: AiAgentProductConfigurationConnection = {
+    ref: String(row.ref),
+    name: String(row.name || "").trim() || "—",
+    status: String(row.status || ""),
+    selected: row.selected === true
+  };
+  assertConfigurationAllowlisted(
+    out as unknown as Record<string, unknown>,
+    ALLOWED_CONFIGURATION_CONNECTION,
+    "configuration.connections[]"
+  );
+  return out;
+}
+
+export function serializeAiAgentProductConfiguration(
+  configuration: AiAgentProductConfiguration
+): AiAgentProductConfiguration {
+  const out: AiAgentProductConfiguration = {
+    identity: {
+      name: String(configuration.identity?.name || ""),
+      description:
+        configuration.identity?.description != null
+          ? String(configuration.identity.description)
+          : null
+    },
+    messages: {
+      fallbackMessage:
+        configuration.messages?.fallbackMessage != null
+          ? String(configuration.messages.fallbackMessage)
+          : null,
+      handoffMessage:
+        configuration.messages?.handoffMessage != null
+          ? String(configuration.messages.handoffMessage)
+          : null
+    },
+    model: {
+      name: String(configuration.model?.name || ""),
+      temperature: Number(configuration.model?.temperature),
+      maxTokens: Number(configuration.model?.maxTokens)
+    },
+    instructions: {
+      configured: configuration.instructions?.configured === true,
+      preview:
+        configuration.instructions?.preview != null
+          ? String(configuration.instructions.preview).slice(0, 200)
+          : null
+    },
+    provider: {
+      configured: configuration.provider?.configured === true,
+      type:
+        configuration.provider?.type != null
+          ? String(configuration.provider.type)
+          : null,
+      label:
+        configuration.provider?.label != null
+          ? String(configuration.provider.label)
+          : null
+    },
+    credential: {
+      configured: configuration.credential?.configured === true,
+      label:
+        configuration.credential?.label != null
+          ? String(configuration.credential.label)
+          : null,
+      maskedKey:
+        configuration.credential?.maskedKey != null
+          ? String(configuration.credential.maskedKey)
+          : null
+    },
+    connections: Array.isArray(configuration.connections)
+      ? configuration.connections.map(serializeConfigurationConnection)
+      : []
+  };
+
+  assertConfigurationAllowlisted(
+    out as unknown as Record<string, unknown>,
+    ALLOWED_CONFIGURATION_ROOT,
+    "configuration"
+  );
+  assertConfigurationAllowlisted(
+    out.identity as unknown as Record<string, unknown>,
+    ALLOWED_CONFIGURATION_IDENTITY,
+    "configuration.identity"
+  );
+  assertConfigurationAllowlisted(
+    out.messages as unknown as Record<string, unknown>,
+    ALLOWED_CONFIGURATION_MESSAGES,
+    "configuration.messages"
+  );
+  assertConfigurationAllowlisted(
+    out.model as unknown as Record<string, unknown>,
+    ALLOWED_CONFIGURATION_MODEL,
+    "configuration.model"
+  );
+  assertConfigurationAllowlisted(
+    out.instructions as unknown as Record<string, unknown>,
+    ALLOWED_CONFIGURATION_INSTRUCTIONS,
+    "configuration.instructions"
+  );
+  assertConfigurationAllowlisted(
+    out.provider as unknown as Record<string, unknown>,
+    ALLOWED_CONFIGURATION_PROVIDER,
+    "configuration.provider"
+  );
+  assertConfigurationAllowlisted(
+    out.credential as unknown as Record<string, unknown>,
+    ALLOWED_CONFIGURATION_CREDENTIAL,
+    "configuration.credential"
+  );
+
+  return out;
+}
+
+export function serializeAiAgentProductConfigurationView(input: {
+  agentScope: AiAgentProductAgentScope;
+  configuration: AiAgentProductConfiguration | null;
+  editableWhileActive?: boolean;
+  summary: AiAgentProductSummary;
+}): AiAgentProductConfigurationView {
+  const out: AiAgentProductConfigurationView = {
+    agentScope: serializeAiAgentAgentScope(input.agentScope),
+    configuration:
+      input.configuration == null
+        ? null
+        : serializeAiAgentProductConfiguration(input.configuration),
+    summary: serializeAiAgentProductSummary(input.summary)
+  };
+  if (input.configuration != null) {
+    out.editableWhileActive = input.editableWhileActive === true;
+  }
+  assertConfigurationAllowlisted(
+    out as unknown as Record<string, unknown>,
+    ALLOWED_CONFIGURATION_VIEW,
+    "configurationView"
+  );
+  return out;
+}
+
+export function serializeAiAgentProductConfigurationResult(input: {
+  changed?: boolean;
+  created?: boolean;
+  configuration: AiAgentProductConfiguration | null;
+  summary: AiAgentProductSummary;
+}): AiAgentProductConfigurationResult {
+  const out: AiAgentProductConfigurationResult = {
+    configuration:
+      input.configuration == null
+        ? null
+        : serializeAiAgentProductConfiguration(input.configuration),
+    summary: serializeAiAgentProductSummary(input.summary)
+  };
+  if (input.changed !== undefined) {
+    out.changed = input.changed === true;
+  }
+  if (input.created !== undefined) {
+    out.created = input.created === true;
+  }
+  assertConfigurationAllowlisted(
+    out as unknown as Record<string, unknown>,
+    ALLOWED_CONFIGURATION_RESULT,
+    "configurationResult"
+  );
+  return out;
+}
+
+export function serializeAiAgentProductConfigurationOptions(
+  options: AiAgentProductConfigurationOptions
+): AiAgentProductConfigurationOptions {
+  const out: AiAgentProductConfigurationOptions = {
+    providers: (options.providers || []).map(p => {
+      const row: {
+        value: string;
+        label: string;
+        available: boolean;
+        unavailableReason?: string | null;
+      } = {
+        value: String(p.value || ""),
+        label: String(p.label || ""),
+        available: p.available === true
+      };
+      if (p.unavailableReason != null && String(p.unavailableReason).trim()) {
+        row.unavailableReason = String(p.unavailableReason);
+      }
+      assertConfigurationAllowlisted(
+        row as unknown as Record<string, unknown>,
+        ALLOWED_OPTIONS_PROVIDER,
+        "options.providers[]"
+      );
+      return row;
+    }),
+    credentials: (options.credentials || []).map(c => {
+      const row = {
+        ref: String(c.ref),
+        name: String(c.name || ""),
+        provider: String(c.provider || ""),
+        maskedKey: String(c.maskedKey || ""),
+        enabled: c.enabled === true,
+        isDefault: c.isDefault === true
+      };
+      assertConfigurationAllowlisted(
+        row as unknown as Record<string, unknown>,
+        ALLOWED_OPTIONS_CREDENTIAL,
+        "options.credentials[]"
+      );
+      return row;
+    }),
+    connections: (options.connections || []).map(c => {
+      const row = {
+        ref: String(c.ref),
+        name: String(c.name || "").trim() || "—",
+        status: String(c.status || ""),
+        selected: c.selected === true,
+        eligible: c.eligible === true,
+        ineligibleReason:
+          c.ineligibleReason != null ? String(c.ineligibleReason) : null
+      };
+      assertConfigurationAllowlisted(
+        row as unknown as Record<string, unknown>,
+        ALLOWED_OPTIONS_CONNECTION,
+        "options.connections[]"
+      );
+      return row;
+    })
+  };
+  assertConfigurationAllowlisted(
+    out as unknown as Record<string, unknown>,
+    ALLOWED_CONFIGURATION_OPTIONS,
+    "configurationOptions"
+  );
+  return out;
+}
+
+export const AI_AGENT_PRODUCT_CONFIGURATION_ALLOWED_KEYS = [
+  ...ALLOWED_CONFIGURATION_ROOT
+];

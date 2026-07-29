@@ -19,3 +19,33 @@ export function getAiAgentProductReadiness() {
 export function postAiAgentProductCommand(command) {
   return api.post("/product/ai-agent/commands", { command });
 }
+
+export async function getAiAgentProductConfiguration() {
+  const { data } = await api.get("/product/ai-agent/configuration");
+  return data;
+}
+
+export async function postAiAgentProductConfiguration(payload) {
+  const { data } = await api.post("/product/ai-agent/configuration", payload);
+  return data;
+}
+
+export async function putAiAgentProductConfiguration(payload) {
+  const { data } = await api.put("/product/ai-agent/configuration", payload);
+  return data;
+}
+
+export async function getAiAgentProductConfigurationOptions() {
+  const { data } = await api.get(
+    "/product/ai-agent/configuration/options"
+  );
+  return data;
+}
+
+export async function putAiAgentProductConnections(payload) {
+  const { data } = await api.put(
+    "/product/ai-agent/configuration/connections",
+    payload
+  );
+  return data;
+}

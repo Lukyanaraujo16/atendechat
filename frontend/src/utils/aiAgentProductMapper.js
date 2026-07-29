@@ -241,6 +241,13 @@ export function buildAiAgentCommercialCommands(summary) {
   }
 
   if (status === "attention_required") {
+    // Hardening 2.3.2: conflito provider/credencial/modelo → sem activate
+    const nextType =
+      summary?.nextAction?.type || summary?.nextAction?.command || primary;
+    if (nextType === "resolve_conflict") {
+      push("deactivate");
+      return commands;
+    }
     push("activate_shadow");
     push("activate_live");
     push("deactivate");
@@ -403,6 +410,46 @@ export function mapAiAgentProductSummary(payload) {
   mapped.secondaryActions = buildAiAgentSecondaryActions(mapped);
   mapped.commercialCommands = buildAiAgentCommercialCommands(mapped);
   return mapped;
+}
+
+export function mapAiAgentProductConfiguration(raw) {
+  if (!raw) return null;
+  return {
+    agentScope: raw.agentScope || null,
+    configuration: raw.configuration || null,
+    editableWhileActive: raw.editableWhileActive === true,
+    summary: raw.summary ? mapAiAgentProductSummary(raw.summary) : null,
+  };
+}
+
+/**
+ * Normaliza providers comerciais da Product API (Hardening 2.3.1).
+ * Não duplica allowlist — apenas normaliza o payload do backend.
+ * Frontend NÃO calcula readiness.
+ */
+export function mapAiAgentProductConfigurationOptions(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const providers = Array.isArray(raw.providers)
+    ? raw.providers.map((p) => ({
+        value: String(p?.value || "").trim().toLowerCase(),
+        label: String(p?.label || "").trim() || String(p?.value || ""),
+        available: p?.available === true,
+        unavailableReason:
+          p?.unavailableReason != null ? String(p.unavailableReason) : null,
+      }))
+    : [];
+  return {
+    providers,
+    credentials: Array.isArray(raw.credentials) ? raw.credentials : [],
+    connections: Array.isArray(raw.connections) ? raw.connections : [],
+  };
+}
+
+export function normalizeAiAgentProductProvider(value) {
+  const v = String(value || "").trim().toLowerCase();
+  if (v === "openai" || v === "gemini") return v;
+  if (!v) return null;
+  return "unknown";
 }
 
 export function isDeferredMutationAction(actionType) {

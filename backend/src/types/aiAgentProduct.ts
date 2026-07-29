@@ -28,6 +28,8 @@ export type AiAgentProductCheckKey =
   | "plan"
   | "agent"
   | "provider"
+  | "credential"
+  | "model"
   | "instructions"
   | "connection"
   | "mode";
@@ -154,4 +156,94 @@ export const AGENT_PRODUCT_STATUS_PRIORITY: Record<AgentProductStatus, number> =
   paused: 5,
   active: 6,
   ready_to_activate: 7
+};
+
+/** Configuração comercial (Fase 2.3). */
+export type AiAgentProductConfigurationIdentity = {
+  name: string;
+  description: string | null;
+};
+
+export type AiAgentProductConfigurationMessages = {
+  fallbackMessage: string | null;
+  handoffMessage: string | null;
+};
+
+export type AiAgentProductConfigurationModel = {
+  name: string;
+  temperature: number;
+  maxTokens: number;
+};
+
+export type AiAgentProductConfigurationInstructions = {
+  configured: boolean;
+  preview: string | null;
+};
+
+export type AiAgentProductConfigurationProvider = {
+  configured: boolean;
+  type: string | null;
+  label: string | null;
+};
+
+export type AiAgentProductConfigurationCredential = {
+  configured: boolean;
+  label: string | null;
+  maskedKey: string | null;
+};
+
+export type AiAgentProductConfigurationConnection = {
+  ref: string;
+  name: string;
+  status: string;
+  selected: boolean;
+};
+
+export type AiAgentProductConfiguration = {
+  identity: AiAgentProductConfigurationIdentity;
+  messages: AiAgentProductConfigurationMessages;
+  model: AiAgentProductConfigurationModel;
+  instructions: AiAgentProductConfigurationInstructions;
+  provider: AiAgentProductConfigurationProvider;
+  credential: AiAgentProductConfigurationCredential;
+  connections: AiAgentProductConfigurationConnection[];
+};
+
+export type AiAgentProductConfigurationResult = {
+  changed?: boolean;
+  created?: boolean;
+  configuration: AiAgentProductConfiguration | null;
+  summary: AiAgentProductSummary;
+};
+
+export type AiAgentProductConfigurationView = {
+  agentScope: AiAgentProductAgentScope;
+  configuration: AiAgentProductConfiguration | null;
+  editableWhileActive?: boolean;
+  summary: AiAgentProductSummary;
+};
+
+export type AiAgentProductConfigurationOptions = {
+  providers: Array<{
+    value: string;
+    label: string;
+    available: boolean;
+    unavailableReason?: string | null;
+  }>;
+  credentials: Array<{
+    ref: string;
+    name: string;
+    provider: string;
+    maskedKey: string;
+    enabled: boolean;
+    isDefault: boolean;
+  }>;
+  connections: Array<{
+    ref: string;
+    name: string;
+    status: string;
+    selected: boolean;
+    eligible: boolean;
+    ineligibleReason: string | null;
+  }>;
 };

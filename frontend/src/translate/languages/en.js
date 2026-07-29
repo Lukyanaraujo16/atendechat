@@ -2729,6 +2729,20 @@ const messages = {
 				commands: {
 					deactivate: "Deactivate agent",
 				},
+				configurationErrors: {
+					ambiguous:
+						"Multiple AI Agent configurations exist. Resolve before continuing.",
+					alreadyExists: "An AI Agent is already configured.",
+					updateNotAllowed:
+						"Deactivate the agent before changing this configuration.",
+					connectionAssigned:
+						"This connection is already linked to another agent.",
+					connectionInvalid:
+						"Invalid connection or does not belong to the company.",
+					credentialInvalid:
+						"Invalid credential or does not belong to the company.",
+					providerInvalid: "Unsupported provider.",
+				},
 				confirm: {
 					activate_shadow: {
 						title: "Enable test mode",
@@ -2837,6 +2851,12 @@ const messages = {
 					agent: "Agent created",
 					agentAmbiguous: "There are multiple AI Agent configurations",
 					provider: "AI provider",
+					providerUnsupported: "Unsupported provider",
+					credential: "Provider credential",
+					credentialIncompatible: "Credential incompatible with provider",
+					credentialDisabled: "Credential disabled",
+					model: "AI model",
+					modelIncompatible: "Model incompatible with provider",
 					instructions: "Instructions",
 					connection: "WhatsApp connection",
 					mode: "Operation mode",
@@ -2844,7 +2864,15 @@ const messages = {
 				checkDescription: {
 					plan: "Module availability on the company plan.",
 					agent: "An AI Agent exists for the company.",
-					provider: "Provider credential configured.",
+					provider: "Supported commercial provider configured.",
+					providerUnsupported: "The configured provider is not supported by the product.",
+					credential: "Selected credential enabled and compatible with the provider.",
+					credentialIncompatible:
+						"The selected credential is not compatible with the provider.",
+					credentialDisabled: "The selected credential is disabled.",
+					model: "Model compatible with the configured provider.",
+					modelIncompatible:
+						"The selected model does not belong to the configured provider.",
 					instructions: "Instructions or attendant profile defined.",
 					connection: "WhatsApp linked to the agent.",
 					mode: "Connection operation mode.",

@@ -502,3 +502,214 @@ agentScope: { type: "none" | "single" | "ambiguous"; count: number }
 |--------|--------|
 | `ERR_AI_AGENT_PRODUCT_CONTEXT_AMBIGUOUS` | ≥2 agentes elegíveis no comando |
 | `ERR_AI_AGENT_PRODUCT_CONTEXT_INVALID` | 0 agentes em activate (ou IDs arbitrários no body) |
+
+---
+
+## 20. Product Configuration API
+
+### Namespace
+
+`/product/ai-agent/configuration` e `/product/ai-agent/configuration/*`
+
+### Endpoints
+
+| Método | Path | Descrição |
+|--------|------|-----------|
+| GET | `/product/ai-agent/configuration` | Configuração editável |
+| POST | `/product/ai-agent/configuration` | Criação comercial |
+| PUT | `/product/ai-agent/configuration` | Atualização comercial |
+| GET | `/product/ai-agent/configuration/options` | Opções disponíveis |
+| PUT | `/product/ai-agent/configuration/connections` | Vincular/desvincular conexões |
+
+### Autorização
+
+- `isAuth` + `requireAiAgentProductView` (admin only)
+- Feature `automation.ai_agent` validada por operação
+- `supportMode` não autoriza
+- Permissões AgentOS não autorizam
+
+### Contexto do agente (ResolveAiAgentProductContextService)
+
+- 0 agentes → tipo `"none"` → criação permitida
+- 1 agente → tipo `"single"` → leitura e atualização
+- ≥2 agentes → tipo `"ambiguous"` → bloqueado, erro comercial
+
+### Campos comerciais editáveis (allowlist)
+
+**Identidade:** `name`, `description`, `fallbackMessage`, `handoffMessage`
+
+**Modelo:** `model`, `temperature`, `maxTokens`
+
+**Profile (instructions):** todos os campos do AiAgentProfile exceto `generated*`, `setupMode`, `schemaVersion`
+
+**Provider:** `credentialRef` (referência opaca)
+
+**Conexões:** `connectionRefs[]` (referências opacas)
+
+### Campos nunca aceitos no payload
+
+`companyId`, `agentId`, `enabled`, `mode`, `dry_run`, `aiAgentEnabled`, `aiAgentMode`, `apiKey`, `secret`, `token`, `platformPermissions`, `systemPrompt`, `generatedPrompt`, `status`, `readiness`
+
+### GET `/product/ai-agent/configuration`
+
+Retorna:
+
+```json
+{
+  "agentScope": { "type": "single", "count": 1 },
+  "configuration": {
+    "identity": { "name": "...", "description": "..." },
+    "messages": { "fallbackMessage": "...", "handoffMessage": "..." },
+    "model": { "name": "gpt-4o-mini", "temperature": 0.3, "maxTokens": 512 },
+    "instructions": { "configured": true, "preview": "..." },
+    "provider": { "configured": true, "type": "openai", "label": "..." },
+    "credential": { "configured": true, "label": "...", "maskedKey": "sk-...XXX" },
+    "connections": [{ "ref": "...", "name": "...", "status": "CONNECTED", "selected": true }]
+  },
+  "editableWhileActive": false,
+  "summary": { }
+}
+```
+
+Para `agentScope.type === "none"`:
+
+```json
+{
+  "agentScope": { "type": "none", "count": 0 },
+  "configuration": null,
+  "summary": { }
+}
+```
+
+Para `agentScope.type === "ambiguous"`:
+
+→ `409 ERR_AI_AGENT_PRODUCT_CONTEXT_AMBIGUOUS`
+
+### GET `/product/ai-agent/configuration/options`
+
+```json
+{
+  "providers": [
+    { "value": "openai", "label": "OpenAI", "available": true },
+    { "value": "gemini", "label": "Google Gemini", "available": true }
+  ],
+  "credentials": [{ "ref": "...", "name": "...", "provider": "openai", "maskedKey": "...", "enabled": true, "isDefault": true }],
+  "connections": [{ "ref": "...", "name": "...", "status": "CONNECTED", "selected": true, "eligible": true, "ineligibleReason": null }]
+}
+```
+
+### Providers comerciais (Hardening 2.3.1)
+
+Fonte única: `aiAgentProductProviderCapabilities` (reutiliza IDs de `aiProviderModels`).
+
+| Provider | Label | Shadow | Live | Credencial própria | Modelos |
+|----------|-------|--------|------|--------------------|---------|
+| `openai` | OpenAI | sim | sim | sim | `gpt-4o-mini`, `gpt-4o`, `gpt-3.5-turbo-1106` |
+| `gemini` | Google Gemini | sim | sim | sim | `gemini-2.5-flash`, `gemini-2.5-flash-lite`, `gemini-2.0-flash`, `gemini-1.5-flash`, `gemini-1.5-pro` |
+
+Regras:
+
+- `credential.provider` deve ser igual ao `provider` comercial selecionado.
+- Modelo deve pertencer à allowlist do provider (`isModelAllowedForProvider`).
+- Combinações cruzadas (`gemini` + `gpt-*`, `openai` + `gemini-*`) → `ERR_AI_AGENT_PRODUCT_CONFIGURATION_INVALID` ou `ERR_AI_AGENT_PRODUCT_CREDENTIAL_INVALID`.
+- Provider desconhecido persistido: GET preserva `type` original com `label: "Não suportado"` — **nunca** converte para `openai`.
+- Troca de provider só em Off (Estratégia C). Sem nova credencial compatível → limpa `credentialRef` e aplica modelo default do novo provider (`setup_incomplete`).
+- Payload aceita `provider` na allowlist comercial (create/update).
+
+### Readiness provider/credencial/modelo (Hardening 2.3.2)
+
+Fonte: `resolveAiAgentProductProviderCompatibility` (mesmo módulo de capabilities).
+
+| Situação | Checks | Status comercial |
+|----------|--------|------------------|
+| Credencial selecionada ausente | provider/credential/model → `pending` | `setup_incomplete` |
+| Provider desconhecido | provider → `blocked` | `attention_required` |
+| Credencial disabled | credential → `blocked` | `attention_required` |
+| Credencial incompatível / cross-tenant (tratada como ausente ou inválida) | blocked/pending | `attention_required` ou `setup_incomplete` |
+| Modelo incompatível | model → `blocked` | `attention_required` |
+| OpenAI/Gemini válidos + demais checks | complete | `ready_to_activate` / `active` |
+
+Regras:
+
+- Readiness usa **somente** a credencial vinculada (`aiProviderCredentialId`), filtrada por `companyId`.
+- Outra credencial válida da empresa **não** mascara a selecionada inválida/ausente.
+- Runtime Shadow/Live ainda pode fazer fallback — Product API é mais estrita para liberar activate.
+- `activate_shadow` / `activate_live` falham com `ERR_AI_AGENT_PRODUCT_NOT_READY` antes de mutar.
+- `deactivate` permanece permitido com configuração inválida (redução de risco).
+- Checks comerciais: `provider`, `credential`, `model` (além dos existentes). Sem IDs, secrets ou companyId.
+
+#### Compatibilidade Wizard legado (Fase 2.4)
+
+- Wizard guiado **não** seleciona provider/modelo/credencial; cria `gpt-4o-mini` com `aiProviderCredentialId: null`.
+- AiAgentModal avançado já filtra modelos por provider da credencial.
+- Divergência a resolver na 2.4: Wizard deve passar a consumir Product API options (openai + gemini).
+
+### POST `/product/ai-agent/configuration` (criação)
+
+- Somente quando `agentScope.type === "none"`
+- Payload: allowlist comercial
+- Agente criado com `enabled: false`
+- Resposta: `{ "created": true, "configuration": {...}, "summary": {...} }`
+- Se agente já existe: `409 ERR_AI_AGENT_PRODUCT_ALREADY_EXISTS`
+- Se ambíguo: `409 ERR_AI_AGENT_PRODUCT_CONTEXT_AMBIGUOUS`
+
+### PUT `/product/ai-agent/configuration` (atualização)
+
+- Somente quando `agentScope.type === "single"`
+- Payload parcial: somente campos presentes são atualizados
+- Idempotência: `changed: false` se valores iguais
+- Agente ativo (shadow/live): somente identity (`name`, `description`, `fallbackMessage`, `handoffMessage`) permitidos → outros campos retornam `ERR_AI_AGENT_PRODUCT_UPDATE_NOT_ALLOWED_WHILE_ACTIVE`
+- Resposta: `{ "changed": true|false, "configuration": {...}, "summary": {...} }`
+
+### PUT `/product/ai-agent/configuration/connections`
+
+- Somente quando `agentScope.type === "single"`
+- Payload: `{ "connectionRefs": ["ref1", "ref2"] }` (estado desejado completo)
+- Validações: ownership, elegibilidade, cross-tenant, já atribuída a outro agente
+- Conexão vinculada: `aiAgentId=agente`, `aiAgentEnabled=false`, `aiAgentMode=disabled`
+- Desvinculada: `aiAgentId=null`, `aiAgentEnabled=false`, `aiAgentMode=disabled`
+- Agente ativo: `409 ERR_AI_AGENT_PRODUCT_UPDATE_NOT_ALLOWED_WHILE_ACTIVE`
+- Resposta: `{ "changed": true|false, "configuration": {...}, "summary": {...} }`
+
+### Transação e locks
+
+- Operações multi-entidade usam transação
+- Lock `UPDATE` com `ORDER BY id ASC`
+- Rollback completo em falha
+
+### Concorrência
+
+- Re-resolve `agentContext` dentro da transação
+- Se ambiguidade surgir durante tx → rollback + erro
+
+### Erros comerciais
+
+| Código | HTTP | Quando |
+|--------|------|--------|
+| `ERR_AI_AGENT_PRODUCT_CONFIGURATION_INVALID` | 400 | Payload inválido |
+| `ERR_AI_AGENT_PRODUCT_CONTEXT_AMBIGUOUS` | 409 | Múltiplos agentes |
+| `ERR_AI_AGENT_PRODUCT_ALREADY_EXISTS` | 409 | Criação com agente existente |
+| `ERR_AI_AGENT_PRODUCT_PROVIDER_INVALID` | 400 | Provider não suportado |
+| `ERR_AI_AGENT_PRODUCT_CREDENTIAL_INVALID` | 400 | Credencial inválida/incompatível/cross-tenant |
+| `ERR_AI_AGENT_PRODUCT_CONNECTION_INVALID` | 400 | Conexão inexistente/cross-tenant |
+| `ERR_AI_AGENT_PRODUCT_CONNECTION_ALREADY_ASSIGNED` | 409 | Conexão vinculada a outro agente |
+| `ERR_AI_AGENT_PRODUCT_UPDATE_NOT_ALLOWED_WHILE_ACTIVE` | 409 | Alteração estrutural com agente ativo |
+| `ERR_AI_AGENT_PRODUCT_NOT_AVAILABLE` | 403 | Plano off |
+| `ERR_AI_AGENT_PRODUCT_ACCESS_DENIED` | 403 | Não admin |
+
+### Idempotência
+
+- PUT com mesmos valores → `changed: false`
+- POST com agente existente → `409` (não duplica)
+- Vincular conexão já vinculada ao mesmo agente → no-op
+
+### Auditoria
+
+- Não existe padrão de audit log para configurações no projeto
+- Risco residual documentado
+- Usar `logger.info` para rastreabilidade mínima
+
+### Knowledge Base
+
+- Não migrada nesta fase
+- `configuration.instructions.configured` indica presença de prompt compilado

@@ -2658,6 +2658,20 @@ const messages = {
         commands: {
           deactivate: "Desactivar agente",
         },
+        configurationErrors: {
+          ambiguous:
+            "Existen múltiples configuraciones de Agente de IA. Resuelva antes de continuar.",
+          alreadyExists: "Ya existe un Agente de IA configurado.",
+          updateNotAllowed:
+            "Desactive el agente antes de cambiar esta configuración.",
+          connectionAssigned:
+            "Esta conexión ya está vinculada a otro agente.",
+          connectionInvalid:
+            "Conexión inválida o no pertenece a la empresa.",
+          credentialInvalid:
+            "Credencial inválida o no pertenece a la empresa.",
+          providerInvalid: "Proveedor no soportado.",
+        },
         confirm: {
           activate_shadow: {
             title: "Activar modo de pruebas",
@@ -2766,6 +2780,12 @@ const messages = {
           agent: "Agente creado",
           agentAmbiguous: "Hay varias configuraciones de Agente de IA",
           provider: "Proveedor de IA",
+          providerUnsupported: "Proveedor no soportado",
+          credential: "Credencial del proveedor",
+          credentialIncompatible: "Credencial incompatible con el proveedor",
+          credentialDisabled: "Credencial deshabilitada",
+          model: "Modelo de IA",
+          modelIncompatible: "Modelo incompatible con el proveedor",
           instructions: "Instrucciones",
           connection: "Conexión WhatsApp",
           mode: "Modo de operación",
@@ -2773,7 +2793,15 @@ const messages = {
         checkDescription: {
           plan: "Disponibilidad del módulo en el plan de la empresa.",
           agent: "Existencia de un Agente de IA en la empresa.",
-          provider: "Credencial de proveedor configurada.",
+          provider: "Proveedor comercial soportado y configurado.",
+          providerUnsupported: "El proveedor configurado no es soportado por el producto.",
+          credential: "Credencial seleccionada, habilitada y compatible con el proveedor.",
+          credentialIncompatible:
+            "La credencial seleccionada no es compatible con el proveedor.",
+          credentialDisabled: "La credencial seleccionada está deshabilitada.",
+          model: "Modelo compatible con el proveedor configurado.",
+          modelIncompatible:
+            "El modelo seleccionado no pertenece al proveedor configurado.",
           instructions: "Instrucciones o perfil de atención definidos.",
           connection: "WhatsApp vinculado al agente.",
           mode: "Modo de operación de la conexión.",

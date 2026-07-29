@@ -4,6 +4,11 @@ import GetAiAgentProductSummaryService, {
   GetAiAgentProductReadinessService
 } from "../services/AiAgentProductService/GetAiAgentProductSummaryService";
 import ExecuteAiAgentProductCommandService from "../services/AiAgentProductService/ExecuteAiAgentProductCommandService";
+import GetAiAgentProductConfigurationService from "../services/AiAgentProductService/GetAiAgentProductConfigurationService";
+import GetAiAgentProductConfigurationOptionsService from "../services/AiAgentProductService/GetAiAgentProductConfigurationOptionsService";
+import CreateAiAgentProductConfigurationService from "../services/AiAgentProductService/CreateAiAgentProductConfigurationService";
+import UpdateAiAgentProductConfigurationService from "../services/AiAgentProductService/UpdateAiAgentProductConfigurationService";
+import UpdateAiAgentProductConnectionsService from "../services/AiAgentProductService/UpdateAiAgentProductConnectionsService";
 import { logger } from "../utils/logger";
 
 function companyIdOrThrow(req: Request): number {
@@ -97,6 +102,154 @@ export const command = async (
       "ERR_AI_AGENT_PRODUCT_COMMAND_NOT_ALLOWED",
       500,
       "Não foi possível executar o comando do Agente de IA."
+    );
+  }
+};
+
+export const getConfiguration = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  try {
+    rejectArbitraryCompanyId(req);
+    const companyId = companyIdOrThrow(req);
+    const data = await GetAiAgentProductConfigurationService({
+      companyId,
+      req
+    });
+    return res.json(data);
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    logger.error(
+      {
+        err: err instanceof Error ? err.message : "unknown",
+        surface: "ai_agent_product"
+      },
+      "ai_agent_product_configuration_get_failed"
+    );
+    throw new AppError(
+      "ERR_AI_AGENT_PRODUCT_NOT_AVAILABLE",
+      500,
+      "Não foi possível carregar a configuração do Agente de IA."
+    );
+  }
+};
+
+export const createConfiguration = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  try {
+    rejectArbitraryCompanyId(req);
+    const companyId = companyIdOrThrow(req);
+    const data = await CreateAiAgentProductConfigurationService({
+      companyId,
+      req,
+      body: req.body as Record<string, unknown>
+    });
+    return res.json(data);
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    logger.error(
+      {
+        err: err instanceof Error ? err.message : "unknown",
+        surface: "ai_agent_product"
+      },
+      "ai_agent_product_configuration_create_failed"
+    );
+    throw new AppError(
+      "ERR_AI_AGENT_PRODUCT_CONFIGURATION_INVALID",
+      500,
+      "Não foi possível criar a configuração do Agente de IA."
+    );
+  }
+};
+
+export const updateConfiguration = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  try {
+    rejectArbitraryCompanyId(req);
+    const companyId = companyIdOrThrow(req);
+    const data = await UpdateAiAgentProductConfigurationService({
+      companyId,
+      req,
+      body: req.body as Record<string, unknown>
+    });
+    return res.json(data);
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    logger.error(
+      {
+        err: err instanceof Error ? err.message : "unknown",
+        surface: "ai_agent_product"
+      },
+      "ai_agent_product_configuration_update_failed"
+    );
+    throw new AppError(
+      "ERR_AI_AGENT_PRODUCT_CONFIGURATION_INVALID",
+      500,
+      "Não foi possível atualizar a configuração do Agente de IA."
+    );
+  }
+};
+
+export const getConfigurationOptions = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  try {
+    rejectArbitraryCompanyId(req);
+    const companyId = companyIdOrThrow(req);
+    const data = await GetAiAgentProductConfigurationOptionsService({
+      companyId,
+      req
+    });
+    return res.json(data);
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    logger.error(
+      {
+        err: err instanceof Error ? err.message : "unknown",
+        surface: "ai_agent_product"
+      },
+      "ai_agent_product_configuration_options_failed"
+    );
+    throw new AppError(
+      "ERR_AI_AGENT_PRODUCT_NOT_AVAILABLE",
+      500,
+      "Não foi possível carregar as opções de configuração do Agente de IA."
+    );
+  }
+};
+
+export const updateConnections = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  try {
+    rejectArbitraryCompanyId(req);
+    const companyId = companyIdOrThrow(req);
+    const data = await UpdateAiAgentProductConnectionsService({
+      companyId,
+      req,
+      body: req.body as Record<string, unknown>
+    });
+    return res.json(data);
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    logger.error(
+      {
+        err: err instanceof Error ? err.message : "unknown",
+        surface: "ai_agent_product"
+      },
+      "ai_agent_product_connections_update_failed"
+    );
+    throw new AppError(
+      "ERR_AI_AGENT_PRODUCT_CONFIGURATION_INVALID",
+      500,
+      "Não foi possível atualizar as conexões do Agente de IA."
     );
   }
 };

@@ -50,7 +50,7 @@ describe("aiAgentConnectionScopePhase221", () => {
     expect(params.disconnectedCount).toBe(1);
   });
 
-  it("attention_required por modo misto oferece comandos de normalização", () => {
+  it("attention_required por modo misto % comandos de normalização", () => {
     const view = mapAiAgentProductSummary({
       availability: { enabledByPlan: true, accessibleByUser: true },
       status: "attention_required",
@@ -69,7 +69,7 @@ describe("aiAgentConnectionScopePhase221", () => {
         ready: false,
         status: "attention_required",
         mode: "live",
-        nextAction: "resolve_conflict",
+        nextAction: "fix_connection",
         checks: [],
       },
     });
@@ -77,6 +77,39 @@ describe("aiAgentConnectionScopePhase221", () => {
     expect(cmds).toEqual(
       expect.arrayContaining(["activate_shadow", "activate_live", "deactivate"])
     );
+  });
+
+  it("attention_required por conflito de provider → só deactivate", () => {
+    const view = mapAiAgentProductSummary({
+      availability: { enabledByPlan: true, accessibleByUser: true },
+      status: "attention_required",
+      mode: "off",
+      agent: { exists: true, id: 1, name: "Bot", enabled: false },
+      connection: { linked: true, name: "A", connected: true },
+      agentScope: { type: "single", count: 1 },
+      connectionScope: {
+        type: "all_linked",
+        count: 1,
+        connectedCount: 1,
+        disconnectedCount: 0,
+        names: ["A"],
+      },
+      readiness: {
+        ready: false,
+        status: "attention_required",
+        mode: "off",
+        nextAction: "resolve_conflict",
+        checks: [
+          {
+            key: "provider",
+            status: "blocked",
+            labelKey: "aiAgentProduct.checks.providerUnsupported",
+          },
+        ],
+      },
+    });
+    const cmds = view.commercialCommands.map((c) => c.command);
+    expect(cmds).toEqual(["deactivate"]);
   });
 
   it("não inventa ids técnicos no scope mapeado", () => {

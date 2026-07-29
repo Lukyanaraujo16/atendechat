@@ -63,7 +63,16 @@ function isSetupStructurallyComplete(
 ): boolean {
   const { readiness, resolution } = computeAiAgentProductReadiness(snapshot);
   if (resolution !== "resolved") return false;
-  const required = ["plan", "agent", "provider", "instructions", "connection"];
+  if (readiness.status === "attention_required") return false;
+  const required = [
+    "plan",
+    "agent",
+    "provider",
+    "credential",
+    "model",
+    "instructions",
+    "connection"
+  ];
   return required.every(key => {
     const check = readiness.checks.find(c => c.key === key);
     return check?.status === "complete";

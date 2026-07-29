@@ -144,3 +144,29 @@ Endpoints `/ai-agents*` **não são removidos** nesta fase.
 | Commands ambíguos | bloqueados (`ERR_AI_AGENT_PRODUCT_CONTEXT_AMBIGUOUS`) |
 | Deactivate ambíguo | **não** desliga em massa |
 | `agentScope` | `none` \| `single` \| `ambiguous` + `count` |
+
+---
+
+## Matriz de migração progressiva (Fase 2.3)
+
+| Operação | Endpoint legado | Nova Product API | Consumidores legado | Migração prevista |
+|----------|-----------------|------------------|---------------------|-------------------|
+| Ler configuração | `GET /ai-agents/:id` + `GET /ai-agents/:id/profile` | `GET /product/ai-agent/configuration` | Wizard, AiAgentModal | Fase 2.4 |
+| Criar agente | `POST /ai-agents` | `POST /product/ai-agent/configuration` | Wizard | Fase 2.4 |
+| Atualizar agente | `PUT /ai-agents/:id` | `PUT /product/ai-agent/configuration` | AiAgentModal | Fase 2.4 |
+| Atualizar profile | `PUT /ai-agents/:id/profile` | `PUT /product/ai-agent/configuration` | Wizard | Fase 2.4 |
+| Atualizar credencial | `PUT /ai-agents/:id` (`aiProviderCredentialId`) | `PUT /product/ai-agent/configuration` | AiAgentModal | Fase 2.4 |
+| Vincular WA | `PUT /whatsapp/:id` | `PUT /product/ai-agent/configuration/connections` | WhatsApp settings, Wizard | Fase 2.4/2.6 |
+| Ativar shadow | `PUT /whatsapp/:id` | `POST /product/ai-agent/commands` | Nenhum novo | Concluído (2.2) |
+| Ativar live | `PUT /whatsapp/:id` | `POST /product/ai-agent/commands` | Nenhum novo | Concluído (2.2) |
+| Desativar | `PUT /whatsapp/:id` + `PUT /ai-agents/:id` | `POST /product/ai-agent/commands` | Nenhum novo | Concluído (2.2) |
+| Listar opções | `GET /ai-provider-credentials` | `GET /product/ai-agent/configuration/options` | AiAgentModal | Fase 2.4 |
+| Knowledge Base | `GET/PUT /ai-agents/:id/knowledge-*` | Não migrada | AiAgentModal, KB modal | Fase 2.5+ |
+
+### Status da redução
+
+- **Endpoints legados não removidos** — existem consumidores ativos (Wizard, Modals)
+- **Product API completa** para: summary, readiness, commands, configuration (GET/POST/PUT), connections
+- **Hardening 2.3.1:** providers comerciais `openai` + `gemini` (fonte única `aiAgentProductProviderCapabilities`); validação credential/model por provider; sem conversão silenciosa
+- **Hardening 2.3.2:** readiness exige credencial **selecionada** + provider suportado + modelo compatível; conflitos → `attention_required`; activate usa o readiness corrigido
+- **Próximo passo:** Fase 2.4 — migrar Wizard para consumir Product API
