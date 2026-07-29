@@ -2713,6 +2713,124 @@ const messages = {
 					subtitle: "Create a prompt to link to the WhatsApp connection, sector, or automated flow.",
 				},
 			},
+			aiAgentProduct: {
+				page: {
+					title: "AI Agent",
+					subtitle:
+						"Configure and monitor automated support for your company.",
+				},
+				loading: {
+					aria: "Loading AI Agent status",
+				},
+				actions: {
+					refresh: "Refresh",
+					retry: "Try again",
+				},
+				error: {
+					title: "Could not load AI Agent status",
+					description:
+						"Something went wrong while fetching information. Please try again shortly.",
+				},
+				accessDenied: {
+					title: "Access restricted",
+					description:
+						"You do not have permission to view the AI Agent for this company.",
+				},
+				support: {
+					activeCompany: "Active company: {{name}}",
+				},
+				status: {
+					aria: "Status: {{status}}",
+					unavailable: "Not available on plan",
+					not_created: "Agent not created yet",
+					setup_incomplete: "Setup incomplete",
+					ready_to_activate: "Ready to activate",
+					active: "In operation",
+					paused: "Agent paused",
+					attention_required: "Attention required",
+				},
+				statusDescription: {
+					unavailable:
+						"The AI Agent is not included in this company's current plan.",
+					not_created:
+						"Create the AI Agent to start configuring automated support.",
+					setup_incomplete:
+						"A few steps are still needed before the Agent is ready.",
+					ready_to_activate:
+						"Setup is complete. Review connections before activating support.",
+					active:
+						"The AI Agent is operating in the current mode of the linked connection.",
+					paused:
+						"The Agent is paused. Resume will be available when commercial activation is enabled.",
+					attention_required:
+						"Something needs your attention before automated support can continue.",
+				},
+				mode: {
+					aria: "Mode: {{mode}}",
+					off: "Off",
+					shadow: "Test mode",
+					live: "Automatic support",
+					paused: "Paused",
+				},
+				checklist: {
+					title: "Setup checklist",
+					aria: "AI Agent setup items",
+				},
+				checkStatus: {
+					complete: "Complete",
+					pending: "Pending",
+					blocked: "Blocked",
+					warning: "Warning",
+				},
+				checks: {
+					plan: "Plan",
+					agent: "Agent created",
+					provider: "AI provider",
+					instructions: "Instructions",
+					connection: "WhatsApp connection",
+					mode: "Operation mode",
+				},
+				checkDescription: {
+					plan: "Module availability on the company plan.",
+					agent: "An AI Agent exists for the company.",
+					provider: "Provider credential configured.",
+					instructions: "Instructions or attendant profile defined.",
+					connection: "WhatsApp linked to the agent.",
+					mode: "Connection operation mode.",
+				},
+				nextAction: {
+					upgrade_plan: "View plan",
+					create_agent: "Create AI Agent",
+					configure_agent: "Continue setup",
+					configure_provider: "Configure provider",
+					connect_whatsapp: "Connect WhatsApp",
+					fix_connection: "Review connection",
+					resolve_conflict: "Review setup",
+					activate_shadow: "Enable test mode",
+					activate_live: "Enable automatic support",
+					resume_agent: "Resume agent",
+					none: "No action",
+					reviewConfig: "Review setup",
+					mutationDeferred:
+						"Secure commercial activation will be available soon. For now, review the setup.",
+				},
+				secondary: {
+					aria: "AI Agent actions",
+					openWizard: "Open wizard",
+					openSimulator: "Open simulator",
+					openConnections: "WhatsApp connections",
+				},
+				meta: {
+					agent: "Agent: {{name}}",
+					connection: "Connection: {{name}} ({{state}})",
+					unnamed: "Unnamed",
+					unnamedConnection: "Unnamed",
+					connected: "connected",
+					disconnected: "disconnected",
+					readyTrue: "Ready according to product status.",
+					readyFalse: "Not fully ready for operation yet.",
+				},
+			},
 			aiAgent: {
 				title: "AI Agent",
 				subtitle:

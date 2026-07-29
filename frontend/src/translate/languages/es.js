@@ -2642,6 +2642,124 @@ const messages = {
           subtitle: "Cree un prompt para vincularlo a la conexión WhatsApp, al sector o al flujo automatizado.",
         },
       },
+      aiAgentProduct: {
+        page: {
+          title: "Agente de IA",
+          subtitle:
+            "Configure y acompañe la atención automatizada de su empresa.",
+        },
+        loading: {
+          aria: "Cargando estado del Agente de IA",
+        },
+        actions: {
+          refresh: "Actualizar",
+          retry: "Intentar de nuevo",
+        },
+        error: {
+          title: "No se pudo cargar el estado del Agente de IA",
+          description:
+            "Ocurrió un problema al obtener la información. Intente de nuevo en unos instantes.",
+        },
+        accessDenied: {
+          title: "Acceso restringido",
+          description:
+            "No tiene permiso para ver el Agente de IA en esta empresa.",
+        },
+        support: {
+          activeCompany: "Empresa activa: {{name}}",
+        },
+        status: {
+          aria: "Estado: {{status}}",
+          unavailable: "No disponible en el plan",
+          not_created: "Agente aún no creado",
+          setup_incomplete: "Configuración incompleta",
+          ready_to_activate: "Listo para activar",
+          active: "En operación",
+          paused: "Agente pausado",
+          attention_required: "Requiere atención",
+        },
+        statusDescription: {
+          unavailable:
+            "El Agente de IA no está incluido en el plan actual de esta empresa.",
+          not_created:
+            "Cree el Agente de IA para comenzar a configurar la atención automatizada.",
+          setup_incomplete:
+            "Aún faltan algunos pasos para dejar el Agente listo.",
+          ready_to_activate:
+            "La configuración está completa. Revise las conexiones antes de activar la atención.",
+          active:
+            "El Agente de IA está en operación en el modo actual de la conexión vinculada.",
+          paused:
+            "El Agente está pausado. La reanudación estará disponible cuando la activación comercial esté habilitada.",
+          attention_required:
+            "Hay algo que necesita su atención antes de continuar con la atención automatizada.",
+        },
+        mode: {
+          aria: "Modo: {{mode}}",
+          off: "Desactivado",
+          shadow: "Modo de pruebas",
+          live: "Atención automática",
+          paused: "Pausado",
+        },
+        checklist: {
+          title: "Lista de configuración",
+          aria: "Elementos de configuración del Agente de IA",
+        },
+        checkStatus: {
+          complete: "Completo",
+          pending: "Pendiente",
+          blocked: "Bloqueado",
+          warning: "Atención",
+        },
+        checks: {
+          plan: "Plan",
+          agent: "Agente creado",
+          provider: "Proveedor de IA",
+          instructions: "Instrucciones",
+          connection: "Conexión WhatsApp",
+          mode: "Modo de operación",
+        },
+        checkDescription: {
+          plan: "Disponibilidad del módulo en el plan de la empresa.",
+          agent: "Existencia de un Agente de IA en la empresa.",
+          provider: "Credencial de proveedor configurada.",
+          instructions: "Instrucciones o perfil de atención definidos.",
+          connection: "WhatsApp vinculado al agente.",
+          mode: "Modo de operación de la conexión.",
+        },
+        nextAction: {
+          upgrade_plan: "Ver plan",
+          create_agent: "Crear Agente de IA",
+          configure_agent: "Continuar configuración",
+          configure_provider: "Configurar proveedor",
+          connect_whatsapp: "Conectar WhatsApp",
+          fix_connection: "Revisar conexión",
+          resolve_conflict: "Revisar configuración",
+          activate_shadow: "Activar modo de pruebas",
+          activate_live: "Activar atención automática",
+          resume_agent: "Reanudar agente",
+          none: "Ninguna acción",
+          reviewConfig: "Revisar configuración",
+          mutationDeferred:
+            "La activación comercial segura estará disponible pronto. Por ahora, revise la configuración.",
+        },
+        secondary: {
+          aria: "Acciones del Agente de IA",
+          openWizard: "Abrir asistente",
+          openSimulator: "Abrir simulador",
+          openConnections: "Conexiones WhatsApp",
+        },
+        meta: {
+          agent: "Agente: {{name}}",
+          connection: "Conexión: {{name}} ({{state}})",
+          unnamed: "Sin nombre",
+          unnamedConnection: "Sin nombre",
+          connected: "conectada",
+          disconnected: "desconectada",
+          readyTrue: "Listo según el estado del producto.",
+          readyFalse: "Aún no está listo para operación plena.",
+        },
+      },
       aiAgent: {
         title: "Agente de IA",
         subtitle:
