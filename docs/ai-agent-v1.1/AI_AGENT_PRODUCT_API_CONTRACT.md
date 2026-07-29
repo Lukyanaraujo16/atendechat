@@ -349,7 +349,7 @@ type AiAgentProductCommand =
 
 | Estado atual (mode) | Ação | Estado esperado | Campos alterados | Service / helper | Readiness exigido | Permitido? |
 |---------------------|------|-----------------|------------------|------------------|-------------------|------------|
-| off | activate_shadow | active / shadow | `AiAgents.enabled=true`; WhatsApp vinculados: `aiAgentMode=shadow`, `aiAgentEnabled=true`, `aiAgentId` | `resolveAiAgentWhatsappFields` + update transacional | Setup estrutural completo + WA CONNECTED | Sim |
+| off | activate_shadow | active / shadow | `AiAgents.enabled=true`; WhatsApp vinculados: `aiAgentMode=shadow`, `aiAgentEnabled=true`, `aiAgentId` | Product command (tx + locks) | Setup estrutural completo + WA CONNECTED | Sim |
 | off | activate_live | active / live | idem com `aiAgentMode=live` | idem | idem | Sim |
 | shadow (ou dry_run comercial) | activate_live | active / live | mode → live; `enabled=true` | idem | idem | Sim |
 | live | activate_shadow | active / shadow | mode → shadow; `enabled=true` | idem | idem | Sim |
@@ -664,7 +664,7 @@ Regras:
   continua ativo.
 - `setup_incomplete` permanece autoridade do backend; o Wizard não recalcula readiness.
 - Rota `/ai-agent/wizard/:agentId` é residual de navegação; o param não resolve agente nem entra em payload.
-- AiAgentModal avançado permanece no legado até Fase 2.5/2.6.
+- AiAgentModal avançado permanece órfão (limpeza futura); WhatsAppModal **não** configura AI (Fase 2.6).
 
 ### POST `/product/ai-agent/configuration` (criação)
 
@@ -788,3 +788,35 @@ Contrato detalhado: `AI_AGENT_PRODUCT_SIMULATOR_CONTRACT.md`.
 | `ERR_AI_AGENT_PRODUCT_SIMULATOR_INVALID` | 400 | Payload / review inválido |
 | `ERR_AI_AGENT_PRODUCT_CONTEXT_AMBIGUOUS` | 409 | Múltiplos agentes |
 | `ERR_AI_AGENT_PRODUCT_CONTEXT_INVALID` | 403 | Ids técnicos no request |
+---
+
+## Fase 2.6 — Fonte única de verdade (Conexões)
+
+### Autoridade comercial
+
+| Operação | Endpoint único |
+|----------|----------------|
+| Vincular / desvincular conexões | `PUT /product/ai-agent/configuration/connections` |
+| Shadow / Live / Off | `POST /product/ai-agent/commands` |
+| Entrada UI | `/ai-agent` e `/ai-agent/wizard` |
+
+### WhatsApp create/update
+
+`POST /whatsapp` e `PUT /whatsapp/:id` **rejeitam** a presença de `aiAgentId`, `aiAgentMode` e `aiAgentEnabled` (inclusive `null` / `false` / `"disabled"`).
+
+Erro: `ERR_AI_AGENT_FIELDS_MANAGED_BY_PRODUCT_API` (HTTP 400).
+
+GET continua retornando os campos. Edição sem campos AI preserva vínculo/modo. Criação usa defaults do model.
+
+### WhatsAppModal
+
+Não lista agentes; não envia campos AI; status read-only + CTA → `/ai-agent`.
+
+### Navegação Hub
+
+- `connect_whatsapp` / `fix_connection` → `/ai-agent/wizard`
+- `open_connections` → `/connections` (administrar canais; não configura IA)
+
+### Fora desta fase
+
+Product Credential API, órfãos, Knowledge Base, runtime, models/migrations.

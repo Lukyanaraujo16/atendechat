@@ -2283,33 +2283,16 @@ const messages = {
 				success: "WhatsApp saved successfully.",
 				aiAgent: {
 					title: "AI Agent",
-					selectAgent: "Select AI agent",
-					runtimeMode: "Runtime mode",
-					enableOnConnection: "Enable AI Agent on this connection",
-					none: "None",
-					noAgents:
-						"No AI agents configured. Create one under Automation > AI Agent.",
-					phaseWarning:
-						"In this phase, the agent does not send replies to customers automatically.",
-					shadowWarning:
-						"Replies will be generated for internal evaluation only and will not be sent to customers.",
-					liveWarning:
-						"Warning: in this mode, the AI Agent will automatically reply to customers when the ticket is eligible.",
-					liveLimitations:
-						"Audio and media without text are not supported yet. Tickets with a human agent will not receive AI replies. Handoff uses the [HANDOFF_HUMAN] marker and pauses AI on the ticket.",
-					liveConfirmLabel:
-						"I understand that the AI will automatically reply to eligible customers.",
-					liveConfirmRequired:
-						"Confirm that you understand Live Mode before saving.",
-					liveKnowledgeHint:
-						"Knowledge Base retrieval (RAG) in Live requires separate opt-in in the agent's Knowledge settings — it is not enabled automatically when choosing Live Mode.",
-					planBlocked: "The AI Agent module is not available on your plan.",
-					modes: {
-						disabled: "Disabled",
-						dryRun: "Eligibility simulation",
-						shadow: "Shadow Mode — generates suggestions, does not send",
-						live: "Live Mode — replies automatically",
+					managedByProduct:
+						"AI Agent configuration is managed in the AI Agent area.",
+					manageCta: "Manage AI Agent",
+					status: {
+						live: "Current status: Active in Live",
+						shadow: "Current status: Active in Shadow",
+						linkedOff: "Current status: Linked, but deactivated",
+						notLinked: "Current status: Not linked",
 					},
+					planBlocked: "The AI Agent module is not available on your plan.",
 				},
 			},
 			ticketAiAgent: {
@@ -2897,7 +2880,7 @@ const messages = {
 					aria: "AI Agent actions",
 					openWizard: "Open wizard",
 					openSimulator: "Open simulator",
-					openConnections: "WhatsApp connections",
+					openConnections: "Manage WhatsApp channels",
 				},
 				simulator: {
 					reasons: {

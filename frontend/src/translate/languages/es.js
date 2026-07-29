@@ -2245,15 +2245,15 @@ const messages = {
         success: "WhatsApp guardado con éxito.",
         aiAgent: {
           title: "Agente de IA",
-          selectAgent: "Seleccionar agente de IA",
-          enableOnConnection: "Activar Agente de IA en esta conexión",
-          none: "Ninguno",
-          noAgents:
-            "No hay agentes de IA registrados. Cree uno en Automatización > Agente de IA.",
-          phaseWarning:
-            "Aunque esté activado aquí, el agente aún no responde mensajes automáticamente en esta fase.",
-          liveKnowledgeHint:
-            "La recuperación de Base de Conocimiento (RAG) en Live requiere opt-in separado en la configuración de Conocimiento del agente — no se activa automáticamente al elegir Live Mode.",
+          managedByProduct:
+            "La configuración del AI Agent se gestiona en el área AI Agent.",
+          manageCta: "Gestionar AI Agent",
+          status: {
+            live: "Estado actual: Activo en Live",
+            shadow: "Estado actual: Activo en Shadow",
+            linkedOff: "Estado actual: Vinculado, pero desactivado",
+            notLinked: "Estado actual: No vinculado",
+          },
           planBlocked: "El módulo Agente de IA no está disponible en su plan.",
         },
       },
@@ -2826,7 +2826,7 @@ const messages = {
           aria: "Acciones del Agente de IA",
           openWizard: "Abrir asistente",
           openSimulator: "Abrir simulador",
-          openConnections: "Conexiones WhatsApp",
+          openConnections: "Administrar canales WhatsApp",
         },
         simulator: {
           reasons: {

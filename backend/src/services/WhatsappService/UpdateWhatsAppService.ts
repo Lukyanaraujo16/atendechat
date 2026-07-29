@@ -5,7 +5,7 @@ import AppError from "../../errors/AppError";
 import Whatsapp from "../../models/Whatsapp";
 import ShowWhatsAppService from "./ShowWhatsAppService";
 import AssociateWhatsappQueue from "./AssociateWhatsappQueue";
-import { applyAiAgentFieldsToWhatsappData } from "./applyAiAgentWhatsappFields";
+import { assertNoAiAgentFieldsInWhatsappPayload } from "./assertNoAiAgentFieldsInWhatsappPayload";
 
 interface WhatsappData {
   name?: string;
@@ -23,9 +23,6 @@ interface WhatsappData {
   transferQueueId?: number; 
   timeToTransfer?: number;    
   promptId?: number;
-  aiAgentId?: number | null;
-  aiAgentEnabled?: boolean;
-  aiAgentMode?: string;
   maxUseBotQueues?: number;
   timeUseBotQueues?: number;
   expiresTicket?: number;
@@ -54,6 +51,8 @@ const UpdateWhatsAppService = async ({
   whatsappId,
   companyId
 }: Request): Promise<Response> => {
+  assertNoAiAgentFieldsInWhatsappPayload(whatsappData);
+
   const schema = Yup.object().shape({
     name: Yup.string().min(2),
     status: Yup.string(),
@@ -76,9 +75,6 @@ const UpdateWhatsAppService = async ({
     transferQueueId,	
 	  timeToTransfer,	
     promptId,
-    aiAgentId,
-    aiAgentEnabled,
-    aiAgentMode,
     maxUseBotQueues,
     timeUseBotQueues,
     expiresTicket,
@@ -191,20 +187,9 @@ const UpdateWhatsAppService = async ({
       ticketVisibility === "admin_supervisor" ? "admin_supervisor" : "all";
   }
 
-  const aiAgentResolved = await applyAiAgentFieldsToWhatsappData(
-    companyId,
-    { aiAgentId, aiAgentEnabled, aiAgentMode },
-    {
-      aiAgentId: whatsapp.aiAgentId,
-      aiAgentEnabled: whatsapp.aiAgentEnabled,
-      aiAgentMode: whatsapp.aiAgentMode
-    }
-  );
-  if (aiAgentResolved) {
-    updateData.aiAgentId = aiAgentResolved.aiAgentId;
-    updateData.aiAgentEnabled = aiAgentResolved.aiAgentEnabled;
-    updateData.aiAgentMode = aiAgentResolved.aiAgentMode;
-  }
+  // AI Agent: não mutar aiAgentId/Mode/Enabled aqui (Fase 2.6).
+  // Ausência no payload preserva vínculo e modo existentes.
+  // Mutação comercial: Product connections / commands.
 
   await whatsapp.update(updateData);
 

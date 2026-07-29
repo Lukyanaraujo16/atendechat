@@ -31,7 +31,7 @@ Este inventário descreve o que o produto comercial usa **hoje**, antes da Produ
 | Profile guiado | `GET/PUT /ai-agents/:id/profile` | Wizard | `Show/UpsertAiAgentProfileService` | Profile completo | Setup incompleto calculado no FE (wizard steps) | Experience: checks `instructions` |
 | Preview prompt | `POST /ai-agents/:id/profile/preview` | Wizard | `GenerateAiAgentPromptPreviewService` | Preview | Comercial OK | Permanecer |
 | Credenciais provider | `/ai-provider-credentials*` | `pages/AiAgent` | AiProviderCredential services | Lista/CRUD/test | Página mistura agentes + credenciais; FE não sabe se “pronto” | Product: check `provider` no readiness |
-| Associação WhatsApp | Campos em create/update WhatsApp (`aiAgentId`, `aiAgentMode`, `aiAgentEnabled`) | Conexões WhatsApp | `resolveAiAgentWhatsappFields` | Persistência na conexão | Modo técnico (`shadow`/`live`/`dry_run`) exposto na UI de conexão; produto não tem resumo | Product: `connection` + `mode` comercial |
+| Associação WhatsApp | Colunas `aiAgentId` / `aiAgentMode` / `aiAgentEnabled` (leitura GET; mutação só Product) | Conexões WhatsApp | Product connections + commands | Persistência na conexão | WhatsApp create/update rejeitam campos AI (2.6) | Product: `connection` + `mode` comercial |
 | Knowledge Base link | `GET/PUT /ai-agents/:id/knowledge-bases` | Knowledge panel | Sync/List KB services | Links | KB **opcional** no runtime; FE pode sugerir sem bloquear | Check opcional futuro; não bloqueia readiness 2.0 |
 | Knowledge settings | `GET/PUT .../knowledge-settings` | Panel | Upsert/Show settings | Settings | Técnico demais para home do produto | Permanecer / Console analytics |
 | Knowledge retrieval test | `POST .../knowledge-retrieval/test` | Panel | Retrieve service | Hits | Operacional | Permanecer |
@@ -157,21 +157,22 @@ Endpoints `/ai-agents*` **não são removidos** nesta fase.
 | Atualizar agente | `PUT /ai-agents/:id` | `PUT /product/ai-agent/configuration` | AiAgentModal | Fase 2.4 |
 | Atualizar profile | `PUT /ai-agents/:id/profile` | `PUT /product/ai-agent/configuration` | — | Wizard migrado (2.4) |
 | Atualizar credencial | `PUT /ai-agents/:id` (`aiProviderCredentialId`) | `PUT /product/ai-agent/configuration` | AiAgentModal | Fase 2.4 |
-| Vincular WA | `PUT /whatsapp/:id` | `PUT /product/ai-agent/configuration/connections` | WhatsApp settings | Wizard migrado (2.4); settings 2.6 |
-| Ativar shadow | `PUT /whatsapp/:id` | `POST /product/ai-agent/commands` | Nenhum novo | Concluído (2.2) |
-| Ativar live | `PUT /whatsapp/:id` | `POST /product/ai-agent/commands` | Nenhum novo | Concluído (2.2) |
-| Desativar | `PUT /whatsapp/:id` + `PUT /ai-agents/:id` | `POST /product/ai-agent/commands` | Nenhum novo | Concluído (2.2) |
+| Vincular WA | `PUT /whatsapp/:id` (**bloqueado** para AI — 2.6) | `PUT /product/ai-agent/configuration/connections` | — | **Concluído (2.6)** |
+| Ativar shadow | `PUT /whatsapp/:id` (**bloqueado** — 2.6) | `POST /product/ai-agent/commands` | Nenhum novo | Concluído (2.2 + harden 2.6) |
+| Ativar live | `PUT /whatsapp/:id` (**bloqueado** — 2.6) | `POST /product/ai-agent/commands` | Nenhum novo | Concluído (2.2 + harden 2.6) |
+| Desativar | `PUT /whatsapp/:id` (**bloqueado** — 2.6) | `POST /product/ai-agent/commands` | Nenhum novo | Concluído (2.2 + harden 2.6) |
 | Listar opções | `GET /ai-provider-credentials` | `GET /product/ai-agent/configuration/options` | AiAgentModal | Wizard migrado (2.4) |
-| Knowledge Base | `GET/PUT /ai-agents/:id/knowledge-*` | Não migrada | AiAgentModal, KB modal | Fase 2.5+ |
+| Knowledge Base | `GET/PUT /ai-agents/:id/knowledge-*` | Não migrada | AiAgentModal, KB modal | backlog |
 
 ### Status da redução
 
-- **Endpoints legados não removidos** — consumidores ativos: AiAgentModal, WhatsApp settings, Simulator
-- **Product API completa** para: summary, readiness, commands, configuration (GET/POST/PUT/preview), connections, options (providers + models)
+- **Endpoints legados não removidos** — consumidores ativos: AiAgentModal (órfão), Simulator legado (compat), CRUD credenciais (KB Embedding)
+- **Product API completa** para: summary, readiness, commands, configuration (GET/POST/PUT/preview), connections, options (providers + models), simulator
 - **Hardening 2.3.1:** providers comerciais `openai` + `gemini` (fonte única `aiAgentProductProviderCapabilities`); validação credential/model por provider; sem conversão silenciosa
 - **Hardening 2.3.2:** readiness exige credencial **selecionada** + provider suportado + modelo compatível; conflitos → `attention_required`; activate usa o readiness corrigido
 - **Fase 2.4 concluída:** Wizard migrado para Product API; ver `AI_AGENT_WIZARD_MIGRATION_INVENTORY.md`
 - **Hardening 2.4.1:** edição de identidade com agente ativo; provider/model/credential obrigatórios no Review; `createMinimalAiAgentPayload` removido; testes `aiAgentWizardActiveIdentityPhase241`
 - **Hardening 2.4.2:** agente ativo usa tela identity-only dedicada, sem steps/Review/preview estruturais; identidade e profile têm hidratação separada; Success específico; teste anti-descarte `aiAgentWizardActiveIdentityModePhase242`
-- **Fase 2.5 (parcial):** Product Simulator em `/product/ai-agent/simulator/*` + UI `/ai-agent/simulator`; ver `AI_AGENT_PRODUCT_SIMULATOR_CONTRACT.md`. Legado `/ai-agents/:id/simulator/*` permanece.
-- **Próximo passo:** Fase 2.5+ — AiAgentModal, Knowledge Base, WhatsApp settings
+- **Fase 2.5 concluída:** Product Simulator em `/product/ai-agent/simulator/*` + UI `/ai-agent/simulator`; ver `AI_AGENT_PRODUCT_SIMULATOR_CONTRACT.md`. Legado `/ai-agents/:id/simulator/*` permanece.
+- **Fase 2.6 concluída:** WhatsAppModal e `POST/PUT /whatsapp` **não** mutam AI Agent. Autoridade única: Product connections (vínculo Off) + Product commands (modo). Erro `ERR_AI_AGENT_FIELDS_MANAGED_BY_PRODUCT_API`. Credenciais comerciais → fase seguinte.
+- **Próximo passo:** Product Credential API; limpeza de órfãos; Knowledge Base Product

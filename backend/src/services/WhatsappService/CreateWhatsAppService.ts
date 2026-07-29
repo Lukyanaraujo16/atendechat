@@ -5,7 +5,6 @@ import Whatsapp from "../../models/Whatsapp";
 import Company from "../../models/Company";
 import Plan from "../../models/Plan";
 import AssociateWhatsappQueue from "./AssociateWhatsappQueue";
-import { applyAiAgentFieldsToWhatsappData } from "./applyAiAgentWhatsappFields";
 
 interface Request {
   name: string;
@@ -24,9 +23,6 @@ interface Request {
   transferQueueId?: number;
   timeToTransfer?: number;    
   promptId?: number;
-  aiAgentId?: number | null;
-  aiAgentEnabled?: boolean;
-  aiAgentMode?: string;
   maxUseBotQueues?: number;
   timeUseBotQueues?: number;
   expiresTicket?: number;
@@ -61,9 +57,6 @@ const CreateWhatsAppService = async ({
   transferQueueId,
   timeToTransfer,    
   promptId,
-  aiAgentId,
-  aiAgentEnabled,
-  aiAgentMode,
   maxUseBotQueues = 3,
   timeUseBotQueues = 0,
   expiresTicket = 0,
@@ -179,12 +172,8 @@ const CreateWhatsAppService = async ({
       ? String(greetingMessage).trim()
       : null;
 
-  const aiAgentResolved = await applyAiAgentFieldsToWhatsappData(companyId, {
-    aiAgentId,
-    aiAgentEnabled,
-    aiAgentMode
-  });
-
+  // AI Agent: defaults do model (null / false / disabled).
+  // Vínculo e modo só via Product API (Fase 2.6).
   const whatsapp = await Whatsapp.create(
     {
       name,
@@ -202,9 +191,6 @@ const CreateWhatsAppService = async ({
 	    transferQueueId,
 	    timeToTransfer,	  
       promptId,
-      aiAgentId: aiAgentResolved?.aiAgentId ?? null,
-      aiAgentEnabled: aiAgentResolved?.aiAgentEnabled ?? false,
-      aiAgentMode: aiAgentResolved?.aiAgentMode ?? "disabled",
       maxUseBotQueues,
       timeUseBotQueues,
       expiresTicket,

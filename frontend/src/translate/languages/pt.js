@@ -2366,33 +2366,16 @@ const messages = {
         success: "WhatsApp salvo com sucesso.",
         aiAgent: {
           title: "Agente de IA",
-          selectAgent: "Selecionar agente de IA",
-          runtimeMode: "Modo de operação",
-          enableOnConnection: "Ativar Agente de IA nesta conexão",
-          none: "Nenhum",
-          noAgents:
-            "Nenhum agente de IA cadastrado. Crie um agente no módulo Automação > Agente de IA.",
-          phaseWarning:
-            "Nesta fase, o agente não envia respostas automaticamente aos clientes.",
-          shadowWarning:
-            "Respostas serão geradas para avaliação interna, mas não serão enviadas aos clientes.",
-          liveWarning:
-            "Atenção: neste modo, o Agente de IA enviará respostas automaticamente aos clientes quando o ticket estiver elegível.",
-          liveLimitations:
-            "Áudio e mídia sem texto ainda não são suportados. Tickets com atendente humano não serão respondidos. O handoff para humano usa o marcador [HANDOFF_HUMAN] e pausa a IA no ticket.",
-          liveConfirmLabel:
-            "Entendo que a IA responderá automaticamente os clientes elegíveis.",
-          liveConfirmRequired:
-            "Confirme que entende o Live Mode antes de salvar.",
-          liveKnowledgeHint:
-            "A recuperação de Base de Conhecimento (RAG) no Live exige opt-in separado nas configurações de Conhecimento do agente — não é ativada automaticamente ao escolher Live Mode.",
-          planBlocked: "O módulo Agente de IA não está disponível no seu plano.",
-          modes: {
-            disabled: "Desativado",
-            dryRun: "Simulação de elegibilidade",
-            shadow: "Shadow Mode — gera sugestões, mas não envia",
-            live: "Live Mode — responde automaticamente",
+          managedByProduct:
+            "A configuração do AI Agent é gerenciada pela área AI Agent.",
+          manageCta: "Gerenciar AI Agent",
+          status: {
+            live: "Status atual: Ativo em Live",
+            shadow: "Status atual: Ativo em Shadow",
+            linkedOff: "Status atual: Vinculado, mas desativado",
+            notLinked: "Status atual: Não vinculado",
           },
+          planBlocked: "O módulo Agente de IA não está disponível no seu plano.",
         },
       },
       ticketAiAgent: {
@@ -2984,7 +2967,7 @@ const messages = {
           aria: "Ações do Agente de IA",
           openWizard: "Abrir assistente",
           openSimulator: "Abrir simulador",
-          openConnections: "Conexões WhatsApp",
+          openConnections: "Administrar canais WhatsApp",
         },
         simulator: {
           reasons: {

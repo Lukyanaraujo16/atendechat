@@ -175,7 +175,8 @@ export function mapAiAgentNextAction(action, context = {}) {
       return { ...base, path: reviewPath, enabled: true };
     case "connect_whatsapp":
     case "fix_connection":
-      return { ...base, path: "/connections", enabled: true };
+      // Vínculo comercial de conexões: Product Wizard (connectionRefs), não o Modal.
+      return { ...base, path: AI_AGENT_WIZARD_ROUTE_PATH, enabled: true };
     case "activate_shadow":
     case "activate_live":
       return {

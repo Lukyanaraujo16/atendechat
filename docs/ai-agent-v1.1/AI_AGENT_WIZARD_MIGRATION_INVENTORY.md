@@ -186,7 +186,7 @@ Abandono antes do POST: descarta draft local (sem `DELETE` legado).
 | AiAgentWizard | Fluxo guiado | **Migrado** |
 | AiAgentModal | Independente / órfão no hub | Não migrado → Fase 2.5/2.6 |
 | AiProviderCredentialModal | Cadastro de credenciais | CTA externo residual; refetch options ao voltar |
-| WhatsApp settings | Vínculo legado | Fora do Wizard → Fase 2.6 |
+| WhatsApp settings | Controles AI removidos (2.6); CTA → `/ai-agent` | Concluído — mutação só Product |
 | Simulator | Pós-success navegação | Intacta |
 
 ---

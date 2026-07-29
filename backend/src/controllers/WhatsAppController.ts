@@ -9,6 +9,7 @@ import DeleteWhatsAppService from "../services/WhatsappService/DeleteWhatsAppSer
 import ListWhatsAppsService from "../services/WhatsappService/ListWhatsAppsService";
 import ShowWhatsAppService from "../services/WhatsappService/ShowWhatsAppService";
 import UpdateWhatsAppService from "../services/WhatsappService/UpdateWhatsAppService";
+import { assertNoAiAgentFieldsInWhatsappPayload } from "../services/WhatsappService/assertNoAiAgentFieldsInWhatsappPayload";
 
 interface WhatsappData {
   name: string;
@@ -26,9 +27,6 @@ interface WhatsappData {
   transferQueueId?: number;
   timeToTransfer?: number;  
   promptId?: number;
-  aiAgentId?: number | null;
-  aiAgentEnabled?: boolean;
-  aiAgentMode?: string;
   maxUseBotQueues?: number;
   timeUseBotQueues?: number;
   expiresTicket?: number;
@@ -54,6 +52,8 @@ export const index = async (req: Request, res: Response): Promise<Response> => {
 };
 
 export const store = async (req: Request, res: Response): Promise<Response> => {
+  assertNoAiAgentFieldsInWhatsappPayload(req.body);
+
   const {
     name,
     status,
@@ -68,9 +68,6 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
 	  transferQueueId,
 	  timeToTransfer,
     promptId,
-    aiAgentId,
-    aiAgentEnabled,
-    aiAgentMode,
     maxUseBotQueues,
     timeUseBotQueues,
     expiresTicket,
@@ -99,9 +96,6 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
 	  transferQueueId,
 	  timeToTransfer,	
     promptId,
-    aiAgentId,
-    aiAgentEnabled,
-    aiAgentMode,
     maxUseBotQueues,
     timeUseBotQueues,
     expiresTicket,
@@ -146,6 +140,8 @@ export const update = async (
   req: Request,
   res: Response
 ): Promise<Response> => {
+  assertNoAiAgentFieldsInWhatsappPayload(req.body);
+
   const { whatsappId } = req.params;
   const whatsappData = req.body;
   const { companyId } = req.user;
