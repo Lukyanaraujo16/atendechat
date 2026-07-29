@@ -45,6 +45,55 @@ export type AiAgentNextAction =
   | "resume_agent"
   | "none";
 
+/**
+ * Comandos comerciais de mutação (Fase 2.2).
+ * Sem resume_agent — não há pausa global no domínio.
+ */
+export type AiAgentProductCommand =
+  | "activate_shadow"
+  | "activate_live"
+  | "deactivate";
+
+export const AI_AGENT_PRODUCT_COMMANDS: AiAgentProductCommand[] = [
+  "activate_shadow",
+  "activate_live",
+  "deactivate"
+];
+
+export type AiAgentProductCommandResult = {
+  command: AiAgentProductCommand;
+  changed: boolean;
+  /**
+   * Escopo afetado pelo comando (Opção A — todas as conexões vinculadas).
+   * Allowlist comercial; sem ids técnicos.
+   */
+  affectedConnections: AiAgentProductAffectedConnections;
+  summary: AiAgentProductSummary;
+};
+
+/**
+ * Escopo comercial das conexões vinculadas ao agente principal.
+ * type fixo `all_linked` (Opção A / hardening 2.2.1).
+ */
+export type AiAgentProductConnectionScope = {
+  type: "all_linked";
+  count: number;
+  connectedCount: number;
+  disconnectedCount: number;
+  /** Nomes comerciais, ordenados de forma estável (id ASC no backend). */
+  names: string[];
+};
+
+export type AiAgentProductAffectedConnections = {
+  scope: "all_linked";
+  count: number;
+  names: string[];
+  /** Modo agregado antes do comando: off | shadow | live | mixed */
+  fromMode: "off" | "shadow" | "live" | "mixed";
+  /** Modo alvo / resultante após normalização */
+  toMode: "off" | "shadow" | "live";
+};
+
 export type AiAgentProductCheck = {
   key: AiAgentProductCheckKey;
   status: AiAgentProductCheckStatus;
@@ -57,6 +106,15 @@ export type AiAgentProductReadiness = {
   mode: AiAgentProductMode;
   nextAction: AiAgentNextAction;
   checks: AiAgentProductCheck[];
+};
+
+/**
+ * Escopo de resolução do agente comercial (V1.1 = no máximo um).
+ * Hardening 2.2.2 — Estratégia A.
+ */
+export type AiAgentProductAgentScope = {
+  type: "none" | "single" | "ambiguous";
+  count: number;
 };
 
 export type AiAgentProductSummary = {
@@ -77,6 +135,13 @@ export type AiAgentProductSummary = {
     name?: string;
     connected?: boolean;
   };
+  /** Impacto do conjunto vinculado (Opção A). */
+  connectionScope: AiAgentProductConnectionScope;
+  /**
+   * Resolução do agente comercial (Hardening 2.2.2 — Estratégia A).
+   * none | single | ambiguous — sem lista de ids.
+   */
+  agentScope: AiAgentProductAgentScope;
   readiness: AiAgentProductReadiness;
 };
 

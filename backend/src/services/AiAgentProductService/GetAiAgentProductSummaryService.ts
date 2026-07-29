@@ -18,6 +18,9 @@ import {
   serializeUnavailableProductSummary
 } from "./serializeAiAgentProduct";
 import {
+  buildAiAgentProductConnectionScope
+} from "./aiAgentProductConnectionScope";
+import {
   AiAgentProductReadiness,
   AiAgentProductSummary
 } from "../../types/aiAgentProduct";
@@ -95,10 +98,7 @@ export async function buildAiAgentProductSnapshot(input: {
 
   const agents = await AiAgent.findAll({
     where: { companyId: input.companyId },
-    order: [
-      ["enabled", "DESC"],
-      ["name", "ASC"]
-    ],
+    order: [["id", "ASC"]],
     attributes: [
       "id",
       "name",
@@ -141,6 +141,7 @@ export async function buildAiAgentProductSnapshot(input: {
 
   const connections = await Whatsapp.findAll({
     where: { companyId: input.companyId },
+    order: [["id", "ASC"]],
     attributes: [
       "id",
       "name",
@@ -217,7 +218,27 @@ export default async function GetAiAgentProductSummaryService(input: {
   });
 
   const computed = computeAiAgentProductReadiness(snapshot);
-  const { readiness, agent, linkedConnections, primaryConnection } = computed;
+  const {
+    readiness,
+    agent,
+    linkedConnections,
+    primaryConnection,
+    agentScope,
+    resolution
+  } = computed;
+
+  // Ambíguo: existe configuração, mas sem seleção comercial — sem nome/id aleatório
+  const agentPayload =
+    resolution === "ambiguous"
+      ? { exists: true as const }
+      : agent
+        ? {
+            exists: true as const,
+            id: agent.id,
+            name: agent.name,
+            enabled: agent.enabled
+          }
+        : { exists: false as const };
 
   const summary: AiAgentProductSummary = {
     availability: {
@@ -226,25 +247,32 @@ export default async function GetAiAgentProductSummaryService(input: {
     },
     status: readiness.status,
     mode: readiness.mode,
-    agent: agent
-      ? {
-          exists: true,
-          id: agent.id,
-          name: agent.name,
-          enabled: agent.enabled
-        }
-      : { exists: false },
-    connection: {
-      linked: linkedConnections.length > 0,
-      ...(linkedConnections.length > 0 && primaryConnection
+    agent: agentPayload,
+    connection:
+      resolution === "resolved" && linkedConnections.length > 0
         ? {
-            name: primaryConnection.name,
-            connected:
-              String(primaryConnection.status || "").toUpperCase() ===
-              "CONNECTED"
+            linked: true,
+            ...(primaryConnection
+              ? {
+                  name: primaryConnection.name,
+                  connected:
+                    String(primaryConnection.status || "").toUpperCase() ===
+                    "CONNECTED"
+                }
+              : {})
           }
-        : {})
-    },
+        : { linked: false },
+    connectionScope:
+      resolution === "resolved"
+        ? buildAiAgentProductConnectionScope(linkedConnections)
+        : {
+            type: "all_linked",
+            count: 0,
+            connectedCount: 0,
+            disconnectedCount: 0,
+            names: []
+          },
+    agentScope,
     readiness
   };
 

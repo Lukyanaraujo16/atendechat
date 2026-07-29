@@ -1,6 +1,7 @@
 /**
- * Hook — Product API summary (Fase 2.1).
+ * Hook — Product API summary (Fases 2.1–2.2).
  * Não recalcula readiness. Invalida ao trocar companyId. 403 limpa dados.
+ * applySummary atualiza a partir da resposta de comando (sem optimistic mode).
  */
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { AuthContext } from "../context/Auth/AuthContext";
@@ -23,6 +24,17 @@ export default function useAiAgentProductSummary({ enabled = true } = {}) {
   const mounted = useRef(true);
   const requestId = useRef(0);
 
+  const applySummary = useCallback((payload) => {
+    if (!mounted.current) return;
+    setState((prev) => ({
+      ...prev,
+      loading: false,
+      error: null,
+      accessDenied: false,
+      data: mapAiAgentProductSummary(payload),
+    }));
+  }, []);
+
   const reload = useCallback(async () => {
     if (!enabled) {
       setState({
@@ -40,7 +52,6 @@ export default function useAiAgentProductSummary({ enabled = true } = {}) {
       loading: true,
       error: null,
       accessDenied: false,
-      // limpa dados anteriores ao recarregar (evita flash/tenant stale)
       data: null,
     }));
 
@@ -81,5 +92,5 @@ export default function useAiAgentProductSummary({ enabled = true } = {}) {
     };
   }, [reload]);
 
-  return { ...state, reload, companyId };
+  return { ...state, reload, applySummary, companyId };
 }

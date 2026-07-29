@@ -2813,6 +2813,56 @@ const messages = {
           refresh: "Atualizar",
           retry: "Tentar novamente",
         },
+        commands: {
+          deactivate: "Desativar agente",
+        },
+        confirm: {
+          activate_shadow: {
+            title: "Ativar modo de testes",
+            body:
+              "O modo de testes será ativado em {{count}} conexão(ões) vinculada(s) a este agente ({{names}}). O agente analisará os atendimentos sem responder automaticamente.",
+            confirm: "Ativar modo de testes",
+          },
+          activate_live: {
+            title: "Ativar atendimento automático",
+            body:
+              "O atendimento automático será ativado em {{count}} conexão(ões) ({{names}}). O agente poderá responder clientes automaticamente por todas elas. Confirme apenas se a configuração estiver revisada. Conexões desconectadas: {{disconnectedCount}}.",
+            confirm: "Ativar atendimento automático",
+          },
+          deactivate: {
+            title: "Desativar o Agente de IA",
+            body:
+              "As respostas automáticas serão interrompidas em {{count}} conexão(ões) ({{names}}). As configurações, credenciais e histórico serão preservados.",
+            confirm: "Desativar",
+          },
+          unknown: {
+            title: "Confirmar ação",
+            body: "Esta ação não está disponível.",
+            confirm: "OK",
+          },
+        },
+        commandSuccess: {
+          activate_shadow: "Modo de testes ativado.",
+          activate_live: "Atendimento automático ativado.",
+          deactivate: "Agente de IA desativado.",
+          generic: "Ação concluída.",
+        },
+        commandErrors: {
+          accessDenied: "Você não tem permissão para alterar o Agente de IA.",
+          notAvailable: "O Agente de IA não está disponível no plano.",
+          notReady: "Conclua a configuração antes de ativar o Agente de IA.",
+          connectionUnavailable:
+            "Vincule e conecte um WhatsApp ao agente antes de ativar.",
+          notAllowed: "Esta ação não é permitida.",
+          ambiguous:
+            "Existem várias configurações de Agente de IA. Revise antes de ativar.",
+          contextInvalid: "Contexto do Agente de IA inválido para esta ação.",
+          generic: "Não foi possível concluir a ação. Tente novamente.",
+        },
+        ambiguous: {
+          description:
+            "Encontramos {{count}} configurações de Agente de IA. Revise as configurações antes de ativar o atendimento.",
+        },
         error: {
           title: "Não foi possível carregar o estado do Agente de IA",
           description:
@@ -2872,6 +2922,7 @@ const messages = {
         checks: {
           plan: "Plano",
           agent: "Agente criado",
+          agentAmbiguous: "Existem várias configurações de Agente de IA",
           provider: "Provedor de IA",
           instructions: "Instruções",
           connection: "Conexão WhatsApp",
@@ -2899,7 +2950,7 @@ const messages = {
           none: "Nenhuma ação",
           reviewConfig: "Revisar configuração",
           mutationDeferred:
-            "A ativação comercial segura estará disponível em breve. Por enquanto, revise a configuração.",
+            "A retomada do agente estará disponível quando houver pausa operacional global no produto.",
         },
         secondary: {
           aria: "Ações do Agente de IA",
@@ -2916,6 +2967,8 @@ const messages = {
           disconnected: "desconectada",
           readyTrue: "Pronto conforme o estado do produto.",
           readyFalse: "Ainda não está pronto para operação plena.",
+          connectionScope:
+            "{{count}} conexão(ões) vinculada(s) ({{connected}} conectada(s), {{disconnected}} desconectada(s))",
         },
       },
       aiAgent: {

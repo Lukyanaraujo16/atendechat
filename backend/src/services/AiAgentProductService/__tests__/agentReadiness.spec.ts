@@ -266,6 +266,14 @@ describe("hardening 2.0.1 — serializer allowlist", () => {
       mode: "shadow",
       agent: { exists: true, id: 1, name: "Bot", enabled: true },
       connection: { linked: true, name: "WA", connected: true },
+      connectionScope: {
+        type: "all_linked",
+        count: 1,
+        connectedCount: 1,
+        disconnectedCount: 0,
+        names: ["WA"]
+      },
+      agentScope: { type: "single", count: 1 },
       readiness: {
         ready: true,
         status: "active",
@@ -322,6 +330,14 @@ describe("hardening 2.0.1 — serializer allowlist", () => {
       mode: "off",
       agent: { exists: false },
       connection: { linked: false },
+      connectionScope: {
+        type: "all_linked",
+        count: 0,
+        connectedCount: 0,
+        disconnectedCount: 0,
+        names: []
+      },
+      agentScope: { type: "none", count: 0 },
       readiness: {
         ready: false,
         status: "not_created",

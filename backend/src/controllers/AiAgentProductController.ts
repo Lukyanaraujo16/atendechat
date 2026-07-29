@@ -3,6 +3,7 @@ import AppError from "../errors/AppError";
 import GetAiAgentProductSummaryService, {
   GetAiAgentProductReadinessService
 } from "../services/AiAgentProductService/GetAiAgentProductSummaryService";
+import ExecuteAiAgentProductCommandService from "../services/AiAgentProductService/ExecuteAiAgentProductCommandService";
 import { logger } from "../utils/logger";
 
 function companyIdOrThrow(req: Request): number {
@@ -14,7 +15,6 @@ function companyIdOrThrow(req: Request): number {
       "Contexto da empresa inválido."
     );
   }
-  // companyId em query/body nunca substitui a sessão
   return Number(id);
 }
 
@@ -67,6 +67,36 @@ export const readiness = async (
       "ERR_AI_AGENT_PRODUCT_NOT_AVAILABLE",
       500,
       "Não foi possível carregar o readiness do Agente de IA."
+    );
+  }
+};
+
+export const command = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  try {
+    rejectArbitraryCompanyId(req);
+    const companyId = companyIdOrThrow(req);
+    const data = await ExecuteAiAgentProductCommandService({
+      companyId,
+      req,
+      body: req.body as Record<string, unknown>
+    });
+    return res.json(data);
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    logger.error(
+      {
+        err: err instanceof Error ? err.message : "unknown",
+        surface: "ai_agent_product"
+      },
+      "ai_agent_product_command_failed"
+    );
+    throw new AppError(
+      "ERR_AI_AGENT_PRODUCT_COMMAND_NOT_ALLOWED",
+      500,
+      "Não foi possível executar o comando do Agente de IA."
     );
   }
 };

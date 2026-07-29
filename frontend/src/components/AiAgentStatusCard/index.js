@@ -1,11 +1,13 @@
-import React from "react";
+import React, { useState } from "react";
 import Box from "@material-ui/core/Box";
 import Typography from "@material-ui/core/Typography";
 import Chip from "@material-ui/core/Chip";
 import { makeStyles } from "@material-ui/core/styles";
-import { AppSectionCard } from "../../ui";
+import { AppSectionCard, AppSecondaryButton, AppNeutralButton } from "../../ui";
 import AiAgentModeBadge from "../AiAgentModeBadge";
 import AiAgentPrimaryAction from "../AiAgentPrimaryAction";
+import ConfirmationModal from "../ConfirmationModal";
+import { getAiAgentCommandConfirmKeys, getAiAgentCommandConfirmParams } from "../../utils/aiAgentProductMapper";
 import { i18n } from "../../translate/i18n";
 
 const useStyles = makeStyles((theme) => ({
@@ -69,7 +71,55 @@ const TONE_CLASS = {
   neutral: "toneNeutral",
 };
 
-export default function AiAgentStatusCard({ summary, onRefresh }) {
+function CommercialCommandButton({
+  action,
+  commandBusy,
+  onCommand,
+  connectionScope,
+}) {
+  const [open, setOpen] = useState(false);
+  const keys = getAiAgentCommandConfirmKeys(action.command);
+  const params = getAiAgentCommandConfirmParams(connectionScope);
+  const ButtonComp = action.destructive ? AppNeutralButton : AppSecondaryButton;
+
+  return (
+    <>
+      <ButtonComp
+        onClick={() => setOpen(true)}
+        disabled={commandBusy}
+        data-testid={`ai-agent-command-${action.command}`}
+      >
+        {i18n.t(action.labelKey)}
+      </ButtonComp>
+      <ConfirmationModal
+        title={i18n.t(keys.titleKey)}
+        open={open}
+        onClose={() => !commandBusy && setOpen(false)}
+        onConfirm={async () => {
+          try {
+            await onCommand(action.command);
+            setOpen(false);
+          } catch (_err) {
+            // erro no pai
+          }
+        }}
+        confirmText={i18n.t(keys.confirmKey)}
+        destructive={keys.destructive}
+        loading={commandBusy}
+        asyncConfirm
+      >
+        {i18n.t(keys.bodyKey, params)}
+      </ConfirmationModal>
+    </>
+  );
+}
+
+export default function AiAgentStatusCard({
+  summary,
+  onRefresh,
+  onCommand,
+  commandBusy = false,
+}) {
   const classes = useStyles();
   if (!summary) return null;
 
@@ -77,15 +127,18 @@ export default function AiAgentStatusCard({ summary, onRefresh }) {
   const toneClass = classes[TONE_CLASS[tone] || "toneNeutral"];
   const showAgent =
     summary.agent?.exists &&
+    summary.agentScope?.type === "single" &&
     summary.status !== "unavailable" &&
     summary.status !== "not_created";
   const showConnection =
     summary.connection?.linked &&
+    summary.agentScope?.type === "single" &&
     summary.status !== "unavailable" &&
     summary.status !== "not_created";
-  const showChecklistStatuses = ![
-    "unavailable",
-  ].includes(summary.status);
+  const showChecklistStatuses = !["unavailable"].includes(summary.status);
+  const commercialCommands = Array.isArray(summary.commercialCommands)
+    ? summary.commercialCommands
+    : [];
 
   return (
     <AppSectionCard
@@ -132,6 +185,19 @@ export default function AiAgentStatusCard({ summary, onRefresh }) {
               })}
             </Typography>
           ) : null}
+          {summary.connectionScope?.count > 0 ? (
+            <Typography
+              variant="body2"
+              className={classes.metaLine}
+              data-testid="ai-agent-connection-scope"
+            >
+              {i18n.t("aiAgentProduct.meta.connectionScope", {
+                count: summary.connectionScope.count,
+                connected: summary.connectionScope.connectedCount,
+                disconnected: summary.connectionScope.disconnectedCount,
+              })}
+            </Typography>
+          ) : null}
         </Box>
       ) : null}
 
@@ -144,7 +210,24 @@ export default function AiAgentStatusCard({ summary, onRefresh }) {
       ) : null}
 
       <Box className={classes.actions}>
-        <AiAgentPrimaryAction nextAction={summary.nextAction} onRefresh={onRefresh} />
+        <AiAgentPrimaryAction
+          nextAction={summary.nextAction}
+          onRefresh={onRefresh}
+          onCommand={onCommand}
+          commandBusy={commandBusy}
+          connectionScope={summary.connectionScope}
+        />
+        {commercialCommands.map((action) =>
+          action.enabled && action.command && typeof onCommand === "function" ? (
+            <CommercialCommandButton
+              key={action.id || action.command}
+              action={action}
+              commandBusy={commandBusy}
+              onCommand={onCommand}
+              connectionScope={summary.connectionScope}
+            />
+          ) : null
+        )}
       </Box>
     </AppSectionCard>
   );

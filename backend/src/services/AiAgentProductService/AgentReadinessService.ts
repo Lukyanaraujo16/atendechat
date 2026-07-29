@@ -1,5 +1,6 @@
 import {
   AiAgentNextAction,
+  AiAgentProductAgentScope,
   AiAgentProductCheck,
   AiAgentProductMode,
   AiAgentProductReadiness,
@@ -7,6 +8,7 @@ import {
   AGENT_PRODUCT_STATUS_PRIORITY
 } from "../../types/aiAgentProduct";
 import { AiAgentRuntimeMode } from "../AiAgentService/aiAgentRuntimeMode";
+import { resolveAiAgentProductAgentContext } from "./ResolveAiAgentProductContextService";
 
 export type AiAgentProductAgentSnapshot = {
   id: number;
@@ -83,29 +85,33 @@ export function resolveAiAgentProductMode(input: {
   return "off";
 }
 
-function pickPrimaryAgent(
-  agents: AiAgentProductAgentSnapshot[]
-): AiAgentProductAgentSnapshot | null {
-  if (!agents.length) return null;
-  const enabled = agents.find(a => a.enabled);
-  return enabled || agents[0];
-}
-
 function buildChecks(input: {
   enabledByPlan: boolean;
   accessibleByUser: boolean;
   agent: AiAgentProductAgentSnapshot | null;
   linked: AiAgentProductConnectionSnapshot[];
   mode: AiAgentProductMode;
+  agentAmbiguous?: boolean;
 }): AiAgentProductCheck[] {
-  const { enabledByPlan, accessibleByUser, agent, linked, mode } = input;
+  const {
+    enabledByPlan,
+    accessibleByUser,
+    agent,
+    linked,
+    mode,
+    agentAmbiguous
+  } = input;
 
   const planStatus =
     !enabledByPlan || !accessibleByUser
       ? ("blocked" as const)
       : ("complete" as const);
 
-  const agentStatus = agent ? ("complete" as const) : ("pending" as const);
+  const agentStatus = agentAmbiguous
+    ? ("blocked" as const)
+    : agent
+      ? ("complete" as const)
+      : ("pending" as const);
 
   const providerStatus = !agent
     ? ("pending" as const)
@@ -139,7 +145,13 @@ function buildChecks(input: {
 
   return [
     { key: "plan", status: planStatus, labelKey: labelKeyForCheck("plan") },
-    { key: "agent", status: agentStatus, labelKey: labelKeyForCheck("agent") },
+    {
+      key: "agent",
+      status: agentStatus,
+      labelKey: agentAmbiguous
+        ? "aiAgentProduct.checks.agentAmbiguous"
+        : labelKeyForCheck("agent")
+    },
     {
       key: "provider",
       status: providerStatus,
@@ -177,12 +189,14 @@ function resolveNextAction(input: {
   status: AgentProductStatus;
   checks: AiAgentProductCheck[];
   mode: AiAgentProductMode;
+  agentAmbiguous?: boolean;
 }): AiAgentNextAction {
-  const { status, checks, mode } = input;
+  const { status, checks, mode, agentAmbiguous } = input;
 
   if (status === "unavailable") return "upgrade_plan";
   if (status === "not_created") return "create_agent";
   if (status === "paused") return "resume_agent";
+  if (agentAmbiguous) return "configure_agent";
   if (status === "attention_required") {
     const conn = checks.find(c => c.key === "connection");
     if (conn && conn.status !== "complete") return "connect_whatsapp";
@@ -224,11 +238,19 @@ function hasAttention(input: {
     if (!anyConnected) return true;
   }
 
-  // Conexão em modo ativo com agente desligado — inconsistência estrutural
   if (
     agent.enabled === false &&
     linked.some(c => technicalModeToCommercial(c.runtimeMode) !== "off")
   ) {
+    return true;
+  }
+
+  const activeModes = new Set(
+    linked
+      .map(c => technicalModeToCommercial(c.runtimeMode))
+      .filter(m => m !== "off")
+  );
+  if (activeModes.size > 1) {
     return true;
   }
 
@@ -237,10 +259,7 @@ function hasAttention(input: {
 
 /**
  * Única fonte oficial de readiness comercial (Architecture Lock §12).
- *
- * Prioridade determinística (AGENT_PRODUCT_STATUS_PRIORITY):
- * unavailable → not_created → setup_incomplete → attention_required →
- * paused (só explicitPaused) → active → ready_to_activate
+ * Resolução do agente: ResolveAiAgentProductContextService (Estratégia A).
  */
 export function computeAiAgentProductReadiness(
   snapshot: AiAgentProductSnapshot
@@ -249,59 +268,78 @@ export function computeAiAgentProductReadiness(
   agent: AiAgentProductAgentSnapshot | null;
   linkedConnections: AiAgentProductConnectionSnapshot[];
   primaryConnection: AiAgentProductConnectionSnapshot | null;
+  agentScope: AiAgentProductAgentScope;
+  resolution: "not_created" | "resolved" | "ambiguous";
 } {
-  const agent = pickPrimaryAgent(snapshot.agents);
+  const resolvedCtx = resolveAiAgentProductAgentContext(snapshot.agents);
+  const agentAmbiguous = resolvedCtx.resolution === "ambiguous";
+  const agent =
+    resolvedCtx.resolution === "resolved" ? resolvedCtx.agent : null;
+
   const linked = agent
     ? snapshot.connections.filter(c => c.aiAgentId === agent.id)
     : [];
 
-  const mode = resolveAiAgentProductMode({
-    agent,
-    linkedConnections: linked
-  });
+  const mode = agentAmbiguous
+    ? ("off" as AiAgentProductMode)
+    : resolveAiAgentProductMode({
+        agent,
+        linkedConnections: linked
+      });
 
   const checks = buildChecks({
     enabledByPlan: snapshot.enabledByPlan,
     accessibleByUser: snapshot.accessibleByUser,
     agent,
     linked,
-    mode
+    mode,
+    agentAmbiguous
   });
 
   const setupComplete =
     snapshot.enabledByPlan &&
     snapshot.accessibleByUser &&
+    !agentAmbiguous &&
     isSetupComplete(checks);
 
   let status: AgentProductStatus;
 
   if (!snapshot.enabledByPlan || !snapshot.accessibleByUser) {
     status = "unavailable";
-  } else if (!agent) {
+  } else if (resolvedCtx.resolution === "not_created") {
     status = "not_created";
+  } else if (agentAmbiguous) {
+    status = "attention_required";
   } else if (!setupComplete) {
     status = "setup_incomplete";
   } else if (hasAttention({ setupComplete: true, mode, linked, agent })) {
     status = "attention_required";
-  } else if (agent.explicitlyPaused === true || mode === "paused") {
+  } else if (agent?.explicitlyPaused === true || mode === "paused") {
     status = "paused";
   } else if (mode === "live" || mode === "shadow") {
     status = "active";
   } else {
-    // Setup completo + modo off — inclui enabled=false sem sinal de pausa
-    // (não há histórico de “já ativou”; enabled sozinho ≠ paused)
     status = "ready_to_activate";
   }
 
-  const nextAction = resolveNextAction({ status, checks, mode });
-  const ready = status === "ready_to_activate" || status === "active";
+  const nextAction = resolveNextAction({
+    status,
+    checks,
+    mode,
+    agentAmbiguous
+  });
+  const ready =
+    !agentAmbiguous &&
+    (status === "ready_to_activate" || status === "active");
 
+  const linkedOrdered = [...linked].sort((a, b) => Number(a.id) - Number(b.id));
   const primaryConnection =
-    linked.find(c => String(c.status || "").toUpperCase() === "CONNECTED") ||
-    linked[0] ||
+    linkedOrdered.find(
+      c => String(c.status || "").toUpperCase() === "CONNECTED"
+    ) ||
+    linkedOrdered[0] ||
     null;
 
-  // Invariante: prioridade numérica coerente com o ramo escolhido
   void AGENT_PRODUCT_STATUS_PRIORITY[status];
 
   return {
@@ -313,8 +351,10 @@ export function computeAiAgentProductReadiness(
       checks
     },
     agent,
-    linkedConnections: linked,
-    primaryConnection
+    linkedConnections: linkedOrdered,
+    primaryConnection,
+    agentScope: resolvedCtx.agentScope,
+    resolution: resolvedCtx.resolution
   };
 }
 

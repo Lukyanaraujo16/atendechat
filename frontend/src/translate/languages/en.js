@@ -2726,6 +2726,56 @@ const messages = {
 					refresh: "Refresh",
 					retry: "Try again",
 				},
+				commands: {
+					deactivate: "Deactivate agent",
+				},
+				confirm: {
+					activate_shadow: {
+						title: "Enable test mode",
+						body:
+							"Test mode will be enabled on {{count}} linked connection(s) for this agent ({{names}}). The agent will analyze conversations without replying automatically.",
+						confirm: "Enable test mode",
+					},
+					activate_live: {
+						title: "Enable automatic support",
+						body:
+							"Automatic support will be enabled on {{count}} connection(s) ({{names}}). The agent may reply to customers on all of them. Confirm only after reviewing the setup. Disconnected connections: {{disconnectedCount}}.",
+						confirm: "Enable automatic support",
+					},
+					deactivate: {
+						title: "Deactivate the AI Agent",
+						body:
+							"Automatic replies will stop on {{count}} connection(s) ({{names}}). Settings, credentials, and history will be preserved.",
+						confirm: "Deactivate",
+					},
+					unknown: {
+						title: "Confirm action",
+						body: "This action is not available.",
+						confirm: "OK",
+					},
+				},
+				commandSuccess: {
+					activate_shadow: "Test mode enabled.",
+					activate_live: "Automatic support enabled.",
+					deactivate: "AI Agent deactivated.",
+					generic: "Action completed.",
+				},
+				commandErrors: {
+					accessDenied: "You do not have permission to change the AI Agent.",
+					notAvailable: "The AI Agent is not available on this plan.",
+					notReady: "Finish setup before activating the AI Agent.",
+					connectionUnavailable:
+						"Link and connect a WhatsApp to the agent before activating.",
+					notAllowed: "This action is not allowed.",
+					ambiguous:
+						"There are multiple AI Agent configurations. Review them before activating.",
+					contextInvalid: "AI Agent context is invalid for this action.",
+					generic: "Could not complete the action. Please try again.",
+				},
+				ambiguous: {
+					description:
+						"We found {{count}} AI Agent configurations. Review them before enabling automated support.",
+				},
 				error: {
 					title: "Could not load AI Agent status",
 					description:
@@ -2785,6 +2835,7 @@ const messages = {
 				checks: {
 					plan: "Plan",
 					agent: "Agent created",
+					agentAmbiguous: "There are multiple AI Agent configurations",
 					provider: "AI provider",
 					instructions: "Instructions",
 					connection: "WhatsApp connection",
@@ -2812,7 +2863,7 @@ const messages = {
 					none: "No action",
 					reviewConfig: "Review setup",
 					mutationDeferred:
-						"Secure commercial activation will be available soon. For now, review the setup.",
+						"Resuming the agent will be available when global operational pause exists in the product.",
 				},
 				secondary: {
 					aria: "AI Agent actions",
@@ -2829,6 +2880,8 @@ const messages = {
 					disconnected: "disconnected",
 					readyTrue: "Ready according to product status.",
 					readyFalse: "Not fully ready for operation yet.",
+					connectionScope:
+						"{{count}} linked connection(s) ({{connected}} connected, {{disconnected}} disconnected)",
 				},
 			},
 			aiAgent: {

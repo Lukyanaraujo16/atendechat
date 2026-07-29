@@ -89,7 +89,8 @@ describe("aiAgentProductMapper", () => {
     });
     expect(view.ready).toBe(true);
     expect(view.agent.enabled).toBe(false);
-    expect(view.nextAction.enabled).toBe(false);
+    expect(view.nextAction.enabled).toBe(true);
+    expect(view.nextAction.command).toBe("activate_shadow");
   });
 });
 

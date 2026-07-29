@@ -319,3 +319,186 @@ Deny-list explícita: `apiKey`, `apiKeyEncrypted`, `systemPrompt`, `generatedPro
 5. CRUD `/ai-agents` permanece até fases futuras.
 6. AgentOS / Console / Orchestrator intactos.
 7. **2.0.1:** Product API exige `admin` (mesmo gate visual); `enabled=false` ≠ `paused`; serializer allowlist.
+
+---
+
+## 17. Comandos comerciais (Fase 2.2)
+
+### Namespace
+
+```
+POST /product/ai-agent/commands
+Body: { "command": "activate_shadow" | "activate_live" | "deactivate" }
+```
+
+Não aceitar `companyId` / `agentId` / `whatsappId` no body — o backend resolve o agente principal e as conexões vinculadas da empresa da sessão.
+
+### Enum
+
+```ts
+type AiAgentProductCommand =
+  | "activate_shadow"
+  | "activate_live"
+  | "deactivate";
+```
+
+`resume_agent` **não** é comando — não há pausa global de agente no domínio.
+
+### Matriz de transições
+
+| Estado atual (mode) | Ação | Estado esperado | Campos alterados | Service / helper | Readiness exigido | Permitido? |
+|---------------------|------|-----------------|------------------|------------------|-------------------|------------|
+| off | activate_shadow | active / shadow | `AiAgents.enabled=true`; WhatsApp vinculados: `aiAgentMode=shadow`, `aiAgentEnabled=true`, `aiAgentId` | `resolveAiAgentWhatsappFields` + update transacional | Setup estrutural completo + WA CONNECTED | Sim |
+| off | activate_live | active / live | idem com `aiAgentMode=live` | idem | idem | Sim |
+| shadow (ou dry_run comercial) | activate_live | active / live | mode → live; `enabled=true` | idem | idem | Sim |
+| live | activate_shadow | active / shadow | mode → shadow; `enabled=true` | idem | idem | Sim |
+| shadow | deactivate | ready_to_activate / off | `enabled=false`; WA: `aiAgentMode=disabled`, `aiAgentEnabled=false` (mantém `aiAgentId`) | update transacional | Agente existe | Sim |
+| live | deactivate | ready_to_activate / off | idem | idem | Agente existe | Sim |
+| off | deactivate | ready_to_activate / off | no-op / `changed:false` | — | — | Idempotente |
+| shadow | activate_shadow | active / shadow | no-op se já shadow técnico | — | — | Idempotente |
+| live | activate_live | active / live | no-op | — | — | Idempotente |
+| * | resume_agent | — | — | — | — | **Não** (sem domínio) |
+
+`activate_shadow` grava **`aiAgentMode = "shadow"`** (pipeline Shadow real), não `dry_run`.
+
+### Autorização dos comandos
+
+`isAuth` + `requireAiAgentProductView` (admin) + feature `automation.ai_agent` efetiva no service.
+
+### Resposta
+
+```json
+{
+  "command": "activate_live",
+  "changed": true,
+  "affectedConnections": {
+    "scope": "all_linked",
+    "count": 2,
+    "names": ["WhatsApp Principal", "WhatsApp Secundário"],
+    "fromMode": "off",
+    "toMode": "live"
+  },
+  "summary": { "...serializeAiAgentProductSummary incluindo connectionScope" }
+}
+```
+
+### Erros
+
+| Código | Quando |
+|--------|--------|
+| `ERR_AI_AGENT_PRODUCT_ACCESS_DENIED` | Perfil/user feature |
+| `ERR_AI_AGENT_PRODUCT_NOT_AVAILABLE` | Plano off |
+| `ERR_AI_AGENT_PRODUCT_NOT_READY` | Setup incompleto |
+| `ERR_AI_AGENT_PRODUCT_COMMAND_NOT_ALLOWED` | Comando inválido |
+| `ERR_AI_AGENT_PRODUCT_CONNECTION_UNAVAILABLE` | Sem vínculo **ou** qualquer vinculada desconectada (activate) |
+| `ERR_AI_AGENT_PRODUCT_CONTEXT_INVALID` | companyId ausente / IDs arbitrário no body |
+
+---
+
+## 18. Escopo de conexões (Hardening 2.2.1)
+
+### Cardinalidade comprovada
+
+| Relação | Cardinalidade | Evidência |
+|---------|---------------|-----------|
+| Empresa → AiAgent | 0..N | sem unique por company |
+| AiAgent → WhatsApp | 0..N | `Whatsapps.aiAgentId` sem UNIQUE |
+| WhatsApp → AiAgent | 0..1 | coluna singular `aiAgentId` |
+
+### Regra comercial oficial — **Opção A**
+
+Comandos comerciais atuam no **agente principal** da empresa e em **todas** as conexões WhatsApp vinculadas (`aiAgentId = agent.id`).
+
+Não há comando por conexão nesta fase. Não há campo de “conexão principal” no domínio — o summary escolhe uma conexão de **exibição** de forma determinística.
+
+### Escopo por comando
+
+| Comando | Escopo | Entidades afetadas | Múltiplas conexões | Conexão desconectada |
+|---------|--------|--------------------|--------------------|----------------------|
+| `activate_shadow` | `all_linked` | `AiAgents.enabled=true` + todas WA vinculadas → `aiAgentMode=shadow`, `aiAgentEnabled=true` | Normaliza **todas** para shadow | **Falha total** se **qualquer** vinculada ≠ CONNECTED |
+| `activate_live` | `all_linked` | idem com `aiAgentMode=live` | Normaliza **todas** para live | **Falha total** se qualquer vinculada ≠ CONNECTED |
+| `deactivate` | `all_linked` + agente | `AiAgents.enabled=false` + todas WA → `disabled` / `aiAgentEnabled=false` (mantém `aiAgentId`) | Desliga **todas** | Desliga mesmo desconectadas (sem exigir CONNECTED) |
+
+Não há sucesso parcial silencioso: activate é atômico (transação) ou falha antes de alterar.
+
+### `connectionScope` no summary
+
+```ts
+connectionScope: {
+  type: "all_linked";
+  count: number;
+  connectedCount: number;
+  disconnectedCount: number;
+  names: string[]; // comerciais, ordenados por id ASC
+}
+```
+
+`connection` (singular) permanece como **preview** determinístico:
+1. conexões vinculadas ordenadas por `id ASC`;
+2. primeira `CONNECTED`, senão a primeira da lista.
+
+### Estado misto
+
+O domínio legado **permite** A=live e B=shadow. O Product API:
+
+* agrega mode (`live` > `shadow` > `off`);
+* marca `attention_required` quando há modos ativos distintos;
+* comandos **normalizam** todas as vinculadas para um único modo.
+
+### Invariantes runtime
+
+| agent.enabled | WA enabled | WA mode | Runtime naquela conexão | Estado Product válido? |
+|---------------|------------|---------|-------------------------|------------------------|
+| false | * | * | não executa | off / ready_to_activate (ou attention se WA ativa) |
+| true | false / disabled | disabled | não executa | off |
+| true | true | shadow | Shadow | active / shadow |
+| true | true | live | Live | active / live |
+
+### Idempotência
+
+`changed: false` somente se **todo** o escopo já estiver no estado alvo (agente + **todas** as WA). Estado misto sob `activate_live` → `changed: true` e normalização.
+
+### Concorrência
+
+Locks `UPDATE` com `ORDER BY id ASC` em agentes da empresa e WA vinculadas. Summary da resposta é lido **após** commit.
+
+---
+
+## 19. Resolução do agente comercial (Hardening 2.2.2)
+
+### Cardinalidade
+
+Empresa → AiAgent = **0..N** · AiAgent → WhatsApp = **0..N** · WhatsApp → AiAgent = **0..1**.
+
+Não existe campo `isPrimary` / soft delete em `AiAgents`.
+
+### Agente elegível
+
+Todos os `AiAgent` com `companyId` da sessão. **`enabled=false` permanece elegível** (pode estar pronto para ativar). Sem filtro por vínculo WhatsApp, `createdAt` ou nome.
+
+### Estratégia A (oficial V1.1)
+
+| Candidatos | Resolução | Summary | Commands |
+|------------|-----------|---------|----------|
+| 0 | `not_created` | `agentScope.type=none` | activate → `CONTEXT_INVALID`; deactivate → no-op |
+| 1 | `resolved` | operação normal | permitido (com readiness/conexões) |
+| ≥2 | `ambiguous` | `attention_required`, `mode=off`, sem nome/id aleatório | **todos bloqueados** → `ERR_AI_AGENT_PRODUCT_CONTEXT_AMBIGUOUS` |
+
+Não escolher silenciosamente o enabled, o mais antigo ou o com mais conexões.
+
+### Resolver central
+
+`ResolveAiAgentProductContextService` / `resolveAiAgentProductAgentContext` — usado por readiness, summary e commands (revalidação sob lock).
+
+### `agentScope`
+
+```ts
+agentScope: { type: "none" | "single" | "ambiguous"; count: number }
+```
+
+### Erro
+
+| Código | Quando |
+|--------|--------|
+| `ERR_AI_AGENT_PRODUCT_CONTEXT_AMBIGUOUS` | ≥2 agentes elegíveis no comando |
+| `ERR_AI_AGENT_PRODUCT_CONTEXT_INVALID` | 0 agentes em activate (ou IDs arbitrários no body) |

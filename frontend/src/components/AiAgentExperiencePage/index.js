@@ -40,6 +40,10 @@ const useStyles = makeStyles((theme) => ({
     color: theme.palette.text.secondary,
     marginBottom: theme.spacing(1),
   },
+  commandError: {
+    color: theme.palette.error.main,
+    marginBottom: theme.spacing(1),
+  },
 }));
 
 function ExperienceSkeleton() {
@@ -59,7 +63,7 @@ function ExperienceSkeleton() {
 }
 
 /**
- * Experience Layer inicial — consome apenas o summary da Product API.
+ * Experience Layer — Product API leitura + comandos comerciais (Fase 2.2).
  */
 export default function AiAgentExperiencePage({
   loading,
@@ -67,6 +71,9 @@ export default function AiAgentExperiencePage({
   accessDenied,
   summary,
   onRetry,
+  onCommand,
+  commandBusy = false,
+  commandError = null,
   supportMode,
   companyLabel,
 }) {
@@ -80,6 +87,12 @@ export default function AiAgentExperiencePage({
     Array.isArray(summary.checks) &&
     summary.checks.length > 0;
 
+  const showActivationActions =
+    summary &&
+    summary.availability?.enabledByPlan === true &&
+    summary.status !== "unavailable" &&
+    summary.agentScope?.type !== "ambiguous";
+
   return (
     <Box className={classes.root} data-testid="ai-agent-experience">
       <AppPageHeader
@@ -91,7 +104,7 @@ export default function AiAgentExperiencePage({
         }
         actions={
           <MainHeaderButtonsWrapper>
-            <AppNeutralButton onClick={onRetry} disabled={loading}>
+            <AppNeutralButton onClick={onRetry} disabled={loading || commandBusy}>
               {i18n.t("aiAgentProduct.actions.refresh")}
             </AppNeutralButton>
           </MainHeaderButtonsWrapper>
@@ -126,7 +139,36 @@ export default function AiAgentExperiencePage({
 
       {!loading && !accessDenied && !error && summary ? (
         <Box className={classes.stack}>
-          <AiAgentStatusCard summary={summary} onRefresh={onRetry} />
+          {summary.agentScope?.type === "ambiguous" ? (
+            <Typography
+              variant="body2"
+              role="status"
+              data-testid="ai-agent-ambiguous-notice"
+              className={classes.supportHint}
+            >
+              {i18n.t("aiAgentProduct.ambiguous.description", {
+                count: summary.agentScope.count,
+              })}
+            </Typography>
+          ) : null}
+
+          {commandError ? (
+            <Typography
+              variant="body2"
+              className={classes.commandError}
+              role="alert"
+              data-testid="ai-agent-command-error"
+            >
+              {commandError}
+            </Typography>
+          ) : null}
+
+          <AiAgentStatusCard
+            summary={summary}
+            onRefresh={onRetry}
+            onCommand={showActivationActions ? onCommand : undefined}
+            commandBusy={commandBusy}
+          />
 
           {showChecklist ? (
             <AiAgentReadinessChecklist checks={summary.checks} />
@@ -145,6 +187,7 @@ export default function AiAgentExperiencePage({
                   <AppSecondaryButton
                     key={action.id}
                     onClick={() => history.push(action.path)}
+                    disabled={commandBusy}
                     data-testid={`ai-agent-secondary-${action.id}`}
                   >
                     {i18n.t(action.labelKey)}

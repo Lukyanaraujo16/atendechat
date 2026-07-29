@@ -99,3 +99,48 @@ Não existia:
 * endpoint de summary.
 
 Endpoints `/ai-agents*` **não são removidos** nesta fase.
+
+---
+
+## Fase 2.2 — Mutações e CRUD legado
+
+### Product API de comandos (nova)
+
+| Comando | Endpoint | Quem usa |
+|---------|----------|----------|
+| activate_shadow / activate_live / deactivate | `POST /product/ai-agent/commands` | Experience Layer `/ai-agent` |
+
+### Endpoints legados que alteram `enabled` / modo
+
+| Endpoint | Campos | Auth atual | Ainda necessário? | Experience Layer 2.2 |
+|----------|--------|------------|-------------------|----------------------|
+| `PUT /ai-agents/:id` | `enabled` | `isAuth` + feature (sem admin) | Wizard / edição | **Não** usar |
+| `PUT /whatsapp/:id` | `aiAgentId`, `aiAgentMode`, `aiAgentEnabled` | `isAuth` apenas; feature dentro do resolver | Conexões WhatsApp UI | **Não** usar |
+| `POST /whatsapp` | idem na criação | `isAuth` + delinquency | Conexões | **Não** usar |
+
+### Hardening futuro (recomendação)
+
+1. Exigir `admin` em `PUT /whatsapp` quando campos AI forem enviados.
+2. Exigir `admin` em `PUT /ai-agents/:id` (alinhar à UI).
+3. Migrar Wizard gradualmente para Product API de configuração (Fase 2.3).
+
+### Hardening 2.2.1 — escopo de conexões
+
+| Decisão | Valor |
+|---------|-------|
+| Regra | **Opção A** — comando no agente + todas as WA vinculadas |
+| Activate + desconectada | **Falha total** (sem sucesso parcial) |
+| Estado misto | Legado permitido; Product marca `attention_required`; comandos normalizam |
+| Summary | `connection` preview determinístico (id ASC) + `connectionScope` |
+| Resposta comando | `affectedConnections` (count, names, fromMode, toMode) |
+
+### Hardening 2.2.2 — resolução do agente
+
+| Decisão | Valor |
+|---------|-------|
+| Estratégia | **A** — no máximo um agente comercial; ≥2 → ambíguo |
+| Resolver | `ResolveAiAgentProductContextService` (único) |
+| Elegível | todos os AiAgent do tenant (incl. `enabled=false`) |
+| Commands ambíguos | bloqueados (`ERR_AI_AGENT_PRODUCT_CONTEXT_AMBIGUOUS`) |
+| Deactivate ambíguo | **não** desliga em massa |
+| `agentScope` | `none` \| `single` \| `ambiguous` + `count` |

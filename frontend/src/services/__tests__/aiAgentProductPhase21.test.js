@@ -87,13 +87,18 @@ describe("Fase 2.1 — mapper Experience", () => {
     expect(action.enabled).toBe(true);
   });
 
-  it("activate_* fica desabilitado (Abordagem A)", () => {
-    ["activate_shadow", "activate_live", "resume_agent"].forEach((type) => {
-      expect(isDeferredMutationAction(type)).toBe(true);
+  it("resume_agent permanece desabilitado; activate_* usa Product API (2.2)", () => {
+    expect(isDeferredMutationAction("resume_agent")).toBe(true);
+    const resume = mapAiAgentNextAction("resume_agent", { agentId: 9 });
+    expect(resume.enabled).toBe(false);
+    expect(resume.fallbackPath).toContain("/ai-agent/wizard");
+
+    ["activate_shadow", "activate_live"].forEach((type) => {
+      expect(isDeferredMutationAction(type)).toBe(false);
       const action = mapAiAgentNextAction(type, { agentId: 9 });
-      expect(action.enabled).toBe(false);
+      expect(action.enabled).toBe(true);
+      expect(action.command).toBe(type);
       expect(action.path).toBeNull();
-      expect(action.fallbackPath).toContain("/ai-agent/wizard");
     });
   });
 
@@ -191,7 +196,7 @@ describe("Fase 2.1 — Experience page states", () => {
     expect(screen.getByTestId("ai-agent-primary-action")).toBeTruthy();
   });
 
-  it("ready_to_activate com activate deferred mostra fallback", () => {
+  it("ready_to_activate sem onCommand mantém botão seguro desabilitado", () => {
     render(
       <MemoryRouter>
         <AiAgentExperiencePage
@@ -210,7 +215,26 @@ describe("Fase 2.1 — Experience page states", () => {
       </MemoryRouter>
     );
     expect(screen.getByTestId("ai-agent-primary-action-disabled")).toBeTruthy();
-    expect(screen.getByTestId("ai-agent-primary-fallback")).toBeTruthy();
+  });
+
+  it("ready_to_activate com onCommand habilita ação principal", () => {
+    render(
+      <MemoryRouter>
+        <AiAgentExperiencePage
+          loading={false}
+          summary={summaryFor("ready_to_activate", {
+            ready: true,
+            nextAction: "activate_shadow",
+            agent: { exists: true, id: 7, name: "Bot", enabled: true },
+            connection: { linked: true, name: "WA", connected: true },
+            checks: [],
+          })}
+          onRetry={() => {}}
+          onCommand={jest.fn()}
+        />
+      </MemoryRouter>
+    );
+    expect(screen.getByTestId("ai-agent-primary-action")).toBeTruthy();
   });
 
   it("active shadow mostra secondary simulator", () => {

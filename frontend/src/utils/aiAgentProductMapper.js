@@ -1,5 +1,5 @@
 /**
- * Mapper comercial — Product API Agente de IA (Fases 2.0 / 2.1).
+ * Mapper comercial — Product API Agente de IA (Fases 2.0–2.2).
  * Não recalcula readiness; traduz status/mode/nextAction/checks para UI.
  */
 import {
@@ -33,6 +33,12 @@ export const AI_AGENT_PRODUCT_NEXT_ACTIONS = [
   "none",
 ];
 
+export const AI_AGENT_PRODUCT_COMMANDS = [
+  "activate_shadow",
+  "activate_live",
+  "deactivate",
+];
+
 export const AI_AGENT_PRODUCT_CHECK_STATUSES = [
   "complete",
   "pending",
@@ -40,11 +46,12 @@ export const AI_AGENT_PRODUCT_CHECK_STATUSES = [
   "warning",
 ];
 
-/** Mutações comerciais ainda sem Product API segura — Abordagem A (Fase 2.1). */
-const DEFERRED_MUTATION_ACTIONS = new Set([
+/** resume_agent permanece adiado — sem pausa global no domínio. */
+const DEFERRED_MUTATION_ACTIONS = new Set(["resume_agent"]);
+
+const PRODUCT_MUTATION_COMMANDS = new Set([
   "activate_shadow",
   "activate_live",
-  "resume_agent",
 ]);
 
 const STATUS_TONE = {
@@ -70,6 +77,11 @@ export function normalizeAiAgentProductMode(mode) {
 export function normalizeAiAgentNextAction(action) {
   if (AI_AGENT_PRODUCT_NEXT_ACTIONS.includes(action)) return action;
   return "none";
+}
+
+export function normalizeAiAgentProductCommand(command) {
+  if (AI_AGENT_PRODUCT_COMMANDS.includes(command)) return command;
+  return null;
 }
 
 export function normalizeAiAgentCheckStatus(status) {
@@ -122,9 +134,21 @@ function simulatorPath(agentId) {
   return AI_AGENT_SIMULATOR_ROUTE_PATH.replace(":agentId", String(agentId));
 }
 
+function commandActionBase(command) {
+  return {
+    type: command,
+    command,
+    labelKey: `aiAgentProduct.nextAction.${command}`,
+    path: null,
+    enabled: true,
+    reasonKey: null,
+    requiresConfirmation: true,
+  };
+}
+
 /**
- * Resolve nextAction → label, route estática, enabled.
- * Não aceita URL do backend. Mutações activate/resume ficam desabilitadas (Abordagem A).
+ * Resolve nextAction → label, route estática, command ou enabled.
+ * Mutações activate_* usam Product API (command). resume_agent permanece desabilitado.
  */
 export function mapAiAgentNextAction(action, context = {}) {
   const normalized = normalizeAiAgentNextAction(action);
@@ -137,6 +161,8 @@ export function mapAiAgentNextAction(action, context = {}) {
     path: null,
     enabled: false,
     reasonKey: null,
+    command: null,
+    requiresConfirmation: false,
   };
 
   switch (normalized) {
@@ -153,6 +179,10 @@ export function mapAiAgentNextAction(action, context = {}) {
       return { ...base, path: "/connections", enabled: true };
     case "activate_shadow":
     case "activate_live":
+      return {
+        ...base,
+        ...commandActionBase(normalized),
+      };
     case "resume_agent":
       return {
         ...base,
@@ -168,8 +198,83 @@ export function mapAiAgentNextAction(action, context = {}) {
   }
 }
 
+/**
+ * Comandos comerciais extras (modo ativo / ready_to_activate).
+ * Não inclui o comando já coberto pelo nextAction principal.
+ */
+export function buildAiAgentCommercialCommands(summary) {
+  const status = summary?.status;
+  const mode = summary?.mode;
+  const primary = summary?.nextAction?.command || summary?.nextAction?.type;
+  const commands = [];
+
+  const push = (command) => {
+    if (!AI_AGENT_PRODUCT_COMMANDS.includes(command)) return;
+    if (command === primary) return;
+    commands.push({
+      ...commandActionBase(command),
+      id: `cmd_${command}`,
+      labelKey:
+        command === "deactivate"
+          ? "aiAgentProduct.commands.deactivate"
+          : `aiAgentProduct.nextAction.${command}`,
+      destructive: command === "deactivate",
+    });
+  };
+
+  if (status === "unavailable" || status === "not_created" || status === "paused") {
+    return commands;
+  }
+
+  if (status === "ready_to_activate") {
+    push("activate_shadow");
+    push("activate_live");
+    return commands;
+  }
+
+  // Ambíguo (2.2.2): sem mutações comerciais
+  if (
+    status === "attention_required" &&
+    summary?.agentScope?.type === "ambiguous"
+  ) {
+    return commands;
+  }
+
+  if (status === "attention_required") {
+    push("activate_shadow");
+    push("activate_live");
+    push("deactivate");
+    return commands;
+  }
+
+  if (status === "active") {
+    if (mode === "shadow") {
+      push("activate_live");
+      push("deactivate");
+    } else if (mode === "live") {
+      push("activate_shadow");
+      push("deactivate");
+    } else if (mode === "off") {
+      push("activate_shadow");
+      push("activate_live");
+    }
+  }
+
+  return commands;
+}
+
 export function buildAiAgentSecondaryActions(summary) {
-  const agentId = summary?.agent?.exists ? summary.agent.id : null;
+  const scopeType = summary?.agentScope?.type;
+  const isAmbiguous = scopeType === "ambiguous";
+  // Sem agentScope (payload legado/teste): usa agent.id se existir. Ambíguo nunca.
+  const agentId =
+    !isAmbiguous &&
+    summary?.agent?.exists &&
+    (scopeType === "single" || scopeType == null) &&
+    summary.agent.id != null &&
+    Number.isFinite(Number(summary.agent.id))
+      ? Number(summary.agent.id)
+      : null;
   const actions = [
     {
       id: "open_wizard",
@@ -223,8 +328,53 @@ export function mapAiAgentProductSummary(payload) {
         }
       : { linked: false };
 
+  const rawScope =
+    data.connectionScope && typeof data.connectionScope === "object"
+      ? data.connectionScope
+      : {};
+  const connectionScope = {
+    type: "all_linked",
+    count: Math.max(0, Number(rawScope.count) || 0),
+    connectedCount: Math.max(0, Number(rawScope.connectedCount) || 0),
+    disconnectedCount: Math.max(0, Number(rawScope.disconnectedCount) || 0),
+    names: Array.isArray(rawScope.names)
+      ? rawScope.names.map((n) => String(n || "").trim()).filter(Boolean)
+      : [],
+  };
+
+  const rawAgentScope =
+    data.agentScope && typeof data.agentScope === "object"
+      ? data.agentScope
+      : {};
+  let agentScopeType = ["none", "single", "ambiguous"].includes(
+    rawAgentScope.type
+  )
+    ? rawAgentScope.type
+    : null;
+  if (!agentScopeType) {
+    if (status === "not_created" || status === "unavailable") {
+      agentScopeType = "none";
+    } else if (agent.exists && agent.id != null) {
+      agentScopeType = "single";
+    } else if (agent.exists) {
+      agentScopeType = "ambiguous";
+    } else {
+      agentScopeType = "none";
+    }
+  }
+  let agentScopeCount = Math.max(0, Number(rawAgentScope.count) || 0);
+  if (agentScopeCount === 0) {
+    if (agentScopeType === "single") agentScopeCount = 1;
+    if (agentScopeType === "ambiguous") agentScopeCount = 2;
+  }
+  const agentScope = {
+    type: agentScopeType,
+    count: agentScopeCount,
+  };
+
   const nextAction = mapAiAgentNextAction(readiness.nextAction, {
-    agentId: agent.exists ? agent.id : null,
+    agentId:
+      agentScope.type === "single" && agent.exists ? agent.id : null,
   });
 
   const checks = Array.isArray(readiness.checks)
@@ -245,12 +395,55 @@ export function mapAiAgentProductSummary(payload) {
     checks,
     agent,
     connection,
+    connectionScope,
+    agentScope,
     secondaryActions: [],
+    commercialCommands: [],
   };
   mapped.secondaryActions = buildAiAgentSecondaryActions(mapped);
+  mapped.commercialCommands = buildAiAgentCommercialCommands(mapped);
   return mapped;
 }
 
 export function isDeferredMutationAction(actionType) {
   return DEFERRED_MUTATION_ACTIONS.has(actionType);
+}
+
+export function isProductMutationCommand(actionType) {
+  return PRODUCT_MUTATION_COMMANDS.has(actionType) || actionType === "deactivate";
+}
+
+export function getAiAgentCommandConfirmKeys(command) {
+  const normalized = normalizeAiAgentProductCommand(command);
+  if (!normalized) {
+    return {
+      titleKey: "aiAgentProduct.confirm.unknown.title",
+      bodyKey: "aiAgentProduct.confirm.unknown.body",
+      confirmKey: "aiAgentProduct.confirm.unknown.confirm",
+      destructive: false,
+    };
+  }
+  return {
+    titleKey: `aiAgentProduct.confirm.${normalized}.title`,
+    bodyKey: `aiAgentProduct.confirm.${normalized}.body`,
+    confirmKey: `aiAgentProduct.confirm.${normalized}.confirm`,
+    destructive: normalized === "deactivate",
+  };
+}
+
+/** Params de interpolação para confirmações (impacto Opção A). */
+export function getAiAgentCommandConfirmParams(connectionScope) {
+  const scope = connectionScope && typeof connectionScope === "object"
+    ? connectionScope
+    : {};
+  const count = Math.max(0, Number(scope.count) || 0);
+  const names = Array.isArray(scope.names)
+    ? scope.names.map((n) => String(n || "").trim()).filter(Boolean)
+    : [];
+  return {
+    count,
+    names: names.join(", "),
+    disconnectedCount: Math.max(0, Number(scope.disconnectedCount) || 0),
+    connectedCount: Math.max(0, Number(scope.connectedCount) || 0),
+  };
 }
