@@ -167,3 +167,15 @@ IDs canônicos: `backend/src/config/aiProviderModels.ts`
 - Wizard guiado não escolhe provider; cria com modelo OpenAI default e `aiProviderCredentialId: null`.
 - Filtro de modelos por provider da credencial permanece na Product Configuration / Wizard (o antigo AiAgentModal foi removido na Fase 2.8A).
 - Divergência para Fase 2.4: Wizard deve consumir options da Product API.
+
+---
+
+## Escopo company vs agent (Fase 2.9A)
+
+| Recurso | Escopo | Motivo |
+|---------|--------|--------|
+| AiAgent (config, profile, prompt, commands, readiness, simulator) | **agent-scoped** (`agentRef`) | Company 1:N AiAgent |
+| WhatsApp link (`aiAgentId`) | **agent-scoped** | Conexão 0..1 agente |
+| AiProviderCredential | **company-scoped** | Compartilhável entre agentes |
+| Knowledge Base / embedding settings | **company ou agent conforme contrato existente** | Não alterado nesta fase sem necessidade |
+| Runtime inbound | **por `whatsapp.aiAgentId`** | Sem mudança |

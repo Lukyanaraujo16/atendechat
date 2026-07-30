@@ -25,6 +25,12 @@ import {
   AiAgentProductSummary
 } from "../../types/aiAgentProduct";
 import { resolveAiAgentProductProviderCompatibility } from "./aiAgentProductProviderCapabilities";
+import {
+  resolveAiAgentProductAgentForOperation
+} from "./aiAgentProductAgentRef";
+import {
+  scopeAiAgentProductSnapshotToAgent
+} from "./ResolveAiAgentProductAgentService";
 
 const FEATURE_KEY = "automation.ai_agent";
 
@@ -189,6 +195,7 @@ function assertCommercialAccess(availability: {
 export default async function GetAiAgentProductSummaryService(input: {
   companyId: number;
   req?: Request;
+  agentRef?: unknown;
   availability?: { enabledByPlan: boolean; accessibleByUser: boolean };
 }): Promise<AiAgentProductSummary> {
   if (input.companyId == null || !Number.isFinite(Number(input.companyId))) {
@@ -215,11 +222,21 @@ export default async function GetAiAgentProductSummaryService(input: {
     });
   }
 
-  const snapshot = await buildAiAgentProductSnapshot({
+  const scoped = await resolveAiAgentProductAgentForOperation({
+    companyId,
+    agentRef: input.agentRef
+  });
+
+  const snapshotBase = await buildAiAgentProductSnapshot({
     companyId,
     req: input.req,
     availability
   });
+
+  const snapshot =
+    scoped.kind === "resolved"
+      ? scopeAiAgentProductSnapshotToAgent(snapshotBase, scoped.agentId)
+      : { ...snapshotBase, agents: [] };
 
   const computed = computeAiAgentProductReadiness(snapshot);
   const {
@@ -231,18 +248,18 @@ export default async function GetAiAgentProductSummaryService(input: {
     resolution
   } = computed;
 
-  // Ambíguo: existe configuração, mas sem seleção comercial — sem nome/id aleatório
   const agentPayload =
-    resolution === "ambiguous"
-      ? { exists: true as const }
-      : agent
-        ? {
-            exists: true as const,
-            id: agent.id,
-            name: agent.name,
-            enabled: agent.enabled
-          }
-        : { exists: false as const };
+    agent
+      ? {
+          exists: true as const,
+          id: agent.id,
+          name: agent.name,
+          enabled: agent.enabled,
+          ...(scoped.kind === "resolved"
+            ? { agentRef: scoped.agentRef }
+            : {})
+        }
+      : { exists: false as const };
 
   const summary: AiAgentProductSummary = {
     availability: {
@@ -286,6 +303,7 @@ export default async function GetAiAgentProductSummaryService(input: {
 export async function GetAiAgentProductReadinessService(input: {
   companyId: number;
   req?: Request;
+  agentRef?: unknown;
   availability?: { enabledByPlan: boolean; accessibleByUser: boolean };
 }): Promise<{
   availability: AiAgentProductSummary["availability"];

@@ -15,9 +15,14 @@ import {
 export default async function GetAiAgentProductSimulatorService(input: {
   companyId: number;
   req?: Request;
+  agentRef?: unknown;
 }): Promise<AiAgentProductSimulatorBootstrap> {
   const companyId = Number(input.companyId);
-  const cap = await resolveProductSimulatorCapability(companyId, input.req);
+  const cap = await resolveProductSimulatorCapability(
+    companyId,
+    input.req,
+    input.agentRef
+  );
 
   let scenarioSegment: string | null = null;
   let sessions: ReturnType<typeof serializeAiAgentProductSimulatorSession>[] =

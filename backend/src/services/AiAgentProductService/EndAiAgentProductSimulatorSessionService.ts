@@ -11,13 +11,18 @@ export default async function EndAiAgentProductSimulatorSessionService(input: {
   companyId: number;
   sessionRef: string;
   req?: Request;
+  agentRef?: unknown;
 }): Promise<{
   ref: string;
   status: string;
   endedAt: string | null;
 }> {
   const companyId = Number(input.companyId);
-  const cap = await assertProductSimulatorCanMutate(companyId, input.req);
+  const cap = await assertProductSimulatorCanMutate(
+    companyId,
+    input.req,
+    input.agentRef
+  );
   const sessionId = decodeSimulatorSessionRef(input.sessionRef);
 
   try {

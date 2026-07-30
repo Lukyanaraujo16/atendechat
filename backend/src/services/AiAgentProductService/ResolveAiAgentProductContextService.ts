@@ -4,13 +4,16 @@ import {
 import { AiAgentProductAgentSnapshot } from "./AgentReadinessService";
 
 /**
- * Resolução comercial do agente (Hardening 2.2.2 — Estratégia A).
+ * Resolução pura a partir de uma lista de snapshots (readiness / testes).
+ *
+ * Operações Product agent-scoped usam `resolveAiAgentProductAgentForOperation`
+ * (agentRef explícito ou compat 0/1). Este helper permanece para compute de
+ * readiness quando o snapshot já está filtrado (ou em testes unitários).
  *
  * Elegíveis: todos os AiAgent da empresa da sessão.
  * - Sem soft delete no model AiAgent — nenhum filtro deletedAt.
- * - enabled=false NÃO exclui o candidato (pode estar ready_to_activate).
- * - Sem preferência por vínculo WhatsApp, createdAt ou “mais recente”.
- * - Sem ORDER BY para “escolher” quando N>1 — ambiguidade explícita.
+ * - enabled=false NÃO exclui o candidato.
+ * - Sem preferência por vínculo WhatsApp / createdAt.
  */
 export type AiAgentProductAgentResolution =
   | "not_created"

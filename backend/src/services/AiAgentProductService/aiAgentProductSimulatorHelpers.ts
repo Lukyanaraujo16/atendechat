@@ -17,6 +17,12 @@ import {
 } from "./GetAiAgentProductSummaryService";
 import { computeAiAgentProductReadiness } from "./AgentReadinessService";
 import { resolveAiAgentProductAgentContext } from "./ResolveAiAgentProductContextService";
+import {
+  resolveAiAgentProductAgentForOperation
+} from "./aiAgentProductAgentRef";
+import {
+  scopeAiAgentProductSnapshotToAgent
+} from "./ResolveAiAgentProductAgentService";
 
 const SESSION_REF_PREFIX = "sim_s_";
 const MESSAGE_REF_PREFIX = "sim_m_";
@@ -166,48 +172,42 @@ export type ProductSimulatorCapability = {
 
 export async function resolveProductSimulatorCapability(
   companyId: number,
-  req?: Request
+  req?: Request,
+  agentRef?: unknown
 ): Promise<ProductSimulatorCapability> {
   await assertAiAgentProductConfigurationAccess({ companyId, req });
 
-  const snapshot = await buildAiAgentProductSnapshot({ companyId, req });
-  const computed = computeAiAgentProductReadiness(snapshot);
-  const { readiness, agent, agentScope, resolution } = computed;
+  const scoped = await resolveAiAgentProductAgentForOperation({
+    companyId,
+    agentRef
+  });
 
-  if (resolution === "not_created") {
+  if (scoped.kind === "not_created") {
     return {
       available: false,
       reason: "not_created",
       canSimulate: false,
       canReview: false,
-      agentScope,
-      resolution,
+      agentScope: { type: "none", count: 0 },
+      resolution: "not_created",
       agentRow: null,
-      readiness,
+      readiness: null,
       providerLabel: null,
       modelLabel: null,
       providerCompatibility: null
     };
   }
 
-  if (resolution === "ambiguous") {
-    return {
-      available: false,
-      reason: "ambiguous",
-      canSimulate: false,
-      canReview: false,
-      agentScope,
-      resolution,
-      agentRow: null,
-      readiness,
-      providerLabel: null,
-      modelLabel: null,
-      providerCompatibility: null
-    };
-  }
+  const snapshotBase = await buildAiAgentProductSnapshot({ companyId, req });
+  const snapshot = scopeAiAgentProductSnapshotToAgent(
+    snapshotBase,
+    scoped.agentId
+  );
+  const computed = computeAiAgentProductReadiness(snapshot);
+  const { readiness, agent, agentScope, resolution } = computed;
 
   const agentRow = await AiAgent.findOne({
-    where: { id: agent!.id, companyId }
+    where: { id: scoped.agentId, companyId }
   });
   if (!agentRow) {
     return {
@@ -261,17 +261,10 @@ export async function resolveProductSimulatorCapability(
 
 export async function assertProductSimulatorCanMutate(
   companyId: number,
-  req?: Request
+  req?: Request,
+  agentRef?: unknown
 ): Promise<ProductSimulatorCapability & { agentRow: AiAgent }> {
-  const cap = await resolveProductSimulatorCapability(companyId, req);
-
-  if (cap.resolution === "ambiguous") {
-    throw new AppError(
-      "ERR_AI_AGENT_PRODUCT_CONTEXT_AMBIGUOUS",
-      409,
-      "Existem várias configurações de Agente de IA. Revise antes de continuar."
-    );
-  }
+  const cap = await resolveProductSimulatorCapability(companyId, req, agentRef);
 
   if (cap.resolution === "not_created" || !cap.agentRow) {
     throw new AppError(

@@ -134,16 +134,17 @@ Endpoints `/ai-agents*` **não são removidos** nesta fase.
 | Summary | `connection` preview determinístico (id ASC) + `connectionScope` |
 | Resposta comando | `affectedConnections` (count, names, fromMode, toMode) |
 
-### Hardening 2.2.2 — resolução do agente
+### Hardening 2.9A — resolução multiagente
 
 | Decisão | Valor |
 |---------|-------|
-| Estratégia | **A** — no máximo um agente comercial; ≥2 → ambíguo |
-| Resolver | `ResolveAiAgentProductContextService` (único) |
+| Estratégia | **Multiagente** — Company 1:N AiAgent; operações agent-scoped com `agentRef` |
+| Resolver | `resolveAiAgentProductAgentForOperation` |
 | Elegível | todos os AiAgent do tenant (incl. `enabled=false`) |
-| Commands ambíguos | bloqueados (`ERR_AI_AGENT_PRODUCT_CONTEXT_AMBIGUOUS`) |
-| Deactivate ambíguo | **não** desliga em massa |
-| `agentScope` | `none` \| `single` \| `ambiguous` + `count` |
+| Sem `agentRef` + ≥2 | `ERR_AI_AGENT_PRODUCT_AGENT_REF_REQUIRED` |
+| Listagem | `GET /product/ai-agent/agents` |
+| Criação N-ésimo | permitida via `POST /product/ai-agent/configuration` |
+| `agentScope` | `none` \| `single` (+ `ambiguous` legado no tipo) |
 
 ---
 

@@ -28,7 +28,13 @@ import {
   resolveAffectedFromMode,
   sortConnectionsByIdAsc
 } from "./aiAgentProductConnectionScope";
-import { resolveAiAgentProductAgentContextFromRows } from "./ResolveAiAgentProductContextService";
+import {
+  encodeAgentRef,
+  resolveAiAgentProductAgentForOperation
+} from "./aiAgentProductAgentRef";
+import {
+  scopeAiAgentProductSnapshotToAgent
+} from "./ResolveAiAgentProductAgentService";
 
 function rejectClientEntityIds(body: Record<string, unknown> | undefined): void {
   if (!body || typeof body !== "object") return;
@@ -76,22 +82,6 @@ function isSetupStructurallyComplete(
   return required.every(key => {
     const check = readiness.checks.find(c => c.key === key);
     return check?.status === "complete";
-  });
-}
-
-/**
- * Lock determinístico de todos os candidatos da empresa (ORDER BY id ASC).
- * A seleção comercial é exclusiva via ResolveAiAgentProductContextService (Estratégia A).
- */
-async function lockEligibleAgents(
-  companyId: number,
-  transaction: Transaction
-): Promise<AiAgent[]> {
-  return AiAgent.findAll({
-    where: { companyId },
-    order: [["id", "ASC"]],
-    lock: Transaction.LOCK.UPDATE,
-    transaction
   });
 }
 
@@ -143,6 +133,7 @@ export default async function ExecuteAiAgentProductCommandService(input: {
   companyId: number;
   req: Request;
   body?: Record<string, unknown>;
+  agentRef?: unknown;
 }): Promise<AiAgentProductCommandResult> {
   if (input.companyId == null || !Number.isFinite(Number(input.companyId))) {
     throw new AppError(
@@ -155,6 +146,8 @@ export default async function ExecuteAiAgentProductCommandService(input: {
   rejectClientEntityIds(input.body);
   const command = parseCommand(input.body?.command);
   const companyId = Number(input.companyId);
+  const agentRef =
+    input.agentRef !== undefined ? input.agentRef : input.body?.agentRef;
 
   const availability = await resolveAiAgentProductAvailability({
     companyId,
@@ -176,27 +169,28 @@ export default async function ExecuteAiAgentProductCommandService(input: {
     );
   }
 
+  const scoped = await resolveAiAgentProductAgentForOperation({
+    companyId,
+    agentRef
+  });
+
   if (command === "activate_shadow" || command === "activate_live") {
-    const snapshot = await buildAiAgentProductSnapshot({
-      companyId,
-      req: input.req,
-      availability
-    });
-    const { resolution } = computeAiAgentProductReadiness(snapshot);
-    if (resolution === "ambiguous") {
-      throw new AppError(
-        "ERR_AI_AGENT_PRODUCT_CONTEXT_AMBIGUOUS",
-        409,
-        "Existem várias configurações de Agente de IA. Revise antes de ativar."
-      );
-    }
-    if (resolution === "not_created") {
+    if (scoped.kind === "not_created") {
       throw new AppError(
         "ERR_AI_AGENT_PRODUCT_CONTEXT_INVALID",
         409,
         "Crie o Agente de IA antes de ativar."
       );
     }
+    const snapshotBase = await buildAiAgentProductSnapshot({
+      companyId,
+      req: input.req,
+      availability
+    });
+    const snapshot = scopeAiAgentProductSnapshotToAgent(
+      snapshotBase,
+      scoped.agentId
+    );
     if (!isSetupStructurallyComplete(snapshot)) {
       throw new AppError(
         "ERR_AI_AGENT_PRODUCT_NOT_READY",
@@ -214,22 +208,12 @@ export default async function ExecuteAiAgentProductCommandService(input: {
     fromMode: "off",
     toMode: "off"
   };
+  let operatedAgentId: number | null =
+    scoped.kind === "resolved" ? scoped.agentId : null;
 
   await sequelize.transaction(async transaction => {
-    const candidates = await lockEligibleAgents(companyId, transaction);
-    const resolved = resolveAiAgentProductAgentContextFromRows(candidates);
-
-    if (resolved.resolution === "ambiguous") {
-      throw new AppError(
-        "ERR_AI_AGENT_PRODUCT_CONTEXT_AMBIGUOUS",
-        409,
-        "Existem várias configurações de Agente de IA. Revise antes de continuar."
-      );
-    }
-
-    if (resolved.resolution === "not_created") {
+    if (scoped.kind === "not_created") {
       if (command === "deactivate") {
-        // No-op seguro: não há agente comercial para desativar
         changed = false;
         affected = {
           scope: "all_linked",
@@ -247,8 +231,20 @@ export default async function ExecuteAiAgentProductCommandService(input: {
       );
     }
 
-    const agent = resolved.agent!;
+    const agent = await AiAgent.findOne({
+      where: { id: scoped.agentId, companyId },
+      lock: Transaction.LOCK.UPDATE,
+      transaction
+    });
+    if (!agent) {
+      throw new AppError(
+        "ERR_AI_AGENT_PRODUCT_AGENT_NOT_FOUND",
+        404,
+        "Agente de IA não encontrado."
+      );
+    }
 
+    operatedAgentId = agent.id;
     const linked = await lockLinkedWhatsapps(companyId, agent.id, transaction);
     const fromMode = resolveAffectedFromMode(toRuntimeSnapshots(linked));
 
@@ -343,7 +339,9 @@ export default async function ExecuteAiAgentProductCommandService(input: {
   const summary = await GetAiAgentProductSummaryService({
     companyId,
     req: input.req,
-    availability
+    availability,
+    agentRef:
+      operatedAgentId != null ? encodeAgentRef(operatedAgentId) : agentRef
   });
 
   return serializeAiAgentProductCommandResult({

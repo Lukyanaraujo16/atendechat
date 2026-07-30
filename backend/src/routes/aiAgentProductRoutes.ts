@@ -4,10 +4,53 @@ import requireAiAgentProductView from "../middleware/requireAiAgentProductView";
 import * as AiAgentProductController from "../controllers/AiAgentProductController";
 
 /**
- * Product API — Agente de IA (Fases 2.0–2.5).
+ * Product API — Agente de IA (Fases 2.0–2.9A).
  * isAuth + admin. Sem permissões AgentOS. supportMode não autoriza.
+ * Multiagente: agentRef em params/query/body; listagem em /agents.
  */
 const aiAgentProductRoutes = Router();
+
+aiAgentProductRoutes.get(
+  "/product/ai-agent/agents",
+  isAuth,
+  requireAiAgentProductView,
+  AiAgentProductController.listAgents
+);
+
+aiAgentProductRoutes.get(
+  "/product/ai-agent/agents/:agentRef/summary",
+  isAuth,
+  requireAiAgentProductView,
+  AiAgentProductController.summary
+);
+
+aiAgentProductRoutes.get(
+  "/product/ai-agent/agents/:agentRef/readiness",
+  isAuth,
+  requireAiAgentProductView,
+  AiAgentProductController.readiness
+);
+
+aiAgentProductRoutes.get(
+  "/product/ai-agent/agents/:agentRef/configuration",
+  isAuth,
+  requireAiAgentProductView,
+  AiAgentProductController.getConfiguration
+);
+
+aiAgentProductRoutes.put(
+  "/product/ai-agent/agents/:agentRef/configuration",
+  isAuth,
+  requireAiAgentProductView,
+  AiAgentProductController.updateConfiguration
+);
+
+aiAgentProductRoutes.put(
+  "/product/ai-agent/agents/:agentRef/configuration/connections",
+  isAuth,
+  requireAiAgentProductView,
+  AiAgentProductController.updateConnections
+);
 
 aiAgentProductRoutes.get(
   "/product/ai-agent/summary",

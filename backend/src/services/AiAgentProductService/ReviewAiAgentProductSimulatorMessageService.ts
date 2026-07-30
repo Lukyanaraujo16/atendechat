@@ -17,9 +17,14 @@ export default async function ReviewAiAgentProductSimulatorMessageService(input:
   userId: number;
   body: Record<string, unknown>;
   req?: Request;
+  agentRef?: unknown;
 }): Promise<AiAgentProductSimulatorReview> {
   const companyId = Number(input.companyId);
-  const cap = await assertProductSimulatorCanMutate(companyId, input.req);
+  const cap = await assertProductSimulatorCanMutate(
+    companyId,
+    input.req,
+    input.agentRef !== undefined ? input.agentRef : input.body?.agentRef
+  );
   const messageId = decodeSimulatorMessageRef(input.messageRef);
 
   const message = await AiAgentSimulationMessage.findOne({

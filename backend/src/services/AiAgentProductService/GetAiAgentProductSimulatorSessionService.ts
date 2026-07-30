@@ -13,17 +13,15 @@ export default async function GetAiAgentProductSimulatorSessionService(input: {
   companyId: number;
   sessionRef: string;
   req?: Request;
+  agentRef?: unknown;
 }): Promise<AiAgentProductSimulatorSession> {
   const companyId = Number(input.companyId);
-  const cap = await resolveProductSimulatorCapability(companyId, input.req);
+  const cap = await resolveProductSimulatorCapability(
+    companyId,
+    input.req,
+    input.agentRef
+  );
 
-  if (cap.resolution === "ambiguous") {
-    throw new AppError(
-      "ERR_AI_AGENT_PRODUCT_CONTEXT_AMBIGUOUS",
-      409,
-      "Existem várias configurações de Agente de IA. Revise antes de continuar."
-    );
-  }
   if (cap.resolution !== "resolved" || !cap.agentRow) {
     throw new AppError(
       "ERR_AI_AGENT_PRODUCT_SIMULATOR_UNAVAILABLE",

@@ -477,19 +477,24 @@ Não existe campo `isPrimary` / soft delete em `AiAgents`.
 
 Todos os `AiAgent` com `companyId` da sessão. **`enabled=false` permanece elegível** (pode estar pronto para ativar). Sem filtro por vínculo WhatsApp, `createdAt` ou nome.
 
-### Estratégia A (oficial V1.1)
+### Resolução multiagente (Fase 2.9A)
 
-| Candidatos | Resolução | Summary | Commands |
-|------------|-----------|---------|----------|
-| 0 | `not_created` | `agentScope.type=none` | activate → `CONTEXT_INVALID`; deactivate → no-op |
-| 1 | `resolved` | operação normal | permitido (com readiness/conexões) |
-| ≥2 | `ambiguous` | `attention_required`, `mode=off`, sem nome/id aleatório | **todos bloqueados** → `ERR_AI_AGENT_PRODUCT_CONTEXT_AMBIGUOUS` |
+Uma empresa pode possuir **múltiplos** agentes comerciais. Operações agent-scoped usam `agentRef` explícito (identificador comercial opaco).
 
-Não escolher silenciosamente o enabled, o mais antigo ou o com mais conexões.
+| Candidatos | Sem `agentRef` (compat frontend singular) | Com `agentRef` |
+|------------|-------------------------------------------|----------------|
+| 0 | `not_created` | 404 `AGENT_NOT_FOUND` se ref inválida |
+| 1 | resolve esse agente | opera no ref (validado na empresa) |
+| ≥2 | `ERR_AI_AGENT_PRODUCT_AGENT_REF_REQUIRED` | opera no agente informado |
+
+Criação (`POST /product/ai-agent/configuration`) **permite** o segundo (e N-ésimo) agente. Não há mais bloqueio `ERR_AI_AGENT_PRODUCT_ALREADY_EXISTS` por “já existe um agente”.
+
+Listagem: `GET /product/ai-agent/agents` — retorna todos os agentes; nunca `ambiguous`.
 
 ### Resolver central
 
-`ResolveAiAgentProductContextService` / `resolveAiAgentProductAgentContext` — usado por readiness, summary e commands (revalidação sob lock).
+- Operações Product: `resolveAiAgentProductAgentForOperation` (`aiAgentProductAgentRef` / `ResolveAiAgentProductAgentService`)
+- Readiness puro sobre snapshot: `resolveAiAgentProductAgentContext` (quando o snapshot já está filtrado a um agente)
 
 ### `agentScope`
 
@@ -497,12 +502,16 @@ Não escolher silenciosamente o enabled, o mais antigo ou o com mais conexões.
 agentScope: { type: "none" | "single" | "ambiguous"; count: number }
 ```
 
+`ambiguous` permanece no tipo apenas por compatibilidade de serialização; operações comerciais não usam mais ambiguous como estado permanente.
+
 ### Erro
 
 | Código | Quando |
 |--------|--------|
-| `ERR_AI_AGENT_PRODUCT_CONTEXT_AMBIGUOUS` | ≥2 agentes elegíveis no comando |
-| `ERR_AI_AGENT_PRODUCT_CONTEXT_INVALID` | 0 agentes em activate (ou IDs arbitrários no body) |
+| `ERR_AI_AGENT_PRODUCT_AGENT_REF_REQUIRED` | ≥2 agentes e operação agent-scoped sem `agentRef` |
+| `ERR_AI_AGENT_PRODUCT_AGENT_NOT_FOUND` | `agentRef` inexistente ou de outra empresa (sem enumeração) |
+| `ERR_AI_AGENT_PRODUCT_CONTEXT_INVALID` | 0 agentes em activate/update (ou IDs arbitrários no body) |
+| `ERR_AI_AGENT_PRODUCT_CONTEXT_AMBIGUOUS` | legado; não é o caminho operacional 2.9A |
 
 ---
 
@@ -530,11 +539,12 @@ agentScope: { type: "none" | "single" | "ambiguous"; count: number }
 - `supportMode` não autoriza
 - Permissões AgentOS não autorizam
 
-### Contexto do agente (ResolveAiAgentProductContextService)
+### Contexto do agente (multiagente 2.9A)
 
 - 0 agentes → tipo `"none"` → criação permitida
-- 1 agente → tipo `"single"` → leitura e atualização
-- ≥2 agentes → tipo `"ambiguous"` → bloqueado, erro comercial
+- 1 agente → tipo `"single"` → leitura/atualização sem `agentRef` (compat)
+- ≥2 agentes → exigir `agentRef` (`ERR_AI_AGENT_PRODUCT_AGENT_REF_REQUIRED`)
+- Rotas preferenciais: `/product/ai-agent/agents/:agentRef/configuration`
 
 ### Campos comerciais editáveis (allowlist)
 
@@ -672,7 +682,7 @@ Regras:
 - Payload: allowlist comercial
 - Agente criado com `enabled: false`
 - Resposta: `{ "created": true, "configuration": {...}, "summary": {...} }`
-- Se agente já existe: `409 ERR_AI_AGENT_PRODUCT_ALREADY_EXISTS`
+- Se agente já existe: criação de **novo** agente permitida (multiagente); retorna `agentRef`
 - Se ambíguo: `409 ERR_AI_AGENT_PRODUCT_CONTEXT_AMBIGUOUS`
 
 ### PUT `/product/ai-agent/configuration` (atualização)
@@ -717,8 +727,8 @@ Regras:
 | Código | HTTP | Quando |
 |--------|------|--------|
 | `ERR_AI_AGENT_PRODUCT_CONFIGURATION_INVALID` | 400 | Payload inválido |
-| `ERR_AI_AGENT_PRODUCT_CONTEXT_AMBIGUOUS` | 409 | Múltiplos agentes |
-| `ERR_AI_AGENT_PRODUCT_ALREADY_EXISTS` | 409 | Criação com agente existente |
+| `ERR_AI_AGENT_PRODUCT_AGENT_REF_REQUIRED` | 409 | ≥2 agentes sem `agentRef` |
+| `ERR_AI_AGENT_PRODUCT_AGENT_NOT_FOUND` | 404 | `agentRef` inexistente / outra empresa |
 | `ERR_AI_AGENT_PRODUCT_PROVIDER_INVALID` | 400 | Provider não suportado |
 | `ERR_AI_AGENT_PRODUCT_CREDENTIAL_INVALID` | 400 | Credencial inválida/incompatível/cross-tenant |
 | `ERR_AI_AGENT_PRODUCT_CONNECTION_INVALID` | 400 | Conexão inexistente/cross-tenant |

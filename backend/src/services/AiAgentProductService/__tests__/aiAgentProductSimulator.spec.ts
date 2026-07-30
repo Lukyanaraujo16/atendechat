@@ -85,6 +85,7 @@ import UpsertAiAgentSimulationMessageReviewService from "../../AiAgentService/Up
 
 const mockAvailability = resolveAiAgentProductAvailability as jest.Mock;
 const mockSnapshot = buildAiAgentProductSnapshot as jest.Mock;
+const mockAgentFindAll = AiAgent.findAll as jest.Mock;
 const mockAgentFindOne = AiAgent.findOne as jest.Mock;
 const mockProfileFindOne = AiAgentProfile.findOne as jest.Mock;
 const mockCredFindOne = AiProviderCredential.findOne as jest.Mock;
@@ -157,6 +158,7 @@ function stubSingleReady() {
     enabledByPlan: true,
     accessibleByUser: true
   });
+  mockAgentFindAll.mockResolvedValue([makeAgent()]);
   mockSnapshot.mockResolvedValue(snapshotWithAgents([agentSnap()]));
   mockAgentFindOne.mockResolvedValue(makeAgent());
   mockProfileFindOne.mockResolvedValue({ businessSegment: "retail" });
@@ -213,6 +215,7 @@ describe("aiAgentProductSimulator — Fase 2.5", () => {
 
   describe("capability — escopos", () => {
     it("zero agents → not_created", async () => {
+      mockAgentFindAll.mockResolvedValue([]);
       mockSnapshot.mockResolvedValue(snapshotWithAgents([]));
       const cap = await resolveProductSimulatorCapability(10, adminReq());
       expect(cap.available).toBe(false);
@@ -220,16 +223,33 @@ describe("aiAgentProductSimulator — Fase 2.5", () => {
       expect(cap.canSimulate).toBe(false);
     });
 
-    it("ambiguous → ambiguous", async () => {
+    it("≥2 sem agentRef → AGENT_REF_REQUIRED", async () => {
+      mockAgentFindAll.mockResolvedValue([
+        makeAgent({ id: 1 }),
+        makeAgent({ id: 2, name: "B" })
+      ]);
+      await expect(
+        resolveProductSimulatorCapability(10, adminReq())
+      ).rejects.toMatchObject({
+        message: "ERR_AI_AGENT_PRODUCT_AGENT_REF_REQUIRED"
+      });
+    });
+
+    it("≥2 com agentRef → resolve agente", async () => {
+      mockAgentFindAll.mockResolvedValue([
+        makeAgent({ id: 1 }),
+        makeAgent({ id: 2, name: "B" })
+      ]);
+      mockAgentFindOne.mockResolvedValue(makeAgent({ id: 2, name: "B" }));
       mockSnapshot.mockResolvedValue(
         snapshotWithAgents([
           agentSnap({ id: 1 }),
           agentSnap({ id: 2, name: "B" })
         ])
       );
-      const cap = await resolveProductSimulatorCapability(10, adminReq());
-      expect(cap.available).toBe(false);
-      expect(cap.reason).toBe("ambiguous");
+      const cap = await resolveProductSimulatorCapability(10, adminReq(), "2");
+      expect(cap.agentRow!.id).toBe(2);
+      expect(cap.canSimulate).toBe(true);
     });
 
     it("OpenAI linked ready → canSimulate", async () => {
@@ -605,13 +625,11 @@ describe("aiAgentProductSimulator — Fase 2.5", () => {
       });
     });
 
-    it("create rejeita quando ambiguous", async () => {
-      mockSnapshot.mockResolvedValue(
-        snapshotWithAgents([
-          agentSnap({ id: 1 }),
-          agentSnap({ id: 2 })
-        ])
-      );
+    it("create rejeita ≥2 sem agentRef", async () => {
+      mockAgentFindAll.mockResolvedValue([
+        makeAgent({ id: 1 }),
+        makeAgent({ id: 2 })
+      ]);
       await expect(
         CreateAiAgentProductSimulatorSessionService({
           companyId: 10,
@@ -619,7 +637,7 @@ describe("aiAgentProductSimulator — Fase 2.5", () => {
           req: adminReq()
         })
       ).rejects.toMatchObject({
-        message: "ERR_AI_AGENT_PRODUCT_CONTEXT_AMBIGUOUS"
+        message: "ERR_AI_AGENT_PRODUCT_AGENT_REF_REQUIRED"
       });
     });
   });

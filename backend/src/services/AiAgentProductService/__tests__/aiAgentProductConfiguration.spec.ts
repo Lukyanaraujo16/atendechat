@@ -136,6 +136,9 @@ function makeAgent(partial: Record<string, unknown> = {}) {
       Object.assign(this, values);
       return this;
     }),
+    reload: jest.fn(async function reload(this: any) {
+      return this;
+    }),
     ...partial
   };
 }
@@ -314,7 +317,7 @@ describe("AiAgent Product Configuration (Fase 2.3)", () => {
       expect(result.editableWhileActive).toBe(true);
     });
 
-    it("5. ambiguous → 409", async () => {
+    it("5. ≥2 sem agentRef → AGENT_REF_REQUIRED", async () => {
       mockAgentFindAll.mockResolvedValue([
         makeAgent({ id: 1 }),
         makeAgent({ id: 2, name: "Bot2" })
@@ -325,9 +328,29 @@ describe("AiAgent Product Configuration (Fase 2.3)", () => {
           req: adminReq()
         })
       ).rejects.toMatchObject({
-        message: "ERR_AI_AGENT_PRODUCT_CONTEXT_AMBIGUOUS",
+        message: "ERR_AI_AGENT_PRODUCT_AGENT_REF_REQUIRED",
         statusCode: 409
       });
+    });
+
+    it("5b. ≥2 com agentRef → opera no agente", async () => {
+      const agent = makeAgent({ id: 2, name: "Bot2" });
+      mockAgentFindAll.mockResolvedValue([
+        makeAgent({ id: 1 }),
+        agent
+      ]);
+      mockAgentFindOne.mockResolvedValue(agent);
+      mockWaFindAll.mockResolvedValue([]);
+      mockProfileFindOne.mockResolvedValue(null);
+      mockCredFindOne.mockResolvedValue(null);
+
+      const result = await GetAiAgentProductConfigurationService({
+        companyId: 10,
+        req: adminReq(),
+        agentRef: "2"
+      });
+      expect(result.agentRef).toBe("2");
+      expect(result.configuration!.identity.name).toBe("Bot2");
     });
 
     it("6. no secret leaked", async () => {
@@ -502,36 +525,42 @@ describe("AiAgent Product Configuration (Fase 2.3)", () => {
       );
     });
 
-    it("13. agente existe → 409", async () => {
+    it("13. agente existente → permite criar segundo (multiagente)", async () => {
       mockAgentFindAll.mockResolvedValue([makeAgent()]);
-      await expect(
-        CreateAiAgentProductConfigurationService({
-          companyId: 10,
-          req: adminReq(),
-          body: { name: "Bot" }
-        })
-      ).rejects.toMatchObject({
-        message: "ERR_AI_AGENT_PRODUCT_ALREADY_EXISTS",
-        statusCode: 409
+      mockAgentCreate.mockResolvedValue(makeAgent({ id: 42, name: "Bot2" }));
+      mockAgentFindOne.mockResolvedValue(makeAgent({ id: 42, name: "Bot2" }));
+      mockWaFindAll.mockResolvedValue([]);
+      mockProfileFindOne.mockResolvedValue(null);
+      mockCredFindOne.mockResolvedValue(null);
+
+      const result = await CreateAiAgentProductConfigurationService({
+        companyId: 10,
+        req: adminReq(),
+        body: { name: "Bot2" }
       });
-      expect(mockTx).not.toHaveBeenCalled();
+      expect(result.created).toBe(true);
+      expect(result.agentRef).toBe("42");
+      expect(mockAgentCreate).toHaveBeenCalled();
     });
 
-    it("14. ambiguous → 409", async () => {
+    it("14. dois agentes existentes → ainda permite criar terceiro", async () => {
       mockAgentFindAll.mockResolvedValue([
         makeAgent({ id: 1 }),
         makeAgent({ id: 2 })
       ]);
-      await expect(
-        CreateAiAgentProductConfigurationService({
-          companyId: 10,
-          req: adminReq(),
-          body: { name: "Bot" }
-        })
-      ).rejects.toMatchObject({
-        message: "ERR_AI_AGENT_PRODUCT_CONTEXT_AMBIGUOUS",
-        statusCode: 409
+      mockAgentCreate.mockResolvedValue(makeAgent({ id: 43, name: "Bot3" }));
+      mockAgentFindOne.mockResolvedValue(makeAgent({ id: 43, name: "Bot3" }));
+      mockWaFindAll.mockResolvedValue([]);
+      mockProfileFindOne.mockResolvedValue(null);
+      mockCredFindOne.mockResolvedValue(null);
+
+      const result = await CreateAiAgentProductConfigurationService({
+        companyId: 10,
+        req: adminReq(),
+        body: { name: "Bot3" }
       });
+      expect(result.created).toBe(true);
+      expect(result.agentRef).toBe("43");
     });
 
     it("15. rejects companyId in body", async () => {
@@ -659,6 +688,7 @@ describe("AiAgent Product Configuration (Fase 2.3)", () => {
     it("22. structural while active → 409", async () => {
       const agent = makeAgent({ enabled: true });
       mockAgentFindAll.mockResolvedValue([agent]);
+      mockAgentFindOne.mockResolvedValue(agent);
       mockWaFindAll.mockResolvedValue([
         makeWa({ aiAgentId: 1, aiAgentMode: "live", aiAgentEnabled: true })
       ]);
@@ -713,7 +743,7 @@ describe("AiAgent Product Configuration (Fase 2.3)", () => {
       expect(agent.update).not.toHaveBeenCalled();
     });
 
-    it("25. ambiguous → 409", async () => {
+    it("25. ≥2 sem agentRef → AGENT_REF_REQUIRED", async () => {
       mockAgentFindAll.mockResolvedValue([
         makeAgent({ id: 1 }),
         makeAgent({ id: 2 })
@@ -725,7 +755,7 @@ describe("AiAgent Product Configuration (Fase 2.3)", () => {
           body: { name: "X" }
         })
       ).rejects.toMatchObject({
-        message: "ERR_AI_AGENT_PRODUCT_CONTEXT_AMBIGUOUS",
+        message: "ERR_AI_AGENT_PRODUCT_AGENT_REF_REQUIRED",
         statusCode: 409
       });
     });
@@ -940,30 +970,27 @@ describe("AiAgent Product Configuration (Fase 2.3)", () => {
   });
 
   describe("concurrency", () => {
-    it("33. agent resolved under lock on create", async () => {
-      mockAgentFindAll
-        .mockResolvedValueOnce([]) // pre-check
-        .mockResolvedValueOnce([makeAgent()]); // under lock → already exists
+    it("33. create sob lock com agente existente ainda cria (multiagente)", async () => {
+      mockAgentFindAll.mockResolvedValue([makeAgent()]);
       mockAgentCreate.mockResolvedValue(makeAgent({ id: 42 }));
+      mockAgentFindOne.mockResolvedValue(makeAgent({ id: 42 }));
+      mockWaFindAll.mockResolvedValue([]);
+      mockProfileFindOne.mockResolvedValue(null);
+      mockCredFindOne.mockResolvedValue(null);
 
-      await expect(
-        CreateAiAgentProductConfigurationService({
-          companyId: 10,
-          req: adminReq(),
-          body: { name: "Bot" }
-        })
-      ).rejects.toMatchObject({
-        message: "ERR_AI_AGENT_PRODUCT_ALREADY_EXISTS"
+      const result = await CreateAiAgentProductConfigurationService({
+        companyId: 10,
+        req: adminReq(),
+        body: { name: "Bot" }
       });
+      expect(result.created).toBe(true);
       expect(mockTx).toHaveBeenCalled();
-      expect(mockAgentCreate).not.toHaveBeenCalled();
+      expect(mockAgentCreate).toHaveBeenCalled();
     });
 
-    it("33b. agent resolved under lock on update → ambiguous", async () => {
+    it("33b. update sem agentRef com ≥2 → AGENT_REF_REQUIRED", async () => {
       const agent = makeAgent({ id: 1 });
-      mockAgentFindAll
-        .mockResolvedValueOnce([agent]) // pre
-        .mockResolvedValueOnce([agent, makeAgent({ id: 2 })]); // under lock
+      mockAgentFindAll.mockResolvedValue([agent, makeAgent({ id: 2 })]);
 
       await expect(
         UpdateAiAgentProductConfigurationService({
@@ -972,7 +999,7 @@ describe("AiAgent Product Configuration (Fase 2.3)", () => {
           body: { name: "X" }
         })
       ).rejects.toMatchObject({
-        message: "ERR_AI_AGENT_PRODUCT_CONTEXT_AMBIGUOUS"
+        message: "ERR_AI_AGENT_PRODUCT_AGENT_REF_REQUIRED"
       });
     });
   });

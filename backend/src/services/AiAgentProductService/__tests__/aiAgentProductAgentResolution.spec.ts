@@ -17,7 +17,7 @@ jest.mock("../../../database", () => ({
 
 jest.mock("../../../models/AiAgent", () => ({
   __esModule: true,
-  default: { findAll: jest.fn() }
+  default: { findAll: jest.fn(), findOne: jest.fn() }
 }));
 
 jest.mock("../../../models/Whatsapp", () => ({
@@ -43,6 +43,7 @@ const mockAvailability = resolveAiAgentProductAvailability as jest.Mock;
 const mockSnapshot = buildAiAgentProductSnapshot as jest.Mock;
 const mockSummary = GetAiAgentProductSummaryService as jest.Mock;
 const mockAgentFindAll = AiAgent.findAll as jest.Mock;
+const mockAgentFindOne = AiAgent.findOne as jest.Mock;
 const mockWaFindAll = Whatsapp.findAll as jest.Mock;
 
 const agentA = {
@@ -163,7 +164,7 @@ describe("readiness com resolução A", () => {
   });
 });
 
-describe("commands bloqueiam ambiguidade", () => {
+describe("commands exigem agentRef com múltiplos agentes", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockAvailability.mockResolvedValue({
@@ -173,7 +174,7 @@ describe("commands bloqueiam ambiguidade", () => {
     mockSummary.mockResolvedValue(summaryPayload());
   });
 
-  it("activate com 2 agentes → CONTEXT_AMBIGUOUS sem update", async () => {
+  it("activate com 2 agentes sem agentRef → AGENT_REF_REQUIRED", async () => {
     mockSnapshot.mockResolvedValue({
       enabledByPlan: true,
       accessibleByUser: true,
@@ -192,12 +193,12 @@ describe("commands bloqueiam ambiguidade", () => {
         body: { command: "activate_live" }
       })
     ).rejects.toMatchObject({
-      message: "ERR_AI_AGENT_PRODUCT_CONTEXT_AMBIGUOUS"
+      message: "ERR_AI_AGENT_PRODUCT_AGENT_REF_REQUIRED"
     });
     expect(mockWaFindAll).not.toHaveBeenCalled();
   });
 
-  it("deactivate com 2 agentes → CONTEXT_AMBIGUOUS (não desliga todos)", async () => {
+  it("deactivate com 2 agentes sem agentRef → AGENT_REF_REQUIRED", async () => {
     const a = { id: 1, enabled: true, update: jest.fn() };
     const b = { id: 2, enabled: true, update: jest.fn() };
     mockAgentFindAll.mockResolvedValue([a, b]);
@@ -209,7 +210,7 @@ describe("commands bloqueiam ambiguidade", () => {
         body: { command: "deactivate" }
       })
     ).rejects.toMatchObject({
-      message: "ERR_AI_AGENT_PRODUCT_CONTEXT_AMBIGUOUS"
+      message: "ERR_AI_AGENT_PRODUCT_AGENT_REF_REQUIRED"
     });
     expect(a.update).not.toHaveBeenCalled();
     expect(b.update).not.toHaveBeenCalled();
@@ -307,6 +308,7 @@ describe("commands bloqueiam ambiguidade", () => {
       ]
     });
     mockAgentFindAll.mockResolvedValue([agent]);
+    mockAgentFindOne.mockResolvedValue(agent);
     mockWaFindAll.mockResolvedValue([waA, waB]);
 
     const result = await ExecuteAiAgentProductCommandService({

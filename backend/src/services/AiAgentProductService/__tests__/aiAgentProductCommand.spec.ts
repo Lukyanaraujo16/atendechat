@@ -13,7 +13,7 @@ jest.mock("../../../database", () => ({
 
 jest.mock("../../../models/AiAgent", () => ({
   __esModule: true,
-  default: { findAll: jest.fn() }
+  default: { findAll: jest.fn(), findOne: jest.fn() }
 }));
 
 jest.mock("../../../models/Whatsapp", () => ({
@@ -40,6 +40,7 @@ const mockAvailability = resolveAiAgentProductAvailability as jest.Mock;
 const mockSnapshot = buildAiAgentProductSnapshot as jest.Mock;
 const mockSummary = GetAiAgentProductSummaryService as jest.Mock;
 const mockAgentFindAll = AiAgent.findAll as jest.Mock;
+const mockAgentFindOne = AiAgent.findOne as jest.Mock;
 const mockWaFindAll = Whatsapp.findAll as jest.Mock;
 const mockTx = sequelize.transaction as jest.Mock;
 
@@ -133,6 +134,11 @@ function adminReq(companyId = 10) {
   } as any;
 }
 
+function mockSingleAgent(agent: ReturnType<typeof makeAgent>): void {
+  mockAgentFindAll.mockResolvedValue([agent]);
+  mockAgentFindOne.mockResolvedValue(agent);
+}
+
 describe("ExecuteAiAgentProductCommandService (Fase 2.2)", () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -208,6 +214,7 @@ describe("ExecuteAiAgentProductCommandService (Fase 2.2)", () => {
   });
 
   it("activate sem readiness estrutural → NOT_READY", async () => {
+    mockSingleAgent(makeAgent({ enabled: true }));
     mockSnapshot.mockResolvedValue(
       completeSnapshot({
         agents: [
@@ -238,7 +245,7 @@ describe("ExecuteAiAgentProductCommandService (Fase 2.2)", () => {
   it("off → shadow altera agent + whatsapp", async () => {
     const agent = makeAgent({ enabled: false });
     const wa = makeWa({ aiAgentMode: "disabled", aiAgentEnabled: false });
-    mockAgentFindAll.mockResolvedValue([agent]);
+    mockSingleAgent(agent);
     mockWaFindAll.mockResolvedValue([wa]);
     mockSummary.mockResolvedValue(
       summaryPayload({ status: "active", mode: "shadow" })
@@ -271,7 +278,7 @@ describe("ExecuteAiAgentProductCommandService (Fase 2.2)", () => {
   it("off → live", async () => {
     const agent = makeAgent({ enabled: false });
     const wa = makeWa();
-    mockAgentFindAll.mockResolvedValue([agent]);
+    mockSingleAgent(agent);
     mockWaFindAll.mockResolvedValue([wa]);
 
     await ExecuteAiAgentProductCommandService({
@@ -292,7 +299,7 @@ describe("ExecuteAiAgentProductCommandService (Fase 2.2)", () => {
       aiAgentMode: "shadow",
       aiAgentEnabled: true
     });
-    mockAgentFindAll.mockResolvedValue([agent]);
+    mockSingleAgent(agent);
     mockWaFindAll.mockResolvedValue([wa]);
 
     const result = await ExecuteAiAgentProductCommandService({
@@ -311,7 +318,7 @@ describe("ExecuteAiAgentProductCommandService (Fase 2.2)", () => {
   it("live → shadow", async () => {
     const agent = makeAgent({ enabled: true });
     const wa = makeWa({ aiAgentMode: "live", aiAgentEnabled: true });
-    mockAgentFindAll.mockResolvedValue([agent]);
+    mockSingleAgent(agent);
     mockWaFindAll.mockResolvedValue([wa]);
 
     await ExecuteAiAgentProductCommandService({
@@ -333,7 +340,7 @@ describe("ExecuteAiAgentProductCommandService (Fase 2.2)", () => {
       aiAgentEnabled: true,
       aiAgentId: 1
     });
-    mockAgentFindAll.mockResolvedValue([agent]);
+    mockSingleAgent(agent);
     mockWaFindAll.mockResolvedValue([wa]);
     mockSummary.mockResolvedValue(
       summaryPayload({
@@ -368,7 +375,7 @@ describe("ExecuteAiAgentProductCommandService (Fase 2.2)", () => {
       aiAgentMode: "live",
       aiAgentEnabled: true
     });
-    mockAgentFindAll.mockResolvedValue([agent]);
+    mockSingleAgent(agent);
     mockWaFindAll.mockResolvedValue([wa]);
 
     const result = await ExecuteAiAgentProductCommandService({
@@ -388,7 +395,7 @@ describe("ExecuteAiAgentProductCommandService (Fase 2.2)", () => {
       aiAgentMode: "disabled",
       aiAgentEnabled: false
     });
-    mockAgentFindAll.mockResolvedValue([agent]);
+    mockSingleAgent(agent);
     mockWaFindAll.mockResolvedValue([wa]);
 
     const result = await ExecuteAiAgentProductCommandService({
@@ -403,7 +410,7 @@ describe("ExecuteAiAgentProductCommandService (Fase 2.2)", () => {
   it("sem conexão CONNECTED → CONNECTION_UNAVAILABLE", async () => {
     const agent = makeAgent({ enabled: true });
     const wa = makeWa({ status: "DISCONNECTED", aiAgentMode: "disabled" });
-    mockAgentFindAll.mockResolvedValue([agent]);
+    mockSingleAgent(agent);
     mockWaFindAll.mockResolvedValue([wa]);
 
     await expect(
@@ -420,7 +427,7 @@ describe("ExecuteAiAgentProductCommandService (Fase 2.2)", () => {
   it("tenant: findAll usa companyId da sessão", async () => {
     const agent = makeAgent({ companyId: 10, enabled: true });
     const wa = makeWa({ companyId: 10, aiAgentMode: "shadow", aiAgentEnabled: true });
-    mockAgentFindAll.mockResolvedValue([agent]);
+    mockSingleAgent(agent);
     mockWaFindAll.mockResolvedValue([wa]);
 
     await ExecuteAiAgentProductCommandService({
@@ -441,7 +448,7 @@ describe("ExecuteAiAgentProductCommandService (Fase 2.2)", () => {
     const agent = makeAgent({ enabled: false });
     const wa = makeWa();
     wa.update.mockRejectedValue(new Error("db_fail"));
-    mockAgentFindAll.mockResolvedValue([agent]);
+    mockSingleAgent(agent);
     mockWaFindAll.mockResolvedValue([wa]);
     mockTx.mockImplementation(async (cb: (t: unknown) => Promise<void>) => {
       await cb({ LOCK: { UPDATE: "UPDATE" } });

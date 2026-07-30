@@ -62,6 +62,7 @@ const mockSummary = GetAiAgentProductSummaryService as jest.Mock;
 const mockSnapshot = buildAiAgentProductSnapshot as jest.Mock;
 const mockAvailability = resolveAiAgentProductAvailability as jest.Mock;
 const mockAgentFindAll = AiAgent.findAll as jest.Mock;
+const mockAgentFindOne = AiAgent.findOne as jest.Mock;
 const mockWaFindAll = Whatsapp.findAll as jest.Mock;
 
 function baseSnapshot(
@@ -447,6 +448,7 @@ describe("aiAgentProductReadinessCompatibility (2.3.2)", () => {
         })
       };
       mockAgentFindAll.mockResolvedValue([agent]);
+      mockAgentFindOne.mockResolvedValue(agent);
       mockWaFindAll.mockResolvedValue([wa]);
       mockSummary.mockResolvedValue({
         availability: { enabledByPlan: true, accessibleByUser: true },

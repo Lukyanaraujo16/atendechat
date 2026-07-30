@@ -111,8 +111,10 @@ export type AiAgentProductReadiness = {
 };
 
 /**
- * Escopo de resolução do agente comercial (V1.1 = no máximo um).
- * Hardening 2.2.2 — Estratégia A.
+ * Escopo de resolução do agente comercial.
+ * Com agentRef explícito ou exatamente um agente → single.
+ * Sem agentRef e ≥2 agentes → ERR_AI_AGENT_PRODUCT_AGENT_REF_REQUIRED (não usar ambiguous operacionalmente).
+ * O tipo "ambiguous" permanece no contrato apenas para compatibilidade de serialização legada.
  */
 export type AiAgentProductAgentScope = {
   type: "none" | "single" | "ambiguous";
@@ -129,6 +131,8 @@ export type AiAgentProductSummary = {
   agent: {
     exists: boolean;
     id?: number;
+    /** Referência comercial opaca (Fase 2.9A). */
+    agentRef?: string;
     name?: string;
     enabled?: boolean;
   };
@@ -140,8 +144,8 @@ export type AiAgentProductSummary = {
   /** Impacto do conjunto vinculado (Opção A). */
   connectionScope: AiAgentProductConnectionScope;
   /**
-   * Resolução do agente comercial (Hardening 2.2.2 — Estratégia A).
-   * none | single | ambiguous — sem lista de ids.
+   * Resolução do agente no escopo da operação.
+   * Operações agent-scoped com múltiplos agentes exigem agentRef.
    */
   agentScope: AiAgentProductAgentScope;
   readiness: AiAgentProductReadiness;
@@ -214,12 +218,16 @@ export type AiAgentProductConfiguration = {
 export type AiAgentProductConfigurationResult = {
   changed?: boolean;
   created?: boolean;
+  /** Referência do agente criado/atualizado (Fase 2.9A). */
+  agentRef?: string;
   configuration: AiAgentProductConfiguration | null;
   summary: AiAgentProductSummary;
 };
 
 export type AiAgentProductConfigurationView = {
   agentScope: AiAgentProductAgentScope;
+  /** Presente quando um agente foi resolvido. */
+  agentRef?: string;
   configuration: AiAgentProductConfiguration | null;
   editableWhileActive?: boolean;
   summary: AiAgentProductSummary;
@@ -263,6 +271,7 @@ export type AiAgentProductConfigurationPreview = {
 export type AiAgentProductSimulatorUnavailableReason =
   | "not_created"
   | "ambiguous"
+  | "agent_ref_required"
   | "credential_not_selected"
   | "credential_disabled"
   | "provider_unsupported"

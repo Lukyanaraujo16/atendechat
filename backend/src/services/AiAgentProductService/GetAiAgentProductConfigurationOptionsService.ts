@@ -1,11 +1,8 @@
 import { Request } from "express";
-import AiAgent from "../../models/AiAgent";
+import AppError from "../../errors/AppError";
 import AiProviderCredential from "../../models/AiProviderCredential";
 import Whatsapp from "../../models/Whatsapp";
 import { AiAgentProductConfigurationOptions } from "../../types/aiAgentProduct";
-import {
-  resolveAiAgentProductAgentContext
-} from "./ResolveAiAgentProductContextService";
 import {
   assertAiAgentProductConfigurationAccess,
   listAiAgentProductProviderOptions
@@ -17,10 +14,14 @@ import {
 import {
   serializeAiAgentProductConfigurationOptions
 } from "./serializeAiAgentProduct";
+import {
+  resolveAiAgentProductAgentForOperation
+} from "./aiAgentProductAgentRef";
 
 export default async function GetAiAgentProductConfigurationOptionsService(input: {
   companyId: number;
   req?: Request;
+  agentRef?: unknown;
   availability?: { enabledByPlan: boolean; accessibleByUser: boolean };
 }): Promise<AiAgentProductConfigurationOptions> {
   const companyId = Number(input.companyId);
@@ -30,25 +31,25 @@ export default async function GetAiAgentProductConfigurationOptionsService(input
     availability: input.availability
   });
 
-  const agents = await AiAgent.findAll({
-    where: { companyId },
-    order: [["id", "ASC"]],
-    attributes: ["id", "name", "enabled"]
-  });
-
-  const resolved = resolveAiAgentProductAgentContext(
-    agents.map(a => ({
-      id: a.id,
-      name: a.name,
-      enabled: a.enabled === true,
-      hasProvider: false,
-      hasInstructions: false,
-      explicitlyPaused: false
-    }))
-  );
-
-  const resolvedAgentId =
-    resolved.resolution === "resolved" ? resolved.agent!.id : null;
+  let resolvedAgentId: number | null = null;
+  try {
+    const scoped = await resolveAiAgentProductAgentForOperation({
+      companyId,
+      agentRef: input.agentRef
+    });
+    if (scoped.kind === "resolved") {
+      resolvedAgentId = scoped.agentId;
+    }
+  } catch (err) {
+    // Sem agentRef e ≥2: opções company-scoped ainda úteis (credenciais/conexões).
+    // selected/eligible ficam neutros (nenhum selected).
+    if (
+      !(err instanceof AppError) ||
+      err.message !== "ERR_AI_AGENT_PRODUCT_AGENT_REF_REQUIRED"
+    ) {
+      throw err;
+    }
+  }
 
   const credentials = await AiProviderCredential.findAll({
     where: { companyId },

@@ -33,7 +33,7 @@ const ALLOWED_SUMMARY_ROOT = new Set([
 ]);
 
 const ALLOWED_AVAILABILITY = new Set(["enabledByPlan", "accessibleByUser"]);
-const ALLOWED_AGENT = new Set(["exists", "id", "name", "enabled"]);
+const ALLOWED_AGENT = new Set(["exists", "id", "agentRef", "name", "enabled"]);
 const ALLOWED_CONNECTION = new Set(["linked", "name", "connected"]);
 const ALLOWED_CONNECTION_SCOPE = new Set([
   "type",
@@ -251,6 +251,11 @@ export function serializeAiAgentProductSummary(
       ? {
           exists: true,
           ...(summary.agent.id != null ? { id: Number(summary.agent.id) } : {}),
+          ...(summary.agent.agentRef != null
+            ? { agentRef: String(summary.agent.agentRef) }
+            : summary.agent.id != null
+              ? { agentRef: String(summary.agent.id) }
+              : {}),
           ...(summary.agent.name != null
             ? { name: String(summary.agent.name) }
             : {}),
@@ -363,6 +368,7 @@ const ALLOWED_CONFIGURATION_CONNECTION = new Set([
 ]);
 const ALLOWED_CONFIGURATION_VIEW = new Set([
   "agentScope",
+  "agentRef",
   "configuration",
   "editableWhileActive",
   "summary"
@@ -370,6 +376,7 @@ const ALLOWED_CONFIGURATION_VIEW = new Set([
 const ALLOWED_CONFIGURATION_RESULT = new Set([
   "changed",
   "created",
+  "agentRef",
   "configuration",
   "summary"
 ]);
@@ -579,6 +586,7 @@ export function serializeAiAgentProductConfiguration(
 
 export function serializeAiAgentProductConfigurationView(input: {
   agentScope: AiAgentProductAgentScope;
+  agentRef?: string;
   configuration: AiAgentProductConfiguration | null;
   editableWhileActive?: boolean;
   summary: AiAgentProductSummary;
@@ -591,6 +599,9 @@ export function serializeAiAgentProductConfigurationView(input: {
         : serializeAiAgentProductConfiguration(input.configuration),
     summary: serializeAiAgentProductSummary(input.summary)
   };
+  if (input.agentRef != null) {
+    out.agentRef = String(input.agentRef);
+  }
   if (input.configuration != null) {
     out.editableWhileActive = input.editableWhileActive === true;
   }
@@ -605,6 +616,7 @@ export function serializeAiAgentProductConfigurationView(input: {
 export function serializeAiAgentProductConfigurationResult(input: {
   changed?: boolean;
   created?: boolean;
+  agentRef?: string;
   configuration: AiAgentProductConfiguration | null;
   summary: AiAgentProductSummary;
 }): AiAgentProductConfigurationResult {
@@ -620,6 +632,9 @@ export function serializeAiAgentProductConfigurationResult(input: {
   }
   if (input.created !== undefined) {
     out.created = input.created === true;
+  }
+  if (input.agentRef != null) {
+    out.agentRef = String(input.agentRef);
   }
   assertConfigurationAllowlisted(
     out as unknown as Record<string, unknown>,

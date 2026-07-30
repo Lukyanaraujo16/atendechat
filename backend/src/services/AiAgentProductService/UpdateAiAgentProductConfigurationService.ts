@@ -7,9 +7,6 @@ import AiAgentProfile from "../../models/AiAgentProfile";
 import Whatsapp from "../../models/Whatsapp";
 import { AiAgentProductConfigurationResult } from "../../types/aiAgentProduct";
 import UpsertAiAgentProfileService from "../AiAgentService/UpsertAiAgentProfileService";
-import {
-  resolveAiAgentProductAgentContextFromRows
-} from "./ResolveAiAgentProductContextService";
 import GetAiAgentProductSummaryService from "./GetAiAgentProductSummaryService";
 import {
   assertAiAgentProductConfigurationAccess,
@@ -18,7 +15,6 @@ import {
   IDENTITY_FIELD_KEYS,
   isAiAgentProductActive,
   loadAiAgentProductConfigurationForAgent,
-  lockEligibleAgents,
   MODEL_FIELD_KEYS,
   pickProfileFieldsFromBody,
   PROFILE_FIELD_KEYS,
@@ -29,6 +25,10 @@ import {
 import {
   serializeAiAgentProductConfigurationResult
 } from "./serializeAiAgentProduct";
+import {
+  encodeAgentRef,
+  resolveAiAgentProductAgentForOperation
+} from "./aiAgentProductAgentRef";
 import { logger } from "../../utils/logger";
 
 function hasStructuralFields(body: Record<string, unknown>): boolean {
@@ -41,7 +41,7 @@ function hasStructuralFields(body: Record<string, unknown>): boolean {
 }
 
 function hasOnlyIdentityOrEmpty(body: Record<string, unknown>): boolean {
-  const keys = Object.keys(body);
+  const keys = Object.keys(body).filter(k => k !== "agentRef");
   if (keys.length === 0) return true;
   return keys.every(k =>
     (IDENTITY_FIELD_KEYS as readonly string[]).includes(k)
@@ -52,6 +52,7 @@ export default async function UpdateAiAgentProductConfigurationService(input: {
   companyId: number;
   req?: Request;
   body?: Record<string, unknown>;
+  agentRef?: unknown;
   availability?: { enabledByPlan: boolean; accessibleByUser: boolean };
 }): Promise<AiAgentProductConfigurationResult> {
   const companyId = Number(input.companyId);
@@ -73,28 +74,22 @@ export default async function UpdateAiAgentProductConfigurationService(input: {
     availability: input.availability
   });
 
-  const agentsPreview = await AiAgent.findAll({
-    where: { companyId },
-    order: [["id", "ASC"]],
-    attributes: ["id", "enabled", "model", "aiProviderCredentialId"]
+  const agentRef =
+    input.agentRef !== undefined ? input.agentRef : body.agentRef;
+
+  const preResolved = await resolveAiAgentProductAgentForOperation({
+    companyId,
+    agentRef
   });
-  const preResolved = resolveAiAgentProductAgentContextFromRows(agentsPreview);
-  if (preResolved.resolution === "not_created") {
+  if (preResolved.kind === "not_created") {
     throw new AppError(
       "ERR_AI_AGENT_PRODUCT_CONTEXT_INVALID",
       409,
       "Crie o Agente de IA antes de atualizar a configuração."
     );
   }
-  if (preResolved.resolution === "ambiguous") {
-    throw new AppError(
-      "ERR_AI_AGENT_PRODUCT_CONTEXT_AMBIGUOUS",
-      409,
-      "Existem várias configurações de Agente de IA. Revise antes de continuar."
-    );
-  }
 
-  const previewAgent = preResolved.agent!;
+  const previewAgent = preResolved.agent;
   const resolved = await resolveCommercialProviderCredentialModel({
     companyId,
     body,
@@ -114,26 +109,18 @@ export default async function UpdateAiAgentProductConfigurationService(input: {
   let agentId = previewAgent.id;
 
   await sequelize.transaction(async transaction => {
-    const locked = await lockEligibleAgents(companyId, transaction);
-    const underLock = resolveAiAgentProductAgentContextFromRows(locked);
-
-    if (underLock.resolution === "ambiguous") {
+    const agent = await AiAgent.findOne({
+      where: { id: agentId, companyId },
+      lock: Transaction.LOCK.UPDATE,
+      transaction
+    });
+    if (!agent) {
       throw new AppError(
-        "ERR_AI_AGENT_PRODUCT_CONTEXT_AMBIGUOUS",
-        409,
-        "Existem várias configurações de Agente de IA. Revise antes de continuar."
+        "ERR_AI_AGENT_PRODUCT_AGENT_NOT_FOUND",
+        404,
+        "Agente de IA não encontrado."
       );
     }
-    if (underLock.resolution === "not_created" || !underLock.agent) {
-      throw new AppError(
-        "ERR_AI_AGENT_PRODUCT_CONTEXT_INVALID",
-        409,
-        "Crie o Agente de IA antes de atualizar a configuração."
-      );
-    }
-
-    const agent = underLock.agent;
-    agentId = agent.id;
 
     const linked = await Whatsapp.findAll({
       where: { companyId, aiAgentId: agent.id },
@@ -186,8 +173,8 @@ export default async function UpdateAiAgentProductConfigurationService(input: {
     });
     if (!agent) {
       throw new AppError(
-        "ERR_AI_AGENT_PRODUCT_CONTEXT_INVALID",
-        409,
+        "ERR_AI_AGENT_PRODUCT_AGENT_NOT_FOUND",
+        404,
         "Agente de IA não encontrado."
       );
     }
@@ -239,11 +226,13 @@ export default async function UpdateAiAgentProductConfigurationService(input: {
   const summary = await GetAiAgentProductSummaryService({
     companyId,
     req: input.req,
-    availability
+    availability,
+    agentRef: encodeAgentRef(agentId)
   });
 
   return serializeAiAgentProductConfigurationResult({
     changed,
+    agentRef: encodeAgentRef(agentId),
     configuration,
     summary
   });

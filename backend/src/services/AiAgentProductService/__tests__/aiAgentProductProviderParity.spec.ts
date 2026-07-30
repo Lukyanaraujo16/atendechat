@@ -500,6 +500,7 @@ describe("aiAgentProductProviderParity (2.3.1)", () => {
         aiProviderCredentialId: 5
       });
       mockAgentFindAll.mockResolvedValue([agent]);
+      mockAgentFindOne.mockResolvedValue(agent);
       mockParseCred.mockResolvedValue(6);
       mockCredFindOne.mockImplementation(async (opts: { where: Record<string, unknown> }) => {
         if (opts.where.id === 6) {
@@ -510,13 +511,6 @@ describe("aiAgentProductProviderParity (2.3.1)", () => {
         }
         return null;
       });
-      mockAgentFindOne.mockResolvedValue(
-        makeAgent({
-          id: 1,
-          model: "gemini-2.5-flash",
-          aiProviderCredentialId: 6
-        })
-      );
 
       const result = await UpdateAiAgentProductConfigurationService({
         companyId: 10,
@@ -568,6 +562,7 @@ describe("aiAgentProductProviderParity (2.3.1)", () => {
         aiProviderCredentialId: 5
       });
       mockAgentFindAll.mockResolvedValue([agent]);
+      mockAgentFindOne.mockResolvedValue(agent);
       mockWaFindAll.mockResolvedValue([
         {
           id: 9,
@@ -599,14 +594,8 @@ describe("aiAgentProductProviderParity (2.3.1)", () => {
         aiProviderCredentialId: 5
       });
       mockAgentFindAll.mockResolvedValue([agent]);
+      mockAgentFindOne.mockResolvedValue(agent);
       mockCredFindOne.mockResolvedValue(makeCred({ id: 5, provider: "openai" }));
-      mockAgentFindOne.mockResolvedValue(
-        makeAgent({
-          id: 1,
-          model: "gemini-2.5-flash",
-          aiProviderCredentialId: null
-        })
-      );
 
       const result = await UpdateAiAgentProductConfigurationService({
         companyId: 10,

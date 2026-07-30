@@ -11,9 +11,14 @@ export default async function CreateAiAgentProductSimulatorSessionService(input:
   companyId: number;
   userId: number;
   req?: Request;
+  agentRef?: unknown;
 }): Promise<AiAgentProductSimulatorSession> {
   const companyId = Number(input.companyId);
-  const cap = await assertProductSimulatorCanMutate(companyId, input.req);
+  const cap = await assertProductSimulatorCanMutate(
+    companyId,
+    input.req,
+    input.agentRef
+  );
 
   try {
     const session = await createAiAgentSimulationSession({

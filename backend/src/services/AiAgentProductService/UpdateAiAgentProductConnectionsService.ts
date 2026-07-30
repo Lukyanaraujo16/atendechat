@@ -2,19 +2,14 @@ import { Request } from "express";
 import { Transaction } from "sequelize";
 import sequelize from "../../database";
 import AppError from "../../errors/AppError";
-import AiAgent from "../../models/AiAgent";
 import Whatsapp from "../../models/Whatsapp";
 import { AiAgentProductConfigurationResult } from "../../types/aiAgentProduct";
-import {
-  resolveAiAgentProductAgentContextFromRows
-} from "./ResolveAiAgentProductContextService";
 import GetAiAgentProductSummaryService from "./GetAiAgentProductSummaryService";
 import {
   assertAiAgentProductConfigurationAccess,
   assertConnectionsAssignableToAgent,
   isAiAgentProductActive,
   loadAiAgentProductConfigurationForAgent,
-  lockEligibleAgents,
   parseConnectionRefs,
   rejectForbiddenConfigurationFields,
   resolveWhatsappsByRefs
@@ -22,12 +17,17 @@ import {
 import {
   serializeAiAgentProductConfigurationResult
 } from "./serializeAiAgentProduct";
+import {
+  encodeAgentRef,
+  resolveAiAgentProductAgentForOperation
+} from "./aiAgentProductAgentRef";
 import { logger } from "../../utils/logger";
 
 export default async function UpdateAiAgentProductConnectionsService(input: {
   companyId: number;
   req?: Request;
   body?: Record<string, unknown>;
+  agentRef?: unknown;
   availability?: { enabledByPlan: boolean; accessibleByUser: boolean };
 }): Promise<AiAgentProductConfigurationResult> {
   const companyId = Number(input.companyId);
@@ -50,61 +50,42 @@ export default async function UpdateAiAgentProductConnectionsService(input: {
   }
 
   const desiredRefs = parseConnectionRefs(body.connectionRefs);
+  const agentRef =
+    input.agentRef !== undefined ? input.agentRef : body.agentRef;
 
-  const agentsPreview = await AiAgent.findAll({
-    where: { companyId },
-    order: [["id", "ASC"]],
-    attributes: ["id", "enabled"]
+  const preResolved = await resolveAiAgentProductAgentForOperation({
+    companyId,
+    agentRef
   });
-  const preResolved = resolveAiAgentProductAgentContextFromRows(agentsPreview);
-  if (preResolved.resolution === "not_created") {
+  if (preResolved.kind === "not_created") {
     throw new AppError(
       "ERR_AI_AGENT_PRODUCT_CONTEXT_INVALID",
       409,
       "Crie o Agente de IA antes de vincular conexões."
     );
   }
-  if (preResolved.resolution === "ambiguous") {
-    throw new AppError(
-      "ERR_AI_AGENT_PRODUCT_CONTEXT_AMBIGUOUS",
-      409,
-      "Existem várias configurações de Agente de IA. Revise antes de continuar."
-    );
-  }
 
-  // Validação prévia de ownership / already assigned (fora do lock)
   const desiredWhatsapps = await resolveWhatsappsByRefs({
     companyId,
     refs: desiredRefs
   });
-  assertConnectionsAssignableToAgent(
-    desiredWhatsapps,
-    preResolved.agent!.id
-  );
+  assertConnectionsAssignableToAgent(desiredWhatsapps, preResolved.agentId);
 
   let changed = false;
-  let agentId = preResolved.agent!.id;
+  let agentId = preResolved.agentId;
 
   await sequelize.transaction(async transaction => {
-    const locked = await lockEligibleAgents(companyId, transaction);
-    const underLock = resolveAiAgentProductAgentContextFromRows(locked);
+    const agent = preResolved.agent;
+    await agent.reload({ lock: Transaction.LOCK.UPDATE, transaction });
 
-    if (underLock.resolution === "ambiguous") {
+    if (agent.companyId !== companyId) {
       throw new AppError(
-        "ERR_AI_AGENT_PRODUCT_CONTEXT_AMBIGUOUS",
-        409,
-        "Existem várias configurações de Agente de IA. Revise antes de continuar."
-      );
-    }
-    if (underLock.resolution === "not_created" || !underLock.agent) {
-      throw new AppError(
-        "ERR_AI_AGENT_PRODUCT_CONTEXT_INVALID",
-        409,
-        "Crie o Agente de IA antes de vincular conexões."
+        "ERR_AI_AGENT_PRODUCT_AGENT_NOT_FOUND",
+        404,
+        "Agente de IA não encontrado."
       );
     }
 
-    const agent = underLock.agent;
     agentId = agent.id;
 
     const currentLinked = await Whatsapp.findAll({
@@ -183,11 +164,13 @@ export default async function UpdateAiAgentProductConnectionsService(input: {
   const summary = await GetAiAgentProductSummaryService({
     companyId,
     req: input.req,
-    availability
+    availability,
+    agentRef: encodeAgentRef(agentId)
   });
 
   return serializeAiAgentProductConfigurationResult({
     changed,
+    agentRef: encodeAgentRef(agentId),
     configuration,
     summary
   });

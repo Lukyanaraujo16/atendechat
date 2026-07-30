@@ -13,9 +13,14 @@ export default async function SendAiAgentProductSimulatorMessageService(input: {
   content: unknown;
   userId?: number | null;
   req?: Request;
+  agentRef?: unknown;
 }) {
   const companyId = Number(input.companyId);
-  const cap = await assertProductSimulatorCanMutate(companyId, input.req);
+  const cap = await assertProductSimulatorCanMutate(
+    companyId,
+    input.req,
+    input.agentRef
+  );
   const sessionId = decodeSimulatorSessionRef(input.sessionRef);
 
   try {

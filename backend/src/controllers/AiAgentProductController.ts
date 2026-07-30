@@ -25,6 +25,8 @@ import UpdateAiAgentProductCredentialService from "../services/AiAgentProductSer
 import TestAiAgentProductCredentialService from "../services/AiAgentProductService/TestAiAgentProductCredentialService";
 import EnableAiAgentProductCredentialService from "../services/AiAgentProductService/EnableAiAgentProductCredentialService";
 import DisableAiAgentProductCredentialService from "../services/AiAgentProductService/DisableAiAgentProductCredentialService";
+import ListAiAgentProductAgentsService from "../services/AiAgentProductService/ListAiAgentProductAgentsService";
+import { extractAgentRefFromRequest } from "../services/AiAgentProductService/aiAgentProductAgentRef";
 import { logger } from "../utils/logger";
 
 function companyIdOrThrow(req: Request): number {
@@ -61,11 +63,45 @@ function rejectArbitraryCompanyId(req: Request): void {
   }
 }
 
+export const listAgents = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  try {
+    rejectArbitraryCompanyId(req);
+    const companyId = companyIdOrThrow(req);
+    const data = await ListAiAgentProductAgentsService({ companyId, req });
+    return res.json(data);
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    logger.error(
+      {
+        err: err instanceof Error ? err.message : "unknown",
+        surface: "ai_agent_product"
+      },
+      "ai_agent_product_agents_list_failed"
+    );
+    throw new AppError(
+      "ERR_AI_AGENT_PRODUCT_NOT_AVAILABLE",
+      500,
+      "Não foi possível listar os Agentes de IA."
+    );
+  }
+};
+
 export const summary = async (req: Request, res: Response): Promise<Response> => {
   try {
     rejectArbitraryCompanyId(req);
     const companyId = companyIdOrThrow(req);
-    const data = await GetAiAgentProductSummaryService({ companyId, req });
+    const agentRef = extractAgentRefFromRequest({
+      params: req.params as Record<string, unknown>,
+      query: req.query as Record<string, unknown>
+    });
+    const data = await GetAiAgentProductSummaryService({
+      companyId,
+      req,
+      agentRef
+    });
     return res.json(data);
   } catch (err) {
     if (err instanceof AppError) throw err;
@@ -88,7 +124,15 @@ export const readiness = async (
   try {
     rejectArbitraryCompanyId(req);
     const companyId = companyIdOrThrow(req);
-    const data = await GetAiAgentProductReadinessService({ companyId, req });
+    const agentRef = extractAgentRefFromRequest({
+      params: req.params as Record<string, unknown>,
+      query: req.query as Record<string, unknown>
+    });
+    const data = await GetAiAgentProductReadinessService({
+      companyId,
+      req,
+      agentRef
+    });
     return res.json(data);
   } catch (err) {
     if (err instanceof AppError) throw err;
@@ -111,10 +155,16 @@ export const command = async (
   try {
     rejectArbitraryCompanyId(req);
     const companyId = companyIdOrThrow(req);
+    const agentRef = extractAgentRefFromRequest({
+      params: req.params as Record<string, unknown>,
+      query: req.query as Record<string, unknown>,
+      body: req.body as Record<string, unknown>
+    });
     const data = await ExecuteAiAgentProductCommandService({
       companyId,
       req,
-      body: req.body as Record<string, unknown>
+      body: req.body as Record<string, unknown>,
+      agentRef
     });
     return res.json(data);
   } catch (err) {
@@ -141,9 +191,14 @@ export const getConfiguration = async (
   try {
     rejectArbitraryCompanyId(req);
     const companyId = companyIdOrThrow(req);
+    const agentRef = extractAgentRefFromRequest({
+      params: req.params as Record<string, unknown>,
+      query: req.query as Record<string, unknown>
+    });
     const data = await GetAiAgentProductConfigurationService({
       companyId,
-      req
+      req,
+      agentRef
     });
     return res.json(data);
   } catch (err) {
@@ -200,10 +255,16 @@ export const updateConfiguration = async (
   try {
     rejectArbitraryCompanyId(req);
     const companyId = companyIdOrThrow(req);
+    const agentRef = extractAgentRefFromRequest({
+      params: req.params as Record<string, unknown>,
+      query: req.query as Record<string, unknown>,
+      body: req.body as Record<string, unknown>
+    });
     const data = await UpdateAiAgentProductConfigurationService({
       companyId,
       req,
-      body: req.body as Record<string, unknown>
+      body: req.body as Record<string, unknown>,
+      agentRef
     });
     return res.json(data);
   } catch (err) {
@@ -232,7 +293,11 @@ export const getConfigurationOptions = async (
     const companyId = companyIdOrThrow(req);
     const data = await GetAiAgentProductConfigurationOptionsService({
       companyId,
-      req
+      req,
+      agentRef: extractAgentRefFromRequest({
+        params: req.params as Record<string, unknown>,
+        query: req.query as Record<string, unknown>
+      })
     });
     return res.json(data);
   } catch (err) {
@@ -289,10 +354,16 @@ export const updateConnections = async (
   try {
     rejectArbitraryCompanyId(req);
     const companyId = companyIdOrThrow(req);
+    const agentRef = extractAgentRefFromRequest({
+      params: req.params as Record<string, unknown>,
+      query: req.query as Record<string, unknown>,
+      body: req.body as Record<string, unknown>
+    });
     const data = await UpdateAiAgentProductConnectionsService({
       companyId,
       req,
-      body: req.body as Record<string, unknown>
+      body: req.body as Record<string, unknown>,
+      agentRef
     });
     return res.json(data);
   } catch (err) {
@@ -320,7 +391,15 @@ export const simulatorBootstrap = async (
     rejectArbitraryCompanyId(req);
     rejectProductSimulatorForbiddenIds(req);
     const companyId = companyIdOrThrow(req);
-    const data = await GetAiAgentProductSimulatorService({ companyId, req });
+    const agentRef = extractAgentRefFromRequest({
+      params: req.params as Record<string, unknown>,
+      query: req.query as Record<string, unknown>
+    });
+    const data = await GetAiAgentProductSimulatorService({
+      companyId,
+      req,
+      agentRef
+    });
     return res.json(data);
   } catch (err) {
     if (err instanceof AppError) throw err;
@@ -348,10 +427,16 @@ export const simulatorCreateSession = async (
     rejectProductSimulatorForbiddenIds(req);
     const companyId = companyIdOrThrow(req);
     const userId = userIdOrThrow(req);
+    const agentRef = extractAgentRefFromRequest({
+      params: req.params as Record<string, unknown>,
+      query: req.query as Record<string, unknown>,
+      body: req.body as Record<string, unknown>
+    });
     const data = await CreateAiAgentProductSimulatorSessionService({
       companyId,
       userId,
-      req
+      req,
+      agentRef
     });
     return res.status(201).json(data);
   } catch (err) {
@@ -379,9 +464,14 @@ export const simulatorListSessions = async (
     rejectArbitraryCompanyId(req);
     rejectProductSimulatorForbiddenIds(req);
     const companyId = companyIdOrThrow(req);
+    const agentRef = extractAgentRefFromRequest({
+      params: req.params as Record<string, unknown>,
+      query: req.query as Record<string, unknown>
+    });
     const data = await ListAiAgentProductSimulatorSessionsService({
       companyId,
       req,
+      agentRef,
       pageNumber: req.query.pageNumber as string | undefined
     });
     return res.json(data);
@@ -410,10 +500,15 @@ export const simulatorGetSession = async (
     rejectArbitraryCompanyId(req);
     rejectProductSimulatorForbiddenIds(req);
     const companyId = companyIdOrThrow(req);
+    const agentRef = extractAgentRefFromRequest({
+      params: req.params as Record<string, unknown>,
+      query: req.query as Record<string, unknown>
+    });
     const data = await GetAiAgentProductSimulatorSessionService({
       companyId,
       sessionRef: String(req.params.sessionRef || ""),
-      req
+      req,
+      agentRef
     });
     return res.json(data);
   } catch (err) {
@@ -442,12 +537,18 @@ export const simulatorSendMessage = async (
     rejectProductSimulatorForbiddenIds(req);
     const companyId = companyIdOrThrow(req);
     const userId = userIdOrThrow(req);
+    const agentRef = extractAgentRefFromRequest({
+      params: req.params as Record<string, unknown>,
+      query: req.query as Record<string, unknown>,
+      body: req.body as Record<string, unknown>
+    });
     const data = await SendAiAgentProductSimulatorMessageService({
       companyId,
       sessionRef: String(req.params.sessionRef || ""),
       content: (req.body as Record<string, unknown>)?.content,
       userId,
-      req
+      req,
+      agentRef
     });
     return res.json(data);
   } catch (err) {
@@ -475,10 +576,16 @@ export const simulatorEndSession = async (
     rejectArbitraryCompanyId(req);
     rejectProductSimulatorForbiddenIds(req);
     const companyId = companyIdOrThrow(req);
+    const agentRef = extractAgentRefFromRequest({
+      params: req.params as Record<string, unknown>,
+      query: req.query as Record<string, unknown>,
+      body: req.body as Record<string, unknown>
+    });
     const data = await EndAiAgentProductSimulatorSessionService({
       companyId,
       sessionRef: String(req.params.sessionRef || ""),
-      req
+      req,
+      agentRef
     });
     return res.json(data);
   } catch (err) {
@@ -507,12 +614,18 @@ export const simulatorReviewMessage = async (
     rejectProductSimulatorForbiddenIds(req);
     const companyId = companyIdOrThrow(req);
     const userId = userIdOrThrow(req);
+    const agentRef = extractAgentRefFromRequest({
+      params: req.params as Record<string, unknown>,
+      query: req.query as Record<string, unknown>,
+      body: req.body as Record<string, unknown>
+    });
     const data = await ReviewAiAgentProductSimulatorMessageService({
       companyId,
       messageRef: String(req.params.messageRef || ""),
       userId,
       body: (req.body || {}) as Record<string, unknown>,
-      req
+      req,
+      agentRef
     });
     return res.json(data);
   } catch (err) {

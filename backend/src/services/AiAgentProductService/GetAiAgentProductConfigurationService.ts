@@ -1,13 +1,10 @@
 import { Request } from "express";
+import AppError from "../../errors/AppError";
 import AiAgent from "../../models/AiAgent";
 import AiAgentProfile from "../../models/AiAgentProfile";
 import AiProviderCredential from "../../models/AiProviderCredential";
 import Whatsapp from "../../models/Whatsapp";
-import AppError from "../../errors/AppError";
 import { AiAgentProductConfigurationView } from "../../types/aiAgentProduct";
-import {
-  resolveAiAgentProductAgentContext
-} from "./ResolveAiAgentProductContextService";
 import GetAiAgentProductSummaryService from "./GetAiAgentProductSummaryService";
 import {
   assertAiAgentProductConfigurationAccess,
@@ -16,10 +13,14 @@ import {
 import {
   serializeAiAgentProductConfigurationView
 } from "./serializeAiAgentProduct";
+import {
+  resolveAiAgentProductAgentForOperation
+} from "./aiAgentProductAgentRef";
 
 export default async function GetAiAgentProductConfigurationService(input: {
   companyId: number;
   req?: Request;
+  agentRef?: unknown;
   availability?: { enabledByPlan: boolean; accessibleByUser: boolean };
 }): Promise<AiAgentProductConfigurationView> {
   const companyId = Number(input.companyId);
@@ -29,52 +30,33 @@ export default async function GetAiAgentProductConfigurationService(input: {
     availability: input.availability
   });
 
-  const agents = await AiAgent.findAll({
-    where: { companyId },
-    order: [["id", "ASC"]],
-    attributes: ["id", "name", "enabled"]
+  const resolved = await resolveAiAgentProductAgentForOperation({
+    companyId,
+    agentRef: input.agentRef
   });
-
-  const resolved = resolveAiAgentProductAgentContext(
-    agents.map(a => ({
-      id: a.id,
-      name: a.name,
-      enabled: a.enabled === true,
-      hasProvider: false,
-      hasInstructions: false,
-      explicitlyPaused: false
-    }))
-  );
 
   const summary = await GetAiAgentProductSummaryService({
     companyId,
     req: input.req,
-    availability
+    availability,
+    agentRef: input.agentRef
   });
 
-  if (resolved.resolution === "not_created") {
+  if (resolved.kind === "not_created") {
     return serializeAiAgentProductConfigurationView({
-      agentScope: resolved.agentScope,
+      agentScope: { type: "none", count: 0 },
       configuration: null,
       summary
     });
   }
 
-  if (resolved.resolution === "ambiguous") {
-    throw new AppError(
-      "ERR_AI_AGENT_PRODUCT_CONTEXT_AMBIGUOUS",
-      409,
-      "Existem várias configurações de Agente de IA. Revise antes de continuar."
-    );
-  }
-
   const agentRow = await AiAgent.findOne({
-    where: { id: resolved.agent!.id, companyId }
+    where: { id: resolved.agentId, companyId }
   });
   if (!agentRow) {
     throw new AppError(
-      "ERR_AI_AGENT_PRODUCT_CONTEXT_INVALID",
-      409,
+      "ERR_AI_AGENT_PRODUCT_AGENT_NOT_FOUND",
+      404,
       "Agente de IA não encontrado."
     );
   }
@@ -106,7 +88,8 @@ export default async function GetAiAgentProductConfigurationService(input: {
   });
 
   return serializeAiAgentProductConfigurationView({
-    agentScope: resolved.agentScope,
+    agentScope: { type: "single", count: 1 },
+    agentRef: resolved.agentRef,
     configuration,
     editableWhileActive: agentRow.enabled === false,
     summary

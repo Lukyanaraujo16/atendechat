@@ -4,9 +4,6 @@ import AppError from "../../errors/AppError";
 import AiAgent from "../../models/AiAgent";
 import { AiAgentProductConfigurationResult } from "../../types/aiAgentProduct";
 import UpsertAiAgentProfileService from "../AiAgentService/UpsertAiAgentProfileService";
-import {
-  resolveAiAgentProductAgentContextFromRows
-} from "./ResolveAiAgentProductContextService";
 import GetAiAgentProductSummaryService from "./GetAiAgentProductSummaryService";
 import {
   assertAiAgentProductConfigurationAccess,
@@ -14,7 +11,6 @@ import {
   buildAgentCreatePatch,
   bodyHasAnyKey,
   loadAiAgentProductConfigurationForAgent,
-  lockEligibleAgents,
   parseConnectionRefs,
   pickProfileFieldsFromBody,
   PROFILE_FIELD_KEYS,
@@ -25,7 +21,9 @@ import {
 import {
   serializeAiAgentProductConfigurationResult
 } from "./serializeAiAgentProduct";
+import { encodeAgentRef } from "./aiAgentProductAgentRef";
 import { logger } from "../../utils/logger";
+import { Transaction } from "sequelize";
 
 export default async function CreateAiAgentProductConfigurationService(input: {
   companyId: number;
@@ -43,27 +41,6 @@ export default async function CreateAiAgentProductConfigurationService(input: {
     req: input.req,
     availability: input.availability
   });
-
-  const existing = await AiAgent.findAll({
-    where: { companyId },
-    order: [["id", "ASC"]],
-    attributes: ["id"]
-  });
-  const preResolved = resolveAiAgentProductAgentContextFromRows(existing);
-  if (preResolved.resolution === "resolved") {
-    throw new AppError(
-      "ERR_AI_AGENT_PRODUCT_ALREADY_EXISTS",
-      409,
-      "Já existe um Agente de IA configurado para esta empresa."
-    );
-  }
-  if (preResolved.resolution === "ambiguous") {
-    throw new AppError(
-      "ERR_AI_AGENT_PRODUCT_CONTEXT_AMBIGUOUS",
-      409,
-      "Existem várias configurações de Agente de IA. Revise antes de continuar."
-    );
-  }
 
   const resolved = await resolveCommercialProviderCredentialModel({
     companyId,
@@ -91,22 +68,13 @@ export default async function CreateAiAgentProductConfigurationService(input: {
   let createdAgentId = 0;
 
   await sequelize.transaction(async transaction => {
-    const locked = await lockEligibleAgents(companyId, transaction);
-    const underLock = resolveAiAgentProductAgentContextFromRows(locked);
-    if (underLock.resolution === "resolved") {
-      throw new AppError(
-        "ERR_AI_AGENT_PRODUCT_ALREADY_EXISTS",
-        409,
-        "Já existe um Agente de IA configurado para esta empresa."
-      );
-    }
-    if (underLock.resolution === "ambiguous") {
-      throw new AppError(
-        "ERR_AI_AGENT_PRODUCT_CONTEXT_AMBIGUOUS",
-        409,
-        "Existem várias configurações de Agente de IA. Revise antes de continuar."
-      );
-    }
+    // Lock determinístico da empresa — evita corridas; multiagente permitido.
+    await AiAgent.findAll({
+      where: { companyId },
+      order: [["id", "ASC"]],
+      lock: Transaction.LOCK.UPDATE,
+      transaction
+    });
 
     const agent = await AiAgent.create(
       {
@@ -168,11 +136,13 @@ export default async function CreateAiAgentProductConfigurationService(input: {
   const summary = await GetAiAgentProductSummaryService({
     companyId,
     req: input.req,
-    availability
+    availability,
+    agentRef: encodeAgentRef(createdAgentId)
   });
 
   return serializeAiAgentProductConfigurationResult({
     created: true,
+    agentRef: encodeAgentRef(createdAgentId),
     configuration,
     summary
   });

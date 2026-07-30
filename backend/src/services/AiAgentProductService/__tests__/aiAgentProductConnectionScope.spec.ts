@@ -23,7 +23,7 @@ jest.mock("../../../database", () => ({
 
 jest.mock("../../../models/AiAgent", () => ({
   __esModule: true,
-  default: { findAll: jest.fn() }
+  default: { findAll: jest.fn(), findOne: jest.fn() }
 }));
 
 jest.mock("../../../models/Whatsapp", () => ({
@@ -49,7 +49,13 @@ const mockAvailability = resolveAiAgentProductAvailability as jest.Mock;
 const mockSnapshot = buildAiAgentProductSnapshot as jest.Mock;
 const mockSummary = GetAiAgentProductSummaryService as jest.Mock;
 const mockAgentFindAll = AiAgent.findAll as jest.Mock;
+const mockAgentFindOne = AiAgent.findOne as jest.Mock;
 const mockWaFindAll = Whatsapp.findAll as jest.Mock;
+
+function mockSingleAgent(agent: any): void {
+  mockAgentFindAll.mockResolvedValue([agent]);
+  mockAgentFindOne.mockResolvedValue(agent);
+}
 
 function completeSnapshot(connections: any[]) {
   return {
@@ -248,7 +254,7 @@ describe("ExecuteAiAgentProductCommandService — escopo Opção A", () => {
     const agent = makeAgent({ enabled: false });
     const waA = makeWa({ id: 1, name: "A", aiAgentMode: "disabled" });
     const waB = makeWa({ id: 2, name: "B", aiAgentMode: "disabled" });
-    mockAgentFindAll.mockResolvedValue([agent]);
+    mockSingleAgent(agent);
     mockWaFindAll.mockResolvedValue([waB, waA]); // ordem invertida; service ordena
 
     const result = await ExecuteAiAgentProductCommandService({
@@ -290,7 +296,7 @@ describe("ExecuteAiAgentProductCommandService — escopo Opção A", () => {
       status: "DISCONNECTED",
       aiAgentMode: "disabled"
     });
-    mockAgentFindAll.mockResolvedValue([agent]);
+    mockSingleAgent(agent);
     mockWaFindAll.mockResolvedValue([waOk, waBad]);
 
     await expect(
@@ -320,7 +326,7 @@ describe("ExecuteAiAgentProductCommandService — escopo Opção A", () => {
       aiAgentMode: "shadow",
       aiAgentEnabled: true
     });
-    mockAgentFindAll.mockResolvedValue([agent]);
+    mockSingleAgent(agent);
     mockWaFindAll.mockResolvedValue([waLive, waShadow]);
 
     const result = await ExecuteAiAgentProductCommandService({
@@ -351,7 +357,7 @@ describe("ExecuteAiAgentProductCommandService — escopo Opção A", () => {
       aiAgentEnabled: true,
       status: "DISCONNECTED"
     });
-    mockAgentFindAll.mockResolvedValue([agent]);
+    mockSingleAgent(agent);
     mockWaFindAll.mockResolvedValue([waA, waB]);
 
     const result = await ExecuteAiAgentProductCommandService({
