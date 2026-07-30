@@ -2789,6 +2789,32 @@ const messages = {
           subtitle:
             "Configure e acompanhe o atendimento automatizado da sua empresa.",
         },
+        hub: {
+          title: "Agentes de IA",
+          subtitle:
+            "Gerencie um ou mais agentes comerciais da sua empresa. Cada conexão WhatsApp pode ser vinculada a um agente.",
+          newAgent: "Novo agente",
+          createFirst: "Criar primeiro agente",
+          emptyTitle: "Nenhum Agente de IA ainda",
+          emptyDescription:
+            "Crie um agente para automatizar o atendimento em uma ou mais conexões WhatsApp.",
+          countLabel: "{{count}} agente(s)",
+          manageAgent: "Gerenciar agente",
+          manageAgentAria: "Gerenciar agente {{name}}",
+          reviewConfig: "Revisar configuração",
+          agentEnabled: "Habilitado",
+          agentDisabled: "Desabilitado",
+          providerUnset: "Provedor ainda não configurado",
+          connectionCount:
+            "{{count}} conexão(ões) vinculada(s)",
+          needsAttention: "Atenção necessária na configuração",
+          backToAgents: "Voltar para agentes",
+          agentTitle: "{{name}}",
+          agentSubtitle: "Configuração e status deste agente",
+          agentNotFoundTitle: "Agente não encontrado",
+          agentNotFoundDescription:
+            "Este agente não está disponível para a empresa atual.",
+        },
         loading: {
           aria: "Carregando estado do Agente de IA",
         },
@@ -2801,7 +2827,10 @@ const messages = {
         },
         configurationErrors: {
           ambiguous:
-            "Existem múltiplas configurações de Agente de IA. Resolva antes de continuar.",
+            "Selecione um Agente de IA para continuar.",
+          agentRefRequired:
+            "Selecione um Agente de IA para continuar.",
+          agentNotFound: "Agente de IA não encontrado.",
           alreadyExists: "Já existe um Agente de IA configurado.",
           updateNotAllowed:
             "Desative o agente antes de alterar esta configuração.",
@@ -2852,7 +2881,9 @@ const messages = {
             "Vincule e conecte um WhatsApp ao agente antes de ativar.",
           notAllowed: "Esta ação não é permitida.",
           ambiguous:
-            "Existem várias configurações de Agente de IA. Revise antes de ativar.",
+            "Selecione um Agente de IA para continuar esta ação.",
+          agentRefRequired:
+            "Selecione um Agente de IA para continuar esta ação.",
           contextInvalid: "Contexto do Agente de IA inválido para esta ação.",
           generic: "Não foi possível concluir a ação. Tente novamente.",
         },
@@ -3020,7 +3051,7 @@ const messages = {
             not_created:
               "Crie o Agente de IA antes de testar o atendimento.",
             ambiguous:
-              "Existem várias configurações de Agente de IA. Resolva antes de simular.",
+              "Selecione um Agente de IA no Hub para abrir o simulador.",
             credential_not_selected:
               "Selecione uma credencial de provedor no assistente para usar o simulador.",
             credential_disabled:
@@ -3217,6 +3248,7 @@ const messages = {
             identityMessages: "Mensagens comerciais",
           },
           fields: {
+            identityName: "Nome do agente",
             companyName: "Nome da empresa",
             businessSegment: "Segmento",
             customBusinessSegment: "Qual é o segmento da sua empresa?",
@@ -3277,6 +3309,8 @@ const messages = {
             stillActive: "O agente continua ativo.",
           },
           hints: {
+            identityName:
+              "Ex.: Agente Comercial, Suporte Técnico ou Pós-venda. Use um nome que diferencie este agente dos demais.",
             businessSegment: "Escolha o segmento que melhor representa sua empresa.",
             sourceWebsiteFuture:
               "O endereço será salvo para uso futuro na base de conhecimento. Nesta fase o site não é lido automaticamente.",

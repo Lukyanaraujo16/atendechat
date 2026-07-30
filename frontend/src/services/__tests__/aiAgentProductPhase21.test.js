@@ -13,7 +13,7 @@ import {
   mapAiAgentProductSummary,
   normalizeAiAgentNextAction,
 } from "../../utils/aiAgentProductMapper";
-import { AI_AGENT_WIZARD_ROUTE_PATH } from "../../config/aiAgentFeature";
+import { AI_AGENT_NEW_ROUTE_PATH } from "../../config/aiAgentFeature";
 import {
   getAiAgentProductSummary,
   listAiAgentProductCredentials,
@@ -125,9 +125,9 @@ describe("Fase 2.1 — mapper Experience", () => {
     expect(view.checks[0].key).toBe("plan");
   });
 
-  it("create_agent aponta para o Wizard", () => {
+  it("create_agent aponta para o Wizard create (/ai-agent/new)", () => {
     const action = mapAiAgentNextAction("create_agent");
-    expect(action.path).toBe(AI_AGENT_WIZARD_ROUTE_PATH);
+    expect(action.path).toBe(AI_AGENT_NEW_ROUTE_PATH);
     expect(action.enabled).toBe(true);
   });
 
@@ -135,7 +135,7 @@ describe("Fase 2.1 — mapper Experience", () => {
     expect(isDeferredMutationAction("resume_agent")).toBe(true);
     const resume = mapAiAgentNextAction("resume_agent", { agentId: 9 });
     expect(resume.enabled).toBe(false);
-    expect(resume.fallbackPath).toContain("/ai-agent/wizard");
+    expect(resume.fallbackPath).toContain("/ai-agent/9/wizard");
 
     ["activate_shadow", "activate_live"].forEach((type) => {
       expect(isDeferredMutationAction(type)).toBe(false);
@@ -151,16 +151,14 @@ describe("Fase 2.1 — mapper Experience", () => {
     expect(mapAiAgentNextAction("explode").type).toBe("none");
   });
 
-  it("secondary inclui simulator na rota canônica (sem agentId)", () => {
+  it("secondary inclui simulator na rota do agente (agentRef)", () => {
     const actions = buildAiAgentSecondaryActions({
-      agent: { exists: true, id: 42 },
+      agent: { exists: true, id: 42, agentRef: "42" },
+      agentScope: { type: "single", count: 1 },
     });
     expect(actions.some((a) => a.id === "open_simulator")).toBe(true);
     expect(actions.find((a) => a.id === "open_simulator").path).toBe(
-      "/ai-agent/simulator"
-    );
-    expect(actions.find((a) => a.id === "open_simulator").path).not.toMatch(
-      /\/\d+\/simulator/
+      "/ai-agent/42/simulator"
     );
   });
 

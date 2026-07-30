@@ -36,14 +36,13 @@ describe("Fase 2.5 — rotas canônicas", () => {
     );
   });
 
-  it("mapper open_simulator usa path canônico", () => {
+  it("mapper open_simulator usa path com agentRef quando single", () => {
     const actions = buildAiAgentSecondaryActions({
-      agent: { exists: true, id: 99 },
+      agent: { exists: true, id: 99, agentRef: "99" },
       agentScope: { type: "single", count: 1 },
     });
     const sim = actions.find((a) => a.id === "open_simulator");
-    expect(sim.path).toBe("/ai-agent/simulator");
-    expect(sim.path).not.toContain("99");
+    expect(sim.path).toBe("/ai-agent/99/simulator");
   });
 
   it("mapper inclui simulator mesmo sem agentId (página explica unavailable)", () => {

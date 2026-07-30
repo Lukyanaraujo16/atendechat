@@ -1,5 +1,5 @@
 import React from "react";
-import { useHistory } from "react-router-dom";
+import { useHistory, useParams, useLocation } from "react-router-dom";
 import Box from "@material-ui/core/Box";
 import IconButton from "@material-ui/core/IconButton";
 import Typography from "@material-ui/core/Typography";
@@ -23,9 +23,19 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
+/**
+ * Wizard create (/ai-agent/new|/ai-agent/wizard) ou edit (/ai-agent/:agentRef/wizard).
+ */
 export default function AiAgentWizardPage() {
   const classes = useStyles();
   const history = useHistory();
+  const location = useLocation();
+  const { agentRef: rawRef, agentId: legacyId } = useParams();
+  const agentRef = String(rawRef || legacyId || "").trim();
+  const isCreateRoute =
+    location.pathname === "/ai-agent/new" ||
+    (location.pathname === "/ai-agent/wizard" && !agentRef);
+  const mode = isCreateRoute ? "create" : agentRef ? "edit" : "create";
 
   return (
     <MainContainer>
@@ -40,7 +50,9 @@ export default function AiAgentWizardPage() {
           </IconButton>
           <Box>
             <Title>
-              {i18n.t("aiAgent.wizard.pageTitleCreate")}
+              {mode === "edit"
+                ? i18n.t("aiAgent.wizard.pageTitleEdit")
+                : i18n.t("aiAgent.wizard.pageTitleCreate")}
             </Title>
             <Typography variant="body2" className={classes.subtitle}>
               {i18n.t("aiAgent.wizard.pageSubtitle")}
@@ -49,7 +61,7 @@ export default function AiAgentWizardPage() {
         </Box>
       </MainHeader>
 
-      <AiAgentWizard />
+      <AiAgentWizard mode={mode} agentRef={agentRef || null} />
     </MainContainer>
   );
 }

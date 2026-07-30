@@ -37,12 +37,15 @@ GET /technical-console/access → allowed
 | `/flowbuilder/:id?` | FlowBuilderConfig | commercial_automation | admin + `automation.chatbot` | — | — | — |
 | `/phrase-lists` | CampaignsPhrase | commercial_automation | admin + `automation.keywords` | — | — | — |
 | `/queue-integration` | QueueIntegration | commercial_automation | admin + `automation.integrations` | — | — | — |
-| `/ai-agent` | AiAgent (Product Hub) | commercial_ai_agent | admin + `automation.ai_agent` + UI flag | — | — | — |
-| `/ai-agent/wizard` | AiAgentWizardPage | commercial_ai_agent | idem + AiAgentRouteGuard | — | — | — |
-| `/ai-agent/wizard/:agentId` | AiAgentWizardPage | commercial_ai_agent | idem | — | — | — |
-| `/ai-agent/simulator` | AiAgentSimulatorPage | commercial_ai_agent | idem | — | canônico (Fase 2.5) | — |
+| `/ai-agent` | AiAgentHubPage (Product Hub multiagente) | commercial_ai_agent | admin + `automation.ai_agent` + UI flag | — | Hub lista agentes | — |
+| `/ai-agent/new` | AiAgentWizardPage (create) | commercial_ai_agent | idem + AiAgentRouteGuard | — | criação explícita | — |
+| `/ai-agent/wizard` | Redirect → `/ai-agent/new` | commercial_compatibility | idem | — | `/ai-agent/new` | path legado create |
+| `/ai-agent/:agentRef` | AiAgentDetailPage | commercial_ai_agent | idem | — | visão agent-scoped | seleção por URL |
+| `/ai-agent/:agentRef/wizard` | AiAgentWizardPage (edit) | commercial_ai_agent | idem | — | edição agent-scoped | — |
+| `/ai-agent/wizard/:agentId` | AiAgentWizardPage (edit legado) | commercial_ai_agent | idem | — | preferir `/:agentRef/wizard` | alias |
+| `/ai-agent/simulator` | AiAgentSimulatorPage | commercial_ai_agent | idem | — | canônico company/compat (Fase 2.5) | — |
+| `/ai-agent/:agentRef/simulator` | AiAgentSimulatorPage | commercial_ai_agent | idem | — | transporta agentRef (2.9B/C) | — |
 | `/ai-agent/:agentId/simulator` | Redirect → `/ai-agent/simulator` | commercial_compatibility | idem | — | `/ai-agent/simulator` | path legado |
-| `/ai-agent/:agentId` | *(não existe rota dedicada)* | commercial_ai_agent | N/A — detalhe via Hub/wizard | — | — | — |
 | `/prompts` | Prompts | commercial_compatibility | admin + `automation.openai` | — | — | — |
 | `/knowledge-base` | KnowledgeBase | commercial_compatibility | admin + KB feature + UI | — | — | — |
 | `/knowledge-base/:baseId` | KnowledgeBaseDetail | commercial_compatibility | idem | — | — | — |
@@ -79,9 +82,11 @@ Conteúdo misto: métricas/gaps de conhecimento (potencial comercial) + replay, 
 
 Dashboard de Function Calling Shadow + evidências de avaliação shadow. **Claramente técnico** → `technical_agentos`.
 
-### Demais `/ai-agent` (lista, wizard, simulador)
+### Demais `/ai-agent` (Hub, wizard, simulador)
 
 Permanecem `commercial_ai_agent`. Não recebem `agentOS.console.view`.
+
+**Fase 2.9B:** `/ai-agent` é Hub multiagente; seleção explícita por `agentRef` na URL (`/ai-agent/:agentRef`). Create canônico: `/ai-agent/new`. Múltiplos agentes são estado normal (não `ambiguous` na UX).
 
 ## Estratégia de alias (Fase 1.3)
 

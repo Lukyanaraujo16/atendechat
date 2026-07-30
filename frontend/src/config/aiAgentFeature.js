@@ -1,18 +1,42 @@
+/**
+ * Rotas e constantes comerciais do Agente de IA (Product Hub).
+ * Fase 2.9B — multiagente com agentRef explícito.
+ */
+
 /** Chave estável no catálogo PlanFeatures (grupo automation). */
 export const AI_AGENT_FEATURE_KEY = "automation.ai_agent";
 
-/** Rota futura do módulo Agente de IA. */
+/** Hub multiagente. */
 export const AI_AGENT_ROUTE_PATH = "/ai-agent";
 
-/** Wizard do Assistente Guiado. */
+/** Criação de novo agente (Wizard create). */
+export const AI_AGENT_NEW_ROUTE_PATH = "/ai-agent/new";
+
+/**
+ * Wizard create legado — redireciona para /ai-agent/new.
+ * Mantido para links internos e testes existentes.
+ */
 export const AI_AGENT_WIZARD_ROUTE_PATH = "/ai-agent/wizard";
+
+/** Wizard edit por agentRef. */
+export const AI_AGENT_AGENT_WIZARD_ROUTE_PATH = "/ai-agent/:agentRef/wizard";
+
+/** Visão/configuração de um agente. */
+export const AI_AGENT_AGENT_ROUTE_PATH = "/ai-agent/:agentRef";
+
+/** @deprecated Prefer AI_AGENT_AGENT_WIZARD_ROUTE_PATH com agentRef. */
 export const AI_AGENT_WIZARD_EDIT_ROUTE_PATH = "/ai-agent/wizard/:agentId";
 
-/** Simulador comercial (Fase 2.5) — rota canônica sem agentId. */
+/** Simulador canônico (company/compat). Preferir rota com agentRef quando disponível. */
 export const AI_AGENT_SIMULATOR_ROUTE_PATH = "/ai-agent/simulator";
 
+/** Simulador por agente (preparado 2.9B / adaptado 2.9C). */
+export const AI_AGENT_AGENT_SIMULATOR_ROUTE_PATH =
+  "/ai-agent/:agentRef/simulator";
+
 /** Rota legada do simulador (redirect → canônica). */
-export const AI_AGENT_SIMULATOR_LEGACY_ROUTE_PATH = "/ai-agent/:agentId/simulator";
+export const AI_AGENT_SIMULATOR_LEGACY_ROUTE_PATH =
+  "/ai-agent/:agentId/simulator";
 
 /** Alias explícito da rota canônica. */
 export const AI_AGENT_SIMULATOR_CANONICAL_ROUTE_PATH =
@@ -81,7 +105,7 @@ export const AGENTOS_FEATURE_KEYS = {
   replay: "automation.replay",
   monitor: "automation.monitor",
   dashboard: "automation.dashboard",
-  tester: "automation.tester"
+  tester: "automation.tester",
 };
 
 /** Automation Orchestrator Monitor (Fase IA 2.0). */
@@ -100,6 +124,22 @@ export const AUTOMATION_AI_TOOLS_FEATURE_KEY = "automation.ai_tools";
 
 /**
  * Controla exibição da aba/menu do Agente de IA.
- * Manter `false` até a fase com página funcional + backend.
  */
 export const AI_AGENT_UI_ENABLED = true;
+
+/** Helpers de path com agentRef (string opaca). */
+export function aiAgentPath(agentRef) {
+  const ref = String(agentRef || "").trim();
+  if (!ref) return AI_AGENT_ROUTE_PATH;
+  return `${AI_AGENT_ROUTE_PATH}/${encodeURIComponent(ref)}`;
+}
+
+export function aiAgentWizardEditPath(agentRef) {
+  return `${aiAgentPath(agentRef)}/wizard`;
+}
+
+export function aiAgentSimulatorPath(agentRef) {
+  const ref = String(agentRef || "").trim();
+  if (!ref) return AI_AGENT_SIMULATOR_ROUTE_PATH;
+  return `${aiAgentPath(ref)}/simulator`;
+}

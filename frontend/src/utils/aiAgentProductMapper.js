@@ -3,8 +3,11 @@
  * Não recalcula readiness; traduz status/mode/nextAction/checks para UI.
  */
 import {
-  AI_AGENT_SIMULATOR_ROUTE_PATH,
+  AI_AGENT_NEW_ROUTE_PATH,
+  AI_AGENT_ROUTE_PATH,
   AI_AGENT_WIZARD_ROUTE_PATH,
+  aiAgentSimulatorPath,
+  aiAgentWizardEditPath,
 } from "../config/aiAgentFeature";
 
 export const AI_AGENT_PRODUCT_STATUSES = [
@@ -122,15 +125,17 @@ export function mapAiAgentCheck(check) {
   };
 }
 
-function wizardPath(agentId) {
-  if (agentId != null && Number.isFinite(Number(agentId))) {
-    return `${AI_AGENT_WIZARD_ROUTE_PATH}/${Number(agentId)}`;
-  }
-  return AI_AGENT_WIZARD_ROUTE_PATH;
+function wizardPath(agentRefOrId) {
+  const ref =
+    agentRefOrId != null && String(agentRefOrId).trim() !== ""
+      ? String(agentRefOrId).trim()
+      : "";
+  if (ref) return aiAgentWizardEditPath(ref);
+  return AI_AGENT_NEW_ROUTE_PATH || AI_AGENT_WIZARD_ROUTE_PATH;
 }
 
-function simulatorPath() {
-  return AI_AGENT_SIMULATOR_ROUTE_PATH;
+function simulatorPath(agentRef) {
+  return aiAgentSimulatorPath(agentRef);
 }
 
 function commandActionBase(command) {
@@ -151,8 +156,13 @@ function commandActionBase(command) {
  */
 export function mapAiAgentNextAction(action, context = {}) {
   const normalized = normalizeAiAgentNextAction(action);
-  const agentId = context.agentId;
-  const reviewPath = wizardPath(agentId);
+  const agentRef =
+    context.agentRef != null && String(context.agentRef).trim() !== ""
+      ? String(context.agentRef).trim()
+      : context.agentId != null
+        ? String(context.agentId)
+        : null;
+  const reviewPath = wizardPath(agentRef);
 
   const base = {
     type: normalized,
@@ -168,15 +178,18 @@ export function mapAiAgentNextAction(action, context = {}) {
     case "upgrade_plan":
       return { ...base, path: "/financeiro", enabled: true };
     case "create_agent":
-      return { ...base, path: AI_AGENT_WIZARD_ROUTE_PATH, enabled: true };
+      return { ...base, path: AI_AGENT_NEW_ROUTE_PATH, enabled: true };
     case "configure_agent":
     case "configure_provider":
     case "resolve_conflict":
       return { ...base, path: reviewPath, enabled: true };
     case "connect_whatsapp":
     case "fix_connection":
-      // Vínculo comercial de conexões: Product Wizard (connectionRefs), não o Modal.
-      return { ...base, path: AI_AGENT_WIZARD_ROUTE_PATH, enabled: true };
+      return {
+        ...base,
+        path: agentRef ? wizardPath(agentRef) : AI_AGENT_NEW_ROUTE_PATH,
+        enabled: true,
+      };
     case "activate_shadow":
     case "activate_live":
       return {
@@ -232,7 +245,7 @@ export function buildAiAgentCommercialCommands(summary) {
     return commands;
   }
 
-  // Ambíguo (2.2.2): sem mutações comerciais
+  // Sem mutações comerciais quando ambiguous (legado); multiagente usa agentRef.
   if (
     status === "attention_required" &&
     summary?.agentScope?.type === "ambiguous"
@@ -273,20 +286,26 @@ export function buildAiAgentCommercialCommands(summary) {
 export function buildAiAgentSecondaryActions(summary) {
   const scopeType = summary?.agentScope?.type;
   const isAmbiguous = scopeType === "ambiguous";
-  // Sem agentScope (payload legado/teste): usa agent.id se existir. Ambíguo nunca.
-  const agentId =
+  const agentRef =
     !isAmbiguous &&
     summary?.agent?.exists &&
-    (scopeType === "single" || scopeType == null) &&
-    summary.agent.id != null &&
-    Number.isFinite(Number(summary.agent.id))
-      ? Number(summary.agent.id)
-      : null;
+    (summary.agent.agentRef != null
+      ? String(summary.agent.agentRef)
+      : summary.agent.id != null
+        ? String(summary.agent.id)
+        : null);
+  // Ambiguous legado: voltar ao Hub para seleção explícita (não inventar agente).
+  const wizard = isAmbiguous
+    ? AI_AGENT_ROUTE_PATH
+    : wizardPath(agentRef);
+  const sim = isAmbiguous
+    ? AI_AGENT_ROUTE_PATH
+    : simulatorPath(agentRef);
   const actions = [
     {
       id: "open_wizard",
       labelKey: "aiAgentProduct.secondary.openWizard",
-      path: wizardPath(agentId),
+      path: wizard,
       enabled: true,
     },
     {
@@ -296,7 +315,6 @@ export function buildAiAgentSecondaryActions(summary) {
       enabled: true,
     },
   ];
-  const sim = simulatorPath();
   actions.unshift({
     id: "open_simulator",
     labelKey: "aiAgentProduct.secondary.openSimulator",
@@ -320,6 +338,12 @@ export function mapAiAgentProductSummary(payload) {
     ? {
         exists: data.agent.exists === true,
         id: data.agent.id,
+        agentRef:
+          data.agent.agentRef != null
+            ? String(data.agent.agentRef)
+            : data.agent.id != null
+              ? String(data.agent.id)
+              : null,
         name: data.agent.name,
         enabled: data.agent.enabled === true,
       }
@@ -378,6 +402,8 @@ export function mapAiAgentProductSummary(payload) {
   };
 
   const nextAction = mapAiAgentNextAction(readiness.nextAction, {
+    agentRef:
+      agentScope.type === "single" && agent.exists ? agent.agentRef : null,
     agentId:
       agentScope.type === "single" && agent.exists ? agent.id : null,
   });

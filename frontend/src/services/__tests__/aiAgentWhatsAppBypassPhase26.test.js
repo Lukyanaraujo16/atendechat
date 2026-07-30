@@ -12,8 +12,8 @@ import {
   buildAiAgentSecondaryActions,
 } from "../../utils/aiAgentProductMapper";
 import {
+  AI_AGENT_NEW_ROUTE_PATH,
   AI_AGENT_ROUTE_PATH,
-  AI_AGENT_WIZARD_ROUTE_PATH,
 } from "../../config/aiAgentFeature";
 
 const modalSource = fs.readFileSync(
@@ -102,12 +102,12 @@ describe("Fase 2.6 — resolveAiAgentReadonlyStatus (espelho do helper)", () => 
 });
 
 describe("Fase 2.6 — Hub navegação", () => {
-  it("connect_whatsapp / fix_connection → Wizard Product", () => {
+  it("connect_whatsapp / fix_connection → Wizard Product create", () => {
     expect(mapAiAgentNextAction("connect_whatsapp").path).toBe(
-      AI_AGENT_WIZARD_ROUTE_PATH
+      AI_AGENT_NEW_ROUTE_PATH
     );
     expect(mapAiAgentNextAction("fix_connection").path).toBe(
-      AI_AGENT_WIZARD_ROUTE_PATH
+      AI_AGENT_NEW_ROUTE_PATH
     );
   });
 

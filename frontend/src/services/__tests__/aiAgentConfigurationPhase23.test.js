@@ -189,7 +189,7 @@ describe("Fase 2.3 — Product Configuration API", () => {
     const current = renderConfigurationHook();
 
     await act(async () => {
-      await current().loadConfiguration();
+      await expect(current().loadConfiguration()).rejects.toBeTruthy();
     });
 
     expect(current().error).toBe("configuration_invalid");
@@ -286,7 +286,7 @@ describe("Fase 2.3 — Product Configuration API", () => {
     const current = renderConfigurationHook();
 
     await act(async () => {
-      await current().loadConfiguration();
+      await expect(current().loadConfiguration()).rejects.toBeTruthy();
     });
 
     expect(current().configuration).toBeNull();

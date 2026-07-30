@@ -7,6 +7,12 @@ export function validateWizardStep(stepId, formState) {
   const errors = {};
 
   if (stepId === "company") {
+    if (!String(formState.identityName || "").trim()) {
+      errors.identityName = "required";
+    } else if (String(formState.identityName).trim().length > 120) {
+      errors.identityName = "tooLong";
+    }
+
     if (!String(formState.companyName || "").trim()) {
       errors.companyName = "required";
     } else if (

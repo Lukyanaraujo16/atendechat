@@ -491,6 +491,14 @@ Criação (`POST /product/ai-agent/configuration`) **permite** o segundo (e N-é
 
 Listagem: `GET /product/ai-agent/agents` — retorna todos os agentes; nunca `ambiguous`.
 
+### Product Hub FE (Fase 2.9B)
+
+- `/ai-agent` — Hub multiagente (lista)
+- `/ai-agent/new` — Wizard create (`POST /product/ai-agent/configuration`)
+- `/ai-agent/:agentRef` — visão agent-scoped
+- `/ai-agent/:agentRef/wizard` — Wizard edit
+- Seleção explícita por `agentRef` na URL; múltiplos agentes são estado normal na UX
+
 ### Resolver central
 
 - Operações Product: `resolveAiAgentProductAgentForOperation` (`aiAgentProductAgentRef` / `ResolveAiAgentProductAgentService`)

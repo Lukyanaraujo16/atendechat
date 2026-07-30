@@ -2702,6 +2702,31 @@ const messages = {
 					subtitle:
 						"Configure and monitor automated support for your company.",
 				},
+				hub: {
+					title: "AI Agents",
+					subtitle:
+						"Manage one or more commercial agents for your company. Each WhatsApp connection can be linked to an agent.",
+					newAgent: "New agent",
+					createFirst: "Create first agent",
+					emptyTitle: "No AI Agent yet",
+					emptyDescription:
+						"Create an agent to automate support on one or more WhatsApp connections.",
+					countLabel: "{{count}} agent(s)",
+					manageAgent: "Manage agent",
+					manageAgentAria: "Manage agent {{name}}",
+					reviewConfig: "Review configuration",
+					agentEnabled: "Enabled",
+					agentDisabled: "Disabled",
+					providerUnset: "Provider not configured yet",
+					connectionCount: "{{count}} linked connection(s)",
+					needsAttention: "Configuration needs attention",
+					backToAgents: "Back to agents",
+					agentTitle: "{{name}}",
+					agentSubtitle: "Configuration and status for this agent",
+					agentNotFoundTitle: "Agent not found",
+					agentNotFoundDescription:
+						"This agent is not available for the current company.",
+				},
 				loading: {
 					aria: "Loading AI Agent status",
 				},
@@ -2713,8 +2738,9 @@ const messages = {
 					deactivate: "Deactivate agent",
 				},
 				configurationErrors: {
-					ambiguous:
-						"Multiple AI Agent configurations exist. Resolve before continuing.",
+					ambiguous: "Select an AI Agent to continue.",
+					agentRefRequired: "Select an AI Agent to continue.",
+					agentNotFound: "AI Agent not found.",
 					alreadyExists: "An AI Agent is already configured.",
 					updateNotAllowed:
 						"Deactivate the agent before changing this configuration.",
@@ -2764,14 +2790,15 @@ const messages = {
 					connectionUnavailable:
 						"Link and connect a WhatsApp to the agent before activating.",
 					notAllowed: "This action is not allowed.",
-					ambiguous:
-						"There are multiple AI Agent configurations. Review them before activating.",
+					ambiguous: "Select an AI Agent to continue this action.",
+					agentRefRequired:
+						"Select an AI Agent to continue this action.",
 					contextInvalid: "AI Agent context is invalid for this action.",
 					generic: "Could not complete the action. Please try again.",
 				},
 				ambiguous: {
 					description:
-						"We found {{count}} AI Agent configurations. Review them before enabling automated support.",
+						"Select an AI Agent in the Hub to continue.",
 				},
 				error: {
 					title: "Could not load AI Agent status",
@@ -3122,6 +3149,7 @@ const messages = {
 						identityMessages: "Commercial messages",
 					},
 					fields: {
+						identityName: "Agent name",
 						companyName: "Company name",
 						businessSegment: "Segment",
 						customBusinessSegment: "What is your company segment?",
@@ -3153,7 +3181,7 @@ const messages = {
 					},
 					product: {
 						ambiguous:
-							"Multiple agents exist for this company. Resolve the setup in the AI Agent hub before continuing.",
+							"Select an AI Agent in the Hub to continue.",
 						providerRequired: "Select a provider to continue.",
 						providerUnsupported: "Unsupported provider",
 						credentialRequired: "Select an active credential for the provider.",
@@ -3182,6 +3210,8 @@ const messages = {
 						stillActive: "The agent remains active.",
 					},
 					hints: {
+						identityName:
+							"E.g. Sales Agent, Technical Support, or After-sales. Use a name that distinguishes this agent from others.",
 						businessSegment: "Choose the segment that best represents your company.",
 						sourceWebsiteFuture:
 							"The address will be saved for future knowledge base use. The site is not read automatically in this phase.",

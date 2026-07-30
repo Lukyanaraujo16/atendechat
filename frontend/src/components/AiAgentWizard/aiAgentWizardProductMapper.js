@@ -24,8 +24,12 @@ function normalizeModel(model, fallbackProvider = null) {
 
 function resolveIdentityName(formState) {
   return (
-    String(formState.attendantName || formState.companyName || "").trim() ||
-    "Atendente virtual"
+    String(
+      formState.identityName ||
+        formState.attendantName ||
+        formState.companyName ||
+        ""
+    ).trim() || "Atendente virtual"
   );
 }
 

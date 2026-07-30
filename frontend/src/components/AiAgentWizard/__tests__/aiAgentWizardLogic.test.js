@@ -29,9 +29,21 @@ import {
 describe("aiAgentWizard validation", () => {
   const base = createDefaultWizardFormState();
 
+  it("não avança company sem identityName", () => {
+    const errors = validateWizardStep("company", {
+      ...base,
+      identityName: "",
+      companyName: "Empresa",
+      businessSegment: "clinic",
+    });
+    expect(hasWizardValidationErrors(errors)).toBe(true);
+    expect(errors.identityName).toBe("required");
+  });
+
   it("não avança company sem companyName", () => {
     const errors = validateWizardStep("company", {
       ...base,
+      identityName: "Agente Comercial",
       companyName: "",
       businessSegment: "clinic",
     });
@@ -42,6 +54,7 @@ describe("aiAgentWizard validation", () => {
   it("segmento other exige customBusinessSegment", () => {
     const errors = validateWizardStep("company", {
       ...base,
+      identityName: "Agente Comercial",
       companyName: "Empresa",
       businessSegment: "other",
       customBusinessSegment: "",

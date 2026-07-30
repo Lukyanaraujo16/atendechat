@@ -1,5 +1,6 @@
 /**
  * Hardening 2.2.2 — resolução segura do agente comercial (Experience)
+ * Atualizado 2.9B: ambiguous não bloqueia UI como falha; aponta ao Hub.
  */
 import React from "react";
 import { MemoryRouter } from "react-router-dom";
@@ -10,7 +11,7 @@ import {
   buildAiAgentSecondaryActions,
   mapAiAgentProductSummary,
 } from "../../utils/aiAgentProductMapper";
-import { AI_AGENT_WIZARD_ROUTE_PATH } from "../../config/aiAgentFeature";
+import { AI_AGENT_ROUTE_PATH } from "../../config/aiAgentFeature";
 import { listAiAgentProductCredentials } from "../aiAgentProductApi";
 
 // jsdom antigo do CRA 3 não expõe MutationObserver (necessário para waitFor).
@@ -83,7 +84,7 @@ describe("aiAgentResolutionPhase222", () => {
     expect(view.commercialCommands.length).toBeGreaterThan(0);
   });
 
-  it("agentScope.ambiguous: sem activate/deactivate; aviso; wizard sem id", async () => {
+  it("agentScope.ambiguous: sem activate/deactivate; secundárias vão ao Hub", async () => {
     const view = mapAiAgentProductSummary({
       availability: { enabledByPlan: true, accessibleByUser: true },
       status: "attention_required",
@@ -108,10 +109,10 @@ describe("aiAgentResolutionPhase222", () => {
     expect(buildAiAgentCommercialCommands(view)).toHaveLength(0);
     const secondary = buildAiAgentSecondaryActions(view);
     expect(secondary.find((a) => a.id === "open_wizard")?.path).toBe(
-      AI_AGENT_WIZARD_ROUTE_PATH
+      AI_AGENT_ROUTE_PATH
     );
     expect(secondary.find((a) => a.id === "open_simulator")?.path).toBe(
-      "/ai-agent/simulator"
+      AI_AGENT_ROUTE_PATH
     );
 
     render(
@@ -127,7 +128,8 @@ describe("aiAgentResolutionPhase222", () => {
     await waitFor(() => {
       expect(listAiAgentProductCredentials).toHaveBeenCalled();
     });
-    expect(screen.getByTestId("ai-agent-ambiguous-notice")).toBeTruthy();
+    // 2.9B: múltiplos agentes não são erro de produto na Experience.
+    expect(screen.queryByTestId("ai-agent-ambiguous-notice")).toBeNull();
     expect(screen.queryByTestId("ai-agent-command-activate_live")).toBeNull();
     expect(screen.queryByTestId("ai-agent-command-deactivate")).toBeNull();
     expect(screen.queryByTestId("ai-agent-primary-action")).toBeTruthy();
@@ -154,10 +156,9 @@ describe("aiAgentResolutionPhase222", () => {
         checks: [],
       },
     });
-    // id pode existir no payload, mas secondary/simulator não usam quando ambiguous
     const secondary = buildAiAgentSecondaryActions(view);
     expect(secondary.find((a) => a.id === "open_wizard")?.path).toBe(
-      AI_AGENT_WIZARD_ROUTE_PATH
+      AI_AGENT_ROUTE_PATH
     );
   });
 });

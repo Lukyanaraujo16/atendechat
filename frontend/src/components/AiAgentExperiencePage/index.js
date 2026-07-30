@@ -78,6 +78,8 @@ export default function AiAgentExperiencePage({
   commandError = null,
   supportMode,
   companyLabel,
+  agentRef = null,
+  hidePageHeader = false,
 }) {
   const classes = useStyles();
   const history = useHistory();
@@ -96,7 +98,8 @@ export default function AiAgentExperiencePage({
     summary &&
     summary.availability?.enabledByPlan === true &&
     summary.status !== "unavailable" &&
-    summary.agentScope?.type !== "ambiguous";
+    summary.agentScope?.type !== "ambiguous" &&
+    (agentRef || summary.agentScope?.type === "single");
 
   const productAvailable =
     summary &&
@@ -151,21 +154,29 @@ export default function AiAgentExperiencePage({
 
   return (
     <Box className={classes.root} data-testid="ai-agent-experience">
-      <AppPageHeader
-        title={<Title>{i18n.t("aiAgentProduct.page.title")}</Title>}
-        subtitle={
-          <Typography variant="body2" color="textSecondary">
-            {i18n.t("aiAgentProduct.page.subtitle")}
-          </Typography>
-        }
-        actions={
-          <MainHeaderButtonsWrapper>
-            <AppNeutralButton onClick={onRetry} disabled={loading || commandBusy}>
-              {i18n.t("aiAgentProduct.actions.refresh")}
-            </AppNeutralButton>
-          </MainHeaderButtonsWrapper>
-        }
-      />
+      {!hidePageHeader ? (
+        <AppPageHeader
+          title={<Title>{i18n.t("aiAgentProduct.page.title")}</Title>}
+          subtitle={
+            <Typography variant="body2" color="textSecondary">
+              {i18n.t("aiAgentProduct.page.subtitle")}
+            </Typography>
+          }
+          actions={
+            <MainHeaderButtonsWrapper>
+              <AppNeutralButton onClick={onRetry} disabled={loading || commandBusy}>
+                {i18n.t("aiAgentProduct.actions.refresh")}
+              </AppNeutralButton>
+            </MainHeaderButtonsWrapper>
+          }
+        />
+      ) : (
+        <Box mb={1}>
+          <AppNeutralButton onClick={onRetry} disabled={loading || commandBusy}>
+            {i18n.t("aiAgentProduct.actions.refresh")}
+          </AppNeutralButton>
+        </Box>
+      )}
 
       {supportMode && companyLabel ? (
         <Typography variant="caption" className={classes.supportHint}>
@@ -195,19 +206,6 @@ export default function AiAgentExperiencePage({
 
       {!loading && !accessDenied && !error && summary ? (
         <Box className={classes.stack}>
-          {summary.agentScope?.type === "ambiguous" ? (
-            <Typography
-              variant="body2"
-              role="status"
-              data-testid="ai-agent-ambiguous-notice"
-              className={classes.supportHint}
-            >
-              {i18n.t("aiAgentProduct.ambiguous.description", {
-                count: summary.agentScope.count,
-              })}
-            </Typography>
-          ) : null}
-
           {commandError ? (
             <Typography
               variant="body2"

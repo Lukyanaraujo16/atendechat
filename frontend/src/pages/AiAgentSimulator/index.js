@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { useHistory } from "react-router-dom";
+import React, { useContext, useEffect, useMemo, useState } from "react";
+import { useHistory, useParams } from "react-router-dom";
 import { makeStyles } from "@material-ui/core/styles";
 import Container from "@material-ui/core/Container";
 import Alert from "@material-ui/lab/Alert";
@@ -21,8 +21,10 @@ import {
 } from "../../components/AiAgentSimulator/aiAgentSimulatorHelpers";
 import {
   AI_AGENT_ROUTE_PATH,
-  AI_AGENT_WIZARD_ROUTE_PATH,
+  AI_AGENT_NEW_ROUTE_PATH,
+  aiAgentWizardEditPath,
 } from "../../config/aiAgentFeature";
+import { AuthContext } from "../../context/Auth/AuthContext";
 import { useAiAgentProductSimulator } from "../../hooks/useAiAgentProductSimulator";
 import { i18n } from "../../translate/i18n";
 import toastError from "../../errors/toastError";
@@ -74,6 +76,9 @@ function unavailableReasonKey(reason) {
 export default function AiAgentSimulatorPage() {
   const classes = useStyles();
   const history = useHistory();
+  const { agentRef: rawAgentRef } = useParams();
+  const agentRef = String(rawAgentRef || "").trim();
+  const { user } = useContext(AuthContext) || {};
   const {
     bootstrap,
     session,
@@ -85,7 +90,7 @@ export default function AiAgentSimulatorPage() {
     sendMessage,
     restartSession,
     reviewMessage,
-  } = useAiAgentProductSimulator();
+  } = useAiAgentProductSimulator(user?.companyId ?? null, agentRef || null);
 
   const [composer, setComposer] = useState("");
   const [reviewMessageItem, setReviewMessageItem] = useState(null);
@@ -95,6 +100,9 @@ export default function AiAgentSimulatorPage() {
   const canSimulate = bootstrap?.capabilities?.canSimulate === true;
   const segment = bootstrap?.scenarioSegment || "other";
   const scenarioPrompts = useMemo(() => getSimulationPrompts(segment), [segment]);
+  const wizardFallback = agentRef
+    ? aiAgentWizardEditPath(agentRef)
+    : AI_AGENT_NEW_ROUTE_PATH;
 
   useEffect(() => {
     const load = async () => {
@@ -184,7 +192,7 @@ export default function AiAgentSimulatorPage() {
   };
 
   const handleEdit = () => {
-    history.push(AI_AGENT_WIZARD_ROUTE_PATH);
+    history.push(wizardFallback);
   };
 
   if (bootLoading) {
@@ -211,7 +219,7 @@ export default function AiAgentSimulatorPage() {
             <Button
               variant="contained"
               color="primary"
-              onClick={() => history.push(AI_AGENT_WIZARD_ROUTE_PATH)}
+              onClick={() => history.push(wizardFallback)}
             >
               {i18n.t("aiAgentProduct.simulator.cta.configure")}
             </Button>

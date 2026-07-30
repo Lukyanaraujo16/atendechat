@@ -8,13 +8,17 @@ import {
   putAiAgentProductConnections,
 } from "../services/aiAgentProductApi";
 
-export function useAiAgentProductConfiguration(companyId = null) {
+export function useAiAgentProductConfiguration(
+  companyId = null,
+  agentRef = null
+) {
   const [configuration, setConfiguration] = useState(null);
   const [options, setOptions] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const mountedRef = useRef(true);
   const tenantRef = useRef(companyId);
+  const agentRefKey = agentRef != null ? String(agentRef).trim() : "";
 
   useEffect(() => {
     mountedRef.current = true;
@@ -49,6 +53,10 @@ export function useAiAgentProductConfiguration(companyId = null) {
         result.agentScope ||
         current?.agentScope ||
         (result.configuration ? { type: "single", count: 1 } : null),
+      agentRef:
+        result.agentRef != null
+          ? String(result.agentRef)
+          : current?.agentRef || agentRefKey || null,
       configuration:
         result.configuration !== undefined
           ? result.configuration
@@ -61,49 +69,57 @@ export function useAiAgentProductConfiguration(companyId = null) {
           : current?.editableWhileActive,
     }));
     return result;
-  }, []);
+  }, [agentRefKey]);
 
   const loadConfiguration = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await getAiAgentProductConfiguration();
+      const data = await getAiAgentProductConfiguration(
+        agentRefKey || undefined
+      );
       if (mountedRef.current) {
         setConfiguration(data);
       }
+      return data;
     } catch (err) {
       if (mountedRef.current) {
         setError(err?.response?.data?.error || err?.message || "unknown");
       }
+      throw err;
     } finally {
       if (mountedRef.current) setLoading(false);
     }
-  }, []);
+  }, [agentRefKey]);
 
   const loadOptions = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await getAiAgentProductConfigurationOptions();
+      const data = await getAiAgentProductConfigurationOptions(
+        agentRefKey || undefined
+      );
       if (mountedRef.current) {
         setOptions(data);
       }
+      return data;
     } catch (err) {
       if (mountedRef.current) {
         setError(err?.response?.data?.error || err?.message || "unknown");
       }
+      throw err;
     } finally {
       if (mountedRef.current) setLoading(false);
     }
-  }, []);
+  }, [agentRefKey]);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const [configurationData, optionsData] = await Promise.all([
-        getAiAgentProductConfiguration(),
-        getAiAgentProductConfigurationOptions(),
+        getAiAgentProductConfiguration(agentRefKey || undefined),
+        getAiAgentProductConfigurationOptions(agentRefKey || undefined),
       ]);
       if (mountedRef.current) {
         setConfiguration(configurationData);
@@ -116,7 +132,7 @@ export function useAiAgentProductConfiguration(companyId = null) {
     } finally {
       if (mountedRef.current) setLoading(false);
     }
-  }, []);
+  }, [agentRefKey]);
 
   const mutate = useCallback(
     async (operation) => {
@@ -139,14 +155,23 @@ export function useAiAgentProductConfiguration(companyId = null) {
     (payload) => mutate(() => postAiAgentProductConfiguration(payload)),
     [mutate]
   );
+
   const update = useCallback(
-    (payload) => mutate(() => putAiAgentProductConfiguration(payload)),
-    [mutate]
+    (payload) =>
+      mutate(() =>
+        putAiAgentProductConfiguration(payload, agentRefKey || undefined)
+      ),
+    [mutate, agentRefKey]
   );
+
   const updateConnections = useCallback(
-    (payload) => mutate(() => putAiAgentProductConnections(payload)),
-    [mutate]
+    (payload) =>
+      mutate(() =>
+        putAiAgentProductConnections(payload, agentRefKey || undefined)
+      ),
+    [mutate, agentRefKey]
   );
+
   const preview = useCallback(
     (payload) => postAiAgentProductConfigurationPreview(payload),
     []
@@ -166,5 +191,6 @@ export function useAiAgentProductConfiguration(companyId = null) {
     preview,
     clearCache,
     applyMutationResult,
+    agentRef: agentRefKey,
   };
 }

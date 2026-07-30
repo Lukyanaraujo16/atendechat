@@ -35,6 +35,24 @@ export default function CompanyStep({
         <TextField
           fullWidth
           required
+          label={i18n.t("aiAgent.wizard.fields.identityName")}
+          value={formState.identityName || ""}
+          onChange={handleField("identityName")}
+          error={Boolean(errors.identityName)}
+          helperText={
+            errors.identityName
+              ? i18n.t(`aiAgent.wizard.errors.${errors.identityName}`)
+              : i18n.t("aiAgent.wizard.hints.identityName")
+          }
+          inputProps={{ maxLength: 120 }}
+          data-testid="ai-agent-wizard-identity-name"
+        />
+      </Grid>
+
+      <Grid item xs={12}>
+        <TextField
+          fullWidth
+          required
           label={i18n.t("aiAgent.wizard.fields.companyName")}
           value={formState.companyName}
           onChange={handleField("companyName")}

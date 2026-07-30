@@ -8,7 +8,12 @@ import {
   reviewAiAgentProductSimulatorMessage,
 } from "../services/aiAgentProductApi";
 
-export function useAiAgentProductSimulator(companyId = null) {
+/**
+ * Product Simulator — transporta agentRef quando informado (Fase 2.9B).
+ * @param {string|number|null} companyId
+ * @param {string|null} agentRef
+ */
+export function useAiAgentProductSimulator(companyId = null, agentRef = null) {
   const [bootstrap, setBootstrap] = useState(null);
   const [session, setSession] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -17,6 +22,7 @@ export function useAiAgentProductSimulator(companyId = null) {
   const [error, setError] = useState(null);
   const mountedRef = useRef(true);
   const tenantRef = useRef(companyId);
+  const agentRefKey = agentRef != null ? String(agentRef).trim() : "";
 
   useEffect(() => {
     mountedRef.current = true;
@@ -46,7 +52,7 @@ export function useAiAgentProductSimulator(companyId = null) {
     setBootLoading(true);
     setError(null);
     try {
-      const data = await getAiAgentProductSimulator();
+      const data = await getAiAgentProductSimulator(agentRefKey || undefined);
       if (!mountedRef.current) return data;
       setBootstrap(data);
       return data;
@@ -58,85 +64,115 @@ export function useAiAgentProductSimulator(companyId = null) {
     } finally {
       if (mountedRef.current) setBootLoading(false);
     }
-  }, []);
+  }, [agentRefKey]);
 
   const startSession = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const created = await createAiAgentProductSimulatorSession();
-      const full = await getAiAgentProductSimulatorSession(created.ref);
-      if (!mountedRef.current) return full;
-      setSession(full);
-      setMessages(full.messages || []);
-      return full;
-    } catch (err) {
-      if (mountedRef.current) {
-        setError(err?.response?.data?.error || err?.message || "unknown");
-      }
-      throw err;
-    } finally {
-      if (mountedRef.current) setLoading(false);
-    }
-  }, []);
-
-  const sendMessage = useCallback(async (sessionRef, content) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await sendAiAgentProductSimulatorMessage(sessionRef, content);
-      if (!mountedRef.current) return data;
-      setMessages((prev) => [
-        ...prev,
-        data.userMessage,
-        data.assistantMessage,
-      ]);
-      setSession((prev) => ({ ...(prev || {}), ...(data.session || {}) }));
-      return data;
-    } catch (err) {
-      if (mountedRef.current) {
-        setError(err?.response?.data?.error || err?.message || "unknown");
-      }
-      throw err;
-    } finally {
-      if (mountedRef.current) setLoading(false);
-    }
-  }, []);
-
-  const restartSession = useCallback(async (currentSession) => {
-    setLoading(true);
-    setError(null);
-    try {
-      if (currentSession?.ref && currentSession.status === "active") {
-        await endAiAgentProductSimulatorSession(currentSession.ref);
-      }
-      const created = await createAiAgentProductSimulatorSession();
-      const full = await getAiAgentProductSimulatorSession(created.ref);
-      if (!mountedRef.current) return full;
-      setSession(full);
-      setMessages(full.messages || []);
-      return full;
-    } catch (err) {
-      if (mountedRef.current) {
-        setError(err?.response?.data?.error || err?.message || "unknown");
-      }
-      throw err;
-    } finally {
-      if (mountedRef.current) setLoading(false);
-    }
-  }, []);
-
-  const reviewMessage = useCallback(async (messageRef, body) => {
-    const data = await reviewAiAgentProductSimulatorMessage(messageRef, body);
-    if (mountedRef.current) {
-      setMessages((prev) =>
-        prev.map((item) =>
-          item.ref === messageRef ? { ...item, review: data } : item
-        )
+      const created = await createAiAgentProductSimulatorSession(
+        agentRefKey || undefined
       );
+      const full = await getAiAgentProductSimulatorSession(
+        created.ref,
+        agentRefKey || undefined
+      );
+      if (!mountedRef.current) return full;
+      setSession(full);
+      setMessages(full.messages || []);
+      return full;
+    } catch (err) {
+      if (mountedRef.current) {
+        setError(err?.response?.data?.error || err?.message || "unknown");
+      }
+      throw err;
+    } finally {
+      if (mountedRef.current) setLoading(false);
     }
-    return data;
-  }, []);
+  }, [agentRefKey]);
+
+  const sendMessage = useCallback(
+    async (sessionRef, content) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await sendAiAgentProductSimulatorMessage(
+          sessionRef,
+          content,
+          agentRefKey || undefined
+        );
+        if (!mountedRef.current) return data;
+        setMessages((prev) => [
+          ...prev,
+          data.userMessage,
+          data.assistantMessage,
+        ]);
+        setSession((prev) => ({ ...(prev || {}), ...(data.session || {}) }));
+        return data;
+      } catch (err) {
+        if (mountedRef.current) {
+          setError(err?.response?.data?.error || err?.message || "unknown");
+        }
+        throw err;
+      } finally {
+        if (mountedRef.current) setLoading(false);
+      }
+    },
+    [agentRefKey]
+  );
+
+  const restartSession = useCallback(
+    async (currentSession) => {
+      setLoading(true);
+      setError(null);
+      try {
+        if (currentSession?.ref && currentSession.status === "active") {
+          await endAiAgentProductSimulatorSession(
+            currentSession.ref,
+            agentRefKey || undefined
+          );
+        }
+        const created = await createAiAgentProductSimulatorSession(
+          agentRefKey || undefined
+        );
+        const full = await getAiAgentProductSimulatorSession(
+          created.ref,
+          agentRefKey || undefined
+        );
+        if (!mountedRef.current) return full;
+        setSession(full);
+        setMessages(full.messages || []);
+        return full;
+      } catch (err) {
+        if (mountedRef.current) {
+          setError(err?.response?.data?.error || err?.message || "unknown");
+        }
+        throw err;
+      } finally {
+        if (mountedRef.current) setLoading(false);
+      }
+    },
+    [agentRefKey]
+  );
+
+  const reviewMessage = useCallback(
+    async (messageRef, body) => {
+      const data = await reviewAiAgentProductSimulatorMessage(
+        messageRef,
+        body,
+        agentRefKey || undefined
+      );
+      if (mountedRef.current) {
+        setMessages((prev) =>
+          prev.map((item) =>
+            item.ref === messageRef ? { ...item, review: data } : item
+          )
+        );
+      }
+      return data;
+    },
+    [agentRefKey]
+  );
 
   return {
     bootstrap,
@@ -145,6 +181,7 @@ export function useAiAgentProductSimulator(companyId = null) {
     loading,
     bootLoading,
     error,
+    agentRef: agentRefKey,
     loadBootstrap,
     startSession,
     sendMessage,

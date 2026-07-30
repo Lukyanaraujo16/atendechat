@@ -64,12 +64,17 @@ import { canViewInventory, planHasInventoryModule } from "../utils/inventoryAcce
 import CRMReports from "../pages/CRMReports";
 import CrmAutomations from "../pages/CrmAutomations";
 import AiAgent from "../pages/AiAgent";
+import AiAgentDetailPage from "../pages/AiAgentDetail";
 import AiAgentWizardPage from "../pages/AiAgentWizard";
 import AiAgentSimulatorPage from "../pages/AiAgentSimulator";
 import AiAgentRouteGuard from "../components/AiAgentRouteGuard";
 import {
   AI_AGENT_FEATURE_KEY,
   AI_AGENT_ROUTE_PATH,
+  AI_AGENT_NEW_ROUTE_PATH,
+  AI_AGENT_AGENT_ROUTE_PATH,
+  AI_AGENT_AGENT_WIZARD_ROUTE_PATH,
+  AI_AGENT_AGENT_SIMULATOR_ROUTE_PATH,
   AI_AGENT_SIMULATOR_ROUTE_PATH,
   AI_AGENT_SIMULATOR_LEGACY_ROUTE_PATH,
   AI_AGENT_WIZARD_ROUTE_PATH,
@@ -460,6 +465,32 @@ function AutomacaoModule({ planFlags, isAdmin }) {
         />
         <Route
           exact
+          path={AI_AGENT_NEW_ROUTE_PATH}
+          render={() => (
+            <AiAgentRouteGuard
+              planFlags={planFlags}
+              user={user}
+              fallbackPath={fallback}
+            >
+              {isAdmin && showAiAgent ? <AiAgentWizardPage /> : null}
+            </AiAgentRouteGuard>
+          )}
+        />
+        <Route
+          exact
+          path={AI_AGENT_AGENT_WIZARD_ROUTE_PATH}
+          render={() => (
+            <AiAgentRouteGuard
+              planFlags={planFlags}
+              user={user}
+              fallbackPath={fallback}
+            >
+              {isAdmin && showAiAgent ? <AiAgentWizardPage /> : null}
+            </AiAgentRouteGuard>
+          )}
+        />
+        <Route
+          exact
           path={`${AI_AGENT_WIZARD_ROUTE_PATH}/:agentId`}
           render={() => (
             <AiAgentRouteGuard
@@ -474,13 +505,18 @@ function AutomacaoModule({ planFlags, isAdmin }) {
         <Route
           exact
           path={AI_AGENT_WIZARD_ROUTE_PATH}
+          render={() => <Redirect to={AI_AGENT_NEW_ROUTE_PATH} />}
+        />
+        <Route
+          exact
+          path={AI_AGENT_AGENT_SIMULATOR_ROUTE_PATH}
           render={() => (
             <AiAgentRouteGuard
               planFlags={planFlags}
               user={user}
               fallbackPath={fallback}
             >
-              {isAdmin && showAiAgent ? <AiAgentWizardPage /> : null}
+              {isAdmin && showAiAgent ? <AiAgentSimulatorPage /> : null}
             </AiAgentRouteGuard>
           )}
         />
@@ -501,6 +537,19 @@ function AutomacaoModule({ planFlags, isAdmin }) {
           exact
           path={AI_AGENT_SIMULATOR_LEGACY_ROUTE_PATH}
           render={() => <Redirect to={AI_AGENT_SIMULATOR_ROUTE_PATH} />}
+        />
+        <Route
+          exact
+          path={AI_AGENT_AGENT_ROUTE_PATH}
+          render={() => (
+            <AiAgentRouteGuard
+              planFlags={planFlags}
+              user={user}
+              fallbackPath={fallback}
+            >
+              {isAdmin && showAiAgent ? <AiAgentDetailPage /> : null}
+            </AiAgentRouteGuard>
+          )}
         />
         <Route
           exact
@@ -739,6 +788,10 @@ export default function LoggedInRoutesContent() {
     "/queue-integration",
     "/prompts",
     AI_AGENT_ROUTE_PATH,
+    AI_AGENT_NEW_ROUTE_PATH,
+    AI_AGENT_AGENT_ROUTE_PATH,
+    AI_AGENT_AGENT_WIZARD_ROUTE_PATH,
+    AI_AGENT_AGENT_SIMULATOR_ROUTE_PATH,
     AI_AGENT_WIZARD_ROUTE_PATH,
     `${AI_AGENT_WIZARD_ROUTE_PATH}/:agentId`,
     AI_AGENT_SIMULATOR_ROUTE_PATH,
