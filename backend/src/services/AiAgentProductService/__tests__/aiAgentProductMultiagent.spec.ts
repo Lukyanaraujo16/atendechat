@@ -432,5 +432,67 @@ describe("Fase 2.9A — Product multiagente", () => {
         message: "ERR_AI_AGENT_PRODUCT_CONNECTION_ALREADY_ASSIGNED"
       });
     });
+
+    it("transferência manual em duas etapas: desvincular depois vincular", async () => {
+      const agentA = makeAgent({ id: 1, name: "Comercial" });
+      const agentB = makeAgent({ id: 2, name: "Financeiro" });
+      const wa = makeWa({ id: 9, aiAgentId: 1, name: "WA Comercial" });
+
+      // Passo 1: Comercial desvincula (lista vazia — desired não consulta findAll)
+      mockAgentFindOne.mockResolvedValueOnce(agentA);
+      mockWaFindAll
+        .mockResolvedValueOnce([wa]) // current linked A
+        .mockResolvedValue([]); // load configuration
+
+      const unlink = await UpdateAiAgentProductConnectionsService({
+        companyId: 10,
+        req: adminReq(),
+        agentRef: "1",
+        body: { connectionRefs: [] }
+      });
+      expect(unlink.changed).toBe(true);
+      expect(wa.update).toHaveBeenCalledWith(
+        expect.objectContaining({ aiAgentId: null }),
+        expect.any(Object)
+      );
+
+      // Passo 2: Financeiro vincula a conexão agora livre
+      jest.clearAllMocks();
+      mockAvailability.mockResolvedValue({
+        enabledByPlan: true,
+        accessibleByUser: true
+      });
+      mockSummary.mockResolvedValue(summaryPayload());
+      mockProfileFindAll.mockResolvedValue([]);
+      mockProfileFindOne.mockResolvedValue(null);
+      mockCredFindAll.mockResolvedValue([
+        { id: 5, provider: "openai", enabled: true }
+      ]);
+      mockCredFindOne.mockResolvedValue({
+        id: 5,
+        provider: "openai",
+        enabled: true
+      });
+
+      const free = makeWa({ id: 9, aiAgentId: null, name: "WA Comercial" });
+      mockAgentFindOne.mockResolvedValue(agentB);
+      mockWaFindAll
+        .mockResolvedValueOnce([free]) // pre desired
+        .mockResolvedValueOnce([]) // current linked B
+        .mockResolvedValueOnce([free]) // desired in tx
+        .mockResolvedValue([makeWa({ id: 9, aiAgentId: 2 })]);
+
+      const link = await UpdateAiAgentProductConnectionsService({
+        companyId: 10,
+        req: adminReq(),
+        agentRef: "2",
+        body: { connectionRefs: ["9"] }
+      });
+      expect(link.changed).toBe(true);
+      expect(free.update).toHaveBeenCalledWith(
+        expect.objectContaining({ aiAgentId: 2 }),
+        expect.any(Object)
+      );
+    });
   });
 });

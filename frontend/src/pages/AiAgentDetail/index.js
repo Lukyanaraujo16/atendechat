@@ -1,4 +1,4 @@
-import React, { useCallback, useContext, useState } from "react";
+import React, { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useHistory, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import Box from "@material-ui/core/Box";
@@ -87,6 +87,13 @@ export default function AiAgentDetailPage() {
   });
   const [busyCommand, setBusyCommand] = useState(null);
   const [commandError, setCommandError] = useState(null);
+  const agentRefLive = useRef(agentRef);
+  agentRefLive.current = agentRef;
+
+  useEffect(() => {
+    setBusyCommand(null);
+    setCommandError(null);
+  }, [agentRef]);
 
   const canMutate =
     user?.profile === "admin" && user?.supportMode !== true;
@@ -94,27 +101,34 @@ export default function AiAgentDetailPage() {
   const handleCommand = useCallback(
     async (command) => {
       if (busyCommand || !agentRef || !canMutate) return;
+      const startedAgentRef = agentRef;
       setBusyCommand(command);
       setCommandError(null);
       try {
         const { data: result } = await postAiAgentProductCommand(
           command,
-          agentRef
+          startedAgentRef
         );
+        // Troca rápida de agente: ignore resposta stale do agente anterior.
+        if (agentRefLive.current !== startedAgentRef) return;
         if (result?.summary) {
           applySummary(result.summary);
         } else {
           await reload();
         }
+        if (agentRefLive.current !== startedAgentRef) return;
         notifyAiAgentProductAgentsChanged();
         toast.success(i18n.t(`aiAgentProduct.commandSuccess.${command}`));
       } catch (err) {
+        if (agentRefLive.current !== startedAgentRef) return;
         const message = mapCommandError(err);
         setCommandError(message);
         toast.error(message);
         throw err;
       } finally {
-        setBusyCommand(null);
+        if (agentRefLive.current === startedAgentRef) {
+          setBusyCommand(null);
+        }
       }
     },
     [agentRef, applySummary, busyCommand, canMutate, reload]

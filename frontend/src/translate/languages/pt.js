@@ -3015,6 +3015,8 @@ const messages = {
           unlink: "Desvincular",
           linkBlocked: "Indisponível",
           transferBlocked: "Transferência não disponível",
+          transferHint:
+            "Para transferir uma conexão, primeiro desvincule do agente atual e depois vincule ao novo agente.",
           conflictWithAgent:
             "Esta conexão já está vinculada ao agente {{name}}. Não é possível transferir silenciosamente.",
           conflictGeneric:

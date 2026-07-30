@@ -52,6 +52,10 @@ const useStyles = makeStyles((theme) => ({
   conflict: {
     color: theme.palette.error.main,
   },
+  transferHint: {
+    color: theme.palette.text.secondary,
+    marginBottom: theme.spacing(1.5),
+  },
   actions: {
     display: "flex",
     flexWrap: "wrap",
@@ -123,23 +127,29 @@ export default function AiAgentConnectionsPanel({
       setUnlinkTarget(null);
       return undefined;
     }
+    setConnections([]);
+    setError(null);
+    setUnlinkTarget(null);
     reload();
     return undefined;
   }, [open, reload]);
 
   const persistLinkedRefs = async (nextRefs) => {
     if (!agentRefKey || !canMutate) return;
+    const startedAgentRef = agentRefKey;
     setSaving(true);
     try {
       await putAiAgentProductConnections(
         { connectionRefs: nextRefs },
-        agentRefKey
+        startedAgentRef
       );
+      if (startedAgentRef !== String(agentRef || "").trim()) return;
       notifyAiAgentProductAgentsChanged();
       await reload();
       if (onChanged) await onChanged();
       toast.success(i18n.t("aiAgentProduct.connections.saved"));
     } catch (err) {
+      if (startedAgentRef !== String(agentRef || "").trim()) return;
       const mapped = mapConnectionsError(err);
       if (mapped) toast.error(mapped);
       else toastError(err);
@@ -281,6 +291,16 @@ export default function AiAgentConnectionsPanel({
                 <Typography className={classes.sectionTitle} component="h3">
                   {i18n.t("aiAgentProduct.connections.otherTitle")}
                 </Typography>
+                {buckets.other.length > 0 ? (
+                  <Typography
+                    variant="body2"
+                    className={classes.transferHint}
+                    role="note"
+                    data-testid="ai-agent-connections-transfer-hint"
+                  >
+                    {i18n.t("aiAgentProduct.connections.transferHint")}
+                  </Typography>
+                ) : null}
                 {buckets.other.length === 0 ? (
                   <Typography variant="body2" className={classes.meta}>
                     {i18n.t("aiAgentProduct.connections.otherEmpty")}

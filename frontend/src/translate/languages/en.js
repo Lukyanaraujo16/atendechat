@@ -2924,6 +2924,8 @@ const messages = {
 					unlink: "Unlink",
 					linkBlocked: "Unavailable",
 					transferBlocked: "Transfer not available",
+					transferHint:
+						"To transfer a connection, first unlink it from the current agent and then link it to the new agent.",
 					conflictWithAgent:
 						"This connection is already linked to agent {{name}}. Silent transfer is not allowed.",
 					conflictGeneric:

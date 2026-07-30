@@ -504,6 +504,7 @@ Listagem: `GET /product/ai-agent/agents` — retorna todos os agentes; nunca `am
 - Commands: `POST /product/ai-agent/agents/:agentRef/commands` (ou body/query compat)
 - Simulator: somente `/ai-agent/:agentRef/simulator`; bare `/ai-agent/simulator` → Hub
 - Connections: painel agent-scoped com buckets vinculadas / disponíveis / outro agente; conflito sem transferência silenciosa
+- Transferência manual (aprovada temporariamente): desvincular do agente atual → vincular ao novo agente
 - Credenciais permanecem company-scoped
 
 ### Resolver central

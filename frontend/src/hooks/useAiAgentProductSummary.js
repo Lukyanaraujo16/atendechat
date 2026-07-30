@@ -34,6 +34,15 @@ export default function useAiAgentProductSummary({
 
   const applySummary = useCallback((payload) => {
     if (!mounted.current) return;
+    if (agentRefKey && payload?.agent) {
+      const incoming =
+        payload.agent.agentRef != null
+          ? String(payload.agent.agentRef)
+          : payload.agent.id != null
+            ? String(payload.agent.id)
+            : "";
+      if (incoming && incoming !== agentRefKey) return;
+    }
     setState((prev) => ({
       ...prev,
       loading: false,
