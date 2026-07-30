@@ -155,7 +155,7 @@ Helper: `resolveRequestCompanyContext(req)`
 
 ## Ownership por entidade (1.4.1)
 
-Helper HTTP: `backend/src/helpers/agentOsTenantOwnership.ts`  
+Helper HTTP: `backend/src/helpers/agentOsTenantOwnership.ts`
 (`assertRecordOwnedByCompany`, `filterRecordsOwnedByCompany`, índice `actionId` por tenant)
 
 | Endpoint | ID recebido | Entidade | Como companyId é validado | Cross-tenant bloqueado? | Evidência |

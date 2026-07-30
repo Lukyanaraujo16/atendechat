@@ -66,7 +66,7 @@ Serviços / models existentes (ListAiAgents, Whatsapp, Profile, Credential meta)
 serializeAiAgentProductSummary / serializeAiAgentReadiness
 ```
 
-A Product API **não** substitui a Experience Layer.  
+A Product API **não** substitui a Experience Layer.
 A Experience Layer **não** modifica AgentOS / Shadow / Live runtime.
 
 ---
@@ -250,7 +250,7 @@ type AiAgentNextAction =
 
 Textos longos **não** são acoplados em PT-BR no service de domínio; usam `labelKey` / status codes.
 
-`ready === true` significa: configuração estrutural completa **e** status `ready_to_activate` ou `active` (pode ativar ou já está ativo).  
+`ready === true` significa: configuração estrutural completa **e** status `ready_to_activate` ou `active` (pode ativar ou já está ativo).
 `setup_incomplete` / `paused` / `attention_required` / `unavailable` / `not_created` → `ready: false`.
 
 ---

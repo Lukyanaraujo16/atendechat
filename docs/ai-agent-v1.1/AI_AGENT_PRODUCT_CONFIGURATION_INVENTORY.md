@@ -134,7 +134,7 @@ Inventário dos campos de configuração do AI Agent, baseado nos modelos reais 
 
 ## Providers comerciais (Hardening 2.3.1)
 
-Fonte única: `backend/src/services/AiAgentProductService/aiAgentProductProviderCapabilities.ts`  
+Fonte única: `backend/src/services/AiAgentProductService/aiAgentProductProviderCapabilities.ts`
 IDs canônicos: `backend/src/config/aiProviderModels.ts`
 
 | Provider | Runtime Shadow | Runtime Live | Simulator | Credencial | Modelos (allowlist real) |

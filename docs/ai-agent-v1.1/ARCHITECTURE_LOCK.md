@@ -1099,7 +1099,7 @@ Este documento deverá permanecer no repositório durante toda a evolução da A
 
 Antes de cada subfase, o prompt de implementação deverá declarar:
 
-> Esta implementação deve respeitar integralmente o  
+> Esta implementação deve respeitar integralmente o
 > **AI Agent V1.1 — Architecture Lock**.
 
 Ao concluir cada fase, o relatório deverá incluir:
