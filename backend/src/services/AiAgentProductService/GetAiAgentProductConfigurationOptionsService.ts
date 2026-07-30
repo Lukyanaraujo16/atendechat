@@ -1,5 +1,6 @@
 import { Request } from "express";
 import AppError from "../../errors/AppError";
+import AiAgent from "../../models/AiAgent";
 import AiProviderCredential from "../../models/AiProviderCredential";
 import Whatsapp from "../../models/Whatsapp";
 import { AiAgentProductConfigurationOptions } from "../../types/aiAgentProduct";
@@ -15,6 +16,7 @@ import {
   serializeAiAgentProductConfigurationOptions
 } from "./serializeAiAgentProduct";
 import {
+  encodeAgentRef,
   resolveAiAgentProductAgentForOperation
 } from "./aiAgentProductAgentRef";
 
@@ -64,11 +66,25 @@ export default async function GetAiAgentProductConfigurationOptionsService(input
     ]
   });
 
-  const connections = await Whatsapp.findAll({
-    where: { companyId },
-    order: [["id", "ASC"]],
-    attributes: ["id", "name", "status", "aiAgentId"]
-  });
+  const [connections, agents] = await Promise.all([
+    Whatsapp.findAll({
+      where: { companyId },
+      order: [["id", "ASC"]],
+      attributes: ["id", "name", "status", "aiAgentId"]
+    }),
+    AiAgent.findAll({
+      where: { companyId },
+      order: [["id", "ASC"]],
+      attributes: ["id", "name"]
+    })
+  ]);
+
+  const agentNameById = new Map<number, string>();
+  for (const agent of agents) {
+    const id = Number(agent.id);
+    if (!Number.isFinite(id)) continue;
+    agentNameById.set(id, String(agent.name || "").trim() || "—");
+  }
 
   const options: AiAgentProductConfigurationOptions = {
     providers: listAiAgentProductProviderOptions().map(p => ({
@@ -100,13 +116,25 @@ export default async function GetAiAgentProductConfigurationOptionsService(input
       const eligible =
         w.aiAgentId == null ||
         (resolvedAgentId != null && w.aiAgentId === resolvedAgentId);
+      const assignedId =
+        w.aiAgentId != null && Number.isFinite(Number(w.aiAgentId))
+          ? Number(w.aiAgentId)
+          : null;
+      const assignedToOther =
+        !eligible && assignedId != null && assignedId !== resolvedAgentId;
       return {
         ref: String(w.id),
         name: String(w.name || "").trim() || "—",
         status: String(w.status || ""),
         selected,
         eligible,
-        ineligibleReason: eligible ? null : "already_assigned"
+        ineligibleReason: eligible ? null : "already_assigned",
+        ...(assignedToOther
+          ? {
+              assignedAgentName: agentNameById.get(assignedId) || "—",
+              assignedAgentRef: encodeAgentRef(assignedId)
+            }
+          : {})
       };
     })
   };

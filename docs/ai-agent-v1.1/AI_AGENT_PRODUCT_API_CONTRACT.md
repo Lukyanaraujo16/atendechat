@@ -499,6 +499,13 @@ Listagem: `GET /product/ai-agent/agents` — retorna todos os agentes; nunca `am
 - `/ai-agent/:agentRef/wizard` — Wizard edit
 - Seleção explícita por `agentRef` na URL; múltiplos agentes são estado normal na UX
 
+### Product agent-scoped FE (Fase 2.9C)
+
+- Commands: `POST /product/ai-agent/agents/:agentRef/commands` (ou body/query compat)
+- Simulator: somente `/ai-agent/:agentRef/simulator`; bare `/ai-agent/simulator` → Hub
+- Connections: painel agent-scoped com buckets vinculadas / disponíveis / outro agente; conflito sem transferência silenciosa
+- Credenciais permanecem company-scoped
+
 ### Resolver central
 
 - Operações Product: `resolveAiAgentProductAgentForOperation` (`aiAgentProductAgentRef` / `ResolveAiAgentProductAgentService`)

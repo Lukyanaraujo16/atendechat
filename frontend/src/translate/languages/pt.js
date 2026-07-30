@@ -2998,9 +2998,32 @@ const messages = {
           aria: "Ações do Agente de IA",
           openWizard: "Abrir assistente",
           openSimulator: "Abrir simulador",
+          manageConnections: "Revisar conexões do agente",
           openConnections: "Administrar canais WhatsApp",
           openCredentials: "Abrir credenciais",
           manageCredentials: "Gerenciar credenciais",
+        },
+        connections: {
+          title: "Conexões de {{name}}",
+          linkedTitle: "Vinculadas a este agente",
+          linkedEmpty: "Nenhuma conexão vinculada ainda.",
+          availableTitle: "Disponíveis para vínculo",
+          availableEmpty: "Não há conexões livres para vincular.",
+          otherTitle: "Vinculadas a outro agente",
+          otherEmpty: "Nenhuma conexão em uso por outros agentes.",
+          link: "Vincular",
+          unlink: "Desvincular",
+          linkBlocked: "Indisponível",
+          transferBlocked: "Transferência não disponível",
+          conflictWithAgent:
+            "Esta conexão já está vinculada ao agente {{name}}. Não é possível transferir silenciosamente.",
+          conflictGeneric:
+            "Esta conexão já está vinculada a outro agente. Não é possível transferir silenciosamente.",
+          unlinkConfirmTitle: "Desvincular conexão?",
+          unlinkConfirmBody:
+            "A conexão {{name}} deixará de usar este agente. A conexão WhatsApp não será apagada.",
+          saved: "Conexões atualizadas.",
+          close: "Fechar",
         },
         credentials: {
           title: "Credenciais de IA",
@@ -3066,6 +3089,7 @@ const messages = {
           cta: {
             configure: "Configurar agente",
             hub: "Voltar ao Agente de IA",
+            backToAgent: "Voltar para o agente",
           },
         },
         meta: {

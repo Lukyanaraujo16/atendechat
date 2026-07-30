@@ -18,6 +18,7 @@ import {
 import useAiAgentProductSummary from "../../hooks/useAiAgentProductSummary";
 import { postAiAgentProductCommand } from "../../services/aiAgentProductApi";
 import { AI_AGENT_ROUTE_PATH } from "../../config/aiAgentFeature";
+import { notifyAiAgentProductAgentsChanged } from "../../utils/aiAgentProductAgentsCache";
 import { i18n } from "../../translate/i18n";
 
 const useStyles = makeStyles((theme) => ({
@@ -51,6 +52,9 @@ function mapCommandError(err) {
   if (code === "ERR_AI_AGENT_PRODUCT_AGENT_REF_REQUIRED") {
     return i18n.t("aiAgentProduct.commandErrors.agentRefRequired");
   }
+  if (code === "ERR_AI_AGENT_PRODUCT_AGENT_NOT_FOUND") {
+    return i18n.t("aiAgentProduct.hub.agentNotFoundDescription");
+  }
   if (code === "ERR_AI_AGENT_PRODUCT_CONTEXT_AMBIGUOUS") {
     return i18n.t("aiAgentProduct.commandErrors.ambiguous");
   }
@@ -61,7 +65,7 @@ function mapCommandError(err) {
 }
 
 /**
- * Visão agent-scoped — /ai-agent/:agentRef (Fase 2.9B).
+ * Visão agent-scoped — /ai-agent/:agentRef (Fases 2.9B–2.9C).
  */
 export default function AiAgentDetailPage() {
   const classes = useStyles();
@@ -81,13 +85,16 @@ export default function AiAgentDetailPage() {
     enabled: Boolean(agentRef),
     agentRef,
   });
-  const [commandBusy, setCommandBusy] = useState(false);
+  const [busyCommand, setBusyCommand] = useState(null);
   const [commandError, setCommandError] = useState(null);
+
+  const canMutate =
+    user?.profile === "admin" && user?.supportMode !== true;
 
   const handleCommand = useCallback(
     async (command) => {
-      if (commandBusy || !agentRef) return;
-      setCommandBusy(true);
+      if (busyCommand || !agentRef || !canMutate) return;
+      setBusyCommand(command);
       setCommandError(null);
       try {
         const { data: result } = await postAiAgentProductCommand(
@@ -99,6 +106,7 @@ export default function AiAgentDetailPage() {
         } else {
           await reload();
         }
+        notifyAiAgentProductAgentsChanged();
         toast.success(i18n.t(`aiAgentProduct.commandSuccess.${command}`));
       } catch (err) {
         const message = mapCommandError(err);
@@ -106,10 +114,10 @@ export default function AiAgentDetailPage() {
         toast.error(message);
         throw err;
       } finally {
-        setCommandBusy(false);
+        setBusyCommand(null);
       }
     },
-    [agentRef, applySummary, commandBusy, reload]
+    [agentRef, applySummary, busyCommand, canMutate, reload]
   );
 
   const companyLabel =
@@ -170,11 +178,12 @@ export default function AiAgentDetailPage() {
         agentRef={agentRef}
         onRetry={reload}
         onCommand={handleCommand}
-        commandBusy={commandBusy}
+        commandBusy={busyCommand}
         commandError={commandError}
         supportMode={user?.supportMode === true}
         companyLabel={companyLabel}
         hidePageHeader
+        canMutate={canMutate}
       />
     </MainContainer>
   );

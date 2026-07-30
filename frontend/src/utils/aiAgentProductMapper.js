@@ -185,9 +185,17 @@ export function mapAiAgentNextAction(action, context = {}) {
       return { ...base, path: reviewPath, enabled: true };
     case "connect_whatsapp":
     case "fix_connection":
+      if (agentRef) {
+        return {
+          ...base,
+          path: null,
+          action: "manage_connections",
+          enabled: true,
+        };
+      }
       return {
         ...base,
-        path: agentRef ? wizardPath(agentRef) : AI_AGENT_NEW_ROUTE_PATH,
+        path: AI_AGENT_NEW_ROUTE_PATH,
         enabled: true,
       };
     case "activate_shadow":
@@ -283,25 +291,43 @@ export function buildAiAgentCommercialCommands(summary) {
   return commands;
 }
 
-export function buildAiAgentSecondaryActions(summary) {
+export function buildAiAgentSecondaryActions(summary, options = {}) {
   const scopeType = summary?.agentScope?.type;
   const isAmbiguous = scopeType === "ambiguous";
+  const preferredRef =
+    options.agentRef != null && String(options.agentRef).trim() !== ""
+      ? String(options.agentRef).trim()
+      : null;
   const agentRef =
-    !isAmbiguous &&
+    preferredRef ||
+    (!isAmbiguous &&
     summary?.agent?.exists &&
     (summary.agent.agentRef != null
       ? String(summary.agent.agentRef)
       : summary.agent.id != null
         ? String(summary.agent.id)
-        : null);
+        : null));
   // Ambiguous legado: voltar ao Hub para seleção explícita (não inventar agente).
-  const wizard = isAmbiguous
+  const wizard = isAmbiguous || !agentRef
     ? AI_AGENT_ROUTE_PATH
     : wizardPath(agentRef);
-  const sim = isAmbiguous
+  const sim = isAmbiguous || !agentRef
     ? AI_AGENT_ROUTE_PATH
     : simulatorPath(agentRef);
   const actions = [
+    {
+      id: "open_simulator",
+      labelKey: "aiAgentProduct.secondary.openSimulator",
+      path: sim,
+      enabled: Boolean(agentRef) && !isAmbiguous,
+    },
+    {
+      id: "manage_connections",
+      labelKey: "aiAgentProduct.secondary.manageConnections",
+      action: "manage_connections",
+      path: null,
+      enabled: Boolean(agentRef) && !isAmbiguous,
+    },
     {
       id: "open_wizard",
       labelKey: "aiAgentProduct.secondary.openWizard",
@@ -315,20 +341,20 @@ export function buildAiAgentSecondaryActions(summary) {
       enabled: true,
     },
   ];
-  actions.unshift({
-    id: "open_simulator",
-    labelKey: "aiAgentProduct.secondary.openSimulator",
-    path: sim,
-    enabled: true,
-  });
   return actions;
 }
 
 /**
  * View-model do summary. ready/status/mode/checks vêm do backend.
+ * @param {object} payload
+ * @param {{ agentRef?: string }} [options] — agentRef explícito da URL (2.9C).
  */
-export function mapAiAgentProductSummary(payload) {
+export function mapAiAgentProductSummary(payload, options = {}) {
   const data = payload && typeof payload === "object" ? payload : {};
+  const preferredRef =
+    options.agentRef != null && String(options.agentRef).trim() !== ""
+      ? String(options.agentRef).trim()
+      : "";
   const readiness = data.readiness || {};
   const status = normalizeAiAgentProductStatus(
     readiness.status || data.status
@@ -339,11 +365,12 @@ export function mapAiAgentProductSummary(payload) {
         exists: data.agent.exists === true,
         id: data.agent.id,
         agentRef:
-          data.agent.agentRef != null
+          preferredRef ||
+          (data.agent.agentRef != null
             ? String(data.agent.agentRef)
             : data.agent.id != null
               ? String(data.agent.id)
-              : null,
+              : null),
         name: data.agent.name,
         enabled: data.agent.enabled === true,
       }
@@ -383,13 +410,17 @@ export function mapAiAgentProductSummary(payload) {
   if (!agentScopeType) {
     if (status === "not_created" || status === "unavailable") {
       agentScopeType = "none";
-    } else if (agent.exists && agent.id != null) {
+    } else if (agent.exists && (agent.id != null || agent.agentRef)) {
       agentScopeType = "single";
     } else if (agent.exists) {
       agentScopeType = "ambiguous";
     } else {
       agentScopeType = "none";
     }
+  }
+  // Com agentRef explícito da URL, nunca tratar como ambiguous na UI agent-scoped.
+  if (preferredRef && agent.exists) {
+    agentScopeType = "single";
   }
   let agentScopeCount = Math.max(0, Number(rawAgentScope.count) || 0);
   if (agentScopeCount === 0) {
@@ -401,9 +432,12 @@ export function mapAiAgentProductSummary(payload) {
     count: agentScopeCount,
   };
 
+  const scopedRef =
+    preferredRef ||
+    (agentScope.type === "single" && agent.exists ? agent.agentRef : null);
+
   const nextAction = mapAiAgentNextAction(readiness.nextAction, {
-    agentRef:
-      agentScope.type === "single" && agent.exists ? agent.agentRef : null,
+    agentRef: scopedRef,
     agentId:
       agentScope.type === "single" && agent.exists ? agent.id : null,
   });
@@ -431,7 +465,9 @@ export function mapAiAgentProductSummary(payload) {
     secondaryActions: [],
     commercialCommands: [],
   };
-  mapped.secondaryActions = buildAiAgentSecondaryActions(mapped);
+  mapped.secondaryActions = buildAiAgentSecondaryActions(mapped, {
+    agentRef: scopedRef,
+  });
   mapped.commercialCommands = buildAiAgentCommercialCommands(mapped);
   return mapped;
 }

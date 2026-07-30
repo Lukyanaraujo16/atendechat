@@ -81,12 +81,14 @@ function CommercialCommandButton({
   const keys = getAiAgentCommandConfirmKeys(action.command);
   const params = getAiAgentCommandConfirmParams(connectionScope);
   const ButtonComp = action.destructive ? AppNeutralButton : AppSecondaryButton;
+  const anyBusy = Boolean(commandBusy);
+  const thisBusy = commandBusy === true || commandBusy === action.command;
 
   return (
     <>
       <ButtonComp
         onClick={() => setOpen(true)}
-        disabled={commandBusy}
+        disabled={anyBusy}
         data-testid={`ai-agent-command-${action.command}`}
       >
         {i18n.t(action.labelKey)}
@@ -94,7 +96,7 @@ function CommercialCommandButton({
       <ConfirmationModal
         title={i18n.t(keys.titleKey)}
         open={open}
-        onClose={() => !commandBusy && setOpen(false)}
+        onClose={() => !thisBusy && setOpen(false)}
         onConfirm={async () => {
           try {
             await onCommand(action.command);
@@ -105,7 +107,7 @@ function CommercialCommandButton({
         }}
         confirmText={i18n.t(keys.confirmKey)}
         destructive={keys.destructive}
-        loading={commandBusy}
+        loading={thisBusy}
         asyncConfirm
       >
         {i18n.t(keys.bodyKey, params)}
@@ -118,6 +120,7 @@ export default function AiAgentStatusCard({
   summary,
   onRefresh,
   onCommand,
+  onManageConnections,
   commandBusy = false,
 }) {
   const classes = useStyles();
@@ -214,6 +217,7 @@ export default function AiAgentStatusCard({
           nextAction={summary.nextAction}
           onRefresh={onRefresh}
           onCommand={onCommand}
+          onManageConnections={onManageConnections}
           commandBusy={commandBusy}
           connectionScope={summary.connectionScope}
         />

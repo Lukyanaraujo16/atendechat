@@ -15,6 +15,7 @@ import MainHeaderButtonsWrapper from "../MainHeaderButtonsWrapper";
 import AiAgentStatusCard from "../AiAgentStatusCard";
 import AiAgentReadinessChecklist from "../AiAgentReadinessChecklist";
 import AiAgentProductCredentialModal from "../AiAgentProductCredentialModal";
+import AiAgentConnectionsPanel from "../AiAgentConnectionsPanel";
 import { listAiAgentProductCredentials } from "../../services/aiAgentProductApi";
 import { i18n } from "../../translate/i18n";
 
@@ -65,7 +66,8 @@ function ExperienceSkeleton() {
 }
 
 /**
- * Experience Layer — Product API leitura + comandos comerciais (Fase 2.2).
+ * Experience Layer — Product API (Fases 2.2–2.9C).
+ * Commands/connections/simulator agent-scoped via agentRef.
  */
 export default function AiAgentExperiencePage({
   loading,
@@ -74,18 +76,21 @@ export default function AiAgentExperiencePage({
   summary,
   onRetry,
   onCommand,
-  commandBusy = false,
+  commandBusy = null,
   commandError = null,
   supportMode,
   companyLabel,
   agentRef = null,
   hidePageHeader = false,
+  canMutate = true,
 }) {
   const classes = useStyles();
   const history = useHistory();
+  const agentRefKey = agentRef != null ? String(agentRef).trim() : "";
   const [credentialModalOpen, setCredentialModalOpen] = useState(false);
   const [credentialModalMode, setCredentialModalMode] = useState("manage");
   const [credentialCount, setCredentialCount] = useState(null);
+  const [connectionsOpen, setConnectionsOpen] = useState(false);
 
   const showChecklist =
     summary &&
@@ -99,7 +104,8 @@ export default function AiAgentExperiencePage({
     summary.availability?.enabledByPlan === true &&
     summary.status !== "unavailable" &&
     summary.agentScope?.type !== "ambiguous" &&
-    (agentRef || summary.agentScope?.type === "single");
+    (Boolean(agentRefKey) || summary.agentScope?.type === "single") &&
+    canMutate;
 
   const productAvailable =
     summary &&
@@ -115,6 +121,7 @@ export default function AiAgentExperiencePage({
     productAvailable &&
     !accessDenied &&
     !error &&
+    canMutate &&
     (credentialNeedsAttention || credentialCount === 0);
 
   useEffect(() => {
@@ -152,6 +159,19 @@ export default function AiAgentExperiencePage({
     await onRetry();
   };
 
+  const handleSecondary = (action) => {
+    if (action?.action === "manage_connections") {
+      if (!agentRefKey) return;
+      setConnectionsOpen(true);
+      return;
+    }
+    if (action?.enabled && action?.path) {
+      history.push(action.path);
+    }
+  };
+
+  const busyAny = Boolean(commandBusy);
+
   return (
     <Box className={classes.root} data-testid="ai-agent-experience">
       {!hidePageHeader ? (
@@ -164,7 +184,7 @@ export default function AiAgentExperiencePage({
           }
           actions={
             <MainHeaderButtonsWrapper>
-              <AppNeutralButton onClick={onRetry} disabled={loading || commandBusy}>
+              <AppNeutralButton onClick={onRetry} disabled={loading || busyAny}>
                 {i18n.t("aiAgentProduct.actions.refresh")}
               </AppNeutralButton>
             </MainHeaderButtonsWrapper>
@@ -172,7 +192,7 @@ export default function AiAgentExperiencePage({
         />
       ) : (
         <Box mb={1}>
-          <AppNeutralButton onClick={onRetry} disabled={loading || commandBusy}>
+          <AppNeutralButton onClick={onRetry} disabled={loading || busyAny}>
             {i18n.t("aiAgentProduct.actions.refresh")}
           </AppNeutralButton>
         </Box>
@@ -221,6 +241,9 @@ export default function AiAgentExperiencePage({
             summary={summary}
             onRefresh={onRetry}
             onCommand={showActivationActions ? onCommand : undefined}
+            onManageConnections={
+              agentRefKey ? () => setConnectionsOpen(true) : undefined
+            }
             commandBusy={commandBusy}
           />
 
@@ -233,7 +256,7 @@ export default function AiAgentExperiencePage({
               {showAddCredential ? (
                 <AppSecondaryButton
                   onClick={() => openCredentialModal("create")}
-                  disabled={commandBusy}
+                  disabled={busyAny}
                   data-testid="ai-agent-product-credential-add"
                 >
                   {i18n.t("aiAgentProduct.credentials.actions.add")}
@@ -241,7 +264,8 @@ export default function AiAgentExperiencePage({
               ) : null}
               <AppNeutralButton
                 onClick={() => openCredentialModal("manage")}
-                disabled={commandBusy}
+                disabled={busyAny}
+                data-testid="ai-agent-product-credential-manage"
               >
                 {i18n.t("aiAgentProduct.secondary.manageCredentials")}
               </AppNeutralButton>
@@ -257,11 +281,11 @@ export default function AiAgentExperiencePage({
               aria-label={i18n.t("aiAgentProduct.secondary.aria")}
             >
               {summary.secondaryActions.map((action) =>
-                action.enabled && action.path ? (
+                action.enabled && (action.path || action.action) ? (
                   <AppSecondaryButton
                     key={action.id}
-                    onClick={() => history.push(action.path)}
-                    disabled={commandBusy}
+                    onClick={() => handleSecondary(action)}
+                    disabled={busyAny}
                     data-testid={`ai-agent-secondary-${action.id}`}
                   >
                     {i18n.t(action.labelKey)}
@@ -277,6 +301,14 @@ export default function AiAgentExperiencePage({
         onClose={() => setCredentialModalOpen(false)}
         onSuccess={handleCredentialSuccess}
         mode={credentialModalMode}
+      />
+      <AiAgentConnectionsPanel
+        open={connectionsOpen}
+        onClose={() => setConnectionsOpen(false)}
+        agentRef={agentRefKey}
+        agentName={summary?.agent?.name}
+        onChanged={onRetry}
+        canMutate={canMutate}
       />
     </Box>
   );

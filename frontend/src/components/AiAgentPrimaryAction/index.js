@@ -20,18 +20,39 @@ export default function AiAgentPrimaryAction({
   nextAction,
   onRefresh,
   onCommand,
+  onManageConnections,
   commandBusy = false,
   connectionScope = null,
 }) {
   const history = useHistory();
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const anyBusy = Boolean(commandBusy);
+  const thisBusy =
+    commandBusy === true ||
+    (nextAction?.command && commandBusy === nextAction.command);
 
   if (!nextAction || nextAction.type === "none") {
     return onRefresh ? (
-      <AppNeutralButton onClick={onRefresh} disabled={commandBusy}>
+      <AppNeutralButton onClick={onRefresh} disabled={anyBusy}>
         {i18n.t("aiAgentProduct.actions.refresh")}
       </AppNeutralButton>
     ) : null;
+  }
+
+  if (
+    nextAction.enabled &&
+    nextAction.action === "manage_connections" &&
+    typeof onManageConnections === "function"
+  ) {
+    return (
+      <AppPrimaryButton
+        onClick={onManageConnections}
+        disabled={anyBusy}
+        data-testid="ai-agent-primary-action"
+      >
+        {i18n.t(nextAction.labelKey)}
+      </AppPrimaryButton>
+    );
   }
 
   if (nextAction.enabled && nextAction.command) {
@@ -42,7 +63,7 @@ export default function AiAgentPrimaryAction({
         <>
           <AppPrimaryButton
             onClick={() => setConfirmOpen(true)}
-            disabled={commandBusy}
+            disabled={anyBusy}
             data-testid="ai-agent-primary-action"
           >
             {i18n.t(nextAction.labelKey)}
@@ -50,7 +71,7 @@ export default function AiAgentPrimaryAction({
           <ConfirmationModal
             title={i18n.t(keys.titleKey)}
             open={confirmOpen}
-            onClose={() => !commandBusy && setConfirmOpen(false)}
+            onClose={() => !thisBusy && setConfirmOpen(false)}
             onConfirm={async () => {
               try {
                 await onCommand(nextAction.command);
@@ -61,7 +82,7 @@ export default function AiAgentPrimaryAction({
             }}
             confirmText={i18n.t(keys.confirmKey)}
             destructive={keys.destructive}
-            loading={commandBusy}
+            loading={thisBusy}
             asyncConfirm
           >
             {i18n.t(keys.bodyKey, params)}
@@ -85,7 +106,7 @@ export default function AiAgentPrimaryAction({
     return (
       <AppPrimaryButton
         onClick={() => history.push(nextAction.path)}
-        disabled={commandBusy}
+        disabled={anyBusy}
         data-testid="ai-agent-primary-action"
       >
         {i18n.t(nextAction.labelKey)}
@@ -105,7 +126,7 @@ export default function AiAgentPrimaryAction({
         </Tooltip>
         <AppSecondaryButton
           onClick={() => history.push(nextAction.fallbackPath)}
-          disabled={commandBusy}
+          disabled={anyBusy}
           data-testid="ai-agent-primary-fallback"
         >
           {i18n.t(

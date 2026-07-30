@@ -67,6 +67,13 @@ aiAgentProductRoutes.get(
 );
 
 aiAgentProductRoutes.post(
+  "/product/ai-agent/agents/:agentRef/commands",
+  isAuth,
+  requireAiAgentProductView,
+  AiAgentProductController.command
+);
+
+aiAgentProductRoutes.post(
   "/product/ai-agent/commands",
   isAuth,
   requireAiAgentProductView,

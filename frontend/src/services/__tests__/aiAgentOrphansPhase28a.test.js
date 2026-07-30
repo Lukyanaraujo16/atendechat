@@ -116,7 +116,8 @@ describe("Fase 2.8A — rotas e superfícies vivas", () => {
     expect(routes).toMatch(/AI_AGENT_WIZARD_ROUTE_PATH/);
     expect(routes).toMatch(/AI_AGENT_SIMULATOR_ROUTE_PATH/);
     expect(routes).toMatch(/AI_AGENT_SIMULATOR_LEGACY_ROUTE_PATH/);
-    expect(routes).toMatch(/Redirect to=\{AI_AGENT_SIMULATOR_ROUTE_PATH\}/);
+    expect(routes).toMatch(/AI_AGENT_AGENT_SIMULATOR_ROUTE_PATH/);
+    expect(routes).toMatch(/Redirect to=\{AI_AGENT_ROUTE_PATH\}/);
   });
 
   it("aliases Console analytics/shadow-fc permanecem", () => {

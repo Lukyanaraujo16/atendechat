@@ -40,9 +40,11 @@ export default function useAiAgentProductSummary({
       error: null,
       accessDenied: false,
       notFound: false,
-      data: mapAiAgentProductSummary(payload),
+      data: mapAiAgentProductSummary(payload, {
+        agentRef: agentRefKey || undefined,
+      }),
     }));
-  }, []);
+  }, [agentRefKey]);
 
   const reload = useCallback(async () => {
     if (!enabled) {
@@ -76,7 +78,9 @@ export default function useAiAgentProductSummary({
         error: null,
         accessDenied: false,
         notFound: false,
-        data: mapAiAgentProductSummary(data),
+        data: mapAiAgentProductSummary(data, {
+          agentRef: agentRefKey || undefined,
+        }),
       });
     } catch (err) {
       if (!mounted.current || rid !== requestId.current) return;

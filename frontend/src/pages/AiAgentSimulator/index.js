@@ -1,10 +1,11 @@
 import React, { useContext, useEffect, useMemo, useState } from "react";
-import { useHistory, useParams } from "react-router-dom";
+import { Redirect, useHistory, useParams } from "react-router-dom";
 import { makeStyles } from "@material-ui/core/styles";
 import Container from "@material-ui/core/Container";
 import Alert from "@material-ui/lab/Alert";
 import Button from "@material-ui/core/Button";
 import Paper from "@material-ui/core/Paper";
+import Chip from "@material-ui/core/Chip";
 import { toast } from "react-toastify";
 import MainContainer from "../../components/MainContainer";
 import MainHeader from "../../components/MainHeader";
@@ -21,7 +22,7 @@ import {
 } from "../../components/AiAgentSimulator/aiAgentSimulatorHelpers";
 import {
   AI_AGENT_ROUTE_PATH,
-  AI_AGENT_NEW_ROUTE_PATH,
+  aiAgentPath,
   aiAgentWizardEditPath,
 } from "../../config/aiAgentFeature";
 import { AuthContext } from "../../context/Auth/AuthContext";
@@ -55,6 +56,12 @@ const useStyles = makeStyles((theme) => ({
     gap: theme.spacing(1),
     marginTop: theme.spacing(2),
   },
+  contextChips: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: theme.spacing(1),
+    marginBottom: theme.spacing(1),
+  },
 }));
 
 function unavailableReasonKey(reason) {
@@ -70,9 +77,16 @@ function unavailableReasonKey(reason) {
   if (known.includes(reason)) {
     return `aiAgentProduct.simulator.reasons.${reason}`;
   }
+  if (reason === "ERR_AI_AGENT_PRODUCT_AGENT_NOT_FOUND") {
+    return "aiAgentProduct.hub.agentNotFoundDescription";
+  }
   return "aiAgentProduct.simulator.reasons.simulator_not_configured";
 }
 
+/**
+ * Simulador agent-scoped — /ai-agent/:agentRef/simulator (Fase 2.9C).
+ * Sem agentRef → Hub (não inferir primeiro agente).
+ */
 export default function AiAgentSimulatorPage() {
   const classes = useStyles();
   const history = useHistory();
@@ -85,6 +99,7 @@ export default function AiAgentSimulatorPage() {
     messages,
     loading,
     bootLoading,
+    error,
     loadBootstrap,
     startSession,
     sendMessage,
@@ -100,14 +115,24 @@ export default function AiAgentSimulatorPage() {
   const canSimulate = bootstrap?.capabilities?.canSimulate === true;
   const segment = bootstrap?.scenarioSegment || "other";
   const scenarioPrompts = useMemo(() => getSimulationPrompts(segment), [segment]);
+  const agentDetailPath = agentRef ? aiAgentPath(agentRef) : AI_AGENT_ROUTE_PATH;
   const wizardFallback = agentRef
     ? aiAgentWizardEditPath(agentRef)
-    : AI_AGENT_NEW_ROUTE_PATH;
+    : AI_AGENT_ROUTE_PATH;
 
   useEffect(() => {
+    setComposer("");
+    setReviewMessageItem(null);
+    setBlocked(false);
+  }, [agentRef]);
+
+  useEffect(() => {
+    if (!agentRef) return undefined;
+    let cancelled = false;
     const load = async () => {
       try {
         const data = await loadBootstrap();
+        if (cancelled) return;
         if (data?.available && data?.capabilities?.canSimulate) {
           setBlocked(false);
           await startSession();
@@ -115,12 +140,21 @@ export default function AiAgentSimulatorPage() {
           setBlocked(true);
         }
       } catch (err) {
-        toastError(err);
-        setBlocked(true);
+        if (!cancelled) {
+          toastError(err);
+          setBlocked(true);
+        }
       }
     };
     load();
-  }, [loadBootstrap, startSession]);
+    return () => {
+      cancelled = true;
+    };
+  }, [agentRef, loadBootstrap, startSession]);
+
+  if (!agentRef) {
+    return <Redirect to={AI_AGENT_ROUTE_PATH} />;
+  }
 
   const handleSend = async (textOverride) => {
     const content = String(textOverride ?? composer).trim();
@@ -191,9 +225,10 @@ export default function AiAgentSimulatorPage() {
     }
   };
 
-  const handleEdit = () => {
-    history.push(wizardFallback);
-  };
+  const agentName =
+    bootstrap?.agent?.name || i18n.t("aiAgent.simulator.untitled");
+  const modeLabel = bootstrap?.agent?.mode || bootstrap?.mode || null;
+  const statusLabel = bootstrap?.agent?.status || null;
 
   if (bootLoading) {
     return (
@@ -201,6 +236,32 @@ export default function AiAgentSimulatorPage() {
         <MainHeader>
           <Title>{i18n.t("aiAgent.simulator.title")}</Title>
         </MainHeader>
+      </MainContainer>
+    );
+  }
+
+  if (
+    error === "ERR_AI_AGENT_PRODUCT_AGENT_NOT_FOUND" ||
+    bootstrap?.reason === "not_created"
+  ) {
+    return (
+      <MainContainer>
+        <MainHeader>
+          <Title>{i18n.t("aiAgent.simulator.title")}</Title>
+        </MainHeader>
+        <Container maxWidth="md">
+          <Alert severity="warning">
+            {i18n.t("aiAgentProduct.hub.agentNotFoundDescription")}
+          </Alert>
+          <div className={classes.unavailableActions}>
+            <Button
+              variant="outlined"
+              onClick={() => history.push(AI_AGENT_ROUTE_PATH)}
+            >
+              {i18n.t("aiAgentProduct.hub.backToAgents")}
+            </Button>
+          </div>
+        </Container>
       </MainContainer>
     );
   }
@@ -213,7 +274,7 @@ export default function AiAgentSimulatorPage() {
         </MainHeader>
         <Container maxWidth="md">
           <Alert severity="warning">
-            {i18n.t(unavailableReasonKey(bootstrap?.reason))}
+            {i18n.t(unavailableReasonKey(bootstrap?.reason || error))}
           </Alert>
           <div className={classes.unavailableActions}>
             <Button
@@ -222,6 +283,12 @@ export default function AiAgentSimulatorPage() {
               onClick={() => history.push(wizardFallback)}
             >
               {i18n.t("aiAgentProduct.simulator.cta.configure")}
+            </Button>
+            <Button
+              variant="outlined"
+              onClick={() => history.push(agentDetailPath)}
+            >
+              {i18n.t("aiAgentProduct.simulator.cta.backToAgent")}
             </Button>
             <Button
               variant="outlined"
@@ -242,19 +309,37 @@ export default function AiAgentSimulatorPage() {
       </MainHeader>
       <Container maxWidth="lg">
         <SimulatorHeader
-          agentName={
-            bootstrap?.agent?.name || i18n.t("aiAgent.simulator.untitled")
-          }
+          agentName={agentName}
           provider={
             session?.providerLabel || bootstrap?.provider?.label || null
           }
           model={
             session?.modelLabel || bootstrap?.provider?.modelLabel || null
           }
-          onBack={() => history.push(AI_AGENT_ROUTE_PATH)}
+          onBack={() => history.push(agentDetailPath)}
           onRestart={handleRestart}
-          onEdit={handleEdit}
+          onEdit={() => history.push(wizardFallback)}
         />
+
+        <div className={classes.contextChips}>
+          {statusLabel ? (
+            <Chip
+              size="small"
+              label={i18n.t(`aiAgentProduct.status.${statusLabel}`, {
+                defaultValue: statusLabel,
+              })}
+            />
+          ) : null}
+          {modeLabel ? (
+            <Chip
+              size="small"
+              variant="outlined"
+              label={i18n.t(`aiAgentProduct.mode.${modeLabel}`, {
+                defaultValue: modeLabel,
+              })}
+            />
+          ) : null}
+        </div>
 
         <Alert severity="info" style={{ marginBottom: 16 }}>
           {i18n.t("aiAgent.simulator.warning")}

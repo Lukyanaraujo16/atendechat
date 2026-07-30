@@ -2907,9 +2907,32 @@ const messages = {
 					aria: "AI Agent actions",
 					openWizard: "Open wizard",
 					openSimulator: "Open simulator",
+					manageConnections: "Review agent connections",
 					openConnections: "Manage WhatsApp channels",
 					openCredentials: "Open credentials",
 					manageCredentials: "Manage credentials",
+				},
+				connections: {
+					title: "Connections for {{name}}",
+					linkedTitle: "Linked to this agent",
+					linkedEmpty: "No connections linked yet.",
+					availableTitle: "Available to link",
+					availableEmpty: "No free connections to link.",
+					otherTitle: "Linked to another agent",
+					otherEmpty: "No connections used by other agents.",
+					link: "Link",
+					unlink: "Unlink",
+					linkBlocked: "Unavailable",
+					transferBlocked: "Transfer not available",
+					conflictWithAgent:
+						"This connection is already linked to agent {{name}}. Silent transfer is not allowed.",
+					conflictGeneric:
+						"This connection is already linked to another agent. Silent transfer is not allowed.",
+					unlinkConfirmTitle: "Unlink connection?",
+					unlinkConfirmBody:
+						"Connection {{name}} will stop using this agent. The WhatsApp connection will not be deleted.",
+					saved: "Connections updated.",
+					close: "Close",
 				},
 				credentials: {
 					title: "AI credentials",
@@ -2973,6 +2996,7 @@ const messages = {
 					cta: {
 						configure: "Configure agent",
 						hub: "Back to AI Agent",
+						backToAgent: "Back to agent",
 					},
 				},
 				meta: {

@@ -407,7 +407,9 @@ const ALLOWED_OPTIONS_CONNECTION = new Set([
   "status",
   "selected",
   "eligible",
-  "ineligibleReason"
+  "ineligibleReason",
+  "assignedAgentName",
+  "assignedAgentRef"
 ]);
 
 /**
@@ -699,7 +701,16 @@ export function serializeAiAgentProductConfigurationOptions(
       return row;
     }),
     connections: (options.connections || []).map(c => {
-      const row = {
+      const row: {
+        ref: string;
+        name: string;
+        status: string;
+        selected: boolean;
+        eligible: boolean;
+        ineligibleReason: string | null;
+        assignedAgentName?: string | null;
+        assignedAgentRef?: string | null;
+      } = {
         ref: String(c.ref),
         name: String(c.name || "").trim() || "—",
         status: String(c.status || ""),
@@ -708,6 +719,12 @@ export function serializeAiAgentProductConfigurationOptions(
         ineligibleReason:
           c.ineligibleReason != null ? String(c.ineligibleReason) : null
       };
+      if (c.assignedAgentName != null && String(c.assignedAgentName).trim()) {
+        row.assignedAgentName = String(c.assignedAgentName).trim();
+      }
+      if (c.assignedAgentRef != null && String(c.assignedAgentRef).trim()) {
+        row.assignedAgentRef = String(c.assignedAgentRef).trim();
+      }
       assertConfigurationAllowlisted(
         row as unknown as Record<string, unknown>,
         ALLOWED_OPTIONS_CONNECTION,

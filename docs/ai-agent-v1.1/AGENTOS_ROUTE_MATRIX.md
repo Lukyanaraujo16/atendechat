@@ -43,9 +43,9 @@ GET /technical-console/access → allowed
 | `/ai-agent/:agentRef` | AiAgentDetailPage | commercial_ai_agent | idem | — | visão agent-scoped | seleção por URL |
 | `/ai-agent/:agentRef/wizard` | AiAgentWizardPage (edit) | commercial_ai_agent | idem | — | edição agent-scoped | — |
 | `/ai-agent/wizard/:agentId` | AiAgentWizardPage (edit legado) | commercial_ai_agent | idem | — | preferir `/:agentRef/wizard` | alias |
-| `/ai-agent/simulator` | AiAgentSimulatorPage | commercial_ai_agent | idem | — | canônico company/compat (Fase 2.5) | — |
-| `/ai-agent/:agentRef/simulator` | AiAgentSimulatorPage | commercial_ai_agent | idem | — | transporta agentRef (2.9B/C) | — |
-| `/ai-agent/:agentId/simulator` | Redirect → `/ai-agent/simulator` | commercial_compatibility | idem | — | `/ai-agent/simulator` | path legado |
+| `/ai-agent/simulator` | Redirect → `/ai-agent` | commercial_compatibility | — | — | exige agentRef (2.9C) | bare descontinuado |
+| `/ai-agent/:agentRef/simulator` | AiAgentSimulatorPage | commercial_ai_agent | idem | — | agent-scoped | — |
+| `/ai-agent/:agentId/simulator` | Redirect → `/ai-agent/:agentRef/simulator` | commercial_compatibility | idem | — | preserva ref | path legado |
 | `/prompts` | Prompts | commercial_compatibility | admin + `automation.openai` | — | — | — |
 | `/knowledge-base` | KnowledgeBase | commercial_compatibility | admin + KB feature + UI | — | — | — |
 | `/knowledge-base/:baseId` | KnowledgeBaseDetail | commercial_compatibility | idem | — | — | — |

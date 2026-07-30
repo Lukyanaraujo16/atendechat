@@ -5,6 +5,7 @@
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { AuthContext } from "../context/Auth/AuthContext";
 import { listAiAgentProductAgents } from "../services/aiAgentProductApi";
+import { subscribeAiAgentProductAgentsChanged } from "../utils/aiAgentProductAgentsCache";
 
 function isForbidden(err) {
   return err?.response?.status === 403;
@@ -75,8 +76,12 @@ export default function useAiAgentProductAgents({ enabled = true } = {}) {
   useEffect(() => {
     mounted.current = true;
     reload();
+    const unsubscribe = subscribeAiAgentProductAgentsChanged(() => {
+      reload();
+    });
     return () => {
       mounted.current = false;
+      unsubscribe();
     };
   }, [reload]);
 

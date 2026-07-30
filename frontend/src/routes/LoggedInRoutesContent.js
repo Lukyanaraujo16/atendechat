@@ -523,20 +523,19 @@ function AutomacaoModule({ planFlags, isAdmin }) {
         <Route
           exact
           path={AI_AGENT_SIMULATOR_ROUTE_PATH}
-          render={() => (
-            <AiAgentRouteGuard
-              planFlags={planFlags}
-              user={user}
-              fallbackPath={fallback}
-            >
-              {isAdmin && showAiAgent ? <AiAgentSimulatorPage /> : null}
-            </AiAgentRouteGuard>
-          )}
+          render={() => <Redirect to={AI_AGENT_ROUTE_PATH} />}
         />
         <Route
           exact
           path={AI_AGENT_SIMULATOR_LEGACY_ROUTE_PATH}
-          render={() => <Redirect to={AI_AGENT_SIMULATOR_ROUTE_PATH} />}
+          render={({ match }) => {
+            const ref = String(match?.params?.agentId || "").trim();
+            return (
+              <Redirect
+                to={ref ? `/ai-agent/${encodeURIComponent(ref)}/simulator` : AI_AGENT_ROUTE_PATH}
+              />
+            );
+          }}
         />
         <Route
           exact

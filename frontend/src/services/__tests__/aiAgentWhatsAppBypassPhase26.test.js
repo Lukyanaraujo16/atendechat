@@ -102,13 +102,18 @@ describe("Fase 2.6 — resolveAiAgentReadonlyStatus (espelho do helper)", () => 
 });
 
 describe("Fase 2.6 — Hub navegação", () => {
-  it("connect_whatsapp / fix_connection → Wizard Product create", () => {
+  it("connect_whatsapp / fix_connection sem agentRef → create; com agentRef → manage_connections", () => {
     expect(mapAiAgentNextAction("connect_whatsapp").path).toBe(
       AI_AGENT_NEW_ROUTE_PATH
     );
     expect(mapAiAgentNextAction("fix_connection").path).toBe(
       AI_AGENT_NEW_ROUTE_PATH
     );
+    const scoped = mapAiAgentNextAction("fix_connection", {
+      agentRef: "ref-a",
+    });
+    expect(scoped.action).toBe("manage_connections");
+    expect(scoped.path).toBeNull();
   });
 
   it("open_connections administra canais, não configura IA", () => {

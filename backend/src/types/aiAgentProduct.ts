@@ -260,6 +260,10 @@ export type AiAgentProductConfigurationOptions = {
     selected: boolean;
     eligible: boolean;
     ineligibleReason: string | null;
+    /** Nome comercial do agente que detém a conexão (quando already_assigned). */
+    assignedAgentName?: string | null;
+    /** agentRef opaco do agente detentor (quando already_assigned). */
+    assignedAgentRef?: string | null;
   }>;
 };
 
