@@ -19,7 +19,7 @@
 Rota UI canônica: `/ai-agent/simulator`
 Rota UI legada (redirect): `/ai-agent/:agentId/simulator` → canônica (ignora `agentId`)
 
-Endpoints legados `/ai-agents/:id/simulator/*` **permanecem** intactos para Console/fallback técnico.
+Endpoints legados `/ai-agents/:id/simulator/*` **permanecem registrados**. Mutações comerciais do simulator legado estão **bloqueadas (410)** na Fase 2.8B.2; GETs de sessão/credential-check permanecem. Autoridade comercial: Product Simulator.
 
 ---
 

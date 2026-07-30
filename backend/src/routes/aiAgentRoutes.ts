@@ -7,6 +7,7 @@ import {
   requireAgentOsManage
 } from "../middleware/requirePlatformPermission";
 import { logAgentOsTechnicalWrite } from "../middleware/logAgentOsTechnicalWrite";
+import { rejectLegacyAiAgentCommercialMutation } from "../middleware/rejectLegacyAiAgentCommercialMutation";
 import * as AiAgentController from "../controllers/AiAgentController";
 import * as AiAgentAnalyticsController from "../controllers/AiAgentAnalyticsController";
 import { KNOWLEDGE_BASE_FEATURE_KEY } from "../config/knowledgeBaseConstants";
@@ -33,6 +34,13 @@ const techManageKb = [
   logAgentOsTechnicalWrite("agentOS.console.manage")
 ];
 
+/** Fase 2.8B.2 — bloqueio comercial legado (após auth + feature gate). */
+const blockAgent = rejectLegacyAiAgentCommercialMutation("ai_agent");
+const blockKnowledge = rejectLegacyAiAgentCommercialMutation("ai_agent_knowledge");
+const blockSimulator = rejectLegacyAiAgentCommercialMutation("ai_agent_simulator");
+const blockShadowReview = rejectLegacyAiAgentCommercialMutation(
+  "ai_agent_shadow_review"
+);
 
 aiAgentRoutes.get(
   "/ai-agents",
@@ -59,6 +67,7 @@ aiAgentRoutes.post(
   "/ai-agents/shadow-suggestions/:id/review",
   isAuth,
   requireAiAgent,
+  blockShadowReview,
   AiAgentController.upsertShadowSuggestionReview
 );
 
@@ -164,6 +173,7 @@ aiAgentRoutes.put(
   "/ai-agents/:id/profile",
   isAuth,
   requireAiAgent,
+  blockAgent,
   AiAgentController.upsertProfile
 );
 
@@ -171,6 +181,7 @@ aiAgentRoutes.post(
   "/ai-agents/:id/profile/preview",
   isAuth,
   requireAiAgent,
+  blockAgent,
   AiAgentController.previewProfilePrompt
 );
 
@@ -185,6 +196,7 @@ aiAgentRoutes.post(
   "/ai-agents/:id/simulator/sessions",
   isAuth,
   requireAiAgent,
+  blockSimulator,
   AiAgentController.createSimulatorSession
 );
 
@@ -206,6 +218,7 @@ aiAgentRoutes.post(
   "/ai-agents/:id/simulator/sessions/:sessionId/messages",
   isAuth,
   requireAiAgent,
+  blockSimulator,
   AiAgentController.sendSimulatorMessage
 );
 
@@ -213,6 +226,7 @@ aiAgentRoutes.post(
   "/ai-agents/:id/simulator/sessions/:sessionId/end",
   isAuth,
   requireAiAgent,
+  blockSimulator,
   AiAgentController.endSimulatorSession
 );
 
@@ -220,6 +234,7 @@ aiAgentRoutes.post(
   "/ai-agents/:id/simulator/sessions/:sessionId/messages/:messageId/review",
   isAuth,
   requireAiAgent,
+  blockSimulator,
   AiAgentController.upsertSimulatorMessageReview
 );
 
@@ -265,6 +280,7 @@ aiAgentRoutes.post(
   "/ai-agents",
   isAuth,
   requireAiAgent,
+  blockAgent,
   AiAgentController.store
 );
 
@@ -272,6 +288,7 @@ aiAgentRoutes.put(
   "/ai-agents/:id",
   isAuth,
   requireAiAgent,
+  blockAgent,
   AiAgentController.update
 );
 
@@ -279,6 +296,7 @@ aiAgentRoutes.delete(
   "/ai-agents/:id",
   isAuth,
   requireAiAgent,
+  blockAgent,
   AiAgentController.remove
 );
 
@@ -296,6 +314,7 @@ aiAgentRoutes.put(
   isAuth,
   requireAiAgent,
   requireKnowledgeBase,
+  blockKnowledge,
   AiAgentController.syncKnowledgeBases
 );
 
@@ -312,6 +331,7 @@ aiAgentRoutes.put(
   isAuth,
   requireAiAgent,
   requireKnowledgeBase,
+  blockKnowledge,
   AiAgentController.upsertKnowledgeSettings
 );
 
@@ -320,6 +340,7 @@ aiAgentRoutes.post(
   isAuth,
   requireAiAgent,
   requireKnowledgeBase,
+  blockKnowledge,
   AiAgentController.testKnowledgeRetrieval
 );
 

@@ -772,7 +772,7 @@ Contrato detalhado: `AI_AGENT_PRODUCT_SIMULATOR_CONTRACT.md`.
 - Refs: `sim_s_{id}`, `sim_m_{id}`
 - `canSimulate` exige credencial **vinculada** (sem company_default)
 - Sem `functionCalling` na Product API
-- Endpoints legados `/ai-agents/:id/simulator/*` permanecem
+- Endpoints legados `/ai-agents/:id/simulator/*` permanecem registrados; mutações comerciais bloqueadas (2.8B.2)
 - UI canônica: `/ai-agent/simulator` (legado redireciona)
 
 ### Erros comerciais
@@ -835,8 +835,20 @@ Contrato detalhado: `AI_AGENT_PRODUCT_CREDENTIALS_CONTRACT.md`.
 
 Sem DELETE Product. Model `AiProviderCredential` compartilhado com KB. Frontend comercial não usa `/ai-provider-credentials`. Runtime/`company_default` intactos.
 
-### Hardening 2.8B.1 — legado `/ai-provider-credentials`
+### Hardening 2.8B.1 — legado `/ai-provider-credentials` (services)
 
-- DELETE bloqueia uso por `AiAgent` (`ERR_AI_PROVIDER_CREDENTIAL_IN_USE`) e por `AiKnowledgeEmbeddingSettings` (`ERR_AI_PROVIDER_CREDENTIAL_IN_USE_BY_KNOWLEDGE`).
-- PUT rejeita propriedade `enabled` (`ERR_AI_PROVIDER_CREDENTIAL_ENABLED_MANAGED_BY_PRODUCT_API`); enable/disable continuam exclusivos Product.
-- GET list permanece para Knowledge Base. Endpoints legados não removidos; bloqueio amplo = Fase 2.8B.2.
+- DELETE (service) bloqueia uso por `AiAgent` e `AiKnowledgeEmbeddingSettings`.
+- PUT (service) rejeita propriedade `enabled`; enable/disable exclusivos Product.
+
+### Fase 2.8B.2 — bloqueio seletivo de mutações comerciais HTTP
+
+Rotas legadas **permanecem registradas**. Mutações comerciais respondem **HTTP 410** com:
+
+- `ERR_AI_AGENT_LEGACY_MUTATION_DISABLED` — agentes, profile, knowledge-agent, simulator legado, shadow suggestion review
+- `ERR_AI_PROVIDER_CREDENTIAL_LEGACY_MUTATION_DISABLED` — POST/PUT/DELETE/test de credenciais
+
+Ordem: `isAuth` → feature gate → `rejectLegacy*` → controller **não executado**.
+
+**Preservados:** `GET /ai-agents` (Console Analytics), `GET /ai-provider-credentials` (KB), GETs técnicos, Shadow FC / Analytics / evaluations (Console), Product API, Product Simulator, Runtime (services internos).
+
+Logging estruturado `ai_agent.legacy_mutation_blocked` (sem secrets/payload). Remoção física = Fase 2.8B.3.
