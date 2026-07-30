@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useHistory } from "react-router-dom";
 import Box from "@material-ui/core/Box";
 import Typography from "@material-ui/core/Typography";
@@ -14,6 +14,8 @@ import Title from "../Title";
 import MainHeaderButtonsWrapper from "../MainHeaderButtonsWrapper";
 import AiAgentStatusCard from "../AiAgentStatusCard";
 import AiAgentReadinessChecklist from "../AiAgentReadinessChecklist";
+import AiAgentProductCredentialModal from "../AiAgentProductCredentialModal";
+import { listAiAgentProductCredentials } from "../../services/aiAgentProductApi";
 import { i18n } from "../../translate/i18n";
 
 const useStyles = makeStyles((theme) => ({
@@ -79,6 +81,9 @@ export default function AiAgentExperiencePage({
 }) {
   const classes = useStyles();
   const history = useHistory();
+  const [credentialModalOpen, setCredentialModalOpen] = useState(false);
+  const [credentialModalMode, setCredentialModalMode] = useState("manage");
+  const [credentialCount, setCredentialCount] = useState(null);
 
   const showChecklist =
     summary &&
@@ -92,6 +97,57 @@ export default function AiAgentExperiencePage({
     summary.availability?.enabledByPlan === true &&
     summary.status !== "unavailable" &&
     summary.agentScope?.type !== "ambiguous";
+
+  const productAvailable =
+    summary &&
+    summary.status !== "unavailable" &&
+    summary.availability?.enabledByPlan !== false;
+  const credentialCheck = summary?.checks?.find(
+    (check) => check.key === "credential"
+  );
+  const credentialNeedsAttention =
+    credentialCheck?.status === "pending" ||
+    credentialCheck?.status === "blocked";
+  const showAddCredential =
+    productAvailable &&
+    !accessDenied &&
+    !error &&
+    (credentialNeedsAttention || credentialCount === 0);
+
+  useEffect(() => {
+    let active = true;
+    const shouldFetch =
+      productAvailable && !accessDenied && !loading && !error;
+    if (!shouldFetch) {
+      setCredentialCount(null);
+      return () => {
+        active = false;
+      };
+    }
+    listAiAgentProductCredentials()
+      .then((response) => {
+        if (!active) return;
+        const items = Array.isArray(response)
+          ? response
+          : response?.credentials || response?.data?.credentials || [];
+        setCredentialCount(Array.isArray(items) ? items.length : null);
+      })
+      .catch(() => {
+        if (active) setCredentialCount(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [productAvailable, summary, accessDenied, loading, error]);
+
+  const openCredentialModal = (mode) => {
+    setCredentialModalMode(mode);
+    setCredentialModalOpen(true);
+  };
+
+  const handleCredentialSuccess = async () => {
+    await onRetry();
+  };
 
   return (
     <Box className={classes.root} data-testid="ai-agent-experience">
@@ -174,6 +230,26 @@ export default function AiAgentExperiencePage({
             <AiAgentReadinessChecklist checks={summary.checks} />
           ) : null}
 
+          {productAvailable ? (
+            <Box className={classes.secondary}>
+              {showAddCredential ? (
+                <AppSecondaryButton
+                  onClick={() => openCredentialModal("create")}
+                  disabled={commandBusy}
+                  data-testid="ai-agent-product-credential-add"
+                >
+                  {i18n.t("aiAgentProduct.credentials.actions.add")}
+                </AppSecondaryButton>
+              ) : null}
+              <AppNeutralButton
+                onClick={() => openCredentialModal("manage")}
+                disabled={commandBusy}
+              >
+                {i18n.t("aiAgentProduct.secondary.manageCredentials")}
+              </AppNeutralButton>
+            </Box>
+          ) : null}
+
           {summary.status !== "unavailable" &&
           Array.isArray(summary.secondaryActions) &&
           summary.secondaryActions.length > 0 ? (
@@ -198,6 +274,12 @@ export default function AiAgentExperiencePage({
           ) : null}
         </Box>
       ) : null}
+      <AiAgentProductCredentialModal
+        open={credentialModalOpen}
+        onClose={() => setCredentialModalOpen(false)}
+        onSuccess={handleCredentialSuccess}
+        mode={credentialModalMode}
+      />
     </Box>
   );
 }

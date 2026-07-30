@@ -174,5 +174,6 @@ Endpoints `/ai-agents*` **não são removidos** nesta fase.
 - **Hardening 2.4.1:** edição de identidade com agente ativo; provider/model/credential obrigatórios no Review; `createMinimalAiAgentPayload` removido; testes `aiAgentWizardActiveIdentityPhase241`
 - **Hardening 2.4.2:** agente ativo usa tela identity-only dedicada, sem steps/Review/preview estruturais; identidade e profile têm hidratação separada; Success específico; teste anti-descarte `aiAgentWizardActiveIdentityModePhase242`
 - **Fase 2.5 concluída:** Product Simulator em `/product/ai-agent/simulator/*` + UI `/ai-agent/simulator`; ver `AI_AGENT_PRODUCT_SIMULATOR_CONTRACT.md`. Legado `/ai-agents/:id/simulator/*` permanece.
-- **Fase 2.6 concluída:** WhatsAppModal e `POST/PUT /whatsapp` **não** mutam AI Agent. Autoridade única: Product connections (vínculo Off) + Product commands (modo). Erro `ERR_AI_AGENT_FIELDS_MANAGED_BY_PRODUCT_API`. Credenciais comerciais → fase seguinte.
-- **Próximo passo:** Product Credential API; limpeza de órfãos; Knowledge Base Product
+- **Fase 2.6 concluída:** WhatsAppModal e `POST/PUT /whatsapp` **não** mutam AI Agent. Autoridade única: Product connections (vínculo Off) + Product commands (modo). Erro `ERR_AI_AGENT_FIELDS_MANAGED_BY_PRODUCT_API`.
+- **Fase 2.7 concluída:** Product Credentials em `/product/ai-agent/credentials*` + UI Hub/Wizard; ver `AI_AGENT_PRODUCT_CREDENTIALS_CONTRACT.md`. CRUD legado permanece para KB. Sem DELETE Product.
+- **Próximo passo:** limpeza de órfãos; Knowledge Base Product

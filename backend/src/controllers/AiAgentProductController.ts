@@ -18,6 +18,13 @@ import SendAiAgentProductSimulatorMessageService from "../services/AiAgentProduc
 import EndAiAgentProductSimulatorSessionService from "../services/AiAgentProductService/EndAiAgentProductSimulatorSessionService";
 import ReviewAiAgentProductSimulatorMessageService from "../services/AiAgentProductService/ReviewAiAgentProductSimulatorMessageService";
 import { rejectProductSimulatorForbiddenIds } from "../services/AiAgentProductService/aiAgentProductSimulatorHelpers";
+import ListAiAgentProductCredentialsService from "../services/AiAgentProductService/ListAiAgentProductCredentialsService";
+import GetAiAgentProductCredentialService from "../services/AiAgentProductService/GetAiAgentProductCredentialService";
+import CreateAiAgentProductCredentialService from "../services/AiAgentProductService/CreateAiAgentProductCredentialService";
+import UpdateAiAgentProductCredentialService from "../services/AiAgentProductService/UpdateAiAgentProductCredentialService";
+import TestAiAgentProductCredentialService from "../services/AiAgentProductService/TestAiAgentProductCredentialService";
+import EnableAiAgentProductCredentialService from "../services/AiAgentProductService/EnableAiAgentProductCredentialService";
+import DisableAiAgentProductCredentialService from "../services/AiAgentProductService/DisableAiAgentProductCredentialService";
 import { logger } from "../utils/logger";
 
 function companyIdOrThrow(req: Request): number {
@@ -521,6 +528,217 @@ export const simulatorReviewMessage = async (
       "ERR_AI_AGENT_PRODUCT_SIMULATOR_INVALID",
       500,
       "Não foi possível salvar a avaliação."
+    );
+  }
+};
+
+/** Product Credentials (Fase 2.7) */
+export const listCredentials = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  try {
+    rejectArbitraryCompanyId(req);
+    const companyId = companyIdOrThrow(req);
+    const data = await ListAiAgentProductCredentialsService({
+      companyId,
+      req
+    });
+    return res.json(data);
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    logger.error(
+      {
+        err: err instanceof Error ? err.message : "unknown",
+        surface: "ai_agent_product_credentials"
+      },
+      "ai_agent_product_credentials_list_failed"
+    );
+    throw new AppError(
+      "ERR_AI_AGENT_PRODUCT_NOT_AVAILABLE",
+      500,
+      "Não foi possível listar as credenciais."
+    );
+  }
+};
+
+export const getCredential = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  try {
+    rejectArbitraryCompanyId(req);
+    const companyId = companyIdOrThrow(req);
+    const data = await GetAiAgentProductCredentialService({
+      companyId,
+      credentialRef: req.params.credentialRef,
+      req
+    });
+    return res.json(data);
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    logger.error(
+      {
+        err: err instanceof Error ? err.message : "unknown",
+        surface: "ai_agent_product_credentials"
+      },
+      "ai_agent_product_credentials_get_failed"
+    );
+    throw new AppError(
+      "ERR_AI_AGENT_PRODUCT_NOT_AVAILABLE",
+      500,
+      "Não foi possível carregar a credencial."
+    );
+  }
+};
+
+export const createCredential = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  try {
+    rejectArbitraryCompanyId(req);
+    const companyId = companyIdOrThrow(req);
+    const data = await CreateAiAgentProductCredentialService({
+      companyId,
+      body: (req.body || {}) as Record<string, unknown>,
+      req
+    });
+    return res.status(201).json(data);
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    logger.error(
+      {
+        err: err instanceof Error ? err.message : "unknown",
+        surface: "ai_agent_product_credentials"
+      },
+      "ai_agent_product_credentials_create_failed"
+    );
+    throw new AppError(
+      "ERR_AI_AGENT_PRODUCT_CREDENTIAL_INVALID",
+      500,
+      "Não foi possível criar a credencial."
+    );
+  }
+};
+
+export const updateCredential = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  try {
+    rejectArbitraryCompanyId(req);
+    const companyId = companyIdOrThrow(req);
+    const data = await UpdateAiAgentProductCredentialService({
+      companyId,
+      credentialRef: req.params.credentialRef,
+      body: (req.body || {}) as Record<string, unknown>,
+      req
+    });
+    return res.json(data);
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    logger.error(
+      {
+        err: err instanceof Error ? err.message : "unknown",
+        surface: "ai_agent_product_credentials"
+      },
+      "ai_agent_product_credentials_update_failed"
+    );
+    throw new AppError(
+      "ERR_AI_AGENT_PRODUCT_CREDENTIAL_INVALID",
+      500,
+      "Não foi possível atualizar a credencial."
+    );
+  }
+};
+
+export const testCredential = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  try {
+    rejectArbitraryCompanyId(req);
+    const companyId = companyIdOrThrow(req);
+    const data = await TestAiAgentProductCredentialService({
+      companyId,
+      credentialRef: req.params.credentialRef,
+      req
+    });
+    return res.json(data);
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    logger.error(
+      {
+        err: err instanceof Error ? err.message : "unknown",
+        surface: "ai_agent_product_credentials"
+      },
+      "ai_agent_product_credentials_test_failed"
+    );
+    throw new AppError(
+      "ERR_AI_AGENT_PRODUCT_CREDENTIAL_INVALID",
+      500,
+      "Não foi possível validar a credencial."
+    );
+  }
+};
+
+export const enableCredential = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  try {
+    rejectArbitraryCompanyId(req);
+    const companyId = companyIdOrThrow(req);
+    const data = await EnableAiAgentProductCredentialService({
+      companyId,
+      credentialRef: req.params.credentialRef,
+      req
+    });
+    return res.json(data);
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    logger.error(
+      {
+        err: err instanceof Error ? err.message : "unknown",
+        surface: "ai_agent_product_credentials"
+      },
+      "ai_agent_product_credentials_enable_failed"
+    );
+    throw new AppError(
+      "ERR_AI_AGENT_PRODUCT_CREDENTIAL_INVALID",
+      500,
+      "Não foi possível ativar a credencial."
+    );
+  }
+};
+
+export const disableCredential = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  try {
+    rejectArbitraryCompanyId(req);
+    const companyId = companyIdOrThrow(req);
+    const data = await DisableAiAgentProductCredentialService({
+      companyId,
+      credentialRef: req.params.credentialRef,
+      req
+    });
+    return res.json(data);
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    logger.error(
+      {
+        err: err instanceof Error ? err.message : "unknown",
+        surface: "ai_agent_product_credentials"
+      },
+      "ai_agent_product_credentials_disable_failed"
+    );
+    throw new AppError(
+      "ERR_AI_AGENT_PRODUCT_CREDENTIAL_INVALID",
+      500,
+      "Não foi possível desativar a credencial."
     );
   }
 };

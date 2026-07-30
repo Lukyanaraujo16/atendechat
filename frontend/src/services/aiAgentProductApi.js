@@ -1,7 +1,8 @@
 /**
  * Product API client — Agente de IA (Fases 2.0–2.5).
  * Não chama /automation/* nem endpoints técnicos do Console.
- * Mutações comerciais usam apenas POST /product/ai-agent/commands.
+ * Ativação operacional usa POST /commands; configuração e credenciais usam
+ * apenas seus endpoints comerciais /product/ai-agent/*.
  * Simulador comercial: /product/ai-agent/simulator/* (sem agentId).
  */
 import api from "./api";
@@ -55,6 +56,71 @@ export async function putAiAgentProductConnections(payload) {
   const { data } = await api.put(
     "/product/ai-agent/configuration/connections",
     payload
+  );
+  return data;
+}
+
+/** Product Credentials (Fase 2.7) — escopo resolvido pelo backend. */
+export async function listAiAgentProductCredentials() {
+  const { data } = await api.get("/product/ai-agent/credentials");
+  return data;
+}
+
+export async function getAiAgentProductCredential(credentialRef) {
+  const { data } = await api.get(
+    `/product/ai-agent/credentials/${encodeURIComponent(credentialRef)}`
+  );
+  return data;
+}
+
+export async function createAiAgentProductCredential({
+  name,
+  provider,
+  apiKey,
+  isDefault,
+} = {}) {
+  const payload = { name, provider, apiKey };
+  if (isDefault !== undefined) payload.isDefault = isDefault;
+  const { data } = await api.post("/product/ai-agent/credentials", payload);
+  return data;
+}
+
+export async function updateAiAgentProductCredential(
+  credentialRef,
+  { name, provider, apiKey, isDefault } = {}
+) {
+  const payload = {};
+  if (name !== undefined) payload.name = name;
+  if (provider !== undefined) payload.provider = provider;
+  // apiKey vazia/omitida = preservar chave atual (não enviar).
+  if (apiKey !== undefined && String(apiKey).trim() !== "") {
+    payload.apiKey = String(apiKey).trim();
+  }
+  if (isDefault !== undefined) payload.isDefault = isDefault;
+  const { data } = await api.put(
+    `/product/ai-agent/credentials/${encodeURIComponent(credentialRef)}`,
+    payload
+  );
+  return data;
+}
+
+export async function testAiAgentProductCredential(credentialRef) {
+  const { data } = await api.post(
+    `/product/ai-agent/credentials/${encodeURIComponent(credentialRef)}/test`
+  );
+  return data;
+}
+
+export async function enableAiAgentProductCredential(credentialRef) {
+  const { data } = await api.post(
+    `/product/ai-agent/credentials/${encodeURIComponent(credentialRef)}/enable`
+  );
+  return data;
+}
+
+export async function disableAiAgentProductCredential(credentialRef) {
+  const { data } = await api.post(
+    `/product/ai-agent/credentials/${encodeURIComponent(credentialRef)}/disable`
   );
   return data;
 }

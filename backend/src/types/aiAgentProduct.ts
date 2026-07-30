@@ -313,3 +313,23 @@ export type AiAgentProductSimulatorBootstrap = {
   scenarioSegment: string | null;
   sessions: AiAgentProductSimulatorSession[];
 };
+
+/** Product Credentials (Fase 2.7) — camada sobre AiProviderCredential. */
+export type AiAgentProductCredential = {
+  credentialRef: string;
+  name: string;
+  provider: string;
+  maskedKey: string;
+  enabled: boolean;
+  isDefault: boolean;
+  usage: {
+    aiAgent: boolean;
+    knowledgeEmbedding: boolean;
+  };
+};
+
+export type AiAgentProductCredentialTestResult = {
+  success: boolean;
+  provider: string;
+  message: string;
+};

@@ -3,7 +3,7 @@
  */
 import React from "react";
 import { MemoryRouter } from "react-router-dom";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import AiAgentExperiencePage from "../../components/AiAgentExperiencePage";
 import {
   AI_AGENT_PRODUCT_STATUSES,
@@ -14,13 +14,35 @@ import {
   normalizeAiAgentNextAction,
 } from "../../utils/aiAgentProductMapper";
 import { AI_AGENT_WIZARD_ROUTE_PATH } from "../../config/aiAgentFeature";
-import { getAiAgentProductSummary } from "../aiAgentProductApi";
+import {
+  getAiAgentProductSummary,
+  listAiAgentProductCredentials,
+} from "../aiAgentProductApi";
 import api from "../api";
+
+// jsdom antigo do CRA 3 não expõe MutationObserver (necessário para waitFor).
+if (typeof global.MutationObserver === "undefined") {
+  global.MutationObserver = class {
+    observe() {}
+    disconnect() {}
+    takeRecords() {
+      return [];
+    }
+  };
+}
 
 jest.mock("../api", () => ({
   __esModule: true,
   default: { get: jest.fn() },
 }));
+
+jest.mock("../aiAgentProductApi", () => {
+  const actual = jest.requireActual("../aiAgentProductApi");
+  return {
+    ...actual,
+    listAiAgentProductCredentials: jest.fn(() => Promise.resolve([])),
+  };
+});
 
 jest.mock("../../translate/i18n", () => ({
   i18n: {
@@ -32,6 +54,11 @@ jest.mock("../../translate/i18n", () => ({
       return key;
     },
   },
+}));
+
+jest.mock("../../components/AiAgentProductCredentialModal", () => ({
+  __esModule: true,
+  default: () => null,
 }));
 
 function summaryFor(status, overrides = {}) {
@@ -49,6 +76,23 @@ function summaryFor(status, overrides = {}) {
       checks: overrides.checks || [],
     },
   });
+}
+
+/** Aguarda o fetch de credentials do Hub estabilizar (evita warning act). */
+async function renderExperience(ui, { expectCredentialsFetch = true } = {}) {
+  listAiAgentProductCredentials.mockClear();
+  listAiAgentProductCredentials.mockResolvedValue([]);
+  const view = render(ui);
+  if (expectCredentialsFetch) {
+    await waitFor(() => {
+      expect(listAiAgentProductCredentials).toHaveBeenCalled();
+    });
+  } else {
+    await waitFor(() => {
+      expect(listAiAgentProductCredentials).not.toHaveBeenCalled();
+    });
+  }
+  return view;
 }
 
 describe("Fase 2.1 — mapper Experience", () => {
@@ -131,6 +175,11 @@ describe("Fase 2.1 — mapper Experience", () => {
 });
 
 describe("Fase 2.1 — Experience page states", () => {
+  beforeEach(() => {
+    listAiAgentProductCredentials.mockClear();
+    listAiAgentProductCredentials.mockResolvedValue([]);
+  });
+
   it("loading mostra skeleton sem not_created", () => {
     render(
       <MemoryRouter>
@@ -139,6 +188,7 @@ describe("Fase 2.1 — Experience page states", () => {
     );
     expect(screen.getByLabelText("aiAgentProduct.loading.aria")).toBeTruthy();
     expect(screen.queryByTestId("ai-agent-status-card")).toBeNull();
+    expect(listAiAgentProductCredentials).not.toHaveBeenCalled();
   });
 
   it("erro mostra retry", () => {
@@ -150,6 +200,7 @@ describe("Fase 2.1 — Experience page states", () => {
     );
     fireEvent.click(screen.getByText("aiAgentProduct.actions.retry"));
     expect(onRetry).toHaveBeenCalled();
+    expect(listAiAgentProductCredentials).not.toHaveBeenCalled();
   });
 
   it("403 accessDenied sem summary", () => {
@@ -165,10 +216,11 @@ describe("Fase 2.1 — Experience page states", () => {
     );
     expect(screen.getByText("aiAgentProduct.accessDenied.title")).toBeTruthy();
     expect(screen.queryByTestId("ai-agent-status-card")).toBeNull();
+    expect(listAiAgentProductCredentials).not.toHaveBeenCalled();
   });
 
-  it("unavailable não mostra checklist nem secondary", () => {
-    render(
+  it("unavailable não mostra checklist nem secondary", async () => {
+    await renderExperience(
       <MemoryRouter>
         <AiAgentExperiencePage
           loading={false}
@@ -180,14 +232,16 @@ describe("Fase 2.1 — Experience page states", () => {
           })}
           onRetry={() => {}}
         />
-      </MemoryRouter>
+      </MemoryRouter>,
+      { expectCredentialsFetch: false }
     );
     expect(screen.getByTestId("ai-agent-status-card")).toBeTruthy();
     expect(screen.queryByText("aiAgentProduct.checklist.title")).toBeNull();
+    expect(listAiAgentProductCredentials).not.toHaveBeenCalled();
   });
 
-  it("not_created com ação criar", () => {
-    render(
+  it("not_created com ação criar", async () => {
+    await renderExperience(
       <MemoryRouter>
         <AiAgentExperiencePage
           loading={false}
@@ -199,8 +253,8 @@ describe("Fase 2.1 — Experience page states", () => {
     expect(screen.getByTestId("ai-agent-primary-action")).toBeTruthy();
   });
 
-  it("ready_to_activate sem onCommand mantém botão seguro desabilitado", () => {
-    render(
+  it("ready_to_activate sem onCommand mantém botão seguro desabilitado", async () => {
+    await renderExperience(
       <MemoryRouter>
         <AiAgentExperiencePage
           loading={false}
@@ -220,8 +274,8 @@ describe("Fase 2.1 — Experience page states", () => {
     expect(screen.getByTestId("ai-agent-primary-action-disabled")).toBeTruthy();
   });
 
-  it("ready_to_activate com onCommand habilita ação principal", () => {
-    render(
+  it("ready_to_activate com onCommand habilita ação principal", async () => {
+    await renderExperience(
       <MemoryRouter>
         <AiAgentExperiencePage
           loading={false}
@@ -240,8 +294,8 @@ describe("Fase 2.1 — Experience page states", () => {
     expect(screen.getByTestId("ai-agent-primary-action")).toBeTruthy();
   });
 
-  it("active shadow mostra secondary simulator", () => {
-    render(
+  it("active shadow mostra secondary simulator", async () => {
+    await renderExperience(
       <MemoryRouter>
         <AiAgentExperiencePage
           loading={false}
@@ -259,8 +313,8 @@ describe("Fase 2.1 — Experience page states", () => {
     expect(screen.getByTestId("ai-agent-secondary-open_simulator")).toBeTruthy();
   });
 
-  it("attention_required renderiza card", () => {
-    render(
+  it("attention_required renderiza card", async () => {
+    await renderExperience(
       <MemoryRouter>
         <AiAgentExperiencePage
           loading={false}
@@ -285,8 +339,8 @@ describe("Fase 2.1 — Experience page states", () => {
     expect(screen.getByText("aiAgentProduct.checklist.title")).toBeTruthy();
   });
 
-  it("paused renderiza com segurança", () => {
-    render(
+  it("paused renderiza com segurança", async () => {
+    await renderExperience(
       <MemoryRouter>
         <AiAgentExperiencePage
           loading={false}
@@ -305,6 +359,7 @@ describe("Fase 2.1 — Experience page states", () => {
 
 describe("Fase 2.1 — Product API only", () => {
   it("service não chama /automation", async () => {
+    api.get.mockClear();
     api.get.mockResolvedValue({ data: {} });
     await getAiAgentProductSummary();
     expect(api.get.mock.calls[0][0]).toBe("/product/ai-agent/summary");

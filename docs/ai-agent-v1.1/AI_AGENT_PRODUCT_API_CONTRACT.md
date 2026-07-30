@@ -817,6 +817,20 @@ Não lista agentes; não envia campos AI; status read-only + CTA → `/ai-agent`
 - `connect_whatsapp` / `fix_connection` → `/ai-agent/wizard`
 - `open_connections` → `/connections` (administrar canais; não configura IA)
 
-### Fora desta fase
+### Fora desta fase (2.6)
 
-Product Credential API, órfãos, Knowledge Base, runtime, models/migrations.
+Órfãos, Knowledge Base Product, runtime, models/migrations.
+
+---
+
+## Fase 2.7 — Product Credentials
+
+Contrato detalhado: `AI_AGENT_PRODUCT_CREDENTIALS_CONTRACT.md`.
+
+| Método | Path | Status |
+|--------|------|--------|
+| GET/POST | `/product/ai-agent/credentials` | **Implementado** |
+| GET/PUT | `/product/ai-agent/credentials/:credentialRef` | **Implementado** |
+| POST | `.../test`, `.../enable`, `.../disable` | **Implementado** |
+
+Sem DELETE Product. Model `AiProviderCredential` compartilhado com KB. Frontend comercial não usa `/ai-provider-credentials`. Runtime/`company_default` intactos.

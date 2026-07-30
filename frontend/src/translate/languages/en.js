@@ -2881,6 +2881,51 @@ const messages = {
 					openWizard: "Open wizard",
 					openSimulator: "Open simulator",
 					openConnections: "Manage WhatsApp channels",
+					openCredentials: "Open credentials",
+					manageCredentials: "Manage credentials",
+				},
+				credentials: {
+					title: "AI credentials",
+					subtitle: "Add and manage the keys used by the AI Agent.",
+					empty: "No credentials have been added.",
+					defaultBadge: "Default",
+					fields: {
+						name: "Name",
+						provider: "Provider",
+						apiKey: "API key",
+						isDefault: "Use as default credential",
+						keepKey: "Leave blank to keep the current key.",
+					},
+					actions: {
+						add: "Add credential",
+						edit: "Edit",
+						test: "Test",
+						testing: "Testing…",
+						enable: "Enable",
+						disable: "Disable",
+						save: "Save",
+						saving: "Saving…",
+						cancel: "Cancel",
+						close: "Close",
+						back: "Back to list",
+					},
+					status: {
+						enabled: "Enabled",
+						disabled: "Disabled",
+					},
+					test: {
+						success: "Credential validated successfully.",
+						failure: "The credential could not be validated.",
+					},
+					confirmDisable: {
+						message:
+							"Disable credential “{{name}}”? It will no longer be available to the AI Agent.",
+						action: "Confirm disable",
+					},
+					errors: {
+						required: "Fill in all required fields.",
+						generic: "The operation could not be completed.",
+					},
 				},
 				simulator: {
 					reasons: {

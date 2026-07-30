@@ -360,6 +360,19 @@ export default function ReviewStep({
                   ))}
                 </Select>
               </FormControl>
+              {!structuralLocked &&
+              formState.provider &&
+              credentials.length === 0 &&
+              onConfigureCredential ? (
+                <Button
+                  color="primary"
+                  size="small"
+                  onClick={onConfigureCredential}
+                  style={{ marginTop: 8 }}
+                >
+                  {i18n.t("aiAgent.wizard.buttons.configureCredential")}
+                </Button>
+              ) : null}
             </Grid>
             <Grid item xs={12}>
               <FormControl variant="outlined" fullWidth size="small">

@@ -2968,6 +2968,52 @@ const messages = {
           openWizard: "Abrir assistente",
           openSimulator: "Abrir simulador",
           openConnections: "Administrar canais WhatsApp",
+          openCredentials: "Abrir credenciais",
+          manageCredentials: "Gerenciar credenciais",
+        },
+        credentials: {
+          title: "Credenciais de IA",
+          subtitle:
+            "Adicione e gerencie as chaves usadas pelo Agente de IA.",
+          empty: "Nenhuma credencial cadastrada.",
+          defaultBadge: "Padrão",
+          fields: {
+            name: "Nome",
+            provider: "Provedor",
+            apiKey: "Chave da API",
+            isDefault: "Usar como credencial padrão",
+            keepKey: "Deixe em branco para manter a chave atual.",
+          },
+          actions: {
+            add: "Adicionar credencial",
+            edit: "Editar",
+            test: "Testar",
+            testing: "Testando…",
+            enable: "Habilitar",
+            disable: "Desabilitar",
+            save: "Salvar",
+            saving: "Salvando…",
+            cancel: "Cancelar",
+            close: "Fechar",
+            back: "Voltar à lista",
+          },
+          status: {
+            enabled: "Habilitada",
+            disabled: "Desabilitada",
+          },
+          test: {
+            success: "Credencial validada com sucesso.",
+            failure: "Não foi possível validar a credencial.",
+          },
+          confirmDisable: {
+            message:
+              "Desabilitar a credencial “{{name}}”? Ela deixará de estar disponível para o Agente de IA.",
+            action: "Confirmar desativação",
+          },
+          errors: {
+            required: "Preencha os campos obrigatórios.",
+            generic: "Não foi possível concluir a operação.",
+          },
         },
         simulator: {
           reasons: {

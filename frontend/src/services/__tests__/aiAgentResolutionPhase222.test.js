@@ -3,7 +3,7 @@
  */
 import React from "react";
 import { MemoryRouter } from "react-router-dom";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import AiAgentExperiencePage from "../../components/AiAgentExperiencePage";
 import {
   buildAiAgentCommercialCommands,
@@ -11,9 +11,34 @@ import {
   mapAiAgentProductSummary,
 } from "../../utils/aiAgentProductMapper";
 import { AI_AGENT_WIZARD_ROUTE_PATH } from "../../config/aiAgentFeature";
+import { listAiAgentProductCredentials } from "../aiAgentProductApi";
+
+// jsdom antigo do CRA 3 não expõe MutationObserver (necessário para waitFor).
+if (typeof global.MutationObserver === "undefined") {
+  global.MutationObserver = class {
+    observe() {}
+    disconnect() {}
+    takeRecords() {
+      return [];
+    }
+  };
+}
 
 jest.mock("../../translate/i18n", () => ({
   i18n: { t: (key, opts) => (opts?.count != null ? `${key}:${opts.count}` : key) },
+}));
+
+jest.mock("../aiAgentProductApi", () => {
+  const actual = jest.requireActual("../aiAgentProductApi");
+  return {
+    ...actual,
+    listAiAgentProductCredentials: jest.fn(() => Promise.resolve([])),
+  };
+});
+
+jest.mock("../../components/AiAgentProductCredentialModal", () => ({
+  __esModule: true,
+  default: () => null,
 }));
 
 describe("aiAgentResolutionPhase222", () => {
@@ -58,7 +83,7 @@ describe("aiAgentResolutionPhase222", () => {
     expect(view.commercialCommands.length).toBeGreaterThan(0);
   });
 
-  it("agentScope.ambiguous: sem activate/deactivate; aviso; wizard sem id", () => {
+  it("agentScope.ambiguous: sem activate/deactivate; aviso; wizard sem id", async () => {
     const view = mapAiAgentProductSummary({
       availability: { enabledByPlan: true, accessibleByUser: true },
       status: "attention_required",
@@ -99,6 +124,9 @@ describe("aiAgentResolutionPhase222", () => {
         />
       </MemoryRouter>
     );
+    await waitFor(() => {
+      expect(listAiAgentProductCredentials).toHaveBeenCalled();
+    });
     expect(screen.getByTestId("ai-agent-ambiguous-notice")).toBeTruthy();
     expect(screen.queryByTestId("ai-agent-command-activate_live")).toBeNull();
     expect(screen.queryByTestId("ai-agent-command-deactivate")).toBeNull();

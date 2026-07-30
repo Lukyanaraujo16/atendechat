@@ -19,6 +19,7 @@ import ConfirmationModal from "../ConfirmationModal";
 import AiAgentWizardProgress from "./AiAgentWizardProgress";
 import AiAgentWizardNavigation from "./AiAgentWizardNavigation";
 import AiAgentPromptPreviewModal from "./AiAgentPromptPreviewModal";
+import AiAgentProductCredentialModal from "../AiAgentProductCredentialModal";
 import WelcomeStep from "./steps/WelcomeStep";
 import CompanyStep from "./steps/CompanyStep";
 import AttendantStep from "./steps/AttendantStep";
@@ -59,6 +60,7 @@ import toastError from "../../errors/toastError";
 import { useAiAgentProductConfiguration } from "../../hooks/useAiAgentProductConfiguration";
 import { AI_AGENT_ROUTE_PATH, AI_AGENT_SIMULATOR_ROUTE_PATH } from "../../config/aiAgentFeature";
 import { AuthContext } from "../../context/Auth/AuthContext";
+import { getAiAgentProductConfigurationOptions } from "../../services/aiAgentProductApi";
 
 const CONTENT_STEP_IDS = WIZARD_STEP_IDS.filter((id) => id !== "welcome");
 
@@ -123,6 +125,7 @@ export default function AiAgentWizard() {
   const [previewAvailable, setPreviewAvailable] = useState(true);
   const [commercialError, setCommercialError] = useState("");
   const [segmentChanged, setSegmentChanged] = useState(false);
+  const [credentialModalOpen, setCredentialModalOpen] = useState(false);
   const initialSnapshotRef = useRef(JSON.stringify(createDefaultWizardFormState()));
 
   const activeIndex = stepIndexById(activeStepId);
@@ -428,6 +431,25 @@ export default function AiAgentWizard() {
     setPreviewOpen(true);
   };
 
+  const handleConfigureCredential = () => {
+    setCredentialModalOpen(true);
+  };
+
+  const handleCredentialSuccess = async ({ credentialRef }) => {
+    const response = await getAiAgentProductConfigurationOptions();
+    const nextOptions = mapAiAgentWizardProductOptions(response);
+    setProductOptions(nextOptions);
+    const createdCredential = nextOptions.credentials.find(
+      (credential) =>
+        credential.ref === String(credentialRef || "") &&
+        credential.enabled &&
+        credential.provider === formState.provider
+    );
+    if (createdCredential) {
+      patchFormState({ credentialRef: createdCredential.ref });
+    }
+  };
+
   const renderStep = () => {
     if (isSuccess && activeIdentityMode) {
       return (
@@ -447,7 +469,7 @@ export default function AiAgentWizard() {
           hasCredentials={hasCredentials}
           summary={summary}
           onViewAgent={() => history.push(AI_AGENT_ROUTE_PATH)}
-          onConfigureCredential={() => history.push(AI_AGENT_ROUTE_PATH)}
+          onConfigureCredential={handleConfigureCredential}
           onBackToList={() => history.push(AI_AGENT_ROUTE_PATH)}
           onTestAttendant={() =>
             history.push(AI_AGENT_SIMULATOR_ROUTE_PATH)
@@ -515,7 +537,7 @@ export default function AiAgentWizard() {
             editableWhileActive={editableWhileActive}
             previewAvailable={previewAvailable}
             commercialError={commercialError}
-            onConfigureCredential={() => history.push(AI_AGENT_ROUTE_PATH)}
+            onConfigureCredential={handleConfigureCredential}
           />
         );
       default:
@@ -581,6 +603,14 @@ export default function AiAgentWizard() {
           onUnavailable={() => setPreviewAvailable(false)}
         />
       ) : null}
+
+      <AiAgentProductCredentialModal
+        open={credentialModalOpen}
+        onClose={() => setCredentialModalOpen(false)}
+        onSuccess={handleCredentialSuccess}
+        mode="create"
+        preferredProvider={formState.provider}
+      />
 
       <Paper className={classes.paper} variant="outlined">
         {!activeIdentityMode && !isSuccess && !isWelcome ? (

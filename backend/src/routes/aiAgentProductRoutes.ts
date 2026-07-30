@@ -72,6 +72,56 @@ aiAgentProductRoutes.put(
   AiAgentProductController.updateConnections
 );
 
+/** Product Credentials (Fase 2.7) — antes de rotas :param conflitantes. Sem DELETE. */
+aiAgentProductRoutes.get(
+  "/product/ai-agent/credentials",
+  isAuth,
+  requireAiAgentProductView,
+  AiAgentProductController.listCredentials
+);
+
+aiAgentProductRoutes.post(
+  "/product/ai-agent/credentials",
+  isAuth,
+  requireAiAgentProductView,
+  AiAgentProductController.createCredential
+);
+
+aiAgentProductRoutes.get(
+  "/product/ai-agent/credentials/:credentialRef",
+  isAuth,
+  requireAiAgentProductView,
+  AiAgentProductController.getCredential
+);
+
+aiAgentProductRoutes.put(
+  "/product/ai-agent/credentials/:credentialRef",
+  isAuth,
+  requireAiAgentProductView,
+  AiAgentProductController.updateCredential
+);
+
+aiAgentProductRoutes.post(
+  "/product/ai-agent/credentials/:credentialRef/test",
+  isAuth,
+  requireAiAgentProductView,
+  AiAgentProductController.testCredential
+);
+
+aiAgentProductRoutes.post(
+  "/product/ai-agent/credentials/:credentialRef/enable",
+  isAuth,
+  requireAiAgentProductView,
+  AiAgentProductController.enableCredential
+);
+
+aiAgentProductRoutes.post(
+  "/product/ai-agent/credentials/:credentialRef/disable",
+  isAuth,
+  requireAiAgentProductView,
+  AiAgentProductController.disableCredential
+);
+
 aiAgentProductRoutes.get(
   "/product/ai-agent/simulator",
   isAuth,

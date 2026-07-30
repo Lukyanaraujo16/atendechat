@@ -3,7 +3,7 @@
  */
 import React from "react";
 import { MemoryRouter } from "react-router-dom";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import AiAgentExperiencePage from "../../components/AiAgentExperiencePage";
 import AiAgentPrimaryAction from "../../components/AiAgentPrimaryAction";
 import {
@@ -16,14 +16,34 @@ import {
 } from "../../utils/aiAgentProductMapper";
 import {
   getAiAgentProductSummary,
+  listAiAgentProductCredentials,
   postAiAgentProductCommand,
 } from "../aiAgentProductApi";
 import api from "../api";
+
+// jsdom antigo do CRA 3 não expõe MutationObserver (necessário para waitFor).
+if (typeof global.MutationObserver === "undefined") {
+  global.MutationObserver = class {
+    observe() {}
+    disconnect() {}
+    takeRecords() {
+      return [];
+    }
+  };
+}
 
 jest.mock("../api", () => ({
   __esModule: true,
   default: { get: jest.fn(), post: jest.fn() },
 }));
+
+jest.mock("../aiAgentProductApi", () => {
+  const actual = jest.requireActual("../aiAgentProductApi");
+  return {
+    ...actual,
+    listAiAgentProductCredentials: jest.fn(() => Promise.resolve([])),
+  };
+});
 
 jest.mock("../../translate/i18n", () => ({
   i18n: {
@@ -34,6 +54,27 @@ jest.mock("../../translate/i18n", () => ({
 jest.mock("react-toastify", () => ({
   toast: { success: jest.fn(), error: jest.fn() },
 }));
+
+jest.mock("../../components/AiAgentProductCredentialModal", () => ({
+  __esModule: true,
+  default: () => null,
+}));
+
+async function renderExperience(ui, { expectCredentialsFetch = true } = {}) {
+  listAiAgentProductCredentials.mockClear();
+  listAiAgentProductCredentials.mockResolvedValue([]);
+  const view = render(ui);
+  if (expectCredentialsFetch) {
+    await waitFor(() => {
+      expect(listAiAgentProductCredentials).toHaveBeenCalled();
+    });
+  } else {
+    await waitFor(() => {
+      expect(listAiAgentProductCredentials).not.toHaveBeenCalled();
+    });
+  }
+  return view;
+}
 
 function readySummary(overrides = {}) {
   return mapAiAgentProductSummary({
@@ -174,7 +215,9 @@ describe("Fase 2.2 — PrimaryAction confirmação + busy", () => {
     fireEvent.click(
       screen.getByText("aiAgentProduct.confirm.activate_shadow.confirm")
     );
-    expect(onCommand).toHaveBeenCalledWith("activate_shadow");
+    await waitFor(() => {
+      expect(onCommand).toHaveBeenCalledWith("activate_shadow");
+    });
   });
 
   it("busy desabilita botão principal", () => {
@@ -193,7 +236,7 @@ describe("Fase 2.2 — PrimaryAction confirmação + busy", () => {
 });
 
 describe("Fase 2.2 — Experience page command wiring", () => {
-  it("exibe botão deactivate quando active/live", () => {
+  it("exibe botão deactivate quando active/live", async () => {
     const summary = mapAiAgentProductSummary({
       availability: { enabledByPlan: true, accessibleByUser: true },
       status: "active",
@@ -208,7 +251,7 @@ describe("Fase 2.2 — Experience page command wiring", () => {
         checks: [],
       },
     });
-    render(
+    await renderExperience(
       <MemoryRouter>
         <AiAgentExperiencePage
           loading={false}
@@ -222,7 +265,7 @@ describe("Fase 2.2 — Experience page command wiring", () => {
     expect(screen.getByTestId("ai-agent-command-activate_shadow")).toBeTruthy();
   });
 
-  it("feature off (unavailable) não passa onCommand efetivo de ativação", () => {
+  it("feature off (unavailable) não passa onCommand efetivo de ativação", async () => {
     const summary = mapAiAgentProductSummary({
       availability: { enabledByPlan: false, accessibleByUser: false },
       status: "unavailable",
@@ -234,7 +277,7 @@ describe("Fase 2.2 — Experience page command wiring", () => {
         checks: [],
       },
     });
-    render(
+    await renderExperience(
       <MemoryRouter>
         <AiAgentExperiencePage
           loading={false}
@@ -242,15 +285,16 @@ describe("Fase 2.2 — Experience page command wiring", () => {
           onRetry={() => {}}
           onCommand={jest.fn()}
         />
-      </MemoryRouter>
+      </MemoryRouter>,
+      { expectCredentialsFetch: false }
     );
     expect(screen.queryByTestId("ai-agent-command-activate_live")).toBeNull();
     expect(screen.queryByTestId("ai-agent-command-deactivate")).toBeNull();
   });
 
-  it("mostra erro de comando e retry de página", () => {
+  it("mostra erro de comando e retry de página", async () => {
     const onRetry = jest.fn();
-    render(
+    await renderExperience(
       <MemoryRouter>
         <AiAgentExperiencePage
           loading={false}
