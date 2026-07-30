@@ -1,4 +1,3 @@
-import AiProviderCredential from "../../models/AiProviderCredential";
 import {
   encryptAiProviderApiKey
 } from "../../helpers/aiProviderCredentialCrypto";
@@ -14,6 +13,7 @@ import {
   parseProvider
 } from "./aiProviderCredentialValidation";
 import { clearOtherDefaultCredentials } from "./clearOtherDefaultCredentials";
+import { assertNoEnabledInLegacyCredentialPayload } from "./assertNoEnabledInLegacyCredentialPayload";
 
 type UpdateBody = Record<string, unknown>;
 
@@ -22,6 +22,9 @@ export default async function UpdateAiProviderCredentialService(input: {
   id: number;
   body: UpdateBody;
 }) {
+  // Rejeita antes de qualquer side effect (clear defaults / update).
+  assertNoEnabledInLegacyCredentialPayload(input.body);
+
   const row = await findAiProviderCredentialOrThrow(input.companyId, input.id);
   const body = input.body;
   const patch: Record<string, unknown> = {};
@@ -33,9 +36,6 @@ export default async function UpdateAiProviderCredentialService(input: {
   if (Object.prototype.hasOwnProperty.call(body, "provider")) {
     effectiveProvider = parseProvider(body.provider);
     patch.provider = effectiveProvider;
-  }
-  if (Object.prototype.hasOwnProperty.call(body, "enabled")) {
-    patch.enabled = parseBooleanField(body.enabled, row.enabled);
   }
   if (Object.prototype.hasOwnProperty.call(body, "isDefault")) {
     const nextDefault = parseBooleanField(body.isDefault, row.isDefault);

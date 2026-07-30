@@ -834,3 +834,9 @@ Contrato detalhado: `AI_AGENT_PRODUCT_CREDENTIALS_CONTRACT.md`.
 | POST | `.../test`, `.../enable`, `.../disable` | **Implementado** |
 
 Sem DELETE Product. Model `AiProviderCredential` compartilhado com KB. Frontend comercial não usa `/ai-provider-credentials`. Runtime/`company_default` intactos.
+
+### Hardening 2.8B.1 — legado `/ai-provider-credentials`
+
+- DELETE bloqueia uso por `AiAgent` (`ERR_AI_PROVIDER_CREDENTIAL_IN_USE`) e por `AiKnowledgeEmbeddingSettings` (`ERR_AI_PROVIDER_CREDENTIAL_IN_USE_BY_KNOWLEDGE`).
+- PUT rejeita propriedade `enabled` (`ERR_AI_PROVIDER_CREDENTIAL_ENABLED_MANAGED_BY_PRODUCT_API`); enable/disable continuam exclusivos Product.
+- GET list permanece para Knowledge Base. Endpoints legados não removidos; bloqueio amplo = Fase 2.8B.2.

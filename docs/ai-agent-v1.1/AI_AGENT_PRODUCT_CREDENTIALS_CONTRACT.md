@@ -25,6 +25,24 @@ Tenant sempre da sessão. Body/query com `companyId` → `ERR_AI_AGENT_PRODUCT_C
 
 O CRUD legado `/ai-provider-credentials` continua com `requireEffectiveModule("automation.ai_agent")` (sem exigir admin), usado pela Knowledge Base (`listAiProviderCredentials`). O modal FE legado `AiProviderCredentialModal` foi **removido** na Fase 2.8A. A Product Experience **não** consome esse CRUD.
 
+#### Hardening 2.8B.1 (credenciais legadas)
+
+Endpoints legados **ainda existem** (bloqueio amplo fica para 2.8B.2):
+
+| Método | Path | Comportamento pós-2.8B.1 |
+|--------|------|--------------------------|
+| GET | `/ai-provider-credentials` | Intacta — Knowledge Base |
+| GET | `/ai-provider-credentials/:id` | Intacta |
+| POST | `/ai-provider-credentials` | Ainda aberto (2.8B.2) |
+| PUT | `/ai-provider-credentials/:id` | **Não aceita** propriedade `enabled` → `ERR_AI_PROVIDER_CREDENTIAL_ENABLED_MANAGED_BY_PRODUCT_API` |
+| DELETE | `/ai-provider-credentials/:id` | Bloqueia se usada por `AiAgent` **ou** `AiKnowledgeEmbeddingSettings` |
+| POST | `.../:id/test` | Ainda aberto (2.8B.2) |
+
+- `enabled` é autoridade exclusiva de Product: `POST .../credentials/:credentialRef/enable` e `.../disable`.
+- DELETE por agente → `ERR_AI_PROVIDER_CREDENTIAL_IN_USE` (preservado).
+- DELETE por Knowledge Embedding → `ERR_AI_PROVIDER_CREDENTIAL_IN_USE_BY_KNOWLEDGE` (novo).
+- PUT legado ainda pode alterar `name` / `provider` / `apiKey` / `isDefault` (sem ampliar payload).
+
 ---
 
 ## 2. Endpoints
