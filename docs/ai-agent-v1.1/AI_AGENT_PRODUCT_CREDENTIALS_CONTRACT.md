@@ -23,7 +23,7 @@ Tenant sempre da sessão. Body/query com `companyId` → `ERR_AI_AGENT_PRODUCT_C
 
 ### Dívida técnica (temporária)
 
-O CRUD legado `/ai-provider-credentials` continua com `requireEffectiveModule("automation.ai_agent")` (sem exigir admin), usado pela Knowledge Base. A Product Experience **não** consome esse CRUD.
+O CRUD legado `/ai-provider-credentials` continua com `requireEffectiveModule("automation.ai_agent")` (sem exigir admin), usado pela Knowledge Base (`listAiProviderCredentials`). O modal FE legado `AiProviderCredentialModal` foi **removido** na Fase 2.8A. A Product Experience **não** consome esse CRUD.
 
 ---
 

@@ -2969,193 +2969,14 @@ const messages = {
 					"In this phase, the agent does not reply to conversations automatically yet. Channel activation will come in a later step.",
 				dryRunWarning:
 					"Simulation mode: the system evaluates and logs eligibility for inbound messages without sending automatic replies.",
-				shadowSection: {
-					title: "Shadow Mode suggestions",
-					warning:
-						"These replies were generated in evaluation mode and were not sent to customers.",
-					evaluationHint:
-						"Use reviews to compare providers and tune prompts before enabling automatic replies.",
-					empty: "No shadow suggestions recorded yet.",
-					notSentBadge: "Not sent to customer",
-					fallbackSource: "fallback",
-					loadMore: "Load more",
-					filters: {
-						all: "All",
-						provider: "Provider",
-						status: "Status",
-						agent: "Agent",
-						source: "Source",
-					},
-					summary: {
-						total: "Total",
-						generated: "Generated",
-						failed: "Failed",
-						goodReviews: "Good reviews",
-						badReviews: "Bad reviews",
-					},
-					table: {
-						date: "Date",
-						agent: "Agent",
-						ticket: "Ticket",
-						status: "Status",
-						messageType: "Type",
-						suggestion: "Suggested reply",
-						model: "Model",
-						provider: "Provider",
-						tokens: "Tokens",
-						latency: "Latency (ms)",
-						error: "Error",
-					},
-					actions: {
-						copy: "Copy reply",
-						copySuccess: "Reply copied",
-						copyError: "Could not copy",
-						openTicket: "Open ticket",
-						details: "View details",
-						review: "Review suggestion",
-					},
-					details: {
-						title: "Suggestion details",
-						reason: "Eligibility reason",
-						credentialSource: "Credential source",
-						suggestionSource: "Suggestion source",
-						contextMessages: "Context messages",
-						evaluatorVersion: "Evaluator version",
-					},
-					review: {
-						title: "Review suggestion",
-						ratingLabel: "Rating",
-						tagsLabel: "Tags",
-						noteLabel: "Note (optional)",
-						toastSaved: "Review saved",
-						ratings: {
-							good: "Good",
-							bad: "Bad",
-							neutral: "Neutral",
-						},
-						tags: {
-							useful: "Useful",
-							inventedInformation: "Invented information",
-							tooLong: "Too long",
-							tooShort: "Too short",
-							needsHuman: "Needs human",
-							wrongTone: "Wrong tone",
-							incomplete: "Incomplete",
-							other: "Other",
-						},
-					},
-				},
 				buttons: {
-					new: "New agent",
-					createAttendant: "Create attendant",
-					save: "Save",
-					cancel: "Cancel",
-					edit: "Edit",
-					editGuided: "Edit with Guided Assistant",
-					editAdvanced: "Advanced configuration",
-					configureGuided: "Set up with Guided Assistant",
-					delete: "Delete",
-					retry: "Try again",
-					simulateConversation: "Simulate conversation",
-					configureKnowledge: "Knowledge base",
-				},
+          cancel: "Cancel",
+        },
 				knowledge: {
-					title: "Agent knowledge base",
-					loading: "Loading settings…",
-					hint:
-						"Link indexed bases and configure retrieval (RAG) per channel. Live requires prior validation in simulator and shadow.",
-					fields: {
-						enabled: "Enable Knowledge Base for this agent",
-						enabledInSimulator: "Use in simulator",
-						enabledInShadow: "Use in Shadow Mode",
-						enabledInLive: "Use in Live Mode",
-						topK: "Top K (chunks)",
-						minimumScore: "Minimum score",
-						maxContextCharacters: "Max context characters",
-						maxContextTokens: "Max context tokens",
-						maxChunksPerDocument: "Max chunks per document",
-						maxChunksPerBase: "Max chunks per base",
-						allowAnswerWithoutKnowledge:
-							"Allow answer without retrieved knowledge",
-						handoffWhenKnowledgeMissing:
-							"Suggest handoff when knowledge is missing",
-					},
-					channels: {
-						title: "Usage channels",
-					},
-					alerts: {
-						noLinkedBases:
-							"No linked bases. Link at least one base to retrieve knowledge.",
-						liveWithoutChannels:
-							"Live enabled without simulator and/or shadow. Validate retrieval there before production.",
-					},
-					bases: {
-						title: "Linked bases",
-						empty: "No knowledge bases registered for this company.",
-						disabled: "base disabled",
-						priority: "Priority",
-						linkEnabled: "Active for agent",
-					},
-					retrieval: {
-						title: "Retrieval parameters",
-					},
-					test: {
-						title: "Test this agent's knowledge",
-						subtitle:
-							"Runs semantic search only — does not generate a model answer.",
-						queryLabel: "Test query",
-						run: "Run test",
-						status: "Status",
-						skipReason: "Skip reason",
-						queryUsed: "Query used",
-						error: "Error",
-						metrics: "Metrics",
-						chunks: "chunks",
-						sources: "Retrieved sources",
-						contextText: "Built context",
-					},
-					status: {
-						skipped: "Skipped",
-						completed: "Completed",
-						empty: "Empty",
-						failed: "Failed",
-						searching: "Searching",
-					},
-					skipReasons: {
-						disabled: "Disabled",
-						channel_disabled: "Channel disabled",
-						no_linked_bases: "No linked bases",
-						no_active_bases: "No active bases",
-						missing_embedding_settings: "Embeddings not configured",
-						invalid_credential: "Invalid credential",
-						empty_query: "Empty query",
-						feature_blocked: "Feature blocked on plan",
-						context_budget_unavailable: "Context budget unavailable",
-						document_not_indexed: "Document not indexed",
-					},
-					liveConfirm: {
-						title: "Enable knowledge in Live",
-						message:
-							"We recommend validating retrieval in simulator and Shadow Mode before enabling Live. Continue anyway?",
-					},
-					buttons: {
-						saveSettings: "Save parameters",
-						saveLinks: "Save links",
-					},
-					toasts: {
-						settingsSaved: "Knowledge parameters saved",
-						linksSaved: "Linked bases updated",
-					},
-					shadow: {
-						used: "Used knowledge · {{count}} source(s) · score {{score}}",
-                  filterWith: "With knowledge",
-                  filterWithout: "Without knowledge",
-                  filterEmpty: "Empty retrieval",
-                  filterError: "Retrieval error",
-                  knowledgeFilter: "Knowledge",
-						detailsTitle: "Retrieved knowledge",
-					},
-				},
+          test: {
+            chunks: "chunks",
+          },
+        },
 				simulator: {
 					title: "Attendant simulator",
 					untitled: "Virtual attendant",
@@ -3260,22 +3081,6 @@ const messages = {
 						viewAgent: "View attendant",
 						configureCredential: "Configure AI credential",
 					},
-					choice: {
-						title: "How do you want to create the attendant?",
-						description: "Choose the setup style that fits your team.",
-						guidedTitle: "Guided Assistant — Recommended",
-						guidedDescription:
-							"Answer a few questions and set up your attendant in minutes.",
-						advancedTitle: "Advanced configuration",
-						advancedDescription:
-							"Manually define instructions, model, and technical parameters.",
-						convertTitle: "Set up with Guided Assistant",
-						convertDescription:
-							"Create a guided profile without removing the existing manual prompt.",
-						convertConfirmTitle: "Set up with Guided Assistant",
-						convertConfirmMessage:
-							"The guided profile will become the business configuration. The existing manual prompt is preserved for advanced mode.",
-					},
 					confirmExit: {
 						title: "Leave without saving?",
 						message:
@@ -3292,6 +3097,7 @@ const messages = {
 						updated: "Guided profile updated successfully",
 						identityUpdated: "Agent identity updated successfully",
 						promptCopied: "Configuration copied",
+            copyError: "Could not copy",
 					},
 					labels: {
 						required: "required",
@@ -3710,134 +3516,6 @@ const messages = {
 							procedures: "Which procedures do you perform?",
 							hours: "Business hours",
 						},
-					},
-				},
-				table: {
-					name: "Name",
-					model: "Model",
-					enabled: "Status",
-					temperature: "Temperature",
-					maxTokens: "Max tokens",
-					actions: "Actions",
-				},
-				status: {
-					active: "Active",
-					inactive: "Inactive",
-				},
-				fields: {
-					name: "Agent name",
-					description: "Description",
-					enabled: "Active",
-					model: "Model",
-					temperature: "Temperature",
-					maxTokens: "Max tokens",
-					systemPrompt: "Main prompt / agent instructions",
-					systemPromptAdvanced: "Advanced configuration (manual prompt)",
-					systemPromptAdvancedHint:
-						"For manually created agents or advanced mode. Guided Assistant agents use the structured profile as the main instruction.",
-					fallbackMessage: "Fallback message",
-					handoffMessage: "Handoff message to a human",
-					allowAudioInput: "Allow understanding audio",
-					allowAudioOutput: "Allow audio replies",
-					audioComingSoon: "Coming soon",
-					credential: "AI credential",
-					credentialDefault: "Use company default credential",
-					credentialHint:
-						"Optional. If not selected, uses the company default credential or the legacy OpenAI fallback.",
-					modelProviderWarning:
-						"The selected model is not compatible with the chosen credential provider.",
-					noDefaultCredential:
-						"No active default credential found. Configure one or select a specific credential.",
-				},
-				modal: {
-					newTitle: "New AI agent",
-					editTitle: "Edit AI agent",
-				},
-				formErrors: {
-					name: {
-						required: "Agent name is required",
-						long: "Name is too long (max 120 characters)",
-					},
-					model: { required: "Model is required" },
-					temperature: {
-						required: "Temperature is required",
-						range: "Temperature must be between 0 and 2",
-					},
-					maxTokens: {
-						required: "Max tokens is required",
-						integer: "Max tokens must be an integer",
-						range: "Max tokens must be between 16 and 4096",
-					},
-				},
-				toasts: {
-					created: "Agent created successfully",
-					updated: "Agent updated successfully",
-					deleted: "Agent deleted successfully",
-				},
-				confirmDelete: {
-					title: "Delete agent",
-					message: "Are you sure you want to delete this agent? This cannot be undone.",
-				},
-				empty: {
-					title: "No agents yet",
-					description: "Create an agent to configure AI instructions and parameters.",
-					loadError: "Could not load agents",
-				},
-				credentials: {
-					title: "AI credentials",
-					subtitle:
-						"The credential connects AtendeChat to the AI provider. Behavior, model, and instructions remain configured in the AI Agent.",
-					empty: "No credentials yet.",
-					defaultBadge: "Default",
-					buttons: {
-						new: "New credential",
-						test: "Test connection",
-					},
-					table: {
-						name: "Name",
-						provider: "Provider",
-						key: "Key",
-						status: "Status",
-					},
-					fields: {
-						name: "Credential name",
-						provider: "Provider",
-						apiKey: "API Key",
-						apiKeyReplace: "New API Key (optional)",
-						currentKey: "Current key",
-						enabled: "Active",
-						isDefault: "Company default credential",
-					},
-					modal: {
-						newTitle: "New AI credential",
-						editTitle: "Edit AI credential",
-						hint: "Authentication only. Model, temperature, and instructions are configured in the agent.",
-					},
-					formErrors: {
-						name: {
-							required: "Name is required",
-							long: "Name is too long (max 120 characters)",
-						},
-						apiKey: {
-							required: "API Key is required",
-							invalid: "Invalid API Key format",
-							invalidOpenAi: "Invalid OpenAI API Key format (must start with sk-)",
-							invalidGemini: "Invalid Google Gemini API Key format",
-						},
-					},
-					providers: {
-						openai: "OpenAI",
-						gemini: "Google Gemini",
-					},
-					toasts: {
-						created: "Credential created successfully",
-						updated: "Credential updated successfully",
-						deleted: "Credential deleted successfully",
-						testOk: "Provider connection validated successfully",
-					},
-					confirmDelete: {
-						title: "Delete credential",
-						message: "Are you sure you want to delete this credential?",
 					},
 				},
 			},

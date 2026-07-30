@@ -2918,110 +2918,11 @@ const messages = {
         dryRunWarning:
           "Modo simulación activo: el sistema solo evalúa y registra elegibilidad en mensajes entrantes, sin enviar respuestas automáticas.",
         buttons: {
-          new: "Nuevo agente",
-          save: "Guardar",
           cancel: "Cancelar",
-          edit: "Editar",
-          delete: "Eliminar",
-          retry: "Reintentar",
-          simulateConversation: "Simular conversación",
-          configureKnowledge: "Base de conocimiento",
         },
         knowledge: {
-          title: "Base de conocimiento del agente",
-          loading: "Cargando configuración…",
-          hint:
-            "Vincule bases indexadas y configure la recuperación (RAG) por canal. Live requiere validación previa en simulador y shadow.",
-          fields: {
-            enabled: "Activar Base de Conocimiento en este agente",
-            enabledInSimulator: "Usar en simulador",
-            enabledInShadow: "Usar en Shadow Mode",
-            enabledInLive: "Usar en Live Mode",
-            topK: "Top K (fragmentos)",
-            minimumScore: "Score mínimo",
-            maxContextCharacters: "Máx. caracteres en contexto",
-            maxContextTokens: "Máx. tokens en contexto",
-            maxChunksPerDocument: "Máx. fragmentos por documento",
-            maxChunksPerBase: "Máx. fragmentos por base",
-            allowAnswerWithoutKnowledge:
-              "Permitir respuesta sin conocimiento recuperado",
-            handoffWhenKnowledgeMissing:
-              "Sugerir handoff cuando no haya conocimiento",
-          },
-          channels: {
-            title: "Canales de uso",
-          },
-          alerts: {
-            noLinkedBases:
-              "Sin bases vinculadas. Vincule al menos una base para recuperar conocimiento.",
-            liveWithoutChannels:
-              "Live activo sin simulador y/o shadow. Valide la recuperación antes de producción.",
-          },
-          bases: {
-            title: "Bases vinculadas",
-            empty: "No hay bases de conocimiento registradas en la empresa.",
-            disabled: "base desactivada",
-            priority: "Prioridad",
-            linkEnabled: "Activa en el agente",
-          },
-          retrieval: {
-            title: "Parámetros de recuperación",
-          },
           test: {
-            title: "Probar conocimiento de este Agente",
-            subtitle:
-              "Ejecuta solo búsqueda semántica — no genera respuesta del modelo.",
-            queryLabel: "Consulta de prueba",
-            run: "Ejecutar prueba",
-            status: "Estado",
-            skipReason: "Motivo de skip",
-            queryUsed: "Consulta usada",
-            error: "Error",
-            metrics: "Métricas",
             chunks: "fragmentos",
-            sources: "Fuentes recuperadas",
-            contextText: "Contexto montado",
-          },
-          status: {
-            skipped: "Omitido",
-            completed: "Completado",
-            empty: "Vacío",
-            failed: "Falló",
-            searching: "Buscando",
-          },
-          skipReasons: {
-            disabled: "Desactivado",
-            channel_disabled: "Canal desactivado",
-            no_linked_bases: "Sin bases vinculadas",
-            no_active_bases: "Sin bases activas",
-            missing_embedding_settings: "Embeddings no configurados",
-            invalid_credential: "Credencial inválida",
-            empty_query: "Consulta vacía",
-            feature_blocked: "Recurso bloqueado en el plan",
-            context_budget_unavailable: "Presupuesto de contexto no disponible",
-            document_not_indexed: "Documento no indexado",
-          },
-          liveConfirm: {
-            title: "Activar conocimiento en Live",
-            message:
-              "Recomendamos validar la recuperación en simulador y Shadow Mode antes de habilitar Live. ¿Continuar de todos modos?",
-          },
-          buttons: {
-            saveSettings: "Guardar parámetros",
-            saveLinks: "Guardar vínculos",
-          },
-          toasts: {
-            settingsSaved: "Parámetros de conocimiento guardados",
-            linksSaved: "Bases vinculadas actualizadas",
-          },
-          shadow: {
-            used: "Usó conocimiento · {{count}} fuente(s) · score {{score}}",
-                  filterWith: "Con conocimiento",
-                  filterWithout: "Sin conocimiento",
-                  filterEmpty: "Recuperación vacía",
-                  filterError: "Fallo en la recuperación",
-                  knowledgeFilter: "Conocimiento",
-            detailsTitle: "Conocimiento recuperado",
           },
         },
         simulator: {
@@ -3036,69 +2937,10 @@ const messages = {
             metrics: "Métricas",
           },
         },
-        table: {
-          name: "Nombre",
-          model: "Modelo",
-          enabled: "Estado",
-          temperature: "Temperatura",
-          maxTokens: "Máx. tokens",
-          actions: "Acciones",
-        },
-        status: {
-          active: "Activo",
-          inactive: "Inactivo",
-        },
-        fields: {
-          name: "Nombre del agente",
-          description: "Descripción",
-          enabled: "Activo",
-          model: "Modelo",
-          temperature: "Temperatura",
-          maxTokens: "Máximo de tokens",
-          systemPrompt: "Prompt principal / instrucciones del agente",
-          fallbackMessage: "Mensaje de respaldo",
-          handoffMessage: "Mensaje de transferencia a humano",
-          allowAudioInput: "Permitir entender audio",
-          allowAudioOutput: "Permitir responder audio",
-          audioComingSoon: "Próximamente",
-        },
-        modal: {
-          newTitle: "Nuevo agente de IA",
-          editTitle: "Editar agente de IA",
-        },
-        formErrors: {
-          name: {
-            required: "El nombre del agente es obligatorio",
-            long: "Nombre demasiado largo (máx. 120 caracteres)",
-          },
-          model: { required: "El modelo es obligatorio" },
-          temperature: {
-            required: "La temperatura es obligatoria",
-            range: "La temperatura debe estar entre 0 y 2",
-          },
-          maxTokens: {
-            required: "El máximo de tokens es obligatorio",
-            integer: "El máximo de tokens debe ser un entero",
-            range: "El máximo de tokens debe estar entre 16 y 4096",
-          },
-        },
-        toasts: {
-          created: "Agente creado con éxito",
-          updated: "Agente actualizado con éxito",
-          deleted: "Agente eliminado con éxito",
-        },
-        confirmDelete: {
-          title: "Eliminar agente",
-          message: "¿Seguro que desea eliminar este agente? Esta acción no se puede deshacer.",
-        },
-        empty: {
-          title: "Sin agentes registrados",
-          description: "Cree un agente para configurar instrucciones y parámetros de IA.",
-          loadError: "No se pudieron cargar los agentes",
-        },
         wizard: {
           toasts: {
             identityUpdated: "Identidad del agente actualizada correctamente",
+            copyError: "No se pudo copiar",
           },
           buttons: {
             suggestFaqs: "Sugerir preguntas frecuentes",

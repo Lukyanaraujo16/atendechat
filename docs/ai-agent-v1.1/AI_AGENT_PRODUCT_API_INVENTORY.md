@@ -152,28 +152,29 @@ Endpoints `/ai-agents*` **não são removidos** nesta fase.
 | Operação | Endpoint legado | Nova Product API | Consumidores legado | Migração prevista |
 |----------|-----------------|------------------|---------------------|-------------------|
 | Wizard (fluxo guiado completo) | `/ai-agents*` + `/ai-provider-credentials` | configuração, opções, conexões e preview em `/product/ai-agent/configuration*` | Nenhum no Wizard | **Migrado (2.4)** |
-| Ler configuração | `GET /ai-agents/:id` + `GET /ai-agents/:id/profile` | `GET /product/ai-agent/configuration` | AiAgentModal | Wizard migrado (2.4) |
+| Ler configuração | `GET /ai-agents/:id` + `GET /ai-agents/:id/profile` | `GET /product/ai-agent/configuration` | *(FE removido 2.8A)* | Wizard migrado (2.4) |
 | Criar agente | `POST /ai-agents` | `POST /product/ai-agent/configuration` | — | Wizard migrado (2.4) |
-| Atualizar agente | `PUT /ai-agents/:id` | `PUT /product/ai-agent/configuration` | AiAgentModal | Fase 2.4 |
+| Atualizar agente | `PUT /ai-agents/:id` | `PUT /product/ai-agent/configuration` | *(FE removido 2.8A)* | Fase 2.4 |
 | Atualizar profile | `PUT /ai-agents/:id/profile` | `PUT /product/ai-agent/configuration` | — | Wizard migrado (2.4) |
-| Atualizar credencial | `PUT /ai-agents/:id` (`aiProviderCredentialId`) | `PUT /product/ai-agent/configuration` | AiAgentModal | Fase 2.4 |
+| Atualizar credencial | `PUT /ai-agents/:id` (`aiProviderCredentialId`) | `PUT /product/ai-agent/configuration` | *(FE removido 2.8A)* | Fase 2.4 |
 | Vincular WA | `PUT /whatsapp/:id` (**bloqueado** para AI — 2.6) | `PUT /product/ai-agent/configuration/connections` | — | **Concluído (2.6)** |
 | Ativar shadow | `PUT /whatsapp/:id` (**bloqueado** — 2.6) | `POST /product/ai-agent/commands` | Nenhum novo | Concluído (2.2 + harden 2.6) |
 | Ativar live | `PUT /whatsapp/:id` (**bloqueado** — 2.6) | `POST /product/ai-agent/commands` | Nenhum novo | Concluído (2.2 + harden 2.6) |
 | Desativar | `PUT /whatsapp/:id` (**bloqueado** — 2.6) | `POST /product/ai-agent/commands` | Nenhum novo | Concluído (2.2 + harden 2.6) |
-| Listar opções | `GET /ai-provider-credentials` | `GET /product/ai-agent/configuration/options` | AiAgentModal | Wizard migrado (2.4) |
-| Knowledge Base | `GET/PUT /ai-agents/:id/knowledge-*` | Não migrada | AiAgentModal, KB modal | backlog |
+| Listar opções | `GET /ai-provider-credentials` | `GET /product/ai-agent/configuration/options` | **KB Embedding** (list) | Wizard migrado (2.4); Product Credentials (2.7) |
+| Knowledge Base | `GET/PUT /ai-agents/:id/knowledge-*` | Não migrada | *(painel FE removido 2.8A)*; KB genérica viva | backlog Product Knowledge |
 
 ### Status da redução
 
-- **Endpoints legados não removidos** — consumidores ativos: AiAgentModal (órfão), Simulator legado (compat), CRUD credenciais (KB Embedding)
-- **Product API completa** para: summary, readiness, commands, configuration (GET/POST/PUT/preview), connections, options (providers + models), simulator
+- **Endpoints legados HTTP não removidos** — BE intacto. FE comercial órfão removido na **Fase 2.8A**. Consumidores vivos restantes: Knowledge Base (`list` credenciais), Console Analytics/Shadow FC, Runtime (services diretos).
+- **Product API completa** para: summary, readiness, commands, configuration (GET/POST/PUT/preview), connections, options (providers + models), simulator, credentials
 - **Hardening 2.3.1:** providers comerciais `openai` + `gemini` (fonte única `aiAgentProductProviderCapabilities`); validação credential/model por provider; sem conversão silenciosa
 - **Hardening 2.3.2:** readiness exige credencial **selecionada** + provider suportado + modelo compatível; conflitos → `attention_required`; activate usa o readiness corrigido
 - **Fase 2.4 concluída:** Wizard migrado para Product API; ver `AI_AGENT_WIZARD_MIGRATION_INVENTORY.md`
 - **Hardening 2.4.1:** edição de identidade com agente ativo; provider/model/credential obrigatórios no Review; `createMinimalAiAgentPayload` removido; testes `aiAgentWizardActiveIdentityPhase241`
 - **Hardening 2.4.2:** agente ativo usa tela identity-only dedicada, sem steps/Review/preview estruturais; identidade e profile têm hidratação separada; Success específico; teste anti-descarte `aiAgentWizardActiveIdentityModePhase242`
-- **Fase 2.5 concluída:** Product Simulator em `/product/ai-agent/simulator/*` + UI `/ai-agent/simulator`; ver `AI_AGENT_PRODUCT_SIMULATOR_CONTRACT.md`. Legado `/ai-agents/:id/simulator/*` permanece.
+- **Fase 2.5 concluída:** Product Simulator em `/product/ai-agent/simulator/*` + UI `/ai-agent/simulator`; ver `AI_AGENT_PRODUCT_SIMULATOR_CONTRACT.md`. Legado `/ai-agents/:id/simulator/*` permanece no BE.
 - **Fase 2.6 concluída:** WhatsAppModal e `POST/PUT /whatsapp` **não** mutam AI Agent. Autoridade única: Product connections (vínculo Off) + Product commands (modo). Erro `ERR_AI_AGENT_FIELDS_MANAGED_BY_PRODUCT_API`.
-- **Fase 2.7 concluída:** Product Credentials em `/product/ai-agent/credentials*` + UI Hub/Wizard; ver `AI_AGENT_PRODUCT_CREDENTIALS_CONTRACT.md`. CRUD legado permanece para KB. Sem DELETE Product.
-- **Próximo passo:** limpeza de órfãos; Knowledge Base Product
+- **Fase 2.7 concluída:** Product Credentials em `/product/ai-agent/credentials*` + UI Hub/Wizard; ver `AI_AGENT_PRODUCT_CREDENTIALS_CONTRACT.md`. CRUD legado BE permanece para KB. Sem DELETE Product.
+- **Fase 2.8A concluída:** removidos FE órfãos `AiAgentModal`, `AiProviderCredentialModal`, `AiAgentCreateChoiceModal`, `AiAgentShadowReviewModal`, `AiAgentShadowDetailsModal`, `AiAgentKnowledgePanel`. Product Experience substitui superfícies comerciais. Shadow pipeline BE, KB, Console, Runtime e CRUD HTTP legado **preservados**.
+- **Próximo passo (2.8B):** depreciação/bloqueio de mutações HTTP comerciais legadas; Knowledge Base Product permanece backlog separado.

@@ -664,7 +664,7 @@ Regras:
   continua ativo.
 - `setup_incomplete` permanece autoridade do backend; o Wizard não recalcula readiness.
 - Rota `/ai-agent/wizard/:agentId` é residual de navegação; o param não resolve agente nem entra em payload.
-- AiAgentModal avançado permanece órfão (limpeza futura); WhatsAppModal **não** configura AI (Fase 2.6).
+- AiAgentModal avançado foi **removido** na Fase 2.8A; WhatsAppModal **não** configura AI (Fase 2.6).
 
 ### POST `/product/ai-agent/configuration` (criação)
 

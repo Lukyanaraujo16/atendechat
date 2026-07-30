@@ -165,5 +165,5 @@ IDs canônicos: `backend/src/config/aiProviderModels.ts`
 ### Wizard legado (não migrado nesta tarefa)
 
 - Wizard guiado não escolhe provider; cria com modelo OpenAI default e `aiProviderCredentialId: null`.
-- AiAgentModal já filtra modelos por provider da credencial.
+- Filtro de modelos por provider da credencial permanece na Product Configuration / Wizard (o antigo AiAgentModal foi removido na Fase 2.8A).
 - Divergência para Fase 2.4: Wizard deve consumir options da Product API.

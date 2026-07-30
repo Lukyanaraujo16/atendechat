@@ -63,7 +63,7 @@ export default function AiAgentPromptPreviewModal({
       await navigator.clipboard.writeText(prompt);
       toast.success(i18n.t("aiAgent.wizard.toasts.promptCopied"));
     } catch {
-      toast.error(i18n.t("aiAgent.shadowSection.actions.copyError"));
+      toast.error(i18n.t("aiAgent.wizard.toasts.copyError"));
     }
   };
 

@@ -1,7 +1,5 @@
 export const AI_AGENT_PROFILE_SCHEMA_VERSION = 1;
 
-export const AI_AGENT_SETUP_MODES = ["guided", "advanced", "legacy"];
-
 export const AI_AGENT_PROFILE_LIMITS = {
   companyName: 100,
   customBusinessSegment: 100,

@@ -184,11 +184,11 @@ Abandono antes do POST: descarta draft local (sem `DELETE` legado).
 | Superfície | Relação com Wizard | Migração 2.4 |
 |------------|--------------------|--------------|
 | AiAgentWizard | Fluxo guiado | **Migrado** |
-| AiAgentModal | Independente / órfão no hub | Não migrado → Fase 2.5/2.6 |
-| AiProviderCredentialModal | Órfão (legado) | Product Credential UI (2.7) — Hub/Wizard |
+| AiAgentModal | Removido (Fase 2.8A) | Substituído por Product Hub/Wizard/Configuration |
+| AiProviderCredentialModal | Removido (Fase 2.8A) | Product Credential UI (2.7) — Hub/Wizard |
+| AiAgentCreateChoiceModal | Removido (Fase 2.8A) | Entrada direta ao Wizard Product |
 | WhatsApp settings | Controles AI removidos (2.6); CTA → `/ai-agent` | Concluído — mutação só Product |
-| Simulator | Pós-success navegação | Intacta |
-
+| Simulator | Pós-success navegação | Intacta (Product 2.5) |
 ---
 
 ## Regras arquiteturais do frontend

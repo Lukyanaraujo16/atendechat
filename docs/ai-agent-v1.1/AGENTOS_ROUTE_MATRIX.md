@@ -37,11 +37,12 @@ GET /technical-console/access → allowed
 | `/flowbuilder/:id?` | FlowBuilderConfig | commercial_automation | admin + `automation.chatbot` | — | — | — |
 | `/phrase-lists` | CampaignsPhrase | commercial_automation | admin + `automation.keywords` | — | — | — |
 | `/queue-integration` | QueueIntegration | commercial_automation | admin + `automation.integrations` | — | — | — |
-| `/ai-agent` | AiAgent | commercial_ai_agent | admin + `automation.ai_agent` + UI flag | — | — | — |
+| `/ai-agent` | AiAgent (Product Hub) | commercial_ai_agent | admin + `automation.ai_agent` + UI flag | — | — | — |
 | `/ai-agent/wizard` | AiAgentWizardPage | commercial_ai_agent | idem + AiAgentRouteGuard | — | — | — |
 | `/ai-agent/wizard/:agentId` | AiAgentWizardPage | commercial_ai_agent | idem | — | — | — |
-| `/ai-agent/:agentId/simulator` | AiAgentSimulatorPage | commercial_ai_agent | idem | — | — | — |
-| `/ai-agent/:agentId` | *(não existe rota dedicada)* | commercial_ai_agent | N/A — detalhe via listagem/wizard | — | — | — |
+| `/ai-agent/simulator` | AiAgentSimulatorPage | commercial_ai_agent | idem | — | canônico (Fase 2.5) | — |
+| `/ai-agent/:agentId/simulator` | Redirect → `/ai-agent/simulator` | commercial_compatibility | idem | — | `/ai-agent/simulator` | path legado |
+| `/ai-agent/:agentId` | *(não existe rota dedicada)* | commercial_ai_agent | N/A — detalhe via Hub/wizard | — | — | — |
 | `/prompts` | Prompts | commercial_compatibility | admin + `automation.openai` | — | — | — |
 | `/knowledge-base` | KnowledgeBase | commercial_compatibility | admin + KB feature + UI | — | — | — |
 | `/knowledge-base/:baseId` | KnowledgeBaseDetail | commercial_compatibility | idem | — | — | — |
