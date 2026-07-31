@@ -21,6 +21,7 @@ import {
   INTERNAL_CHAT_FEATURE_KEY,
 } from "../utils/attendanceAccess";
 import { isCommercialAutomationsPath } from "../utils/commercialAutomationsNav";
+import { getConfiguracoesAccess } from "../utils/settingsConnectionsAccess";
 
 import Dashboard from "../pages/Dashboard/";
 import TicketResponsiveContainer from "../pages/TicketResponsiveContainer";
@@ -751,64 +752,122 @@ function EquipeModule({ isAdmin, planFlags }) {
   );
 }
 
-function ConfiguracoesModule({
-  planFlagsLoaded,
-  showExternalApi,
-  showMediaManager,
-  showGroupsManager,
-  planFlags,
-}) {
+function ConfiguracoesModule({ planFlags, user }) {
+  const access = useMemo(
+    () => getConfiguracoesAccess(planFlags, user),
+    [planFlags, user]
+  );
+
   const tabs = useMemo(() => {
-    const t = [{ path: "/connections", label: i18n.t("mainDrawer.listItems.connections") }];
-    if (showExternalApi) {
-      t.push({ path: "/messages-api", label: i18n.t("mainDrawer.listItems.messagesAPI") });
+    const t = [];
+    if (access.showConnections) {
+      t.push({
+        path: "/connections",
+        label: i18n.t("mainDrawer.listItems.connections"),
+      });
     }
-    t.push({ path: "/settings", label: i18n.t("mainDrawer.listItems.settings") });
-    if (showMediaManager) {
-      t.push({ path: "/settings/media-manager", label: i18n.t("settings.tabs.mediaManager") });
+    if (access.showApi) {
+      t.push({
+        path: "/messages-api",
+        label: i18n.t("mainDrawer.listItems.messagesAPI"),
+      });
     }
-    if (showGroupsManager) {
-      t.push({ path: "/settings/groups", label: i18n.t("settings.tabs.groupManager") });
+    if (access.showCompanySettings) {
+      t.push({
+        path: "/settings",
+        label: i18n.t("mainDrawer.listItems.settings"),
+      });
+    }
+    if (access.showMediaManager) {
+      t.push({
+        path: "/settings/media-manager",
+        label: i18n.t("settings.tabs.mediaManager"),
+      });
+    }
+    if (access.showGroups) {
+      t.push({
+        path: "/settings/groups",
+        label: i18n.t("settings.tabs.groupManager"),
+      });
     }
     return t;
-  }, [showExternalApi, showMediaManager, showGroupsManager, i18n.language]);
+  }, [access, i18n.language]);
 
-  if (!planFlagsLoaded) {
+  if (!planFlags.loaded) {
     return <PlanFlagsLoadingState />;
+  }
+
+  if (!access.visible) {
+    return (
+      <FeatureBlocked
+        planFlags={planFlags}
+        anyOf={["settings.connections", "settings.api"]}
+      />
+    );
   }
 
   return (
     <ModuleTabsLayout tabs={tabs}>
       <Switch>
-        <Route exact path="/connections" component={Connections} />
+        <Route
+          exact
+          path="/connections"
+          render={() =>
+            access.showConnections ? (
+              <Connections />
+            ) : (
+              <FeatureBlocked
+                planFlags={planFlags}
+                anyOf={["settings.connections"]}
+              />
+            )
+          }
+        />
         <Route
           exact
           path="/messages-api"
           render={() =>
-            showExternalApi ? <MessagesAPI /> : (
+            access.showApi ? (
+              <MessagesAPI />
+            ) : (
               <FeatureBlocked planFlags={planFlags} anyOf={["settings.api"]} />
             )
           }
         />
-        <Route exact path="/settings" component={SettingsCustom} />
+        <Route
+          exact
+          path="/settings"
+          render={() =>
+            access.showCompanySettings ? (
+              <SettingsCustom />
+            ) : (
+              <PlanFeatureBlocked variant="user" />
+            )
+          }
+        />
         <Route
           exact
           path="/settings/media-manager"
           render={() =>
-            showMediaManager ? <MediaManager /> : <PlanFeatureBlocked />
+            access.showMediaManager ? (
+              <MediaManager />
+            ) : (
+              <PlanFeatureBlocked variant="user" />
+            )
           }
         />
         <Route
           exact
           path="/settings/groups"
           render={() =>
-            showGroupsManager ? (
+            access.showGroups ? (
               <GroupManager />
             ) : (
               <FeatureBlocked planFlags={planFlags} anyOf={["team.groups"]} />
             )
           }
         />
+        <Redirect to={access.defaultPath} />
       </Switch>
     </ModuleTabsLayout>
   );
@@ -819,9 +878,6 @@ export default function LoggedInRoutesContent() {
   const planFlags = usePlanFlags();
   const isAdmin = user?.profile === "admin";
   const isTenantManager = isAdmin || user?.profile === "supervisor";
-  const isPrivileged =
-    user?.profile === "admin" || user?.profile === "supervisor" || user?.supportMode === true;
-  const showMediaManager = isAdmin || user?.supportMode === true;
   const fx = planFlags.effectiveFeatures || {};
   const showDashboardNav =
     fx["dashboard.main"] === true || fx["dashboard.reports"] === true;
@@ -1030,13 +1086,7 @@ export default function LoggedInRoutesContent() {
       <Route
         path={configPaths}
         render={() => (
-          <ConfiguracoesModule
-            planFlagsLoaded={planFlags.loaded}
-            showExternalApi={planFlags.useExternalApi}
-            showMediaManager={showMediaManager}
-            showGroupsManager={planFlags.useGroups && isPrivileged}
-            planFlags={planFlags}
-          />
+          <ConfiguracoesModule planFlags={planFlags} user={user} />
         )}
       />
 

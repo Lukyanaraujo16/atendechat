@@ -49,7 +49,6 @@ import { WhatsAppsContext } from "../../context/WhatsApp/WhatsAppsContext";
 import toastError from "../../errors/toastError";
 
 import { AuthContext } from "../../context/Auth/AuthContext";
-import { Can } from "../../components/Can";
 import {
 	AppTableContainer,
 	AppEmptyState,
@@ -65,6 +64,7 @@ import {
 	getInstagramOAuthCallbackParams,
 } from "../../utils/instagramOAuth";
 import { canUseInstagramIntegration } from "../../utils/canUseInstagramIntegration";
+import { canManageWhatsAppConnections } from "../../utils/settingsConnectionsAccess";
 
 const useStyles = makeStyles(theme => ({
 	mainPaper: {
@@ -182,6 +182,7 @@ const Connections = () => {
 
 	const { user } = useContext(AuthContext);
 	const { whatsApps, loading } = useContext(WhatsAppsContext);
+	const canManageConnections = canManageWhatsAppConnections(planFlags, user);
 	const [whatsAppModalOpen, setWhatsAppModalOpen] = useState(false);
 	const [qrModalOpen, setQrModalOpen] = useState(false);
 	const [selectedWhatsApp, setSelectedWhatsApp] = useState(null);
@@ -464,7 +465,7 @@ const Connections = () => {
 			});
 		}
 
-		if (user?.profile === "admin") {
+		if (canManageConnections) {
 			items.push({ key: "edit-divider", divider: true });
 			items.push({
 				key: "edit",
@@ -619,20 +620,14 @@ const Connections = () => {
 			<MainHeader>
 				<Title>{i18n.t("connections.title")}</Title>
 				<MainHeaderButtonsWrapper>
-					{activeChannelTab === "whatsapp" && (
-						<Can
-							role={user.profile}
-							perform="connections-page:addConnection"
-							yes={() => (
-								<Button
-									variant="contained"
-									color="primary"
-									onClick={handleOpenWhatsAppModal}
-								>
-									{i18n.t("connections.buttons.add")}
-								</Button>
-							)}
-						/>
+					{activeChannelTab === "whatsapp" && canManageConnections && (
+						<Button
+							variant="contained"
+							color="primary"
+							onClick={handleOpenWhatsAppModal}
+						>
+							{i18n.t("connections.buttons.add")}
+						</Button>
 					)}
 				</MainHeaderButtonsWrapper>
 			</MainHeader>
@@ -703,30 +698,22 @@ const Connections = () => {
 							<TableCell align="center" className={classes.tableHeadCell}>
 								{i18n.t("connections.table.status")}
 							</TableCell>
-							<Can
-								role={user.profile}
-								perform="connections-page:actionButtons"
-								yes={() => (
-									<TableCell align="center" className={classes.tableHeadCell}>
-										{i18n.t("connections.table.session")}
-									</TableCell>
-								)}
-							/>
+							{canManageConnections && (
+								<TableCell align="center" className={classes.tableHeadCell}>
+									{i18n.t("connections.table.session")}
+								</TableCell>
+							)}
 							<TableCell align="center" className={classes.tableHeadCell}>
 								{i18n.t("connections.table.lastUpdate")}
 							</TableCell>
 							<TableCell align="center" className={classes.tableHeadCell}>
 								{i18n.t("connections.table.default")}
 							</TableCell>
-							<Can
-								role={user.profile}
-								perform="connections-page:editOrDeleteConnection"
-								yes={() => (
-									<TableCell align="center" className={classes.tableHeadCell}>
-										{i18n.t("connections.table.actions")}
-									</TableCell>
-								)}
-							/>
+							{canManageConnections && (
+								<TableCell align="center" className={classes.tableHeadCell}>
+									{i18n.t("connections.table.actions")}
+								</TableCell>
+							)}
 						</TableRow>
 					</TableHead>
 					<TableBody>
@@ -767,15 +754,11 @@ const Connections = () => {
 											<TableCell align="center">
 												{renderStatusToolTips(whatsApp)}
 											</TableCell>
-											<Can
-												role={user.profile}
-												perform="connections-page:actionButtons"
-												yes={() => (
-													<TableCell align="center">
-														{renderActionButtons(whatsApp)}
-													</TableCell>
-												)}
-											/>
+											{canManageConnections && (
+												<TableCell align="center">
+													{renderActionButtons(whatsApp)}
+												</TableCell>
+											)}
 											<TableCell align="center">
 												{format(parseISO(whatsApp.updatedAt), "dd/MM/yy HH:mm")}
 											</TableCell>
@@ -786,29 +769,25 @@ const Connections = () => {
 													</div>
 												)}
 											</TableCell>
-											<Can
-												role={user.profile}
-												perform="connections-page:editOrDeleteConnection"
-												yes={() => (
-													<TableCell align="center">
-														<IconButton
-															size="small"
-															onClick={() => handleEditWhatsApp(whatsApp)}
-														>
-															<Edit />
-														</IconButton>
+											{canManageConnections && (
+												<TableCell align="center">
+													<IconButton
+														size="small"
+														onClick={() => handleEditWhatsApp(whatsApp)}
+													>
+														<Edit />
+													</IconButton>
 
-														<IconButton
-															size="small"
-															onClick={e => {
-																handleOpenConfirmationModal("delete", whatsApp.id);
-															}}
-														>
-															<DeleteOutline />
-														</IconButton>
-													</TableCell>
-												)}
-											/>
+													<IconButton
+														size="small"
+														onClick={e => {
+															handleOpenConfirmationModal("delete", whatsApp.id);
+														}}
+													>
+														<DeleteOutline />
+													</IconButton>
+												</TableCell>
+											)}
 										</TableRow>
 									))}
 							</>

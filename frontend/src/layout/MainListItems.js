@@ -49,6 +49,7 @@ import { canUseAiAgent } from "../utils/canUseAiAgent";
 import { canUseKnowledgeBase } from "../utils/canUseKnowledgeBase";
 import { canShowTechnicalConsoleNav } from "../utils/agentOsConsoleAccess";
 import { canUseInventorySales } from "../utils/canUseInventorySales";
+import { getConfiguracoesAccess } from "../utils/settingsConnectionsAccess";
 import { WhatsAppsContext } from "../context/WhatsApp/WhatsAppsContext";
 import { AuthContext } from "../context/Auth/AuthContext";
 import { Can } from "../components/Can";
@@ -316,6 +317,9 @@ const MainListItems = (props) => {
     planFlags.loaded && canUseInventorySales(planFlags, user);
   const showTeamUsersNav =
     fx["team.users"] === true || fx["team.queues"] === true;
+  const configuracoesAccess = getConfiguracoesAccess(planFlags, user);
+  const showConfiguracoesNav =
+    planFlags.loaded && configuracoesAccess.visible;
 
   useEffect(() => {
     dispatch({ type: "RESET" });
@@ -788,22 +792,31 @@ const MainListItems = (props) => {
               selected={selFinanceiro}
             />
           ) : null}
-
-          <ListItemLink
-            to="/connections"
-            primary={i18n.t("mainDrawer.sections.configuracoes")}
-            icon={
-              <Badge badgeContent={connectionWarning ? "!" : 0} color="error">
-                <SyncAltIcon />
-              </Badge>
-            }
-            listItemClassName={classes.listItem}
-            listItemIconClassName={classes.listItemIcon}
-            listItemTextClassName={classes.listItemText}
-            selected={selConfig}
-          />
         </>
       )}
+
+      {showConfiguracoesNav ? (
+        <ListItemLink
+          to={configuracoesAccess.defaultPath}
+          primary={i18n.t("mainDrawer.sections.configuracoes")}
+          icon={
+            <Badge
+              badgeContent={
+                configuracoesAccess.showConnections && connectionWarning
+                  ? "!"
+                  : 0
+              }
+              color="error"
+            >
+              <SyncAltIcon />
+            </Badge>
+          }
+          listItemClassName={classes.listItem}
+          listItemIconClassName={classes.listItemIcon}
+          listItemTextClassName={classes.listItemText}
+          selected={selConfig}
+        />
+      ) : null}
 
       {standaloneAfterConfig}
     </div>
