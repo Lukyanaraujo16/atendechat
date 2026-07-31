@@ -2,12 +2,12 @@
 
 ## Versão e carregamento
 
-- SDK: **OneSignal Web SDK v16** via CDN  
-  `https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js`
+- SDK: **OneSignal Web SDK v16** via CDN
+  (`https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js`)
 - Service workers públicos:
   - `/OneSignalSDKWorker.js`
-  - `/OneSignalSDKUpdaterWorker.js`  
-  Ambos fazem `importScripts` do SW oficial v16.
+  - `/OneSignalSDKUpdaterWorker.js`
+  - Ambos fazem `importScripts` do SW oficial v16.
 - App ID público vem de `GET /system-settings/public/push-config` (sem REST API Key).
 - Init com `autoRegister: false` — inscrição só no fluxo explícito do utilizador.
 
