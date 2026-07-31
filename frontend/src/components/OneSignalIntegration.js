@@ -1,20 +1,23 @@
+/**
+ * Arranque global: OneSignal (scope /push/onesignal/) + PWA/Workbox (scope /);
+ * após login, associa utilizador e tags.
+ */
 import React, { useContext, useEffect, useState } from "react";
 import { AuthContext } from "../context/Auth/AuthContext";
 import {
   bootstrapPushAndPwaServiceWorker,
   syncOneSignalUser,
   refreshOneSignalPushStatus,
+  exposeOneSignalPushDiagnosticsGlobal,
 } from "../services/oneSignalService";
 
-/**
- * Arranque global: regista OneSignal OU SW PWA mínimo; após login, associa utilizador e tags.
- */
 export default function OneSignalIntegration() {
   const { user, isAuth } = useContext(AuthContext);
   const [booted, setBooted] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+    exposeOneSignalPushDiagnosticsGlobal();
     bootstrapPushAndPwaServiceWorker()
       .then(() => {
         if (!cancelled) {

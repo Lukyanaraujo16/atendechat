@@ -1,7 +1,6 @@
 /**
- * Service worker exigido pelo OneSignal Web SDK v16.
- * Fase 3 (envio): o backend usará a REST API Key guardada em SystemSettings (não exposta ao cliente).
- *
- * Integração com SW próprio: pode usar importScripts adicionais aqui, mas mantenha esta linha.
+ * Compatibilidade temporária: clientes com registro legado em /OneSignalSDKWorker.js.
+ * O init atual usa /push/onesignal/; a transição desregistra este script raiz.
+ * Remover após janela de migração (próximas releases).
  */
 importScripts("https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js");

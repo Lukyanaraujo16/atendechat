@@ -7,6 +7,17 @@ import {
   normalizeSubscriptionChangeEvent,
   readNativePermission,
 } from "../utils/oneSignalPushDomain";
+import {
+  detectBrowserLabel,
+  getOneSignalServiceWorkerPath,
+  getOneSignalServiceWorkerScope,
+  getOneSignalServiceWorkerUpdaterPath,
+  maskSubscriptionId,
+} from "../utils/oneSignalServiceWorkerPaths";
+import {
+  listServiceWorkerRegistrationsForDiagnostics,
+  unregisterLegacyOneSignalRootWorkers,
+} from "../utils/oneSignalWorkerTransition";
 
 /** Instância do namespace OneSignal após `init` (SDK Web v16 via CDN). */
 let oneSignalApi = null;
@@ -18,6 +29,7 @@ let lastConfig = null;
 let statusListenersAttached = false;
 let identityUserId = null;
 let enableInFlight = null;
+let legacyTransitionPromise = null;
 
 let pushStatus = {
   domainState: PUSH_DOMAIN_STATES.NOT_CONFIGURED,
@@ -50,11 +62,6 @@ function publicUrlBase() {
   return (process.env.PUBLIC_URL || "").replace(/\/$/, "");
 }
 
-function swAsset(file) {
-  const base = publicUrlBase();
-  return base ? `${base}/${file}` : `/${file}`;
-}
-
 function logPush(event, detail = {}) {
   try {
     // Observabilidade controlada — sem JWT, REST key ou tokens completos.
@@ -63,7 +70,7 @@ function logPush(event, detail = {}) {
       safe.token = `${String(safe.token).slice(0, 6)}…`;
     }
     if (safe.subscriptionId) {
-      safe.subscriptionId = `${String(safe.subscriptionId).slice(0, 8)}…`;
+      safe.subscriptionId = maskSubscriptionId(safe.subscriptionId);
     }
     // eslint-disable-next-line no-console
     console.info(`[onesignal-push] ${event}`, safe);
@@ -369,6 +376,25 @@ async function waitForEffectiveSubscription(api, timeoutMs = SUBSCRIPTION_WAIT_M
   });
 }
 
+async function ensureLegacyOneSignalRootTransition() {
+  if (legacyTransitionPromise) {
+    return legacyTransitionPromise;
+  }
+  legacyTransitionPromise = (async () => {
+    try {
+      const summary = await unregisterLegacyOneSignalRootWorkers();
+      if (summary.unregistered > 0) {
+        logPush("legacy_onesignal_root_unregistered", summary);
+      }
+      return summary;
+    } catch (e) {
+      logPush("legacy_transition_failed", { message: e?.message || "unknown" });
+      return { unregistered: 0, skipped: 0, errors: 1 };
+    }
+  })();
+  return legacyTransitionPromise;
+}
+
 async function initOneSignalFromConfig(cfg) {
   if (initPromise) {
     return initPromise;
@@ -376,8 +402,6 @@ async function initOneSignalFromConfig(cfg) {
   if (typeof window === "undefined" || !cfg.onesignalAppId) {
     return false;
   }
-  const base = publicUrlBase();
-  const scope = base ? `${base}/` : "/";
   sdkLoading = true;
   setPushStatus({
     onesignalEnabled: Boolean(cfg.onesignalEnabled),
@@ -387,12 +411,16 @@ async function initOneSignalFromConfig(cfg) {
 
   initPromise = (async () => {
     try {
+      await ensureLegacyOneSignalRootTransition();
       await loadOneSignalPageScript();
+      const serviceWorkerPath = getOneSignalServiceWorkerPath();
+      const serviceWorkerUpdaterPath = getOneSignalServiceWorkerUpdaterPath();
+      const scope = getOneSignalServiceWorkerScope();
       const api = await runOneSignalDeferredInit({
         appId: cfg.onesignalAppId,
         allowLocalhostAsSecureOrigin: cfg.onesignalEnvironment === "development",
-        serviceWorkerPath: swAsset("OneSignalSDKWorker.js"),
-        serviceWorkerUpdaterPath: swAsset("OneSignalSDKUpdaterWorker.js"),
+        serviceWorkerPath,
+        serviceWorkerUpdaterPath,
         serviceWorkerParam: { scope },
         // Permissão/inscrição só via fluxo explícito (optIn).
         autoRegister: false,
@@ -414,6 +442,13 @@ async function initOneSignalFromConfig(cfg) {
         ...readSubscriptionSnapshot(api),
         errorCode: null,
       });
+      logPush("init_ok", {
+        serviceWorkerPath,
+        scope,
+        browser: detectBrowserLabel(
+          typeof navigator !== "undefined" ? navigator.userAgent : ""
+        ),
+      });
       return true;
     } catch (e) {
       logPush("init_failed", { message: e?.message || "unknown" });
@@ -433,10 +468,11 @@ async function initOneSignalFromConfig(cfg) {
 }
 
 /**
- * Arranque: OneSignal OU service worker PWA mínimo (nunca ambos no mesmo scope).
- * Se OneSignal estiver habilitado e o init falhar, não regista o SW PWA concorrente.
+ * Arranque: OneSignal (scope /push/onesignal/) e PWA/Workbox (scope /) podem coexistir.
+ * Workbox continua registado em produção mesmo com OneSignal ativo.
  */
 export async function bootstrapPushAndPwaServiceWorker() {
+  let onesignalResult = "skipped";
   try {
     const cfg = await fetchPublicPushConfig();
     setPushStatus({
@@ -445,21 +481,21 @@ export async function bootstrapPushAndPwaServiceWorker() {
     });
     if (cfg.onesignalEnabled && cfg.onesignalAppId) {
       const ok = await initOneSignalFromConfig(cfg);
-      if (ok) {
-        return "onesignal";
-      }
-      return "onesignal_failed";
+      onesignalResult = ok ? "onesignal" : "onesignal_failed";
+    } else {
+      setPushStatus({
+        onesignalEnabled: false,
+        onesignalAppId: "",
+        domainState: PUSH_DOMAIN_STATES.NOT_CONFIGURED,
+      });
     }
   } catch (e) {
     logPush("sdk_load_failed", { message: e?.message || "config" });
+    onesignalResult = "onesignal_failed";
   }
+  // PWA/Workbox: scope / — independente do OneSignal isolado.
   registerMinimalPwaServiceWorker();
-  setPushStatus({
-    onesignalEnabled: false,
-    onesignalAppId: "",
-    domainState: PUSH_DOMAIN_STATES.NOT_CONFIGURED,
-  });
-  return "pwa";
+  return onesignalResult;
 }
 
 export function isOneSignalReady() {
@@ -752,6 +788,52 @@ export async function requestOneSignalPushPermission() {
   return Boolean(result?.ok);
 }
 
+/**
+ * Diagnóstico técnico (console/suporte) — sem secrets nem tokens completos.
+ */
+export async function getOneSignalPushDiagnostics() {
+  const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
+  const status = getOneSignalPushStatus();
+  const workers = await listServiceWorkerRegistrationsForDiagnostics();
+  let oneSignalPermission = null;
+  try {
+    if (oneSignalApi?.Notifications?.permissionNative != null) {
+      oneSignalPermission = oneSignalApi.Notifications.permissionNative;
+    } else if (typeof oneSignalApi?.Notifications?.permission === "boolean") {
+      oneSignalPermission = oneSignalApi.Notifications.permission
+        ? "granted"
+        : "denied_or_default";
+    }
+  } catch {
+    oneSignalPermission = null;
+  }
+  return {
+    browser: detectBrowserLabel(ua),
+    notificationPermission: readNativePermission(),
+    oneSignalPermission,
+    optedIn: Boolean(status.optedIn),
+    hasSubscriptionId: Boolean(status.subscriptionId),
+    maskedSubscriptionId: maskSubscriptionId(status.subscriptionId),
+    hasToken: Boolean(status.token),
+    externalIdApplied: status.externalUserId != null ? String(status.externalUserId) : null,
+    domainState: status.domainState,
+    serviceWorkerPath: getOneSignalServiceWorkerPath(),
+    serviceWorkerScope: getOneSignalServiceWorkerScope(),
+    workers: workers.map((w) => ({
+      scriptURL: w.scriptURL,
+      scope: w.scope,
+      state: w.state,
+    })),
+  };
+}
+
+/** Expõe diagnóstico no window apenas em desenvolvimento (suporte). */
+export function exposeOneSignalPushDiagnosticsGlobal() {
+  if (typeof window === "undefined") return;
+  if (process.env.NODE_ENV === "production") return;
+  window.__atendechatOneSignalDiagnostics = getOneSignalPushDiagnostics;
+}
+
 /** Test helpers */
 export function __setPushWaitMsForTests(subscriptionMs, permissionMs) {
   SUBSCRIPTION_WAIT_MS =
@@ -769,6 +851,7 @@ export function __resetOneSignalServiceForTests() {
   statusListenersAttached = false;
   identityUserId = null;
   enableInFlight = null;
+  legacyTransitionPromise = null;
   SUBSCRIPTION_WAIT_MS = SUBSCRIPTION_WAIT_MS_DEFAULT;
   PERMISSION_WAIT_MS = PERMISSION_WAIT_MS_DEFAULT;
   statusListeners.clear();

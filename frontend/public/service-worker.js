@@ -1,14 +1,10 @@
 /**
- * Service worker mínimo (Fase 1 PWA).
+ * Service worker mínimo de referência em `public/` (Fase 1 PWA).
  *
- * - Não intercepta nem cacheia `fetch` — o browser mantém o comportamento normal de rede.
- *   • Isto inclui favicons e ficheiros em `/public/branding/` (ícone da aba vem de <link rel="icon">).
- * - Não armazena dados sensíveis.
- * - Atualização: novo deploy substitui este ficheiro; o browser deteta e ativa nova versão.
+ * ATENÇÃO: o `react-scripts build` gera Workbox real em `build/service-worker.js`,
+ * que sobrescreve este ficheiro no artefacto de produção. Scope típico: `/`.
  *
- * CACHE_VERSION: incrementar em deploy se for necessário forçar reciclagem de SW antigo nos clientes.
- *
- * OneSignal / SW único: evite dois service workers no mesmo scope; ver documentação do plugin.
+ * OneSignal usa scope isolado `/push/onesignal/` — os dois podem coexistir.
  */
 /* eslint-disable no-restricted-globals */
 // eslint-disable-next-line no-unused-vars
