@@ -4845,7 +4845,21 @@ const messages = {
         pushOptIn: {
           message:
             "Ative as notificações push para receber alertas mesmo com o separador em segundo plano (quando a plataforma estiver configurada).",
+          grantedUnsubscribed:
+            "O navegador já permitiu notificações, mas a inscrição push ainda não foi concluída. Clique para finalizar a ativação.",
+          denied:
+            "As notificações estão bloqueadas neste navegador. Libere a permissão nas configurações do site e tente novamente.",
+          deniedToast:
+            "Permissão de notificações bloqueada pelo navegador.",
+          subscriptionMissing:
+            "A permissão foi concedida, mas a inscrição no OneSignal não foi confirmada. Verifique o service worker e o domínio configurado.",
+          initFailed:
+            "Não foi possível iniciar o OneSignal. Confirme o App ID e se os arquivos do service worker estão acessíveis.",
+          error: "Não foi possível ativar as notificações push. Tente novamente.",
+          errorToast: "Falha ao ativar notificações push.",
+          success: "Notificações push ativadas.",
           enable: "Ativar notificações",
+          enabling: "Ativando…",
           later: "Agora não",
         },
         signupRequests: {

@@ -4300,7 +4300,20 @@ const messages = {
         pushOptIn: {
           message:
             "Active las notificaciones push para recibir alertas con la pestaña en segundo plano (cuando la plataforma esté configurada).",
+          grantedUnsubscribed:
+            "El navegador ya permitió notificaciones, pero la suscripción push aún no está completa. Haga clic para finalizar la activación.",
+          denied:
+            "Las notificaciones están bloqueadas en este navegador. Permítalas en la configuración del sitio e intente de nuevo.",
+          deniedToast: "Permiso de notificaciones bloqueado por el navegador.",
+          subscriptionMissing:
+            "Se concedió el permiso, pero la suscripción en OneSignal no se confirmó. Revise el service worker y el dominio configurado.",
+          initFailed:
+            "No se pudo iniciar OneSignal. Confirme el App ID y que los archivos del service worker sean accesibles.",
+          error: "No se pudieron activar las notificaciones push. Inténtelo de nuevo.",
+          errorToast: "Error al activar notificaciones push.",
+          success: "Notificaciones push activadas.",
           enable: "Activar notificaciones",
+          enabling: "Activando…",
           later: "Ahora no",
         },
         signupRequests: {

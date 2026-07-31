@@ -1,6 +1,10 @@
 import React, { useContext, useEffect, useState } from "react";
 import { AuthContext } from "../context/Auth/AuthContext";
-import { bootstrapPushAndPwaServiceWorker, syncOneSignalUser } from "../services/oneSignalService";
+import {
+  bootstrapPushAndPwaServiceWorker,
+  syncOneSignalUser,
+  refreshOneSignalPushStatus,
+} from "../services/oneSignalService";
 
 /**
  * Arranque global: regista OneSignal OU SW PWA mínimo; após login, associa utilizador e tags.
@@ -10,7 +14,19 @@ export default function OneSignalIntegration() {
   const [booted, setBooted] = useState(false);
 
   useEffect(() => {
-    bootstrapPushAndPwaServiceWorker().finally(() => setBooted(true));
+    let cancelled = false;
+    bootstrapPushAndPwaServiceWorker()
+      .then(() => {
+        if (!cancelled) {
+          refreshOneSignalPushStatus();
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setBooted(true);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const queueKey = Array.isArray(user?.queues)

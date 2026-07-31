@@ -4733,7 +4733,20 @@ const messages = {
 				pushOptIn: {
 					message:
 						"Enable push notifications to receive alerts when the tab is in the background (when the platform is configured).",
+					grantedUnsubscribed:
+						"The browser already allowed notifications, but the push subscription is not complete. Click to finish activation.",
+					denied:
+						"Notifications are blocked in this browser. Allow permission in the site settings and try again.",
+					deniedToast: "Notification permission blocked by the browser.",
+					subscriptionMissing:
+						"Permission was granted, but the OneSignal subscription was not confirmed. Check the service worker and configured domain.",
+					initFailed:
+						"Could not start OneSignal. Confirm the App ID and that service worker files are reachable.",
+					error: "Could not enable push notifications. Please try again.",
+					errorToast: "Failed to enable push notifications.",
+					success: "Push notifications enabled.",
 					enable: "Enable notifications",
+					enabling: "Enabling…",
 					later: "Not now",
 				},
 				signupRequests: {

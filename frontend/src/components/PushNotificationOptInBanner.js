@@ -2,11 +2,19 @@ import React, { useContext, useEffect, useState, useCallback } from "react";
 import Alert from "@material-ui/lab/Alert";
 import Button from "@material-ui/core/Button";
 import { makeStyles } from "@material-ui/core/styles";
+import { toast } from "react-toastify";
 import { AuthContext } from "../context/Auth/AuthContext";
 import {
-  fetchPublicPushConfig,
-  requestOneSignalPushPermission,
+  enableOneSignalPushSubscription,
+  getOneSignalPushStatus,
+  refreshOneSignalPushStatus,
+  subscribeOneSignalPushStatus,
 } from "../services/oneSignalService";
+import {
+  PUSH_DOMAIN_STATES,
+  shouldShowPushDeniedHelp,
+  shouldShowPushOptInBanner,
+} from "../utils/oneSignalPushDomain";
 import { i18n } from "../translate/i18n";
 
 const DISMISS_KEY = "pushOptInBannerDismissed";
@@ -24,28 +32,47 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
+function messageForState(domainState, errorCode) {
+  if (domainState === PUSH_DOMAIN_STATES.PERMISSION_DENIED) {
+    return i18n.t("platform.pushOptIn.denied");
+  }
+  if (domainState === PUSH_DOMAIN_STATES.PERMISSION_GRANTED_UNSUBSCRIBED) {
+    return i18n.t("platform.pushOptIn.grantedUnsubscribed");
+  }
+  if (domainState === PUSH_DOMAIN_STATES.ERROR || errorCode) {
+    if (errorCode === "subscription_missing_after_permission") {
+      return i18n.t("platform.pushOptIn.subscriptionMissing");
+    }
+    if (errorCode === "init_failed" || errorCode === "sdk_load_failed") {
+      return i18n.t("platform.pushOptIn.initFailed");
+    }
+    return i18n.t("platform.pushOptIn.error");
+  }
+  return i18n.t("platform.pushOptIn.message");
+}
+
 export default function PushNotificationOptInBanner() {
   const classes = useStyles();
   const { user } = useContext(AuthContext);
-  const [visible, setVisible] = useState(false);
+  const [status, setStatus] = useState(() => getOneSignalPushStatus());
+  const [dismissed, setDismissed] = useState(
+    () => typeof sessionStorage !== "undefined" && Boolean(sessionStorage.getItem(DISMISS_KEY))
+  );
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (!user?.id || sessionStorage.getItem(DISMISS_KEY)) {
-      return;
+    return subscribeOneSignalPushStatus(setStatus);
+  }, []);
+
+  useEffect(() => {
+    if (!user?.id) {
+      return undefined;
     }
     let cancelled = false;
     (async () => {
-      try {
-        const cfg = await fetchPublicPushConfig();
-        if (cancelled || !cfg.onesignalEnabled || !cfg.onesignalAppId) {
-          return;
-        }
-        if (typeof Notification !== "undefined" && Notification.permission === "default") {
-          setVisible(true);
-        }
-      } catch {
-        /* ignorar */
+      await refreshOneSignalPushStatus();
+      if (!cancelled) {
+        setStatus(getOneSignalPushStatus());
       }
     })();
     return () => {
@@ -53,42 +80,76 @@ export default function PushNotificationOptInBanner() {
     };
   }, [user?.id]);
 
+  const domainState = status.domainState;
+  const showOptIn = shouldShowPushOptInBanner(domainState, { dismissed });
+  const showDenied = shouldShowPushDeniedHelp(domainState, { dismissed });
+  const visible = Boolean(user?.id) && (showOptIn || showDenied);
+
   const onEnable = useCallback(async () => {
+    if (busy) return;
     setBusy(true);
     try {
-      await requestOneSignalPushPermission();
+      const result = await enableOneSignalPushSubscription({ user });
+      setStatus(result.status || getOneSignalPushStatus());
+      if (result.ok) {
+        toast.success(i18n.t("platform.pushOptIn.success"));
+        return;
+      }
+      if (result.errorCode === "permission_denied") {
+        toast.warn(i18n.t("platform.pushOptIn.deniedToast"));
+        return;
+      }
+      toast.error(i18n.t("platform.pushOptIn.errorToast"));
+    } catch {
+      toast.error(i18n.t("platform.pushOptIn.errorToast"));
+      setStatus(getOneSignalPushStatus());
     } finally {
       setBusy(false);
-      setVisible(false);
     }
-  }, []);
+  }, [busy, user]);
 
   const onDismiss = useCallback(() => {
     sessionStorage.setItem(DISMISS_KEY, "1");
-    setVisible(false);
+    setDismissed(true);
   }, []);
 
   if (!visible) {
     return null;
   }
 
+  const severity =
+    domainState === PUSH_DOMAIN_STATES.PERMISSION_DENIED ||
+    domainState === PUSH_DOMAIN_STATES.ERROR
+      ? "warning"
+      : "info";
+
   return (
     <Alert
-      severity="info"
+      severity={severity}
       variant="outlined"
       className={classes.root}
       action={
         <div className={classes.actions}>
-          <Button color="primary" size="small" variant="contained" disabled={busy} onClick={onEnable}>
-            {i18n.t("platform.pushOptIn.enable")}
-          </Button>
+          {showOptIn ? (
+            <Button
+              color="primary"
+              size="small"
+              variant="contained"
+              disabled={busy || domainState === PUSH_DOMAIN_STATES.SUBSCRIBING}
+              onClick={onEnable}
+            >
+              {busy || domainState === PUSH_DOMAIN_STATES.SUBSCRIBING
+                ? i18n.t("platform.pushOptIn.enabling")
+                : i18n.t("platform.pushOptIn.enable")}
+            </Button>
+          ) : null}
           <Button size="small" onClick={onDismiss} disabled={busy}>
             {i18n.t("platform.pushOptIn.later")}
           </Button>
         </div>
       }
     >
-      {i18n.t("platform.pushOptIn.message")}
+      {messageForState(domainState, status.errorCode)}
     </Alert>
   );
 }
