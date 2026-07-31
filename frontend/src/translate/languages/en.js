@@ -5688,7 +5688,7 @@ const messages = {
 			},
 			notificationSound: {
 				ariaLabel: "Notification volume",
-				popoverTitle: "Alert sound volume",
+				popoverTitle: "New message alerts",
 				openSettings: "Open volume settings",
 				mute: "Mute alerts",
 				unmute: "Enable sounds",
@@ -5697,7 +5697,20 @@ const messages = {
 				toastUnmuted: "Notifications enabled",
 				openConversation: "Open conversation sound",
 				openConversationHint:
-					"Plays a subtle sound when messages arrive in the conversation you are already viewing.",
+					"Plays a soft sound when messages arrive in the conversation you are already viewing.",
+				audioBlocked:
+					"The browser blocked audio. Click “Test sound” or interact with the page to enable it.",
+				desktopNotifications: "Browser notifications",
+				desktopNotificationsHint:
+					"When this tab is in the background, the system can show a browser notification.",
+				desktopEnable: "Enable browser notifications",
+				desktopEnabled: "Browser notifications enabled",
+				desktopDenied:
+					"Notifications are blocked in this browser. Allow them in the site settings.",
+				desktopUnsupported: "This browser does not support desktop notifications.",
+				desktopToggle: "Use browser alerts in the background",
+				desktopToastGranted: "Browser notifications enabled",
+				desktopToastDenied: "Notification permission denied",
 			},
 			userNotificationCenter: {
 				title: "Notification center",

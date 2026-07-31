@@ -5801,7 +5801,7 @@ const messages = {
       },
       notificationSound: {
         ariaLabel: "Volume das notificações",
-        popoverTitle: "Volume dos alertas de atendimento",
+        popoverTitle: "Alertas de novas mensagens",
         openSettings: "Abrir configurações de volume",
         mute: "Silenciar alertas",
         unmute: "Ativar sons",
@@ -5811,6 +5811,19 @@ const messages = {
         openConversation: "Som da conversa aberta",
         openConversationHint:
           "Reproduz um som discreto quando chegam mensagens na conversa que você já está visualizando.",
+        audioBlocked:
+          "O navegador bloqueou o áudio. Clique em “Testar som” ou interaja com a página para ativar.",
+        desktopNotifications: "Notificações do navegador",
+        desktopNotificationsHint:
+          "Quando a aba estiver em segundo plano, o sistema pode mostrar um aviso do navegador.",
+        desktopEnable: "Ativar notificações do navegador",
+        desktopEnabled: "Notificações do navegador ativas",
+        desktopDenied:
+          "Notificações bloqueadas neste navegador. Libere nas configurações do site.",
+        desktopUnsupported: "Este navegador não suporta notificações desktop.",
+        desktopToggle: "Usar aviso do navegador em segundo plano",
+        desktopToastGranted: "Notificações do navegador ativadas",
+        desktopToastDenied: "Permissão de notificação negada",
       },
       userNotificationCenter: {
         title: "Central de notificações",

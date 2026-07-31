@@ -18,6 +18,13 @@ import { toast } from "react-toastify";
 
 import { useNotificationSound } from "../../context/NotificationSound/NotificationSoundContext";
 import { playNotificationSoundThrottled } from "../../utils/notificationSoundPlayback";
+import {
+  getDesktopNotificationPermission,
+  isDesktopNotificationSupported,
+  persistDesktopNotificationPrefEnabled,
+  readDesktopNotificationPrefEnabled,
+  requestDesktopNotificationPermission,
+} from "../../utils/browserDesktopNotification";
 import { i18n } from "../../translate/i18n";
 
 const SLIDER_DEBOUNCE_MS = 150;
@@ -62,6 +69,14 @@ const useStyles = makeStyles((theme) => ({
     marginTop: theme.spacing(0.5),
     paddingLeft: theme.spacing(5),
   },
+  sectionTitle: {
+    marginTop: theme.spacing(2),
+    display: "block",
+  },
+  warnText: {
+    marginTop: theme.spacing(1),
+    display: "block",
+  },
 }));
 
 const NotificationsVolume = () => {
@@ -74,6 +89,7 @@ const NotificationsVolume = () => {
     openConversationEnabled,
     setOpenConversationEnabled,
     playNotificationSound,
+    audioBlocked,
   } = useNotificationSound();
 
   const anchorEl = useRef();
@@ -81,6 +97,12 @@ const NotificationsVolume = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [sliderValue, setSliderValue] = useState(() =>
     muted || volume === 0 ? 0 : volume
+  );
+  const [desktopPermission, setDesktopPermission] = useState(() =>
+    getDesktopNotificationPermission()
+  );
+  const [desktopPrefEnabled, setDesktopPrefEnabled] = useState(() =>
+    readDesktopNotificationPrefEnabled()
   );
   const isSilent = muted || volume === 0;
 
@@ -105,6 +127,7 @@ const NotificationsVolume = () => {
 
   const handleOpenPopover = (event) => {
     event.stopPropagation();
+    setDesktopPermission(getDesktopNotificationPermission());
     setIsOpen(true);
   };
 
@@ -180,6 +203,26 @@ const NotificationsVolume = () => {
   const handleOpenConversationChange = (event) => {
     setOpenConversationEnabled(event.target.checked);
   };
+
+  const handleEnableDesktop = async () => {
+    const result = await requestDesktopNotificationPermission();
+    setDesktopPermission(result);
+    if (result === "granted") {
+      persistDesktopNotificationPrefEnabled(true);
+      setDesktopPrefEnabled(true);
+      toast.success(i18n.t("notificationSound.desktopToastGranted"));
+    } else if (result === "denied") {
+      toast.error(i18n.t("notificationSound.desktopToastDenied"));
+    }
+  };
+
+  const handleDesktopPrefToggle = (event) => {
+    const next = event.target.checked;
+    setDesktopPrefEnabled(next);
+    persistDesktopNotificationPrefEnabled(next);
+  };
+
+  const desktopSupported = isDesktopNotificationSupported();
 
   return (
     <div className={classes.controlRoot} ref={anchorEl}>
@@ -290,6 +333,72 @@ const NotificationsVolume = () => {
           >
             {i18n.t("notificationSound.testSound")}
           </Button>
+          {audioBlocked ? (
+            <Typography
+              variant="caption"
+              color="error"
+              className={classes.warnText}
+            >
+              {i18n.t("notificationSound.audioBlocked")}
+            </Typography>
+          ) : null}
+
+          <Typography
+            variant="caption"
+            color="textSecondary"
+            className={classes.sectionTitle}
+          >
+            {i18n.t("notificationSound.desktopNotifications")}
+          </Typography>
+          <Typography variant="caption" color="textSecondary" display="block">
+            {i18n.t("notificationSound.desktopNotificationsHint")}
+          </Typography>
+          {!desktopSupported ? (
+            <Typography variant="caption" color="textSecondary" display="block">
+              {i18n.t("notificationSound.desktopUnsupported")}
+            </Typography>
+          ) : desktopPermission === "denied" ? (
+            <Typography
+              variant="caption"
+              color="error"
+              className={classes.warnText}
+            >
+              {i18n.t("notificationSound.desktopDenied")}
+            </Typography>
+          ) : desktopPermission === "granted" ? (
+            <>
+              <Typography variant="body2" className={classes.warnText}>
+                {i18n.t("notificationSound.desktopEnabled")}
+              </Typography>
+              <FormControlLabel
+                className={classes.openConversationRow}
+                control={
+                  <Switch
+                    color="primary"
+                    size="small"
+                    checked={desktopPrefEnabled}
+                    onChange={handleDesktopPrefToggle}
+                  />
+                }
+                label={
+                  <Typography variant="body2">
+                    {i18n.t("notificationSound.desktopToggle")}
+                  </Typography>
+                }
+              />
+            </>
+          ) : (
+            <Button
+              size="small"
+              color="primary"
+              variant="contained"
+              fullWidth
+              className={classes.testBtn}
+              onClick={handleEnableDesktop}
+            >
+              {i18n.t("notificationSound.desktopEnable")}
+            </Button>
+          )}
         </List>
       </Popover>
     </div>

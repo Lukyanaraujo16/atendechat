@@ -40,10 +40,27 @@ import "../../styles/globalMessageToast.css";
 import {
   BACKGROUND_SUMMARY_TOAST_ID,
   initPageVisibilityNotifications,
+  isPageHidden,
   queueBackgroundNotification,
   registerNotificationFlushHandlers,
   shouldDeferUiNotification,
+  subscribePageVisibility,
 } from "../../utils/pageVisibilityNotifications";
+import {
+  initNotificationTabLeader,
+  isNotificationTabLeader,
+} from "../../utils/notificationTabLeader";
+import { claimNotificationAlertId } from "../../utils/notificationAlertDedupe";
+import {
+  getDesktopNotificationPermission,
+  showDesktopMessageNotification,
+} from "../../utils/browserDesktopNotification";
+import {
+  resetPendingMessageTabIndicators,
+  syncPendingMessageTabIndicators,
+} from "../../utils/notificationTabIndicators";
+import { logNotificationMetric } from "../../utils/globalNotificationMetrics";
+import { useBranding } from "../Branding/BrandingContext";
 
 const SOUND_DEBOUNCE_MS = 1000;
 
@@ -51,8 +68,20 @@ function createNotificationId(dedupeKey) {
   return dedupeKey || `n-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+function resolveNotificationIcon(branding) {
+  const raw = branding?.faviconUrl || branding?.menuLogoUrl || "";
+  if (raw && typeof window !== "undefined") {
+    if (/^https?:\/\//i.test(raw)) return raw;
+    if (raw.startsWith("/")) return `${window.location.origin}${raw}`;
+  }
+  if (typeof window === "undefined") return undefined;
+  const base = process.env.PUBLIC_URL || "";
+  return `${window.location.origin}${base}/favicon.ico`;
+}
+
 function GlobalNotificationsSocketBridge({ children }) {
   const { user } = useContext(AuthContext);
+  const { branding } = useBranding() || {};
   const planFlags = usePlanFlags();
   const effectiveFeatures = planFlags.effectiveFeatures || {};
   const canAccessWhatsappInbox = hasAttendanceInboxAccess(effectiveFeatures);
@@ -69,6 +98,7 @@ function GlobalNotificationsSocketBridge({ children }) {
     markAsReadByChat,
     markAsReadByTicket,
     removeByTicketId,
+    unreadCount,
   } = useGlobalNotifications();
 
   const {
@@ -83,6 +113,10 @@ function GlobalNotificationsSocketBridge({ children }) {
 
   const playSound = useCallback(
     (soundType, ticketMeta) => {
+      if (!isNotificationTabLeader()) {
+        logNotificationMetric("sound_skipped_follower_tab");
+        return;
+      }
       const now = Date.now();
       if (now - lastSoundAtRef.current < SOUND_DEBOUNCE_MS) {
         return;
@@ -207,6 +241,47 @@ function GlobalNotificationsSocketBridge({ children }) {
     [history, markAsReadByChat, markAsReadByTicket, canAccessWhatsappInbox]
   );
 
+  const maybeShowDesktopNotification = useCallback(
+    (notification) => {
+      if (!isPageHidden()) return;
+      if (!isNotificationTabLeader()) {
+        logNotificationMetric("desktop_skipped_follower_tab");
+        return;
+      }
+      if (getDesktopNotificationPermission() !== "granted") {
+        logNotificationMetric("desktop_skipped_permission", {
+          permission: getDesktopNotificationPermission(),
+        });
+        return;
+      }
+
+      const tag =
+        notification.type === "internalChat"
+          ? `chat-${notification.chatId || notification.dedupeKey}`
+          : `ticket-${notification.ticketUuid || notification.ticketId}`;
+
+      showDesktopMessageNotification({
+        title: notification.contactName || notification.title,
+        body: notification.preview || notification.body || "",
+        icon: resolveNotificationIcon(branding),
+        tag,
+        data: {
+          targetUrl: notification.targetUrl,
+          ticketId: notification.ticketId,
+          ticketUuid: notification.ticketUuid,
+          chatId: notification.chatId,
+          type: notification.type,
+        },
+        onClick: () => openNotificationTarget(notification),
+      });
+      logNotificationMetric("desktop_shown", {
+        type: notification.type,
+        tag,
+      });
+    },
+    [branding, openNotificationTarget]
+  );
+
   useEffect(() => {
     const match = location.pathname.match(/^\/chats\/([^/?#]+)/);
     if (!match) return;
@@ -216,24 +291,33 @@ function GlobalNotificationsSocketBridge({ children }) {
 
   useEffect(() => {
     registerNotificationFlushHandlers({
-      playSound: () => {
-        const now = Date.now();
-        if (now - lastSoundAtRef.current < SOUND_DEBOUNCE_MS) {
-          return;
-        }
-        lastSoundAtRef.current = now;
-        playNotificationSoundThrottled(
-          playNotificationSound,
-          NOTIFICATION_SOUND_TYPES.newMessage
-        );
-      },
       showSummaryToast: showBackgroundSummaryToast,
     });
-  }, [playNotificationSound, showBackgroundSummaryToast]);
+  }, [showBackgroundSummaryToast]);
 
   useEffect(() => {
-    return initPageVisibilityNotifications();
+    const stopVisibility = initPageVisibilityNotifications();
+    const stopLeader = initNotificationTabLeader();
+    return () => {
+      stopVisibility();
+      stopLeader();
+      resetPendingMessageTabIndicators();
+    };
   }, []);
+
+  useEffect(() => {
+    const sync = () => {
+      syncPendingMessageTabIndicators({
+        count: unreadCount,
+        pageHidden: isPageHidden(),
+        systemName: branding?.systemName,
+      });
+    };
+    sync();
+    return subscribePageVisibility(() => {
+      sync();
+    });
+  }, [unreadCount, branding?.systemName]);
 
   useEffect(() => {
     const match = location.pathname.match(/^\/tickets\/([^/?#]+)/);
@@ -245,17 +329,20 @@ function GlobalNotificationsSocketBridge({ children }) {
   const handleWhatsappMessage = useCallback(
     (data) => {
       if (!canAccessWhatsappInbox) {
+        logNotificationMetric("whatsapp_skipped_inbox_access");
         return;
       }
       if (!socketLiveRef.current) {
         return;
       }
       if (!shouldNotifyWhatsappMessage(data, user)) {
+        logNotificationMetric("whatsapp_skipped_visibility");
         return;
       }
 
       const { message, contact, ticket } = data;
       if (!isRealtimeInboundMessage(message, sessionStartMsRef.current)) {
+        logNotificationMetric("whatsapp_skipped_stale");
         return;
       }
 
@@ -263,12 +350,20 @@ function GlobalNotificationsSocketBridge({ children }) {
       const ticketDedupeKey = buildTicketNotificationDedupeKey(ticket);
       if (!messageDedupeKey) return;
 
+      if (!claimNotificationAlertId(messageDedupeKey)) {
+        logNotificationMetric("whatsapp_skipped_dedupe", {
+          key: messageDedupeKey,
+        });
+        return;
+      }
+
       const contactName = contact?.name || i18n.t("globalNotifications.unknownContact");
       const preview = buildWhatsappMessagePreview(message);
       const body = preview ? `${contactName}: ${preview}` : contactName;
       const targetUrl = `/tickets/${ticket.uuid || ticket.id}`;
       const ticketOpen = isTicketOpenInRoute(ticket, locationRef.current);
       const toastVariant = getWhatsappToastVariant(locationRef.current, ticket);
+      const pageHidden = isPageHidden();
 
       const notification = {
         id: createNotificationId(messageDedupeKey),
@@ -295,10 +390,14 @@ function GlobalNotificationsSocketBridge({ children }) {
       };
 
       addNotification(notification);
+      logNotificationMetric("whatsapp_received", {
+        ticketId: ticket.id,
+        pageHidden,
+        ticketOpen,
+      });
 
-      if (shouldDeferUiNotification()) {
+      if (pageHidden) {
         queueBackgroundNotification({ messageId: message?.id });
-        return;
       }
 
       if (ticketOpen || toastVariant === "none") {
@@ -306,6 +405,7 @@ function GlobalNotificationsSocketBridge({ children }) {
           ticketId: ticket.id,
           ticketUuid: ticket.uuid,
         });
+        maybeShowDesktopNotification(notification);
         return;
       }
 
@@ -313,13 +413,18 @@ function GlobalNotificationsSocketBridge({ children }) {
         ticketId: ticket.id,
         ticketUuid: ticket.uuid,
       });
-      showWhatsappMessageToast(notification, () =>
-        openNotificationTarget(notification)
-      );
+      maybeShowDesktopNotification(notification);
+
+      if (!shouldDeferUiNotification()) {
+        showWhatsappMessageToast(notification, () =>
+          openNotificationTarget(notification)
+        );
+      }
     },
     [
       addNotification,
       canAccessWhatsappInbox,
+      maybeShowDesktopNotification,
       openNotificationTarget,
       playSound,
       showWhatsappMessageToast,
@@ -355,12 +460,18 @@ function GlobalNotificationsSocketBridge({ children }) {
       );
       if (!dedupeKey) return;
 
+      if (!claimNotificationAlertId(dedupeKey)) {
+        logNotificationMetric("internal_skipped_dedupe", { key: dedupeKey });
+        return;
+      }
+
       const senderName = getInternalChatSenderName(newMessage, chat);
       const preview = buildInternalChatPreview(newMessage);
       const body = preview ? `${senderName}: ${preview}` : senderName;
       const chatPathId = chat.uuid || chat.id;
       const targetUrl = `/chats/${chatPathId}`;
       const chatOpen = isInternalChatOpenInRoute(chat, locationRef.current);
+      const pageHidden = isPageHidden();
 
       const notification = {
         id: createNotificationId(dedupeKey),
@@ -383,31 +494,39 @@ function GlobalNotificationsSocketBridge({ children }) {
 
       addNotification(notification);
 
-      if (shouldDeferUiNotification()) {
+      if (pageHidden) {
         queueBackgroundNotification({ messageId: newMessage?.id });
-        return;
       }
 
       if (chatOpen) {
         if (openConversationEnabled) {
-          playNotificationSoundThrottled(
-            playNotificationSound,
-            NOTIFICATION_SOUND_TYPES.openConversationMessage
-          );
+          if (isNotificationTabLeader()) {
+            playNotificationSoundThrottled(
+              playNotificationSound,
+              NOTIFICATION_SOUND_TYPES.openConversationMessage
+            );
+          }
         }
+        maybeShowDesktopNotification(notification);
         return;
       }
 
       playSound(NOTIFICATION_SOUND_TYPES.internalChat);
-      showInternalChatToast(notification, () =>
-        openNotificationTarget(notification)
-      );
+      maybeShowDesktopNotification(notification);
+
+      if (!shouldDeferUiNotification()) {
+        showInternalChatToast(notification, () =>
+          openNotificationTarget(notification)
+        );
+      }
     },
     [
       addNotification,
+      maybeShowDesktopNotification,
       openConversationEnabled,
       openNotificationTarget,
       playSound,
+      playNotificationSound,
       showInternalChatToast,
       user?.companyId,
       user?.id,

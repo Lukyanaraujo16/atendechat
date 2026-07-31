@@ -1,6 +1,9 @@
 /**
- * Controle de notificações UI/som quando a aba está em background ou ao restaurar
- * após minimizar (eventos socket processados em lote).
+ * Controle de visibilidade da página para notificações.
+ *
+ * Toast in-app só faz sentido com a aba visível.
+ * Som / título / notificação nativa NÃO devem ser adiados até o retorno —
+ * isso era a causa de silêncio com guia oculta ou navegador minimizado.
  */
 
 export const BACKGROUND_SUMMARY_TOAST_ID = "background-notifications-summary";
@@ -32,12 +35,21 @@ const queue = {
 
 let lastSoundPlayedAt = 0;
 let flushHandlers = null;
+const visibilityListeners = new Set();
 
 export function isPageInForeground() {
   if (typeof document === "undefined") return true;
   return !document.hidden;
 }
 
+export function isPageHidden() {
+  return !isPageInForeground();
+}
+
+/**
+ * Adiar apenas UI de toast (não som/título/nativa).
+ * Mantido o nome por compatibilidade com callers existentes.
+ */
 export function shouldDeferUiNotification() {
   if (typeof document === "undefined") return false;
   if (document.hidden) return true;
@@ -47,6 +59,21 @@ export function shouldDeferUiNotification() {
 
 export function registerNotificationFlushHandlers(handlers) {
   flushHandlers = handlers;
+}
+
+export function subscribePageVisibility(listener) {
+  visibilityListeners.add(listener);
+  return () => visibilityListeners.delete(listener);
+}
+
+function emitVisibility(hidden) {
+  visibilityListeners.forEach((fn) => {
+    try {
+      fn({ hidden, visible: !hidden });
+    } catch {
+      /* ignore */
+    }
+  });
 }
 
 export function queueBackgroundNotification({ messageId } = {}) {
@@ -78,6 +105,9 @@ function canPlayThrottledSound() {
   return true;
 }
 
+/**
+ * Ao voltar: apenas resumo toast (som já tocou em background quando possível).
+ */
 export function flushDeferredNotifications() {
   state.batchingUntil = 0;
   const count = queue.count;
@@ -89,11 +119,7 @@ export function flushDeferredNotifications() {
   debug("flushing", count);
   resetQueue();
 
-  if (flushHandlers?.playSound && canPlayThrottledSound()) {
-    flushHandlers.playSound();
-    debug("sound played");
-  }
-
+  // Som em background já foi tentado; no retorno só resume visual.
   if (flushHandlers?.showSummaryToast) {
     flushHandlers.showSummaryToast(count);
     debug("summary toast shown", count);
@@ -116,6 +142,7 @@ function onBecameVisible() {
   state.lastVisibleAt = Date.now();
   state.batchingUntil = Date.now() + BACKGROUND_BATCH_WINDOW_MS;
   debug("visible", { batchingUntil: state.batchingUntil });
+  emitVisibility(false);
   scheduleFlushAfterBatchWindow();
 }
 
@@ -127,6 +154,7 @@ function onBecameHidden() {
     clearTimeout(state.flushTimer);
     state.flushTimer = null;
   }
+  emitVisibility(true);
 }
 
 /**
@@ -166,5 +194,11 @@ export function initPageVisibilityNotifications() {
       clearTimeout(state.flushTimer);
       state.flushTimer = null;
     }
+    visibilityListeners.clear();
   };
+}
+
+/** @deprecated som em background não usa mais este gate; mantido para testes */
+export function __canPlayThrottledSoundForTests() {
+  return canPlayThrottledSound();
 }

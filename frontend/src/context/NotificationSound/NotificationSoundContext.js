@@ -2,7 +2,9 @@ import React, {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -14,6 +16,7 @@ import {
   readOpenConversationEnabled,
 } from "../../utils/notificationSoundOpenConversation";
 import { playNotificationSoundThrottled } from "../../utils/notificationSoundPlayback";
+import { logNotificationMetric } from "../../utils/globalNotificationMetrics";
 
 const STORAGE_VOLUME = "notificationSoundVolume";
 const STORAGE_MUTED = "notificationSoundMuted";
@@ -71,14 +74,79 @@ function persistSoundPrefs(volume, muted) {
 
 const NotificationSoundContext = createContext(null);
 
+function createUnlockedPool() {
+  const pool = new Map();
+  Object.values(SOUND_SRC).forEach((src) => {
+    if (pool.has(src)) return;
+    try {
+      const audio = new Audio(src);
+      audio.preload = "auto";
+      pool.set(src, audio);
+    } catch {
+      /* ignore */
+    }
+  });
+  return pool;
+}
+
 export function NotificationSoundProvider({ children }) {
   const [volume, setVolumeState] = useState(readStoredVolume);
   const [muted, setMutedState] = useState(readStoredMuted);
   const [openConversationEnabled, setOpenConversationEnabledState] = useState(
     readOpenConversationEnabled
   );
+  const [audioUnlocked, setAudioUnlocked] = useState(false);
+  const [audioBlocked, setAudioBlocked] = useState(false);
+  const poolRef = useRef(null);
+
+  if (poolRef.current == null && typeof Audio !== "undefined") {
+    poolRef.current = createUnlockedPool();
+  }
 
   const effectiveVolume = muted ? 0 : volume;
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+
+    const unlock = () => {
+      const pool = poolRef.current;
+      if (!pool) {
+        setAudioUnlocked(true);
+        return;
+      }
+      const first = pool.values().next().value;
+      if (!first) {
+        setAudioUnlocked(true);
+        return;
+      }
+      const prevVolume = first.volume;
+      first.volume = 0;
+      first
+        .play()
+        .then(() => {
+          first.pause();
+          first.currentTime = 0;
+          first.volume = prevVolume;
+          setAudioUnlocked(true);
+          setAudioBlocked(false);
+          logNotificationMetric("audio_unlocked");
+        })
+        .catch(() => {
+          /* ainda bloqueado até próximo gesto */
+        });
+    };
+
+    const opts = { capture: true, passive: true };
+    window.addEventListener("pointerdown", unlock, opts);
+    window.addEventListener("keydown", unlock, opts);
+    window.addEventListener("touchstart", unlock, opts);
+
+    return () => {
+      window.removeEventListener("pointerdown", unlock, opts);
+      window.removeEventListener("keydown", unlock, opts);
+      window.removeEventListener("touchstart", unlock, opts);
+    };
+  }, []);
 
   const setVolume = useCallback((next) => {
     const v = clampVolume(next);
@@ -114,20 +182,50 @@ export function NotificationSoundProvider({ children }) {
   const playNotificationSound = useCallback(
     (soundType = NOTIFICATION_SOUND_TYPES.default) => {
       if (muted || effectiveVolume <= 0) {
-        return Promise.resolve();
+        return Promise.resolve({ played: false, reason: "muted" });
       }
 
       const src = SOUND_SRC[soundType] || SOUND_SRC.default;
-      const audio = new Audio(src);
       const scale = SOUND_VOLUME_SCALE[soundType] ?? 1;
-      audio.volume = effectiveVolume * scale;
+      const pool = poolRef.current;
+      let audio = pool?.get(src);
 
-      return audio.play().catch((err) => {
-        if (process.env.NODE_ENV === "development") {
-          // eslint-disable-next-line no-console
-          console.debug("[NotificationSound] play blocked or failed", err);
+      try {
+        if (audio) {
+          audio.pause();
+          audio.currentTime = 0;
+        } else {
+          audio = new Audio(src);
+          if (pool) pool.set(src, audio);
         }
-      });
+        audio.volume = effectiveVolume * scale;
+      } catch (err) {
+        logNotificationMetric("audio_create_failed", {
+          message: err?.message,
+        });
+        return Promise.resolve({ played: false, reason: "create_failed" });
+      }
+
+      return audio
+        .play()
+        .then(() => {
+          setAudioBlocked(false);
+          setAudioUnlocked(true);
+          return { played: true };
+        })
+        .catch((err) => {
+          const name = err?.name || "";
+          const blocked =
+            name === "NotAllowedError" || name === "NotSupportedError";
+          if (blocked) {
+            setAudioBlocked(true);
+            logNotificationMetric("audio_blocked", { name });
+          } else if (process.env.NODE_ENV === "development") {
+            // eslint-disable-next-line no-console
+            console.debug("[NotificationSound] play failed", err);
+          }
+          return { played: false, reason: blocked ? "blocked" : "error" };
+        });
     },
     [muted, effectiveVolume]
   );
@@ -135,7 +233,7 @@ export function NotificationSoundProvider({ children }) {
   const playContextualNotificationSound = useCallback(
     ({ ticketId, ticketUuid, route } = {}) => {
       if (muted || effectiveVolume <= 0) {
-        return Promise.resolve();
+        return Promise.resolve({ played: false, reason: "muted" });
       }
 
       const pathname =
@@ -151,7 +249,7 @@ export function NotificationSoundProvider({ children }) {
         soundType === NOTIFICATION_SOUND_TYPES.openConversationMessage &&
         !openConversationEnabled
       ) {
-        return Promise.resolve();
+        return Promise.resolve({ played: false, reason: "open_disabled" });
       }
 
       return playNotificationSoundThrottled(
@@ -173,6 +271,8 @@ export function NotificationSoundProvider({ children }) {
       muted,
       effectiveVolume,
       openConversationEnabled,
+      audioUnlocked,
+      audioBlocked,
       setVolume,
       setMuted,
       toggleMuted,
@@ -185,6 +285,8 @@ export function NotificationSoundProvider({ children }) {
       muted,
       effectiveVolume,
       openConversationEnabled,
+      audioUnlocked,
+      audioBlocked,
       setVolume,
       setMuted,
       toggleMuted,
