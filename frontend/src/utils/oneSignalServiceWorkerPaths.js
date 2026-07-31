@@ -1,20 +1,18 @@
 /**
- * Caminhos e scopes do OneSignal Web Push (isolados do Workbox PWA).
+ * Caminhos e scopes do OneSignal Web Push (Fase 2.13C).
  *
- * Workbox/PWA: /service-worker.js → scope /
- * OneSignal:   /push/onesignal/*.js → scope /push/onesignal/
+ * Workbox/PWA:  /service-worker.js           → scope /
+ * OneSignal:    /OneSignalSDKWorker.js         → scope /push/onesignal/
+ * Updater:      /OneSignalSDKUpdaterWorker.js  → scope /push/onesignal/
+ *
+ * Migração segura (docs OneSignal): alterar somente o scope, manter a URL histórica do worker.
+ * Não desregistrar automaticamente o worker OneSignal.
  */
 
-export const ONESIGNAL_SW_DIR = "push/onesignal";
 export const ONESIGNAL_SW_FILE = "OneSignalSDKWorker.js";
 export const ONESIGNAL_SW_UPDATER_FILE = "OneSignalSDKUpdaterWorker.js";
+/** Scope restrito — distinto do Workbox na raiz. */
 export const ONESIGNAL_SW_SCOPE_PATH = "/push/onesignal/";
-
-/** Scripts legados na raiz (scope /) — candidatos a unregister seletivo. */
-export const LEGACY_ONESIGNAL_ROOT_SW_FILES = [
-  "OneSignalSDKWorker.js",
-  "OneSignalSDKUpdaterWorker.js",
-];
 
 export function publicUrlBase(envPublicUrl = process.env.PUBLIC_URL) {
   return String(envPublicUrl || "").replace(/\/$/, "");
@@ -22,7 +20,6 @@ export function publicUrlBase(envPublicUrl = process.env.PUBLIC_URL) {
 
 /**
  * Monta URL absoluta de asset SW sem barras duplicadas.
- * Ex.: push/onesignal/OneSignalSDKWorker.js → /push/onesignal/OneSignalSDKWorker.js
  */
 export function buildPublicAssetPath(relativePath, envPublicUrl = process.env.PUBLIC_URL) {
   const base = publicUrlBase(envPublicUrl);
@@ -35,19 +32,17 @@ export function buildPublicAssetPath(relativePath, envPublicUrl = process.env.PU
   return base ? `${base}/${rel}` : `/${rel}`;
 }
 
+/** URL canónica histórica na raiz. */
 export function getOneSignalServiceWorkerPath(envPublicUrl = process.env.PUBLIC_URL) {
-  return buildPublicAssetPath(`${ONESIGNAL_SW_DIR}/${ONESIGNAL_SW_FILE}`, envPublicUrl);
+  return buildPublicAssetPath(ONESIGNAL_SW_FILE, envPublicUrl);
 }
 
 export function getOneSignalServiceWorkerUpdaterPath(envPublicUrl = process.env.PUBLIC_URL) {
-  return buildPublicAssetPath(
-    `${ONESIGNAL_SW_DIR}/${ONESIGNAL_SW_UPDATER_FILE}`,
-    envPublicUrl
-  );
+  return buildPublicAssetPath(ONESIGNAL_SW_UPDATER_FILE, envPublicUrl);
 }
 
 /**
- * Scope deve cobrir o diretório do worker (requisito do browser).
+ * Scope isolado (descendente de `/`). Script na raiz pode pedir scope mais restrito.
  * Com PUBLIC_URL=/app → /app/push/onesignal/
  */
 export function getOneSignalServiceWorkerScope(envPublicUrl = process.env.PUBLIC_URL) {
@@ -59,16 +54,29 @@ export function getOneSignalServiceWorkerScope(envPublicUrl = process.env.PUBLIC
   return `${base}/${scopeRel}`.replace(/\/{2,}/g, "/");
 }
 
-export function isLegacyOneSignalRootWorkerScript(scriptURL) {
+/** Path antigo da 2.13B (subdiretório) — não é canónico. */
+export function isDeprecatedSubdirOneSignalWorkerScript(scriptURL) {
   if (!scriptURL) return false;
   try {
     const path = new URL(String(scriptURL), "https://local.invalid").pathname;
-    // Legado: /OneSignalSDKWorker.js — não o isolado /push/onesignal/...
-    if (path.includes(`/${ONESIGNAL_SW_DIR}/`)) {
+    return path.includes("/push/onesignal/OneSignalSDK");
+  } catch {
+    return false;
+  }
+}
+
+export function isCanonicalOneSignalRootWorkerScript(scriptURL) {
+  if (!scriptURL) return false;
+  try {
+    const path = new URL(String(scriptURL), "https://local.invalid").pathname;
+    if (path.includes("/push/onesignal/")) {
       return false;
     }
-    return LEGACY_ONESIGNAL_ROOT_SW_FILES.some(
-      (file) => path === `/${file}` || path.endsWith(`/${file}`)
+    return (
+      path === `/${ONESIGNAL_SW_FILE}` ||
+      path.endsWith(`/${ONESIGNAL_SW_FILE}`) ||
+      path === `/${ONESIGNAL_SW_UPDATER_FILE}` ||
+      path.endsWith(`/${ONESIGNAL_SW_UPDATER_FILE}`)
     );
   } catch {
     return false;

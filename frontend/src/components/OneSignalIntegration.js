@@ -1,5 +1,5 @@
 /**
- * Arranque global: OneSignal (scope /push/onesignal/) + PWA/Workbox (scope /);
+ * Arranque global: OneSignal (script raiz, scope /push/onesignal/) + PWA/Workbox (scope /);
  * após login, associa utilizador e tags.
  */
 import React, { useContext, useEffect, useState } from "react";

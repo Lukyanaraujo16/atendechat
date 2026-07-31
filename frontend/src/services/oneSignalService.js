@@ -14,10 +14,7 @@ import {
   getOneSignalServiceWorkerUpdaterPath,
   maskSubscriptionId,
 } from "../utils/oneSignalServiceWorkerPaths";
-import {
-  listServiceWorkerRegistrationsForDiagnostics,
-  unregisterLegacyOneSignalRootWorkers,
-} from "../utils/oneSignalWorkerTransition";
+import { listServiceWorkerRegistrationsForDiagnostics } from "../utils/oneSignalWorkerTransition";
 
 /** Instância do namespace OneSignal após `init` (SDK Web v16 via CDN). */
 let oneSignalApi = null;
@@ -29,7 +26,6 @@ let lastConfig = null;
 let statusListenersAttached = false;
 let identityUserId = null;
 let enableInFlight = null;
-let legacyTransitionPromise = null;
 
 let pushStatus = {
   domainState: PUSH_DOMAIN_STATES.NOT_CONFIGURED,
@@ -376,25 +372,6 @@ async function waitForEffectiveSubscription(api, timeoutMs = SUBSCRIPTION_WAIT_M
   });
 }
 
-async function ensureLegacyOneSignalRootTransition() {
-  if (legacyTransitionPromise) {
-    return legacyTransitionPromise;
-  }
-  legacyTransitionPromise = (async () => {
-    try {
-      const summary = await unregisterLegacyOneSignalRootWorkers();
-      if (summary.unregistered > 0) {
-        logPush("legacy_onesignal_root_unregistered", summary);
-      }
-      return summary;
-    } catch (e) {
-      logPush("legacy_transition_failed", { message: e?.message || "unknown" });
-      return { unregistered: 0, skipped: 0, errors: 1 };
-    }
-  })();
-  return legacyTransitionPromise;
-}
-
 async function initOneSignalFromConfig(cfg) {
   if (initPromise) {
     return initPromise;
@@ -403,15 +380,19 @@ async function initOneSignalFromConfig(cfg) {
     return false;
   }
   sdkLoading = true;
+  // Não reutilizar id/token anteriores ao novo init (evita "subscribed" stale).
   setPushStatus({
     onesignalEnabled: Boolean(cfg.onesignalEnabled),
     onesignalAppId: cfg.onesignalAppId,
     sdkLoading: true,
+    optedIn: false,
+    subscriptionId: null,
+    token: null,
+    errorCode: null,
   });
 
   initPromise = (async () => {
     try {
-      await ensureLegacyOneSignalRootTransition();
       await loadOneSignalPageScript();
       const serviceWorkerPath = getOneSignalServiceWorkerPath();
       const serviceWorkerUpdaterPath = getOneSignalServiceWorkerUpdaterPath();
@@ -432,6 +413,8 @@ async function initOneSignalFromConfig(cfg) {
       registerTicketDeepLinkOnNotificationClick(api);
       attachSdkStatusListeners(api);
       const supported = isPushSupportedBySdk(api);
+      // Relê sempre do SDK após init — nunca confiar em snapshot pré-init.
+      const snap = readSubscriptionSnapshot(api);
       setPushStatus({
         onesignalEnabled: true,
         onesignalAppId: cfg.onesignalAppId,
@@ -439,12 +422,16 @@ async function initOneSignalFromConfig(cfg) {
         sdkReady: true,
         sdkLoading: false,
         permissionNative: readNativePermission(),
-        ...readSubscriptionSnapshot(api),
+        optedIn: snap.optedIn,
+        subscriptionId: snap.subscriptionId,
+        token: snap.token,
         errorCode: null,
       });
       logPush("init_ok", {
         serviceWorkerPath,
         scope,
+        hasSubscriptionId: Boolean(snap.subscriptionId),
+        optedIn: snap.optedIn,
         browser: detectBrowserLabel(
           typeof navigator !== "undefined" ? navigator.userAgent : ""
         ),
@@ -459,6 +446,9 @@ async function initOneSignalFromConfig(cfg) {
       setPushStatus({
         sdkReady: false,
         sdkLoading: false,
+        optedIn: false,
+        subscriptionId: null,
+        token: null,
         errorCode: "init_failed",
       });
       return false;
@@ -468,8 +458,8 @@ async function initOneSignalFromConfig(cfg) {
 }
 
 /**
- * Arranque: OneSignal (scope /push/onesignal/) e PWA/Workbox (scope /) podem coexistir.
- * Workbox continua registado em produção mesmo com OneSignal ativo.
+ * Arranque: OneSignal (script na raiz, scope /push/onesignal/) e PWA/Workbox (scope /).
+ * Não desregistra workers OneSignal automaticamente.
  */
 export async function bootstrapPushAndPwaServiceWorker() {
   let onesignalResult = "skipped";
@@ -493,7 +483,7 @@ export async function bootstrapPushAndPwaServiceWorker() {
     logPush("sdk_load_failed", { message: e?.message || "config" });
     onesignalResult = "onesignal_failed";
   }
-  // PWA/Workbox: scope / — independente do OneSignal isolado.
+  // PWA/Workbox: scope / — independente do OneSignal com scope descendente.
   registerMinimalPwaServiceWorker();
   return onesignalResult;
 }
@@ -851,7 +841,6 @@ export function __resetOneSignalServiceForTests() {
   statusListenersAttached = false;
   identityUserId = null;
   enableInFlight = null;
-  legacyTransitionPromise = null;
   SUBSCRIPTION_WAIT_MS = SUBSCRIPTION_WAIT_MS_DEFAULT;
   PERMISSION_WAIT_MS = PERMISSION_WAIT_MS_DEFAULT;
   statusListeners.clear();

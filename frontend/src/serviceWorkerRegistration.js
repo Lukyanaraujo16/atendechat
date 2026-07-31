@@ -1,9 +1,9 @@
 /**
  * PWA/Workbox no scope `/` (produção).
  *
- * Após isolamento OneSignal em `/push/onesignal/`, este registro pode coexistir
- * com o worker OneSignal. O build do react-scripts gera Workbox real em
- * `build/service-worker.js` (não o arquivo mínimo de `public/`).
+ * OneSignal usa script na raiz com scope `/push/onesignal/` — coexistência sem
+ * disputa pelo controlador da raiz. O build do react-scripts gera Workbox real
+ * em `build/service-worker.js`.
  *
  * Não desregistrar workers OneSignal daqui.
  */
