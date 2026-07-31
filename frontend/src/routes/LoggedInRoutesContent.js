@@ -22,6 +22,7 @@ import {
 } from "../utils/attendanceAccess";
 import { isCommercialAutomationsPath } from "../utils/commercialAutomationsNav";
 import { getConfiguracoesAccess } from "../utils/settingsConnectionsAccess";
+import { canAccessAiAgentProduct } from "../utils/canManageAiAgentProduct";
 
 import Dashboard from "../pages/Dashboard/";
 import TicketResponsiveContainer from "../pages/TicketResponsiveContainer";
@@ -332,7 +333,7 @@ function AtendimentoModule({ planFlags, isAdmin, user }) {
   );
 }
 
-function AutomacaoModule({ planFlags, isAdmin }) {
+function AutomacaoModule({ planFlags, isAdmin, canAccessAiAgent }) {
   const { user } = useContext(AuthContext);
   const location = useLocation();
   const pathname = location.pathname;
@@ -343,7 +344,9 @@ function AutomacaoModule({ planFlags, isAdmin }) {
   const showOpenAi = fx["automation.openai"] === true;
   const showQuickReplies = fx["automation.quick_replies"] === true;
   const showAiAgent =
-    AI_AGENT_UI_ENABLED && isAdmin && fx[AI_AGENT_FEATURE_KEY] === true;
+    AI_AGENT_UI_ENABLED &&
+    canAccessAiAgent &&
+    fx[AI_AGENT_FEATURE_KEY] === true;
   const showKnowledgeBase =
     KNOWLEDGE_BASE_UI_ENABLED && isAdmin && fx[KNOWLEDGE_BASE_FEATURE_KEY] === true;
 
@@ -469,7 +472,7 @@ function AutomacaoModule({ planFlags, isAdmin }) {
               user={user}
               fallbackPath={fallback}
             >
-              {isAdmin && showAiAgent ? <AiAgentWizardPage /> : null}
+              {showAiAgent ? <AiAgentWizardPage /> : null}
             </AiAgentRouteGuard>
           )}
         />
@@ -482,7 +485,7 @@ function AutomacaoModule({ planFlags, isAdmin }) {
               user={user}
               fallbackPath={fallback}
             >
-              {isAdmin && showAiAgent ? <AiAgentWizardPage /> : null}
+              {showAiAgent ? <AiAgentWizardPage /> : null}
             </AiAgentRouteGuard>
           )}
         />
@@ -495,7 +498,7 @@ function AutomacaoModule({ planFlags, isAdmin }) {
               user={user}
               fallbackPath={fallback}
             >
-              {isAdmin && showAiAgent ? <AiAgentWizardPage /> : null}
+              {showAiAgent ? <AiAgentWizardPage /> : null}
             </AiAgentRouteGuard>
           )}
         />
@@ -513,7 +516,7 @@ function AutomacaoModule({ planFlags, isAdmin }) {
               user={user}
               fallbackPath={fallback}
             >
-              {isAdmin && showAiAgent ? <AiAgentSimulatorPage /> : null}
+              {showAiAgent ? <AiAgentSimulatorPage /> : null}
             </AiAgentRouteGuard>
           )}
         />
@@ -543,7 +546,7 @@ function AutomacaoModule({ planFlags, isAdmin }) {
               user={user}
               fallbackPath={fallback}
             >
-              {isAdmin && showAiAgent ? <AiAgentDetailPage /> : null}
+              {showAiAgent ? <AiAgentDetailPage /> : null}
             </AiAgentRouteGuard>
           )}
         />
@@ -556,7 +559,7 @@ function AutomacaoModule({ planFlags, isAdmin }) {
               user={user}
               fallbackPath={fallback}
             >
-              {isAdmin && showAiAgent ? <AiAgentDetailPage /> : null}
+              {showAiAgent ? <AiAgentDetailPage /> : null}
             </AiAgentRouteGuard>
           )}
         />
@@ -569,7 +572,7 @@ function AutomacaoModule({ planFlags, isAdmin }) {
               user={user}
               fallbackPath={fallback}
             >
-              {isAdmin && showAiAgent ? <AiAgentDetailPage /> : null}
+              {showAiAgent ? <AiAgentDetailPage /> : null}
             </AiAgentRouteGuard>
           )}
         />
@@ -582,7 +585,7 @@ function AutomacaoModule({ planFlags, isAdmin }) {
               user={user}
               fallbackPath={fallback}
             >
-              {isAdmin && showAiAgent ? <AiAgentDetailPage /> : null}
+              {showAiAgent ? <AiAgentDetailPage /> : null}
             </AiAgentRouteGuard>
           )}
         />
@@ -595,7 +598,7 @@ function AutomacaoModule({ planFlags, isAdmin }) {
               user={user}
               fallbackPath={fallback}
             >
-              {isAdmin && showAiAgent ? <AiAgentDetailPage /> : null}
+              {showAiAgent ? <AiAgentDetailPage /> : null}
             </AiAgentRouteGuard>
           )}
         />
@@ -608,7 +611,7 @@ function AutomacaoModule({ planFlags, isAdmin }) {
               user={user}
               fallbackPath={fallback}
             >
-              {isAdmin && showAiAgent ? <AiAgentDetailPage /> : null}
+              {showAiAgent ? <AiAgentDetailPage /> : null}
             </AiAgentRouteGuard>
           )}
         />
@@ -621,7 +624,7 @@ function AutomacaoModule({ planFlags, isAdmin }) {
               user={user}
               fallbackPath={fallback}
             >
-              {isAdmin && showAiAgent ? <AiAgent /> : null}
+              {showAiAgent ? <AiAgent /> : null}
             </AiAgentRouteGuard>
           )}
         />
@@ -877,6 +880,7 @@ export default function LoggedInRoutesContent() {
   const { user } = useContext(AuthContext);
   const planFlags = usePlanFlags();
   const isAdmin = user?.profile === "admin";
+  const canAccessAiAgent = canAccessAiAgentProduct(user);
   const isTenantManager = isAdmin || user?.profile === "supervisor";
   const fx = planFlags.effectiveFeatures || {};
   const showDashboardNav =
@@ -1058,7 +1062,7 @@ export default function LoggedInRoutesContent() {
 
       <Route path={technicalConsolePaths} component={TechnicalAgentOsRoutes} />
 
-      <Route path={automacaoPaths} render={() => <AutomacaoModule planFlags={planFlags} isAdmin={isAdmin} />} />
+      <Route path={automacaoPaths} render={() => <AutomacaoModule planFlags={planFlags} isAdmin={isAdmin} canAccessAiAgent={canAccessAiAgent} />} />
 
       <Route
         path={campanhasPaths}

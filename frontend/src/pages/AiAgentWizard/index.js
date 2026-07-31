@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useContext } from "react";
 import { useHistory, useParams, useLocation } from "react-router-dom";
 import Box from "@material-ui/core/Box";
 import IconButton from "@material-ui/core/IconButton";
@@ -10,6 +10,8 @@ import MainContainer from "../../components/MainContainer";
 import MainHeader from "../../components/MainHeader";
 import Title from "../../components/Title";
 import AiAgentWizard from "../../components/AiAgentWizard";
+import AiAgentSupportBanner from "../../components/AiAgentSupportBanner";
+import { AuthContext } from "../../context/Auth/AuthContext";
 import { i18n } from "../../translate/i18n";
 import { AI_AGENT_ROUTE_PATH } from "../../config/aiAgentFeature";
 
@@ -30,12 +32,17 @@ export default function AiAgentWizardPage() {
   const classes = useStyles();
   const history = useHistory();
   const location = useLocation();
+  const { user } = useContext(AuthContext);
   const { agentRef: rawRef, agentId: legacyId } = useParams();
   const agentRef = String(rawRef || legacyId || "").trim();
   const isCreateRoute =
     location.pathname === "/ai-agent/new" ||
     (location.pathname === "/ai-agent/wizard" && !agentRef);
   const mode = isCreateRoute ? "create" : agentRef ? "edit" : "create";
+  const companyLabel =
+    user?.company?.name ||
+    user?.companyName ||
+    (user?.companyId != null ? String(user.companyId) : "");
 
   return (
     <MainContainer>
@@ -60,6 +67,11 @@ export default function AiAgentWizardPage() {
           </Box>
         </Box>
       </MainHeader>
+
+      <AiAgentSupportBanner
+        supportMode={user?.supportMode === true}
+        companyLabel={companyLabel}
+      />
 
       <AiAgentWizard mode={mode} agentRef={agentRef || null} />
     </MainContainer>

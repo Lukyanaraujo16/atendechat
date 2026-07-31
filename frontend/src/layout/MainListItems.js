@@ -46,6 +46,7 @@ import {
   KNOWLEDGE_BASE_UI_ENABLED,
 } from "../config/knowledgeBaseFeature";
 import { canUseAiAgent } from "../utils/canUseAiAgent";
+import { canAccessAiAgentProduct } from "../utils/canManageAiAgentProduct";
 import { canUseKnowledgeBase } from "../utils/canUseKnowledgeBase";
 import { canShowTechnicalConsoleNav } from "../utils/agentOsConsoleAccess";
 import { canUseInventorySales } from "../utils/canUseInventorySales";
@@ -471,7 +472,7 @@ const MainListItems = (props) => {
    * Perfil admin alinhado às rotas do AutomacaoModule / AiAgentRouteGuard.
    */
   const aiAgentVisible =
-    isAdmin &&
+    canAccessAiAgentProduct(user) &&
     planFlags.loaded &&
     AI_AGENT_UI_ENABLED &&
     canUseAiAgent(user, planFlags);

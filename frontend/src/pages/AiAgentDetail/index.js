@@ -38,6 +38,7 @@ import {
   parseAiAgentDetailSection,
 } from "../../config/aiAgentFeature";
 import { notifyAiAgentProductAgentsChanged } from "../../utils/aiAgentProductAgentsCache";
+import { canManageAiAgentProduct } from "../../utils/canManageAiAgentProduct";
 import { i18n } from "../../translate/i18n";
 
 const useStyles = makeStyles((theme) => ({
@@ -138,8 +139,7 @@ export default function AiAgentDetailPage() {
     setCommandError(null);
   }, [agentRef]);
 
-  const canMutate =
-    user?.profile === "admin" && user?.supportMode !== true;
+  const canMutate = canManageAiAgentProduct(user);
 
   const loadEditableFlag = useCallback(async () => {
     if (!agentRef) return;
@@ -347,6 +347,7 @@ export default function AiAgentDetailPage() {
                 onCommand={handleCommand}
                 commandBusy={busyCommand}
                 onOpenCredentials={() => setCredentialModalOpen(true)}
+                supportMode={user?.supportMode === true}
               />
             </Box>
           </>

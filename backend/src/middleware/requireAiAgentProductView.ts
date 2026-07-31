@@ -1,28 +1,35 @@
 import { Request, Response, NextFunction } from "express";
 import AppError from "../errors/AppError";
+import { resolveAiAgentProductManageAccess } from "../helpers/canManageAiAgentProduct";
 
 /**
  * Acesso comercial à Product API do Agente de IA.
- * Alinhado à superfície que abre /ai-agent (menu + rotas):
- * profile === "admin" — supervisor/user comum não visualizam o módulo.
- * Feature de plano / permissão granular são avaliadas no Experience service
- * (plano off → unavailable; user feature off → 403).
- * supportMode e grants AgentOS NÃO autorizam.
+ *
+ * Autoriza:
+ * - profile === "admin" no tenant da sessão (fora do suporte);
+ * - Super Admin autenticado em supportMode no tenant alvo (companyId do JWT).
+ *
+ * Não autoriza: supervisor/user, supportMode sem Super Admin, grants AgentOS.
+ * Feature de plano é avaliada nos services (plano off → unavailable).
  */
-export default function requireAiAgentProductView(
+export default async function requireAiAgentProductView(
   req: Request,
   _res: Response,
   next: NextFunction
-): void {
-  const profile = String(req.user?.profile || "").toLowerCase();
-  if (profile !== "admin") {
-    return next(
-      new AppError(
-        "ERR_AI_AGENT_PRODUCT_ACCESS_DENIED",
-        403,
-        "Acesso ao Agente de IA não permitido para este perfil."
-      )
-    );
+): Promise<void> {
+  try {
+    const access = await resolveAiAgentProductManageAccess(req.user);
+    if (!access.allowed) {
+      return next(
+        new AppError(
+          "ERR_AI_AGENT_PRODUCT_ACCESS_DENIED",
+          403,
+          "Acesso ao Agente de IA não permitido para este perfil."
+        )
+      );
+    }
+    return next();
+  } catch (err) {
+    return next(err);
   }
-  return next();
 }

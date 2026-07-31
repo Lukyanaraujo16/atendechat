@@ -15,6 +15,7 @@ import {
 import Title from "../Title";
 import MainHeaderButtonsWrapper from "../MainHeaderButtonsWrapper";
 import AiAgentCard from "../AiAgentCard";
+import AiAgentSupportBanner from "../AiAgentSupportBanner";
 import {
   AI_AGENT_NEW_ROUTE_PATH,
   aiAgentPath,
@@ -134,12 +135,11 @@ export default function AiAgentHubPage({
         }
       />
 
-      {supportMode && companyLabel ? (
-        <Typography variant="caption" color="textSecondary" paragraph>
-          {i18n.t("aiAgentProduct.support.activeCompany", {
-            name: companyLabel,
-          })}
-        </Typography>
+      {supportMode ? (
+        <AiAgentSupportBanner
+          supportMode={supportMode}
+          companyLabel={companyLabel}
+        />
       ) : null}
 
       {loading ? <HubSkeleton /> : null}

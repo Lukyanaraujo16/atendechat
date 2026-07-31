@@ -2903,6 +2903,12 @@ const messages = {
         },
         support: {
           activeCompany: "Empresa ativa: {{name}}",
+          configuring:
+            "Você está configurando esta empresa em modo suporte.",
+          configuringCompany:
+            "Você está configurando a empresa {{name}} em modo suporte.",
+          mutationHint:
+            "Esta alteração será aplicada à empresa em modo suporte.",
         },
         status: {
           aria: "Status: {{status}}",

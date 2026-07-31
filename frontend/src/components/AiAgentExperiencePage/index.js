@@ -16,6 +16,7 @@ import AiAgentStatusCard from "../AiAgentStatusCard";
 import AiAgentReadinessChecklist from "../AiAgentReadinessChecklist";
 import AiAgentProductCredentialModal from "../AiAgentProductCredentialModal";
 import AiAgentConnectionsPanel from "../AiAgentConnectionsPanel";
+import AiAgentSupportBanner from "../AiAgentSupportBanner";
 import { listAiAgentProductCredentials } from "../../services/aiAgentProductApi";
 import { i18n } from "../../translate/i18n";
 
@@ -202,10 +203,11 @@ export default function AiAgentExperiencePage({
         </Box>
       )}
 
-      {supportMode && companyLabel ? (
-        <Typography variant="caption" className={classes.supportHint}>
-          {i18n.t("aiAgentProduct.support.activeCompany", { name: companyLabel })}
-        </Typography>
+      {supportMode ? (
+        <AiAgentSupportBanner
+          supportMode={supportMode}
+          companyLabel={companyLabel}
+        />
       ) : null}
 
       {loading ? <ExperienceSkeleton /> : null}

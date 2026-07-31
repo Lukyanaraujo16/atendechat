@@ -882,3 +882,53 @@ Ordem: `isAuth` → feature gate → `rejectLegacy*` → controller **não execu
 **Preservados:** `GET /ai-agents` (Console Analytics), `GET /ai-provider-credentials` (KB), GETs técnicos, Shadow FC / Analytics / evaluations (Console), Product API, Product Simulator, Runtime (services internos).
 
 Logging estruturado `ai_agent.legacy_mutation_blocked` (sem secrets/payload). Remoção física = Fase 2.8B.3.
+
+---
+
+## Fase 2.11 — Super Admin em modo suporte (Product AI Agent)
+
+### Predicado
+
+```
+canManageAiAgentProduct =
+  (profile === "admin" && supportMode !== true)
+  OR (Super Admin autenticado && supportMode === true)
+```
+
+- **Frontend:** `utils/canManageAiAgentProduct.js`
+- **Backend:** `helpers/canManageAiAgentProduct.ts` + `requireAiAgentProductView` (confirma `user.super` no banco quando `supportMode`)
+
+### Diferença Admin tenant vs Super Admin supportMode
+
+| Contexto | Listar / mutar Product AI | Observação |
+|----------|---------------------------|------------|
+| Admin da empresa | Sim | Tenant = `companyId` da sessão |
+| Super Admin fora do suporte | Só no tenant home se `profile=admin` | Sem operar tenant alheio |
+| Super Admin em supportMode | Sim, no tenant alvo do JWT | Entrada só via `/auth/support/start` |
+| Supervisor / user | Não | Sem bypass |
+| supportMode sem Super | Não | Backend rejeita |
+
+### Ações liberadas no suporte
+
+Criar/editar agente, identidade, inteligência (provider/modelo/credencial/prompt/FAQ), Knowledge, Connections, Commands, Simulator, readiness, ativar/desativar — **respeitando** `editableWhileActive` e readiness (sem bypass operacional).
+
+### Ações restritas
+
+Secrets completos, export de credenciais, faturamento/plano, exclusão de empresa, Console Técnico irrestrito, tenants não selecionados, reabertura de rotas 410.
+
+### Credenciais
+
+- Listagem mascarada e seleção permitidas.
+- **Criação/substituição permitida** no suporte (mesmo contrato Product); secret digitado pelo operador; nunca retornado; audit sem secret.
+
+### Live Mode
+
+Confirmação obrigatória na UI (Settings + PrimaryAction). Readiness/gates do backend preservados. Audit `ai_agent.product.support_write`.
+
+### Auditoria
+
+Middleware `logAiAgentProductSupportWrite` em mutações Product quando `supportMode`. Campos: actorUserId, targetCompanyId, action, agentRef, resultado. Sessão de suporte já persiste em `SupportAccessLogs` (entrada/saída).
+
+### Cross-company / cache
+
+`companyId` só do JWT; body/query `companyId` rejeitados. Hooks FE recarregam por `companyId` da sessão ao trocar tenant. Runtime permanece por `whatsapp.aiAgentId`.

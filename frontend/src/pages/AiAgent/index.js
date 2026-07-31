@@ -3,9 +3,10 @@ import { AuthContext } from "../../context/Auth/AuthContext";
 import MainContainer from "../../components/MainContainer";
 import AiAgentHubPage from "../../components/AiAgentHubPage";
 import useAiAgentProductAgents from "../../hooks/useAiAgentProductAgents";
+import { canManageAiAgentProduct } from "../../utils/canManageAiAgentProduct";
 
 /**
- * Hub comercial /ai-agent — listagem multiagente (Fase 2.9B).
+ * Hub comercial /ai-agent — listagem multiagente (Fase 2.9B / 2.11).
  */
 const AiAgent = () => {
   const { user } = useContext(AuthContext);
@@ -17,8 +18,7 @@ const AiAgent = () => {
     user?.companyName ||
     (user?.companyId != null ? String(user.companyId) : "");
 
-  const isAdmin = user?.profile === "admin";
-  const canCreate = isAdmin && user?.supportMode !== true;
+  const canCreate = canManageAiAgentProduct(user);
 
   return (
     <MainContainer>

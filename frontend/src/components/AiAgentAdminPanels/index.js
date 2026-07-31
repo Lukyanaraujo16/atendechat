@@ -20,6 +20,7 @@ import {
   AppNeutralButton,
   AppEmptyState,
 } from "../../ui";
+import ConfirmationModal from "../ConfirmationModal";
 import {
   getAiAgentProductConfiguration,
   getAiAgentProductConfigurationOptions,
@@ -27,6 +28,10 @@ import {
   getAiAgentProductKnowledge,
   putAiAgentProductKnowledge,
 } from "../../services/aiAgentProductApi";
+import {
+  getAiAgentCommandConfirmKeys,
+  getAiAgentCommandConfirmParams,
+} from "../../utils/aiAgentProductMapper";
 import {
   aiAgentProductConfigurationToWizardFormState,
   filterAiAgentWizardCredentialsByProvider,
@@ -872,8 +877,25 @@ export function AiAgentSettingsPanel({
   onCommand,
   commandBusy,
   onOpenCredentials,
+  supportMode = false,
 }) {
   const classes = useStyles();
+  const [confirmCommand, setConfirmCommand] = useState(null);
+  const connectionScope = summary?.connectionScope || null;
+  const thisBusy =
+    commandBusy === true ||
+    (confirmCommand && commandBusy === confirmCommand);
+
+  const openConfirm = (command) => {
+    if (!canMutate || !onCommand) return;
+    setConfirmCommand(command);
+  };
+
+  const keys = confirmCommand
+    ? getAiAgentCommandConfirmKeys(confirmCommand)
+    : null;
+  const params = getAiAgentCommandConfirmParams(connectionScope);
+
   return (
     <Box className={classes.panel} data-testid="ai-agent-settings-panel">
       <Typography variant="h6" component="h2">
@@ -890,8 +912,9 @@ export function AiAgentSettingsPanel({
       <Box className={classes.actions}>
         {canMutate && summary?.status === "active" ? (
           <AppSecondaryButton
-            onClick={() => onCommand?.("deactivate")}
+            onClick={() => openConfirm("deactivate")}
             disabled={Boolean(commandBusy)}
+            data-testid="ai-agent-command-deactivate"
           >
             {i18n.t("aiAgentProduct.commands.deactivate")}
           </AppSecondaryButton>
@@ -899,14 +922,16 @@ export function AiAgentSettingsPanel({
         {canMutate && summary?.status !== "active" ? (
           <>
             <AppSecondaryButton
-              onClick={() => onCommand?.("activate_shadow")}
+              onClick={() => openConfirm("activate_shadow")}
               disabled={Boolean(commandBusy)}
+              data-testid="ai-agent-command-activate_shadow"
             >
               {i18n.t("aiAgentProduct.commands.activate_shadow")}
             </AppSecondaryButton>
             <AppSecondaryButton
-              onClick={() => onCommand?.("activate_live")}
+              onClick={() => openConfirm("activate_live")}
               disabled={Boolean(commandBusy)}
+              data-testid="ai-agent-command-activate_live"
             >
               {i18n.t("aiAgentProduct.commands.activate_live")}
             </AppSecondaryButton>
@@ -919,6 +944,33 @@ export function AiAgentSettingsPanel({
       <Typography variant="caption" className={classes.meta}>
         {i18n.t("aiAgentProduct.admin.toolsDeferred")}
       </Typography>
+      {keys ? (
+        <ConfirmationModal
+          title={i18n.t(keys.titleKey)}
+          open={Boolean(confirmCommand)}
+          onClose={() => !thisBusy && setConfirmCommand(null)}
+          onConfirm={async () => {
+            try {
+              await onCommand(confirmCommand);
+              setConfirmCommand(null);
+            } catch (_err) {
+              // erro tratado pelo pai; mantém modal
+            }
+          }}
+          confirmText={i18n.t(keys.confirmKey)}
+          destructive={keys.destructive}
+          loading={thisBusy}
+          asyncConfirm
+        >
+          {i18n.t(keys.bodyKey, params)}
+          {supportMode ? (
+            <>
+              {" "}
+              {i18n.t("aiAgentProduct.support.mutationHint")}
+            </>
+          ) : null}
+        </ConfirmationModal>
+      ) : null}
     </Box>
   );
 }

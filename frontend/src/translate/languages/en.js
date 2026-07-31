@@ -2812,6 +2812,12 @@ const messages = {
 				},
 				support: {
 					activeCompany: "Active company: {{name}}",
+					configuring:
+						"You are configuring this company in support mode.",
+					configuringCompany:
+						"You are configuring company {{name}} in support mode.",
+					mutationHint:
+						"This change will be applied to the company in support mode.",
 				},
 				status: {
 					aria: "Status: {{status}}",

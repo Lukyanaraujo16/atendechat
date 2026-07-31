@@ -1,237 +1,226 @@
 import { Router } from "express";
 import isAuth from "../middleware/isAuth";
 import requireAiAgentProductView from "../middleware/requireAiAgentProductView";
+import logAiAgentProductSupportWrite from "../middleware/logAiAgentProductSupportWrite";
 import * as AiAgentProductController from "../controllers/AiAgentProductController";
 
 /**
- * Product API — Agente de IA (Fases 2.0–2.9A).
- * isAuth + admin. Sem permissões AgentOS. supportMode não autoriza.
+ * Product API — Agente de IA (Fases 2.0–2.11).
+ * isAuth + (admin tenant | Super Admin em supportMode).
+ * Sem permissões AgentOS. companyId só do JWT.
  * Multiagente: agentRef em params/query/body; listagem em /agents.
  */
 const aiAgentProductRoutes = Router();
 
+const productView = [isAuth, requireAiAgentProductView] as const;
+
 aiAgentProductRoutes.get(
   "/product/ai-agent/agents",
-  isAuth,
-  requireAiAgentProductView,
+  ...productView,
   AiAgentProductController.listAgents
 );
 
 aiAgentProductRoutes.get(
   "/product/ai-agent/agents/:agentRef/summary",
-  isAuth,
-  requireAiAgentProductView,
+  ...productView,
   AiAgentProductController.summary
 );
 
 aiAgentProductRoutes.get(
   "/product/ai-agent/agents/:agentRef/readiness",
-  isAuth,
-  requireAiAgentProductView,
+  ...productView,
   AiAgentProductController.readiness
 );
 
 aiAgentProductRoutes.get(
   "/product/ai-agent/agents/:agentRef/configuration",
-  isAuth,
-  requireAiAgentProductView,
+  ...productView,
   AiAgentProductController.getConfiguration
 );
 
 aiAgentProductRoutes.put(
   "/product/ai-agent/agents/:agentRef/configuration",
-  isAuth,
-  requireAiAgentProductView,
+  ...productView,
+  logAiAgentProductSupportWrite("ai_agent.product.configuration.update"),
   AiAgentProductController.updateConfiguration
 );
 
 aiAgentProductRoutes.put(
   "/product/ai-agent/agents/:agentRef/configuration/connections",
-  isAuth,
-  requireAiAgentProductView,
+  ...productView,
+  logAiAgentProductSupportWrite("ai_agent.product.connections.update"),
   AiAgentProductController.updateConnections
 );
 
 aiAgentProductRoutes.get(
   "/product/ai-agent/agents/:agentRef/knowledge",
-  isAuth,
-  requireAiAgentProductView,
+  ...productView,
   AiAgentProductController.listKnowledge
 );
 
 aiAgentProductRoutes.put(
   "/product/ai-agent/agents/:agentRef/knowledge",
-  isAuth,
-  requireAiAgentProductView,
+  ...productView,
+  logAiAgentProductSupportWrite("ai_agent.product.knowledge.sync"),
   AiAgentProductController.syncKnowledge
 );
 
 aiAgentProductRoutes.get(
   "/product/ai-agent/summary",
-  isAuth,
-  requireAiAgentProductView,
+  ...productView,
   AiAgentProductController.summary
 );
 
 aiAgentProductRoutes.get(
   "/product/ai-agent/readiness",
-  isAuth,
-  requireAiAgentProductView,
+  ...productView,
   AiAgentProductController.readiness
 );
 
 aiAgentProductRoutes.post(
   "/product/ai-agent/agents/:agentRef/commands",
-  isAuth,
-  requireAiAgentProductView,
+  ...productView,
+  logAiAgentProductSupportWrite("ai_agent.product.command"),
   AiAgentProductController.command
 );
 
 aiAgentProductRoutes.post(
   "/product/ai-agent/commands",
-  isAuth,
-  requireAiAgentProductView,
+  ...productView,
+  logAiAgentProductSupportWrite("ai_agent.product.command"),
   AiAgentProductController.command
 );
 
 aiAgentProductRoutes.get(
   "/product/ai-agent/configuration",
-  isAuth,
-  requireAiAgentProductView,
+  ...productView,
   AiAgentProductController.getConfiguration
 );
 
 aiAgentProductRoutes.post(
   "/product/ai-agent/configuration",
-  isAuth,
-  requireAiAgentProductView,
+  ...productView,
+  logAiAgentProductSupportWrite("ai_agent.product.configuration.create"),
   AiAgentProductController.createConfiguration
 );
 
 aiAgentProductRoutes.put(
   "/product/ai-agent/configuration",
-  isAuth,
-  requireAiAgentProductView,
+  ...productView,
+  logAiAgentProductSupportWrite("ai_agent.product.configuration.update"),
   AiAgentProductController.updateConfiguration
 );
 
 aiAgentProductRoutes.get(
   "/product/ai-agent/configuration/options",
-  isAuth,
-  requireAiAgentProductView,
+  ...productView,
   AiAgentProductController.getConfigurationOptions
 );
 
 aiAgentProductRoutes.post(
   "/product/ai-agent/configuration/preview",
-  isAuth,
-  requireAiAgentProductView,
+  ...productView,
   AiAgentProductController.previewConfiguration
 );
 
 aiAgentProductRoutes.put(
   "/product/ai-agent/configuration/connections",
-  isAuth,
-  requireAiAgentProductView,
+  ...productView,
+  logAiAgentProductSupportWrite("ai_agent.product.connections.update"),
   AiAgentProductController.updateConnections
 );
 
 /** Product Credentials (Fase 2.7) — antes de rotas :param conflitantes. Sem DELETE. */
 aiAgentProductRoutes.get(
   "/product/ai-agent/credentials",
-  isAuth,
-  requireAiAgentProductView,
+  ...productView,
   AiAgentProductController.listCredentials
 );
 
 aiAgentProductRoutes.post(
   "/product/ai-agent/credentials",
-  isAuth,
-  requireAiAgentProductView,
+  ...productView,
+  logAiAgentProductSupportWrite("ai_agent.product.credential.create"),
   AiAgentProductController.createCredential
 );
 
 aiAgentProductRoutes.get(
   "/product/ai-agent/credentials/:credentialRef",
-  isAuth,
-  requireAiAgentProductView,
+  ...productView,
   AiAgentProductController.getCredential
 );
 
 aiAgentProductRoutes.put(
   "/product/ai-agent/credentials/:credentialRef",
-  isAuth,
-  requireAiAgentProductView,
+  ...productView,
+  logAiAgentProductSupportWrite("ai_agent.product.credential.update"),
   AiAgentProductController.updateCredential
 );
 
 aiAgentProductRoutes.post(
   "/product/ai-agent/credentials/:credentialRef/test",
-  isAuth,
-  requireAiAgentProductView,
+  ...productView,
+  logAiAgentProductSupportWrite("ai_agent.product.credential.test"),
   AiAgentProductController.testCredential
 );
 
 aiAgentProductRoutes.post(
   "/product/ai-agent/credentials/:credentialRef/enable",
-  isAuth,
-  requireAiAgentProductView,
+  ...productView,
+  logAiAgentProductSupportWrite("ai_agent.product.credential.enable"),
   AiAgentProductController.enableCredential
 );
 
 aiAgentProductRoutes.post(
   "/product/ai-agent/credentials/:credentialRef/disable",
-  isAuth,
-  requireAiAgentProductView,
+  ...productView,
+  logAiAgentProductSupportWrite("ai_agent.product.credential.disable"),
   AiAgentProductController.disableCredential
 );
 
 aiAgentProductRoutes.get(
   "/product/ai-agent/simulator",
-  isAuth,
-  requireAiAgentProductView,
+  ...productView,
   AiAgentProductController.simulatorBootstrap
 );
 
 aiAgentProductRoutes.post(
   "/product/ai-agent/simulator/sessions",
-  isAuth,
-  requireAiAgentProductView,
+  ...productView,
+  logAiAgentProductSupportWrite("ai_agent.product.simulator.session.create"),
   AiAgentProductController.simulatorCreateSession
 );
 
 aiAgentProductRoutes.get(
   "/product/ai-agent/simulator/sessions",
-  isAuth,
-  requireAiAgentProductView,
+  ...productView,
   AiAgentProductController.simulatorListSessions
 );
 
 aiAgentProductRoutes.get(
   "/product/ai-agent/simulator/sessions/:sessionRef",
-  isAuth,
-  requireAiAgentProductView,
+  ...productView,
   AiAgentProductController.simulatorGetSession
 );
 
 aiAgentProductRoutes.post(
   "/product/ai-agent/simulator/sessions/:sessionRef/messages",
-  isAuth,
-  requireAiAgentProductView,
+  ...productView,
+  logAiAgentProductSupportWrite("ai_agent.product.simulator.message"),
   AiAgentProductController.simulatorSendMessage
 );
 
 aiAgentProductRoutes.post(
   "/product/ai-agent/simulator/sessions/:sessionRef/end",
-  isAuth,
-  requireAiAgentProductView,
+  ...productView,
+  logAiAgentProductSupportWrite("ai_agent.product.simulator.session.end"),
   AiAgentProductController.simulatorEndSession
 );
 
 aiAgentProductRoutes.post(
   "/product/ai-agent/simulator/messages/:messageRef/review",
-  isAuth,
-  requireAiAgentProductView,
+  ...productView,
+  logAiAgentProductSupportWrite("ai_agent.product.simulator.review"),
   AiAgentProductController.simulatorReviewMessage
 );
 
