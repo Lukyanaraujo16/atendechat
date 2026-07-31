@@ -24,6 +24,20 @@ export const AI_AGENT_AGENT_WIZARD_ROUTE_PATH = "/ai-agent/:agentRef/wizard";
 /** Visão/configuração de um agente. */
 export const AI_AGENT_AGENT_ROUTE_PATH = "/ai-agent/:agentRef";
 
+/** Seções comerciais do detalhe (Fase 2.10). */
+export const AI_AGENT_DETAIL_SECTIONS = [
+  "overview",
+  "identity",
+  "intelligence",
+  "knowledge",
+  "connections",
+  "tests",
+  "settings",
+];
+
+export const AI_AGENT_AGENT_SECTION_ROUTE_PATH =
+  "/ai-agent/:agentRef/:section(identity|intelligence|knowledge|connections|tests|settings)";
+
 /** @deprecated Prefer AI_AGENT_AGENT_WIZARD_ROUTE_PATH com agentRef. */
 export const AI_AGENT_WIZARD_EDIT_ROUTE_PATH = "/ai-agent/wizard/:agentId";
 
@@ -142,4 +156,36 @@ export function aiAgentSimulatorPath(agentRef) {
   const ref = String(agentRef || "").trim();
   if (!ref) return AI_AGENT_SIMULATOR_ROUTE_PATH;
   return `${aiAgentPath(ref)}/simulator`;
+}
+
+export function aiAgentSectionPath(agentRef, section = "overview") {
+  const ref = String(agentRef || "").trim();
+  if (!ref) return AI_AGENT_ROUTE_PATH;
+  const key = String(section || "overview").trim();
+  if (!key || key === "overview") return aiAgentPath(ref);
+  if (key === "tests") return aiAgentSimulatorPath(ref);
+  return `${aiAgentPath(ref)}/${encodeURIComponent(key)}`;
+}
+
+export function parseAiAgentDetailSection(pathname) {
+  const parts = String(pathname || "")
+    .split("/")
+    .filter(Boolean);
+  // ai-agent / :agentRef / :section?
+  if (parts[0] !== "ai-agent" || !parts[1] || parts[1] === "new") {
+    return { agentRef: "", section: "overview" };
+  }
+  const reserved = new Set(["wizard", "simulator", "new"]);
+  if (reserved.has(parts[1])) {
+    return { agentRef: "", section: "overview" };
+  }
+  const agentRef = decodeURIComponent(parts[1]);
+  const section = parts[2] && !reserved.has(parts[2]) ? parts[2] : "overview";
+  if (section === "simulator") {
+    return { agentRef, section: "tests" };
+  }
+  return {
+    agentRef,
+    section: AI_AGENT_DETAIL_SECTIONS.includes(section) ? section : "overview",
+  };
 }

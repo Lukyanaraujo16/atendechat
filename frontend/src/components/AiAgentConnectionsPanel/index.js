@@ -81,8 +81,9 @@ function mapConnectionsError(err) {
 }
 
 /**
- * Gestão de conexões agent-scoped — Fase 2.9C.
+ * Gestão de conexões agent-scoped — Fase 2.9C / 2.10.
  * Sem transferência silenciosa; conflito mostra agente detentor.
+ * `embedded` renderiza inline (aba Conexões) em vez de Dialog.
  */
 export default function AiAgentConnectionsPanel({
   open,
@@ -91,6 +92,7 @@ export default function AiAgentConnectionsPanel({
   agentName,
   onChanged,
   canMutate = true,
+  embedded = false,
 }) {
   const classes = useStyles();
   const agentRefKey = String(agentRef || "").trim();
@@ -121,18 +123,20 @@ export default function AiAgentConnectionsPanel({
   }, [agentRefKey]);
 
   useEffect(() => {
-    if (!open) {
+    if (!embedded && !open) {
       setConnections([]);
       setError(null);
       setUnlinkTarget(null);
       return undefined;
     }
-    setConnections([]);
-    setError(null);
-    setUnlinkTarget(null);
-    reload();
+    if (embedded || open) {
+      setConnections([]);
+      setError(null);
+      setUnlinkTarget(null);
+      reload();
+    }
     return undefined;
-  }, [open, reload]);
+  }, [open, embedded, reload]);
 
   const persistLinkedRefs = async (nextRefs) => {
     if (!agentRefKey || !canMutate) return;
@@ -186,177 +190,190 @@ export default function AiAgentConnectionsPanel({
     name: agentName || i18n.t("aiAgentProduct.meta.unnamed"),
   });
 
+  const body = (
+    <>
+      {loading ? (
+        <Box display="flex" justifyContent="center" py={4} role="status">
+          <CircularProgress size={28} />
+        </Box>
+      ) : null}
+
+      {!loading && error ? (
+        <AppEmptyState
+          title={i18n.t("aiAgentProduct.error.title")}
+          description={error}
+        >
+          <AppSecondaryButton onClick={reload}>
+            {i18n.t("aiAgentProduct.actions.retry")}
+          </AppSecondaryButton>
+        </AppEmptyState>
+      ) : null}
+
+      {!loading && !error ? (
+        <>
+          <Box className={classes.section} data-testid="ai-agent-connections-linked">
+            <Typography className={classes.sectionTitle} component="h3">
+              {i18n.t("aiAgentProduct.connections.linkedTitle")}
+            </Typography>
+            {buckets.linked.length === 0 ? (
+              <Typography variant="body2" className={classes.meta}>
+                {i18n.t("aiAgentProduct.connections.linkedEmpty")}
+              </Typography>
+            ) : (
+              buckets.linked.map((connection) => (
+                <Box
+                  key={connection.ref}
+                  className={classes.row}
+                  data-testid={`ai-agent-connection-linked-${connection.ref}`}
+                >
+                  <Box minWidth={0}>
+                    <Typography variant="subtitle2">{connection.name}</Typography>
+                    <Typography variant="body2" className={classes.meta}>
+                      {connection.status || "—"}
+                    </Typography>
+                  </Box>
+                  {canMutate ? (
+                    <AppNeutralButton
+                      onClick={() => setUnlinkTarget(connection)}
+                      disabled={saving}
+                      data-testid={`ai-agent-connection-unlink-${connection.ref}`}
+                    >
+                      {i18n.t("aiAgentProduct.connections.unlink")}
+                    </AppNeutralButton>
+                  ) : null}
+                </Box>
+              ))
+            )}
+          </Box>
+
+          <Box className={classes.section} data-testid="ai-agent-connections-available">
+            <Typography className={classes.sectionTitle} component="h3">
+              {i18n.t("aiAgentProduct.connections.availableTitle")}
+            </Typography>
+            {buckets.available.length === 0 ? (
+              <Typography variant="body2" className={classes.meta}>
+                {i18n.t("aiAgentProduct.connections.availableEmpty")}
+              </Typography>
+            ) : (
+              buckets.available.map((connection) => (
+                <Box
+                  key={connection.ref}
+                  className={classes.row}
+                  data-testid={`ai-agent-connection-available-${connection.ref}`}
+                >
+                  <Box minWidth={0}>
+                    <Typography variant="subtitle2">{connection.name}</Typography>
+                    <Typography variant="body2" className={classes.meta}>
+                      {connection.status || "—"}
+                    </Typography>
+                  </Box>
+                  {canMutate ? (
+                    <AppPrimaryButton
+                      onClick={() => handleLink(connection)}
+                      disabled={saving}
+                      data-testid={`ai-agent-connection-link-${connection.ref}`}
+                    >
+                      {i18n.t("aiAgentProduct.connections.link")}
+                    </AppPrimaryButton>
+                  ) : null}
+                </Box>
+              ))
+            )}
+          </Box>
+
+          <Box className={classes.section} data-testid="ai-agent-connections-other">
+            <Typography className={classes.sectionTitle} component="h3">
+              {i18n.t("aiAgentProduct.connections.otherTitle")}
+            </Typography>
+            {buckets.other.length > 0 ? (
+              <Typography
+                variant="body2"
+                className={classes.transferHint}
+                role="note"
+                data-testid="ai-agent-connections-transfer-hint"
+              >
+                {i18n.t("aiAgentProduct.connections.transferHint")}
+              </Typography>
+            ) : null}
+            {buckets.other.length === 0 ? (
+              <Typography variant="body2" className={classes.meta}>
+                {i18n.t("aiAgentProduct.connections.otherEmpty")}
+              </Typography>
+            ) : (
+              buckets.other.map((connection) => {
+                const conflict = aiAgentConnectionConflictMessage(connection);
+                return (
+                  <Box
+                    key={connection.ref}
+                    className={classes.row}
+                    data-testid={`ai-agent-connection-other-${connection.ref}`}
+                  >
+                    <Box minWidth={0}>
+                      <Typography variant="subtitle2">
+                        {connection.name}
+                      </Typography>
+                      <Typography variant="body2" className={classes.meta}>
+                        {connection.status || "—"}
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        className={classes.conflict}
+                        role="status"
+                      >
+                        {i18n.t(conflict.key, conflict.params)}
+                      </Typography>
+                      <Chip
+                        size="small"
+                        label={i18n.t(
+                          "aiAgentProduct.connections.transferBlocked"
+                        )}
+                        style={{ marginTop: 4 }}
+                      />
+                    </Box>
+                    <AppNeutralButton disabled>
+                      {i18n.t("aiAgentProduct.connections.linkBlocked")}
+                    </AppNeutralButton>
+                  </Box>
+                );
+              })
+            )}
+          </Box>
+        </>
+      ) : null}
+    </>
+  );
+
   return (
     <>
-      <Dialog
-        open={open}
-        onClose={() => !saving && onClose?.()}
-        fullWidth
-        maxWidth="sm"
-        aria-labelledby="ai-agent-connections-title"
-        data-testid="ai-agent-connections-panel"
-      >
-        <DialogTitle id="ai-agent-connections-title">{title}</DialogTitle>
-        <DialogContent dividers>
-          {loading ? (
-            <Box display="flex" justifyContent="center" py={4} role="status">
-              <CircularProgress size={28} />
-            </Box>
-          ) : null}
-
-          {!loading && error ? (
-            <AppEmptyState
-              title={i18n.t("aiAgentProduct.error.title")}
-              description={error}
+      {embedded ? (
+        <Box data-testid="ai-agent-connections-panel" maxWidth={720}>
+          <Typography variant="h6" component="h2" gutterBottom>
+            {title}
+          </Typography>
+          {body}
+        </Box>
+      ) : (
+        <Dialog
+          open={open}
+          onClose={() => !saving && onClose?.()}
+          fullWidth
+          maxWidth="sm"
+          aria-labelledby="ai-agent-connections-title"
+          data-testid="ai-agent-connections-panel"
+        >
+          <DialogTitle id="ai-agent-connections-title">{title}</DialogTitle>
+          <DialogContent dividers>{body}</DialogContent>
+          <DialogActions className={classes.actions}>
+            <AppSecondaryButton
+              onClick={onClose}
+              disabled={saving}
+              data-testid="ai-agent-connections-close"
             >
-              <AppSecondaryButton onClick={reload}>
-                {i18n.t("aiAgentProduct.actions.retry")}
-              </AppSecondaryButton>
-            </AppEmptyState>
-          ) : null}
-
-          {!loading && !error ? (
-            <>
-              <Box className={classes.section} data-testid="ai-agent-connections-linked">
-                <Typography className={classes.sectionTitle} component="h3">
-                  {i18n.t("aiAgentProduct.connections.linkedTitle")}
-                </Typography>
-                {buckets.linked.length === 0 ? (
-                  <Typography variant="body2" className={classes.meta}>
-                    {i18n.t("aiAgentProduct.connections.linkedEmpty")}
-                  </Typography>
-                ) : (
-                  buckets.linked.map((connection) => (
-                    <Box
-                      key={connection.ref}
-                      className={classes.row}
-                      data-testid={`ai-agent-connection-linked-${connection.ref}`}
-                    >
-                      <Box minWidth={0}>
-                        <Typography variant="subtitle2">{connection.name}</Typography>
-                        <Typography variant="body2" className={classes.meta}>
-                          {connection.status || "—"}
-                        </Typography>
-                      </Box>
-                      {canMutate ? (
-                        <AppNeutralButton
-                          onClick={() => setUnlinkTarget(connection)}
-                          disabled={saving}
-                          data-testid={`ai-agent-connection-unlink-${connection.ref}`}
-                        >
-                          {i18n.t("aiAgentProduct.connections.unlink")}
-                        </AppNeutralButton>
-                      ) : null}
-                    </Box>
-                  ))
-                )}
-              </Box>
-
-              <Box className={classes.section} data-testid="ai-agent-connections-available">
-                <Typography className={classes.sectionTitle} component="h3">
-                  {i18n.t("aiAgentProduct.connections.availableTitle")}
-                </Typography>
-                {buckets.available.length === 0 ? (
-                  <Typography variant="body2" className={classes.meta}>
-                    {i18n.t("aiAgentProduct.connections.availableEmpty")}
-                  </Typography>
-                ) : (
-                  buckets.available.map((connection) => (
-                    <Box
-                      key={connection.ref}
-                      className={classes.row}
-                      data-testid={`ai-agent-connection-available-${connection.ref}`}
-                    >
-                      <Box minWidth={0}>
-                        <Typography variant="subtitle2">{connection.name}</Typography>
-                        <Typography variant="body2" className={classes.meta}>
-                          {connection.status || "—"}
-                        </Typography>
-                      </Box>
-                      {canMutate ? (
-                        <AppPrimaryButton
-                          onClick={() => handleLink(connection)}
-                          disabled={saving}
-                          data-testid={`ai-agent-connection-link-${connection.ref}`}
-                        >
-                          {i18n.t("aiAgentProduct.connections.link")}
-                        </AppPrimaryButton>
-                      ) : null}
-                    </Box>
-                  ))
-                )}
-              </Box>
-
-              <Box className={classes.section} data-testid="ai-agent-connections-other">
-                <Typography className={classes.sectionTitle} component="h3">
-                  {i18n.t("aiAgentProduct.connections.otherTitle")}
-                </Typography>
-                {buckets.other.length > 0 ? (
-                  <Typography
-                    variant="body2"
-                    className={classes.transferHint}
-                    role="note"
-                    data-testid="ai-agent-connections-transfer-hint"
-                  >
-                    {i18n.t("aiAgentProduct.connections.transferHint")}
-                  </Typography>
-                ) : null}
-                {buckets.other.length === 0 ? (
-                  <Typography variant="body2" className={classes.meta}>
-                    {i18n.t("aiAgentProduct.connections.otherEmpty")}
-                  </Typography>
-                ) : (
-                  buckets.other.map((connection) => {
-                    const conflict = aiAgentConnectionConflictMessage(connection);
-                    return (
-                      <Box
-                        key={connection.ref}
-                        className={classes.row}
-                        data-testid={`ai-agent-connection-other-${connection.ref}`}
-                      >
-                        <Box minWidth={0}>
-                          <Typography variant="subtitle2">
-                            {connection.name}
-                          </Typography>
-                          <Typography variant="body2" className={classes.meta}>
-                            {connection.status || "—"}
-                          </Typography>
-                          <Typography
-                            variant="body2"
-                            className={classes.conflict}
-                            role="status"
-                          >
-                            {i18n.t(conflict.key, conflict.params)}
-                          </Typography>
-                          <Chip
-                            size="small"
-                            label={i18n.t(
-                              "aiAgentProduct.connections.transferBlocked"
-                            )}
-                            style={{ marginTop: 4 }}
-                          />
-                        </Box>
-                        <AppNeutralButton disabled>
-                          {i18n.t("aiAgentProduct.connections.linkBlocked")}
-                        </AppNeutralButton>
-                      </Box>
-                    );
-                  })
-                )}
-              </Box>
-            </>
-          ) : null}
-        </DialogContent>
-        <DialogActions className={classes.actions}>
-          <AppSecondaryButton
-            onClick={onClose}
-            disabled={saving}
-            data-testid="ai-agent-connections-close"
-          >
-            {i18n.t("aiAgentProduct.connections.close")}
-          </AppSecondaryButton>
-        </DialogActions>
-      </Dialog>
+              {i18n.t("aiAgentProduct.connections.close")}
+            </AppSecondaryButton>
+          </DialogActions>
+        </Dialog>
+      )}
 
       <ConfirmationModal
         title={i18n.t("aiAgentProduct.connections.unlinkConfirmTitle")}

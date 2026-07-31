@@ -506,6 +506,10 @@ Listagem: `GET /product/ai-agent/agents` — retorna todos os agentes; nunca `am
 - Connections: painel agent-scoped com buckets vinculadas / disponíveis / outro agente; conflito sem transferência silenciosa
 - Transferência manual (aprovada temporariamente): desvincular do agente atual → vincular ao novo agente
 - Credenciais permanecem company-scoped
+- Detalhe comercial (Fase 2.10): `/ai-agent/:agentRef` com seções `identity|intelligence|knowledge|connections|settings`
+- Knowledge Product: `GET/PUT /product/ai-agent/agents/:agentRef/knowledge`
+- Menu: OpenAI removido (provider dentro de Inteligência); Base de Conhecimento acessível via seção Conhecimento
+- `/prompts` redireciona para `/ai-agent`
 
 ### Resolver central
 

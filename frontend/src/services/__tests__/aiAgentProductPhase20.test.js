@@ -67,7 +67,7 @@ describe("aiAgentProductMapper", () => {
     expect(view.ready).toBe(false);
     expect(view.status).toBe("setup_incomplete");
     expect(view.nextAction.type).toBe("configure_provider");
-    expect(view.nextAction.path).toBe("/ai-agent/1/wizard");
+    expect(view.nextAction.path).toBe("/ai-agent/1/intelligence");
     expect(view.checks).toHaveLength(1);
   });
 

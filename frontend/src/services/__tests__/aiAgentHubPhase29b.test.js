@@ -249,7 +249,7 @@ describe("Fase 2.9B — Hub multiagente", () => {
       },
     });
     const secondary = buildAiAgentSecondaryActions(view);
-    expect(secondary.find((a) => a.id === "open_wizard")?.path).toBe(
+    expect(secondary.find((a) => a.id === "edit_intelligence")?.path).toBe(
       AI_AGENT_ROUTE_PATH
     );
     expect(secondary.find((a) => a.id === "open_simulator")?.path).toBe(

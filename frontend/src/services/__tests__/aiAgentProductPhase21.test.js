@@ -135,7 +135,7 @@ describe("Fase 2.1 — mapper Experience", () => {
     expect(isDeferredMutationAction("resume_agent")).toBe(true);
     const resume = mapAiAgentNextAction("resume_agent", { agentId: 9 });
     expect(resume.enabled).toBe(false);
-    expect(resume.fallbackPath).toContain("/ai-agent/9/wizard");
+    expect(resume.fallbackPath).toContain("/ai-agent/9/intelligence");
 
     ["activate_shadow", "activate_live"].forEach((type) => {
       expect(isDeferredMutationAction(type)).toBe(false);

@@ -26,6 +26,8 @@ import TestAiAgentProductCredentialService from "../services/AiAgentProductServi
 import EnableAiAgentProductCredentialService from "../services/AiAgentProductService/EnableAiAgentProductCredentialService";
 import DisableAiAgentProductCredentialService from "../services/AiAgentProductService/DisableAiAgentProductCredentialService";
 import ListAiAgentProductAgentsService from "../services/AiAgentProductService/ListAiAgentProductAgentsService";
+import ListAiAgentProductKnowledgeService from "../services/AiAgentProductService/ListAiAgentProductKnowledgeService";
+import SyncAiAgentProductKnowledgeService from "../services/AiAgentProductService/SyncAiAgentProductKnowledgeService";
 import { extractAgentRefFromRequest } from "../services/AiAgentProductService/aiAgentProductAgentRef";
 import { logger } from "../utils/logger";
 
@@ -852,6 +854,76 @@ export const disableCredential = async (
       "ERR_AI_AGENT_PRODUCT_CREDENTIAL_INVALID",
       500,
       "Não foi possível desativar a credencial."
+    );
+  }
+};
+
+export const listKnowledge = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  try {
+    rejectArbitraryCompanyId(req);
+    const companyId = companyIdOrThrow(req);
+    const agentRef = extractAgentRefFromRequest({
+      params: req.params as Record<string, unknown>,
+      query: req.query as Record<string, unknown>
+    });
+    const data = await ListAiAgentProductKnowledgeService({
+      companyId,
+      req,
+      agentRef
+    });
+    return res.json(data);
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    logger.error(
+      {
+        err: err instanceof Error ? err.message : "unknown",
+        surface: "ai_agent_product"
+      },
+      "ai_agent_product_knowledge_list_failed"
+    );
+    throw new AppError(
+      "ERR_AI_AGENT_PRODUCT_NOT_AVAILABLE",
+      500,
+      "Não foi possível carregar o conhecimento do Agente de IA."
+    );
+  }
+};
+
+export const syncKnowledge = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  try {
+    rejectArbitraryCompanyId(req);
+    const companyId = companyIdOrThrow(req);
+    const agentRef = extractAgentRefFromRequest({
+      params: req.params as Record<string, unknown>,
+      query: req.query as Record<string, unknown>,
+      body: req.body as Record<string, unknown>
+    });
+    const data = await SyncAiAgentProductKnowledgeService({
+      companyId,
+      req,
+      agentRef,
+      body: req.body as Record<string, unknown>
+    });
+    return res.json(data);
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    logger.error(
+      {
+        err: err instanceof Error ? err.message : "unknown",
+        surface: "ai_agent_product"
+      },
+      "ai_agent_product_knowledge_sync_failed"
+    );
+    throw new AppError(
+      "ERR_AI_AGENT_PRODUCT_CONFIGURATION_INVALID",
+      500,
+      "Não foi possível atualizar o conhecimento do Agente de IA."
     );
   }
 };

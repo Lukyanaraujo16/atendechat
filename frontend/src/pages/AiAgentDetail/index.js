@@ -1,8 +1,10 @@
-import React, { useCallback, useContext, useEffect, useRef, useState } from "react";
-import { useHistory, useParams } from "react-router-dom";
+import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useHistory, useLocation, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import Box from "@material-ui/core/Box";
 import IconButton from "@material-ui/core/IconButton";
+import Tab from "@material-ui/core/Tab";
+import Tabs from "@material-ui/core/Tabs";
 import Typography from "@material-ui/core/Typography";
 import ArrowBackIcon from "@material-ui/icons/ArrowBack";
 import { makeStyles } from "@material-ui/core/styles";
@@ -11,13 +13,30 @@ import MainContainer from "../../components/MainContainer";
 import MainHeader from "../../components/MainHeader";
 import Title from "../../components/Title";
 import AiAgentExperiencePage from "../../components/AiAgentExperiencePage";
+import AiAgentConnectionsPanel from "../../components/AiAgentConnectionsPanel";
+import AiAgentProductCredentialModal from "../../components/AiAgentProductCredentialModal";
+import {
+  AiAgentIdentityPanel,
+  AiAgentIntelligencePanel,
+  AiAgentKnowledgePanel,
+  AiAgentSettingsPanel,
+  AiAgentTestsPanel,
+} from "../../components/AiAgentAdminPanels";
 import {
   AppEmptyState,
   AppSecondaryButton,
 } from "../../ui";
 import useAiAgentProductSummary from "../../hooks/useAiAgentProductSummary";
-import { postAiAgentProductCommand } from "../../services/aiAgentProductApi";
-import { AI_AGENT_ROUTE_PATH } from "../../config/aiAgentFeature";
+import {
+  getAiAgentProductConfiguration,
+  postAiAgentProductCommand,
+} from "../../services/aiAgentProductApi";
+import {
+  AI_AGENT_DETAIL_SECTIONS,
+  AI_AGENT_ROUTE_PATH,
+  aiAgentSectionPath,
+  parseAiAgentDetailSection,
+} from "../../config/aiAgentFeature";
 import { notifyAiAgentProductAgentsChanged } from "../../utils/aiAgentProductAgentsCache";
 import { i18n } from "../../translate/i18n";
 
@@ -29,7 +48,17 @@ const useStyles = makeStyles((theme) => ({
     marginTop: theme.spacing(0.5),
     color: theme.palette.text.secondary,
   },
+  tabs: {
+    marginTop: theme.spacing(1),
+    marginBottom: theme.spacing(2),
+    borderBottom: `1px solid ${theme.palette.divider}`,
+  },
+  panel: {
+    marginTop: theme.spacing(1),
+  },
 }));
+
+const TAB_KEYS = AI_AGENT_DETAIL_SECTIONS.filter((key) => key !== "tests");
 
 function mapCommandError(err) {
   const code = err?.response?.data?.error || err?.response?.data?.message;
@@ -65,13 +94,25 @@ function mapCommandError(err) {
 }
 
 /**
- * Visão agent-scoped — /ai-agent/:agentRef (Fases 2.9B–2.9C).
+ * Administração completa agent-scoped — /ai-agent/:agentRef(/:section)
+ * Fase 2.10.
  */
 export default function AiAgentDetailPage() {
   const classes = useStyles();
   const history = useHistory();
-  const { agentRef: rawRef } = useParams();
-  const agentRef = String(rawRef || "").trim();
+  const location = useLocation();
+  const { agentRef: rawRef, section: rawSection } = useParams();
+  const parsed = parseAiAgentDetailSection(location.pathname);
+  const agentRef = String(rawRef || parsed.agentRef || "").trim();
+  const section =
+    rawSection && TAB_KEYS.includes(rawSection)
+      ? rawSection
+      : parsed.section === "tests"
+        ? "overview"
+        : TAB_KEYS.includes(parsed.section)
+          ? parsed.section
+          : "overview";
+
   const { user } = useContext(AuthContext);
   const {
     loading,
@@ -87,6 +128,8 @@ export default function AiAgentDetailPage() {
   });
   const [busyCommand, setBusyCommand] = useState(null);
   const [commandError, setCommandError] = useState(null);
+  const [editableWhileActive, setEditableWhileActive] = useState(null);
+  const [credentialModalOpen, setCredentialModalOpen] = useState(false);
   const agentRefLive = useRef(agentRef);
   agentRefLive.current = agentRef;
 
@@ -97,6 +140,22 @@ export default function AiAgentDetailPage() {
 
   const canMutate =
     user?.profile === "admin" && user?.supportMode !== true;
+
+  const loadEditableFlag = useCallback(async () => {
+    if (!agentRef) return;
+    const started = agentRef;
+    try {
+      const cfg = await getAiAgentProductConfiguration(started);
+      if (agentRefLive.current !== started) return;
+      setEditableWhileActive(cfg?.editableWhileActive !== false);
+    } catch (_err) {
+      if (agentRefLive.current === started) setEditableWhileActive(null);
+    }
+  }, [agentRef]);
+
+  useEffect(() => {
+    loadEditableFlag();
+  }, [loadEditableFlag]);
 
   const handleCommand = useCallback(
     async (command) => {
@@ -109,7 +168,6 @@ export default function AiAgentDetailPage() {
           command,
           startedAgentRef
         );
-        // Troca rápida de agente: ignore resposta stale do agente anterior.
         if (agentRefLive.current !== startedAgentRef) return;
         if (result?.summary) {
           applySummary(result.summary);
@@ -119,6 +177,7 @@ export default function AiAgentDetailPage() {
         if (agentRefLive.current !== startedAgentRef) return;
         notifyAiAgentProductAgentsChanged();
         toast.success(i18n.t(`aiAgentProduct.commandSuccess.${command}`));
+        await loadEditableFlag();
       } catch (err) {
         if (agentRefLive.current !== startedAgentRef) return;
         const message = mapCommandError(err);
@@ -131,7 +190,7 @@ export default function AiAgentDetailPage() {
         }
       }
     },
-    [agentRef, applySummary, busyCommand, canMutate, reload]
+    [agentRef, applySummary, busyCommand, canMutate, loadEditableFlag, reload]
   );
 
   const companyLabel =
@@ -142,6 +201,21 @@ export default function AiAgentDetailPage() {
   const agentName =
     data?.agent?.name ||
     i18n.t("aiAgentProduct.meta.unnamed");
+
+  const tabIndex = useMemo(() => {
+    const idx = TAB_KEYS.indexOf(section);
+    return idx >= 0 ? idx : 0;
+  }, [section]);
+
+  const handleTabChange = (_event, nextIndex) => {
+    const next = TAB_KEYS[nextIndex] || "overview";
+    history.push(aiAgentSectionPath(agentRef, next));
+  };
+
+  const handleSaved = async () => {
+    await reload();
+    await loadEditableFlag();
+  };
 
   if (!agentRef || notFound) {
     return (
@@ -184,20 +258,106 @@ export default function AiAgentDetailPage() {
         </Box>
       </MainHeader>
 
-      <AiAgentExperiencePage
-        loading={loading}
-        error={error}
-        accessDenied={accessDenied}
-        summary={data}
-        agentRef={agentRef}
-        onRetry={reload}
-        onCommand={handleCommand}
-        commandBusy={busyCommand}
-        commandError={commandError}
-        supportMode={user?.supportMode === true}
-        companyLabel={companyLabel}
-        hidePageHeader
-        canMutate={canMutate}
+      <Tabs
+        className={classes.tabs}
+        value={tabIndex}
+        onChange={handleTabChange}
+        variant="scrollable"
+        scrollButtons="auto"
+        aria-label={i18n.t("aiAgentProduct.admin.tabsAria")}
+        data-testid="ai-agent-admin-tabs"
+      >
+        {TAB_KEYS.map((key) => (
+          <Tab
+            key={key}
+            label={i18n.t(`aiAgentProduct.admin.sections.${key}`)}
+            data-testid={`ai-agent-tab-${key}`}
+          />
+        ))}
+      </Tabs>
+
+      <Box className={classes.panel}>
+        {section === "overview" ? (
+          <AiAgentExperiencePage
+            loading={loading}
+            error={error}
+            accessDenied={accessDenied}
+            summary={data}
+            agentRef={agentRef}
+            onRetry={reload}
+            onCommand={handleCommand}
+            commandBusy={busyCommand}
+            commandError={commandError}
+            supportMode={user?.supportMode === true}
+            companyLabel={companyLabel}
+            hidePageHeader
+            canMutate={canMutate}
+          />
+        ) : null}
+
+        {section === "identity" ? (
+          <AiAgentIdentityPanel
+            agentRef={agentRef}
+            canMutate={canMutate}
+            editableWhileActive={editableWhileActive}
+            onSaved={handleSaved}
+          />
+        ) : null}
+
+        {section === "intelligence" ? (
+          <AiAgentIntelligencePanel
+            agentRef={agentRef}
+            canMutate={canMutate}
+            editableWhileActive={editableWhileActive}
+            onDeactivate={() => handleCommand("deactivate")}
+            commandBusy={busyCommand}
+            onSaved={handleSaved}
+            onOpenCredentials={() => setCredentialModalOpen(true)}
+          />
+        ) : null}
+
+        {section === "knowledge" ? (
+          <AiAgentKnowledgePanel
+            agentRef={agentRef}
+            canMutate={canMutate}
+            editableWhileActive={editableWhileActive}
+            onDeactivate={() => handleCommand("deactivate")}
+            commandBusy={busyCommand}
+          />
+        ) : null}
+
+        {section === "connections" ? (
+          <AiAgentConnectionsPanel
+            embedded
+            open
+            agentRef={agentRef}
+            agentName={agentName}
+            onChanged={handleSaved}
+            canMutate={canMutate}
+          />
+        ) : null}
+
+        {section === "settings" ? (
+          <>
+            <AiAgentTestsPanel agentRef={agentRef} />
+            <Box mt={3}>
+              <AiAgentSettingsPanel
+                summary={data}
+                canMutate={canMutate}
+                onCommand={handleCommand}
+                commandBusy={busyCommand}
+                onOpenCredentials={() => setCredentialModalOpen(true)}
+              />
+            </Box>
+          </>
+        ) : null}
+      </Box>
+
+      <AiAgentProductCredentialModal
+        open={credentialModalOpen}
+        onClose={() => setCredentialModalOpen(false)}
+        onSuccess={handleSaved}
+        mode="manage"
       />
     </MainContainer>
   );

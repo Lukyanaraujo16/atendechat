@@ -108,7 +108,7 @@ describe("aiAgentResolutionPhase222", () => {
     expect(view.agentScope.type).toBe("ambiguous");
     expect(buildAiAgentCommercialCommands(view)).toHaveLength(0);
     const secondary = buildAiAgentSecondaryActions(view);
-    expect(secondary.find((a) => a.id === "open_wizard")?.path).toBe(
+    expect(secondary.find((a) => a.id === "edit_intelligence")?.path).toBe(
       AI_AGENT_ROUTE_PATH
     );
     expect(secondary.find((a) => a.id === "open_simulator")?.path).toBe(
@@ -157,7 +157,7 @@ describe("aiAgentResolutionPhase222", () => {
       },
     });
     const secondary = buildAiAgentSecondaryActions(view);
-    expect(secondary.find((a) => a.id === "open_wizard")?.path).toBe(
+    expect(secondary.find((a) => a.id === "edit_intelligence")?.path).toBe(
       AI_AGENT_ROUTE_PATH
     );
   });

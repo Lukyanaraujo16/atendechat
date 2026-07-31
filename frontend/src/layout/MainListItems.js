@@ -475,15 +475,8 @@ const MainListItems = (props) => {
     isTenantManager &&
     planFlags.loaded &&
     fx["automation.quick_replies"] === true;
-  const promptsVisible =
-    isAdmin &&
-    planFlags.loaded &&
-    (planFlags.useOpenAi || fx["automation.openai"] === true);
-  const knowledgeBaseVisible =
-    isAdmin &&
-    planFlags.loaded &&
-    KNOWLEDGE_BASE_UI_ENABLED &&
-    canUseKnowledgeBase(user, planFlags);
+  const promptsVisible = false;
+  const knowledgeBaseVisible = false;
   /** Console Técnico — identidade interna + agentOS.console.view (sessão). */
   const technicalConsoleVisible = canShowTechnicalConsoleNav(user);
 

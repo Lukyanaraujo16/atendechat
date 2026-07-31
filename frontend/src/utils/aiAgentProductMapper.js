@@ -6,6 +6,7 @@ import {
   AI_AGENT_NEW_ROUTE_PATH,
   AI_AGENT_ROUTE_PATH,
   AI_AGENT_WIZARD_ROUTE_PATH,
+  aiAgentSectionPath,
   aiAgentSimulatorPath,
   aiAgentWizardEditPath,
 } from "../config/aiAgentFeature";
@@ -162,7 +163,9 @@ export function mapAiAgentNextAction(action, context = {}) {
       : context.agentId != null
         ? String(context.agentId)
         : null;
-  const reviewPath = wizardPath(agentRef);
+  const reviewPath = agentRef
+    ? aiAgentSectionPath(agentRef, "intelligence")
+    : AI_AGENT_NEW_ROUTE_PATH;
 
   const base = {
     type: normalized,
@@ -188,7 +191,7 @@ export function mapAiAgentNextAction(action, context = {}) {
       if (agentRef) {
         return {
           ...base,
-          path: null,
+          path: aiAgentSectionPath(agentRef, "connections"),
           action: "manage_connections",
           enabled: true,
         };
@@ -308,13 +311,34 @@ export function buildAiAgentSecondaryActions(summary, options = {}) {
         ? String(summary.agent.id)
         : null));
   // Ambiguous legado: voltar ao Hub para seleção explícita (não inventar agente).
-  const wizard = isAmbiguous || !agentRef
-    ? AI_AGENT_ROUTE_PATH
-    : wizardPath(agentRef);
   const sim = isAmbiguous || !agentRef
     ? AI_AGENT_ROUTE_PATH
     : simulatorPath(agentRef);
   const actions = [
+    {
+      id: "edit_identity",
+      labelKey: "aiAgentProduct.secondary.editIdentity",
+      path: agentRef
+        ? aiAgentSectionPath(agentRef, "identity")
+        : AI_AGENT_ROUTE_PATH,
+      enabled: Boolean(agentRef) && !isAmbiguous,
+    },
+    {
+      id: "edit_intelligence",
+      labelKey: "aiAgentProduct.secondary.editIntelligence",
+      path: agentRef
+        ? aiAgentSectionPath(agentRef, "intelligence")
+        : AI_AGENT_ROUTE_PATH,
+      enabled: Boolean(agentRef) && !isAmbiguous,
+    },
+    {
+      id: "edit_knowledge",
+      labelKey: "aiAgentProduct.secondary.editKnowledge",
+      path: agentRef
+        ? aiAgentSectionPath(agentRef, "knowledge")
+        : AI_AGENT_ROUTE_PATH,
+      enabled: Boolean(agentRef) && !isAmbiguous,
+    },
     {
       id: "open_simulator",
       labelKey: "aiAgentProduct.secondary.openSimulator",
@@ -325,14 +349,10 @@ export function buildAiAgentSecondaryActions(summary, options = {}) {
       id: "manage_connections",
       labelKey: "aiAgentProduct.secondary.manageConnections",
       action: "manage_connections",
-      path: null,
+      path: agentRef
+        ? aiAgentSectionPath(agentRef, "connections")
+        : null,
       enabled: Boolean(agentRef) && !isAmbiguous,
-    },
-    {
-      id: "open_wizard",
-      labelKey: "aiAgentProduct.secondary.openWizard",
-      path: wizard,
-      enabled: true,
     },
     {
       id: "open_connections",

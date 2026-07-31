@@ -113,7 +113,7 @@ describe("Fase 2.6 — Hub navegação", () => {
       agentRef: "ref-a",
     });
     expect(scoped.action).toBe("manage_connections");
-    expect(scoped.path).toBeNull();
+    expect(scoped.path).toBe("/ai-agent/ref-a/connections");
   });
 
   it("open_connections administra canais, não configura IA", () => {

@@ -40,14 +40,19 @@ GET /technical-console/access → allowed
 | `/ai-agent` | AiAgentHubPage (Product Hub multiagente) | commercial_ai_agent | admin + `automation.ai_agent` + UI flag | — | Hub lista agentes | — |
 | `/ai-agent/new` | AiAgentWizardPage (create) | commercial_ai_agent | idem + AiAgentRouteGuard | — | criação explícita | — |
 | `/ai-agent/wizard` | Redirect → `/ai-agent/new` | commercial_compatibility | idem | — | `/ai-agent/new` | path legado create |
-| `/ai-agent/:agentRef` | AiAgentDetailPage | commercial_ai_agent | idem | — | visão agent-scoped | seleção por URL |
+| `/ai-agent/:agentRef` | AiAgentDetailPage (abas) | commercial_ai_agent | idem | — | visão agent-scoped | seleção por URL |
+| `/ai-agent/:agentRef/identity` | AiAgentDetailPage | commercial_ai_agent | idem | — | identidade | — |
+| `/ai-agent/:agentRef/intelligence` | AiAgentDetailPage | commercial_ai_agent | idem | — | provider/model/instruções/FAQ | — |
+| `/ai-agent/:agentRef/knowledge` | AiAgentDetailPage | commercial_ai_agent | idem | — | bases vinculadas | — |
+| `/ai-agent/:agentRef/connections` | AiAgentDetailPage | commercial_ai_agent | idem | — | conexões agent-scoped | — |
+| `/ai-agent/:agentRef/settings` | AiAgentDetailPage | commercial_ai_agent | idem | — | modo/ações | — |
 | `/ai-agent/:agentRef/wizard` | AiAgentWizardPage (edit) | commercial_ai_agent | idem | — | edição agent-scoped | — |
 | `/ai-agent/wizard/:agentId` | AiAgentWizardPage (edit legado) | commercial_ai_agent | idem | — | preferir `/:agentRef/wizard` | alias |
 | `/ai-agent/simulator` | Redirect → `/ai-agent` | commercial_compatibility | — | — | exige agentRef (2.9C) | bare descontinuado |
 | `/ai-agent/:agentRef/simulator` | AiAgentSimulatorPage | commercial_ai_agent | idem | — | agent-scoped | — |
 | `/ai-agent/:agentId/simulator` | Redirect → `/ai-agent/:agentRef/simulator` | commercial_compatibility | idem | — | preserva ref | path legado |
-| `/prompts` | Prompts | commercial_compatibility | admin + `automation.openai` | — | — | — |
-| `/knowledge-base` | KnowledgeBase | commercial_compatibility | admin + KB feature + UI | — | — | — |
+| `/prompts` | Redirect → `/ai-agent` | commercial_compatibility | — | — | OpenAI é provider, não módulo | menu removido |
+| `/knowledge-base` | KnowledgeBase (biblioteca) | commercial_compatibility | admin + KB; acesso preferencial via agente | — | biblioteca compartilhada | menu lateral removido |
 | `/knowledge-base/:baseId` | KnowledgeBaseDetail | commercial_compatibility | idem | — | — | — |
 | `/quick-messages` | QuickMessages | commercial_compatibility | `automation.quick_replies` | — | — | — |
 | `/ai-agent/analytics` | AiAgentAnalyticsPage | technical_agentos | *antes:* admin + ai_agent + KB | Console | `/technical-console/agentos/analytics` | `/ai-agent/analytics` |

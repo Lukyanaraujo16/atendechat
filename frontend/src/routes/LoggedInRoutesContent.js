@@ -457,11 +457,7 @@ function AutomacaoModule({ planFlags, isAdmin }) {
         <Route
           exact
           path="/prompts"
-          render={() =>
-            isAdmin && showOpenAi ? <Prompts /> : (
-              <FeatureBlocked planFlags={planFlags} anyOf={["automation.openai"]} />
-            )
-          }
+          render={() => <Redirect to={AI_AGENT_ROUTE_PATH} />}
         />
         <Route
           exact
@@ -536,6 +532,71 @@ function AutomacaoModule({ planFlags, isAdmin }) {
               />
             );
           }}
+        />
+        <Route
+          exact
+          path="/ai-agent/:agentRef/identity"
+          render={() => (
+            <AiAgentRouteGuard
+              planFlags={planFlags}
+              user={user}
+              fallbackPath={fallback}
+            >
+              {isAdmin && showAiAgent ? <AiAgentDetailPage /> : null}
+            </AiAgentRouteGuard>
+          )}
+        />
+        <Route
+          exact
+          path="/ai-agent/:agentRef/intelligence"
+          render={() => (
+            <AiAgentRouteGuard
+              planFlags={planFlags}
+              user={user}
+              fallbackPath={fallback}
+            >
+              {isAdmin && showAiAgent ? <AiAgentDetailPage /> : null}
+            </AiAgentRouteGuard>
+          )}
+        />
+        <Route
+          exact
+          path="/ai-agent/:agentRef/knowledge"
+          render={() => (
+            <AiAgentRouteGuard
+              planFlags={planFlags}
+              user={user}
+              fallbackPath={fallback}
+            >
+              {isAdmin && showAiAgent ? <AiAgentDetailPage /> : null}
+            </AiAgentRouteGuard>
+          )}
+        />
+        <Route
+          exact
+          path="/ai-agent/:agentRef/connections"
+          render={() => (
+            <AiAgentRouteGuard
+              planFlags={planFlags}
+              user={user}
+              fallbackPath={fallback}
+            >
+              {isAdmin && showAiAgent ? <AiAgentDetailPage /> : null}
+            </AiAgentRouteGuard>
+          )}
+        />
+        <Route
+          exact
+          path="/ai-agent/:agentRef/settings"
+          render={() => (
+            <AiAgentRouteGuard
+              planFlags={planFlags}
+              user={user}
+              fallbackPath={fallback}
+            >
+              {isAdmin && showAiAgent ? <AiAgentDetailPage /> : null}
+            </AiAgentRouteGuard>
+          )}
         />
         <Route
           exact

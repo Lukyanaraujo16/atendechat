@@ -161,6 +161,10 @@ export default function AiAgentExperiencePage({
 
   const handleSecondary = (action) => {
     if (action?.action === "manage_connections") {
+      if (action?.path) {
+        history.push(action.path);
+        return;
+      }
       if (!agentRefKey) return;
       setConnectionsOpen(true);
       return;

@@ -53,6 +53,20 @@ aiAgentProductRoutes.put(
 );
 
 aiAgentProductRoutes.get(
+  "/product/ai-agent/agents/:agentRef/knowledge",
+  isAuth,
+  requireAiAgentProductView,
+  AiAgentProductController.listKnowledge
+);
+
+aiAgentProductRoutes.put(
+  "/product/ai-agent/agents/:agentRef/knowledge",
+  isAuth,
+  requireAiAgentProductView,
+  AiAgentProductController.syncKnowledge
+);
+
+aiAgentProductRoutes.get(
   "/product/ai-agent/summary",
   isAuth,
   requireAiAgentProductView,

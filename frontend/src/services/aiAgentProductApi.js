@@ -162,6 +162,27 @@ export async function putAiAgentProductConnections(payload, agentRef) {
   return data;
 }
 
+/** Knowledge agent-scoped (Fase 2.10). */
+export async function getAiAgentProductKnowledge(agentRef) {
+  const ref = String(agentRef || "").trim();
+  if (!ref) {
+    throw new Error("agentRef required");
+  }
+  const { data } = await api.get(agentScopedPath(ref, "/knowledge"));
+  return data;
+}
+
+export async function putAiAgentProductKnowledge(payload, agentRef) {
+  const ref = String(agentRef || "").trim();
+  if (!ref) {
+    throw new Error("agentRef required");
+  }
+  const body = { ...(payload || {}) };
+  delete body.agentRef;
+  const { data } = await api.put(agentScopedPath(ref, "/knowledge"), body);
+  return data;
+}
+
 /** Product Credentials (Fase 2.7) — escopo company. */
 export async function listAiAgentProductCredentials() {
   const { data } = await api.get("/product/ai-agent/credentials");
