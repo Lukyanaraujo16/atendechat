@@ -84,6 +84,22 @@ const SocketManager = {
   currentSocket: null,
   socketReady: false,
 
+  /** Encerra o socket da sessão atual (logout / troca de conta). */
+  disconnectSession() {
+    if (this.currentSocket) {
+      try {
+        this.currentSocket.removeAllListeners();
+        this.currentSocket.disconnect();
+      } catch (_) {
+        /* ignore */
+      }
+      this.currentSocket = null;
+    }
+    this.currentCompanyId = -1;
+    this.currentUserId = -1;
+    this.socketReady = false;
+  },
+
   getSocket: function(companyId) {
     let userId = null;
     if (localStorage.getItem("userId")) {

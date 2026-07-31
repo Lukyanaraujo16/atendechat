@@ -13,15 +13,32 @@ import { computeFinanceFromDueDate } from "../../helpers/financeFlags";
 import { oneSignalLogout } from "../../services/oneSignalService";
 import { canAccessSaasPlatform } from "../../utils/platformUser";
 import { getPostLoginHomePath } from "../../utils/attendanceAccess";
-import { setAuthSessionInvalidHandler } from "../../services/authApiInterceptors";
-import { countPostLogin, debugPostLogin } from "../../utils/postLoginDebug";
+import {
+  setAuthSessionInvalidHandler,
+  setAuthLoggingOut,
+} from "../../services/authApiInterceptors";
+import { debugPostLogin } from "../../utils/postLoginDebug";
 import { resetTechnicalConsoleAccessCache } from "../../services/technicalConsoleAccessProbe";
+import {
+  broadcastAuthLogout,
+  clearAuthCredentialsFromStorage,
+  clearCurrentUserNotificationCache,
+  clearNotificationSessionArtifacts,
+  isForeignTabLogoutEvent,
+  withTimeout,
+} from "../../utils/authSessionCleanup";
+import { clearNotificationAlertDedupe } from "../../utils/notificationAlertDedupe";
+import { resetPendingMessageTabIndicators } from "../../utils/notificationTabIndicators";
+
+const LOGOUT_API_TIMEOUT_MS = 8000;
+const ONESIGNAL_LOGOUT_TIMEOUT_MS = 2500;
 
 const useAuth = () => {
   const history = useHistory();
   const [isAuth, setIsAuth] = useState(false);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState({});
+  const loggingOutRef = useRef(false);
 
   useEffect(() => {
     setAuthSessionInvalidHandler(() => {
@@ -36,8 +53,47 @@ const useAuth = () => {
   const permRefreshTimerRef = useRef(null);
   const permRefreshInFlightRef = useRef(false);
 
+  const applyLocalLoggedOutState = useCallback(
+    ({ redirect = false } = {}) => {
+      resetTechnicalConsoleAccessCache();
+      clearCurrentUserNotificationCache();
+      clearAuthCredentialsFromStorage();
+      clearNotificationSessionArtifacts();
+      clearNotificationAlertDedupe();
+      resetPendingMessageTabIndicators();
+      api.defaults.headers.Authorization = undefined;
+      try {
+        if (
+          socketManager &&
+          typeof socketManager.disconnectSession === "function"
+        ) {
+          socketManager.disconnectSession();
+        }
+      } catch {
+        /* ignore */
+      }
+      setIsAuth(false);
+      setUser({});
+      if (redirect) {
+        history.push("/login");
+      }
+    },
+    [history, socketManager]
+  );
+
+  useEffect(() => {
+    const onStorage = (event) => {
+      if (!isForeignTabLogoutEvent(event)) return;
+      if (loggingOutRef.current) return;
+      applyLocalLoggedOutState({ redirect: true });
+      setLoading(false);
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [applyLocalLoggedOutState]);
+
   const refreshSessionAfterPermissionChange = useCallback(async () => {
-    if (permRefreshInFlightRef.current) return;
+    if (permRefreshInFlightRef.current || loggingOutRef.current) return;
     permRefreshInFlightRef.current = true;
     try {
       const { data } = await api.post(
@@ -45,6 +101,7 @@ const useAuth = () => {
         undefined,
         { skipLogoutOnAuthError: true }
       );
+      if (loggingOutRef.current) return;
       if (data?.token) {
         localStorage.setItem("token", JSON.stringify(data.token));
         api.defaults.headers.Authorization = `Bearer ${data.token}`;
@@ -160,8 +217,6 @@ const useAuth = () => {
           },
         };
       });
-      // Rejoin rooms: o estado React sozinho não atualiza Socket.IO.
-      // leave + join força o backend a recomputar allowNullQueueTickets.
       try {
         socket.emit("leaveTickets", "pending");
         socket.emit("leaveNotification");
@@ -227,7 +282,7 @@ const useAuth = () => {
           (s) => s.key === "campaignsEnabled"
         );
         if (setting && setting.value === "true") {
-          localStorage.setItem("cshow", null); //regra pra exibir campanhas
+          localStorage.setItem("cshow", null);
         }
       }
 
@@ -293,26 +348,45 @@ const useAuth = () => {
   }, [history]);
 
   const handleLogout = useCallback(async () => {
+    if (loggingOutRef.current) {
+      return;
+    }
+    loggingOutRef.current = true;
+    setAuthLoggingOut(true);
     setLoading(true);
 
     try {
-      await oneSignalLogout();
-      await api.delete("/auth/logout");
-      resetTechnicalConsoleAccessCache();
-      setIsAuth(false);
-      setUser({});
-      localStorage.removeItem("token");
-      localStorage.removeItem("companyId");
-      localStorage.removeItem("userId");
-      localStorage.removeItem("cshow");
-      api.defaults.headers.Authorization = undefined;
+      try {
+        await withTimeout(
+          oneSignalLogout(),
+          ONESIGNAL_LOGOUT_TIMEOUT_MS,
+          "onesignal_logout_timeout"
+        );
+      } catch {
+        /* OneSignal lento/offline não pode travar a saída */
+      }
+
+      try {
+        await withTimeout(
+          api.delete("/auth/logout", {
+            timeout: LOGOUT_API_TIMEOUT_MS,
+            skipLogoutOnAuthError: true,
+          }),
+          LOGOUT_API_TIMEOUT_MS + 500,
+          "logout_api_timeout"
+        );
+      } catch {
+        /* API fora / 401 / 500 / timeout: ainda assim limpar sessão local */
+      }
+    } finally {
+      broadcastAuthLogout();
+      applyLocalLoggedOutState({ redirect: false });
       setLoading(false);
+      setAuthLoggingOut(false);
+      loggingOutRef.current = false;
       history.push("/login");
-    } catch (err) {
-      toastError(err);
-      setLoading(false);
     }
-  }, [history]);
+  }, [applyLocalLoggedOutState, history]);
 
   const getCurrentUserInfo = useCallback(async () => {
     try {

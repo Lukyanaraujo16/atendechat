@@ -35,7 +35,7 @@ export const RefreshTokenService = async (
     const user = await ShowUserService(id);
 
     if (user.tokenVersion !== tokenVersion) {
-      res.clearCookie("jrt");
+      res.clearCookie("jrt", { httpOnly: true, path: "/" });
       throw new AppError("ERR_SESSION_EXPIRED", 401);
     }
 
@@ -49,7 +49,7 @@ export const RefreshTokenService = async (
     const tokenHome = normalizeHome(homeInToken);
     const userHome = user.companyId ?? null;
     if (tokenHome !== userHome) {
-      res.clearCookie("jrt");
+      res.clearCookie("jrt", { httpOnly: true, path: "/" });
       throw new AppError("ERR_SESSION_EXPIRED", 401);
     }
 
@@ -74,7 +74,7 @@ export const RefreshTokenService = async (
 
     return { newToken, refreshToken: newRefresh, serializedUser };
   } catch {
-    res.clearCookie("jrt");
+    res.clearCookie("jrt", { httpOnly: true, path: "/" });
     throw new AppError("ERR_SESSION_EXPIRED", 401);
   }
 };

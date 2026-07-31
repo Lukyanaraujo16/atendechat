@@ -8,6 +8,7 @@ const BUSINESS_FORBIDDEN = [
 
 let registered = false;
 let isRefreshing = false;
+let isLoggingOut = false;
 let failedRequestsQueue = [];
 
 const sessionHandlers = {
@@ -16,6 +17,27 @@ const sessionHandlers = {
 
 export function setAuthSessionInvalidHandler(handler) {
   sessionHandlers.onSessionInvalid = typeof handler === "function" ? handler : null;
+}
+
+export function setAuthLoggingOut(next) {
+  isLoggingOut = Boolean(next);
+  if (isLoggingOut) {
+    // Descarta fila de refresh pendente — não renovar sessão durante logout.
+    failedRequestsQueue.forEach((request) => {
+      request.reject(new Error("ERR_LOGGING_OUT"));
+    });
+    failedRequestsQueue = [];
+    isRefreshing = false;
+  }
+}
+
+export function getAuthLoggingOut() {
+  return isLoggingOut;
+}
+
+function isLogoutRequest(config) {
+  const url = String(config?.url || "");
+  return /\/auth\/logout\b/.test(url);
 }
 
 /**
@@ -30,6 +52,9 @@ export function attachAuthApiInterceptors(api) {
 
   api.interceptors.request.use(
     (config) => {
+      if (isLoggingOut && !isLogoutRequest(config)) {
+        return config;
+      }
       try {
         const token = localStorage.getItem("token");
         if (token) {
@@ -48,7 +73,7 @@ export function attachAuthApiInterceptors(api) {
     async (error) => {
       const originalRequest = error.config;
 
-      if (originalRequest?.skipLogoutOnAuthError) {
+      if (originalRequest?.skipLogoutOnAuthError || isLoggingOut || isLogoutRequest(originalRequest)) {
         return Promise.reject(error);
       }
 
@@ -72,7 +97,13 @@ export function attachAuthApiInterceptors(api) {
         isRefreshing = true;
 
         try {
-          const { data } = await api.post("/auth/refresh_token");
+          const { data } = await api.post("/auth/refresh_token", undefined, {
+            skipLogoutOnAuthError: true,
+          });
+
+          if (isLoggingOut) {
+            return Promise.reject(error);
+          }
 
           if (data?.token) {
             localStorage.setItem("token", JSON.stringify(data.token));
@@ -90,11 +121,13 @@ export function attachAuthApiInterceptors(api) {
           });
           failedRequestsQueue = [];
 
-          localStorage.removeItem("token");
-          localStorage.removeItem("companyId");
-          api.defaults.headers.Authorization = undefined;
-          if (sessionHandlers.onSessionInvalid) {
-            sessionHandlers.onSessionInvalid();
+          if (!isLoggingOut) {
+            localStorage.removeItem("token");
+            localStorage.removeItem("companyId");
+            api.defaults.headers.Authorization = undefined;
+            if (sessionHandlers.onSessionInvalid) {
+              sessionHandlers.onSessionInvalid();
+            }
           }
 
           return Promise.reject(refreshError);
@@ -107,11 +140,13 @@ export function attachAuthApiInterceptors(api) {
         error?.response?.status === 401 ||
         (error?.response?.status === 403 && originalRequest._retry)
       ) {
-        localStorage.removeItem("token");
-        localStorage.removeItem("companyId");
-        api.defaults.headers.Authorization = undefined;
-        if (sessionHandlers.onSessionInvalid) {
-          sessionHandlers.onSessionInvalid();
+        if (!isLoggingOut) {
+          localStorage.removeItem("token");
+          localStorage.removeItem("companyId");
+          api.defaults.headers.Authorization = undefined;
+          if (sessionHandlers.onSessionInvalid) {
+            sessionHandlers.onSessionInvalid();
+          }
         }
       }
 
@@ -125,4 +160,12 @@ export function registerAuthApiInterceptors(handlers = {}) {
   if (handlers.onSessionInvalid) {
     setAuthSessionInvalidHandler(handlers.onSessionInvalid);
   }
+}
+
+/** Test helpers */
+export function __resetAuthInterceptorStateForTests() {
+  registered = false;
+  isRefreshing = false;
+  isLoggingOut = false;
+  failedRequestsQueue = [];
 }

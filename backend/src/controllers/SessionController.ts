@@ -86,9 +86,14 @@ export const remove = async (
 ): Promise<Response> => {
   const { id } = req.user;
   const user = await User.findByPk(id);
-  await user.update({ online: false });
+  if (user) {
+    await user.update({
+      online: false,
+      tokenVersion: (user.tokenVersion || 0) + 1
+    });
+  }
 
-  res.clearCookie("jrt");
+  res.clearCookie("jrt", { httpOnly: true, path: "/" });
 
   return res.send();
 };

@@ -48,6 +48,7 @@ let heartbeatTimer = null;
 let channel = null;
 let listeners = new Set();
 let started = false;
+let onStorageHandler = null;
 
 function emitChange() {
   listeners.forEach((fn) => {
@@ -99,6 +100,36 @@ function onHeartbeat() {
   tryClaim();
 }
 
+function stopLeaderInternals({ removeLeaderKeyAlways = false } = {}) {
+  if (typeof window !== "undefined" && onStorageHandler) {
+    window.removeEventListener("storage", onStorageHandler);
+    onStorageHandler = null;
+  }
+  if (heartbeatTimer) {
+    clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
+  }
+  if (channel) {
+    try {
+      channel.close();
+    } catch {
+      /* ignore */
+    }
+    channel = null;
+  }
+  const current = readLeader();
+  if (removeLeaderKeyAlways || current?.id === tabId) {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
+  }
+  started = false;
+  setLeaderFlag(false);
+  listeners.clear();
+}
+
 /**
  * Inicia eleição de líder. Idempotente. Retorna cleanup.
  */
@@ -128,42 +159,39 @@ export function initNotificationTabLeader() {
     channel = null;
   }
 
-  const onStorage = (event) => {
+  onStorageHandler = (event) => {
     if (event.key !== STORAGE_KEY) return;
     const current = readLeader();
     setLeaderFlag(Boolean(current && current.id === tabId));
   };
 
-  window.addEventListener("storage", onStorage);
+  window.addEventListener("storage", onStorageHandler);
   tryClaim();
   heartbeatTimer = setInterval(onHeartbeat, HEARTBEAT_MS);
 
   return () => {
-    started = false;
-    window.removeEventListener("storage", onStorage);
-    if (heartbeatTimer) {
-      clearInterval(heartbeatTimer);
-      heartbeatTimer = null;
-    }
-    if (channel) {
-      try {
-        channel.close();
-      } catch {
-        /* ignore */
-      }
-      channel = null;
-    }
-    const current = readLeader();
-    if (current?.id === tabId) {
-      try {
-        localStorage.removeItem(STORAGE_KEY);
-      } catch {
-        /* ignore */
-      }
-    }
-    setLeaderFlag(false);
-    listeners.clear();
+    if (!started) return;
+    stopLeaderInternals({ removeLeaderKeyAlways: false });
   };
+}
+
+/**
+ * Encerra liderança/canal/timers mesmo se o cleanup do provider ainda não rodou
+ * (ex.: logout). Permite reiniciar em login seguinte.
+ */
+export function forceStopNotificationTabLeader() {
+  if (typeof window === "undefined") {
+    return;
+  }
+  if (!started) {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
+    return;
+  }
+  stopLeaderInternals({ removeLeaderKeyAlways: true });
 }
 
 export function isNotificationTabLeader() {
@@ -179,4 +207,10 @@ export function subscribeNotificationTabLeader(listener) {
 
 export function getNotificationTabId() {
   return tabId;
+}
+
+/** @deprecated test helper */
+export function __resetNotificationTabLeaderForTests() {
+  forceStopNotificationTabLeader();
+  tabId = null;
 }
