@@ -84,6 +84,10 @@ export async function generateLiveResponseWithOptionalFc(input: {
   whatsapp: Whatsapp;
   agent: AiAgent;
   inboundText: string;
+  /** Query Knowledge (ex.: transcrição); default = inboundText. */
+  knowledgeQuery?: string | null;
+  /** Imagens do turno atual para visão. */
+  imageParts?: Array<{ mimeType: string; base64: string }>;
   logId?: number;
   messageId?: string | null;
   messageHints?: {
@@ -198,6 +202,8 @@ export async function generateLiveResponseWithOptionalFc(input: {
       whatsapp: input.whatsapp,
       agent: input.agent,
       inboundText: input.inboundText,
+      knowledgeQuery: input.knowledgeQuery,
+      imageParts: input.imageParts,
       source: AI_AGENT_LIVE_SOURCE,
       timeoutMs: AI_AGENT_LIVE_TIMEOUT_MS,
       maxTokensCap: AI_AGENT_LIVE_MAX_TOKENS_CAP,
@@ -258,6 +264,75 @@ export async function generateLiveResponseWithOptionalFc(input: {
     };
   }
 
+  // Visão: FC loop ainda é text-only — usar pipeline legado com imageParts.
+  if (input.imageParts && input.imageParts.length > 0) {
+    const vision = await buildAiAgentProviderResponse({
+      companyId: input.companyId,
+      ticket: input.ticket,
+      contact: input.contact,
+      whatsapp: input.whatsapp,
+      agent: input.agent,
+      inboundText: input.inboundText,
+      knowledgeQuery: input.knowledgeQuery,
+      imageParts: input.imageParts,
+      source: AI_AGENT_LIVE_SOURCE,
+      timeoutMs: AI_AGENT_LIVE_TIMEOUT_MS,
+      maxTokensCap: AI_AGENT_LIVE_MAX_TOKENS_CAP,
+      logId: input.logId,
+      knowledgeChannel: "live",
+      messageId: input.messageId
+    });
+    if (vision.ok === false) {
+      return {
+        ok: false,
+        usedFunctionCalling: false,
+        fallback: true,
+        fallbackReason: "vision_via_legacy",
+        eligibility,
+        latencyMs: vision.latencyMs,
+        errorCode: vision.errorCode,
+        isRateLimited: vision.isRateLimited,
+        credentialSource: vision.credentialSource,
+        credentialId: vision.credentialId,
+        knowledgeMeta: vision.knowledgeMeta,
+        liveFcMeta: {
+          version: AUTOMATION_LIVE_ROLLOUT_VERSION,
+          usedFunctionCalling: false,
+          vision: true,
+          eligibility,
+          policySnapshot
+        }
+      };
+    }
+    return {
+      ok: true,
+      text: vision.text,
+      usedFunctionCalling: false,
+      fallback: true,
+      fallbackReason: "vision_via_legacy",
+      eligibility,
+      model: vision.model,
+      provider: vision.provider,
+      promptTokens: vision.promptTokens,
+      completionTokens: vision.completionTokens,
+      totalTokens: vision.totalTokens,
+      latencyMs: vision.latencyMs,
+      contextMessageCount: vision.contextMessageCount,
+      contextHash: vision.contextHash,
+      credentialSource: vision.credentialSource,
+      credentialId: vision.credentialId,
+      knowledgeMeta: vision.knowledgeMeta,
+      forceHandoff: vision.forceHandoff,
+      liveFcMeta: {
+        version: AUTOMATION_LIVE_ROLLOUT_VERSION,
+        usedFunctionCalling: false,
+        vision: true,
+        eligibility,
+        policySnapshot
+      }
+    };
+  }
+
   try {
     const profile = await loadAiAgentProfileForRuntime({
       companyId: input.companyId,
@@ -274,7 +349,9 @@ export async function generateLiveResponseWithOptionalFc(input: {
     const retrieval = await safeRetrieveKnowledgeForAgent({
       companyId: input.companyId,
       aiAgentId: input.agent.id,
-      query: input.inboundText,
+      query:
+        (input.knowledgeQuery && String(input.knowledgeQuery).trim()) ||
+        input.inboundText,
       channel: "live",
       conversationContext: promptContext.messages,
       ticketId: input.ticket.id,
@@ -522,6 +599,8 @@ export async function generateLiveResponseWithOptionalFc(input: {
       whatsapp: input.whatsapp,
       agent: input.agent,
       inboundText: input.inboundText,
+      knowledgeQuery: input.knowledgeQuery,
+      imageParts: input.imageParts,
       source: AI_AGENT_LIVE_SOURCE,
       timeoutMs: AI_AGENT_LIVE_TIMEOUT_MS,
       maxTokensCap: AI_AGENT_LIVE_MAX_TOKENS_CAP,

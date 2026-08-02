@@ -33,7 +33,7 @@ Inventário dos campos de configuração do AI Agent, baseado nos modelos reais 
 | `fallbackMessage` | TEXT NULL | `commercial_editable` | Sim |
 | `handoffMessage` | TEXT NULL | `commercial_editable` | Sim |
 | `aiProviderCredentialId` | FK NULL | `commercial_editable` | Via referência segura |
-| `allowAudioInput` | BOOLEAN | `deprecated` | Não |
+| `allowAudioInput` | BOOLEAN | `deprecated` | Não (capacidade multimodal deriva do modelo — Fase 2.17) |
 | `allowAudioOutput` | BOOLEAN | `deprecated` | Não |
 | `createdAt` / `updatedAt` | DATE | `technical_internal` | Não |
 

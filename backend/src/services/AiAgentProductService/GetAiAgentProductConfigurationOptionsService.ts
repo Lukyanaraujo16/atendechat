@@ -12,6 +12,7 @@ import {
   AI_AGENT_PRODUCT_PROVIDER_CAPABILITIES,
   listModelsForCommercialProvider
 } from "./aiAgentProductProviderCapabilities";
+import { resolveAiModelMediaCapabilities } from "../../config/aiModelMediaCapabilities";
 import {
   serializeAiAgentProductConfigurationOptions
 } from "./serializeAiAgentProduct";
@@ -96,11 +97,20 @@ export default async function GetAiAgentProductConfigurationOptionsService(input
         : {})
     })),
     models: AI_AGENT_PRODUCT_PROVIDER_CAPABILITIES.flatMap(capability =>
-      listModelsForCommercialProvider(capability.provider).map(model => ({
-        value: model,
-        label: model,
-        provider: capability.provider
-      }))
+      listModelsForCommercialProvider(capability.provider).map(model => {
+        const caps = resolveAiModelMediaCapabilities(
+          capability.provider,
+          model
+        );
+        return {
+          value: model,
+          label: model,
+          provider: capability.provider,
+          supportsText: caps.supportsText,
+          supportsVision: caps.supportsVision,
+          supportsAudioTranscription: caps.supportsAudioTranscription
+        };
+      })
     ),
     credentials: credentials.map(c => ({
       ref: String(c.id),

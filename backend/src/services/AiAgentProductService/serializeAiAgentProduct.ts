@@ -61,8 +61,16 @@ const ALLOWED_READINESS = new Set([
   "status",
   "mode",
   "nextAction",
-  "checks"
+  "checks",
+  "mediaCapabilities"
 ]);
+const ALLOWED_MEDIA_CAPABILITIES = new Set([
+  "text",
+  "vision",
+  "audioTranscription",
+  "reason"
+]);
+const ALLOWED_MEDIA_REASON = new Set(["vision", "audioTranscription"]);
 const ALLOWED_CHECK = new Set(["key", "status", "labelKey"]);
 
 const FORBIDDEN_KEY_FRAGMENTS = [
@@ -186,13 +194,46 @@ export function serializeAffectedConnections(
 export function serializeAiAgentReadiness(
   readiness: AiAgentProductReadiness
 ): AiAgentProductReadiness {
+  const media = readiness.mediaCapabilities;
   const out: AiAgentProductReadiness = {
     ready: readiness.ready === true,
     status: readiness.status,
     mode: readiness.mode,
     nextAction: readiness.nextAction,
-    checks: serializeChecks(readiness.checks)
+    checks: serializeChecks(readiness.checks),
+    ...(media
+      ? {
+          mediaCapabilities: {
+            text: media.text,
+            vision: media.vision,
+            audioTranscription: media.audioTranscription,
+            ...(media.reason
+              ? {
+                  reason: {
+                    vision: media.reason.vision ?? null,
+                    audioTranscription:
+                      media.reason.audioTranscription ?? null
+                  }
+                }
+              : {})
+          }
+        }
+      : {})
   };
+  if (out.mediaCapabilities) {
+    assertAllowlistedObject(
+      out.mediaCapabilities as unknown as Record<string, unknown>,
+      ALLOWED_MEDIA_CAPABILITIES,
+      "readiness.mediaCapabilities"
+    );
+    if (out.mediaCapabilities.reason) {
+      assertAllowlistedObject(
+        out.mediaCapabilities.reason as unknown as Record<string, unknown>,
+        ALLOWED_MEDIA_REASON,
+        "readiness.mediaCapabilities.reason"
+      );
+    }
+  }
   assertAllowlistedObject(
     out as unknown as Record<string, unknown>,
     ALLOWED_READINESS,
@@ -400,7 +441,14 @@ const ALLOWED_OPTIONS_CREDENTIAL = new Set([
   "enabled",
   "isDefault"
 ]);
-const ALLOWED_OPTIONS_MODEL = new Set(["value", "label", "provider"]);
+const ALLOWED_OPTIONS_MODEL = new Set([
+  "value",
+  "label",
+  "provider",
+  "supportsText",
+  "supportsVision",
+  "supportsAudioTranscription"
+]);
 const ALLOWED_OPTIONS_CONNECTION = new Set([
   "ref",
   "name",
@@ -675,7 +723,10 @@ export function serializeAiAgentProductConfigurationOptions(
       const row = {
         value: String(model.value || ""),
         label: String(model.label || ""),
-        provider: String(model.provider || "")
+        provider: String(model.provider || ""),
+        supportsText: model.supportsText !== false,
+        supportsVision: model.supportsVision === true,
+        supportsAudioTranscription: model.supportsAudioTranscription === true
       };
       assertConfigurationAllowlisted(
         row as unknown as Record<string, unknown>,

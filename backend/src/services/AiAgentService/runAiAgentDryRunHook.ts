@@ -13,10 +13,20 @@ import { sanitizeAiAgentRuntimeMetadata } from "./sanitizeAiAgentRuntimeMetadata
 import { scheduleShadowGeneration } from "./AiAgentShadowService";
 import { scheduleLiveResponse } from "./AiAgentLiveService";
 import { scheduleAutomationObserveFromInbound } from "../AutomationOrchestrator/scheduleAutomationObserveFromInbound";
+import { isMultimodalInboundCandidate } from "./prepareAiAgentMultimodalTurn";
 import Contact from "../../models/Contact";
 import Ticket from "../../models/Ticket";
 import Whatsapp from "../../models/Whatsapp";
 import { proto } from "@whiskeysockets/baileys";
+
+function canScheduleAiAgentGeneration(
+  classification: InboundMessageClassification
+): boolean {
+  return (
+    classification.hasText === true ||
+    isMultimodalInboundCandidate(classification)
+  );
+}
 
 export type RunAiAgentDryRunHookInput = {
   companyId: number;
@@ -131,7 +141,7 @@ export async function runAiAgentDryRunHook(
     persistResult.status === "created" &&
     evaluation.eligible &&
     runtimeMode === "shadow" &&
-    input.classification.hasText
+    canScheduleAiAgentGeneration(input.classification)
   ) {
     scheduleShadowGeneration({
       logId: persistResult.logId,
@@ -146,7 +156,7 @@ export async function runAiAgentDryRunHook(
     persistResult.status === "created" &&
     evaluation.eligible &&
     runtimeMode === "live" &&
-    input.classification.hasText
+    canScheduleAiAgentGeneration(input.classification)
   ) {
     scheduleLiveResponse({
       logId: persistResult.logId,

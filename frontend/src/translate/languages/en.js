@@ -2936,6 +2936,18 @@ const messages = {
 						"Name, description and commercial messages for this agent.",
 					intelligenceHint:
 						"Provider, model, credential, instructions and FAQs for this agent.",
+					mediaCapabilitiesTitle: "Media understanding",
+					media: {
+						capabilityText: "Text",
+						capabilityImages: "Images",
+						capabilityAudio: "Audio",
+						available: "available",
+						unavailable: "unavailable",
+						reasonModel: "incompatible model",
+						reasonCredential: "missing credential",
+						recommendVisionModel:
+							"To analyze photos and audio, choose a compatible model (e.g. GPT-4o or Gemini Flash).",
+					},
 					knowledgeHint:
 						"Knowledge bases linked to this agent. The company library can be shared.",
 					testsHint: "Simulate conversations with this agent's current setup.",

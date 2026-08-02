@@ -2,6 +2,12 @@ import { ChatCompletionRequestMessage } from "openai";
 import { AiProviderId } from "../../config/aiProviderModels";
 import { AiAgentShadowErrorCode } from "../AiAgentService/aiAgentShadowErrors";
 
+export type GenerateChatCompletionImagePart = {
+  mimeType: string;
+  /** Base64 sem prefixo data: — nunca logar. */
+  base64: string;
+};
+
 export type GenerateChatCompletionInput = {
   companyId: number;
   ticketId?: number | null;
@@ -13,6 +19,8 @@ export type GenerateChatCompletionInput = {
   messages: ChatCompletionRequestMessage[];
   timeoutMs: number;
   source: string;
+  /** Imagens do turno atual (visão). Opcional. */
+  imageParts?: GenerateChatCompletionImagePart[];
   /** Function calling — opcional; ausente = comportamento legado (Live/Shadow). */
   tools?: Array<{
     type: "function";

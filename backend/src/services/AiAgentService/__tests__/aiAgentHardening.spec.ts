@@ -88,23 +88,26 @@ describe("AiAgent hardening 1.2.1", () => {
       expect(c.blockReason).toBeUndefined();
     });
 
-    it("áudio bloqueia com audio_not_supported", () => {
+    it("áudio não bloqueia — candidata multimodal", () => {
       const msg = {
         key: { id: "2" },
         message: { audioMessage: {} }
       } as proto.IWebMessageInfo;
       const c = classifyInboundMessageFromBaileys(msg, "Áudio");
       expect(c.messageType).toBe("audio");
-      expect(c.blockReason).toBe("audio_not_supported");
+      expect(c.hasMedia).toBe(true);
+      expect(c.blockReason).toBeUndefined();
     });
 
-    it("imagem sem legenda bloqueia com media_not_supported", () => {
+    it("imagem sem legenda não bloqueia — candidata multimodal", () => {
       const msg = {
         key: { id: "3" },
         message: { imageMessage: {} }
       } as proto.IWebMessageInfo;
       const c = classifyInboundMessageFromBaileys(msg, null);
-      expect(c.blockReason).toBe("media_not_supported");
+      expect(c.messageType).toBe("image");
+      expect(c.hasMedia).toBe(true);
+      expect(c.blockReason).toBeUndefined();
     });
 
     it("imagem com legenda permite avaliação da legenda", () => {

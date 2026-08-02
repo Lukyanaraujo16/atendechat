@@ -41,6 +41,7 @@ export async function generateChatCompletionViaAdapter(input: {
   messages: import("openai").ChatCompletionRequestMessage[];
   timeoutMs: number;
   source: string;
+  imageParts?: import("./aiProviderTypes").GenerateChatCompletionImagePart[];
   tools?: import("./aiProviderTypes").GenerateChatCompletionInput["tools"];
   geminiFunctionDeclarations?: import("./aiProviderTypes").GenerateChatCompletionInput["geminiFunctionDeclarations"];
 }): Promise<GenerateChatCompletionResult> {
@@ -56,6 +57,7 @@ export async function generateChatCompletionViaAdapter(input: {
     messages: input.messages,
     timeoutMs: input.timeoutMs,
     source: input.source,
+    imageParts: input.imageParts,
     tools: input.tools,
     geminiFunctionDeclarations: input.geminiFunctionDeclarations
   });

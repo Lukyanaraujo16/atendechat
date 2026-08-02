@@ -43,8 +43,29 @@ import {
   acquireAiAgentGenerationLock,
   releaseAiAgentGenerationLock
 } from "./knowledge/aiAgentGenerationLock";
+import {
+  isMultimodalInboundCandidate,
+  prepareAiAgentMultimodalTurn
+} from "./prepareAiAgentMultimodalTurn";
+import { AI_AGENT_AUDIO_FALLBACK_MESSAGE } from "./aiAgentInputContent";
+import { emitAiAgentMediaMetric } from "./emitAiAgentMediaMetric";
 
 const inFlightTickets = new Set<number>();
+
+function mapShadowMediaError(errorCode: string): string {
+  switch (errorCode) {
+    case "vision_not_supported":
+      return AI_AGENT_SHADOW_ERROR_CODES.VISION_NOT_SUPPORTED;
+    case "file_too_large":
+      return AI_AGENT_SHADOW_ERROR_CODES.MEDIA_TOO_LARGE;
+    case "format_unsupported":
+      return AI_AGENT_SHADOW_ERROR_CODES.MEDIA_FORMAT_UNSUPPORTED;
+    case "media_unavailable":
+      return AI_AGENT_SHADOW_ERROR_CODES.MEDIA_UNAVAILABLE;
+    default:
+      return AI_AGENT_SHADOW_ERROR_CODES.AUDIO_TRANSCRIPTION_FAILED;
+  }
+}
 
 async function loadShadowEntities(log: AiAgentRuntimeLog): Promise<{
   ticket: Ticket;
@@ -83,7 +104,10 @@ export async function generateShadowSuggestionForLog(
   inboundText: string,
   classification: InboundMessageClassification
 ): Promise<void> {
-  if (!classification.hasText) {
+  if (
+    !classification.hasText &&
+    !isMultimodalInboundCandidate(classification)
+  ) {
     await updateAiAgentShadowLog(logId, companyId, {
       shadowStatus: AI_AGENT_SHADOW_STATUSES.SKIPPED,
       errorCode: AI_AGENT_SHADOW_ERROR_CODES.NOT_ELIGIBLE
@@ -176,6 +200,71 @@ export async function generateShadowSuggestionForLog(
       return;
     }
 
+    let effectiveInboundText = inboundText;
+    let knowledgeQuery = inboundText;
+    let imageParts: Array<{ mimeType: string; base64: string }> = [];
+
+    if (
+      isMultimodalInboundCandidate(classification) ||
+      classification.hasMedia
+    ) {
+      let modelForCaps = String(agent.model || "");
+      try {
+        modelForCaps = parseAiAgentModelForProvider(
+          agent.model,
+          resolved.provider
+        );
+      } catch {
+        // keep raw
+      }
+
+      const prepared = await prepareAiAgentMultimodalTurn({
+        companyId,
+        ticketId: ticket.id,
+        agentId: agent.id,
+        messageId: log.messageId || null,
+        inboundText,
+        classification,
+        provider: resolved.provider,
+        apiKey: resolved.apiKey,
+        model: modelForCaps
+      });
+
+      if (prepared.ok === false) {
+        await mergeAiAgentShadowLogMetadata(logId, companyId, {
+          mediaErrorCode: prepared.errorCode,
+          mediaAskRetry: prepared.askRetry,
+          mediaType: classification.messageType
+        });
+        // Shadow: grava sugestão de fallback natural (não envia ao cliente)
+        await updateAiAgentShadowLog(logId, companyId, {
+          shadowStatus: AI_AGENT_SHADOW_STATUSES.GENERATED,
+          suggestedReply:
+            prepared.clientFallbackMessage || AI_AGENT_AUDIO_FALLBACK_MESSAGE,
+          errorCode: mapShadowMediaError(prepared.errorCode),
+          latencyMs: Date.now() - startedAt,
+          shadowModel: modelForCaps,
+          shadowProvider: resolved.provider
+        });
+        return;
+      }
+
+      effectiveInboundText = prepared.turn.inboundText;
+      knowledgeQuery = prepared.knowledgeQuery;
+      imageParts = prepared.turn.imageParts.map(p => ({
+        mimeType: p.mimeType,
+        base64: p.base64
+      }));
+      await mergeAiAgentShadowLogMetadata(logId, companyId, {
+        mediaType: prepared.turn.mediaMeta.mediaType || classification.messageType,
+        mediaByteSize: prepared.turn.mediaMeta.byteSize ?? null,
+        mediaImageCount: prepared.turn.mediaMeta.imageCount ?? null,
+        mediaTranscribed: prepared.turn.mediaMeta.transcribed === true,
+        mediaTranscriptionChars:
+          prepared.turn.mediaMeta.transcriptionChars ?? null
+      });
+    }
+
     let promptContext;
     try {
       promptContext = await buildAiAgentPromptContext({
@@ -183,7 +272,7 @@ export async function generateShadowSuggestionForLog(
         ticket,
         contact,
         agent,
-        currentInboundText: inboundText
+        currentInboundText: effectiveInboundText
       });
     } catch {
       await updateAiAgentShadowLog(logId, companyId, {
@@ -203,7 +292,7 @@ export async function generateShadowSuggestionForLog(
     const retrieval = await safeRetrieveKnowledgeForAgent({
       companyId,
       aiAgentId: agent.id,
-      query: inboundText,
+      query: knowledgeQuery,
       channel: "shadow",
       conversationContext: promptContext.messages,
       ticketId: ticket.id,
@@ -250,8 +339,29 @@ export async function generateShadowSuggestionForLog(
       systemPrompt,
       messages: promptContext.messages,
       timeoutMs: AI_AGENT_SHADOW_TIMEOUT_MS,
-      source: AI_AGENT_SHADOW_SOURCE
+      source: AI_AGENT_SHADOW_SOURCE,
+      imageParts
     });
+
+    if (imageParts.length > 0) {
+      emitAiAgentMediaMetric(
+        result.ok
+          ? "ai_agent.image_analysis_completed"
+          : "ai_agent.image_analysis_failed",
+        {
+          companyId,
+          agentId: agent.id,
+          ticketId: ticket.id,
+          messageId: log.messageId,
+          provider: resolved.provider,
+          model,
+          mediaType: "image",
+          durationMs: result.latencyMs,
+          result: result.ok ? "ok" : "failed",
+          errorCode: result.ok === false ? result.errorCode : null
+        }
+      );
+    }
 
     const latencyMs = result.latencyMs ?? Date.now() - startedAt;
 
@@ -281,7 +391,7 @@ export async function generateShadowSuggestionForLog(
         companyId,
         aiAgentId: agent.id,
         channel: "shadow",
-        query: inboundText,
+        query: knowledgeQuery,
         retrieval,
         decision: knowledgeApplied.decision,
         ticketId: ticket.id,
@@ -312,7 +422,7 @@ export async function generateShadowSuggestionForLog(
         companyId,
         aiAgentId: agent.id,
         channel: "shadow",
-        query: inboundText,
+        query: knowledgeQuery,
         retrieval,
         decision: knowledgeApplied.decision,
         ticketId: ticket.id,
@@ -348,7 +458,7 @@ export async function generateShadowSuggestionForLog(
       companyId,
       aiAgentId: agent.id,
       channel: "shadow",
-      query: inboundText,
+      query: knowledgeQuery,
       retrieval,
       decision: knowledgeApplied.decision,
       ticketId: ticket.id,

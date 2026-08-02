@@ -2,6 +2,7 @@ import { AI_PROVIDER_OPENAI } from "../../config/aiProviderModels";
 import { executeOpenAi } from "../OpenAi/OpenAiManager";
 import { AI_AGENT_SHADOW_ERROR_CODES } from "../AiAgentService/aiAgentShadowErrors";
 import { mapOpenAiManagerError } from "./aiProviderErrors";
+import { buildOpenAiMultimodalMessages } from "./aiProviderMultimodal";
 import {
   AiProviderAdapter,
   GenerateChatCompletionInput,
@@ -33,13 +34,18 @@ export class OpenAiProviderAdapter implements AiProviderAdapter {
     const startedAt = Date.now();
 
     try {
+      const messages = buildOpenAiMultimodalMessages(
+        input.messages,
+        input.imageParts
+      );
+
       const result = await withTimeout(
         executeOpenAi({
           companyId: input.companyId,
           ticketId: input.ticketId,
           apiKey: input.apiKey,
           prompt: input.systemPrompt,
-          messages: input.messages,
+          messages,
           model: input.model,
           maxTokens: input.maxTokens,
           temperature: input.temperature,

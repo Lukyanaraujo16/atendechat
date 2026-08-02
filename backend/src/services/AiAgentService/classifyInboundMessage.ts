@@ -167,20 +167,28 @@ export function classifyInboundMessageFromBaileys(
     };
   }
 
+  // Fase 2.17: áudio e imagem passam para o pipeline multimodal (transcrição/visão).
+  // Vídeo/documento sem legenda útil continuam bloqueados.
   if (messageType === "audio") {
     return {
       messageType,
       hasText: false,
       hasMedia: true,
-      baileysType: typeKey,
-      blockReason: AI_AGENT_EVALUATION_REASONS.AUDIO_NOT_SUPPORTED
+      baileysType: typeKey
+    };
+  }
+
+  if (messageType === "image" && !captionUseful) {
+    return {
+      messageType,
+      hasText: false,
+      hasMedia: true,
+      baileysType: typeKey
     };
   }
 
   if (
-    (messageType === "image" ||
-      messageType === "video" ||
-      messageType === "document") &&
+    (messageType === "video" || messageType === "document") &&
     !captionUseful
   ) {
     return {

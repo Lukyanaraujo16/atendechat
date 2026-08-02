@@ -351,6 +351,19 @@ export function AiAgentIntelligencePanel({
     form?.provider
   ).filter((item) => item.enabled);
 
+  const selectedModelCaps = useMemo(() => {
+    if (!form?.model) return null;
+    const row = (options.models || []).find(
+      (model) => model.value === form.model
+    );
+    if (!row) return null;
+    return {
+      supportsText: row.supportsText !== false,
+      supportsVision: row.supportsVision === true,
+      supportsAudioTranscription: row.supportsAudioTranscription === true,
+    };
+  }, [form?.model, options.models]);
+
   const load = useCallback(async () => {
     if (!agentRefKey) return;
     setLoading(true);
@@ -495,6 +508,50 @@ export function AiAgentIntelligencePanel({
           </MenuItem>
         ))}
       </TextField>
+
+      <Box
+        className={classes.field}
+        data-testid="ai-agent-media-capabilities"
+        aria-label={i18n.t("aiAgentProduct.admin.mediaCapabilitiesTitle")}
+      >
+        <Typography variant="subtitle2" component="h3">
+          {i18n.t("aiAgentProduct.admin.mediaCapabilitiesTitle")}
+        </Typography>
+        <Typography variant="body2" className={classes.meta}>
+          {i18n.t("aiAgentProduct.admin.media.capabilityText")}:{" "}
+          {i18n.t("aiAgentProduct.admin.media.available")}
+        </Typography>
+        <Typography variant="body2" className={classes.meta}>
+          {i18n.t("aiAgentProduct.admin.media.capabilityImages")}:{" "}
+          {selectedModelCaps?.supportsVision
+            ? i18n.t("aiAgentProduct.admin.media.available")
+            : i18n.t("aiAgentProduct.admin.media.unavailable")}
+          {!selectedModelCaps?.supportsVision && form.model
+            ? ` — ${i18n.t("aiAgentProduct.admin.media.reasonModel")}`
+            : !form.credentialRef
+              ? ` — ${i18n.t("aiAgentProduct.admin.media.reasonCredential")}`
+              : ""}
+        </Typography>
+        <Typography variant="body2" className={classes.meta}>
+          {i18n.t("aiAgentProduct.admin.media.capabilityAudio")}:{" "}
+          {selectedModelCaps?.supportsAudioTranscription
+            ? i18n.t("aiAgentProduct.admin.media.available")
+            : i18n.t("aiAgentProduct.admin.media.unavailable")}
+          {!selectedModelCaps?.supportsAudioTranscription && form.model
+            ? ` — ${i18n.t("aiAgentProduct.admin.media.reasonModel")}`
+            : !form.credentialRef
+              ? ` — ${i18n.t("aiAgentProduct.admin.media.reasonCredential")}`
+              : ""}
+        </Typography>
+        {form.model &&
+        selectedModelCaps &&
+        (!selectedModelCaps.supportsVision ||
+          !selectedModelCaps.supportsAudioTranscription) ? (
+          <Typography variant="body2" className={classes.meta}>
+            {i18n.t("aiAgentProduct.admin.media.recommendVisionModel")}
+          </Typography>
+        ) : null}
+      </Box>
 
       <TextField
         className={classes.field}

@@ -7,21 +7,17 @@ import {
 import { AI_AGENT_SHADOW_ERROR_CODES } from "../AiAgentService/aiAgentShadowErrors";
 import { mapGeminiErrorToShadowCode } from "./aiProviderErrors";
 import {
+  GeminiPart,
+  buildGeminiUserParts
+} from "./aiProviderMultimodal";
+import {
   AiProviderAdapter,
+  GenerateChatCompletionImagePart,
   GenerateChatCompletionInput,
   GenerateChatCompletionResult
 } from "./aiProviderTypes";
 
 type GeminiRole = "user" | "model";
-
-type GeminiGenerateResponse = {
-  text(): string;
-  usageMetadata?: {
-    promptTokenCount?: number;
-    candidatesTokenCount?: number;
-    totalTokenCount?: number;
-  };
-};
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -68,24 +64,36 @@ function extractLastUserText(messages: ChatCompletionRequestMessage[]): string {
   return "";
 }
 
-function splitGeminiConversation(messages: ChatCompletionRequestMessage[]): {
+function splitGeminiConversation(
+  messages: ChatCompletionRequestMessage[],
+  imageParts?: GenerateChatCompletionImagePart[]
+): {
   history: Array<{ role: GeminiRole; parts: Array<{ text: string }> }>;
-  lastUserText: string;
+  lastUserParts: GeminiPart[];
 } {
   const all = toGeminiHistory(messages);
   if (all.length === 0) {
-    return { history: [], lastUserText: "" };
+    return {
+      history: [],
+      lastUserParts: buildGeminiUserParts("", imageParts)
+    };
   }
 
   const last = all[all.length - 1];
   if (last.role === "user") {
     return {
       history: all.slice(0, -1),
-      lastUserText: last.parts[0]?.text || ""
+      lastUserParts: buildGeminiUserParts(last.parts[0]?.text || "", imageParts)
     };
   }
 
-  return { history: all, lastUserText: extractLastUserText(messages) };
+  return {
+    history: all,
+    lastUserParts: buildGeminiUserParts(
+      extractLastUserText(messages),
+      imageParts
+    )
+  };
 }
 
 export class GeminiProviderAdapter implements AiProviderAdapter {
@@ -120,8 +128,15 @@ export class GeminiProviderAdapter implements AiProviderAdapter {
 
       const model = genAI.getGenerativeModel(modelConfig as any);
 
-      const { history, lastUserText } = splitGeminiConversation(input.messages);
-      if (!lastUserText) {
+      const { history, lastUserParts } = splitGeminiConversation(
+        input.messages,
+        input.imageParts
+      );
+      const hasText = lastUserParts.some(
+        p => "text" in p && String(p.text || "").trim()
+      );
+      const hasImage = lastUserParts.some(p => "inlineData" in p);
+      if (!hasText && !hasImage) {
         return {
           ok: false,
           errorCode: AI_AGENT_SHADOW_ERROR_CODES.EMPTY_AI_RESPONSE,
@@ -138,12 +153,12 @@ export class GeminiProviderAdapter implements AiProviderAdapter {
         history.length > 0
           ? (async () => {
               const chat = model.startChat({ history, generationConfig });
-              const result = await chat.sendMessage(lastUserText);
+              const result = await chat.sendMessage(lastUserParts as any);
               return result.response;
             })()
           : model
               .generateContent({
-                contents: [{ role: "user", parts: [{ text: lastUserText }] }],
+                contents: [{ role: "user", parts: lastUserParts }],
                 generationConfig
               })
               .then((r: any) => r.response),

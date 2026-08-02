@@ -9,7 +9,12 @@ export const AI_AGENT_SHADOW_ERROR_CODES = {
   GENERATION_FAILED: "generation_failed",
   DEBOUNCED_SUPERSEDED: "debounced_superseded",
   NOT_SHADOW_MODE: "not_shadow_mode",
-  NOT_ELIGIBLE: "not_eligible"
+  NOT_ELIGIBLE: "not_eligible",
+  MEDIA_UNAVAILABLE: "media_unavailable",
+  AUDIO_TRANSCRIPTION_FAILED: "audio_transcription_failed",
+  VISION_NOT_SUPPORTED: "vision_not_supported",
+  MEDIA_FORMAT_UNSUPPORTED: "media_format_unsupported",
+  MEDIA_TOO_LARGE: "media_too_large"
 } as const;
 
 export type AiAgentShadowErrorCode =

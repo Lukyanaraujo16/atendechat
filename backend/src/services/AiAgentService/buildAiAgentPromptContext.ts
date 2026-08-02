@@ -80,6 +80,15 @@ export async function buildAiAgentPromptContext(
   for (const row of filtered) {
     const body = sanitizeLine(String(row.body || ""));
     if (!body || body.startsWith("[")) continue;
+    // Placeholders de mídia sem conteúdo útil — não poluir o histórico
+    if (
+      body === "Áudio" ||
+      body === "Imagem" ||
+      body === "sticker" ||
+      body === "reaction"
+    ) {
+      continue;
+    }
     const role = row.fromMe ? "Atendente" : "Cliente";
     const line = `${role}: ${body}`;
     if (charCount + line.length > AI_AGENT_CONTEXT_MAX_CHARS) break;

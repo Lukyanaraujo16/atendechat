@@ -35,6 +35,10 @@ export type BuildAiAgentProviderResponseInput = {
   /** simulator | shadow | live */
   knowledgeChannel?: "shadow" | "live";
   messageId?: string | null;
+  /** Partes de imagem do turno atual (visão). */
+  imageParts?: Array<{ mimeType: string; base64: string }>;
+  /** Query alternativa para Knowledge (ex.: transcrição). */
+  knowledgeQuery?: string | null;
 };
 
 export type BuildAiAgentProviderResponseSuccess = {
@@ -123,10 +127,13 @@ export async function buildAiAgentProviderResponse(
   let systemPrompt = buildAiAgentSystemPrompt(input.agent, profile);
 
   const knowledgeChannel = input.knowledgeChannel || "live";
+  const knowledgeQuery =
+    (input.knowledgeQuery && String(input.knowledgeQuery).trim()) ||
+    input.inboundText;
   const retrieval = await safeRetrieveKnowledgeForAgent({
     companyId: input.companyId,
     aiAgentId: input.agent.id,
-    query: input.inboundText,
+    query: knowledgeQuery,
     channel: knowledgeChannel,
     conversationContext: promptContext.messages,
     ticketId: input.ticket.id,
@@ -171,7 +178,8 @@ export async function buildAiAgentProviderResponse(
     systemPrompt,
     messages: promptContext.messages,
     timeoutMs: input.timeoutMs,
-    source: input.source
+    source: input.source,
+    imageParts: input.imageParts
   });
 
   const latencyMs = result.latencyMs ?? Date.now() - startedAt;

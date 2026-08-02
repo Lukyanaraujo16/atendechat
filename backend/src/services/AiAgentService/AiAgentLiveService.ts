@@ -38,8 +38,41 @@ import {
   releaseAiAgentGenerationLock
 } from "./knowledge/aiAgentGenerationLock";
 import { generateLiveResponseWithOptionalFc } from "../AutomationOrchestrator/liveRollout/LiveFunctionCallingService";
+import {
+  isMultimodalInboundCandidate,
+  mediaTypeHintFromClassification,
+  prepareAiAgentMultimodalTurn
+} from "./prepareAiAgentMultimodalTurn";
+import { resolveAiAgentOpenAiApiKeyWithSource } from "./resolveAiAgentApiCredential";
+import {
+  parseAiAgentModelForProvider
+} from "./aiAgentValidation";
+import { AI_AGENT_SHADOW_ERROR_CODES } from "./aiAgentShadowErrors";
+import { emitAiAgentMediaMetric } from "./emitAiAgentMediaMetric";
 
 const inFlightLiveTickets = new Set<number>();
+
+function mapMediaPrepareError(errorCode: string): string {
+  switch (errorCode) {
+    case "vision_not_supported":
+      return AI_AGENT_SHADOW_ERROR_CODES.VISION_NOT_SUPPORTED;
+    case "file_too_large":
+      return AI_AGENT_SHADOW_ERROR_CODES.MEDIA_TOO_LARGE;
+    case "format_unsupported":
+      return AI_AGENT_SHADOW_ERROR_CODES.MEDIA_FORMAT_UNSUPPORTED;
+    case "media_unavailable":
+      return AI_AGENT_SHADOW_ERROR_CODES.MEDIA_UNAVAILABLE;
+    case "empty_transcription":
+    case "timeout":
+    case "provider_unavailable":
+    case "credential_missing":
+    case "lock_busy":
+    case "model_incompatible":
+      return AI_AGENT_SHADOW_ERROR_CODES.AUDIO_TRANSCRIPTION_FAILED;
+    default:
+      return AI_AGENT_SHADOW_ERROR_CODES.MEDIA_UNAVAILABLE;
+  }
+}
 
 async function loadLiveEntities(log: AiAgentRuntimeLog): Promise<{
   ticket: Ticket;
@@ -114,7 +147,10 @@ export async function generateAndSendLiveResponseForLog(
   inboundText: string,
   classification: InboundMessageClassification
 ): Promise<void> {
-  if (!classification.hasText) {
+  if (
+    !classification.hasText &&
+    !isMultimodalInboundCandidate(classification)
+  ) {
     await updateAiAgentLiveLog(logId, companyId, {
       liveStatus: AI_AGENT_LIVE_STATUSES.SKIPPED,
       errorCode: AI_AGENT_LIVE_ERROR_CODES.NOT_ELIGIBLE
@@ -228,22 +264,156 @@ export async function generateAndSendLiveResponseForLog(
       return;
     }
 
+    const resolvedCred = await resolveAiAgentOpenAiApiKeyWithSource({
+      companyId,
+      whatsapp,
+      ticket: freshTicket,
+      agent
+    });
+
+    let effectiveInboundText = inboundText;
+    let knowledgeQuery = inboundText;
+    let imageParts: Array<{ mimeType: string; base64: string }> = [];
+
+    if (
+      resolvedCred.apiKey &&
+      resolvedCred.provider &&
+      (isMultimodalInboundCandidate(classification) ||
+        classification.hasMedia)
+    ) {
+      let modelForCaps = String(agent.model || "");
+      try {
+        modelForCaps = parseAiAgentModelForProvider(
+          agent.model,
+          resolvedCred.provider
+        );
+      } catch {
+        // usa model bruto para capability check
+      }
+
+      const prepared = await prepareAiAgentMultimodalTurn({
+        companyId,
+        ticketId: freshTicket.id,
+        agentId: agent.id,
+        messageId: log.messageId || null,
+        inboundText,
+        classification,
+        provider: resolvedCred.provider,
+        apiKey: resolvedCred.apiKey,
+        model: modelForCaps
+      });
+
+      if (prepared.ok === false) {
+        await mergeAiAgentLiveLogMetadata(logId, companyId, {
+          mediaErrorCode: prepared.errorCode,
+          mediaAskRetry: prepared.askRetry,
+          mediaType: classification.messageType
+        });
+
+        const claimedSend = await claimLiveSending(logId, companyId);
+        if (!claimedSend) {
+          return;
+        }
+
+        const sendFallback = await sendAiAgentWhatsappMessage({
+          ticket: freshTicket,
+          body: prepared.clientFallbackMessage,
+          companyId,
+          aiAgentId: agent.id,
+          aiAgentRuntimeLogId: logId,
+          agentName: agent.name
+        });
+
+        if (sendFallback.ok === false) {
+          await updateAiAgentLiveLog(logId, companyId, {
+            liveStatus: AI_AGENT_LIVE_STATUSES.FAILED,
+            errorCode: mapMediaPrepareError(prepared.errorCode),
+            sendErrorCode: AI_AGENT_LIVE_ERROR_CODES.LIVE_SEND_FAILED,
+            deliveryStatus: AI_AGENT_LIVE_DELIVERY_STATUSES.SEND_FAILED
+          });
+          return;
+        }
+
+        await updateAiAgentLiveLog(logId, companyId, {
+          liveStatus: AI_AGENT_LIVE_STATUSES.SENT,
+          sentMessageId: sendFallback.messageId,
+          sentAt: new Date(),
+          deliveryStatus: AI_AGENT_LIVE_DELIVERY_STATUSES.SENT,
+          sendErrorCode: null,
+          suggestedReply: prepared.clientFallbackMessage,
+          errorCode: mapMediaPrepareError(prepared.errorCode)
+        });
+        return;
+      }
+
+      effectiveInboundText = prepared.turn.inboundText;
+      knowledgeQuery = prepared.knowledgeQuery;
+      imageParts = prepared.turn.imageParts.map(p => ({
+        mimeType: p.mimeType,
+        base64: p.base64
+      }));
+
+      await mergeAiAgentLiveLogMetadata(logId, companyId, {
+        mediaType: prepared.turn.mediaMeta.mediaType || classification.messageType,
+        mediaByteSize: prepared.turn.mediaMeta.byteSize ?? null,
+        mediaImageCount: prepared.turn.mediaMeta.imageCount ?? null,
+        mediaTranscribed: prepared.turn.mediaMeta.transcribed === true,
+        mediaTranscriptionChars:
+          prepared.turn.mediaMeta.transcriptionChars ?? null
+      });
+
+      if (imageParts.length > 0) {
+        emitAiAgentMediaMetric("ai_agent.image_analysis_started", {
+          companyId,
+          agentId: agent.id,
+          ticketId: freshTicket.id,
+          messageId: log.messageId,
+          provider: resolvedCred.provider,
+          model: modelForCaps,
+          mediaType: "image",
+          byteSize: prepared.turn.mediaMeta.byteSize
+        });
+      }
+    }
+
     const generation = await generateLiveResponseWithOptionalFc({
       companyId,
       ticket: freshTicket,
       contact,
       whatsapp,
       agent,
-      inboundText,
+      inboundText: effectiveInboundText,
+      knowledgeQuery,
+      imageParts,
       logId,
       messageId: log.messageId || null,
       messageHints: {
         fromMe: false,
-        mediaType: "chat",
+        mediaType: mediaTypeHintFromClassification(classification),
         ticketStatus: freshTicket.status,
         userId: freshTicket.userId ?? null
       }
     });
+
+    if (imageParts.length > 0) {
+      emitAiAgentMediaMetric(
+        generation.ok
+          ? "ai_agent.image_analysis_completed"
+          : "ai_agent.image_analysis_failed",
+        {
+          companyId,
+          agentId: agent.id,
+          ticketId: freshTicket.id,
+          messageId: log.messageId,
+          provider: generation.provider || resolvedCred.provider,
+          model: generation.model || null,
+          mediaType: "image",
+          durationMs: generation.latencyMs,
+          result: generation.ok ? "ok" : "failed",
+          errorCode: generation.ok === false ? generation.errorCode || null : null
+        }
+      );
+    }
 
     await mergeAiAgentLiveLogMetadata(logId, companyId, {
       credentialSource: generation.credentialSource ?? "missing",

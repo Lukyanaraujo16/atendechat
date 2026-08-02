@@ -11,6 +11,7 @@ import {
 import { AiAgentRuntimeMode } from "../AiAgentService/aiAgentRuntimeMode";
 import { resolveAiAgentProductAgentContext } from "./ResolveAiAgentProductContextService";
 import type { AiAgentProductProviderCompatibility } from "./aiAgentProductProviderCapabilities";
+import { buildAiAgentMediaReadiness } from "../../config/aiModelMediaCapabilities";
 
 export type AiAgentProductAgentSnapshot = {
   id: number;
@@ -33,6 +34,12 @@ export type AiAgentProductAgentSnapshot = {
    * Ausente em snapshots legados de teste → deriva de hasProvider.
    */
   providerCompatibility?: AiAgentProductProviderCompatibility;
+  /** Modelo configurado (para readiness multimodal). */
+  model?: string | null;
+  /** Provider da credencial vinculada (para readiness multimodal). */
+  linkedProvider?: string | null;
+  /** Credencial vinculada habilitada. */
+  hasLinkedCredential?: boolean;
 };
 
 export type AiAgentProductConnectionSnapshot = {
@@ -414,7 +421,22 @@ export function computeAiAgentProductReadiness(
       status,
       mode,
       nextAction,
-      checks
+      checks,
+      mediaCapabilities: agent
+        ? buildAiAgentMediaReadiness({
+            provider: agent.linkedProvider,
+            model: agent.model,
+            hasCredential: agent.hasLinkedCredential === true
+          })
+        : {
+            text: "unavailable",
+            vision: "unavailable",
+            audioTranscription: "unavailable",
+            reason: {
+              vision: "credential_missing",
+              audioTranscription: "credential_missing"
+            }
+          }
     },
     agent,
     linkedConnections: linkedOrdered,

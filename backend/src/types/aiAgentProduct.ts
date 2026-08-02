@@ -108,6 +108,16 @@ export type AiAgentProductReadiness = {
   mode: AiAgentProductMode;
   nextAction: AiAgentNextAction;
   checks: AiAgentProductCheck[];
+  /** Capacidades multimodais do modelo/credencial atual (Fase 2.17). */
+  mediaCapabilities?: {
+    text: "ready" | "unavailable";
+    vision: "ready" | "unavailable";
+    audioTranscription: "ready" | "unavailable";
+    reason?: {
+      vision?: string | null;
+      audioTranscription?: string | null;
+    };
+  };
 };
 
 /**
@@ -244,6 +254,9 @@ export type AiAgentProductConfigurationOptions = {
     value: string;
     label: string;
     provider: string;
+    supportsText?: boolean;
+    supportsVision?: boolean;
+    supportsAudioTranscription?: boolean;
   }>;
   credentials: Array<{
     ref: string;

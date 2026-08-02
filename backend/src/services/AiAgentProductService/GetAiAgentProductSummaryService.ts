@@ -145,7 +145,11 @@ export async function buildAiAgentProductSnapshot(input: {
       hasProvider: providerCompatibility.ready === true,
       hasInstructions: hasInstructions(agent, profile),
       explicitlyPaused: false,
-      providerCompatibility
+      providerCompatibility,
+      model: agent.model,
+      linkedProvider: linkedCredential?.provider ?? null,
+      hasLinkedCredential:
+        linkedCredential != null && linkedCredential.enabled === true
     });
   }
 

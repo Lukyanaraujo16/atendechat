@@ -3027,6 +3027,18 @@ const messages = {
             "Nome, descrição e mensagens comerciais deste agente.",
           intelligenceHint:
             "Provedor, modelo, credencial, instruções e perguntas frequentes deste agente.",
+          mediaCapabilitiesTitle: "Compreensão de mídia",
+          media: {
+            capabilityText: "Texto",
+            capabilityImages: "Imagens",
+            capabilityAudio: "Áudio",
+            available: "disponível",
+            unavailable: "indisponível",
+            reasonModel: "modelo incompatível",
+            reasonCredential: "credencial ausente",
+            recommendVisionModel:
+              "Para analisar fotos e áudios, escolha um modelo compatível (ex.: GPT-4o ou Gemini Flash).",
+          },
           knowledgeHint:
             "Bases de conhecimento vinculadas a este agente. A biblioteca da empresa é compartilhada.",
           testsHint: "Simule conversas com a configuração atual deste agente.",

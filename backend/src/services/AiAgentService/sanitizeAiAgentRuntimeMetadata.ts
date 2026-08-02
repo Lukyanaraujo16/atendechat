@@ -24,7 +24,15 @@ const ALLOWED_KEYS = new Set([
   "handoffMarkerDetected",
   "handoffAppliedAt",
   "cleanResponseLength",
-  "knowledge"
+  "knowledge",
+  "mediaType",
+  "mediaByteSize",
+  "mediaImageCount",
+  "mediaTranscribed",
+  "mediaTranscriptionChars",
+  "mediaErrorCode",
+  "mediaAskRetry",
+  "runtimeMode"
 ]);
 
 const SENSITIVE_KEY_PATTERN =
