@@ -92,7 +92,7 @@ A transição respeita formal / professional / friendly / casual / custom **sem*
 
 ## 10. Áreas protegidas
 
-Orchestrator: apenas passa `agent` ao safety handoff (sem reescrita).  
+Orchestrator: apenas passa `agent` ao safety handoff (sem reescrita).
 Sem migration. Runtime de elegibilidade preservado (`whatsapp.aiAgentId`).
 
 ## 11. Logs sanitizados
