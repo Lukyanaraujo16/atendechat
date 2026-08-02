@@ -3044,6 +3044,7 @@ const messages = {
             objective: "Objetivo / descrição do negócio",
             instructions: "Como o agente deve responder",
             tone: "Tom de comunicação",
+            customTone: "Descreva o tom personalizado",
             handoffRules: "Quando transferir para uma pessoa",
             faqQuestion: "Pergunta",
             faqAnswer: "Resposta",

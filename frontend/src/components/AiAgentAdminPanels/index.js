@@ -43,6 +43,7 @@ import {
   wizardFormStateToProductIdentityPayload,
 } from "../AiAgentWizard/aiAgentWizardProductMapper";
 import { hasWizardValidationErrors } from "../AiAgentWizard/aiAgentWizardValidation";
+import { AI_AGENT_TONES } from "../../config/aiAgentProfileOptions";
 import { aiAgentSectionPath, aiAgentSimulatorPath } from "../../config/aiAgentFeature";
 import { KNOWLEDGE_BASE_ROUTE_PATH } from "../../config/knowledgeBaseFeature";
 import { notifyAiAgentProductAgentsChanged } from "../../utils/aiAgentProductAgentsCache";
@@ -541,12 +542,46 @@ export function AiAgentIntelligencePanel({
       />
       <TextField
         className={classes.field}
+        select
         label={i18n.t("aiAgentProduct.admin.fields.tone")}
-        value={form.tone || ""}
-        onChange={(e) => patch({ tone: e.target.value })}
+        value={form.tone || "professional"}
+        onChange={(e) =>
+          patch({
+            tone: e.target.value,
+            customTone:
+              e.target.value === "custom" ? form.customTone || "" : "",
+          })
+        }
         fullWidth
         disabled={structuralLocked}
-      />
+        inputProps={{ "data-testid": "ai-agent-tone-select" }}
+        SelectProps={{
+          MenuProps: { "data-testid": "ai-agent-tone-menu" },
+        }}
+      >
+        {AI_AGENT_TONES.map((item) => (
+          <MenuItem
+            key={item.value}
+            value={item.value}
+            data-testid={`ai-agent-tone-option-${item.value}`}
+          >
+            {item.label}
+          </MenuItem>
+        ))}
+      </TextField>
+      {form.tone === "custom" ? (
+        <TextField
+          className={classes.field}
+          label={i18n.t("aiAgentProduct.admin.fields.customTone")}
+          value={form.customTone || ""}
+          onChange={(e) => patch({ customTone: e.target.value })}
+          fullWidth
+          multiline
+          minRows={2}
+          disabled={structuralLocked}
+          inputProps={{ "data-testid": "ai-agent-custom-tone" }}
+        />
+      ) : null}
       <TextField
         className={classes.field}
         label={i18n.t("aiAgentProduct.admin.fields.handoffRules")}

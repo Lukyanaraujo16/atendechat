@@ -2953,6 +2953,7 @@ const messages = {
 						objective: "Objective / business description",
 						instructions: "How the agent should reply",
 						tone: "Tone of voice",
+						customTone: "Describe the custom tone",
 						handoffRules: "When to hand off to a person",
 						faqQuestion: "Question",
 						faqAnswer: "Answer",

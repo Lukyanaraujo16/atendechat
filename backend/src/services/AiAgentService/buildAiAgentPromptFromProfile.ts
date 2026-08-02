@@ -6,47 +6,47 @@ import {
   AI_AGENT_FORBIDDEN_ACTION_LABELS,
   AI_AGENT_HANDOFF_RULE_LABELS,
   AI_AGENT_RESPONSE_LENGTH_LABELS,
-  AI_AGENT_SEGMENT_LABELS,
-  AI_AGENT_TONE_LABELS
+  AI_AGENT_SEGMENT_LABELS
 } from "../../config/aiAgentProfileConfig";
 import AiAgentProfile, {
   AiAgentProfileFaqItem
 } from "../../models/AiAgentProfile";
 import { buildSegmentSpecificPromptInstructions } from "./buildSegmentSpecificPromptInstructions";
+import { buildToneCommunicationInstructions } from "./buildToneCommunicationInstructions";
 import { ValidatedAiAgentProfileInput } from "./aiAgentProfileValidation";
 
 type PromptProfileInput = ValidatedAiAgentProfileInput | AiAgentProfile;
 
 function nonEmpty(value: string | null | undefined): string | null {
   const trimmed = String(value ?? "").trim();
-  return trimmed ? trimmed : null;
+  return trimmed || null;
 }
 
 function section(title: string, lines: string[]): string | null {
-  const body = lines.map((line) => line.trim()).filter(Boolean);
+  const body = lines.map(line => line.trim()).filter(Boolean);
   if (!body.length) return null;
   return [`## ${title}`, ...body].join("\n");
 }
 
-function labelMap(values: string[] | null | undefined, map: Record<string, string>): string[] {
-  return (values ?? []).map((key) => map[key] || key);
+function labelMap(
+  values: string[] | null | undefined,
+  map: Record<string, string>
+): string[] {
+  return (values ?? []).map(key => map[key] || key);
 }
 
 function resolveSegment(profile: PromptProfileInput): string {
   if (profile.businessSegment === "other") {
     return nonEmpty(profile.customBusinessSegment) || "Outro segmento";
   }
-  return AI_AGENT_SEGMENT_LABELS[profile.businessSegment] || profile.businessSegment;
+  return (
+    AI_AGENT_SEGMENT_LABELS[profile.businessSegment] || profile.businessSegment
+  );
 }
 
-function resolveTone(profile: PromptProfileInput): string {
-  if (profile.tone === "custom") {
-    return nonEmpty(profile.customTone) || "Tom personalizado";
-  }
-  return AI_AGENT_TONE_LABELS[profile.tone] || profile.tone;
-}
-
-function buildFaqSection(items: AiAgentProfileFaqItem[] | null | undefined): string | null {
+function buildFaqSection(
+  items: AiAgentProfileFaqItem[] | null | undefined
+): string | null {
   const list = Array.isArray(items) ? items : [];
   if (!list.length) return null;
   const lines = list.flatMap((item, index) => [
@@ -66,7 +66,10 @@ export function buildAiAgentPromptFromProfile(
     profile.attendantRole
       ? `Sua função: ${profile.attendantRole}.`
       : "Você é um atendente virtual da empresa.",
-    `Departamentos/funções: ${labelMap(profile.departments, AI_AGENT_DEPARTMENT_LABELS).join(", ")}.`
+    `Departamentos/funções: ${labelMap(
+      profile.departments,
+      AI_AGENT_DEPARTMENT_LABELS
+    ).join(", ")}.`
   ]);
   if (identity) sections.push(identity);
 
@@ -88,13 +91,26 @@ export function buildAiAgentPromptFromProfile(
   ]);
   if (company) sections.push(company);
 
-  const style = section("Tom e estilo", [
-    `Tom de voz: ${resolveTone(profile)}.`,
+  const toneLines = buildToneCommunicationInstructions({
+    tone: profile.tone,
+    customTone: profile.customTone
+  });
+  const style = section("Tom e estilo de comunicação", [
+    ...toneLines,
     profile.clientAddressStyle
-      ? `Tratamento ao cliente: ${AI_AGENT_CLIENT_ADDRESS_LABELS[profile.clientAddressStyle] || profile.clientAddressStyle}.`
+      ? `Tratamento ao cliente (configuração explícita): ${
+          AI_AGENT_CLIENT_ADDRESS_LABELS[profile.clientAddressStyle] ||
+          profile.clientAddressStyle
+        }.`
       : "",
-    `Emojis: ${AI_AGENT_EMOJI_LABELS[profile.emojiLevel] || profile.emojiLevel}.`,
-    `Tamanho das respostas: ${AI_AGENT_RESPONSE_LENGTH_LABELS[profile.responseLength] || profile.responseLength}.`
+    `Emojis (configuração explícita): ${
+      AI_AGENT_EMOJI_LABELS[profile.emojiLevel] || profile.emojiLevel
+    }.`,
+    `Tamanho das respostas (configuração explícita): ${
+      AI_AGENT_RESPONSE_LENGTH_LABELS[profile.responseLength] ||
+      profile.responseLength
+    }.`,
+    "Quando a configuração explícita de emojis ou tamanho conflitar com a tendência do tom, priorize a configuração explícita sem abandonar o restante do estilo do tom."
   ]);
   if (style) sections.push(style);
 
@@ -112,9 +128,7 @@ export function buildAiAgentPromptFromProfile(
   if (faq) sections.push(faq);
 
   const policies = section("Políticas comerciais", [
-    nonEmpty(profile.pricingPolicy)
-      ? `Preços: ${profile.pricingPolicy}`
-      : "",
+    nonEmpty(profile.pricingPolicy) ? `Preços: ${profile.pricingPolicy}` : "",
     nonEmpty(profile.negotiationPolicy)
       ? `Negociação: ${profile.negotiationPolicy}`
       : "",
@@ -124,11 +138,14 @@ export function buildAiAgentPromptFromProfile(
   ]);
   if (policies) sections.push(policies);
 
-  const allowed = labelMap(profile.allowedActions, AI_AGENT_ALLOWED_ACTION_LABELS);
+  const allowed = labelMap(
+    profile.allowedActions,
+    AI_AGENT_ALLOWED_ACTION_LABELS
+  );
   if (allowed.length) {
     const allowedSection = section("Ações permitidas", [
       "Você pode:",
-      ...allowed.map((item) => `- ${item}`)
+      ...allowed.map(item => `- ${item}`)
     ]);
     if (allowedSection) sections.push(allowedSection);
   }
@@ -140,7 +157,7 @@ export function buildAiAgentPromptFromProfile(
   if (forbidden.length) {
     const forbiddenSection = section("Ações proibidas", [
       "Você não pode:",
-      ...forbidden.map((item) => `- ${item}`)
+      ...forbidden.map(item => `- ${item}`)
     ]);
     if (forbiddenSection) sections.push(forbiddenSection);
   }
@@ -149,7 +166,7 @@ export function buildAiAgentPromptFromProfile(
   if (handoff.length) {
     const handoffSection = section("Quando solicitar atendimento humano", [
       "Solicite handoff para humano quando ocorrer:",
-      ...handoff.map((item) => `- ${item}`)
+      ...handoff.map(item => `- ${item}`)
     ]);
     if (handoffSection) sections.push(handoffSection);
   }
