@@ -76,8 +76,61 @@ Estados: `unsupported`, `not_configured`, `sdk_loading`, `permission_default`,
 
 ## Diagnóstico
 
-Em desenvolvimento: `window.__atendechatOneSignalDiagnostics()`.
-Inclui browser (Firefox/Chrome), permissões, optedIn, id mascarado, lista de workers.
+Em development: `window.__atendechatOneSignalDiagnostics()`.
+
+Em produção (somente suporte):
+- Super Admin com `supportMode`, **ou**
+- `localStorage.setItem('atendechat_onesignal_diag', '1')` e recarregar.
+
+Inclui browser (Firefox/Chrome), permissões, optedIn, id mascarado, tokenLength
+(sem token completo), workers/scopes, PushManager nativo (host mascarado),
+timeline do fluxo e `waitMeta` (elapsedMs / resolvedBy).
+
+## Diagnóstico Firefox
+
+Quando o Chrome recebe push e o Firefox (mesmo utilizador) recebe a boas-vindas
+mas **não** aparece em Audience → Subscriptions:
+
+1. Abrir o **Console** do Firefox na app autenticada.
+2. Executar: `await window.__atendechatOneSignalDiagnostics()`
+   (se undefined em produção: confirmar Super Admin em supportMode ou a flag acima).
+3. Copiar **apenas** o objeto sanitizado (já sem token/ID completos).
+4. Verificar `about:serviceworkers` (registros do domínio).
+5. Verificar `about:debugging#/runtime/this-firefox` → Service Workers.
+6. Confirmar workers e scopes:
+   - `/OneSignalSDKWorker.js` → scope `/push/onesignal/`
+   - `/service-worker.js` → scope `/`
+7. Confirmar `workers[].hasNativePushSubscription` (PushManager nativo, leitura).
+8. Confirmar `optedIn`, `hasSubscriptionId`, `hasToken`, `tokenLength`, `lifecycleStage`.
+9. Comparar com OneSignal → Audience → Subscriptions (Browser = Firefox).
+10. **Não** executar `unregister` automático nem limpar storage em massa.
+
+Matriz rápida:
+
+| Estado | Chrome | Firefox |
+|--------|--------|---------|
+| Notification.permission | (manual) | (manual) |
+| OneSignal permission | diag | diag |
+| optedIn | diag | diag |
+| Subscription ID | mascarado | mascarado |
+| token | só length | só length |
+| PushManager subscription | workers[] | workers[] |
+| worker URL / scope | raiz + isolado | raiz + isolado |
+| login concluído | externalIdApplied | externalIdApplied |
+| aparece no painel | manual | manual |
+
+Chrome e Firefox usam **Subscription IDs distintos** com o **mesmo external ID**
+(`OneSignal.login(String(user.id))`). O backend envia por
+`include_external_user_ids` e **não** guarda uma tabela local de device
+subscriptions — não há sobrescrita de um browser pelo outro no servidor da app.
+
+Timeouts atuais (instrumentados em `timeouts` / `waitMeta`):
+- confirmação de subscription: **15000 ms** (listener `change` + microtask; poll
+  de diagnóstico a cada 1s **sem** alterar o critério de sucesso);
+- `optIn` / `requestPermission`: **120000 ms**.
+
+Não aumentar timeouts sem evidência da timeline no Firefox.
+
 
 ## Teste dirigido (pós-deploy)
 

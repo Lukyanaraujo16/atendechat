@@ -14,7 +14,14 @@ import {
   getOneSignalServiceWorkerUpdaterPath,
   maskSubscriptionId,
 } from "../utils/oneSignalServiceWorkerPaths";
-import { listServiceWorkerRegistrationsForDiagnostics } from "../utils/oneSignalWorkerTransition";
+import {
+  buildOneSignalPushDiagnostics,
+  canExposeOneSignalDiagnostics,
+  recordPushDiagnosticEvent,
+  setLastWaitMeta,
+  setPushLifecycleStage,
+  __resetPushDiagnosticsForTests,
+} from "../utils/oneSignalPushDiagnostics";
 
 /** Instância do namespace OneSignal após `init` (SDK Web v16 via CDN). */
 let oneSignalApi = null;
@@ -64,10 +71,15 @@ function logPush(event, detail = {}) {
     const safe = { ...detail };
     if (safe.token) {
       safe.token = `${String(safe.token).slice(0, 6)}…`;
+      safe.hasToken = true;
+      delete safe.token;
     }
     if (safe.subscriptionId) {
-      safe.subscriptionId = maskSubscriptionId(safe.subscriptionId);
+      safe.maskedSubscriptionId = maskSubscriptionId(safe.subscriptionId);
+      safe.hasId = true;
+      delete safe.subscriptionId;
     }
+    recordPushDiagnosticEvent(event, safe);
     // eslint-disable-next-line no-console
     console.info(`[onesignal-push] ${event}`, safe);
   } catch {
@@ -156,16 +168,24 @@ function loadOneSignalPageScript() {
     return Promise.reject(new Error("no document"));
   }
   if (document.getElementById(ONESIGNAL_PAGE_SCRIPT_ID)) {
+    recordPushDiagnosticEvent("sdk_ready", { alreadyPresent: true });
     return Promise.resolve();
   }
+  recordPushDiagnosticEvent("sdk_script_requested");
+  setPushLifecycleStage("sdk_script_requested");
   return new Promise((resolve, reject) => {
     const s = document.createElement("script");
     s.id = ONESIGNAL_PAGE_SCRIPT_ID;
     s.src = ONESIGNAL_PAGE_SCRIPT_SRC;
     s.defer = true;
-    s.onload = () => resolve();
+    s.onload = () => {
+      recordPushDiagnosticEvent("sdk_ready");
+      setPushLifecycleStage("sdk_ready");
+      resolve();
+    };
     s.onerror = () => {
       logPush("sdk_load_failed");
+      setPushLifecycleStage("sdk_load_failed");
       reject(new Error("OneSignal page script failed to load"));
     };
     document.head.appendChild(s);
@@ -181,9 +201,15 @@ function runOneSignalDeferredInit(initConfig) {
     window.OneSignalDeferred = window.OneSignalDeferred || [];
     window.OneSignalDeferred.push(async (OneSignal) => {
       try {
+        recordPushDiagnosticEvent("init_started");
+        setPushLifecycleStage("init_started");
         await OneSignal.init(initConfig);
+        recordPushDiagnosticEvent("init_completed");
+        setPushLifecycleStage("init_completed");
         resolve(OneSignal);
       } catch (e) {
+        recordPushDiagnosticEvent("init_failed", { error: e });
+        setPushLifecycleStage("init_failed");
         reject(e);
       }
     });
@@ -260,6 +286,11 @@ function attachSdkStatusListeners(api) {
     if (sub && typeof sub.addEventListener === "function") {
       sub.addEventListener("change", (event) => {
         const normalized = normalizeSubscriptionChangeEvent(event, api);
+        recordPushDiagnosticEvent("subscription_change_received", {
+          optedIn: normalized.optedIn,
+          hasId: Boolean(normalized.subscriptionId),
+          hasToken: Boolean(normalized.token),
+        });
         setPushStatus({
           permissionNative: readNativePermission(),
           optedIn: normalized.optedIn,
@@ -294,42 +325,135 @@ function isPushSupportedBySdk(api) {
 }
 
 async function waitForEffectiveSubscription(api, timeoutMs = SUBSCRIPTION_WAIT_MS) {
+  const waitStartedAt = Date.now();
   const immediate = readSubscriptionSnapshot(api);
+  recordPushDiagnosticEvent("subscription_state_read", {
+    phase: "wait_immediate",
+    optedIn: immediate.optedIn,
+    hasId: Boolean(immediate.subscriptionId),
+    hasToken: Boolean(immediate.token),
+  });
   if (isEffectivelySubscribed(immediate)) {
+    if (immediate.subscriptionId) {
+      recordPushDiagnosticEvent("subscription_id_available", { phase: "immediate" });
+    }
+    if (immediate.token) {
+      recordPushDiagnosticEvent("subscription_token_available", { phase: "immediate" });
+    }
+    setLastWaitMeta({
+      elapsedMs: Date.now() - waitStartedAt,
+      timeoutMs,
+      resolvedBy: "immediate",
+      browser: detectBrowserLabel(
+        typeof navigator !== "undefined" ? navigator.userAgent : ""
+      ),
+    });
     return immediate;
   }
 
   return new Promise((resolve, reject) => {
     let settled = false;
     const sub = api?.User?.PushSubscription;
+    let changeCount = 0;
+    let pollCount = 0;
 
-    const finishOk = (snap) => {
+    const finishOk = (snap, resolvedBy) => {
       if (settled) return;
       settled = true;
       cleanup();
+      const elapsedMs = Date.now() - waitStartedAt;
+      setLastWaitMeta({
+        elapsedMs,
+        timeoutMs,
+        resolvedBy,
+        changeCount,
+        pollCount,
+        browser: detectBrowserLabel(
+          typeof navigator !== "undefined" ? navigator.userAgent : ""
+        ),
+      });
+      if (snap.subscriptionId) {
+        recordPushDiagnosticEvent("subscription_id_available", {
+          phase: resolvedBy,
+          elapsedMs,
+        });
+      }
+      if (snap.token) {
+        recordPushDiagnosticEvent("subscription_token_available", {
+          phase: resolvedBy,
+          elapsedMs,
+        });
+      }
+      recordPushDiagnosticEvent("subscribed_confirmed", {
+        resolvedBy,
+        elapsedMs,
+        optedIn: snap.optedIn,
+        hasId: Boolean(snap.subscriptionId),
+        hasToken: Boolean(snap.token),
+      });
       resolve(snap);
     };
     const finishErr = (err) => {
       if (settled) return;
       settled = true;
       cleanup();
+      const elapsedMs = Date.now() - waitStartedAt;
+      const last = readSubscriptionSnapshot(api);
+      setLastWaitMeta({
+        elapsedMs,
+        timeoutMs,
+        resolvedBy: "timeout",
+        changeCount,
+        pollCount,
+        optedIn: last.optedIn,
+        hasId: Boolean(last.subscriptionId),
+        hasToken: Boolean(last.token),
+        browser: detectBrowserLabel(
+          typeof navigator !== "undefined" ? navigator.userAgent : ""
+        ),
+      });
+      recordPushDiagnosticEvent("timeout", {
+        elapsedMs,
+        timeoutMs,
+        optedIn: last.optedIn,
+        hasId: Boolean(last.subscriptionId),
+        hasToken: Boolean(last.token),
+        changeCount,
+        error: err,
+      });
       reject(err);
     };
 
     const onChange = (event) => {
+      changeCount += 1;
       const normalized = normalizeSubscriptionChangeEvent(event, api);
+      recordPushDiagnosticEvent("subscription_change_received", {
+        phase: "wait",
+        changeCount,
+        optedIn: normalized.optedIn,
+        hasId: Boolean(normalized.subscriptionId),
+        hasToken: Boolean(normalized.token),
+        elapsedMs: Date.now() - waitStartedAt,
+      });
       if (isEffectivelySubscribed(normalized)) {
-        finishOk(normalized);
+        finishOk(normalized, "change_event");
         return;
       }
       const snap = readSubscriptionSnapshot(api);
+      recordPushDiagnosticEvent("subscription_state_read", {
+        phase: "after_change",
+        optedIn: snap.optedIn,
+        hasId: Boolean(snap.subscriptionId),
+        hasToken: Boolean(snap.token),
+      });
       if (isEffectivelySubscribed(snap)) {
-        finishOk(snap);
+        finishOk(snap, "change_then_read");
       }
     };
 
     function cleanup() {
       clearTimeout(timer);
+      clearInterval(pollTimer);
       try {
         if (sub && typeof sub.removeEventListener === "function") {
           sub.removeEventListener("change", onChange);
@@ -342,7 +466,7 @@ async function waitForEffectiveSubscription(api, timeoutMs = SUBSCRIPTION_WAIT_M
     const timer = setTimeout(() => {
       const last = readSubscriptionSnapshot(api);
       if (isEffectivelySubscribed(last)) {
-        finishOk(last);
+        finishOk(last, "timeout_final_read");
       } else {
         logPush("subscription_missing_after_permission", {
           permission: readNativePermission(),
@@ -353,6 +477,22 @@ async function waitForEffectiveSubscription(api, timeoutMs = SUBSCRIPTION_WAIT_M
         finishErr(new Error("subscription_missing_after_permission"));
       }
     }, timeoutMs);
+
+    // Polling somente diagnóstico (não altera critério de sucesso nesta fase).
+    const pollTimer = setInterval(() => {
+      if (settled) return;
+      pollCount += 1;
+      const snap = readSubscriptionSnapshot(api);
+      recordPushDiagnosticEvent("subscription_state_read", {
+        phase: "poll",
+        pollCount,
+        optedIn: snap.optedIn,
+        hasId: Boolean(snap.subscriptionId),
+        hasToken: Boolean(snap.token),
+        elapsedMs: Date.now() - waitStartedAt,
+        effectivelySubscribed: isEffectivelySubscribed(snap),
+      });
+    }, 1000);
 
     try {
       if (sub && typeof sub.addEventListener === "function") {
@@ -365,8 +505,14 @@ async function waitForEffectiveSubscription(api, timeoutMs = SUBSCRIPTION_WAIT_M
     // Re-check após microtask (SDK pode atualizar sync após optIn).
     Promise.resolve().then(() => {
       const snap = readSubscriptionSnapshot(api);
+      recordPushDiagnosticEvent("subscription_state_read", {
+        phase: "microtask",
+        optedIn: snap.optedIn,
+        hasId: Boolean(snap.subscriptionId),
+        hasToken: Boolean(snap.token),
+      });
       if (isEffectivelySubscribed(snap)) {
-        finishOk(snap);
+        finishOk(snap, "microtask");
       }
     });
   });
@@ -513,8 +659,15 @@ async function applyUserIdentity(user) {
     return;
   }
   try {
+    recordPushDiagnosticEvent("login_started", {
+      externalIdExpected: String(user.id),
+    });
+    setPushLifecycleStage("login_started");
     await oneSignalApi.login(String(user.id));
     identityUserId = String(user.id);
+    recordPushDiagnosticEvent("login_completed", {
+      externalIdApplied: identityUserId,
+    });
     const companyId = user.companyId ?? localStorage.getItem("companyId") ?? "";
     const queueIds = Array.isArray(user.queues)
       ? user.queues.map((q) => q.id).filter((id) => id != null).join(",")
@@ -526,10 +679,13 @@ async function applyUserIdentity(user) {
         profile: String(user.profile || ""),
         queue_ids: queueIds || "none",
       });
+      recordPushDiagnosticEvent("tags_completed");
     }
+    setPushLifecycleStage("tags_completed");
     setPushStatus({ externalUserId: identityUserId });
   } catch (e) {
     logPush("identity_login_failed", { message: e?.message || "unknown" });
+    setPushLifecycleStage("login_failed");
     throw e;
   }
 }
@@ -586,6 +742,8 @@ export function enableOneSignalPushSubscription({ user } = {}) {
       errorCode: null,
     });
     logPush("opt_in_started");
+    recordPushDiagnosticEvent("optin_started");
+    setPushLifecycleStage("optin_started");
 
     try {
       const cfg = await fetchPublicPushConfig();
@@ -627,6 +785,7 @@ export function enableOneSignalPushSubscription({ user } = {}) {
           }
         }
         logPush("subscription_confirmed", { already: true });
+        setPushLifecycleStage("subscribed_confirmed");
         const status = setPushStatus({
           subscribing: false,
           errorCode: null,
@@ -637,6 +796,9 @@ export function enableOneSignalPushSubscription({ user } = {}) {
       }
 
       const permissionBefore = readNativePermission();
+      recordPushDiagnosticEvent("permission_before", {
+        permission: permissionBefore,
+      });
       if (permissionBefore === "denied") {
         logPush("permission_denied");
         const status = setPushStatus({
@@ -658,9 +820,16 @@ export function enableOneSignalPushSubscription({ user } = {}) {
       }
 
       try {
+        recordPushDiagnosticEvent("permission_requested");
         await withTimeout(Promise.resolve(pushSub.optIn()), PERMISSION_WAIT_MS, "opt_in_timeout");
+        recordPushDiagnosticEvent("optin_resolved");
+        setPushLifecycleStage("optin_resolved");
       } catch (e) {
         logPush("opt_in_failed", { message: e?.message || "optIn" });
+        recordPushDiagnosticEvent("error", {
+          stage: e?.message === "opt_in_timeout" ? "opt_in_timeout" : "opt_in_failed",
+          error: e,
+        });
         const perm = readNativePermission();
         if (perm === "denied") {
           const status = setPushStatus({
@@ -695,6 +864,7 @@ export function enableOneSignalPushSubscription({ user } = {}) {
       }
       if (permAfter === "granted") {
         logPush("permission_granted");
+        recordPushDiagnosticEvent("permission_granted");
       }
 
       let confirmed;
@@ -708,6 +878,7 @@ export function enableOneSignalPushSubscription({ user } = {}) {
             oneSignalApi.Notifications &&
             typeof oneSignalApi.Notifications.requestPermission === "function"
           ) {
+            recordPushDiagnosticEvent("permission_requested", { phase: "fallback" });
             await withTimeout(
               Promise.resolve(oneSignalApi.Notifications.requestPermission()),
               PERMISSION_WAIT_MS,
@@ -715,9 +886,15 @@ export function enableOneSignalPushSubscription({ user } = {}) {
             );
           }
           await withTimeout(Promise.resolve(pushSub.optIn()), PERMISSION_WAIT_MS, "opt_in_timeout");
+          recordPushDiagnosticEvent("optin_resolved", { phase: "fallback" });
           confirmed = await waitForEffectiveSubscription(oneSignalApi, SUBSCRIPTION_WAIT_MS);
         } catch (e2) {
           logPush("opt_in_failed", { message: e2?.message || e?.message || "confirm" });
+          recordPushDiagnosticEvent("error", {
+            stage: "subscription_missing_after_permission",
+            error: e2,
+          });
+          setPushLifecycleStage("subscription_missing_after_permission");
           const status = setPushStatus({
             subscribing: false,
             errorCode: "subscription_missing_after_permission",
@@ -737,6 +914,7 @@ export function enableOneSignalPushSubscription({ user } = {}) {
         hasId: Boolean(confirmed.subscriptionId),
         hasToken: Boolean(confirmed.token),
       });
+      setPushLifecycleStage("subscribed_confirmed");
 
       if (user?.id) {
         try {
@@ -782,45 +960,36 @@ export async function requestOneSignalPushPermission() {
  * Diagnóstico técnico (console/suporte) — sem secrets nem tokens completos.
  */
 export async function getOneSignalPushDiagnostics() {
-  const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
-  const status = getOneSignalPushStatus();
-  const workers = await listServiceWorkerRegistrationsForDiagnostics();
-  let oneSignalPermission = null;
-  try {
-    if (oneSignalApi?.Notifications?.permissionNative != null) {
-      oneSignalPermission = oneSignalApi.Notifications.permissionNative;
-    } else if (typeof oneSignalApi?.Notifications?.permission === "boolean") {
-      oneSignalPermission = oneSignalApi.Notifications.permission
-        ? "granted"
-        : "denied_or_default";
-    }
-  } catch {
-    oneSignalPermission = null;
-  }
-  return {
-    browser: detectBrowserLabel(ua),
-    notificationPermission: readNativePermission(),
-    oneSignalPermission,
-    optedIn: Boolean(status.optedIn),
-    hasSubscriptionId: Boolean(status.subscriptionId),
-    maskedSubscriptionId: maskSubscriptionId(status.subscriptionId),
-    hasToken: Boolean(status.token),
-    externalIdApplied: status.externalUserId != null ? String(status.externalUserId) : null,
-    domainState: status.domainState,
-    serviceWorkerPath: getOneSignalServiceWorkerPath(),
-    serviceWorkerScope: getOneSignalServiceWorkerScope(),
-    workers: workers.map((w) => ({
-      scriptURL: w.scriptURL,
-      scope: w.scope,
-      state: w.state,
-    })),
-  };
+  refreshFromSdk();
+  return buildOneSignalPushDiagnostics({
+    status: getOneSignalPushStatus(),
+    oneSignalApi,
+    sdkLoaded:
+      typeof document !== "undefined" &&
+      Boolean(document.getElementById(ONESIGNAL_PAGE_SCRIPT_ID)),
+    initialized: oneSignalReady,
+    externalIdExpected: identityUserId,
+    subscriptionWaitMs: SUBSCRIPTION_WAIT_MS,
+    permissionWaitMs: PERMISSION_WAIT_MS,
+  });
 }
 
-/** Expõe diagnóstico no window apenas em desenvolvimento (suporte). */
-export function exposeOneSignalPushDiagnosticsGlobal() {
+/**
+ * Expõe diagnóstico no window em development, Super Admin em supportMode,
+ * ou com flag localStorage `atendechat_onesignal_diag=1`.
+ */
+export function exposeOneSignalPushDiagnosticsGlobal(user) {
   if (typeof window === "undefined") return;
-  if (process.env.NODE_ENV === "production") return;
+  if (!canExposeOneSignalDiagnostics(user)) {
+    try {
+      if (window.__atendechatOneSignalDiagnostics) {
+        delete window.__atendechatOneSignalDiagnostics;
+      }
+    } catch {
+      /* ignore */
+    }
+    return;
+  }
   window.__atendechatOneSignalDiagnostics = getOneSignalPushDiagnostics;
 }
 
@@ -844,6 +1013,7 @@ export function __resetOneSignalServiceForTests() {
   SUBSCRIPTION_WAIT_MS = SUBSCRIPTION_WAIT_MS_DEFAULT;
   PERMISSION_WAIT_MS = PERMISSION_WAIT_MS_DEFAULT;
   statusListeners.clear();
+  __resetPushDiagnosticsForTests();
   pushStatus = {
     domainState: PUSH_DOMAIN_STATES.NOT_CONFIGURED,
     onesignalEnabled: false,

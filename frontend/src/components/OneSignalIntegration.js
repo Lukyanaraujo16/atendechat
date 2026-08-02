@@ -17,7 +17,7 @@ export default function OneSignalIntegration() {
 
   useEffect(() => {
     let cancelled = false;
-    exposeOneSignalPushDiagnosticsGlobal();
+    exposeOneSignalPushDiagnosticsGlobal(user);
     bootstrapPushAndPwaServiceWorker()
       .then(() => {
         if (!cancelled) {
@@ -31,6 +31,10 @@ export default function OneSignalIntegration() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    exposeOneSignalPushDiagnosticsGlobal(user);
+  }, [user?.id, user?.super, user?.supportMode]);
 
   const queueKey = Array.isArray(user?.queues)
     ? user.queues.map((q) => q.id).join(",")
