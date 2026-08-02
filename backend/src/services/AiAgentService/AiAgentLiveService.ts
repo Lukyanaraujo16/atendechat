@@ -5,10 +5,7 @@ import Ticket from "../../models/Ticket";
 import Whatsapp from "../../models/Whatsapp";
 import { debounce } from "../../helpers/Debounce";
 import { logger } from "../../utils/logger";
-import {
-  AI_AGENT_LIVE_DEBOUNCE_MS,
-  AI_AGENT_LIVE_SOURCE
-} from "./aiAgentLiveConfig";
+import { AI_AGENT_LIVE_DEBOUNCE_MS } from "./aiAgentLiveConfig";
 import {
   AI_AGENT_LIVE_DELIVERY_STATUSES,
   AI_AGENT_LIVE_ERROR_CODES,
@@ -44,11 +41,11 @@ import {
   prepareAiAgentMultimodalTurn
 } from "./prepareAiAgentMultimodalTurn";
 import { resolveAiAgentOpenAiApiKeyWithSource } from "./resolveAiAgentApiCredential";
-import {
-  parseAiAgentModelForProvider
-} from "./aiAgentValidation";
+import { parseAiAgentModelForProvider } from "./aiAgentValidation";
 import { AI_AGENT_SHADOW_ERROR_CODES } from "./aiAgentShadowErrors";
 import { emitAiAgentMediaMetric } from "./emitAiAgentMediaMetric";
+import { startAiAgentTypingPresence } from "./startAiAgentTypingPresence";
+import { applyAiAgentLivePacing } from "./applyAiAgentLivePacing";
 
 const inFlightLiveTickets = new Set<number>();
 
@@ -242,6 +239,16 @@ export async function generateAndSendLiveResponseForLog(
 
   inFlightLiveTickets.add(ticket.id);
   const startedAt = Date.now();
+  const executionId = `live-${companyId}-${logId}-${startedAt}`;
+
+  const typing = await startAiAgentTypingPresence({
+    ticket,
+    whatsapp,
+    contact,
+    companyId,
+    agentId: agent.id,
+    executionId
+  });
 
   try {
     const freshTicket = await Ticket.findOne({
@@ -255,7 +262,10 @@ export async function generateAndSendLiveResponseForLog(
       return;
     }
 
-    const freshBlock = await assertTicketStillEligibleForLive(freshTicket, whatsapp);
+    const freshBlock = await assertTicketStillEligibleForLive(
+      freshTicket,
+      whatsapp
+    );
     if (freshBlock) {
       await updateAiAgentLiveLog(logId, companyId, {
         liveStatus: AI_AGENT_LIVE_STATUSES.SKIPPED,
@@ -263,6 +273,15 @@ export async function generateAndSendLiveResponseForLog(
       });
       return;
     }
+
+    const pacingCtx = {
+      processingStartedAtMs: startedAt,
+      companyId,
+      ticketId: freshTicket.id,
+      agentId: agent.id,
+      whatsappId: whatsapp.id,
+      executionId
+    };
 
     const resolvedCred = await resolveAiAgentOpenAiApiKeyWithSource({
       companyId,
@@ -278,8 +297,7 @@ export async function generateAndSendLiveResponseForLog(
     if (
       resolvedCred.apiKey &&
       resolvedCred.provider &&
-      (isMultimodalInboundCandidate(classification) ||
-        classification.hasMedia)
+      (isMultimodalInboundCandidate(classification) || classification.hasMedia)
     ) {
       let modelForCaps = String(agent.model || "");
       try {
@@ -314,6 +332,12 @@ export async function generateAndSendLiveResponseForLog(
         if (!claimedSend) {
           return;
         }
+
+        await applyAiAgentLivePacing({
+          ...pacingCtx,
+          responseText: prepared.clientFallbackMessage,
+          kind: "fallback"
+        });
 
         const sendFallback = await sendAiAgentWhatsappMessage({
           ticket: freshTicket,
@@ -354,7 +378,8 @@ export async function generateAndSendLiveResponseForLog(
       }));
 
       await mergeAiAgentLiveLogMetadata(logId, companyId, {
-        mediaType: prepared.turn.mediaMeta.mediaType || classification.messageType,
+        mediaType:
+          prepared.turn.mediaMeta.mediaType || classification.messageType,
         mediaByteSize: prepared.turn.mediaMeta.byteSize ?? null,
         mediaImageCount: prepared.turn.mediaMeta.imageCount ?? null,
         mediaTranscribed: prepared.turn.mediaMeta.transcribed === true,
@@ -410,7 +435,8 @@ export async function generateAndSendLiveResponseForLog(
           mediaType: "image",
           durationMs: generation.latencyMs,
           result: generation.ok ? "ok" : "failed",
-          errorCode: generation.ok === false ? generation.errorCode || null : null
+          errorCode:
+            generation.ok === false ? generation.errorCode || null : null
         }
       );
     }
@@ -481,6 +507,11 @@ export async function generateAndSendLiveResponseForLog(
       if (handoffSignal.handoffRequested) {
         const sendClaimedForHandoff = await claimLiveSending(logId, companyId);
         if (sendClaimedForHandoff) {
+          await applyAiAgentLivePacing({
+            ...pacingCtx,
+            responseText: agent.handoffMessage || "transferência",
+            kind: "handoff"
+          });
           const handoffResult = await executeAiAgentHandoffWithTransition({
             ticket: freshTicket,
             companyId,
@@ -594,6 +625,11 @@ export async function generateAndSendLiveResponseForLog(
 
     // Handoff com resposta válida: a própria resposta (sanitizada) é a transição.
     if (handoffSignal.handoffRequested) {
+      await applyAiAgentLivePacing({
+        ...pacingCtx,
+        responseText: validated.text,
+        kind: "handoff"
+      });
       const handoffResult = await executeAiAgentHandoffWithTransition({
         ticket: ticketBeforeSend,
         companyId,
@@ -654,6 +690,12 @@ export async function generateAndSendLiveResponseForLog(
       return;
     }
 
+    await applyAiAgentLivePacing({
+      ...pacingCtx,
+      responseText: validated.text,
+      kind: "normal"
+    });
+
     const sendResult = await sendAiAgentWhatsappMessage({
       ticket: ticketBeforeSend,
       body: validated.text,
@@ -709,6 +751,7 @@ export async function generateAndSendLiveResponseForLog(
       "[AiAgent][live] generation_failed"
     );
   } finally {
+    await typing.stop("live_finished");
     inFlightLiveTickets.delete(log.ticketId ?? 0);
     await releaseAiAgentGenerationLock(lock.key);
   }
@@ -734,22 +777,26 @@ function ensureDebouncedLiveRunner(ticketId: number): () => void {
   const existing = debouncedLiveByTicket.get(ticketId);
   if (existing) return existing.fn;
 
-  const fn = debounce(async () => {
-    const pending = pendingLiveByTicket.get(ticketId);
-    if (!pending) return;
-    pendingLiveByTicket.delete(ticketId);
-    await markSupersededLiveLogs(
-      pending.ticketId,
-      pending.companyId,
-      pending.logId
-    );
-    await generateAndSendLiveResponseForLog(
-      pending.logId,
-      pending.companyId,
-      pending.inboundText,
-      pending.classification
-    );
-  }, AI_AGENT_LIVE_DEBOUNCE_MS, ticketId);
+  const fn = debounce(
+    async () => {
+      const pending = pendingLiveByTicket.get(ticketId);
+      if (!pending) return;
+      pendingLiveByTicket.delete(ticketId);
+      await markSupersededLiveLogs(
+        pending.ticketId,
+        pending.companyId,
+        pending.logId
+      );
+      await generateAndSendLiveResponseForLog(
+        pending.logId,
+        pending.companyId,
+        pending.inboundText,
+        pending.classification
+      );
+    },
+    AI_AGENT_LIVE_DEBOUNCE_MS,
+    ticketId
+  );
 
   debouncedLiveByTicket.set(ticketId, { fn, ticketId });
   return fn;

@@ -1,3 +1,28 @@
+import AiAgentRuntimeLog from "../../../models/AiAgentRuntimeLog";
+import Ticket from "../../../models/Ticket";
+import Contact from "../../../models/Contact";
+import Whatsapp from "../../../models/Whatsapp";
+import AiAgent from "../../../models/AiAgent";
+import ShowTicketService from "../../TicketServices/ShowTicketService";
+import { generateChatCompletionViaAdapter } from "../../AiProviderService/AiProviderAdapterFactory";
+import sendAiAgentWhatsappMessage from "../sendAiAgentWhatsappMessage";
+import { resolveWhatsappAiAgentRuntimeMode } from "../aiAgentRuntimeMode";
+import { runAiAgentDryRunHook } from "../runAiAgentDryRunHook";
+import { generateAndSendLiveResponseForLog } from "../AiAgentLiveService";
+import AiAgentOrchestrator from "../AiAgentOrchestrator";
+import {
+  AI_AGENT_LIVE_DELIVERY_STATUSES,
+  AI_AGENT_LIVE_STATUSES
+} from "../aiAgentLiveErrors";
+import { buildAiAgentRuntimeContext } from "../buildAiAgentRuntimeContext";
+import PauseTicketAiAgentService from "../../TicketServices/PauseTicketAiAgentService";
+import ResumeTicketAiAgentService from "../../TicketServices/ResumeTicketAiAgentService";
+import { validateAiAgentLiveResponse } from "../validateAiAgentLiveResponse";
+import { generateLiveResponseWithOptionalFc } from "../../AutomationOrchestrator/liveRollout/LiveFunctionCallingService";
+import { InboundMessageClassification } from "../classifyInboundMessage";
+import { startAiAgentTypingPresence } from "../startAiAgentTypingPresence";
+import { applyAiAgentLivePacing } from "../applyAiAgentLivePacing";
+
 jest.mock("@whiskeysockets/baileys", () => ({
   getContentType: () => "conversation",
   proto: {}
@@ -10,7 +35,11 @@ jest.mock("../knowledge/integrateKnowledgeIntoRuntime", () => ({
     systemPrompt: sys,
     knowledgeBlocked: false,
     forceHandoff: false,
-    decision: { decision: "skip", injectKnowledgeContext: false, reason: "disabled" }
+    decision: {
+      decision: "skip",
+      injectKnowledgeContext: false,
+      reason: "disabled"
+    }
   })),
   buildKnowledgeRuntimeMetadata: jest.fn().mockReturnValue(null),
   resolveKnowledgeRuntimeDecision: jest.fn()
@@ -22,14 +51,19 @@ jest.mock("../../KnowledgeBaseService/SearchKnowledgeChunksService", () => ({
   default: jest.fn(async () => ({ chunks: [], maxScore: 0 }))
 }));
 
-jest.mock("../../AutomationOrchestrator/liveRollout/LiveFunctionCallingService", () => ({
-  generateLiveResponseWithOptionalFc: jest.fn()
-}));
+jest.mock(
+  "../../AutomationOrchestrator/liveRollout/LiveFunctionCallingService",
+  () => ({
+    generateLiveResponseWithOptionalFc: jest.fn()
+  })
+);
 
 jest.mock("../knowledge/aiAgentGenerationLock", () => ({
-  acquireAiAgentGenerationLock: jest
-    .fn()
-    .mockResolvedValue({ acquired: true, key: "test-live-lock", redisUnavailable: false }),
+  acquireAiAgentGenerationLock: jest.fn().mockResolvedValue({
+    acquired: true,
+    key: "test-live-lock",
+    redisUnavailable: false
+  }),
   releaseAiAgentGenerationLock: jest.fn().mockResolvedValue(undefined)
 }));
 
@@ -40,6 +74,20 @@ jest.mock("../../AiProviderService/AiProviderAdapterFactory", () => ({
 jest.mock("../sendAiAgentWhatsappMessage", () => ({
   __esModule: true,
   default: jest.fn()
+}));
+
+/** Fase 2.18 — evita presença real e delays nos testes de Live. */
+jest.mock("../startAiAgentTypingPresence", () => ({
+  startAiAgentTypingPresence: jest.fn().mockResolvedValue({
+    executionId: "test-live-exec",
+    started: true,
+    stop: jest.fn().mockResolvedValue(undefined)
+  }),
+  emitAiAgentTypingMetric: jest.fn()
+}));
+
+jest.mock("../applyAiAgentLivePacing", () => ({
+  applyAiAgentLivePacing: jest.fn().mockResolvedValue(undefined)
 }));
 
 jest.mock("../../../models/Message", () => ({
@@ -113,33 +161,12 @@ jest.mock("../../TicketServices/ShowTicketService", () => ({
   default: jest.fn()
 }));
 
-import AiAgentRuntimeLog from "../../../models/AiAgentRuntimeLog";
-import Ticket from "../../../models/Ticket";
-import Contact from "../../../models/Contact";
-import Whatsapp from "../../../models/Whatsapp";
-import AiAgent from "../../../models/AiAgent";
-import ShowTicketService from "../../TicketServices/ShowTicketService";
-import { generateChatCompletionViaAdapter } from "../../AiProviderService/AiProviderAdapterFactory";
-import sendAiAgentWhatsappMessage from "../sendAiAgentWhatsappMessage";
-import { resolveWhatsappAiAgentRuntimeMode } from "../aiAgentRuntimeMode";
-import { runAiAgentDryRunHook } from "../runAiAgentDryRunHook";
-import { generateAndSendLiveResponseForLog } from "../AiAgentLiveService";
-import AiAgentOrchestrator from "../AiAgentOrchestrator";
-import {
-  AI_AGENT_LIVE_DELIVERY_STATUSES,
-  AI_AGENT_LIVE_STATUSES
-} from "../aiAgentLiveErrors";
-import { buildAiAgentRuntimeContext } from "../buildAiAgentRuntimeContext";
-import PauseTicketAiAgentService from "../../TicketServices/PauseTicketAiAgentService";
-import ResumeTicketAiAgentService from "../../TicketServices/ResumeTicketAiAgentService";
-import { validateAiAgentLiveResponse } from "../validateAiAgentLiveResponse";
-import { generateLiveResponseWithOptionalFc } from "../../AutomationOrchestrator/liveRollout/LiveFunctionCallingService";
-import { InboundMessageClassification } from "../classifyInboundMessage";
-
 const mockedLiveGenerate = generateLiveResponseWithOptionalFc as jest.Mock;
 const mockedSend = sendAiAgentWhatsappMessage as jest.Mock;
 const mockedBuildCtx = buildAiAgentRuntimeContext as jest.Mock;
 const mockedShowTicket = ShowTicketService as jest.Mock;
+const mockedStartTyping = startAiAgentTypingPresence as jest.Mock;
+const mockedApplyPacing = applyAiAgentLivePacing as jest.Mock;
 
 function whatsapp(partial: Record<string, unknown>) {
   return partial as unknown as Whatsapp;
@@ -210,7 +237,13 @@ describe("AiAgent live mode 1.4", () => {
         aiAgentId: 9
       }),
       aiAgent: agent({ id: 9, enabled: true }),
-      ticket: ticket({ id: 1, status: "open", userId: 7, chatbot: false, isGroup: false })
+      ticket: ticket({
+        id: 1,
+        status: "open",
+        userId: 7,
+        chatbot: false,
+        isGroup: false
+      })
     });
 
     const result = await AiAgentOrchestrator.evaluateInboundMessage({
@@ -295,12 +328,14 @@ describe("AiAgent live mode 1.4", () => {
   });
 
   it("dry_run não chama provider nem envia", async () => {
-    jest.spyOn(AiAgentOrchestrator, "evaluateInboundMessage").mockResolvedValue({
-      eligible: true,
-      reason: "eligible",
-      aiAgentId: 9,
-      mode: "dry_run"
-    });
+    jest
+      .spyOn(AiAgentOrchestrator, "evaluateInboundMessage")
+      .mockResolvedValue({
+        eligible: true,
+        reason: "eligible",
+        aiAgentId: 9,
+        mode: "dry_run"
+      });
     (AiAgentRuntimeLog.findOne as jest.Mock).mockResolvedValue(null);
     (AiAgentRuntimeLog.create as jest.Mock).mockResolvedValue({ id: 50 });
 
@@ -357,9 +392,16 @@ describe("AiAgent live mode 1.4", () => {
         contact: contact({ id: 2, name: "João" })
       })
     );
-    (Contact.findOne as jest.Mock).mockResolvedValue(contact({ id: 2, name: "João" }));
+    (Contact.findOne as jest.Mock).mockResolvedValue(
+      contact({ id: 2, name: "João" })
+    );
     (Whatsapp.findOne as jest.Mock).mockResolvedValue(
-      whatsapp({ id: 3, aiAgentMode: "live", aiAgentEnabled: true, aiAgentId: 9 })
+      whatsapp({
+        id: 3,
+        aiAgentMode: "live",
+        aiAgentEnabled: true,
+        aiAgentId: 9
+      })
     );
     (AiAgent.findOne as jest.Mock).mockResolvedValue(
       agent({
@@ -391,15 +433,37 @@ describe("AiAgent live mode 1.4", () => {
       bodySent: "Eduardo:\nOlá! Como posso ajudar?"
     });
 
-    await generateAndSendLiveResponseForLog(70, 1, "Preciso de ajuda", textClassification);
+    await generateAndSendLiveResponseForLog(
+      70,
+      1,
+      "Preciso de ajuda",
+      textClassification
+    );
 
+    expect(mockedStartTyping).toHaveBeenCalled();
     expect(mockedLiveGenerate).toHaveBeenCalled();
+    expect(mockedApplyPacing).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: "normal",
+        responseText: "Olá! Como posso ajudar?"
+      })
+    );
     expect(mockedSend).toHaveBeenCalledWith(
       expect.objectContaining({
         body: "Olá! Como posso ajudar?",
         agentName: "Eduardo"
       })
     );
+    // typing inicia antes do provider; stop no finally
+    const typingCallOrder = mockedStartTyping.mock.invocationCallOrder[0];
+    const providerCallOrder = mockedLiveGenerate.mock.invocationCallOrder[0];
+    const pacingCallOrder = mockedApplyPacing.mock.invocationCallOrder[0];
+    const sendCallOrder = mockedSend.mock.invocationCallOrder[0];
+    expect(typingCallOrder).toBeLessThan(providerCallOrder);
+    expect(pacingCallOrder).toBeGreaterThan(providerCallOrder);
+    expect(pacingCallOrder).toBeLessThan(sendCallOrder);
+    const typingHandle = await mockedStartTyping.mock.results[0].value;
+    expect(typingHandle.stop).toHaveBeenCalledWith("live_finished");
     expect(AiAgentRuntimeLog.update).toHaveBeenCalledWith(
       expect.objectContaining({
         liveStatus: AI_AGENT_LIVE_STATUSES.SENT,

@@ -1,7 +1,7 @@
+import { Op } from "sequelize";
 import AppError from "../../errors/AppError";
 import AiAgent from "../../models/AiAgent";
 import AiAgentSimulationSession from "../../models/AiAgentSimulationSession";
-import { Op } from "sequelize";
 import { generateChatCompletionViaAdapter } from "../AiProviderService/AiProviderAdapterFactory";
 import { buildAiAgentSystemPrompt } from "./buildAiAgentSystemPrompt";
 import { loadAiAgentProfileForRuntime } from "./resolveAiAgentBusinessPrompt";
@@ -38,6 +38,7 @@ import {
 } from "./knowledge/integrateKnowledgeIntoRuntime";
 import { safeEmitKnowledgeObservability } from "./analytics/emitKnowledgeObservability";
 import { safeRecordAgentAnalyticsEvent } from "./analytics/recordAgentAnalyticsEvent";
+import { calculateAiAgentResponsePacing } from "./calculateAiAgentResponsePacing";
 
 const SIMULATOR_ERROR_CODES = {
   MISSING_CREDENTIAL: "missing_credential",
@@ -168,7 +169,7 @@ export async function listAiAgentSimulationSessions(input: {
   });
 
   return {
-    sessions: rows.map((session) => ({
+    sessions: rows.map(session => ({
       id: session.id,
       status: session.status,
       provider: session.provider,
@@ -202,7 +203,9 @@ export async function showAiAgentSimulationSession(input: {
     ]
   });
 
-  const { serializeSimulationSession } = await import("./aiAgentSimulationSerialization");
+  const { serializeSimulationSession } = await import(
+    "./aiAgentSimulationSerialization"
+  );
   return serializeSimulationSession(session, messages);
 }
 
@@ -229,7 +232,13 @@ export async function sendAiAgentSimulationMessage(input: {
   /** 2.1D — Function Calling somente no Simulador. */
   functionCalling?: boolean;
   plannerCategories?: Array<
-    "system" | "contact" | "ticket" | "queue" | "user" | "knowledge" | "automation"
+    | "system"
+    | "contact"
+    | "ticket"
+    | "queue"
+    | "user"
+    | "knowledge"
+    | "automation"
   >;
   userId?: number | null;
 }) {
@@ -431,9 +440,7 @@ export async function sendAiAgentSimulationMessage(input: {
   if (result.ok === false) {
     const failMeta = {
       ...(knowledgeMeta || {}),
-      ...(functionCallingTrace
-        ? { functionCalling: functionCallingTrace }
-        : {})
+      ...(functionCallingTrace ? { functionCalling: functionCallingTrace } : {})
     };
     const assistantRow = await AiAgentSimulationMessage.create({
       companyId: input.companyId,
@@ -502,13 +509,25 @@ export async function sendAiAgentSimulationMessage(input: {
           : "")
     )
   });
+  // Fase 2.18 — Simulator: calcula pacing informativo sem aguardar nem enviar presence.
+  const pacingPreview = calculateAiAgentResponsePacing({
+    responseText: signedAssistant.body || handoff.cleanText,
+    processingStartedAtMs: startedAt,
+    kind: handoffSuggested ? "handoff" : "normal",
+    jitterRng: () => 0.5
+  });
   const successMeta = {
     ...(knowledgeMeta || {}),
-    ...(functionCallingTrace
-      ? { functionCalling: functionCallingTrace }
-      : {}),
+    ...(functionCallingTrace ? { functionCalling: functionCallingTrace } : {}),
     messageSigned: signedAssistant.signed,
-    handoffSuggested
+    handoffSuggested,
+    pacingPreview: {
+      responseLengthBucket: pacingPreview.responseLengthBucket,
+      processingDurationMs: pacingPreview.processingDurationMs,
+      targetDurationMs: pacingPreview.targetDurationMs,
+      remainingDelayMs: pacingPreview.remainingDelayMs,
+      appliedInSimulator: false
+    }
   };
   const assistantRow = await AiAgentSimulationMessage.create({
     companyId: input.companyId,
@@ -522,9 +541,9 @@ export async function sendAiAgentSimulationMessage(input: {
     totalTokens: result.totalTokens ?? null,
     latencyMs,
     handoffSuggested,
-    handoffReason: handoff.handoffReason || (knowledgeApplied.forceHandoff
-      ? "knowledge_missing"
-      : null),
+    handoffReason:
+      handoff.handoffReason ||
+      (knowledgeApplied.forceHandoff ? "knowledge_missing" : null),
     metadata: successMeta
   });
 
@@ -541,6 +560,8 @@ export async function sendAiAgentSimulationMessage(input: {
     model: result.model || session.model
   });
 
+  // Observabilidade fire-and-forget (padrão Shadow/Live).
+  // eslint-disable-next-line no-void
   void safeEmitKnowledgeObservability({
     companyId: input.companyId,
     aiAgentId: agent.id,
@@ -559,6 +580,7 @@ export async function sendAiAgentSimulationMessage(input: {
     tokensOutput: result.completionTokens,
     interaction: true
   });
+  // eslint-disable-next-line no-void
   void safeRecordAgentAnalyticsEvent({
     companyId: input.companyId,
     aiAgentId: agent.id,
@@ -624,7 +646,10 @@ export async function checkAiAgentSimulatorCredential(input: {
     model: resolved.provider
       ? (() => {
           try {
-            return parseAiAgentModelForProvider(agent.model, resolved.provider!);
+            return parseAiAgentModelForProvider(
+              agent.model,
+              resolved.provider!
+            );
           } catch {
             return null;
           }
