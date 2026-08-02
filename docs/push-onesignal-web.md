@@ -155,7 +155,7 @@ Preparar (sem REST key/JWT/tokens):
 | Camada | Identificador | Valor |
 |--------|---------------|-------|
 | Frontend `OneSignal.login` | External ID | `String(user.id)` |
-| Backend envio | `include_external_user_ids` | `String(userId)` dos destinatários |
+| Backend envio | `include_aliases.external_id` + `target_channel: push` | `String(userId)` dos destinatários |
 | Tags | metadados | `user_id`, `company_id`, `profile`, `queue_ids` |
 | Logout | — | `OneSignal.logout()` sem `optOut` |
 
@@ -251,7 +251,7 @@ Matriz rápida:
 
 Chrome e Firefox usam **Subscription IDs distintos** com o **mesmo external ID**
 (`OneSignal.login(String(user.id))`). O backend envia por
-`include_external_user_ids` e **não** guarda uma tabela local de device
+`include_aliases.external_id` (+ `target_channel: "push"`) e **não** guarda uma tabela local de device
 subscriptions — não há sobrescrita de um browser pelo outro no servidor da app.
 
 Timeouts atuais (instrumentados em `timeouts` / `waitMeta`):
@@ -307,7 +307,7 @@ Esperado: HTTP 200, JavaScript; OneSignal com `importScripts` v16; Workbox em
 
 ## Envio backend
 
-`SendOneSignalPushNotificationService` → `include_external_user_ids: String(userId)`.
+`SendOneSignalPushNotificationService` → `include_aliases.external_id: String(userId)` + `target_channel: "push"`.
 Sem tabela local de device subscriptions. Sem `include_subscription_ids`.
 `companyId` nunca é destinatário (só contexto/tenant e tags).
 

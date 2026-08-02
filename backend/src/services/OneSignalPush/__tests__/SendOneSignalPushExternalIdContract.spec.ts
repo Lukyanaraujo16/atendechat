@@ -1,5 +1,6 @@
 /**
- * Contrato External ID OneSignal = String(userId), nunca companyId (Fase 2.13E).
+ * Contrato External ID OneSignal = String(userId), nunca companyId.
+ * Targeting atual: include_aliases.external_id + target_channel=push.
  */
 jest.mock("axios", () => ({
   __esModule: true,
@@ -37,7 +38,9 @@ jest.mock("../userPushPreferences", () => ({
 }));
 
 import axios from "axios";
-import SendOneSignalPushNotificationService from "../SendOneSignalPushNotificationService";
+import SendOneSignalPushNotificationService, {
+  buildOneSignalPushPayload
+} from "../SendOneSignalPushNotificationService";
 import GetOneSignalServerSettingsService from "../GetOneSignalServerSettingsService";
 
 const axiosPost = axios.post as jest.Mock;
@@ -55,10 +58,23 @@ describe("SendOneSignalPushNotificationService — external id contract (2.13E)"
     axiosPost.mockResolvedValue({ data: { id: "notif-1", recipients: 1 } });
   });
 
-  it("envia include_external_user_ids com String(userId), não companyId", async () => {
+  it("buildOneSignalPushPayload usa include_aliases.external_id", () => {
+    const payload = buildOneSignalPushPayload({
+      appId: "app",
+      externalUserIds: ["25"],
+      title: "t",
+      body: "b",
+      data: { type: "x" }
+    });
+    expect(payload.include_aliases).toEqual({ external_id: ["25"] });
+    expect(payload.target_channel).toBe("push");
+    expect(payload).not.toHaveProperty("include_external_user_ids");
+  });
+
+  it("envia include_aliases.external_id com String(userId), não companyId", async () => {
     await SendOneSignalPushNotificationService({
       eventType: "ticket.message",
-      preferenceCategory: "ticket_message" as any,
+      preferenceCategory: "message",
       companyId: 1,
       ticketId: 10,
       recipientUserIds: [25],
@@ -74,16 +90,18 @@ describe("SendOneSignalPushNotificationService — external id contract (2.13E)"
 
     expect(axiosPost).toHaveBeenCalledTimes(1);
     const payload = axiosPost.mock.calls[0][1];
-    expect(payload.include_external_user_ids).toEqual(["25"]);
-    expect(payload.include_external_user_ids).not.toContain("1");
+    expect(payload.include_aliases.external_id).toEqual(["25"]);
+    expect(payload.include_aliases.external_id).not.toContain("1");
+    expect(payload.target_channel).toBe("push");
     expect(payload.app_id).toBe("app-test");
+    expect(payload).not.toHaveProperty("include_external_user_ids");
     expect(axiosPost.mock.calls[0][2].headers.Authorization).toMatch(/^Key /);
   });
 
   it("user 26 na mesma empresa 1 recebe External ID 26", async () => {
     await SendOneSignalPushNotificationService({
       eventType: "ticket.message",
-      preferenceCategory: "ticket_message" as any,
+      preferenceCategory: "message",
       companyId: 1,
       ticketId: 11,
       recipientUserIds: [26],
@@ -96,13 +114,15 @@ describe("SendOneSignalPushNotificationService — external id contract (2.13E)"
         status: "open"
       }
     });
-    expect(axiosPost.mock.calls[0][1].include_external_user_ids).toEqual(["26"]);
+    expect(axiosPost.mock.calls[0][1].include_aliases.external_id).toEqual([
+      "26"
+    ]);
   });
 
   it("múltiplos utilizadores da mesma empresa mantêm IDs individuais", async () => {
     await SendOneSignalPushNotificationService({
       eventType: "ticket.message",
-      preferenceCategory: "ticket_message" as any,
+      preferenceCategory: "message",
       companyId: 1,
       ticketId: 12,
       recipientUserIds: [25, 26],
@@ -115,7 +135,7 @@ describe("SendOneSignalPushNotificationService — external id contract (2.13E)"
         status: "open"
       }
     });
-    const ids = axiosPost.mock.calls[0][1].include_external_user_ids;
+    const ids = axiosPost.mock.calls[0][1].include_aliases.external_id;
     expect(ids).toEqual(["25", "26"]);
     expect(ids).not.toContain(1);
     expect(ids).not.toContain("1");
@@ -124,7 +144,7 @@ describe("SendOneSignalPushNotificationService — external id contract (2.13E)"
   it("não envia companyId como destinatário único", async () => {
     await SendOneSignalPushNotificationService({
       eventType: "ticket.message",
-      preferenceCategory: "ticket_message" as any,
+      preferenceCategory: "message",
       companyId: 1,
       ticketId: 13,
       recipientUserIds: [25],
@@ -139,7 +159,7 @@ describe("SendOneSignalPushNotificationService — external id contract (2.13E)"
     });
     const body = JSON.stringify(axiosPost.mock.calls[0][1]);
     expect(body).toContain('"25"');
-    expect(axiosPost.mock.calls[0][1].include_external_user_ids).not.toEqual([
+    expect(axiosPost.mock.calls[0][1].include_aliases.external_id).not.toEqual([
       "1"
     ]);
   });
@@ -167,10 +187,10 @@ describe("SendOneSignalPushNotificationService — external id contract (2.13E)"
       }
     });
     expect(filterOutUsersViewingTicket).not.toHaveBeenCalled();
-    expect(axiosPost.mock.calls[0][1].include_external_user_ids).toEqual([
+    expect(axiosPost.mock.calls[0][1].include_aliases.external_id).toEqual([
       "25"
     ]);
-    expect(axiosPost.mock.calls[0][1].include_external_user_ids).not.toEqual([
+    expect(axiosPost.mock.calls[0][1].include_aliases.external_id).not.toEqual([
       "1"
     ]);
     expect(axiosPost.mock.calls[0][1].data.type).toBe("internal_chat_message");
@@ -194,11 +214,11 @@ describe("SendOneSignalPushNotificationService — external id contract (2.13E)"
         targetUrl: "/chats/11"
       }
     });
-    expect(axiosPost.mock.calls[0][1].include_external_user_ids).toEqual([
+    expect(axiosPost.mock.calls[0][1].include_aliases.external_id).toEqual([
       "25"
     ]);
-    expect(axiosPost.mock.calls[0][1].include_external_user_ids).not.toContain(
-      "26"
-    );
+    expect(
+      axiosPost.mock.calls[0][1].include_aliases.external_id
+    ).not.toContain("26");
   });
 });

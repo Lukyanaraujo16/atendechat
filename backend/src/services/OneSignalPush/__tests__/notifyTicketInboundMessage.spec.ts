@@ -131,6 +131,30 @@ describe("notifyTicketInboundMessage — hardening (2.14B)", () => {
     expect(sendPush).not.toHaveBeenCalled();
   });
 
+  it("pending segunda mensagem → ticket_message_inbound (não duplica pending_new)", async () => {
+    count.mockResolvedValue(2);
+    await notifyTicketInboundMessage({
+      message: makeMessage({
+        ticket: {
+          id: 51,
+          companyId: 1,
+          uuid: "p",
+          status: "pending",
+          userId: null,
+          queueId: 3,
+          whatsappId: 9,
+          channel: "whatsapp",
+          contact: { name: "Novo" },
+          queue: { name: "Fila" }
+        }
+      }),
+      companyId: 1
+    });
+    expect(resolvePending).not.toHaveBeenCalled();
+    expect(resolveInbound).toHaveBeenCalled();
+    expect(sendPush.mock.calls[0][0].eventType).toBe("ticket_message_inbound");
+  });
+
   it("External IDs individuais no dispatcher (recipientUserIds numéricos)", async () => {
     resolveInbound.mockResolvedValue([25, 26]);
     await notifyTicketInboundMessage({

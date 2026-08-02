@@ -9,8 +9,7 @@ import {
   loadEffectivePreferencesMap
 } from "./userPushPreferences";
 
-const ONESIGNAL_NOTIFICATIONS_URL =
-  "https://api.onesignal.com/notifications";
+const ONESIGNAL_NOTIFICATIONS_URL = "https://api.onesignal.com/notifications";
 
 export type PushNotificationData = {
   type: string;
@@ -54,7 +53,18 @@ export type SendPushParams = {
 /** Alias histórico. */
 export type SendTicketPushParams = SendPushParams;
 
-function summarizeApiResponse(data: unknown): Record<string, unknown> {
+export type OneSignalDispatchResult = {
+  attempted: boolean;
+  success: boolean;
+  httpStatus?: number | null;
+  notificationId?: string | null;
+  apiRecipients?: number | null;
+  externalUserIds: string[];
+  skipped?: string | null;
+  errorCode?: string | null;
+};
+
+export function summarizeApiResponse(data: unknown): Record<string, unknown> {
   if (data == null || typeof data !== "object") {
     return { raw: String(data) };
   }
@@ -64,13 +74,51 @@ function summarizeApiResponse(data: unknown): Record<string, unknown> {
   if (d.errors != null) out.errors = d.errors;
   if (d.warnings != null) out.warnings = d.warnings;
   if (d.recipients != null) out.recipients = d.recipients;
-  if (d.external_id_errors != null) out.external_id_errors = d.external_id_errors;
+  if (d.external_id_errors != null)
+    out.external_id_errors = d.external_id_errors;
   return Object.keys(out).length ? out : { keys: Object.keys(d) };
+}
+
+/**
+ * Contrato de targeting OneSignal (SDK Web v16 / API atual):
+ * include_aliases.external_id + target_channel=push.
+ * include_external_user_ids está depreciado e pode retornar recipients=0.
+ */
+export function buildOneSignalPushPayload(params: {
+  appId: string;
+  externalUserIds: string[];
+  title: string;
+  body: string;
+  data: Record<string, unknown>;
+}): Record<string, unknown> {
+  return {
+    app_id: params.appId,
+    include_aliases: {
+      external_id: params.externalUserIds
+    },
+    target_channel: "push",
+    headings: { en: params.title, pt: params.title },
+    contents: { en: params.body, pt: params.body },
+    data: params.data
+  };
+}
+
+function readApiRecipients(data: unknown): number | null {
+  if (data == null || typeof data !== "object") return null;
+  const r = (data as Record<string, unknown>).recipients;
+  if (typeof r === "number" && Number.isFinite(r)) return r;
+  return null;
+}
+
+function readNotificationId(data: unknown): string | null {
+  if (data == null || typeof data !== "object") return null;
+  const { id } = data as Record<string, unknown>;
+  return id != null ? String(id) : null;
 }
 
 const SendOneSignalPushNotificationService = async (
   params: SendPushParams
-): Promise<void> => {
+): Promise<OneSignalDispatchResult> => {
   const {
     eventType,
     preferenceCategory,
@@ -89,15 +137,15 @@ const SendOneSignalPushNotificationService = async (
       ? params.applyActiveTicketViewFilter
       : ticketId != null && !Number.isNaN(Number(ticketId));
 
-  const exclude = new Set(
-    excludeUserIds.map(id => String(id)).filter(Boolean)
-  );
+  const exclude = new Set(excludeUserIds.map(id => String(id)).filter(Boolean));
 
   const recipientsBeforeFilters = [
     ...new Set(
       params.recipientUserIds
         .map(id => Number(id))
-        .filter(id => id != null && !Number.isNaN(id) && !exclude.has(String(id)))
+        .filter(
+          id => id != null && !Number.isNaN(id) && !exclude.has(String(id))
+        )
     )
   ];
 
@@ -114,12 +162,30 @@ const SendOneSignalPushNotificationService = async (
     finalRecipients: [] as number[]
   };
 
+  logger.info(
+    {
+      ...logBase,
+      phase: "dispatch_started",
+      candidateCount: recipientsBeforeFilters.length
+    },
+    "[OneSignalPush]"
+  );
+
   if (!recipientsBeforeFilters.length) {
     logger.info(
-      { ...logBase, skipped: "no_recipients_before_filters", recipientCount: 0 },
+      {
+        ...logBase,
+        skipped: "no_recipients_before_filters",
+        recipientCount: 0
+      },
       "[OneSignalPush]"
     );
-    return;
+    return {
+      attempted: false,
+      success: false,
+      externalUserIds: [],
+      skipped: "no_recipients_before_filters"
+    };
   }
 
   let afterActiveView = recipientsBeforeFilters;
@@ -135,7 +201,10 @@ const SendOneSignalPushNotificationService = async (
 
   let finalUserIds = afterActiveView;
   if (preferenceCategory != null) {
-    const prefMap = await loadEffectivePreferencesMap(companyId, afterActiveView);
+    const prefMap = await loadEffectivePreferencesMap(
+      companyId,
+      afterActiveView
+    );
     const filteredPrefs = filterUserIdsByPushPreference(
       afterActiveView,
       preferenceCategory,
@@ -157,7 +226,12 @@ const SendOneSignalPushNotificationService = async (
       },
       "[OneSignalPush]"
     );
-    return;
+    return {
+      attempted: false,
+      success: false,
+      externalUserIds: [],
+      skipped: "no_recipients_after_filters"
+    };
   }
 
   const inAppPayload: Record<string, unknown> = {
@@ -201,27 +275,70 @@ const SendOneSignalPushNotificationService = async (
       },
       "[OneSignalPush]"
     );
-    return;
+    return {
+      attempted: false,
+      success: false,
+      externalUserIds,
+      skipped: "disabled_or_incomplete_config"
+    };
   }
 
+  const payload = buildOneSignalPushPayload({
+    appId: settings.appId,
+    externalUserIds,
+    title,
+    body,
+    data: data as Record<string, unknown>
+  });
+
+  logger.info(
+    {
+      ...logBase,
+      phase: "onesignal_request_started",
+      recipientCount: externalUserIds.length,
+      targeting: "include_aliases.external_id"
+    },
+    "[OneSignalPush]"
+  );
+
   try {
-    const res = await axios.post(
-      ONESIGNAL_NOTIFICATIONS_URL,
-      {
-        app_id: settings.appId,
-        include_external_user_ids: externalUserIds,
-        headings: { en: title, pt: title },
-        contents: { en: body, pt: body },
-        data: data as Record<string, unknown>
+    const res = await axios.post(ONESIGNAL_NOTIFICATIONS_URL, payload, {
+      headers: {
+        Authorization: `Key ${settings.restApiKey}`,
+        "Content-Type": "application/json"
       },
-      {
-        headers: {
-          Authorization: `Key ${settings.restApiKey}`,
-          "Content-Type": "application/json"
+      timeout: 15000
+    });
+
+    const apiRecipients = readApiRecipients(res.data);
+    const notificationId = readNotificationId(res.data);
+    const apiSummary = summarizeApiResponse(res.data);
+    const zeroRecipients = apiRecipients === 0;
+
+    if (zeroRecipients) {
+      logger.warn(
+        {
+          ...logBase,
+          recipientCount: externalUserIds.length,
+          recipients: externalUserIds,
+          success: false,
+          errorCode: "zero_recipients",
+          httpStatus: res.status,
+          notificationId,
+          api: apiSummary
         },
-        timeout: 15000
-      }
-    );
+        "[OneSignalPush]"
+      );
+      return {
+        attempted: true,
+        success: false,
+        httpStatus: res.status,
+        notificationId,
+        apiRecipients,
+        externalUserIds,
+        errorCode: "zero_recipients"
+      };
+    }
 
     logger.info(
       {
@@ -229,23 +346,65 @@ const SendOneSignalPushNotificationService = async (
         recipientCount: externalUserIds.length,
         recipients: externalUserIds,
         success: true,
-        api: summarizeApiResponse(res.data)
+        httpStatus: res.status,
+        notificationId,
+        apiRecipients,
+        api: apiSummary
       },
       "[OneSignalPush]"
     );
+
+    return {
+      attempted: true,
+      success: true,
+      httpStatus: res.status,
+      notificationId,
+      apiRecipients,
+      externalUserIds
+    };
   } catch (err: unknown) {
-    const ax = err as { response?: { data?: unknown; status?: number } };
+    const ax = err as {
+      code?: string;
+      message?: string;
+      response?: { data?: unknown; status?: number };
+    };
+    const httpStatus = ax.response?.status ?? null;
+    let errorCode = "onesignal_http_error";
+    if (!ax.response) {
+      errorCode =
+        ax.code === "ECONNABORTED" || /timeout/i.test(String(ax.message || ""))
+          ? "onesignal_timeout"
+          : "onesignal_network_error";
+    } else if (httpStatus === 401 || httpStatus === 403) {
+      errorCode = "onesignal_auth_error";
+    } else if (httpStatus === 429) {
+      errorCode = "onesignal_rate_limited";
+    } else if (httpStatus != null && httpStatus >= 500) {
+      errorCode = "onesignal_server_error";
+    } else if (httpStatus === 400) {
+      errorCode = "onesignal_bad_request";
+    }
+
     logger.warn(
       {
         ...logBase,
         recipientCount: externalUserIds.length,
         recipients: externalUserIds,
         success: false,
-        httpStatus: ax.response?.status,
+        httpStatus,
+        errorCode,
         api: summarizeApiResponse(ax.response?.data)
       },
       "[OneSignalPush]"
     );
+
+    return {
+      attempted: true,
+      success: false,
+      httpStatus,
+      externalUserIds,
+      errorCode
+    };
   }
 };
 

@@ -2,7 +2,8 @@
  * Contrato de identidade OneSignal Web (Fase 2.13E).
  *
  * External ID = String(user.id) — o mesmo valor que o backend envia em
- * include_external_user_ids. Nunca companyId, e-mail, JWT ou subscription id.
+ * include_aliases.external_id (e legado include_external_user_ids).
+ * Nunca companyId, e-mail, JWT ou subscription id.
  *
  * companyId / profile / queues são apenas tags (metadados).
  */
@@ -16,7 +17,7 @@ export function resolveOneSignalExternalId(user) {
   if (user == null || typeof user !== "object") {
     return null;
   }
-  // Preferir user.id (contrato backend include_external_user_ids).
+  // Preferir user.id (contrato backend include_aliases.external_id).
   // Nunca usar companyId / company.id.
   const raw =
     user.id != null && user.id !== ""

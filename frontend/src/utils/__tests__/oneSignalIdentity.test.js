@@ -306,21 +306,27 @@ describe("oneSignal identity sync single-flight (2.13E)", () => {
     expect(api.User.addTags.mock.calls[1][0].queue_ids).toBe("5");
   });
 
-  it("erro de login impede tags", async () => {
+  it("erro de login impede tags e não marca sync como OK", async () => {
     const api = createMockSdk({
       loginImpl: async () => {
         throw new Error("http_400");
       },
     });
     __forceOneSignalReadyForTests(api);
-    await syncOneSignalUser({ id: 25, companyId: 1, profile: "admin" });
+    const result = await syncOneSignalUser(
+      { id: 25, companyId: 1, profile: "admin" },
+      { maxAttempts: 2, baseDelayMs: 20 }
+    );
+    expect(result.ok).toBe(false);
     expect(api.login).toHaveBeenCalledWith("25");
+    expect(api.login.mock.calls.length).toBeGreaterThanOrEqual(2);
     expect(api.User.addTags).not.toHaveBeenCalled();
+    expect(getOneSignalPushStatus().externalUserId).toBeNull();
     const tl = getPushDiagnosticTimeline();
     expect(tl.some((e) => e.name === "identity_login_failed")).toBe(true);
   });
 
-  it("retry após erro de login", async () => {
+  it("retry limitado após erro de login reassocia", async () => {
     let failOnce = true;
     const api = createMockSdk({
       loginImpl: async () => {
@@ -331,11 +337,64 @@ describe("oneSignal identity sync single-flight (2.13E)", () => {
       },
     });
     __forceOneSignalReadyForTests(api);
-    await syncOneSignalUser({ id: 25, companyId: 1, profile: "admin" });
-    expect(api.User.addTags).not.toHaveBeenCalled();
-    await syncOneSignalUser({ id: 25, companyId: 1, profile: "admin" });
+    const result = await syncOneSignalUser(
+      { id: 25, companyId: 1, profile: "admin" },
+      { maxAttempts: 3, baseDelayMs: 20 }
+    );
+    expect(result.ok).toBe(true);
     expect(api.login).toHaveBeenCalledTimes(2);
     expect(api.User.addTags).toHaveBeenCalledTimes(1);
+    expect(getOneSignalPushStatus().externalUserId).toBe("25");
+  });
+
+  it("push desabilitado → sync falha sem login", async () => {
+    openApiModule.openApi.get.mockResolvedValue({
+      data: {
+        onesignalEnabled: false,
+        onesignalAppId: null,
+        onesignalEnvironment: "development",
+      },
+    });
+    const result = await syncOneSignalUser(
+      { id: 25, companyId: 1, profile: "admin" },
+      { maxAttempts: 1 }
+    );
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe("push_disabled");
+  });
+
+  it("logout + login reassocia External ID", async () => {
+    const api = createMockSdk();
+    __forceOneSignalReadyForTests(api);
+    await syncOneSignalUser({ id: 25, companyId: 1, profile: "admin" });
+    await oneSignalLogout();
+    expect(api.logout).toHaveBeenCalled();
+    expect(getOneSignalPushStatus().externalUserId).toBeNull();
+    await syncOneSignalUser({ id: 25, companyId: 1, profile: "admin" });
+    expect(api.login).toHaveBeenLastCalledWith("25");
+    expect(getOneSignalPushStatus().externalUserId).toBe("25");
+  });
+
+  it("troca de conta troca o External ID", async () => {
+    const api = createMockSdk();
+    __forceOneSignalReadyForTests(api);
+    await syncOneSignalUser({ id: 25, companyId: 1, profile: "admin" });
+    await oneSignalLogout();
+    await syncOneSignalUser({ id: 26, companyId: 1, profile: "user" });
+    expect(api.login.mock.calls.map((c) => c[0])).toEqual(["25", "26"]);
+    expect(getOneSignalPushStatus().externalUserId).toBe("26");
+  });
+
+  it("opt-out: sync ainda associa External ID (permissão ≠ preferência backend)", async () => {
+    const api = createMockSdk({ optedIn: false, id: null, token: null });
+    __forceOneSignalReadyForTests(api);
+    const result = await syncOneSignalUser({
+      id: 25,
+      companyId: 1,
+      profile: "admin",
+    });
+    expect(result.ok).toBe(true);
+    expect(api.login).toHaveBeenCalledWith("25");
   });
 
   it("logout invalida cache e utilizador B não herda A", async () => {

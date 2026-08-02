@@ -48,9 +48,17 @@ export default function OneSignalIntegration() {
     if (!booted || !isAuth || !externalId) {
       return;
     }
-    syncOneSignalUser(user);
+    let cancelled = false;
+    (async () => {
+      // Retry limitado fica no serviço; não chama login a cada render.
+      await syncOneSignalUser(user);
+      if (cancelled) return;
+    })();
     // Dedup real ocorre no serviço (single-flight + cache de tags).
     // Dispara só quando identidade ou tags relevantes mudam — não a cada render.
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [booted, isAuth, externalId, tagsKey]);
 

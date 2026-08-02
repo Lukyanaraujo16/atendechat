@@ -937,37 +937,125 @@ function invalidateIdentitySyncCache() {
   lastAnonymousProbe = null;
 }
 
-export async function syncOneSignalUser(user) {
+function delayMs(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Associa External ID ao SDK (idempotente, com retry limitado).
+ * Não marca sincronização como OK se login falhar.
+ * @returns {Promise<{ ok: boolean, reason?: string, externalId?: string, attempts?: number }>}
+ */
+export async function syncOneSignalUser(user, options = {}) {
+  const maxAttempts = Math.max(1, Number(options.maxAttempts) || 3);
+  const baseDelayMs = Math.max(100, Number(options.baseDelayMs) || 750);
   const externalId = resolveOneSignalExternalId(user);
   if (!externalId) {
-    return;
+    return { ok: false, reason: "missing_user_id", attempts: 0 };
   }
-  try {
-    const cfg = await fetchPublicPushConfig();
-    if (!cfg.onesignalEnabled || !cfg.onesignalAppId) {
-      return;
+
+  let lastResult = { ok: false, reason: "not_attempted", externalId, attempts: 0 };
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    lastResult = { ...lastResult, attempts: attempt };
+    try {
+      if (attempt > 1) {
+        recordPushDiagnosticEvent("identity_sync_retry", {
+          externalId,
+          attempt,
+          maxAttempts,
+        });
+      }
+      const cfg = await fetchPublicPushConfig();
+      if (!cfg.onesignalEnabled || !cfg.onesignalAppId) {
+        return { ok: false, reason: "push_disabled", externalId, attempts: attempt };
+      }
+      const ok = await initOneSignalFromConfig(cfg);
+      if (!ok || !oneSignalApi) {
+        lastResult = {
+          ok: false,
+          reason: "sdk_not_ready",
+          externalId,
+          attempts: attempt,
+        };
+        if (attempt < maxAttempts) {
+          await delayMs(baseDelayMs * 2 ** (attempt - 1));
+        }
+        continue;
+      }
+      // Após falha anterior (ex.: stability timeout pós-logout), tentar login
+      // sem bloquear de novo no wait completo — association first.
+      const result = await applyUserIdentity(user, {
+        skipStabilityWait: attempt > 1,
+      });
+      if (result?.ok) {
+        refreshFromSdk();
+        recordPushDiagnosticEvent("identity_sync_ok", {
+          externalId: result.externalId || externalId,
+          attempt,
+          deduplicated: Boolean(result.deduplicated),
+          deferredLogin: Boolean(result.deferredLogin),
+        });
+        return {
+          ok: true,
+          externalId: result.externalId || externalId,
+          attempts: attempt,
+          deduplicated: Boolean(result.deduplicated),
+          deferredLogin: Boolean(result.deferredLogin),
+        };
+      }
+      lastResult = {
+        ok: false,
+        reason: result?.reason || "identity_failed",
+        externalId,
+        attempts: attempt,
+      };
+      invalidateIdentitySyncCache();
+    } catch (e) {
+      invalidateIdentitySyncCache();
+      lastResult = {
+        ok: false,
+        reason: e?.message || "sync_error",
+        externalId,
+        attempts: attempt,
+      };
+      recordPushDiagnosticEvent("identity_sync_retry_failed", {
+        externalId,
+        attempt,
+        reason: lastResult.reason,
+      });
     }
-    const ok = await initOneSignalFromConfig(cfg);
-    if (!ok || !oneSignalApi) {
-      return;
+    if (attempt < maxAttempts) {
+      await delayMs(baseDelayMs * 2 ** (attempt - 1));
     }
-    await applyUserIdentity(user);
-    refreshFromSdk();
-  } catch {
-    /* falha sanitizada no sync automático — diagnóstico regista a etapa */
   }
+
+  recordPushDiagnosticEvent("identity_sync_exhausted", {
+    externalId,
+    reason: lastResult.reason,
+    attempts: lastResult.attempts,
+  });
+  return lastResult;
 }
 
 export async function oneSignalLogout() {
+  recordPushDiagnosticEvent("identity_logout_started", {});
   invalidateIdentitySyncCache();
   if (!oneSignalApi || !oneSignalReady) {
     setPushStatus({ externalUserId: null });
+    recordPushDiagnosticEvent("identity_logout_completed", {
+      reason: "sdk_not_ready",
+    });
     return;
   }
   try {
     await oneSignalApi.logout();
-  } catch {
-    /* noop — não bloqueia logout */
+    recordPushDiagnosticEvent("identity_logout_completed", { ok: true });
+  } catch (e) {
+    recordPushDiagnosticEvent("identity_logout_completed", {
+      ok: false,
+      reason: e?.message || "logout_error",
+    });
   } finally {
     invalidateIdentitySyncCache();
     setPushStatus({ externalUserId: null });
