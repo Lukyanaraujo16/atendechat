@@ -22,6 +22,7 @@ import {
   setPushLifecycleStage,
   __resetPushDiagnosticsForTests,
 } from "../utils/oneSignalPushDiagnostics";
+import { resolveOneSignalNotificationPath } from "../utils/oneSignalNotificationDeepLink";
 import {
   assertExternalIdIsNotCompanyId,
   buildOneSignalIdentitySyncKey,
@@ -270,20 +271,12 @@ function registerTicketDeepLinkOnNotificationClick(OneSignal) {
           (typeof n?.additionalData === "function" ? n.additionalData() : n?.additionalData) ||
           n?.data ||
           {};
-        const ticketUuid =
-          data?.ticketUuid != null && String(data.ticketUuid).trim() !== ""
-            ? String(data.ticketUuid).trim()
-            : null;
-        const ticketId =
-          data?.ticketId != null && String(data.ticketId).trim() !== ""
-            ? String(data.ticketId).trim()
-            : null;
-        const pathId = ticketUuid || ticketId;
-        if (!pathId || typeof window === "undefined") {
+        const path = resolveOneSignalNotificationPath(data);
+        if (!path || typeof window === "undefined") {
           return;
         }
         const base = publicUrlBase();
-        const url = `${base}/tickets/${encodeURIComponent(pathId)}`;
+        const url = `${base}${path.startsWith("/") ? path : `/${path}`}`;
         if (typeof event?.preventDefault === "function") {
           event.preventDefault();
         }

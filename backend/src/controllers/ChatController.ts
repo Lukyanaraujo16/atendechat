@@ -12,6 +12,7 @@ import MarkChatAsReadService from "../services/ChatService/MarkChatAsReadService
 import Chat from "../models/Chat";
 import CreateMessageService from "../services/ChatService/CreateMessageService";
 import CreateMediaMessageService from "../services/ChatService/CreateMediaMessageService";
+import notifyInternalChatMessage from "../services/OneSignalPush/notifyInternalChatMessage";
 import User from "../models/User";
 import ChatUser from "../models/ChatUser";
 import path from "path";
@@ -161,6 +162,17 @@ export const saveMessage = async (
     chat
   });
 
+  void notifyInternalChatMessage({
+    companyId,
+    chatId,
+    messageId: Number(newMessage.id),
+    senderUserId: senderId,
+    senderName: (newMessage as any)?.sender?.name || null,
+    messageText: newMessage.message,
+    mediaType: (newMessage as any)?.mediaType || null,
+    mimeType: (newMessage as any)?.mimeType || null
+  });
+
   return res.json(newMessage);
 };
 
@@ -228,6 +240,17 @@ export const saveMessageWithMedia = async (
     action: "new-message",
     newMessage,
     chat
+  });
+
+  void notifyInternalChatMessage({
+    companyId,
+    chatId,
+    messageId: Number(newMessage.id),
+    senderUserId: senderId,
+    senderName: (newMessage as any)?.sender?.name || null,
+    messageText: newMessage.message,
+    mediaType: (newMessage as any)?.mediaType || null,
+    mimeType: (newMessage as any)?.mimeType || null
   });
 
   return res.json(newMessage);

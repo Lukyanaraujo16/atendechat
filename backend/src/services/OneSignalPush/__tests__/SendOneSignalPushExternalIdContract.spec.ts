@@ -143,4 +143,62 @@ describe("SendOneSignalPushNotificationService — external id contract (2.13E)"
       "1"
     ]);
   });
+
+  it("chat interno: External IDs individuais e preferenceCategory null", async () => {
+    const { filterOutUsersViewingTicket } = jest.requireMock(
+      "../../../libs/cache"
+    );
+    await SendOneSignalPushNotificationService({
+      eventType: "internal_chat_message",
+      preferenceCategory: null,
+      companyId: 1,
+      chatId: 10,
+      ticketId: null,
+      applyActiveTicketViewFilter: false,
+      recipientUserIds: [25],
+      title: "Nova mensagem no chat interno",
+      body: "A: oi",
+      data: {
+        type: "internal_chat_message",
+        companyId: 1,
+        chatId: 10,
+        chatUuid: "c-uuid",
+        targetUrl: "/chats/c-uuid"
+      }
+    });
+    expect(filterOutUsersViewingTicket).not.toHaveBeenCalled();
+    expect(axiosPost.mock.calls[0][1].include_external_user_ids).toEqual([
+      "25"
+    ]);
+    expect(axiosPost.mock.calls[0][1].include_external_user_ids).not.toEqual([
+      "1"
+    ]);
+    expect(axiosPost.mock.calls[0][1].data.type).toBe("internal_chat_message");
+  });
+
+  it("usuários distintos mesma empresa: só o destinatário real", async () => {
+    await SendOneSignalPushNotificationService({
+      eventType: "internal_chat_message",
+      preferenceCategory: null,
+      companyId: 1,
+      chatId: 11,
+      applyActiveTicketViewFilter: false,
+      recipientUserIds: [25],
+      excludeUserIds: [26],
+      title: "t",
+      body: "b",
+      data: {
+        type: "internal_chat_message",
+        companyId: 1,
+        chatId: 11,
+        targetUrl: "/chats/11"
+      }
+    });
+    expect(axiosPost.mock.calls[0][1].include_external_user_ids).toEqual([
+      "25"
+    ]);
+    expect(axiosPost.mock.calls[0][1].include_external_user_ids).not.toContain(
+      "26"
+    );
+  });
 });

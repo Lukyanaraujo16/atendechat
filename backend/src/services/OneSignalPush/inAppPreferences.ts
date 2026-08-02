@@ -95,9 +95,14 @@ export async function isInAppNotificationAllowed(
   return categoryAllowedInApp(prefs, category);
 }
 
+/**
+ * Mapeia eventType de push → categoria in-app.
+ * `null` = sem filtro de preferência (ex.: chat interno — sem coluna dedicada).
+ */
 export function pushEventTypeToInAppCategory(
   eventType: string
-): InAppPreferenceCategory {
+): InAppPreferenceCategory | null {
+  if (eventType === "internal_chat_message") return null;
   if (eventType === "ticket_message_inbound") return "message";
   if (eventType === "ticket_assigned") return "assigned";
   if (eventType === "ticket_queue_transfer") return "transfer";

@@ -305,7 +305,51 @@ Esperado: HTTP 200, JavaScript; OneSignal com `importScripts` v16; Workbox em
 - Sem JWT no OneSignal; logs mascaram subscription/token.
 - Sem unregister global / limpeza automática de storage.
 
-## Envio (inalterado)
+## Envio backend
 
-`SendOneSignalPushNotificationService` → `include_external_user_ids`.
-Sem tabela local de device subscriptions.
+`SendOneSignalPushNotificationService` → `include_external_user_ids: String(userId)`.
+Sem tabela local de device subscriptions. Sem `include_subscription_ids`.
+`companyId` nunca é destinatário (só contexto/tenant e tags).
+
+### Eventos de ticket
+
+| eventType | Quando | Destinatários |
+|-----------|--------|---------------|
+| `ticket_pending_new` | 1ª mensagem pending sem assignee | admins + supervisores + fila (ou allTicket/contingência) |
+| `ticket_message_inbound` | mensagem inbound | assignee; senão fila; senão regra pending |
+| `ticket_assigned` | novo responsável | só o assignee |
+| `ticket_queue_transfer` | mudança de fila | regra pending/queue da nova fila |
+| `ticket_returned_pending` | status → pending | regra pending/queue |
+
+- `fromMe === true` → sem push inbound.
+- Dedupe Redis: `os_push_dedupe:msg:{messageId}` (TTL 120s); fail-open se Redis cair.
+- Filtro `active_view` (ticket aberto na UI) + preferências push por categoria.
+- Super (`super: true`) excluído das listas do tenant.
+
+### Evento chat interno (Fase 2.14B)
+
+| eventType | Quando | Destinatários |
+|-----------|--------|---------------|
+| `internal_chat_message` | após persistir mensagem (texto/mídia) + emit Socket.IO | membros do chat, mesma empresa, ativos, não-super, **exceto remetente** |
+
+- Dispatcher: `notifyInternalChatMessage` → `SendOneSignalPushNotificationService`.
+- External ID individual: `String(user.id)` (ex.: empresa 1, user 25 → `["25"]`).
+- Dedupe: `os_push_dedupe:internal-chat:msg:{messageId}` (TTL 120s).
+- Preferência dedicada de chat interno: **não existe** (sem migration nesta fase); envio com `preferenceCategory: null` (default habilitado).
+- **Não** reutiliza preferência de ticket message / new ticket.
+- Deep link: `data.type = internal_chat_message`, `chatId` / `chatUuid`, `targetUrl = /chats/{uuid|id}`.
+- Falha OneSignal: best-effort; mensagem e socket **não** são revertidos.
+
+### Camadas UI vs push
+
+| Estado | Chat interno | Ticket |
+|--------|--------------|--------|
+| Aba visível | Socket → toast/som/badge | Socket UI + OneSignal (exceto active_view) |
+| Aba oculta | Notification API + som; **também** OneSignal | Notification API + OneSignal |
+| Navegador fechado | **OneSignal** | OneSignal |
+
+Pode haver **duplicidade** alerta interno + push no chat (não há `active_view` de chat nesta fase). Online sozinho **não** silencia push.
+
+### Firefox
+
+Investigação separada (estabilidade de subscription). Não bloqueia o contrato Chrome / External ID / eventos acima.

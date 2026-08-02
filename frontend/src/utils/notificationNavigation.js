@@ -1,4 +1,5 @@
 import { hasAttendanceInboxAccess } from "./attendanceAccess";
+import { resolveOneSignalNotificationPath } from "./oneSignalNotificationDeepLink";
 
 /**
  * Navegação a partir de `UserNotification.data` (tickets, agenda, cobrança plataforma).
@@ -36,6 +37,21 @@ export function navigateFromNotificationData(data, history, options = {}) {
     history.push("/saas/companies");
     return;
   }
+
+  if (
+    d.type === "internal_chat_message" ||
+    d.chatId != null ||
+    d.chatUuid != null
+  ) {
+    const chatPath = resolveOneSignalNotificationPath(d);
+    if (chatPath) {
+      history.push(chatPath);
+    } else {
+      history.push("/chats");
+    }
+    return;
+  }
+
   if (!hasAttendanceInboxAccess(fx)) {
     return;
   }
@@ -67,6 +83,12 @@ export function notificationVisualType(notification) {
   }
   if (t.startsWith("appointment_") || d.type === "appointment") {
     return "appointment";
+  }
+  if (
+    t === "internal_chat_message" ||
+    d.type === "internal_chat_message"
+  ) {
+    return "message";
   }
   if (
     t.includes("message") ||

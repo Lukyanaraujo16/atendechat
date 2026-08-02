@@ -12,28 +12,47 @@ import {
 const ONESIGNAL_NOTIFICATIONS_URL =
   "https://api.onesignal.com/notifications";
 
-export type TicketPushNotificationData = {
+export type PushNotificationData = {
   type: string;
-  ticketId: number;
-  ticketUuid?: string;
   companyId: number;
-  status: string;
+  ticketId?: number;
+  ticketUuid?: string;
+  chatId?: number;
+  chatUuid?: string;
+  status?: string;
+  targetUrl?: string;
   meta?: Record<string, unknown>;
 };
 
-export type SendTicketPushParams = {
-  eventType: string;
-  preferenceCategory: PushPreferenceCategory;
-  companyId: number;
+/** @deprecated alias — manter compatibilidade com callers de ticket. */
+export type TicketPushNotificationData = PushNotificationData & {
   ticketId: number;
-  messageId?: string | null;
+  status: string;
+};
+
+export type SendPushParams = {
+  eventType: string;
+  /**
+   * Categoria de preferência push. `null` = sem filtro de categoria
+   * (ex.: chat interno — não há preferência dedicada sem migration).
+   */
+  preferenceCategory: PushPreferenceCategory | null;
+  companyId: number;
+  ticketId?: number | null;
+  chatId?: number | null;
+  messageId?: string | number | null;
   /** Destinatários internos (IDs de utilizador); filtros aplicam-se antes do OneSignal. */
   recipientUserIds: number[];
   title: string;
   body: string;
-  data: TicketPushNotificationData;
+  data: PushNotificationData;
   excludeUserIds?: number[];
+  /** Default: true quando `ticketId` está definido. */
+  applyActiveTicketViewFilter?: boolean;
 };
+
+/** Alias histórico. */
+export type SendTicketPushParams = SendPushParams;
 
 function summarizeApiResponse(data: unknown): Record<string, unknown> {
   if (data == null || typeof data !== "object") {
@@ -50,19 +69,25 @@ function summarizeApiResponse(data: unknown): Record<string, unknown> {
 }
 
 const SendOneSignalPushNotificationService = async (
-  params: SendTicketPushParams
+  params: SendPushParams
 ): Promise<void> => {
   const {
     eventType,
     preferenceCategory,
     companyId,
-    ticketId,
+    ticketId = null,
+    chatId = null,
     messageId,
     title,
     body,
     data,
     excludeUserIds = []
   } = params;
+
+  const applyActiveTicketViewFilter =
+    params.applyActiveTicketViewFilter !== undefined
+      ? params.applyActiveTicketViewFilter
+      : ticketId != null && !Number.isNaN(Number(ticketId));
 
   const exclude = new Set(
     excludeUserIds.map(id => String(id)).filter(Boolean)
@@ -81,6 +106,7 @@ const SendOneSignalPushNotificationService = async (
     preferenceCategory,
     companyId,
     ticketId,
+    chatId,
     messageId,
     recipientsBeforeFilters,
     skippedActiveView: [] as number[],
@@ -90,30 +116,35 @@ const SendOneSignalPushNotificationService = async (
 
   if (!recipientsBeforeFilters.length) {
     logger.info(
-      { ...logBase, skipped: "no_recipients_before_filters" },
+      { ...logBase, skipped: "no_recipients_before_filters", recipientCount: 0 },
       "[OneSignalPush]"
     );
     return;
   }
 
-  const { kept: afterActiveView, skippedActiveView } =
-    await filterOutUsersViewingTicket(
+  let afterActiveView = recipientsBeforeFilters;
+  if (applyActiveTicketViewFilter && ticketId != null) {
+    const filtered = await filterOutUsersViewingTicket(
       companyId,
-      ticketId,
+      Number(ticketId),
       recipientsBeforeFilters
     );
+    afterActiveView = filtered.kept;
+    logBase.skippedActiveView = filtered.skippedActiveView;
+  }
 
-  logBase.skippedActiveView = skippedActiveView;
-
-  const prefMap = await loadEffectivePreferencesMap(companyId, afterActiveView);
-  const { kept: finalUserIds, skippedByPreferences } =
-    filterUserIdsByPushPreference(
+  let finalUserIds = afterActiveView;
+  if (preferenceCategory != null) {
+    const prefMap = await loadEffectivePreferencesMap(companyId, afterActiveView);
+    const filteredPrefs = filterUserIdsByPushPreference(
       afterActiveView,
       preferenceCategory,
       prefMap
     );
+    finalUserIds = filteredPrefs.kept;
+    logBase.skippedByPreferences = filteredPrefs.skippedByPreferences;
+  }
 
-  logBase.skippedByPreferences = skippedByPreferences;
   logBase.finalRecipients = finalUserIds;
 
   if (finalUserIds.length === 0) {
@@ -131,14 +162,15 @@ const SendOneSignalPushNotificationService = async (
 
   const inAppPayload: Record<string, unknown> = {
     type: data.type,
-    ticketId: data.ticketId,
-    ticketUuid: data.ticketUuid,
-    companyId: data.companyId,
-    status: data.status
+    companyId: data.companyId
   };
-  if (data.meta != null) {
-    inAppPayload.meta = data.meta;
-  }
+  if (data.ticketId != null) inAppPayload.ticketId = data.ticketId;
+  if (data.ticketUuid != null) inAppPayload.ticketUuid = data.ticketUuid;
+  if (data.chatId != null) inAppPayload.chatId = data.chatId;
+  if (data.chatUuid != null) inAppPayload.chatUuid = data.chatUuid;
+  if (data.status != null) inAppPayload.status = data.status;
+  if (data.targetUrl != null) inAppPayload.targetUrl = data.targetUrl;
+  if (data.meta != null) inAppPayload.meta = data.meta;
 
   try {
     await persistInAppNotificationsFromPush({
@@ -151,7 +183,7 @@ const SendOneSignalPushNotificationService = async (
     });
   } catch (err) {
     logger.warn(
-      { err, eventType, companyId, ticketId },
+      { err, eventType, companyId, ticketId, chatId },
       "[UserNotification] batch_persist_failed"
     );
   }
