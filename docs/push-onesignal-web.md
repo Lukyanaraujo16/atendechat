@@ -61,17 +61,63 @@ Estados: `unsupported`, `not_configured`, `sdk_loading`, `permission_default`,
 1. Validar config (enabled + App ID).
 2. `init` com path raiz + scope `/push/onesignal/`.
 3. Relê `optedIn` / id / token do SDK.
-4. Se já inscrito → `login(userId)` e sucesso.
+4. Se já inscrito → `login(externalId)` e sucesso.
 5. Se `denied` → orientar bloqueio.
-6. `optIn()` → aguardar confirmação.
-7. `login(userId)` + tags.
+6. `optIn()` → aguardar confirmação (`optedIn` + id/token).
+7. `login(externalId)` (aguardar) → depois tags.
 8. Banner some **só** em `subscribed`.
+
+## Identidade individual (Fase 2.13E)
+
+| Camada | Identificador | Valor |
+|--------|---------------|-------|
+| Frontend `OneSignal.login` | External ID | `String(user.id)` |
+| Backend envio | `include_external_user_ids` | `String(userId)` dos destinatários |
+| Tags | metadados | `user_id`, `company_id`, `profile`, `queue_ids` |
+| Logout | — | `OneSignal.logout()` sem `optOut` |
+
+**Contrato:** External ID = utilizador, **nunca** `companyId`.
+
+Exemplos:
+
+- user `id=25`, `companyId=1` → login/envio `"25"`; tag `company_id="1"`
+- user `id=26`, `companyId=1` → login/envio `"26"` (entrega individual na mesma empresa)
+
+`companyId`, `profile` e filas são **só tags**, não identidade.
+
+### Ordem e deduplicação
+
+1. subscription confirmada
+2. `login(externalId)` (single-flight)
+3. `addTags` só após login
+4. sync idêntico reutiliza Promise / cache (evita HTTP 409 por PATCH repetido)
+5. falha limpa o in-flight para retry; logout invalida o cache
+
+### Chrome + Firefox
+
+Mesmo External ID (`"25"`); Subscription IDs distintos; OneSignal mantém
+múltiplas subscriptions por utilizador. O frontend **não** remove a do Chrome
+ao ligar o Firefox.
+
+### SupportMode
+
+External ID = utilizador autenticado da sessão (ex.: Super Admin), **não** o
+`companyId` do tenant visitado. O tenant entra só como tag `company_id`.
+
+### Troubleshooting 400 / 409
+
+| Erro | Causa típica | Mitigação 2.13E |
+|------|--------------|-----------------|
+| HTTP 400 login `externalId` = companyId | identidade trocada / corrida | resolver só `user.id` + single-flight |
+| HTTP 409 tags | vários `addTags` simultâneos | serializar login→tags + dedupe |
+
+Diagnóstico: `identity_sync_*`, `identity_login_*`, `tags_sync_*`,
+`identity_sync_deduplicated` (sem JWT/token/ID completos).
 
 ## Identidade por navegador
 
 - Cada browser gera **Subscription ID** próprio (Chrome ≠ Firefox).
-- External ID partilhado: `String(user.id)`.
-- Backend: `include_external_user_ids` (inalterado nesta fase).
+- External ID partilhado: `String(user.id)` (igual ao backend).
 - Logout: `OneSignal.logout()`; **sem** `optOut` físico.
 
 ## Diagnóstico

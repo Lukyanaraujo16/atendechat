@@ -218,7 +218,12 @@ describe("oneSignalPushDiagnostics (2.13D)", () => {
     const tl = getPushDiagnosticTimeline();
     expect(tl.some((e) => e.name === "optin_resolved")).toBe(true);
     expect(tl.some((e) => e.name === "subscription_change_received")).toBe(true);
-    expect(tl.some((e) => e.name === "login_started")).toBe(true);
+    expect(
+      tl.some(
+        (e) =>
+          e.name === "login_started" || e.name === "identity_login_started"
+      )
+    ).toBe(true);
   });
 
   it("timeout é diagnosticado quando id/token não chegam", async () => {
@@ -306,7 +311,9 @@ describe("oneSignalPushDiagnostics (2.13D)", () => {
     expect(order.indexOf("optin")).toBeLessThan(order.indexOf("login"));
     const tl = getPushDiagnosticTimeline();
     const optIdx = tl.findIndex((e) => e.name === "optin_resolved");
-    const loginIdx = tl.findIndex((e) => e.name === "login_started");
+    const loginIdx = tl.findIndex(
+      (e) => e.name === "login_started" || e.name === "identity_login_started"
+    );
     expect(optIdx).toBeGreaterThanOrEqual(0);
     expect(loginIdx).toBeGreaterThan(optIdx);
   });

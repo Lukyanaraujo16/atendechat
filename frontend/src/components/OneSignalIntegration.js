@@ -1,6 +1,6 @@
 /**
  * Arranque global: OneSignal (script raiz, scope /push/onesignal/) + PWA/Workbox (scope /);
- * após login, associa utilizador e tags.
+ * após login, associa utilizador e tags (single-flight no serviço).
  */
 import React, { useContext, useEffect, useState } from "react";
 import { AuthContext } from "../context/Auth/AuthContext";
@@ -10,6 +10,7 @@ import {
   refreshOneSignalPushStatus,
   exposeOneSignalPushDiagnosticsGlobal,
 } from "../services/oneSignalService";
+import { oneSignalTagsSignature, buildOneSignalIdentityTags, resolveOneSignalExternalId } from "../utils/oneSignalIdentity";
 
 export default function OneSignalIntegration() {
   const { user, isAuth } = useContext(AuthContext);
@@ -30,22 +31,28 @@ export default function OneSignalIntegration() {
     return () => {
       cancelled = true;
     };
+    // Bootstrap uma vez; user para diagnóstico é atualizado noutro efeito.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     exposeOneSignalPushDiagnosticsGlobal(user);
   }, [user?.id, user?.super, user?.supportMode]);
 
-  const queueKey = Array.isArray(user?.queues)
-    ? user.queues.map((q) => q.id).join(",")
+  const externalId = resolveOneSignalExternalId(user);
+  const tagsKey = user
+    ? oneSignalTagsSignature(buildOneSignalIdentityTags(user, externalId || ""))
     : "";
 
   useEffect(() => {
-    if (!booted || !isAuth || !user?.id) {
+    if (!booted || !isAuth || !externalId) {
       return;
     }
     syncOneSignalUser(user);
-  }, [booted, isAuth, user?.id, user?.companyId, user?.profile, queueKey]);
+    // Dedup real ocorre no serviço (single-flight + cache de tags).
+    // Dispara só quando identidade ou tags relevantes mudam — não a cada render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [booted, isAuth, externalId, tagsKey]);
 
   return null;
 }

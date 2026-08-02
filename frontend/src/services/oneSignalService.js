@@ -22,6 +22,14 @@ import {
   setPushLifecycleStage,
   __resetPushDiagnosticsForTests,
 } from "../utils/oneSignalPushDiagnostics";
+import {
+  assertExternalIdIsNotCompanyId,
+  buildOneSignalIdentitySyncKey,
+  buildOneSignalIdentityTags,
+  oneSignalTagsSignature,
+  resolveOneSignalCompanyIdTag,
+  resolveOneSignalExternalId,
+} from "../utils/oneSignalIdentity";
 
 /** Instância do namespace OneSignal após `init` (SDK Web v16 via CDN). */
 let oneSignalApi = null;
@@ -33,6 +41,13 @@ let lastConfig = null;
 let statusListenersAttached = false;
 let identityUserId = null;
 let enableInFlight = null;
+/** Single-flight da sincronização login → tags. */
+let identitySyncInFlight = null;
+let identitySyncInFlightKey = null;
+/** Último sync concluído com sucesso (evita PATCH 409 repetidos). */
+let lastIdentitySync = null;
+/** Contagem de tentativas de identity sync (diagnóstico). */
+let identitySyncAttempt = 0;
 
 let pushStatus = {
   domainState: PUSH_DOMAIN_STATES.NOT_CONFIGURED,
@@ -655,43 +670,178 @@ export async function refreshOneSignalPushStatus() {
 }
 
 async function applyUserIdentity(user) {
-  if (!user?.id || !oneSignalApi) {
-    return;
+  if (!oneSignalApi) {
+    return { ok: false, reason: "sdk_not_ready" };
   }
-  try {
-    recordPushDiagnosticEvent("login_started", {
-      externalIdExpected: String(user.id),
+
+  const externalId = resolveOneSignalExternalId(user);
+  if (!externalId) {
+    recordPushDiagnosticEvent("identity_login_failed", {
+      reason: "missing_user_id",
     });
-    setPushLifecycleStage("login_started");
-    await oneSignalApi.login(String(user.id));
-    identityUserId = String(user.id);
-    recordPushDiagnosticEvent("login_completed", {
-      externalIdApplied: identityUserId,
+    return { ok: false, reason: "missing_user_id" };
+  }
+
+  const companyIdTag = resolveOneSignalCompanyIdTag(user);
+  const ambiguity = assertExternalIdIsNotCompanyId(externalId, companyIdTag);
+  const tags = buildOneSignalIdentityTags(user, externalId);
+  const tagsSig = oneSignalTagsSignature(tags);
+  const snap = readSubscriptionSnapshot(oneSignalApi);
+  const appId = lastConfig?.onesignalAppId || pushStatus.onesignalAppId || "";
+  const syncKey = buildOneSignalIdentitySyncKey({
+    appId,
+    externalId,
+    subscriptionId: snap.subscriptionId || "",
+  });
+
+  // Dedup: mesma identidade + mesmas tags já aplicadas.
+  if (
+    lastIdentitySync &&
+    lastIdentitySync.key === syncKey &&
+    lastIdentitySync.tagsSignature === tagsSig &&
+    identityUserId === externalId
+  ) {
+    recordPushDiagnosticEvent("identity_sync_deduplicated", {
+      externalId,
+      companyIdTag,
+      ambiguous: ambiguity.reason === "external_id_equals_company_id_ambiguous",
     });
-    const companyId = user.companyId ?? localStorage.getItem("companyId") ?? "";
-    const queueIds = Array.isArray(user.queues)
-      ? user.queues.map((q) => q.id).filter((id) => id != null).join(",")
-      : "";
-    if (oneSignalApi.User && typeof oneSignalApi.User.addTags === "function") {
-      oneSignalApi.User.addTags({
-        user_id: String(user.id),
-        company_id: String(companyId),
-        profile: String(user.profile || ""),
-        queue_ids: queueIds || "none",
+    return { ok: true, deduplicated: true, externalId };
+  }
+
+  // Single-flight: callers concorrentes reutilizam a mesma Promise.
+  if (identitySyncInFlight && identitySyncInFlightKey === syncKey) {
+    recordPushDiagnosticEvent("identity_sync_deduplicated", {
+      externalId,
+      reason: "in_flight",
+    });
+    return identitySyncInFlight;
+  }
+
+  identitySyncAttempt += 1;
+  const attempt = identitySyncAttempt;
+  recordPushDiagnosticEvent("identity_sync_started", {
+    externalId,
+    companyIdTag,
+    attempt,
+    ambiguous: ambiguity.reason === "external_id_equals_company_id_ambiguous",
+  });
+  setPushLifecycleStage("identity_sync_started");
+
+  identitySyncInFlightKey = syncKey;
+  identitySyncInFlight = (async () => {
+    try {
+      // Defesa: External ID nunca deve ser companyId quando user.id é outro valor.
+      if (
+        companyIdTag &&
+        externalId === companyIdTag &&
+        user?.id != null &&
+        String(user.id) !== companyIdTag
+      ) {
+        const err = new Error("external_id_would_be_company_id");
+        recordPushDiagnosticEvent("identity_login_failed", {
+          error: err,
+          externalId,
+          companyIdTag,
+          attempt,
+        });
+        throw err;
+      }
+
+      recordPushDiagnosticEvent("identity_login_started", {
+        externalId,
+        attempt,
       });
-      recordPushDiagnosticEvent("tags_completed");
+      setPushLifecycleStage("login_started");
+      await oneSignalApi.login(externalId);
+      identityUserId = externalId;
+      recordPushDiagnosticEvent("identity_login_completed", {
+        externalIdApplied: identityUserId,
+        attempt,
+      });
+
+      if (
+        lastIdentitySync &&
+        lastIdentitySync.key === syncKey &&
+        lastIdentitySync.tagsSignature === tagsSig
+      ) {
+        recordPushDiagnosticEvent("identity_sync_deduplicated", {
+          externalId,
+          reason: "tags_unchanged_after_login",
+        });
+      } else if (
+        oneSignalApi.User &&
+        typeof oneSignalApi.User.addTags === "function"
+      ) {
+        recordPushDiagnosticEvent("tags_sync_started", {
+          externalId,
+          tagsSignature: tagsSig,
+          attempt,
+        });
+        setPushLifecycleStage("tags_sync_started");
+        // Aguardar login antes das tags — evita 409 por corrida.
+        oneSignalApi.User.addTags(tags);
+        recordPushDiagnosticEvent("tags_sync_completed", {
+          externalId,
+          tagsSignature: tagsSig,
+          attempt,
+        });
+      }
+
+      lastIdentitySync = {
+        key: syncKey,
+        tagsSignature: tagsSig,
+        externalId,
+        completedAt: Date.now(),
+      };
+      setPushLifecycleStage("tags_completed");
+      setPushStatus({ externalUserId: identityUserId });
+      return { ok: true, externalId, attempt };
+    } catch (e) {
+      const stage =
+        e?.message === "external_id_would_be_company_id"
+          ? "identity_login_failed"
+          : identityUserId === externalId
+            ? "tags_sync_failed"
+            : "identity_login_failed";
+      recordPushDiagnosticEvent(stage, {
+        error: e,
+        externalId,
+        companyIdTag,
+        attempt,
+      });
+      if (stage === "identity_login_failed") {
+        logPush("identity_login_failed", { message: e?.message || "unknown" });
+      } else {
+        recordPushDiagnosticEvent("tags_sync_failed", {
+          error: e,
+          attempt,
+        });
+      }
+      setPushLifecycleStage(stage);
+      // Falha limpa o in-flight para permitir retry; não marca lastIdentitySync.
+      throw e;
+    } finally {
+      if (identitySyncInFlightKey === syncKey) {
+        identitySyncInFlight = null;
+        identitySyncInFlightKey = null;
+      }
     }
-    setPushLifecycleStage("tags_completed");
-    setPushStatus({ externalUserId: identityUserId });
-  } catch (e) {
-    logPush("identity_login_failed", { message: e?.message || "unknown" });
-    setPushLifecycleStage("login_failed");
-    throw e;
-  }
+  })();
+
+  return identitySyncInFlight;
+}
+
+function invalidateIdentitySyncCache() {
+  identitySyncInFlight = null;
+  identitySyncInFlightKey = null;
+  lastIdentitySync = null;
+  identityUserId = null;
 }
 
 export async function syncOneSignalUser(user) {
-  if (!user?.id) {
+  const externalId = resolveOneSignalExternalId(user);
+  if (!externalId) {
     return;
   }
   try {
@@ -706,22 +856,22 @@ export async function syncOneSignalUser(user) {
     await applyUserIdentity(user);
     refreshFromSdk();
   } catch {
-    /* falha silenciosa no sync automático */
+    /* falha sanitizada no sync automático — diagnóstico regista a etapa */
   }
 }
 
 export async function oneSignalLogout() {
+  invalidateIdentitySyncCache();
   if (!oneSignalApi || !oneSignalReady) {
-    identityUserId = null;
     setPushStatus({ externalUserId: null });
     return;
   }
   try {
     await oneSignalApi.logout();
   } catch {
-    /* noop */
+    /* noop — não bloqueia logout */
   } finally {
-    identityUserId = null;
+    invalidateIdentitySyncCache();
     setPushStatus({ externalUserId: null });
     refreshFromSdk();
   }
@@ -961,7 +1111,7 @@ export async function requestOneSignalPushPermission() {
  */
 export async function getOneSignalPushDiagnostics() {
   refreshFromSdk();
-  return buildOneSignalPushDiagnostics({
+  const base = await buildOneSignalPushDiagnostics({
     status: getOneSignalPushStatus(),
     oneSignalApi,
     sdkLoaded:
@@ -972,6 +1122,17 @@ export async function getOneSignalPushDiagnostics() {
     subscriptionWaitMs: SUBSCRIPTION_WAIT_MS,
     permissionWaitMs: PERMISSION_WAIT_MS,
   });
+  return {
+    ...base,
+    identitySync: {
+      attempt: identitySyncAttempt,
+      inFlight: Boolean(identitySyncInFlight),
+      lastExternalId: lastIdentitySync?.externalId || identityUserId,
+      lastTagsSignature: lastIdentitySync?.tagsSignature || null,
+      supportModeNote:
+        "External ID = utilizador autenticado da sessão; companyId do tenant é só tag.",
+    },
+  };
 }
 
 /**
@@ -1008,8 +1169,9 @@ export function __resetOneSignalServiceForTests() {
   sdkLoading = false;
   lastConfig = null;
   statusListenersAttached = false;
-  identityUserId = null;
   enableInFlight = null;
+  invalidateIdentitySyncCache();
+  identitySyncAttempt = 0;
   SUBSCRIPTION_WAIT_MS = SUBSCRIPTION_WAIT_MS_DEFAULT;
   PERMISSION_WAIT_MS = PERMISSION_WAIT_MS_DEFAULT;
   statusListeners.clear();
