@@ -11,6 +11,11 @@ import {
   parseAiAgentModelForProvider
 } from "./aiAgentValidation";
 import { parseAiAgentHandoffSignal } from "./parseAiAgentHandoffSignal";
+import { formatAiAgentSignedMessage } from "./formatAiAgentSignedMessage";
+import {
+  buildAiAgentHandoffTransitionMessage,
+  sanitizeAiAgentClientFacingText
+} from "./buildAiAgentHandoffTransitionMessage";
 import { buildSimulationContextMessages } from "./buildSimulationContextMessages";
 import { findSimulationSessionOrThrow } from "./aiAgentSimulationSerialization";
 import AiAgentSimulationMessage from "../../models/AiAgentSimulationMessage";
@@ -484,17 +489,32 @@ export async function sendAiAgentSimulationMessage(input: {
   const handoff = parseAiAgentHandoffSignal(result.text);
   const handoffSuggested =
     handoff.handoffRequested || knowledgeApplied.forceHandoff;
+  const signedAssistant = formatAiAgentSignedMessage({
+    agentName: agent.name,
+    content: sanitizeAiAgentClientFacingText(
+      handoff.cleanText ||
+        (handoffSuggested
+          ? buildAiAgentHandoffTransitionMessage({
+              reason: handoff.handoffReason || "knowledge_missing",
+              configuredHandoffMessage: agent.handoffMessage,
+              tone: profile?.tone || "professional"
+            })
+          : "")
+    )
+  });
   const successMeta = {
     ...(knowledgeMeta || {}),
     ...(functionCallingTrace
       ? { functionCalling: functionCallingTrace }
-      : {})
+      : {}),
+    messageSigned: signedAssistant.signed,
+    handoffSuggested
   };
   const assistantRow = await AiAgentSimulationMessage.create({
     companyId: input.companyId,
     sessionId: session.id,
     role: "assistant",
-    content: handoff.cleanText,
+    content: signedAssistant.body || handoff.cleanText,
     provider: result.provider || resolved.provider,
     model: result.model || model,
     promptTokens: result.promptTokens ?? null,

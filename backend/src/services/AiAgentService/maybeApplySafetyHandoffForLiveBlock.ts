@@ -1,10 +1,15 @@
+import AiAgent from "../../models/AiAgent";
 import Ticket from "../../models/Ticket";
-import applyAiAgentHandoffToTicket from "./applyAiAgentHandoffToTicket";
+import executeAiAgentHandoffWithTransition from "./executeAiAgentHandoffWithTransition";
+import { loadAiAgentProfileForRuntime } from "./resolveAiAgentBusinessPrompt";
+import { logger } from "../../utils/logger";
 
 export async function maybeApplySafetyHandoffForLiveBlock(input: {
   ticket: Ticket;
   companyId: number;
   errorCode: string;
+  agent?: AiAgent | null;
+  aiAgentRuntimeLogId?: number | null;
 }): Promise<void> {
   if (input.ticket.aiAgentHandoffRequested === true) {
     return;
@@ -20,10 +25,36 @@ export async function maybeApplySafetyHandoffForLiveBlock(input: {
     return;
   }
 
-  await applyAiAgentHandoffToTicket({
+  // Sem agente não há como assinar/enviar transição — não transferir silenciosamente.
+  if (!input.agent) {
+    logger.warn(
+      {
+        event: "ai_agent.handoff_failed",
+        companyId: input.companyId,
+        ticketId: input.ticket.id,
+        reason,
+        result: "missing_agent_for_transition"
+      },
+      "ai_agent.handoff_failed"
+    );
+    return;
+  }
+
+  const profile = await loadAiAgentProfileForRuntime({
+    companyId: input.companyId,
+    aiAgentId: input.agent.id
+  });
+
+  await executeAiAgentHandoffWithTransition({
     ticket: input.ticket,
     companyId: input.companyId,
+    aiAgentId: input.agent.id,
+    agentName: input.agent.name,
+    aiAgentRuntimeLogId: input.aiAgentRuntimeLogId ?? null,
     reason,
+    configuredHandoffMessage: input.agent.handoffMessage,
+    tone: profile?.tone || "professional",
+    modelCleanText: null,
     by: "ai_agent"
   });
 }

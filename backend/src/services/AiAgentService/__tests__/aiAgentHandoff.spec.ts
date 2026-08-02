@@ -16,6 +16,16 @@ jest.mock("../knowledge/integrateKnowledgeIntoRuntime", () => ({
   resolveKnowledgeRuntimeDecision: jest.fn()
 }));
 
+/** Evita carregar database via PgVectorStore (Live FC → tools → SearchKnowledge). */
+jest.mock("../../KnowledgeBaseService/SearchKnowledgeChunksService", () => ({
+  __esModule: true,
+  default: jest.fn(async () => ({ chunks: [], maxScore: 0 }))
+}));
+
+jest.mock("../../AutomationOrchestrator/liveRollout/LiveFunctionCallingService", () => ({
+  generateLiveResponseWithOptionalFc: jest.fn()
+}));
+
 jest.mock("../knowledge/aiAgentGenerationLock", () => ({
   acquireAiAgentGenerationLock: jest
     .fn()
@@ -121,16 +131,12 @@ jest.mock("../../../helpers/companyTicketSocket", () => ({
 
 import ShowTicketService from "../../TicketServices/ShowTicketService";
 import { buildAiAgentRuntimeContext } from "../buildAiAgentRuntimeContext";
-
-const mockedBuildCtx = buildAiAgentRuntimeContext as jest.Mock;
-const mockedShowTicket = ShowTicketService as jest.Mock;
-
+import { generateLiveResponseWithOptionalFc } from "../../AutomationOrchestrator/liveRollout/LiveFunctionCallingService";
 import AiAgentRuntimeLog from "../../../models/AiAgentRuntimeLog";
 import Ticket from "../../../models/Ticket";
 import Contact from "../../../models/Contact";
 import Whatsapp from "../../../models/Whatsapp";
 import AiAgent from "../../../models/AiAgent";
-import { generateChatCompletionViaAdapter } from "../../AiProviderService/AiProviderAdapterFactory";
 import sendAiAgentWhatsappMessage from "../sendAiAgentWhatsappMessage";
 import { generateAndSendLiveResponseForLog } from "../AiAgentLiveService";
 import AiAgentOrchestrator from "../AiAgentOrchestrator";
@@ -141,8 +147,10 @@ import {
 import { InboundMessageClassification } from "../classifyInboundMessage";
 import ResumeTicketAiAgentService from "../../TicketServices/ResumeTicketAiAgentService";
 
-const mockedGenerate = generateChatCompletionViaAdapter as jest.Mock;
+const mockedBuildCtx = buildAiAgentRuntimeContext as jest.Mock;
+const mockedShowTicket = ShowTicketService as jest.Mock;
 const mockedSend = sendAiAgentWhatsappMessage as jest.Mock;
+const mockedLiveGenerate = generateLiveResponseWithOptionalFc as jest.Mock;
 
 function ticket(partial: Record<string, unknown>) {
   const row = {
@@ -227,10 +235,17 @@ describe("AiAgent handoff 1.5", () => {
       aiAgentId: 9
     });
     (AiAgent.findOne as jest.Mock).mockResolvedValue(
-      agent({ id: 9, enabled: true, model: "gpt-4o-mini", maxTokens: 256, temperature: 0.2 })
+      agent({
+        id: 9,
+        name: "Eduardo",
+        enabled: true,
+        model: "gpt-4o-mini",
+        maxTokens: 256,
+        temperature: 0.2
+      })
     );
 
-    mockedGenerate.mockResolvedValue({
+    mockedLiveGenerate.mockResolvedValue({
       ok: true,
       text: "Vou deixar disponível para um atendente.\n[HANDOFF_HUMAN]",
       provider: "openai",
@@ -238,16 +253,25 @@ describe("AiAgent handoff 1.5", () => {
       latencyMs: 100,
       promptTokens: 10,
       completionTokens: 8,
-      totalTokens: 18
+      totalTokens: 18,
+      forceHandoff: false
     });
-    mockedSend.mockResolvedValue({ ok: true, messageId: "OUT-HANDOFF" });
+    mockedSend.mockResolvedValue({
+      ok: true,
+      messageId: "OUT-HANDOFF",
+      bodySent: "Eduardo:\nVou deixar disponível para um atendente."
+    });
 
-    await generateAndSendLiveResponseForLog(80, 1, "Quero humano", textClassification);
+    await generateAndSendLiveResponseForLog(80, 1, "Quero falar com alguém", textClassification);
 
     expect(mockedSend).toHaveBeenCalledWith(
       expect.objectContaining({
-        body: "Vou deixar disponível para um atendente."
+        body: "Eduardo:\nVou deixar disponível para um atendente.",
+        alreadySigned: true
       })
+    );
+    expect(String(mockedSend.mock.calls[0][0].body).toLowerCase()).not.toMatch(
+      /humano/
     );
     expect(ticketUpdateMock).toHaveBeenCalledWith(
       expect.objectContaining({

@@ -16,6 +16,17 @@ jest.mock("../knowledge/integrateKnowledgeIntoRuntime", () => ({
   resolveKnowledgeRuntimeDecision: jest.fn()
 }));
 
+/** Evita carregar database via PgVectorStore (Live FC → tools → SearchKnowledge). */
+jest.mock("../../KnowledgeBaseService/SearchKnowledgeChunksService", () => ({
+  __esModule: true,
+  default: jest.fn(async () => ({ chunks: [], maxScore: 0 }))
+}));
+
+jest.mock("../shadowFc/ShadowFcEvaluationService", () => ({
+  scheduleShadowFcEvaluation: jest.fn(),
+  runShadowFcEvaluation: jest.fn()
+}));
+
 jest.mock("../knowledge/aiAgentGenerationLock", () => ({
   acquireAiAgentGenerationLock: jest
     .fn()

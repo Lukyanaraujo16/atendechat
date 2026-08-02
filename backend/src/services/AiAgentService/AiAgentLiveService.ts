@@ -29,8 +29,10 @@ import { validateAiAgentLiveResponse } from "./validateAiAgentLiveResponse";
 import { isFlowAutomationActive } from "./isFlowAutomationActive";
 import { isTicketIntegrationActive } from "./isTicketIntegrationActive";
 import { parseAiAgentHandoffSignal } from "./parseAiAgentHandoffSignal";
-import applyAiAgentHandoffToTicket from "./applyAiAgentHandoffToTicket";
+import executeAiAgentHandoffWithTransition from "./executeAiAgentHandoffWithTransition";
 import { maybeApplySafetyHandoffForLiveBlock } from "./maybeApplySafetyHandoffForLiveBlock";
+import { loadAiAgentProfileForRuntime } from "./resolveAiAgentBusinessPrompt";
+import { sanitizeAiAgentClientFacingText } from "./buildAiAgentHandoffTransitionMessage";
 import {
   acquireAiAgentGenerationLock,
   releaseAiAgentGenerationLock
@@ -169,7 +171,9 @@ export async function generateAndSendLiveResponseForLog(
     await maybeApplySafetyHandoffForLiveBlock({
       ticket,
       companyId,
-      errorCode: limits.errorCode
+      errorCode: limits.errorCode,
+      agent,
+      aiAgentRuntimeLogId: logId
     });
     await updateAiAgentLiveLog(logId, companyId, {
       liveStatus: AI_AGENT_LIVE_STATUSES.SKIPPED,
@@ -290,22 +294,62 @@ export async function generateAndSendLiveResponseForLog(
       handoffSignal.handoffReason =
         handoffSignal.handoffReason || "knowledge_missing";
     }
-    const validated = validateAiAgentLiveResponse(handoffSignal.cleanText);
+
+    const profile = await loadAiAgentProfileForRuntime({
+      companyId,
+      aiAgentId: agent.id
+    });
+    const tone = profile?.tone || "professional";
+
+    const validated = validateAiAgentLiveResponse(
+      sanitizeAiAgentClientFacingText(handoffSignal.cleanText)
+    );
+
+    // Handoff com resposta inválida/vazia: envia transição obrigatória antes;
+    // nunca transferir silenciosamente.
     if (validated.ok === false) {
       if (handoffSignal.handoffRequested) {
-        await applyAiAgentHandoffToTicket({
-          ticket: freshTicket,
-          companyId,
-          reason: handoffSignal.handoffReason ?? "model_requested_handoff",
-          by: "ai_agent"
-        });
-        await mergeAiAgentLiveLogMetadata(logId, companyId, {
-          handoffRequested: true,
-          handoffReason: handoffSignal.handoffReason,
-          handoffMarkerDetected: true,
-          handoffAppliedAt: new Date().toISOString(),
-          cleanResponseLength: 0
-        });
+        const sendClaimedForHandoff = await claimLiveSending(logId, companyId);
+        if (sendClaimedForHandoff) {
+          const handoffResult = await executeAiAgentHandoffWithTransition({
+            ticket: freshTicket,
+            companyId,
+            aiAgentId: agent.id,
+            agentName: agent.name,
+            aiAgentRuntimeLogId: logId,
+            reason: handoffSignal.handoffReason ?? "model_requested_handoff",
+            configuredHandoffMessage: agent.handoffMessage,
+            tone,
+            modelCleanText: null,
+            by: "ai_agent"
+          });
+          await mergeAiAgentLiveLogMetadata(logId, companyId, {
+            handoffRequested: true,
+            handoffReason: handoffSignal.handoffReason,
+            handoffMarkerDetected: true,
+            handoffTransitionSent: handoffResult.transitionSent,
+            handoffBlocked: handoffResult.ok === false,
+            handoffAppliedAt:
+              handoffResult.ok === true ? new Date().toISOString() : null,
+            cleanResponseLength: 0
+          });
+          if (handoffResult.ok) {
+            await updateAiAgentLiveLog(logId, companyId, {
+              liveStatus: AI_AGENT_LIVE_STATUSES.SENT,
+              suggestedReply: handoffResult.transitionBody,
+              suggestionSource: "handoff_transition",
+              sentMessageId: handoffResult.messageId,
+              sentAt: new Date(),
+              deliveryStatus: AI_AGENT_LIVE_DELIVERY_STATUSES.SENT,
+              liveModel: generationAdapted.model,
+              liveProvider: generationAdapted.provider,
+              liveLatencyMs: generationAdapted.latencyMs,
+              generatedAt: new Date(),
+              errorCode: null
+            });
+            return;
+          }
+        }
       }
       await updateAiAgentLiveLog(logId, companyId, {
         liveStatus: AI_AGENT_LIVE_STATUSES.FAILED,
@@ -365,7 +409,10 @@ export async function generateAndSendLiveResponseForLog(
       return;
     }
 
-    const sendBlock = await assertTicketStillEligibleForLive(ticketBeforeSend, whatsapp);
+    const sendBlock = await assertTicketStillEligibleForLive(
+      ticketBeforeSend,
+      whatsapp
+    );
     if (sendBlock) {
       await updateAiAgentLiveLog(logId, companyId, {
         liveStatus: AI_AGENT_LIVE_STATUSES.SKIPPED,
@@ -375,26 +422,78 @@ export async function generateAndSendLiveResponseForLog(
       return;
     }
 
+    // Handoff com resposta válida: a própria resposta (sanitizada) é a transição.
+    if (handoffSignal.handoffRequested) {
+      const handoffResult = await executeAiAgentHandoffWithTransition({
+        ticket: ticketBeforeSend,
+        companyId,
+        aiAgentId: agent.id,
+        agentName: agent.name,
+        aiAgentRuntimeLogId: logId,
+        reason: handoffSignal.handoffReason ?? "model_requested_handoff",
+        configuredHandoffMessage: agent.handoffMessage,
+        tone,
+        modelCleanText: validated.text,
+        by: "ai_agent"
+      });
+      await mergeAiAgentLiveLogMetadata(logId, companyId, {
+        handoffTransitionSent: handoffResult.transitionSent,
+        handoffBlocked: handoffResult.ok === false,
+        handoffAppliedAt:
+          handoffResult.ok === true ? new Date().toISOString() : null
+      });
+      if (handoffResult.ok === false) {
+        await updateAiAgentLiveLog(logId, companyId, {
+          liveStatus: AI_AGENT_LIVE_STATUSES.FAILED,
+          sendErrorCode: AI_AGENT_LIVE_ERROR_CODES.LIVE_SEND_FAILED,
+          deliveryStatus: AI_AGENT_LIVE_DELIVERY_STATUSES.SEND_FAILED,
+          errorCode: AI_AGENT_LIVE_ERROR_CODES.LIVE_SEND_FAILED
+        });
+        logger.warn(
+          {
+            companyId,
+            logId,
+            ticketId: ticket.id,
+            error: handoffResult.error
+          },
+          "[AiAgent][live] handoff_transition_failed"
+        );
+        return;
+      }
+      await updateAiAgentLiveLog(logId, companyId, {
+        liveStatus: AI_AGENT_LIVE_STATUSES.SENT,
+        sentMessageId: handoffResult.messageId,
+        sentAt: new Date(),
+        deliveryStatus: AI_AGENT_LIVE_DELIVERY_STATUSES.SENT,
+        sendErrorCode: null,
+        suggestedReply: handoffResult.transitionBody
+      });
+      logger.info(
+        {
+          companyId,
+          ticketId: ticket.id,
+          logId,
+          model: generationAdapted.model,
+          provider: generationAdapted.provider,
+          messageId: handoffResult.messageId,
+          usedFunctionCalling: generation.usedFunctionCalling === true,
+          fallback: generation.fallback === true
+        },
+        "[AiAgent][live] handoff_transition_sent"
+      );
+      return;
+    }
+
     const sendResult = await sendAiAgentWhatsappMessage({
       ticket: ticketBeforeSend,
       body: validated.text,
       companyId,
       aiAgentId: agent.id,
-      aiAgentRuntimeLogId: logId
+      aiAgentRuntimeLogId: logId,
+      agentName: agent.name
     });
 
     if (sendResult.ok === false) {
-      if (handoffSignal.handoffRequested) {
-        await applyAiAgentHandoffToTicket({
-          ticket: ticketBeforeSend,
-          companyId,
-          reason: "handoff_pending_send_failed",
-          by: "ai_agent"
-        });
-        await mergeAiAgentLiveLogMetadata(logId, companyId, {
-          handoffAppliedAt: new Date().toISOString()
-        });
-      }
       await updateAiAgentLiveLog(logId, companyId, {
         liveStatus: AI_AGENT_LIVE_STATUSES.FAILED,
         sendErrorCode: AI_AGENT_LIVE_ERROR_CODES.LIVE_SEND_FAILED,
@@ -406,18 +505,6 @@ export async function generateAndSendLiveResponseForLog(
         "[AiAgent][live] send_failed"
       );
       return;
-    }
-
-    if (handoffSignal.handoffRequested) {
-      await applyAiAgentHandoffToTicket({
-        ticket: ticketBeforeSend,
-        companyId,
-        reason: handoffSignal.handoffReason ?? "model_requested_handoff",
-        by: "ai_agent"
-      });
-      await mergeAiAgentLiveLogMetadata(logId, companyId, {
-        handoffAppliedAt: new Date().toISOString()
-      });
     }
 
     await updateAiAgentLiveLog(logId, companyId, {

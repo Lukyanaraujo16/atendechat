@@ -377,7 +377,8 @@ export default class AiAgentOrchestrator {
           await maybeApplySafetyHandoffForLiveBlock({
             ticket: ctx.ticket,
             companyId: input.companyId,
-            errorCode: liveLimits.errorCode
+            errorCode: liveLimits.errorCode,
+            agent: ctx.aiAgent
           });
           return finish(
             deny(

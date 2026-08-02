@@ -25,7 +25,7 @@ export type LiveLogUpdateInput = {
   deliveryStatus?: string;
   contextMessageCount?: number | null;
   contextHash?: string | null;
-  suggestionSource?: "model" | null;
+  suggestionSource?: "model" | "handoff_transition" | null;
   metadataPatch?: Record<string, unknown>;
 };
 
@@ -69,7 +69,9 @@ export async function updateAiAgentLiveLog(
     }
   }
 
-  await AiAgentRuntimeLog.update(updatePayload, { where: { id: logId, companyId } });
+  await AiAgentRuntimeLog.update(updatePayload, {
+    where: { id: logId, companyId }
+  });
 }
 
 export async function mergeAiAgentLiveLogMetadata(

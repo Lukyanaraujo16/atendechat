@@ -16,6 +16,16 @@ jest.mock("../knowledge/integrateKnowledgeIntoRuntime", () => ({
   resolveKnowledgeRuntimeDecision: jest.fn()
 }));
 
+/** Evita carregar database via PgVectorStore (Live FC → tools → SearchKnowledge). */
+jest.mock("../../KnowledgeBaseService/SearchKnowledgeChunksService", () => ({
+  __esModule: true,
+  default: jest.fn(async () => ({ chunks: [], maxScore: 0 }))
+}));
+
+jest.mock("../../AutomationOrchestrator/liveRollout/LiveFunctionCallingService", () => ({
+  generateLiveResponseWithOptionalFc: jest.fn()
+}));
+
 jest.mock("../knowledge/aiAgentGenerationLock", () => ({
   acquireAiAgentGenerationLock: jest
     .fn()
@@ -123,9 +133,10 @@ import { buildAiAgentRuntimeContext } from "../buildAiAgentRuntimeContext";
 import PauseTicketAiAgentService from "../../TicketServices/PauseTicketAiAgentService";
 import ResumeTicketAiAgentService from "../../TicketServices/ResumeTicketAiAgentService";
 import { validateAiAgentLiveResponse } from "../validateAiAgentLiveResponse";
+import { generateLiveResponseWithOptionalFc } from "../../AutomationOrchestrator/liveRollout/LiveFunctionCallingService";
 import { InboundMessageClassification } from "../classifyInboundMessage";
 
-const mockedGenerate = generateChatCompletionViaAdapter as jest.Mock;
+const mockedLiveGenerate = generateLiveResponseWithOptionalFc as jest.Mock;
 const mockedSend = sendAiAgentWhatsappMessage as jest.Mock;
 const mockedBuildCtx = buildAiAgentRuntimeContext as jest.Mock;
 const mockedShowTicket = ShowTicketService as jest.Mock;
@@ -316,7 +327,8 @@ describe("AiAgent live mode 1.4", () => {
       classification: textClassification
     });
 
-    expect(mockedGenerate).not.toHaveBeenCalled();
+    expect(generateChatCompletionViaAdapter).not.toHaveBeenCalled();
+    expect(mockedLiveGenerate).not.toHaveBeenCalled();
     expect(mockedSend).not.toHaveBeenCalled();
   });
 
@@ -352,6 +364,7 @@ describe("AiAgent live mode 1.4", () => {
     (AiAgent.findOne as jest.Mock).mockResolvedValue(
       agent({
         id: 9,
+        name: "Eduardo",
         enabled: true,
         model: "gpt-4o-mini",
         maxTokens: 256,
@@ -361,7 +374,7 @@ describe("AiAgent live mode 1.4", () => {
     );
     (AiAgentRuntimeLog.update as jest.Mock).mockResolvedValue([1]);
 
-    mockedGenerate.mockResolvedValue({
+    mockedLiveGenerate.mockResolvedValue({
       ok: true,
       text: "Olá! Como posso ajudar?",
       provider: "openai",
@@ -369,14 +382,24 @@ describe("AiAgent live mode 1.4", () => {
       latencyMs: 120,
       promptTokens: 10,
       completionTokens: 8,
-      totalTokens: 18
+      totalTokens: 18,
+      forceHandoff: false
     });
-    mockedSend.mockResolvedValue({ ok: true, messageId: "OUT1" });
+    mockedSend.mockResolvedValue({
+      ok: true,
+      messageId: "OUT1",
+      bodySent: "Eduardo:\nOlá! Como posso ajudar?"
+    });
 
     await generateAndSendLiveResponseForLog(70, 1, "Preciso de ajuda", textClassification);
 
-    expect(mockedGenerate).toHaveBeenCalled();
-    expect(mockedSend).toHaveBeenCalled();
+    expect(mockedLiveGenerate).toHaveBeenCalled();
+    expect(mockedSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: "Olá! Como posso ajudar?",
+        agentName: "Eduardo"
+      })
+    );
     expect(AiAgentRuntimeLog.update).toHaveBeenCalledWith(
       expect.objectContaining({
         liveStatus: AI_AGENT_LIVE_STATUSES.SENT,

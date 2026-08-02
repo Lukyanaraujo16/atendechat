@@ -208,7 +208,7 @@ export const AI_AGENT_FORBIDDEN_ACTION_LABELS: Record<string, string> = {
 };
 
 export const AI_AGENT_HANDOFF_RULE_LABELS: Record<string, string> = {
-  customer_requests_human: "Cliente pede atendente humano",
+  customer_requests_human: "Cliente pede outro atendente da equipe",
   complaint: "Reclamação",
   angry_customer: "Cliente irritado",
   negotiation_request: "Pedido de negociação",
@@ -219,7 +219,7 @@ export const AI_AGENT_HANDOFF_RULE_LABELS: Record<string, string> = {
   technical_issue: "Problema técnico",
   missing_information: "Falta de informação",
   sensitive_subject: "Assunto sensível",
-  qualified_lead: "Lead qualificado para humano",
+  qualified_lead: "Lead qualificado para outro atendente",
   repeated_failure: "Falhas repetidas de atendimento",
   custom: "Regra personalizada"
 };
