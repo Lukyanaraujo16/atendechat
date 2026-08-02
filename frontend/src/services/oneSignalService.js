@@ -30,6 +30,17 @@ import {
   resolveOneSignalCompanyIdTag,
   resolveOneSignalExternalId,
 } from "../utils/oneSignalIdentity";
+import {
+  buildSanitizedSubscriptionSnapshot,
+  classifyInvalidTokenDeviceTypeError,
+  getLastStabilityMeta,
+  getSnapshotChangesCount,
+  isAnonymousStabilityProbeAllowed,
+  setReportedSdkVersion,
+  waitForStableSubscriptionSnapshot,
+  __resetStabilityStateForTests,
+  __setStabilityTimingForTests,
+} from "../utils/oneSignalSubscriptionStability";
 
 /** Instância do namespace OneSignal após `init` (SDK Web v16 via CDN). */
 let oneSignalApi = null;
@@ -48,6 +59,11 @@ let identitySyncInFlightKey = null;
 let lastIdentitySync = null;
 /** Contagem de tentativas de identity sync (diagnóstico). */
 let identitySyncAttempt = 0;
+/** Single-flight da espera de estabilidade. */
+let stabilityWaitInFlight = null;
+/** Modo diagnóstico: pausar antes do login (Super Admin / dev). */
+let deferLoginForProbe = false;
+let lastAnonymousProbe = null;
 
 let pushStatus = {
   domainState: PUSH_DOMAIN_STATES.NOT_CONFIGURED,
@@ -597,6 +613,18 @@ async function initOneSignalFromConfig(cfg) {
           typeof navigator !== "undefined" ? navigator.userAgent : ""
         ),
       });
+      try {
+        const ver =
+          api?.VERSION ||
+          api?.SdkVersion ||
+          api?._VERSION ||
+          (typeof window !== "undefined" && window.OneSignal?.VERSION) ||
+          null;
+        if (ver) setReportedSdkVersion(ver);
+        else setReportedSdkVersion("160609"); // CDN v16 atual (page.es6.js?v=160609)
+      } catch {
+        setReportedSdkVersion("160609");
+      }
       return true;
     } catch (e) {
       logPush("init_failed", { message: e?.message || "unknown" });
@@ -669,7 +697,24 @@ export async function refreshOneSignalPushStatus() {
   return refreshFromSdk();
 }
 
-async function applyUserIdentity(user) {
+async function ensureStableSubscriptionBeforeLogin(api) {
+  if (stabilityWaitInFlight) {
+    recordPushDiagnosticEvent("identity_sync_deduplicated", {
+      reason: "stability_in_flight",
+    });
+    return stabilityWaitInFlight;
+  }
+  stabilityWaitInFlight = (async () => {
+    try {
+      return await waitForStableSubscriptionSnapshot(api);
+    } finally {
+      stabilityWaitInFlight = null;
+    }
+  })();
+  return stabilityWaitInFlight;
+}
+
+async function applyUserIdentity(user, { skipStabilityWait = false } = {}) {
   if (!oneSignalApi) {
     return { ok: false, reason: "sdk_not_ready" };
   }
@@ -748,9 +793,53 @@ async function applyUserIdentity(user) {
         throw err;
       }
 
+      const pre = readSubscriptionSnapshot(oneSignalApi);
+      const needsStability =
+        !skipStabilityWait &&
+        (isEffectivelySubscribed(pre) || Boolean(pre.token) || Boolean(pre.subscriptionId));
+
+      let stableSnap = null;
+      if (needsStability) {
+        setPushLifecycleStage("stability_wait");
+        stableSnap = await ensureStableSubscriptionBeforeLogin(oneSignalApi);
+      }
+
+      if (deferLoginForProbe && isAnonymousStabilityProbeAllowed(user)) {
+        lastAnonymousProbe = {
+          at: new Date().toISOString(),
+          phase: "before_login",
+          stable: Boolean(stableSnap),
+          stabilityMeta: getLastStabilityMeta(),
+          snapshot: stableSnap
+            ? {
+                signature: stableSnap.signature,
+                optedIn: stableSnap.optedIn,
+                maskedSubscriptionId: stableSnap.maskedSubscriptionId,
+                endpointHost: stableSnap.endpointHost,
+                tokenHash: stableSnap.tokenHash,
+                browser: stableSnap.browser,
+                sdkVersion: stableSnap.sdkVersion,
+              }
+            : null,
+        };
+        recordPushDiagnosticEvent("anonymous_probe_captured", {
+          phase: "before_login",
+        });
+        setPushStatus({ externalUserId: null });
+        return {
+          ok: true,
+          deferredLogin: true,
+          externalId,
+          attempt,
+          probe: lastAnonymousProbe,
+        };
+      }
+
       recordPushDiagnosticEvent("identity_login_started", {
         externalId,
         attempt,
+        snapshotChangesCount: getSnapshotChangesCount(),
+        endpointHost: stableSnap?.endpointHost || null,
       });
       setPushLifecycleStage("login_started");
       await oneSignalApi.login(externalId);
@@ -798,20 +887,34 @@ async function applyUserIdentity(user) {
       setPushStatus({ externalUserId: identityUserId });
       return { ok: true, externalId, attempt };
     } catch (e) {
+      const typed = classifyInvalidTokenDeviceTypeError(e);
+      if (typed) {
+        recordPushDiagnosticEvent("onesignal_invalid_token_device_type", {
+          ...typed,
+          loginAttempt: attempt,
+          endpointHost: getLastStabilityMeta()?.endpointHost || null,
+        });
+        setPushStatus({
+          errorCode: "onesignal_invalid_token_device_type",
+        });
+      }
       const stage =
-        e?.message === "external_id_would_be_company_id"
-          ? "identity_login_failed"
-          : identityUserId === externalId
-            ? "tags_sync_failed"
-            : "identity_login_failed";
+        e?.message === "subscription_stability_timeout"
+          ? "stability_timeout"
+          : e?.message === "external_id_would_be_company_id"
+            ? "identity_login_failed"
+            : identityUserId === externalId
+              ? "tags_sync_failed"
+              : "identity_login_failed";
       recordPushDiagnosticEvent(stage, {
         error: e,
         externalId,
         companyIdTag,
         attempt,
+        typedError: typed?.code || null,
       });
-      if (stage === "identity_login_failed") {
-        logPush("identity_login_failed", { message: e?.message || "unknown" });
+      if (stage === "identity_login_failed" || stage === "stability_timeout") {
+        logPush(stage, { message: e?.message || "unknown" });
       } else {
         recordPushDiagnosticEvent("tags_sync_failed", {
           error: e,
@@ -837,6 +940,8 @@ function invalidateIdentitySyncCache() {
   identitySyncInFlightKey = null;
   lastIdentitySync = null;
   identityUserId = null;
+  stabilityWaitInFlight = null;
+  lastAnonymousProbe = null;
 }
 
 export async function syncOneSignalUser(user) {
@@ -1111,6 +1216,14 @@ export async function requestOneSignalPushPermission() {
  */
 export async function getOneSignalPushDiagnostics() {
   refreshFromSdk();
+  let liveSnap = null;
+  try {
+    if (oneSignalApi) {
+      liveSnap = await buildSanitizedSubscriptionSnapshot(oneSignalApi, "diagnostics");
+    }
+  } catch {
+    liveSnap = null;
+  }
   const base = await buildOneSignalPushDiagnostics({
     status: getOneSignalPushStatus(),
     oneSignalApi,
@@ -1124,6 +1237,7 @@ export async function getOneSignalPushDiagnostics() {
   });
   return {
     ...base,
+    sdkVersion: liveSnap?.sdkVersion || null,
     identitySync: {
       attempt: identitySyncAttempt,
       inFlight: Boolean(identitySyncInFlight),
@@ -1132,7 +1246,67 @@ export async function getOneSignalPushDiagnostics() {
       supportModeNote:
         "External ID = utilizador autenticado da sessão; companyId do tenant é só tag.",
     },
+    stability: {
+      ...getLastStabilityMeta(),
+      snapshotChangesCount: getSnapshotChangesCount(),
+      live: liveSnap
+        ? {
+            signature: liveSnap.signature,
+            optedIn: liveSnap.optedIn,
+            enabled: liveSnap.enabled,
+            notificationTypes: liveSnap.notificationTypes,
+            maskedSubscriptionId: liveSnap.maskedSubscriptionId,
+            tokenHash: liveSnap.tokenHash,
+            endpointHost: liveSnap.endpointHost,
+            webAuthHash: liveSnap.webAuthHash,
+            webP256Hash: liveSnap.webP256Hash,
+            onesignalWorkerState: liveSnap.onesignalWorkerState,
+            blocksLogin: liveSnap.blocksLogin,
+            browser: liveSnap.browser,
+          }
+        : null,
+    },
+    anonymousProbe: lastAnonymousProbe,
+    sdkPinning: {
+      supportedOfficially: false,
+      loadedFrom:
+        "https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js → page.es6.js?v=160609",
+      workerFrom:
+        "https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js (160609)",
+      note:
+        "OneSignal recomenda CDN /v16/ sem pin; pinning não implementado nesta fase.",
+    },
   };
+}
+
+/**
+ * Modo diagnóstico controlado (dev ou Super Admin em supportMode):
+ * captura snapshot estável sem chamar login.
+ */
+export function setOneSignalDeferLoginForProbe(enabled, user) {
+  if (!enabled) {
+    deferLoginForProbe = false;
+    return true;
+  }
+  if (!isAnonymousStabilityProbeAllowed(user)) {
+    deferLoginForProbe = false;
+    return false;
+  }
+  deferLoginForProbe = true;
+  return true;
+}
+
+export function getOneSignalAnonymousProbe() {
+  return lastAnonymousProbe ? { ...lastAnonymousProbe } : null;
+}
+
+/**
+ * Após probe anónimo: executa login+tags normalmente.
+ */
+export async function completeOneSignalLoginAfterProbe(user) {
+  deferLoginForProbe = false;
+  invalidateIdentitySyncCache();
+  return applyUserIdentity(user, { skipStabilityWait: false });
 }
 
 /**
@@ -1170,12 +1344,22 @@ export function __resetOneSignalServiceForTests() {
   lastConfig = null;
   statusListenersAttached = false;
   enableInFlight = null;
+  deferLoginForProbe = false;
+  lastAnonymousProbe = null;
   invalidateIdentitySyncCache();
   identitySyncAttempt = 0;
   SUBSCRIPTION_WAIT_MS = SUBSCRIPTION_WAIT_MS_DEFAULT;
   PERMISSION_WAIT_MS = PERMISSION_WAIT_MS_DEFAULT;
   statusListeners.clear();
   __resetPushDiagnosticsForTests();
+  __resetStabilityStateForTests();
+  // Timing acelerado em testes unitários (produção usa defaults do módulo).
+  __setStabilityTimingForTests({
+    pollMs: 15,
+    requiredMatches: 2,
+    minWindowMs: 30,
+    timeoutMs: 800,
+  });
   pushStatus = {
     domainState: PUSH_DOMAIN_STATES.NOT_CONFIGURED,
     onesignalEnabled: false,
@@ -1197,6 +1381,10 @@ export function __resetOneSignalServiceForTests() {
   } catch {
     /* ignore */
   }
+}
+
+export function __setStabilityTimingForServiceTests(timing) {
+  __setStabilityTimingForTests(timing);
 }
 
 export function __setOneSignalApiForTests(api) {

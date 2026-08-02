@@ -61,11 +61,94 @@ Estados: `unsupported`, `not_configured`, `sdk_loading`, `permission_default`,
 1. Validar config (enabled + App ID).
 2. `init` com path raiz + scope `/push/onesignal/`.
 3. Relê `optedIn` / id / token do SDK.
-4. Se já inscrito → `login(externalId)` e sucesso.
+4. Se já inscrito → estabilidade → `login(externalId)` e sucesso.
 5. Se `denied` → orientar bloqueio.
 6. `optIn()` → aguardar confirmação (`optedIn` + id/token).
-7. `login(externalId)` (aguardar) → depois tags.
-8. Banner some **só** em `subscribed`.
+7. Aguardar **snapshot estável** (token/chaves/enabled sem oscilar).
+8. `login(externalId)` (aguardar) → depois tags.
+9. Banner some **só** em `subscribed`.
+
+## Estabilidade Firefox (Fase 2.13F)
+
+### Sintoma em produção
+
+- Chrome: push OK.
+- Firefox: aparece como Subscribed, token Mozilla, recebe welcome;
+  push posterior do painel só chega ao Chrome.
+- External ID correto (`String(user.id)`, ex. `"25"`).
+- Identity Verification: **desativada** (não é a causa).
+- HTTP 400 no sync do SDK:
+
+  `Invalid \`token\` format for device type iOS`
+
+  embora a operação local declare `type: "FirefoxPush"` e o token seja
+  endpoint Mozilla (`updates.push.services.mozilla.com`).
+
+### Interpretação
+
+O lote interno do SDK pode conter estados contraditórios da mesma
+subscription (enabled true/false, `notification_types` 1/0/-2, endpoints e
+chaves web_auth/web_p256 a mudar) **antes** do `login`/transfer. O servidor
+rejeita o token como se fosse iOS — inconsistência de mapeamento/lote, não
+Identity Verification nem External ID errado.
+
+### SDK 16.6.9 (`160609`)
+
+- Página: `cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js` →
+  `OneSignalSDK.page.es6.js?v=160609`
+- Worker: `.../v16/OneSignalSDK.sw.js` (mesma `160609`)
+- Release oficial: 30 Jul 2026 (Channels: Current, Stable)
+- OneSignal recomenda carregar o CDN `/v16/` (atualizações automáticas);
+  **não** há suporte oficial documentado a pin de versão → **não** pinamos
+  nesta fase (evita divergência page/worker e perda de patches).
+
+### Critério de estabilidade
+
+Antes de `login`:
+
+- poll ~750 ms;
+- ≥ 3 leituras consecutivas com a mesma assinatura sanitizada;
+- janela mínima ~2,5 s;
+- timeout ~25 s;
+- evento `change` reinicia a contagem;
+- worker OneSignal `installing`/`waiting` bloqueia login.
+
+Assinatura inclui (só hashes/hosts): optedIn, enabled, notification_types,
+Subscription ID mascarado, hash do token, host/hash do endpoint, hash
+web_auth/web_p256, estado do worker.
+
+### Ordem final
+
+optIn → optedIn+id/token → **estável** → login → tags (single-flight).
+
+### Diagnóstico
+
+`onesignal_invalid_token_device_type` na timeline/diagnóstico, com browser,
+SDK version, `expectedType=FirefoxPush`, endpointHost, snapshotChangesCount.
+
+Probe anónimo (só dev ou Super Admin + supportMode):
+`setOneSignalDeferLoginForProbe(true, user)` captura snapshot estável **sem**
+login; depois `completeOneSignalLoginAfterProbe(user)`.
+
+### Limpeza manual no Firefox de teste (após deploy)
+
+Tokens/chaves já expostos em logs devem ser considerados comprometidos.
+
+1. Remover dados do site / permissão de notificações.
+2. Fechar abas do domínio.
+3. Confirmar workers só manualmente (`about:serviceworkers`).
+4. Reabrir, permitir, aguardar inscrição estável.
+5. Login da app; confirmar nova subscription no painel.
+6. **Não** executar unregister automático em massa.
+
+### Escalamento suporte OneSignal (sanitizado)
+
+Preparar (sem REST key/JWT/tokens):
+
+- App ID mascarado; domínio; Firefox + macOS; SDK 160609;
+- worker URL/scope; External ID mascarado; HTTP 400 + título do erro;
+- Chrome OK / Firefox falha; Identity Verification off;
+- timestamps; Subscription ID mascarado; `snapshotChangesCount`.
 
 ## Identidade individual (Fase 2.13E)
 
@@ -106,10 +189,11 @@ External ID = utilizador autenticado da sessão (ex.: Super Admin), **não** o
 
 ### Troubleshooting 400 / 409
 
-| Erro | Causa típica | Mitigação 2.13E |
-|------|--------------|-----------------|
-| HTTP 400 login `externalId` = companyId | identidade trocada / corrida | resolver só `user.id` + single-flight |
-| HTTP 409 tags | vários `addTags` simultâneos | serializar login→tags + dedupe |
+| Erro | Causa típica | Mitigação |
+|------|--------------|-----------|
+| HTTP 400 login `externalId` = companyId | identidade trocada | resolver só `user.id` + single-flight (2.13E) |
+| HTTP 409 tags | vários `addTags` simultâneos | serializar login→tags + dedupe (2.13E) |
+| HTTP 400 `Invalid token format for device type iOS` no Firefox | lote/subscription instável antes do login | estabilidade pré-login (2.13F) |
 
 Diagnóstico: `identity_sync_*`, `identity_login_*`, `tags_sync_*`,
 `identity_sync_deduplicated` (sem JWT/token/ID completos).

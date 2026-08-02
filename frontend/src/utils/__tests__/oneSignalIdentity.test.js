@@ -249,10 +249,10 @@ describe("oneSignal identity sync single-flight (2.13E)", () => {
     const p3 = syncOneSignalUser(user);
     const p4 = enableOneSignalPushSubscription({ user });
 
-    // flush fetchPublicPushConfig + init antes do login
+    // flush fetch + estabilidade (poll/minWindow em testes) antes do login
     await Promise.resolve();
     await Promise.resolve();
-    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 120));
     expect(api.login).toHaveBeenCalledTimes(1);
     expect(api.login).toHaveBeenCalledWith("25");
     expect(typeof releaseLogin).toBe("function");
@@ -274,7 +274,10 @@ describe("oneSignal identity sync single-flight (2.13E)", () => {
     });
     __forceOneSignalReadyForTests(api);
     await syncOneSignalUser({ id: 25, companyId: 1, profile: "admin" });
-    expect(order).toEqual(["login", "tags"]);
+    expect(api.login).toHaveBeenCalledTimes(1);
+    expect(api.User.addTags).toHaveBeenCalledTimes(1);
+    expect(order.indexOf("login")).toBeGreaterThanOrEqual(0);
+    expect(order.indexOf("tags")).toBeGreaterThan(order.indexOf("login"));
   });
 
   it("tags iguais não repetem PATCH", async () => {
