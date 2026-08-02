@@ -43,6 +43,18 @@ export function shouldNotifyUserAboutTicket(ticket, user) {
   if (assigneeId === myId) {
     return true;
   }
+
+  // Alinhado ao backend (pending/queue push): admin e supervisor recebem
+  // tickets não atribuídos da empresa, mesmo sem filas pessoais.
+  const profile = user?.profile;
+  if (
+    profile === "admin" ||
+    profile === "supervisor" ||
+    user?.supportMode === true
+  ) {
+    return true;
+  }
+
   return qid != null && queueIds.includes(qid);
 }
 
@@ -129,14 +141,64 @@ export function buildTicketNotificationDedupeKey(ticket) {
 
 const REALTIME_SKEW_MS = 8000;
 
-/** Mensagem criada após o início da sessão (evita burst ao reconectar). */
+/**
+ * Evita burst ao reconectar.
+ * Evento Socket.IO ao vivo sem `createdAt` é tratado como realtime (o canal já é live).
+ */
 export function isRealtimeInboundMessage(message, sessionStartMs) {
   if (!sessionStartMs || !message) return false;
   const raw = message.createdAt;
-  if (!raw) return false;
+  if (raw == null || raw === "") {
+    return true;
+  }
   const ts = new Date(raw).getTime();
-  if (Number.isNaN(ts)) return false;
+  if (Number.isNaN(ts)) return true;
   return ts >= sessionStartMs - REALTIME_SKEW_MS;
+}
+
+/** Ticket pendente/aguardando não atribuído — candidato a alerta de novo atendimento. */
+export function isNewWaitingAttendanceTicket(ticket) {
+  if (!ticket || ticket.isGroup) return false;
+  if (String(ticket.status || "") !== "pending") return false;
+  const rawAssignee = ticket.userId;
+  const hasAssignee =
+    rawAssignee != null &&
+    rawAssignee !== "" &&
+    !Number.isNaN(Number(rawAssignee)) &&
+    Number(rawAssignee) > 0;
+  return !hasAssignee;
+}
+
+export function buildPendingAttendanceSoundDedupeKey(ticket) {
+  const id = ticket?.uuid || ticket?.id;
+  if (id == null || id === "") return null;
+  return `pending-attendance:${id}`;
+}
+
+/**
+ * Decide o tipo de som para inbound WhatsApp (sem tocar áudio).
+ * `claimPendingFn(key, ttl)` deve retornar true na primeira vez.
+ */
+export function resolveWhatsappInboundSoundType({
+  ticket,
+  pathname = "",
+  claimPendingFn,
+}) {
+  if (!ticket) return null;
+  const pendingKey = buildPendingAttendanceSoundDedupeKey(ticket);
+  const waiting = isNewWaitingAttendanceTicket(ticket);
+  if (
+    waiting &&
+    pendingKey &&
+    typeof claimPendingFn === "function" &&
+    claimPendingFn(pendingKey)
+  ) {
+    return "newPendingTicket";
+  }
+  if (isTicketOpenInRoute(ticket, pathname)) {
+    return "openConversationMessage";
+  }
+  return "newMessage";
 }
 
 /** /tickets sem conversa aberta = toast discreto; demais rotas = normal. */

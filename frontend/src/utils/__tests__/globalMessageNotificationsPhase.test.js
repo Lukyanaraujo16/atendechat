@@ -96,13 +96,13 @@ describe("global message notifications", () => {
       ).toBe(false);
     });
 
-    it("admin ainda precisa de assignee ou fila (regra atual de shouldNotifyUserAboutTicket)", () => {
+    it("admin/supervisor sem filas notificam pending não atribuído", () => {
       expect(
         shouldNotifyUserAboutTicket(
           { id: 10, queueId: 99, userId: null, isGroup: false },
           { id: 1, profile: "admin", queues: [] }
         )
-      ).toBe(false);
+      ).toBe(true);
       expect(
         shouldNotifyUserAboutTicket(
           { id: 10, queueId: 1, userId: null, isGroup: false },

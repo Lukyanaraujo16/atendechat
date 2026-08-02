@@ -29,6 +29,7 @@ const OPEN_CONVERSATION_VOLUME_SCALE = 0.45;
 export const NOTIFICATION_SOUND_TYPES = {
   newMessage: "newMessage",
   openConversationMessage: "openConversationMessage",
+  newPendingTicket: "newPendingTicket",
   internalChat: "internalChat",
   default: "default",
 };
@@ -36,6 +37,7 @@ export const NOTIFICATION_SOUND_TYPES = {
 const SOUND_SRC = {
   [NOTIFICATION_SOUND_TYPES.newMessage]: alertSound,
   [NOTIFICATION_SOUND_TYPES.openConversationMessage]: alertSound,
+  [NOTIFICATION_SOUND_TYPES.newPendingTicket]: alertSound,
   [NOTIFICATION_SOUND_TYPES.internalChat]: notifySound,
   [NOTIFICATION_SOUND_TYPES.default]: alertSound,
 };

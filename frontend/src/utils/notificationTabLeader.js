@@ -3,8 +3,8 @@
  * Badges/título podem atualizar em todas as abas.
  */
 
-const STORAGE_KEY = "atendechat:notification-tab-leader";
-const CHANNEL_NAME = "atendechat:notification-leader";
+const LEGACY_STORAGE_KEY = "atendechat:notification-tab-leader";
+const CHANNEL_PREFIX = "atendechat:notification-leader";
 const HEARTBEAT_MS = 2000;
 const STALE_MS = 5000;
 
@@ -19,9 +19,39 @@ function createTabId() {
   return `tab-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+export function buildNotificationLeaderStorageKey(companyId, userId) {
+  const c =
+    companyId != null && String(companyId).trim() !== ""
+      ? String(companyId)
+      : typeof localStorage !== "undefined"
+        ? localStorage.getItem("companyId") || "none"
+        : "none";
+  const u =
+    userId != null && String(userId).trim() !== ""
+      ? String(userId)
+      : typeof localStorage !== "undefined"
+        ? localStorage.getItem("userId") || "anon"
+        : "anon";
+  return `${LEGACY_STORAGE_KEY}:${c}:${u}`;
+}
+
+function buildChannelName(storageKey) {
+  return `${CHANNEL_PREFIX}:${storageKey}`;
+}
+
+let storageKey = LEGACY_STORAGE_KEY;
+let channelName = CHANNEL_PREFIX;
+let tabId = null;
+let isLeader = false;
+let heartbeatTimer = null;
+let channel = null;
+let listeners = new Set();
+let started = false;
+let onStorageHandler = null;
+
 function readLeader() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storageKey);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed?.id || !parsed?.at) return null;
@@ -34,21 +64,13 @@ function readLeader() {
 function writeLeader(id) {
   try {
     localStorage.setItem(
-      STORAGE_KEY,
+      storageKey,
       JSON.stringify({ id, at: Date.now() })
     );
   } catch {
     /* ignore quota */
   }
 }
-
-let tabId = null;
-let isLeader = false;
-let heartbeatTimer = null;
-let channel = null;
-let listeners = new Set();
-let started = false;
-let onStorageHandler = null;
 
 function emitChange() {
   listeners.forEach((fn) => {
@@ -100,6 +122,19 @@ function onHeartbeat() {
   tryClaim();
 }
 
+function clearLeaderKeys() {
+  try {
+    localStorage.removeItem(storageKey);
+  } catch {
+    /* ignore */
+  }
+  try {
+    localStorage.removeItem(LEGACY_STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
 function stopLeaderInternals({ removeLeaderKeyAlways = false } = {}) {
   if (typeof window !== "undefined" && onStorageHandler) {
     window.removeEventListener("storage", onStorageHandler);
@@ -119,11 +154,7 @@ function stopLeaderInternals({ removeLeaderKeyAlways = false } = {}) {
   }
   const current = readLeader();
   if (removeLeaderKeyAlways || current?.id === tabId) {
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch {
-      /* ignore */
-    }
+    clearLeaderKeys();
   }
   started = false;
   setLeaderFlag(false);
@@ -131,21 +162,35 @@ function stopLeaderInternals({ removeLeaderKeyAlways = false } = {}) {
 }
 
 /**
- * Inicia eleição de líder. Idempotente. Retorna cleanup.
+ * Inicia eleição de líder. Escopo por empresa/usuário.
+ * Retorna cleanup.
  */
-export function initNotificationTabLeader() {
+export function initNotificationTabLeader(scope = {}) {
   if (typeof window === "undefined") {
     return () => {};
   }
-  if (started) {
+
+  const nextKey = buildNotificationLeaderStorageKey(
+    scope.companyId,
+    scope.userId
+  );
+
+  if (started && storageKey === nextKey) {
     return () => {};
   }
+
+  if (started) {
+    stopLeaderInternals({ removeLeaderKeyAlways: true });
+  }
+
+  storageKey = nextKey;
+  channelName = buildChannelName(nextKey);
   started = true;
   tabId = createTabId();
 
   try {
     if (typeof BroadcastChannel !== "undefined") {
-      channel = new BroadcastChannel(CHANNEL_NAME);
+      channel = new BroadcastChannel(channelName);
       channel.onmessage = (event) => {
         const data = event?.data;
         if (!data || data.type !== "claim") return;
@@ -160,13 +205,19 @@ export function initNotificationTabLeader() {
   }
 
   onStorageHandler = (event) => {
-    if (event.key !== STORAGE_KEY) return;
+    if (event.key !== storageKey) return;
     const current = readLeader();
-    setLeaderFlag(Boolean(current && current.id === tabId));
+    // Sem líder válido / chave limpa → esta aba tenta assumir (fallback).
+    if (!current) {
+      tryClaim();
+      return;
+    }
+    setLeaderFlag(Boolean(current.id === tabId));
   };
 
   window.addEventListener("storage", onStorageHandler);
   tryClaim();
+  // Sem BroadcastChannel, heartbeat ainda elege via localStorage.
   heartbeatTimer = setInterval(onHeartbeat, HEARTBEAT_MS);
 
   return () => {
@@ -176,19 +227,14 @@ export function initNotificationTabLeader() {
 }
 
 /**
- * Encerra liderança/canal/timers mesmo se o cleanup do provider ainda não rodou
- * (ex.: logout). Permite reiniciar em login seguinte.
+ * Encerra liderança/canal/timers (logout). Permite reinício no login seguinte.
  */
 export function forceStopNotificationTabLeader() {
   if (typeof window === "undefined") {
     return;
   }
   if (!started) {
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch {
-      /* ignore */
-    }
+    clearLeaderKeys();
     return;
   }
   stopLeaderInternals({ removeLeaderKeyAlways: true });
@@ -197,6 +243,11 @@ export function forceStopNotificationTabLeader() {
 export function isNotificationTabLeader() {
   if (typeof window === "undefined") return true;
   if (!started) return true;
+  // Fallback: se a chave sumiu/expirou, tentar assumir em vez de silenciar.
+  const current = typeof localStorage !== "undefined" ? readLeader() : null;
+  if (!current || Date.now() - Number(current.at) > STALE_MS) {
+    tryClaim();
+  }
   return isLeader;
 }
 
@@ -213,4 +264,6 @@ export function getNotificationTabId() {
 export function __resetNotificationTabLeaderForTests() {
   forceStopNotificationTabLeader();
   tabId = null;
+  storageKey = LEGACY_STORAGE_KEY;
+  channelName = CHANNEL_PREFIX;
 }

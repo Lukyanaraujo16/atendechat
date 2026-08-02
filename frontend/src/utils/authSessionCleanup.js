@@ -39,6 +39,16 @@ export function clearNotificationSessionArtifacts() {
   } catch {
     /* ignore */
   }
+  try {
+    const companyId = localStorage.getItem("companyId");
+    const userId = localStorage.getItem("userId");
+    if (companyId || userId) {
+      const scoped = `atendechat:notification-tab-leader:${companyId || "none"}:${userId || "anon"}`;
+      localStorage.removeItem(scoped);
+    }
+  } catch {
+    /* ignore */
+  }
 }
 
 /**

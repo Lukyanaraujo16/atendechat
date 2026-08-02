@@ -12,14 +12,18 @@ import { playNotificationSoundThrottled } from "../../utils/notificationSoundPla
 import {
   buildInternalChatPreview,
   buildNotificationDedupeKey,
+  buildPendingAttendanceSoundDedupeKey,
   buildTicketNotificationDedupeKey,
   buildWhatsappMessagePreview,
   getInternalChatSenderName,
   getWhatsappToastVariant,
   isInternalChatOpenInRoute,
+  isNewWaitingAttendanceTicket,
   isParticipantInInternalChat,
   isRealtimeInboundMessage,
   isTicketOpenInRoute,
+  resolveWhatsappInboundSoundType,
+  shouldNotifyUserAboutTicket,
   shouldNotifyWhatsappMessage,
 } from "../../utils/globalNotificationRules";
 import GlobalNotificationToast from "../../components/GlobalNotificationToast";
@@ -114,11 +118,12 @@ function GlobalNotificationsSocketBridge({ children }) {
   const playSound = useCallback(
     (soundType, ticketMeta) => {
       if (!isNotificationTabLeader()) {
-        logNotificationMetric("sound_skipped_follower_tab");
+        logNotificationMetric("sound_skipped", { reason: "NOT_LEADER" });
         return;
       }
       const now = Date.now();
       if (now - lastSoundAtRef.current < SOUND_DEBOUNCE_MS) {
+        logNotificationMetric("sound_skipped", { reason: "DEBOUNCE" });
         return;
       }
       lastSoundAtRef.current = now;
@@ -127,25 +132,98 @@ function GlobalNotificationsSocketBridge({ children }) {
         soundType === NOTIFICATION_SOUND_TYPES.openConversationMessage &&
         !openConversationEnabled
       ) {
+        logNotificationMetric("sound_skipped", { reason: "OPEN_DISABLED" });
+        return;
+      }
+
+      const run = (promiseLike) => {
+        Promise.resolve(promiseLike)
+          .then((result) => {
+            logNotificationMetric("sound_play_result", {
+              soundType,
+              played: result?.played !== false,
+              reason: result?.reason || null,
+            });
+          })
+          .catch(() => {
+            logNotificationMetric("sound_play_result", {
+              soundType,
+              played: false,
+              reason: "error",
+            });
+          });
+      };
+
+      // Tipos explícitos não passam pelo contextual (que sobrescreveria o tipo).
+      if (
+        soundType === NOTIFICATION_SOUND_TYPES.newPendingTicket ||
+        soundType === NOTIFICATION_SOUND_TYPES.internalChat ||
+        soundType === NOTIFICATION_SOUND_TYPES.newMessage
+      ) {
+        if (
+          soundType === NOTIFICATION_SOUND_TYPES.newMessage &&
+          (ticketMeta?.ticketId || ticketMeta?.ticketUuid)
+        ) {
+          run(
+            playContextualNotificationSound({
+              ticketId: ticketMeta.ticketId,
+              ticketUuid: ticketMeta.ticketUuid,
+              route: locationRef.current,
+            })
+          );
+          return;
+        }
+        run(playNotificationSoundThrottled(playNotificationSound, soundType));
         return;
       }
 
       if (ticketMeta?.ticketId || ticketMeta?.ticketUuid) {
-        playContextualNotificationSound({
-          ticketId: ticketMeta.ticketId,
-          ticketUuid: ticketMeta.ticketUuid,
-          route: locationRef.current,
-        });
+        run(
+          playContextualNotificationSound({
+            ticketId: ticketMeta.ticketId,
+            ticketUuid: ticketMeta.ticketUuid,
+            route: locationRef.current,
+          })
+        );
         return;
       }
 
-      playNotificationSoundThrottled(playNotificationSound, soundType);
+      run(playNotificationSoundThrottled(playNotificationSound, soundType));
     },
     [
       openConversationEnabled,
       playContextualNotificationSound,
       playNotificationSound,
     ]
+  );
+
+  const playInboundTicketSound = useCallback(
+    (ticket) => {
+      if (!ticket) return;
+      const soundType = resolveWhatsappInboundSoundType({
+        ticket,
+        pathname: locationRef.current,
+        claimPendingFn: (key) => claimNotificationAlertId(key, 15 * 60 * 1000),
+      });
+      if (!soundType) return;
+
+      if (soundType === "newPendingTicket") {
+        playSound(NOTIFICATION_SOUND_TYPES.newPendingTicket);
+        return;
+      }
+      if (soundType === "openConversationMessage") {
+        playSound(NOTIFICATION_SOUND_TYPES.openConversationMessage, {
+          ticketId: ticket.id,
+          ticketUuid: ticket.uuid,
+        });
+        return;
+      }
+      playSound(NOTIFICATION_SOUND_TYPES.newMessage, {
+        ticketId: ticket.id,
+        ticketUuid: ticket.uuid,
+      });
+    },
+    [playSound]
   );
 
   const showWhatsappMessageToast = useCallback((notification, onOpen) => {
@@ -297,13 +375,24 @@ function GlobalNotificationsSocketBridge({ children }) {
 
   useEffect(() => {
     const stopVisibility = initPageVisibilityNotifications();
-    const stopLeader = initNotificationTabLeader();
     return () => {
       stopVisibility();
-      stopLeader();
       resetPendingMessageTabIndicators();
     };
   }, []);
+
+  useEffect(() => {
+    if (!user?.companyId || !user?.id) {
+      return undefined;
+    }
+    const stopLeader = initNotificationTabLeader({
+      companyId: user.companyId,
+      userId: user.id,
+    });
+    return () => {
+      stopLeader();
+    };
+  }, [user?.companyId, user?.id]);
 
   useEffect(() => {
     const sync = () => {
@@ -329,33 +418,37 @@ function GlobalNotificationsSocketBridge({ children }) {
   const handleWhatsappMessage = useCallback(
     (data) => {
       if (!canAccessWhatsappInbox) {
-        logNotificationMetric("whatsapp_skipped_inbox_access");
+        logNotificationMetric("sound_skipped", { reason: "NO_INBOX_ACCESS" });
         return;
       }
       if (!socketLiveRef.current) {
+        logNotificationMetric("sound_skipped", { reason: "SOCKET_NOT_LIVE" });
         return;
       }
       if (!shouldNotifyWhatsappMessage(data, user)) {
-        logNotificationMetric("whatsapp_skipped_visibility");
         return;
       }
 
       const { message, contact, ticket } = data;
       if (!isRealtimeInboundMessage(message, sessionStartMsRef.current)) {
-        logNotificationMetric("whatsapp_skipped_stale");
+        logNotificationMetric("sound_skipped", { reason: "STALE" });
         return;
       }
 
       const messageDedupeKey = buildNotificationDedupeKey("whatsapp", message?.id);
       const ticketDedupeKey = buildTicketNotificationDedupeKey(ticket);
-      if (!messageDedupeKey) return;
-
-      if (!claimNotificationAlertId(messageDedupeKey)) {
-        logNotificationMetric("whatsapp_skipped_dedupe", {
-          key: messageDedupeKey,
-        });
+      if (!messageDedupeKey) {
+        logNotificationMetric("sound_skipped", { reason: "EMPTY_MESSAGE_ID" });
         return;
       }
+
+      if (!claimNotificationAlertId(messageDedupeKey)) {
+        logNotificationMetric("sound_skipped", { reason: "DUPLICATE" });
+        return;
+      }
+
+      // Som isolado da UI: não depende de toast/central.
+      playInboundTicketSound(ticket);
 
       const contactName = contact?.name || i18n.t("globalNotifications.unknownContact");
       const preview = buildWhatsappMessagePreview(message);
@@ -390,30 +483,16 @@ function GlobalNotificationsSocketBridge({ children }) {
       };
 
       addNotification(notification);
-      logNotificationMetric("whatsapp_received", {
-        ticketId: ticket.id,
-        pageHidden,
-        ticketOpen,
-      });
 
       if (pageHidden) {
         queueBackgroundNotification({ messageId: message?.id });
       }
 
+      maybeShowDesktopNotification(notification);
+
       if (ticketOpen || toastVariant === "none") {
-        playSound(NOTIFICATION_SOUND_TYPES.openConversationMessage, {
-          ticketId: ticket.id,
-          ticketUuid: ticket.uuid,
-        });
-        maybeShowDesktopNotification(notification);
         return;
       }
-
-      playSound(NOTIFICATION_SOUND_TYPES.newMessage, {
-        ticketId: ticket.id,
-        ticketUuid: ticket.uuid,
-      });
-      maybeShowDesktopNotification(notification);
 
       if (!shouldDeferUiNotification()) {
         showWhatsappMessageToast(notification, () =>
@@ -426,10 +505,35 @@ function GlobalNotificationsSocketBridge({ children }) {
       canAccessWhatsappInbox,
       maybeShowDesktopNotification,
       openNotificationTarget,
-      playSound,
+      playInboundTicketSound,
       showWhatsappMessageToast,
       user,
     ]
+  );
+
+  const handlePendingTicketSound = useCallback(
+    (payload) => {
+      if (!canAccessWhatsappInbox || !socketLiveRef.current) {
+        return;
+      }
+      if (payload?.action !== "update" && payload?.action !== "create") {
+        return;
+      }
+      const ticket = payload?.ticket;
+      if (!ticket || !isNewWaitingAttendanceTicket(ticket)) {
+        return;
+      }
+      if (!shouldNotifyUserAboutTicket(ticket, user)) {
+        return;
+      }
+      const pendingKey = buildPendingAttendanceSoundDedupeKey(ticket);
+      if (!pendingKey) return;
+      if (!claimNotificationAlertId(pendingKey, 15 * 60 * 1000)) {
+        return;
+      }
+      playSound(NOTIFICATION_SOUND_TYPES.newPendingTicket);
+    },
+    [canAccessWhatsappInbox, playSound, user]
   );
 
   const handleInternalChatMessage = useCallback(
@@ -556,12 +660,18 @@ function GlobalNotificationsSocketBridge({ children }) {
     const onReadyJoin = () => {
       socket.emit("joinNotification");
       socketLiveRef.current = true;
+      logNotificationMetric("sound_socket_live", {
+        companyId,
+        connected: Boolean(socket.connected),
+        ready: Boolean(socket.ready || socketManager.socketReady),
+      });
     };
 
     const onTicket = (payload) => {
       if (payload.action === "updateUnread" || payload.action === "delete") {
         removeByTicketId(payload.ticketId);
       }
+      handlePendingTicketSound(payload);
     };
 
     socket.on("ready", onReadyJoin);
@@ -569,7 +679,7 @@ function GlobalNotificationsSocketBridge({ children }) {
     socket.on(appMessageEvent, handleWhatsappMessage);
     socket.on(chatEvent, handleInternalChatMessage);
 
-    if (socket.connected) {
+    if (socket.connected || socket.ready || socketManager.socketReady) {
       onReadyJoin();
     }
 
@@ -586,6 +696,7 @@ function GlobalNotificationsSocketBridge({ children }) {
     socketManager,
     handleWhatsappMessage,
     handleInternalChatMessage,
+    handlePendingTicketSound,
     removeByTicketId,
   ]);
 
