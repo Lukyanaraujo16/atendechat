@@ -345,6 +345,11 @@ Dois arquivos de site no Nginx.
 
 **Frontend (site principal):**
 
+> **Cache (obrigatório em produção):** ver `deploy/nginx-frontend-cache.example.conf`.
+> Sem `Cache-Control` em `index.html`/`version.json`, clientes podem ficar dias em versão antiga
+> (especialmente com Service Worker Workbox legado). Assets em `/static/` devem usar
+> `immutable` longo.
+
 ```bash
 sudo nano /etc/nginx/sites-available/atendechat-frontend
 ```
@@ -355,6 +360,24 @@ server {
     server_name seudominio.com www.seudominio.com;
     root /var/www/atendechat/frontend/build;
     index index.html;
+
+    location = /index.html {
+        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+        expires -1;
+    }
+    location = /version.json {
+        default_type application/json;
+        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+        expires -1;
+    }
+    location = /service-worker.js {
+        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+        expires -1;
+    }
+    location /static/ {
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        try_files $uri =404;
+    }
     location / {
         try_files $uri $uri/ /index.html;
     }

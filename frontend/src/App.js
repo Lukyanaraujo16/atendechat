@@ -15,6 +15,7 @@ import { getThemeOptions } from "./theme/appThemeOptions";
 import Routes from "./routes";
 import { BrandingProvider } from "./context/Branding/BrandingContext";
 import { NotificationSoundProvider } from "./context/NotificationSound/NotificationSoundContext";
+import AppVersionGate from "./components/AppVersionGate";
 
 const queryClient = new QueryClient();
 
@@ -63,7 +64,9 @@ const App = () => {
           <SocketContext.Provider value={SocketManager}>
             <NotificationSoundProvider>
               <BrandingProvider>
-                <Routes />
+                <AppVersionGate>
+                  <Routes />
+                </AppVersionGate>
               </BrandingProvider>
             </NotificationSoundProvider>
           </SocketContext.Provider>

@@ -665,7 +665,7 @@ export async function bootstrapPushAndPwaServiceWorker() {
     logPush("sdk_load_failed", { message: e?.message || "config" });
     onesignalResult = "onesignal_failed";
   }
-  // PWA/Workbox: scope / — independente do OneSignal com scope descendente.
+  // Desliga Workbox/PWA (scope /). OneSignal permanece com scope /push/onesignal/.
   registerMinimalPwaServiceWorker();
   return onesignalResult;
 }

@@ -1,18 +1,37 @@
 /**
- * Service worker mínimo de referência em `public/` (Fase 1 PWA).
- *
- * ATENÇÃO: o `react-scripts build` gera Workbox real em `build/service-worker.js`,
- * que sobrescreve este ficheiro no artefacto de produção. Scope típico: `/`.
- *
- * OneSignal usa scope isolado `/push/onesignal/` — os dois podem coexistir.
+ * Service worker mínimo em public/ — sobrescrito no build pelo kill-switch.
+ * Em produção o artefacto final não faz precache (ver replace-service-worker-killswitch.js).
  */
 /* eslint-disable no-restricted-globals */
-// eslint-disable-next-line no-unused-vars
-const CACHE_VERSION = "2026-04-22-branding-favicon";
 self.addEventListener("install", (event) => {
   self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    (async () => {
+      try {
+        await self.clients.claim();
+      } catch (e) {
+        // ignore
+      }
+      try {
+        const keys = await caches.keys();
+        await Promise.all(
+          keys
+            .filter((k) =>
+              /workbox|precache|cra-v|streamhub-chat|atendechat/i.test(String(k))
+            )
+            .map((k) => caches.delete(k))
+        );
+      } catch (e) {
+        // ignore
+      }
+      try {
+        await self.registration.unregister();
+      } catch (e) {
+        // ignore
+      }
+    })()
+  );
 });

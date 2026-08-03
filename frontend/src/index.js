@@ -11,7 +11,8 @@ ReactDOM.render(
 	document.getElementById("root")
 );
 
-/** Service worker: OneSignal (quando ativo) ou PWA mínimo — registo em `oneSignalService.bootstrapPushAndPwaServiceWorker`. */
+/** Service worker: desliga Workbox/PWA; OneSignal permanece isolado. */
+
 
 // ReactDOM.render(
 // 	<React.StrictMode>
