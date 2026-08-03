@@ -16,11 +16,13 @@ import Title from "../Title";
 import MainHeaderButtonsWrapper from "../MainHeaderButtonsWrapper";
 import AiAgentCard from "../AiAgentCard";
 import AiAgentSupportBanner from "../AiAgentSupportBanner";
+import ConfirmationModal from "../ConfirmationModal";
 import {
   AI_AGENT_NEW_ROUTE_PATH,
   aiAgentPath,
   aiAgentWizardEditPath,
 } from "../../config/aiAgentFeature";
+import useAiAgentHubQuickToggle from "../../hooks/useAiAgentHubQuickToggle";
 import { i18n } from "../../translate/i18n";
 
 const useStyles = makeStyles((theme) => ({
@@ -68,7 +70,7 @@ function HubSkeleton() {
 }
 
 /**
- * Product Hub multiagente — listagem e CTA Novo agente (Fase 2.9B).
+ * Product Hub multiagente — listagem e CTA Novo agente (Fase 2.9B / 2.19).
  */
 export default function AiAgentHubPage({
   loading,
@@ -77,12 +79,14 @@ export default function AiAgentHubPage({
   agents = [],
   onRetry,
   canCreate = true,
+  canMutate = false,
   supportMode,
   companyLabel,
 }) {
   const classes = useStyles();
   const history = useHistory();
   const list = Array.isArray(agents) ? agents : [];
+  const mutateAllowed = canMutate === true;
 
   const goCreate = useCallback(() => {
     history.push(AI_AGENT_NEW_ROUTE_PATH);
@@ -105,6 +109,21 @@ export default function AiAgentHubPage({
     },
     [history]
   );
+
+  const {
+    busyAgentRef,
+    deactivateTarget,
+    notReadyTarget,
+    handleToggleRequest,
+    confirmDeactivate,
+    cancelDeactivate,
+    dismissNotReady,
+    confirmNotReadyReview,
+  } = useAiAgentHubQuickToggle({
+    canMutate: mutateAllowed,
+    onRetry,
+    onReview: goReview,
+  });
 
   return (
     <Box className={classes.root} data-testid="ai-agent-hub">
@@ -186,18 +205,50 @@ export default function AiAgentHubPage({
             {i18n.t("aiAgentProduct.hub.countLabel", { count: list.length })}
           </Typography>
           <MobileCardList className={classes.grid}>
-            {list.map((agent) => (
-              <AiAgentCard
-                key={String(agent.agentRef)}
-                agent={agent}
-                onManage={goManage}
-                onReview={goReview}
-                canManage={canCreate}
-              />
-            ))}
+            {list.map((agent) => {
+              const ref = String(agent.agentRef || "");
+              return (
+                <AiAgentCard
+                  key={ref}
+                  agent={agent}
+                  onManage={goManage}
+                  onReview={goReview}
+                  canManage={canCreate}
+                  canMutate={mutateAllowed}
+                  busy={busyAgentRef === ref}
+                  onToggleRequest={handleToggleRequest}
+                />
+              );
+            })}
           </MobileCardList>
         </Box>
       ) : null}
+
+      <ConfirmationModal
+        title={i18n.t("aiAgentProduct.hub.quickToggle.deactivateTitle")}
+        open={Boolean(deactivateTarget)}
+        onClose={cancelDeactivate}
+        onConfirm={confirmDeactivate}
+        confirmText={i18n.t("aiAgentProduct.hub.quickToggle.deactivateConfirm")}
+        destructive
+        loading={
+          Boolean(deactivateTarget) &&
+          busyAgentRef === String(deactivateTarget?.agentRef || "")
+        }
+        asyncConfirm
+      >
+        {i18n.t("aiAgentProduct.hub.quickToggle.deactivateBody")}
+      </ConfirmationModal>
+
+      <ConfirmationModal
+        title={i18n.t("aiAgentProduct.hub.quickToggle.notReadyTitle")}
+        open={Boolean(notReadyTarget)}
+        onClose={dismissNotReady}
+        onConfirm={confirmNotReadyReview}
+        confirmText={i18n.t("aiAgentProduct.hub.reviewConfig")}
+      >
+        {i18n.t("aiAgentProduct.hub.quickToggle.notReadyBody")}
+      </ConfirmationModal>
     </Box>
   );
 }

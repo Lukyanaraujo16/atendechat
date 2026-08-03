@@ -2726,6 +2726,24 @@ const messages = {
 					agentNotFoundTitle: "Agent not found",
 					agentNotFoundDescription:
 						"This agent is not available for the current company.",
+					quickToggle: {
+						activateAria: "Activate agent {{name}}",
+						deactivateAria: "Deactivate agent {{name}}",
+						activeLabel: "Active",
+						inactiveLabel: "Inactive",
+						loadingAria: "Updating activation for {{name}}",
+						activated: "Agent activated.",
+						deactivated: "Agent deactivated.",
+						deactivateTitle: "Deactivate agent?",
+						deactivateBody:
+							"The agent will stop replying automatically, but its settings and connections will be preserved.",
+						deactivateConfirm: "Deactivate agent",
+						notReadyTitle: "Setup needed",
+						notReadyBody:
+							"This agent still needs a few adjustments before it can be activated.",
+						connectionHint:
+							"Review the credential and linked connection to continue.",
+					},
 				},
 				loading: {
 					aria: "Loading AI Agent status",

@@ -18,7 +18,7 @@ const AiAgent = () => {
     user?.companyName ||
     (user?.companyId != null ? String(user.companyId) : "");
 
-  const canCreate = canManageAiAgentProduct(user);
+  const canManage = canManageAiAgentProduct(user);
 
   return (
     <MainContainer>
@@ -28,7 +28,8 @@ const AiAgent = () => {
         accessDenied={accessDenied}
         agents={agents}
         onRetry={reload}
-        canCreate={canCreate}
+        canCreate={canManage}
+        canMutate={canManage}
         supportMode={user?.supportMode === true}
         companyLabel={companyLabel}
       />

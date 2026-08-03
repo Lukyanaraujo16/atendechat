@@ -70,6 +70,7 @@ const useCardStyles = makeStyles((theme) => ({
     minWidth: 0,
   },
   chipRow: {
+    marginTop: theme.spacing(1),
     display: "flex",
     flexWrap: "wrap",
     gap: theme.spacing(0.5),
@@ -95,6 +96,7 @@ export default function MobileEntityCard({
   title,
   subtitle,
   badges,
+  trailing,
   children,
   footer,
   onClick,
@@ -131,8 +133,13 @@ export default function MobileEntityCard({
                 </Typography>
               ) : null}
             </Box>
-            {badges || null}
+            {trailing ? (
+              <Box flexShrink={0} onClick={(e) => e.stopPropagation()}>
+                {trailing}
+              </Box>
+            ) : null}
           </Box>
+          {badges ? <Box className={classes.chipRow}>{badges}</Box> : null}
           {children ? <Box className={classes.meta}>{children}</Box> : null}
           {footer ? <Box className={classes.footer}>{footer}</Box> : null}
         </Box>

@@ -2814,6 +2814,24 @@ const messages = {
           agentNotFoundTitle: "Agente não encontrado",
           agentNotFoundDescription:
             "Este agente não está disponível para a empresa atual.",
+          quickToggle: {
+            activateAria: "Ativar agente {{name}}",
+            deactivateAria: "Desativar agente {{name}}",
+            activeLabel: "Ativo",
+            inactiveLabel: "Desativado",
+            loadingAria: "Atualizando ativação de {{name}}",
+            activated: "Agente ativado.",
+            deactivated: "Agente desativado.",
+            deactivateTitle: "Desativar agente?",
+            deactivateBody:
+              "O agente deixará de responder automaticamente, mas suas configurações e conexões serão preservadas.",
+            deactivateConfirm: "Desativar agente",
+            notReadyTitle: "Ajustes necessários",
+            notReadyBody:
+              "Este agente ainda precisa de alguns ajustes antes de ser ativado.",
+            connectionHint:
+              "Revise a credencial e a conexão vinculada para continuar.",
+          },
         },
         loading: {
           aria: "Carregando estado do Agente de IA",
