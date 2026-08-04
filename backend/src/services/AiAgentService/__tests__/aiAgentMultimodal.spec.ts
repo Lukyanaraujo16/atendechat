@@ -31,13 +31,18 @@ import {
 } from "../../../config/aiModelMediaCapabilities";
 import {
   resolveAiAgentLocalMediaPath,
-  guessMimeFromFilename
+  guessMimeFromFilename,
+  resolveWhisperUploadFilename
 } from "../resolveAiAgentLocalMediaPath";
 import TranscribeAiAgentAudioService from "../TranscribeAiAgentAudioService";
 import { prepareAiAgentMultimodalTurn } from "../prepareAiAgentMultimodalTurn";
 import { buildOpenAiMultimodalMessages } from "../../AiProviderService/aiProviderMultimodal";
 import { AI_AGENT_AUDIO_FALLBACK_MESSAGE } from "../aiAgentInputContent";
 import { get } from "../../../libs/cache";
+import {
+  normalizeAiAgentMediaMimeType,
+  isAllowedAiAgentAudioMime
+} from "../../../config/aiModelMediaCapabilities";
 
 const mockedTranscribe = executeOpenAiTranscription as jest.Mock;
 const mockedMessageFind = Message.findOne as jest.Mock;
@@ -138,8 +143,35 @@ describe("AiAgent multimodal 2.17", () => {
 
     it("guess mime", () => {
       expect(guessMimeFromFilename("a.ogg", "audio")).toBe("audio/ogg");
+      expect(guessMimeFromFilename("a.oga", "audio")).toBe("audio/ogg");
+      expect(guessMimeFromFilename("a.weba", "audio")).toBe("audio/webm");
       expect(guessMimeFromFilename("a.jpg", "image")).toBe("image/jpeg");
       expect(guessMimeFromFilename("a.webp", "image")).toBe("image/webp");
+    });
+
+    it("normaliza MIME com codecs e aliases do WhatsApp", () => {
+      expect(normalizeAiAgentMediaMimeType("audio/ogg; codecs=opus")).toBe(
+        "audio/ogg"
+      );
+      expect(
+        normalizeAiAgentMediaMimeType("audio/mp4; codecs=mp4a.40.2")
+      ).toBe("audio/mp4");
+      expect(normalizeAiAgentMediaMimeType("application/ogg")).toBe(
+        "audio/ogg"
+      );
+      expect(normalizeAiAgentMediaMimeType("audio/opus")).toBe("audio/ogg");
+      expect(isAllowedAiAgentAudioMime("audio/ogg; codecs=opus")).toBe(true);
+      expect(isAllowedAiAgentAudioMime("application/ogg")).toBe(true);
+      expect(isAllowedAiAgentAudioMime("application/pdf")).toBe(false);
+    });
+
+    it("Whisper filename cobre .oga e extensão desconhecida", () => {
+      expect(resolveWhisperUploadFilename("/tmp/123.oga", "audio/ogg")).toBe(
+        "123.oga"
+      );
+      expect(
+        resolveWhisperUploadFilename("/tmp/123.false", "audio/ogg; codecs=opus")
+      ).toBe("audio.ogg");
     });
   });
 
@@ -314,6 +346,54 @@ describe("AiAgent multimodal 2.17", () => {
             "Qual é o horário de atendimento?"
           );
         }
+      } finally {
+        try {
+          fs.unlinkSync(fixture.abs);
+        } catch {
+          // ignore
+        }
+      }
+    });
+
+    it("áudio .oga (extensão real mime-types/WhatsApp) transcreve", async () => {
+      mockedTranscribe.mockResolvedValue({
+        ok: true,
+        text: "Quero remarcar minha consulta",
+        tokensUsed: 0
+      });
+      const fixture = writePublicFixture(
+        `_test_audio_${Date.now()}.oga`,
+        Buffer.from("OggS")
+      );
+      mockedMessageFind.mockResolvedValue({
+        id: "A-OGA",
+        mediaType: "audio",
+        body: "Áudio",
+        getDataValue: () => fixture.rel
+      });
+
+      try {
+        const prepared = await prepareAiAgentMultimodalTurn({
+          companyId: 1,
+          ticketId: 2,
+          agentId: 3,
+          messageId: "A-OGA",
+          inboundText: "Áudio",
+          classification: {
+            messageType: "audio",
+            hasText: false,
+            hasMedia: true,
+            baileysType: "audioMessage"
+          },
+          provider: "openai",
+          apiKey: "sk-test",
+          model: "gpt-4o-mini"
+        });
+        expect(prepared.ok).toBe(true);
+        if (prepared.ok) {
+          expect(prepared.turn.transcription).toContain("remarcar");
+        }
+        expect(mockedTranscribe).toHaveBeenCalled();
       } finally {
         try {
           fs.unlinkSync(fixture.abs);

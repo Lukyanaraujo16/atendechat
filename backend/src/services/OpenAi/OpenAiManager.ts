@@ -216,14 +216,17 @@ export async function executeOpenAi(params: ExecuteOpenAiParams): Promise<Execut
 
 /**
  * Transcrição Whisper: conta como 1 chamada no limite diário.
+ * `filename` opcional garante extensão reconhecida pelo Whisper no multipart
+ * (ex.: áudio WhatsApp salvo como `.oga` ou sem extensão útil).
  */
 export async function executeOpenAiTranscription(params: {
   companyId: number;
   ticketId?: number | null;
   apiKey: string;
   file: NodeJS.ReadableStream;
+  filename?: string;
 }): Promise<ExecuteTranscriptionResult> {
-  const { companyId, ticketId, apiKey, file } = params;
+  const { companyId, ticketId, apiKey, file, filename } = params;
 
   if (!(await canMakeOpenAiCalls(companyId, 1))) {
     logger.warn(
@@ -242,7 +245,24 @@ export async function executeOpenAiTranscription(params: {
     const configuration = new Configuration({ apiKey });
     const openai = new OpenAIApi(configuration);
 
-    const transcription = await openai.createTranscription(file as any, "whisper-1");
+    if (filename && file && typeof file === "object") {
+      // form-data usa stream.path (basename) como filename do multipart.
+      // Não reabre o arquivo — só altera o nome enviado à API.
+      try {
+        Object.defineProperty(file, "path", {
+          value: filename,
+          writable: true,
+          configurable: true
+        });
+      } catch {
+        (file as { path?: string }).path = filename;
+      }
+    }
+
+    const transcription = await openai.createTranscription(
+      file as any,
+      "whisper-1"
+    );
     const text = transcription.data.text ?? "";
 
     await assertUnderLimitAndLog(companyId, ticketId, 0);

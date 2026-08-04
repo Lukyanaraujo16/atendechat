@@ -1,8 +1,9 @@
 import fs from "fs";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import {
-  AI_AGENT_AUDIO_MIME_TYPES,
-  AI_AGENT_MEDIA_LIMITS
+  AI_AGENT_MEDIA_LIMITS,
+  isAllowedAiAgentAudioMime,
+  normalizeAiAgentMediaMimeType
 } from "../../config/aiModelMediaCapabilities";
 import {
   AiProviderId,
@@ -12,6 +13,7 @@ import {
 import { del, get, set, setNx } from "../../libs/cache";
 import { executeOpenAiTranscription } from "../OpenAi/OpenAiManager";
 import { emitAiAgentMediaMetric } from "./emitAiAgentMediaMetric";
+import { resolveWhisperUploadFilename } from "./resolveAiAgentLocalMediaPath";
 import { logger } from "../../utils/logger";
 
 export type TranscribeAiAgentAudioErrorCode =
@@ -88,17 +90,23 @@ async function transcribeWithOpenAi(input: {
   ticketId?: number | null;
   apiKey: string;
   absolutePath: string;
+  mimeType: string;
 }): Promise<
   | { ok: true; text: string }
   | { ok: false; errorCode: TranscribeAiAgentAudioErrorCode }
 > {
   const stream = fs.createReadStream(input.absolutePath);
+  const filename = resolveWhisperUploadFilename(
+    input.absolutePath,
+    input.mimeType
+  );
   try {
     const result = await executeOpenAiTranscription({
       companyId: input.companyId,
       ticketId: input.ticketId,
       apiKey: input.apiKey,
-      file: stream
+      file: stream,
+      filename
     });
     if (!result.ok) {
       return {
@@ -202,11 +210,8 @@ export async function TranscribeAiAgentAudioService(
     return { ok: false, errorCode: "credential_missing", durationMs };
   }
 
-  const mime = String(input.mimeType || "")
-    .toLowerCase()
-    .split(";")[0]
-    .trim();
-  if (!AI_AGENT_AUDIO_MIME_TYPES.has(mime)) {
+  const mime = normalizeAiAgentMediaMimeType(input.mimeType);
+  if (!isAllowedAiAgentAudioMime(mime)) {
     const durationMs = Date.now() - startedAt;
     emitAiAgentMediaMetric("ai_agent.audio_transcription_failed", {
       companyId: input.companyId,
@@ -345,7 +350,8 @@ export async function TranscribeAiAgentAudioService(
         companyId: input.companyId,
         ticketId: input.ticketId,
         apiKey: input.apiKey,
-        absolutePath: input.absolutePath
+        absolutePath: input.absolutePath,
+        mimeType: mime
       });
     } else if (input.provider === AI_PROVIDER_GEMINI) {
       work = transcribeWithGemini({

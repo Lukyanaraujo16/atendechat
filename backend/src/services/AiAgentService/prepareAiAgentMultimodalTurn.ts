@@ -1,8 +1,9 @@
 import fs from "fs";
 import {
-  AI_AGENT_AUDIO_MIME_TYPES,
   AI_AGENT_IMAGE_MIME_TYPES,
   AI_AGENT_MEDIA_LIMITS,
+  isAllowedAiAgentAudioMime,
+  normalizeAiAgentMediaMimeType,
   resolveAiModelMediaCapabilities
 } from "../../config/aiModelMediaCapabilities";
 import { AiProviderId } from "../../config/aiProviderModels";
@@ -226,8 +227,10 @@ export async function prepareAiAgentMultimodalTurn(
       };
     }
 
-    const mime = guessMimeFromFilename(absolutePath, "audio");
-    if (!AI_AGENT_AUDIO_MIME_TYPES.has(mime)) {
+    const mime = normalizeAiAgentMediaMimeType(
+      guessMimeFromFilename(absolutePath, "audio")
+    );
+    if (!isAllowedAiAgentAudioMime(mime)) {
       return {
         ok: false,
         errorCode: "format_unsupported",
@@ -362,7 +365,9 @@ export async function prepareAiAgentMultimodalTurn(
       };
     }
 
-    const mime = guessMimeFromFilename(absolutePath, "image");
+    const mime = normalizeAiAgentMediaMimeType(
+      guessMimeFromFilename(absolutePath, "image")
+    );
     if (!AI_AGENT_IMAGE_MIME_TYPES.has(mime)) {
       return {
         ok: false,

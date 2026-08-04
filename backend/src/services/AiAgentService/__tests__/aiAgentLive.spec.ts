@@ -22,6 +22,8 @@ import { generateLiveResponseWithOptionalFc } from "../../AutomationOrchestrator
 import { InboundMessageClassification } from "../classifyInboundMessage";
 import { startAiAgentTypingPresence } from "../startAiAgentTypingPresence";
 import { applyAiAgentLivePacing } from "../applyAiAgentLivePacing";
+import { prepareAiAgentMultimodalTurn } from "../prepareAiAgentMultimodalTurn";
+import { AI_AGENT_AUDIO_FALLBACK_MESSAGE } from "../aiAgentInputContent";
 
 jest.mock("@whiskeysockets/baileys", () => ({
   getContentType: () => "conversation",
@@ -152,6 +154,14 @@ jest.mock("../resolveAiAgentApiCredential", () => ({
   })
 }));
 
+jest.mock("../prepareAiAgentMultimodalTurn", () => {
+  const actual = jest.requireActual("../prepareAiAgentMultimodalTurn");
+  return {
+    ...actual,
+    prepareAiAgentMultimodalTurn: jest.fn()
+  };
+});
+
 jest.mock("../buildAiAgentRuntimeContext", () => ({
   buildAiAgentRuntimeContext: jest.fn()
 }));
@@ -167,6 +177,7 @@ const mockedBuildCtx = buildAiAgentRuntimeContext as jest.Mock;
 const mockedShowTicket = ShowTicketService as jest.Mock;
 const mockedStartTyping = startAiAgentTypingPresence as jest.Mock;
 const mockedApplyPacing = applyAiAgentLivePacing as jest.Mock;
+const mockedPrepareMultimodal = prepareAiAgentMultimodalTurn as jest.Mock;
 
 function whatsapp(partial: Record<string, unknown>) {
   return partial as unknown as Whatsapp;
@@ -192,9 +203,18 @@ const textClassification: InboundMessageClassification = {
   blockReason: undefined
 };
 
+const audioClassification: InboundMessageClassification = {
+  messageType: "audio",
+  hasText: false,
+  hasMedia: true,
+  baileysType: "audioMessage",
+  blockReason: undefined
+};
+
 describe("AiAgent live mode 1.4", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockedPrepareMultimodal.mockReset();
     mockedBuildCtx.mockResolvedValue({
       planHasAiAgent: true,
       whatsapp: whatsapp({
@@ -522,6 +542,106 @@ describe("AiAgent live mode 1.4", () => {
       }),
       expect.any(Object)
     );
+  });
+
+  it("falha de transcrição envia fallback natural (claim GENERATED→SENDING)", async () => {
+    (AiAgentRuntimeLog.findOne as jest.Mock).mockResolvedValue({
+      id: 71,
+      companyId: 1,
+      ticketId: 1,
+      contactId: 2,
+      whatsappId: 3,
+      aiAgentId: 9,
+      messageId: "AUD-1",
+      eligible: true,
+      mode: "live",
+      liveStatus: AI_AGENT_LIVE_STATUSES.QUEUED
+    });
+    (Ticket.findOne as jest.Mock).mockResolvedValue(
+      ticket({
+        id: 1,
+        companyId: 1,
+        contactId: 2,
+        status: "pending",
+        userId: null,
+        aiAgentPaused: false,
+        chatbot: false,
+        isGroup: false,
+        contact: contact({ id: 2, name: "João" })
+      })
+    );
+    (Contact.findOne as jest.Mock).mockResolvedValue(
+      contact({ id: 2, name: "João" })
+    );
+    (Whatsapp.findOne as jest.Mock).mockResolvedValue(
+      whatsapp({
+        id: 3,
+        aiAgentMode: "live",
+        aiAgentEnabled: true,
+        aiAgentId: 9
+      })
+    );
+    (AiAgent.findOne as jest.Mock).mockResolvedValue(
+      agent({
+        id: 9,
+        name: "Eduardo",
+        enabled: true,
+        model: "gpt-4o-mini",
+        maxTokens: 256,
+        temperature: 0.2,
+        systemPrompt: "Seja educado."
+      })
+    );
+    // claimLiveGeneration (queued) + GENERATED + claimLiveSending + SENT
+    (AiAgentRuntimeLog.update as jest.Mock).mockResolvedValue([1]);
+
+    mockedPrepareMultimodal.mockResolvedValue({
+      ok: false,
+      errorCode: "timeout",
+      clientFallbackMessage: AI_AGENT_AUDIO_FALLBACK_MESSAGE,
+      askRetry: true
+    });
+    mockedSend.mockResolvedValue({
+      ok: true,
+      messageId: "OUT-FB",
+      bodySent: `Eduardo:\n${AI_AGENT_AUDIO_FALLBACK_MESSAGE}`
+    });
+
+    await generateAndSendLiveResponseForLog(71, 1, "Áudio", audioClassification);
+
+    expect(mockedPrepareMultimodal).toHaveBeenCalled();
+    expect(mockedLiveGenerate).not.toHaveBeenCalled();
+    expect(mockedApplyPacing).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: "fallback",
+        responseText: AI_AGENT_AUDIO_FALLBACK_MESSAGE
+      })
+    );
+    expect(mockedSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: AI_AGENT_AUDIO_FALLBACK_MESSAGE,
+        agentName: "Eduardo"
+      })
+    );
+    // Garante transição QUEUED → GENERATED antes do claim de envio
+    expect(AiAgentRuntimeLog.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        liveStatus: AI_AGENT_LIVE_STATUSES.GENERATED,
+        suggestionSource: "media_fallback",
+        suggestedReply: AI_AGENT_AUDIO_FALLBACK_MESSAGE
+      }),
+      expect.any(Object)
+    );
+    expect(AiAgentRuntimeLog.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        liveStatus: AI_AGENT_LIVE_STATUSES.SENT,
+        sentMessageId: "OUT-FB",
+        suggestionSource: "media_fallback"
+      }),
+      expect.any(Object)
+    );
+    const typingHandle = await mockedStartTyping.mock.results[0].value;
+    expect(typingHandle.stop).toHaveBeenCalledWith("live_finished");
   });
 
   it("resposta longa demais não envia", () => {

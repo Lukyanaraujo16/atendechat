@@ -1,11 +1,12 @@
-# AI Agent — Multimodal: áudio e imagem (Fase 2.17)
+# AI Agent — Multimodal: áudio e imagem (Fase 2.17 + correção 2.20)
 
 | Campo | Valor |
 |-------|-------|
 | **Produto** | StreamHUB Chat |
-| **Fase** | AI Agent V1.1 — 2.17 |
+| **Fase** | AI Agent V1.1 — 2.17 / 2.20 |
 | **Status** | Implementado |
-| **Commit** | `feat(ai-agent): adiciona compreensão de áudio e imagem` |
+| **Commit 2.17** | `feat(ai-agent): adiciona compreensão de áudio e imagem` |
+| **Commit 2.20** | `fix(ai-agent): corrige transcrição de áudio no Live` |
 
 ## 1. Arquitetura
 
@@ -30,9 +31,10 @@ Não há migration. Transcrição fica em cache Redis temporário (`ai-agent:tra
 
 | Item | Detalhe |
 |------|---------|
-| Formatos | OGG/Opus, MPEG, MP4/M4A, WAV, WebM, AAC |
+| Formatos | OGG/Opus (incl. `.oga`), MPEG, MP4/M4A, WAV, WebM, AAC |
+| MIME | Normalizado (strip `codecs=…`; `application/ogg` → `audio/ogg`) |
 | Limite | 25 MB |
-| OpenAI | Whisper (`executeOpenAiTranscription`) |
+| OpenAI | Whisper (`executeOpenAiTranscription`) com filename compatível |
 | Gemini | `generateContent` com `inlineData` de áudio |
 | Timeout | 45s |
 | Fallback | “Não consegui compreender bem o áudio…” |
@@ -50,6 +52,14 @@ Conteúdo compreendido (transcrição de áudio):
 
 A transcrição é tratada como conteúdo não confiável do usuário.
 
+### Correção 2.20 (produção)
+
+Sintoma: áudio no Live iniciava “digitando…”, processava ~30–40s, encerrava typing **sem** resposta e **sem** fallback.
+
+Causa raiz: no fallback de mídia, `claimLiveSending` exige `liveStatus=generated`, mas o log ainda estava `queued` → claim falhava e o cliente não recebia nada.
+
+Correção: antes do claim de envio, o Live grava `GENERATED` + `suggestionSource=media_fallback` e só então faz o claim `SENDING`.
+
 ## 3. Imagem
 
 | Item | Detalhe |
@@ -62,6 +72,8 @@ A transcrição é tratada como conteúdo não confiável do usuário.
 | Fallback | “Não consegui visualizar essa imagem…” |
 
 Regras de visão no prompt do turno: incerteza, sem biometria, sem autenticidade inventada, texto na imagem ≠ system.
+
+> Fase 2.20 não altera o pipeline de imagem, salvo helpers MIME compartilhados.
 
 ## 4. Providers / capabilities
 
@@ -81,7 +93,7 @@ Não há troca silenciosa de modelo.
 | Tipo | WhatsApp | Instagram | Arquivo | Runtime | Provider |
 |------|----------|-----------|---------|---------|----------|
 | texto | sim | persistido | n/a | sim | texto |
-| áudio | download Baileys | download Meta | `public/` | sim (WA) | transcrição |
+| áudio | download Baileys | download Meta | `public/` (ex. `.oga`) | sim (WA) | transcrição |
 | imagem | download Baileys | download Meta | `public/` | sim (WA) | visão |
 | vídeo/doc | — | — | sim | bloqueado sem caption | não |
 
@@ -89,7 +101,7 @@ Instagram continua fora do runtime do AI Agent (`unsupported_channel`).
 
 ## 6. Live / Shadow / Simulator
 
-- **Live**: prepara multimodal → gera → assina → envia; falha de mídia envia fallback assinado.
+- **Live**: prepara multimodal → gera → assina → envia; falha de mídia envia fallback assinado (após `GENERATED` → `SENDING`).
 - **Shadow**: mesma preparação; sugestão/fallback sem envio.
 - **Simulator**: upload de mídia **não** implementado nesta fase (melhoria futura); serviços cobertos por testes unitários.
 

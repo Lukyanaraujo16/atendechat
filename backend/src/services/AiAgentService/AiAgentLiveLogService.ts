@@ -25,7 +25,7 @@ export type LiveLogUpdateInput = {
   deliveryStatus?: string;
   contextMessageCount?: number | null;
   contextHash?: string | null;
-  suggestionSource?: "model" | "handoff_transition" | null;
+  suggestionSource?: "model" | "handoff_transition" | "media_fallback" | null;
   metadataPatch?: Record<string, unknown>;
 };
 

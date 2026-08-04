@@ -72,8 +72,36 @@ export const AI_AGENT_AUDIO_MIME_TYPES = new Set([
   "audio/wav",
   "audio/x-wav",
   "audio/webm",
-  "audio/aac"
+  "audio/aac",
+  /** Alguns canais/libs rotulam Ogg Opus assim. */
+  "application/ogg"
 ]);
+
+/**
+ * Normaliza MIME de áudio/imagem do canal (codecs, aliases).
+ * Nunca comparar MIME com igualdade exata contra o valor cru do WhatsApp.
+ */
+export function normalizeAiAgentMediaMimeType(
+  raw: string | null | undefined
+): string {
+  const base = String(raw || "")
+    .toLowerCase()
+    .split(";")[0]
+    .trim();
+  if (!base) return "";
+  if (base === "audio/mp3") return "audio/mpeg";
+  if (base === "audio/m4a" || base === "audio/x-m4a") return "audio/mp4";
+  if (base === "application/ogg" || base === "audio/opus") return "audio/ogg";
+  if (base === "image/jpg") return "image/jpeg";
+  return base;
+}
+
+export function isAllowedAiAgentAudioMime(
+  raw: string | null | undefined
+): boolean {
+  const normalized = normalizeAiAgentMediaMimeType(raw);
+  return Boolean(normalized) && AI_AGENT_AUDIO_MIME_TYPES.has(normalized);
+}
 
 export const AI_AGENT_IMAGE_MIME_TYPES = new Set([
   "image/jpeg",

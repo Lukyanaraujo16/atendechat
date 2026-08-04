@@ -328,6 +328,17 @@ export async function generateAndSendLiveResponseForLog(
           mediaType: classification.messageType
         });
 
+        // claimLiveSending exige liveStatus=GENERATED (máquina de estados).
+        // Sem este update o fallback de mídia nunca sai do QUEUED → cliente
+        // fica sem resposta após timeout de transcrição (sintoma 2.20).
+        await updateAiAgentLiveLog(logId, companyId, {
+          liveStatus: AI_AGENT_LIVE_STATUSES.GENERATED,
+          suggestedReply: prepared.clientFallbackMessage,
+          suggestionSource: "media_fallback",
+          errorCode: mapMediaPrepareError(prepared.errorCode),
+          generatedAt: new Date()
+        });
+
         const claimedSend = await claimLiveSending(logId, companyId);
         if (!claimedSend) {
           return;
@@ -365,6 +376,7 @@ export async function generateAndSendLiveResponseForLog(
           deliveryStatus: AI_AGENT_LIVE_DELIVERY_STATUSES.SENT,
           sendErrorCode: null,
           suggestedReply: prepared.clientFallbackMessage,
+          suggestionSource: "media_fallback",
           errorCode: mapMediaPrepareError(prepared.errorCode)
         });
         return;
