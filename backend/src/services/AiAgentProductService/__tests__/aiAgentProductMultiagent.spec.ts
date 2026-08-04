@@ -380,13 +380,15 @@ describe("Fase 2.9A — Product multiagente", () => {
         expect.any(Object)
       );
       expect(agentB.update).not.toHaveBeenCalled();
-      expect(waA.update).toHaveBeenCalledWith(
+      // Fase 2.19.1: desativa operação sem apagar aiAgentMode (live|shadow).
+      expect(waA.update).toHaveBeenCalledTimes(1);
+      const updatePayload = waA.update.mock.calls[0][0];
+      expect(updatePayload).toEqual(
         expect.objectContaining({
-          aiAgentMode: "disabled",
           aiAgentEnabled: false
-        }),
-        expect.any(Object)
+        })
       );
+      expect(updatePayload).not.toHaveProperty("aiAgentMode");
     });
   });
 
