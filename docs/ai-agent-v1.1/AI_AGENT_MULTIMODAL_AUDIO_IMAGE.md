@@ -1,12 +1,13 @@
-# AI Agent — Multimodal: áudio e imagem (Fase 2.17 + correção 2.20)
+# AI Agent — Multimodal: áudio e imagem (Fase 2.17 + 2.20 + 2.20.1)
 
 | Campo | Valor |
 |-------|-------|
 | **Produto** | StreamHUB Chat |
-| **Fase** | AI Agent V1.1 — 2.17 / 2.20 |
+| **Fase** | AI Agent V1.1 — 2.17 / 2.20 / 2.20.1 |
 | **Status** | Implementado |
 | **Commit 2.17** | `feat(ai-agent): adiciona compreensão de áudio e imagem` |
 | **Commit 2.20** | `fix(ai-agent): corrige transcrição de áudio no Live` |
+| **Commit 2.20.1** | `fix(ai-agent): corrige processamento real de áudio do WhatsApp` |
 
 ## 1. Arquitetura
 
@@ -59,6 +60,27 @@ Sintoma: áudio no Live iniciava “digitando…”, processava ~30–40s, encer
 Causa raiz: no fallback de mídia, `claimLiveSending` exige `liveStatus=generated`, mas o log ainda estava `queued` → claim falhava e o cliente não recebia nada.
 
 Correção: antes do claim de envio, o Live grava `GENERATED` + `suggestionSource=media_fallback` e só então faz o claim `SENDING`.
+
+### Correção 2.20.1 (transcrição real)
+
+Sintoma pós-2.20: fallback chega ao cliente, mas áudios válidos do WhatsApp ainda caem no fallback.
+
+Causas técnicas confirmadas:
+
+1. **Multipart quebrado (regressão 2.20):** sobrescrever `stream.path` com apenas o basename faz o `form-data` tentar `open()`/`stat()` nesse path relativo → `ENOENT` e falha da Whisper.
+2. **Persistência WhatsApp:** `Buffer.from(media.data, "base64")` sobre Buffer já binário do Baileys era frágil; download falho ainda criava Message sem arquivo.
+
+Correções:
+
+- Whisper via `FormData.append(file, { filename, contentType, knownLength })` **sem** alterar `stream.path`;
+- `coerceWhatsAppMediaBuffer` + falha explícita se write/download falhar;
+- códigos técnicos distinguíveis (`audio_provider_auth_failed`, `audio_file_missing`, …) nos logs;
+- inspeção por magic bytes (OggS, etc.);
+- script local `diagnoseAiAgentAudioTranscription.ts` (exige `AI_AGENT_AUDIO_DIAG=1`, não é HTTP).
+
+Fallback comercial permanece; logs mostram a causa técnica real.
+
+**Conversão ffmpeg:** não necessária — Whisper aceita OGG/Opus do WhatsApp quando o multipart está correto.
 
 ## 3. Imagem
 

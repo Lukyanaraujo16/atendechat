@@ -26,6 +26,7 @@ import CreateMessageService from "../MessageServices/CreateMessageService";
 import { incrementCompanyStorageUsage } from "../CompanyService/adjustCompanyStorageUsage";
 import { logger } from "../../utils/logger";
 import { isFlowBuilderDebugEnabled } from "../../utils/flowBuilderDebug";
+import { coerceWhatsAppMediaBuffer } from "../AiAgentService/inspectAiAgentAudioFile";
 import CreateOrUpdateContactService from "../ContactServices/CreateOrUpdateContactService";
 import FindOrCreateTicketService from "../TicketServices/FindOrCreateTicketService";
 import ShowTicketService from "../TicketServices/ShowTicketService";
@@ -658,15 +659,27 @@ const getContactMessage = async (
 };
 
 const downloadMedia = async (msg: proto.IWebMessageInfo) => {
-  let buffer;
+  let buffer: Buffer | undefined;
   try {
     // Baileys v7 alterou os tipos esperados por downloadMediaMessage
     // Mantemos o comportamento, apenas ajustando o cast de tipagem.
     buffer = await downloadMediaMessage(msg as any, "buffer", {});
   } catch (err) {
     console.error("Erro ao baixar mídia:", err);
+    return null;
+  }
 
-    // Trate o erro de acordo com as suas necessidades
+  if (!buffer || (Buffer.isBuffer(buffer) ? buffer.length === 0 : !(buffer as any)?.length)) {
+    logger.warn(
+      { messageId: msg.key?.id },
+      "[WhatsAppInbound] download_media_empty"
+    );
+    return null;
+  }
+
+  // Garantir Buffer binário
+  if (!Buffer.isBuffer(buffer)) {
+    buffer = Buffer.from(buffer as Uint8Array);
   }
 
   let filename = msg.message?.documentMessage?.fileName || "";
@@ -682,22 +695,26 @@ const downloadMedia = async (msg: proto.IWebMessageInfo) => {
       ?.imageMessage ||
     msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.videoMessage;
 
-  if (!mineType) console.log(msg);
+  if (!mineType) {
+    logger.warn(
+      { messageId: msg.key?.id },
+      "[WhatsAppInbound] download_media_missing_mimetype"
+    );
+    return null;
+  }
 
   if (!filename) {
-    const ext = mimeExtension(mineType.mimetype);
+    const ext = mimeExtension(mineType.mimetype) || "bin";
     filename = `${new Date().getTime()}.${ext}`;
   } else {
     filename = `${new Date().getTime()}_${filename}`;
   }
 
-  const media = {
+  return {
     data: buffer,
     mimetype: mineType.mimetype,
     filename
   };
-
-  return media;
 };
 
 const verifyContact = async (
@@ -1021,19 +1038,23 @@ const handleOpenAi = async (
     }
 
     const mediaUrl = mediaSent!.mediaUrl!.split("/").pop();
-    const file = fs.createReadStream(`${publicFolder}/${mediaUrl}`) as any;
+    const absolutePath = `${publicFolder}/${mediaUrl}`;
     const transResult = await executeOpenAiTranscription({
       companyId: ticket.companyId,
       ticketId: ticket.id,
       apiKey: prompt.apiKey,
-      file
+      absolutePath,
+      filename: mediaUrl || "audio.ogg",
+      mimeType: "audio/ogg"
     });
     if (transResult.ok === false) {
       logger.warn(
         {
           ticketId: ticket.id,
           companyId: ticket.companyId,
-          error: transResult.error
+          error: transResult.error,
+          httpStatus: transResult.httpStatus,
+          providerErrorCode: transResult.providerErrorCode
         },
         "[handleOpenAi] fallback ao cliente (transcrição)"
       );
@@ -1148,7 +1169,12 @@ export const verifyMediaMessage = async (
   }
 
   try {
-    const fileBuf = Buffer.from(media.data, "base64");
+    // Baileys `downloadMediaMessage(..., "buffer")` já devolve Buffer binário.
+    // Nunca decodificar como base64 — isso corrompe OGG/Opus do WhatsApp.
+    const fileBuf = coerceWhatsAppMediaBuffer(media.data);
+    if (!fileBuf.length) {
+      throw new Error("EMPTY_MEDIA_BUFFER");
+    }
     await writeFileAsync(
       join(__dirname, "..", "..", "..", "public", media.filename),
       fileBuf
@@ -1156,7 +1182,17 @@ export const verifyMediaMessage = async (
     void incrementCompanyStorageUsage(ticket.companyId, fileBuf.length);
   } catch (err) {
     Sentry.captureException(err);
-    logger.error(err);
+    logger.error(
+      { err, ticketId: ticket.id, messageId: msg.key?.id },
+      "[WhatsAppInbound] media_write_failed"
+    );
+    await verifyMessage(
+      msg,
+      ticket,
+      contact,
+      "[Mídia: não foi possível salvar o arquivo]"
+    );
+    return undefined;
   }
 
   const body = getBodyMessage(msg);

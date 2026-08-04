@@ -325,7 +325,8 @@ export async function generateAndSendLiveResponseForLog(
         await mergeAiAgentLiveLogMetadata(logId, companyId, {
           mediaErrorCode: prepared.errorCode,
           mediaAskRetry: prepared.askRetry,
-          mediaType: classification.messageType
+          mediaType: classification.messageType,
+          mediaTechnicalCode: prepared.technicalCode || null
         });
 
         // claimLiveSending exige liveStatus=GENERATED (máquina de estados).
@@ -368,6 +369,17 @@ export async function generateAndSendLiveResponseForLog(
           });
           return;
         }
+
+        emitAiAgentMediaMetric("ai_agent.audio_fallback_sent", {
+          companyId,
+          agentId: agent.id,
+          ticketId: freshTicket.id,
+          messageId: log.messageId,
+          provider: resolvedCred.provider,
+          mediaType: classification.messageType,
+          errorCode: prepared.errorCode,
+          result: "sent"
+        });
 
         await updateAiAgentLiveLog(logId, companyId, {
           liveStatus: AI_AGENT_LIVE_STATUSES.SENT,

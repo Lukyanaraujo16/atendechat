@@ -220,13 +220,15 @@ export const handleOpenAi = async (
     }
 
     const mediaUrl = mediaSent!.mediaUrl!.split("/").pop();
-    const file = fs.createReadStream(`${publicFolder}/${mediaUrl}`) as any;
+    const absolutePath = `${publicFolder}/${mediaUrl}`;
 
     const transResult = await executeOpenAiTranscription({
       companyId: ticket.companyId,
       ticketId: ticket.id,
       apiKey: openAiSettings.apiKey,
-      file
+      absolutePath,
+      filename: mediaUrl || "audio.ogg",
+      mimeType: "audio/ogg"
     });
     if (transResult.ok === false) {
       logger.warn(

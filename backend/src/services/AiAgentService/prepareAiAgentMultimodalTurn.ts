@@ -15,6 +15,7 @@ import {
   AiAgentPreparedImagePart,
   AiAgentPreparedMultimodalTurn
 } from "./aiAgentInputContent";
+import { mapLegacyTranscribeErrorToTechnicalCode } from "./aiAgentAudioTechnicalCodes";
 import { emitAiAgentMediaMetric } from "./emitAiAgentMediaMetric";
 import {
   guessMimeFromFilename,
@@ -45,6 +46,8 @@ export type PrepareAiAgentMultimodalTurnSuccess = {
 export type PrepareAiAgentMultimodalTurnFailure = {
   ok: false;
   errorCode: string;
+  /** Código técnico observável (não exibido ao cliente). */
+  technicalCode?: string;
   /** Mensagem natural para o cliente (assinada pelo caller). */
   clientFallbackMessage: string;
   /** true = pedir repetição; false = informar limitação. */
@@ -202,6 +205,7 @@ export async function prepareAiAgentMultimodalTurn(
       return {
         ok: false,
         errorCode: "model_incompatible",
+        technicalCode: "audio_provider_request_failed",
         clientFallbackMessage: AI_AGENT_AUDIO_FALLBACK_MESSAGE,
         askRetry: false
       };
@@ -210,6 +214,7 @@ export async function prepareAiAgentMultimodalTurn(
       return {
         ok: false,
         errorCode: "media_unavailable",
+        technicalCode: "audio_file_missing",
         clientFallbackMessage: AI_AGENT_AUDIO_FALLBACK_MESSAGE,
         askRetry: true
       };
@@ -222,6 +227,7 @@ export async function prepareAiAgentMultimodalTurn(
       return {
         ok: false,
         errorCode: "media_unavailable",
+        technicalCode: "audio_file_missing",
         clientFallbackMessage: AI_AGENT_AUDIO_FALLBACK_MESSAGE,
         askRetry: true
       };
@@ -234,6 +240,7 @@ export async function prepareAiAgentMultimodalTurn(
       return {
         ok: false,
         errorCode: "format_unsupported",
+        technicalCode: "audio_format_invalid",
         clientFallbackMessage: AI_AGENT_AUDIO_FALLBACK_MESSAGE,
         askRetry: true
       };
@@ -256,6 +263,9 @@ export async function prepareAiAgentMultimodalTurn(
       return {
         ok: false,
         errorCode: transcription.errorCode,
+        technicalCode:
+          transcription.technicalCode ||
+          mapLegacyTranscribeErrorToTechnicalCode(transcription.errorCode),
         clientFallbackMessage: AI_AGENT_AUDIO_FALLBACK_MESSAGE,
         askRetry: true
       };

@@ -5,9 +5,12 @@ import { logger } from "../../utils/logger";
  */
 export type AiAgentMediaMetricEvent =
   | "ai_agent.media_received"
+  | "ai_agent.audio_file_resolved"
   | "ai_agent.audio_transcription_started"
   | "ai_agent.audio_transcription_completed"
   | "ai_agent.audio_transcription_failed"
+  | "ai_agent.audio_fallback_sent"
+  | "ai_agent.audio_processing_completed"
   | "ai_agent.image_analysis_started"
   | "ai_agent.image_analysis_completed"
   | "ai_agent.image_analysis_failed";
@@ -19,11 +22,21 @@ export type AiAgentMediaMetricFields = {
   messageId?: string | null;
   provider?: string | null;
   model?: string | null;
+  transcriptionModel?: string | null;
   mediaType?: string | null;
   byteSize?: number | null;
   durationMs?: number | null;
   result?: string | null;
   errorCode?: string | null;
+  technicalCode?: string | null;
+  normalizedMimeType?: string | null;
+  detectedExtension?: string | null;
+  detectedContainer?: string | null;
+  magicHex?: string | null;
+  httpStatus?: number | null;
+  providerErrorCode?: string | null;
+  errorStage?: string | null;
+  timedOut?: boolean | null;
 };
 
 export function emitAiAgentMediaMetric(
@@ -42,6 +55,7 @@ export function emitAiAgentMediaMetric(
           : null,
         provider: fields.provider ?? null,
         model: fields.model ?? null,
+        transcriptionModel: fields.transcriptionModel ?? null,
         mediaType: fields.mediaType ?? null,
         byteSize:
           typeof fields.byteSize === "number" &&
@@ -54,7 +68,19 @@ export function emitAiAgentMediaMetric(
             ? fields.durationMs
             : null,
         result: fields.result ?? null,
-        errorCode: fields.errorCode ?? null
+        errorCode: fields.errorCode ?? null,
+        technicalCode: fields.technicalCode ?? null,
+        normalizedMimeType: fields.normalizedMimeType ?? null,
+        detectedExtension: fields.detectedExtension ?? null,
+        detectedContainer: fields.detectedContainer ?? null,
+        magicHex: fields.magicHex ?? null,
+        httpStatus:
+          typeof fields.httpStatus === "number" ? fields.httpStatus : null,
+        providerErrorCode: fields.providerErrorCode
+          ? String(fields.providerErrorCode).slice(0, 64)
+          : null,
+        errorStage: fields.errorStage ?? null,
+        timedOut: fields.timedOut === true
       },
       `[AiAgent][media] ${event}`
     );

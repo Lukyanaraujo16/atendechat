@@ -75,8 +75,59 @@ export type ExecuteOpenAiResult =
 
 export type ExecuteTranscriptionResult =
   | { ok: true; text: string; tokensUsed: number }
-  | { ok: false; error: "OPENAI_LIMIT_REACHED" }
-  | { ok: false; error: "OPENAI_API_ERROR" };
+  | {
+      ok: false;
+      error: "OPENAI_LIMIT_REACHED" | "OPENAI_API_ERROR" | "OPENAI_TIMEOUT";
+      httpStatus?: number | null;
+      providerErrorCode?: string | null;
+      timedOut?: boolean;
+      errorStage?: string | null;
+    };
+
+/**
+ * Sanitiza erro Axios/OpenAI para logs — sem API key, sem corpo de áudio.
+ */
+export function sanitizeOpenAiProviderError(err: unknown): {
+  httpStatus: number | null;
+  providerErrorCode: string | null;
+  timedOut: boolean;
+  errorStage: string;
+} {
+  const anyErr = err as {
+    code?: string;
+    message?: string;
+    response?: {
+      status?: number;
+      data?: { error?: { code?: string; type?: string } };
+    };
+  };
+  const httpStatus =
+    typeof anyErr?.response?.status === "number"
+      ? anyErr.response.status
+      : null;
+  const providerErrorCode =
+    anyErr?.response?.data?.error?.code ||
+    anyErr?.response?.data?.error?.type ||
+    (typeof anyErr?.code === "string" ? anyErr.code : null);
+  const msg = String(anyErr?.message || "");
+  const timedOut =
+    anyErr?.code === "ECONNABORTED" ||
+    /timeout/i.test(msg) ||
+    msg === "TRANSCRIBE_TIMEOUT";
+  let errorStage = "provider_request";
+  if (timedOut) errorStage = "timeout";
+  else if (httpStatus === 401 || httpStatus === 403) errorStage = "auth";
+  else if (httpStatus === 415 || httpStatus === 400) errorStage = "format";
+  else if (/ENOENT|EACCES|EISDIR/i.test(msg)) errorStage = "local_file";
+  return {
+    httpStatus,
+    providerErrorCode: providerErrorCode
+      ? String(providerErrorCode).slice(0, 64)
+      : null,
+    timedOut,
+    errorStage
+  };
+}
 
 async function countCallsToday(companyId: number): Promise<number> {
   const start = startOfDay(new Date());
@@ -215,18 +266,34 @@ export async function executeOpenAi(params: ExecuteOpenAiParams): Promise<Execut
 }
 
 /**
- * Transcrição Whisper: conta como 1 chamada no limite diário.
- * `filename` opcional garante extensão reconhecida pelo Whisper no multipart
- * (ex.: áudio WhatsApp salvo como `.oga` ou sem extensão útil).
+ * Transcrição Whisper via multipart controlado.
+ *
+ * NÃO sobrescreve `stream.path` com basename — o form-data usa path para
+ * fs.stat/open; basename relativo causa ENOENT e falha a transcrição.
+ *
+ * Prefira `absolutePath` (fluxo AI Agent). `file` permanece para compat legado.
  */
 export async function executeOpenAiTranscription(params: {
   companyId: number;
   ticketId?: number | null;
   apiKey: string;
-  file: NodeJS.ReadableStream;
+  /** Caminho absoluto local do áudio (recomendado). */
+  absolutePath?: string;
+  file?: NodeJS.ReadableStream;
   filename?: string;
+  mimeType?: string;
+  timeoutMs?: number;
 }): Promise<ExecuteTranscriptionResult> {
-  const { companyId, ticketId, apiKey, file, filename } = params;
+  const {
+    companyId,
+    ticketId,
+    apiKey,
+    absolutePath,
+    file,
+    filename,
+    mimeType,
+    timeoutMs
+  } = params;
 
   if (!(await canMakeOpenAiCalls(companyId, 1))) {
     logger.warn(
@@ -241,38 +308,142 @@ export async function executeOpenAiTranscription(params: {
     "[OpenAiManager] chamada OpenAI (transcrição Whisper)"
   );
 
-  try {
-    const configuration = new Configuration({ apiKey });
-    const openai = new OpenAIApi(configuration);
+  const FormData = (await import("form-data")).default;
+  const axios = (await import("axios")).default;
+  const fs = await import("fs");
+  const path = await import("path");
 
-    if (filename && file && typeof file === "object") {
-      // form-data usa stream.path (basename) como filename do multipart.
-      // Não reabre o arquivo — só altera o nome enviado à API.
-      try {
-        Object.defineProperty(file, "path", {
-          value: filename,
-          writable: true,
-          configurable: true
-        });
-      } catch {
-        (file as { path?: string }).path = filename;
+  let stream: NodeJS.ReadableStream | null = null;
+  let createdStream = false;
+
+  try {
+    const uploadName = String(
+      filename ||
+        (absolutePath ? path.basename(absolutePath) : "") ||
+        "audio.ogg"
+    ).replace(/[^\w.\-]+/g, "_");
+
+    const contentType =
+      String(mimeType || "audio/ogg")
+        .split(";")[0]
+        .trim() || "audio/ogg";
+
+    let knownLength: number | undefined;
+    if (absolutePath) {
+      const stat = await fs.promises.stat(absolutePath);
+      if (!stat.isFile() || stat.size <= 0) {
+        return {
+          ok: false,
+          error: "OPENAI_API_ERROR",
+          errorStage: "local_file",
+          providerErrorCode: "EMPTY_OR_MISSING_FILE"
+        };
       }
+      knownLength = stat.size;
+      stream = fs.createReadStream(absolutePath);
+      createdStream = true;
+    } else if (file) {
+      stream = file;
+    } else {
+      return {
+        ok: false,
+        error: "OPENAI_API_ERROR",
+        errorStage: "local_file",
+        providerErrorCode: "NO_FILE_INPUT"
+      };
     }
 
-    const transcription = await openai.createTranscription(
-      file as any,
-      "whisper-1"
+    const form = new FormData();
+    form.append("file", stream as any, {
+      filename: uploadName,
+      contentType,
+      knownLength
+    });
+    form.append("model", "whisper-1");
+
+    const response = await axios.post(
+      "https://api.openai.com/v1/audio/transcriptions",
+      form,
+      {
+        headers: {
+          ...form.getHeaders(),
+          Authorization: `Bearer ${apiKey}`
+        },
+        timeout: timeoutMs && timeoutMs > 0 ? timeoutMs : 45_000,
+        maxBodyLength: Infinity,
+        maxContentLength: Infinity,
+        validateStatus: () => true
+      }
     );
-    const text = transcription.data.text ?? "";
+
+    if (response.status === 401 || response.status === 403) {
+      return {
+        ok: false,
+        error: "OPENAI_API_ERROR",
+        httpStatus: response.status,
+        providerErrorCode:
+          response.data?.error?.code || response.data?.error?.type || "auth",
+        errorStage: "auth"
+      };
+    }
+
+    if (response.status < 200 || response.status >= 300) {
+      return {
+        ok: false,
+        error: "OPENAI_API_ERROR",
+        httpStatus: response.status,
+        providerErrorCode:
+          response.data?.error?.code ||
+          response.data?.error?.type ||
+          `http_${response.status}`,
+        errorStage:
+          response.status === 415 || response.status === 400
+            ? "format"
+            : "provider_request"
+      };
+    }
+
+    const text =
+      typeof response.data === "string"
+        ? response.data
+        : String(response.data?.text ?? "");
 
     await assertUnderLimitAndLog(companyId, ticketId, 0);
 
     return { ok: true, text, tokensUsed: 0 };
   } catch (err) {
+    const sanitized = sanitizeOpenAiProviderError(err);
     logger.error(
-      { err, companyId, ticketId, phase: "transcription" },
+      {
+        companyId,
+        ticketId,
+        phase: "transcription",
+        httpStatus: sanitized.httpStatus,
+        providerErrorCode: sanitized.providerErrorCode,
+        errorStage: sanitized.errorStage,
+        timedOut: sanitized.timedOut
+      },
       "[OpenAiManager] OPENAI_API_ERROR"
     );
-    return { ok: false, error: "OPENAI_API_ERROR" };
+    return {
+      ok: false,
+      error: sanitized.timedOut ? "OPENAI_TIMEOUT" : "OPENAI_API_ERROR",
+      httpStatus: sanitized.httpStatus,
+      providerErrorCode: sanitized.providerErrorCode,
+      timedOut: sanitized.timedOut,
+      errorStage: sanitized.errorStage
+    };
+  } finally {
+    if (
+      createdStream &&
+      stream &&
+      typeof (stream as any).destroy === "function"
+    ) {
+      try {
+        (stream as any).destroy();
+      } catch {
+        /* ignore */
+      }
+    }
   }
 }
