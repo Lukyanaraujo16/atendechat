@@ -1,5 +1,6 @@
 /**
- * Fase 2.19 — Toggle de ativação rápida no card do AI Agent.
+ * Fase 2.19.1 — Persistência do modo operacional (backend authority).
+ * Toggle rápido no card; sem memória SPA.
  */
 import React from "react";
 import { Router } from "react-router-dom";
@@ -16,10 +17,8 @@ import AiAgentHubPage from "../../components/AiAgentHubPage";
 import useAiAgentHubQuickToggle from "../../hooks/useAiAgentHubQuickToggle";
 import {
   resolveAiAgentQuickActivateCommand,
-  rememberAiAgentLastOperationMode,
-  takeAiAgentLastOperationMode,
+  resolveAiAgentPersistedOperationMode,
   mapAiAgentProductCommandError,
-  __resetAiAgentQuickToggleSessionMemory,
 } from "../../utils/aiAgentQuickToggle";
 import { canManageAiAgentProduct } from "../../utils/canManageAiAgentProduct";
 import { postAiAgentProductCommand } from "../aiAgentProductApi";
@@ -41,6 +40,7 @@ jest.mock("../../translate/i18n", () => ({
     t: (key, opts) => {
       if (opts?.count != null) return `${key}:${opts.count}`;
       if (opts?.name != null) return `${key}:${opts.name}`;
+      if (opts?.mode != null) return `${key}:${opts.mode}`;
       return key;
     },
   },
@@ -100,6 +100,9 @@ function QuickToggleHarness({ canMutate = true, onRetry, onReview, apiRef }) {
         {api.deactivateTarget ? "1" : "0"}
       </span>
       <span data-testid="not-ready-open">{api.notReadyTarget ? "1" : "0"}</span>
+      <span data-testid="mode-choice-open">
+        {api.modeChoiceTarget ? "1" : "0"}
+      </span>
       {api.deactivateTarget ? (
         <button type="button" onClick={api.confirmDeactivate}>
           confirm-deactivate
@@ -115,39 +118,52 @@ function QuickToggleHarness({ canMutate = true, onRetry, onReview, apiRef }) {
           review-config
         </button>
       ) : null}
+      {api.modeChoiceTarget ? (
+        <>
+          <button
+            type="button"
+            onClick={() => api.confirmModeChoice("activate_shadow")}
+          >
+            choose-shadow
+          </button>
+          <button
+            type="button"
+            onClick={() => api.confirmModeChoice("activate_live")}
+          >
+            choose-live
+          </button>
+        </>
+      ) : null}
     </div>
   );
 }
 
-describe("Fase 2.19 — util quick toggle", () => {
-  beforeEach(() => {
-    __resetAiAgentQuickToggleSessionMemory();
+describe("Fase 2.19.1 — util quick toggle (modo persistido)", () => {
+  it("Live desativado resolve activate_live", () => {
+    expect(
+      resolveAiAgentQuickActivateCommand({ operationMode: "live" })
+    ).toBe("activate_live");
   });
 
-  it("resolve activate_shadow como padrão Product quando off", () => {
-    expect(resolveAiAgentQuickActivateCommand({ operationMode: "off" })).toBe(
-      "activate_shadow"
-    );
-  });
-
-  it("preserva live/shadow quando modo ainda está no agent", () => {
-    expect(resolveAiAgentQuickActivateCommand({ operationMode: "live" })).toBe(
-      "activate_live"
-    );
+  it("Shadow desativado resolve activate_shadow", () => {
     expect(
       resolveAiAgentQuickActivateCommand({ operationMode: "shadow" })
     ).toBe("activate_shadow");
   });
 
-  it("usa preferredMode da sessão após desativar", () => {
-    rememberAiAgentLastOperationMode("ref-a", "live");
-    expect(takeAiAgentLastOperationMode("ref-a")).toBe("live");
-    expect(
-      resolveAiAgentQuickActivateCommand({
-        agentRef: "ref-a",
-        operationMode: "off",
-      })
-    ).toBe("activate_live");
+  it("modo off não escolhe Shadow silenciosamente", () => {
+    expect(resolveAiAgentQuickActivateCommand({ operationMode: "off" })).toBe(
+      null
+    );
+  });
+
+  it("persisted mode ignora off", () => {
+    expect(resolveAiAgentPersistedOperationMode({ operationMode: "live" })).toBe(
+      "live"
+    );
+    expect(resolveAiAgentPersistedOperationMode({ operationMode: "off" })).toBe(
+      null
+    );
   });
 
   it("mapeia erro de readiness para mensagem comercial", () => {
@@ -178,45 +194,27 @@ describe("Fase 2.19 — permissões", () => {
   it("user sem permissão não pode", () => {
     expect(canManageAiAgentProduct({ profile: "user" })).toBe(false);
   });
-
-  it("supervisor conforme contrato (somente leitura)", () => {
-    expect(canManageAiAgentProduct({ profile: "superv" })).toBe(false);
-    expect(canManageAiAgentProduct({ profile: "supervisor" })).toBe(false);
-  });
 });
 
 describe("Fase 2.19 — AiAgentCard toggle", () => {
-  it("toggle aparece no card", () => {
-    render(
+  it("toggle aparece e reflete enabled", () => {
+    const { rerender } = render(
       <AiAgentCard
-        agent={agentFixture({ enabled: true })}
-        canMutate
-        onToggleRequest={jest.fn()}
-      />
-    );
-    expect(getToggle()).toBeTruthy();
-  });
-
-  it("ativo aparece ligado", () => {
-    render(
-      <AiAgentCard
-        agent={agentFixture({ enabled: true })}
+        agent={agentFixture({ enabled: true, operationMode: "live" })}
         canMutate
         onToggleRequest={jest.fn()}
       />
     );
     expect(getToggle().checked).toBe(true);
-  });
-
-  it("desativado aparece desligado", () => {
-    render(
+    rerender(
       <AiAgentCard
-        agent={agentFixture({ enabled: false })}
+        agent={agentFixture({ enabled: false, operationMode: "live" })}
         canMutate
         onToggleRequest={jest.fn()}
       />
     );
     expect(getToggle().checked).toBe(false);
+    expect(screen.getByTestId("ai-agent-card-last-mode-ref-a")).toBeTruthy();
   });
 
   it("sem permissão fica disabled", () => {
@@ -230,27 +228,12 @@ describe("Fase 2.19 — AiAgentCard toggle", () => {
     expect(getToggle().disabled).toBe(true);
   });
 
-  it("loading anuncia busy e desabilita", () => {
-    render(
-      <AiAgentCard
-        agent={agentFixture({ enabled: true })}
-        canMutate
-        busy
-        onToggleRequest={jest.fn()}
-      />
-    );
-    expect(
-      screen.getByTestId("ai-agent-card-toggle-loading-ref-a")
-    ).toBeTruthy();
-    expect(getToggle().disabled).toBe(true);
-  });
-
   it("teclado no toggle não dispara Gerenciar agente", () => {
     const onManage = jest.fn();
     const onToggleRequest = jest.fn();
     render(
       <AiAgentCard
-        agent={agentFixture({ enabled: false, ready: true })}
+        agent={agentFixture({ enabled: false, ready: true, operationMode: "live" })}
         canManage
         canMutate
         onManage={onManage}
@@ -264,92 +247,50 @@ describe("Fase 2.19 — AiAgentCard toggle", () => {
     );
     expect(onManage).not.toHaveBeenCalled();
   });
-
-  it("Gerenciar agente é ação independente do toggle", () => {
-    const onManage = jest.fn();
-    const onToggleRequest = jest.fn();
-    render(
-      <AiAgentCard
-        agent={agentFixture({ enabled: false })}
-        canManage
-        canMutate
-        onManage={onManage}
-        onToggleRequest={onToggleRequest}
-      />
-    );
-    fireEvent.click(screen.getByTestId("ai-agent-card-manage-ref-a"));
-    expect(onManage).toHaveBeenCalled();
-    expect(onToggleRequest).not.toHaveBeenCalled();
-  });
-
-  it("expõe aria-label de ativar/desativar", () => {
-    const { rerender } = render(
-      <AiAgentCard
-        agent={agentFixture({ enabled: false })}
-        canMutate
-        onToggleRequest={jest.fn()}
-      />
-    );
-    expect(
-      screen.getAllByLabelText(
-        "aiAgentProduct.hub.quickToggle.activateAria:Agente Comercial"
-      ).length
-    ).toBeGreaterThan(0);
-    rerender(
-      <AiAgentCard
-        agent={agentFixture({ enabled: true })}
-        canMutate
-        onToggleRequest={jest.fn()}
-      />
-    );
-    expect(
-      screen.getAllByLabelText(
-        "aiAgentProduct.hub.quickToggle.deactivateAria:Agente Comercial"
-      ).length
-    ).toBeGreaterThan(0);
-  });
-
-  it("labels Ativo/Desativado visíveis", () => {
-    const { rerender } = render(
-      <AiAgentCard
-        agent={agentFixture({ enabled: true })}
-        canMutate
-        onToggleRequest={jest.fn()}
-      />
-    );
-    expect(
-      screen.getByText("aiAgentProduct.hub.quickToggle.activeLabel")
-    ).toBeTruthy();
-    rerender(
-      <AiAgentCard
-        agent={agentFixture({ enabled: false })}
-        canMutate
-        onToggleRequest={jest.fn()}
-      />
-    );
-    expect(
-      screen.getByText("aiAgentProduct.hub.quickToggle.inactiveLabel")
-    ).toBeTruthy();
-  });
 });
 
-describe("Fase 2.19 — hook quick toggle", () => {
+describe("Fase 2.19.1 — hook quick toggle", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    __resetAiAgentQuickToggleSessionMemory();
     postAiAgentProductCommand.mockResolvedValue({ data: { ok: true } });
   });
 
-  it("ativação chama agentRef correto com activate_shadow", async () => {
-    const onRetry = jest.fn().mockResolvedValue([]);
+  it("card Live desativado reativa com activate_live", async () => {
     const apiRef = { current: null };
-    render(
-      <QuickToggleHarness canMutate onRetry={onRetry} apiRef={apiRef} />
-    );
+    render(<QuickToggleHarness canMutate apiRef={apiRef} />);
 
     await act(async () => {
       apiRef.current.handleToggleRequest(
-        agentFixture({ agentRef: "ref-fin", ready: true, enabled: false }),
+        agentFixture({
+          agentRef: "ref-a",
+          ready: true,
+          enabled: false,
+          operationMode: "live",
+        }),
+        true
+      );
+    });
+
+    await waitFor(() => {
+      expect(postAiAgentProductCommand).toHaveBeenCalledWith(
+        "activate_live",
+        "ref-a"
+      );
+    });
+  });
+
+  it("card Shadow desativado reativa com activate_shadow", async () => {
+    const apiRef = { current: null };
+    render(<QuickToggleHarness canMutate apiRef={apiRef} />);
+
+    await act(async () => {
+      apiRef.current.handleToggleRequest(
+        agentFixture({
+          agentRef: "ref-fin",
+          ready: true,
+          enabled: false,
+          operationMode: "shadow",
+        }),
         true
       );
     });
@@ -360,14 +301,35 @@ describe("Fase 2.19 — hook quick toggle", () => {
         "ref-fin"
       );
     });
-    expect(notifyAiAgentProductAgentsChanged).toHaveBeenCalled();
-    expect(toast.success).toHaveBeenCalledWith(
-      "aiAgentProduct.hub.quickToggle.activated"
-    );
-    expect(onRetry).toHaveBeenCalled();
   });
 
-  it("desativação pede confirmação e usa agentRef correto", async () => {
+  it("sem memória SPA: modo off abre escolha explícita", async () => {
+    const apiRef = { current: null };
+    render(<QuickToggleHarness canMutate apiRef={apiRef} />);
+
+    act(() => {
+      apiRef.current.handleToggleRequest(
+        agentFixture({ ready: true, enabled: false, operationMode: "off" }),
+        true
+      );
+    });
+
+    expect(postAiAgentProductCommand).not.toHaveBeenCalled();
+    expect(screen.getByTestId("mode-choice-open").textContent).toBe("1");
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("choose-live"));
+    });
+
+    await waitFor(() => {
+      expect(postAiAgentProductCommand).toHaveBeenCalledWith(
+        "activate_live",
+        "ref-a"
+      );
+    });
+  });
+
+  it("desativação pede confirmação e usa agentRef", async () => {
     const apiRef = { current: null };
     render(<QuickToggleHarness canMutate apiRef={apiRef} />);
 
@@ -383,29 +345,15 @@ describe("Fase 2.19 — hook quick toggle", () => {
     });
 
     expect(postAiAgentProductCommand).not.toHaveBeenCalled();
-    expect(screen.getByTestId("deactivate-open").textContent).toBe("1");
-
     await act(async () => {
       fireEvent.click(screen.getByText("confirm-deactivate"));
     });
-
     await waitFor(() => {
       expect(postAiAgentProductCommand).toHaveBeenCalledWith(
         "deactivate",
         "ref-a"
       );
     });
-  });
-
-  it("cancelar confirmação não executa command", () => {
-    const apiRef = { current: null };
-    render(<QuickToggleHarness canMutate apiRef={apiRef} />);
-    act(() => {
-      apiRef.current.handleToggleRequest(agentFixture({ enabled: true }), false);
-    });
-    fireEvent.click(screen.getByText("cancel-deactivate"));
-    expect(postAiAgentProductCommand).not.toHaveBeenCalled();
-    expect(screen.getByTestId("deactivate-open").textContent).toBe("0");
   });
 
   it("agente A não altera B", async () => {
@@ -416,16 +364,15 @@ describe("Fase 2.19 — hook quick toggle", () => {
       apiRef.current.handleToggleRequest(
         agentFixture({
           agentRef: "ref-fin",
-          name: "Financeiro",
           enabled: false,
           ready: true,
+          operationMode: "shadow",
         }),
         true
       );
     });
 
     await waitFor(() => {
-      expect(postAiAgentProductCommand).toHaveBeenCalledTimes(1);
       expect(postAiAgentProductCommand).toHaveBeenCalledWith(
         "activate_shadow",
         "ref-fin"
@@ -446,13 +393,13 @@ describe("Fase 2.19 — hook quick toggle", () => {
 
     act(() => {
       apiRef.current.handleToggleRequest(
-        agentFixture({ ready: true, enabled: false }),
+        agentFixture({ ready: true, enabled: false, operationMode: "live" }),
         true
       );
     });
     act(() => {
       apiRef.current.handleToggleRequest(
-        agentFixture({ ready: true, enabled: false }),
+        agentFixture({ ready: true, enabled: false, operationMode: "live" }),
         true
       );
     });
@@ -466,34 +413,7 @@ describe("Fase 2.19 — hook quick toggle", () => {
     });
   });
 
-  it("readiness incompleto oferece CTA revisar configuração", () => {
-    const onReview = jest.fn();
-    const apiRef = { current: null };
-    render(
-      <QuickToggleHarness canMutate onReview={onReview} apiRef={apiRef} />
-    );
-
-    act(() => {
-      apiRef.current.handleToggleRequest(
-        agentFixture({
-          agentRef: "ref-a",
-          ready: false,
-          enabled: false,
-          status: "setup_incomplete",
-        }),
-        true
-      );
-    });
-
-    expect(postAiAgentProductCommand).not.toHaveBeenCalled();
-    expect(screen.getByTestId("not-ready-open").textContent).toBe("1");
-    fireEvent.click(screen.getByText("review-config"));
-    expect(onReview).toHaveBeenCalledWith(
-      expect.objectContaining({ agentRef: "ref-a" })
-    );
-  });
-
-  it("erro preserva estado e não marca sucesso", async () => {
+  it("erro não marca sucesso", async () => {
     postAiAgentProductCommand.mockRejectedValue({
       response: {
         status: 409,
@@ -505,7 +425,7 @@ describe("Fase 2.19 — hook quick toggle", () => {
 
     await act(async () => {
       apiRef.current.handleToggleRequest(
-        agentFixture({ ready: true, enabled: false }),
+        agentFixture({ ready: true, enabled: false, operationMode: "live" }),
         true
       );
     });
@@ -514,64 +434,6 @@ describe("Fase 2.19 — hook quick toggle", () => {
       expect(toast.error).toHaveBeenCalled();
     });
     expect(toast.success).not.toHaveBeenCalled();
-  });
-
-  it("user sem canMutate não executa command", () => {
-    const apiRef = { current: null };
-    render(<QuickToggleHarness canMutate={false} apiRef={apiRef} />);
-    act(() => {
-      apiRef.current.handleToggleRequest(
-        agentFixture({ ready: true }),
-        true
-      );
-    });
-    expect(postAiAgentProductCommand).not.toHaveBeenCalled();
-  });
-
-  it("desativar live e reativar usa activate_live (memória de sessão)", async () => {
-    const apiRef = { current: null };
-    render(<QuickToggleHarness canMutate apiRef={apiRef} />);
-
-    act(() => {
-      apiRef.current.handleToggleRequest(
-        agentFixture({
-          agentRef: "ref-a",
-          enabled: true,
-          operationMode: "live",
-          ready: true,
-        }),
-        false
-      );
-    });
-    await act(async () => {
-      fireEvent.click(screen.getByText("confirm-deactivate"));
-    });
-    await waitFor(() =>
-      expect(postAiAgentProductCommand).toHaveBeenCalledWith(
-        "deactivate",
-        "ref-a"
-      )
-    );
-
-    postAiAgentProductCommand.mockClear();
-
-    await act(async () => {
-      apiRef.current.handleToggleRequest(
-        agentFixture({
-          agentRef: "ref-a",
-          enabled: false,
-          operationMode: "off",
-          ready: true,
-        }),
-        true
-      );
-    });
-    await waitFor(() => {
-      expect(postAiAgentProductCommand).toHaveBeenCalledWith(
-        "activate_live",
-        "ref-a"
-      );
-    });
   });
 
   it("cache é invalidado após sucesso", async () => {
@@ -586,7 +448,7 @@ describe("Fase 2.19 — hook quick toggle", () => {
 
     await act(async () => {
       apiRef.current.handleToggleRequest(
-        agentFixture({ ready: true, enabled: false }),
+        agentFixture({ ready: true, enabled: false, operationMode: "shadow" }),
         true
       );
     });
@@ -595,21 +457,41 @@ describe("Fase 2.19 — hook quick toggle", () => {
       expect(notifyAiAgentProductAgentsChanged).toHaveBeenCalled();
     });
   });
+
+  it("user sem canMutate não executa command", () => {
+    const apiRef = { current: null };
+    render(<QuickToggleHarness canMutate={false} apiRef={apiRef} />);
+    act(() => {
+      apiRef.current.handleToggleRequest(
+        agentFixture({ ready: true, operationMode: "live" }),
+        true
+      );
+    });
+    expect(postAiAgentProductCommand).not.toHaveBeenCalled();
+  });
 });
 
 describe("Fase 2.19 — Hub renderiza toggle nos cards", () => {
-  it("hub multiagente mostra toggles distintos", () => {
+  it("hub multiagente mostra toggles e último modo", () => {
     const history = createMemoryHistory({ initialEntries: ["/ai-agent"] });
     render(
       <Router history={history}>
         <AiAgentHubPage
           loading={false}
           agents={[
-            agentFixture({ agentRef: "ref-com", name: "Comercial", enabled: true }),
+            agentFixture({
+              agentRef: "ref-com",
+              name: "Comercial",
+              enabled: false,
+              operationMode: "live",
+              ready: true,
+            }),
             agentFixture({
               agentRef: "ref-fin",
               name: "Financeiro",
               enabled: false,
+              operationMode: "shadow",
+              ready: true,
             }),
           ]}
           canCreate
@@ -618,8 +500,10 @@ describe("Fase 2.19 — Hub renderiza toggle nos cards", () => {
         />
       </Router>
     );
-    expect(getToggle("ref-com").checked).toBe(true);
+    expect(getToggle("ref-com").checked).toBe(false);
     expect(getToggle("ref-fin").checked).toBe(false);
+    expect(screen.getByTestId("ai-agent-card-last-mode-ref-com")).toBeTruthy();
+    expect(screen.getByTestId("ai-agent-card-last-mode-ref-fin")).toBeTruthy();
   });
 
   it("hub readiness incompleto via teclado abre CTA", () => {

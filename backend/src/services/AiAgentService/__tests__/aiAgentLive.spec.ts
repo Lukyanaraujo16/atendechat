@@ -227,6 +227,56 @@ describe("AiAgent live mode 1.4", () => {
     ).toBe("live");
   });
 
+  it("enabled=false + mode live → não elegível (modo preservado)", async () => {
+    mockedBuildCtx.mockResolvedValue({
+      planHasAiAgent: true,
+      whatsapp: whatsapp({
+        id: 3,
+        aiAgentMode: "live",
+        aiAgentEnabled: false,
+        aiAgentId: 9
+      }),
+      aiAgent: agent({ id: 9, enabled: false }),
+      ticket: ticket({
+        id: 1,
+        status: "pending",
+        userId: null,
+        aiAgentPaused: false,
+        chatbot: false,
+        isGroup: false,
+        queueId: null
+      })
+    });
+
+    const result = await AiAgentOrchestrator.evaluateInboundMessage({
+      companyId: 1,
+      ticket: ticket({
+        id: 1,
+        status: "pending",
+        userId: null,
+        chatbot: false,
+        isGroup: false,
+        queueId: null
+      }),
+      contact: contact({ id: 2 }),
+      whatsapp: whatsapp({
+        id: 3,
+        aiAgentMode: "live",
+        aiAgentEnabled: false,
+        aiAgentId: 9
+      }),
+      message: {
+        id: "MSG-OFF",
+        fromMe: false,
+        body: "Olá",
+        classification: textClassification
+      }
+    });
+
+    expect(result.eligible).toBe(false);
+    expect(result.reason).toBe("ai_agent_disabled");
+  });
+
   it("live não responde se ticket tem userId", async () => {
     mockedBuildCtx.mockResolvedValue({
       planHasAiAgent: true,

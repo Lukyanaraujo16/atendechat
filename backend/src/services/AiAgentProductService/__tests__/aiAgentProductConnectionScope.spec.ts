@@ -370,8 +370,18 @@ describe("ExecuteAiAgentProductCommandService — escopo Opção A", () => {
       { enabled: false },
       expect.any(Object)
     );
-    expect(waA.update).toHaveBeenCalled();
-    expect(waB.update).toHaveBeenCalled();
+    expect(waA.update).toHaveBeenCalledWith(
+      { aiAgentEnabled: false },
+      expect.any(Object)
+    );
+    expect(waB.update).toHaveBeenCalledWith(
+      { aiAgentEnabled: false },
+      expect.any(Object)
+    );
+    expect(waA.update).not.toHaveBeenCalledWith(
+      expect.objectContaining({ aiAgentMode: "disabled" }),
+      expect.any(Object)
+    );
     expect(result.affectedConnections.toMode).toBe("off");
   });
 

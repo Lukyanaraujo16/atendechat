@@ -1,69 +1,38 @@
 /**
- * Toggle rápido no card do Hub (Fase 2.19).
+ * Toggle rápido no card do Hub (Fase 2.19 / 2.19.1).
  * Controla enabled/disabled via commands Product; não é seletor de modo.
+ * Autoridade do último modo: backend (aiAgentMode preservado nas conexões).
  */
 import { i18n } from "../translate/i18n";
 
 const ACTIVATE_COMMANDS = new Set(["activate_shadow", "activate_live"]);
 
-/** Memória de sessão (SPA) do último modo ao desativar pelo toggle. Sem migration. */
-const lastOperationModeByAgentRef = Object.create(null);
-
 /**
- * Resolve o command de ativação sem inventar Live arbitrariamente.
+ * Resolve o command de ativação a partir do modo persistido no Product.
  *
- * Ordem:
- * 1. preferredMode explícito;
- * 2. memória de sessão do card (após desativar no Hub);
- * 3. operationMode atual se ainda for live/shadow;
- * 4. regra oficial Product quando off: activate_shadow.
+ * - live → activate_live
+ * - shadow → activate_shadow
+ * - off/ausente → null (exige escolha explícita; sem fallback Shadow silencioso)
  *
- * @param {{ agentRef?: string, operationMode?: string } | null | undefined} agent
- * @param {"live"|"shadow"|null|undefined} [preferredMode]
- * @returns {"activate_shadow"|"activate_live"}
+ * @param {{ operationMode?: string } | null | undefined} agent
+ * @returns {"activate_shadow"|"activate_live"|null}
  */
-export function resolveAiAgentQuickActivateCommand(agent, preferredMode) {
-  const preferred = String(
-    preferredMode || takeAiAgentLastOperationMode(agent?.agentRef) || ""
-  ).toLowerCase();
-  if (preferred === "live") return "activate_live";
-  if (preferred === "shadow") return "activate_shadow";
-
+export function resolveAiAgentQuickActivateCommand(agent) {
   const mode = String(agent?.operationMode || "off").toLowerCase();
   if (mode === "live") return "activate_live";
   if (mode === "shadow") return "activate_shadow";
-  return "activate_shadow";
+  return null;
 }
 
 export function isAiAgentQuickActivateCommand(command) {
   return ACTIVATE_COMMANDS.has(String(command || ""));
 }
 
-/**
- * Memória de sessão do último modo operacional ao desativar pelo toggle.
- * Não persiste no backend (sem migration); após full reload da página usa a regra Product.
- */
-export function rememberAiAgentLastOperationMode(agentRef, mode) {
-  const ref = String(agentRef || "").trim();
-  if (!ref) return;
-  const normalized = String(mode || "").toLowerCase();
-  if (normalized === "live" || normalized === "shadow") {
-    lastOperationModeByAgentRef[ref] = normalized;
-  }
-}
-
-export function takeAiAgentLastOperationMode(agentRef) {
-  const ref = String(agentRef || "").trim();
-  if (!ref) return null;
-  const mode = lastOperationModeByAgentRef[ref];
-  return mode === "live" || mode === "shadow" ? mode : null;
-}
-
-/** Apenas testes. */
-export function __resetAiAgentQuickToggleSessionMemory() {
-  Object.keys(lastOperationModeByAgentRef).forEach((key) => {
-    delete lastOperationModeByAgentRef[key];
-  });
+/** Modo persistido recuperável para UI (mesmo com enabled=false). */
+export function resolveAiAgentPersistedOperationMode(agent) {
+  const mode = String(agent?.operationMode || "off").toLowerCase();
+  if (mode === "live" || mode === "shadow") return mode;
+  return null;
 }
 
 export function mapAiAgentProductCommandError(err) {

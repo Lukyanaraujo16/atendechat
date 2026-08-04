@@ -2831,6 +2831,12 @@ const messages = {
               "Este agente ainda precisa de alguns ajustes antes de ser ativado.",
             connectionHint:
               "Revise a credencial e a conexão vinculada para continuar.",
+            lastModeLabel: "Último modo: {{mode}}",
+            modeChoiceTitle: "Como deseja ativar o agente?",
+            modeChoiceBody:
+              "Não encontramos um modo anterior salvo. Escolha se o agente deve operar em modo de testes ou em atendimento automático.",
+            modeChoiceShadow: "Ativar em modo de testes",
+            modeChoiceLive: "Ativar atendimento automático",
           },
         },
         loading: {

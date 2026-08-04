@@ -333,7 +333,7 @@ describe("ExecuteAiAgentProductCommandService (Fase 2.2)", () => {
     );
   });
 
-  it("live → deactivate preserva aiAgentId", async () => {
+  it("live → deactivate preserva aiAgentId e aiAgentMode", async () => {
     const agent = makeAgent({ enabled: true });
     const wa = makeWa({
       aiAgentMode: "live",
@@ -345,7 +345,7 @@ describe("ExecuteAiAgentProductCommandService (Fase 2.2)", () => {
     mockSummary.mockResolvedValue(
       summaryPayload({
         status: "ready_to_activate",
-        mode: "off",
+        mode: "live",
         agent: { exists: true, id: 1, name: "Bot", enabled: false }
       })
     );
@@ -361,12 +361,121 @@ describe("ExecuteAiAgentProductCommandService (Fase 2.2)", () => {
       expect.any(Object)
     );
     expect(wa.update).toHaveBeenCalledWith(
-      { aiAgentMode: "disabled", aiAgentEnabled: false },
+      { aiAgentEnabled: false },
+      expect.any(Object)
+    );
+    expect(wa.update).not.toHaveBeenCalledWith(
+      expect.objectContaining({ aiAgentMode: "disabled" }),
       expect.any(Object)
     );
     expect(result.summary.status).toBe("ready_to_activate");
-    expect(result.summary.mode).toBe("off");
+    expect(result.summary.mode).toBe("live");
     expect(result.summary.status).not.toBe("paused");
+  });
+
+  it("shadow → deactivate preserva aiAgentMode shadow", async () => {
+    const agent = makeAgent({ enabled: true });
+    const wa = makeWa({
+      aiAgentMode: "shadow",
+      aiAgentEnabled: true,
+      aiAgentId: 1
+    });
+    mockSingleAgent(agent);
+    mockWaFindAll.mockResolvedValue([wa]);
+    mockSummary.mockResolvedValue(
+      summaryPayload({
+        status: "ready_to_activate",
+        mode: "shadow",
+        agent: { exists: true, id: 1, name: "Bot", enabled: false }
+      })
+    );
+
+    const result = await ExecuteAiAgentProductCommandService({
+      companyId: 10,
+      req: adminReq(),
+      body: { command: "deactivate" }
+    });
+
+    expect(wa.update).toHaveBeenCalledWith(
+      { aiAgentEnabled: false },
+      expect.any(Object)
+    );
+    expect(result.summary.mode).toBe("shadow");
+  });
+
+  it("live desativado → activate_live restaura live", async () => {
+    const agent = makeAgent({ enabled: false });
+    const wa = makeWa({
+      aiAgentMode: "live",
+      aiAgentEnabled: false,
+      aiAgentId: 1
+    });
+    mockSingleAgent(agent);
+    mockWaFindAll.mockResolvedValue([wa]);
+
+    const result = await ExecuteAiAgentProductCommandService({
+      companyId: 10,
+      req: adminReq(),
+      body: { command: "activate_live" }
+    });
+
+    expect(agent.update).toHaveBeenCalledWith(
+      { enabled: true },
+      expect.any(Object)
+    );
+    expect(wa.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        aiAgentMode: "live",
+        aiAgentEnabled: true
+      }),
+      expect.any(Object)
+    );
+    expect(result.command).toBe("activate_live");
+  });
+
+  it("shadow desativado → activate_shadow restaura shadow", async () => {
+    const agent = makeAgent({ enabled: false });
+    const wa = makeWa({
+      aiAgentMode: "shadow",
+      aiAgentEnabled: false,
+      aiAgentId: 1
+    });
+    mockSingleAgent(agent);
+    mockWaFindAll.mockResolvedValue([wa]);
+
+    const result = await ExecuteAiAgentProductCommandService({
+      companyId: 10,
+      req: adminReq(),
+      body: { command: "activate_shadow" }
+    });
+
+    expect(wa.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        aiAgentMode: "shadow",
+        aiAgentEnabled: true
+      }),
+      expect.any(Object)
+    );
+    expect(result.command).toBe("activate_shadow");
+  });
+
+  it("deactivate já off (enabled false + aiAgentEnabled false) → changed:false", async () => {
+    const agent = makeAgent({ enabled: false });
+    const wa = makeWa({
+      aiAgentMode: "live",
+      aiAgentEnabled: false
+    });
+    mockSingleAgent(agent);
+    mockWaFindAll.mockResolvedValue([wa]);
+
+    const result = await ExecuteAiAgentProductCommandService({
+      companyId: 10,
+      req: adminReq(),
+      body: { command: "deactivate" }
+    });
+
+    expect(result.changed).toBe(false);
+    expect(wa.update).not.toHaveBeenCalled();
   });
 
   it("comando repetido é idempotente (changed:false)", async () => {

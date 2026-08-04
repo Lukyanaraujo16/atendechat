@@ -108,7 +108,7 @@ Endpoints `/ai-agents*` **não são removidos** nesta fase.
 
 | Comando | Endpoint | Quem usa |
 |---------|----------|----------|
-| activate_shadow / activate_live / deactivate | `POST /product/ai-agent/commands` (+ agent-scoped `/agents/:agentRef/commands`) | Experience Layer `/ai-agent`, Hub card toggle (Fase 2.19) |
+| activate_shadow / activate_live / deactivate | `POST /product/ai-agent/commands` (+ agent-scoped `/agents/:agentRef/commands`) | Experience Layer `/ai-agent`, Hub card toggle (Fase 2.19 / 2.19.1; deactivate preserva `aiAgentMode`) |
 
 ### Endpoints legados que alteram `enabled` / modo
 

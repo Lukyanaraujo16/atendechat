@@ -155,6 +155,23 @@ describe("AiAgent shadow mode 1.3", () => {
         )
       ).toBe("dry_run");
     });
+
+    it("preserva shadow/live armazenado com aiAgentEnabled=false (reativação)", () => {
+      expect(
+        resolveWhatsappAiAgentRuntimeMode(
+          whatsapp({
+            aiAgentMode: "shadow",
+            aiAgentEnabled: false,
+            aiAgentId: 1
+          })
+        )
+      ).toBe("shadow");
+      expect(
+        resolveWhatsappAiAgentRuntimeMode(
+          whatsapp({ aiAgentMode: "live", aiAgentEnabled: false, aiAgentId: 1 })
+        )
+      ).toBe("live");
+    });
   });
 
   describe("buildAiAgentSystemPrompt", () => {

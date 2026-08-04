@@ -2743,6 +2743,12 @@ const messages = {
 							"This agent still needs a few adjustments before it can be activated.",
 						connectionHint:
 							"Review the credential and linked connection to continue.",
+						lastModeLabel: "Last mode: {{mode}}",
+						modeChoiceTitle: "How do you want to activate the agent?",
+						modeChoiceBody:
+							"We could not find a saved previous mode. Choose test mode or automatic support.",
+						modeChoiceShadow: "Enable test mode",
+						modeChoiceLive: "Enable automatic support",
 					},
 				},
 				loading: {

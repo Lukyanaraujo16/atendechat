@@ -269,7 +269,13 @@ function resolveNextAction(input: {
     if (conn && conn.status !== "complete") return "connect_whatsapp";
     return "fix_connection";
   }
-  if (status === "ready_to_activate") return "activate_shadow";
+  if (status === "ready_to_activate") {
+    // Restaura o último modo válido preservado nas conexões.
+    // Só usa activate_shadow como default quando nunca houve modo (off).
+    if (mode === "live") return "activate_live";
+    if (mode === "shadow") return "activate_shadow";
+    return "activate_shadow";
+  }
   if (status === "active") return "none";
 
   const order: Array<{
@@ -300,18 +306,13 @@ function hasAttention(input: {
   const { setupComplete, mode, linked, agent } = input;
   if (!setupComplete || !agent) return false;
 
-  if (mode === "live" || mode === "shadow") {
+  // Desativado intencional com modo live/shadow preservado NÃO é atenção
+  // (Fase 2.19.1). Conexão desconectada só exige atenção se o agente estiver habilitado.
+  if (agent.enabled === true && (mode === "live" || mode === "shadow")) {
     const anyConnected = linked.some(
       c => String(c.status || "").toUpperCase() === "CONNECTED"
     );
     if (!anyConnected) return true;
-  }
-
-  if (
-    agent.enabled === false &&
-    linked.some(c => technicalModeToCommercial(c.runtimeMode) !== "off")
-  ) {
-    return true;
   }
 
   const activeModes = new Set(
@@ -319,7 +320,7 @@ function hasAttention(input: {
       .map(c => technicalModeToCommercial(c.runtimeMode))
       .filter(m => m !== "off")
   );
-  if (activeModes.size > 1) {
+  if (agent.enabled === true && activeModes.size > 1) {
     return true;
   }
 
@@ -389,9 +390,13 @@ export function computeAiAgentProductReadiness(
     status = "attention_required";
   } else if (agent?.explicitlyPaused === true || mode === "paused") {
     status = "paused";
-  } else if (mode === "live" || mode === "shadow") {
+  } else if (
+    (mode === "live" || mode === "shadow") &&
+    agent?.enabled === true
+  ) {
     status = "active";
   } else {
+    // setup completo + enabled=false (com ou sem modo preservado) → pronto para reativar
     status = "ready_to_activate";
   }
 

@@ -11,6 +11,7 @@ import {
   MobileEntityCard,
 } from "../../ui";
 import { i18n } from "../../translate/i18n";
+import { resolveAiAgentPersistedOperationMode } from "../../utils/aiAgentQuickToggle";
 
 const useStyles = makeStyles((theme) => ({
   metaLine: {
@@ -49,9 +50,9 @@ function statusTone(status) {
 }
 
 /**
- * Card comercial de um agente no Hub multiagente (Fase 2.9B / 2.19).
+ * Card comercial de um agente no Hub multiagente (Fase 2.9B / 2.19 / 2.19.1).
  * agentRef não é exibido ao usuário.
- * Toggle controla enabled/disabled; não seleciona modo operacional.
+ * Toggle controla enabled/disabled; modo operacional vem do backend.
  */
 export default function AiAgentCard({
   agent,
@@ -71,6 +72,7 @@ export default function AiAgentCard({
   const connectionCount = Number(agent?.connectionCount) || 0;
   const enabled = agent?.enabled === true;
   const agentRef = String(agent?.agentRef || "").trim();
+  const persistedMode = resolveAiAgentPersistedOperationMode(agent);
   const needsAttention =
     status === "attention_required" || status === "setup_incomplete";
   const providerModel = [agent?.provider, agent?.model]
@@ -208,6 +210,17 @@ export default function AiAgentCard({
             count: connectionCount,
           })}
         </Typography>
+        {!enabled && persistedMode ? (
+          <Typography
+            variant="body2"
+            className={classes.metaLine}
+            data-testid={`ai-agent-card-last-mode-${agentRef}`}
+          >
+            {i18n.t("aiAgentProduct.hub.quickToggle.lastModeLabel", {
+              mode: i18n.t(`aiAgentProduct.mode.${persistedMode}`),
+            })}
+          </Typography>
+        ) : null}
         {needsAttention ? (
           <Typography
             variant="body2"

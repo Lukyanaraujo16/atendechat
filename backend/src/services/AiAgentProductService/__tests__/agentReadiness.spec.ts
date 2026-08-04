@@ -189,14 +189,45 @@ describe("hardening 2.0.1 — AgentReadinessService", () => {
     expect(readiness.status).toBe("attention_required");
   });
 
-  it("enabled=false + mode live na conexão → attention (não paused)", () => {
+  it("enabled=false + mode live na conexão → ready_to_activate (modo preservado)", () => {
     const { readiness } = computeAiAgentProductReadiness(
       baseSnapshot({
         agents: [{ ...completeAgent, enabled: false }],
         connections: [{ ...connectedWa, runtimeMode: "live" }]
       })
     );
-    expect(readiness.status).toBe("attention_required");
+    expect(readiness.status).toBe("ready_to_activate");
+    expect(readiness.mode).toBe("live");
+    expect(readiness.nextAction).toBe("activate_live");
+    expect(readiness.ready).toBe(true);
+  });
+
+  it("enabled=false + mode shadow → nextAction activate_shadow", () => {
+    const { readiness } = computeAiAgentProductReadiness(
+      baseSnapshot({
+        agents: [{ ...completeAgent, enabled: false }],
+        connections: [{ ...connectedWa, runtimeMode: "shadow" }]
+      })
+    );
+    expect(readiness.status).toBe("ready_to_activate");
+    expect(readiness.mode).toBe("shadow");
+    expect(readiness.nextAction).toBe("activate_shadow");
+  });
+
+  it("enabled=false + mode live + conexão desconectada → ainda ready (não attention)", () => {
+    const { readiness } = computeAiAgentProductReadiness(
+      baseSnapshot({
+        agents: [{ ...completeAgent, enabled: false }],
+        connections: [
+          {
+            ...connectedWa,
+            status: "DISCONNECTED",
+            runtimeMode: "live"
+          }
+        ]
+      })
+    );
+    expect(readiness.status).toBe("ready_to_activate");
     expect(readiness.mode).toBe("live");
   });
 

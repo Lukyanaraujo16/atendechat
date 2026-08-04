@@ -10,6 +10,10 @@ import {
   AppPrimaryButton,
   AppSecondaryButton,
   AppNeutralButton,
+  AppDialog,
+  AppDialogTitle,
+  AppDialogContent,
+  AppDialogActions,
   MobileCardList,
 } from "../../ui";
 import Title from "../Title";
@@ -114,11 +118,14 @@ export default function AiAgentHubPage({
     busyAgentRef,
     deactivateTarget,
     notReadyTarget,
+    modeChoiceTarget,
     handleToggleRequest,
     confirmDeactivate,
     cancelDeactivate,
     dismissNotReady,
     confirmNotReadyReview,
+    dismissModeChoice,
+    confirmModeChoice,
   } = useAiAgentHubQuickToggle({
     canMutate: mutateAllowed,
     onRetry,
@@ -249,6 +256,47 @@ export default function AiAgentHubPage({
       >
         {i18n.t("aiAgentProduct.hub.quickToggle.notReadyBody")}
       </ConfirmationModal>
+
+      <AppDialog
+        open={Boolean(modeChoiceTarget)}
+        onClose={dismissModeChoice}
+        aria-labelledby="ai-agent-mode-choice-title"
+        maxWidth="xs"
+      >
+        <AppDialogTitle id="ai-agent-mode-choice-title">
+          {i18n.t("aiAgentProduct.hub.quickToggle.modeChoiceTitle")}
+        </AppDialogTitle>
+        <AppDialogContent dividers>
+          <Typography variant="body2">
+            {i18n.t("aiAgentProduct.hub.quickToggle.modeChoiceBody")}
+          </Typography>
+        </AppDialogContent>
+        <AppDialogActions>
+          <AppNeutralButton
+            onClick={dismissModeChoice}
+            disabled={Boolean(busyAgentRef)}
+          >
+            {i18n.t("confirmationModal.buttons.cancel")}
+          </AppNeutralButton>
+          <AppSecondaryButton
+            onClick={() => confirmModeChoice("activate_shadow")}
+            disabled={Boolean(busyAgentRef)}
+            data-testid="ai-agent-hub-mode-choice-shadow"
+          >
+            {i18n.t("aiAgentProduct.hub.quickToggle.modeChoiceShadow")}
+          </AppSecondaryButton>
+          <AppPrimaryButton
+            onClick={() => confirmModeChoice("activate_live")}
+            loading={
+              Boolean(modeChoiceTarget) &&
+              busyAgentRef === String(modeChoiceTarget?.agentRef || "")
+            }
+            data-testid="ai-agent-hub-mode-choice-live"
+          >
+            {i18n.t("aiAgentProduct.hub.quickToggle.modeChoiceLive")}
+          </AppPrimaryButton>
+        </AppDialogActions>
+      </AppDialog>
     </Box>
   );
 }

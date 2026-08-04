@@ -260,9 +260,11 @@ export default async function ExecuteAiAgentProductCommandService(input: {
         toMode
       });
 
+      // Idempotente: agente e conexões já sem operação automática.
+      // O modo live/shadow nas conexões é preservado para reativação (Fase 2.19.1).
       const agentAlreadyOff = agent.enabled !== true;
       const connectionsAlreadyOff = linked.every(
-        w => resolveWhatsappAiAgentRuntimeMode(w) === "disabled"
+        w => w.aiAgentEnabled !== true
       );
       if (agentAlreadyOff && connectionsAlreadyOff) {
         changed = false;
@@ -274,15 +276,10 @@ export default async function ExecuteAiAgentProductCommandService(input: {
         changed = true;
       }
       for (const wa of linked) {
-        const mode = resolveWhatsappAiAgentRuntimeMode(wa);
-        if (mode !== "disabled" || wa.aiAgentEnabled === true) {
-          await wa.update(
-            {
-              aiAgentMode: "disabled",
-              aiAgentEnabled: false
-            },
-            { transaction }
-          );
+        if (wa.aiAgentEnabled === true) {
+          // Preserva aiAgentMode (live|shadow|dry_run) + aiAgentId.
+          // Runtime continua gated por agent.enabled === false.
+          await wa.update({ aiAgentEnabled: false }, { transaction });
           changed = true;
         }
       }

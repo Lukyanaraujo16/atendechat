@@ -1,4 +1,4 @@
-# AI Agent — Toggle rápido no card (Fase 2.19)
+# AI Agent — Toggle rápido no card (Fase 2.19 / 2.19.1)
 
 ## Objetivo
 
@@ -9,95 +9,88 @@ sem abrir o detalhe, usando exclusivamente os commands oficiais da Product API c
 
 | Conceito | Campo / origem | Significado |
 |---|---|---|
-| Habilitado | `agent.enabled` | Toggle ligado/desligado |
-| Modo operacional | `agent.operationMode` (`off` / `shadow` / `live` / `paused`) | Shadow vs Live vs off |
+| Habilitado | `agent.enabled` | Toggle ligado/desligado; gate principal do Runtime |
+| Modo operacional | `operationMode` (derivado de `Whatsapp.aiAgentMode`) | Shadow vs Live |
 | Pronto | `agent.ready` + readiness Product | Pode tentar ativar |
-| Status comercial | `agent.status` | Badges (setup, attention, active…) |
+| Status comercial | `agent.status` | Badges (setup, attention, active, ready_to_activate…) |
 | Conexão | `connectionCount` + runtime WhatsApp | Vínculo e conectividade |
 
-O toggle **não** usa apenas a cor do badge nem `readiness.status` como estado visual do switch.
 O switch reflete **somente** `enabled`.
+O modo Live/Shadow permanece visível mesmo com o agente desativado (“Último modo: …”).
+
+## Persistência do modo (Fase 2.19.1)
+
+**Backend é a autoridade.** Não há memória SPA, `localStorage` nem campo novo.
+
+Estratégia A (sem migration):
+
+1. Ao **desativar** (`deactivate`):
+   - `AiAgent.enabled = false`
+   - `Whatsapp.aiAgentEnabled = false`
+   - **`Whatsapp.aiAgentMode` permanece `live` ou `shadow`**
+   - `aiAgentId` preservado
+2. Ao **reativar**:
+   - Hub lê `operationMode` retornado pela Product API
+   - chama `activate_live` ou `activate_shadow` conforme o modo persistido
+3. Após reload, logout/login, outro navegador ou outro administrador:
+   - o modo continua nas conexões WhatsApp
+   - a listagem Product deriva `operationMode` desse estado
+
+### Relação `enabled` × `operationMode`
+
+Exemplo Live:
+
+| Momento | enabled | operationMode | Runtime |
+|---|---|---|---|
+| Ativo | true | live | pode operar |
+| Desativado | false | live | **não** opera (`AI_AGENT_DISABLED`) |
+| Reativado | true | live | opera em Live |
+
+Exemplo Shadow: análogo com `shadow` / `activate_shadow`.
+
+### Agente legado sem modo anterior
+
+Se `operationMode` for `off` (nunca ativado ou desativado antes da 2.19.1):
+
+- o toggle **não** escolhe Shadow silenciosamente;
+- abre diálogo: modo de testes **ou** atendimento automático.
 
 ## Commands
 
 | Ação | Command Product | Escopo |
 |---|---|---|
-| Ativar (padrão Product / shadow) | `activate_shadow` | `POST .../agents/:agentRef/commands` |
-| Ativar live | `activate_live` | idem |
+| Ativar (modo preservado live) | `activate_live` | `POST .../agents/:agentRef/commands` |
+| Ativar (modo preservado shadow) | `activate_shadow` | idem |
 | Desativar | `deactivate` | idem |
 
-Nenhuma rota legada é reaberta. Runtime / Orchestrator não são alterados.
+Nenhuma rota legada é reaberta. Runtime / Orchestrator não são alterados estruturalmente.
 
-## Preservação do modo operacional
+## Readiness
 
-O toggle **não** é seletor de modo.
+Com setup completo, `enabled=false` e modo `live`/`shadow` preservado:
 
-Estratégia de ativação (`resolveAiAgentQuickActivateCommand`):
+- status: `ready_to_activate` (não `attention_required`, não `active`)
+- nextAction: `activate_live` ou `activate_shadow` conforme o modo
 
-1. Memória de sessão SPA do último modo (`live`/`shadow`) gravada ao desativar pelo card;
-2. Se `operationMode` ainda for `live` ou `shadow`, reutiliza esse modo;
-3. Caso contrário, aplica a regra oficial Product quando `off`: **`activate_shadow`**.
+## Runtime
 
-Limitações:
-
-- A memória de sessão não sobrevive a reload completo da página (sem migration / campo persistido);
-- Após reload com agente desabilitado, a reativação usa `activate_shadow`;
-- Live permanente após reload continua disponível em Detalhe / Configurações / commands comerciais.
-
-## Ativação
-
-1. Valida `canManageAiAgentProduct` no frontend;
-2. Se `ready !== true`, **não** chama API: modal comercial + CTA “Revisar configuração”;
-3. Se pronto, chama o command resolvido com `agentRef`;
-4. Backend valida plano, tenant, readiness, provider, credencial, modelo, instruções e conexões;
-5. Sem optimistic update definitivo: loading no toggle; estado final vem do refresh da lista;
-6. Toast: “Agente ativado.”
-
-## Desativação
-
-1. Confirmação obrigatória;
-2. Command `deactivate`;
-3. Preserva configurações, conexões, Knowledge, credencial e histórico;
-4. Interrompe apenas a operação automática (`enabled=false` + modo off nas conexões vinculadas);
-5. Toast: “Agente desativado.”
+O Orchestrator já nega elegibilidade quando `!agent.enabled` (`AI_AGENT_DISABLED`),
+mesmo se `aiAgentMode` permanecer `live`/`shadow`. Live e Shadow generation também checam `agent.enabled`.
 
 ## Permissões / supportMode
 
-Usa `canManageAiAgentProduct`:
-
-- Admin do tenant: sim;
-- Super Admin em `supportMode`: sim;
-- Super Admin fora do suporte no tenant alvo: não (sessão);
-- Supervisor / User: somente leitura (toggle disabled).
-
+Usa `canManageAiAgentProduct` (admin do tenant; Super Admin em `supportMode`).
 Backend permanece autoridade final.
 
 ## Multiagente
 
-- Cada card usa o próprio `agentRef`;
-- `busyAgentRef` isola loading por agente;
-- Erro/sucesso em A não altera B;
-- `notifyAiAgentProductAgentsChanged` recarrega a listagem do Hub;
-- Sem seleção implícita do primeiro agente.
-
-## Cache e stale
-
-- Após sucesso: `notifyAiAgentProductAgentsChanged` + `onRetry` (reload da lista);
-- Sequência por `agentRef` ignora respostas stale;
-- Detalhe continua sincronizado via mesma Product API / invalidação existente.
-
-## Acessibilidade e mobile
-
-- `aria-label` Ativar/Desativar agente;
-- `aria-checked` / `aria-busy`;
-- Labels “Ativo” / “Desativado”;
-- Área de toque ≥ 44px;
-- `stopPropagation` no toggle;
-- Grid responsivo sem overflow horizontal.
+Cada card usa o próprio `agentRef` e o próprio `aiAgentMode` nas conexões vinculadas.
+Comercial Live e Financeiro Shadow preservam modos independentemente.
 
 ## Arquivos principais
 
+- `backend/.../ExecuteAiAgentProductCommandService.ts`
+- `backend/.../AgentReadinessService.ts`
 - `frontend/src/components/AiAgentCard/index.js`
-- `frontend/src/components/AiAgentHubPage/index.js`
+- `frontend/src/hooks/useAiAgentHubQuickToggle.js`
 - `frontend/src/utils/aiAgentQuickToggle.js`
-- `frontend/src/services/__tests__/aiAgentCardQuickTogglePhase219.test.js`
