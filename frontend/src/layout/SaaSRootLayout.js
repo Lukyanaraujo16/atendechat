@@ -17,6 +17,8 @@ import { AuthContext } from "../context/Auth/AuthContext";
 import ColorModeContext from "./themeContext";
 import LanguageControl from "../components/LanguageControl";
 import UserModal from "../components/UserModal";
+import PushNotificationOptInBanner from "../components/PushNotificationOptInBanner";
+import { usePwaInstallManualEntry } from "../hooks/usePwaInstallManualEntry";
 import { useBranding } from "../context/Branding/BrandingContext";
 import { i18n } from "../translate/i18n";
 import { APP_HEADER_HEIGHT } from "./layoutConstants";
@@ -100,6 +102,7 @@ export default function SaaSRootLayout({ children }) {
   const theme = useTheme();
   const { colorMode } = useContext(ColorModeContext);
   const { handleLogout, user, exitSupportMode } = useContext(AuthContext);
+  const { handleInstallAppClick } = usePwaInstallManualEntry();
   const { resolveMenuLogo } = useBranding();
   const menuLogoSrc = resolveMenuLogo();
 
@@ -151,6 +154,14 @@ export default function SaaSRootLayout({ children }) {
             <MenuItem
               onClick={() => {
                 setAnchorEl(null);
+                handleInstallAppClick();
+              }}
+            >
+              {i18n.t("pwaInstall.manual.menuLabel")}
+            </MenuItem>
+            <MenuItem
+              onClick={() => {
+                setAnchorEl(null);
                 handleLogout();
               }}
             >
@@ -196,6 +207,8 @@ export default function SaaSRootLayout({ children }) {
           </Alert>
         </Box>
       ) : null}
+
+      <PushNotificationOptInBanner />
 
       <Box className={classes.body}>{children}</Box>
 

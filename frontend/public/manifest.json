@@ -1,7 +1,7 @@
 {
-	"name": "Central de atendimento",
-	"short_name": "Atendimento",
-	"description": "Plataforma de atendimento e gestão de conversas. O nome e ícones no ecrã podem ser personalizados pelo administrador.",
+	"name": "StreamHUB Chat",
+	"short_name": "StreamHUB",
+	"description": "StreamHUB Chat — plataforma de atendimento e gestão de conversas. Logos e nome de sistema no produto podem ser personalizados pelo administrador (white-label); o nome no ícone PWA reflete esta marca padrão do manifesto.",
 	"lang": "pt-BR",
 	"dir": "ltr",
 	"start_url": ".",

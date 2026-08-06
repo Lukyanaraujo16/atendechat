@@ -5539,6 +5539,48 @@ const messages = {
 					toastSaved: "Profile updated successfully.",
 				},
 			},
+			pwaInstall: {
+				android: {
+					title: "Install StreamHUB Chat",
+					body:
+						"Use the system as an app on your phone and access it faster.",
+				},
+				ios: {
+					titleIphone: "Install StreamHUB Chat on your iPhone",
+					titleIpad: "Install StreamHUB Chat on your iPad",
+					step1: "Tap the Share button in the browser.",
+					step2: "Choose “Add to Home Screen”.",
+					step3: "Tap “Add”.",
+					step4: "Open StreamHUB Chat from the new icon.",
+					pushNote:
+						"After opening from the icon, you can enable notifications.",
+					nonSafariNote:
+						"The option may vary in this browser. The most reliable flow is to open StreamHUB Chat in Safari and follow the steps below.",
+				},
+				actions: {
+					install: "Install",
+					notNow: "Not now",
+					understood: "Got it",
+				},
+				manual: {
+					menuLabel: "Install app",
+					alreadyInstalled: "App already installed.",
+					desktopHint:
+						"App installation is available on mobile (Android or iPhone/iPad).",
+					androidMenuHint:
+						"Your browser may offer “Install app” in the menu (⋮). Open the menu and look for that option.",
+					installStarted: "Installation started.",
+					unsupported:
+						"Guided installation is not available on this device.",
+				},
+				push: {
+					iosIncompatible:
+						"Push notifications on this device require a compatible iOS/iPadOS version (16.4 or later) and the app on the Home Screen.",
+					iosNeedsInstall:
+						"To enable notifications on iPhone/iPad, install StreamHUB Chat on the Home Screen and open it from the icon.",
+					active: "Notifications enabled.",
+				},
+			},
 			queueIntegration: {
 				title: "Automations by queue",
 				pageSubtitle:

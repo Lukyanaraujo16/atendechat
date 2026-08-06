@@ -5071,6 +5071,48 @@ const messages = {
           toastSaved: "Datos actualizados correctamente.",
         },
       },
+      pwaInstall: {
+        android: {
+          title: "Instale StreamHUB Chat",
+          body:
+            "Use el sistema como una aplicación en su celular y acceda más rápido.",
+        },
+        ios: {
+          titleIphone: "Instale StreamHUB Chat en su iPhone",
+          titleIpad: "Instale StreamHUB Chat en su iPad",
+          step1: "Toque el botón Compartir del navegador.",
+          step2: "Elija “Añadir a la pantalla de inicio”.",
+          step3: "Toque “Añadir”.",
+          step4: "Abra StreamHUB Chat desde el nuevo icono.",
+          pushNote:
+            "Después de abrir desde el icono, podrá activar las notificaciones.",
+          nonSafariNote:
+            "La opción puede variar en este navegador. El flujo más fiable es abrir StreamHUB Chat en Safari y seguir los pasos siguientes.",
+        },
+        actions: {
+          install: "Instalar",
+          notNow: "Ahora no",
+          understood: "Entendido",
+        },
+        manual: {
+          menuLabel: "Instalar aplicación",
+          alreadyInstalled: "Aplicación ya instalada.",
+          desktopHint:
+            "La instalación como aplicación está disponible en el celular (Android o iPhone/iPad).",
+          androidMenuHint:
+            "Su navegador puede ofrecer “Instalar app” en el menú (⋮). Abra el menú y busque esa opción.",
+          installStarted: "Instalación iniciada.",
+          unsupported:
+            "La instalación guiada no está disponible en este dispositivo.",
+        },
+        push: {
+          iosIncompatible:
+            "Las notificaciones push en este dispositivo requieren una versión compatible de iOS/iPadOS (16.4 o superior) y la aplicación en la pantalla de inicio.",
+          iosNeedsInstall:
+            "Para activar notificaciones en iPhone/iPad, instale StreamHUB Chat en la pantalla de inicio y ábralo desde el icono.",
+          active: "Notificaciones activadas.",
+        },
+      },
       queueIntegration: {
         title: "Automatizaciones por sector",
         pageSubtitle:

@@ -5652,6 +5652,48 @@ const messages = {
           toastSaved: "Dados atualizados com sucesso.",
         },
       },
+      pwaInstall: {
+        android: {
+          title: "Instale o StreamHUB Chat",
+          body:
+            "Use o sistema como um aplicativo no seu celular e acesse mais rapidamente.",
+        },
+        ios: {
+          titleIphone: "Instale o StreamHUB Chat no seu iPhone",
+          titleIpad: "Instale o StreamHUB Chat no seu iPad",
+          step1: "Toque no botão Compartilhar do navegador.",
+          step2: "Escolha “Adicionar à Tela de Início”.",
+          step3: "Toque em “Adicionar”.",
+          step4: "Abra o StreamHUB Chat pelo novo ícone.",
+          pushNote:
+            "Depois de abrir pelo ícone, você poderá ativar as notificações.",
+          nonSafariNote:
+            "A opção pode variar neste navegador. O fluxo mais confiável é abrir o StreamHUB Chat no Safari e seguir os passos abaixo.",
+        },
+        actions: {
+          install: "Instalar",
+          notNow: "Agora não",
+          understood: "Entendi",
+        },
+        manual: {
+          menuLabel: "Instalar aplicativo",
+          alreadyInstalled: "Aplicativo já instalado.",
+          desktopHint:
+            "A instalação como aplicativo está disponível no celular (Android ou iPhone/iPad).",
+          androidMenuHint:
+            "Seu navegador pode disponibilizar “Instalar app” no menu (⋮). Abra o menu e procure essa opção.",
+          installStarted: "Instalação iniciada.",
+          unsupported:
+            "A instalação guiada não está disponível neste dispositivo.",
+        },
+        push: {
+          iosIncompatible:
+            "As notificações push neste dispositivo exigem uma versão compatível do iOS/iPadOS (16.4 ou superior) e o aplicativo na Tela de Início.",
+          iosNeedsInstall:
+            "Para ativar notificações no iPhone/iPad, instale o StreamHUB Chat na Tela de Início e abra pelo ícone.",
+          active: "Notificações ativadas.",
+        },
+      },
       queueIntegration: {
         title: "Automações por setor",
         pageSubtitle:

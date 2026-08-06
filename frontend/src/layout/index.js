@@ -35,6 +35,7 @@ import { i18n } from "../translate/i18n";
 import toastError from "../errors/toastError";
 import AnnouncementsPopover from "../components/AnnouncementsPopover";
 import PushNotificationOptInBanner from "../components/PushNotificationOptInBanner";
+import { usePwaInstallManualEntry } from "../hooks/usePwaInstallManualEntry";
 
 import { useBranding } from "../context/Branding/BrandingContext";
 import { SocketContext } from "../context/Socket/SocketContext";
@@ -426,6 +427,7 @@ const LoggedInLayout = ({ children, themeToggle }) => {
   const [anchorEl, setAnchorEl] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const { handleLogout, loading, user, exitSupportMode } = useContext(AuthContext);
+  const { handleInstallAppClick } = usePwaInstallManualEntry();
   const [drawerOpen, setDrawerOpen] = useState(() => {
     if (typeof window !== "undefined" && window.matchMedia("(max-width:959.95px)").matches) {
       return false;
@@ -830,6 +832,14 @@ const LoggedInLayout = ({ children, themeToggle }) => {
               >
                 <MenuItem onClick={handleOpenUserModal}>
                   {i18n.t("mainDrawer.appBar.user.profile")}
+                </MenuItem>
+                <MenuItem
+                  onClick={() => {
+                    handleCloseMenu();
+                    handleInstallAppClick();
+                  }}
+                >
+                  {i18n.t("pwaInstall.manual.menuLabel")}
                 </MenuItem>
                 {isMobile ? (
                   <MenuItem
