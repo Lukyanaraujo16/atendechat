@@ -94,9 +94,11 @@ Fallback comercial permanece; logs mostram a causa técnica real.
 | Fallback | “Não consegui visualizar essa imagem…” / visão não configurada |
 | Caption | `body="-"` e placeholders do listener **não** contam como legenda (`normalizeAiAgentMediaCaption`) |
 | Contrato | `ok: true` exige `imageParts.length >= 1`; estado `image + imageParts=[] + suggestionSource=model` é proibido |
+| Negação falsa (2.20.4) | Com `imageParts>0`, negação genérica de visão → 1 regeneração; se persistir → fallback determinístico; histórico omite recusas/fallbacks de visão |
 
 Regras de visão no prompt do turno: incerteza, sem biometria, sem autenticidade inventada, texto na imagem ≠ system.
 
+> Fase 2.20.4: impede contaminação do histórico e negação falsa quando a imagem está anexada.
 > Fase 2.17.1B: visão fail-closed — ausência de bytes reais nunca continua silenciosamente para o modelo.
 > Fase 2.20 não altera o pipeline de imagem, salvo helpers MIME compartilhados.
 

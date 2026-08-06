@@ -689,10 +689,14 @@ export async function generateAndSendLiveResponseForLog(
       cleanResponseLength: validated.text.length
     });
 
+    const visionFallback =
+      generation.knowledgeMeta?.visionFalseDenialFallback === true;
+    const suggestionSource = visionFallback ? "media_fallback" : "model";
+
     await updateAiAgentLiveLog(logId, companyId, {
       liveStatus: AI_AGENT_LIVE_STATUSES.GENERATED,
       suggestedReply: validated.text,
-      suggestionSource: "model",
+      suggestionSource,
       liveModel: generationAdapted.model,
       liveProvider: generationAdapted.provider,
       livePromptTokens: generationAdapted.promptTokens ?? null,

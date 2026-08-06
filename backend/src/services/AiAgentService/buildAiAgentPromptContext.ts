@@ -8,6 +8,7 @@ import {
   AI_AGENT_CONTEXT_MAX_CHARS,
   AI_AGENT_CONTEXT_MAX_MESSAGES
 } from "./aiAgentShadowConfig";
+import { shouldOmitAiAgentHistoryLineForVision } from "./detectAiAgentFalseMediaCapabilityDenial";
 
 const EXCLUDED_MEDIA_TYPES = new Set([
   "reactionMessage",
@@ -85,7 +86,15 @@ export async function buildAiAgentPromptContext(
       body === "Áudio" ||
       body === "Imagem" ||
       body === "sticker" ||
-      body === "reaction"
+      body === "reaction" ||
+      body === "-"
+    ) {
+      continue;
+    }
+    // Fase 2.20.4: não reintroduzir negações de visão / fallbacks de mídia no contexto
+    if (
+      row.fromMe &&
+      shouldOmitAiAgentHistoryLineForVision(String(row.body || ""))
     ) {
       continue;
     }

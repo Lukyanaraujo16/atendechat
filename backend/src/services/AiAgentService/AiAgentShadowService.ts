@@ -54,6 +54,7 @@ import {
 } from "./aiAgentInputContent";
 import { emitAiAgentMediaMetric } from "./emitAiAgentMediaMetric";
 import { resolveAiModelMediaCapabilities } from "../../config/aiModelMediaCapabilities";
+import { enforceAiAgentVisionResponseIntegrity } from "./enforceAiAgentVisionResponseIntegrity";
 
 const inFlightTickets = new Set<number>();
 
@@ -454,8 +455,8 @@ export async function generateShadowSuggestionForLog(
       return;
     }
 
-    const content = result.text?.trim();
-    if (!content) {
+    const contentRaw = result.text?.trim();
+    if (!contentRaw) {
       await updateAiAgentShadowLog(logId, companyId, {
         shadowStatus: AI_AGENT_SHADOW_STATUSES.FAILED,
         errorCode: AI_AGENT_SHADOW_ERROR_CODES.EMPTY_AI_RESPONSE,
@@ -485,10 +486,37 @@ export async function generateShadowSuggestionForLog(
       return;
     }
 
+    const visionGuard = await enforceAiAgentVisionResponseIntegrity({
+      hasImageParts: imageParts.length > 0,
+      text: contentRaw,
+      provider: resolved.provider,
+      companyId,
+      ticketId: ticket.id,
+      apiKey: resolved.apiKey,
+      model,
+      maxTokens,
+      temperature: agent.temperature,
+      systemPrompt,
+      messages: promptContext.messages,
+      timeoutMs: AI_AGENT_SHADOW_TIMEOUT_MS,
+      source: AI_AGENT_SHADOW_SOURCE,
+      imageParts
+    });
+    const content = visionGuard.text;
+    const totalLatencyMs = latencyMs + visionGuard.latencyMsExtra;
+
+    if (visionGuard.meta.visionFalseDenialDetected) {
+      await mergeAiAgentShadowLogMetadata(logId, companyId, {
+        ...visionGuard.meta
+      });
+    }
+
     await updateAiAgentShadowLog(logId, companyId, {
       shadowStatus: AI_AGENT_SHADOW_STATUSES.GENERATED,
       suggestedReply: content,
-      suggestionSource: "model",
+      suggestionSource: visionGuard.meta.visionFalseDenialFallback
+        ? "fallback"
+        : "model",
       shadowModel: result.model || model,
       shadowProvider: result.provider,
       promptTokens: result.promptTokens ?? null,
@@ -496,7 +524,7 @@ export async function generateShadowSuggestionForLog(
       totalTokens: result.totalTokens ?? null,
       contextMessageCount: promptContext.contextMessageCount,
       contextHash: promptContext.contextHash,
-      latencyMs,
+      latencyMs: totalLatencyMs,
       generatedAt: new Date(),
       errorCode: null
     });
@@ -514,7 +542,7 @@ export async function generateShadowSuggestionForLog(
       requestId: `shadow-${logId}`,
       provider: result.provider || resolved.provider,
       model: result.model || model,
-      latencyMs,
+      latencyMs: totalLatencyMs,
       responseText: content,
       systemPrompt,
       tokensInput: result.promptTokens,
@@ -530,7 +558,7 @@ export async function generateShadowSuggestionForLog(
       tokensOutput: result.completionTokens,
       provider: result.provider || resolved.provider,
       model: result.model || model,
-      generationTimeMs: latencyMs
+      generationTimeMs: totalLatencyMs
     });
 
     // 2.1E — Shadow Function Calling evaluation (observacional, async)

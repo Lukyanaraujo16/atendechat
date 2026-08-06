@@ -33,6 +33,9 @@ const ALLOWED_KEYS = new Set([
   "mediaErrorCode",
   "mediaAskRetry",
   "mediaTechnicalCode",
+  "visionFalseDenialDetected",
+  "visionFalseDenialRetried",
+  "visionFalseDenialFallback",
   "runtimeMode"
 ]);
 

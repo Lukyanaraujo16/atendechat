@@ -20,6 +20,7 @@ import {
 import type { KnowledgeRetrievalResult } from "./knowledge/knowledgeRetrievalTypes";
 import { safeEmitKnowledgeObservability } from "./analytics/emitKnowledgeObservability";
 import { safeRecordAgentAnalyticsEvent } from "./analytics/recordAgentAnalyticsEvent";
+import { enforceAiAgentVisionResponseIntegrity } from "./enforceAiAgentVisionResponseIntegrity";
 
 export type BuildAiAgentProviderResponseInput = {
   companyId: number;
@@ -57,6 +58,9 @@ export type BuildAiAgentProviderResponseSuccess = {
   knowledge?: KnowledgeRetrievalResult | null;
   knowledgeMeta?: Record<string, unknown> | null;
   forceHandoff?: boolean;
+  visionFalseDenialDetected?: boolean;
+  visionFalseDenialRetried?: boolean;
+  visionFalseDenialFallback?: boolean;
 };
 
 export type BuildAiAgentProviderResponseFailure = {
@@ -225,8 +229,8 @@ export async function buildAiAgentProviderResponse(
     };
   }
 
-  const text = result.text?.trim() || "";
-  if (!text) {
+  const textRaw = result.text?.trim() || "";
+  if (!textRaw) {
     void safeEmitKnowledgeObservability({
       companyId: input.companyId,
       aiAgentId: input.agent.id,
@@ -265,6 +269,25 @@ export async function buildAiAgentProviderResponse(
     };
   }
 
+  const visionGuard = await enforceAiAgentVisionResponseIntegrity({
+    hasImageParts: Array.isArray(input.imageParts) && input.imageParts.length > 0,
+    text: textRaw,
+    provider: resolved.provider,
+    companyId: input.companyId,
+    ticketId: input.ticket.id,
+    apiKey: resolved.apiKey,
+    model,
+    maxTokens,
+    temperature: input.agent.temperature,
+    systemPrompt,
+    messages: promptContext.messages,
+    timeoutMs: input.timeoutMs,
+    source: input.source,
+    imageParts: input.imageParts
+  });
+  const text = visionGuard.text;
+  const totalLatencyMs = latencyMs + visionGuard.latencyMsExtra;
+
   void safeEmitKnowledgeObservability({
     companyId: input.companyId,
     aiAgentId: input.agent.id,
@@ -278,7 +301,7 @@ export async function buildAiAgentProviderResponse(
     requestId: input.logId ? `${knowledgeChannel}-${input.logId}` : null,
     provider: result.provider || resolved.provider,
     model: result.model || model,
-    latencyMs,
+    latencyMs: totalLatencyMs,
     responseText: text,
     systemPrompt,
     historySummary: {
@@ -300,7 +323,7 @@ export async function buildAiAgentProviderResponse(
       tokensOutput: result.completionTokens,
       provider: result.provider || resolved.provider,
       model: result.model || model,
-      generationTimeMs: latencyMs
+      generationTimeMs: totalLatencyMs
     });
   }
 
@@ -312,13 +335,19 @@ export async function buildAiAgentProviderResponse(
     promptTokens: result.promptTokens,
     completionTokens: result.completionTokens,
     totalTokens: result.totalTokens,
-    latencyMs,
+    latencyMs: totalLatencyMs,
     contextMessageCount: promptContext.contextMessageCount,
     contextHash: promptContext.contextHash,
     credentialSource: resolved.source,
     credentialId: resolved.credentialId ?? null,
     knowledge: retrieval,
-    knowledgeMeta,
-    forceHandoff: knowledgeApplied.forceHandoff
+    knowledgeMeta: {
+      ...(knowledgeMeta || {}),
+      ...visionGuard.meta
+    },
+    forceHandoff: knowledgeApplied.forceHandoff,
+    visionFalseDenialDetected: visionGuard.meta.visionFalseDenialDetected,
+    visionFalseDenialRetried: visionGuard.meta.visionFalseDenialRetried,
+    visionFalseDenialFallback: visionGuard.meta.visionFalseDenialFallback
   };
 }
