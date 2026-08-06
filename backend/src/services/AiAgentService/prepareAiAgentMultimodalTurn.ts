@@ -17,6 +17,7 @@ import {
 } from "./aiAgentInputContent";
 import { mapLegacyTranscribeErrorToTechnicalCode } from "./aiAgentAudioTechnicalCodes";
 import { emitAiAgentMediaMetric } from "./emitAiAgentMediaMetric";
+import { normalizeAiAgentMediaCaption } from "./normalizeAiAgentMediaCaption";
 import {
   guessMimeFromFilename,
   resolveAiAgentLocalMediaPath
@@ -58,21 +59,28 @@ export type PrepareAiAgentMultimodalTurnResult =
   | PrepareAiAgentMultimodalTurnSuccess
   | PrepareAiAgentMultimodalTurnFailure;
 
-function isPlaceholderBody(text: string): boolean {
-  const t = text.trim();
-  if (!t) return true;
-  if (/^\[[^\]]+\]$/.test(t)) return true;
-  if (t === "Áudio" || t === "Imagem" || t === "sticker" || t === "reaction") {
-    return true;
-  }
-  if (t.startsWith("[Conteúdo:") || t.startsWith("[Mídia:")) return true;
-  return false;
+function usefulText(
+  raw: string | null | undefined,
+  mediaUrlOrFilename?: string | null
+): string {
+  return (
+    normalizeAiAgentMediaCaption(raw, { mediaUrlOrFilename }) || ""
+  );
 }
 
-function usefulText(raw: string | null | undefined): string {
-  const t = String(raw || "").trim();
-  if (!t || isPlaceholderBody(t)) return "";
-  return t;
+function imageFailure(
+  errorCode: string,
+  clientFallbackMessage: string,
+  askRetry: boolean,
+  technicalCode?: string
+): PrepareAiAgentMultimodalTurnFailure {
+  return {
+    ok: false,
+    errorCode,
+    technicalCode,
+    clientFallbackMessage,
+    askRetry
+  };
 }
 
 function buildUnderstoodBlock(params: {
@@ -121,31 +129,36 @@ export async function prepareAiAgentMultimodalTurn(
     };
   }
 
-  // Sem messageId não há arquivo confiável
+  // Sem messageId não há arquivo confiável — imagem nunca segue text-only
   if (!input.messageId) {
-    if (baseText) {
+    if (messageType === "image") {
+      return imageFailure(
+        "media_unavailable",
+        AI_AGENT_IMAGE_FALLBACK_MESSAGE,
+        true,
+        "image_message_id_missing"
+      );
+    }
+    if (messageType === "audio" || !baseText) {
       return {
-        ok: true,
-        turn: {
-          inboundText: baseText,
-          originalMediaType:
-            messageType === "image" || messageType === "audio"
-              ? messageType
-              : "unknown",
-          imageParts: [],
-          mediaMeta: { mediaType: messageType }
-        },
-        knowledgeQuery: baseText
+        ok: false,
+        errorCode: "media_unavailable",
+        clientFallbackMessage:
+          messageType === "audio"
+            ? AI_AGENT_AUDIO_FALLBACK_MESSAGE
+            : AI_AGENT_IMAGE_FALLBACK_MESSAGE,
+        askRetry: true
       };
     }
     return {
-      ok: false,
-      errorCode: "media_unavailable",
-      clientFallbackMessage:
-        messageType === "audio"
-          ? AI_AGENT_AUDIO_FALLBACK_MESSAGE
-          : AI_AGENT_IMAGE_FALLBACK_MESSAGE,
-      askRetry: true
+      ok: true,
+      turn: {
+        inboundText: baseText,
+        originalMediaType: "unknown",
+        imageParts: [],
+        mediaMeta: { mediaType: messageType }
+      },
+      knowledgeQuery: baseText
     };
   }
 
@@ -159,34 +172,44 @@ export async function prepareAiAgentMultimodalTurn(
   });
 
   if (!message) {
-    if (baseText) {
+    if (messageType === "image") {
+      return imageFailure(
+        "media_unavailable",
+        AI_AGENT_IMAGE_FALLBACK_MESSAGE,
+        true,
+        "image_message_missing"
+      );
+    }
+    if (messageType === "audio" || !baseText) {
       return {
-        ok: true,
-        turn: {
-          inboundText: baseText,
-          originalMediaType: "unknown",
-          imageParts: [],
-          mediaMeta: {}
-        },
-        knowledgeQuery: baseText
+        ok: false,
+        errorCode: "media_unavailable",
+        clientFallbackMessage:
+          messageType === "audio"
+            ? AI_AGENT_AUDIO_FALLBACK_MESSAGE
+            : AI_AGENT_IMAGE_FALLBACK_MESSAGE,
+        askRetry: true
       };
     }
     return {
-      ok: false,
-      errorCode: "media_unavailable",
-      clientFallbackMessage:
-        messageType === "audio"
-          ? AI_AGENT_AUDIO_FALLBACK_MESSAGE
-          : AI_AGENT_IMAGE_FALLBACK_MESSAGE,
-      askRetry: true
+      ok: true,
+      turn: {
+        inboundText: baseText,
+        originalMediaType: "unknown",
+        imageParts: [],
+        mediaMeta: {}
+      },
+      knowledgeQuery: baseText
     };
   }
 
   const mediaTypeDb = String(
     message.mediaType || messageType || ""
   ).toLowerCase();
-  const caption = usefulText(message.body) || baseText;
   const relativeMedia = message.getDataValue("mediaUrl") as string | null;
+  const caption =
+    usefulText(message.body, relativeMedia) ||
+    usefulText(input.inboundText, relativeMedia);
   const absolutePath = resolveAiAgentLocalMediaPath(relativeMedia);
 
   emitAiAgentMediaMetric("ai_agent.media_received", {
@@ -295,96 +318,57 @@ export async function prepareAiAgentMultimodalTurn(
     };
   }
 
-  // ——— IMAGEM ———
+  // ——— IMAGEM (fail-closed: só ok:true com imageParts.length >= 1) ———
   if (messageType === "image" || mediaTypeDb === "image") {
     if (!caps.supportsVision) {
-      // Não trocar modelo silenciosamente
-      if (caption) {
-        // Ainda responde pela legenda, avisando limitação visual
-        return {
-          ok: true,
-          turn: {
-            inboundText: [
-              buildUnderstoodBlock({
-                mediaType: "image",
-                caption
-              }),
-              "",
-              "(Nota interna: o modelo configurado não possui visão; responda apenas com base na legenda/texto e, se necessário, peça descrição da imagem.)"
-            ].join("\n"),
-            originalMediaType: "image",
-            imageParts: [],
-            mediaMeta: {
-              mediaType: "image",
-              imageCount: 0
-            }
-          },
-          knowledgeQuery: caption
-        };
-      }
-      return {
-        ok: false,
-        errorCode: "vision_not_supported",
-        clientFallbackMessage: AI_AGENT_VISION_UNSUPPORTED_MESSAGE,
-        askRetry: false
-      };
+      return imageFailure(
+        "vision_not_supported",
+        AI_AGENT_VISION_UNSUPPORTED_MESSAGE,
+        false,
+        "vision_model_incompatible"
+      );
     }
 
     if (!absolutePath) {
-      if (caption) {
-        return {
-          ok: true,
-          turn: {
-            inboundText: buildUnderstoodBlock({
-              mediaType: "image",
-              caption
-            }),
-            originalMediaType: "image",
-            imageParts: [],
-            mediaMeta: { mediaType: "image", imageCount: 0 }
-          },
-          knowledgeQuery: caption
-        };
-      }
-      return {
-        ok: false,
-        errorCode: "media_unavailable",
-        clientFallbackMessage: AI_AGENT_IMAGE_FALLBACK_MESSAGE,
-        askRetry: true
-      };
+      return imageFailure(
+        "media_unavailable",
+        AI_AGENT_IMAGE_FALLBACK_MESSAGE,
+        true,
+        "image_file_missing"
+      );
     }
 
     let stat: fs.Stats;
     try {
       stat = await fs.promises.stat(absolutePath);
     } catch {
-      return {
-        ok: false,
-        errorCode: "media_unavailable",
-        clientFallbackMessage: AI_AGENT_IMAGE_FALLBACK_MESSAGE,
-        askRetry: true
-      };
+      return imageFailure(
+        "media_unavailable",
+        AI_AGENT_IMAGE_FALLBACK_MESSAGE,
+        true,
+        "image_file_missing"
+      );
     }
 
     if (stat.size > AI_AGENT_MEDIA_LIMITS.maxImageBytes) {
-      return {
-        ok: false,
-        errorCode: "file_too_large",
-        clientFallbackMessage: AI_AGENT_IMAGE_FALLBACK_MESSAGE,
-        askRetry: true
-      };
+      return imageFailure(
+        "file_too_large",
+        AI_AGENT_IMAGE_FALLBACK_MESSAGE,
+        true,
+        "image_file_too_large"
+      );
     }
 
     const mime = normalizeAiAgentMediaMimeType(
       guessMimeFromFilename(absolutePath, "image")
     );
     if (!AI_AGENT_IMAGE_MIME_TYPES.has(mime)) {
-      return {
-        ok: false,
-        errorCode: "format_unsupported",
-        clientFallbackMessage: AI_AGENT_IMAGE_FALLBACK_MESSAGE,
-        askRetry: true
-      };
+      return imageFailure(
+        "format_unsupported",
+        AI_AGENT_IMAGE_FALLBACK_MESSAGE,
+        true,
+        "image_format_invalid"
+      );
     }
 
     emitAiAgentMediaMetric("ai_agent.image_analysis_started", {
@@ -401,6 +385,9 @@ export async function prepareAiAgentMultimodalTurn(
     let imageParts: AiAgentPreparedImagePart[] = [];
     try {
       const buffer = await fs.promises.readFile(absolutePath);
+      if (!buffer.length) {
+        throw new Error("EMPTY_IMAGE_BUFFER");
+      }
       imageParts = [
         {
           mimeType: mime,
@@ -420,12 +407,21 @@ export async function prepareAiAgentMultimodalTurn(
         byteSize: stat.size,
         errorCode: "media_unavailable"
       });
-      return {
-        ok: false,
-        errorCode: "media_unavailable",
-        clientFallbackMessage: AI_AGENT_IMAGE_FALLBACK_MESSAGE,
-        askRetry: true
-      };
+      return imageFailure(
+        "media_unavailable",
+        AI_AGENT_IMAGE_FALLBACK_MESSAGE,
+        true,
+        "image_read_failed"
+      );
+    }
+
+    if (imageParts.length < 1) {
+      return imageFailure(
+        "media_unavailable",
+        AI_AGENT_IMAGE_FALLBACK_MESSAGE,
+        true,
+        "image_parts_empty"
+      );
     }
 
     const inboundText = [

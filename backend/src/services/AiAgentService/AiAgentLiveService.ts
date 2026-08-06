@@ -46,6 +46,11 @@ import { AI_AGENT_SHADOW_ERROR_CODES } from "./aiAgentShadowErrors";
 import { emitAiAgentMediaMetric } from "./emitAiAgentMediaMetric";
 import { startAiAgentTypingPresence } from "./startAiAgentTypingPresence";
 import { applyAiAgentLivePacing } from "./applyAiAgentLivePacing";
+import {
+  AI_AGENT_IMAGE_FALLBACK_MESSAGE,
+  AI_AGENT_VISION_UNSUPPORTED_MESSAGE
+} from "./aiAgentInputContent";
+import { resolveAiModelMediaCapabilities } from "../../config/aiModelMediaCapabilities";
 
 const inFlightLiveTickets = new Set<number>();
 
@@ -423,6 +428,89 @@ export async function generateAndSendLiveResponseForLog(
           byteSize: prepared.turn.mediaMeta.byteSize
         });
       }
+    }
+
+    // Fail-closed: imagem sem bytes reais nunca chama o modelo text-only.
+    if (classification.messageType === "image" && imageParts.length === 0) {
+      let modelForCapsGuard = String(agent.model || "");
+      try {
+        if (resolvedCred.provider) {
+          modelForCapsGuard = parseAiAgentModelForProvider(
+            agent.model,
+            resolvedCred.provider
+          );
+        }
+      } catch {
+        // model bruto
+      }
+      const caps = resolveAiModelMediaCapabilities(
+        resolvedCred.provider,
+        modelForCapsGuard
+      );
+      const guardErrorCode = caps.supportsVision
+        ? "media_unavailable"
+        : "vision_not_supported";
+      const clientFallbackMessage = caps.supportsVision
+        ? AI_AGENT_IMAGE_FALLBACK_MESSAGE
+        : AI_AGENT_VISION_UNSUPPORTED_MESSAGE;
+
+      await mergeAiAgentLiveLogMetadata(logId, companyId, {
+        mediaErrorCode: guardErrorCode,
+        mediaAskRetry: caps.supportsVision,
+        mediaType: "image",
+        mediaImageCount: 0,
+        mediaTechnicalCode: "image_parts_empty_fail_closed"
+      });
+
+      await updateAiAgentLiveLog(logId, companyId, {
+        liveStatus: AI_AGENT_LIVE_STATUSES.GENERATED,
+        suggestedReply: clientFallbackMessage,
+        suggestionSource: "media_fallback",
+        errorCode: mapMediaPrepareError(guardErrorCode),
+        generatedAt: new Date()
+      });
+
+      const claimedSendGuard = await claimLiveSending(logId, companyId);
+      if (!claimedSendGuard) {
+        return;
+      }
+
+      await applyAiAgentLivePacing({
+        ...pacingCtx,
+        responseText: clientFallbackMessage,
+        kind: "fallback"
+      });
+
+      const sendGuard = await sendAiAgentWhatsappMessage({
+        ticket: freshTicket,
+        body: clientFallbackMessage,
+        companyId,
+        aiAgentId: agent.id,
+        aiAgentRuntimeLogId: logId,
+        agentName: agent.name
+      });
+
+      if (sendGuard.ok === false) {
+        await updateAiAgentLiveLog(logId, companyId, {
+          liveStatus: AI_AGENT_LIVE_STATUSES.FAILED,
+          errorCode: mapMediaPrepareError(guardErrorCode),
+          sendErrorCode: AI_AGENT_LIVE_ERROR_CODES.LIVE_SEND_FAILED,
+          deliveryStatus: AI_AGENT_LIVE_DELIVERY_STATUSES.SEND_FAILED
+        });
+        return;
+      }
+
+      await updateAiAgentLiveLog(logId, companyId, {
+        liveStatus: AI_AGENT_LIVE_STATUSES.SENT,
+        sentMessageId: sendGuard.messageId,
+        sentAt: new Date(),
+        deliveryStatus: AI_AGENT_LIVE_DELIVERY_STATUSES.SENT,
+        sendErrorCode: null,
+        suggestedReply: clientFallbackMessage,
+        suggestionSource: "media_fallback",
+        errorCode: mapMediaPrepareError(guardErrorCode)
+      });
+      return;
     }
 
     const generation = await generateLiveResponseWithOptionalFc({

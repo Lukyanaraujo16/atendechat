@@ -32,6 +32,7 @@ const ALLOWED_KEYS = new Set([
   "mediaTranscriptionChars",
   "mediaErrorCode",
   "mediaAskRetry",
+  "mediaTechnicalCode",
   "runtimeMode"
 ]);
 

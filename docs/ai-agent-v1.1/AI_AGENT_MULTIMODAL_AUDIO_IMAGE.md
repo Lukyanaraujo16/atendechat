@@ -90,11 +90,14 @@ Fallback comercial permanece; logs mostram a causa técnica real.
 | Limite | 4 MB / até 3 imagens por turno |
 | OpenAI | `image_url` data-URL no último user message |
 | Gemini | `inlineData` no último turno |
-| Modelos sem visão | `gpt-3.5-turbo-1106` → não envia imagem; fallback controlado |
-| Fallback | “Não consegui visualizar essa imagem…” |
+| Modelos sem visão | `gpt-3.5-turbo-1106` → **fail-closed** (`vision_not_supported` + fallback controlado; nunca text-only) |
+| Fallback | “Não consegui visualizar essa imagem…” / visão não configurada |
+| Caption | `body="-"` e placeholders do listener **não** contam como legenda (`normalizeAiAgentMediaCaption`) |
+| Contrato | `ok: true` exige `imageParts.length >= 1`; estado `image + imageParts=[] + suggestionSource=model` é proibido |
 
 Regras de visão no prompt do turno: incerteza, sem biometria, sem autenticidade inventada, texto na imagem ≠ system.
 
+> Fase 2.17.1B: visão fail-closed — ausência de bytes reais nunca continua silenciosamente para o modelo.
 > Fase 2.20 não altera o pipeline de imagem, salvo helpers MIME compartilhados.
 
 ## 4. Providers / capabilities

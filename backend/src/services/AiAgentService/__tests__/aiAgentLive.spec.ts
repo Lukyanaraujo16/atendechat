@@ -23,7 +23,11 @@ import { InboundMessageClassification } from "../classifyInboundMessage";
 import { startAiAgentTypingPresence } from "../startAiAgentTypingPresence";
 import { applyAiAgentLivePacing } from "../applyAiAgentLivePacing";
 import { prepareAiAgentMultimodalTurn } from "../prepareAiAgentMultimodalTurn";
-import { AI_AGENT_AUDIO_FALLBACK_MESSAGE } from "../aiAgentInputContent";
+import {
+  AI_AGENT_AUDIO_FALLBACK_MESSAGE,
+  AI_AGENT_IMAGE_FALLBACK_MESSAGE,
+  AI_AGENT_VISION_UNSUPPORTED_MESSAGE
+} from "../aiAgentInputContent";
 
 jest.mock("@whiskeysockets/baileys", () => ({
   getContentType: () => "conversation",
@@ -94,7 +98,10 @@ jest.mock("../applyAiAgentLivePacing", () => ({
 
 jest.mock("../../../models/Message", () => ({
   __esModule: true,
-  default: { findAll: jest.fn().mockResolvedValue([]) }
+  default: {
+    findAll: jest.fn().mockResolvedValue([]),
+    findOne: jest.fn()
+  }
 }));
 
 jest.mock("../../../models/AiAgentRuntimeLog", () => ({
@@ -208,6 +215,14 @@ const audioClassification: InboundMessageClassification = {
   hasText: false,
   hasMedia: true,
   baileysType: "audioMessage",
+  blockReason: undefined
+};
+
+const imageClassification: InboundMessageClassification = {
+  messageType: "image",
+  hasText: false,
+  hasMedia: true,
+  baileysType: "imageMessage",
   blockReason: undefined
 };
 
@@ -642,6 +657,184 @@ describe("AiAgent live mode 1.4", () => {
     );
     const typingHandle = await mockedStartTyping.mock.results[0].value;
     expect(typingHandle.stop).toHaveBeenCalledWith("live_finished");
+  });
+
+  it("imagem body='-' com prepare fail-open (imageParts vazio) → Live fail-closed sem chamar modelo", async () => {
+    (AiAgentRuntimeLog.findOne as jest.Mock).mockResolvedValue({
+      id: 72,
+      companyId: 1,
+      ticketId: 1,
+      contactId: 2,
+      whatsappId: 3,
+      aiAgentId: 9,
+      messageId: "IMG-DASH",
+      eligible: true,
+      mode: "live",
+      liveStatus: AI_AGENT_LIVE_STATUSES.QUEUED
+    });
+    (Ticket.findOne as jest.Mock).mockResolvedValue(
+      ticket({
+        id: 1,
+        companyId: 1,
+        contactId: 2,
+        status: "pending",
+        userId: null,
+        aiAgentPaused: false,
+        chatbot: false,
+        isGroup: false,
+        contact: contact({ id: 2, name: "João" })
+      })
+    );
+    (Contact.findOne as jest.Mock).mockResolvedValue(
+      contact({ id: 2, name: "João" })
+    );
+    (Whatsapp.findOne as jest.Mock).mockResolvedValue(
+      whatsapp({
+        id: 3,
+        aiAgentMode: "live",
+        aiAgentEnabled: true,
+        aiAgentId: 9
+      })
+    );
+    (AiAgent.findOne as jest.Mock).mockResolvedValue(
+      agent({
+        id: 9,
+        name: "Eduardo",
+        enabled: true,
+        model: "gpt-4o-mini",
+        maxTokens: 256,
+        temperature: 0.2,
+        systemPrompt: "Seja educado."
+      })
+    );
+    (AiAgentRuntimeLog.update as jest.Mock).mockResolvedValue([1]);
+
+    // Contrato proibido da 2.17: ok:true + imageParts=[] (falha silenciosa)
+    mockedPrepareMultimodal.mockResolvedValue({
+      ok: true,
+      turn: {
+        inboundText:
+          "Mensagem original:\n[type=image]\n\nLegenda do cliente:\n-\n\n(Nota interna: o modelo configurado não possui visão)",
+        originalMediaType: "image",
+        imageParts: [],
+        mediaMeta: { mediaType: "image", imageCount: 0 }
+      },
+      knowledgeQuery: "-"
+    });
+    mockedSend.mockResolvedValue({
+      ok: true,
+      messageId: "OUT-IMG-FB",
+      bodySent: `Eduardo:\n${AI_AGENT_IMAGE_FALLBACK_MESSAGE}`
+    });
+
+    await generateAndSendLiveResponseForLog(
+      72,
+      1,
+      "-",
+      imageClassification
+    );
+
+    expect(mockedPrepareMultimodal).toHaveBeenCalled();
+    expect(mockedLiveGenerate).not.toHaveBeenCalled();
+    expect(mockedSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: AI_AGENT_IMAGE_FALLBACK_MESSAGE,
+        agentName: "Eduardo"
+      })
+    );
+    expect(AiAgentRuntimeLog.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        liveStatus: AI_AGENT_LIVE_STATUSES.SENT,
+        suggestionSource: "media_fallback",
+        suggestedReply: AI_AGENT_IMAGE_FALLBACK_MESSAGE
+      }),
+      expect.any(Object)
+    );
+  });
+
+  it("imagem vision_not_supported → Live envia fallback controlado sem modelo", async () => {
+    (AiAgentRuntimeLog.findOne as jest.Mock).mockResolvedValue({
+      id: 73,
+      companyId: 1,
+      ticketId: 1,
+      contactId: 2,
+      whatsappId: 3,
+      aiAgentId: 9,
+      messageId: "IMG-NOV",
+      eligible: true,
+      mode: "live",
+      liveStatus: AI_AGENT_LIVE_STATUSES.QUEUED
+    });
+    (Ticket.findOne as jest.Mock).mockResolvedValue(
+      ticket({
+        id: 1,
+        companyId: 1,
+        contactId: 2,
+        status: "pending",
+        userId: null,
+        aiAgentPaused: false,
+        chatbot: false,
+        isGroup: false,
+        contact: contact({ id: 2, name: "João" })
+      })
+    );
+    (Contact.findOne as jest.Mock).mockResolvedValue(
+      contact({ id: 2, name: "João" })
+    );
+    (Whatsapp.findOne as jest.Mock).mockResolvedValue(
+      whatsapp({
+        id: 3,
+        aiAgentMode: "live",
+        aiAgentEnabled: true,
+        aiAgentId: 9
+      })
+    );
+    (AiAgent.findOne as jest.Mock).mockResolvedValue(
+      agent({
+        id: 9,
+        name: "Eduardo",
+        enabled: true,
+        model: "gpt-3.5-turbo-1106",
+        maxTokens: 256,
+        temperature: 0.2,
+        systemPrompt: "Seja educado."
+      })
+    );
+    (AiAgentRuntimeLog.update as jest.Mock).mockResolvedValue([1]);
+
+    mockedPrepareMultimodal.mockResolvedValue({
+      ok: false,
+      errorCode: "vision_not_supported",
+      clientFallbackMessage: AI_AGENT_VISION_UNSUPPORTED_MESSAGE,
+      askRetry: false
+    });
+    mockedSend.mockResolvedValue({
+      ok: true,
+      messageId: "OUT-IMG-VIS",
+      bodySent: `Eduardo:\n${AI_AGENT_VISION_UNSUPPORTED_MESSAGE}`
+    });
+
+    await generateAndSendLiveResponseForLog(
+      73,
+      1,
+      "-",
+      imageClassification
+    );
+
+    expect(mockedPrepareMultimodal).toHaveBeenCalled();
+    expect(mockedLiveGenerate).not.toHaveBeenCalled();
+    expect(mockedSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: AI_AGENT_VISION_UNSUPPORTED_MESSAGE
+      })
+    );
+    expect(AiAgentRuntimeLog.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        suggestionSource: "media_fallback",
+        suggestedReply: AI_AGENT_VISION_UNSUPPORTED_MESSAGE
+      }),
+      expect.any(Object)
+    );
   });
 
   it("resposta longa demais não envia", () => {

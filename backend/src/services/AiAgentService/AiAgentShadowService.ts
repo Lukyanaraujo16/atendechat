@@ -47,8 +47,13 @@ import {
   isMultimodalInboundCandidate,
   prepareAiAgentMultimodalTurn
 } from "./prepareAiAgentMultimodalTurn";
-import { AI_AGENT_AUDIO_FALLBACK_MESSAGE } from "./aiAgentInputContent";
+import {
+  AI_AGENT_AUDIO_FALLBACK_MESSAGE,
+  AI_AGENT_IMAGE_FALLBACK_MESSAGE,
+  AI_AGENT_VISION_UNSUPPORTED_MESSAGE
+} from "./aiAgentInputContent";
 import { emitAiAgentMediaMetric } from "./emitAiAgentMediaMetric";
+import { resolveAiModelMediaCapabilities } from "../../config/aiModelMediaCapabilities";
 
 const inFlightTickets = new Set<number>();
 
@@ -241,6 +246,7 @@ export async function generateShadowSuggestionForLog(
           shadowStatus: AI_AGENT_SHADOW_STATUSES.GENERATED,
           suggestedReply:
             prepared.clientFallbackMessage || AI_AGENT_AUDIO_FALLBACK_MESSAGE,
+          suggestionSource: "fallback",
           errorCode: mapShadowMediaError(prepared.errorCode),
           latencyMs: Date.now() - startedAt,
           shadowModel: modelForCaps,
@@ -263,6 +269,47 @@ export async function generateShadowSuggestionForLog(
         mediaTranscriptionChars:
           prepared.turn.mediaMeta.transcriptionChars ?? null
       });
+    }
+
+    // Fail-closed: imagem sem bytes reais nunca gera sugestão text-only.
+    if (classification.messageType === "image" && imageParts.length === 0) {
+      let modelForCapsGuard = String(agent.model || "");
+      try {
+        modelForCapsGuard = parseAiAgentModelForProvider(
+          agent.model,
+          resolved.provider
+        );
+      } catch {
+        // model bruto
+      }
+      const caps = resolveAiModelMediaCapabilities(
+        resolved.provider,
+        modelForCapsGuard
+      );
+      const guardErrorCode = caps.supportsVision
+        ? "media_unavailable"
+        : "vision_not_supported";
+      const clientFallbackMessage = caps.supportsVision
+        ? AI_AGENT_IMAGE_FALLBACK_MESSAGE
+        : AI_AGENT_VISION_UNSUPPORTED_MESSAGE;
+
+      await mergeAiAgentShadowLogMetadata(logId, companyId, {
+        mediaErrorCode: guardErrorCode,
+        mediaAskRetry: caps.supportsVision,
+        mediaType: "image",
+        mediaImageCount: 0,
+        mediaTechnicalCode: "image_parts_empty_fail_closed"
+      });
+      await updateAiAgentShadowLog(logId, companyId, {
+        shadowStatus: AI_AGENT_SHADOW_STATUSES.GENERATED,
+        suggestedReply: clientFallbackMessage,
+        suggestionSource: "fallback",
+        errorCode: mapShadowMediaError(guardErrorCode),
+        latencyMs: Date.now() - startedAt,
+        shadowModel: modelForCapsGuard,
+        shadowProvider: resolved.provider
+      });
+      return;
     }
 
     let promptContext;

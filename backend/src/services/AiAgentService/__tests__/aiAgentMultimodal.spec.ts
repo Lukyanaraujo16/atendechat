@@ -37,7 +37,12 @@ import {
 import TranscribeAiAgentAudioService from "../TranscribeAiAgentAudioService";
 import { prepareAiAgentMultimodalTurn } from "../prepareAiAgentMultimodalTurn";
 import { buildOpenAiMultimodalMessages } from "../../AiProviderService/aiProviderMultimodal";
-import { AI_AGENT_AUDIO_FALLBACK_MESSAGE } from "../aiAgentInputContent";
+import {
+  AI_AGENT_AUDIO_FALLBACK_MESSAGE,
+  AI_AGENT_IMAGE_FALLBACK_MESSAGE,
+  AI_AGENT_VISION_UNSUPPORTED_MESSAGE
+} from "../aiAgentInputContent";
+import { normalizeAiAgentMediaCaption } from "../normalizeAiAgentMediaCaption";
 import { get } from "../../../libs/cache";
 import {
   normalizeAiAgentMediaMimeType,
@@ -302,6 +307,28 @@ describe("AiAgent multimodal 2.17", () => {
     });
   });
 
+  describe("normalizeAiAgentMediaCaption", () => {
+    it("remove marcadores técnicos e preserva legenda real", () => {
+      expect(normalizeAiAgentMediaCaption("-")).toBeNull();
+      expect(normalizeAiAgentMediaCaption("   ")).toBeNull();
+      expect(normalizeAiAgentMediaCaption("Imagem")).toBeNull();
+      expect(normalizeAiAgentMediaCaption("Áudio")).toBeNull();
+      expect(normalizeAiAgentMediaCaption(null)).toBeNull();
+      expect(normalizeAiAgentMediaCaption("[Mídia: x]")).toBeNull();
+      expect(normalizeAiAgentMediaCaption("Qual é este produto?")).toBe(
+        "Qual é este produto?"
+      );
+      expect(normalizeAiAgentMediaCaption("Veja o preço nesta foto")).toBe(
+        "Veja o preço nesta foto"
+      );
+      expect(
+        normalizeAiAgentMediaCaption("171234.jpg", {
+          mediaUrlOrFilename: "171234.jpg"
+        })
+      ).toBeNull();
+    });
+  });
+
   describe("prepareAiAgentMultimodalTurn", () => {
     it("áudio → contexto com transcrição", async () => {
       mockedTranscribe.mockResolvedValue({
@@ -474,6 +501,119 @@ describe("AiAgent multimodal 2.17", () => {
       if (prepared.ok === false) {
         expect(prepared.errorCode).toBe("vision_not_supported");
         expect(prepared.askRetry).toBe(false);
+        expect(prepared.clientFallbackMessage).toBe(
+          AI_AGENT_VISION_UNSUPPORTED_MESSAGE
+        );
+      }
+    });
+
+    it("body='-' + modelo sem visão → fail-closed (nunca ok com imageParts vazio)", async () => {
+      mockedMessageFind.mockResolvedValue({
+        id: "I-DASH",
+        mediaType: "image",
+        body: "-",
+        getDataValue: () => "photo.jpg"
+      });
+      const prepared = await prepareAiAgentMultimodalTurn({
+        companyId: 1,
+        ticketId: 2,
+        agentId: 3,
+        messageId: "I-DASH",
+        inboundText: "-",
+        classification: {
+          messageType: "image",
+          hasText: false,
+          hasMedia: true,
+          baileysType: "imageMessage"
+        },
+        provider: "openai",
+        apiKey: "sk-test",
+        model: "gpt-3.5-turbo-1106"
+      });
+      expect(prepared.ok).toBe(false);
+      if (prepared.ok === false) {
+        expect(prepared.errorCode).toBe("vision_not_supported");
+        expect(prepared.clientFallbackMessage).toBe(
+          AI_AGENT_VISION_UNSUPPORTED_MESSAGE
+        );
+      }
+    });
+
+    it("body='-' + arquivo ausente → fail-closed media_unavailable", async () => {
+      mockedMessageFind.mockResolvedValue({
+        id: "I-MISS",
+        mediaType: "image",
+        body: "-",
+        getDataValue: () => null
+      });
+      const prepared = await prepareAiAgentMultimodalTurn({
+        companyId: 1,
+        ticketId: 2,
+        agentId: 3,
+        messageId: "I-MISS",
+        inboundText: "-",
+        classification: {
+          messageType: "image",
+          hasText: false,
+          hasMedia: true,
+          baileysType: "imageMessage"
+        },
+        provider: "openai",
+        apiKey: "sk-test",
+        model: "gpt-4o-mini"
+      });
+      expect(prepared.ok).toBe(false);
+      if (prepared.ok === false) {
+        expect(prepared.errorCode).toBe("media_unavailable");
+        expect(prepared.clientFallbackMessage).toBe(
+          AI_AGENT_IMAGE_FALLBACK_MESSAGE
+        );
+      }
+    });
+
+    it("body='-' + JPEG válido com visão → imageParts e sem legenda falsa", async () => {
+      const fixture = writePublicFixture(
+        `_test_img_dash_${Date.now()}.jpg`,
+        Buffer.from([0xff, 0xd8, 0xff, 0xd9])
+      );
+      mockedMessageFind.mockResolvedValue({
+        id: "I-OK",
+        mediaType: "image",
+        body: "-",
+        getDataValue: () => fixture.rel
+      });
+
+      try {
+        const prepared = await prepareAiAgentMultimodalTurn({
+          companyId: 1,
+          ticketId: 2,
+          agentId: 3,
+          messageId: "I-OK",
+          inboundText: "-",
+          classification: {
+            messageType: "image",
+            hasText: false,
+            hasMedia: true,
+            baileysType: "imageMessage"
+          },
+          provider: "openai",
+          apiKey: "sk-test",
+          model: "gpt-4o-mini"
+        });
+        expect(prepared.ok).toBe(true);
+        if (prepared.ok) {
+          expect(prepared.turn.imageParts.length).toBeGreaterThanOrEqual(1);
+          expect(prepared.turn.inboundText).not.toContain("Legenda do cliente:\n-");
+          expect(prepared.turn.inboundText).not.toContain(
+            "não possui visão"
+          );
+        }
+      } finally {
+        try {
+          fs.unlinkSync(fixture.abs);
+        } catch {
+          // ignore
+        }
       }
     });
 
