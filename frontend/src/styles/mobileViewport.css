@@ -18,6 +18,43 @@ body {
   }
 }
 
+/*
+ * Conversa mobile aberta: altura = visualViewport (acima do teclado).
+ * Só ativa com classe aplicada por useMobileVisualViewport — não global.
+ */
+/* Fundação: CSS vars + fallback via attr() não é universal — usamos var()
+ * preenchida por JS; data-* serve para testes/diagnóstico. */
+html.shc-ticket-conversation-mobile,
+html.shc-ticket-conversation-mobile body {
+  height: var(--app-vv-height, 100dvh);
+  max-height: var(--app-vv-height, 100dvh);
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+html.shc-ticket-conversation-mobile #root {
+  height: var(--app-vv-height, 100dvh);
+  max-height: var(--app-vv-height, 100dvh);
+  min-height: 0;
+  overflow: hidden;
+}
+
+html.shc-ticket-conversation-mobile body {
+  position: fixed;
+  width: 100%;
+  top: var(--app-vv-offset-top, 0px);
+  left: 0;
+}
+
+/* Teclado aberto: não somar safe-area-bottom (iOS já encolheu o visualViewport) */
+html.shc-ticket-keyboard-open .shc-ticket-composer-safe {
+  padding-bottom: 8px !important;
+}
+
+html.shc-ticket-conversation-mobile .shc-layout-content-tickets {
+  padding-bottom: 0 !important;
+}
+
 /* Toasts acima do drawer (1200), abaixo de modais MUI (~1300+) */
 .Toastify__toast-container {
   z-index: 1400;

@@ -67,6 +67,12 @@ const useStyles = makeStyles((theme) => ({
       height: "100vh",
     },
     backgroundColor: theme.palette.background.default,
+    // Conversa mobile: altura = visualViewport (CSS var de useMobileVisualViewport)
+    "html.shc-ticket-conversation-mobile &": {
+      height: "var(--app-vv-height, 100dvh)",
+      maxHeight: "var(--app-vv-height, 100dvh)",
+      overflow: "hidden",
+    },
     '& .MuiButton-outlinedPrimary': {
       color: theme.palette.primary.contrastText,
       backgroundColor:
@@ -870,7 +876,8 @@ const LoggedInLayout = ({ children, themeToggle }) => {
         className={clsx(
           classes.content,
           isFullHeightModulePage && classes.contentTicketsFocus,
-          classes.contentMobileSafe
+          classes.contentMobileSafe,
+          isTicketsPage && "shc-layout-content-tickets"
         )}
       >
         <div className={classes.appBarSpacer} />

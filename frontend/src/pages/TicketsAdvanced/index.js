@@ -5,6 +5,7 @@ import { makeStyles } from "@material-ui/core/styles";
 
 import TicketsManagerTabs from "../../components/TicketsManagerTabs/";
 import Ticket from "../../components/Ticket/";
+import useMobileVisualViewport from "../../hooks/useMobileVisualViewport";
 
 const useStyles = makeStyles((theme) => ({
   inboxRoot: {
@@ -38,10 +39,25 @@ const useStyles = makeStyles((theme) => ({
 /**
  * Mobile (< md): lista e conversa em rotas separadas — estilo app/PWA.
  * /tickets → só inbox; /tickets/:uuid → conversa fullscreen com voltar.
+ * visualViewport: altura útil acima do teclado (sem faixa branca).
  */
 const TicketAdvanced = () => {
   const classes = useStyles();
   const { ticketId } = useParams();
+  const conversationOpen = Boolean(ticketId);
+
+  const vv = useMobileVisualViewport({ enabled: conversationOpen });
+
+  React.useEffect(() => {
+    if (!conversationOpen || !vv.keyboardLikelyOpen) return;
+    const list = document.getElementById("messagesList");
+    if (!list) return;
+    const distanceFromBottom =
+      list.scrollHeight - list.scrollTop - list.clientHeight;
+    if (distanceFromBottom < 140) {
+      list.scrollTop = list.scrollHeight;
+    }
+  }, [conversationOpen, vv.keyboardLikelyOpen, vv.height]);
 
   if (ticketId) {
     return (

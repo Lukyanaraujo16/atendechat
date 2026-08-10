@@ -417,8 +417,14 @@ const MessagesList = forwardRef(function MessagesList(
   const socketManager = useContext(SocketContext);
 
   const scrollToBottom = useCallback(() => {
-    if (lastMessageRef.current) {
-      lastMessageRef.current.scrollIntoView({});
+    // Preferir scroll no container — scrollIntoView no iOS desloca o documento/visualViewport
+    const list = document.getElementById("messagesList");
+    if (list && typeof list.scrollTop === "number") {
+      list.scrollTop = list.scrollHeight;
+      return;
+    }
+    if (lastMessageRef.current && typeof lastMessageRef.current.scrollIntoView === "function") {
+      lastMessageRef.current.scrollIntoView({ block: "nearest", inline: "nearest" });
     }
   }, []);
 

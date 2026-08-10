@@ -29,11 +29,20 @@ const useStyles = makeStyles((theme) => {
 			overflow: "hidden",
 			boxSizing: "border-box",
 			[theme.breakpoints.down("md")]: {
-				flexWrap: "wrap",
+				// Mobile: uma linha estável — sem wrap que provoca sobreposição
+				flexWrap: "nowrap",
+				alignItems: "stretch",
+				minHeight: 52,
+				maxHeight: 64,
+				padding: theme.spacing(0.25, 0.25, 0.25, 0),
 			},
 		},
 		ticketHeaderCompact: {
 			minHeight: 56,
+			[theme.breakpoints.down("md")]: {
+				minHeight: 52,
+				maxHeight: 56,
+			},
 		},
 	};
 });

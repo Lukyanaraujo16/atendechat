@@ -3,7 +3,7 @@ import { useHistory } from "react-router-dom";
 
 import { Avatar, CardHeader, IconButton, Box } from "@material-ui/core";
 import ArrowBackIcon from "@material-ui/icons/ArrowBack";
-import { makeStyles, useTheme, alpha } from "@material-ui/core/styles";
+import { makeStyles, alpha } from "@material-ui/core/styles";
 import useIsMobile from "../../hooks/useIsMobile";
 
 import { i18n } from "../../translate/i18n";
@@ -23,6 +23,9 @@ const useStyles = makeStyles((theme) => ({
 		"&:hover": {
 			backgroundColor: theme.palette.action.hover,
 		},
+		[theme.breakpoints.down("md")]: {
+			padding: theme.spacing(0.75, 0.75, 0.75, 0.25),
+		},
 	},
 	avatar: {
 		width: 44,
@@ -37,6 +40,10 @@ const useStyles = makeStyles((theme) => ({
 			width: "100%",
 			height: "100%",
 		},
+		[theme.breakpoints.down("md")]: {
+			width: 36,
+			height: 36,
+		},
 	},
 	title: {
 		fontWeight: 600,
@@ -44,17 +51,35 @@ const useStyles = makeStyles((theme) => ({
 		lineHeight: 1.35,
 		letterSpacing: "-0.01em",
 		color: theme.palette.text.primary,
+		overflow: "hidden",
+		textOverflow: "ellipsis",
+		whiteSpace: "nowrap",
+		[theme.breakpoints.down("md")]: {
+			fontSize: "0.9375rem",
+		},
 	},
 	subheader: {
 		fontSize: "0.8125rem",
 		lineHeight: 1.35,
 		color: theme.palette.text.secondary,
 		marginTop: theme.spacing(0.25),
+		overflow: "hidden",
+		textOverflow: "ellipsis",
+		whiteSpace: "nowrap",
+		[theme.breakpoints.down("md")]: {
+			fontSize: "0.75rem",
+			marginTop: 0,
+		},
 	},
 	backButton: {
 		marginRight: theme.spacing(0.5),
 		marginLeft: theme.spacing(-0.5),
 		flexShrink: 0,
+		[theme.breakpoints.down("md")]: {
+			marginRight: theme.spacing(0.25),
+			marginLeft: 0,
+			alignSelf: "center",
+		},
 	},
 	headerRow: {
 		display: "flex",
@@ -62,10 +87,29 @@ const useStyles = makeStyles((theme) => ({
 		flex: 1,
 		minWidth: 0,
 		width: "100%",
+		overflow: "hidden",
 	},
 	headerMain: {
 		flex: 1,
 		minWidth: 0,
+		overflow: "hidden",
+	},
+	titleBlock: {
+		display: "block",
+		overflow: "hidden",
+		textOverflow: "ellipsis",
+		whiteSpace: "nowrap",
+		maxWidth: "100%",
+	},
+	subheaderBlock: {
+		display: "block",
+		overflow: "hidden",
+		textOverflow: "ellipsis",
+		whiteSpace: "nowrap",
+		maxWidth: "100%",
+	},
+	desktopExtras: {
+		display: "block",
 	},
 }));
 
@@ -77,7 +121,6 @@ const TicketInfo = ({
 	onTicketUpdate,
 }) => {
 	const classes = useStyles();
-	const theme = useTheme();
 	const history = useHistory();
 	const isMobile = useIsMobile();
 	const { user } = ticket;
@@ -109,6 +152,31 @@ const TicketInfo = ({
 		history.push("/tickets");
 	};
 
+	const titleNode = (
+		<span className={classes.titleBlock}>{`${contactName} #${ticket.id}`}</span>
+	);
+
+	const subheaderParts = [];
+	if (String(ticket?.channel || "").toLowerCase() === "instagram") {
+		subheaderParts.push(
+			`Instagram${
+				ticket?.instagramAccount?.name ? ` · ${ticket.instagramAccount.name}` : ""
+			}`
+		);
+	}
+	if (ticket.user) {
+		subheaderParts.push(userName);
+	}
+	if (!isMobile && ticket.startedOutsideSystem) {
+		subheaderParts.push(i18n.t("ticketsList.startedOutsideSystemHint"));
+	}
+
+	const subheaderNode = (
+		<span className={classes.subheaderBlock}>
+			{subheaderParts.filter(Boolean).join(" · ")}
+		</span>
+	);
+
 	return (
 		<Box className={classes.headerRow}>
 			{isMobile ? (
@@ -134,53 +202,35 @@ const TicketInfo = ({
 				titleTypographyProps={{ noWrap: true, variant: "subtitle1", component: "span" }}
 				subheaderTypographyProps={{ noWrap: true, component: "span" }}
 				avatar={<Avatar src={contact.profilePicUrl} alt="contact_image" />}
-			title={
-				<span>
-					<span style={{ display: "block" }}>{`${contactName} #${ticket.id}`}</span>
-					{contact?.id && onLabelsChange ? (
-						<span
-							onClick={(e) => e.stopPropagation()}
-							onKeyDown={(e) => e.stopPropagation()}
-							role="presentation"
-						>
-							<ContactLabelsBar
-								contactId={contact.id}
-								labels={contact.labels}
-								onLabelsChange={onLabelsChange}
-								compact
-							/>
+				title={
+					isMobile ? (
+						titleNode
+					) : (
+						<span>
+							{titleNode}
+							{contact?.id && onLabelsChange ? (
+								<span
+									className={classes.desktopExtras}
+									onClick={(e) => e.stopPropagation()}
+									onKeyDown={(e) => e.stopPropagation()}
+									role="presentation"
+								>
+									<ContactLabelsBar
+										contactId={contact.id}
+										labels={contact.labels}
+										onLabelsChange={onLabelsChange}
+										compact
+									/>
+								</span>
+							) : null}
 						</span>
-					) : null}
-				</span>
-			}
-			subheader={
-				<span>
-					{String(ticket?.channel || "").toLowerCase() === "instagram" ? (
-						<span style={{ display: "block", marginBottom: ticket.user ? 4 : 0 }}>
-							Instagram
-							{ticket?.instagramAccount?.name
-								? ` · ${ticket.instagramAccount.name}`
-								: ""}
-						</span>
-					) : null}
-					{ticket.user && `${userName}`}
-					{ticket.startedOutsideSystem && (
-						<span
-							style={{
-								display: "block",
-								marginTop: 4,
-								fontSize: "0.75rem",
-								lineHeight: 1.35,
-								color: theme.palette.text.secondary,
-							}}
-						>
-							{i18n.t("ticketsList.startedOutsideSystemHint")}
-						</span>
-					)}
-				</span>
-			}
+					)
+				}
+				subheader={subheaderNode}
 			/>
-			<TicketAiAgentControls ticket={ticket} onTicketUpdate={onTicketUpdate} />
+			{!isMobile ? (
+				<TicketAiAgentControls ticket={ticket} onTicketUpdate={onTicketUpdate} />
+			) : null}
 		</Box>
 	);
 };

@@ -132,12 +132,18 @@ const useStyles = makeStyles((theme) => ({
     flexShrink: 0,
     backgroundColor: getComposerSurface(theme),
     borderBottomRightRadius: PANEL_RADIUS,
-    paddingBottom: "env(safe-area-inset-bottom, 0px)",
+    // safe-area só no composer interno (evita empilhar com newMessageBox)
     [theme.breakpoints.down("md")]: {
       borderBottomRightRadius: 0,
     },
   },
 
+  ticketPanelMobileConversation: {
+    [theme.breakpoints.down("md")]: {
+      height: "100%",
+      maxHeight: "100%",
+    },
+  },
 }));
 
 const Ticket = () => {
@@ -446,7 +452,7 @@ const Ticket = () => {
       return <TicketOrphanComposer />;
     }
     return (
-      <div className={classes.messageInputFooter}>
+      <div className={clsx(classes.messageInputFooter)}>
         <MessageInput
           ticketId={ticket.id}
           ticketStatus={ticket.status}
@@ -470,6 +476,7 @@ const Ticket = () => {
         className={clsx(classes.ticketPanel, {
           [classes.mainWrapperShift]: drawerOpen && !isMobile,
           [classes.ticketPanelMobileShift]: isMobile,
+          [classes.ticketPanelMobileConversation]: isMobile,
         })}
         data-ticket-chat-panel
       >

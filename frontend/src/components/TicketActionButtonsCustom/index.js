@@ -28,15 +28,21 @@ import { useAcceptTicket } from "../../hooks/useAcceptTicket";
 import { isGroupTicket } from "../../utils/isGroupTicket";
 
 const useStyles = makeStyles((theme) => ({
-  actionButtons: {
+    actionButtons: {
     flex: "none",
     alignSelf: "center",
     marginLeft: "auto",
     display: "flex",
     alignItems: "center",
     minWidth: 0,
+    flexShrink: 0,
     paddingRight: theme.spacing(1),
     paddingLeft: theme.spacing(0.5),
+    [theme.breakpoints.down("md")]: {
+      paddingRight: theme.spacing(0.25),
+      paddingLeft: theme.spacing(0.25),
+      maxWidth: "46%",
+    },
   },
   legacyCluster: {
     marginRight: theme.spacing(0.5),

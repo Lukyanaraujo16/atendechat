@@ -60,6 +60,7 @@ const useStyles = makeStyles((theme) => {
     boxShadow: getComposerTopDivider(theme),
     borderBottomRightRadius: PANEL_RADIUS,
     borderBottomLeftRadius: 0,
+    width: "100%",
   },
   pendingHint: {
     width: "100%",
@@ -79,9 +80,13 @@ const useStyles = makeStyles((theme) => {
     boxSizing: "border-box",
     display: "flex",
     padding: theme.spacing(1, 1.25),
-    paddingBottom: `calc(${theme.spacing(1)}px + env(safe-area-inset-bottom, 0px))`,
+    paddingBottom: theme.spacing(1),
     alignItems: "flex-end",
     gap: theme.spacing(0.5),
+    [theme.breakpoints.down("md")]: {
+      // safe-area só com teclado fechado (classe .shc-ticket-composer-safe + html.shc-ticket-keyboard-open zera)
+      paddingBottom: `calc(${theme.spacing(1)}px + env(safe-area-inset-bottom, 0px))`,
+    },
   },
 
   messageInputWrapper: {
@@ -129,6 +134,12 @@ const useStyles = makeStyles((theme) => {
     minWidth: 0,
     border: "none",
     color: theme.palette.text.primary,
+    // iOS: <16px no input provoca zoom automático e desloca o viewport
+    fontSize: 16,
+    lineHeight: 1.35,
+    [theme.breakpoints.up("md")]: {
+      fontSize: "0.9375rem",
+    },
   },
 
   signToggleButton: {
@@ -1030,7 +1041,7 @@ const MessageInputCustom = (props) => {
           </div>
         )}
         {replyingMessage && renderReplyingMessage(replyingMessage)}
-        <div className={classes.newMessageBox}>
+        <div className={clsx(classes.newMessageBox, "shc-ticket-composer-safe")}>
           <input
             ref={documentInputRef}
             type="file"
