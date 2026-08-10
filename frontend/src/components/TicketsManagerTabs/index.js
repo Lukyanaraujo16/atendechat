@@ -65,6 +65,7 @@ import CheckBoxIcon from "@material-ui/icons/CheckBox";
 import PlaylistAddCheckIcon from "@material-ui/icons/PlaylistAddCheck";
 import DeleteOutlineIcon from "@material-ui/icons/DeleteOutline";
 import { canDeleteTickets } from "../../utils/canDeleteTickets";
+import { buildTicketConversationLocation } from "../../utils/ticketConversationRoute";
 
 import useTicketsKeyboardShortcuts from "../../hooks/useTicketsKeyboardShortcuts";
 import {
@@ -890,7 +891,9 @@ const TicketsManagerTabs = () => {
   const handleCloseOrOpenTicket = (ticket) => {
     setNewTicketModalOpen(false);
     if (ticket !== undefined && ticket.uuid !== undefined) {
-      history.push(`/tickets/${ticket.uuid}`);
+      history.push(
+        buildTicketConversationLocation(ticket.uuid, { fromInbox: true })
+      );
     }
   };
 

@@ -25,6 +25,7 @@ import {
   getInboxCardSurfaceHover,
   getCardElevation,
 } from "../../theme/ticketPanelStyles";
+import { buildTicketConversationLocation } from "../../utils/ticketConversationRoute";
 
 const CARD_RADIUS = 14;
 
@@ -98,7 +99,12 @@ export default function GroupInboxListItem({ group, disabled, onOpened }) {
         if (typeof setCurrentTicket === "function") {
           setCurrentTicket({ id: null, uuid: data.uuid, code: uuidv4() });
         }
-        history.push(`/tickets/${data.uuid}?inboxTab=groups`);
+        history.push(
+          buildTicketConversationLocation(data.uuid, {
+            fromInbox: true,
+            search: "?inboxTab=groups",
+          })
+        );
         if (typeof onOpened === "function") {
           onOpened(group.contactId);
         }

@@ -1,4 +1,4 @@
-import React, { useContext, useState } from "react";
+import React, { useContext, useRef, useState } from "react";
 import { useHistory } from "react-router-dom";
 import { toast } from "react-toastify";
 
@@ -7,6 +7,12 @@ import { Replay } from "@material-ui/icons";
 import Tooltip from "@material-ui/core/Tooltip";
 import IconButton from "@material-ui/core/IconButton";
 import Button from "@material-ui/core/Button";
+import MenuItem from "@material-ui/core/MenuItem";
+import ListItemIcon from "@material-ui/core/ListItemIcon";
+import ListItemText from "@material-ui/core/ListItemText";
+import LocalOfferOutlinedIcon from "@material-ui/icons/LocalOfferOutlined";
+import BusinessCenterOutlinedIcon from "@material-ui/icons/BusinessCenterOutlined";
+import ShoppingCartOutlinedIcon from "@material-ui/icons/ShoppingCartOutlined";
 import SmartToyIcon from "@mui/icons-material/SmartToy";
 import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
 
@@ -20,15 +26,17 @@ import { TicketsSetContext } from "../../context/Tickets/TicketsContext";
 import { TicketsInboxContext } from "../../context/TicketsInboxContext";
 import TicketConversationActionBar from "../TicketConversationActionBar";
 import usePlanFlags from "../../hooks/usePlanFlags";
+import useIsMobile from "../../hooks/useIsMobile";
 import TicketCrmDealButton from "../Crm/TicketCrmDealButton";
 import TicketInventorySaleButton from "../Inventory/TicketInventorySaleButton";
 import { TicketTagsButton } from "../TagsContainer";
 import { canDeleteTickets } from "../../utils/canDeleteTickets";
 import { useAcceptTicket } from "../../hooks/useAcceptTicket";
 import { isGroupTicket } from "../../utils/isGroupTicket";
+import { leaveTicketConversation } from "../../utils/ticketConversationRoute";
 
 const useStyles = makeStyles((theme) => ({
-    actionButtons: {
+  actionButtons: {
     flex: "none",
     alignSelf: "center",
     marginLeft: "auto",
@@ -78,11 +86,20 @@ const TicketActionButtonsCustom = ({
   const mayDelete = canDeleteTickets(user);
   const { completeAcceptTicket } = useAcceptTicket();
   const isGroupConversation = isGroupTicket(ticket);
+  const isMobile = useIsMobile();
+  const tagsOwnerRef = useRef(null);
+  const crmOwnerRef = useRef(null);
+  const tagCount = Array.isArray(ticket?.tags) ? ticket.tags.length : 0;
+  const manageTagsLabel = i18n.t("messagesList.header.buttons.manageTags");
+  const manageTagsMenuLabel =
+    tagCount > 0 ? `${manageTagsLabel} (${tagCount})` : manageTagsLabel;
+  const crmMenuDisabled =
+    loading || crmFeatureLoading || !ticket?.id || !ticket?.contactId;
 
   const handleAcceptTicket = async () => {
     setLoading(true);
     try {
-      await completeAcceptTicket(ticket);
+      await completeAcceptTicket(ticket, { fromInbox: false });
     } catch (err) {
       toastError(err);
     } finally {
@@ -111,7 +128,7 @@ const TicketActionButtonsCustom = ({
         });
       } else {
         setCurrentTicket({ id: null, code: null });
-        history.push("/tickets");
+        leaveTicketConversation({ history, replace: true });
       }
     } catch (err) {
       setLoading(false);
@@ -142,6 +159,15 @@ const TicketActionButtonsCustom = ({
     }
   };
 
+  const chatbotEnableLabel = i18n.t(
+    "ticket.chatbot.enableForContact",
+    "Ativar chatbot para este contato"
+  );
+  const chatbotDisableLabel = i18n.t(
+    "ticket.chatbot.disableForContact",
+    "Desativar chatbot para este contato"
+  );
+
   if (isGroupConversation) {
     return (
       <div className={classes.actionButtons}>
@@ -150,15 +176,7 @@ const TicketActionButtonsCustom = ({
           {contact?.id ? (
             <Tooltip
               title={
-                contact.chatbotDisabled
-                  ? i18n.t(
-                      "ticket.chatbot.enableForContact",
-                      "Ativar chatbot para este contato"
-                    )
-                  : i18n.t(
-                      "ticket.chatbot.disableForContact",
-                      "Desativar chatbot para este contato"
-                    )
+                contact.chatbotDisabled ? chatbotEnableLabel : chatbotDisableLabel
               }
             >
               <span>
@@ -209,64 +227,155 @@ const TicketActionButtonsCustom = ({
       {ticket.status === "open" && (
         <TicketActionModals ticket={ticket}>
           {({ openSchedule, openDelete }) => (
-            <TicketConversationActionBar
-              loading={loading}
-              userProfile={user?.profile}
-              showDelete={mayDelete}
-              ticketId={ticket.id}
-              onResolve={(e) =>
-                handleUpdateTicketStatus(e, "closed", user?.id)
-              }
-              onReturn={(e) => handleUpdateTicketStatus(e, "pending", null)}
-              onScheduleClick={openSchedule}
-              onTransferClick={onOpenTransfer}
-              onDeleteClick={openDelete}
-              onQuickRepliesClick={onOpenQuickReplies}
-              extraIconActions={
-                <>
-                  <TicketTagsButton ticket={ticket} disabled={loading} />
-                  {contact?.id ? (
-                    <Tooltip
-                      title={
-                        contact.chatbotDisabled
-                          ? i18n.t(
-                              "ticket.chatbot.enableForContact",
-                              "Ativar chatbot para este contato"
-                            )
-                          : i18n.t(
-                              "ticket.chatbot.disableForContact",
-                              "Desativar chatbot para este contato"
-                            )
-                      }
+            <>
+              {isMobile ? (
+                <span data-testid="ticket-mobile-dialog-owners" aria-hidden>
+                  <TicketTagsButton
+                    ref={tagsOwnerRef}
+                    ticket={ticket}
+                    disabled={loading}
+                    hideTrigger
+                  />
+                  {showCrmSlot ? (
+                    <TicketCrmDealButton
+                      ref={crmOwnerRef}
+                      ticket={ticket}
+                      onCrmDealSaved={onCrmDealSaved}
+                      disabled={loading}
+                      featureLoading={crmFeatureLoading}
+                      hideTrigger
+                    />
+                  ) : null}
+                </span>
+              ) : null}
+              <TicketConversationActionBar
+                loading={loading}
+                userProfile={user?.profile}
+                showDelete={mayDelete}
+                ticketId={ticket.id}
+                onResolve={(e) =>
+                  handleUpdateTicketStatus(e, "closed", user?.id)
+                }
+                onReturn={(e) => handleUpdateTicketStatus(e, "pending", null)}
+                onScheduleClick={openSchedule}
+                onTransferClick={onOpenTransfer}
+                onDeleteClick={openDelete}
+                onQuickRepliesClick={onOpenQuickReplies}
+                extraIconActions={
+                  <>
+                    <TicketTagsButton ticket={ticket} disabled={loading} />
+                    {contact?.id ? (
+                      <Tooltip
+                        title={
+                          contact.chatbotDisabled
+                            ? chatbotEnableLabel
+                            : chatbotDisableLabel
+                        }
+                      >
+                        <span>
+                          <IconButton
+                            size="small"
+                            onClick={handleToggleChatbotForContact}
+                            disabled={loading || chatbotToggleLoading}
+                            aria-label={i18n.t("contacts.chatbotToggle")}
+                          >
+                            {contact.chatbotDisabled ? (
+                              <SmartToyOutlinedIcon fontSize="small" />
+                            ) : (
+                              <SmartToyIcon fontSize="small" />
+                            )}
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                    ) : null}
+                    {showCrmSlot ? (
+                      <TicketCrmDealButton
+                        ticket={ticket}
+                        onCrmDealSaved={onCrmDealSaved}
+                        disabled={loading}
+                        featureLoading={crmFeatureLoading}
+                      />
+                    ) : null}
+                    <TicketInventorySaleButton disabled={loading} />
+                  </>
+                }
+                renderExtraMenuItems={({ runMenuAction, menuItemClassName }) =>
+                  [
+                    <MenuItem
+                      key="tags"
+                      onClick={runMenuAction(() => tagsOwnerRef.current?.open())}
+                      disabled={loading || !ticket?.id}
+                      className={menuItemClassName}
+                      data-testid="ticket-menu-manage-tags"
                     >
-                      <span>
-                        <IconButton
-                          size="small"
-                          onClick={handleToggleChatbotForContact}
-                          disabled={loading || chatbotToggleLoading}
-                          aria-label={i18n.t("contacts.chatbotToggle")}
-                        >
+                      <ListItemIcon>
+                        <LocalOfferOutlinedIcon fontSize="small" />
+                      </ListItemIcon>
+                      <ListItemText primary={manageTagsMenuLabel} />
+                    </MenuItem>,
+                    contact?.id ? (
+                      <MenuItem
+                        key="chatbot"
+                        onClick={runMenuAction(handleToggleChatbotForContact)}
+                        disabled={loading || chatbotToggleLoading}
+                        className={menuItemClassName}
+                        data-testid="ticket-menu-chatbot"
+                      >
+                        <ListItemIcon>
                           {contact.chatbotDisabled ? (
                             <SmartToyOutlinedIcon fontSize="small" />
                           ) : (
                             <SmartToyIcon fontSize="small" />
                           )}
-                        </IconButton>
-                      </span>
-                    </Tooltip>
-                  ) : null}
-                  {showCrmSlot ? (
-                    <TicketCrmDealButton
-                      ticket={ticket}
-                      onCrmDealSaved={onCrmDealSaved}
+                        </ListItemIcon>
+                        <ListItemText
+                          primary={
+                            contact.chatbotDisabled
+                              ? chatbotEnableLabel
+                              : chatbotDisableLabel
+                          }
+                        />
+                      </MenuItem>
+                    ) : null,
+                    showCrmSlot ? (
+                      <MenuItem
+                        key="crm"
+                        onClick={runMenuAction(() => crmOwnerRef.current?.open())}
+                        disabled={crmMenuDisabled}
+                        className={menuItemClassName}
+                        data-testid="ticket-menu-crm"
+                      >
+                        <ListItemIcon>
+                          <BusinessCenterOutlinedIcon fontSize="small" />
+                        </ListItemIcon>
+                        <ListItemText
+                          primary={i18n.t("crm.ticket.createOpportunity")}
+                        />
+                      </MenuItem>
+                    ) : null,
+                    <TicketInventorySaleButton
+                      key="inventory"
                       disabled={loading}
-                      featureLoading={crmFeatureLoading}
-                    />
-                  ) : null}
-                  <TicketInventorySaleButton disabled={loading} />
-                </>
-              }
-            />
+                      renderTrigger={(openSale, saleDisabled) => (
+                        <MenuItem
+                          onClick={runMenuAction(openSale)}
+                          disabled={saleDisabled}
+                          className={menuItemClassName}
+                          data-testid="ticket-menu-inventory"
+                        >
+                          <ListItemIcon>
+                            <ShoppingCartOutlinedIcon fontSize="small" />
+                          </ListItemIcon>
+                          <ListItemText
+                            primary={i18n.t("inventorySales.ticket.openSale")}
+                          />
+                        </MenuItem>
+                      )}
+                    />,
+                  ].filter(Boolean)
+                }
+              />
+            </>
           )}
         </TicketActionModals>
       )}
@@ -280,7 +389,7 @@ const TicketActionButtonsCustom = ({
               inbox.removeTicket(ticket.id);
             }
             setCurrentTicket({ id: null, code: null });
-            history.push("/tickets");
+            leaveTicketConversation({ history, replace: true });
           }}
         >
           {({ openDelete }) => (

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useHistory } from "react-router-dom";
+import { useHistory, useLocation } from "react-router-dom";
 
 import { Avatar, CardHeader, IconButton, Box } from "@material-ui/core";
 import ArrowBackIcon from "@material-ui/icons/ArrowBack";
@@ -9,6 +9,7 @@ import useIsMobile from "../../hooks/useIsMobile";
 import { i18n } from "../../translate/i18n";
 import ContactLabelsBar from "../ContactLabelsBar";
 import TicketAiAgentControls from "../TicketAiAgentControls";
+import { resolveTicketConversationBack } from "../../utils/ticketConversationRoute";
 
 const useStyles = makeStyles((theme) => ({
 	root: {
@@ -122,6 +123,7 @@ const TicketInfo = ({
 }) => {
 	const classes = useStyles();
 	const history = useHistory();
+	const location = useLocation();
 	const isMobile = useIsMobile();
 	const { user } = ticket;
 	const [userName, setUserName] = useState("");
@@ -149,7 +151,7 @@ const TicketInfo = ({
 
 	const handleBack = (e) => {
 		e.stopPropagation();
-		history.push("/tickets");
+		resolveTicketConversationBack({ history, location });
 	};
 
 	const titleNode = (

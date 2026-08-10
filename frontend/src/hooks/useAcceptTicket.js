@@ -11,10 +11,16 @@ import {
 import { TicketsInboxContext } from "../context/TicketsInboxContext";
 import toastError from "../errors/toastError";
 import { isGroupTicket } from "../utils/isGroupTicket";
+import { resolveAcceptTicketNavigation } from "../utils/ticketConversationRoute";
 
 /**
  * Fluxo pós-aceitar: API → estado inbox → aba "Em atendimento" → abrir conversa.
  * Ordem evita abrir ticket ainda pending no estado local.
+ *
+ * Navegação (origem explícita):
+ * - `{ fromInbox: true }` — aceite da lista/inbox → push com marker
+ * - `{ fromInbox: false }` (ou omitido) — já na conversa/órfão → não inventa marker;
+ *   não faz push se a rota já for a mesma conversa
  */
 export function useAcceptTicket() {
   const { user } = useContext(AuthContext);
@@ -24,7 +30,7 @@ export function useAcceptTicket() {
   const inbox = useContext(TicketsInboxContext);
 
   const completeAcceptTicket = useCallback(
-    async (ticket, { sendGreeting } = {}) => {
+    async (ticket, { sendGreeting, fromInbox = false, search } = {}) => {
       if (!ticket?.id) return null;
 
       if (isGroupTicket(ticket)) {
@@ -73,8 +79,14 @@ export function useAcceptTicket() {
         code: acceptCode,
       });
 
-      if (targetUuid) {
-        history.push(`/tickets/${targetUuid}`);
+      const nav = resolveAcceptTicketNavigation({
+        fromInbox: fromInbox === true,
+        targetUuid,
+        currentPathname: history.location?.pathname,
+        search,
+      });
+      if (nav?.type === "push" && nav.location != null) {
+        history.push(nav.location);
       }
 
       const shouldGreet =

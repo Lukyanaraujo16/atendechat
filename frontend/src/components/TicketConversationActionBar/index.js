@@ -7,9 +7,9 @@ import Menu from "@material-ui/core/Menu";
 import MenuItem from "@material-ui/core/MenuItem";
 import ListItemIcon from "@material-ui/core/ListItemIcon";
 import ListItemText from "@material-ui/core/ListItemText";
+import Divider from "@material-ui/core/Divider";
 import CircularProgress from "@material-ui/core/CircularProgress";
-import { makeStyles, alpha, useTheme } from "@material-ui/core/styles";
-import useMediaQuery from "@material-ui/core/useMediaQuery";
+import { makeStyles, alpha } from "@material-ui/core/styles";
 import clsx from "clsx";
 
 import CheckCircleIcon from "@material-ui/icons/CheckCircle";
@@ -25,6 +25,7 @@ import { i18n } from "../../translate/i18n";
 import ButtonWithSpinner from "../ButtonWithSpinner";
 import TicketFlowExecutionLogModal from "../TicketFlowExecutionLogModal";
 import { Can } from "../Can";
+import useIsMobile from "../../hooks/useIsMobile";
 
 const MICRO_MS = 180;
 
@@ -115,11 +116,16 @@ const useStyles = makeStyles((theme) => ({
   menuDelete: {
     color: theme.palette.error.main,
   },
-  menuExtras: {
-    display: "flex",
-    alignItems: "center",
-    gap: theme.spacing(0.5),
-    padding: theme.spacing(0.5, 0),
+  menuPaper: {
+    width: 280,
+    maxWidth: "calc(100vw - 24px)",
+    maxHeight:
+      "min(70vh, calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 96px))",
+    overflowY: "auto",
+    WebkitOverflowScrolling: "touch",
+  },
+  menuItem: {
+    minHeight: 48,
   },
 }));
 
@@ -147,7 +153,8 @@ const ActionIconButton = ({
 
 /**
  * Barra de ações do ticket (status open).
- * Desktop: ações principais visíveis; mobile: Transferir + Resolver + menu ⋮.
+ * Compact = mesmo predicado mobile do ticket (`useIsMobile` / down("md")).
+ * Desktop: IconButtons; mobile: MenuItems rotulados via renderExtraMenuItems.
  */
 const TicketConversationActionBar = ({
   loading,
@@ -160,11 +167,11 @@ const TicketConversationActionBar = ({
   onQuickRepliesClick,
   ticketId,
   extraIconActions,
+  renderExtraMenuItems,
   showDelete,
 }) => {
   const classes = useStyles();
-  const theme = useTheme();
-  const compact = useMediaQuery(theme.breakpoints.down("sm"));
+  const compact = useIsMobile();
   const [menuAnchor, setMenuAnchor] = useState(null);
 
   const openMenu = (event) => setMenuAnchor(event.currentTarget);
@@ -261,7 +268,10 @@ const TicketConversationActionBar = ({
 
   const renderMenuDeleteItem = () =>
     showDelete === true ? (
-      <MenuItem onClick={runMenuAction(onDeleteClick)} className={classes.menuDelete}>
+      <MenuItem
+        onClick={runMenuAction(onDeleteClick)}
+        className={clsx(classes.menuItem, classes.menuDelete)}
+      >
         <ListItemIcon className={classes.menuDelete}>
           <DeleteOutlineIcon fontSize="small" />
         </ListItemIcon>
@@ -274,7 +284,7 @@ const TicketConversationActionBar = ({
         yes={() => (
           <MenuItem
             onClick={runMenuAction(onDeleteClick)}
-            className={classes.menuDelete}
+            className={clsx(classes.menuItem, classes.menuDelete)}
           >
             <ListItemIcon className={classes.menuDelete}>
               <DeleteOutlineIcon fontSize="small" />
@@ -285,8 +295,19 @@ const TicketConversationActionBar = ({
       />
     );
 
+  const extraMenuNodes =
+    compact && typeof renderExtraMenuItems === "function"
+      ? renderExtraMenuItems({
+          closeMenu,
+          runMenuAction,
+          menuItemClassName: classes.menuItem,
+        })
+      : null;
+
+  const deleteMenuItem = renderMenuDeleteItem();
+
   return (
-    <div className={classes.root} data-ticket-action-bar>
+    <div className={classes.root} data-ticket-action-bar data-compact={compact ? "true" : "false"}>
       {!compact ? (
         <div className={classes.actionGroup}>
           {renderReturnIcon()}
@@ -379,8 +400,14 @@ const TicketConversationActionBar = ({
           getContentAnchorEl={null}
           anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
           transformOrigin={{ vertical: "top", horizontal: "right" }}
+          PaperProps={{ className: classes.menuPaper }}
+          MenuListProps={{ dense: false }}
         >
-          <MenuItem onClick={runMenuAction(onReturn)} disabled={loading}>
+          <MenuItem
+            onClick={runMenuAction(onReturn)}
+            disabled={loading}
+            className={classes.menuItem}
+          >
             <ListItemIcon>
               {loading ? (
                 <CircularProgress size={18} />
@@ -395,7 +422,7 @@ const TicketConversationActionBar = ({
             <TicketFlowExecutionLogModal
               ticketId={ticketId}
               renderTrigger={(open) => (
-                <MenuItem onClick={runMenuAction(open)}>
+                <MenuItem onClick={runMenuAction(open)} className={classes.menuItem}>
                   <ListItemIcon>
                     <AccountTreeIcon fontSize="small" />
                   </ListItemIcon>
@@ -408,7 +435,11 @@ const TicketConversationActionBar = ({
           ) : null}
 
           {typeof onQuickRepliesClick === "function" ? (
-            <MenuItem onClick={runMenuAction(onQuickRepliesClick)} disabled={loading}>
+            <MenuItem
+              onClick={runMenuAction(onQuickRepliesClick)}
+              disabled={loading}
+              className={classes.menuItem}
+            >
               <ListItemIcon>
                 <FlashOnIcon fontSize="small" />
               </ListItemIcon>
@@ -418,20 +449,21 @@ const TicketConversationActionBar = ({
             </MenuItem>
           ) : null}
 
-          <MenuItem onClick={runMenuAction(onScheduleClick)}>
+          <MenuItem
+            onClick={runMenuAction(onScheduleClick)}
+            className={classes.menuItem}
+          >
             <ListItemIcon>
               <EventIcon fontSize="small" />
             </ListItemIcon>
             <ListItemText primary={i18n.t("ticketOptionsMenu.schedule")} />
           </MenuItem>
 
-          {extraIconActions ? (
-            <MenuItem disabled style={{ opacity: 1 }}>
-              <div className={classes.menuExtras}>{extraIconActions}</div>
-            </MenuItem>
-          ) : null}
+          {extraMenuNodes ? <Divider /> : null}
+          {extraMenuNodes}
 
-          {renderMenuDeleteItem()}
+          {deleteMenuItem ? <Divider /> : null}
+          {deleteMenuItem}
         </Menu>
       ) : null}
     </div>

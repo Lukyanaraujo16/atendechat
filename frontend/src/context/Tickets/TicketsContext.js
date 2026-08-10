@@ -2,6 +2,8 @@ import React, { useState, useEffect, createContext } from "react";
 import { useHistory } from "react-router-dom";
 import useIsMobile from "../../hooks/useIsMobile";
 
+import { buildTicketConversationLocation } from "../../utils/ticketConversationRoute";
+
 const TicketsContext = createContext();
 
 /** Setter estável: consumidores não re-renderizam quando só `currentTicket` muda (ex.: lista de tickets). */
@@ -17,7 +19,9 @@ const TicketsContextProvider = ({ children }) => {
     useEffect(() => {
         if (isMobile) return;
         if (currentTicket.id !== null && currentTicket.uuid) {
-            history.push(`/tickets/${currentTicket.uuid}`);
+            history.push(
+              buildTicketConversationLocation(currentTicket.uuid, { fromInbox: true })
+            );
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [currentTicket, isMobile]);

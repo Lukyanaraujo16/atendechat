@@ -40,6 +40,7 @@ import TicketStateBanner from "../TicketStateBanner";
 import TicketOrphanComposer from "../TicketOrphanComposer";
 import { useAcceptTicket } from "../../hooks/useAcceptTicket";
 import { TicketInventorySalesProvider } from "../Inventory/TicketInventorySalesProvider";
+import { leaveTicketConversation } from "../../utils/ticketConversationRoute";
 import {
   PANEL_RADIUS,
   getPanelElevation,
@@ -204,7 +205,7 @@ const Ticket = () => {
 
           if (!canAccessTicket(u, data)) {
             toast.error(i18n.t("tickets.toasts.unauthorized"));
-            history.push("/tickets");
+            leaveTicketConversation({ history, replace: true });
             return;
           }
 
@@ -284,7 +285,7 @@ const Ticket = () => {
         }
       }
       if (data.action === "delete" && data.ticketId === id) {
-        history.push("/tickets");
+        leaveTicketConversation({ history, replace: true });
       }
     };
 
@@ -340,7 +341,7 @@ const Ticket = () => {
         promptId: false,
         integrationId: false,
       });
-      history.push("/tickets");
+      leaveTicketConversation({ history, replace: true });
     } catch (err) {
       toastError(err);
     } finally {
@@ -371,14 +372,14 @@ const Ticket = () => {
       inbox.removeTicket(ticket.id);
     }
     setCurrentTicket({ id: null, code: null });
-    history.push("/tickets");
+    leaveTicketConversation({ history, replace: true });
   };
 
   const handleAcceptOrphanTicket = async () => {
     if (!ticket?.id) return;
     setStatusActionLoading(true);
     try {
-      await completeAcceptTicket(ticket);
+      await completeAcceptTicket(ticket, { fromInbox: false });
     } catch (err) {
       toastError(err);
     } finally {

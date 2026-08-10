@@ -1,4 +1,11 @@
-import React, { useContext, useMemo, useState } from "react";
+import React, {
+  forwardRef,
+  useCallback,
+  useContext,
+  useImperativeHandle,
+  useMemo,
+  useState,
+} from "react";
 import IconButton from "@material-ui/core/IconButton";
 import Tooltip from "@material-ui/core/Tooltip";
 import CircularProgress from "@material-ui/core/CircularProgress";
@@ -34,12 +41,17 @@ function buildTicketCrmNotes(ticket) {
   return lines.join("\n");
 }
 
-export default function TicketCrmDealButton({
-  ticket,
-  onCrmDealSaved,
-  disabled = false,
-  featureLoading = false,
-}) {
+const TicketCrmDealButton = forwardRef(function TicketCrmDealButton(
+  {
+    ticket,
+    onCrmDealSaved,
+    disabled = false,
+    featureLoading = false,
+    renderTrigger,
+    hideTrigger = false,
+  },
+  ref
+) {
   const [crmOpen, setCrmOpen] = useState(false);
   const [crmDealId, setCrmDealId] = useState(null);
   const [dupOpen, setDupOpen] = useState(false);
@@ -58,7 +70,59 @@ export default function TicketCrmDealButton({
     ? i18n.t("crm.ticket.loadingCrm")
     : i18n.t("crm.ticket.createOpportunity");
 
+  const handleOpenRequest = useCallback(async () => {
+    if (
+      disabled ||
+      featureLoading ||
+      opening ||
+      !ticket?.id ||
+      !ticket?.contactId
+    ) {
+      return;
+    }
+    setOpening(true);
+    try {
+      const { data } = await api.get(`/crm/deals/by-contact/${ticket.contactId}`);
+      const openList = (Array.isArray(data) ? data : []).filter(
+        (d) => d.status === "open"
+      );
+      if (openList.length > 0) {
+        setDupDeals(openList);
+        setDupOpen(true);
+        return;
+      }
+    } catch (e) {
+      if (!isForbiddenPermissionError(e)) {
+        toastError(e);
+      }
+      return;
+    } finally {
+      setOpening(false);
+    }
+    setCrmDealId(null);
+    setCrmOpen(true);
+  }, [
+    disabled,
+    featureLoading,
+    opening,
+    ticket?.id,
+    ticket?.contactId,
+  ]);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      open: () => handleOpenRequest(),
+      isDisabled: () => isDisabled,
+    }),
+    [handleOpenRequest, isDisabled]
+  );
+
   if (!ticket?.id) {
+    if (hideTrigger) return null;
+    if (typeof renderTrigger === "function") {
+      return renderTrigger(() => {}, true);
+    }
     return (
       <Tooltip title={tooltipTitle}>
         <span>
@@ -95,31 +159,6 @@ export default function TicketCrmDealButton({
     priority: "medium",
   };
 
-  const handleOpenRequest = async () => {
-    if (isDisabled) return;
-    setOpening(true);
-    try {
-      const { data } = await api.get(`/crm/deals/by-contact/${ticket.contactId}`);
-      const openList = (Array.isArray(data) ? data : []).filter(
-        (d) => d.status === "open"
-      );
-      if (openList.length > 0) {
-        setDupDeals(openList);
-        setDupOpen(true);
-        return;
-      }
-    } catch (e) {
-      if (!isForbiddenPermissionError(e)) {
-        toastError(e);
-      }
-      return;
-    } finally {
-      setOpening(false);
-    }
-    setCrmDealId(null);
-    setCrmOpen(true);
-  };
-
   const handleCrmSaved = () => {
     setCrmOpen(false);
     setCrmDealId(null);
@@ -128,24 +167,36 @@ export default function TicketCrmDealButton({
     }
   };
 
+  const defaultTrigger = (
+    <Tooltip title={tooltipTitle}>
+      <span>
+        <IconButton
+          size="small"
+          onClick={handleOpenRequest}
+          disabled={isDisabled}
+          aria-label={tooltipTitle}
+        >
+          {featureLoading || opening ? (
+            <CircularProgress size={18} />
+          ) : (
+            <BusinessCenterOutlinedIcon fontSize="small" />
+          )}
+        </IconButton>
+      </span>
+    </Tooltip>
+  );
+
+  let trigger = null;
+  if (!hideTrigger) {
+    trigger =
+      typeof renderTrigger === "function"
+        ? renderTrigger(handleOpenRequest, isDisabled)
+        : defaultTrigger;
+  }
+
   return (
     <>
-      <Tooltip title={tooltipTitle}>
-        <span>
-          <IconButton
-            size="small"
-            onClick={handleOpenRequest}
-            disabled={isDisabled}
-            aria-label={tooltipTitle}
-          >
-            {featureLoading || opening ? (
-              <CircularProgress size={18} />
-            ) : (
-              <BusinessCenterOutlinedIcon fontSize="small" />
-            )}
-          </IconButton>
-        </span>
-      </Tooltip>
+      {trigger}
       <CrmOpenDealsChoiceDialog
         open={dupOpen}
         onClose={() => setDupOpen(false)}
@@ -174,4 +225,6 @@ export default function TicketCrmDealButton({
       />
     </>
   );
-}
+});
+
+export default TicketCrmDealButton;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useContext, useCallback, useMemo } from "react";
 
-import { useHistory } from "react-router-dom";
+import { useHistory, useLocation } from "react-router-dom";
 import {
   parseISO,
   format,
@@ -32,6 +32,7 @@ import { i18n } from "../../translate/i18n";
 import api from "../../services/api";
 import ButtonWithSpinner from "../ButtonWithSpinner";
 import MarkdownWrapper from "../MarkdownWrapper";
+import { buildTicketConversationLocation, leaveTicketConversation } from "../../utils/ticketConversationRoute";
 import AndroidIcon from "@material-ui/icons/Android";
 import MemoryIcon from "@material-ui/icons/Memory";
 import VisibilityIcon from "@material-ui/icons/Visibility";
@@ -491,6 +492,7 @@ const TicketListItemCustom = ({
   const classes = useStyles();
   const theme = useTheme();
   const history = useHistory();
+  const location = useLocation();
   const isMobile = useIsMobile();
   const [loading, setLoading] = useState(false);
   const [ticketUser, setTicketUser] = useState(null);
@@ -561,13 +563,16 @@ const TicketListItemCustom = ({
     if (isMounted.current) {
       setLoading(false);
     }
-    history.push(`/tickets/${ticket.uuid}`);
+    history.push(buildTicketConversationLocation(ticket.uuid, { fromInbox: true }));
   };
 
   const handleAcepptTicket = async () => {
     setLoading(true);
     try {
-      await completeAcceptTicket(ticket);
+      await completeAcceptTicket(ticket, {
+        fromInbox: true,
+        search: location.search || undefined,
+      });
     } catch (err) {
       toastError(err);
     }
@@ -582,7 +587,7 @@ const TicketListItemCustom = ({
       const { id, uuid } = t;
       setCurrentTicket({ id, uuid, code });
       if (isMobile) {
-        history.push(`/tickets/${uuid}`);
+        history.push(buildTicketConversationLocation(uuid, { fromInbox: true }));
       }
     },
     [setCurrentTicket, history, isMobile]
@@ -610,7 +615,7 @@ const TicketListItemCustom = ({
       }
       toast.success(i18n.t("ticketOptionsMenu.confirmationModal.deleteSuccess"));
       if (selected) {
-        history.push("/tickets");
+        leaveTicketConversation({ history, replace: true });
       }
     } catch (err) {
       toastError(err);

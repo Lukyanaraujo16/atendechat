@@ -7,7 +7,10 @@ import ShoppingCartOutlinedIcon from "@material-ui/icons/ShoppingCartOutlined";
 import { i18n } from "../../translate/i18n";
 import { useTicketInventorySales } from "./TicketInventorySalesProvider";
 
-export default function TicketInventorySaleButton({ disabled = false }) {
+export default function TicketInventorySaleButton({
+  disabled = false,
+  renderTrigger,
+}) {
   const ctx = useTicketInventorySales();
 
   if (!ctx?.enabled) {
@@ -17,6 +20,10 @@ export default function TicketInventorySaleButton({ disabled = false }) {
   const { opening, handleSaleButtonClick } = ctx;
   const isDisabled = disabled || opening;
   const tooltipTitle = i18n.t("inventorySales.ticket.openSale");
+
+  if (typeof renderTrigger === "function") {
+    return renderTrigger(handleSaleButtonClick, isDisabled);
+  }
 
   return (
     <Tooltip title={tooltipTitle}>

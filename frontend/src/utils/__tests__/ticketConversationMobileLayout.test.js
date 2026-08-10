@@ -52,6 +52,17 @@ describe("ticket conversation mobile layout guards", () => {
     expect(src).toContain("enabled: conversationOpen");
   });
 
+  it("ModuleTabsLayout usa isTicketConversationPath + useIsMobile para focus", () => {
+    const src = fs.readFileSync(
+      path.join(root, "layout/ModuleTabsLayout.js"),
+      "utf8"
+    );
+    expect(src).toContain("isTicketConversationPath");
+    expect(src).toContain("useIsMobile");
+    expect(src).toContain("conversationFocus");
+    expect(src).toContain("moduleWrapConversationFocus");
+  });
+
   it("CSS mobileViewport tem regras de conversa/teclado", () => {
     const css = fs.readFileSync(
       path.join(root, "styles/mobileViewport.css"),

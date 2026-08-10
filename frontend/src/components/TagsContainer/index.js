@@ -206,65 +206,97 @@ export function TicketTagsEditor({ ticket, autoFocus, loadWhenActive = true }) {
 }
 
 /** Ícone no header que abre popover (desktop) ou dialog fullscreen (mobile) para tags. */
-export function TicketTagsButton({ ticket, disabled, className }) {
+export const TicketTagsButton = React.forwardRef(function TicketTagsButton(
+  { ticket, disabled, className, renderTrigger, hideTrigger = false },
+  ref
+) {
   const classes = usePopoverStyles();
   const isMobile = useIsMobile();
   const [anchorEl, setAnchorEl] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const tagCount = Array.isArray(ticket?.tags) ? ticket.tags.length : 0;
+  /** Dialog: mobile, hideTrigger (owner fora do Menu) ou renderTrigger legado. */
+  const useDialog = isMobile || hideTrigger || typeof renderTrigger === "function";
+
+  const handleOpen = React.useCallback((e) => {
+    if (e && typeof e.stopPropagation === "function") {
+      e.stopPropagation();
+    }
+    if (useDialog) {
+      setDialogOpen(true);
+    } else if (e?.currentTarget) {
+      setAnchorEl(e.currentTarget);
+    } else {
+      setDialogOpen(true);
+    }
+  }, [useDialog]);
+
+  const handleClose = React.useCallback(() => {
+    setAnchorEl(null);
+    setDialogOpen(false);
+  }, []);
+
+  React.useImperativeHandle(
+    ref,
+    () => ({
+      open: () => handleOpen(),
+      close: handleClose,
+      getTagCount: () => tagCount,
+    }),
+    [handleOpen, handleClose, tagCount]
+  );
 
   if (!ticket?.id) return null;
 
   const popoverOpen = Boolean(anchorEl);
-  const open = isMobile ? dialogOpen : popoverOpen;
-
-  const handleOpen = (e) => {
-    e.stopPropagation();
-    if (isMobile) {
-      setDialogOpen(true);
-    } else {
-      setAnchorEl(e.currentTarget);
-    }
-  };
-
-  const handleClose = () => {
-    setAnchorEl(null);
-    setDialogOpen(false);
-  };
+  const open = useDialog ? dialogOpen : popoverOpen;
 
   const editor = (
     <TicketTagsEditor ticket={ticket} autoFocus={open} loadWhenActive={open} />
   );
 
+  const defaultTrigger = (
+    <Tooltip title={i18n.t("messagesList.header.buttons.manageTags")}>
+      <span>
+        <IconButton
+          size="small"
+          onClick={handleOpen}
+          disabled={disabled}
+          className={className || classes.iconBtn}
+          aria-label={i18n.t("messagesList.header.buttons.manageTags")}
+          aria-haspopup="true"
+          aria-expanded={open}
+        >
+          <Badge
+            badgeContent={tagCount}
+            color="primary"
+            invisible={tagCount === 0}
+            overlap="circular"
+          >
+            <LocalOfferOutlinedIcon fontSize="small" />
+          </Badge>
+        </IconButton>
+      </span>
+    </Tooltip>
+  );
+
+  let trigger = null;
+  if (!hideTrigger) {
+    trigger =
+      typeof renderTrigger === "function"
+        ? renderTrigger(handleOpen)
+        : defaultTrigger;
+  }
+
   return (
     <>
-      <Tooltip title={i18n.t("messagesList.header.buttons.manageTags")}>
-        <span>
-          <IconButton
-            size="small"
-            onClick={handleOpen}
-            disabled={disabled}
-            className={className || classes.iconBtn}
-            aria-label={i18n.t("messagesList.header.buttons.manageTags")}
-            aria-haspopup="true"
-            aria-expanded={open}
-          >
-            <Badge
-              badgeContent={tagCount}
-              color="primary"
-              invisible={tagCount === 0}
-              overlap="circular"
-            >
-              <LocalOfferOutlinedIcon fontSize="small" />
-            </Badge>
-          </IconButton>
-        </span>
-      </Tooltip>
-      {isMobile ? (
+      {trigger}
+      {useDialog ? (
         <AppDialog
           open={dialogOpen}
           onClose={handleClose}
           onClick={(e) => e.stopPropagation()}
+          data-testid="ticket-tags-dialog"
         >
           <AppDialogTitle>
             {i18n.t("messagesList.header.buttons.manageTags")}
@@ -296,7 +328,8 @@ export function TicketTagsButton({ ticket, disabled, className }) {
       )}
     </>
   );
-}
+});
+
 
 /** @deprecated Use TicketTagsButton no header. Mantido para compatibilidade. */
 export function TagsContainer({ ticket }) {

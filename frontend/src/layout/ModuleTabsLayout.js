@@ -7,6 +7,7 @@ import Tabs from "@material-ui/core/Tabs";
 import Tab from "@material-ui/core/Tab";
 import { makeStyles } from "@material-ui/core/styles";
 import useIsMobile from "../hooks/useIsMobile";
+import { isTicketConversationPath } from "../utils/ticketConversationRoute";
 
 const useStyles = makeStyles((theme) => ({
   /** Área do módulo: respiro moderado; conteúdo com mais peso visual que a barra de tabs */
@@ -21,6 +22,16 @@ const useStyles = makeStyles((theme) => ({
     [theme.breakpoints.up("md")]: {
       paddingLeft: theme.spacing(2),
       paddingRight: theme.spacing(2),
+    },
+  },
+  /** Conversa mobile: sem chrome intermediário — só o ticket sob a topbar */
+  moduleWrapConversationFocus: {
+    paddingTop: 0,
+    paddingLeft: 0,
+    paddingRight: 0,
+    [theme.breakpoints.up("md")]: {
+      paddingLeft: 0,
+      paddingRight: 0,
     },
   },
   headerSpacer: {
@@ -105,11 +116,18 @@ const useStyles = makeStyles((theme) => ({
     paddingTop: theme.spacing(1),
     paddingBottom: 0,
   },
+  contentBelowConversationFocus: {
+    paddingTop: 0,
+    paddingBottom: 0,
+    paddingLeft: 0,
+    paddingRight: 0,
+  },
 }));
 
 /**
  * Abas de módulo: navegação por rota (URLs inalteradas).
  * Layout: [respiro] → [tabs em Paper] → [conteúdo com padding próprio]
+ * Mobile + /tickets/:id → conversation focus (sem abas).
  */
 export default function ModuleTabsLayout({ tabs, children }) {
   const location = useLocation();
@@ -140,34 +158,43 @@ export default function ModuleTabsLayout({ tabs, children }) {
 
   const isTicketsRoute =
     pathname === "/tickets" || pathname.startsWith("/tickets/");
+  const conversationFocus =
+    isMobile && isTicketConversationPath(pathname);
 
   return (
     <Box
       className={clsx(
         classes.moduleWrap,
-        isTicketsRoute && classes.moduleWrapTicketsFill
+        isTicketsRoute && classes.moduleWrapTicketsFill,
+        conversationFocus && classes.moduleWrapConversationFocus
       )}
+      data-module-conversation-focus={conversationFocus ? "true" : "false"}
     >
-      <Box className={classes.headerSpacer} aria-hidden />
-      <Paper className={classes.tabsPaper} elevation={0} square={false}>
-        <Tabs
-          value={activeIndex}
-          aria-label="module-tabs"
-          className={classes.tabs}
-          indicatorColor="primary"
-          textColor="primary"
-          variant="scrollable"
-          scrollButtons={isMobile ? "on" : "auto"}
-        >
-          {tabs.map((tab) => (
-            <Tab key={tab.path} label={tab.label} component={Link} to={tab.path} />
-          ))}
-        </Tabs>
-      </Paper>
+      {!conversationFocus ? (
+        <>
+          <Box className={classes.headerSpacer} aria-hidden />
+          <Paper className={classes.tabsPaper} elevation={0} square={false}>
+            <Tabs
+              value={activeIndex}
+              aria-label="module-tabs"
+              className={classes.tabs}
+              indicatorColor="primary"
+              textColor="primary"
+              variant="scrollable"
+              scrollButtons={isMobile ? "on" : "auto"}
+            >
+              {tabs.map((tab) => (
+                <Tab key={tab.path} label={tab.label} component={Link} to={tab.path} />
+              ))}
+            </Tabs>
+          </Paper>
+        </>
+      ) : null}
       <Box
         className={clsx(
           classes.contentBelow,
-          isTicketsRoute && classes.contentBelowTicketsFill
+          isTicketsRoute && classes.contentBelowTicketsFill,
+          conversationFocus && classes.contentBelowConversationFocus
         )}
       >
         {children}

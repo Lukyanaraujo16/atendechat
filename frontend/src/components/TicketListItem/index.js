@@ -22,6 +22,7 @@ import MarkdownWrapper from "../MarkdownWrapper";
 import { Tooltip } from "@material-ui/core";
 import { AuthContext } from "../../context/Auth/AuthContext";
 import toastError from "../../errors/toastError";
+import { buildTicketConversationLocation } from "../../utils/ticketConversationRoute";
 
 const useStyles = makeStyles((theme) => ({
   ticket: {
@@ -129,12 +130,16 @@ const TicketListItem = ({ ticket }) => {
     if (isMounted.current) {
       setLoading(false);
     }
-    history.push(`/tickets/${ticket.uuid}`);
+    history.push(
+      buildTicketConversationLocation(ticket.uuid, { fromInbox: true })
+    );
   };
   console.log("🚀 Console Log : ticket.lastMessage", ticket.lastMessage);
 
   const handleSelectTicket = (ticket) => {
-    history.push(`/tickets/${ticket.uuid}`);
+    history.push(
+      buildTicketConversationLocation(ticket.uuid, { fromInbox: true })
+    );
   };
 
   return (
