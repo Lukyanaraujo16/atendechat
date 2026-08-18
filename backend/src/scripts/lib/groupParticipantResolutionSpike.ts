@@ -874,3 +874,26 @@ export function containsFullPhoneInJson(value: unknown): boolean {
   const text = JSON.stringify(value);
   return /\b\d{11,15}\b/.test(text);
 }
+
+export type SpikeSignalKeyStore = {
+  get: (type: string, ids: string[]) => unknown;
+  set: (data: Record<string, unknown>) => unknown;
+};
+
+/**
+ * Encaminha get() e descarta set() — impede persistência via authState.saveState.
+ * O cache in-memory do Baileys (makeCacheableSignalKeyStore) continua atualizando.
+ */
+export function wrapReadOnlySignalKeyStore<T extends SpikeSignalKeyStore>(
+  keys: T,
+  onSet?: (types: string[]) => void
+): T {
+  return {
+    ...keys,
+    get: (type: string, ids: string[]) => keys.get(type, ids),
+    set: ((data: Record<string, unknown>) => {
+      onSet?.(Object.keys(data || {}));
+      return undefined;
+    }) as T["set"]
+  };
+}

@@ -38,6 +38,7 @@ import {
   maskPhone,
   phoneDigitsFromRuntimePnJid,
   resolveSpikeParticipant,
+  wrapReadOnlySignalKeyStore,
   type SpikeGroupInput,
   type SpikeParticipantInput
 } from "./lib/groupParticipantResolutionSpike";
@@ -179,9 +180,24 @@ function pickRepresentativeGroups(
   return picks.slice(0, maxGroups);
 }
 
+function blockWhatsappPersistence(whatsapp: Whatsapp): void {
+  whatsapp.update = (async () => {
+    // eslint-disable-next-line no-console
+    console.log("Whatsapp.update chamado — bloqueado");
+    return whatsapp;
+  }) as unknown as typeof whatsapp.update;
+}
+
 async function createReadOnlySocket(whatsapp: Whatsapp, connectTimeoutMs: number) {
   const { state } = await authState(whatsapp);
   const { version } = await fetchLatestBaileysVersion();
+  const readOnlyKeys = wrapReadOnlySignalKeyStore(
+    state.keys as unknown as Parameters<typeof wrapReadOnlySignalKeyStore>[0],
+    types => {
+      // eslint-disable-next-line no-console
+      console.log(`keys.set chamado types=${types.join(",")}`);
+    }
+  ) as unknown as typeof state.keys;
 
   return new Promise<SpikeSocket>((resolve, reject) => {
     const sock = makeWASocket({
@@ -190,7 +206,7 @@ async function createReadOnlySocket(whatsapp: Whatsapp, connectTimeoutMs: number
       browser: Browsers.appropriate("Desktop"),
       auth: {
         creds: state.creds,
-        keys: makeCacheableSignalKeyStore(state.keys, logger)
+        keys: makeCacheableSignalKeyStore(readOnlyKeys, logger)
       },
       version,
       markOnlineOnConnect: false,
@@ -207,6 +223,11 @@ async function createReadOnlySocket(whatsapp: Whatsapp, connectTimeoutMs: number
       }
       reject(new Error("ERR_SPIKE_CONNECT_TIMEOUT"));
     }, connectTimeoutMs);
+
+    sock.ev.on("creds.update", () => {
+      // eslint-disable-next-line no-console
+      console.log("creds.update chamado — persistência ignorada");
+    });
 
     sock.ev.on("connection.update", ({ connection, lastDisconnect, qr }) => {
       if (qr) {
@@ -240,7 +261,7 @@ async function createReadOnlySocket(whatsapp: Whatsapp, connectTimeoutMs: number
       }
     });
 
-    // Deliberadamente SEM creds.update → não persiste mutações de sessão durante o spike.
+    // creds.update é observado apenas para log; não chama saveState.
   });
 }
 
@@ -328,6 +349,7 @@ async function main(): Promise<void> {
     )
   );
 
+  blockWhatsappPersistence(whatsapp);
   const sock = await createReadOnlySocket(whatsapp, opts.connectTimeoutMs);
 
   try {

@@ -10,6 +10,7 @@ import {
   maskJid,
   maskPhone,
   resolveSpikeParticipant,
+  wrapReadOnlySignalKeyStore,
   type SpikeGroupInput,
   type SpikeParticipantInput
 } from "../groupParticipantResolutionSpike";
@@ -217,5 +218,27 @@ describe("groupParticipantResolutionSpike", () => {
     expect(shape.idIsLid).toBe(1);
     expect(shape.hasPhoneNumber).toBe(0);
     expect(shape.hasLidField).toBe(0);
+  });
+
+  it("wrapReadOnlySignalKeyStore não encaminha keys.set", () => {
+    const calls: unknown[] = [];
+    const wrapped = wrapReadOnlySignalKeyStore(
+      {
+        get: (type: string, ids: string[]) => ({ type, ids }),
+        set: (data: Record<string, unknown>) => {
+          calls.push(data);
+        }
+      },
+      types => {
+        expect(types).toEqual(["lid-mapping"]);
+      }
+    );
+
+    wrapped.set({ "lid-mapping": { "123_reverse": "hidden" } });
+    expect(calls).toEqual([]);
+    expect(wrapped.get("lid-mapping", ["123_reverse"])).toEqual({
+      type: "lid-mapping",
+      ids: ["123_reverse"]
+    });
   });
 });
