@@ -159,6 +159,28 @@ const messages = {
           openConversation: "Abrir conversa",
           leave: "Sair",
         },
+        importParticipants: {
+          action: "Importar participantes",
+          title: "Importar participantes",
+          total: "Total de participantes: {{count}}",
+          withPhone: "Com telefone: {{count}}",
+          withoutPhone: "Sem telefone: {{count}}",
+          existing: "Já cadastrados: {{count}}",
+          news: "Novos contatos: {{count}}",
+          importable: "Quantidade que será importada: {{count}}",
+          unavailableHint:
+            "O WhatsApp pode não disponibilizar o número de alguns participantes. Os contatos disponíveis serão importados normalmente.",
+          export: "Baixar planilha",
+          import: "Importar para contatos",
+          cancel: "Cancelar",
+          exportSuccess: "Planilha baixada.",
+          importSuccess:
+            "{{imported}} contato(s) importado(s). {{skippedExisting}} já existiam.",
+          importPartialSuccess:
+            "{{imported}} contato(s) importado(s). {{skippedExisting}} já existiam. {{failed}} não puderam ser importados.",
+          importLimitHint:
+            "{{skippedLimit}} contato(s) ficaram de fora neste envio por limite da operação. Importe de novo para concluir o restante.",
+        },
         visibility: {
           label: "Visível para usuários",
           showTooltip: "Liberar grupo para usuários",
@@ -1713,6 +1735,11 @@ const messages = {
             groups: {
               label: "Grupos WhatsApp",
               description: "Gestão de grupos da conexão WhatsApp.",
+            },
+            export_group_participants: {
+              label: "Importar participantes de grupos",
+              description:
+                "Exportar e importar participantes de grupos WhatsApp para Contatos.",
             },
             ratings: {
               label: "Avaliações",
@@ -7823,6 +7850,11 @@ const messages = {
           "Seu plano não possui acesso à integração com Instagram.",
         ERR_GROUP_PERMANENT_CONVERSATION:
           "Conversas de grupo permanecem abertas e não podem ser finalizadas.",
+        ERR_GROUP_ID_REQUIRED: "Selecione um grupo para continuar.",
+        ERR_GROUP_INVALID_GROUP_ID: "Não foi possível identificar o grupo selecionado.",
+        ERR_GROUP_NOT_VISIBLE: "Você não tem acesso a este grupo.",
+        ERR_GROUP_ACCESS_DENIED:
+          "Não foi possível acessar o grupo. Verifique se a conexão está ativa e se você participa deste grupo.",
         ERR_MODULE_NOT_ALLOWED:
           "Este módulo não está liberado para a sua empresa (plano ou configuração da plataforma).",
         ERR_PLAN_FEATURE_DISABLED:

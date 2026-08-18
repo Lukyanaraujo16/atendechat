@@ -109,6 +109,11 @@ export const FEATURES = {
         label: "Grupos WhatsApp",
         description: "Gestão de grupos da conexão WhatsApp.",
       },
+      export_group_participants: {
+        label: "Importar participantes de grupos",
+        description:
+          "Exportar e importar participantes de grupos WhatsApp para Contatos.",
+      },
       ratings: {
         label: "Avaliações",
         description: "Pesquisas de satisfação após o atendimento.",

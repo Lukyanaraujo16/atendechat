@@ -34,10 +34,12 @@ import SearchIcon from "@material-ui/icons/Search";
 import GroupIcon from "@material-ui/icons/Group";
 import ForumIcon from "@material-ui/icons/Forum";
 import InfoOutlinedIcon from "@material-ui/icons/InfoOutlined";
+import PersonAddIcon from "@material-ui/icons/PersonAdd";
 
 import MainContainer from "../../components/MainContainer";
 import MainHeader from "../../components/MainHeader";
 import Title from "../../components/Title";
+import GroupImportParticipantsModal from "../../components/GroupImportParticipantsModal";
 import { WhatsAppsContext } from "../../context/WhatsApp/WhatsAppsContext";
 import { AuthContext } from "../../context/Auth/AuthContext";
 import api from "../../services/api";
@@ -190,6 +192,10 @@ const GroupManager = () => {
   const [joining, setJoining] = useState(false);
 
   const [leaveModal, setLeaveModal] = useState({ open: false, group: null });
+  const [importModal, setImportModal] = useState({ open: false, group: null });
+  const closeImportModal = useCallback(() => {
+    setImportModal({ open: false, group: null });
+  }, []);
   const [leaving, setLeaving] = useState(false);
   const [openingGroupId, setOpeningGroupId] = useState(null);
   const [companyQueues, setCompanyQueues] = useState([]);
@@ -226,6 +232,8 @@ const GroupManager = () => {
   const canManageVisibility = useMemo(() => {
     return user?.profile === "admin" || user?.profile === "supervisor" || user?.supportMode === true;
   }, [user]);
+
+  const canImportParticipants = user?.effectiveUserFeatures?.["team.export_group_participants"] === true;
 
   const handleToggleGroupVisible = async (g) => {
     if (!g?.contactId) return;
@@ -489,6 +497,16 @@ const GroupManager = () => {
       }
     }
 
+    if (canImportParticipants) {
+      items.push({
+        key: "import-participants",
+        label: i18n.t("groups.importParticipants.action"),
+        icon: <PersonAddIcon fontSize="small" />,
+        disabled: loadingList || openingGroupId === g.id,
+        onClick: () => setImportModal({ open: true, group: g }),
+      });
+    }
+
     items.push({ key: "leave-divider", divider: true });
     items.push({
       key: "leave",
@@ -668,6 +686,13 @@ const GroupManager = () => {
           </DialogActions>
         </Dialog>
       )}
+
+      <GroupImportParticipantsModal
+        open={importModal.open}
+        group={importModal.group}
+        whatsappId={whatsappId}
+        onClose={closeImportModal}
+      />
 
       <MainHeader>
         <Title>Gerenciar grupos (WhatsApp)</Title>
@@ -888,6 +913,18 @@ const GroupManager = () => {
                       >
                         {i18n.t("groups.manager.openConversation")}
                       </Button>
+                      {canImportParticipants ? (
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          color="primary"
+                          startIcon={<PersonAddIcon />}
+                          onClick={() => setImportModal({ open: true, group: g })}
+                          disabled={loadingList || !!openingGroupId}
+                        >
+                          {i18n.t("groups.importParticipants.action")}
+                        </Button>
+                      ) : null}
                       <Button
                         size="small"
                         variant="outlined"

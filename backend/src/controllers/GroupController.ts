@@ -4,6 +4,9 @@ import AppError from "../errors/AppError";
 import { getWbot } from "../libs/wbot";
 import Contact from "../models/Contact";
 import Whatsapp from "../models/Whatsapp";
+import GroupPreviewParticipantsService from "../services/GroupServices/GroupPreviewParticipantsService";
+import GroupExportParticipantsService from "../services/GroupServices/GroupExportParticipantsService";
+import GroupImportParticipantsService from "../services/GroupServices/GroupImportParticipantsService";
 import GroupOpenConversationService from "../services/GroupServices/GroupOpenConversationService";
 import ListGroupsInboxService from "../services/GroupServices/ListGroupsInboxService";
 import ShowWhatsAppService from "../services/WhatsappService/ShowWhatsAppService";
@@ -18,6 +21,7 @@ import {
   contactNeedsGroupNameResolution,
   ensureGroupContactDisplayName
 } from "../helpers/groupContactName";
+import { resolveGroupJidFromBody } from "../helpers/groupParticipantsRequest";
 
 const ADMIN_PREVIEW_MAX = 5;
 
@@ -357,4 +361,75 @@ export const leave = async (req: Request, res: Response): Promise<Response> => {
     logger.error({ err, whatsappId }, "[groups] leave failed");
     return res.status(500).json({ error: "ERR_INTERNAL_SERVER_ERROR" });
   }
+};
+
+export const previewParticipants = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const { whatsappId } = req.params;
+  const { companyId, profile, supportMode } = req.user;
+  const groupJid = resolveGroupJidFromBody(req.body);
+
+  if (!groupJid) {
+    throw new AppError("ERR_GROUP_ID_REQUIRED", 400);
+  }
+
+  const actor = { id: req.user.id, profile, supportMode, companyId };
+  const data = await GroupPreviewParticipantsService({
+    companyId,
+    whatsappId: Number(whatsappId),
+    groupJid,
+    actor
+  });
+  return res.status(200).json(data);
+};
+
+export const exportParticipants = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const { whatsappId } = req.params;
+  const { companyId, profile, supportMode } = req.user;
+  const groupJid = resolveGroupJidFromBody(req.body);
+
+  if (!groupJid) {
+    throw new AppError("ERR_GROUP_ID_REQUIRED", 400);
+  }
+
+  const actor = { id: req.user.id, profile, supportMode, companyId };
+  const { filename, csv } = await GroupExportParticipantsService({
+    companyId,
+    userId: Number(req.user.id),
+    whatsappId: Number(whatsappId),
+    groupJid,
+    actor
+  });
+
+  res.setHeader("Content-Type", "text/csv; charset=utf-8");
+  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+  return res.status(200).send(csv);
+};
+
+export const importParticipants = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const { whatsappId } = req.params;
+  const { companyId, profile, supportMode } = req.user;
+  const groupJid = resolveGroupJidFromBody(req.body);
+
+  if (!groupJid) {
+    throw new AppError("ERR_GROUP_ID_REQUIRED", 400);
+  }
+
+  const actor = { id: req.user.id, profile, supportMode, companyId };
+  const data = await GroupImportParticipantsService({
+    companyId,
+    userId: Number(req.user.id),
+    whatsappId: Number(whatsappId),
+    groupJid,
+    actor
+  });
+  return res.status(200).json(data);
 };

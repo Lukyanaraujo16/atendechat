@@ -60,6 +60,16 @@ export function applyPersistedPlanFeatureAliases(
       }
     }
   }
+
+  if (
+    !Object.prototype.hasOwnProperty.call(out, "team.export_group_participants") &&
+    Object.prototype.hasOwnProperty.call(out, "team.groups")
+  ) {
+    out["team.export_group_participants"] = planFeatureEnabled(
+      out["team.groups"]
+    );
+  }
+
   return out;
 }
 
@@ -141,6 +151,9 @@ function applyLegacyModulePermissionGates(
   }
   if (off("useExternalApi") && featureKey === "settings.api") return false;
   if (off("useGroups") && featureKey === "team.groups") return false;
+  if (off("useGroups") && featureKey === "team.export_group_participants") {
+    return false;
+  }
 
   if (off("useCampaigns")) {
     if (

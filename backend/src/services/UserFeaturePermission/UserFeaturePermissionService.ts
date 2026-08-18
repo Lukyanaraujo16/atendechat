@@ -227,6 +227,7 @@ function buildDefaultPermissionState(
     setIfPlan("contacts.tags", true);
     setIfPlan("contacts.files", true);
     setIfPlan("team.groups", true);
+    setIfPlan("team.export_group_participants", true);
     setIfPlan("team.queues", true);
     setIfPlan("agenda.calendar", true);
     setIfPlan("crm.pipeline", true);

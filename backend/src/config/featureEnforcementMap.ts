@@ -133,8 +133,18 @@ export const FEATURE_ENFORCEMENT_MAP: Array<{
   {
     feature: "team.groups",
     menu: "Atendimento → Grupos",
-    frontendRoutes: ["/group-manager"],
+    frontendRoutes: ["/group-manager", "/settings/groups"],
     backendRoutes: ["/groups/*"]
+  },
+  {
+    feature: "team.export_group_participants",
+    menu: "Gestão de grupos → Importar participantes",
+    frontendRoutes: ["/settings/groups"],
+    backendRoutes: [
+      "POST /groups/:whatsappId/participants/preview",
+      "POST /groups/:whatsappId/participants/export",
+      "POST /groups/:whatsappId/participants/import"
+    ]
   },
   {
     feature: "team.ratings",

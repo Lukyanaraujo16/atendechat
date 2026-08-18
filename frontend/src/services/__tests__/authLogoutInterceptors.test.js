@@ -85,6 +85,24 @@ describe("auth logout interceptors", () => {
     expect(refreshCalls).toBe(0);
   });
 
+  it("ERR_GROUP_NOT_VISIBLE é 403 de negócio e não dispara refresh", async () => {
+    localStorage.setItem("token", JSON.stringify("access-old"));
+    let refreshCalls = 0;
+    const api = createTestApi((config) => {
+      if (String(config.url).includes("/auth/refresh_token")) {
+        refreshCalls += 1;
+        return ok(config, { token: "access-new" });
+      }
+      return httpError(config, 403, { error: "ERR_GROUP_NOT_VISIBLE" });
+    });
+
+    await expect(api.post("/groups/1/participants/preview")).rejects.toMatchObject({
+      response: { data: { error: "ERR_GROUP_NOT_VISIBLE" } },
+    });
+    expect(refreshCalls).toBe(0);
+    expect(localStorage.getItem("token")).toBe(JSON.stringify("access-old"));
+  });
+
   it("setAuthLoggingOut rejeita fila de refresh pendente", async () => {
     localStorage.setItem("token", JSON.stringify("access-old"));
     let resolveRefresh;

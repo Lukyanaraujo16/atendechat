@@ -110,6 +110,32 @@ export function canUserAccessGroupContact(
   return authorizedQueueIds.some((qid) => userSet.has(qid));
 }
 
+/** Mesma regra da UI de gestão de grupos: admin, supervisor ou modo suporte. */
+export function assertCanManageGroupParticipants(actor: GroupAccessActor): void {
+  if (!isGroupVisibilityPrivileged(actor)) {
+    throw new AppError("ERR_NO_PERMISSION", 403);
+  }
+}
+
+/**
+ * Fail-closed para preview/export/import: sem Contact do grupo, perfil
+ * não privilegiado não acessa JID arbitrário da sessão.
+ */
+export async function assertGroupParticipantsVisibility(actor: GroupAccessActor, groupContact: Contact | null): Promise<void> {
+  if (isGroupVisibilityPrivileged(actor)) {
+    if (groupContact) {
+      await assertUserCanAccessGroupContact(groupContact, actor);
+    }
+    return;
+  }
+
+  if (!groupContact) {
+    throw new AppError("ERR_GROUP_NOT_VISIBLE", 403);
+  }
+
+  await assertUserCanAccessGroupContact(groupContact, actor);
+}
+
 export async function assertUserCanAccessGroupContact(
   contact: Contact,
   actor: GroupAccessActor

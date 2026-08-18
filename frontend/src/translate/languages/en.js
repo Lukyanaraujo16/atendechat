@@ -157,6 +157,28 @@ const messages = {
 					openConversation: "Open conversation",
 					leave: "Leave",
 				},
+				importParticipants: {
+					action: "Import participants",
+					title: "Import participants",
+					total: "Total participants: {{count}}",
+					withPhone: "With phone number: {{count}}",
+					withoutPhone: "Without phone number: {{count}}",
+					existing: "Already in contacts: {{count}}",
+					news: "New contacts: {{count}}",
+					importable: "Contacts to import: {{count}}",
+					unavailableHint:
+						"WhatsApp may not provide the phone number of some participants. Available contacts will be imported as usual.",
+					export: "Download spreadsheet",
+					import: "Import to contacts",
+					cancel: "Cancel",
+					exportSuccess: "Spreadsheet downloaded.",
+					importSuccess:
+						"{{imported}} contact(s) imported. {{skippedExisting}} already existed.",
+					importPartialSuccess:
+						"{{imported}} contact(s) imported. {{skippedExisting}} already existed. {{failed}} could not be imported.",
+					importLimitHint:
+						"{{skippedLimit}} contact(s) were left out of this run due to the operation limit. Import again to finish the rest.",
+				},
 				visibility: {
 					label: "Visible to users",
 					showTooltip: "Allow group for users",
@@ -1642,6 +1664,11 @@ const messages = {
 						groups: {
 							label: "WhatsApp groups",
 							description: "Manage WhatsApp connection groups.",
+						},
+						export_group_participants: {
+							label: "Import group participants",
+							description:
+								"Export and import WhatsApp group participants into Contacts.",
 						},
 						ratings: {
 							label: "Ratings",
@@ -7622,6 +7649,11 @@ const messages = {
 					"Your plan does not include access to Instagram integration.",
 				ERR_GROUP_PERMANENT_CONVERSATION:
 					"Group conversations stay open and cannot be closed.",
+				ERR_GROUP_ID_REQUIRED: "Select a group to continue.",
+				ERR_GROUP_INVALID_GROUP_ID: "Could not identify the selected group.",
+				ERR_GROUP_NOT_VISIBLE: "You don't have access to this group.",
+				ERR_GROUP_ACCESS_DENIED:
+					"Could not access the group. Check that the connection is active and that you belong to this group.",
 				ERR_MODULE_NOT_ALLOWED:
 					"This module is not enabled for your company (plan or platform settings).",
 				ERR_PLAN_FEATURE_DISABLED: "This feature is not included in your plan.",

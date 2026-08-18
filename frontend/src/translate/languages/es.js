@@ -159,6 +159,28 @@ const messages = {
           openConversation: "Abrir conversación",
           leave: "Salir",
         },
+        importParticipants: {
+          action: "Importar participantes",
+          title: "Importar participantes",
+          total: "Total de participantes: {{count}}",
+          withPhone: "Con teléfono: {{count}}",
+          withoutPhone: "Sin teléfono: {{count}}",
+          existing: "Ya registrados: {{count}}",
+          news: "Contactos nuevos: {{count}}",
+          importable: "Cantidad que se importará: {{count}}",
+          unavailableHint:
+            "WhatsApp puede no facilitar el número de algunos participantes. Los contactos disponibles se importarán con normalidad.",
+          export: "Descargar hoja",
+          import: "Importar a contactos",
+          cancel: "Cancelar",
+          exportSuccess: "Hoja descargada.",
+          importSuccess:
+            "{{imported}} contacto(s) importado(s). {{skippedExisting}} ya existían.",
+          importPartialSuccess:
+            "{{imported}} contacto(s) importado(s). {{skippedExisting}} ya existían. {{failed}} no pudieron importarse.",
+          importLimitHint:
+            "{{skippedLimit}} contacto(s) quedaron fuera de este envío por el límite de la operación. Importe de nuevo para terminar el resto.",
+        },
         visibility: {
           label: "Visible para usuarios",
           showTooltip: "Permitir grupo para usuarios",
@@ -1608,6 +1630,11 @@ const messages = {
             groups: {
               label: "Grupos de WhatsApp",
               description: "Gestión de grupos de la conexión WhatsApp.",
+            },
+            export_group_participants: {
+              label: "Importar participantes de grupos",
+              description:
+                "Exportar e importar participantes de grupos de WhatsApp a Contactos.",
             },
             ratings: {
               label: "Evaluaciones",
@@ -6892,6 +6919,11 @@ const messages = {
           "Su plan no incluye acceso a la integración con Instagram.",
         ERR_GROUP_PERMANENT_CONVERSATION:
           "Las conversaciones de grupo permanecen abiertas y no se pueden finalizar.",
+        ERR_GROUP_ID_REQUIRED: "Seleccione un grupo para continuar.",
+        ERR_GROUP_INVALID_GROUP_ID: "No fue posible identificar el grupo seleccionado.",
+        ERR_GROUP_NOT_VISIBLE: "No tiene acceso a este grupo.",
+        ERR_GROUP_ACCESS_DENIED:
+          "No fue posible acceder al grupo. Verifique que la conexión esté activa y que participe en este grupo.",
         ERR_MODULE_NOT_ALLOWED:
           "Este módulo no está habilitado para su empresa (plan o configuración de la plataforma).",
         ERR_PLAN_FEATURE_DISABLED:

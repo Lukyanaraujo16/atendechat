@@ -42,6 +42,7 @@ export function legacyPlanFeatureValue(
     case "team.queues":
     case "team.ratings":
     case "team.groups":
+    case "team.export_group_participants":
     case "finance.subscription":
     case "finance.invoices":
       return true;
