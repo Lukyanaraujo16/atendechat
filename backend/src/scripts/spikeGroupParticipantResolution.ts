@@ -1,18 +1,17 @@
 /**
- * Spike controlado: taxa de resolução de telefone em participantes de grupos WhatsApp.
+ * Spike controlado — fase 2: resolução de telefone + diagnóstico estrutural LID.
  *
  * Somente leitura:
  * - groupMetadata / groupFetchAllParticipating
- * - lid-mapping persistido na sessão (leitura via JSON, sem mutar authState)
+ * - lid-mapping via JSON de sessão
+ * - signalRepository.lidMapping.getPNForLID (consulta local ao key store, sem USync)
  *
  * Uso:
  *   npm run build
- *   node dist/scripts/spikeGroupParticipantResolution.js --whatsappId=1
- *   node dist/scripts/spikeGroupParticipantResolution.js --whatsappId=1 --groupJid=120363...@g.us
- *   node dist/scripts/spikeGroupParticipantResolution.js --whatsappId=1 --maxGroups=5
- *
- * Requer: backend/.env com DB + sessão WhatsApp CONNECTED (campo session preenchido).
- * Não registra creds.update — não persiste alterações de sessão durante o spike.
+ *   node dist/scripts/spikeGroupParticipantResolution.js --whatsappId=19 --maxGroups=30
+ *   node dist/scripts/spikeGroupParticipantResolution.js --whatsappId=19 --groupJid=120363...@g.us
+ *   node dist/scripts/spikeGroupParticipantResolution.js --whatsappId=19 --skipPhase2
+ *   node dist/scripts/spikeGroupParticipantResolution.js --whatsappId=19 --skipRuntimeAudit
  */
 
 import "../bootstrap";
@@ -22,7 +21,8 @@ import makeWASocket, {
   DisconnectReason,
   fetchLatestBaileysVersion,
   makeCacheableSignalKeyStore,
-  type GroupMetadata
+  type GroupMetadata,
+  type GroupParticipant
 } from "@whiskeysockets/baileys";
 import P from "pino";
 import sequelize from "../database";
@@ -31,9 +31,15 @@ import Whatsapp from "../models/Whatsapp";
 import { logger } from "../utils/logger";
 import {
   analyzeSpikeGroups,
+  containsFullPhoneInJson,
+  extractLidUserFromJid,
+  isLidJid,
   loadLidToPnUserMapFromSessionJson,
   maskPhone,
-  type SpikeGroupInput
+  phoneDigitsFromRuntimePnJid,
+  resolveSpikeParticipant,
+  type SpikeGroupInput,
+  type SpikeParticipantInput
 } from "./lib/groupParticipantResolutionSpike";
 
 type CliOptions = {
@@ -41,6 +47,18 @@ type CliOptions = {
   groupJid?: string;
   maxGroups: number;
   connectTimeoutMs: number;
+  includePhase2: boolean;
+  skipRuntimeAudit: boolean;
+};
+
+type RuntimeLidMappingReader = {
+  getPNForLID: (lid: string) => Promise<string | null>;
+};
+
+type SpikeSocket = ReturnType<typeof makeWASocket> & {
+  signalRepository?: {
+    lidMapping?: RuntimeLidMappingReader;
+  };
 };
 
 function parseArgs(argv: string[]): CliOptions {
@@ -48,6 +66,8 @@ function parseArgs(argv: string[]): CliOptions {
   let groupJid: string | undefined;
   let maxGroups = 8;
   let connectTimeoutMs = 90_000;
+  let includePhase2 = true;
+  let skipRuntimeAudit = false;
 
   for (const arg of argv) {
     if (arg.startsWith("--whatsappId=")) {
@@ -58,6 +78,10 @@ function parseArgs(argv: string[]): CliOptions {
       maxGroups = Number(arg.split("=")[1]);
     } else if (arg.startsWith("--connectTimeoutMs=")) {
       connectTimeoutMs = Number(arg.split("=")[1]);
+    } else if (arg === "--skipPhase2") {
+      includePhase2 = false;
+    } else if (arg === "--skipRuntimeAudit") {
+      skipRuntimeAudit = true;
     }
   }
 
@@ -72,7 +96,9 @@ function parseArgs(argv: string[]): CliOptions {
     connectTimeoutMs:
       Number.isFinite(connectTimeoutMs) && connectTimeoutMs > 0
         ? connectTimeoutMs
-        : 90_000
+        : 90_000,
+    includePhase2,
+    skipRuntimeAudit
   };
 }
 
@@ -84,16 +110,37 @@ function normalizeGroupJid(input: string): string {
   return `${digits}@g.us`;
 }
 
+function mapParticipant(participant: GroupParticipant): SpikeParticipantInput {
+  const record = participant as unknown as Record<string, unknown>;
+  const presentKeys = Object.keys(record).filter(
+    key => record[key] !== undefined
+  );
+
+  return {
+    id: participant.id ?? null,
+    phoneNumber: participant.phoneNumber ?? null,
+    lid: participant.lid ?? null,
+    name: participant.name ?? null,
+    notify: participant.notify ?? null,
+    verifiedName: participant.verifiedName ?? null,
+    imgUrl:
+      participant.imgUrl === undefined || participant.imgUrl === null
+        ? null
+        : String(participant.imgUrl),
+    status: participant.status ?? null,
+    admin: participant.admin ?? null,
+    isAdmin: participant.isAdmin ?? null,
+    isSuperAdmin: participant.isSuperAdmin ?? null,
+    presentKeys
+  };
+}
+
 function mapParticipants(meta: GroupMetadata): SpikeGroupInput {
   return {
     groupJid: meta.id,
     subject: meta.subject,
     addressingMode: meta.addressingMode ?? null,
-    participants: (meta.participants || []).map(p => ({
-      id: p.id,
-      phoneNumber: (p as { phoneNumber?: string }).phoneNumber ?? null,
-      lid: (p as { lid?: string }).lid ?? null
-    }))
+    participants: (meta.participants || []).map(mapParticipant)
   };
 }
 
@@ -119,7 +166,9 @@ function pickRepresentativeGroups(
   push(sorted[Math.floor(sorted.length / 2)]);
   push(sorted[sorted.length - 1]);
 
-  const lidGroup = all.find(g => String(g.addressingMode).toLowerCase() === "lid");
+  const lidGroup = all.find(
+    g => String(g.addressingMode).toLowerCase() === "lid"
+  );
   push(lidGroup);
 
   for (const g of sorted) {
@@ -134,7 +183,7 @@ async function createReadOnlySocket(whatsapp: Whatsapp, connectTimeoutMs: number
   const { state } = await authState(whatsapp);
   const { version } = await fetchLatestBaileysVersion();
 
-  return new Promise<ReturnType<typeof makeWASocket>>((resolve, reject) => {
+  return new Promise<SpikeSocket>((resolve, reject) => {
     const sock = makeWASocket({
       logger: P({ level: "silent" }),
       printQRInTerminal: false,
@@ -148,7 +197,7 @@ async function createReadOnlySocket(whatsapp: Whatsapp, connectTimeoutMs: number
       syncFullHistory: false,
       connectTimeoutMs,
       shouldIgnoreJid: () => false
-    });
+    }) as SpikeSocket;
 
     const timer = setTimeout(() => {
       try {
@@ -195,6 +244,54 @@ async function createReadOnlySocket(whatsapp: Whatsapp, connectTimeoutMs: number
   });
 }
 
+function collectUnresolvedLidJids(
+  groups: SpikeGroupInput[],
+  sessionLidToPn: Map<string, string>
+): string[] {
+  const jids = new Set<string>();
+  for (const group of groups) {
+    for (const participant of group.participants) {
+      const id = String(participant.id ?? "").trim();
+      if (!isLidJid(id)) continue;
+      const resolution = resolveSpikeParticipant(participant, sessionLidToPn);
+      if (resolution.category === "unresolvedLid") {
+        jids.add(id);
+      }
+    }
+  }
+  return Array.from(jids);
+}
+
+/**
+ * Consulta getPNForLID para LIDs ainda não resolvidos pelo metadata/sessão JSON.
+ * getPNForLID (Baileys 7) lê cache + keys.get — não dispara USync nem mutações.
+ */
+async function buildRuntimeLidToPnMap(
+  sock: SpikeSocket,
+  unresolvedLidJids: string[]
+): Promise<Map<string, string>> {
+  const runtimeMap = new Map<string, string>();
+  const reader = sock.signalRepository?.lidMapping;
+  if (!reader?.getPNForLID || unresolvedLidJids.length === 0) {
+    return runtimeMap;
+  }
+
+  for (const lidJid of unresolvedLidJids) {
+    try {
+      const pnJid = await reader.getPNForLID(lidJid);
+      const digits = phoneDigitsFromRuntimePnJid(pnJid);
+      const lidUser = extractLidUserFromJid(lidJid);
+      if (lidUser && digits) {
+        runtimeMap.set(lidUser, digits);
+      }
+    } catch {
+      /* ignore individual lookup failures */
+    }
+  }
+
+  return runtimeMap;
+}
+
 async function main(): Promise<void> {
   const opts = parseArgs(process.argv.slice(2));
 
@@ -209,10 +306,10 @@ async function main(): Promise<void> {
     );
   }
 
-  const lidToPnUser = loadLidToPnUserMapFromSessionJson(whatsapp.session);
+  const sessionLidToPn = loadLidToPnUserMapFromSessionJson(whatsapp.session);
 
   // eslint-disable-next-line no-console
-  console.log("\n=== Spike: resolução de participantes de grupo ===");
+  console.log("\n=== Spike fase 2: resolução + diagnóstico LID ===");
   // eslint-disable-next-line no-console
   console.log(
     JSON.stringify(
@@ -220,7 +317,9 @@ async function main(): Promise<void> {
         whatsappId: whatsapp.id,
         companyId: whatsapp.companyId,
         status: whatsapp.status,
-        lidMappingEntries: lidToPnUser.size,
+        sessionLidMappingEntries: sessionLidToPn.size,
+        phase2Enabled: opts.includePhase2,
+        runtimeAuditEnabled: opts.includePhase2 && !opts.skipRuntimeAudit,
         mode: opts.groupJid ? "single-group" : "sample-groups",
         maxGroups: opts.maxGroups
       },
@@ -244,53 +343,61 @@ async function main(): Promise<void> {
       groupsToAnalyze = pickRepresentativeGroups(mapped, opts.maxGroups);
     }
 
-    const aggregate = analyzeSpikeGroups(groupsToAnalyze, lidToPnUser);
+    let runtimeLidToPn = new Map<string, string>();
+    if (opts.includePhase2 && !opts.skipRuntimeAudit) {
+      const unresolvedLidJids = collectUnresolvedLidJids(
+        groupsToAnalyze,
+        sessionLidToPn
+      );
+      runtimeLidToPn = await buildRuntimeLidToPnMap(sock, unresolvedLidJids);
+    }
 
-    const exampleResolved = aggregate.groups.find(
-      g =>
-        g.withPhoneNumberField +
-          g.withPnId +
-          g.lidWithPnField +
-          g.lidResolvedByMapping >
-        0
-    );
+    const aggregate = analyzeSpikeGroups(groupsToAnalyze, sessionLidToPn, {
+      runtimeLidToPn,
+      sessionJson: whatsapp.session,
+      includePhase2: opts.includePhase2
+    });
+
+    const output = {
+      groupsAnalyzed: aggregate.groupsAnalyzed,
+      totalParticipants: aggregate.totalParticipants,
+      resolutionPercentage: aggregate.resolutionPercentage,
+      withPhoneNumberField: aggregate.withPhoneNumberField,
+      pctWithPhoneNumberField: aggregate.pctWithPhoneNumberField,
+      withPnId: aggregate.withPnId,
+      pctWithPnId: aggregate.pctWithPnId,
+      lidWithPnField: aggregate.lidWithPnField,
+      pctLidWithPnField: aggregate.pctLidWithPnField,
+      lidResolvedByMapping: aggregate.lidResolvedByMapping,
+      pctLidResolvedByMapping: aggregate.pctLidResolvedByMapping,
+      lidResolvedByRuntimeKeyStore: aggregate.lidResolvedByRuntimeKeyStore,
+      pctLidResolvedByRuntimeKeyStore: aggregate.pctLidResolvedByRuntimeKeyStore,
+      unresolvedLid: aggregate.unresolvedLid,
+      pctUnresolvedLid: aggregate.pctUnresolvedLid,
+      invalidPhone: aggregate.invalidPhone,
+      pctInvalidPhone: aggregate.pctInvalidPhone,
+      uniqueResolvedPhones: aggregate.uniqueResolvedPhones,
+      byAddressingMode: aggregate.byAddressingMode,
+      phase2: aggregate.phase2,
+      sampleGroups: aggregate.groups.map(g => ({
+        groupJidMasked: g.groupJidMasked,
+        addressingMode: g.addressingMode,
+        totalParticipants: g.totalParticipants,
+        resolutionPercentage: g.resolutionPercentage,
+        unresolvedLid: g.unresolvedLid,
+        lidResolvedByRuntimeKeyStore: g.lidResolvedByRuntimeKeyStore
+      })),
+      maskedPhoneExample: maskPhone("5511999887766")
+    };
+
+    if (containsFullPhoneInJson(output)) {
+      throw new Error("ERR_SPIKE_PII_GUARD: saída contém telefone completo");
+    }
 
     // eslint-disable-next-line no-console
     console.log("\n=== Resultado agregado (sem PII) ===");
     // eslint-disable-next-line no-console
-    console.log(
-      JSON.stringify(
-        {
-          groupsAnalyzed: aggregate.groupsAnalyzed,
-          totalParticipants: aggregate.totalParticipants,
-          resolutionPercentage: aggregate.resolutionPercentage,
-          withPhoneNumberField: aggregate.withPhoneNumberField,
-          pctWithPhoneNumberField: aggregate.pctWithPhoneNumberField,
-          withPnId: aggregate.withPnId,
-          pctWithPnId: aggregate.pctWithPnId,
-          lidWithPnField: aggregate.lidWithPnField,
-          pctLidWithPnField: aggregate.pctLidWithPnField,
-          lidResolvedByMapping: aggregate.lidResolvedByMapping,
-          pctLidResolvedByMapping: aggregate.pctLidResolvedByMapping,
-          unresolvedLid: aggregate.unresolvedLid,
-          pctUnresolvedLid: aggregate.pctUnresolvedLid,
-          invalidPhone: aggregate.invalidPhone,
-          pctInvalidPhone: aggregate.pctInvalidPhone,
-          uniqueResolvedPhones: aggregate.uniqueResolvedPhones,
-          byAddressingMode: aggregate.byAddressingMode,
-          sampleGroups: aggregate.groups.map(g => ({
-            groupJidMasked: g.groupJidMasked,
-            addressingMode: g.addressingMode,
-            totalParticipants: g.totalParticipants,
-            resolutionPercentage: g.resolutionPercentage,
-            unresolvedLid: g.unresolvedLid
-          })),
-          maskedPhoneExample: exampleResolved ? maskPhone("5511999887766") : null
-        },
-        null,
-        2
-      )
-    );
+    console.log(JSON.stringify(output, null, 2));
   } finally {
     try {
       sock.ws?.close();
