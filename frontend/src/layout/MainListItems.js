@@ -30,6 +30,8 @@ import CodeIcon from "@material-ui/icons/Code";
 import BuildOutlinedIcon from "@material-ui/icons/BuildOutlined";
 import StoreIcon from "@material-ui/icons/Store";
 import { i18n } from "../translate/i18n";
+import { useAttendanceUnread } from "../context/AttendanceUnread/AttendanceUnreadContext";
+import AttendanceUnreadMenuBadge from "./AttendanceUnreadMenuBadge";
 import {
   getAttendanceDefaultPath,
   hasAttendanceModuleAccess,
@@ -242,6 +244,7 @@ const MainListItems = (props) => {
   const socketManager = useContext(SocketContext);
   const [connectionWarning, setConnectionWarning] = useState(false);
 
+  const { unreadConversationsCount } = useAttendanceUnread();
   const [invisible, setInvisible] = useState(true);
   const [pageNumber, setPageNumber] = useState(1);
   const [searchParam] = useState("");
@@ -646,7 +649,11 @@ const MainListItems = (props) => {
         <ListItemLink
           to={atendimentoPath}
           primary={i18n.t("mainDrawer.sections.atendimento")}
-          icon={<WhatsAppIcon />}
+          icon={
+            <AttendanceUnreadMenuBadge count={unreadConversationsCount}>
+              <WhatsAppIcon />
+            </AttendanceUnreadMenuBadge>
+          }
           listItemClassName={classes.listItem}
           listItemIconClassName={classes.listItemIcon}
           listItemTextClassName={classes.listItemText}

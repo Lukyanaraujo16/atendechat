@@ -4414,6 +4414,7 @@ const messages = {
 			},
 			mainDrawer: {
 				loadingModules: "Loading modules…",
+				attendanceUnreadBadge: "{{count}} conversations with unread messages",
 				sections: {
 					dashboard: "Dashboard",
 					atendimento: "Customer service",

@@ -1,6 +1,6 @@
 import { proto, WASocket } from "@whiskeysockets/baileys";
 import type { WAMessageKey } from "@whiskeysockets/baileys/lib/Types/Message.js";
-// import cacheLayer from "../libs/cache";
+import { cacheLayer } from "../libs/cache";
 import { getIO } from "../libs/socket";
 import Contact from "../models/Contact";
 import Message from "../models/Message";
@@ -218,7 +218,16 @@ const SetTicketMessagesAsRead = async (
   const receiptReason = readReceiptReason ?? "unspecified";
 
   await ticket.update({ unreadMessages: 0 });
-  // await cacheLayer.set(`contacts:${ticket.contactId}:unreads`, "0");
+  const unreadCacheContactId = ticket.contactId ?? ticket.contact?.id;
+  if (unreadCacheContactId != null) {
+    try {
+      await cacheLayer.set(`contacts:${unreadCacheContactId}:unreads`, "0");
+    } catch (err) {
+      logger.warn(
+        `Could not reset unread cache for contact ${unreadCacheContactId}. Err: ${err}`
+      );
+    }
+  }
 
   try {
     if (syncWhatsAppReadReceipt) {

@@ -41,6 +41,7 @@ import { useBranding } from "../context/Branding/BrandingContext";
 import { SocketContext } from "../context/Socket/SocketContext";
 import ChatPopover from "../pages/Chat/ChatPopover";
 import GlobalNotificationsProvider from "../context/GlobalNotifications/GlobalNotificationsProvider";
+import AttendanceUnreadProvider from "../context/AttendanceUnread/AttendanceUnreadProvider";
 import { countPostLogin } from "../utils/postLoginDebug";
 
 import { useDate } from "../hooks/useDate";
@@ -617,6 +618,7 @@ const LoggedInLayout = ({ children, themeToggle }) => {
 
   return (
     <GlobalNotificationsProvider>
+    <AttendanceUnreadProvider>
     <div className={classes.root}>
       <Drawer
         variant={drawerVariant}
@@ -967,6 +969,7 @@ const LoggedInLayout = ({ children, themeToggle }) => {
         ) : null}
       </main>
     </div>
+    </AttendanceUnreadProvider>
     </GlobalNotificationsProvider>
   );
 };

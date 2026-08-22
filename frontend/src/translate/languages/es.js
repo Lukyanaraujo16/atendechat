@@ -3942,6 +3942,7 @@ const messages = {
       },
       mainDrawer: {
         loadingModules: "Cargando módulos…",
+        attendanceUnreadBadge: "{{count}} conversaciones con mensajes no leídos",
         sections: {
           dashboard: "Dashboard",
           atendimento: "Atención",

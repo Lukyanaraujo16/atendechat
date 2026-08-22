@@ -6,7 +6,6 @@ import Contact from "../../models/Contact";
 import Message from "../../models/Message";
 import Queue from "../../models/Queue";
 import User from "../../models/User";
-import ShowUserService from "../UserServices/ShowUserService";
 import Tag from "../../models/Tag";
 import TicketTag from "../../models/TicketTag";
 import ContactLabelRelation from "../../models/ContactLabelRelation";
@@ -320,22 +319,11 @@ const ListTicketsService = async ({
   }
 
   if (withUnreadMessages === "true") {
-    const user = await ShowUserService(userId);
-    const userQueueIds = user.queues.map(queue => queue.id);
-    const unreadAllowNull = allowsNullQueueVisibility(
-      userQueueIds,
-      user?.allTicket === "enabled",
-      contingencyQueueId
-    );
-
+    // Compose onto the already-built visibility/status/search filters.
+    // Rebuilding with ShowUserService + buildAgentTicketListWhere discarded
+    // status, showAll and effectiveQueueIds.
     whereCondition = {
-      ...buildAgentTicketListWhere(
-        actor,
-        userId,
-        userQueueIds,
-        unreadAllowNull,
-        companyId
-      ),
+      ...whereCondition,
       unreadMessages: { [Op.gt]: 0 }
     };
   }
