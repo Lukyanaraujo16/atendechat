@@ -201,6 +201,8 @@ const TicketsListCustom = (props) => {
     style,
     /** Lista mais densa (Fase 3) */
     compact = false,
+    /** Densidade da faixa desktop compacta (1280–1599.95); calculada uma vez no manager. */
+    compactDesktop = false,
     // false: não registra socket (ex.: lista oculta na mesma aba com outras instâncias)
     socketActive = true,
     /** Inbox: tickets vindos do TicketsInboxContext (sem reducer/socket local). */
@@ -780,6 +782,7 @@ const TicketsListCustom = (props) => {
                   ticket={ticket}
                   key={`ticket-${ticket.id}`}
                   compact={compact}
+                  compactDesktop={compactDesktop}
                   selected={isRowSelected(ticket)}
                   bulkSelectMode={bulkActiveOnCards}
                   bulkSelected={selectedIds.has(ticket.id)}

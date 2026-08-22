@@ -1,6 +1,5 @@
 import React from "react";
 import { useParams } from "react-router-dom";
-import Grid from "@material-ui/core/Grid";
 import Typography from "@material-ui/core/Typography";
 import { makeStyles } from "@material-ui/core/styles";
 
@@ -15,6 +14,7 @@ import {
 	getPanelDividerBorder,
 	getChatPanelBackground,
 } from "../../theme/ticketPanelStyles";
+import { TICKETS_DESKTOP_SPLIT_COLUMNS } from "../../utils/ticketsCompactDesktopLayout";
 
 import PersonIcon from "@material-ui/icons/Person";
 
@@ -37,15 +37,20 @@ const useStyles = makeStyles(theme => ({
 		width: "100%",
 	},
 
-	gridRoot: {
+	splitLayout: {
+		display: "grid",
 		flex: 1,
 		minHeight: 0,
 		width: "100%",
 		height: "100%",
+		gap: theme.spacing(PANEL_GAP_PX / 8),
+		overflow: "hidden",
+		gridTemplateColumns: TICKETS_DESKTOP_SPLIT_COLUMNS,
 	},
 
 	contactsWrapper: {
 		display: "flex",
+		minWidth: 0,
 		minHeight: 0,
 		height: "100%",
 		flexDirection: "column",
@@ -59,6 +64,7 @@ const useStyles = makeStyles(theme => ({
 	},
 	messagesWrapper: {
 		display: "flex",
+		minWidth: 0,
 		minHeight: 0,
 		height: "100%",
 		flexDirection: "column",
@@ -182,16 +188,14 @@ const TicketsCustom = () => {
 	return (
 		<div className={classes.chatContainer}>
 			<div className={classes.chatPapper}>
-				<Grid
-					container
-					spacing={PANEL_GAP_PX / 8}
-					className={classes.gridRoot}
-					wrap="nowrap"
+				<div
+					className={classes.splitLayout}
+					data-tickets-split-layout="desktop"
 				>
-					<Grid item xs={4} className={classes.contactsWrapper}>
+					<div className={classes.contactsWrapper}>
 						<TicketsManager />
-					</Grid>
-					<Grid item xs={8} className={classes.messagesWrapper}>
+					</div>
+					<div className={classes.messagesWrapper}>
 						{ticketId ? (
 							<>
 								<Ticket />
@@ -218,8 +222,8 @@ const TicketsCustom = () => {
 								</Typography>
 							</div>
 						)}
-					</Grid>
-				</Grid>
+					</div>
+				</div>
 			</div>
 		</div>
 	);

@@ -52,6 +52,7 @@ import toastError from "../../errors/toastError";
 import { v4 as uuidv4 } from "uuid";
 import { useAcceptTicket } from "../../hooks/useAcceptTicket";
 import useIsMobile from "../../hooks/useIsMobile";
+import { TICKETS_COMPACT_DESKTOP_MEDIA } from "../../utils/ticketsCompactDesktopLayout";
 
 import ContactTag from "../ContactTag";
 import ContactLabelChip from "../ContactLabelChip";
@@ -124,6 +125,10 @@ const useStyles = makeStyles((theme) => {
     },
     transition: `all ${MICRO_MS}ms ${MICRO_EASE}`,
     cursor: "pointer",
+    [TICKETS_COMPACT_DESKTOP_MEDIA]: {
+      padding: "10px 12px",
+      marginBottom: 8,
+    },
     "@media (hover: hover)": {
       "&:hover:not($listItemSelected):not($listItemBusy)": {
         backgroundColor: getInboxCardSurfaceHover(theme),
@@ -198,6 +203,9 @@ const useStyles = makeStyles((theme) => {
     flex: 1,
     minWidth: 0,
     gap: 11,
+    [TICKETS_COMPACT_DESKTOP_MEDIA]: {
+      gap: 9,
+    },
   },
   avatarWrap: {
     alignSelf: "center",
@@ -219,6 +227,11 @@ const useStyles = makeStyles((theme) => {
       objectFit: "cover",
       width: "100%",
       height: "100%",
+    },
+    [TICKETS_COMPACT_DESKTOP_MEDIA]: {
+      width: 44,
+      height: 44,
+      fontSize: "1rem",
     },
   },
   avatarSelected: {
@@ -284,6 +297,9 @@ const useStyles = makeStyles((theme) => {
     flexShrink: 0,
     maxWidth: "38%",
     paddingTop: 1,
+    [TICKETS_COMPACT_DESKTOP_MEDIA]: {
+      maxWidth: "42%",
+    },
   },
   timeText: {
     fontSize: "0.72rem",
@@ -291,6 +307,7 @@ const useStyles = makeStyles((theme) => {
     color: theme.palette.text.secondary,
     whiteSpace: "nowrap",
     letterSpacing: "0.01em",
+    flexShrink: 0,
   },
   statusChip: {
     height: "auto",
@@ -314,6 +331,9 @@ const useStyles = makeStyles((theme) => {
     marginTop: theme.spacing(0.5),
     opacity: 0.92,
     transition: `color ${MICRO_MS}ms ${MICRO_EASE}`,
+    [TICKETS_COMPACT_DESKTOP_MEDIA]: {
+      WebkitLineClamp: 1,
+    },
   },
   lastMessageMedia: {
     fontStyle: "normal",
@@ -327,6 +347,12 @@ const useStyles = makeStyles((theme) => {
     gap: theme.spacing(0.5),
     marginTop: theme.spacing(0.75),
     rowGap: theme.spacing(0.5),
+    minWidth: 0,
+    [TICKETS_COMPACT_DESKTOP_MEDIA]: {
+      gap: theme.spacing(0.35),
+      rowGap: theme.spacing(0.35),
+      marginTop: theme.spacing(0.5),
+    },
   },
   moreTagsChip: {
     height: "auto",
@@ -479,6 +505,7 @@ const useStyles = makeStyles((theme) => {
 const TicketListItemCustom = ({
   ticket,
   compact = false,
+  compactDesktop = false,
   selected = false,
   bulkSelectMode = false,
   bulkSelected = false,
@@ -494,6 +521,7 @@ const TicketListItemCustom = ({
   const history = useHistory();
   const location = useLocation();
   const isMobile = useIsMobile();
+  const isCompactDesktopLayout = compactDesktop === true;
   const [loading, setLoading] = useState(false);
   const [ticketUser, setTicketUser] = useState(null);
   const [tag, setTag] = useState([]);
@@ -709,19 +737,23 @@ const TicketListItemCustom = ({
   const actionBusy = loading || deleteLoading;
 
   const tagList = Array.isArray(tag) ? tag : [];
-  const visibleTags = tagList.slice(0, MAX_TAGS_VISIBLE);
+  const maxTagsVisible =
+    compact || isCompactDesktopLayout ? 2 : MAX_TAGS_VISIBLE;
+  const maxContactLabelsVisible =
+    compact || isCompactDesktopLayout ? 1 : MAX_CONTACT_LABELS_VISIBLE;
+  const visibleTags = tagList.slice(0, maxTagsVisible);
   const extraTagCount = Math.max(0, tagList.length - visibleTags.length);
 
   const contactLabelList = Array.isArray(ticket?.contact?.labels)
     ? ticket.contact.labels
     : [];
-  const visibleContactLabels = contactLabelList.slice(0, MAX_CONTACT_LABELS_VISIBLE);
+  const visibleContactLabels = contactLabelList.slice(0, maxContactLabelsVisible);
   const extraContactLabelCount = Math.max(
     0,
     contactLabelList.length - visibleContactLabels.length
   );
   const hiddenContactLabelNames = contactLabelList
-    .slice(MAX_CONTACT_LABELS_VISIBLE)
+    .slice(maxContactLabelsVisible)
     .map((l) => l.name)
     .join(", ");
 
@@ -755,7 +787,7 @@ const TicketListItemCustom = ({
         }}
         selected={bulkSelectMode ? bulkSelected : selected}
         className={clsx(classes.listItemRoot, {
-          [classes.listItemCompact]: compact,
+          [classes.listItemCompact]: compact || isCompactDesktopLayout,
           [classes.listItemBulkSelect]: bulkSelectMode,
           [classes.listItemSelected]: bulkSelectMode
             ? bulkSelected
@@ -804,7 +836,7 @@ const TicketListItemCustom = ({
             >
               <Avatar
                 className={clsx(classes.avatar, {
-                  [classes.avatarCompact]: compact,
+                  [classes.avatarCompact]: compact || isCompactDesktopLayout,
                   [classes.avatarSelected]: bulkSelectMode
                     ? bulkSelected
                     : selected,
@@ -825,7 +857,9 @@ const TicketListItemCustom = ({
                 <PushPinIcon className={classes.pinIconNearName} aria-hidden />
               ) : null}
               <Typography
-                className={clsx(classes.contactName, { [classes.contactNameCompact]: compact })}
+                className={clsx(classes.contactName, {
+                  [classes.contactNameCompact]: compact || isCompactDesktopLayout,
+                })}
                 component="span"
                 title={ticket.contact.name}
               >
@@ -1081,6 +1115,7 @@ const TicketListItemCustom = ({
 
 function ticketListItemPropsAreEqual(prev, next) {
   if (prev.compact !== next.compact) return false;
+  if (prev.compactDesktop !== next.compactDesktop) return false;
   if (prev.selected !== next.selected) return false;
   if (prev.bulkSelectMode !== next.bulkSelectMode) return false;
   if (prev.bulkSelected !== next.bulkSelected) return false;

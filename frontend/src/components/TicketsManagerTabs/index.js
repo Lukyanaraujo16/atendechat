@@ -89,6 +89,11 @@ import {
   getTicketSearchPlaceholderKey,
   normalizeTicketSearchTerm,
 } from "../../utils/ticketSearchState";
+import {
+  TICKETS_COMPACT_DESKTOP_MEDIA,
+  formatInboxPillCount,
+} from "../../utils/ticketsCompactDesktopLayout";
+import useTicketsCompactDesktop from "../../hooks/useTicketsCompactDesktop";
 
 /**
  * Atendimentos (desktop): abas, busca, filtros e lista.
@@ -325,6 +330,13 @@ const useStyles = makeStyles(theme => ({
 		alignItems: "center",
 		width: "100%",
 		borderBottom: getSubtleBorder(theme),
+		[TICKETS_COMPACT_DESKTOP_MEDIA]: {
+			display: "grid",
+			gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+			flexWrap: "nowrap",
+			gap: theme.spacing(0.75),
+			padding: theme.spacing(1, 1),
+		},
 	},
 	statusPill: {
 		fontSize: "0.75rem",
@@ -334,6 +346,12 @@ const useStyles = makeStyles(theme => ({
 		transition: theme.transitions.create(["box-shadow", "border-color", "background-color"], {
 			duration: 200,
 		}),
+		[TICKETS_COMPACT_DESKTOP_MEDIA]: {
+			fontSize: "0.72rem",
+			padding: "7px 8px",
+			minWidth: 0,
+			width: "100%",
+		},
 	},
 	statusPillBtn: {
 		cursor: "pointer",
@@ -342,15 +360,31 @@ const useStyles = makeStyles(theme => ({
 		alignItems: "center",
 		gap: theme.spacing(1),
 		justifyContent: "center",
+		[TICKETS_COMPACT_DESKTOP_MEDIA]: {
+			gap: theme.spacing(0.5),
+			minWidth: 0,
+		},
 	},
 	statusPillIcon: {
 		fontSize: 16,
+		flexShrink: 0,
+		[TICKETS_COMPACT_DESKTOP_MEDIA]: {
+			display: "none",
+		},
+	},
+	statusPillLabel: {
+		overflow: "hidden",
+		textOverflow: "ellipsis",
+		whiteSpace: "nowrap",
+		minWidth: 0,
 	},
 	statusCountGreen: {
-		width: 22,
-		height: 22,
-		borderRadius: "50%",
-		display: "flex",
+		minWidth: 20,
+		height: 20,
+		width: "auto",
+		padding: "0 5px",
+		borderRadius: 999,
+		display: "inline-flex",
 		alignItems: "center",
 		justifyContent: "center",
 		backgroundColor: theme.palette.success.main,
@@ -358,12 +392,17 @@ const useStyles = makeStyles(theme => ({
 		color: theme.palette.success.contrastText,
 		fontWeight: 700,
 		fontSize: "0.72rem",
+		flexShrink: 0,
+		lineHeight: 1.2,
+		boxSizing: "border-box",
 	},
 	statusCountPink: {
-		width: 22,
-		height: 22,
-		borderRadius: "50%",
-		display: "flex",
+		minWidth: 20,
+		height: 20,
+		width: "auto",
+		padding: "0 5px",
+		borderRadius: 999,
+		display: "inline-flex",
 		alignItems: "center",
 		justifyContent: "center",
 		backgroundColor: theme.palette.secondary.main,
@@ -371,6 +410,9 @@ const useStyles = makeStyles(theme => ({
 		color: theme.palette.getContrastText(theme.palette.secondary.main),
 		fontWeight: 700,
 		fontSize: "0.72rem",
+		flexShrink: 0,
+		lineHeight: 1.2,
+		boxSizing: "border-box",
 	},
 	statusPillGreen: {
 		backgroundColor: theme.palette.background.paper,
@@ -421,6 +463,29 @@ const useStyles = makeStyles(theme => ({
 		[theme.breakpoints.down("xs")]: {
 			padding: theme.spacing(1),
 		},
+		[TICKETS_COMPACT_DESKTOP_MEDIA]: {
+			flexWrap: "nowrap",
+			padding: theme.spacing(1, 1.25),
+			gap: theme.spacing(0.75),
+		},
+	},
+	searchRowWrapBulk: {
+		[TICKETS_COMPACT_DESKTOP_MEDIA]: {
+			flexWrap: "wrap",
+		},
+	},
+	searchRowBulkWrap: {
+		display: "contents",
+		[TICKETS_COMPACT_DESKTOP_MEDIA]: {
+			display: "flex",
+			flex: "1 0 100%",
+			width: "100%",
+			flexWrap: "wrap",
+			justifyContent: "flex-end",
+			alignItems: "center",
+			gap: theme.spacing(0.75),
+			paddingTop: theme.spacing(0.25),
+		},
 	},
 	searchInputWrap: {
 		flex: 1,
@@ -437,6 +502,12 @@ const useStyles = makeStyles(theme => ({
 		"&:focus-within": {
 			borderColor: theme.palette.primary.light,
 			boxShadow: `0 0 0 2px ${theme.palette.type === "dark" ? "rgba(144,202,249,0.35)" : "rgba(25, 118, 210, 0.2)"}`,
+		},
+		[TICKETS_COMPACT_DESKTOP_MEDIA]: {
+			flex: "1 1 auto",
+			minWidth: 140,
+			minHeight: 42,
+			padding: theme.spacing(0.65, 1),
 		},
 	},
 	searchIconInField: {
@@ -532,31 +603,45 @@ const InboxSubTabsPills = memo(function InboxSubTabsPills({
   classes,
 }) {
   const { openCount, pendingCount, chatbotCount } = useTicketsInboxMetrics();
+  const isCompactDesktop = useMediaQuery(TICKETS_COMPACT_DESKTOP_MEDIA);
   const isNarrow = useMediaQuery("(max-width:560px)");
-  const automationsLabel = isNarrow
-    ? i18n.t("tickets.inbox.automations.short")
-    : i18n.t("tickets.inbox.automations.label");
+  const automationsLabel =
+    isNarrow || isCompactDesktop
+      ? i18n.t("tickets.inbox.automations.short")
+      : i18n.t("tickets.inbox.automations.label");
+
+  const openCountFmt = formatInboxPillCount(openCount);
+  const pendingCountFmt = formatInboxPillCount(pendingCount);
+  const chatbotCountFmt = formatInboxPillCount(chatbotCount);
 
   const selectTab = (tab) => {
     setTabOpen(tab);
   };
 
   return (
-    <div className={classes.statusPillsRow}>
+    <div className={classes.statusPillsRow} data-inbox-subtabs-pills>
       <ButtonBase
         className={`${classes.statusPill} ${classes.statusPillBtn} ${classes.statusPillGreen} ${
           tabOpen === "open" ? classes.statusPillGreenActive : ""
         }`}
         onClick={() => selectTab("open")}
+        aria-pressed={tabOpen === "open"}
       >
-        <span className={classes.statusCountGreen}>{openCount}</span>
+        <span
+          className={classes.statusCountGreen}
+          title={String(openCountFmt.exact)}
+          aria-label={String(openCountFmt.exact)}
+        >
+          {openCountFmt.display}
+        </span>
         <FolderOpenIcon className={clsx(classes.statusPillIcon, classes.statusIconGreen)} />
         <span
-          className={
-            tabOpen === "open" ? classes.statusPillTextActive : classes.statusPillText
-          }
+          className={clsx(classes.statusPillLabel, {
+            [classes.statusPillTextActive]: tabOpen === "open",
+            [classes.statusPillText]: tabOpen !== "open",
+          })}
         >
-          ATENDENDO
+          {i18n.t("ticketsList.assignedHeader").toUpperCase()}
         </span>
       </ButtonBase>
 
@@ -565,15 +650,23 @@ const InboxSubTabsPills = memo(function InboxSubTabsPills({
           tabOpen === "pending" ? classes.statusPillPinkActive : ""
         }`}
         onClick={() => selectTab("pending")}
+        aria-pressed={tabOpen === "pending"}
       >
-        <span className={classes.statusCountPink}>{pendingCount}</span>
+        <span
+          className={classes.statusCountPink}
+          title={String(pendingCountFmt.exact)}
+          aria-label={String(pendingCountFmt.exact)}
+        >
+          {pendingCountFmt.display}
+        </span>
         <PersonIcon className={clsx(classes.statusPillIcon, classes.statusIconPink)} />
         <span
-          className={
-            tabOpen === "pending" ? classes.statusPillTextActive : classes.statusPillText
-          }
+          className={clsx(classes.statusPillLabel, {
+            [classes.statusPillTextActive]: tabOpen === "pending",
+            [classes.statusPillText]: tabOpen !== "pending",
+          })}
         >
-          AGUARDANDO
+          {i18n.t("ticketsList.pendingHeader").toUpperCase()}
         </span>
       </ButtonBase>
 
@@ -584,13 +677,21 @@ const InboxSubTabsPills = memo(function InboxSubTabsPills({
           }`}
           onClick={() => selectTab("chatbot")}
           aria-label={i18n.t("tickets.inbox.automations.label")}
+          aria-pressed={tabOpen === "chatbot"}
         >
-          <span className={classes.statusCountGreen}>{chatbotCount}</span>
+          <span
+            className={classes.statusCountGreen}
+            title={String(chatbotCountFmt.exact)}
+            aria-label={String(chatbotCountFmt.exact)}
+          >
+            {chatbotCountFmt.display}
+          </span>
           <AndroidIcon className={clsx(classes.statusPillIcon, classes.statusIconGreen)} />
           <span
-            className={
-              tabOpen === "chatbot" ? classes.statusPillTextActive : classes.statusPillText
-            }
+            className={clsx(classes.statusPillLabel, {
+              [classes.statusPillTextActive]: tabOpen === "chatbot",
+              [classes.statusPillText]: tabOpen !== "chatbot",
+            })}
           >
             {automationsLabel}
           </span>
@@ -602,6 +703,7 @@ const InboxSubTabsPills = memo(function InboxSubTabsPills({
 
 const InboxOpenListPanel = memo(function InboxOpenListPanel({
   compactList,
+  compactDesktop = false,
   style,
   showAllTickets,
   selectedQueueIds,
@@ -631,6 +733,7 @@ const InboxOpenListPanel = memo(function InboxOpenListPanel({
       controlledHasMore={hasMore}
       onControlledLoadMore={loadMore}
       compact={compactList}
+      compactDesktop={compactDesktop}
       style={style}
       enableBulkDelete
       bulkSelectMode={bulkSelectMode && isBulkListActive}
@@ -646,6 +749,7 @@ const InboxOpenListPanel = memo(function InboxOpenListPanel({
 
 const InboxPendingListPanel = memo(function InboxPendingListPanel({
   compactList,
+  compactDesktop = false,
   style,
   selectedQueueIds,
   searchParam,
@@ -666,6 +770,7 @@ const InboxPendingListPanel = memo(function InboxPendingListPanel({
       controlledHasMore={hasMore}
       onControlledLoadMore={loadMore}
       compact={compactList}
+      compactDesktop={compactDesktop}
       style={style}
       enableBulkDelete
       bulkSelectMode={bulkSelectMode && isBulkListActive}
@@ -678,6 +783,7 @@ const InboxPendingListPanel = memo(function InboxPendingListPanel({
 
 const InboxChatbotListPanel = memo(function InboxChatbotListPanel({
   compactList,
+  compactDesktop = false,
   style,
   selectedQueueIds,
   searchParam,
@@ -699,6 +805,7 @@ const InboxChatbotListPanel = memo(function InboxChatbotListPanel({
       controlledHasMore={hasMore}
       onControlledLoadMore={loadMore}
       compact={compactList}
+      compactDesktop={compactDesktop}
       style={style}
       enableBulkDelete
       bulkSelectMode={bulkSelectMode && isBulkListActive}
@@ -712,6 +819,7 @@ const InboxChatbotListPanel = memo(function InboxChatbotListPanel({
 function OpenInboxTicketLists({
   tabOpen,
   compactList,
+  compactDesktop = false,
   selectedQueueIds,
   showAllTickets,
   ticketSearch,
@@ -735,6 +843,7 @@ function OpenInboxTicketLists({
     <>
       <InboxOpenListPanel
         compactList={compactList}
+        compactDesktop={compactDesktop}
         style={styleOpen}
         showAllTickets={showAllTickets}
         selectedQueueIds={selectedQueueIds}
@@ -745,6 +854,7 @@ function OpenInboxTicketLists({
       />
       <InboxPendingListPanel
         compactList={compactList}
+        compactDesktop={compactDesktop}
         style={stylePending}
         selectedQueueIds={selectedQueueIds}
         searchParam={ticketSearch.pending}
@@ -754,6 +864,7 @@ function OpenInboxTicketLists({
       />
       <InboxChatbotListPanel
         compactList={compactList}
+        compactDesktop={compactDesktop}
         style={styleChatbot}
         selectedQueueIds={selectedQueueIds}
         searchParam={ticketSearch.chatbot}
@@ -798,6 +909,7 @@ const TicketsManagerTabs = () => {
   const [bulkListApi, setBulkListApi] = useState(null);
   const showBulkSelectControl =
     mayBulkDelete && (tab === "open" || tab === "closed");
+  const isCompactDesktop = useTicketsCompactDesktop();
 
   useEffect(() => {
     setBulkSelectMode(false);
@@ -1088,7 +1200,11 @@ const TicketsManagerTabs = () => {
       )}
 
       <div
-        className={classes.searchRow}
+        className={clsx(classes.searchRow, {
+          [classes.searchRowWrapBulk]:
+            isCompactDesktop && showBulkSelectControl,
+        })}
+        data-inbox-search-row
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
@@ -1160,7 +1276,7 @@ const TicketsManagerTabs = () => {
           </IconButton>
         </Tooltip>
         {showBulkSelectControl ? (
-          <>
+          <div className={classes.searchRowBulkWrap}>
             <Tooltip
               title={
                 bulkSelectMode
@@ -1213,7 +1329,7 @@ const TicketsManagerTabs = () => {
                 ) : null}
               </>
             ) : null}
-          </>
+          </div>
         ) : null}
       </div>
 
@@ -1254,6 +1370,7 @@ const TicketsManagerTabs = () => {
           <OpenInboxTicketLists
             tabOpen={tabOpen}
             compactList={compactList}
+            compactDesktop={isCompactDesktop}
             selectedQueueIds={selectedQueueIds}
             showAllTickets={showAllTickets}
             ticketSearch={ticketSearch}
@@ -1269,6 +1386,7 @@ const TicketsManagerTabs = () => {
           selectedQueueIds={selectedQueueIds}
           searchParam={ticketSearch.closed}
           compact={compactList}
+          compactDesktop={isCompactDesktop}
           enableBulkDelete
           bulkSelectMode={bulkSelectMode && tab === "closed"}
           onBulkSelectionApiChange={
@@ -1290,6 +1408,7 @@ const TicketsManagerTabs = () => {
           users={selectedUsers}
           selectedQueueIds={selectedQueueIds}
           compact={compactList}
+          compactDesktop={isCompactDesktop}
         />
       </TabPanel>
 
@@ -1301,6 +1420,7 @@ const TicketsManagerTabs = () => {
             selectedQueueIds={selectedQueueIds}
             searchParam={ticketSearch.groups}
             compact={compactList}
+            compactDesktop={isCompactDesktop}
             socketActive={tab === "groups"}
           />
         </div>
