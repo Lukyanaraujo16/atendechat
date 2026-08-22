@@ -8,6 +8,8 @@
  * Geometria da lista/conversa: regra única contínua em todo o desktop split.
  */
 
+import { MODULE_TABS_HORIZONTAL_PADDING_PX } from "../layout/layoutConstants";
+
 export const TICKETS_DESKTOP_MIN_WIDTH = 1280;
 
 /** Limite superior inclusivo da faixa de densidade compacta (cards/pills). */
@@ -21,12 +23,19 @@ export const TICKETS_LIST_FRACTION = 0.4;
 
 export const TICKETS_COMPACT_DESKTOP_MEDIA = `(min-width: ${TICKETS_DESKTOP_MIN_WIDTH}px) and (max-width: ${TICKETS_COMPACT_DESKTOP_MAX_WIDTH}px)`;
 
+/** Desktop split (TicketsCustom): >=1280, independente da largura da lista (máx. 520px). */
+export const TICKETS_DESKTOP_SPLIT_MEDIA = `(min-width: ${TICKETS_DESKTOP_MIN_WIDTH}px)`;
+
 /** Colunas do split em todo o desktop (>= 1280): monotônicas ao redimensionar. */
 export const TICKETS_DESKTOP_SPLIT_COLUMNS = `clamp(${TICKETS_LIST_MIN_PX}px, 40%, ${TICKETS_LIST_MAX_PX}px) minmax(0, 1fr)`;
+
+/** Abaixo desta largura útil da conversa, ações secundárias vão para ⋮ (drawer aberto). */
+export const TICKETS_CONVERSATION_OVERFLOW_MAX_PX = 900;
 
 /** Estimativas para testes (alinhadas ao layout/index.js). */
 export const DRAWER_WIDTH_OPEN_PX = 299;
 export const DRAWER_WIDTH_COLLAPSED_PX = 72;
+/** TicketsCustom `chatContainer`: theme.spacing(1) × 2 (horizontal total). */
 export const TICKETS_CHAT_CONTAINER_PADDING_PX = 16;
 export const TICKETS_SPLIT_GRID_GAP_PX = 12;
 
@@ -40,7 +49,13 @@ export function estimateSplitContentWidth(
   { drawerOpen = true } = {}
 ) {
   const drawer = drawerOpen ? DRAWER_WIDTH_OPEN_PX : DRAWER_WIDTH_COLLAPSED_PX;
-  return Math.max(0, viewportWidth - drawer - TICKETS_CHAT_CONTAINER_PADDING_PX);
+  return Math.max(
+    0,
+    viewportWidth -
+      drawer -
+      MODULE_TABS_HORIZONTAL_PADDING_PX -
+      TICKETS_CHAT_CONTAINER_PADDING_PX
+  );
 }
 
 /**
@@ -52,6 +67,38 @@ export function estimateTicketsListColumnWidth(splitContentWidth) {
   return Math.min(
     TICKETS_LIST_MAX_PX,
     Math.max(TICKETS_LIST_MIN_PX, preferred)
+  );
+}
+
+/**
+ * Largura útil da coluna da conversa no split desktop.
+ * @param {number} viewportWidth
+ * @param {{ drawerOpen?: boolean }} [options]
+ */
+export function estimateConversationColumnWidth(
+  viewportWidth,
+  { drawerOpen = true } = {}
+) {
+  const splitW = estimateSplitContentWidth(viewportWidth, { drawerOpen });
+  const listW = estimateTicketsListColumnWidth(splitW);
+  return Math.max(0, splitW - TICKETS_SPLIT_GRID_GAP_PX - listW);
+}
+
+/**
+ * Desktop split com conversa estreita → menu ⋮ para ações secundárias.
+ * @param {number} viewportWidth
+ * @param {{ drawerOpen?: boolean }} [options]
+ */
+export function shouldUseDesktopConversationOverflow(
+  viewportWidth,
+  { drawerOpen = true } = {}
+) {
+  if (viewportWidth < TICKETS_DESKTOP_MIN_WIDTH) {
+    return false;
+  }
+  return (
+    estimateConversationColumnWidth(viewportWidth, { drawerOpen }) <
+    TICKETS_CONVERSATION_OVERFLOW_MAX_PX
   );
 }
 

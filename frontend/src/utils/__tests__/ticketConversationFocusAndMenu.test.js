@@ -99,7 +99,7 @@ describe("breakpoint alinhamento", () => {
     expect(MOBILE_MEDIA_QUERY).toBe("(max-width:1279.95px)");
   });
 
-  it("action bar compact usa useIsMobile (não down sm)", () => {
+  it("action bar compact usa useIsMobile para botões primários (não down sm)", () => {
     const src = fs.readFileSync(
       path.join(
         __dirname,
@@ -108,6 +108,7 @@ describe("breakpoint alinhamento", () => {
       "utf8"
     );
     expect(src).toContain("useIsMobile");
+    expect(src).toContain("useDesktopConversationActionOverflow");
     expect(src).not.toMatch(/breakpoints\.down\(["']sm["']\)/);
     expect(src).not.toContain("menuExtras");
   });
@@ -219,8 +220,13 @@ describe("TicketConversationActionBar menu mobile", () => {
     expect(onSchedule).toHaveBeenCalled();
   });
 
-  it("desktop mantém IconButtons (sem menu ⋮)", () => {
+  it("desktop largo mantém IconButtons (sem menu ⋮)", () => {
     useMediaQuery.mockReturnValue(false);
+    Object.defineProperty(window, "innerWidth", {
+      writable: true,
+      configurable: true,
+      value: 1920,
+    });
     const { queryByLabelText, container } = render(
       <ThemeProvider theme={theme}>
         <TicketConversationActionBar
@@ -239,7 +245,39 @@ describe("TicketConversationActionBar menu mobile", () => {
     );
     expect(queryByLabelText(/mais ações|more actions/i)).toBeNull();
     expect(container.querySelector('[data-compact="false"]')).toBeTruthy();
+    expect(container.querySelector('[data-overflow-menu="false"]')).toBeTruthy();
     expect(container.textContent).toContain("crm-icon");
+  });
+
+  it("desktop split estreito usa menu ⋮ com Transferir/Resolver visíveis", () => {
+    useMediaQuery.mockReturnValue(false);
+    Object.defineProperty(window, "innerWidth", {
+      writable: true,
+      configurable: true,
+      value: 1440,
+    });
+    const { getByLabelText, getByText, getByTitle, getAllByText, queryByText, container } = render(
+      <ThemeProvider theme={theme}>
+        <TicketConversationActionBar
+          loading={false}
+          userProfile="admin"
+          showDelete={false}
+          ticketId={9}
+          onResolve={() => {}}
+          onReturn={() => {}}
+          onScheduleClick={() => {}}
+          onTransferClick={() => {}}
+          onDeleteClick={() => {}}
+          onQuickRepliesClick={() => {}}
+        />
+      </ThemeProvider>
+    );
+    expect(container.querySelector('[data-overflow-menu="true"]')).toBeTruthy();
+    expect(getByTitle(/transferir|transfer/i)).toBeTruthy();
+    expect(getByText(/resolver|resolve/i)).toBeTruthy();
+    expect(queryByText(/crm-icon/)).toBeNull();
+    fireEvent.click(getByLabelText(/mais ações|more actions/i));
+    expect(getAllByText(/histórico|flow history|retornar|return/i).length).toBeGreaterThan(0);
   });
 
   it("menuPaper tem overflow vertical seguro", () => {
@@ -270,6 +308,8 @@ describe("guards estruturais open/pending/group + viewport", () => {
     expect(src).toContain('ticket.status === "closed"');
     expect(src).toContain("isGroupConversation");
     expect(src).toContain("ticket-mobile-dialog-owners");
+    expect(src).toContain("needsDialogOwners");
+    expect(src).toContain("useDesktopConversationActionOverflow");
     expect(src).toContain("hideTrigger");
     expect(src).toContain("tagsOwnerRef");
     expect(src).toContain("crmOwnerRef");

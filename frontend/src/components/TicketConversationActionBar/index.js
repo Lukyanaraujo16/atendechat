@@ -26,6 +26,7 @@ import ButtonWithSpinner from "../ButtonWithSpinner";
 import TicketFlowExecutionLogModal from "../TicketFlowExecutionLogModal";
 import { Can } from "../Can";
 import useIsMobile from "../../hooks/useIsMobile";
+import useDesktopConversationActionOverflow from "../../hooks/useDesktopConversationActionOverflow";
 
 const MICRO_MS = 180;
 
@@ -40,6 +41,7 @@ const useStyles = makeStyles((theme) => ({
     marginRight: theme.spacing(0.5),
     gap: theme.spacing(0.5),
     minWidth: 0,
+    flexShrink: 0,
     [theme.breakpoints.down("xs")]: {
       overflowX: "auto",
       WebkitOverflowScrolling: "touch",
@@ -153,8 +155,9 @@ const ActionIconButton = ({
 
 /**
  * Barra de ações do ticket (status open).
- * Compact = mesmo predicado mobile do ticket (`useIsMobile` / down("md")).
- * Desktop: IconButtons; mobile: MenuItems rotulados via renderExtraMenuItems.
+ * Mobile: `useIsMobile` (menu ⋮ + ícones).
+ * Desktop split estreito: Transferir/Resolver visíveis + ⋮ (ações secundárias).
+ * Desktop largo: todos os ícones inline.
  */
 const TicketConversationActionBar = ({
   loading,
@@ -171,7 +174,10 @@ const TicketConversationActionBar = ({
   showDelete,
 }) => {
   const classes = useStyles();
-  const compact = useIsMobile();
+  const isMobile = useIsMobile();
+  const desktopOverflow = useDesktopConversationActionOverflow();
+  const useOverflowMenu = isMobile || desktopOverflow;
+  const compactPrimaryButtons = isMobile;
   const [menuAnchor, setMenuAnchor] = useState(null);
 
   const openMenu = (event) => setMenuAnchor(event.currentTarget);
@@ -296,7 +302,7 @@ const TicketConversationActionBar = ({
     );
 
   const extraMenuNodes =
-    compact && typeof renderExtraMenuItems === "function"
+    useOverflowMenu && typeof renderExtraMenuItems === "function"
       ? renderExtraMenuItems({
           closeMenu,
           runMenuAction,
@@ -307,8 +313,13 @@ const TicketConversationActionBar = ({
   const deleteMenuItem = renderMenuDeleteItem();
 
   return (
-    <div className={classes.root} data-ticket-action-bar data-compact={compact ? "true" : "false"}>
-      {!compact ? (
+    <div
+      className={classes.root}
+      data-ticket-action-bar
+      data-compact={compactPrimaryButtons ? "true" : "false"}
+      data-overflow-menu={useOverflowMenu ? "true" : "false"}
+    >
+      {!useOverflowMenu ? (
         <div className={classes.actionGroup}>
           {renderReturnIcon()}
           {renderFlowIcon()}
@@ -322,7 +333,7 @@ const TicketConversationActionBar = ({
 
       <div className={classes.actionGroup}>
         <Tooltip title={i18n.t("ticketOptionsMenu.transfer")}>
-          {compact ? (
+          {compactPrimaryButtons ? (
             <IconButton
               size="small"
               onClick={onTransferClick}
@@ -347,7 +358,7 @@ const TicketConversationActionBar = ({
 
         <Tooltip title={i18n.t("messagesList.header.buttons.resolve")}>
           <span>
-            {compact ? (
+            {compactPrimaryButtons ? (
               <ButtonWithSpinner
                 loading={loading}
                 size="small"
@@ -373,9 +384,9 @@ const TicketConversationActionBar = ({
           </span>
         </Tooltip>
 
-        {!compact ? deleteVisible : null}
+        {!useOverflowMenu ? deleteVisible : null}
 
-        {compact ? (
+        {useOverflowMenu ? (
           <Tooltip title={i18n.t("ticketOptionsMenu.moreActions")}>
             <IconButton
               size="small"
@@ -391,7 +402,7 @@ const TicketConversationActionBar = ({
         ) : null}
       </div>
 
-      {compact ? (
+      {useOverflowMenu ? (
         <Menu
           id="ticket-action-menu"
           anchorEl={menuAnchor}

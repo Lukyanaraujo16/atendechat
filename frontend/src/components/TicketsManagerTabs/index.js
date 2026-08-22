@@ -91,6 +91,7 @@ import {
 } from "../../utils/ticketSearchState";
 import {
   TICKETS_COMPACT_DESKTOP_MEDIA,
+  TICKETS_DESKTOP_SPLIT_MEDIA,
   formatInboxPillCount,
 } from "../../utils/ticketsCompactDesktopLayout";
 import useTicketsCompactDesktop from "../../hooks/useTicketsCompactDesktop";
@@ -330,7 +331,7 @@ const useStyles = makeStyles(theme => ({
 		alignItems: "center",
 		width: "100%",
 		borderBottom: getSubtleBorder(theme),
-		[TICKETS_COMPACT_DESKTOP_MEDIA]: {
+		[TICKETS_DESKTOP_SPLIT_MEDIA]: {
 			display: "grid",
 			gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
 			flexWrap: "nowrap",
@@ -346,11 +347,14 @@ const useStyles = makeStyles(theme => ({
 		transition: theme.transitions.create(["box-shadow", "border-color", "background-color"], {
 			duration: 200,
 		}),
-		[TICKETS_COMPACT_DESKTOP_MEDIA]: {
+		[TICKETS_DESKTOP_SPLIT_MEDIA]: {
 			fontSize: "0.72rem",
 			padding: "7px 8px",
 			minWidth: 0,
 			width: "100%",
+		},
+		[TICKETS_COMPACT_DESKTOP_MEDIA]: {
+			padding: "6px 6px",
 		},
 	},
 	statusPillBtn: {
@@ -360,7 +364,7 @@ const useStyles = makeStyles(theme => ({
 		alignItems: "center",
 		gap: theme.spacing(1),
 		justifyContent: "center",
-		[TICKETS_COMPACT_DESKTOP_MEDIA]: {
+		[TICKETS_DESKTOP_SPLIT_MEDIA]: {
 			gap: theme.spacing(0.5),
 			minWidth: 0,
 		},
@@ -368,7 +372,7 @@ const useStyles = makeStyles(theme => ({
 	statusPillIcon: {
 		fontSize: 16,
 		flexShrink: 0,
-		[TICKETS_COMPACT_DESKTOP_MEDIA]: {
+		[TICKETS_DESKTOP_SPLIT_MEDIA]: {
 			display: "none",
 		},
 	},
@@ -603,10 +607,10 @@ const InboxSubTabsPills = memo(function InboxSubTabsPills({
   classes,
 }) {
   const { openCount, pendingCount, chatbotCount } = useTicketsInboxMetrics();
-  const isCompactDesktop = useMediaQuery(TICKETS_COMPACT_DESKTOP_MEDIA);
+  const isDesktopSplit = useMediaQuery(TICKETS_DESKTOP_SPLIT_MEDIA);
   const isNarrow = useMediaQuery("(max-width:560px)");
   const automationsLabel =
-    isNarrow || isCompactDesktop
+    isNarrow || isDesktopSplit
       ? i18n.t("tickets.inbox.automations.short")
       : i18n.t("tickets.inbox.automations.label");
 

@@ -1,4 +1,5 @@
 import React, { useContext, useRef, useState } from "react";
+import clsx from "clsx";
 import { useHistory } from "react-router-dom";
 import { toast } from "react-toastify";
 
@@ -27,6 +28,7 @@ import { TicketsInboxContext } from "../../context/TicketsInboxContext";
 import TicketConversationActionBar from "../TicketConversationActionBar";
 import usePlanFlags from "../../hooks/usePlanFlags";
 import useIsMobile from "../../hooks/useIsMobile";
+import useDesktopConversationActionOverflow from "../../hooks/useDesktopConversationActionOverflow";
 import TicketCrmDealButton from "../Crm/TicketCrmDealButton";
 import TicketInventorySaleButton from "../Inventory/TicketInventorySaleButton";
 import { TicketTagsButton } from "../TagsContainer";
@@ -54,9 +56,18 @@ const useStyles = makeStyles((theme) => ({
   },
   legacyCluster: {
     marginRight: theme.spacing(0.5),
+    display: "flex",
+    flexWrap: "nowrap",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    minWidth: 0,
     "& > *": {
       margin: theme.spacing(0.5),
     },
+  },
+  legacyClusterOverflow: {
+    flexWrap: "wrap",
+    maxWidth: "100%",
   },
 }));
 
@@ -87,6 +98,11 @@ const TicketActionButtonsCustom = ({
   const { completeAcceptTicket } = useAcceptTicket();
   const isGroupConversation = isGroupTicket(ticket);
   const isMobile = useIsMobile();
+  const desktopOverflow = useDesktopConversationActionOverflow();
+  const needsDialogOwners = isMobile || desktopOverflow;
+  const legacyClusterClass = clsx(classes.legacyCluster, {
+    [classes.legacyClusterOverflow]: desktopOverflow,
+  });
   const tagsOwnerRef = useRef(null);
   const crmOwnerRef = useRef(null);
   const tagCount = Array.isArray(ticket?.tags) ? ticket.tags.length : 0;
@@ -171,7 +187,7 @@ const TicketActionButtonsCustom = ({
   if (isGroupConversation) {
     return (
       <div className={classes.actionButtons}>
-        <div className={classes.legacyCluster}>
+        <div className={legacyClusterClass}>
           <TicketTagsButton ticket={ticket} disabled={loading} />
           {contact?.id ? (
             <Tooltip
@@ -211,7 +227,7 @@ const TicketActionButtonsCustom = ({
   return (
     <div className={classes.actionButtons}>
       {ticket.status === "closed" && (
-        <div className={classes.legacyCluster}>
+        <div className={legacyClusterClass}>
           <TicketTagsButton ticket={ticket} disabled={loading} />
           <TicketInventorySaleButton disabled={loading} />
           <ButtonWithSpinner
@@ -228,7 +244,7 @@ const TicketActionButtonsCustom = ({
         <TicketActionModals ticket={ticket}>
           {({ openSchedule, openDelete }) => (
             <>
-              {isMobile ? (
+              {needsDialogOwners ? (
                 <span data-testid="ticket-mobile-dialog-owners" aria-hidden>
                   <TicketTagsButton
                     ref={tagsOwnerRef}
@@ -393,7 +409,7 @@ const TicketActionButtonsCustom = ({
           }}
         >
           {({ openDelete }) => (
-            <div className={classes.legacyCluster}>
+            <div className={legacyClusterClass}>
               <TicketTagsButton ticket={ticket} disabled={loading} />
               <TicketInventorySaleButton disabled={loading} />
               <ButtonWithSpinner

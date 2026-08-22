@@ -13,7 +13,7 @@ import { resolveTicketConversationBack } from "../../utils/ticketConversationRou
 
 const useStyles = makeStyles((theme) => ({
 	root: {
-		flex: 1,
+		flex: "1 1 auto",
 		minWidth: 0,
 		padding: theme.spacing(1.25, 2),
 		alignItems: "center",
@@ -31,6 +31,7 @@ const useStyles = makeStyles((theme) => ({
 	avatar: {
 		width: 44,
 		height: 44,
+		flexShrink: 0,
 		borderRadius: "50%",
 		overflow: "hidden",
 		border: `2px solid ${alpha(theme.palette.success.main, 0.35)}`,
@@ -85,14 +86,14 @@ const useStyles = makeStyles((theme) => ({
 	headerRow: {
 		display: "flex",
 		alignItems: "center",
-		flex: 1,
+		flex: "1 1 auto",
 		minWidth: 0,
 		width: "100%",
 		overflow: "hidden",
 	},
 	headerMain: {
-		flex: 1,
-		minWidth: 0,
+		flex: "1 1 auto",
+		minWidth: "7.5rem",
 		overflow: "hidden",
 	},
 	titleBlock: {

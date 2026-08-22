@@ -54,6 +54,7 @@ import { versionSystem } from "../../package.json";
 import { APP_HEADER_HEIGHT } from "./layoutConstants";
 import useIsMobile from "../hooks/useIsMobile";
 import Box from "@material-ui/core/Box";
+import { MainDrawerLayoutProvider } from "../context/MainDrawerLayout/MainDrawerLayoutContext";
 
 const drawerWidth = 299;
 
@@ -955,9 +956,13 @@ const LoggedInLayout = ({ children, themeToggle }) => {
 
         {children ? (
           isFullHeightModulePage ? (
-            <div className={classes.contentChildrenGrow}>{children}</div>
+            <MainDrawerLayoutProvider drawerOpen={drawerOpen}>
+              <div className={classes.contentChildrenGrow}>{children}</div>
+            </MainDrawerLayoutProvider>
           ) : (
-            children
+            <MainDrawerLayoutProvider drawerOpen={drawerOpen}>
+              {children}
+            </MainDrawerLayoutProvider>
           )
         ) : null}
       </main>
