@@ -24,7 +24,6 @@ import {
 
 import {
   AccessTime,
-  Block,
   Done,
   DoneAll,
   ExpandMore,
@@ -33,6 +32,12 @@ import {
 
 import MarkdownWrapper from "../MarkdownWrapper";
 import { getDisplayableMessageBody } from "../../utils/messages/isTechnicalMediaFallback";
+import {
+  shouldRenderChatMedia,
+  shouldShowMessageActionMenu,
+  shouldShowQuotedMessage,
+} from "../../utils/messages/messageChatPresentation";
+import DeletedMessageTombstone from "./DeletedMessageTombstone";
 import ModalImageCors from "../ModalImageCors";
 import MessageOptionsMenu from "../MessageOptionsMenu";
 import whatsBackground from "../../assets/wa-background.png";
@@ -580,6 +585,7 @@ const MessagesList = forwardRef(function MessagesList(
   };
 
   const handleOpenMessageOptionsMenu = (e, message) => {
+    if (!shouldShowMessageActionMenu(message)) return;
     setAnchorEl(e.currentTarget);
     setSelectedMessage(message);
   };
@@ -741,10 +747,9 @@ const MessagesList = forwardRef(function MessagesList(
     "instagram";
 
   const shouldRenderMessageMedia = (message) =>
-    Boolean(message.mediaUrl) ||
-    message.mediaType === "locationMessage" ||
-    message.mediaType === "vcard" ||
-    INSTAGRAM_INTERACTION_MEDIA_TYPES.has(message.mediaType);
+    shouldRenderChatMedia(message) ||
+    (!message.isDeleted &&
+      INSTAGRAM_INTERACTION_MEDIA_TYPES.has(message.mediaType));
 
   const INSTAGRAM_SHARE_CARD_COPY = {
     instagram_post: { icon: "📷", title: "Post compartilhado" },
@@ -1094,6 +1099,9 @@ const MessagesList = forwardRef(function MessagesList(
   };
 
   const renderQuotedMessage = (message) => {
+    const quoted = message.quotedMsg;
+    if (!quoted) return null;
+
     return (
       <div
         className={clsx(classes.quotedContainerLeft, {
@@ -1102,68 +1110,74 @@ const MessagesList = forwardRef(function MessagesList(
       >
         <span
           className={clsx(classes.quotedSideColorLeft, {
-            [classes.quotedSideColorRight]: message.quotedMsg?.fromMe,
+            [classes.quotedSideColorRight]: quoted.fromMe,
           })}
         ></span>
         <div className={classes.quotedMsg}>
-          {!message.quotedMsg?.fromMe && (
+          {quoted.isDeleted ? (
+            <DeletedMessageTombstone iconClassName={classes.deletedIcon} />
+          ) : (
+            <>
+          {!quoted.fromMe && (
             <span className={classes.messageContactName}>
               {isGroup
-                ? getGroupSenderDisplayName(message.quotedMsg)
-                : message.quotedMsg?.contact?.name}
+                ? getGroupSenderDisplayName(quoted)
+                : quoted.contact?.name}
             </span>
           )}
 
-          {message.quotedMsg.mediaType === "audio"
+          {quoted.mediaType === "audio"
             && (
               <div className={classes.downloadMedia}>
                 <audio
                   controls
-                  src={message.quotedMsg.mediaUrl}
+                  src={quoted.mediaUrl}
                   preload="metadata"
                 />
               </div>
             )
           }
-          {message.quotedMsg.mediaType === "video"
+          {quoted.mediaType === "video"
             && (
               <video
                 className={classes.messageMedia}
-                src={message.quotedMsg.mediaUrl}
+                src={quoted.mediaUrl}
                 controls
               />
             )
           }
-          {(message.quotedMsg.mediaType === "application" ||
-            message.quotedMsg.mediaType === "document") && (
+          {(quoted.mediaType === "application" ||
+            quoted.mediaType === "document") && (
               <div className={classes.downloadMedia}>
                 <Button
                   startIcon={<GetApp />}
                   color="primary"
                   variant="outlined"
                   target="_blank"
-                  href={message.quotedMsg.mediaUrl}
+                  href={quoted.mediaUrl}
                 >
-                  {message.quotedMsg.body || i18n.t("messagesList.header.buttons.download")}
+                  {quoted.body || i18n.t("messagesList.header.buttons.download")}
                 </Button>
               </div>
             )}
 
-          {(message.quotedMsg.mediaType === "chat" ||
-            message.quotedMsg.mediaType === "conversation" ||
-            !message.quotedMsg.mediaUrl) &&
-            getDisplayableMessageBody(message.quotedMsg) && (
-              <span>{getDisplayableMessageBody(message.quotedMsg)}</span>
+          {(quoted.mediaType === "chat" ||
+            quoted.mediaType === "conversation" ||
+            !quoted.mediaUrl) &&
+            getDisplayableMessageBody(quoted) && (
+              <span>{getDisplayableMessageBody(quoted)}</span>
             )}
 
-          {message.quotedMsg.mediaType === "image"
-            && (<ModalImageCors imageUrl={message.quotedMsg.mediaUrl} />)}
+          {quoted.mediaType === "image"
+            && (<ModalImageCors imageUrl={quoted.mediaUrl} />)}
 
-          {message.quotedMsg.mediaType === "contactMessage"
+          {quoted.mediaType === "contactMessage"
             && (
-                <span>{message.quotedMsg.body}</span>
+                <span>{quoted.body}</span>
               )
           }
+            </>
+          )}
         </div>
       </div>
     );
@@ -1181,16 +1195,17 @@ const MessagesList = forwardRef(function MessagesList(
               {renderNumberTicket(message, index)}
               {renderMessageDivider(message, index)}
               <div className={classes.messageCenter}>
+                {shouldShowMessageActionMenu(message) && (
                 <IconButton
                   variant="contained"
                   size="small"
                   id="messageActionsButton"
-                  disabled={message.isDeleted}
                   className={classes.messageActionsButton}
                   onClick={(e) => handleOpenMessageOptionsMenu(e, message)}
                 >
                   <ExpandMore />
                 </IconButton>
+                )}
                 {isGroup && (
                   <span className={classes.messageContactName}>
                     {getGroupSenderDisplayName(message)}
@@ -1213,39 +1228,35 @@ const MessagesList = forwardRef(function MessagesList(
               {renderNumberTicket(message, index)}
               {renderMessageDivider(message, index)}
               <div className={classes.messageLeft}>
+                {shouldShowMessageActionMenu(message) && (
                 <IconButton
                   variant="contained"
                   size="small"
                   id="messageActionsButton"
-                  disabled={message.isDeleted}
                   className={classes.messageActionsButton}
                   onClick={(e) => handleOpenMessageOptionsMenu(e, message)}
                 >
                   <ExpandMore />
                 </IconButton>
+                )}
                 {isGroup && (
                   <span className={classes.messageContactName}>
                     {getGroupSenderDisplayName(message)}
                   </span>
                 )}
 
-                {/* aviso de mensagem apagado pelo contato */}
-                {message.isDeleted && (
-                  <div>
-                    <span className={"message-deleted"}
-                    >{i18n.t("messagesList.deletedMessage")} &nbsp;
-                      <Block
-                        color="error"
-                        fontSize="small"
-                        className={classes.deletedIcon}
-                      />
-                    </span>
-                  </div>
-                )}
-
                 {shouldRenderMessageMedia(message) && checkMessageMedia(message)}
-                <div className={classes.textContentItem}>
-                  {message.quotedMsg && renderQuotedMessage(message)}
+                <div
+                  className={clsx(classes.textContentItem, {
+                    [classes.textContentItemDeleted]: message.isDeleted,
+                  })}
+                >
+                  {message.isDeleted && (
+                    <DeletedMessageTombstone
+                      iconClassName={classes.deletedIcon}
+                    />
+                  )}
+                  {shouldShowQuotedMessage(message) && renderQuotedMessage(message)}
                   {renderMessageBody(message)}
                   <span className={classes.timestamp}>
 				    {message.isEdited && <span>Editada </span>}
@@ -1262,16 +1273,17 @@ const MessagesList = forwardRef(function MessagesList(
               {renderNumberTicket(message, index)}
               {renderMessageDivider(message, index)}
               <div className={classes.messageRight}>
+                {shouldShowMessageActionMenu(message) && (
                 <IconButton
                   variant="contained"
                   size="small"
                   id="messageActionsButton"
-                  disabled={message.isDeleted}
                   className={classes.messageActionsButton}
                   onClick={(e) => handleOpenMessageOptionsMenu(e, message)}
                 >
                   <ExpandMore />
                 </IconButton>
+                )}
                 {shouldRenderMessageMedia(message) && checkMessageMedia(message)}
                 <div
                   className={clsx(classes.textContentItem, {
@@ -1280,13 +1292,11 @@ const MessagesList = forwardRef(function MessagesList(
                   })}
                 >
                   {message.isDeleted && (
-                    <Block
-                      color="disabled"
-                      fontSize="small"
-                      className={classes.deletedIcon}
+                    <DeletedMessageTombstone
+                      iconClassName={classes.deletedIcon}
                     />
                   )}
-                  {message.quotedMsg && renderQuotedMessage(message)}
+                  {shouldShowQuotedMessage(message) && renderQuotedMessage(message)}
                   {renderMessageBody(message)}
                   <span className={classes.timestamp}>
 				    {message.isEdited && <span>{i18n.t("messagesList.edited")}</span>}

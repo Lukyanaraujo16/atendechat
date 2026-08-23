@@ -7522,6 +7522,7 @@ const messages = {
         },
         lostCall: "Chamada de voz/vídeo perdida às",
         deletedMessage: "Essa mensagem foi apagada pelo contato",
+        messageDeleted: "Mensagem apagada",
         edited: "Editada",
         saudation: "Diga olá para seu novo contato!",
       },

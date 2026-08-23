@@ -33,6 +33,50 @@ const MEDIA_TYPES_WITH_URL = new Set([
   "document",
 ]);
 
+/** Tipos em que o filename não deve virar legenda no balão. Documentos continuam com nome. */
+const TYPES_HIDE_FILENAME_CAPTION = new Set(["image", "sticker"]);
+
+const IMAGE_FILENAME_ONLY = /^[^/\s]+\.(png|jpe?g|gif|webp|bmp|heic|heif|svg)$/i;
+
+export function mediaUrlBasename(mediaUrl) {
+  if (!mediaUrl) return "";
+  try {
+    const withoutQuery = String(mediaUrl).split("?")[0].split("#")[0];
+    const parts = withoutQuery.split("/");
+    return decodeURIComponent(parts[parts.length - 1] || "");
+  } catch (_err) {
+    return "";
+  }
+}
+
+/**
+ * Filename técnico (originalname / basename da URL / sentinela "-") usado como body.
+ * Não se aplica a documentos: o nome do arquivo continua visível.
+ */
+export function isTechnicalFilenameCaption(body, message) {
+  if (!message || !TYPES_HIDE_FILENAME_CAPTION.has(message.mediaType)) {
+    return false;
+  }
+  const trimmed = String(body ?? "").trim();
+  if (!trimmed || trimmed === "-") {
+    return true;
+  }
+
+  const urlName = mediaUrlBasename(message.mediaUrl);
+  if (urlName && trimmed.toLowerCase() === urlName.toLowerCase()) {
+    return true;
+  }
+
+  if (/\s/.test(trimmed)) {
+    return false;
+  }
+
+  if (message.mediaType === "image" || message.mediaType === "sticker") {
+    return IMAGE_FILENAME_ONLY.test(trimmed);
+  }
+  return false;
+}
+
 /**
  * @param {string|null|undefined} text
  * @param {string|null|undefined} [mediaType]
@@ -69,10 +113,15 @@ export function isTechnicalMediaFallback(text, mediaType) {
  */
 export function getDisplayableMessageBody(message) {
   if (!message) return null;
+  if (message.isDeleted) return null;
 
   const { body, mediaType, mediaUrl } = message;
 
   if (body == null || String(body).trim() === "") {
+    return null;
+  }
+
+  if (isTechnicalFilenameCaption(body, message)) {
     return null;
   }
 

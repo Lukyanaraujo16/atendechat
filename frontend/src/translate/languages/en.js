@@ -7355,6 +7355,7 @@ const messages = {
 				},
 				lostCall: "Missed voice/video call at",
 				deletedMessage: "This message was deleted by the contact",
+				messageDeleted: "Deleted message",
 				edited: "Edited",
 				saudation: "Say hello to your new contact!",
 			},

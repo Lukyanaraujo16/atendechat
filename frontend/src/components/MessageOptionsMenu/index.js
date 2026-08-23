@@ -69,6 +69,10 @@ const MessageOptionsMenu = ({ message, menuOpen, handleClose, anchorEl }) => {
 		}
 	};
 
+	if (message?.isDeleted) {
+		return null;
+	}
+
 	return (
 		<>
 			<ConfirmationModal

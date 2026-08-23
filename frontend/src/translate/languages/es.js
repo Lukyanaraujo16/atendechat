@@ -6683,6 +6683,7 @@ const messages = {
         },
         lostCall: "Llamada de voz/video perdida a las",
         deletedMessage: "Este mensaje fue borrado por el contacto",
+        messageDeleted: "Mensaje eliminado",
         edited: "Editado",
         saudation: "¡Saluda a tu nuevo contacto!",
       },
