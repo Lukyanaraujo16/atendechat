@@ -10,7 +10,7 @@ import {
 } from "./inventoryPaymentHelpers";
 import {
   findInventorySaleOrThrow,
-  inventorySaleIncludes,
+  buildInventorySaleIncludes,
   toMoney
 } from "./inventorySaleHelpers";
 import { normalizeOptionalString } from "./inventoryTenant";
@@ -108,5 +108,5 @@ export default async function UpdateInventorySalePaymentService(input: {
   }
 
   await sale.update(patch);
-  return sale.reload({ include: inventorySaleIncludes });
+  return sale.reload({ include: buildInventorySaleIncludes(input.companyId) });
 }

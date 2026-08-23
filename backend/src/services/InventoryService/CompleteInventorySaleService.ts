@@ -1,4 +1,4 @@
-import { Transaction } from "sequelize";
+import { Transaction, Op } from "sequelize";
 import sequelize from "../../database";
 import AppError from "../../errors/AppError";
 import InventorySettings from "../../models/InventorySettings";
@@ -7,11 +7,12 @@ import InventorySaleItem from "../../models/InventorySaleItem";
 import InventoryProduct from "../../models/InventoryProduct";
 import InventoryStockMovement from "../../models/InventoryStockMovement";
 import InventorySellerProfile from "../../models/InventorySellerProfile";
+import InventorySaleItemIdentifier from "../../models/InventorySaleItemIdentifier";
 import GetOrCreateInventorySettingsService from "./GetOrCreateInventorySettingsService";
 import {
   assertInventorySaleIsDraft,
   assertInventoryUserInCompany,
-  inventorySaleIncludes,
+  buildInventorySaleIncludes,
   recalculateInventorySaleTotals,
   roundMoney,
   toMoney
@@ -21,6 +22,7 @@ import {
   derivePaymentStatusFromAmount,
   resolvePaidAtForPaymentUpdate
 } from "./inventoryPaymentHelpers";
+import { assertIdentifiersForCompleteSale } from "./inventorySaleItemIdentifiers";
 
 export default async function CompleteInventorySaleService(input: {
   companyId: number;
@@ -79,7 +81,45 @@ export default async function CompleteInventorySaleService(input: {
       );
     }
 
-    let sellerUserId = sale.sellerUserId;
+    const identifiers = await InventorySaleItemIdentifier.findAll({
+      where: {
+        companyId: input.companyId,
+        saleItemId: items.map(item => item.id)
+      },
+      transaction: t
+    });
+
+    const strayIdentifiers = await InventorySaleItemIdentifier.count({
+      where: {
+        saleItemId: items.map(item => item.id),
+        companyId: { [Op.ne]: input.companyId }
+      },
+      transaction: t
+    });
+    if (strayIdentifiers > 0) {
+      throw new AppError(
+        "ERR_INVENTORY_SALE_IDENTIFIER_COMPANY_MISMATCH",
+        403,
+        "Identificador não pertence à empresa da venda."
+      );
+    }
+
+    assertIdentifiersForCompleteSale({
+      companyId: input.companyId,
+      items: items.map(item => ({
+        id: item.id,
+        companyId: item.companyId,
+        quantity: item.quantity
+      })),
+      identifiers: identifiers.map(row => ({
+        companyId: row.companyId,
+        saleItemId: row.saleItemId,
+        position: row.position,
+        identifier: row.identifier
+      }))
+    });
+
+    let { sellerUserId } = sale;
     if (input.sellerUserId !== undefined && input.sellerUserId !== null) {
       sellerUserId = Number(input.sellerUserId);
     }
@@ -175,13 +215,19 @@ export default async function CompleteInventorySaleService(input: {
     const totalAmount = toMoney(sale.totalAmount);
     const commissionAmount = roundMoney((totalAmount * commissionRate) / 100);
     const paidAmount = toMoney(sale.paidAmount);
-    const paymentStatus = derivePaymentStatusFromAmount(paidAmount, totalAmount);
+    const paymentStatus = derivePaymentStatusFromAmount(
+      paidAmount,
+      totalAmount
+    );
     const paidAt = resolvePaidAtForPaymentUpdate({
       paymentStatus,
       existingPaidAt: sale.paidAt
     });
 
-    await settings.update({ nextSaleNumber: saleNumber + 1 }, { transaction: t });
+    await settings.update(
+      { nextSaleNumber: saleNumber + 1 },
+      { transaction: t }
+    );
 
     await sale.update(
       {
@@ -198,6 +244,9 @@ export default async function CompleteInventorySaleService(input: {
       { transaction: t }
     );
 
-    return sale.reload({ transaction: t, include: inventorySaleIncludes });
+    return sale.reload({
+      transaction: t,
+      include: buildInventorySaleIncludes(input.companyId)
+    });
   });
 }

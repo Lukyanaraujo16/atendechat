@@ -2,8 +2,8 @@ import AppError from "../../errors/AppError";
 import InventorySale from "../../models/InventorySale";
 import {
   assertInventorySaleIsDraft,
+  buildInventorySaleIncludes,
   findInventorySaleOrThrow,
-  inventorySaleIncludes,
   parseOptionalId,
   validateInventorySaleLinks
 } from "./inventorySaleHelpers";
@@ -66,9 +66,13 @@ export default async function UpdateInventorySaleService(input: {
   }
 
   if (Object.keys(patch).length === 0) {
-    return sale.reload({ include: inventorySaleIncludes });
+    return sale.reload({
+      include: buildInventorySaleIncludes(input.companyId)
+    });
   }
 
   await sale.update(patch);
-  return sale.reload({ include: inventorySaleIncludes });
+  return sale.reload({
+    include: buildInventorySaleIncludes(input.companyId)
+  });
 }

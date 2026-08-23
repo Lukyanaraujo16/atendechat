@@ -5,9 +5,7 @@ import InventorySale from "../../models/InventorySale";
 import InventorySaleItem from "../../models/InventorySaleItem";
 import InventoryProduct from "../../models/InventoryProduct";
 import InventoryStockMovement from "../../models/InventoryStockMovement";
-import {
-  inventorySaleIncludes
-} from "./inventorySaleHelpers";
+import { buildInventorySaleIncludes } from "./inventorySaleHelpers";
 import { normalizeOptionalString, toInventoryQuantity } from "./inventoryTenant";
 
 export default async function CancelInventorySaleService(input: {
@@ -119,6 +117,9 @@ export default async function CancelInventorySaleService(input: {
       { transaction: t }
     );
 
-    return sale.reload({ transaction: t, include: inventorySaleIncludes });
+    return sale.reload({
+      transaction: t,
+      include: buildInventorySaleIncludes(input.companyId)
+    });
   });
 }

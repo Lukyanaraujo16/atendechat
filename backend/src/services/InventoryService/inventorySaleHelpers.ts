@@ -1,4 +1,4 @@
-import { Transaction } from "sequelize";
+import { FindOptions, Transaction } from "sequelize";
 import AppError from "../../errors/AppError";
 import Contact from "../../models/Contact";
 import Ticket from "../../models/Ticket";
@@ -6,70 +6,62 @@ import User from "../../models/User";
 import InventorySale, { InventorySaleStatus } from "../../models/InventorySale";
 import InventorySaleItem from "../../models/InventorySaleItem";
 import InventoryProduct from "../../models/InventoryProduct";
+import { buildInventorySaleItemIdentifierInclude } from "./inventorySaleItemIdentifiers";
 
-export function cloneInventorySaleIncludes() {
-  return inventorySaleIncludes.map((inc) => {
-    const cloned: Record<string, unknown> = { ...inc };
-    if (Array.isArray(cloned.include)) {
-      cloned.include = (cloned.include as Record<string, unknown>[]).map(
-        (sub) => ({ ...sub })
-      );
+export function buildInventorySaleIncludes(companyId: number) {
+  return [
+    {
+      model: Contact,
+      attributes: ["id", "name", "number"],
+      required: false
+    },
+    {
+      model: Ticket,
+      attributes: ["id", "status", "contactId"],
+      required: false
+    },
+    {
+      model: User,
+      as: "seller",
+      attributes: ["id", "name", "email"],
+      required: false
+    },
+    {
+      model: User,
+      as: "creator",
+      attributes: ["id", "name"],
+      required: false
+    },
+    {
+      model: User,
+      as: "canceller",
+      attributes: ["id", "name"],
+      required: false
+    },
+    {
+      model: InventorySaleItem,
+      as: "items",
+      required: false,
+      include: [
+        {
+          model: InventoryProduct,
+          attributes: ["id", "name", "sku", "active"],
+          required: false
+        },
+        buildInventorySaleItemIdentifierInclude(companyId)
+      ]
     }
-    return cloned;
-  });
+  ];
 }
 
-/** Remove filtros acidentais no include partilhado (ex.: após pesquisa em listagens). */
+export function cloneInventorySaleIncludes(companyId: number) {
+  return buildInventorySaleIncludes(companyId);
+}
+
+/** Includes passam a ser construídos por request; não há filtro partilhado a limpar. */
 export function resetInventorySaleIncludesContactFilter(): void {
-  const contactInc = inventorySaleIncludes.find((inc) => inc.model === Contact);
-  if (contactInc) {
-    delete (contactInc as { where?: unknown }).where;
-    (contactInc as { required?: boolean }).required = false;
-  }
+  return undefined;
 }
-
-export const inventorySaleIncludes = [
-  {
-    model: Contact,
-    attributes: ["id", "name", "number"],
-    required: false
-  },
-  {
-    model: Ticket,
-    attributes: ["id", "status", "contactId"],
-    required: false
-  },
-  {
-    model: User,
-    as: "seller",
-    attributes: ["id", "name", "email"],
-    required: false
-  },
-  {
-    model: User,
-    as: "creator",
-    attributes: ["id", "name"],
-    required: false
-  },
-  {
-    model: User,
-    as: "canceller",
-    attributes: ["id", "name"],
-    required: false
-  },
-  {
-    model: InventorySaleItem,
-    as: "items",
-    required: false,
-    include: [
-      {
-        model: InventoryProduct,
-        attributes: ["id", "name", "sku", "active"],
-        required: false
-      }
-    ]
-  }
-];
 
 export function toMoney(value: string | number): number {
   const n = Number(value);
@@ -91,12 +83,17 @@ export function computeLineTotal(
 export async function findInventorySaleOrThrow(
   companyId: number,
   id: number,
-  transaction?: Transaction
+  transaction?: Transaction,
+  lock?: FindOptions["lock"]
 ): Promise<InventorySale> {
-  const sale = await InventorySale.findOne({
+  const options: FindOptions = {
     where: { id, companyId },
     transaction
-  });
+  };
+  if (lock) {
+    options.lock = lock;
+  }
+  const sale = await InventorySale.findOne(options);
   if (!sale) {
     throw new AppError("ERR_INVENTORY_SALE_NOT_FOUND", 404);
   }

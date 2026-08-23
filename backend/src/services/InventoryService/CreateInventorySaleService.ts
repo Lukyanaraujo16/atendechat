@@ -2,7 +2,7 @@ import sequelize from "../../database";
 import AppError from "../../errors/AppError";
 import InventorySale from "../../models/InventorySale";
 import {
-  inventorySaleIncludes,
+  buildInventorySaleIncludes,
   parseOptionalId,
   validateInventorySaleLinks
 } from "./inventorySaleHelpers";
@@ -45,7 +45,7 @@ export default async function CreateInventorySaleService(input: {
 
   const notes = normalizeOptionalString(input.body.notes);
 
-  return sequelize.transaction(async (t) => {
+  return sequelize.transaction(async t => {
     const sale = await InventorySale.create(
       {
         companyId: input.companyId,
@@ -66,6 +66,9 @@ export default async function CreateInventorySaleService(input: {
 
     await sale.update({ saleNumber: -sale.id }, { transaction: t });
 
-    return sale.reload({ transaction: t, include: inventorySaleIncludes });
+    return sale.reload({
+      transaction: t,
+      include: buildInventorySaleIncludes(input.companyId)
+    });
   });
 }

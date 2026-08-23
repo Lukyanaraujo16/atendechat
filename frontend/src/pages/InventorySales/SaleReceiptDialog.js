@@ -29,6 +29,7 @@ import {
   getSaleDisplayDate,
   toNumber,
 } from "./utils";
+import { identifiersFromSaleItem } from "./saleItemIdentifiers";
 
 const useStyles = makeStyles((theme) => ({
   receiptRoot: {
@@ -110,6 +111,26 @@ const useStyles = makeStyles((theme) => ({
     color: "#777",
     marginTop: 2,
   },
+  identifiersBlock: {
+    marginTop: 6,
+    minWidth: 0,
+    maxWidth: "100%",
+  },
+  identifierLine: {
+    display: "block",
+    fontSize: "0.75rem",
+    color: "#444",
+    wordBreak: "break-word",
+    overflowWrap: "anywhere",
+    whiteSpace: "normal",
+  },
+  identifierTitle: {
+    display: "block",
+    fontSize: "0.6875rem",
+    fontWeight: 600,
+    color: "#555",
+    marginBottom: 2,
+  },
   totalsBox: {
     marginTop: theme.spacing(2),
     paddingTop: theme.spacing(2),
@@ -165,6 +186,29 @@ function displayValue(value, fallback = "—") {
 
 function getItemName(item) {
   return item?.productName || item?.product?.name || "—";
+}
+
+function ReceiptItemIdentifiers({ item, classes }) {
+  const filled = identifiersFromSaleItem(item);
+  if (!filled.length) return null;
+  return (
+    <div
+      className={classes.identifiersBlock}
+      data-testid={`sale-receipt-item-identifiers-${item.id}`}
+    >
+      <span className={classes.identifierTitle}>
+        {i18n.t("inventorySales.sales.items.identifiers.listTitle")}
+      </span>
+      {filled.map((row) => (
+        <span
+          key={row.position}
+          className={classes.identifierLine}
+        >
+          - {row.identifier}
+        </span>
+      ))}
+    </div>
+  );
 }
 
 function getPendingAmount(sale) {
@@ -280,6 +324,7 @@ export default function SaleReceiptDialog({ open, onClose, sale }) {
                 {i18n.t("inventorySales.sales.receipt.columns.total")}:{" "}
                 {formatCurrencyBRL(item.totalAmount)}
               </Typography>
+              <ReceiptItemIdentifiers item={item} classes={classes} />
             </div>
           ))}
         </Box>
@@ -313,6 +358,7 @@ export default function SaleReceiptDialog({ open, onClose, sale }) {
                     {item.productSku ? (
                       <span className={classes.productSku}>{item.productSku}</span>
                     ) : null}
+                    <ReceiptItemIdentifiers item={item} classes={classes} />
                   </TableCell>
                   <TableCell align="right">
                     {formatQuantity(item.quantity)} {item.unit || ""}

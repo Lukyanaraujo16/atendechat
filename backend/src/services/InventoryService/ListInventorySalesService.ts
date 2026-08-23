@@ -81,7 +81,7 @@ export default async function ListInventorySalesService(input: {
     input.search != null && String(input.search).trim() !== ""
       ? String(input.search).trim()
       : "";
-  const include = cloneInventorySaleIncludes();
+  const include = cloneInventorySaleIncludes(input.companyId);
   if (search) {
     const or: any[] = [
       { notes: { [Op.like]: `%${search}%` } },

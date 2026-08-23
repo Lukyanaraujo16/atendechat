@@ -524,6 +524,24 @@ const messages = {
               updated: "Item atualizado.",
               removed: "Item removido.",
             },
+            identifiers: {
+              title: "Identificação da unidade",
+              hint:
+                "Ex.: número de série, IMEI, MAC, chassi ou código de fabricação.",
+              unitLabel: "Unidade {{position}}",
+              add: "Adicionar identificação",
+              remove: "Remover identificação",
+              duplicate:
+                "Esta identificação já foi usada em outra unidade deste item.",
+              integerOnly:
+                "Identificação por unidade disponível apenas para quantidades inteiras.",
+              fractionalNeedsClear:
+                "Remova as identificações das unidades antes de usar uma quantidade fracionária.",
+              removeAll: "Remover todas as identificações",
+              listTitle: "Identificações",
+              reduceQuantity:
+                "Remova a identificação da unidade {{position}} antes de reduzir a quantidade.",
+            },
           },
           toasts: {
             created: "Venda criada.",

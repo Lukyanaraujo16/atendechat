@@ -8,6 +8,7 @@ import {
   AutoIncrement,
   ForeignKey,
   BelongsTo,
+  HasMany,
   AllowNull,
   Default,
   DataType
@@ -15,6 +16,7 @@ import {
 import Company from "./Company";
 import InventorySale from "./InventorySale";
 import InventoryProduct from "./InventoryProduct";
+import InventorySaleItemIdentifier from "./InventorySaleItemIdentifier";
 
 @Table({
   tableName: "InventorySaleItems",
@@ -86,6 +88,15 @@ class InventorySaleItem extends Model<InventorySaleItem> {
   @Default(true)
   @Column
   trackStock: boolean;
+
+  @HasMany(() => InventorySaleItemIdentifier, {
+    as: "identifiers",
+    foreignKey: "saleItemId",
+    onUpdate: "CASCADE",
+    onDelete: "CASCADE",
+    hooks: true
+  })
+  identifiers: InventorySaleItemIdentifier[];
 
   @CreatedAt
   createdAt: Date;

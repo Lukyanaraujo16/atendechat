@@ -522,6 +522,24 @@ const messages = {
 							updated: "Item updated.",
 							removed: "Item removed.",
 						},
+						identifiers: {
+							title: "Unit identification",
+							hint:
+								"E.g. serial number, IMEI, MAC, chassis or manufacturing code.",
+							unitLabel: "Unit {{position}}",
+							add: "Add identification",
+							remove: "Remove identification",
+							duplicate:
+								"This identification is already used on another unit of this item.",
+							integerOnly:
+								"Per-unit identification is available only for whole quantities.",
+							fractionalNeedsClear:
+								"Remove the unit identifications before using a fractional quantity.",
+							removeAll: "Remove all identifications",
+							listTitle: "Identifications",
+							reduceQuantity:
+								"Remove the identification of unit {{position}} before reducing the quantity.",
+						},
 					},
 					toasts: {
 						created: "Sale created.",

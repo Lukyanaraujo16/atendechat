@@ -83,6 +83,7 @@ import InventoryStockMovement from "../models/InventoryStockMovement";
 import InventorySellerProfile from "../models/InventorySellerProfile";
 import InventorySale from "../models/InventorySale";
 import InventorySaleItem from "../models/InventorySaleItem";
+import InventorySaleItemIdentifier from "../models/InventorySaleItemIdentifier";
 import AiAgent from "../models/AiAgent";
 import AiAgentProfile from "../models/AiAgentProfile";
 import AiAgentRuntimeLog from "../models/AiAgentRuntimeLog";
@@ -226,6 +227,7 @@ const models = [
   InventorySellerProfile,
   InventorySale,
   InventorySaleItem,
+  InventorySaleItemIdentifier,
   AiAgent,
   AiAgentProfile,
   AiAgentRuntimeLog,

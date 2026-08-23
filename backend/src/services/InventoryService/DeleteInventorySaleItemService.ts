@@ -1,3 +1,4 @@
+import sequelize from "../../database";
 import AppError from "../../errors/AppError";
 import InventorySaleItem from "../../models/InventorySaleItem";
 import {
@@ -11,16 +12,27 @@ export default async function DeleteInventorySaleItemService(input: {
   saleId: number;
   itemId: number;
 }): Promise<void> {
-  const sale = await findInventorySaleOrThrow(input.companyId, input.saleId);
-  assertInventorySaleIsDraft(sale, "ter itens removidos");
+  await sequelize.transaction(async t => {
+    const sale = await findInventorySaleOrThrow(
+      input.companyId,
+      input.saleId,
+      t
+    );
+    assertInventorySaleIsDraft(sale, "ter itens removidos");
 
-  const item = await InventorySaleItem.findOne({
-    where: { id: input.itemId, saleId: input.saleId, companyId: input.companyId }
+    const item = await InventorySaleItem.findOne({
+      where: {
+        id: input.itemId,
+        saleId: input.saleId,
+        companyId: input.companyId
+      },
+      transaction: t
+    });
+    if (!item) {
+      throw new AppError("ERR_INVENTORY_SALE_ITEM_NOT_FOUND", 404);
+    }
+
+    await item.destroy({ transaction: t });
+    await recalculateInventorySaleTotals(sale.id, input.companyId, t);
   });
-  if (!item) {
-    throw new AppError("ERR_INVENTORY_SALE_ITEM_NOT_FOUND", 404);
-  }
-
-  await item.destroy();
-  await recalculateInventorySaleTotals(sale.id, input.companyId);
 }

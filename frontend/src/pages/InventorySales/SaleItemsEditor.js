@@ -36,13 +36,53 @@ import { i18n } from "../../translate/i18n";
 import useIsMobile from "../../hooks/useIsMobile";
 import { formatCurrencyBRL, parseBrazilianCurrencyToNumber } from "../../utils/brazilianCurrency";
 import { formatQuantity, toNumber } from "./utils";
+import SaleItemIdentifiersEditor from "./SaleItemIdentifiersEditor";
+import SaleItemIdentifiersList from "./SaleItemIdentifiersList";
+import {
+  buildCreateIdentifiersField,
+  buildUpdateIdentifiersField,
+  emptyIdentifierDraft,
+  hasFilledIdentifiers,
+  identifierDraftFromItem,
+  identifierPayloadsEqual,
+  identifierValuesFromItem,
+  validateIdentifiersForSubmit,
+} from "./saleItemIdentifiers";
 
 const emptyAddForm = {
   productId: "",
   quantity: "1",
   unitPrice: "",
   discountAmount: "0",
+  ...emptyIdentifierDraft(),
 };
+
+function toastIdentifierValidation(result) {
+  if (!result || result.ok) return false;
+  if (result.code === "duplicate") {
+    toast.error(i18n.t("inventorySales.sales.items.identifiers.duplicate"));
+    return true;
+  }
+  if (result.code === "reduceQuantity") {
+    toast.error(
+      i18n.t("inventorySales.sales.items.identifiers.reduceQuantity", {
+        position: result.position,
+      })
+    );
+    return true;
+  }
+  if (result.code === "integerOnly") {
+    toast.error(i18n.t("inventorySales.sales.items.identifiers.integerOnly"));
+    return true;
+  }
+  if (result.code === "fractionalNeedsClear") {
+    toast.error(
+      i18n.t("inventorySales.sales.items.identifiers.fractionalNeedsClear")
+    );
+    return true;
+  }
+  return true;
+}
 
 export default function SaleItemsEditor({
   sale,
@@ -55,39 +95,78 @@ export default function SaleItemsEditor({
   const [adding, setAdding] = useState(false);
   const [rowSaving, setRowSaving] = useState(null);
   const [rowDrafts, setRowDrafts] = useState({});
+  const [expandedByItemId, setExpandedByItemId] = useState({});
+  const [addIdentifiersExpanded, setAddIdentifiersExpanded] = useState(false);
 
   const items = Array.isArray(sale?.items) ? sale.items : [];
   const activeProducts = (products || []).filter((p) => p.active !== false);
 
   const getRowDraft = (item) => {
+    const identifierDefaults = identifierDraftFromItem(item);
     if (!item?.id) {
-      return { quantity: "", unitPrice: "", discountAmount: "0" };
+      return {
+        quantity: "",
+        unitPrice: "",
+        discountAmount: "0",
+        ...identifierDefaults,
+      };
     }
-    if (rowDrafts[item.id]) return rowDrafts[item.id];
     return {
       quantity: String(item.quantity ?? ""),
       unitPrice: String(item.unitPrice ?? ""),
       discountAmount: String(item.discountAmount ?? "0"),
+      ...identifierDefaults,
+      ...rowDrafts[item.id],
     };
   };
 
-  const setRowField = (itemId, field, value) => {
+  const patchRowDraft = (itemId, patch) => {
     const item = items.find((i) => i.id === itemId);
     const base = item
       ? {
           quantity: String(item.quantity ?? ""),
           unitPrice: String(item.unitPrice ?? ""),
           discountAmount: String(item.discountAmount ?? "0"),
+          ...identifierDraftFromItem(item),
         }
-      : { quantity: "", unitPrice: "", discountAmount: "0" };
+      : {
+          quantity: "",
+          unitPrice: "",
+          discountAmount: "0",
+          ...emptyIdentifierDraft(),
+        };
     setRowDrafts((prev) => ({
       ...prev,
       [itemId]: {
         ...base,
         ...prev[itemId],
-        [field]: value,
+        ...patch,
       },
     }));
+  };
+
+  const setRowField = (itemId, field, value) => {
+    patchRowDraft(itemId, { [field]: value });
+  };
+
+  const isIdentifiersExpanded = (item) => {
+    if (expandedByItemId[item.id] !== undefined) return expandedByItemId[item.id];
+    return hasFilledIdentifiers(getRowDraft(item).identifierValues);
+  };
+
+  const handleQuantityBlur = (item) => {
+    const draft = getRowDraft(item);
+    const result = validateIdentifiersForSubmit({
+      quantity: draft.quantity,
+      values: draft.identifierValues,
+    });
+    if (
+      result.code === "reduceQuantity" ||
+      result.code === "integerOnly" ||
+      result.code === "fractionalNeedsClear"
+    ) {
+      toastIdentifierValidation(result);
+    }
   };
 
   const handleAddItem = async () => {
@@ -100,6 +179,15 @@ export default function SaleItemsEditor({
     const quantity = Number(addForm.quantity);
     if (!Number.isFinite(quantity) || quantity <= 0) {
       toast.error(i18n.t("inventorySales.sales.items.validation.quantity"));
+      return;
+    }
+
+    const identifierCheck = validateIdentifiersForSubmit({
+      quantity,
+      values: addForm.identifierValues,
+    });
+    if (!identifierCheck.ok) {
+      toastIdentifierValidation(identifierCheck);
       return;
     }
 
@@ -117,11 +205,20 @@ export default function SaleItemsEditor({
       payload.discountAmount = discount;
     }
 
+    const identifiersField = buildCreateIdentifiersField({
+      quantity,
+      values: addForm.identifierValues,
+    });
+    if (identifiersField.include) {
+      payload.identifiers = identifiersField.identifiers;
+    }
+
     setAdding(true);
     try {
       await addInventorySaleItem(sale.id, payload);
       toast.success(i18n.t("inventorySales.sales.items.toasts.added"));
       setAddForm(emptyAddForm);
+      setAddIdentifiersExpanded(false);
       if (onSaleUpdated) await onSaleUpdated();
     } catch (err) {
       toastError(err);
@@ -146,13 +243,33 @@ export default function SaleItemsEditor({
     const discountAmount =
       parseBrazilianCurrencyToNumber(draft.discountAmount) ?? 0;
 
+    const identifierCheck = validateIdentifiersForSubmit({
+      quantity,
+      values: draft.identifierValues,
+    });
+    if (!identifierCheck.ok) {
+      toastIdentifierValidation(identifierCheck);
+      return;
+    }
+
+    const payload = {
+      quantity,
+      unitPrice,
+      discountAmount,
+    };
+    const identifiersField = buildUpdateIdentifiersField({
+      identifiersTouched: draft.identifiersTouched,
+      quantity,
+      values: draft.identifierValues,
+      originalValues: identifierValuesFromItem(item),
+    });
+    if (identifiersField.include) {
+      payload.identifiers = identifiersField.identifiers;
+    }
+
     setRowSaving(item.id);
     try {
-      await updateInventorySaleItem(sale.id, item.id, {
-        quantity,
-        unitPrice,
-        discountAmount,
-      });
+      await updateInventorySaleItem(sale.id, item.id, payload);
       toast.success(i18n.t("inventorySales.sales.items.toasts.updated"));
       setRowDrafts((prev) => {
         const next = { ...prev };
@@ -178,16 +295,48 @@ export default function SaleItemsEditor({
     }
   };
 
+  const renderIdentifiers = (item, draft) => {
+    if (readOnly) {
+      return <SaleItemIdentifiersList item={item} />;
+    }
+    return (
+      <SaleItemIdentifiersEditor
+        itemId={item.id}
+        quantity={draft.quantity}
+        values={draft.identifierValues}
+        extraPositions={draft.extraPositions}
+        expanded={isIdentifiersExpanded(item)}
+        onExpandedChange={(open) =>
+          setExpandedByItemId((prev) => ({ ...prev, [item.id]: open }))
+        }
+        onChange={(next) =>
+          patchRowDraft(item.id, {
+            identifierValues: next.identifierValues,
+            extraPositions: next.extraPositions,
+            identifiersTouched: true,
+          })
+        }
+      />
+    );
+  };
+
   const renderItemActions = (item) => {
     if (readOnly) return null;
     const draft = getRowDraft(item);
     const originalQty = String(item.quantity ?? "");
     const originalPrice = String(item.unitPrice ?? "");
     const originalDiscount = String(item.discountAmount ?? "0");
+    const identifiersDirty =
+      draft.identifiersTouched &&
+      !identifierPayloadsEqual(
+        draft.identifierValues,
+        identifierValuesFromItem(item)
+      );
     const dirty =
       draft.quantity !== originalQty ||
       draft.unitPrice !== originalPrice ||
-      draft.discountAmount !== originalDiscount;
+      draft.discountAmount !== originalDiscount ||
+      identifiersDirty;
 
     return (
       <Box display="flex" justifyContent="flex-end">
@@ -196,6 +345,7 @@ export default function SaleItemsEditor({
             size="small"
             onClick={() => handleUpdateItem(item)}
             disabled={rowSaving === item.id}
+            data-testid={`sale-item-save-${item.id}`}
           >
             <SaveIcon fontSize="small" />
           </IconButton>
@@ -222,6 +372,7 @@ export default function SaleItemsEditor({
           <MobileCardList>
             {items.map((item) => {
               const draft = getRowDraft(item);
+              const identifiersBlock = renderIdentifiers(item, draft);
               return (
                 <MobileEntityCard
                   key={item.id}
@@ -242,6 +393,11 @@ export default function SaleItemsEditor({
                       <Typography variant="body2" style={{ fontWeight: 600 }}>
                         {formatCurrencyBRL(item.totalAmount)}
                       </Typography>
+                      {identifiersBlock ? (
+                        <Box mt={1} style={{ minWidth: 0, maxWidth: "100%" }}>
+                          {identifiersBlock}
+                        </Box>
+                      ) : null}
                     </>
                   ) : (
                     <>
@@ -253,6 +409,7 @@ export default function SaleItemsEditor({
                         onChange={(e) =>
                           setRowField(item.id, "quantity", e.target.value)
                         }
+                        onBlur={() => handleQuantityBlur(item)}
                         type="number"
                         inputProps={{ min: 0, step: "any" }}
                         fullWidth
@@ -283,6 +440,11 @@ export default function SaleItemsEditor({
                       <Typography variant="body2" style={{ fontWeight: 600 }}>
                         {formatCurrencyBRL(item.totalAmount)}
                       </Typography>
+                      {identifiersBlock ? (
+                        <Box mt={1} style={{ minWidth: 0, maxWidth: "100%" }}>
+                          {identifiersBlock}
+                        </Box>
+                      ) : null}
                     </>
                   )}
                 </MobileEntityCard>
@@ -317,70 +479,90 @@ export default function SaleItemsEditor({
               <TableBody>
                 {items.map((item) => {
                   const draft = getRowDraft(item);
+                  const colSpan = readOnly ? 5 : 6;
+                  const identifiersBlock = renderIdentifiers(item, draft);
                   return (
-                    <TableRow key={item.id}>
-                      <TableCell>
-                        <Typography variant="body2">{item.productName}</Typography>
-                        {item.productSku ? (
-                          <Typography variant="caption" color="textSecondary">
-                            {item.productSku}
-                          </Typography>
+                    <React.Fragment key={item.id}>
+                      <TableRow>
+                        <TableCell style={{ minWidth: 0, maxWidth: 280 }}>
+                          <Typography variant="body2">{item.productName}</Typography>
+                          {item.productSku ? (
+                            <Typography variant="caption" color="textSecondary">
+                              {item.productSku}
+                            </Typography>
+                          ) : null}
+                        </TableCell>
+                        <TableCell align="right">
+                          {readOnly ? (
+                            formatQuantity(draft.quantity)
+                          ) : (
+                            <TextField
+                              size="small"
+                              variant="outlined"
+                              value={draft.quantity}
+                              onChange={(e) =>
+                                setRowField(item.id, "quantity", e.target.value)
+                              }
+                              onBlur={() => handleQuantityBlur(item)}
+                              type="number"
+                              inputProps={{ min: 0, step: "any" }}
+                              style={{ width: 88 }}
+                            />
+                          )}
+                        </TableCell>
+                        <TableCell align="right">
+                          {readOnly ? (
+                            formatCurrencyBRL(draft.unitPrice)
+                          ) : (
+                            <TextField
+                              size="small"
+                              variant="outlined"
+                              value={draft.unitPrice}
+                              onChange={(e) =>
+                                setRowField(item.id, "unitPrice", e.target.value)
+                              }
+                              style={{ width: 100 }}
+                            />
+                          )}
+                        </TableCell>
+                        <TableCell align="right">
+                          {readOnly ? (
+                            formatCurrencyBRL(draft.discountAmount)
+                          ) : (
+                            <TextField
+                              size="small"
+                              variant="outlined"
+                              value={draft.discountAmount}
+                              onChange={(e) =>
+                                setRowField(item.id, "discountAmount", e.target.value)
+                              }
+                              style={{ width: 100 }}
+                            />
+                          )}
+                        </TableCell>
+                        <TableCell align="right">
+                          {formatCurrencyBRL(item.totalAmount)}
+                        </TableCell>
+                        {!readOnly ? (
+                          <TableCell align="right">{renderItemActions(item)}</TableCell>
                         ) : null}
-                      </TableCell>
-                      <TableCell align="right">
-                        {readOnly ? (
-                          formatQuantity(draft.quantity)
-                        ) : (
-                          <TextField
-                            size="small"
-                            variant="outlined"
-                            value={draft.quantity}
-                            onChange={(e) =>
-                              setRowField(item.id, "quantity", e.target.value)
-                            }
-                            type="number"
-                            inputProps={{ min: 0, step: "any" }}
-                            style={{ width: 88 }}
-                          />
-                        )}
-                      </TableCell>
-                      <TableCell align="right">
-                        {readOnly ? (
-                          formatCurrencyBRL(draft.unitPrice)
-                        ) : (
-                          <TextField
-                            size="small"
-                            variant="outlined"
-                            value={draft.unitPrice}
-                            onChange={(e) =>
-                              setRowField(item.id, "unitPrice", e.target.value)
-                            }
-                            style={{ width: 100 }}
-                          />
-                        )}
-                      </TableCell>
-                      <TableCell align="right">
-                        {readOnly ? (
-                          formatCurrencyBRL(draft.discountAmount)
-                        ) : (
-                          <TextField
-                            size="small"
-                            variant="outlined"
-                            value={draft.discountAmount}
-                            onChange={(e) =>
-                              setRowField(item.id, "discountAmount", e.target.value)
-                            }
-                            style={{ width: 100 }}
-                          />
-                        )}
-                      </TableCell>
-                      <TableCell align="right">
-                        {formatCurrencyBRL(item.totalAmount)}
-                      </TableCell>
-                      {!readOnly ? (
-                        <TableCell align="right">{renderItemActions(item)}</TableCell>
+                      </TableRow>
+                      {identifiersBlock ? (
+                        <TableRow>
+                          <TableCell
+                            colSpan={colSpan}
+                            style={{
+                              paddingTop: 0,
+                              minWidth: 0,
+                            }}
+                          >
+                            <Box style={{ maxWidth: 420, minWidth: 0 }}>
+                              {identifiersBlock}
+                            </Box>
+                          </TableCell>
+                        </TableRow>
                       ) : null}
-                    </TableRow>
+                    </React.Fragment>
                   );
                 })}
               </TableBody>
@@ -455,6 +637,21 @@ export default function SaleItemsEditor({
                 style={{ flex: 1, minWidth: 100 }}
               />
             </Box>
+            <SaleItemIdentifiersEditor
+              quantity={addForm.quantity}
+              values={addForm.identifierValues}
+              extraPositions={addForm.extraPositions}
+              expanded={addIdentifiersExpanded}
+              onExpandedChange={setAddIdentifiersExpanded}
+              onChange={(next) =>
+                setAddForm((prev) => ({
+                  ...prev,
+                  identifierValues: next.identifierValues,
+                  extraPositions: next.extraPositions,
+                  identifiersTouched: true,
+                }))
+              }
+            />
             <Box>
               <AppPrimaryButton
                 startIcon={<AddIcon />}
