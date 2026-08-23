@@ -37,6 +37,7 @@ import { canUseQuickRepliesFeature } from "../../utils/canUseQuickRepliesFeature
 import { SocketContext } from "../../context/Socket/SocketContext";
 import { useWhatsAppPanelRecorder } from "../../hooks/useWhatsAppPanelRecorder";
 import resolveQuickMessageTemplate from "../../utils/resolveQuickMessageTemplate";
+import { appendOutgoingMediaFormData } from "../../utils/messages/resolveOutgoingMediaBody";
 import { recordRecentUse } from "../../utils/quickMessageChatStorage";
 import { PANEL_RADIUS, getSubtleBorderColor, getComposerSurface, getComposerTopDivider } from "../../theme/ticketPanelStyles";
 import {
@@ -837,25 +838,13 @@ const MessageInputCustom = (props) => {
     e.preventDefault();
 
     const formData = new FormData();
-    formData.append("fromMe", true);
-    medias.forEach((media) => {
-      formData.append("medias", media);
-      const isInstagramDocument =
+    appendOutgoingMediaFormData(formData, {
+      medias,
+      typedCaption: inputMessage,
+      isInstagramChannel,
+      isInstagramDocumentFor: (media) =>
         isInstagramChannel &&
-        INSTAGRAM_DOCUMENT_EXTENSIONS.has(getFileExtension(media.name));
-      const fallbackBody = isInstagramChannel
-        ? isInstagramDocument
-          ? media.name
-          : String(media.type || "").startsWith("video/")
-            ? "Vídeo"
-            : String(media.type || "").startsWith("audio/")
-              ? "Áudio"
-              : "Imagem"
-        : media.name;
-      formData.append(
-        "body",
-        isInstagramDocument ? media.name : inputMessage.trim() || fallbackBody
-      );
+        INSTAGRAM_DOCUMENT_EXTENSIONS.has(getFileExtension(media.name)),
     });
 
     try {
