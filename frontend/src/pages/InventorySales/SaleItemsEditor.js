@@ -14,6 +14,7 @@ import {
   TextField,
   Typography,
 } from "@material-ui/core";
+import { makeStyles } from "@material-ui/core/styles";
 import DeleteOutlineIcon from "@material-ui/icons/DeleteOutline";
 import SaveIcon from "@material-ui/icons/Save";
 import AddIcon from "@material-ui/icons/Add";
@@ -42,12 +43,53 @@ import {
   buildCreateIdentifiersField,
   buildUpdateIdentifiersField,
   emptyIdentifierDraft,
-  hasFilledIdentifiers,
   identifierDraftFromItem,
   identifierPayloadsEqual,
   identifierValuesFromItem,
   validateIdentifiersForSubmit,
 } from "./saleItemIdentifiers";
+
+const useStyles = makeStyles(() => ({
+  tableContainer: {
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
+    overflowX: "visible",
+  },
+  table: {
+    width: "100%",
+    maxWidth: "100%",
+    tableLayout: "fixed",
+  },
+  productCell: {
+    minWidth: 0,
+    width: "auto",
+  },
+  numericCell: {
+    minWidth: 0,
+    width: "16%",
+  },
+  actionsCell: {
+    minWidth: 0,
+    width: "12%",
+  },
+  numericField: {
+    width: "100%",
+    minWidth: 0,
+    maxWidth: "100%",
+  },
+  identifiersCell: {
+    paddingTop: 0,
+    minWidth: 0,
+    width: "100%",
+    maxWidth: "100%",
+  },
+  identifiersInner: {
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
+  },
+}));
 
 const emptyAddForm = {
   productId: "",
@@ -90,13 +132,12 @@ export default function SaleItemsEditor({
   readOnly,
   onSaleUpdated,
 }) {
+  const classes = useStyles();
   const isMobile = useIsMobile();
   const [addForm, setAddForm] = useState(emptyAddForm);
   const [adding, setAdding] = useState(false);
   const [rowSaving, setRowSaving] = useState(null);
   const [rowDrafts, setRowDrafts] = useState({});
-  const [expandedByItemId, setExpandedByItemId] = useState({});
-  const [addIdentifiersExpanded, setAddIdentifiersExpanded] = useState(false);
 
   const items = Array.isArray(sale?.items) ? sale.items : [];
   const activeProducts = (products || []).filter((p) => p.active !== false);
@@ -147,11 +188,6 @@ export default function SaleItemsEditor({
 
   const setRowField = (itemId, field, value) => {
     patchRowDraft(itemId, { [field]: value });
-  };
-
-  const isIdentifiersExpanded = (item) => {
-    if (expandedByItemId[item.id] !== undefined) return expandedByItemId[item.id];
-    return hasFilledIdentifiers(getRowDraft(item).identifierValues);
   };
 
   const handleQuantityBlur = (item) => {
@@ -218,7 +254,6 @@ export default function SaleItemsEditor({
       await addInventorySaleItem(sale.id, payload);
       toast.success(i18n.t("inventorySales.sales.items.toasts.added"));
       setAddForm(emptyAddForm);
-      setAddIdentifiersExpanded(false);
       if (onSaleUpdated) await onSaleUpdated();
     } catch (err) {
       toastError(err);
@@ -305,10 +340,6 @@ export default function SaleItemsEditor({
         quantity={draft.quantity}
         values={draft.identifierValues}
         extraPositions={draft.extraPositions}
-        expanded={isIdentifiersExpanded(item)}
-        onExpandedChange={(open) =>
-          setExpandedByItemId((prev) => ({ ...prev, [item.id]: open }))
-        }
         onChange={(next) =>
           patchRowDraft(item.id, {
             identifierValues: next.identifierValues,
@@ -452,25 +483,33 @@ export default function SaleItemsEditor({
             })}
           </MobileCardList>
         ) : (
-          <AppTableContainer>
-            <Table size="small">
+          <AppTableContainer
+            nested
+            className={classes.tableContainer}
+            style={{ width: "100%", maxWidth: "100%", minWidth: 0, overflowX: "visible" }}
+          >
+            <Table
+              size="small"
+              className={classes.table}
+              style={{ width: "100%", maxWidth: "100%", tableLayout: "fixed" }}
+            >
               <TableHead>
                 <TableRow>
-                  <TableCell>{i18n.t("inventorySales.sales.items.product")}</TableCell>
-                  <TableCell align="right">
+                  <TableCell className={classes.productCell}>{i18n.t("inventorySales.sales.items.product")}</TableCell>
+                  <TableCell align="right" className={classes.numericCell}>
                     {i18n.t("inventorySales.sales.items.quantity")}
                   </TableCell>
-                  <TableCell align="right">
+                  <TableCell align="right" className={classes.numericCell}>
                     {i18n.t("inventorySales.sales.items.unitPrice")}
                   </TableCell>
-                  <TableCell align="right">
+                  <TableCell align="right" className={classes.numericCell}>
                     {i18n.t("inventorySales.sales.items.discount")}
                   </TableCell>
-                  <TableCell align="right">
+                  <TableCell align="right" className={classes.numericCell}>
                     {i18n.t("inventorySales.sales.items.total")}
                   </TableCell>
                   {!readOnly ? (
-                    <TableCell align="right">
+                    <TableCell align="right" className={classes.actionsCell}>
                       {i18n.t("inventorySales.common.actions")}
                     </TableCell>
                   ) : null}
@@ -484,7 +523,7 @@ export default function SaleItemsEditor({
                   return (
                     <React.Fragment key={item.id}>
                       <TableRow>
-                        <TableCell style={{ minWidth: 0, maxWidth: 280 }}>
+                        <TableCell className={classes.productCell}>
                           <Typography variant="body2">{item.productName}</Typography>
                           {item.productSku ? (
                             <Typography variant="caption" color="textSecondary">
@@ -492,7 +531,7 @@ export default function SaleItemsEditor({
                             </Typography>
                           ) : null}
                         </TableCell>
-                        <TableCell align="right">
+                        <TableCell align="right" className={classes.numericCell}>
                           {readOnly ? (
                             formatQuantity(draft.quantity)
                           ) : (
@@ -506,11 +545,12 @@ export default function SaleItemsEditor({
                               onBlur={() => handleQuantityBlur(item)}
                               type="number"
                               inputProps={{ min: 0, step: "any" }}
-                              style={{ width: 88 }}
+                              className={classes.numericField}
+                              fullWidth
                             />
                           )}
                         </TableCell>
-                        <TableCell align="right">
+                        <TableCell align="right" className={classes.numericCell}>
                           {readOnly ? (
                             formatCurrencyBRL(draft.unitPrice)
                           ) : (
@@ -521,11 +561,12 @@ export default function SaleItemsEditor({
                               onChange={(e) =>
                                 setRowField(item.id, "unitPrice", e.target.value)
                               }
-                              style={{ width: 100 }}
+                              className={classes.numericField}
+                              fullWidth
                             />
                           )}
                         </TableCell>
-                        <TableCell align="right">
+                        <TableCell align="right" className={classes.numericCell}>
                           {readOnly ? (
                             formatCurrencyBRL(draft.discountAmount)
                           ) : (
@@ -536,27 +577,40 @@ export default function SaleItemsEditor({
                               onChange={(e) =>
                                 setRowField(item.id, "discountAmount", e.target.value)
                               }
-                              style={{ width: 100 }}
+                              className={classes.numericField}
+                              fullWidth
                             />
                           )}
                         </TableCell>
-                        <TableCell align="right">
+                        <TableCell align="right" className={classes.numericCell}>
                           {formatCurrencyBRL(item.totalAmount)}
                         </TableCell>
                         {!readOnly ? (
-                          <TableCell align="right">{renderItemActions(item)}</TableCell>
+                          <TableCell align="right" className={classes.actionsCell}>{renderItemActions(item)}</TableCell>
                         ) : null}
                       </TableRow>
                       {identifiersBlock ? (
                         <TableRow>
                           <TableCell
                             colSpan={colSpan}
+                            className={classes.identifiersCell}
+                            data-testid={`sale-item-identifiers-cell-${item.id}`}
                             style={{
                               paddingTop: 0,
                               minWidth: 0,
+                              width: "100%",
+                              maxWidth: "100%",
                             }}
                           >
-                            <Box style={{ maxWidth: 420, minWidth: 0 }}>
+                            <Box
+                              className={classes.identifiersInner}
+                              data-testid={`sale-item-identifiers-wrap-${item.id}`}
+                              style={{
+                                width: "100%",
+                                maxWidth: "100%",
+                                minWidth: 0,
+                              }}
+                            >
                               {identifiersBlock}
                             </Box>
                           </TableCell>
@@ -641,8 +695,6 @@ export default function SaleItemsEditor({
               quantity={addForm.quantity}
               values={addForm.identifierValues}
               extraPositions={addForm.extraPositions}
-              expanded={addIdentifiersExpanded}
-              onExpandedChange={setAddIdentifiersExpanded}
               onChange={(next) =>
                 setAddForm((prev) => ({
                   ...prev,

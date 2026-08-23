@@ -216,8 +216,6 @@ describe("SaleItemsEditor identifiers", () => {
         items: [itemBase({ quantity: 2, identifiers: [] })],
       }),
     });
-    fireEvent.click(getByTestId("sale-item-identifiers-toggle-21"));
-    await waitFor(() => getByTestId("sale-item-identifier-input-21-1"));
     fireEvent.change(getByTestId("sale-item-identifier-input-21-1"), {
       target: { value: "SN-DUP" },
     });
@@ -237,8 +235,6 @@ describe("SaleItemsEditor identifiers", () => {
     });
     fireEvent.mouseDown(getByLabelText("Produto"));
     fireEvent.click(getByText(/Roteador XYZ/));
-    fireEvent.click(getByTestId("sale-item-identifiers-toggle-add"));
-    await waitFor(() => getByTestId("sale-item-identifier-input-add-1"));
     fireEvent.change(getByTestId("sale-item-identifier-input-add-1"), {
       target: { value: "  SN123  " },
     });
@@ -417,14 +413,81 @@ describe("SaleItemsEditor identifiers", () => {
 
   it("21. mobile empilha identifiers no card", async () => {
     useIsMobile.mockReturnValue(true);
-    const { getByTestId } = renderEditor({
+    const { getByTestId, queryByTestId } = renderEditor({
       sale: saleBase({
         items: [itemBase({ quantity: 2, identifiers: [] })],
       }),
     });
-    fireEvent.click(getByTestId("sale-item-identifiers-toggle-21"));
-    await waitFor(() => getByTestId("sale-item-identifier-input-21-1"));
+    expect(queryByTestId("sale-item-identifiers-toggle-21")).toBeNull();
     expect(getByTestId("sale-item-identifier-input-21-1")).toBeTruthy();
     expect(getByTestId("sale-item-identifier-input-21-2")).toBeTruthy();
+  });
+
+  it("identificação fica visível no draft sem accordion", () => {
+    const { getByTestId, queryByTestId, queryByLabelText } = renderEditor();
+    expect(getByTestId("sale-item-identifiers-title-21").textContent).toBe(
+      "Identificação da unidade"
+    );
+    expect(queryByTestId("sale-item-identifiers-toggle-21")).toBeNull();
+    expect(getByTestId("sale-item-identifier-input-21-1")).toBeTruthy();
+    expect(queryByLabelText("Unidade 1")).toBeNull();
+    expect(
+      getByTestId("sale-item-identifiers-21").textContent
+    ).toContain("Ex.: número de série, IMEI, MAC, chassi ou código de fabricação.");
+  });
+
+  it("bloco Adicionar produto mostra identificação sem clique", () => {
+    const { getByTestId, queryByTestId } = renderEditor({
+      sale: saleBase({ items: [] }),
+    });
+    expect(getByTestId("sale-item-identifiers-title-add")).toBeTruthy();
+    expect(queryByTestId("sale-item-identifiers-toggle-add")).toBeNull();
+    expect(getByTestId("sale-item-identifier-input-add-1")).toBeTruthy();
+  });
+
+  it("não renderiza o texto indevido ): null)}", () => {
+    const { container } = renderEditor();
+    expect(container.textContent).not.toMatch(/\):\s*null\}/);
+    expect(container.textContent).not.toContain("): null)}");
+  });
+
+  it("área de identificação usa a largura disponível sem coluna apertada", () => {
+    const { getByTestId, container } = renderEditor();
+    const wrap = getByTestId("sale-item-identifiers-wrap-21");
+    const cell = getByTestId("sale-item-identifiers-cell-21");
+    const table = container.querySelector("table");
+    expect(table).toBeTruthy();
+    expect(table.style.width).toBe("100%");
+    expect(table.style.tableLayout).toBe("fixed");
+    expect(wrap.style.width).toBe("100%");
+    expect(wrap.style.maxWidth).toBe("100%");
+    expect(wrap.style.minWidth).toBe("0");
+    expect(cell.style.maxWidth).toBe("100%");
+    expect(cell.style.width).toBe("100%");
+    expect(wrap.style.maxWidth).not.toBe("420px");
+  });
+
+  it("quantity 2 preserva slots visíveis sem accordion", () => {
+    const { getByTestId, getByLabelText, queryByTestId } = renderEditor({
+      sale: saleBase({
+        items: [itemBase({ quantity: 2, identifiers: [] })],
+      }),
+    });
+    expect(queryByTestId("sale-item-identifiers-toggle-21")).toBeNull();
+    expect(getByLabelText("Unidade 1")).toBeTruthy();
+    expect(getByLabelText("Unidade 2")).toBeTruthy();
+    expect(getByTestId("sale-item-identifier-input-21-1")).toBeTruthy();
+    expect(getByTestId("sale-item-identifier-input-21-2")).toBeTruthy();
+  });
+
+  it("quantity 50 no editor não renderiza dezenas de inputs", () => {
+    const { queryAllByTestId, getByTestId, queryByTestId } = renderEditor({
+      sale: saleBase({
+        items: [itemBase({ quantity: 50, identifiers: [] })],
+      }),
+    });
+    expect(queryByTestId("sale-item-identifiers-toggle-21")).toBeNull();
+    expect(queryAllByTestId(/sale-item-identifier-input-21-/).length).toBe(0);
+    expect(getByTestId("sale-item-identifier-add-21")).toBeTruthy();
   });
 });

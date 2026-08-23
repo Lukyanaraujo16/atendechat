@@ -573,8 +573,6 @@ export default function SaleDrawer({
                     disabled={!editable}
                   />
 
-                  ) : null}
-
                   {sale.status === "cancelled" && sale.cancelReason ? (
                     <Typography variant="body2" color="textSecondary">
                       {i18n.t("inventorySales.sales.cancelReasonLabel")}:{" "}
