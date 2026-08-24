@@ -3014,8 +3014,9 @@ const messages = {
 						unavailable: "unavailable",
 						reasonModel: "incompatible model",
 						reasonCredential: "missing credential",
+						reasonProvider: "provider transcription (STT)",
 						recommendVisionModel:
-							"To analyze photos and audio, choose a compatible model (e.g. GPT-4o or Gemini Flash).",
+							"To analyze photos, choose a vision-capable model (e.g. GPT-4o mini or Gemini Flash).",
 					},
 					knowledgeHint:
 						"Knowledge bases linked to this agent. The company library can be shared.",

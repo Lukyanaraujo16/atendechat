@@ -37,6 +37,8 @@ import {
   filterAiAgentWizardCredentialsByProvider,
   filterAiAgentWizardModelsByProvider,
   mapAiAgentWizardProductOptions,
+  resolveMediaCapabilityReason,
+  resolveSelectedModelMediaCaps,
   validateAiAgentWizardCommercialSetup,
   validateAiAgentWizardIdentity,
   wizardFormStateToProductConfigurationPayload,
@@ -351,18 +353,23 @@ export function AiAgentIntelligencePanel({
     form?.provider
   ).filter((item) => item.enabled);
 
-  const selectedModelCaps = useMemo(() => {
-    if (!form?.model) return null;
-    const row = (options.models || []).find(
-      (model) => model.value === form.model
-    );
-    if (!row) return null;
-    return {
-      supportsText: row.supportsText !== false,
-      supportsVision: row.supportsVision === true,
-      supportsAudioTranscription: row.supportsAudioTranscription === true,
-    };
-  }, [form?.model, options.models]);
+  const selectedModel = form?.model;
+  const selectedModelCaps = useMemo(
+    () => resolveSelectedModelMediaCaps(options.models, selectedModel),
+    [selectedModel, options.models]
+  );
+  const visionReason = resolveMediaCapabilityReason({
+    kind: "vision",
+    caps: selectedModelCaps,
+    hasModel: Boolean(form?.model),
+    hasCredential: Boolean(form?.credentialRef),
+  });
+  const audioReason = resolveMediaCapabilityReason({
+    kind: "audio",
+    caps: selectedModelCaps,
+    hasModel: Boolean(form?.model),
+    hasCredential: Boolean(form?.credentialRef),
+  });
 
   const load = useCallback(async () => {
     if (!agentRefKey) return;
@@ -526,27 +533,22 @@ export function AiAgentIntelligencePanel({
           {selectedModelCaps?.supportsVision
             ? i18n.t("aiAgentProduct.admin.media.available")
             : i18n.t("aiAgentProduct.admin.media.unavailable")}
-          {!selectedModelCaps?.supportsVision && form.model
-            ? ` — ${i18n.t("aiAgentProduct.admin.media.reasonModel")}`
-            : !form.credentialRef
-              ? ` — ${i18n.t("aiAgentProduct.admin.media.reasonCredential")}`
-              : ""}
+          {visionReason
+            ? ` — ${i18n.t(`aiAgentProduct.admin.media.${visionReason}`)}`
+            : ""}
         </Typography>
         <Typography variant="body2" className={classes.meta}>
           {i18n.t("aiAgentProduct.admin.media.capabilityAudio")}:{" "}
           {selectedModelCaps?.supportsAudioTranscription
             ? i18n.t("aiAgentProduct.admin.media.available")
             : i18n.t("aiAgentProduct.admin.media.unavailable")}
-          {!selectedModelCaps?.supportsAudioTranscription && form.model
-            ? ` — ${i18n.t("aiAgentProduct.admin.media.reasonModel")}`
-            : !form.credentialRef
-              ? ` — ${i18n.t("aiAgentProduct.admin.media.reasonCredential")}`
-              : ""}
+          {audioReason
+            ? ` — ${i18n.t(`aiAgentProduct.admin.media.${audioReason}`)}`
+            : ""}
         </Typography>
         {form.model &&
         selectedModelCaps &&
-        (!selectedModelCaps.supportsVision ||
-          !selectedModelCaps.supportsAudioTranscription) ? (
+        !selectedModelCaps.supportsVision ? (
           <Typography variant="body2" className={classes.meta}>
             {i18n.t("aiAgentProduct.admin.media.recommendVisionModel")}
           </Typography>

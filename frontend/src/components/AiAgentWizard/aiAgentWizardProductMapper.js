@@ -10,7 +10,14 @@ import {
 
 function normalizeModel(model, fallbackProvider = null) {
   if (typeof model === "string") {
-    return { value: model, label: model, provider: fallbackProvider };
+    return {
+      value: model,
+      label: model,
+      provider: fallbackProvider,
+      supportsText: true,
+      supportsVision: false,
+      supportsAudioTranscription: false,
+    };
   }
   const value = String(model?.value || model?.name || model?.id || "").trim();
   return {
@@ -19,7 +26,40 @@ function normalizeModel(model, fallbackProvider = null) {
     provider: normalizeAiAgentProductProvider(
       model?.provider || fallbackProvider
     ),
+    supportsText: model?.supportsText !== false,
+    supportsVision: model?.supportsVision === true,
+    supportsAudioTranscription: model?.supportsAudioTranscription === true,
   };
+}
+
+export function resolveSelectedModelMediaCaps(models, modelValue) {
+  if (!modelValue) return null;
+  const row = (models || []).find((model) => model.value === modelValue);
+  if (!row) return null;
+  return {
+    supportsText: row.supportsText !== false,
+    supportsVision: row.supportsVision === true,
+    supportsAudioTranscription: row.supportsAudioTranscription === true,
+  };
+}
+
+/** Motivo comercial da UI: visão = modelo; áudio = pipeline/provider STT. */
+export function resolveMediaCapabilityReason({
+  kind,
+  caps,
+  hasModel,
+  hasCredential,
+}) {
+  if (kind === "vision") {
+    if (caps?.supportsVision) return null;
+    if (hasModel) return "reasonModel";
+    if (!hasCredential) return "reasonCredential";
+    return null;
+  }
+  if (caps?.supportsAudioTranscription) return null;
+  if (hasModel) return "reasonProvider";
+  if (!hasCredential) return "reasonCredential";
+  return null;
 }
 
 function resolveIdentityName(formState) {
