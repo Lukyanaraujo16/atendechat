@@ -101,7 +101,7 @@ export async function buildAiAgentProductSnapshot(input: {
   const availability = await resolveAiAgentProductAvailability(input);
 
   const agents = await AiAgent.findAll({
-    where: { companyId: input.companyId },
+    where: { companyId: input.companyId, archivedAt: null },
     order: [["id", "ASC"]],
     attributes: [
       "id",

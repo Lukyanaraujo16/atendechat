@@ -395,7 +395,7 @@ describe("ExecuteAiAgentProductCommandService — escopo Opção A", () => {
     expect(result.changed).toBe(false);
     expect(mockAgentFindAll).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { companyId: 77 },
+        where: expect.objectContaining({ companyId: 77 }),
         order: [["id", "ASC"]]
       })
     );

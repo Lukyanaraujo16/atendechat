@@ -3,6 +3,7 @@ import Contact from "../../models/Contact";
 import Whatsapp from "../../models/Whatsapp";
 import AiAgent from "../../models/AiAgent";
 import { loadCompanyPlanContextByCompanyId } from "../../middleware/loadCompanyEffectiveFeatures";
+import { isAiAgentArchived } from "../../helpers/isAiAgentArchived";
 import { AI_AGENT_PLAN_FEATURE_KEY } from "./resolveAiAgentWhatsappFields";
 import { InboundMessageClassification } from "./classifyInboundMessage";
 
@@ -63,6 +64,6 @@ export async function buildAiAgentRuntimeContext(
     contact: input.contact,
     whatsapp: input.whatsapp,
     message: input.message,
-    aiAgent
+    aiAgent: isAiAgentArchived(aiAgent) ? null : aiAgent
   };
 }

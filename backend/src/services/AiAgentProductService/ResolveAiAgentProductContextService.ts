@@ -10,9 +10,9 @@ import { AiAgentProductAgentSnapshot } from "./AgentReadinessService";
  * (agentRef explícito ou compat 0/1). Este helper permanece para compute de
  * readiness quando o snapshot já está filtrado (ou em testes unitários).
  *
- * Elegíveis: todos os AiAgent da empresa da sessão.
- * - Sem soft delete no model AiAgent — nenhum filtro deletedAt.
+ * Elegíveis: AiAgent da empresa com archivedAt IS NULL (Product).
  * - enabled=false NÃO exclui o candidato.
+ * - Arquivados não entram em Hub, Detail, wizard, commands nem readiness.
  * - Sem preferência por vínculo WhatsApp / createdAt.
  */
 export type AiAgentProductAgentResolution =

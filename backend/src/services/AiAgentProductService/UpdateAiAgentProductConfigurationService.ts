@@ -27,7 +27,8 @@ import {
 } from "./serializeAiAgentProduct";
 import {
   encodeAgentRef,
-  resolveAiAgentProductAgentForOperation
+  resolveAiAgentProductAgentForOperation,
+  throwIfAiAgentArchived
 } from "./aiAgentProductAgentRef";
 import { logger } from "../../utils/logger";
 
@@ -121,6 +122,7 @@ export default async function UpdateAiAgentProductConfigurationService(input: {
         "Agente de IA não encontrado."
       );
     }
+    throwIfAiAgentArchived(agent);
 
     const linked = await Whatsapp.findAll({
       where: { companyId, aiAgentId: agent.id },

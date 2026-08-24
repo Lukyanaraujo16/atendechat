@@ -3168,6 +3168,22 @@ const messages = {
               "Desative o agente antes de alterar esta configuração.",
           },
         },
+        archive: {
+          dangerTitle: "Zona de perigo",
+          cardTitle: "Arquivar agente",
+          cardBody:
+            "Este agente será removido da operação e deixará de aparecer na lista de agentes ativos. O histórico de atendimentos e dados de auditoria serão preservados.",
+          cta: "Arquivar agente",
+          ctaAria: "Arquivar agente {{name}}",
+          confirmTitle: "Arquivar {{name}}?",
+          confirmBody:
+            "Este agente será removido da operação e suas conexões serão desvinculadas. O histórico de atendimentos será preservado.",
+          confirmNameLabel: "Para confirmar, digite o nome do agente:",
+          requiresDeactivation: "Desative o agente antes de arquivá-lo.",
+          activeTitle: "Não é possível arquivar {{name}}",
+          success: "Agente arquivado.",
+          archivedToast: "Este agente foi arquivado.",
+        },
         connections: {
           title: "Conexões de {{name}}",
           linkedTitle: "Vinculadas a este agente",

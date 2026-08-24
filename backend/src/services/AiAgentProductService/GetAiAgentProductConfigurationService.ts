@@ -14,7 +14,8 @@ import {
   serializeAiAgentProductConfigurationView
 } from "./serializeAiAgentProduct";
 import {
-  resolveAiAgentProductAgentForOperation
+  resolveAiAgentProductAgentForOperation,
+  throwIfAiAgentArchived
 } from "./aiAgentProductAgentRef";
 
 export default async function GetAiAgentProductConfigurationService(input: {
@@ -60,6 +61,7 @@ export default async function GetAiAgentProductConfigurationService(input: {
       "Agente de IA não encontrado."
     );
   }
+  throwIfAiAgentArchived(agentRow);
 
   const profile = await AiAgentProfile.findOne({
     where: { companyId, aiAgentId: agentRow.id }

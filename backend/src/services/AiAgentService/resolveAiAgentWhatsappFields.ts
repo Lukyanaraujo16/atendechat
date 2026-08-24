@@ -1,4 +1,5 @@
 import AppError from "../../errors/AppError";
+import { isAiAgentArchived } from "../../helpers/isAiAgentArchived";
 import AiAgent from "../../models/AiAgent";
 import {
   AiAgentRuntimeMode,
@@ -34,7 +35,7 @@ async function assertAgentBelongsToCompany(
   const agent = await AiAgent.findOne({
     where: { id: agentId, companyId }
   });
-  if (!agent) {
+  if (!agent || isAiAgentArchived(agent)) {
     throw new AppError(
       "ERR_AI_AGENT_NOT_FOUND",
       404,

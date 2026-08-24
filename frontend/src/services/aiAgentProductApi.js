@@ -88,6 +88,11 @@ export function postAiAgentProductCommand(command, agentRef) {
   return api.post("/product/ai-agent/commands", { command });
 }
 
+export function postAiAgentProductArchive(agentRef) {
+  const ref = agentRef != null ? String(agentRef).trim() : "";
+  return api.post(agentScopedPath(ref, "/archive"));
+}
+
 export async function getAiAgentProductConfiguration(agentRef) {
   const ref = agentRef != null ? String(agentRef).trim() : "";
   if (ref) {

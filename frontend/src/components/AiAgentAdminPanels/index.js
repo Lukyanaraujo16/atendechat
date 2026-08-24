@@ -21,6 +21,7 @@ import {
   AppEmptyState,
 } from "../../ui";
 import ConfirmationModal from "../ConfirmationModal";
+import AiAgentArchiveControl from "../AiAgentArchiveControl";
 import {
   getAiAgentProductConfiguration,
   getAiAgentProductConfigurationOptions,
@@ -972,6 +973,7 @@ export function AiAgentSettingsPanel({
   commandBusy,
   onOpenCredentials,
   supportMode = false,
+  agentRef = null,
 }) {
   const classes = useStyles();
   const [confirmCommand, setConfirmCommand] = useState(null);
@@ -1065,6 +1067,13 @@ export function AiAgentSettingsPanel({
           ) : null}
         </ConfirmationModal>
       ) : null}
+      <AiAgentArchiveControl
+        agentRef={agentRef || summary?.agent?.agentRef}
+        agentName={summary?.agent?.name}
+        enabled={summary?.agent?.enabled === true}
+        canMutate={canMutate}
+        commandBusy={commandBusy}
+      />
     </Box>
   );
 }

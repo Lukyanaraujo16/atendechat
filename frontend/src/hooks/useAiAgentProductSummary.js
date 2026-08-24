@@ -1,5 +1,5 @@
 /**
- * Hook — Product API summary (Fases 2.1–2.9B).
+ * Hook — Product API summary (Fases 2.1–2.9B / 2.21C).
  * Com agentRef: summary do agente. Sem agentRef: compat 0/1 agente.
  */
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
@@ -15,6 +15,20 @@ function isNotFound(err) {
   return err?.response?.status === 404;
 }
 
+function isArchived(err) {
+  const code = err?.response?.data?.error || err?.response?.data?.message;
+  return code === "ERR_AI_AGENT_PRODUCT_ARCHIVED";
+}
+
+const idleState = {
+  loading: false,
+  error: null,
+  accessDenied: false,
+  notFound: false,
+  archived: false,
+  data: null,
+};
+
 export default function useAiAgentProductSummary({
   enabled = true,
   agentRef = null,
@@ -23,11 +37,8 @@ export default function useAiAgentProductSummary({
   const companyId = user?.companyId ?? null;
   const agentRefKey = agentRef != null ? String(agentRef).trim() : "";
   const [state, setState] = useState({
+    ...idleState,
     loading: Boolean(enabled),
-    error: null,
-    accessDenied: false,
-    notFound: false,
-    data: null,
   });
   const mounted = useRef(true);
   const requestId = useRef(0);
@@ -45,10 +56,7 @@ export default function useAiAgentProductSummary({
     }
     setState((prev) => ({
       ...prev,
-      loading: false,
-      error: null,
-      accessDenied: false,
-      notFound: false,
+      ...idleState,
       data: mapAiAgentProductSummary(payload, {
         agentRef: agentRefKey || undefined,
       }),
@@ -57,24 +65,15 @@ export default function useAiAgentProductSummary({
 
   const reload = useCallback(async () => {
     if (!enabled) {
-      setState({
-        loading: false,
-        error: null,
-        accessDenied: false,
-        notFound: false,
-        data: null,
-      });
+      setState({ ...idleState });
       return;
     }
 
     const rid = ++requestId.current;
     setState((prev) => ({
       ...prev,
+      ...idleState,
       loading: true,
-      error: null,
-      accessDenied: false,
-      notFound: false,
-      data: null,
     }));
 
     try {
@@ -83,10 +82,7 @@ export default function useAiAgentProductSummary({
       );
       if (!mounted.current || rid !== requestId.current) return;
       setState({
-        loading: false,
-        error: null,
-        accessDenied: false,
-        notFound: false,
+        ...idleState,
         data: mapAiAgentProductSummary(data, {
           agentRef: agentRefKey || undefined,
         }),
@@ -94,32 +90,18 @@ export default function useAiAgentProductSummary({
     } catch (err) {
       if (!mounted.current || rid !== requestId.current) return;
       if (isForbidden(err)) {
-        setState({
-          loading: false,
-          error: null,
-          accessDenied: true,
-          notFound: false,
-          data: null,
-        });
+        setState({ ...idleState, accessDenied: true });
+        return;
+      }
+      if (isArchived(err)) {
+        setState({ ...idleState, notFound: true, archived: true });
         return;
       }
       if (isNotFound(err)) {
-        setState({
-          loading: false,
-          error: null,
-          accessDenied: false,
-          notFound: true,
-          data: null,
-        });
+        setState({ ...idleState, notFound: true });
         return;
       }
-      setState({
-        loading: false,
-        error: err,
-        accessDenied: false,
-        notFound: false,
-        data: null,
-      });
+      setState({ ...idleState, error: err });
     }
   }, [enabled, companyId, agentRefKey]);
 

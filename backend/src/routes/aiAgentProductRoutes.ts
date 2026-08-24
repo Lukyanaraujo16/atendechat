@@ -91,6 +91,13 @@ aiAgentProductRoutes.post(
   AiAgentProductController.command
 );
 
+aiAgentProductRoutes.post(
+  "/product/ai-agent/agents/:agentRef/archive",
+  ...productView,
+  logAiAgentProductSupportWrite("ai_agent.product.archive"),
+  AiAgentProductController.archive
+);
+
 aiAgentProductRoutes.get(
   "/product/ai-agent/configuration",
   ...productView,

@@ -358,7 +358,9 @@ describe("commands exigem agentRef com múltiplos agentes", () => {
       body: { command: "deactivate" }
     });
     expect(mockAgentFindAll).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { companyId: 55 } })
+      expect.objectContaining({
+        where: expect.objectContaining({ companyId: 55 })
+      })
     );
   });
 });

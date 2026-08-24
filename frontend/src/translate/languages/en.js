@@ -3077,6 +3077,22 @@ const messages = {
 							"Deactivate the agent before changing this configuration.",
 					},
 				},
+				archive: {
+					dangerTitle: "Danger zone",
+					cardTitle: "Archive agent",
+					cardBody:
+						"This agent will be removed from operation and will no longer appear in the active agents list. Conversation history and audit data will be preserved.",
+					cta: "Archive agent",
+					ctaAria: "Archive agent {{name}}",
+					confirmTitle: "Archive {{name}}?",
+					confirmBody:
+						"This agent will be removed from operation and its connections will be unlinked. Conversation history will be preserved.",
+					confirmNameLabel: "To confirm, type the agent name:",
+					requiresDeactivation: "Deactivate the agent before archiving it.",
+					activeTitle: "Cannot archive {{name}}",
+					success: "Agent archived.",
+					archivedToast: "This agent was archived.",
+				},
 				connections: {
 					title: "Connections for {{name}}",
 					linkedTitle: "Linked to this agent",

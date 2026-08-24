@@ -1,4 +1,5 @@
 import AiAgent from "../../models/AiAgent";
+import { isAiAgentArchived } from "../../helpers/isAiAgentArchived";
 import AiAgentRuntimeLog from "../../models/AiAgentRuntimeLog";
 import Contact from "../../models/Contact";
 import Ticket from "../../models/Ticket";
@@ -193,7 +194,7 @@ export async function generateAndSendLiveResponseForLog(
     return;
   }
 
-  if (!agent.enabled) {
+  if (!agent.enabled || isAiAgentArchived(agent)) {
     await updateAiAgentLiveLog(logId, companyId, {
       liveStatus: AI_AGENT_LIVE_STATUSES.SKIPPED,
       errorCode: AI_AGENT_LIVE_ERROR_CODES.NOT_ELIGIBLE

@@ -112,6 +112,10 @@ class AiAgent extends Model<AiAgent> {
   @CreatedAt
   createdAt: Date;
 
+  @AllowNull(true)
+  @Column(DataType.DATE)
+  archivedAt: Date | null;
+
   @UpdatedAt
   updatedAt: Date;
 }

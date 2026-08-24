@@ -30,7 +30,8 @@ import {
 } from "./aiAgentProductConnectionScope";
 import {
   encodeAgentRef,
-  resolveAiAgentProductAgentForOperation
+  resolveAiAgentProductAgentForOperation,
+  throwIfAiAgentArchived
 } from "./aiAgentProductAgentRef";
 import {
   scopeAiAgentProductSnapshotToAgent
@@ -243,6 +244,7 @@ export default async function ExecuteAiAgentProductCommandService(input: {
         "Agente de IA não encontrado."
       );
     }
+    throwIfAiAgentArchived(agent);
 
     operatedAgentId = agent.id;
     const linked = await lockLinkedWhatsapps(companyId, agent.id, transaction);

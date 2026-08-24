@@ -74,7 +74,7 @@ export default async function GetAiAgentProductConfigurationOptionsService(input
       attributes: ["id", "name", "status", "aiAgentId"]
     }),
     AiAgent.findAll({
-      where: { companyId },
+      where: { companyId, archivedAt: null },
       order: [["id", "ASC"]],
       attributes: ["id", "name"]
     })

@@ -26,6 +26,7 @@ import TestAiAgentProductCredentialService from "../services/AiAgentProductServi
 import EnableAiAgentProductCredentialService from "../services/AiAgentProductService/EnableAiAgentProductCredentialService";
 import DisableAiAgentProductCredentialService from "../services/AiAgentProductService/DisableAiAgentProductCredentialService";
 import ListAiAgentProductAgentsService from "../services/AiAgentProductService/ListAiAgentProductAgentsService";
+import ArchiveAiAgentProductService from "../services/AiAgentProductService/ArchiveAiAgentProductService";
 import ListAiAgentProductKnowledgeService from "../services/AiAgentProductService/ListAiAgentProductKnowledgeService";
 import SyncAiAgentProductKnowledgeService from "../services/AiAgentProductService/SyncAiAgentProductKnowledgeService";
 import { extractAgentRefFromRequest } from "../services/AiAgentProductService/aiAgentProductAgentRef";
@@ -182,6 +183,42 @@ export const command = async (
       "ERR_AI_AGENT_PRODUCT_COMMAND_NOT_ALLOWED",
       500,
       "Não foi possível executar o comando do Agente de IA."
+    );
+  }
+};
+
+export const archive = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  try {
+    rejectArbitraryCompanyId(req);
+    const companyId = companyIdOrThrow(req);
+    const agentRef = extractAgentRefFromRequest({
+      params: req.params as Record<string, unknown>,
+      query: req.query as Record<string, unknown>,
+      body: req.body as Record<string, unknown>
+    });
+    const data = await ArchiveAiAgentProductService({
+      companyId,
+      req,
+      body: req.body as Record<string, unknown>,
+      agentRef
+    });
+    return res.json(data);
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    logger.error(
+      {
+        err: err instanceof Error ? err.message : "unknown",
+        surface: "ai_agent_product"
+      },
+      "ai_agent_product_archive_failed"
+    );
+    throw new AppError(
+      "ERR_AI_AGENT_PRODUCT_COMMAND_NOT_ALLOWED",
+      500,
+      "Não foi possível arquivar o Agente de IA."
     );
   }
 };

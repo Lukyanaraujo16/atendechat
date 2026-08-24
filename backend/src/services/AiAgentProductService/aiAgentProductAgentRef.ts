@@ -1,4 +1,8 @@
 import AppError from "../../errors/AppError";
+import {
+  isAiAgentArchived,
+  withAiAgentNotArchived
+} from "../../helpers/isAiAgentArchived";
 import AiAgent from "../../models/AiAgent";
 
 /**
@@ -11,6 +15,20 @@ export const ERR_AI_AGENT_PRODUCT_AGENT_REF_REQUIRED =
 
 export const ERR_AI_AGENT_PRODUCT_AGENT_NOT_FOUND =
   "ERR_AI_AGENT_PRODUCT_AGENT_NOT_FOUND";
+
+export const ERR_AI_AGENT_PRODUCT_ARCHIVED = "ERR_AI_AGENT_PRODUCT_ARCHIVED";
+
+export function throwIfAiAgentArchived(
+  agent: { archivedAt?: Date | string | null } | null
+): void {
+  if (isAiAgentArchived(agent)) {
+    throw new AppError(
+      ERR_AI_AGENT_PRODUCT_ARCHIVED,
+      404,
+      "Este agente foi arquivado."
+    );
+  }
+}
 
 export function encodeAgentRef(id: number): string {
   return String(id);
@@ -73,6 +91,7 @@ export async function findAiAgentProductByRefOrThrow(input: {
       "Agente de IA não encontrado."
     );
   }
+  throwIfAiAgentArchived(agent);
   return agent;
 }
 
@@ -112,6 +131,7 @@ export async function resolveAiAgentProductAgentForOperation(input: {
         "Agente de IA não encontrado."
       );
     }
+    throwIfAiAgentArchived(agent);
     return {
       kind: "resolved",
       agent,
@@ -121,7 +141,7 @@ export async function resolveAiAgentProductAgentForOperation(input: {
   }
 
   const agents = await AiAgent.findAll({
-    where: { companyId },
+    where: withAiAgentNotArchived({ companyId }),
     order: [["id", "ASC"]],
     attributes: ["id", "name", "enabled", "model", "aiProviderCredentialId", "companyId", "systemPrompt"]
   });

@@ -1,4 +1,5 @@
 import AiAgent from "../../models/AiAgent";
+import { isAiAgentArchived } from "../../helpers/isAiAgentArchived";
 import AiAgentRuntimeLog from "../../models/AiAgentRuntimeLog";
 import Contact from "../../models/Contact";
 import Ticket from "../../models/Ticket";
@@ -151,7 +152,7 @@ export async function generateShadowSuggestionForLog(
     return;
   }
 
-  if (!agent.enabled) {
+  if (!agent.enabled || isAiAgentArchived(agent)) {
     await updateAiAgentShadowLog(logId, companyId, {
       shadowStatus: AI_AGENT_SHADOW_STATUSES.SKIPPED,
       errorCode: AI_AGENT_SHADOW_ERROR_CODES.NOT_ELIGIBLE

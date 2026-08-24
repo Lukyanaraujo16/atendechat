@@ -45,7 +45,7 @@ export default async function ListAiAgentProductAgentsService(input: {
   });
 
   const agents = await AiAgent.findAll({
-    where: { companyId },
+    where: { companyId, archivedAt: null },
     order: [
       ["name", "ASC"],
       ["id", "ASC"]

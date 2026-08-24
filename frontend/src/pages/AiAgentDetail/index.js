@@ -120,6 +120,7 @@ export default function AiAgentDetailPage() {
     error,
     accessDenied,
     notFound,
+    archived,
     data,
     reload,
     applySummary,
@@ -138,6 +139,13 @@ export default function AiAgentDetailPage() {
     setBusyCommand(null);
     setCommandError(null);
   }, [agentRef]);
+
+  useEffect(() => {
+    if (!archived) return undefined;
+    toast.info(i18n.t("aiAgentProduct.archive.archivedToast"));
+    history.replace(AI_AGENT_ROUTE_PATH);
+    return undefined;
+  }, [archived, history]);
 
   const canMutate = canManageAiAgentProduct(user);
 
@@ -216,6 +224,10 @@ export default function AiAgentDetailPage() {
     await reload();
     await loadEditableFlag();
   };
+
+  if (archived) {
+    return null;
+  }
 
   if (!agentRef || notFound) {
     return (
@@ -348,6 +360,7 @@ export default function AiAgentDetailPage() {
                 commandBusy={busyCommand}
                 onOpenCredentials={() => setCredentialModalOpen(true)}
                 supportMode={user?.supportMode === true}
+                agentRef={agentRef}
               />
             </Box>
           </>

@@ -546,7 +546,9 @@ describe("ExecuteAiAgentProductCommandService (Fase 2.2)", () => {
     });
 
     expect(mockAgentFindAll).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { companyId: 10 } })
+      expect.objectContaining({
+        where: expect.objectContaining({ companyId: 10 })
+      })
     );
     expect(mockWaFindAll).toHaveBeenCalledWith(
       expect.objectContaining({ where: { companyId: 10, aiAgentId: 1 } })

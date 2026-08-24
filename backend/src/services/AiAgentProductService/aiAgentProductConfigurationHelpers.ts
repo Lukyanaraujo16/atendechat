@@ -804,7 +804,7 @@ export async function lockEligibleAgents(
   transaction: Transaction
 ): Promise<AiAgent[]> {
   return AiAgent.findAll({
-    where: { companyId },
+    where: { companyId, archivedAt: null },
     order: [["id", "ASC"]],
     lock: Transaction.LOCK.UPDATE,
     transaction
