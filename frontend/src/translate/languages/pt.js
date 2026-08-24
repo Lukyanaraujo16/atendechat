@@ -2891,6 +2891,18 @@ const messages = {
           refresh: "Atualizar",
           retry: "Tentar novamente",
         },
+        reconfigure: {
+          cta: "Reconfigurar agente",
+          ctaAria: "Reconfigurar agente {{name}}",
+          confirmTitle: "Reconfigurar {{name}}?",
+          confirmBodyDeactivate:
+            "Para alterar toda a configuração, o agente precisa ser desativado primeiro.",
+          confirmBodyNavigate:
+            "Ao continuar, o agente será desativado e você será levado ao assistente de configuração.",
+          confirmBodySave:
+            "Nenhuma alteração será aplicada até você concluir o assistente.",
+          confirmAction: "Desativar e reconfigurar",
+        },
         commands: {
           deactivate: "Desativar agente",
         },

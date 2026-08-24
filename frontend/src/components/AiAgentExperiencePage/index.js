@@ -17,6 +17,7 @@ import AiAgentReadinessChecklist from "../AiAgentReadinessChecklist";
 import AiAgentProductCredentialModal from "../AiAgentProductCredentialModal";
 import AiAgentConnectionsPanel from "../AiAgentConnectionsPanel";
 import AiAgentSupportBanner from "../AiAgentSupportBanner";
+import AiAgentReconfigureControl from "../AiAgentReconfigureControl";
 import { listAiAgentProductCredentials } from "../../services/aiAgentProductApi";
 import { i18n } from "../../translate/i18n";
 
@@ -92,6 +93,7 @@ export default function AiAgentExperiencePage({
   const [credentialModalMode, setCredentialModalMode] = useState("manage");
   const [credentialCount, setCredentialCount] = useState(null);
   const [connectionsOpen, setConnectionsOpen] = useState(false);
+  const [reconfigureBusy, setReconfigureBusy] = useState(false);
 
   const showChecklist =
     summary &&
@@ -175,7 +177,7 @@ export default function AiAgentExperiencePage({
     }
   };
 
-  const busyAny = Boolean(commandBusy);
+  const busyAny = Boolean(commandBusy) || reconfigureBusy;
 
   return (
     <Box className={classes.root} data-testid="ai-agent-experience">
@@ -251,6 +253,15 @@ export default function AiAgentExperiencePage({
               agentRefKey ? () => setConnectionsOpen(true) : undefined
             }
             commandBusy={commandBusy}
+          />
+
+          <AiAgentReconfigureControl
+            agentRef={agentRefKey}
+            summary={summary}
+            canMutate={canMutate}
+            commandBusy={commandBusy}
+            onRetry={onRetry}
+            onBusyChange={setReconfigureBusy}
           />
 
           {showChecklist ? (

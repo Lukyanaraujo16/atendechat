@@ -2803,6 +2803,18 @@ const messages = {
 					refresh: "Refresh",
 					retry: "Try again",
 				},
+				reconfigure: {
+					cta: "Reconfigure agent",
+					ctaAria: "Reconfigure agent {{name}}",
+					confirmTitle: "Reconfigure {{name}}?",
+					confirmBodyDeactivate:
+						"To change the full configuration, the agent must be deactivated first.",
+					confirmBodyNavigate:
+						"If you continue, the agent will be deactivated and you will be taken to the setup assistant.",
+					confirmBodySave:
+						"No changes will be applied until you finish the assistant.",
+					confirmAction: "Deactivate and reconfigure",
+				},
 				commands: {
 					deactivate: "Deactivate agent",
 				},
