@@ -6,7 +6,6 @@ import { isNil, isNull, head } from "lodash";
 import { extension as mimeExtension } from "mime-types";
 
 import {
-  downloadMediaMessage,
   getContentType,
   jidNormalizedUser,
   MessageUpsertType,
@@ -91,7 +90,18 @@ import {
   classifyInboundMessageFromNormalized
 } from "../AiAgentService/classifyInboundMessage";
 import { NormalizedWhatsAppMessage } from "../../modules/whatsapp/inbound/NormalizedWhatsAppMessage";
-import { requireBaileysRawMessage } from "../../modules/whatsapp/providers/baileys/inbound/requireBaileysRawMessage";
+import { resolveQuotedMessageByStanzaId } from "../../modules/whatsapp/inbound/resolveQuotedMessageByStanzaId";
+import {
+  requireBaileysRawMessage,
+  tryGetBaileysRawMessage
+} from "../../modules/whatsapp/providers/baileys/inbound/requireBaileysRawMessage";
+import { downloadBaileysMedia } from "../../modules/whatsapp/providers/baileys/inbound/BaileysMediaExtractor";
+import {
+  createBaileysIdentityProbe,
+  inboundAddressingAsMsgLike
+} from "../../modules/whatsapp/providers/baileys/inbound/baileysIdentityProbe";
+import { wrapBaileysSession } from "../../modules/whatsapp/outbound/resolveWhatsAppOutbound";
+import type { WhatsAppOutbound } from "../../modules/whatsapp/outbound/WhatsAppOutbound";
 import CreateTicketSystemMessageService from "../TicketServices/CreateTicketSystemMessageService";
 import Company from "../../models/Company";
 import { formatChatbotBypassSystemMessage } from "../../helpers/chatbotBypassMessages";
@@ -123,13 +133,13 @@ const request = require("request");
 const fs = require("fs");
 
 /**
- * Fase 3 — fronteira inbound WhatsApp:
+ * Fase 4 — fronteira inbound WhatsApp:
  *   Baileys socket → filter/retry (listener) → adaptBaileysInboundMessage
  *   → processInboundWhatsAppMessage → handleMessage(NormalizedWhatsAppMessage).
  *
- * Parsing Baileys fica no adapter. rawProviderMessage é residual (mídia/dataJson/LID).
- * Permanece aqui: transporte (messages.upsert/update), ACK, filtros de stub,
- * contato/ticket/mídia/chatbot/Flow/Typebot/IA, Socket.IO.
+ * Mídia: BaileysMediaExtractor. Quoted: quotedStanzaId. Identidade: baileysIdentityProbe.
+ * rawProviderMessage opcional no gate; lazy via tryGet/requireBaileysRawMessage.
+ * Outbound de domínio deve preferir WhatsAppOutbound (wrapBaileysSession).
  */
 
 type Session = WASocket & {
@@ -308,6 +318,32 @@ function timeout(ms) {
 export async function sleep(time) {
   await timeout(time);
 }
+function outboundForSession(wbot: Session): WhatsAppOutbound {
+  return wrapBaileysSession(wbot);
+}
+
+function contactChatJid(contact: { number: string }, ticket: Ticket): string {
+  return `${contact.number}@${ticket.isGroup ? "g.us" : "s.whatsapp.net"}`;
+}
+
+async function sendOutboundText(
+  wbot: Session,
+  jid: string,
+  text: string
+): Promise<proto.IWebMessageInfo> {
+  const sent = await outboundForSession(wbot).sendText({ jid, text });
+  return sent.rawSentMessage as proto.IWebMessageInfo;
+}
+
+async function sendOutboundContent(
+  wbot: Session,
+  jid: string,
+  content: Record<string, unknown>
+): Promise<proto.IWebMessageInfo> {
+  const sent = await outboundForSession(wbot).sendContent({ jid, content });
+  return sent.rawSentMessage as proto.IWebMessageInfo;
+}
+
 export const sendMessageImage = async (
   wbot: Session,
   contact,
@@ -315,31 +351,35 @@ export const sendMessageImage = async (
   url: string,
   caption: string
 ) => {
+  const outbound = outboundForSession(wbot);
+  const jid = contactChatJid(contact, ticket);
   let sentMessage;
   try {
-    sentMessage = await wbot.sendMessage(
-      `${contact.number}@${ticket.isGroup ? "g.us" : "s.whatsapp.net"}`,
-      {
-        image: url
-          ? { url }
-          : fs.readFileSync(`public/temp/${caption}-${makeid(10)}`),
-        fileName: caption,
-        caption: caption,
-        mimetype: "image/jpeg"
-      }
-    );
+    sentMessage = (
+      await outbound.sendContent({
+        jid,
+        content: {
+          image: url
+            ? { url }
+            : fs.readFileSync(`public/temp/${caption}-${makeid(10)}`),
+          fileName: caption,
+          caption: caption,
+          mimetype: "image/jpeg"
+        }
+      })
+    ).rawSentMessage;
   } catch (error) {
-    sentMessage = await wbot.sendMessage(
-      `${contact.number}@${ticket.isGroup ? "g.us" : "s.whatsapp.net"}`,
-      {
+    sentMessage = (
+      await outbound.sendText({
+        jid,
         text: formatBody(
           "Não consegui enviar a imagem, tente novamente!",
           contact
         )
-      }
-    );
+      })
+    ).rawSentMessage;
   }
-  verifyMessage(sentMessage, ticket, contact);
+  verifyMessage(sentMessage as proto.IWebMessageInfo, ticket, contact);
 };
 
 export const sendMessageLink = async (
@@ -349,28 +389,32 @@ export const sendMessageLink = async (
   url: string,
   caption: string
 ) => {
+  const outbound = outboundForSession(wbot);
+  const jid = contactChatJid(contact, ticket);
   let sentMessage;
   try {
-    sentMessage = await wbot.sendMessage(
-      `${contact.number}@${ticket.isGroup ? "g.us" : "s.whatsapp.net"}`,
-      {
-        document: url
-          ? { url }
-          : fs.readFileSync(`public/temp/${caption}-${makeid(10)}`),
-        fileName: caption,
-        caption: caption,
-        mimetype: "application/pdf"
-      }
-    );
+    sentMessage = (
+      await outbound.sendContent({
+        jid,
+        content: {
+          document: url
+            ? { url }
+            : fs.readFileSync(`public/temp/${caption}-${makeid(10)}`),
+          fileName: caption,
+          caption: caption,
+          mimetype: "application/pdf"
+        }
+      })
+    ).rawSentMessage;
   } catch (error) {
-    sentMessage = await wbot.sendMessage(
-      `${contact.number}@${ticket.isGroup ? "g.us" : "s.whatsapp.net"}`,
-      {
+    sentMessage = (
+      await outbound.sendText({
+        jid,
         text: formatBody("Não consegui enviar o PDF, tente novamente!", contact)
-      }
-    );
+      })
+    ).rawSentMessage;
   }
-  verifyMessage(sentMessage, ticket, contact);
+  verifyMessage(sentMessage as proto.IWebMessageInfo, ticket, contact);
 };
 
 export function makeid(length) {
@@ -514,69 +558,14 @@ const getContactMessage = async (
 };
 
 const downloadMedia = async (msg: proto.IWebMessageInfo) => {
-  let buffer: Buffer | undefined;
-  try {
-    // Baileys v7 alterou os tipos esperados por downloadMediaMessage
-    // Mantemos o comportamento, apenas ajustando o cast de tipagem.
-    buffer = await downloadMediaMessage(msg as any, "buffer", {});
-  } catch (err) {
-    console.error("Erro ao baixar mídia:", err);
-    return null;
-  }
-
-  if (!buffer || (Buffer.isBuffer(buffer) ? buffer.length === 0 : !(buffer as any)?.length)) {
-    logger.warn(
-      { messageId: msg.key?.id },
-      "[WhatsAppInbound] download_media_empty"
-    );
-    return null;
-  }
-
-  // Garantir Buffer binário
-  if (!Buffer.isBuffer(buffer)) {
-    buffer = Buffer.from(buffer as Uint8Array);
-  }
-
-  let filename = msg.message?.documentMessage?.fileName || "";
-
-  const mineType =
-    msg.message?.imageMessage ||
-    msg.message?.audioMessage ||
-    msg.message?.videoMessage ||
-    msg.message?.stickerMessage ||
-    msg.message?.documentMessage ||
-    msg.message?.documentWithCaptionMessage?.message?.documentMessage ||
-    msg.message?.extendedTextMessage?.contextInfo?.quotedMessage
-      ?.imageMessage ||
-    msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.videoMessage;
-
-  if (!mineType) {
-    logger.warn(
-      { messageId: msg.key?.id },
-      "[WhatsAppInbound] download_media_missing_mimetype"
-    );
-    return null;
-  }
-
-  if (!filename) {
-    const ext = mimeExtension(mineType.mimetype) || "bin";
-    filename = `${new Date().getTime()}.${ext}`;
-  } else {
-    filename = `${new Date().getTime()}_${filename}`;
-  }
-
-  return {
-    data: buffer,
-    mimetype: mineType.mimetype,
-    filename
-  };
+  return downloadBaileysMedia(msg);
 };
 
 const verifyContact = async (
   msgContact: IMe,
   wbot: Session,
   companyId: number,
-  inboundMsg?: proto.IWebMessageInfo
+  inboundMsg?: proto.IWebMessageInfo | ReturnType<typeof inboundAddressingAsMsgLike>
 ): Promise<Contact> => {
   const rawId = String(msgContact.id || "");
   const isGroupEntity = rawId.includes("g.us");
@@ -588,21 +577,7 @@ const verifyContact = async (
     number = rawId.replace(/\D/g, "");
     profileJid = rawId;
   } else if (inboundMsg) {
-    const tryOnWhatsApp = async (jid: string): Promise<string | null> => {
-      try {
-        const results = await wbot.onWhatsApp(jid);
-        const first = Array.isArray(results) ? results[0] : results;
-        if (first?.exists && first?.jid) {
-          return normalizeWhatsAppJidToNumber(first.jid);
-        }
-      } catch (probeErr) {
-        logger.debug(
-          { err: probeErr, jid },
-          "[ContactNormalization] onWhatsApp probe failed"
-        );
-      }
-      return null;
-    };
+    const tryOnWhatsApp = createBaileysIdentityProbe(wbot);
 
     const isGroupParticipantMsg = Boolean(
       inboundMsg?.key?.remoteJid?.endsWith("@g.us")
@@ -656,20 +631,15 @@ const verifyContact = async (
 };
 
 const verifyQuotedMessage = async (
-  msg: proto.IWebMessageInfo
+  msg: proto.IWebMessageInfo | null | undefined,
+  quotedStanzaId?: string | null
 ): Promise<Message | null> => {
+  if (quotedStanzaId != null && String(quotedStanzaId).length > 0) {
+    return resolveQuotedMessageByStanzaId(quotedStanzaId);
+  }
   if (!msg) return null;
   const quoted = getQuotedMessageId(msg);
-
-  if (!quoted) return null;
-
-  const quotedMsg = await Message.findOne({
-    where: { id: quoted }
-  });
-
-  if (!quotedMsg) return null;
-
-  return quotedMsg;
+  return resolveQuotedMessageByStanzaId(quoted);
 };
 
 export const convertTextToSpeechAndSaveToFile = (
@@ -822,7 +792,12 @@ const handleOpenAi = async (
 
   let messagesOpenAi: ChatCompletionRequestMessage[] = [];
 
-  if (msg.message?.conversation || msg.message?.extendedTextMessage?.text) {
+  const isTextInbound =
+    Boolean(msg.message?.conversation || msg.message?.extendedTextMessage?.text) ||
+    (Boolean(bodyMessage) && !msg.message?.audioMessage);
+  const isAudioInbound = Boolean(msg.message?.audioMessage);
+
+  if (isTextInbound) {
     messagesOpenAi = [];
     messagesOpenAi.push({ role: "system", content: promptSystem });
     for (let i = 0; i < Math.min(maxMessages, chronologicalMessages.length); i++) {
@@ -859,9 +834,7 @@ const handleOpenAi = async (
         },
         "[handleOpenAi] fallback ao cliente (chat)"
       );
-      const sentFallback = await wbot.sendMessage(msg.key.remoteJid!, {
-        text: `\u200e ${OPENAI_FALLBACK_CLIENT_MESSAGE}`
-      });
+      const sentFallback = await sendOutboundText(wbot, msg.key.remoteJid!, `\u200e ${OPENAI_FALLBACK_CLIENT_MESSAGE}`);
       await verifyMessage(sentFallback!, ticket, contact);
       return;
     }
@@ -875,19 +848,15 @@ const handleOpenAi = async (
         .trim();
     }
 
-    const sentMessage = await wbot.sendMessage(msg.key.remoteJid!, {
-      text: `\u200e ${response!}`
-    });
+    const sentMessage = await sendOutboundText(wbot, msg.key.remoteJid!, `\u200e ${response!}`);
     await verifyMessage(sentMessage!, ticket, contact);
-  } else if (msg.message?.audioMessage) {
+  } else if (isAudioInbound) {
     if (!(await canMakeOpenAiCalls(ticket.companyId, 2))) {
       logger.warn(
         { ticketId: ticket.id, companyId: ticket.companyId },
         "[handleOpenAi] limite diário OpenAI (transcrição + chat)"
       );
-      const sentLimit = await wbot.sendMessage(msg.key.remoteJid!, {
-        text: `\u200e ${OPENAI_FALLBACK_CLIENT_MESSAGE}`
-      });
+      const sentLimit = await sendOutboundText(wbot, msg.key.remoteJid!, `\u200e ${OPENAI_FALLBACK_CLIENT_MESSAGE}`);
       await verifyMessage(sentLimit!, ticket, contact);
       return;
     }
@@ -913,9 +882,7 @@ const handleOpenAi = async (
         },
         "[handleOpenAi] fallback ao cliente (transcrição)"
       );
-      const sentTransFallback = await wbot.sendMessage(msg.key.remoteJid!, {
-        text: `\u200e ${OPENAI_FALLBACK_CLIENT_MESSAGE}`
-      });
+      const sentTransFallback = await sendOutboundText(wbot, msg.key.remoteJid!, `\u200e ${OPENAI_FALLBACK_CLIENT_MESSAGE}`);
       await verifyMessage(sentTransFallback!, ticket, contact);
       return;
     }
@@ -955,9 +922,7 @@ const handleOpenAi = async (
         },
         "[handleOpenAi] fallback ao cliente (chat pós-áudio)"
       );
-      const sentAudioFallback = await wbot.sendMessage(msg.key.remoteJid!, {
-        text: `\u200e ${OPENAI_FALLBACK_CLIENT_MESSAGE}`
-      });
+      const sentAudioFallback = await sendOutboundText(wbot, msg.key.remoteJid!, `\u200e ${OPENAI_FALLBACK_CLIENT_MESSAGE}`);
       await verifyMessage(sentAudioFallback!, ticket, contact);
       return;
     }
@@ -971,9 +936,7 @@ const handleOpenAi = async (
         .trim();
     }
 
-    const sentAudioReply = await wbot.sendMessage(msg.key.remoteJid!, {
-      text: `\u200e ${response!}`
-    });
+    const sentAudioReply = await sendOutboundText(wbot, msg.key.remoteJid!, `\u200e ${response!}`);
     await verifyMessage(sentAudioReply!, ticket, contact);
   }
   messagesOpenAi = [];
@@ -1007,11 +970,12 @@ export const verifyMediaMessage = async (
     | "ack"
     | "messageType"
     | "editedMessageId"
+    | "quotedStanzaId"
   > | null
 ): Promise<Message | undefined> => {
   const io = getIO();
   try {
-  const quotedMsg = await verifyQuotedMessage(msg);
+  const quotedMsg = await verifyQuotedMessage(msg, inbound?.quotedStanzaId);
   const media = await downloadMedia(msg);
 
   if (!media) {
@@ -1176,11 +1140,12 @@ export const verifyMessage = async (
     | "ack"
     | "messageType"
     | "editedMessageId"
+    | "quotedStanzaId"
   > | null
 ) => {
   const io = getIO();
   try {
-  const quotedMsg = await verifyQuotedMessage(msg);
+  const quotedMsg = await verifyQuotedMessage(msg, inbound?.quotedStanzaId);
   const extractedBody = inbound?.body ?? getBodyMessage(msg);
   const fromMe = inbound?.fromMe ?? (msg.key?.fromMe ?? Boolean(bodyOverride));
   let body: string | null = bodyOverride ?? extractedBody;
@@ -1506,12 +1471,7 @@ const verifyQueue = async (
     ) {
       const body = formatBody(`${connectionGreetingTrim}`, contact);
 
-      await wbot.sendMessage(
-        `${contact.number}@${ticket.isGroup ? "g.us" : "s.whatsapp.net"}`,
-        {
-          text: body
-        }
-      );
+      await sendOutboundText(wbot, contactChatJid(contact, ticket), body);
     }
 
     const firstQueue = head(queues);
@@ -1589,10 +1549,7 @@ const verifyQueue = async (
       )
     };
 
-    const sendMsg = await wbot.sendMessage(
-      `${contact.number}@${ticket.isGroup ? "g.us" : "s.whatsapp.net"}`,
-      textMessage
-    );
+    const sendMsg = await sendOutboundContent(wbot, contactChatJid(contact, ticket), textMessage);
 
     await verifyMessage(sendMsg, ticket, ticket.contact);
   };
@@ -1645,12 +1602,7 @@ const verifyQueue = async (
             `\u200e ${queue.outOfHoursMessage}\n\n*[ # ]* - Voltar ao Menu Principal`,
             ticket.contact
           );
-          const sentMessage = await wbot.sendMessage(
-            `${contact.number}@${ticket.isGroup ? "g.us" : "s.whatsapp.net"}`,
-            {
-              text: body
-            }
-          );
+          const sentMessage = await sendOutboundText(wbot, contactChatJid(contact, ticket), body);
           await verifyMessage(sentMessage, ticket, contact);
           await UpdateTicketService({
             ticketData: { queueId: null, chatbot },
@@ -1706,12 +1658,7 @@ const verifyQueue = async (
         ticket.contact
       );
       if (choosenQueue.greetingMessage) {
-        const sentMessage = await wbot.sendMessage(
-          `${contact.number}@${ticket.isGroup ? "g.us" : "s.whatsapp.net"}`,
-          {
-            text: body
-          }
-        );
+        const sentMessage = await sendOutboundText(wbot, contactChatJid(contact, ticket), body);
         await verifyMessage(sentMessage, ticket, contact);
       }
     }
@@ -2068,12 +2015,7 @@ const handleChartbot = async (
         headerType: 4
       };
 
-      const sendMsg = await wbot.sendMessage(
-        `${ticket.contact.number}@${
-          ticket.isGroup ? "g.us" : "s.whatsapp.net"
-        }`,
-        buttonMessage
-      );
+      const sendMsg = await sendOutboundContent(wbot, contactChatJid(ticket.contact, ticket), buttonMessage);
 
       await verifyMessage(sendMsg, ticket, ticket.contact);
     };
@@ -2094,12 +2036,7 @@ const handleChartbot = async (
         )
       };
 
-      const sendMsg = await wbot.sendMessage(
-        `${ticket.contact.number}@${
-          ticket.isGroup ? "g.us" : "s.whatsapp.net"
-        }`,
-        textMessage
-      );
+      const sendMsg = await sendOutboundContent(wbot, contactChatJid(ticket.contact, ticket), textMessage);
 
       await verifyMessage(sendMsg, ticket, ticket.contact);
     };
@@ -2162,12 +2099,7 @@ const handleChartbot = async (
           sections
         };
 
-        const sendMsg = await wbot.sendMessage(
-          `${ticket.contact.number}@${
-            ticket.isGroup ? "g.us" : "s.whatsapp.net"
-          }`,
-          listMessage
-        );
+        const sendMsg = await sendOutboundContent(wbot, contactChatJid(ticket.contact, ticket), listMessage);
 
         await verifyMessage(sendMsg, ticket, ticket.contact);
       };
@@ -2193,12 +2125,7 @@ const handleChartbot = async (
           headerType: 4
         };
 
-        const sendMsg = await wbot.sendMessage(
-          `${ticket.contact.number}@${
-            ticket.isGroup ? "g.us" : "s.whatsapp.net"
-          }`,
-          buttonMessage
-        );
+        const sendMsg = await sendOutboundContent(wbot, contactChatJid(ticket.contact, ticket), buttonMessage);
 
         await verifyMessage(sendMsg, ticket, ticket.contact);
       };
@@ -2218,12 +2145,7 @@ const handleChartbot = async (
           )
         };
 
-        const sendMsg = await wbot.sendMessage(
-          `${ticket.contact.number}@${
-            ticket.isGroup ? "g.us" : "s.whatsapp.net"
-          }`,
-          textMessage
-        );
+        const sendMsg = await sendOutboundContent(wbot, contactChatJid(ticket.contact, ticket), textMessage);
 
         await verifyMessage(sendMsg, ticket, ticket.contact);
       };
@@ -2256,10 +2178,11 @@ const flowbuilderIntegration = async (
   contact: Contact | null,
   isFirstMsg?: Ticket,
   isTranfered?: boolean,
-  bodyOverride?: string | null
+  bodyOverride?: string | null,
+  quotedStanzaId?: string | null
 ) => {
   const io = getIO();
-  const quotedMsg = await verifyQuotedMessage(msg);
+  const quotedMsg = await verifyQuotedMessage(msg, quotedStanzaId);
   const body = bodyOverride ?? getBodyMessage(msg);
 
   /*
@@ -2767,13 +2690,18 @@ export const handleMessageIntegration = async (
   isFirstMsg: Ticket | null = null,
   inbound?: Pick<
     NormalizedWhatsAppMessage,
-    "body" | "pushName" | "addressing" | "fromMe" | "messageType"
+    "body" | "pushName" | "addressing" | "fromMe" | "messageType" | "quotedStanzaId"
   > | null
 ): Promise<void> => {
   const msgType = inbound?.messageType || getTypeMessage(msg);
 
   if (queueIntegration.type === "n8n" || queueIntegration.type === "webhook") {
     if (queueIntegration?.urlN8N) {
+      /**
+       * Contrato externo legado: body HTTP é o proto Baileys cru (`json: msg`).
+       * Renomear/remover = breaking change para workflows n8n existentes.
+       * Campo conceitual: legacyBaileysPayload. Não migrar sem versionamento.
+       */
       const options = {
         method: "POST",
         url: queueIntegration?.urlN8N,
@@ -2830,7 +2758,8 @@ export const handleMessageIntegration = async (
         contact,
         isFirstMsg,
         undefined,
-        inbound?.body
+        inbound?.body,
+        inbound?.quotedStanzaId
       );
     } else {
       // Menu aceita qualquer texto do cliente (número ou não) para o backend
@@ -2916,14 +2845,29 @@ const handleMessage = async (
   inbound: NormalizedWhatsAppMessage,
   wbot: Session
 ): Promise<void> => {
-  const msg = requireBaileysRawMessage(inbound);
+  const raw = tryGetBaileysRawMessage(inbound);
+  const msgLike = inboundAddressingAsMsgLike(inbound);
+  /**
+   * Compat: restante do handler ainda tipa proto. Preferimos raw;
+   * sem raw usamos shape mínimo do DTO (key/addressing) — suficiente para
+   * contato/ticket/fromMe. Mídia e isValidMsg fino exigem raw.
+   */
+  const msg = (raw ??
+    (msgLike as unknown as proto.IWebMessageInfo)) as proto.IWebMessageInfo;
   const companyId = inbound.companyId;
   let mediaSent: Message | undefined;
   const settingsTracker = createMessageSettingsTracker();
   const loadWhatsappSettings = createWhatsappSettingsLoader(settingsTracker);
 
   try {
-    if (!isValidMsg(msg)) {
+    if (raw) {
+      if (!isValidMsg(raw)) {
+        return;
+      }
+    } else if (!inbound.messageType) {
+      logger.info(
+        `[WhatsAppInbound] ignored reason=empty_message_type_no_raw messageId=${inbound.messageId || ""}`
+      );
       return;
     }
 
@@ -2936,6 +2880,16 @@ const handleMessage = async (
     const msgType = inbound.messageType;
 
     const hasMedia = inbound.media.hasMedia;
+    if (hasMedia && !raw) {
+      logger.warn(
+        {
+          messageId: inbound.messageId,
+          messageType: inbound.messageType
+        },
+        "[WhatsAppInbound] media_requires_rawProviderMessage — stub sem download"
+      );
+    }
+
     if (inbound.fromMe) {
       if (/\u200e/.test(bodyMessage || "")) {
         logger.info(
@@ -2969,26 +2923,27 @@ const handleMessage = async (
       );
       if (groupSettings.callsGroups.groupMessagesMode === "ignore") {
         logger.info(
-          `[WhatsAppInbound] ignored reason=group_messages_disabled whatsappId=${whatsappIdEarly} messageId=${msg.key?.id ?? ""}`
+          `[WhatsAppInbound] ignored reason=group_messages_disabled whatsappId=${whatsappIdEarly} messageId=${inbound.messageId || ""}`
         );
         return;
       }
     }
 
     // Nunca criar/atualizar ticket para o próprio número (evita resposta ir para "si mesmo")
-    if (!isGroup && msg.key.remoteJid) {
+    if (!isGroup && inbound.addressing.remoteJid) {
       const myId = (wbot as WASocket).user?.id;
       if (myId) {
-        const inboundMeta = extractInboundJidMeta(msg);
-        const remoteNumber = normalizeWhatsAppJidToNumber(inboundMeta.remoteJid, {
-          senderPn: inboundMeta.senderPn,
-          remoteJidAlt: inboundMeta.remoteJidAlt,
-          participantPn: inboundMeta.participantPn
-        });
+        const remoteNumber =
+          inbound.senderNumber ||
+          normalizeWhatsAppJidToNumber(inbound.addressing.remoteJid, {
+            senderPn: inbound.addressing.senderPn,
+            remoteJidAlt: inbound.addressing.remoteJidAlt,
+            participantPn: inbound.addressing.participantPn
+          });
         const myNumber = normalizeWhatsAppJidToNumber(jidNormalizedUser(myId));
         if (remoteNumber && myNumber && remoteNumber === myNumber) {
           logger.info(
-            `[WhatsAppInbound] ignored reason=self_chat messageId=${msg.key?.id ?? ""}`
+            `[WhatsAppInbound] ignored reason=self_chat messageId=${inbound.messageId || ""}`
           );
           return;
         }
@@ -2996,12 +2951,18 @@ const handleMessage = async (
     }
 
     if (isGroup) {
-      const grupoMeta = await wbot.groupMetadata(msg.key.remoteJid);
+      const groupJid = inbound.addressing.remoteJid;
+      const grupoMeta = await wbot.groupMetadata(groupJid);
       const msgGroupContact = {
         id: grupoMeta.id,
         name: grupoMeta.subject
       };
-      groupContact = await verifyContact(msgGroupContact, wbot, companyId, msg);
+      groupContact = await verifyContact(
+        msgGroupContact,
+        wbot,
+        companyId,
+        msg
+      );
     }
 
     const whatsapp = await ShowWhatsAppService(wbot.id!, companyId);
@@ -3248,15 +3209,25 @@ const handleMessage = async (
     }
 
     if (hasMedia) {
-      mediaSent = await verifyMediaMessage(
-        msg,
-        ticket,
-        contact,
-        null,
-        false,
-        false,
-        inbound
-      );
+      if (!raw) {
+        await verifyMessage(
+          msg,
+          ticket,
+          contact,
+          "[Mídia: rawProviderMessage ausente]",
+          inbound
+        );
+      } else {
+        mediaSent = await verifyMediaMessage(
+          msg,
+          ticket,
+          contact,
+          null,
+          false,
+          false,
+          inbound
+        );
+      }
     } else {
       await verifyMessage(msg, ticket, contact, undefined, inbound);
     }
@@ -3301,14 +3272,7 @@ const handleMessage = async (
 
           const debouncedSentMessage = debounce(
             async () => {
-              await wbot.sendMessage(
-                `${ticket.contact.number}@${
-                  ticket.isGroup ? "g.us" : "s.whatsapp.net"
-                }`,
-                {
-                  text: body
-                }
-              );
+              await sendOutboundText(wbot, contactChatJid(ticket.contact, ticket), body);
             },
             3000,
             ticket.id
@@ -3352,14 +3316,7 @@ const handleMessage = async (
               const body = `${queue.outOfHoursMessage}`;
               const debouncedSentMessage = debounce(
                 async () => {
-                  await wbot.sendMessage(
-                    `${ticket.contact.number}@${
-                      ticket.isGroup ? "g.us" : "s.whatsapp.net"
-                    }`,
-                    {
-                      text: body
-                    }
-                  );
+                  await sendOutboundText(wbot, contactChatJid(ticket.contact, ticket), body);
                 },
                 3000,
                 ticket.id
@@ -3856,14 +3813,7 @@ const handleMessage = async (
             const body = queue.outOfHoursMessage;
             const debouncedSentMessage = debounce(
               async () => {
-                await wbot.sendMessage(
-                  `${ticket.contact.number}@${
-                    ticket.isGroup ? "g.us" : "s.whatsapp.net"
-                  }`,
-                  {
-                    text: body
-                  }
-                );
+                await sendOutboundText(wbot, contactChatJid(ticket.contact, ticket), body);
               },
               3000,
               ticket.id
@@ -3903,14 +3853,7 @@ const handleMessage = async (
       if (whatsapp.greetingMessage) {
         const debouncedSentMessage = debounce(
           async () => {
-            await wbot.sendMessage(
-              `${ticket.contact.number}@${
-                ticket.isGroup ? "g.us" : "s.whatsapp.net"
-              }`,
-              {
-                text: whatsapp.greetingMessage
-              }
-            );
+            await sendOutboundText(wbot, contactChatJid(ticket.contact, ticket), whatsapp.greetingMessage);
           },
           1000,
           ticket.id

@@ -4,8 +4,8 @@
  * Independente de proto.IWebMessageInfo. Campos derivados do uso real em
  * wbotMessageListener / helpers de JID — não de um contrato Evolution.
  *
- * Fase 3: único provider existente é "baileys". O pipeline de domínio deve
- * preferir estes campos em vez do payload cru.
+ * Fase 4: rawProviderMessage é opcional no pipeline; obrigatório apenas
+ * para caminhos que ainda precisam de download/dataJson/compat Baileys.
  */
 export type WhatsAppInboundProvider = "baileys";
 
@@ -62,30 +62,29 @@ export type NormalizedWhatsAppMessage = {
    */
   editedMessageId: string | null;
   /**
-   * COMPATIBILIDADE TRANSITÓRIA (Fase 3).
+   * COMPATIBILIDADE TRANSITÓRIA (Fase 4).
    *
    * Payload cru do provider. Para Baileys é proto.IWebMessageInfo.
+   * Opcional no pipeline provider-agnostic. Ainda necessário para:
+   * download de mídia, dataJson completo, n8n legado, isValidMsg fino.
    *
-   * Ainda necessário para: dataJson, downloadMedia, quoted lookup,
-   * n8n/webhook (json: msg), LID resolveInboundContactFromMessage,
-   * groupMetadata e alguns ramos OpenAI/chatbot.
-   *
-   * NÃO usar em módulos novos. Não é mais o argumento principal de handleMessage.
+   * NÃO usar em módulos novos. Preferir campos semânticos do DTO.
    */
-  rawProviderMessage: unknown;
+  rawProviderMessage?: unknown | null;
 };
 
 /**
- * Consumidores que ainda dependem de proto.IWebMessageInfo / payload Baileys cru.
- * Trabalho da Fase 4 — não adicionar novos itens.
+ * Resíduos Baileys ainda documentados após Fase 4.
+ * Candidatos a Fase 5 (Evolution) ou cleanup posterior.
  */
-export const PHASE4_BAILEYS_RAW_CONSUMERS = [
-  "services/WbotServices/wbotMessageListener.ts (downloadMedia, verifyQuotedMessage, verifyContact LID, isValidMsg, filterMessages, handleMsgAck, n8n json:msg, groupMetadata, chatbot/OpenAI outbound sendMessage)",
-  "services/WbotServices/providers.ts (outbound sendMessage + getBodyMessage residual)",
-  "services/TypebotServices/typebotListener.ts (msg opcional no caminho ActionsWebhook)",
-  "services/IntegrationsServices/OpenAiService.ts (branch áudio + wbot.sendMessage legado)",
-  "services/WebhookService/ActionsWebhookService.ts (msg proto opcional no fluxo)",
-  "helpers/extractMessageReceivedAt.ts (adapter Baileys)",
-  "helpers/SetTicketMessagesAsRead.ts (dataJson Baileys para recibos — ACK fora desta fase)",
-  "verifyMessage/verifyMediaMessage (dataJson + quoted + download; campos semânticos já preferem o DTO quando informado)"
+export const PHASE5_BAILEYS_RAW_CONSUMERS = [
+  "BaileysMediaExtractor (downloadMediaMessage)",
+  "dataJson persistido com payload Baileys (quoted outbound / histórico)",
+  "n8n webhook json: msg (contrato externo legado — breaking change se removido)",
+  "isValidMsg/filterMessages/handleMsgAck (borda Baileys)",
+  "groupMetadata / GroupServices (admin de grupo)",
+  "lifecycle (initWASocket, QR, logout, rejectCall, heartbeat)",
+  "CheckNumber/CheckIsValidContact (onWhatsApp utilitário)",
+  "SetTicketMessagesAsRead (dataJson → keys de recibo)",
+  "chatbot list/button messages em wbotMessageListener (payload Baileys específico)"
 ] as const;

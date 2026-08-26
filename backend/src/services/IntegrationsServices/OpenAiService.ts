@@ -1,4 +1,7 @@
 import { MessageUpsertType, proto, WASocket } from "@whiskeysockets/baileys";
+
+import fs from "fs";
+import path from "path";
 import {
   convertTextToSpeechAndSaveToFile,
   getBodyMessage,
@@ -7,9 +10,6 @@ import {
   verifyMediaMessage,
   verifyMessage
 } from "../WbotServices/wbotMessageListener";
-
-import fs from "fs";
-import path from "path";
 
 import {
   canMakeOpenAiCalls,
@@ -24,6 +24,7 @@ import Contact from "../../models/Contact";
 import Message from "../../models/Message";
 import TicketTraking from "../../models/TicketTraking";
 import { logger } from "../../utils/logger";
+import { wrapBaileysSession } from "../../modules/whatsapp/outbound/resolveWhatsAppOutbound";
 
 type Session = WASocket & {
   id?: number;
@@ -88,6 +89,9 @@ export const handleOpenAi = async (
 
   if (msg.messageStubType) return;
 
+  const outbound = wrapBaileysSession(wbot);
+  const remoteJid = msg.key.remoteJid!;
+
   const publicFolder: string = path.resolve(
     __dirname,
     "..",
@@ -114,7 +118,14 @@ export const handleOpenAi = async (
 
   let messagesOpenAi = [];
 
-  if (msg.message?.conversation || msg.message?.extendedTextMessage?.text) {
+  const isTextInbound =
+    Boolean(
+      msg.message?.conversation || msg.message?.extendedTextMessage?.text
+    ) ||
+    (Boolean(bodyOverride) && !msg.message?.audioMessage);
+  const isAudioInbound = Boolean(msg.message?.audioMessage);
+
+  if (isTextInbound) {
     messagesOpenAi = [];
     messagesOpenAi.push({ role: "system", content: promptSystem });
     for (
@@ -154,9 +165,14 @@ export const handleOpenAi = async (
         },
         "[OpenAiService] fallback ao cliente (chat)"
       );
-      const sentFallback = await wbot.sendMessage(msg.key.remoteJid!, {
-        text: `\u200e ${OPENAI_FALLBACK_CLIENT_MESSAGE}`
-      });
+      const sentFallback = (
+        await outbound.sendContent({
+          jid: remoteJid,
+          content: {
+            text: `\u200e ${OPENAI_FALLBACK_CLIENT_MESSAGE}`
+          }
+        })
+      ).rawSentMessage;
       await verifyMessage(sentFallback!, ticket, contact);
       return;
     }
@@ -172,9 +188,14 @@ export const handleOpenAi = async (
 
     if (openAiSettings.voice === "texto") {
       logger.info(response);
-      const sentMessage = await wbot.sendMessage(msg.key.remoteJid!, {
-        text: `\u200e ${response!}`
-      });
+      const sentMessage = (
+        await outbound.sendContent({
+          jid: remoteJid,
+          content: {
+            text: `\u200e ${response!}`
+          }
+        })
+      ).rawSentMessage;
       await verifyMessage(sentMessage!, ticket, contact);
     } else {
       const fileNameWithOutExtension = `${ticket.id}_${Date.now()}`;
@@ -187,11 +208,18 @@ export const handleOpenAi = async (
         "mp3"
       ).then(async () => {
         try {
-          const sendMessage = await wbot.sendMessage(msg.key.remoteJid!, {
-            audio: { url: `${publicFolder}/${fileNameWithOutExtension}.mp3` },
-            mimetype: "audio/mpeg",
-            ptt: true
-          });
+          const sendMessage = (
+            await outbound.sendContent({
+              jid: remoteJid,
+              content: {
+                audio: {
+                  url: `${publicFolder}/${fileNameWithOutExtension}.mp3`
+                },
+                mimetype: "audio/mpeg",
+                ptt: true
+              }
+            })
+          ).rawSentMessage;
           await verifyMediaMessage(
             sendMessage!,
             ticket,
@@ -203,19 +231,27 @@ export const handleOpenAi = async (
           deleteFileSync(`${publicFolder}/${fileNameWithOutExtension}.mp3`);
           deleteFileSync(`${publicFolder}/${fileNameWithOutExtension}.wav`);
         } catch (error) {
-          logger.warn({ err: error }, "[OpenAiService] erro ao enviar áudio TTS");
+          logger.warn(
+            { err: error },
+            "[OpenAiService] erro ao enviar áudio TTS"
+          );
         }
       });
     }
-  } else if (msg.message?.audioMessage) {
+  } else if (isAudioInbound) {
     if (!(await canMakeOpenAiCalls(ticket.companyId, 2))) {
       logger.warn(
         { ticketId: ticket.id, companyId: ticket.companyId },
         "[OpenAiService] limite diário OpenAI (transcrição + chat)"
       );
-      const sentLimit = await wbot.sendMessage(msg.key.remoteJid!, {
-        text: `\u200e ${OPENAI_FALLBACK_CLIENT_MESSAGE}`
-      });
+      const sentLimit = (
+        await outbound.sendContent({
+          jid: remoteJid,
+          content: {
+            text: `\u200e ${OPENAI_FALLBACK_CLIENT_MESSAGE}`
+          }
+        })
+      ).rawSentMessage;
       await verifyMessage(sentLimit!, ticket, contact);
       return;
     }
@@ -240,9 +276,14 @@ export const handleOpenAi = async (
         },
         "[OpenAiService] fallback ao cliente (transcrição)"
       );
-      const sentTransFallback = await wbot.sendMessage(msg.key.remoteJid!, {
-        text: `\u200e ${OPENAI_FALLBACK_CLIENT_MESSAGE}`
-      });
+      const sentTransFallback = (
+        await outbound.sendContent({
+          jid: remoteJid,
+          content: {
+            text: `\u200e ${OPENAI_FALLBACK_CLIENT_MESSAGE}`
+          }
+        })
+      ).rawSentMessage;
       await verifyMessage(sentTransFallback!, ticket, contact);
       return;
     }
@@ -286,9 +327,14 @@ export const handleOpenAi = async (
         },
         "[OpenAiService] fallback ao cliente (chat pós-áudio)"
       );
-      const sentAudioFallback = await wbot.sendMessage(msg.key.remoteJid!, {
-        text: `\u200e ${OPENAI_FALLBACK_CLIENT_MESSAGE}`
-      });
+      const sentAudioFallback = (
+        await outbound.sendContent({
+          jid: remoteJid,
+          content: {
+            text: `\u200e ${OPENAI_FALLBACK_CLIENT_MESSAGE}`
+          }
+        })
+      ).rawSentMessage;
       await verifyMessage(sentAudioFallback!, ticket, contact);
       return;
     }
@@ -302,9 +348,14 @@ export const handleOpenAi = async (
         .trim();
     }
     if (openAiSettings.voice === "texto") {
-      const sentMessage = await wbot.sendMessage(msg.key.remoteJid!, {
-        text: `\u200e ${response!}`
-      });
+      const sentMessage = (
+        await outbound.sendContent({
+          jid: remoteJid,
+          content: {
+            text: `\u200e ${response!}`
+          }
+        })
+      ).rawSentMessage;
       await verifyMessage(sentMessage!, ticket, contact);
     } else {
       const fileNameWithOutExtension = `${ticket.id}_${Date.now()}`;
@@ -317,11 +368,18 @@ export const handleOpenAi = async (
         "mp3"
       ).then(async () => {
         try {
-          const sendMessage = await wbot.sendMessage(msg.key.remoteJid!, {
-            audio: { url: `${publicFolder}/${fileNameWithOutExtension}.mp3` },
-            mimetype: "audio/mpeg",
-            ptt: true
-          });
+          const sendMessage = (
+            await outbound.sendContent({
+              jid: remoteJid,
+              content: {
+                audio: {
+                  url: `${publicFolder}/${fileNameWithOutExtension}.mp3`
+                },
+                mimetype: "audio/mpeg",
+                ptt: true
+              }
+            })
+          ).rawSentMessage;
           await verifyMediaMessage(
             sendMessage!,
             ticket,
@@ -333,7 +391,10 @@ export const handleOpenAi = async (
           deleteFileSync(`${publicFolder}/${fileNameWithOutExtension}.mp3`);
           deleteFileSync(`${publicFolder}/${fileNameWithOutExtension}.wav`);
         } catch (error) {
-          logger.warn({ err: error }, "[OpenAiService] erro ao enviar áudio TTS (pós-transcrição)");
+          logger.warn(
+            { err: error },
+            "[OpenAiService] erro ao enviar áudio TTS (pós-transcrição)"
+          );
         }
       });
     }

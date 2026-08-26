@@ -10,8 +10,17 @@ export function requireBaileysRawMessage(
 ): proto.IWebMessageInfo {
   if (inbound.rawProviderMessage == null) {
     throw new Error(
-      "NormalizedWhatsAppMessage.rawProviderMessage ausente (compatibilidade transitória Fase 3)"
+      "NormalizedWhatsAppMessage.rawProviderMessage ausente (necessário para mídia/dataJson/compatibilidade Baileys)"
     );
+  }
+  return inbound.rawProviderMessage as proto.IWebMessageInfo;
+}
+
+export function tryGetBaileysRawMessage(
+  inbound: NormalizedWhatsAppMessage
+): proto.IWebMessageInfo | null {
+  if (inbound.rawProviderMessage == null) {
+    return null;
   }
   return inbound.rawProviderMessage as proto.IWebMessageInfo;
 }

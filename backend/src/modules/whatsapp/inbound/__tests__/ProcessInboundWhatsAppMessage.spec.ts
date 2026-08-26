@@ -1,4 +1,7 @@
-import { processInboundWhatsAppMessage } from "../ProcessInboundWhatsAppMessage";
+import {
+  OPERATIONS_REQUIRING_RAW_PROVIDER_MESSAGE,
+  processInboundWhatsAppMessage
+} from "../ProcessInboundWhatsAppMessage";
 import { NormalizedWhatsAppMessage } from "../NormalizedWhatsAppMessage";
 
 function inbound(
@@ -54,12 +57,29 @@ describe("processInboundWhatsAppMessage", () => {
     expect(received[0].rawProviderMessage).toBe(msg.rawProviderMessage);
   });
 
-  it("rejeita ausência de rawProviderMessage na Fase 3 (compatibilidade)", async () => {
-    await expect(
-      processInboundWhatsAppMessage(inbound({ rawProviderMessage: null }), {
-        handleInboundMessage: async () => undefined
-      })
-    ).rejects.toThrow(/rawProviderMessage/);
+  it("aceita ausência de rawProviderMessage no gate (Fase 4)", async () => {
+    const received: NormalizedWhatsAppMessage[] = [];
+    await processInboundWhatsAppMessage(
+      inbound({ rawProviderMessage: undefined }),
+      {
+        handleInboundMessage: async normalized => {
+          received.push(normalized);
+        }
+      }
+    );
+    expect(received).toHaveLength(1);
+    expect(received[0].rawProviderMessage).toBeUndefined();
+  });
+
+  it("aceita rawProviderMessage null no gate (Fase 4)", async () => {
+    const received: NormalizedWhatsAppMessage[] = [];
+    await processInboundWhatsAppMessage(inbound({ rawProviderMessage: null }), {
+      handleInboundMessage: async normalized => {
+        received.push(normalized);
+      }
+    });
+    expect(received).toHaveLength(1);
+    expect(received[0].rawProviderMessage).toBeNull();
   });
 
   it("rejeita provider diferente de baileys", async () => {
@@ -69,5 +89,12 @@ describe("processInboundWhatsAppMessage", () => {
         { handleInboundMessage: async () => undefined }
       )
     ).rejects.toThrow(/baileys/);
+  });
+
+  it("documenta operações que ainda exigem raw", () => {
+    expect(OPERATIONS_REQUIRING_RAW_PROVIDER_MESSAGE.length).toBeGreaterThan(0);
+    expect(OPERATIONS_REQUIRING_RAW_PROVIDER_MESSAGE.join(" ")).toMatch(
+      /downloadMedia|dataJson|n8n/i
+    );
   });
 });

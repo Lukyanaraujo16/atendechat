@@ -86,9 +86,6 @@ export interface WhatsAppOutbound {
  * Trabalho da Fase 3 (e grupos/lifecycle).
  */
 export const PHASE3_WHATSAPP_SOCKET_CONSUMERS = [
-  "services/WbotServices/wbotMessageListener.ts (respostas inbound: OpenAI, chatbot, greeting, sendMessageImage/Link)",
-  "services/WbotServices/providers.ts (chatbot de boletos/ISP)",
-  "services/IntegrationsServices/OpenAiService.ts (Flow/webhook OpenAI legado)",
   "services/WbotServices/wbotMonitor.ts (rejectCall + mensagem pós-rejeição — lifecycle)",
   "helpers/whatsappUnavailablePresence.ts (heartbeat unavailable — conexão, não domínio)",
   "libs/wbot.ts (logout/lifecycle)",
@@ -99,5 +96,7 @@ export const PHASE3_WHATSAPP_SOCKET_CONSUMERS = [
   "helpers/SendMessageFlow.ts (GetWhatsappWbot; sendMessage comentado)",
   "GroupServices/* groupMetadata (admin de grupo)",
   "helpers/groupContactName.ts (groupMetadata)",
-  "quoted via Message.dataJson (SendWhatsAppMessage / BaileysWhatsAppOutbound)"
+  "quoted via Message.dataJson (SendWhatsAppMessage / BaileysWhatsAppOutbound)",
+  "n8n/webhook json: msg (legacyBaileysPayload — contrato externo)",
+  "chatbot list/button payloads Baileys em wbotMessageListener (via sendOutboundContent)"
 ] as const;
