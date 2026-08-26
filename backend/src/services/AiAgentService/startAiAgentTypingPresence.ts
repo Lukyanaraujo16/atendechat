@@ -1,6 +1,7 @@
 import { jidNormalizedUser } from "@whiskeysockets/baileys";
 import { getTicketRemoteJid } from "../../helpers/GetTicketRemoteJid";
 import { isWhatsAppDisableAllReadAndPresenceSideEffects } from "../../helpers/whatsappUnavailablePresence";
+import { WhatsAppOutbound } from "../../modules/whatsapp/outbound/WhatsAppOutbound";
 import Contact from "../../models/Contact";
 import Ticket from "../../models/Ticket";
 import Whatsapp from "../../models/Whatsapp";
@@ -33,20 +34,12 @@ export type StartAiAgentTypingPresenceInput = {
   };
 };
 
-type PresenceWbot = {
-  sendPresenceUpdate?: (
-    state: "composing" | "paused",
-    remoteJid: string
-  ) => Promise<void>;
-  presenceSubscribe?: (remoteJid: string) => Promise<void>;
-};
-
 type PresenceSession = {
   stopped: boolean;
   renewTimer: NodeJS.Timeout | null;
   maxTimer: NodeJS.Timeout | null;
   jid: string | null;
-  wbot: PresenceWbot | null;
+  outbound: WhatsAppOutbound | null;
 };
 
 /**
@@ -111,7 +104,7 @@ async function resolveChatJid(
 }
 
 async function sendPresenceSafe(
-  wbot: PresenceWbot,
+  outbound: WhatsAppOutbound,
   jid: string,
   presence: "composing" | "paused",
   meta: {
@@ -123,17 +116,12 @@ async function sendPresenceSafe(
   }
 ): Promise<boolean> {
   try {
-    if (
-      typeof wbot.presenceSubscribe === "function" &&
-      presence === "composing"
-    ) {
-      await wbot.presenceSubscribe(jid);
-    }
-    if (typeof wbot.sendPresenceUpdate !== "function") {
-      return false;
-    }
-    await wbot.sendPresenceUpdate(presence, jid);
-    return true;
+    const sent = await outbound.sendPresence({
+      jid,
+      presence,
+      subscribe: presence === "composing"
+    });
+    return sent;
   } catch (err) {
     emitAiAgentTypingMetric("ai_agent.typing_failed", {
       companyId: meta.companyId,
@@ -164,7 +152,7 @@ export async function startAiAgentTypingPresence(
     renewTimer: null,
     maxTimer: null,
     jid: null,
-    wbot: null
+    outbound: null
   };
 
   const stop = async (reason = "completed"): Promise<void> => {
@@ -182,11 +170,11 @@ export async function startAiAgentTypingPresence(
     }
 
     if (
-      session.wbot &&
+      session.outbound &&
       session.jid &&
       !isWhatsAppDisableAllReadAndPresenceSideEffects()
     ) {
-      await sendPresenceSafe(session.wbot, session.jid, "paused", {
+      await sendPresenceSafe(session.outbound, session.jid, "paused", {
         companyId: input.companyId,
         ticketId: input.ticket.id,
         agentId: input.agentId,
@@ -242,7 +230,11 @@ export async function startAiAgentTypingPresence(
     const { default: GetTicketWbot } = await import(
       "../../helpers/GetTicketWbot"
     );
+    const { wrapBaileysSession } = await import(
+      "../../modules/whatsapp/outbound/resolveWhatsAppOutbound"
+    );
     const wbot = await GetTicketWbot(input.ticket);
+    const outbound = wrapBaileysSession(wbot);
     const jid = await resolveChatJid(input.ticket, input.contact);
     if (!jid) {
       emitAiAgentTypingMetric("ai_agent.typing_failed", {
@@ -257,10 +249,10 @@ export async function startAiAgentTypingPresence(
       return { executionId: input.executionId, started: false, stop };
     }
 
-    session.wbot = wbot;
+    session.outbound = outbound;
     session.jid = jid;
 
-    const ok = await sendPresenceSafe(wbot, jid, "composing", {
+    const ok = await sendPresenceSafe(outbound, jid, "composing", {
       companyId: input.companyId,
       ticketId: input.ticket.id,
       agentId: input.agentId,
@@ -288,8 +280,8 @@ export async function startAiAgentTypingPresence(
     const setTimeoutFn = input.timers?.setTimeout || setTimeout;
 
     session.renewTimer = setIntervalFn(() => {
-      if (session.stopped || !session.wbot || !session.jid) return;
-      sendPresenceSafe(session.wbot, session.jid, "composing", {
+      if (session.stopped || !session.outbound || !session.jid) return;
+      sendPresenceSafe(session.outbound, session.jid, "composing", {
         companyId: input.companyId,
         ticketId: input.ticket.id,
         agentId: input.agentId,

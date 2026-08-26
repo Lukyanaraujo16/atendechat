@@ -8,7 +8,7 @@ import Queue from "../../models/Queue";
 import ShowTicketService from "./ShowTicketService";
 import SendWhatsAppMessage from "../WbotServices/SendWhatsAppMessage";
 import FindOrCreateATicketTrakingService from "./FindOrCreateATicketTrakingService";
-import GetTicketWbot from "../../helpers/GetTicketWbot";
+import { getWhatsAppOutboundForTicket } from "../../modules/whatsapp/outbound/resolveWhatsAppOutbound";
 import { verifyMessage } from "../WbotServices/wbotMessageListener";
 import {
   getGlobalAutoMessagesFallback,
@@ -410,12 +410,23 @@ const UpdateTicketService = async ({
 
     if (!isInstagram && transferAutoMessages.sendMsgTransfTicket === "enabled") {
       try {
+        const transferJid = `${ticket.contact.number}@${ticket.isGroup ? "g.us" : "s.whatsapp.net"}`;
+        let outbound: Awaited<
+          ReturnType<typeof getWhatsAppOutboundForTicket>
+        > | null = null;
+        const sendTransferText = async (text: string) => {
+          if (!outbound) {
+            outbound = await getWhatsAppOutboundForTicket(ticket);
+          }
+          const sent = await outbound.sendText({ jid: transferJid, text });
+          await verifyMessage(sent.rawSentMessage as never, ticket, ticket.contact);
+        };
+
         // Mensagem de transferencia da FILA
         if (oldQueueId !== queueId && oldUserId === userId && !isNil(oldQueueId) && !isNil(queueId)) {
 
           const { language } = await Company.findByPk(companyId);
           const queue = await Queue.findByPk(queueId);
-          const wbot = await GetTicketWbot(ticket);
 
           const translatedMessage = {
             pt: "*Mensagem automática*:\nVocê foi transferido para o departamento *" + queue?.name + "*\naguarde, já vamos te atender!",
@@ -423,14 +434,9 @@ const UpdateTicketService = async ({
             es: "*Mensaje automático*:\nHas sido transferido al departamento *" + queue?.name + "*\npor favor espera, ¡te atenderemos pronto!"
           };
 
-          const queueChangedMessage = await wbot.sendMessage(
-            `${ticket.contact.number}@${ticket.isGroup ? "g.us" : "s.whatsapp.net"}`,
-            { text: translatedMessage[language] }
-          );
-          await verifyMessage(queueChangedMessage, ticket, ticket.contact);
+          await sendTransferText(translatedMessage[language]);
         } else if (oldUserId !== userId && oldQueueId === queueId && !isNil(oldUserId) && !isNil(userId)) {
           const { language } = await Company.findByPk(companyId);
-          const wbot = await GetTicketWbot(ticket);
           const nome = await ShowUserService(ticketData.userId);
 
           const translatedMessage = {
@@ -439,14 +445,9 @@ const UpdateTicketService = async ({
             es: "*Mensaje automático*:\nHas sido transferido al agente *" + nome.name + "*\npor favor espera, ¡te atenderemos pronto!"
           };
 
-          const queueChangedMessage = await wbot.sendMessage(
-            `${ticket.contact.number}@${ticket.isGroup ? "g.us" : "s.whatsapp.net"}`,
-            { text: translatedMessage[language] }
-          );
-          await verifyMessage(queueChangedMessage, ticket, ticket.contact);
+          await sendTransferText(translatedMessage[language]);
         } else if (oldUserId !== userId && !isNil(oldUserId) && !isNil(userId) && oldQueueId !== queueId && !isNil(oldQueueId) && !isNil(queueId)) {
           const { language } = await Company.findByPk(companyId);
-          const wbot = await GetTicketWbot(ticket);
           const queue = await Queue.findByPk(queueId);
           const nome = await ShowUserService(ticketData.userId);
 
@@ -456,15 +457,10 @@ const UpdateTicketService = async ({
             es: "*Mensaje automático*:\nHas sido transferido al departamento *" + queue?.name + "* y serás atendido por *" + nome.name + "*\npor favor espera, ¡te atenderemos pronto!"
           };
 
-          const queueChangedMessage = await wbot.sendMessage(
-            `${ticket.contact.number}@${ticket.isGroup ? "g.us" : "s.whatsapp.net"}`,
-            { text: translatedMessage[language] }
-          );
-          await verifyMessage(queueChangedMessage, ticket, ticket.contact);
+          await sendTransferText(translatedMessage[language]);
         } else if (oldUserId !== undefined && isNil(userId) && oldQueueId !== queueId && !isNil(queueId)) {
           const { language } = await Company.findByPk(companyId);
           const queue = await Queue.findByPk(queueId);
-          const wbot = await GetTicketWbot(ticket);
 
           const translatedMessage = {
             pt: "*Mensagem automática*:\nVocê foi transferido para o departamento *" + queue?.name + "*\naguarde, já vamos te atender!",
@@ -472,11 +468,7 @@ const UpdateTicketService = async ({
             es: "*Mensaje automático*:\nHas sido transferido al departamento *" + queue?.name + "*\npor favor espera, ¡te atenderemos pronto!"
           };
 
-          const queueChangedMessage = await wbot.sendMessage(
-            `${ticket.contact.number}@${ticket.isGroup ? "g.us" : "s.whatsapp.net"}`,
-            { text: translatedMessage[language] }
-          );
-          await verifyMessage(queueChangedMessage, ticket, ticket.contact);
+          await sendTransferText(translatedMessage[language]);
         }
       } catch (err) {
         logger.warn(

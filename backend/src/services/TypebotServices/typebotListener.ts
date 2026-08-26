@@ -7,9 +7,11 @@ import { logger } from "../../utils/logger";
 import { isNil } from "lodash";
 import UpdateTicketService from "../TicketServices/UpdateTicketService";
 import { isWhatsAppDisableAllReadAndPresenceSideEffects } from "../../helpers/whatsappUnavailablePresence";
+import { WhatsAppOutbound } from "../../modules/whatsapp/outbound/WhatsAppOutbound";
+import { wrapBaileysSession } from "../../modules/whatsapp/outbound/resolveWhatsAppOutbound";
 
 async function runTypebotTypingSimulation(
-    wbot: Session,
+    outbound: WhatsAppOutbound,
     remoteJid: string,
     typebotDelayMessage: number,
     label: string
@@ -18,10 +20,13 @@ async function runTypebotTypingSimulation(
         logger.info(`[WhatsAppPresence] suppressed context=${label} reason=WHATSAPP_DISABLE_ALL_READ_AND_PRESENCE_SIDE_EFFECTS`);
         return;
     }
-    await wbot.presenceSubscribe(remoteJid);
-    await wbot.sendPresenceUpdate("composing", remoteJid);
+    await outbound.sendPresence({
+        jid: remoteJid,
+        presence: "composing",
+        subscribe: true
+    });
     await delay(typebotDelayMessage);
-    await wbot.sendPresenceUpdate("paused", remoteJid);
+    await outbound.sendPresence({ jid: remoteJid, presence: "paused" });
 }
 
 
@@ -55,6 +60,8 @@ const typebotListener = async ({
         typebotDelayMessage,
         typebotRestartMessage
     } = typebot;
+
+    const outbound = wrapBaileysSession(wbot);
 
     const number = msg.key.remoteJid.replace(/\D/g, '');
 
@@ -162,7 +169,10 @@ const typebotListener = async ({
             }
 
             if (messages?.length === 0) {
-                await wbot.sendMessage(`${number}@c.us`, { text: typebotUnknownMessage });
+                await outbound.sendText({
+                    jid: `${number}@c.us`,
+                    text: typebotUnknownMessage
+                });
             } else {
                 for (const message of messages) {
                     if (message.type === 'text') {
@@ -301,14 +311,17 @@ const typebotListener = async ({
                             }
                         }
 
-                        await runTypebotTypingSimulation(wbot, msg.key.remoteJid!, typebotDelayMessage, "typebot:text_reply");
+                        await runTypebotTypingSimulation(outbound, msg.key.remoteJid!, typebotDelayMessage, "typebot:text_reply");
 
 
-                        await wbot.sendMessage(msg.key.remoteJid, { text: formattedText });
+                        await outbound.sendText({
+                            jid: msg.key.remoteJid,
+                            text: formattedText
+                        });
                     }
 
                     if (message.type === 'audio') {
-                        await runTypebotTypingSimulation(wbot, msg.key.remoteJid!, typebotDelayMessage, "typebot:audio");
+                        await runTypebotTypingSimulation(outbound, msg.key.remoteJid!, typebotDelayMessage, "typebot:audio");
                         const media = {
                             audio: {
                                 url: message.content.url,
@@ -316,7 +329,10 @@ const typebotListener = async ({
                                 ptt: true
                             },
                         }
-                        await wbot.sendMessage(msg.key.remoteJid, media);
+                        await outbound.sendContent({
+                            jid: msg.key.remoteJid,
+                            content: media
+                        });
 
                     }
 
@@ -337,14 +353,17 @@ const typebotListener = async ({
                     // }
 
                     if (message.type === 'image') {
-                        await runTypebotTypingSimulation(wbot, msg.key.remoteJid!, typebotDelayMessage, "typebot:image");
+                        await runTypebotTypingSimulation(outbound, msg.key.remoteJid!, typebotDelayMessage, "typebot:image");
                         const media = {
                             image: {
                                 url: message.content.url,
                             },
 
                         }
-                        await wbot.sendMessage(msg.key.remoteJid, media);
+                        await outbound.sendContent({
+                            jid: msg.key.remoteJid,
+                            content: media
+                        });
                     }
 
                     // if (message.type === 'video' ) {
@@ -370,8 +389,11 @@ const typebotListener = async ({
                             formattedText += `▶️ ${item.content}\n`;
                         }
                         formattedText = formattedText.replace(/\n$/, '');
-                        await runTypebotTypingSimulation(wbot, msg.key.remoteJid!, typebotDelayMessage, "typebot:choice_input");
-                        await wbot.sendMessage(msg.key.remoteJid, { text: formattedText });
+                        await runTypebotTypingSimulation(outbound, msg.key.remoteJid!, typebotDelayMessage, "typebot:choice_input");
+                        await outbound.sendText({
+                            jid: msg.key.remoteJid,
+                            text: formattedText
+                        });
 
                     }
                 }
@@ -386,7 +408,10 @@ const typebotListener = async ({
 
             await ticket.reload();
 
-            await wbot.sendMessage(`${number}@c.us`, { text: typebotRestartMessage })
+            await outbound.sendText({
+                jid: `${number}@c.us`,
+                text: typebotRestartMessage
+            })
 
         }
         if (body === typebotKeywordFinish) {

@@ -1,11 +1,11 @@
 import { WAMessage, jidNormalizedUser } from "@whiskeysockets/baileys";
 import * as Sentry from "@sentry/node";
 import AppError from "../../errors/AppError";
-import GetTicketWbot from "../../helpers/GetTicketWbot";
 import { getTicketRemoteJid } from "../../helpers/GetTicketRemoteJid";
 import Message from "../../models/Message";
 import Ticket from "../../models/Ticket";
 import { logger } from "../../utils/logger";
+import { getWhatsAppOutboundForTicket } from "../../modules/whatsapp/outbound/resolveWhatsAppOutbound";
 
 import formatBody from "../../helpers/Mustache";
 
@@ -23,12 +23,12 @@ const SendWhatsAppMessage = async ({
   quotedMsg,
   remoteJid: remoteJidOverride
 }: Request): Promise<WAMessage> => {
-  let options = {};
-  const wbot = await GetTicketWbot(ticket);
+  const outbound = await getWhatsAppOutboundForTicket(ticket);
   // Evitar enviar para o próprio número da conexão (resposta indo para "si mesmo")
-  if (!ticket.isGroup && ticket.contact?.number && ticket.contact.number !== "LID" && wbot.user?.id) {
+  const ownJid = outbound.getOwnUserJid();
+  if (!ticket.isGroup && ticket.contact?.number && ticket.contact.number !== "LID" && ownJid) {
     const destNumber = String(ticket.contact.number).replace(/\D/g, "");
-    const myNumber = jidNormalizedUser(wbot.user.id).replace(/\D/g, "");
+    const myNumber = jidNormalizedUser(ownJid).replace(/\D/g, "");
     if (destNumber && myNumber && destNumber === myNumber) {
       throw new AppError("Não é possível enviar mensagem para o próprio número da conexão. Verifique o contato do ticket.");
     }
@@ -45,6 +45,12 @@ const SendWhatsAppMessage = async ({
       : `${destNumber}@s.whatsapp.net`;
   }
 
+  let quoted: {
+    dataJson: string | Record<string, unknown>;
+    destinationJid: string;
+    isGroup: boolean;
+  } | null = null;
+
   if (quotedMsg) {
       const chatMessages = await Message.findOne({
         where: {
@@ -53,18 +59,10 @@ const SendWhatsAppMessage = async ({
       });
 
       if (chatMessages) {
-        const msgFound = JSON.parse(chatMessages.dataJson);
-        const quotedKey = msgFound.key || {};
-        // quoted.key.remoteJid deve ser o JID de destino (@s.whatsapp.net), não @lid (Baileys #1832)
-        options = {
-          quoted: {
-            key: {
-              ...quotedKey,
-              remoteJid: number,
-              participant: ticket.isGroup ? quotedKey.participant : undefined
-            },
-            message: msgFound.message || { extendedTextMessage: {} }
-          }
+        quoted = {
+          dataJson: chatMessages.dataJson,
+          destinationJid: number,
+          isGroup: Boolean(ticket.isGroup)
         };
       }
     
@@ -72,7 +70,7 @@ const SendWhatsAppMessage = async ({
 
   try {
     const chatJid = number.includes("@") ? jidNormalizedUser(number) : number;
-    const textPayload = { text: formatBody(body, ticket.contact) };
+    const textPayload = formatBody(body, ticket.contact);
     const sendStartedAt = Date.now();
     logger.info(
       {
@@ -84,24 +82,25 @@ const SendWhatsAppMessage = async ({
       },
       "[SendPerf] baileys_send_start"
     );
-    const sentMessage =
-      Object.keys(options).length > 0
-        ? await wbot.sendMessage(chatJid, textPayload, options)
-        : await wbot.sendMessage(chatJid, textPayload);
+    const sent = await outbound.sendText({
+      jid: chatJid,
+      text: textPayload,
+      quoted
+    });
     logger.info(
       {
         ticketId: ticket.id,
         companyId: ticket.companyId,
         whatsappId: ticket.whatsappId,
         chatJid,
-        baileysMessageId: (sentMessage as any)?.key?.id ?? null,
+        baileysMessageId: sent.messageId,
         durationMs: Date.now() - sendStartedAt
       },
       "[SendPerf] baileys_send_done"
     );
 
     await ticket.update({ lastMessage: formatBody(body, ticket.contact) });
-    return sentMessage;
+    return sent.rawSentMessage as WAMessage;
   } catch (err) {
     Sentry.captureException(err);
     console.log(err);

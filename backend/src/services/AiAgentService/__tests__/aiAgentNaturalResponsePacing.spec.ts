@@ -14,6 +14,11 @@ jest.mock("../../../helpers/GetTicketWbot", () => ({
   default: jest.fn()
 }));
 
+jest.mock("../../../helpers/GetWhatsappWbot", () => ({
+  __esModule: true,
+  default: jest.fn()
+}));
+
 jest.mock("../../../helpers/GetTicketRemoteJid", () => ({
   getTicketRemoteJid: jest.fn()
 }));

@@ -1,8 +1,6 @@
-import { proto, WASocket } from "@whiskeysockets/baileys";
-import WALegacySocket from "@whiskeysockets/baileys"
 import AppError from "../../errors/AppError";
-import GetTicketWbot from "../../helpers/GetTicketWbot";
 import GetWbotMessage from "../../helpers/GetWbotMessage";
+import { getWhatsAppOutboundForTicket } from "../../modules/whatsapp/outbound/resolveWhatsAppOutbound";
 import Message from "../../models/Message";
 import Ticket from "../../models/Ticket";
 
@@ -26,20 +24,18 @@ const DeleteWhatsAppMessage = async (messageId: string): Promise<Message> => {
   const messageToDelete = await GetWbotMessage(ticket, messageId);
 
   try {
-    const wbot = await GetTicketWbot(ticket);
-    const messageDelete = messageToDelete as proto.WebMessageInfo;
-
+    const outbound = await getWhatsAppOutboundForTicket(ticket);
     const menssageDelete = messageToDelete as Message;
 
-    await (wbot as WASocket).sendMessage(menssageDelete.remoteJid, {
-      delete: {
+    await outbound.deleteMessage({
+      jid: menssageDelete.remoteJid,
+      target: {
         id: menssageDelete.id,
         remoteJid: menssageDelete.remoteJid,
         participant: menssageDelete.participant,
         fromMe: menssageDelete.fromMe
       }
     });
-
   } catch (err) {
     throw new AppError("ERR_DELETE_WAPP_MSG");
   }

@@ -2,6 +2,11 @@ jest.mock("../../utils/logger", () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() }
 }));
 
+jest.mock("@whiskeysockets/baileys", () => ({
+  proto: {},
+  jidNormalizedUser: (jid: string) => jid
+}));
+
 jest.mock("../../libs/cache", () => ({
   cacheLayer: {
     set: jest.fn(),
@@ -41,6 +46,11 @@ jest.mock("../../models/Ticket", () => ({
 }));
 
 jest.mock("../GetTicketWbot", () => ({
+  __esModule: true,
+  default: jest.fn()
+}));
+
+jest.mock("../GetWhatsappWbot", () => ({
   __esModule: true,
   default: jest.fn()
 }));

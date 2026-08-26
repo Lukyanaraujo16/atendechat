@@ -1,0 +1,103 @@
+/**
+ * Contrato outbound WhatsApp independente de WASocket.
+ *
+ * Fase 2: único provider real é "baileys". Consumidores de domínio devem
+ * depender deste contrato, não de GetTicketWbot / wbot.sendMessage.
+ */
+
+export type WhatsAppOutboundProvider = "baileys";
+
+export type WhatsAppOutboundSendResult = {
+  messageId: string | null;
+  remoteJid: string | null;
+  fromMe: boolean;
+  status: number | null;
+  /**
+   * Payload cru do envio (Baileys WAMessage). Usado para dataJson e
+   * consumidores que ainda esperam o objeto enviado.
+   * Não usar em código novo além da persistência atual.
+   */
+  rawSentMessage: unknown;
+};
+
+/**
+ * Quoted reconstruído a partir de Message.dataJson (payload Baileys).
+ * Compatibilidade transitória — não eliminar nesta fase.
+ */
+export type WhatsAppQuotedMessage = {
+  dataJson: string | Record<string, unknown>;
+  destinationJid: string;
+  isGroup: boolean;
+};
+
+export type WhatsAppReadKey = {
+  remoteJid: string;
+  id: string;
+  fromMe: boolean;
+  participant?: string;
+};
+
+export type WhatsAppPresence = "composing" | "paused" | "unavailable";
+
+export type WhatsAppDeleteTarget = {
+  id: string;
+  remoteJid: string;
+  participant?: string | null;
+  fromMe: boolean;
+};
+
+export interface WhatsAppOutbound {
+  readonly provider: WhatsAppOutboundProvider;
+
+  sendText(input: {
+    jid: string;
+    text: string;
+    quoted?: WhatsAppQuotedMessage | null;
+  }): Promise<WhatsAppOutboundSendResult>;
+
+  /**
+   * Conteúdo já montado pelos serviços atuais (mídia, campanha, sticker, Typebot).
+   * Forma alinhada ao objeto passado hoje a wbot.sendMessage(jid, content).
+   * Não redesenha payload Baileys.
+   */
+  sendContent(input: {
+    jid: string;
+    content: Record<string, unknown>;
+  }): Promise<WhatsAppOutboundSendResult>;
+
+  deleteMessage(input: {
+    jid: string;
+    target: WhatsAppDeleteTarget;
+  }): Promise<void>;
+
+  markAsRead(keys: WhatsAppReadKey[]): Promise<void>;
+
+  sendPresence(input: {
+    jid?: string;
+    presence: WhatsAppPresence;
+    subscribe?: boolean;
+  }): Promise<boolean>;
+
+  getOwnUserJid(): string | null;
+}
+
+/**
+ * Consumidores que ainda chamam WASocket / sendMessage fora desta fronteira.
+ * Trabalho da Fase 3 (e grupos/lifecycle).
+ */
+export const PHASE3_WHATSAPP_SOCKET_CONSUMERS = [
+  "services/WbotServices/wbotMessageListener.ts (respostas inbound: OpenAI, chatbot, greeting, sendMessageImage/Link)",
+  "services/WbotServices/providers.ts (chatbot de boletos/ISP)",
+  "services/IntegrationsServices/OpenAiService.ts (Flow/webhook OpenAI legado)",
+  "services/WbotServices/wbotMonitor.ts (rejectCall + mensagem pós-rejeição — lifecycle)",
+  "helpers/whatsappUnavailablePresence.ts (heartbeat unavailable — conexão, não domínio)",
+  "libs/wbot.ts (logout/lifecycle)",
+  "controllers/WhatsAppSessionController.ts (logout)",
+  "helpers/GetWbotMessage.ts (GetTicketWbot residual; fetch já é DB)",
+  "services/AiAgentService/startAiAgentTypingPresence.ts (GetTicketWbot + wrapBaileysSession por compatibilidade de testes)",
+  "services/TypebotServices/typebotListener.ts (ainda recebe WASocket do inbound; envio via wrapBaileysSession)",
+  "helpers/SendMessageFlow.ts (GetWhatsappWbot; sendMessage comentado)",
+  "GroupServices/* groupMetadata (admin de grupo)",
+  "helpers/groupContactName.ts (groupMetadata)",
+  "quoted via Message.dataJson (SendWhatsAppMessage / BaileysWhatsAppOutbound)"
+] as const;

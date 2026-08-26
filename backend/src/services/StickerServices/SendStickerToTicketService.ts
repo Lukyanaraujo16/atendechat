@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from "uuid";
 import { jidNormalizedUser, WAMessage } from "@whiskeysockets/baileys";
 import AppError from "../../errors/AppError";
 import Sticker from "../../models/Sticker";
-import GetTicketWbot from "../../helpers/GetTicketWbot";
+import { getWhatsAppOutboundForTicket } from "../../modules/whatsapp/outbound/resolveWhatsAppOutbound";
 import { getTicketRemoteJid } from "../../helpers/GetTicketRemoteJid";
 import ShowTicketService from "../TicketServices/ShowTicketService";
 import {
@@ -61,16 +61,17 @@ const SendStickerToTicketService = async ({
   }
 
   const buffer = fs.readFileSync(absPath);
-  const wbot = await GetTicketWbot(ticket);
+  const outbound = await getWhatsAppOutboundForTicket(ticket);
+  const ownJid = outbound.getOwnUserJid();
 
   if (
     !ticket.isGroup &&
     ticket.contact?.number &&
     ticket.contact.number !== "LID" &&
-    wbot.user?.id
+    ownJid
   ) {
     const destNumber = String(ticket.contact.number).replace(/\D/g, "");
-    const myNumber = jidNormalizedUser(wbot.user.id).replace(/\D/g, "");
+    const myNumber = jidNormalizedUser(ownJid).replace(/\D/g, "");
     if (destNumber && myNumber && destNumber === myNumber) {
       throw new AppError(
         "Não é possível enviar figurinha para o próprio número da conexão.",
@@ -97,9 +98,11 @@ const SendStickerToTicketService = async ({
 
   let sentMessage: WAMessage;
   try {
-    sentMessage = await wbot.sendMessage(chatJid, {
-      sticker: buffer
+    const sent = await outbound.sendContent({
+      jid: chatJid,
+      content: { sticker: buffer }
     });
+    sentMessage = sent.rawSentMessage as WAMessage;
   } catch {
     throw new AppError("ERR_SENDING_WAPP_STICKER", 500);
   }

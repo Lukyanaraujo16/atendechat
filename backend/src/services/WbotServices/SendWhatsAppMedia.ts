@@ -5,8 +5,8 @@ import { exec } from "child_process";
 import path from "path";
 import ffmpegPath from "@ffmpeg-installer/ffmpeg";
 import AppError from "../../errors/AppError";
-import GetTicketWbot from "../../helpers/GetTicketWbot";
 import { getTicketRemoteJid } from "../../helpers/GetTicketRemoteJid";
+import { getWhatsAppOutboundForTicket } from "../../modules/whatsapp/outbound/resolveWhatsAppOutbound";
 import Ticket from "../../models/Ticket";
 import { lookup } from "mime-types";
 import formatBody from "../../helpers/Mustache";
@@ -127,11 +127,12 @@ const SendWhatsAppMedia = async ({
   asSticker = false
 }: Request): Promise<WAMessage> => {
   try {
-    const wbot = await GetTicketWbot(ticket);
+    const outbound = await getWhatsAppOutboundForTicket(ticket);
     // Evitar enviar para o próprio número da conexão
-    if (!ticket.isGroup && ticket.contact?.number && ticket.contact.number !== "LID" && wbot.user?.id) {
+    const ownJid = outbound.getOwnUserJid();
+    if (!ticket.isGroup && ticket.contact?.number && ticket.contact.number !== "LID" && ownJid) {
       const destNumber = String(ticket.contact.number).replace(/\D/g, "");
-      const myNumber = jidNormalizedUser(wbot.user.id).replace(/\D/g, "");
+      const myNumber = jidNormalizedUser(ownJid).replace(/\D/g, "");
       if (destNumber && myNumber && destNumber === myNumber) {
         throw new AppError("Não é possível enviar mídia para o próprio número da conexão. Verifique o contato do ticket.");
       }
@@ -210,9 +211,11 @@ const SendWhatsAppMedia = async ({
         : `${destNumber}@s.whatsapp.net`;
     }
     const chatJid = number.includes("@") ? jidNormalizedUser(number) : number;
-    const sentMessage = await wbot.sendMessage(chatJid, {
-      ...options
+    const sent = await outbound.sendContent({
+      jid: chatJid,
+      content: { ...options }
     });
+    const sentMessage = sent.rawSentMessage as WAMessage;
 
     await ticket.update({ lastMessage: bodyMessage });
 

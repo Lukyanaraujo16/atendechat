@@ -1,5 +1,5 @@
 import Whatsapp from "../models/Whatsapp";
-import GetWhatsappWbot from "./GetWhatsappWbot";
+import { getWhatsAppOutboundForWhatsapp } from "../modules/whatsapp/outbound/resolveWhatsAppOutbound";
 import fs from "fs";
 
 import { getMessageOptions } from "../services/WbotServices/SendWhatsAppMedia";
@@ -16,7 +16,7 @@ export const SendMessage = async (
   messageData: MessageData
 ): Promise<any> => {
   try {
-    const wbot = await GetWhatsappWbot(whatsapp);
+    const outbound = await getWhatsAppOutboundForWhatsapp(whatsapp);
     const chatId = `${messageData.number}@s.whatsapp.net`;
 
     let message;
@@ -29,13 +29,17 @@ export const SendMessage = async (
       );
       if (options) {
         const body = fs.readFileSync(messageData.mediaPath);
-        message = await wbot.sendMessage(chatId, {
-          ...options
-        });
+        message = (
+          await outbound.sendContent({
+            jid: chatId,
+            content: { ...options }
+          })
+        ).rawSentMessage;
       }
     } else {
       const body = `\u200e ${messageData.body}`;
-      message = await wbot.sendMessage(chatId, { text: body });
+      message = (await outbound.sendText({ jid: chatId, text: body }))
+        .rawSentMessage;
     }
 
     return message;

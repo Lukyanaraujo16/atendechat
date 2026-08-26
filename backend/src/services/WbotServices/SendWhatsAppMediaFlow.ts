@@ -5,8 +5,8 @@ import { exec } from "child_process";
 import path from "path";
 import ffmpegPath from "@ffmpeg-installer/ffmpeg";
 import AppError from "../../errors/AppError";
-import GetTicketWbot from "../../helpers/GetTicketWbot";
 import { getTicketRemoteJid } from "../../helpers/GetTicketRemoteJid";
+import { getWhatsAppOutboundForTicket } from "../../modules/whatsapp/outbound/resolveWhatsAppOutbound";
 import Ticket from "../../models/Ticket";
 import mime from "mime-types";
 import Contact from "../../models/Contact";
@@ -74,7 +74,7 @@ export const typeSimulation = async (ticket: Ticket, presence: WAPresence) => {
     return;
   }
 
-  const wbot = await GetTicketWbot(ticket);
+  const outbound = await getWhatsAppOutboundForTicket(ticket);
 
   const contact = await Contact.findOne({
     where: {
@@ -90,9 +90,13 @@ export const typeSimulation = async (ticket: Ticket, presence: WAPresence) => {
   if (!chatJid) return;
 
   const jid = chatJid.includes("@") ? jidNormalizedUser(chatJid) : chatJid;
-  await wbot.sendPresenceUpdate(presence, jid);
+  await outbound.sendPresence({
+    jid,
+    presence: presence as "composing" | "paused" | "unavailable",
+    subscribe: false
+  });
   await delay(5000);
-  await wbot.sendPresenceUpdate("paused", jid);
+  await outbound.sendPresence({ jid, presence: "paused" });
 
 }
 
@@ -104,7 +108,7 @@ const SendWhatsAppMediaFlow = async ({
   isRecord = false
 }: RequestFlow): Promise<WAMessage> => {
   try {
-    const wbot = await GetTicketWbot(ticket);
+    const outbound = await getWhatsAppOutboundForTicket(ticket);
 
     const pathMedia = path.resolve(media);
     const mimetype = mime.lookup(pathMedia);
@@ -236,9 +240,11 @@ const SendWhatsAppMediaFlow = async ({
       );
     }
 
-    const sentMessage = await wbot.sendMessage(dest, {
-      ...options
+    const sent = await outbound.sendContent({
+      jid: dest,
+      content: { ...options }
     });
+    const sentMessage = sent.rawSentMessage as WAMessage;
 
     if (isFlowBuilderDebugEnabled()) {
       logger.info(

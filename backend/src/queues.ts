@@ -17,7 +17,7 @@ import ContactListItem from "./models/ContactListItem";
 import { isEmpty, isNil, isArray } from "lodash";
 import CampaignSetting from "./models/CampaignSetting";
 import CampaignShipping from "./models/CampaignShipping";
-import GetWhatsappWbot from "./helpers/GetWhatsappWbot";
+import { getWhatsAppOutboundForWhatsapp } from "./modules/whatsapp/outbound/resolveWhatsAppOutbound";
 import sequelize from "./database";
 import { getMessageOptions } from "./services/WbotServices/SendWhatsAppMedia";
 import { getIO } from "./libs/socket";
@@ -1149,9 +1149,9 @@ async function handleDispatchCampaign(job) {
       return;
     }
 
-    const wbot = await GetWhatsappWbot(campaign.whatsapp);
+    const outbound = await getWhatsAppOutboundForWhatsapp(campaign.whatsapp);
 
-    if (!wbot) {
+    if (!outbound) {
       logger.error(`[🚨] - Wbot não encontrado para campanha ${campaignId}`);
       return;
     }
@@ -1161,7 +1161,7 @@ async function handleDispatchCampaign(job) {
       return;
     }
 
-    if (!wbot?.user?.id) {
+    if (!outbound.getOwnUserJid()) {
       logger.error(`[🚨] - Usuário do wbot não encontrado para campanha ${campaignId}`);
       return;
     }
@@ -1193,7 +1193,7 @@ async function handleDispatchCampaign(job) {
         const folder = path.resolve(publicFolder, "fileList", String(files.id))
         for (const [index, file] of files.options.entries()) {
           const options = await getMessageOptions(file.path, path.resolve(folder, file.path), file.name);
-          await wbot.sendMessage(chatId, { ...options });
+          await outbound.sendContent({ jid: chatId, content: { ...options } });
 
           logger.info(`[🚩] - Enviou arquivo: ${file.name} | CampaignShippingId: ${campaignShippingId} CampanhaID: ${campaignId}`);
         };
@@ -1210,13 +1210,14 @@ async function handleDispatchCampaign(job) {
 
       const options = await getMessageOptions(campaign.mediaName, filePath, body);
       if (Object.keys(options).length) {
-        await wbot.sendMessage(chatId, { ...options });
+        await outbound.sendContent({ jid: chatId, content: { ...options } });
       }
     }
     else {
       logger.info(`[🚩] - Enviando mensagem de texto da campanha | CampaignShippingId: ${campaignShippingId} CampanhaID: ${campaignId}`);
 
-      await wbot.sendMessage(chatId, {
+      await outbound.sendText({
+        jid: chatId,
         text: body
       });
     }
