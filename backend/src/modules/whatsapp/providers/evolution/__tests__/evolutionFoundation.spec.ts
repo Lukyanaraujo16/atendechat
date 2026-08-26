@@ -21,7 +21,7 @@ import AppError from "../../../../../errors/AppError";
 describe("Evolution foundation Fase 5", () => {
   it("capacidades de transporte estão desabilitadas", () => {
     expect(EVOLUTION_PHASE5_CAPABILITIES.sendText).toBe(false);
-    expect(EVOLUTION_PHASE5_CAPABILITIES.webhookInbound).toBe(false);
+    expect(EVOLUTION_PHASE5_CAPABILITIES.webhookInbound).toBe(true);
     expect(EVOLUTION_PHASE5_CAPABILITIES.connect).toBe(false);
   });
 

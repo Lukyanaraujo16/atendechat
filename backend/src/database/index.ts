@@ -13,6 +13,7 @@ import Whatsapp from "../models/Whatsapp";
 import InstagramAccount from "../models/InstagramAccount";
 import InstagramAccountQueue from "../models/InstagramAccountQueue";
 import MetaWebhookEvent from "../models/MetaWebhookEvent";
+import EvolutionWebhookEvent from "../models/EvolutionWebhookEvent";
 import ContactCustomField from "../models/ContactCustomField";
 import Message from "../models/Message";
 import Queue from "../models/Queue";
@@ -159,6 +160,7 @@ const models = [
   InstagramAccount,
   InstagramAccountQueue,
   MetaWebhookEvent,
+  EvolutionWebhookEvent,
   ContactCustomField,
   Setting,
   Queue,

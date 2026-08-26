@@ -82,16 +82,29 @@ describe("processInboundWhatsAppMessage", () => {
     expect(received[0].rawProviderMessage).toBeNull();
   });
 
-  it("rejeita provider diferente de baileys", async () => {
+  it("aceita provider evolution no gate (Fase 6)", async () => {
+    const received: string[] = [];
+    await processInboundWhatsAppMessage(
+      inbound({ provider: "evolution", rawProviderMessage: null }),
+      {
+        handleInboundMessage: async normalized => {
+          received.push(normalized.provider);
+        }
+      }
+    );
+    expect(received).toEqual(["evolution"]);
+  });
+
+  it("rejeita provider diferente de baileys|evolution", async () => {
     await expect(
       processInboundWhatsAppMessage(
         inbound({ provider: "unknown-provider" as never }),
         { handleInboundMessage: async () => undefined }
       )
-    ).rejects.toThrow(/baileys/);
+    ).rejects.toThrow(/baileys\|evolution/);
   });
 
-  it("documenta operações que ainda exigem raw", () => {
+  it("documenta operações que ainda exigem raw", async () => {
     expect(OPERATIONS_REQUIRING_RAW_PROVIDER_MESSAGE.length).toBeGreaterThan(0);
     expect(OPERATIONS_REQUIRING_RAW_PROVIDER_MESSAGE.join(" ")).toMatch(
       /downloadMedia|dataJson|n8n/i

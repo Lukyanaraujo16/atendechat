@@ -24,18 +24,19 @@ export type EvolutionClientCapabilities = {
   connect: false;
   logout: false;
   qr: false;
-  webhookInbound: false;
+  /** Fase 6+: webhook textual inbound habilitado. */
+  webhookInbound: boolean;
   ack: false;
 };
 
-/** Capacidades desta fase: nenhuma operação de transporte real. */
+/** Capacidades de transporte Evolution (Fase 5+). Outbound/QR ainda off. */
 export const EVOLUTION_PHASE5_CAPABILITIES: EvolutionClientCapabilities = {
   sendText: false,
   sendMedia: false,
   connect: false,
   logout: false,
   qr: false,
-  webhookInbound: false,
+  webhookInbound: true,
   ack: false
 };
 

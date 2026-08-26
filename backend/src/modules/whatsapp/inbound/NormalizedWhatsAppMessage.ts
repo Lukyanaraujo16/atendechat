@@ -7,7 +7,7 @@
  * Fase 4: rawProviderMessage é opcional no pipeline; obrigatório apenas
  * para caminhos que ainda precisam de download/dataJson/compat Baileys.
  */
-export type WhatsAppInboundProvider = "baileys";
+export type WhatsAppInboundProvider = "baileys" | "evolution";
 
 export type NormalizedWhatsAppAddressing = {
   remoteJid: string;
@@ -85,6 +85,8 @@ export const PHASE5_BAILEYS_RAW_CONSUMERS = [
   "groupMetadata / GroupServices (admin de grupo)",
   "lifecycle (initWASocket, QR, logout, rejectCall, heartbeat)",
   "CheckNumber/CheckIsValidContact (onWhatsApp utilitário)",
-  "SetTicketMessagesAsRead (dataJson → keys de recibo)",
-  "chatbot list/button messages em wbotMessageListener (payload Baileys específico)"
+  "SetTicketMessagesAsRead (dataJson → keys de recibo) — só payloads Baileys",
+  "chatbot list/button messages em wbotMessageListener (payload Baileys específico)",
+  "Evolution inbound: mídia/áudio/documento/reação (Fase 7+)",
+  "Evolution outbound / Live AI reply (ainda NOT_READY)"
 ] as const;

@@ -8,14 +8,15 @@ import multer from "multer";
 import * as Sentry from "@sentry/node";
 
 import "./database";
+import bodyParser from "body-parser";
 import uploadConfig from "./config/upload";
 import AppError from "./errors/AppError";
 import routes from "./routes";
 import metaWebhookRoutes from "./routes/metaWebhookRoutes";
+import evolutionWebhookRoutes from "./routes/evolutionWebhookRoutes";
 import instagramOAuthCallbackRoutes from "./routes/instagramOAuthCallbackRoutes";
 import { logger } from "./utils/logger";
 import { messageQueue, sendScheduledMessages } from "./queues";
-import bodyParser from 'body-parser';
 import agentOsSecurityHeaders from "./middleware/agentOsSecurityHeaders";
 import { AGENTOS_SECRET_KEY_RE } from "./config/automationAgentOsSecurityConstants";
 
@@ -26,6 +27,9 @@ const app = express();
 /** Webhook Meta: raw body necessário para validar X-Hub-Signature-256 */
 app.use("/webhooks/meta", metaWebhookRoutes);
 
+/** Webhook Evolution: path identifica conexão; auth via apikey da credencial */
+app.use("/webhooks/evolution", evolutionWebhookRoutes);
+
 /** OAuth Instagram callback: rota pública (Meta redireciona sem JWT) */
 app.use(instagramOAuthCallbackRoutes);
 
@@ -34,15 +38,19 @@ app.set("queues", {
   sendScheduledMessages
 });
 
-const bodyparser = require('body-parser');
-app.use(bodyParser.json({ limit: '10mb' }));
+const bodyparser = require("body-parser");
+
+app.use(bodyParser.json({ limit: "10mb" }));
 
 /** Origens CORS: FRONTEND_URL e CORS_EXTRA_ORIGINS (várias separadas por vírgula). Sem barra final. */
 function getCorsAllowedOrigins(): string[] {
-  const raw = [process.env.FRONTEND_URL || "", process.env.CORS_EXTRA_ORIGINS || ""].join(",");
+  const raw = [
+    process.env.FRONTEND_URL || "",
+    process.env.CORS_EXTRA_ORIGINS || ""
+  ].join(",");
   const parts = raw
     .split(",")
-    .map((s) => s.trim().replace(/\/$/, ""))
+    .map(s => s.trim().replace(/\/$/, ""))
     .filter(Boolean);
   return [...new Set(parts)];
 }
@@ -73,7 +81,6 @@ app.use(routes);
 app.use(Sentry.Handlers.errorHandler());
 
 app.use(async (err: Error, req: Request, res: Response, _: NextFunction) => {
-
   if (err instanceof AppError) {
     const safeData =
       err.data && typeof err.data === "object"
@@ -99,7 +106,8 @@ app.use(async (err: Error, req: Request, res: Response, _: NextFunction) => {
     logger.warn({ multerCode: err.code, field: err.field, msg: err.message });
     const pathStr = req.originalUrl || req.url || "";
     const hint =
-      err.code === "LIMIT_UNEXPECTED_FILE" && pathStr.includes("/system-settings/branding")
+      err.code === "LIMIT_UNEXPECTED_FILE" &&
+      pathStr.includes("/system-settings/branding")
         ? "Campo de ficheiro não aceite pelo servidor. Reconstrua e reinicie o backend (rotas branding com loginLogoDark/menuLogoDark) ou alinhe o nome do campo ao multer.fields."
         : undefined;
     return res.status(400).json({
@@ -127,8 +135,7 @@ app.use(async (err: Error, req: Request, res: Response, _: NextFunction) => {
   }
 
   logger.error(err);
-  const detail =
-    err instanceof Error ? err.message : String(err);
+  const detail = err instanceof Error ? err.message : String(err);
   const exposeDetail =
     pathStr.includes("/platform/backups/execute-restore") ||
     pathStr.includes("/platform/backups/generate");

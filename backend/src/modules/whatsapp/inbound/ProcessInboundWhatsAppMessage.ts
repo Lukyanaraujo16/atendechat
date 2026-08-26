@@ -12,17 +12,16 @@ export type ProcessInboundWhatsAppMessageDeps = {
 /**
  * Pipeline inbound WhatsApp independente de provider.
  *
- * Fase 4: rawProviderMessage não é mais obrigatório no gate.
- * Operações sem raw (texto/domínio) podem avançar; mídia/dataJson Baileys
- * ainda pedem raw dentro do handler quando necessário.
+ * Fase 6: aceita baileys | evolution.
+ * rawProviderMessage continua opcional; Evolution texto não o usa.
  */
 export async function processInboundWhatsAppMessage(
   inbound: NormalizedWhatsAppMessage,
   deps: ProcessInboundWhatsAppMessageDeps
 ): Promise<void> {
-  if (inbound.provider !== "baileys") {
+  if (inbound.provider !== "baileys" && inbound.provider !== "evolution") {
     throw new Error(
-      `ProcessInboundWhatsAppMessage aceita apenas provider baileys. Recebido: ${String(
+      `ProcessInboundWhatsAppMessage aceita baileys|evolution. Recebido: ${String(
         inbound.provider
       )}`
     );
