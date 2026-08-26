@@ -52,6 +52,11 @@ export default async function sendAiAgentWhatsappMessage(
       ? String(sentMessage.key.id)
       : uuidv4();
 
+    const isEvolution =
+      sentMessage &&
+      typeof sentMessage === "object" &&
+      (sentMessage as { provider?: string }).provider === "evolution";
+
     await CreateMessageService({
       messageData: {
         id: messageId,
@@ -66,7 +71,16 @@ export default async function sendAiAgentWhatsappMessage(
         messageOrigin: AI_AGENT_MESSAGE_ORIGIN,
         aiAgentId: input.aiAgentId,
         aiAgentRuntimeLogId: input.aiAgentRuntimeLogId ?? null,
-        dataJson: JSON.stringify(sentMessage)
+        externalMessageId: isEvolution ? messageId : undefined,
+        dataJson: isEvolution
+          ? JSON.stringify({
+              provider: "evolution",
+              payload: {
+                key: (sentMessage as { key?: unknown }).key,
+                status: (sentMessage as { status?: unknown }).status
+              }
+            })
+          : JSON.stringify(sentMessage)
       } as never,
       companyId: input.companyId
     });

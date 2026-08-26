@@ -7,23 +7,20 @@ import AppError from "../../../errors/AppError";
 import { isInstagramChannelTicket } from "../../../helpers/ticketChannel";
 import { WhatsAppOutbound } from "./WhatsAppOutbound";
 import { BaileysWhatsAppOutbound } from "../providers/baileys/outbound/BaileysWhatsAppOutbound";
+import { EvolutionWhatsAppOutbound } from "../providers/evolution/outbound/EvolutionWhatsAppOutbound";
 import {
   isBaileysConnection,
   isEvolutionConnection,
   resolveWhatsAppConnectionProvider
 } from "../connectionProvider";
-import {
-  ERR_WHATSAPP_PROVIDER_NOT_READY,
-  throwEvolutionProviderNotReady
-} from "../providers/evolution/evolutionErrors";
+import { throwEvolutionProviderNotReady } from "../providers/evolution/evolutionErrors";
 
 type Session = WASocket & { id?: number };
 
 /**
  * Resolução outbound por conexão WhatsApp (multi-provider).
- * Baileys → BaileysWhatsAppOutbound.
- * Evolution → erro controlado (Fase 5: transporte ainda não pronto).
- * Nunca resolve Evolution via GetTicketWbot/GetWhatsappWbot.
+ * Baileys → BaileysWhatsAppOutbound (socket).
+ * Evolution → EvolutionWhatsAppOutbound (HTTP) — sem Get*Wbot.
  */
 export async function getWhatsAppOutboundForWhatsapp(
   whatsapp: Whatsapp
@@ -31,9 +28,7 @@ export async function getWhatsAppOutboundForWhatsapp(
   const provider = resolveWhatsAppConnectionProvider(whatsapp);
 
   if (isEvolutionConnection(provider)) {
-    throwEvolutionProviderNotReady(
-      `Conexão ${whatsapp.id} é Evolution; outbound ainda não está pronto (${ERR_WHATSAPP_PROVIDER_NOT_READY}).`
-    );
+    return new EvolutionWhatsAppOutbound(whatsapp.id);
   }
 
   if (!isBaileysConnection(provider)) {

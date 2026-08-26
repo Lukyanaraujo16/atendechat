@@ -34,8 +34,9 @@ function createAxiosClient(baseUrl: string, apiKey: string): AxiosInstance {
 }
 
 /**
- * Client HTTP Evolution (Fase 7) — somente obtenção de mídia.
+ * Client HTTP Evolution (Fases 7–8).
  * API key descriptografada só em memória; nunca logada.
+ * Sem retry automático em POST de envio (não idempotente).
  */
 export async function loadEvolutionCredentialForMedia(
   whatsappId: number
@@ -51,7 +52,7 @@ export async function loadEvolutionCredentialForMedia(
   if (!cred?.baseUrl || !cred.instanceName || !cred.apiKeyEncrypted) {
     throw new EvolutionHttpError(
       "ERR_EVOLUTION_CREDENTIAL_MISSING",
-      "Credencial Evolution ausente para download de mídia"
+      "Credencial Evolution ausente"
     );
   }
   let apiKey: string;
@@ -68,6 +69,149 @@ export async function loadEvolutionCredentialForMedia(
     instanceName: cred.instanceName,
     apiKey
   };
+}
+
+/** Alias Fase 8 — mesma credencial para inbound/outbound. */
+export const loadEvolutionCredential = loadEvolutionCredentialForMedia;
+
+function parseEvolutionErrorBody(data: unknown): string {
+  if (!data || typeof data !== "object") return "Evolution API error";
+  const d = data as Record<string, unknown>;
+  if (typeof d.message === "string") return d.message.slice(0, 300);
+  if (Array.isArray(d.message)) return String(d.message[0] || "").slice(0, 300);
+  if (d.response && typeof d.response === "object") {
+    const r = d.response as Record<string, unknown>;
+    if (Array.isArray(r.message))
+      return String(r.message[0] || "").slice(0, 300);
+  }
+  if (typeof d.error === "string") return d.error.slice(0, 300);
+  return "Evolution API error";
+}
+
+async function evolutionPostJson(input: {
+  whatsappId: number;
+  path: string;
+  body: Record<string, unknown>;
+}): Promise<unknown> {
+  const cred = await loadEvolutionCredential(input.whatsappId);
+  const client = createAxiosClient(cred.baseUrl, cred.apiKey);
+  const path = input.path.replace(
+    "{instance}",
+    encodeURIComponent(cred.instanceName)
+  );
+
+  let response;
+  try {
+    response = await client.post(path, input.body);
+  } catch (err) {
+    const code = (err as { code?: string })?.code;
+    logger.warn(
+      { whatsappId: input.whatsappId, path, code },
+      "[EvolutionHttp] outbound request failed"
+    );
+    if (code === "ECONNABORTED" || code === "ETIMEDOUT") {
+      throw new EvolutionHttpError(
+        "ERR_EVOLUTION_TIMEOUT",
+        "Timeout ao chamar Evolution API"
+      );
+    }
+    throw new EvolutionHttpError(
+      "ERR_EVOLUTION_REQUEST_FAILED",
+      "Falha de rede ao chamar Evolution API"
+    );
+  }
+
+  if (response.status < 200 || response.status >= 300) {
+    throw new EvolutionHttpError(
+      "ERR_EVOLUTION_API_ERROR",
+      parseEvolutionErrorBody(response.data) ||
+        `Evolution HTTP ${response.status}`
+    );
+  }
+
+  return response.data;
+}
+
+/**
+ * POST /message/sendText/{instance}
+ * Docs: https://doc.evolution-api.com/v2/api-reference/message-controller/send-text
+ */
+export async function evolutionSendText(input: {
+  whatsappId: number;
+  number: string;
+  text: string;
+}): Promise<unknown> {
+  return evolutionPostJson({
+    whatsappId: input.whatsappId,
+    path: "/message/sendText/{instance}",
+    body: {
+      number: input.number,
+      text: input.text
+    }
+  });
+}
+
+/**
+ * POST /message/sendMedia/{instance}
+ * mediatype: image | video | document | audio
+ */
+export async function evolutionSendMedia(input: {
+  whatsappId: number;
+  number: string;
+  mediatype: "image" | "video" | "document" | "audio";
+  media: string;
+  mimetype: string;
+  fileName: string;
+  caption?: string;
+}): Promise<unknown> {
+  return evolutionPostJson({
+    whatsappId: input.whatsappId,
+    path: "/message/sendMedia/{instance}",
+    body: {
+      number: input.number,
+      mediatype: input.mediatype,
+      media: input.media,
+      mimetype: input.mimetype,
+      fileName: input.fileName,
+      caption: input.caption != null ? input.caption : ""
+    }
+  });
+}
+
+/**
+ * POST /message/sendWhatsAppAudio/{instance} — voice note / PTT
+ */
+export async function evolutionSendWhatsAppAudio(input: {
+  whatsappId: number;
+  number: string;
+  audio: string;
+}): Promise<unknown> {
+  return evolutionPostJson({
+    whatsappId: input.whatsappId,
+    path: "/message/sendWhatsAppAudio/{instance}",
+    body: {
+      number: input.number,
+      audio: input.audio
+    }
+  });
+}
+
+/**
+ * POST /message/sendSticker/{instance}
+ */
+export async function evolutionSendSticker(input: {
+  whatsappId: number;
+  number: string;
+  sticker: string;
+}): Promise<unknown> {
+  return evolutionPostJson({
+    whatsappId: input.whatsappId,
+    path: "/message/sendSticker/{instance}",
+    body: {
+      number: input.number,
+      sticker: input.sticker
+    }
+  });
 }
 
 /**

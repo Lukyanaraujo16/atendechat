@@ -13,9 +13,8 @@ export type WhatsAppOutboundSendResult = {
   fromMe: boolean;
   status: number | null;
   /**
-   * Payload cru do envio (Baileys WAMessage). Usado para dataJson e
-   * consumidores que ainda esperam o objeto enviado.
-   * Não usar em código novo além da persistência atual.
+   * Payload do envio para dataJson / compat.
+   * Baileys: WAMessage. Evolution: envelope { provider, key, ... } (não proto).
    */
   rawSentMessage: unknown;
 };

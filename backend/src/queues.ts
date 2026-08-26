@@ -1161,7 +1161,7 @@ async function handleDispatchCampaign(job) {
       return;
     }
 
-    if (!outbound.getOwnUserJid()) {
+    if (outbound.provider !== "evolution" && !outbound.getOwnUserJid()) {
       logger.error(`[🚨] - Usuário do wbot não encontrado para campanha ${campaignId}`);
       return;
     }

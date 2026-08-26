@@ -18,19 +18,18 @@ import {
 } from "../evolutionErrors";
 import AppError from "../../../../../errors/AppError";
 
-describe("Evolution foundation Fase 5", () => {
-  it("capacidades de transporte estão desabilitadas", () => {
-    expect(EVOLUTION_PHASE5_CAPABILITIES.sendText).toBe(false);
+describe("Evolution foundation (Fases 5–8)", () => {
+  it("capacidades: outbound + webhook on; QR/ACK off", () => {
+    expect(EVOLUTION_PHASE5_CAPABILITIES.sendText).toBe(true);
+    expect(EVOLUTION_PHASE5_CAPABILITIES.sendMedia).toBe(true);
     expect(EVOLUTION_PHASE5_CAPABILITIES.webhookInbound).toBe(true);
     expect(EVOLUTION_PHASE5_CAPABILITIES.connect).toBe(false);
   });
 
-  it("outbound skeleton lança ERR_WHATSAPP_PROVIDER_NOT_READY", async () => {
-    const outbound = new EvolutionWhatsAppOutbound();
+  it("outbound Evolution instancia com whatsappId (transporte HTTP)", () => {
+    const outbound = new EvolutionWhatsAppOutbound(42);
     expect(outbound.provider).toBe("evolution");
-    await expect(
-      outbound.sendText({ jid: "x", text: "hi" })
-    ).rejects.toMatchObject({ message: ERR_WHATSAPP_PROVIDER_NOT_READY });
+    expect(outbound.getOwnUserJid()).toBe("evolution:42");
   });
 
   it("assertEvolutionTransportNotAvailable lança erro tipado", () => {

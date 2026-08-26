@@ -30,8 +30,6 @@ import {
   getWhatsAppOutboundForWhatsapp,
   wrapBaileysSession
 } from "../resolveWhatsAppOutbound";
-import AppError from "../../../../errors/AppError";
-import { ERR_WHATSAPP_PROVIDER_NOT_READY } from "../../providers/evolution/evolutionErrors";
 
 const mockedTicketWbot = GetTicketWbot as jest.Mock;
 const mockedWhatsappWbot = GetWhatsappWbot as jest.Mock;
@@ -58,15 +56,12 @@ describe("resolveWhatsAppOutbound", () => {
     expect(outbound.provider).toBe("baileys");
   });
 
-  it("Evolution NÃO resolve Baileys e NÃO chama GetWhatsappWbot", async () => {
-    await expect(
-      getWhatsAppOutboundForWhatsapp({
-        id: 99,
-        connectionProvider: "evolution"
-      } as never)
-    ).rejects.toMatchObject({
-      message: ERR_WHATSAPP_PROVIDER_NOT_READY
-    });
+  it("Evolution resolve EvolutionWhatsAppOutbound sem GetWhatsappWbot", async () => {
+    const outbound = await getWhatsAppOutboundForWhatsapp({
+      id: 99,
+      connectionProvider: "evolution"
+    } as never);
+    expect(outbound.provider).toBe("evolution");
     expect(mockedWhatsappWbot).not.toHaveBeenCalled();
     expect(mockedTicketWbot).not.toHaveBeenCalled();
   });
@@ -77,13 +72,12 @@ describe("resolveWhatsAppOutbound", () => {
       connectionProvider: "evolution"
     });
 
-    await expect(
-      getWhatsAppOutboundForTicket({
-        whatsappId: 77,
-        companyId: 1
-      } as never)
-    ).rejects.toBeInstanceOf(AppError);
+    const outbound = await getWhatsAppOutboundForTicket({
+      whatsappId: 77,
+      companyId: 1
+    } as never);
 
+    expect(outbound.provider).toBe("evolution");
     expect(mockedTicketWbot).not.toHaveBeenCalled();
     expect(mockedWhatsappWbot).not.toHaveBeenCalled();
   });
