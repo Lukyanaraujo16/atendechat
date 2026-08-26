@@ -6,8 +6,10 @@ import {
 } from "../../../../../helpers/normalizeWhatsAppJidToNumber";
 import { NormalizedWhatsAppMessage } from "../../../inbound/NormalizedWhatsAppMessage";
 import {
+  extractBaileysAck,
   extractBaileysMediaMetadata,
   extractBaileysWrapping,
+  extractEditedMessageId,
   extractMentionedJids,
   getBodyMessage,
   getQuotedMessageId,
@@ -22,8 +24,8 @@ export type AdaptBaileysInboundContext = {
 /**
  * Converte proto.IWebMessageInfo → NormalizedWhatsAppMessage.
  *
- * Única camada que deve conhecer estruturas Baileys no inbound futuro.
- * Nesta fase o payload cru permanece em rawProviderMessage para o handler legado.
+ * Única camada que deve conhecer estruturas Baileys no inbound.
+ * rawProviderMessage permanece apenas para compatibilidade (dataJson, mídia, LID).
  */
 export function adaptBaileysInboundMessage(
   msg: proto.IWebMessageInfo,
@@ -77,6 +79,8 @@ export function adaptBaileysInboundMessage(
     wrapping: extractBaileysWrapping(msg),
     messageStubType:
       msg.messageStubType != null ? Number(msg.messageStubType) : null,
+    ack: extractBaileysAck(msg),
+    editedMessageId: extractEditedMessageId(msg),
     rawProviderMessage: msg
   };
 }

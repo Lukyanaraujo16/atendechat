@@ -73,14 +73,15 @@ export const handleOpenAi = async (
   ticket: Ticket,
   contact: Contact,
   mediaSent: Message | undefined,
-  ticketTraking: TicketTraking
+  ticketTraking: TicketTraking,
+  bodyOverride?: string | null
 ): Promise<void> => {
   // REGRA PARA DESABILITAR O BOT PARA ALGUM CONTATO
   if (contact.disableBot || contact.chatbotDisabled) {
     return;
   }
 
-  const bodyMessage = getBodyMessage(msg);
+  const bodyMessage = bodyOverride ?? getBodyMessage(msg);
   if (!bodyMessage) return;
 
   if (!openAiSettings) return;

@@ -1,8 +1,8 @@
-import { proto, WASocket } from "@whiskeysockets/baileys";
+import { WASocket } from "@whiskeysockets/baileys";
 import Contact from "../../models/Contact";
 import Setting from "../../models/Setting";
 import Ticket from "../../models/Ticket";
-import { getBodyMessage, isNumeric, sleep, validaCpfCnpj, sendMessageImage, sendMessageLink, makeid } from "./wbotMessageListener";
+import { isNumeric, sleep, validaCpfCnpj, sendMessageImage, sendMessageLink, makeid } from "./wbotMessageListener";
 import formatBody from "../../helpers/Mustache";
 
 import puppeteer from "puppeteer";
@@ -11,12 +11,18 @@ import axios from 'axios';
 import UpdateTicketService from "../TicketServices/UpdateTicketService";
 import fs from 'fs';
 
-export const provider = async (ticket: Ticket, msg: proto.IWebMessageInfo, companyId: number, contact: Contact, wbot: WASocket) => {
+export const provider = async (
+  ticket: Ticket,
+  bodyMessage: string | null,
+  companyId: number,
+  contact: Contact,
+  wbot: WASocket
+) => {
   if (ticket.isGroup) return;
   const filaescolhida = ticket.queue?.name
   if (filaescolhida === "2ª Via de Boleto" || filaescolhida === "2 Via de Boleto") {
     let cpfcnpj
-    cpfcnpj = getBodyMessage(msg);
+    cpfcnpj = bodyMessage;
     cpfcnpj = cpfcnpj.replace(/\./g, '');
     cpfcnpj = cpfcnpj.replace('-', '')
     cpfcnpj = cpfcnpj.replace('/', '')
@@ -73,7 +79,7 @@ export const provider = async (ticket: Ticket, msg: proto.IWebMessageInfo, compa
     const urlixc = urlixcdb.value
     const asaastk = asaastoken.value
 
-    const cnpj_cpf = getBodyMessage(msg);
+    const cnpj_cpf = bodyMessage;
     let numberCPFCNPJ = cpfcnpj;
 
     if (urlmkauth != "" && Client_Id != "" && Client_Secret != "") {
@@ -1188,7 +1194,7 @@ export const provider = async (ticket: Ticket, msg: proto.IWebMessageInfo, compa
 
   if (filaescolhida === "Religue de Confiança" || filaescolhida === "Liberação em Confiança") {
     let cpfcnpj
-    cpfcnpj = getBodyMessage(msg);
+    cpfcnpj = bodyMessage;
     cpfcnpj = cpfcnpj.replace(/\./g, '');
     cpfcnpj = cpfcnpj.replace('-', '')
     cpfcnpj = cpfcnpj.replace('/', '')
@@ -1245,7 +1251,7 @@ export const provider = async (ticket: Ticket, msg: proto.IWebMessageInfo, compa
     const urlixc = urlixcdb.value
     const asaastk = asaastoken.value
 
-    const cnpj_cpf = getBodyMessage(msg);
+    const cnpj_cpf = bodyMessage;
     let numberCPFCNPJ = cpfcnpj;
 
     if (ixcapikey.value != "" && urlixcdb.value != "") {

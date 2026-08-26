@@ -1351,7 +1351,20 @@ export const ActionsWebhookService = async (
           ticketForCond || ticket,
           ticketForCond?.contact || ticket?.contact,
           nodeSelected.data as any,
-          originalWhatsAppMsg,
+          (() => {
+            const m = originalWhatsAppMsg?.message;
+            if (!m) return pressKey != null ? String(pressKey) : "";
+            return (
+              m.conversation ||
+              m.extendedTextMessage?.text ||
+              m.imageMessage?.caption ||
+              m.videoMessage?.caption ||
+              m.documentMessage?.caption ||
+              m.buttonsResponseMessage?.selectedButtonId ||
+              m.listResponseMessage?.title ||
+              (pressKey != null ? String(pressKey) : "")
+            );
+          })(),
           companyId
         );
         const handleChosen = condResult.passed ? "true" : "false";

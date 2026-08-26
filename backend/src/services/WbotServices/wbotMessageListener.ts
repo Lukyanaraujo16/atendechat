@@ -87,7 +87,11 @@ import {differenceInMilliseconds} from "date-fns";
 import Whatsapp from "../../models/Whatsapp";
 import { shouldBypassChatbot } from "../../helpers/shouldBypassChatbot";
 import { scheduleAiAgentDryRunFromInbound } from "../AiAgentService/runAiAgentDryRunHook";
-import { classifyInboundMessageFromBaileys } from "../AiAgentService/classifyInboundMessage";
+import {
+  classifyInboundMessageFromNormalized
+} from "../AiAgentService/classifyInboundMessage";
+import { NormalizedWhatsAppMessage } from "../../modules/whatsapp/inbound/NormalizedWhatsAppMessage";
+import { requireBaileysRawMessage } from "../../modules/whatsapp/providers/baileys/inbound/requireBaileysRawMessage";
 import CreateTicketSystemMessageService from "../TicketServices/CreateTicketSystemMessageService";
 import Company from "../../models/Company";
 import { formatChatbotBypassSystemMessage } from "../../helpers/chatbotBypassMessages";
@@ -119,11 +123,11 @@ const request = require("request");
 const fs = require("fs");
 
 /**
- * Fase 1 — fronteira inbound WhatsApp:
+ * Fase 3 — fronteira inbound WhatsApp:
  *   Baileys socket → filter/retry (listener) → adaptBaileysInboundMessage
- *   → processInboundWhatsAppMessage → handleMessage legado.
+ *   → processInboundWhatsAppMessage → handleMessage(NormalizedWhatsAppMessage).
  *
- * Extraído: unwrap/tipo/body/quoted (parsing Baileys) e entrada via DTO normalizado.
+ * Parsing Baileys fica no adapter. rawProviderMessage é residual (mídia/dataJson/LID).
  * Permanece aqui: transporte (messages.upsert/update), ACK, filtros de stub,
  * contato/ticket/mídia/chatbot/Flow/Typebot/IA, Socket.IO.
  */
@@ -993,7 +997,17 @@ export const verifyMediaMessage = async (
   contact: Contact,
   ticketTraking: TicketTraking = null,
   isForwarded: boolean = false,
-  isPrivate: boolean = false
+  isPrivate: boolean = false,
+  inbound?: Pick<
+    NormalizedWhatsAppMessage,
+    | "messageId"
+    | "fromMe"
+    | "body"
+    | "addressing"
+    | "ack"
+    | "messageType"
+    | "editedMessageId"
+  > | null
 ): Promise<Message | undefined> => {
   const io = getIO();
   try {
@@ -1002,14 +1016,15 @@ export const verifyMediaMessage = async (
 
   if (!media) {
     logger.warn(
-      { ticketId: ticket.id, messageId: msg.key?.id },
+      { ticketId: ticket.id, messageId: inbound?.messageId || msg.key?.id },
       `[WhatsAppInbound] error_processing context=download_media_failed fallback=verifyMessage_stub`
     );
     await verifyMessage(
       msg,
       ticket,
       contact,
-      "[Mídia: não foi possível baixar o arquivo]"
+      "[Mídia: não foi possível baixar o arquivo]",
+      inbound
     );
     return undefined;
   }
@@ -1034,41 +1049,48 @@ export const verifyMediaMessage = async (
   } catch (err) {
     Sentry.captureException(err);
     logger.error(
-      { err, ticketId: ticket.id, messageId: msg.key?.id },
+      { err, ticketId: ticket.id, messageId: inbound?.messageId || msg.key?.id },
       "[WhatsAppInbound] media_write_failed"
     );
     await verifyMessage(
       msg,
       ticket,
       contact,
-      "[Mídia: não foi possível salvar o arquivo]"
+      "[Mídia: não foi possível salvar o arquivo]",
+      inbound
     );
     return undefined;
   }
 
-  const body = getBodyMessage(msg);
+  const body = inbound?.body ?? getBodyMessage(msg);
 
   const hasCap = hasCaption(body, media.filename);
   const bodyMessage = body ? hasCap ? formatBody(body, ticket.contact) : "-" : "-";
 
+  const resolvedId = inbound?.messageId || msg.key.id;
   const safeMessageId =
-    msg.key.id != null && String(msg.key.id).length > 0
-      ? String(msg.key.id)
+    resolvedId != null && String(resolvedId).length > 0
+      ? String(resolvedId)
       : `fallback-${ticket.id}-${Date.now()}`;
+
+  const fromMe = inbound?.fromMe ?? Boolean(msg.key.fromMe);
+  const remoteJid = inbound?.addressing?.remoteJid || msg.key.remoteJid;
+  const participant = inbound?.addressing?.participant || msg.key.participant;
+  const ack = inbound?.ack != null ? inbound.ack : msg.status;
 
   const messageData = {
     id: safeMessageId,
     ticketId: ticket.id,
-    contactId: msg.key.fromMe ? undefined : contact.id,
+    contactId: fromMe ? undefined : contact.id,
     body: bodyMessage,
-    fromMe: msg.key.fromMe,
-    read: msg.key.fromMe,
+    fromMe,
+    read: fromMe,
     mediaUrl: media.filename,
     mediaType: media.mimetype.split("/")[0],
     quotedMsgId: quotedMsg?.id,
-    ack: msg.status,
-    remoteJid: msg.key.remoteJid,
-    participant: msg.key.participant,
+    ack,
+    remoteJid,
+    participant,
     dataJson: JSON.stringify(msg),
     ticketTrakingId: ticketTraking?.id,
   };
@@ -1085,7 +1107,7 @@ export const verifyMediaMessage = async (
     `[WhatsAppInbound] message_saved ticketId=${ticket.id} messageId=${safeMessageId} mediaType=${messageData.mediaType} fromMe=${messageData.fromMe}`
   );
 
-  if (!msg.key.fromMe && ticket.status === "closed") {
+  if (!fromMe && ticket.status === "closed") {
     await ticket.update({ status: "pending" });
     await ticket.reload({
       include: [
@@ -1120,7 +1142,7 @@ export const verifyMediaMessage = async (
         err,
         stack: err instanceof Error ? err.stack : undefined,
         ticketId: ticket.id,
-        messageId: msg.key?.id
+        messageId: inbound?.messageId || msg.key?.id
       },
       `[WhatsAppInbound] error_processing context=verifyMediaMessage`
     );
@@ -1144,46 +1166,62 @@ export const verifyMessage = async (
   msg: proto.IWebMessageInfo,
   ticket: Ticket,
   contact: Contact,
-  bodyOverride?: string
+  bodyOverride?: string,
+  inbound?: Pick<
+    NormalizedWhatsAppMessage,
+    | "messageId"
+    | "fromMe"
+    | "body"
+    | "addressing"
+    | "ack"
+    | "messageType"
+    | "editedMessageId"
+  > | null
 ) => {
   const io = getIO();
   try {
   const quotedMsg = await verifyQuotedMessage(msg);
-  const extractedBody = getBodyMessage(msg);
-  const fromMe = msg.key?.fromMe ?? Boolean(bodyOverride);
+  const extractedBody = inbound?.body ?? getBodyMessage(msg);
+  const fromMe = inbound?.fromMe ?? (msg.key?.fromMe ?? Boolean(bodyOverride));
   let body: string | null = bodyOverride ?? extractedBody;
+  const msgType = inbound?.messageType ?? getTypeMessage(msg);
   if (body == null || body === "") {
-    body = `[${getTypeMessage(msg)}]`;
+    body = `[${msgType}]`;
   }
-  const isEdited = getTypeMessage(msg) == "editedMessage";
+  const isEdited = msgType == "editedMessage";
 
   if (fromMe && !bodyOverride && isWhatsAppPendingStub(extractedBody)) {
     logger.info(
-      `[WhatsAppInbound] ignored reason=whatsapp_pending_stub messageId=${msg.key?.id ?? ""} ticketId=${ticket.id}`
+      `[WhatsAppInbound] ignored reason=whatsapp_pending_stub messageId=${inbound?.messageId || msg.key?.id || ""} ticketId=${ticket.id}`
     );
     return;
   }
 
   const rawId = isEdited
-    ? msg?.message?.editedMessage?.message?.protocolMessage?.key?.id
-    : msg.key.id;
+    ? inbound?.editedMessageId ||
+      msg?.message?.editedMessage?.message?.protocolMessage?.key?.id
+    : inbound?.messageId || msg.key.id;
   const safeMessageId =
     rawId != null && String(rawId).length > 0
       ? String(rawId)
       : `fallback-${ticket.id}-${Date.now()}`;
 
+  const remoteJid = inbound?.addressing?.remoteJid || msg.key.remoteJid;
+  const participant = inbound?.addressing?.participant || msg.key.participant;
+  const ack = inbound?.ack != null ? inbound.ack : msg.status;
+
   const messageData = {
     id: safeMessageId,
     ticketId: ticket.id,
-    contactId: msg.key.fromMe ? undefined : contact.id,
+    contactId: fromMe ? undefined : contact.id,
     body,
     fromMe,
-    mediaType: getTypeMessage(msg),
+    mediaType: msgType,
     read: fromMe,
     quotedMsgId: quotedMsg?.id,
-    ack: msg.status,
-    remoteJid: msg.key.remoteJid,
-    participant: msg.key.participant,
+    ack,
+    remoteJid,
+    participant,
     dataJson: JSON.stringify(msg),
     isEdited: isEdited
   };
@@ -1197,7 +1235,7 @@ export const verifyMessage = async (
     `[WhatsAppInbound] message_saved ticketId=${ticket.id} messageId=${safeMessageId} mediaType=${messageData.mediaType} fromMe=${fromMe}`
   );
 
-  if (!msg.key.fromMe && ticket.status === "closed") {
+  if (!fromMe && ticket.status === "closed") {
     await ticket.update({ status: "pending" });
     await ticket.reload({
       include: [
@@ -1863,7 +1901,8 @@ const handleChartbot = async (
   msg: proto.IWebMessageInfo,
   wbot: Session,
   dontReadTheFirstQuestion: boolean = false,
-  whatsappSettings?: WhatsappSettingsResolved
+  whatsappSettings?: WhatsappSettingsResolved,
+  bodyOverride?: string | null
 ) => {
   const companyId = ticket.companyId;
   const settings =
@@ -1887,7 +1926,7 @@ const handleChartbot = async (
     ]
   });
 
-  const messageBody = getBodyMessage(msg);
+  const messageBody = bodyOverride ?? getBodyMessage(msg);
 
   if (messageBody == "#") {
     await UpdateTicketService({
@@ -2216,11 +2255,12 @@ const flowbuilderIntegration = async (
   ticket: Ticket,
   contact: Contact | null,
   isFirstMsg?: Ticket,
-  isTranfered?: boolean
+  isTranfered?: boolean,
+  bodyOverride?: string | null
 ) => {
   const io = getIO();
   const quotedMsg = await verifyQuotedMessage(msg);
-  const body = getBodyMessage(msg);
+  const body = bodyOverride ?? getBodyMessage(msg);
 
   /*
   const messageData = {
@@ -2725,8 +2765,12 @@ export const handleMessageIntegration = async (
   whatsapp: Whatsapp = null,
   contact: Contact = null,
   isFirstMsg: Ticket | null = null,
+  inbound?: Pick<
+    NormalizedWhatsAppMessage,
+    "body" | "pushName" | "addressing" | "fromMe" | "messageType"
+  > | null
 ): Promise<void> => {
-  const msgType = getTypeMessage(msg);
+  const msgType = inbound?.messageType || getTypeMessage(msg);
 
   if (queueIntegration.type === "n8n" || queueIntegration.type === "webhook") {
     if (queueIntegration?.urlN8N) {
@@ -2752,7 +2796,13 @@ export const handleMessageIntegration = async (
     }
   } else if (queueIntegration.type === "typebot") {
     // await typebots(ticket, msg, wbot, queueIntegration);
-    await typebotListener({ ticket, msg, wbot, typebot: queueIntegration });
+    await typebotListener({
+      ticket,
+      msg,
+      inbound: inbound || undefined,
+      wbot,
+      typebot: queueIntegration
+    });
   } else if(queueIntegration.type === "flowbuilder") {
     if (isFlowBuilderDebugEnabled()) {
       logger.info(
@@ -2778,7 +2828,9 @@ export const handleMessageIntegration = async (
         queueIntegration,
         ticket,
         contact,
-        isFirstMsg
+        isFirstMsg,
+        undefined,
+        inbound?.body
       );
     } else {
       // Menu aceita qualquer texto do cliente (número ou não) para o backend
@@ -2792,7 +2844,8 @@ export const handleMessageIntegration = async (
           whatsapp,
           companyId,
           contact,
-          isFirstMsg
+          isFirstMsg,
+          inbound?.body
         );
       }
     }
@@ -2806,9 +2859,10 @@ const flowBuilderQueue = async (
   whatsapp: Whatsapp,
   companyId: number,
   contact: Contact,
-  isFirstMsg: Ticket
+  isFirstMsg: Ticket,
+  bodyOverride?: string | null
 ) => {
-  const body = getBodyMessage(msg);
+  const body = bodyOverride ?? getBodyMessage(msg);
 
   const flow = await FlowBuilderModel.findOne({
     where: {
@@ -2859,10 +2913,11 @@ const flowBuilderQueue = async (
 
 
 const handleMessage = async (
-  msg: proto.IWebMessageInfo,
-  wbot: Session,
-  companyId: number
+  inbound: NormalizedWhatsAppMessage,
+  wbot: Session
 ): Promise<void> => {
+  const msg = requireBaileysRawMessage(inbound);
+  const companyId = inbound.companyId;
   let mediaSent: Message | undefined;
   const settingsTracker = createMessageSettingsTracker();
   const loadWhatsappSettings = createWhatsappSettingsLoader(settingsTracker);
@@ -2875,24 +2930,16 @@ const handleMessage = async (
     let msgContact: IMe;
     let groupContact: Contact | undefined;
 
-    const isGroup = msg.key.remoteJid?.endsWith("@g.us");
+    const isGroup = inbound.isGroup;
 
-    const bodyMessage = getBodyMessage(msg);
-    const msgType = getTypeMessage(msg);
+    const bodyMessage = inbound.body;
+    const msgType = inbound.messageType;
 
-    const effectiveForMedia = unwrapMessageContent(msg.message);
-    const hasMedia = !!(
-      effectiveForMedia?.audioMessage ||
-      effectiveForMedia?.imageMessage ||
-      effectiveForMedia?.videoMessage ||
-      effectiveForMedia?.documentMessage ||
-      effectiveForMedia?.documentWithCaptionMessage ||
-      effectiveForMedia?.stickerMessage
-    );
-    if (msg.key.fromMe) {
+    const hasMedia = inbound.media.hasMedia;
+    if (inbound.fromMe) {
       if (/\u200e/.test(bodyMessage || "")) {
         logger.info(
-          `[WhatsAppInbound] ignored reason=fromMe_bidi_mark messageId=${msg.key?.id ?? ""}`
+          `[WhatsAppInbound] ignored reason=fromMe_bidi_mark messageId=${inbound.messageId || ""}`
         );
         return;
       }
@@ -2904,7 +2951,7 @@ const handleMessage = async (
         msgType !== "contactMessage"
       ) {
         logger.info(
-          `[WhatsAppInbound] ignored reason=fromMe_non_inbox_type type=${msgType} messageId=${msg.key?.id ?? ""}`
+          `[WhatsAppInbound] ignored reason=fromMe_non_inbox_type type=${msgType} messageId=${inbound.messageId || ""}`
         );
         return;
       }
@@ -3052,7 +3099,7 @@ const handleMessage = async (
         !groupContact &&
         !ticketFromEcho;
 
-      const messageReceivedAt = extractMessageReceivedAt(msg);
+      const messageReceivedAt = inbound.timestamp ?? extractMessageReceivedAt(msg);
 
       try {
         ticket = await FindOrCreateTicketService(
@@ -3139,7 +3186,7 @@ const handleMessage = async (
     }
 
     if (!ticket.isGroup) {
-      await provider(ticket, msg, companyId, contact, wbot as WASocket);
+      await provider(ticket, bodyMessage, companyId, contact, wbot as WASocket);
     }
 
     // voltar para o menu inicial
@@ -3207,15 +3254,16 @@ const handleMessage = async (
         contact,
         null,
         false,
-        false
+        false,
+        inbound
       );
     } else {
-      await verifyMessage(msg, ticket, contact);
+      await verifyMessage(msg, ticket, contact, undefined, inbound);
     }
 
-    if (!msg.key.fromMe) {
-      const classification = classifyInboundMessageFromBaileys(
-        msg,
+    if (!inbound.fromMe) {
+      const classification = classifyInboundMessageFromNormalized(
+        inbound,
         bodyMessage ?? null
       );
       scheduleAiAgentDryRunFromInbound({
@@ -3223,12 +3271,12 @@ const handleMessage = async (
         ticket,
         contact,
         whatsapp,
-        msg,
+        messageId: inbound.messageId || null,
         bodyMessage: bodyMessage ?? null,
         persistedMessageId:
           mediaSent?.id ??
-          (msg.key?.id != null && String(msg.key.id).length > 0
-            ? String(msg.key.id)
+          (inbound.messageId != null && String(inbound.messageId).length > 0
+            ? String(inbound.messageId)
             : null),
         classification
       });
@@ -3612,7 +3660,9 @@ const handleMessage = async (
         companyId,
         isMenu,
         whatsapp,
-        contact
+        contact,
+        null,
+        inbound
       );
 
       return;
@@ -3662,7 +3712,8 @@ const handleMessage = async (
         isMenu,
         whatsapp,
         contact,
-        isFirstMsg
+        isFirstMsg,
+        inbound
       );
     }
 
@@ -3756,7 +3807,8 @@ const handleMessage = async (
         isMenu,
         whatsapp,
         contact,
-        isFirstMsg
+        isFirstMsg,
+        inbound
       );
     }
 
@@ -3870,7 +3922,7 @@ const handleMessage = async (
 
     if (whatsapp.queues.length == 1 && ticket.queue) {
       if (ticket.chatbot && !msg.key.fromMe) {
-        await handleChartbot(ticket, msg, wbot, false, whatsappSettings);
+        await handleChartbot(ticket, msg, wbot, false, whatsappSettings, bodyMessage);
       }
     }
 
@@ -3881,7 +3933,8 @@ const handleMessage = async (
           msg,
           wbot,
           dontReadTheFirstQuestion,
-          whatsappSettings
+          whatsappSettings,
+          bodyMessage
         );
       }
     }
@@ -4002,12 +4055,8 @@ const processInboundWithRetry = async (
   });
   const runPipeline = () =>
     processInboundWhatsAppMessage(inbound, {
-      handleLegacyBaileysMessage: async normalized => {
-        await handleMessage(
-          normalized.rawProviderMessage as proto.IWebMessageInfo,
-          wbot,
-          companyId
-        );
+      handleInboundMessage: async normalized => {
+        await handleMessage(normalized, wbot);
       }
     });
 

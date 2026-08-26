@@ -95,6 +95,10 @@ describe("adaptBaileysInboundMessage", () => {
     expect(inbound.addressing.remoteJid).toBe("5511999887766@s.whatsapp.net");
     expect(inbound.senderNumber).toBe("5511999887766");
     expect(inbound.timestamp).toEqual(new Date(1700000000 * 1000));
+    expect(inbound.wrapping.isEphemeral).toBe(false);
+    expect(inbound.wrapping.isViewOnce).toBe(false);
+    expect(inbound.ack).toBeNull();
+    expect(inbound.editedMessageId).toBeNull();
     expect(inbound.rawProviderMessage).toBe(msg);
     expect(inbound.body).toBe(getBodyMessage(msg));
     expect(inbound.messageType).toBe(getTypeMessage(msg));

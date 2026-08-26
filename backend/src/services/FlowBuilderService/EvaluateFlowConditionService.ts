@@ -1,4 +1,3 @@
-import { proto } from "@whiskeysockets/baileys";
 import Contact from "../../models/Contact";
 import Message from "../../models/Message";
 import Ticket from "../../models/Ticket";
@@ -105,21 +104,6 @@ function toBool(v: unknown): boolean | null {
   }
   if (typeof v === "number") return v !== 0;
   return null;
-}
-
-function extractBodyFromMsg(msg?: proto.IWebMessageInfo): string {
-  if (!msg?.message) return "";
-  const m = msg.message;
-  return (
-    m.conversation ||
-    m.extendedTextMessage?.text ||
-    m.imageMessage?.caption ||
-    m.videoMessage?.caption ||
-    m.documentMessage?.caption ||
-    m.buttonsResponseMessage?.selectedButtonId ||
-    m.listResponseMessage?.title ||
-    ""
-  );
 }
 
 async function resolveFieldValue(
@@ -292,7 +276,7 @@ export async function evaluateFlowCondition(
   ticket: Ticket | null | undefined,
   contact: Contact | null | undefined,
   nodeData: ConditionNodeData | null | undefined,
-  msg: proto.IWebMessageInfo | undefined,
+  bodyInput: string | null | undefined,
   companyId: number
 ): Promise<EvaluateFlowConditionResult> {
   const { mode, rules } = normalizeNodeData(nodeData || undefined);
@@ -305,7 +289,7 @@ export async function evaluateFlowCondition(
     return { passed: false, mode, ruleResults: [] };
   }
 
-  const body = extractBodyFromMsg(msg);
+  const body = bodyInput != null ? String(bodyInput) : "";
   const inboundCount = await Message.count({
     where: {
       ticketId: ticket.id,

@@ -250,6 +250,21 @@ export function extractBaileysMediaMetadata(msg: proto.IWebMessageInfo): {
   };
 }
 
+export function extractEditedMessageId(msg: proto.IWebMessageInfo): string | null {
+  const id =
+    msg?.message?.editedMessage?.message?.protocolMessage?.key?.id;
+  if (id == null || String(id).length === 0) {
+    return null;
+  }
+  return String(id);
+}
+
+export function extractBaileysAck(msg: proto.IWebMessageInfo): number | null {
+  if (msg.status == null) return null;
+  const n = Number(msg.status);
+  return Number.isFinite(n) ? n : null;
+}
+
 export function extractBaileysWrapping(msg: proto.IWebMessageInfo): {
   isEphemeral: boolean;
   isViewOnce: boolean;

@@ -1,5 +1,6 @@
 import { proto, getContentType } from "@whiskeysockets/baileys";
 import { AI_AGENT_EVALUATION_REASONS } from "./aiAgentEvaluationReasons";
+import type { NormalizedWhatsAppMessage } from "../../modules/whatsapp/inbound/NormalizedWhatsAppMessage";
 
 export type InboundMessageProductType =
   | "text"
@@ -22,26 +23,12 @@ export type InboundMessageClassification = {
   blockReason?: (typeof AI_AGENT_EVALUATION_REASONS)[keyof typeof AI_AGENT_EVALUATION_REASONS];
 };
 
-function unwrapMessageContent(
-  message: proto.IMessage | null | undefined,
-  depth = 0
-): proto.IMessage | null | undefined {
-  if (!message || depth > 8) return message || undefined;
-  const m = message as proto.IMessage & {
-    ephemeralMessage?: { message?: proto.IMessage };
-    viewOnceMessage?: { message?: proto.IMessage };
-    viewOnceMessageV2?: { message?: proto.IMessage };
-  };
-  const next =
-    m.ephemeralMessage?.message ||
-    m.viewOnceMessage?.message ||
-    m.viewOnceMessageV2?.message ||
-    m.documentWithCaptionMessage?.message;
-  if (next) {
-    return unwrapMessageContent(next, depth + 1) || next;
-  }
-  return message;
-}
+export type ClassifyInboundMessageInput = {
+  messageType: string | null;
+  body?: string | null;
+  hasMedia?: boolean;
+  mediaCaption?: string | null;
+};
 
 function isPlaceholderBody(text: string): boolean {
   const t = text.trim();
@@ -60,35 +47,11 @@ function isUsefulText(text: string | null | undefined): boolean {
   return true;
 }
 
-function extractCaption(base: proto.IMessage | null | undefined): string | null {
-  if (!base) return null;
-  const cap =
-    base.imageMessage?.caption ||
-    base.videoMessage?.caption ||
-    base.documentMessage?.caption ||
-    base.documentWithCaptionMessage?.message?.documentMessage?.caption;
-  if (cap == null) return null;
-  const s = String(cap).trim();
-  return s || null;
-}
-
-function hasMediaPayload(base: proto.IMessage | null | undefined): boolean {
-  if (!base) return false;
-  return !!(
-    base.audioMessage ||
-    base.imageMessage ||
-    base.videoMessage ||
-    base.documentMessage ||
-    base.documentWithCaptionMessage ||
-    base.stickerMessage
-  );
-}
-
-function mapBaileysToProductType(
-  baileysType: string,
+function mapProviderTypeToProductType(
+  providerType: string,
   hasMedia: boolean
 ): InboundMessageProductType {
-  switch (baileysType) {
+  switch (providerType) {
     case "conversation":
     case "extendedTextMessage":
     case "buttonsResponseMessage":
@@ -124,26 +87,29 @@ function mapBaileysToProductType(
 }
 
 /**
- * Classifica mensagem inbound a partir do payload Baileys (não apenas body persistido).
+ * Classifica mensagem inbound a partir do contrato interno (NormalizedWhatsAppMessage).
+ * Não interpreta proto Baileys.
  */
-export function classifyInboundMessageFromBaileys(
-  msg: proto.IWebMessageInfo,
-  bodyFromListener?: string | null
+export function classifyInboundMessage(
+  input: ClassifyInboundMessageInput
 ): InboundMessageClassification {
-  const base = unwrapMessageContent(msg.message);
-  const baileysType = base ? getContentType(base) : null;
-  const typeKey = baileysType || "unknown";
-  const hasMedia = hasMediaPayload(base);
-  const messageType = mapBaileysToProductType(typeKey, hasMedia);
-  const caption = extractCaption(base);
+  const typeKey = input.messageType || "unknown";
+  const hasMedia = Boolean(input.hasMedia);
+  const messageType = mapProviderTypeToProductType(typeKey, hasMedia);
+  const caption =
+    input.mediaCaption != null && String(input.mediaCaption).trim() !== ""
+      ? String(input.mediaCaption).trim()
+      : null;
   const listenerBody =
-    bodyFromListener != null && String(bodyFromListener).trim() !== ""
-      ? String(bodyFromListener)
+    input.body != null && String(input.body).trim() !== ""
+      ? String(input.body)
       : null;
 
   const captionUseful = isUsefulText(caption);
   const listenerUseful =
-    listenerBody != null && isUsefulText(listenerBody) && listenerBody !== caption;
+    listenerBody != null &&
+    isUsefulText(listenerBody) &&
+    listenerBody !== caption;
 
   const hasText = captionUseful || listenerUseful;
 
@@ -157,7 +123,11 @@ export function classifyInboundMessageFromBaileys(
     };
   }
 
-  if (messageType === "sticker" || messageType === "location" || messageType === "contact") {
+  if (
+    messageType === "sticker" ||
+    messageType === "location" ||
+    messageType === "contact"
+  ) {
     return {
       messageType,
       hasText: false,
@@ -167,8 +137,6 @@ export function classifyInboundMessageFromBaileys(
     };
   }
 
-  // Fase 2.17: áudio e imagem passam para o pipeline multimodal (transcrição/visão).
-  // Vídeo/documento sem legenda útil continuam bloqueados.
   if (messageType === "audio") {
     return {
       messageType,
@@ -226,6 +194,85 @@ export function classifyInboundMessageFromBaileys(
     hasMedia,
     baileysType: typeKey
   };
+}
+
+export function classifyInboundMessageFromNormalized(
+  inbound: Pick<NormalizedWhatsAppMessage, "messageType" | "body" | "media">,
+  bodyOverride?: string | null
+): InboundMessageClassification {
+  return classifyInboundMessage({
+    messageType: inbound.messageType,
+    body: bodyOverride ?? inbound.body,
+    hasMedia: inbound.media.hasMedia,
+    mediaCaption: inbound.media.caption
+  });
+}
+
+function unwrapMessageContent(
+  message: proto.IMessage | null | undefined,
+  depth = 0
+): proto.IMessage | null | undefined {
+  if (!message || depth > 8) return message || undefined;
+  const m = message as proto.IMessage & {
+    ephemeralMessage?: { message?: proto.IMessage };
+    viewOnceMessage?: { message?: proto.IMessage };
+    viewOnceMessageV2?: { message?: proto.IMessage };
+  };
+  const next =
+    m.ephemeralMessage?.message ||
+    m.viewOnceMessage?.message ||
+    m.viewOnceMessageV2?.message ||
+    m.documentWithCaptionMessage?.message;
+  if (next) {
+    return unwrapMessageContent(next, depth + 1) || next;
+  }
+  return message;
+}
+
+function extractCaption(
+  base: proto.IMessage | null | undefined
+): string | null {
+  if (!base) return null;
+  const cap =
+    base.imageMessage?.caption ||
+    base.videoMessage?.caption ||
+    base.documentMessage?.caption ||
+    base.documentWithCaptionMessage?.message?.documentMessage?.caption;
+  if (cap == null) return null;
+  const s = String(cap).trim();
+  return s || null;
+}
+
+function hasMediaPayload(base: proto.IMessage | null | undefined): boolean {
+  if (!base) return false;
+  return !!(
+    base.audioMessage ||
+    base.imageMessage ||
+    base.videoMessage ||
+    base.documentMessage ||
+    base.documentWithCaptionMessage ||
+    base.stickerMessage
+  );
+}
+
+/**
+ * @deprecated Preferir classifyInboundMessage / classifyInboundMessageFromNormalized.
+ * Mantido para testes e chamadas residuais que ainda passam proto cru.
+ */
+export function classifyInboundMessageFromBaileys(
+  msg: proto.IWebMessageInfo,
+  bodyFromListener?: string | null
+): InboundMessageClassification {
+  const base = unwrapMessageContent(msg.message);
+  const baileysType = base ? getContentType(base) : null;
+  const hasMedia = hasMediaPayload(base);
+  const caption = extractCaption(base);
+  return classifyInboundMessage({
+    messageType: baileysType || "unknown",
+    body: bodyFromListener,
+    hasMedia,
+    mediaCaption: caption
+  });
 }
 
 export function isCampaignOrSystemText(body?: string | null): boolean {

@@ -9,6 +9,7 @@ import UpdateTicketService from "../TicketServices/UpdateTicketService";
 import { isWhatsAppDisableAllReadAndPresenceSideEffects } from "../../helpers/whatsappUnavailablePresence";
 import { WhatsAppOutbound } from "../../modules/whatsapp/outbound/WhatsAppOutbound";
 import { wrapBaileysSession } from "../../modules/whatsapp/outbound/resolveWhatsAppOutbound";
+import type { NormalizedWhatsAppMessage } from "../../modules/whatsapp/inbound/NormalizedWhatsAppMessage";
 
 async function runTypebotTypingSimulation(
     outbound: WhatsAppOutbound,
@@ -36,9 +37,18 @@ type Session = WASocket & {
 
 interface Request {
     wbot: Session;
-    msg: proto.IWebMessageInfo;
     ticket: Ticket;
     typebot: QueueIntegrations;
+    /** Preferido na Fase 3 — body/remoeteJid/pushName sem proto. */
+    inbound?: Pick<
+        NormalizedWhatsAppMessage,
+        "body" | "pushName" | "addressing" | "fromMe"
+    >;
+    /**
+     * COMPATIBILIDADE: ActionsWebhook / caminhos que ainda passam Baileys.
+     * Não usar em código novo.
+     */
+    msg?: proto.IWebMessageInfo;
 }
 
 
@@ -46,10 +56,15 @@ const typebotListener = async ({
     wbot,
     msg,
     ticket,
-    typebot
+    typebot,
+    inbound
 }: Request): Promise<void> => {
 
-    if (msg.key.remoteJid === 'status@broadcast') return;
+    const remoteJid =
+        inbound?.addressing?.remoteJid ||
+        msg?.key?.remoteJid ||
+        "";
+    if (remoteJid === 'status@broadcast') return;
 
     const { urlN8N: url,
         typebotExpires,
@@ -63,11 +78,16 @@ const typebotListener = async ({
 
     const outbound = wrapBaileysSession(wbot);
 
-    const number = msg.key.remoteJid.replace(/\D/g, '');
+    const number = remoteJid.replace(/\D/g, '');
 
-    let body = getBodyMessage(msg);
+    let body =
+        inbound?.body != null
+            ? inbound.body
+            : msg
+              ? getBodyMessage(msg)
+              : null;
 
-    async function createSession(msg, typebot, number) {
+    async function createSession(_msgUnused: unknown, typebotCfg: typeof typebot, numberValue: string) {
         try {
             const id = Math.floor(Math.random() * 10000000000).toString();
 
@@ -77,8 +97,8 @@ const typebotListener = async ({
                 "resultId": "string",
                 "isOnlyRegistering": false,
                 "prefilledVariables": {
-                    "number": number,
-                    "pushName": msg.pushName || ""
+                    "number": numberValue,
+                    "pushName": inbound?.pushName || msg?.pushName || ""
                 },
             });
 
@@ -122,7 +142,7 @@ const typebotListener = async ({
         }
 
         if (isNil(ticket.typebotSessionId)) {            
-            dataStart = await createSession(msg, typebot, number);
+            dataStart = await createSession(null, typebot, number);
             sessionId = dataStart.sessionId
             status = true;
             await ticket.update({
@@ -311,17 +331,17 @@ const typebotListener = async ({
                             }
                         }
 
-                        await runTypebotTypingSimulation(outbound, msg.key.remoteJid!, typebotDelayMessage, "typebot:text_reply");
+                        await runTypebotTypingSimulation(outbound, remoteJid, typebotDelayMessage, "typebot:text_reply");
 
 
                         await outbound.sendText({
-                            jid: msg.key.remoteJid,
+                            jid: remoteJid,
                             text: formattedText
                         });
                     }
 
                     if (message.type === 'audio') {
-                        await runTypebotTypingSimulation(outbound, msg.key.remoteJid!, typebotDelayMessage, "typebot:audio");
+                        await runTypebotTypingSimulation(outbound, remoteJid, typebotDelayMessage, "typebot:audio");
                         const media = {
                             audio: {
                                 url: message.content.url,
@@ -330,7 +350,7 @@ const typebotListener = async ({
                             },
                         }
                         await outbound.sendContent({
-                            jid: msg.key.remoteJid,
+                            jid: remoteJid,
                             content: media
                         });
 
@@ -353,7 +373,7 @@ const typebotListener = async ({
                     // }
 
                     if (message.type === 'image') {
-                        await runTypebotTypingSimulation(outbound, msg.key.remoteJid!, typebotDelayMessage, "typebot:image");
+                        await runTypebotTypingSimulation(outbound, remoteJid, typebotDelayMessage, "typebot:image");
                         const media = {
                             image: {
                                 url: message.content.url,
@@ -361,7 +381,7 @@ const typebotListener = async ({
 
                         }
                         await outbound.sendContent({
-                            jid: msg.key.remoteJid,
+                            jid: remoteJid,
                             content: media
                         });
                     }
@@ -389,9 +409,9 @@ const typebotListener = async ({
                             formattedText += `▶️ ${item.content}\n`;
                         }
                         formattedText = formattedText.replace(/\n$/, '');
-                        await runTypebotTypingSimulation(outbound, msg.key.remoteJid!, typebotDelayMessage, "typebot:choice_input");
+                        await runTypebotTypingSimulation(outbound, remoteJid, typebotDelayMessage, "typebot:choice_input");
                         await outbound.sendText({
-                            jid: msg.key.remoteJid,
+                            jid: remoteJid,
                             text: formattedText
                         });
 

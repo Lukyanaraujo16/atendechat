@@ -31,18 +31,20 @@ function inbound(
     },
     wrapping: { isEphemeral: false, isViewOnce: false },
     messageStubType: null,
+    ack: null,
+    editedMessageId: null,
     rawProviderMessage: { key: { id: "M1" } },
     ...partial
   };
 }
 
 describe("processInboundWhatsAppMessage", () => {
-  it("delega ao handler legado com o DTO normalizado", async () => {
+  it("delega ao handler de domínio com o DTO normalizado", async () => {
     const received: NormalizedWhatsAppMessage[] = [];
     const msg = inbound();
 
     await processInboundWhatsAppMessage(msg, {
-      handleLegacyBaileysMessage: async normalized => {
+      handleInboundMessage: async normalized => {
         received.push(normalized);
       }
     });
@@ -52,10 +54,10 @@ describe("processInboundWhatsAppMessage", () => {
     expect(received[0].rawProviderMessage).toBe(msg.rawProviderMessage);
   });
 
-  it("rejeita ausência de rawProviderMessage na Fase 1", async () => {
+  it("rejeita ausência de rawProviderMessage na Fase 3 (compatibilidade)", async () => {
     await expect(
       processInboundWhatsAppMessage(inbound({ rawProviderMessage: null }), {
-        handleLegacyBaileysMessage: async () => undefined
+        handleInboundMessage: async () => undefined
       })
     ).rejects.toThrow(/rawProviderMessage/);
   });
@@ -64,7 +66,7 @@ describe("processInboundWhatsAppMessage", () => {
     await expect(
       processInboundWhatsAppMessage(
         inbound({ provider: "unknown-provider" as never }),
-        { handleLegacyBaileysMessage: async () => undefined }
+        { handleInboundMessage: async () => undefined }
       )
     ).rejects.toThrow(/baileys/);
   });

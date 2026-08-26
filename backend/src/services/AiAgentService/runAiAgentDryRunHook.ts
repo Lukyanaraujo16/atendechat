@@ -17,7 +17,6 @@ import { isMultimodalInboundCandidate } from "./prepareAiAgentMultimodalTurn";
 import Contact from "../../models/Contact";
 import Ticket from "../../models/Ticket";
 import Whatsapp from "../../models/Whatsapp";
-import { proto } from "@whiskeysockets/baileys";
 
 function canScheduleAiAgentGeneration(
   classification: InboundMessageClassification
@@ -174,7 +173,7 @@ export function scheduleAiAgentDryRunFromInbound(params: {
   ticket: Ticket;
   contact: Contact;
   whatsapp: Whatsapp;
-  msg: proto.IWebMessageInfo;
+  messageId?: string | null;
   bodyMessage?: string | null;
   persistedMessageId?: string | null;
   classification: InboundMessageClassification;
@@ -185,8 +184,8 @@ export function scheduleAiAgentDryRunFromInbound(params: {
     contact: params.contact,
     whatsapp: params.whatsapp,
     baileysMessageId:
-      params.msg.key?.id != null && String(params.msg.key.id).length > 0
-        ? String(params.msg.key.id)
+      params.messageId != null && String(params.messageId).length > 0
+        ? String(params.messageId)
         : null,
     persistedMessageId: params.persistedMessageId ?? null,
     fromMe: false,
@@ -199,7 +198,7 @@ export function scheduleAiAgentDryRunFromInbound(params: {
         err,
         companyId: params.companyId,
         ticketId: params.ticket.id,
-        messageId: params.msg.key?.id ?? null
+        messageId: params.messageId ?? null
       },
       "[AiAgent][runtime] hook_failed"
     );
@@ -208,8 +207,8 @@ export function scheduleAiAgentDryRunFromInbound(params: {
   // Fase IA 2.0: Orchestrator observe — não assume chatbot/flow/live.
   const orchMessageId =
     params.persistedMessageId ||
-    (params.msg.key?.id != null && String(params.msg.key.id).length > 0
-      ? String(params.msg.key.id)
+    (params.messageId != null && String(params.messageId).length > 0
+      ? String(params.messageId)
       : null);
   void scheduleAutomationObserveFromInbound({
     companyId: params.companyId,

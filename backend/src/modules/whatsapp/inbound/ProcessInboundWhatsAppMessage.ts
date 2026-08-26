@@ -2,28 +2,18 @@ import { NormalizedWhatsAppMessage } from "./NormalizedWhatsAppMessage";
 
 export type ProcessInboundWhatsAppMessageDeps = {
   /**
-   * Handler legado (handleMessage). Fase 1: ainda opera sobre
-   * inbound.rawProviderMessage (proto.IWebMessageInfo).
-   *
-   * Não adicionar novos consumidores de rawProviderMessage.
+   * Handler de domínio. Recebe NormalizedWhatsAppMessage (Fase 3).
+   * rawProviderMessage só deve ser usado via requireBaileysRawMessage
+   * para resíduos documentados.
    */
-  handleLegacyBaileysMessage: (
-    inbound: NormalizedWhatsAppMessage
-  ) => Promise<void>;
+  handleInboundMessage: (inbound: NormalizedWhatsAppMessage) => Promise<void>;
 };
 
 /**
- * Pipeline inbound WhatsApp independente de provider (Fase 1).
+ * Pipeline inbound WhatsApp independente de provider.
  *
- * Etapas de domínio que permanecem no handleMessage legado nesta fase:
- * - localizar/criar contato
- * - localizar/criar ticket
- * - persistir mensagem
- * - chatbot / Flow / Typebot / IA
- * - Socket.IO / notificações
- *
- * A fronteira já existe: o listener Baileys não chama handleMessage direto;
- * converte para NormalizedWhatsAppMessage e entra por aqui.
+ * Fase 3: o handler principal opera sobre NormalizedWhatsAppMessage.
+ * Contato/ticket/persistência/chatbot/Flow/Typebot/IA devem preferir o DTO.
  */
 export async function processInboundWhatsAppMessage(
   inbound: NormalizedWhatsAppMessage,
@@ -31,15 +21,15 @@ export async function processInboundWhatsAppMessage(
 ): Promise<void> {
   if (inbound.provider !== "baileys") {
     throw new Error(
-      `ProcessInboundWhatsAppMessage Fase 1 aceita apenas provider baileys. Recebido: ${String(
+      `ProcessInboundWhatsAppMessage aceita apenas provider baileys. Recebido: ${String(
         inbound.provider
       )}`
     );
   }
   if (inbound.rawProviderMessage == null) {
     throw new Error(
-      "ProcessInboundWhatsAppMessage Fase 1 exige rawProviderMessage para o handler legado"
+      "ProcessInboundWhatsAppMessage ainda exige rawProviderMessage para compatibilidade transitória (mídia/dataJson/LID)"
     );
   }
-  await deps.handleLegacyBaileysMessage(inbound);
+  await deps.handleInboundMessage(inbound);
 }
