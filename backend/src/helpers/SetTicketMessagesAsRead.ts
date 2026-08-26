@@ -1,4 +1,3 @@
-import { proto } from "@whiskeysockets/baileys";
 import type { WAMessageKey } from "@whiskeysockets/baileys/lib/Types/Message.js";
 import { cacheLayer } from "../libs/cache";
 import { getIO } from "../libs/socket";
@@ -70,21 +69,113 @@ export const HUMAN_PANEL_CONVERSATION_VIEW_WHATSAPP_READ: SetTicketMessagesAsRea
     readReceiptReason: "panel_unspecified"
   };
 
-/** `Messages.dataJson` é TEXT com JSON stringificado; normaliza para IWebMessageInfo. */
-function parseInboundWebMessageInfo(
+/** `Messages.dataJson` é TEXT com JSON stringificado; normaliza para objeto. */
+function parseDataJsonObject(
   raw: string | null | undefined
-): proto.IWebMessageInfo | null {
+): Record<string, unknown> | null {
   if (raw == null || raw === "") {
     return null;
   }
   try {
+    let parsed: unknown;
     if (typeof raw === "string") {
-      return JSON.parse(raw) as proto.IWebMessageInfo;
+      parsed = JSON.parse(raw);
+    } else {
+      parsed = JSON.parse(JSON.stringify(raw));
     }
-    return JSON.parse(JSON.stringify(raw)) as proto.IWebMessageInfo;
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+    return null;
   } catch {
     return null;
   }
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function pickStringId(...candidates: unknown[]): string {
+  const found = candidates.find(
+    c => typeof c === "string" && String(c).trim().length > 0
+  );
+  return found != null ? String(found).trim() : "";
+}
+
+function resolveFromMe(
+  fromMeHint: boolean | null,
+  key: Record<string, unknown> | null
+): boolean {
+  if (fromMeHint === true) return true;
+  if (fromMeHint === false) return false;
+  return key?.fromMe === true;
+}
+
+/**
+ * Extrai chave de leitura de dataJson Baileys (key no root) ou Evolution
+ * ({ provider, payload: { key } | envelope.data.key | keyId }).
+ */
+function extractReadKeyFields(
+  row: Message,
+  fallbackJid: string
+): {
+  id: string;
+  remoteJid: string;
+  fromMe: boolean;
+  participant?: string;
+} | null {
+  const parsed = parseDataJsonObject(row.dataJson);
+  let key: Record<string, unknown> | null = null;
+  let fromMeHint: boolean | null = null;
+
+  if (parsed?.provider === "evolution") {
+    const payload = asRecord(parsed.payload);
+    key = asRecord(payload?.key);
+    if (!key) {
+      const data = asRecord(payload?.data);
+      key = asRecord(data?.key);
+      if (!key && data) {
+        const id = pickStringId(data.keyId, data.id);
+        if (id) {
+          key = {
+            id,
+            remoteJid: data.remoteJid,
+            fromMe: data.fromMe,
+            participant: data.participant
+          };
+        }
+      }
+    }
+    if (typeof key?.fromMe === "boolean") {
+      fromMeHint = key.fromMe;
+    }
+  } else {
+    key = asRecord(parsed?.key) || asRecord(parsed);
+  }
+
+  if (resolveFromMe(fromMeHint, key)) {
+    return null;
+  }
+
+  const id = String(key?.id || row.id || "").trim();
+  const remoteJid = String(
+    key?.remoteJid || row.remoteJid || fallbackJid || ""
+  ).trim();
+  if (!id || !remoteJid) {
+    return null;
+  }
+
+  let participant: string | undefined;
+  if (key?.participant) {
+    participant = String(key.participant);
+  } else if (row.participant) {
+    participant = String(row.participant);
+  }
+
+  return { id, remoteJid, fromMe: false, participant };
 }
 
 function buildFallbackRemoteJid(ticket: Ticket): string {
@@ -94,43 +185,39 @@ function buildFallbackRemoteJid(ticket: Ticket): string {
   return `${num}@${suffix}`;
 }
 
-/** Monta chaves WAMessageKey para recibos de leitura (inbound apenas). */
-function buildReadKeysFromRows(rows: Message[], ticket: Ticket): WAMessageKey[] {
+/** Monta chaves para recibos de leitura (inbound apenas). */
+function buildReadKeysFromRows(
+  rows: Message[],
+  ticket: Ticket
+): WAMessageKey[] {
   const fallbackJid = buildFallbackRemoteJid(ticket);
   const seen = new Set<string>();
   const keys: WAMessageKey[] = [];
 
-  for (const row of rows) {
-    const parsed = parseInboundWebMessageInfo(row.dataJson);
-    const key = parsed?.key;
-    const fromMe =
-      key?.fromMe === true ? true : key?.fromMe === false ? false : false;
-    if (fromMe) {
-      continue;
+  rows.forEach(row => {
+    const extracted = extractReadKeyFields(row, fallbackJid);
+    if (!extracted) {
+      return;
     }
 
-    const id = (key?.id || row.id || "").trim();
-    const remoteJid = (key?.remoteJid || row.remoteJid || fallbackJid || "").trim();
-    if (!id || !remoteJid) {
-      continue;
+    const dedupe = `${extracted.remoteJid}|${extracted.id}|${
+      extracted.participant || ""
+    }`;
+    if (seen.has(dedupe)) {
+      return;
     }
-
-    const participant =
-      key?.participant || row.participant || undefined;
-    const dedupe = `${remoteJid}|${id}|${participant || ""}`;
-    if (seen.has(dedupe)) continue;
     seen.add(dedupe);
 
     const waKey: WAMessageKey = {
-      remoteJid,
-      id,
+      remoteJid: extracted.remoteJid,
+      id: extracted.id,
       fromMe: false
     };
-    if (participant) {
-      waKey.participant = participant;
+    if (extracted.participant) {
+      waKey.participant = extracted.participant;
     }
     keys.push(waKey);
-  }
+  });
 
   return keys;
 }
@@ -148,7 +235,7 @@ async function ensureTicketWithContact(ticket: Ticket): Promise<Ticket> {
 async function sendWhatsAppReadReceipts(
   outbound: {
     markAsRead: (
-      keys: Array<{
+      readKeys: Array<{
         remoteJid: string;
         id: string;
         fromMe: boolean;
@@ -166,7 +253,7 @@ async function sendWhatsAppReadReceipts(
 ): Promise<void> {
   if (keys.length === 0) return;
 
-  const sample = keys.slice(0, 3).map((k) => ({
+  const sample = keys.slice(0, 3).map(k => ({
     remoteJid: k.remoteJid,
     id: k.id,
     fromMe: k.fromMe,
@@ -177,7 +264,13 @@ async function sendWhatsAppReadReceipts(
   const strategy = peerVisible ? "sendReceipts(read)" : "readMessages";
 
   logger.info(
-    `${READ_LOG_PREFIX} whatsapp_send reason=${meta.readReceiptReason} strategy=${strategy} companyId=${meta.companyId} whatsappId=${meta.whatsappId} ticketId=${meta.ticketId} keyCount=${keys.length} peerVisibleEnv=${peerVisible} sample=${JSON.stringify(sample)}`
+    `${READ_LOG_PREFIX} whatsapp_send reason=${
+      meta.readReceiptReason
+    } strategy=${strategy} companyId=${meta.companyId} whatsappId=${
+      meta.whatsappId
+    } ticketId=${meta.ticketId} keyCount=${
+      keys.length
+    } peerVisibleEnv=${peerVisible} sample=${JSON.stringify(sample)}`
   );
   await outbound.markAsRead(
     keys.map(k => ({
@@ -249,8 +342,9 @@ const SetTicketMessagesAsRead = async (
           const whatsapp = await Whatsapp.findByPk(ticket.whatsappId, {
             attributes: ["autoReadMessages"]
           });
-          const allowWhatsAppReceipt =
-            whatsapp ? whatsapp.autoReadMessages !== false : true;
+          const allowWhatsAppReceipt = whatsapp
+            ? whatsapp.autoReadMessages !== false
+            : true;
 
           if (allowWhatsAppReceipt) {
             const ticketScoped = await ensureTicketWithContact(ticket);
@@ -276,7 +370,15 @@ const SetTicketMessagesAsRead = async (
                   });
                 } catch (receiptErr) {
                   logger.warn(
-                    `${READ_LOG_PREFIX} error reason=${receiptReason} ticketId=${ticket.id} companyId=${ticket.companyId} whatsappId=${ticket.whatsappId} err=${receiptErr instanceof Error ? receiptErr.message : String(receiptErr)}`
+                    `${READ_LOG_PREFIX} error reason=${receiptReason} ticketId=${
+                      ticket.id
+                    } companyId=${ticket.companyId} whatsappId=${
+                      ticket.whatsappId
+                    } err=${
+                      receiptErr instanceof Error
+                        ? receiptErr.message
+                        : String(receiptErr)
+                    }`
                   );
                 }
               }
@@ -306,10 +408,13 @@ const SetTicketMessagesAsRead = async (
   }
 
   const io = getIO();
-  io.to(`company-${ticket.companyId}-mainchannel`).emit(`company-${ticket.companyId}-ticket`, {
-    action: "updateUnread",
-    ticketId: ticket.id
-  });
+  io.to(`company-${ticket.companyId}-mainchannel`).emit(
+    `company-${ticket.companyId}-ticket`,
+    {
+      action: "updateUnread",
+      ticketId: ticket.id
+    }
+  );
 };
 
 export default SetTicketMessagesAsRead;

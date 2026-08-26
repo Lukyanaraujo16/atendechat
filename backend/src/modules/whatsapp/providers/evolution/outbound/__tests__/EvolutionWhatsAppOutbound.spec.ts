@@ -10,18 +10,23 @@ jest.mock("../../inbound/evolutionHttpClient", () => ({
   evolutionSendText: jest.fn(),
   evolutionSendMedia: jest.fn(),
   evolutionSendWhatsAppAudio: jest.fn(),
-  evolutionSendSticker: jest.fn()
+  evolutionSendSticker: jest.fn(),
+  evolutionMarkMessageAsRead: jest.fn(),
+  evolutionSendPresence: jest.fn()
 }));
 
 import {
   EvolutionWhatsAppOutbound,
-  ERR_EVOLUTION_OPERATION_NOT_SUPPORTED
+  ERR_EVOLUTION_OPERATION_NOT_SUPPORTED,
+  ERR_EVOLUTION_INVALID_READ_KEYS
 } from "../EvolutionWhatsAppOutbound";
 import {
   evolutionSendText,
   evolutionSendMedia,
   evolutionSendWhatsAppAudio,
   evolutionSendSticker,
+  evolutionMarkMessageAsRead,
+  evolutionSendPresence,
   EvolutionHttpError
 } from "../../inbound/evolutionHttpClient";
 import { jidToEvolutionNumber } from "../evolutionDestination";
@@ -31,6 +36,8 @@ const sendText = evolutionSendText as jest.Mock;
 const sendMedia = evolutionSendMedia as jest.Mock;
 const sendAudio = evolutionSendWhatsAppAudio as jest.Mock;
 const sendSticker = evolutionSendSticker as jest.Mock;
+const markRead = evolutionMarkMessageAsRead as jest.Mock;
+const sendPresenceHttp = evolutionSendPresence as jest.Mock;
 
 const evoResponse = (id = "BAE594145F4C59B4") => ({
   key: {
@@ -49,6 +56,8 @@ describe("EvolutionWhatsAppOutbound Fase 8", () => {
     sendMedia.mockResolvedValue(evoResponse("IMG1"));
     sendAudio.mockResolvedValue(evoResponse("AUD1"));
     sendSticker.mockResolvedValue(evoResponse("STK1"));
+    markRead.mockResolvedValue({ message: "Read messages", read: "success" });
+    sendPresenceHttp.mockResolvedValue({});
   });
 
   it("sendText chama endpoint com number/text e retorna message id", async () => {
@@ -80,11 +89,8 @@ describe("EvolutionWhatsAppOutbound Fase 8", () => {
     expect(sendText).not.toHaveBeenCalled();
   });
 
-  it("markAsRead/delete não fazem fallback Baileys", async () => {
+  it("delete não faz fallback Baileys", async () => {
     const outbound = new EvolutionWhatsAppOutbound(1);
-    await expect(outbound.markAsRead([])).rejects.toMatchObject({
-      message: ERR_EVOLUTION_OPERATION_NOT_SUPPORTED
-    });
     await expect(
       outbound.deleteMessage({
         jid: "x",
@@ -93,11 +99,77 @@ describe("EvolutionWhatsAppOutbound Fase 8", () => {
     ).rejects.toMatchObject({ message: ERR_EVOLUTION_OPERATION_NOT_SUPPORTED });
   });
 
-  it("sendPresence retorna false sem throw", async () => {
+  it("markAsRead chama markMessageAsRead com remote/message ids", async () => {
+    const outbound = new EvolutionWhatsAppOutbound(10);
+    await outbound.markAsRead([
+      {
+        remoteJid: "5511999998888@s.whatsapp.net",
+        id: "INB1",
+        fromMe: false
+      }
+    ]);
+    expect(markRead).toHaveBeenCalledWith({
+      whatsappId: 10,
+      readMessages: [
+        {
+          remoteJid: "5511999998888@s.whatsapp.net",
+          id: "INB1",
+          fromMe: false
+        }
+      ]
+    });
+  });
+
+  it("markAsRead keys vazias / timeout / API error", async () => {
     const outbound = new EvolutionWhatsAppOutbound(1);
+    await expect(outbound.markAsRead([])).rejects.toMatchObject({
+      message: ERR_EVOLUTION_INVALID_READ_KEYS
+    });
+    markRead.mockRejectedValueOnce(
+      new EvolutionHttpError("ERR_EVOLUTION_TIMEOUT", "Timeout")
+    );
+    await expect(
+      outbound.markAsRead([
+        { remoteJid: "a@s.whatsapp.net", id: "1", fromMe: false }
+      ])
+    ).rejects.toMatchObject({ message: "ERR_EVOLUTION_TIMEOUT" });
+    markRead.mockRejectedValueOnce(
+      new EvolutionHttpError("ERR_EVOLUTION_API_ERROR", "fail")
+    );
+    await expect(
+      outbound.markAsRead([
+        { remoteJid: "a@s.whatsapp.net", id: "1", fromMe: false }
+      ])
+    ).rejects.toMatchObject({ message: "ERR_EVOLUTION_API_ERROR" });
+  });
+
+  it("sendPresence composing/paused; sem jid → false; sem Baileys", async () => {
+    const outbound = new EvolutionWhatsAppOutbound(10);
     await expect(
       outbound.sendPresence({ presence: "composing" })
     ).resolves.toBe(false);
+    expect(sendPresenceHttp).not.toHaveBeenCalled();
+
+    await expect(
+      outbound.sendPresence({
+        jid: "5511999998888@s.whatsapp.net",
+        presence: "composing"
+      })
+    ).resolves.toBe(true);
+    expect(sendPresenceHttp).toHaveBeenCalledWith({
+      whatsappId: 10,
+      number: "5511999998888@s.whatsapp.net",
+      presence: "composing",
+      delay: 5000
+    });
+
+    await outbound.sendPresence({
+      jid: "5511999998888@s.whatsapp.net",
+      presence: "paused"
+    });
+    expect(sendPresenceHttp).toHaveBeenLastCalledWith(
+      expect.objectContaining({ presence: "paused", delay: 1000 })
+    );
   });
 
   it("timeout/API error tipados", async () => {

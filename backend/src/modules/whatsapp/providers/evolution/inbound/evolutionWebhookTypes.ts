@@ -20,6 +20,18 @@ export const EVOLUTION_MESSAGE_UPSERT_EVENTS = [
 export type EvolutionMessageUpsertEvent =
   (typeof EVOLUTION_MESSAGE_UPSERT_EVENTS)[number];
 
+/**
+ * Status/ACK — Evolution API v2 webhook MESSAGES_UPDATE.
+ * Docs: https://doc.evolution-api.com/v2/en/configuration/webhooks
+ * Payload real (Evolution baileys channel): keyId, remoteJid, fromMe, status…
+ */
+export const EVOLUTION_MESSAGE_UPDATE_EVENTS = [
+  "MESSAGES_UPDATE",
+  "messages.update"
+] as const;
+
+export type EvolutionMessageUpdateEvent =
+  (typeof EVOLUTION_MESSAGE_UPDATE_EVENTS)[number];
 export type EvolutionWebhookKey = {
   remoteJid?: string;
   fromMe?: boolean;
@@ -179,6 +191,15 @@ export function isEvolutionMessageUpsertEvent(
   );
 }
 
+export function isEvolutionMessageUpdateEvent(
+  event: string | null | undefined
+): event is EvolutionMessageUpdateEvent {
+  if (!event) return false;
+  const normalized = String(event).trim();
+  return (EVOLUTION_MESSAGE_UPDATE_EVENTS as readonly string[]).includes(
+    normalized
+  );
+}
 const BASE64_KEYS = new Set([
   "base64",
   "mediaBase64",

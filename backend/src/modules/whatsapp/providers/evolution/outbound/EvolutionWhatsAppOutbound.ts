@@ -9,7 +9,9 @@ import {
 } from "../../../outbound/WhatsAppOutbound";
 import {
   EvolutionHttpError,
+  evolutionMarkMessageAsRead,
   evolutionSendMedia,
+  evolutionSendPresence,
   evolutionSendSticker,
   evolutionSendText,
   evolutionSendWhatsAppAudio
@@ -23,16 +25,110 @@ import { mapEvolutionSendResponseToResult } from "./mapEvolutionSendResponse";
 
 export const ERR_EVOLUTION_OPERATION_NOT_SUPPORTED =
   "ERR_EVOLUTION_OPERATION_NOT_SUPPORTED";
+export const ERR_EVOLUTION_INVALID_READ_KEYS =
+  "ERR_EVOLUTION_INVALID_READ_KEYS";
+export const ERR_EVOLUTION_INVALID_PRESENCE = "ERR_EVOLUTION_INVALID_PRESENCE";
+
+const MAX_READ_KEYS = 100;
+const DEFAULT_PRESENCE_DELAY_MS = 5000;
 
 function httpStatusForEvolutionCode(code: string): number {
   if (code === "ERR_EVOLUTION_TIMEOUT") return 504;
   if (
     code === "ERR_EVOLUTION_CREDENTIAL_MISSING" ||
-    code === "ERR_EVOLUTION_CREDENTIAL_DECRYPT"
+    code === "ERR_EVOLUTION_CREDENTIAL_DECRYPT" ||
+    code === ERR_EVOLUTION_INVALID_READ_KEYS ||
+    code === ERR_EVOLUTION_INVALID_PRESENCE
   ) {
     return 400;
   }
   return 502;
+}
+
+function hasControlChars(value: string): boolean {
+  for (let i = 0; i < value.length; i += 1) {
+    const code = value.charCodeAt(i);
+    if (code <= 0x1f) return true;
+  }
+  return false;
+}
+
+function normalizeReadKeys(keys: WhatsAppReadKey[]): Array<{
+  remoteJid: string;
+  fromMe: boolean;
+  id: string;
+  participant?: string;
+}> {
+  if (!Array.isArray(keys) || keys.length === 0) {
+    throw new AppError(
+      ERR_EVOLUTION_INVALID_READ_KEYS,
+      400,
+      "readMessages vazio"
+    );
+  }
+  if (keys.length > MAX_READ_KEYS) {
+    throw new AppError(
+      ERR_EVOLUTION_INVALID_READ_KEYS,
+      400,
+      "readMessages excede limite"
+    );
+  }
+
+  const out: Array<{
+    remoteJid: string;
+    fromMe: boolean;
+    id: string;
+    participant?: string;
+  }> = [];
+  const seen = new Set<string>();
+
+  keys.forEach(key => {
+    const id = String(key?.id || "").trim();
+    const remoteJid = String(key?.remoteJid || "").trim();
+    if (!id || !remoteJid) {
+      throw new AppError(
+        ERR_EVOLUTION_INVALID_READ_KEYS,
+        400,
+        "readMessages com id/remoteJid inválidos"
+      );
+    }
+    if (hasControlChars(id) || hasControlChars(remoteJid)) {
+      throw new AppError(
+        ERR_EVOLUTION_INVALID_READ_KEYS,
+        400,
+        "readMessages com caracteres de controle"
+      );
+    }
+    const dedupe = `${remoteJid}|${id}`;
+    if (seen.has(dedupe)) {
+      return;
+    }
+    seen.add(dedupe);
+    const item: {
+      remoteJid: string;
+      fromMe: boolean;
+      id: string;
+      participant?: string;
+    } = {
+      remoteJid,
+      fromMe: Boolean(key.fromMe),
+      id
+    };
+    if (key.participant) {
+      item.participant = String(key.participant).trim();
+    }
+    out.push(item);
+  });
+
+  if (out.length === 0) {
+    throw new AppError(
+      ERR_EVOLUTION_INVALID_READ_KEYS,
+      400,
+      "readMessages vazio após normalização"
+    );
+  }
+
+  return out;
 }
 
 function toAppError(err: unknown): never {
@@ -74,7 +170,7 @@ function asBuffer(value: unknown): Buffer | null {
 }
 
 /**
- * Outbound Evolution (Fase 8) — HTTP real via Evolution API v2.
+ * Outbound Evolution (Fases 8–9A) — HTTP real via Evolution API v2.
  * Sem WASocket / Get*Wbot / Baileys / AnyMessageContent opaco genérico.
  */
 /* eslint-disable class-methods-use-this */
@@ -104,7 +200,7 @@ export class EvolutionWhatsAppOutbound implements WhatsAppOutbound {
       throw new AppError(
         ERR_EVOLUTION_OPERATION_NOT_SUPPORTED,
         400,
-        "Quoted/reply Evolution ainda não suportado (Fase 9)."
+        "quoted/reply Evolution ainda não suportado (Fase 9B)."
       );
     }
     try {
@@ -145,24 +241,67 @@ export class EvolutionWhatsAppOutbound implements WhatsAppOutbound {
     throw new AppError(
       ERR_EVOLUTION_OPERATION_NOT_SUPPORTED,
       400,
-      "deleteMessage Evolution ainda não suportado (Fase 9)."
+      "deleteMessage Evolution ainda não suportado (Fase 9B)."
     );
   }
 
-  async markAsRead(_keys: WhatsAppReadKey[]): Promise<void> {
-    throw new AppError(
-      ERR_EVOLUTION_OPERATION_NOT_SUPPORTED,
-      400,
-      "markAsRead Evolution ainda não suportado (Fase 9)."
-    );
+  /**
+   * POST /chat/markMessageAsRead/{instance}.
+   * Sem equivalente a Baileys readMessages local — endpoint é peer-visível.
+   * Sem retry cego.
+   */
+  async markAsRead(keys: WhatsAppReadKey[]): Promise<void> {
+    try {
+      const readMessages = normalizeReadKeys(keys);
+      await evolutionMarkMessageAsRead({
+        whatsappId: this.whatsappId,
+        readMessages
+      });
+    } catch (err) {
+      toAppError(err);
+    }
   }
 
-  async sendPresence(_input: {
+  /**
+   * POST /chat/sendPresence/{instance} (number, presence, delay).
+   * Retorna false se jid ausente.
+   */
+  async sendPresence(input: {
     jid?: string;
     presence: WhatsAppPresence;
     subscribe?: boolean;
   }): Promise<boolean> {
-    return false;
+    const { presence } = input;
+    if (
+      presence !== "composing" &&
+      presence !== "paused" &&
+      presence !== "unavailable"
+    ) {
+      throw new AppError(
+        ERR_EVOLUTION_INVALID_PRESENCE,
+        400,
+        "presence Evolution inválida"
+      );
+    }
+    const jid = input.jid != null ? String(input.jid).trim() : "";
+    if (!jid) {
+      return false;
+    }
+    try {
+      const number = jidToEvolutionNumber(jid);
+      await evolutionSendPresence({
+        whatsappId: this.whatsappId,
+        number,
+        presence,
+        delay:
+          presence === "composing"
+            ? DEFAULT_PRESENCE_DELAY_MS
+            : Math.min(DEFAULT_PRESENCE_DELAY_MS, 1000)
+      });
+      return true;
+    } catch (err) {
+      return toAppError(err);
+    }
   }
 
   private async dispatchKnownContent(

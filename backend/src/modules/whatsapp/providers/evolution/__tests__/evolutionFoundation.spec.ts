@@ -19,10 +19,13 @@ import {
 import AppError from "../../../../../errors/AppError";
 
 describe("Evolution foundation (Fases 5–8)", () => {
-  it("capacidades: outbound + webhook on; QR/ACK off", () => {
+  it("capacidades: outbound + webhook + ack/read/presence on; QR off", () => {
     expect(EVOLUTION_PHASE5_CAPABILITIES.sendText).toBe(true);
     expect(EVOLUTION_PHASE5_CAPABILITIES.sendMedia).toBe(true);
     expect(EVOLUTION_PHASE5_CAPABILITIES.webhookInbound).toBe(true);
+    expect(EVOLUTION_PHASE5_CAPABILITIES.ack).toBe(true);
+    expect(EVOLUTION_PHASE5_CAPABILITIES.markAsRead).toBe(true);
+    expect(EVOLUTION_PHASE5_CAPABILITIES.presence).toBe(true);
     expect(EVOLUTION_PHASE5_CAPABILITIES.connect).toBe(false);
   });
 

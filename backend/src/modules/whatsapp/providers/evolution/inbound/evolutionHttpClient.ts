@@ -215,6 +215,52 @@ export async function evolutionSendSticker(input: {
 }
 
 /**
+ * POST /chat/markMessageAsRead/{instance}
+ * Docs: https://doc.evolution-api.com/v2/api-reference/chat-controller/mark-as-read
+ * Body: { readMessages: [{ remoteJid, fromMe, id }] }
+ * Sem retry automático (efeito peer-visível).
+ */
+export async function evolutionMarkMessageAsRead(input: {
+  whatsappId: number;
+  readMessages: Array<{
+    remoteJid: string;
+    fromMe: boolean;
+    id: string;
+    participant?: string;
+  }>;
+}): Promise<unknown> {
+  return evolutionPostJson({
+    whatsappId: input.whatsappId,
+    path: "/chat/markMessageAsRead/{instance}",
+    body: {
+      readMessages: input.readMessages
+    }
+  });
+}
+
+/**
+ * POST /chat/sendPresence/{instance}
+ * Schema Evolution: number, presence, delay (raiz — issue #1107).
+ * presence: unavailable | available | composing | recording | paused
+ */
+export async function evolutionSendPresence(input: {
+  whatsappId: number;
+  number: string;
+  presence: "unavailable" | "available" | "composing" | "recording" | "paused";
+  delay: number;
+}): Promise<unknown> {
+  return evolutionPostJson({
+    whatsappId: input.whatsappId,
+    path: "/chat/sendPresence/{instance}",
+    body: {
+      number: input.number,
+      presence: input.presence,
+      delay: input.delay
+    }
+  });
+}
+
+/**
  * POST /chat/getBase64FromMediaMessage/{instance}
  * Docs: https://doc.evolution-api.com/v2/api-reference/chat-controller/get-base64
  */

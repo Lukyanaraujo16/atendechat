@@ -1,9 +1,11 @@
 import { WhatsAppOutboundSendResult } from "../../../outbound/WhatsAppOutbound";
+import { mapEvolutionStatusToAck } from "../inbound/mapEvolutionStatusToAck";
 
 /**
  * Normaliza resposta Evolution send* → WhatsAppOutboundSendResult.
  * rawSentMessage = envelope provider-aware (NÃO proto Baileys).
  * Mantém key.id para callers legados que leem .key.id.
+ * status numérico = escala StreamHub 0–5 (Fase 9A).
  */
 export function mapEvolutionSendResponseToResult(
   data: unknown,
@@ -30,17 +32,7 @@ export function mapEvolutionSendResponseToResult(
 
   const fromMe = key.fromMe != null ? Boolean(key.fromMe) : true;
 
-  let status: number | null = null;
-  if (typeof root.status === "number") {
-    status = root.status;
-  } else if (root.status === "PENDING" || root.status === "SERVER_ACK") {
-    status = 1;
-  } else if (root.status === "DELIVERY_ACK") {
-    status = 2;
-  } else if (root.status === "READ" || root.status === "PLAYED") {
-    status = 3;
-  }
-
+  const status = mapEvolutionStatusToAck(root.status);
   const rawSentMessage = {
     provider: "evolution",
     key: {

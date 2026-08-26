@@ -1,15 +1,7 @@
 /**
- * Fundação Evolution API (Fase 5).
- *
- * Ainda NÃO implementa:
- * - webhook inbound real
- * - mapper completo → NormalizedWhatsAppMessage
- * - envio real
- * - QR / connect / logout / ACK reais
- *
- * Inbound futuro (Fase 6+):
- * Evolution webhook → Evolution adapter → NormalizedWhatsAppMessage
- * → processInboundWhatsAppMessage
+ * Fundação Evolution API (Fase 5+).
+ * Fase 9A: ACK webhook, markAsRead e presence HTTP ativos.
+ * Ainda NÃO: quoted/delete (9B), QR / connect / logout.
  */
 
 export type EvolutionInstanceConfig = {
@@ -25,10 +17,12 @@ export type EvolutionClientCapabilities = {
   logout: false;
   qr: false;
   webhookInbound: boolean;
-  ack: false;
+  ack: boolean;
+  markAsRead: boolean;
+  presence: boolean;
 };
 
-/** Capacidades Evolution após Fase 8 (outbound texto/mídia HTTP). */
+/** Capacidades Evolution após Fase 9A (ACK / markAsRead / presence). */
 export const EVOLUTION_PHASE5_CAPABILITIES: EvolutionClientCapabilities = {
   sendText: true,
   sendMedia: true,
@@ -36,7 +30,9 @@ export const EVOLUTION_PHASE5_CAPABILITIES: EvolutionClientCapabilities = {
   logout: false,
   qr: false,
   webhookInbound: true,
-  ack: false
+  ack: true,
+  markAsRead: true,
+  presence: true
 };
 
 /**

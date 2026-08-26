@@ -226,15 +226,23 @@ export async function startAiAgentTypingPresence(
   }
 
   try {
-    // Lazy: evita carregar libs/wbot no import graph de Shadow/Simulator.
-    const { default: GetTicketWbot } = await import(
-      "../../helpers/GetTicketWbot"
-    );
-    const { wrapBaileysSession } = await import(
+    // Provider-agnostic: Baileys ou Evolution via resolver (sem GetTicketWbot).
+    const { getWhatsAppOutboundForTicket } = await import(
       "../../modules/whatsapp/outbound/resolveWhatsAppOutbound"
     );
-    const wbot = await GetTicketWbot(input.ticket);
-    const outbound = wrapBaileysSession(wbot);
+    const outbound = await getWhatsAppOutboundForTicket(input.ticket);
+    if (!outbound) {
+      emitAiAgentTypingMetric("ai_agent.typing_failed", {
+        companyId: input.companyId,
+        ticketId: input.ticket.id,
+        agentId: input.agentId,
+        whatsappId: input.whatsapp?.id,
+        executionId: input.executionId,
+        reason: "outbound_missing",
+        result: "skipped"
+      });
+      return { executionId: input.executionId, started: false, stop };
+    }
     const jid = await resolveChatJid(input.ticket, input.contact);
     if (!jid) {
       emitAiAgentTypingMetric("ai_agent.typing_failed", {
