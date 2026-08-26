@@ -31,22 +31,57 @@ function buildQuotedOptions(
   quoted: WhatsAppQuotedMessage
 ): { quoted: proto.IWebMessageInfo } | Record<string, never> {
   try {
-    const msgFound =
-      typeof quoted.dataJson === "string"
-        ? JSON.parse(quoted.dataJson)
-        : quoted.dataJson;
-    if (!msgFound) return {};
-    const quotedKey = msgFound.key || {};
-    return {
-      quoted: {
-        key: {
-          ...quotedKey,
-          remoteJid: quoted.destinationJid,
-          participant: quoted.isGroup ? quotedKey.participant : undefined
-        },
-        message: msgFound.message || { extendedTextMessage: {} }
+    if (quoted.dataJson != null && quoted.dataJson !== "") {
+      const msgFound =
+        typeof quoted.dataJson === "string"
+          ? JSON.parse(quoted.dataJson)
+          : quoted.dataJson;
+      if (msgFound && typeof msgFound === "object") {
+        const quotedKey =
+          (msgFound as { key?: Record<string, unknown> }).key || {};
+        let participant: string | undefined;
+        if (quoted.isGroup) {
+          if (typeof quotedKey.participant === "string") {
+            participant = quotedKey.participant;
+          } else if (quoted.participant) {
+            participant = quoted.participant;
+          }
+        }
+        return {
+          quoted: {
+            key: {
+              ...quotedKey,
+              remoteJid: quoted.destinationJid,
+              participant
+            },
+            message: (msgFound as { message?: unknown }).message || {
+              extendedTextMessage: {}
+            }
+          }
+        };
       }
-    };
+    }
+
+    // Fallback semântico (sem dataJson Baileys)
+    if (quoted.stanzaId) {
+      return {
+        quoted: {
+          key: {
+            id: quoted.stanzaId,
+            remoteJid: quoted.destinationJid,
+            fromMe: Boolean(quoted.fromMe),
+            participant: quoted.isGroup
+              ? quoted.participant || undefined
+              : undefined
+          },
+          message: {
+            conversation: quoted.body || "",
+            extendedTextMessage: {}
+          }
+        }
+      };
+    }
+    return {};
   } catch {
     return {};
   }

@@ -1,9 +1,13 @@
 import AppError from "../../errors/AppError";
-import GetWbotMessage from "../../helpers/GetWbotMessage";
 import { getWhatsAppOutboundForTicket } from "../../modules/whatsapp/outbound/resolveWhatsAppOutbound";
 import Message from "../../models/Message";
 import Ticket from "../../models/Ticket";
 
+/**
+ * Apaga mensagem no provider via WhatsAppOutbound.
+ * Usa colunas semânticas Message (id/remoteJid/participant/fromMe) —
+ * sem GetTicketWbot / WAMessage (Evolution-safe).
+ */
 const DeleteWhatsAppMessage = async (messageId: string): Promise<Message> => {
   const message = await Message.findByPk(messageId, {
     include: [
@@ -20,23 +24,24 @@ const DeleteWhatsAppMessage = async (messageId: string): Promise<Message> => {
   }
 
   const { ticket } = message;
-
-  const messageToDelete = await GetWbotMessage(ticket, messageId);
+  const remoteJid = String(message.remoteJid || "").trim();
+  if (!remoteJid) {
+    throw new AppError("ERR_DELETE_WAPP_MSG");
+  }
 
   try {
     const outbound = await getWhatsAppOutboundForTicket(ticket);
-    const menssageDelete = messageToDelete as Message;
-
     await outbound.deleteMessage({
-      jid: menssageDelete.remoteJid,
+      jid: remoteJid,
       target: {
-        id: menssageDelete.id,
-        remoteJid: menssageDelete.remoteJid,
-        participant: menssageDelete.participant,
-        fromMe: menssageDelete.fromMe
+        id: message.id,
+        remoteJid,
+        participant: message.participant,
+        fromMe: Boolean(message.fromMe)
       }
     });
   } catch (err) {
+    if (err instanceof AppError) throw err;
     throw new AppError("ERR_DELETE_WAPP_MSG");
   }
   await message.update({ isDeleted: true });

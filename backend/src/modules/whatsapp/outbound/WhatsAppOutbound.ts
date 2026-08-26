@@ -20,13 +20,21 @@ export type WhatsAppOutboundSendResult = {
 };
 
 /**
- * Quoted reconstruído a partir de Message.dataJson (payload Baileys).
- * Compatibilidade transitória — não eliminar nesta fase.
+ * Quoted provider-agnostic (Fase 9B).
+ * Baileys: continua preferindo `dataJson` (WAMessage).
+ * Evolution: usa campos semânticos (stanzaId/fromMe/participant) — NÃO interpreta dataJson como proto.
  */
 export type WhatsAppQuotedMessage = {
-  dataJson: string | Record<string, unknown>;
+  /** LEGACY Baileys — opcional quando stanzaId está presente. */
+  dataJson?: string | Record<string, unknown> | null;
   destinationJid: string;
   isGroup: boolean;
+  /** Id canônico da mensagem citada (Message.id / key.id). */
+  stanzaId?: string;
+  fromMe?: boolean;
+  participant?: string | null;
+  /** Texto/contexto opcional para Evolution `quoted.message.conversation`. */
+  body?: string | null;
 };
 
 export type WhatsAppReadKey = {
@@ -95,7 +103,7 @@ export const PHASE3_WHATSAPP_SOCKET_CONSUMERS = [
   "helpers/SendMessageFlow.ts (GetWhatsappWbot; sendMessage comentado)",
   "GroupServices/* groupMetadata (admin de grupo)",
   "helpers/groupContactName.ts (groupMetadata)",
-  "quoted via Message.dataJson (SendWhatsAppMessage / BaileysWhatsAppOutbound)",
+  "quoted semântico (stanzaId) + dataJson Baileys compat (SendWhatsAppMessage / outbound)",
   "n8n/webhook json: msg (legacyBaileysPayload — contrato externo)",
   "chatbot list/button payloads Baileys em wbotMessageListener (via sendOutboundContent)"
 ] as const;

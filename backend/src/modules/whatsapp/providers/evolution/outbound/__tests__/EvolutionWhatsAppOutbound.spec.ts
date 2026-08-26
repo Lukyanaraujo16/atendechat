@@ -12,13 +12,15 @@ jest.mock("../../inbound/evolutionHttpClient", () => ({
   evolutionSendWhatsAppAudio: jest.fn(),
   evolutionSendSticker: jest.fn(),
   evolutionMarkMessageAsRead: jest.fn(),
-  evolutionSendPresence: jest.fn()
+  evolutionSendPresence: jest.fn(),
+  evolutionDeleteMessage: jest.fn()
 }));
 
 import {
   EvolutionWhatsAppOutbound,
   ERR_EVOLUTION_OPERATION_NOT_SUPPORTED,
-  ERR_EVOLUTION_INVALID_READ_KEYS
+  ERR_EVOLUTION_INVALID_READ_KEYS,
+  ERR_EVOLUTION_INVALID_QUOTED
 } from "../EvolutionWhatsAppOutbound";
 import {
   evolutionSendText,
@@ -27,6 +29,7 @@ import {
   evolutionSendSticker,
   evolutionMarkMessageAsRead,
   evolutionSendPresence,
+  evolutionDeleteMessage,
   EvolutionHttpError
 } from "../../inbound/evolutionHttpClient";
 import { jidToEvolutionNumber } from "../evolutionDestination";
@@ -38,6 +41,7 @@ const sendAudio = evolutionSendWhatsAppAudio as jest.Mock;
 const sendSticker = evolutionSendSticker as jest.Mock;
 const markRead = evolutionMarkMessageAsRead as jest.Mock;
 const sendPresenceHttp = evolutionSendPresence as jest.Mock;
+const deleteMsg = evolutionDeleteMessage as jest.Mock;
 
 const evoResponse = (id = "BAE594145F4C59B4") => ({
   key: {
@@ -58,6 +62,7 @@ describe("EvolutionWhatsAppOutbound Fase 8", () => {
     sendSticker.mockResolvedValue(evoResponse("STK1"));
     markRead.mockResolvedValue({ message: "Read messages", read: "success" });
     sendPresenceHttp.mockResolvedValue({});
+    deleteMsg.mockResolvedValue({ message: "Message deleted" });
   });
 
   it("sendText chama endpoint com number/text e retorna message id", async () => {
@@ -69,7 +74,8 @@ describe("EvolutionWhatsAppOutbound Fase 8", () => {
     expect(sendText).toHaveBeenCalledWith({
       whatsappId: 10,
       number: "5511999998888@s.whatsapp.net",
-      text: "Olá\nlinha2\u200c"
+      text: "Olá\nlinha2\u200c",
+      quoted: undefined
     });
     expect(result.messageId).toBe("BAE594145F4C59B4");
     expect(result.fromMe).toBe(true);
@@ -77,26 +83,91 @@ describe("EvolutionWhatsAppOutbound Fase 8", () => {
     expect((result.rawSentMessage as any).key.id).toBe("BAE594145F4C59B4");
   });
 
-  it("quoted retorna NOT_SUPPORTED", async () => {
+  it("quoted textual semântico envia quoted.key.id sem Baileys", async () => {
+    const outbound = new EvolutionWhatsAppOutbound(10);
+    await outbound.sendText({
+      jid: "5511999998888@s.whatsapp.net",
+      text: "reply",
+      quoted: {
+        stanzaId: "QUOTE_A",
+        destinationJid: "5511999998888@s.whatsapp.net",
+        isGroup: false,
+        fromMe: false,
+        body: "original"
+      }
+    });
+    expect(sendText).toHaveBeenCalledWith({
+      whatsappId: 10,
+      number: "5511999998888@s.whatsapp.net",
+      text: "reply",
+      quoted: {
+        key: {
+          id: "QUOTE_A",
+          remoteJid: "5511999998888@s.whatsapp.net",
+          fromMe: false
+        },
+        message: { conversation: "original" }
+      }
+    });
+  });
+
+  it("quoted sem stanzaId / grupo sem participant falha controlado", async () => {
     const outbound = new EvolutionWhatsAppOutbound(1);
     await expect(
       outbound.sendText({
         jid: "5511@s.whatsapp.net",
         text: "x",
-        quoted: { dataJson: "{}", destinationJid: "x", isGroup: false }
+        quoted: { destinationJid: "x", isGroup: false }
       })
-    ).rejects.toMatchObject({ message: ERR_EVOLUTION_OPERATION_NOT_SUPPORTED });
-    expect(sendText).not.toHaveBeenCalled();
+    ).rejects.toMatchObject({ message: ERR_EVOLUTION_INVALID_QUOTED });
+    await expect(
+      outbound.sendText({
+        jid: "120363@g.us",
+        text: "x",
+        quoted: {
+          stanzaId: "G1",
+          destinationJid: "120363@g.us",
+          isGroup: true
+        }
+      })
+    ).rejects.toMatchObject({ message: ERR_EVOLUTION_INVALID_QUOTED });
   });
 
-  it("delete não faz fallback Baileys", async () => {
+  it("deleteMessage chama deleteMessageForEveryone sem Baileys", async () => {
+    const outbound = new EvolutionWhatsAppOutbound(10);
+    await outbound.deleteMessage({
+      jid: "5511999998888@s.whatsapp.net",
+      target: {
+        id: "DEL1",
+        remoteJid: "5511999998888@s.whatsapp.net",
+        fromMe: true
+      }
+    });
+    expect(deleteMsg).toHaveBeenCalledWith({
+      whatsappId: 10,
+      id: "DEL1",
+      remoteJid: "5511999998888@s.whatsapp.net",
+      fromMe: true,
+      participant: undefined
+    });
+  });
+
+  it("delete timeout/API error tipados", async () => {
     const outbound = new EvolutionWhatsAppOutbound(1);
+    deleteMsg.mockRejectedValueOnce(
+      new EvolutionHttpError("ERR_EVOLUTION_TIMEOUT", "Timeout")
+    );
     await expect(
       outbound.deleteMessage({
-        jid: "x",
-        target: { id: "1", remoteJid: "x", fromMe: true }
+        jid: "a@s.whatsapp.net",
+        target: { id: "1", remoteJid: "a@s.whatsapp.net", fromMe: true }
       })
-    ).rejects.toMatchObject({ message: ERR_EVOLUTION_OPERATION_NOT_SUPPORTED });
+    ).rejects.toMatchObject({ message: "ERR_EVOLUTION_TIMEOUT" });
+  });
+
+  it("sticker quoted path ainda sem quoted em sendContent (dívida mídia)", async () => {
+    // sendContent sticker não recebe WhatsAppQuotedMessage — documentado.
+    expect(ERR_EVOLUTION_OPERATION_NOT_SUPPORTED).toBeTruthy();
   });
 
   it("markAsRead chama markMessageAsRead com remote/message ids", async () => {

@@ -5,6 +5,7 @@ import Whatsapp from "../../../../../models/Whatsapp";
 import notifyTicketInboundMessage from "../../../../../services/OneSignalPush/notifyTicketInboundMessage";
 import { serializeMessageForClient } from "../../../../../services/MessageServices/CreateMessageService";
 import { NormalizedWhatsAppMessage } from "../../../inbound/NormalizedWhatsAppMessage";
+import { scheduleReapplyDeferredEvolutionAcks } from "./reapplyDeferredEvolutionAcks";
 
 export type EvolutionInboundMessagePersistInput = {
   inbound: NormalizedWhatsAppMessage;
@@ -133,6 +134,12 @@ export async function createEvolutionInboundMessage(
     // eslint-disable-next-line no-void
     void notifyTicketInboundMessage({ message, companyId });
   }
+
+  scheduleReapplyDeferredEvolutionAcks({
+    companyId,
+    whatsappId: inbound.whatsappId,
+    providerMessageId: inbound.messageId
+  });
 
   return message;
 }

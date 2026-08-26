@@ -92,7 +92,10 @@ jest.mock("../../inbound/evolutionHttpClient", () => ({
   })),
   evolutionSendMedia: jest.fn(),
   evolutionSendWhatsAppAudio: jest.fn(),
-  evolutionSendSticker: jest.fn()
+  evolutionSendSticker: jest.fn(),
+  evolutionDeleteMessage: jest.fn(),
+  evolutionMarkMessageAsRead: jest.fn(),
+  evolutionSendPresence: jest.fn()
 }));
 
 import { EvolutionWhatsAppOutbound } from "../EvolutionWhatsAppOutbound";

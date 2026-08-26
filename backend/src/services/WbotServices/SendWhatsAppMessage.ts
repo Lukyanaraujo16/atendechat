@@ -26,11 +26,18 @@ const SendWhatsAppMessage = async ({
   const outbound = await getWhatsAppOutboundForTicket(ticket);
   // Evitar enviar para o próprio número da conexão (resposta indo para "si mesmo")
   const ownJid = outbound.getOwnUserJid();
-  if (!ticket.isGroup && ticket.contact?.number && ticket.contact.number !== "LID" && ownJid) {
+  if (
+    !ticket.isGroup &&
+    ticket.contact?.number &&
+    ticket.contact.number !== "LID" &&
+    ownJid
+  ) {
     const destNumber = String(ticket.contact.number).replace(/\D/g, "");
     const myNumber = jidNormalizedUser(ownJid).replace(/\D/g, "");
     if (destNumber && myNumber && destNumber === myNumber) {
-      throw new AppError("Não é possível enviar mensagem para o próprio número da conexão. Verifique o contato do ticket.");
+      throw new AppError(
+        "Não é possível enviar mensagem para o próprio número da conexão. Verifique o contato do ticket."
+      );
     }
   }
   // Obter JID para envio: override > ticket (dataWebhook ou última mensagem) > construir do contato
@@ -38,7 +45,9 @@ const SendWhatsAppMessage = async ({
   if (!number) {
     const destNumber = String(ticket.contact?.number || "").replace(/\D/g, "");
     if (!destNumber && !ticket.isGroup) {
-      throw new AppError("Não foi possível obter o destino da mensagem. O contato pode ter número oculto (LID) e não há histórico de conversa.");
+      throw new AppError(
+        "Não foi possível obter o destino da mensagem. O contato pode ter número oculto (LID) e não há histórico de conversa."
+      );
     }
     number = ticket.isGroup
       ? `${destNumber}@g.us`
@@ -46,26 +55,33 @@ const SendWhatsAppMessage = async ({
   }
 
   let quoted: {
-    dataJson: string | Record<string, unknown>;
+    dataJson?: string | Record<string, unknown> | null;
     destinationJid: string;
     isGroup: boolean;
+    stanzaId?: string;
+    fromMe?: boolean;
+    participant?: string | null;
+    body?: string | null;
   } | null = null;
 
   if (quotedMsg) {
-      const chatMessages = await Message.findOne({
-        where: {
-          id: quotedMsg.id
-        }
-      });
-
-      if (chatMessages) {
-        quoted = {
-          dataJson: chatMessages.dataJson,
-          destinationJid: number,
-          isGroup: Boolean(ticket.isGroup)
-        };
+    const chatMessages = await Message.findOne({
+      where: {
+        id: quotedMsg.id
       }
-    
+    });
+
+    if (chatMessages) {
+      quoted = {
+        dataJson: chatMessages.dataJson,
+        destinationJid: number,
+        isGroup: Boolean(ticket.isGroup),
+        stanzaId: chatMessages.id,
+        fromMe: Boolean(chatMessages.fromMe),
+        participant: chatMessages.participant || null,
+        body: chatMessages.body || null
+      };
+    }
   }
 
   try {

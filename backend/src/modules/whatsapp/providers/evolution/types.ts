@@ -1,7 +1,8 @@
 /**
  * Fundação Evolution API (Fase 5+).
- * Fase 9A: ACK webhook, markAsRead e presence HTTP ativos.
- * Ainda NÃO: quoted/delete (9B), QR / connect / logout.
+ * Fase 9A: ACK webhook, markAsRead e presence HTTP.
+ * Fase 9B: quoted/reply + delete + reapply ACK deferred.
+ * Ainda NÃO: QR / connect / logout.
  */
 
 export type EvolutionInstanceConfig = {

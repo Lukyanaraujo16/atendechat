@@ -9,6 +9,8 @@ import {
 } from "../../../outbound/WhatsAppOutbound";
 import {
   EvolutionHttpError,
+  EvolutionQuotedPayload,
+  evolutionDeleteMessage,
   evolutionMarkMessageAsRead,
   evolutionSendMedia,
   evolutionSendPresence,
@@ -28,6 +30,9 @@ export const ERR_EVOLUTION_OPERATION_NOT_SUPPORTED =
 export const ERR_EVOLUTION_INVALID_READ_KEYS =
   "ERR_EVOLUTION_INVALID_READ_KEYS";
 export const ERR_EVOLUTION_INVALID_PRESENCE = "ERR_EVOLUTION_INVALID_PRESENCE";
+export const ERR_EVOLUTION_INVALID_QUOTED = "ERR_EVOLUTION_INVALID_QUOTED";
+export const ERR_EVOLUTION_INVALID_DELETE_KEY =
+  "ERR_EVOLUTION_INVALID_DELETE_KEY";
 
 const MAX_READ_KEYS = 100;
 const DEFAULT_PRESENCE_DELAY_MS = 5000;
@@ -38,11 +43,51 @@ function httpStatusForEvolutionCode(code: string): number {
     code === "ERR_EVOLUTION_CREDENTIAL_MISSING" ||
     code === "ERR_EVOLUTION_CREDENTIAL_DECRYPT" ||
     code === ERR_EVOLUTION_INVALID_READ_KEYS ||
-    code === ERR_EVOLUTION_INVALID_PRESENCE
+    code === ERR_EVOLUTION_INVALID_PRESENCE ||
+    code === ERR_EVOLUTION_INVALID_QUOTED ||
+    code === ERR_EVOLUTION_INVALID_DELETE_KEY
   ) {
     return 400;
   }
   return 502;
+}
+
+/**
+ * Monta quoted Evolution semântico — NÃO interpreta dataJson como WAMessage/proto.
+ */
+export function buildEvolutionQuotedPayload(
+  quoted: WhatsAppQuotedMessage
+): EvolutionQuotedPayload {
+  const stanzaId = String(quoted.stanzaId || "").trim();
+  if (!stanzaId) {
+    throw new AppError(
+      ERR_EVOLUTION_INVALID_QUOTED,
+      400,
+      "quoted Evolution exige stanzaId"
+    );
+  }
+  if (quoted.isGroup && !String(quoted.participant || "").trim()) {
+    throw new AppError(
+      ERR_EVOLUTION_INVALID_QUOTED,
+      400,
+      "quoted Evolution em grupo exige participant"
+    );
+  }
+
+  const key: EvolutionQuotedPayload["key"] = {
+    id: stanzaId,
+    remoteJid: quoted.destinationJid || undefined,
+    fromMe: Boolean(quoted.fromMe)
+  };
+  if (quoted.isGroup && quoted.participant) {
+    key.participant = String(quoted.participant).trim();
+  }
+
+  const payload: EvolutionQuotedPayload = { key };
+  if (quoted.body != null && String(quoted.body).trim()) {
+    payload.message = { conversation: String(quoted.body).slice(0, 2000) };
+  }
+  return payload;
 }
 
 function hasControlChars(value: string): boolean {
@@ -196,19 +241,16 @@ export class EvolutionWhatsAppOutbound implements WhatsAppOutbound {
     text: string;
     quoted?: WhatsAppQuotedMessage | null;
   }): Promise<WhatsAppOutboundSendResult> {
-    if (input.quoted) {
-      throw new AppError(
-        ERR_EVOLUTION_OPERATION_NOT_SUPPORTED,
-        400,
-        "quoted/reply Evolution ainda não suportado (Fase 9B)."
-      );
-    }
     try {
       const number = jidToEvolutionNumber(input.jid);
+      const quoted = input.quoted
+        ? buildEvolutionQuotedPayload(input.quoted)
+        : undefined;
       const data = await evolutionSendText({
         whatsappId: this.whatsappId,
         number,
-        text: input.text
+        text: input.text,
+        quoted
       });
       const result = mapEvolutionSendResponseToResult(data, input.jid);
       if (!result.messageId) {
@@ -234,15 +276,38 @@ export class EvolutionWhatsAppOutbound implements WhatsAppOutbound {
     }
   }
 
-  async deleteMessage(_input: {
+  /**
+   * DELETE /chat/deleteMessageForEveryone/{instance}.
+   * Dados semânticos Message — sem WAMessage/Baileys.
+   */
+  async deleteMessage(input: {
     jid: string;
     target: WhatsAppDeleteTarget;
   }): Promise<void> {
-    throw new AppError(
-      ERR_EVOLUTION_OPERATION_NOT_SUPPORTED,
-      400,
-      "deleteMessage Evolution ainda não suportado (Fase 9B)."
-    );
+    try {
+      const id = String(input.target?.id || "").trim();
+      const remoteJid = String(
+        input.target?.remoteJid || input.jid || ""
+      ).trim();
+      if (!id || !remoteJid) {
+        throw new AppError(
+          ERR_EVOLUTION_INVALID_DELETE_KEY,
+          400,
+          "delete Evolution exige id e remoteJid"
+        );
+      }
+      await evolutionDeleteMessage({
+        whatsappId: this.whatsappId,
+        id,
+        remoteJid,
+        fromMe: Boolean(input.target.fromMe),
+        participant: input.target.participant
+          ? String(input.target.participant).trim()
+          : undefined
+      });
+    } catch (err) {
+      toAppError(err);
+    }
   }
 
   /**

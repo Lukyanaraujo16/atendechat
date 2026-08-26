@@ -484,6 +484,10 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
     });
     const bodyToSave = formatBody(body, ticket.contact);
     const idToSave = (sentMessage as any)?.key?.id || uuidv4();
+    const isEvolution =
+      sentMessage &&
+      typeof sentMessage === "object" &&
+      (sentMessage as { provider?: string }).provider === "evolution";
     sendPerfLog("before_persist_message", {
       resolvedTicketId: ticket.id,
       messageId: idToSave
@@ -497,10 +501,35 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
         read: true,
         ack: (sentMessage as any)?.status,
         mediaType: "conversation",
-        ...(sentMessage ? { dataJson: JSON.stringify(sentMessage as any) } : {})
+        quotedMsgId: quotedMsg?.id || null,
+        remoteJid: (sentMessage as any)?.key?.remoteJid || null,
+        externalMessageId: isEvolution ? idToSave : undefined,
+        ...(sentMessage
+          ? {
+              dataJson: isEvolution
+                ? JSON.stringify({
+                    provider: "evolution",
+                    payload: {
+                      key: (sentMessage as any).key,
+                      status: (sentMessage as any).status
+                    }
+                  })
+                : JSON.stringify(sentMessage as any)
+            }
+          : {})
       } as any,
       companyId: ticket.companyId
     });
+    if (isEvolution && ticket.whatsappId != null) {
+      const { scheduleReapplyDeferredEvolutionAcks } = await import(
+        "../modules/whatsapp/providers/evolution/inbound/reapplyDeferredEvolutionAcks"
+      );
+      scheduleReapplyDeferredEvolutionAcks({
+        companyId: ticket.companyId,
+        whatsappId: Number(ticket.whatsappId),
+        providerMessageId: idToSave
+      });
+    }
     sendPerfLog("after_persist_message", {
       resolvedTicketId: ticket.id,
       messageId: savedMessage.id

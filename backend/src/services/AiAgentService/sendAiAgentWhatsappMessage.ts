@@ -85,6 +85,17 @@ export default async function sendAiAgentWhatsappMessage(
       companyId: input.companyId
     });
 
+    if (isEvolution && input.ticket.whatsappId != null) {
+      const { scheduleReapplyDeferredEvolutionAcks } = await import(
+        "../../modules/whatsapp/providers/evolution/inbound/reapplyDeferredEvolutionAcks"
+      );
+      scheduleReapplyDeferredEvolutionAcks({
+        companyId: input.companyId,
+        whatsappId: Number(input.ticket.whatsappId),
+        providerMessageId: messageId
+      });
+    }
+
     await input.ticket.update({
       lastMessage: bodyToSave,
       fromMe: true

@@ -88,8 +88,9 @@ function parseEvolutionErrorBody(data: unknown): string {
   return "Evolution API error";
 }
 
-async function evolutionPostJson(input: {
+async function evolutionRequestJson(input: {
   whatsappId: number;
+  method: "post" | "delete";
   path: string;
   body: Record<string, unknown>;
 }): Promise<unknown> {
@@ -102,11 +103,14 @@ async function evolutionPostJson(input: {
 
   let response;
   try {
-    response = await client.post(path, input.body);
+    response =
+      input.method === "delete"
+        ? await client.delete(path, { data: input.body })
+        : await client.post(path, input.body);
   } catch (err) {
     const code = (err as { code?: string })?.code;
     logger.warn(
-      { whatsappId: input.whatsappId, path, code },
+      { whatsappId: input.whatsappId, path, code, method: input.method },
       "[EvolutionHttp] outbound request failed"
     );
     if (code === "ECONNABORTED" || code === "ETIMEDOUT") {
@@ -132,28 +136,58 @@ async function evolutionPostJson(input: {
   return response.data;
 }
 
+async function evolutionPostJson(input: {
+  whatsappId: number;
+  path: string;
+  body: Record<string, unknown>;
+}): Promise<unknown> {
+  return evolutionRequestJson({
+    whatsappId: input.whatsappId,
+    method: "post",
+    path: input.path,
+    body: input.body
+  });
+}
+
+export type EvolutionQuotedPayload = {
+  key: {
+    id: string;
+    remoteJid?: string;
+    fromMe?: boolean;
+    participant?: string;
+  };
+  message?: { conversation?: string };
+};
+
 /**
  * POST /message/sendText/{instance}
  * Docs: https://doc.evolution-api.com/v2/api-reference/message-controller/send-text
+ * Quoted: body.quoted = { key: { id, ... }, message? }
  */
 export async function evolutionSendText(input: {
   whatsappId: number;
   number: string;
   text: string;
+  quoted?: EvolutionQuotedPayload;
 }): Promise<unknown> {
+  const body: Record<string, unknown> = {
+    number: input.number,
+    text: input.text
+  };
+  if (input.quoted) {
+    body.quoted = input.quoted;
+  }
   return evolutionPostJson({
     whatsappId: input.whatsappId,
     path: "/message/sendText/{instance}",
-    body: {
-      number: input.number,
-      text: input.text
-    }
+    body
   });
 }
 
 /**
  * POST /message/sendMedia/{instance}
  * mediatype: image | video | document | audio
+ * Quoted: mesmo mecanismo que sendText (quoted no body).
  */
 export async function evolutionSendMedia(input: {
   whatsappId: number;
@@ -163,18 +197,23 @@ export async function evolutionSendMedia(input: {
   mimetype: string;
   fileName: string;
   caption?: string;
+  quoted?: EvolutionQuotedPayload;
 }): Promise<unknown> {
+  const body: Record<string, unknown> = {
+    number: input.number,
+    mediatype: input.mediatype,
+    media: input.media,
+    mimetype: input.mimetype,
+    fileName: input.fileName,
+    caption: input.caption != null ? input.caption : ""
+  };
+  if (input.quoted) {
+    body.quoted = input.quoted;
+  }
   return evolutionPostJson({
     whatsappId: input.whatsappId,
     path: "/message/sendMedia/{instance}",
-    body: {
-      number: input.number,
-      mediatype: input.mediatype,
-      media: input.media,
-      mimetype: input.mimetype,
-      fileName: input.fileName,
-      caption: input.caption != null ? input.caption : ""
-    }
+    body
   });
 }
 
@@ -211,6 +250,34 @@ export async function evolutionSendSticker(input: {
       number: input.number,
       sticker: input.sticker
     }
+  });
+}
+
+/**
+ * DELETE /chat/deleteMessageForEveryone/{instance}
+ * Body: { id, remoteJid, fromMe, participant? }
+ * Sem retry automático.
+ */
+export async function evolutionDeleteMessage(input: {
+  whatsappId: number;
+  id: string;
+  remoteJid: string;
+  fromMe: boolean;
+  participant?: string;
+}): Promise<unknown> {
+  const body: Record<string, unknown> = {
+    id: input.id,
+    remoteJid: input.remoteJid,
+    fromMe: input.fromMe
+  };
+  if (input.participant) {
+    body.participant = input.participant;
+  }
+  return evolutionRequestJson({
+    whatsappId: input.whatsappId,
+    method: "delete",
+    path: "/chat/deleteMessageForEveryone/{instance}",
+    body
   });
 }
 
