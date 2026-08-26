@@ -2,14 +2,30 @@ import crypto from "crypto";
 import { NormalizedWhatsAppMessage } from "../../../inbound/NormalizedWhatsAppMessage";
 import { normalizeWhatsAppJidToNumber } from "../../../../../helpers/normalizeWhatsAppJidToNumber";
 import {
+  EvolutionAudioMessage,
+  EvolutionDocumentMessage,
+  EvolutionImageMessage,
+  EvolutionLocationMessage,
+  EvolutionMediaContextInfo,
+  EvolutionStickerMessage,
+  EvolutionVideoMessage,
   EvolutionWebhookEnvelope,
   EvolutionWebhookMessageContent,
   EvolutionWebhookMessageData,
   isEvolutionMessageUpsertEvent
 } from "./evolutionWebhookTypes";
+import {
+  EvolutionMediaExtractHints,
+  collectEvolutionMediaHints
+} from "./EvolutionMediaExtractor";
+import { EvolutionBinaryMediaKind } from "./evolutionMediaLimits";
 
 export type AdaptEvolutionResult =
-  | { ok: true; inbound: NormalizedWhatsAppMessage }
+  | {
+      ok: true;
+      inbound: NormalizedWhatsAppMessage;
+      mediaHints: EvolutionMediaExtractHints | null;
+    }
   | {
       ok: false;
       reason:
@@ -29,18 +45,24 @@ const TEXT_TYPES = new Set([
   "extendedText"
 ]);
 
-const MEDIA_OR_OTHER_TYPES = new Set([
+const BINARY_MEDIA_TYPES = new Set([
   "imageMessage",
   "videoMessage",
   "audioMessage",
   "documentMessage",
   "documentWithCaptionMessage",
-  "stickerMessage",
+  "stickerMessage"
+]);
+
+const ENRICHED_NON_BINARY = new Set([
   "reactionMessage",
   "contactMessage",
   "contactsArrayMessage",
   "locationMessage",
-  "liveLocationMessage",
+  "liveLocationMessage"
+]);
+
+const STILL_UNSUPPORTED = new Set([
   "buttonsMessage",
   "listMessage",
   "templateMessage",
@@ -75,39 +97,59 @@ function detectMessageType(
   if (!message) return null;
   if (typeof message.conversation === "string") return "conversation";
   if (message.extendedTextMessage) return "extendedTextMessage";
-  const matched = Object.keys(message).find(
+  const keys = Object.keys(message);
+  const matched = keys.find(
     key =>
       key !== "messageContextInfo" &&
-      (TEXT_TYPES.has(key) || MEDIA_OR_OTHER_TYPES.has(key))
+      (TEXT_TYPES.has(key) ||
+        BINARY_MEDIA_TYPES.has(key) ||
+        ENRICHED_NON_BINARY.has(key) ||
+        STILL_UNSUPPORTED.has(key))
   );
   return matched || null;
 }
 
-function extractTextBody(
-  messageType: string | null,
-  message: EvolutionWebhookMessageContent | null | undefined
+function contextStanza(
+  ctx: EvolutionMediaContextInfo | undefined
 ): string | null {
-  if (!message) return null;
-  if (
-    messageType === "conversation" ||
-    typeof message.conversation === "string"
-  ) {
-    const t = String(message.conversation || "").trim();
-    return t.length > 0 ? t : null;
-  }
-  const ext = message.extendedTextMessage;
-  if (ext && typeof ext.text === "string") {
-    const t = ext.text.trim();
-    return t.length > 0 ? t : null;
+  if (typeof ctx?.stanzaId === "string" && ctx.stanzaId.trim()) {
+    return ctx.stanzaId.trim();
   }
   return null;
 }
 
 function extractQuotedStanzaId(
+  messageType: string | null,
   message: EvolutionWebhookMessageContent | null | undefined
 ): string | null {
-  const stanza = message?.extendedTextMessage?.contextInfo?.stanzaId;
-  if (typeof stanza === "string" && stanza.trim()) return stanza.trim();
+  if (!message) return null;
+  if (messageType === "extendedTextMessage" || message.extendedTextMessage) {
+    return contextStanza(message.extendedTextMessage?.contextInfo);
+  }
+  if (messageType === "imageMessage") {
+    return contextStanza(message.imageMessage?.contextInfo);
+  }
+  if (messageType === "videoMessage") {
+    return contextStanza(message.videoMessage?.contextInfo);
+  }
+  if (messageType === "audioMessage") {
+    return contextStanza(message.audioMessage?.contextInfo);
+  }
+  if (messageType === "documentMessage") {
+    return contextStanza(message.documentMessage?.contextInfo);
+  }
+  if (messageType === "documentWithCaptionMessage") {
+    return contextStanza(
+      message.documentWithCaptionMessage?.message?.documentMessage?.contextInfo
+    );
+  }
+  if (messageType === "stickerMessage") {
+    return contextStanza(message.stickerMessage?.contextInfo);
+  }
+  if (messageType === "reactionMessage") {
+    const id = message.reactionMessage?.key?.id;
+    return typeof id === "string" && id.trim() ? id.trim() : null;
+  }
   return null;
 }
 
@@ -132,6 +174,226 @@ function parseTimestamp(
     if (!Number.isNaN(d.getTime())) return d;
   }
   return null;
+}
+
+function messageTypeToKind(
+  messageType: string
+): EvolutionBinaryMediaKind | null {
+  switch (messageType) {
+    case "imageMessage":
+      return "image";
+    case "videoMessage":
+      return "video";
+    case "audioMessage":
+      return "audio";
+    case "documentMessage":
+    case "documentWithCaptionMessage":
+      return "document";
+    case "stickerMessage":
+      return "sticker";
+    default:
+      return null;
+  }
+}
+
+function resolveDocumentNode(
+  message: EvolutionWebhookMessageContent
+): EvolutionDocumentMessage | null {
+  if (message.documentMessage) return message.documentMessage;
+  return message.documentWithCaptionMessage?.message?.documentMessage || null;
+}
+
+function buildLocationBody(loc: EvolutionLocationMessage | undefined): string {
+  if (!loc) return "Localização";
+  const lat = loc.degreesLatitude;
+  const lng = loc.degreesLongitude;
+  if (typeof lat === "number" && typeof lng === "number") {
+    const name = loc.name ? `${loc.name} — ` : "";
+    const addr = loc.address ? `${loc.address} | ` : "";
+    return `${name}${addr}https://maps.google.com/maps?q=${lat}%2C${lng}&z=17&hl=pt-BR|${lat}, ${lng}`;
+  }
+  if (loc.name || loc.address) {
+    return [loc.name, loc.address].filter(Boolean).join(" — ");
+  }
+  return "Localização";
+}
+
+function buildBodyAndMedia(input: {
+  messageType: string | null;
+  message: EvolutionWebhookMessageContent | null;
+  messageId: string;
+}): {
+  body: string | null;
+  media: NormalizedWhatsAppMessage["media"];
+  mediaHints: EvolutionMediaExtractHints | null;
+  fail?: AdaptEvolutionResult;
+} {
+  const { messageType, message, messageId } = input;
+  const emptyMedia = {
+    hasMedia: false,
+    mimetype: null as string | null,
+    filename: null as string | null,
+    caption: null as string | null,
+    isPtt: false
+  };
+
+  if (!messageType) {
+    return {
+      body: null,
+      media: emptyMedia,
+      mediaHints: null,
+      fail: { ok: false, reason: "unsupported_message_type", detail: "unknown" }
+    };
+  }
+
+  if (STILL_UNSUPPORTED.has(messageType)) {
+    return {
+      body: null,
+      media: emptyMedia,
+      mediaHints: null,
+      fail: {
+        ok: false,
+        reason: "unsupported_message_type",
+        detail: messageType
+      }
+    };
+  }
+
+  // Texto
+  if (TEXT_TYPES.has(messageType) || messageType === "conversation") {
+    let body: string | null = null;
+    if (typeof message?.conversation === "string") {
+      body = message.conversation.trim() || null;
+    } else if (message?.extendedTextMessage?.text) {
+      body = String(message.extendedTextMessage.text).trim() || null;
+    }
+    if (!body) {
+      return {
+        body: null,
+        media: emptyMedia,
+        mediaHints: null,
+        fail: { ok: false, reason: "empty_text", detail: messageType }
+      };
+    }
+    return { body, media: emptyMedia, mediaHints: null };
+  }
+
+  // Binários
+  const kind = messageTypeToKind(messageType);
+  if (kind) {
+    let mimetype: string | null = null;
+    let caption: string | null = null;
+    let filename: string | null = null;
+    let isPtt = false;
+    let node: Record<string, unknown> | null = null;
+    let body: string;
+
+    if (messageType === "imageMessage") {
+      const img = message?.imageMessage as EvolutionImageMessage | undefined;
+      mimetype = img?.mimetype || "image/jpeg";
+      caption = img?.caption?.trim() || null;
+      body = caption || "Imagem";
+      node = asRecord(img);
+    } else if (messageType === "videoMessage") {
+      const vid = message?.videoMessage as EvolutionVideoMessage | undefined;
+      mimetype = vid?.mimetype || "video/mp4";
+      caption = vid?.caption?.trim() || null;
+      filename = vid?.fileName || null;
+      body = caption || "Vídeo";
+      node = asRecord(vid);
+    } else if (messageType === "audioMessage") {
+      const aud = message?.audioMessage as EvolutionAudioMessage | undefined;
+      mimetype = aud?.mimetype || "audio/ogg; codecs=opus";
+      isPtt = Boolean(aud?.ptt);
+      body = "Áudio";
+      node = asRecord(aud);
+    } else if (
+      messageType === "documentMessage" ||
+      messageType === "documentWithCaptionMessage"
+    ) {
+      const doc = message ? resolveDocumentNode(message) : null;
+      mimetype = doc?.mimetype || "application/octet-stream";
+      caption = doc?.caption?.trim() || null;
+      filename = doc?.fileName || doc?.title || null;
+      body = caption || filename || "Documento";
+      node = asRecord(doc);
+    } else {
+      const stk = message?.stickerMessage as
+        | EvolutionStickerMessage
+        | undefined;
+      mimetype = stk?.mimetype || "image/webp";
+      body = "sticker";
+      node = asRecord(stk);
+    }
+
+    const mediaHints = collectEvolutionMediaHints({
+      kind,
+      messageId,
+      messageNode: node,
+      mimetype,
+      filename
+    });
+
+    return {
+      body,
+      media: {
+        hasMedia: true,
+        mimetype,
+        filename,
+        caption,
+        isPtt
+      },
+      mediaHints
+    };
+  }
+
+  // Enriquecidos sem binário
+  if (
+    messageType === "locationMessage" ||
+    messageType === "liveLocationMessage"
+  ) {
+    const loc =
+      messageType === "liveLocationMessage"
+        ? message?.liveLocationMessage
+        : message?.locationMessage;
+    return {
+      body: buildLocationBody(loc as EvolutionLocationMessage | undefined),
+      media: emptyMedia,
+      mediaHints: null
+    };
+  }
+
+  if (messageType === "contactMessage") {
+    const vcard = message?.contactMessage?.vcard;
+    const display = message?.contactMessage?.displayName;
+    const body =
+      (typeof vcard === "string" && vcard.trim()) ||
+      (typeof display === "string" && display.trim()) ||
+      "Contato";
+    return { body, media: emptyMedia, mediaHints: null };
+  }
+
+  if (messageType === "contactsArrayMessage") {
+    return { body: "varios contatos", media: emptyMedia, mediaHints: null };
+  }
+
+  if (messageType === "reactionMessage") {
+    const text = message?.reactionMessage?.text;
+    const body =
+      typeof text === "string" && text.trim() ? text.trim() : "reaction";
+    return { body, media: emptyMedia, mediaHints: null };
+  }
+
+  return {
+    body: null,
+    media: emptyMedia,
+    mediaHints: null,
+    fail: {
+      ok: false,
+      reason: "unsupported_message_type",
+      detail: messageType
+    }
+  };
 }
 
 /**
@@ -170,32 +432,9 @@ export function adaptEvolutionInboundMessage(input: {
     null) as EvolutionWebhookMessageContent | null;
   const messageType = detectMessageType(data, message);
 
-  if (messageType && MEDIA_OR_OTHER_TYPES.has(messageType)) {
-    return {
-      ok: false,
-      reason: "unsupported_message_type",
-      detail: messageType
-    };
-  }
-
-  if (
-    messageType &&
-    !TEXT_TYPES.has(messageType) &&
-    messageType !== "conversation"
-  ) {
-    // tipo desconhecido sem campos de texto
-    const bodyProbe = extractTextBody(messageType, message);
-    if (!bodyProbe) {
-      return {
-        ok: false,
-        reason: "unsupported_message_type",
-        detail: messageType
-      };
-    }
-  }
-
-  const body = extractTextBody(messageType, message);
-  if (!body) {
+  const built = buildBodyAndMedia({ messageType, message, messageId });
+  if (built.fail) return built.fail;
+  if (!built.body) {
     return {
       ok: false,
       reason: "empty_text",
@@ -213,8 +452,6 @@ export function adaptEvolutionInboundMessage(input: {
   const participantPn =
     key.participantPn != null ? String(key.participantPn) : undefined;
   const senderPnKey = key.senderPn != null ? String(key.senderPn) : undefined;
-  // Em grupo, envelope.sender não é fonte confiável do participante (pode ser
-  // outro JID do envelope). Preferir key.participant / participantPn / senderPn.
   const senderPn = isGroup
     ? senderPnKey || participantPn
     : senderPnKey ||
@@ -267,7 +504,7 @@ export function adaptEvolutionInboundMessage(input: {
     fromMe,
     timestamp: parseTimestamp(data, envelope),
     messageType: messageType || "conversation",
-    body,
+    body: built.body,
     pushName:
       typeof data.pushName === "string" && data.pushName.trim()
         ? data.pushName.trim()
@@ -281,15 +518,9 @@ export function adaptEvolutionInboundMessage(input: {
       participantPn
     },
     senderNumber: senderNumber || null,
-    quotedStanzaId: extractQuotedStanzaId(message),
+    quotedStanzaId: extractQuotedStanzaId(messageType, message),
     mentionedJids: [],
-    media: {
-      hasMedia: false,
-      mimetype: null,
-      filename: null,
-      caption: null,
-      isPtt: false
-    },
+    media: built.media,
     wrapping: { isEphemeral: false, isViewOnce: false },
     messageStubType: null,
     ack: null,
@@ -297,7 +528,7 @@ export function adaptEvolutionInboundMessage(input: {
     rawProviderMessage: null
   };
 
-  return { ok: true, inbound };
+  return { ok: true, inbound, mediaHints: built.mediaHints };
 }
 
 export function buildEvolutionExternalEventId(input: {

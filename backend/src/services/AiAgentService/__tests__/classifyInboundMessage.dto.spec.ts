@@ -94,6 +94,27 @@ describe("classifyInboundMessage (DTO)", () => {
     expect(c.blockReason).toBeUndefined();
   });
 
+  it("imagem Evolution via DTO classifica multimodal sem raw", () => {
+    const c = classifyInboundMessageFromNormalized(
+      baseInbound({
+        provider: "evolution",
+        messageType: "imageMessage",
+        body: "foto",
+        rawProviderMessage: null,
+        media: {
+          hasMedia: true,
+          mimetype: "image/jpeg",
+          filename: "a.jpg",
+          caption: "foto",
+          isPtt: false
+        }
+      })
+    );
+    expect(c.messageType).toBe("image");
+    expect(c.hasMedia).toBe(true);
+    expect(c.blockReason).toBeUndefined();
+  });
+
   it("reação bloqueia unsupported_message_type", () => {
     const c = classifyInboundMessageFromNormalized(
       baseInbound({

@@ -10,11 +10,21 @@ import { NormalizedWhatsAppMessage } from "../../../inbound/NormalizedWhatsAppMe
 import { processInboundWhatsAppMessage } from "../../../inbound/ProcessInboundWhatsAppMessage";
 import { resolveQuotedMessageByStanzaId } from "../../../inbound/resolveQuotedMessageByStanzaId";
 import { createEvolutionInboundMessage } from "./createEvolutionInboundMessage";
+import {
+  EvolutionMediaExtractHints,
+  extractEvolutionMedia
+} from "./EvolutionMediaExtractor";
+import { EvolutionHttpError } from "./evolutionHttpClient";
+import { persistEvolutionMediaFile } from "./persistEvolutionMediaFile";
 
-export type ProcessEvolutionTextResult =
+export type ProcessEvolutionInboundResult =
   | { status: "created"; messageId: string; ticketId: number }
   | { status: "duplicate"; messageId: string }
-  | { status: "skipped"; reason: string };
+  | { status: "skipped"; reason: string }
+  | { status: "media_failed"; reason: string; retryable: boolean };
+
+/** @deprecated alias Fase 6 */
+export type ProcessEvolutionTextResult = ProcessEvolutionInboundResult;
 
 async function isDuplicateEvolutionMessage(
   companyId: number,
@@ -29,17 +39,30 @@ async function isDuplicateEvolutionMessage(
   return Boolean(byId);
 }
 
+export type ProcessEvolutionInboundDeps = {
+  extractMedia?: typeof extractEvolutionMedia;
+  persistMedia?: typeof persistEvolutionMediaFile;
+  publicDir?: string;
+};
+
 /**
- * Domínio provider-agnostic para texto Evolution.
+ * Domínio Evolution inbound (texto + mídia Fase 7).
  * Sem WASocket / GetTicketWbot / raw Baileys / outbound.
+ * Chatbot/Typebot/Flow: skip consciente (ainda session-bound).
  */
 export async function processEvolutionTextInbound(input: {
   inbound: NormalizedWhatsAppMessage;
   whatsapp: Whatsapp;
   evolutionPayloadSanitized: Record<string, unknown>;
-}): Promise<ProcessEvolutionTextResult> {
-  const { inbound, whatsapp, evolutionPayloadSanitized } = input;
-  let result: ProcessEvolutionTextResult = {
+  mediaHints?: EvolutionMediaExtractHints | null;
+  deps?: ProcessEvolutionInboundDeps;
+}): Promise<ProcessEvolutionInboundResult> {
+  const { inbound, whatsapp, evolutionPayloadSanitized, mediaHints, deps } =
+    input;
+  const extractMedia = deps?.extractMedia || extractEvolutionMedia;
+  const persistMedia = deps?.persistMedia || persistEvolutionMediaFile;
+
+  let result: ProcessEvolutionInboundResult = {
     status: "skipped",
     reason: "no_result"
   };
@@ -53,6 +76,7 @@ export async function processEvolutionTextInbound(input: {
         throw new Error("ERR_EVOLUTION_MUST_NOT_CARRY_BAILEYS_RAW");
       }
 
+      // Dedupe ANTES do download pesado.
       if (await isDuplicateEvolutionMessage(dto.companyId, dto.messageId)) {
         result = { status: "duplicate", messageId: dto.messageId };
         return;
@@ -127,12 +151,67 @@ export async function processEvolutionTextInbound(input: {
 
       const quoted = await resolveQuotedMessageByStanzaId(dto.quotedStanzaId);
 
+      let mediaUrl: string | null = null;
+      let persistedMediaType: string | null = null;
+
+      if (dto.media.hasMedia) {
+        const hints = mediaHints;
+        if (!hints) {
+          result = {
+            status: "media_failed",
+            reason: "missing_media_hints",
+            retryable: false
+          };
+          return;
+        }
+        try {
+          const extracted = await extractMedia({
+            whatsappId: whatsapp.id,
+            hints
+          });
+          const saved = await persistMedia({
+            companyId: dto.companyId,
+            media: extracted,
+            publicDir: deps?.publicDir
+          });
+          mediaUrl = saved.relativeFilename;
+          persistedMediaType =
+            extracted.mimetype.split("/")[0] || extracted.kind;
+          // Atualiza mimetype/filename no DTO para classificação.
+          dto.media.mimetype = extracted.mimetype;
+          dto.media.filename = extracted.filename;
+        } catch (err) {
+          const code =
+            err instanceof EvolutionHttpError
+              ? err.code
+              : "MEDIA_EXTRACT_ERROR";
+          logger.warn(
+            {
+              whatsappId: whatsapp.id,
+              messageId: dto.messageId,
+              messageType: dto.messageType,
+              code
+            },
+            "[EvolutionInbound] media extract failed"
+          );
+          result = {
+            status: "media_failed",
+            reason: code,
+            // Terminal no event id (ACK 2xx) — evita loop infinito de retry Evolution.
+            retryable: false
+          };
+          return;
+        }
+      }
+
       const message = await createEvolutionInboundMessage({
         inbound: dto,
         ticket,
         contactId: contact.id,
         quotedMsgId: quoted?.id || null,
-        evolutionPayloadSanitized
+        evolutionPayloadSanitized,
+        mediaUrl,
+        persistedMediaType
       });
 
       try {
@@ -145,6 +224,8 @@ export async function processEvolutionTextInbound(input: {
             messageId: dto.messageId,
             ticketId: ticket.id,
             classification: classification.messageType,
+            hasMedia: dto.media.hasMedia,
+            isPtt: dto.media.isPtt,
             provider: "evolution"
           },
           "[EvolutionInbound] classified"

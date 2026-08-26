@@ -1,13 +1,15 @@
 /**
- * Contrato Evolution webhook (Fase 6) — baseado na documentação Evolution API v2:
- * https://doc.evolution-api.com / mintlify concepts/webhooks
+ * Contrato Evolution webhook (Fases 6–7) — Evolution API v2.
+ * Docs: webhooks + getBase64FromMediaMessage
+ * https://doc.evolution-api.com/v2/api-reference/chat-controller/get-base64
  *
- * Eventos aceitos:
- * - "MESSAGES_UPSERT"
- * - "messages.upsert"
+ * Mídia no webhook pode vir como:
+ * - base64 inline (webhookBase64=true): imageMessage.base64 / mediaBase64
+ * - URL (url/mediaUrl) na própria Evolution
+ * - apenas key → POST /chat/getBase64FromMediaMessage/{instance}
  *
- * Auth: header/body `apikey` (sem HMAC nativo no modo alvo).
- * Não inventar campos fora deste shape documentado + extensões LID comuns.
+ * Shape de message.* alinhado a campos Baileys-compatíveis que a Evolution
+ * espelha no upsert (mimetype, caption, fileName, ptt, degreesLatitude, vcard…).
  */
 
 export const EVOLUTION_MESSAGE_UPSERT_EVENTS = [
@@ -23,30 +25,123 @@ export type EvolutionWebhookKey = {
   fromMe?: boolean;
   id?: string;
   participant?: string;
-  /** Extensões LID/PN quando Evolution as enviar */
   senderPn?: string;
   remoteJidAlt?: string;
   participantPn?: string;
+};
+
+export type EvolutionMediaContextInfo = {
+  stanzaId?: string;
+  participant?: string;
+  quotedMessage?: unknown;
+};
+
+export type EvolutionImageMessage = {
+  mimetype?: string;
+  caption?: string;
+  fileLength?: number | string;
+  url?: string;
+  mediaUrl?: string;
+  base64?: string;
+  mediaBase64?: string;
+  jpegThumbnail?: string;
+  contextInfo?: EvolutionMediaContextInfo;
+};
+
+export type EvolutionVideoMessage = {
+  mimetype?: string;
+  caption?: string;
+  fileLength?: number | string;
+  fileName?: string;
+  url?: string;
+  mediaUrl?: string;
+  base64?: string;
+  mediaBase64?: string;
+  contextInfo?: EvolutionMediaContextInfo;
+};
+
+export type EvolutionAudioMessage = {
+  mimetype?: string;
+  ptt?: boolean;
+  seconds?: number;
+  fileLength?: number | string;
+  url?: string;
+  mediaUrl?: string;
+  base64?: string;
+  mediaBase64?: string;
+  contextInfo?: EvolutionMediaContextInfo;
+};
+
+export type EvolutionDocumentMessage = {
+  mimetype?: string;
+  caption?: string;
+  fileName?: string;
+  title?: string;
+  fileLength?: number | string;
+  url?: string;
+  mediaUrl?: string;
+  base64?: string;
+  mediaBase64?: string;
+  contextInfo?: EvolutionMediaContextInfo;
+};
+
+export type EvolutionStickerMessage = {
+  mimetype?: string;
+  fileLength?: number | string;
+  url?: string;
+  mediaUrl?: string;
+  base64?: string;
+  mediaBase64?: string;
+  isAnimated?: boolean;
+  contextInfo?: EvolutionMediaContextInfo;
+};
+
+export type EvolutionLocationMessage = {
+  degreesLatitude?: number;
+  degreesLongitude?: number;
+  name?: string;
+  address?: string;
+  url?: string;
+  jpegThumbnail?: string;
+};
+
+export type EvolutionContactMessage = {
+  displayName?: string;
+  vcard?: string;
+};
+
+export type EvolutionReactionMessage = {
+  text?: string;
+  key?: {
+    id?: string;
+    remoteJid?: string;
+    fromMe?: boolean;
+    participant?: string;
+  };
 };
 
 export type EvolutionWebhookMessageContent = {
   conversation?: string;
   extendedTextMessage?: {
     text?: string;
-    contextInfo?: {
-      stanzaId?: string;
-      participant?: string;
-      quotedMessage?: unknown;
-    };
+    contextInfo?: EvolutionMediaContextInfo;
   };
-  imageMessage?: unknown;
-  videoMessage?: unknown;
-  audioMessage?: unknown;
-  documentMessage?: unknown;
-  stickerMessage?: unknown;
-  reactionMessage?: unknown;
-  contactMessage?: unknown;
-  locationMessage?: unknown;
+  imageMessage?: EvolutionImageMessage;
+  videoMessage?: EvolutionVideoMessage;
+  audioMessage?: EvolutionAudioMessage;
+  documentMessage?: EvolutionDocumentMessage;
+  documentWithCaptionMessage?: {
+    message?: { documentMessage?: EvolutionDocumentMessage };
+  };
+  stickerMessage?: EvolutionStickerMessage;
+  reactionMessage?: EvolutionReactionMessage;
+  contactMessage?: EvolutionContactMessage;
+  contactsArrayMessage?: {
+    contacts?: EvolutionContactMessage[];
+    displayName?: string;
+  };
+  locationMessage?: EvolutionLocationMessage;
+  liveLocationMessage?: EvolutionLocationMessage;
   [key: string]: unknown;
 };
 
@@ -84,10 +179,49 @@ export function isEvolutionMessageUpsertEvent(
   );
 }
 
+const BASE64_KEYS = new Set([
+  "base64",
+  "mediaBase64",
+  "fileBase64",
+  "jpegThumbnail"
+]);
+
+function sanitizeValue(value: unknown, depth: number): unknown {
+  if (depth <= 0) return null;
+  if (Array.isArray(value)) {
+    return value.map(v => sanitizeValue(v, depth - 1));
+  }
+  if (value && typeof value === "object") {
+    return Object.entries(value as Record<string, unknown>).reduce(
+      (out, [k, v]) => {
+        if (BASE64_KEYS.has(k)) {
+          out[k] = typeof v === "string" && v.length > 0 ? "[omitted]" : null;
+          return out;
+        }
+        if (
+          (k === "url" || k === "mediaUrl") &&
+          typeof v === "string" &&
+          v.startsWith("data:")
+        ) {
+          out[k] = "[omitted-data-url]";
+          return out;
+        }
+        out[k] = sanitizeValue(v, depth - 1);
+        return out;
+      },
+      {} as Record<string, unknown>
+    );
+  }
+  return value;
+}
+
+/**
+ * Remove apikey e base64/thumbnails grandes do payload persistido.
+ */
 export function sanitizeEvolutionWebhookPayload(
   body: Record<string, unknown>
 ): Record<string, unknown> {
-  const clone: Record<string, unknown> = { ...body };
+  const clone = sanitizeValue({ ...body }, 8) as Record<string, unknown>;
   delete clone.apikey;
   delete clone.apiKey;
   delete clone.api_key;

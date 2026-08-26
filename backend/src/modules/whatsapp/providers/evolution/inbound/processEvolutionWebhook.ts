@@ -161,7 +161,8 @@ export async function processEvolutionWebhook(input: {
     const result = await processEvolutionTextInbound({
       inbound: adapted.inbound,
       whatsapp,
-      evolutionPayloadSanitized: sanitized
+      evolutionPayloadSanitized: sanitized,
+      mediaHints: adapted.mediaHints
     });
 
     if (result.status === "duplicate") {
@@ -191,6 +192,32 @@ export async function processEvolutionWebhook(input: {
       };
     }
 
+    if (result.status === "media_failed") {
+      // ACK 2xx + event marked error: evita retry infinito da Evolution.
+      // Operador pode apagar o EvolutionWebhookEvent para reprocessar.
+      await webhookEvent.update({
+        processed: true,
+        processingStatus: "error",
+        skipReason: "media_download_failed",
+        errorSummary: result.reason.slice(0, 500)
+      });
+      logger.warn(
+        {
+          whatsappId: whatsapp.id,
+          messageId: adapted.inbound.messageId,
+          messageType: adapted.inbound.messageType,
+          reason: result.reason
+        },
+        "[EvolutionWebhook] media failed (acked)"
+      );
+      return {
+        outcome: "error",
+        reason: result.reason,
+        messageId: adapted.inbound.messageId,
+        webhookEventId: webhookEvent.id
+      };
+    }
+
     await webhookEvent.update({
       processed: true,
       processingStatus: "processed"
@@ -202,9 +229,10 @@ export async function processEvolutionWebhook(input: {
         companyId: whatsapp.companyId,
         messageId: result.messageId,
         ticketId: result.ticketId,
-        eventType
+        eventType,
+        hasMedia: adapted.inbound.media.hasMedia
       },
-      "[EvolutionWebhook] text processed"
+      "[EvolutionWebhook] inbound processed"
     );
 
     return {

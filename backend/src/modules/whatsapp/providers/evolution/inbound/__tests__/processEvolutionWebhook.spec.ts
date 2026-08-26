@@ -4,6 +4,10 @@ jest.mock("@whiskeysockets/baileys", () => ({
   proto: {}
 }));
 
+jest.mock("../../../../../../services/CompanyService/adjustCompanyStorageUsage", () => ({
+  incrementCompanyStorageUsage: jest.fn()
+}));
+
 const createEvent = jest.fn();
 const findMessage = jest.fn();
 const findByPkMessage = jest.fn();

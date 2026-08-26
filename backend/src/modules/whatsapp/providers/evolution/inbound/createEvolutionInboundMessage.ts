@@ -11,19 +11,44 @@ export type EvolutionInboundMessagePersistInput = {
   ticket: Ticket;
   contactId: number;
   quotedMsgId?: string | null;
-  /** Envelope sanitizado (sem apikey) para dataJson provider-aware. */
+  /** Envelope sanitizado (sem apikey/base64) para dataJson provider-aware. */
   evolutionPayloadSanitized: Record<string, unknown>;
+  /** Filename relativo sob public/ (padrão Baileys). */
+  mediaUrl?: string | null;
+  /**
+   * mediaType persistido: major MIME ("image") para arquivos;
+   * messageType completo para location/contact/reaction/texto.
+   */
+  persistedMediaType?: string | null;
 };
 
+function resolvePersistedMediaType(
+  inbound: NormalizedWhatsAppMessage,
+  override?: string | null
+): string {
+  if (override) return override;
+  if (inbound.media.hasMedia && inbound.media.mimetype) {
+    return inbound.media.mimetype.split("/")[0] || "application";
+  }
+  return inbound.messageType || "conversation";
+}
+
 /**
- * Persistência inbound Evolution (texto).
+ * Persistência inbound Evolution (texto + mídia Fase 7).
  * channel=whatsapp; dataJson = payload Evolution sanitizado (não Baileys).
  */
 export async function createEvolutionInboundMessage(
   input: EvolutionInboundMessagePersistInput
 ): Promise<Message> {
-  const { inbound, ticket, contactId, quotedMsgId, evolutionPayloadSanitized } =
-    input;
+  const {
+    inbound,
+    ticket,
+    contactId,
+    quotedMsgId,
+    evolutionPayloadSanitized,
+    mediaUrl,
+    persistedMediaType
+  } = input;
   const { companyId } = inbound;
 
   await Message.upsert({
@@ -33,7 +58,8 @@ export async function createEvolutionInboundMessage(
     body: inbound.body || "",
     fromMe: inbound.fromMe,
     read: inbound.fromMe,
-    mediaType: inbound.messageType || "conversation",
+    mediaType: resolvePersistedMediaType(inbound, persistedMediaType),
+    mediaUrl: mediaUrl || null,
     ack: inbound.fromMe ? 2 : 0,
     channel: "whatsapp",
     externalMessageId: inbound.messageId,
@@ -104,7 +130,6 @@ export async function createEvolutionInboundMessage(
   });
 
   if (!inbound.fromMe) {
-    // Mesmo padrão de CreateMessageService (fire-and-forget push).
     // eslint-disable-next-line no-void
     void notifyTicketInboundMessage({ message, companyId });
   }

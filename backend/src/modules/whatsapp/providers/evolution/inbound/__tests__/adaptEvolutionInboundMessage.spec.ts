@@ -111,8 +111,8 @@ describe("adaptEvolutionInboundMessage", () => {
     expect(result.inbound.senderNumber).toBe("5511777666555");
   });
 
-  it("skip controlado para imagem", () => {
-    const result = adaptEvolutionInboundMessage({
+  it("mapeia imagem com e sem caption", () => {
+    const withCaption = adaptEvolutionInboundMessage({
       envelope: textEnvelope({
         data: {
           key: {
@@ -120,8 +120,241 @@ describe("adaptEvolutionInboundMessage", () => {
             fromMe: false,
             id: "IMG1"
           },
-          message: { imageMessage: { mimetype: "image/jpeg" } },
+          message: {
+            imageMessage: {
+              mimetype: "image/jpeg",
+              caption: "foto",
+              base64: "aaaa"
+            }
+          },
           messageType: "imageMessage",
+          messageTimestamp: 1
+        }
+      }),
+      companyId: 1,
+      whatsappId: 10
+    });
+    expect(withCaption.ok).toBe(true);
+    if (!withCaption.ok) return;
+    expect(withCaption.inbound.media.hasMedia).toBe(true);
+    expect(withCaption.inbound.media.caption).toBe("foto");
+    expect(withCaption.inbound.body).toBe("foto");
+    expect(withCaption.inbound.rawProviderMessage).toBeNull();
+    expect(withCaption.mediaHints?.inlineBase64).toBe("aaaa");
+
+    const noCaption = adaptEvolutionInboundMessage({
+      envelope: textEnvelope({
+        data: {
+          key: {
+            remoteJid: "5511999998888@s.whatsapp.net",
+            fromMe: false,
+            id: "IMG2"
+          },
+          message: { imageMessage: { mimetype: "image/png" } },
+          messageType: "imageMessage",
+          messageTimestamp: 1
+        }
+      }),
+      companyId: 1,
+      whatsappId: 10
+    });
+    expect(noCaption.ok).toBe(true);
+    if (!noCaption.ok) return;
+    expect(noCaption.inbound.body).toBe("Imagem");
+    expect(noCaption.inbound.media.caption).toBeNull();
+  });
+
+  it("mapeia video, audio PTT, document, sticker", () => {
+    const video = adaptEvolutionInboundMessage({
+      envelope: textEnvelope({
+        data: {
+          key: {
+            remoteJid: "5511999998888@s.whatsapp.net",
+            fromMe: false,
+            id: "V1"
+          },
+          message: {
+            videoMessage: { mimetype: "video/mp4", caption: "clip" }
+          },
+          messageType: "videoMessage",
+          messageTimestamp: 1
+        }
+      }),
+      companyId: 1,
+      whatsappId: 10
+    });
+    expect(video.ok && video.inbound.media.hasMedia).toBe(true);
+    expect(video.ok && video.inbound.body).toBe("clip");
+
+    const ptt = adaptEvolutionInboundMessage({
+      envelope: textEnvelope({
+        data: {
+          key: {
+            remoteJid: "5511999998888@s.whatsapp.net",
+            fromMe: false,
+            id: "A1"
+          },
+          message: {
+            audioMessage: {
+              mimetype: "audio/ogg; codecs=opus",
+              ptt: true
+            }
+          },
+          messageType: "audioMessage",
+          messageTimestamp: 1
+        }
+      }),
+      companyId: 1,
+      whatsappId: 10
+    });
+    expect(ptt.ok && ptt.inbound.media.isPtt).toBe(true);
+    expect(ptt.ok && ptt.inbound.body).toBe("Áudio");
+
+    const doc = adaptEvolutionInboundMessage({
+      envelope: textEnvelope({
+        data: {
+          key: {
+            remoteJid: "5511999998888@s.whatsapp.net",
+            fromMe: false,
+            id: "D1"
+          },
+          message: {
+            documentMessage: {
+              mimetype: "application/pdf",
+              fileName: "contrato.pdf"
+            }
+          },
+          messageType: "documentMessage",
+          messageTimestamp: 1
+        }
+      }),
+      companyId: 1,
+      whatsappId: 10
+    });
+    expect(doc.ok && doc.inbound.media.filename).toBe("contrato.pdf");
+
+    const sticker = adaptEvolutionInboundMessage({
+      envelope: textEnvelope({
+        data: {
+          key: {
+            remoteJid: "5511999998888@s.whatsapp.net",
+            fromMe: false,
+            id: "S1"
+          },
+          message: { stickerMessage: { mimetype: "image/webp" } },
+          messageType: "stickerMessage",
+          messageTimestamp: 1
+        }
+      }),
+      companyId: 1,
+      whatsappId: 10
+    });
+    expect(sticker.ok && sticker.inbound.body).toBe("sticker");
+  });
+
+  it("mapeia location, contact, contacts array, reaction", () => {
+    const loc = adaptEvolutionInboundMessage({
+      envelope: textEnvelope({
+        data: {
+          key: {
+            remoteJid: "5511999998888@s.whatsapp.net",
+            fromMe: false,
+            id: "L1"
+          },
+          message: {
+            locationMessage: {
+              degreesLatitude: -23.5,
+              degreesLongitude: -46.6,
+              name: "Escritório"
+            }
+          },
+          messageType: "locationMessage",
+          messageTimestamp: 1
+        }
+      }),
+      companyId: 1,
+      whatsappId: 10
+    });
+    expect(loc.ok && loc.inbound.media.hasMedia).toBe(false);
+    expect(loc.ok && loc.inbound.body).toContain("maps.google.com");
+
+    const contact = adaptEvolutionInboundMessage({
+      envelope: textEnvelope({
+        data: {
+          key: {
+            remoteJid: "5511999998888@s.whatsapp.net",
+            fromMe: false,
+            id: "C1"
+          },
+          message: {
+            contactMessage: {
+              displayName: "Ana",
+              vcard: "BEGIN:VCARD\nFN:Ana\nEND:VCARD"
+            }
+          },
+          messageType: "contactMessage",
+          messageTimestamp: 1
+        }
+      }),
+      companyId: 1,
+      whatsappId: 10
+    });
+    expect(contact.ok && contact.inbound.body).toContain("VCARD");
+
+    const contacts = adaptEvolutionInboundMessage({
+      envelope: textEnvelope({
+        data: {
+          key: {
+            remoteJid: "5511999998888@s.whatsapp.net",
+            fromMe: false,
+            id: "C2"
+          },
+          message: { contactsArrayMessage: { contacts: [] } },
+          messageType: "contactsArrayMessage",
+          messageTimestamp: 1
+        }
+      }),
+      companyId: 1,
+      whatsappId: 10
+    });
+    expect(contacts.ok && contacts.inbound.body).toBe("varios contatos");
+
+    const reaction = adaptEvolutionInboundMessage({
+      envelope: textEnvelope({
+        data: {
+          key: {
+            remoteJid: "5511999998888@s.whatsapp.net",
+            fromMe: false,
+            id: "R1"
+          },
+          message: {
+            reactionMessage: {
+              text: "👍",
+              key: { id: "TARGET1" }
+            }
+          },
+          messageType: "reactionMessage",
+          messageTimestamp: 1
+        }
+      }),
+      companyId: 1,
+      whatsappId: 10
+    });
+    expect(reaction.ok && reaction.inbound.body).toBe("👍");
+    expect(reaction.ok && reaction.inbound.quotedStanzaId).toBe("TARGET1");
+  });
+
+  it("skip controlado para tipo ainda não suportado", () => {
+    const result = adaptEvolutionInboundMessage({
+      envelope: textEnvelope({
+        data: {
+          key: {
+            remoteJid: "5511999998888@s.whatsapp.net",
+            fromMe: false,
+            id: "B1"
+          },
+          message: { buttonsMessage: {} },
+          messageType: "buttonsMessage",
           messageTimestamp: 1
         }
       }),
