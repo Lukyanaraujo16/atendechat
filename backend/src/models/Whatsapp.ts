@@ -10,6 +10,7 @@ import {
   Default,
   AllowNull,
   HasMany,
+  HasOne,
   Unique,
   BelongsToMany,
   ForeignKey,
@@ -23,6 +24,7 @@ import Prompt from "./Prompt";
 import AiAgent from "./AiAgent";
 import QueueIntegrations from "./QueueIntegrations";
 import {FlowBuilderModel} from "./FlowBuilder";
+import WhatsappEvolutionCredential from "./WhatsappEvolutionCredential";
 
 @Table
 class Whatsapp extends Model<Whatsapp> {
@@ -74,8 +76,22 @@ class Whatsapp extends Model<Whatsapp> {
   @Column(DataType.TEXT)
   ratingMessage: string;
 
+  /**
+   * Legado Baileys: "stable" | "beta".
+   * NÃO representa Evolution/Baileys como transporte.
+   * Ver connectionProvider.
+   */
   @Column({ defaultValue: "stable" })
   provider: string;
+
+  /**
+   * Provider de transporte da conexão: "baileys" | "evolution".
+   * Default baileys — conexões existentes e creates sem campo.
+   */
+  @Default("baileys")
+  @AllowNull(false)
+  @Column(DataType.STRING(32))
+  connectionProvider: string;
 
   @Default(false)
   @AllowNull
@@ -100,6 +116,9 @@ class Whatsapp extends Model<Whatsapp> {
 
   @HasMany(() => Ticket)
   tickets: Ticket[];
+
+  @HasOne(() => WhatsappEvolutionCredential)
+  evolutionCredential: WhatsappEvolutionCredential;
 
   @BelongsToMany(() => Queue, () => WhatsappQueue)
   queues: Array<Queue & { WhatsappQueue: WhatsappQueue }>;

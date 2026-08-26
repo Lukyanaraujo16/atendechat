@@ -5,6 +5,22 @@ import Whatsapp from "../../models/Whatsapp";
 import Company from "../../models/Company";
 import Plan from "../../models/Plan";
 import AssociateWhatsappQueue from "./AssociateWhatsappQueue";
+import {
+  parseWhatsAppConnectionProviderInput,
+  WhatsAppConnectionProvider,
+  WhatsAppConnectionProviderValue,
+  isEvolutionConnection,
+  isWhatsAppConnectionProvider
+} from "../../modules/whatsapp/connectionProvider";
+import { upsertWhatsappEvolutionCredentials } from "./evolutionCredentialsService";
+import { ERR_WHATSAPP_CONNECTION_PROVIDER_INVALID } from "../../modules/whatsapp/providers/evolution/evolutionErrors";
+
+interface EvolutionConfigInput {
+  baseUrl?: string;
+  instanceName?: string;
+  instanceId?: string | null;
+  apiKey?: string;
+}
 
 interface Request {
   name: string;
@@ -17,11 +33,12 @@ interface Request {
   status?: string;
   isDefault?: boolean;
   token?: string;
+  /** Legado Baileys stable/beta — NÃO é connectionProvider. */
   provider?: string;
-  //sendIdQueue?: number;
-  //timeSendQueue?: number;
+  connectionProvider?: string;
+  evolution?: EvolutionConfigInput;
   transferQueueId?: number;
-  timeToTransfer?: number;    
+  timeToTransfer?: number;
   promptId?: number;
   maxUseBotQueues?: number;
   timeUseBotQueues?: number;
@@ -52,10 +69,10 @@ const CreateWhatsAppService = async ({
   companyId,
   token = "",
   provider = "beta",
-  //timeSendQueue,
-  //sendIdQueue,
+  connectionProvider: connectionProviderInput,
+  evolution,
   transferQueueId,
-  timeToTransfer,    
+  timeToTransfer,
   promptId,
   maxUseBotQueues = 3,
   timeUseBotQueues = 0,
@@ -68,7 +85,6 @@ const CreateWhatsAppService = async ({
   defaultGroupVisible = false,
   ticketVisibility = "all"
 }: Request): Promise<Response> => {
-
   const company = await Company.findOne({
     where: {
       id: companyId
@@ -86,6 +102,58 @@ const CreateWhatsAppService = async ({
     if (whatsappCount >= company.plan.connections) {
       throw new AppError(
         `Número máximo de conexões já alcançado: ${whatsappCount}`
+      );
+    }
+  }
+
+  let connectionProvider: WhatsAppConnectionProviderValue =
+    WhatsAppConnectionProvider.BAILEYS;
+  try {
+    if (
+      connectionProviderInput != null &&
+      connectionProviderInput !== "" &&
+      !isWhatsAppConnectionProvider(
+        String(connectionProviderInput).trim().toLowerCase()
+      )
+    ) {
+      throw new AppError(
+        ERR_WHATSAPP_CONNECTION_PROVIDER_INVALID,
+        400,
+        `connectionProvider inválido: ${String(connectionProviderInput)}`
+      );
+    }
+    connectionProvider = parseWhatsAppConnectionProviderInput(
+      connectionProviderInput
+    );
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    throw new AppError(
+      ERR_WHATSAPP_CONNECTION_PROVIDER_INVALID,
+      400,
+      err instanceof Error ? err.message : String(err)
+    );
+  }
+
+  // Evolution: não iniciar como OPENING (evita lifecycle Baileys/QR).
+  const effectiveStatus = isEvolutionConnection(connectionProvider)
+    ? status &&
+      status !== "OPENING" &&
+      status !== "CONNECTED" &&
+      status !== "qrcode"
+      ? status
+      : "DISCONNECTED"
+    : status;
+
+  if (isEvolutionConnection(connectionProvider)) {
+    if (
+      !evolution?.baseUrl ||
+      !evolution?.instanceName ||
+      !evolution?.apiKey
+    ) {
+      throw new AppError(
+        "ERR_EVOLUTION_CONFIG_REQUIRED",
+        400,
+        "Conexão Evolution exige evolution.baseUrl, evolution.instanceName e evolution.apiKey."
       );
     }
   }
@@ -109,7 +177,7 @@ const CreateWhatsAppService = async ({
   });
 
   try {
-    await schema.validate({ name, status, isDefault });
+    await schema.validate({ name, status: effectiveStatus, isDefault });
   } catch (err: any) {
     throw new AppError(err.message);
   }
@@ -129,9 +197,10 @@ const CreateWhatsAppService = async ({
     }
   }
 
-  const finalToken = token && String(token).trim() !== ""
-    ? String(token).trim()
-    : crypto.randomBytes(24).toString("hex");
+  const finalToken =
+    token && String(token).trim() !== ""
+      ? String(token).trim()
+      : crypto.randomBytes(24).toString("hex");
 
   if (token && String(token).trim() !== "") {
     const tokenSchema = Yup.object().shape({
@@ -163,7 +232,8 @@ const CreateWhatsAppService = async ({
     JSON.stringify({
       event: "whatsapp_create",
       companyId,
-      name
+      name,
+      connectionProvider
     })
   );
 
@@ -172,12 +242,10 @@ const CreateWhatsAppService = async ({
       ? String(greetingMessage).trim()
       : null;
 
-  // AI Agent: defaults do model (null / false / disabled).
-  // Vínculo e modo só via Product API (Fase 2.6).
   const whatsapp = await Whatsapp.create(
     {
       name,
-      status,
+      status: effectiveStatus,
       greetingMessage: greetingStored,
       complationMessage,
       outOfHoursMessage,
@@ -186,10 +254,9 @@ const CreateWhatsAppService = async ({
       companyId,
       token: finalToken,
       provider,
-      //timeSendQueue,
-      //sendIdQueue,
-	    transferQueueId,
-	    timeToTransfer,	  
+      connectionProvider,
+      transferQueueId,
+      timeToTransfer,
       promptId,
       maxUseBotQueues,
       timeUseBotQueues,
@@ -205,6 +272,17 @@ const CreateWhatsAppService = async ({
     },
     { include: ["queues"] }
   );
+
+  if (isEvolutionConnection(connectionProvider) && evolution) {
+    await upsertWhatsappEvolutionCredentials({
+      companyId,
+      whatsappId: whatsapp.id,
+      baseUrl: evolution.baseUrl!,
+      instanceName: evolution.instanceName!,
+      instanceId: evolution.instanceId,
+      apiKey: evolution.apiKey!
+    });
+  }
 
   await AssociateWhatsappQueue(whatsapp, queueIds);
 

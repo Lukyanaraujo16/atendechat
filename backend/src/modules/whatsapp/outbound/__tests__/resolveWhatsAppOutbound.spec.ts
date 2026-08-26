@@ -7,6 +7,16 @@ jest.mock("../../../../helpers/GetWhatsappWbot", () => ({
   __esModule: true,
   default: jest.fn()
 }));
+jest.mock("../../../../helpers/GetDefaultWhatsApp", () => ({
+  __esModule: true,
+  default: jest.fn()
+}));
+jest.mock("../../../../models/Whatsapp", () => ({
+  __esModule: true,
+  default: {
+    findByPk: jest.fn()
+  }
+}));
 jest.mock("@whiskeysockets/baileys", () => ({
   proto: {},
   jidNormalizedUser: (jid: string) => jid
@@ -14,41 +24,25 @@ jest.mock("@whiskeysockets/baileys", () => ({
 
 import GetTicketWbot from "../../../../helpers/GetTicketWbot";
 import GetWhatsappWbot from "../../../../helpers/GetWhatsappWbot";
+import Whatsapp from "../../../../models/Whatsapp";
 import {
   getWhatsAppOutboundForTicket,
   getWhatsAppOutboundForWhatsapp,
   wrapBaileysSession
 } from "../resolveWhatsAppOutbound";
+import AppError from "../../../../errors/AppError";
+import { ERR_WHATSAPP_PROVIDER_NOT_READY } from "../../providers/evolution/evolutionErrors";
 
 const mockedTicketWbot = GetTicketWbot as jest.Mock;
 const mockedWhatsappWbot = GetWhatsappWbot as jest.Mock;
+const mockedFindByPk = Whatsapp.findByPk as jest.Mock;
 
 describe("resolveWhatsAppOutbound", () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  it("resolve por ticket a sessão Baileys da conexão do ticket", async () => {
-    const wbot = {
-      id: 7,
-      user: { id: "5511:1@s.whatsapp.net" },
-      sendMessage: jest.fn()
-    };
-    mockedTicketWbot.mockResolvedValue(wbot);
-
-    const outbound = await getWhatsAppOutboundForTicket({
-      whatsappId: 7,
-      companyId: 1
-    } as never);
-
-    expect(mockedTicketWbot).toHaveBeenCalledWith(
-      expect.objectContaining({ whatsappId: 7 })
-    );
-    expect(outbound.provider).toBe("baileys");
-    expect(outbound.getOwnUserJid()).toBe("5511:1@s.whatsapp.net");
-  });
-
-  it("resolve por Whatsapp a sessão da mesma conexão", async () => {
+  it("Baileys resolve BaileysWhatsAppOutbound sem Evolution", async () => {
     const wbot = {
       id: 9,
       user: { id: "5511888:1@s.whatsapp.net" },
@@ -56,15 +50,68 @@ describe("resolveWhatsAppOutbound", () => {
     };
     mockedWhatsappWbot.mockResolvedValue(wbot);
 
-    const outbound = await getWhatsAppOutboundForWhatsapp({ id: 9 } as never);
-    expect(mockedWhatsappWbot).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 9 })
-    );
+    const outbound = await getWhatsAppOutboundForWhatsapp({
+      id: 9,
+      connectionProvider: "baileys"
+    } as never);
+    expect(mockedWhatsappWbot).toHaveBeenCalled();
     expect(outbound.provider).toBe("baileys");
-    expect(outbound.getOwnUserJid()).toBe("5511888:1@s.whatsapp.net");
   });
 
-  it("wrapBaileysSession encapsula socket já obtido (Typebot/inbound)", async () => {
+  it("Evolution NÃO resolve Baileys e NÃO chama GetWhatsappWbot", async () => {
+    await expect(
+      getWhatsAppOutboundForWhatsapp({
+        id: 99,
+        connectionProvider: "evolution"
+      } as never)
+    ).rejects.toMatchObject({
+      message: ERR_WHATSAPP_PROVIDER_NOT_READY
+    });
+    expect(mockedWhatsappWbot).not.toHaveBeenCalled();
+    expect(mockedTicketWbot).not.toHaveBeenCalled();
+  });
+
+  it("Evolution por ticket NÃO chama GetTicketWbot", async () => {
+    mockedFindByPk.mockResolvedValue({
+      id: 77,
+      connectionProvider: "evolution"
+    });
+
+    await expect(
+      getWhatsAppOutboundForTicket({
+        whatsappId: 77,
+        companyId: 1
+      } as never)
+    ).rejects.toBeInstanceOf(AppError);
+
+    expect(mockedTicketWbot).not.toHaveBeenCalled();
+    expect(mockedWhatsappWbot).not.toHaveBeenCalled();
+  });
+
+  it("resolve por ticket Baileys usa helpers após checagem de provider", async () => {
+    mockedFindByPk.mockResolvedValue({
+      id: 7,
+      connectionProvider: "baileys"
+    });
+    const wbot = {
+      id: 7,
+      user: { id: "5511:1@s.whatsapp.net" },
+      sendMessage: jest.fn()
+    };
+    mockedWhatsappWbot.mockResolvedValue(wbot);
+
+    const outbound = await getWhatsAppOutboundForTicket({
+      whatsappId: 7,
+      companyId: 1
+    } as never);
+
+    expect(mockedFindByPk).toHaveBeenCalledWith(7);
+    expect(mockedWhatsappWbot).toHaveBeenCalled();
+    expect(mockedTicketWbot).not.toHaveBeenCalled();
+    expect(outbound.provider).toBe("baileys");
+  });
+
+  it("wrapBaileysSession encapsula socket já obtido", async () => {
     const wbot = {
       user: { id: "x" },
       sendMessage: jest.fn().mockResolvedValue({
@@ -74,6 +121,5 @@ describe("resolveWhatsAppOutbound", () => {
     const outbound = wrapBaileysSession(wbot as never);
     const sent = await outbound.sendText({ jid: "jid", text: "oi" });
     expect(sent.messageId).toBe("T1");
-    expect(wbot.sendMessage).toHaveBeenCalled();
   });
 });

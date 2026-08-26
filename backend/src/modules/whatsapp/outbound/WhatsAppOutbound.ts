@@ -5,7 +5,7 @@
  * depender deste contrato, não de GetTicketWbot / wbot.sendMessage.
  */
 
-export type WhatsAppOutboundProvider = "baileys";
+export type WhatsAppOutboundProvider = "baileys" | "evolution";
 
 export type WhatsAppOutboundSendResult = {
   messageId: string | null;

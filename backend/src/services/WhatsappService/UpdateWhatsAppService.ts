@@ -6,6 +6,11 @@ import Whatsapp from "../../models/Whatsapp";
 import ShowWhatsAppService from "./ShowWhatsAppService";
 import AssociateWhatsappQueue from "./AssociateWhatsappQueue";
 import { assertNoAiAgentFieldsInWhatsappPayload } from "./assertNoAiAgentFieldsInWhatsappPayload";
+import {
+  parseWhatsAppConnectionProviderInput,
+  resolveWhatsAppConnectionProvider
+} from "../../modules/whatsapp/connectionProvider";
+import { ERR_WHATSAPP_CONNECTION_PROVIDER_IMMUTABLE } from "../../modules/whatsapp/providers/evolution/evolutionErrors";
 
 interface WhatsappData {
   name?: string;
@@ -18,10 +23,9 @@ interface WhatsappData {
   ratingMessage?: string;
   queueIds?: number[];
   token?: string;
-  //sendIdQueue?: number;
-  //timeSendQueue?: number;
-  transferQueueId?: number; 
-  timeToTransfer?: number;    
+  connectionProvider?: string;
+  transferQueueId?: number;
+  timeToTransfer?: number;
   promptId?: number;
   maxUseBotQueues?: number;
   timeUseBotQueues?: number;
@@ -70,10 +74,9 @@ const UpdateWhatsAppService = async ({
     ratingMessage,
     queueIds = [],
     token,
-    //timeSendQueue,
-    //sendIdQueue = null,
-    transferQueueId,	
-	  timeToTransfer,	
+    connectionProvider: connectionProviderInput,
+    transferQueueId,
+    timeToTransfer,
     promptId,
     maxUseBotQueues,
     timeUseBotQueues,
@@ -111,6 +114,22 @@ const UpdateWhatsAppService = async ({
   const whatsapp = await ShowWhatsAppService(whatsappId, companyId);
 
   if (
+    connectionProviderInput !== undefined &&
+    connectionProviderInput !== null &&
+    connectionProviderInput !== ""
+  ) {
+    const current = resolveWhatsAppConnectionProvider(whatsapp);
+    const next = parseWhatsAppConnectionProviderInput(connectionProviderInput);
+    if (next !== current) {
+      throw new AppError(
+        ERR_WHATSAPP_CONNECTION_PROVIDER_IMMUTABLE,
+        400,
+        "Troca de connectionProvider (Baileys ↔ Evolution) não é permitida nesta fase. Crie uma nova conexão."
+      );
+    }
+  }
+
+  if (
     name !== undefined &&
     name !== whatsapp.name &&
     typeof name === "string"
@@ -146,8 +165,6 @@ const UpdateWhatsAppService = async ({
     ratingMessage,
     isDefault,
     companyId,
-    //timeSendQueue,
-    //sendIdQueue,
     transferQueueId,
     timeToTransfer,
     maxUseBotQueues,
@@ -186,10 +203,6 @@ const UpdateWhatsAppService = async ({
     updateData.ticketVisibility =
       ticketVisibility === "admin_supervisor" ? "admin_supervisor" : "all";
   }
-
-  // AI Agent: não mutar aiAgentId/Mode/Enabled aqui (Fase 2.6).
-  // Ausência no payload preserva vínculo e modo existentes.
-  // Mutação comercial: Product connections / commands.
 
   await whatsapp.update(updateData);
 
