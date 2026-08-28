@@ -14,11 +14,17 @@ import {
 } from "./adaptEvolutionMessageStatus";
 import {
   EvolutionWebhookEnvelope,
+  isEvolutionConnectionUpdateEvent,
   isEvolutionMessageUpdateEvent,
   isEvolutionMessageUpsertEvent,
+  isEvolutionQrcodeUpdatedEvent,
   sanitizeEvolutionWebhookPayload
 } from "./evolutionWebhookTypes";
 import { processEvolutionTextInbound } from "./processEvolutionTextInbound";
+import {
+  processEvolutionConnectionUpdate,
+  processEvolutionQrcodeUpdated
+} from "../lifecycle/processEvolutionConnectionWebhook";
 
 const MAX_BODY_CHARS = 20000;
 
@@ -219,6 +225,46 @@ export async function processEvolutionWebhook(input: {
       apiKeyValid,
       eventType
     });
+  }
+
+  if (isEvolutionConnectionUpdateEvent(eventType)) {
+    const life = await processEvolutionConnectionUpdate({
+      whatsapp,
+      envelope,
+      sanitized,
+      apiKeyValid,
+      eventType
+    });
+    let outcome: ProcessEvolutionWebhookResult["outcome"] = "skipped";
+    if (life.outcome === "processed") outcome = "processed";
+    else if (life.outcome === "duplicate") outcome = "duplicate";
+    else if (life.outcome === "skipped") outcome = "skipped";
+    else outcome = "skipped";
+    return {
+      outcome,
+      reason: life.reason,
+      webhookEventId: life.webhookEventId
+    };
+  }
+
+  if (isEvolutionQrcodeUpdatedEvent(eventType)) {
+    const life = await processEvolutionQrcodeUpdated({
+      whatsapp,
+      envelope,
+      sanitized,
+      apiKeyValid,
+      eventType
+    });
+    let outcome: ProcessEvolutionWebhookResult["outcome"] = "skipped";
+    if (life.outcome === "processed") outcome = "processed";
+    else if (life.outcome === "duplicate") outcome = "duplicate";
+    else if (life.outcome === "skipped") outcome = "skipped";
+    else outcome = "skipped";
+    return {
+      outcome,
+      reason: life.reason,
+      webhookEventId: life.webhookEventId
+    };
   }
 
   if (!isEvolutionMessageUpsertEvent(eventType)) {

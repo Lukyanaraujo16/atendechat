@@ -244,13 +244,14 @@ describe("Evolution ACK Fase 9A", () => {
     expect(result.reason).toBe("not_evolution_connection");
   });
 
-  it("evento unknown continua ignored", async () => {
+  it("evento QRCODE_UPDATED sem code → skipped (lifecycle)", async () => {
     const result = await processEvolutionWebhook({
       whatsapp,
       apiKeyValid: true,
       body: { event: "QRCODE_UPDATED", data: {} }
     });
-    expect(result.outcome).toBe("ignored_event");
+    expect(result.outcome).toBe("skipped");
+    expect(result.reason).toBe("qrcode_missing_code");
   });
 
   it("lookup companyId + externalMessageId", async () => {

@@ -1,8 +1,6 @@
 /**
  * Fundação Evolution API (Fase 5+).
- * Fase 9A: ACK webhook, markAsRead e presence HTTP.
- * Fase 9B: quoted/reply + delete + reapply ACK deferred.
- * Ainda NÃO: QR / connect / logout.
+ * Fase 10: lifecycle — create/connect/QR/state/logout/restart/CONNECTION_UPDATE.
  */
 
 export type EvolutionInstanceConfig = {
@@ -14,22 +12,22 @@ export type EvolutionInstanceConfig = {
 export type EvolutionClientCapabilities = {
   sendText: boolean;
   sendMedia: boolean;
-  connect: false;
-  logout: false;
-  qr: false;
+  connect: boolean;
+  logout: boolean;
+  qr: boolean;
   webhookInbound: boolean;
   ack: boolean;
   markAsRead: boolean;
   presence: boolean;
 };
 
-/** Capacidades Evolution após Fase 9A (ACK / markAsRead / presence). */
+/** Capacidades Evolution após Fase 10 (lifecycle). */
 export const EVOLUTION_PHASE5_CAPABILITIES: EvolutionClientCapabilities = {
   sendText: true,
   sendMedia: true,
-  connect: false,
-  logout: false,
-  qr: false,
+  connect: true,
+  logout: true,
+  qr: true,
   webhookInbound: true,
   ack: true,
   markAsRead: true,
@@ -38,7 +36,6 @@ export const EVOLUTION_PHASE5_CAPABILITIES: EvolutionClientCapabilities = {
 
 /**
  * Interface do client HTTP Evolution (skeleton).
- * Implementação real entra em fases posteriores.
  */
 export interface EvolutionApiClient {
   readonly baseUrl: string;

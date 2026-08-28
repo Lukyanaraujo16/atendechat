@@ -32,6 +32,24 @@ export const EVOLUTION_MESSAGE_UPDATE_EVENTS = [
 
 export type EvolutionMessageUpdateEvent =
   (typeof EVOLUTION_MESSAGE_UPDATE_EVENTS)[number];
+
+/** CONNECTION_UPDATE — lifecycle (Fase 10). */
+export const EVOLUTION_CONNECTION_UPDATE_EVENTS = [
+  "CONNECTION_UPDATE",
+  "connection.update"
+] as const;
+
+export type EvolutionConnectionUpdateEvent =
+  (typeof EVOLUTION_CONNECTION_UPDATE_EVENTS)[number];
+
+/** QRCODE_UPDATED — lifecycle (Fase 10). */
+export const EVOLUTION_QRCODE_UPDATED_EVENTS = [
+  "QRCODE_UPDATED",
+  "qrcode.updated"
+] as const;
+
+export type EvolutionQrcodeUpdatedEvent =
+  (typeof EVOLUTION_QRCODE_UPDATED_EVENTS)[number];
 export type EvolutionWebhookKey = {
   remoteJid?: string;
   fromMe?: boolean;
@@ -197,6 +215,26 @@ export function isEvolutionMessageUpdateEvent(
   if (!event) return false;
   const normalized = String(event).trim();
   return (EVOLUTION_MESSAGE_UPDATE_EVENTS as readonly string[]).includes(
+    normalized
+  );
+}
+
+export function isEvolutionConnectionUpdateEvent(
+  event: string | null | undefined
+): event is EvolutionConnectionUpdateEvent {
+  if (!event) return false;
+  const normalized = String(event).trim();
+  return (EVOLUTION_CONNECTION_UPDATE_EVENTS as readonly string[]).includes(
+    normalized
+  );
+}
+
+export function isEvolutionQrcodeUpdatedEvent(
+  event: string | null | undefined
+): event is EvolutionQrcodeUpdatedEvent {
+  if (!event) return false;
+  const normalized = String(event).trim();
+  return (EVOLUTION_QRCODE_UPDATED_EVENTS as readonly string[]).includes(
     normalized
   );
 }

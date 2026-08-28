@@ -90,9 +90,12 @@ function parseEvolutionErrorBody(data: unknown): string {
 
 async function evolutionRequestJson(input: {
   whatsappId: number;
-  method: "post" | "delete";
+  method: "get" | "post" | "delete";
   path: string;
-  body: Record<string, unknown>;
+  body?: Record<string, unknown>;
+  query?: Record<string, string>;
+  /** Se true, HTTP 404 não lança (fetch/state). */
+  allowNotFound?: boolean;
 }): Promise<unknown> {
   const cred = await loadEvolutionCredential(input.whatsappId);
   const client = createAxiosClient(cred.baseUrl, cred.apiKey);
@@ -103,10 +106,15 @@ async function evolutionRequestJson(input: {
 
   let response;
   try {
-    response =
-      input.method === "delete"
-        ? await client.delete(path, { data: input.body })
-        : await client.post(path, input.body);
+    if (input.method === "get") {
+      response = await client.get(path, { params: input.query });
+    } else if (input.method === "delete") {
+      response = await client.delete(path, {
+        data: input.body || undefined
+      });
+    } else {
+      response = await client.post(path, input.body || {});
+    }
   } catch (err) {
     const code = (err as { code?: string })?.code;
     logger.warn(
@@ -123,6 +131,10 @@ async function evolutionRequestJson(input: {
       "ERR_EVOLUTION_REQUEST_FAILED",
       "Falha de rede ao chamar Evolution API"
     );
+  }
+
+  if (input.allowNotFound && response.status === 404) {
+    return null;
   }
 
   if (response.status < 200 || response.status >= 300) {
@@ -146,6 +158,170 @@ async function evolutionPostJson(input: {
     method: "post",
     path: input.path,
     body: input.body
+  });
+}
+
+async function evolutionGetJson(input: {
+  whatsappId: number;
+  path: string;
+  query?: Record<string, string>;
+  allowNotFound?: boolean;
+}): Promise<unknown> {
+  return evolutionRequestJson({
+    whatsappId: input.whatsappId,
+    method: "get",
+    path: input.path,
+    query: input.query,
+    allowNotFound: input.allowNotFound
+  });
+}
+
+async function evolutionDeleteJson(input: {
+  whatsappId: number;
+  path: string;
+  body?: Record<string, unknown>;
+}): Promise<unknown> {
+  return evolutionRequestJson({
+    whatsappId: input.whatsappId,
+    method: "delete",
+    path: input.path,
+    body: input.body
+  });
+}
+
+/** Eventos webhook habilitados no StreamHub (Fases 6–10). */
+export const EVOLUTION_WEBHOOK_EVENTS = [
+  "QRCODE_UPDATED",
+  "CONNECTION_UPDATE",
+  "MESSAGES_UPSERT",
+  "MESSAGES_UPDATE"
+] as const;
+
+/**
+ * POST /instance/create
+ * Auth: apikey da credencial (global ou instance token).
+ * Sem retry automático (não idempotente).
+ */
+export async function evolutionCreateInstance(input: {
+  whatsappId: number;
+  instanceName: string;
+  webhookUrl: string | null;
+}): Promise<unknown> {
+  const body: Record<string, unknown> = {
+    instanceName: input.instanceName,
+    qrcode: true,
+    integration: "WHATSAPP-BAILEYS"
+  };
+  if (input.webhookUrl) {
+    body.webhook = {
+      enabled: true,
+      url: input.webhookUrl,
+      byEvents: false,
+      base64: false,
+      events: [...EVOLUTION_WEBHOOK_EVENTS]
+    };
+  }
+  return evolutionPostJson({
+    whatsappId: input.whatsappId,
+    path: "/instance/create",
+    body
+  });
+}
+
+/**
+ * GET /instance/fetchInstances?instanceName=
+ */
+export async function evolutionFetchInstances(input: {
+  whatsappId: number;
+  instanceName: string;
+}): Promise<unknown> {
+  return evolutionGetJson({
+    whatsappId: input.whatsappId,
+    path: "/instance/fetchInstances",
+    query: { instanceName: input.instanceName },
+    allowNotFound: true
+  });
+}
+
+/**
+ * GET /instance/connect/{instance}
+ * Retorna QR (code/base64/pairingCode) ou state se já open.
+ */
+export async function evolutionConnect(input: {
+  whatsappId: number;
+}): Promise<unknown> {
+  return evolutionGetJson({
+    whatsappId: input.whatsappId,
+    path: "/instance/connect/{instance}"
+  });
+}
+
+/**
+ * GET /instance/connectionState/{instance}
+ */
+export async function evolutionConnectionState(input: {
+  whatsappId: number;
+}): Promise<unknown> {
+  return evolutionGetJson({
+    whatsappId: input.whatsappId,
+    path: "/instance/connectionState/{instance}"
+  });
+}
+
+/**
+ * POST /instance/restart/{instance}
+ */
+export async function evolutionRestartInstance(input: {
+  whatsappId: number;
+}): Promise<unknown> {
+  return evolutionPostJson({
+    whatsappId: input.whatsappId,
+    path: "/instance/restart/{instance}",
+    body: {}
+  });
+}
+
+/**
+ * DELETE /instance/logout/{instance}
+ */
+export async function evolutionLogoutInstance(input: {
+  whatsappId: number;
+}): Promise<unknown> {
+  return evolutionDeleteJson({
+    whatsappId: input.whatsappId,
+    path: "/instance/logout/{instance}"
+  });
+}
+
+/**
+ * DELETE /instance/delete/{instance}
+ */
+export async function evolutionDeleteInstance(input: {
+  whatsappId: number;
+}): Promise<unknown> {
+  return evolutionDeleteJson({
+    whatsappId: input.whatsappId,
+    path: "/instance/delete/{instance}"
+  });
+}
+
+/**
+ * POST /webhook/set/{instance} — reconfigura eventos se instância já existia.
+ */
+export async function evolutionSetWebhook(input: {
+  whatsappId: number;
+  webhookUrl: string;
+}): Promise<unknown> {
+  return evolutionPostJson({
+    whatsappId: input.whatsappId,
+    path: "/webhook/set/{instance}",
+    body: {
+      enabled: true,
+      url: input.webhookUrl,
+      webhookByEvents: false,
+      webhookBase64: false,
+      events: [...EVOLUTION_WEBHOOK_EVENTS]
+    }
   });
 }
 

@@ -1,5 +1,7 @@
 import { Request, Response } from "express";
 import { getWbot } from "../libs/wbot";
+import { isEvolutionConnection } from "../modules/whatsapp/connectionProvider";
+import { logoutEvolutionWhatsAppSession } from "../modules/whatsapp/providers/evolution";
 import ShowWhatsAppService from "../services/WhatsappService/ShowWhatsAppService";
 import { StartWhatsAppSession } from "../services/WbotServices/StartWhatsAppSession";
 import UpdateWhatsAppService from "../services/WhatsappService/UpdateWhatsAppService";
@@ -33,6 +35,11 @@ const remove = async (req: Request, res: Response): Promise<Response> => {
   const { whatsappId } = req.params;
   const { companyId } = req.user;
   const whatsapp = await ShowWhatsAppService(whatsappId, companyId);
+
+  if (isEvolutionConnection(whatsapp)) {
+    await logoutEvolutionWhatsAppSession(whatsapp, companyId);
+    return res.status(200).json({ message: "Session disconnected." });
+  }
 
   if (whatsapp.session) {
     await whatsapp.update({ status: "DISCONNECTED", session: "" });

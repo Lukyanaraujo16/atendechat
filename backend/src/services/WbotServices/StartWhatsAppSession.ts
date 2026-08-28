@@ -4,7 +4,7 @@ import {
   isEvolutionConnection,
   resolveWhatsAppConnectionProvider
 } from "../../modules/whatsapp/connectionProvider";
-import { startEvolutionWhatsAppSessionPlaceholder } from "../../modules/whatsapp/providers/evolution";
+import { startEvolutionWhatsAppSessionEntry } from "../../modules/whatsapp/providers/evolution";
 import { initWASocket } from "../../libs/wbot";
 import Whatsapp from "../../models/Whatsapp";
 import { wbotMessageListener } from "./wbotMessageListener";
@@ -16,7 +16,7 @@ import AppError from "../../errors/AppError";
 /**
  * Inicia sessão WhatsApp conforme connectionProvider.
  * Baileys → initWASocket (comportamento atual).
- * Evolution → placeholder controlado (Fase 5: sem transporte real).
+ * Evolution → lifecycle HTTP real (Fase 10).
  */
 export const StartWhatsAppSession = async (
   whatsapp: Whatsapp,
@@ -43,7 +43,7 @@ export const StartWhatsAppSession = async (
   );
 
   if (isEvolutionConnection(connectionProvider)) {
-    await startEvolutionWhatsAppSessionPlaceholder(whatsapp, companyId);
+    await startEvolutionWhatsAppSessionEntry(whatsapp, companyId);
     return;
   }
 

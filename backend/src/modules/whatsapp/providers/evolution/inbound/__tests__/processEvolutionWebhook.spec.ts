@@ -4,6 +4,12 @@ jest.mock("@whiskeysockets/baileys", () => ({
   proto: {}
 }));
 
+jest.mock("../../../../../../libs/socket", () => ({
+  getIO: () => ({
+    to: () => ({ emit: jest.fn() })
+  })
+}));
+
 jest.mock("../../../../../../services/CompanyService/adjustCompanyStorageUsage", () => ({
   incrementCompanyStorageUsage: jest.fn()
 }));
@@ -132,13 +138,34 @@ describe("processEvolutionWebhook idempotency", () => {
     expect(createEvoMessage).not.toHaveBeenCalled();
   });
 
-  it("evento desconhecido → ignored", async () => {
+  it("QRCODE_UPDATED sem code → skipped (lifecycle Fase 10)", async () => {
     const result = await processEvolutionWebhook({
       whatsapp,
       body: { event: "QRCODE_UPDATED", data: {} },
       apiKeyValid: true
     });
-    expect(result.outcome).toBe("ignored_event");
+    expect(result.outcome).toBe("skipped");
+    expect(result.reason).toBe("qrcode_missing_code");
+  });
+
+  it("CONNECTION_UPDATE open processa lifecycle", async () => {
+    const wa = {
+      id: 10,
+      companyId: 1,
+      connectionProvider: "evolution",
+      status: "OPENING",
+      qrcode: "",
+      update: jest.fn().mockResolvedValue(undefined)
+    };
+    const result = await processEvolutionWebhook({
+      whatsapp: wa as never,
+      body: {
+        event: "CONNECTION_UPDATE",
+        data: { state: "open", statusReason: 200 }
+      },
+      apiKeyValid: true
+    });
+    expect(["processed", "skipped"]).toContain(result.outcome);
   });
 
   it("pipeline evolution texto sem rawProviderMessage", async () => {
