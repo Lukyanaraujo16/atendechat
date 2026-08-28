@@ -116,7 +116,8 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
     flowIdNotPhrase,
     autoReadMessages,
     defaultGroupVisible,
-    ticketVisibility
+    ticketVisibility,
+    createdByUserId: Number(req.user.id)
   });
 
   StartWhatsAppSession(whatsapp, companyId);

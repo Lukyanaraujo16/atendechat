@@ -12,8 +12,9 @@ import {
   isEvolutionConnection,
   isWhatsAppConnectionProvider
 } from "../../modules/whatsapp/connectionProvider";
-import { upsertWhatsappEvolutionCredentials } from "./evolutionCredentialsService";
 import { ERR_WHATSAPP_CONNECTION_PROVIDER_INVALID } from "../../modules/whatsapp/providers/evolution/evolutionErrors";
+import { provisionCentralEvolutionCredentials } from "../../modules/whatsapp/providers/evolution/central/provisionCentralEvolutionCredentials";
+import { assertEvolutionCentralProvisionAllowed } from "./evolutionProvisioningGuard";
 
 interface EvolutionConfigInput {
   baseUrl?: string;
@@ -50,6 +51,8 @@ interface Request {
   autoReadMessages?: boolean;
   defaultGroupVisible?: boolean;
   ticketVisibility?: string;
+  /** Usuário que solicita a criação — gate Evolution central (Fase 10.5). */
+  createdByUserId?: number;
 }
 
 interface Response {
@@ -83,7 +86,8 @@ const CreateWhatsAppService = async ({
   flowIdNotPhrase = null,
   autoReadMessages = true,
   defaultGroupVisible = false,
-  ticketVisibility = "all"
+  ticketVisibility = "all",
+  createdByUserId
 }: Request): Promise<Response> => {
   const company = await Company.findOne({
     where: {
@@ -145,17 +149,10 @@ const CreateWhatsAppService = async ({
     : status;
 
   if (isEvolutionConnection(connectionProvider)) {
-    if (
-      !evolution?.baseUrl ||
-      !evolution?.instanceName ||
-      !evolution?.apiKey
-    ) {
-      throw new AppError(
-        "ERR_EVOLUTION_CONFIG_REQUIRED",
-        400,
-        "Conexão Evolution exige evolution.baseUrl, evolution.instanceName e evolution.apiKey."
-      );
-    }
+    await assertEvolutionCentralProvisionAllowed({
+      createdByUserId,
+      evolution
+    });
   }
 
   const schema = Yup.object().shape({
@@ -273,15 +270,16 @@ const CreateWhatsAppService = async ({
     { include: ["queues"] }
   );
 
-  if (isEvolutionConnection(connectionProvider) && evolution) {
-    await upsertWhatsappEvolutionCredentials({
-      companyId,
-      whatsappId: whatsapp.id,
-      baseUrl: evolution.baseUrl!,
-      instanceName: evolution.instanceName!,
-      instanceId: evolution.instanceId,
-      apiKey: evolution.apiKey!
-    });
+  if (isEvolutionConnection(connectionProvider)) {
+    try {
+      await provisionCentralEvolutionCredentials({
+        companyId,
+        whatsappId: whatsapp.id
+      });
+    } catch (err) {
+      await whatsapp.destroy();
+      throw err;
+    }
   }
 
   await AssociateWhatsappQueue(whatsapp, queueIds);
