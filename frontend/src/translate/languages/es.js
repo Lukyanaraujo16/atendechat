@@ -2189,6 +2189,10 @@ const messages = {
           visibilityAll: "Todos",
           visibilityRestricted: "Restringido",
         },
+        providerBadge: {
+          standard: "Estándar",
+          evolution: "Evolution",
+        },
         mobile: {
           actions: "Acciones de la conexión",
           lastUpdate: "Actualizado",
@@ -2280,6 +2284,11 @@ const messages = {
           ticketVisibilityAdminSupervisor: "Solo admin y supervisor",
           ticketVisibilityHint:
             "Las conexiones restringidas (ej. WhatsApp personal) ocultan tickets a usuarios comunes.",
+          connectionProvider: "Tipo de conexión",
+          connectionProviderStandard: "WhatsApp estándar",
+          connectionProviderEvolution: "WhatsApp Evolution",
+          connectionProviderHint:
+            "Disponible solo para Super Admin. La infraestructura Evolution la provisiona el servidor.",
         },
         buttons: {
           okAdd: "Agregar",
@@ -2315,6 +2324,7 @@ const messages = {
           four: "Apunte la cámara del teléfono al código QR de abajo",
         },
         waiting: "Esperando lectura del código QR...",
+        waitingStatus: "Esperando sesión ({{status}})...",
         newQr: "Generar nuevo código QR",
         connected: "¡Conectado! Ya puede cerrar esta ventana.",
       },
@@ -7100,6 +7110,28 @@ const messages = {
           "Este ticket ya tiene un vínculo activo. La reasignación solo está permitida en tickets huérfanos.",
         ERR_WAPP_NOT_CONNECTED:
           "La conexión elegida no está conectada. Seleccione una sesión activa.",
+        ERR_EVOLUTION_PROVISION_FORBIDDEN:
+          "El aprovisionamiento Evolution está restringido a la plataforma StreamHub.",
+        ERR_EVOLUTION_TECHNICAL_FIELDS_NOT_ALLOWED:
+          "Las credenciales técnicas Evolution no pueden enviarse desde el cliente.",
+        ERR_EVOLUTION_CENTRAL_CONFIG_MISSING:
+          "La infraestructura Evolution aún no está configurada en el servidor.",
+        ERR_EVOLUTION_CENTRAL_CONFIG_INVALID:
+          "La configuración Evolution del servidor no es válida. Contacte al soporte de la plataforma.",
+        ERR_WHATSAPP_CONNECTION_PROVIDER_INVALID:
+          "Tipo de conexión inválido.",
+        ERR_WHATSAPP_CONNECTION_PROVIDER_IMMUTABLE:
+          "El tipo de conexión no se puede cambiar después de la creación.",
+        ERR_EVOLUTION_CREDENTIAL_MISSING:
+          "No se encontraron credenciales de la sesión Evolution. Contacte al soporte.",
+        ERR_EVOLUTION_API_ERROR:
+          "Error al comunicar con la infraestructura Evolution. Intente de nuevo.",
+        ERR_EVOLUTION_TIMEOUT:
+          "Tiempo de espera agotado al contactar la infraestructura Evolution.",
+        ERR_EVOLUTION_LOGOUT_FAILED:
+          "No se pudo desconectar la sesión Evolution. Intente de nuevo.",
+        ERR_EVOLUTION_INVALID_INSTANCE_NAME:
+          "Identificador interno de la sesión Evolution inválido.",
         ERR_STAGE_HAS_DEALS:
           "No se puede eliminar una etapa con elementos. Mueva o elimine los elementos primero.",
         ERR_NO_CRM_STAGE: "Etapa CRM no encontrada.",

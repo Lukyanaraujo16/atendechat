@@ -16,6 +16,7 @@ import api from "../../services/api";
 import { SocketContext } from "../../context/Socket/SocketContext";
 import { AuthContext } from "../../context/Auth/AuthContext";
 import useIsMobile from "../../hooks/useIsMobile";
+import { shouldCloseQrcodeModalOnSession } from "../../utils/whatsappEvolutionUi";
 import {
   AppDialog,
   AppDialogTitle,
@@ -58,6 +59,7 @@ const QrcodeModal = ({ open, onClose, whatsAppId }) => {
   const classes = useStyles();
   const isMobile = useIsMobile();
   const [qrCode, setQrCode] = useState("");
+  const [sessionStatus, setSessionStatus] = useState("");
   const [connected, setConnected] = useState(false);
   const [loadingNewQr, setLoadingNewQr] = useState(false);
 
@@ -69,6 +71,7 @@ const QrcodeModal = ({ open, onClose, whatsAppId }) => {
     if (!open) {
       setConnected(false);
       setQrCode("");
+      setSessionStatus("");
     }
   }, [open]);
 
@@ -79,15 +82,21 @@ const QrcodeModal = ({ open, onClose, whatsAppId }) => {
       try {
         const { data } = await api.get(`/whatsapp/${whatsAppId}`);
         setQrCode(data.qrcode || "");
+        setSessionStatus(data.status || "");
+        if (shouldCloseQrcodeModalOnSession(data)) {
+          setConnected(true);
+          toast.success(i18n.t("connections.toasts.connected"));
+          setTimeout(() => onClose(), 1500);
+        }
       } catch (err) {
         toastError(err);
       }
     };
     fetchSession();
-  }, [whatsAppId, open]);
+  }, [whatsAppId, open, onClose]);
 
   useEffect(() => {
-    if (!whatsAppId) return;
+    if (!whatsAppId || !open) return;
     const companyId =
       authCompanyId != null
         ? String(authCompanyId)
@@ -106,9 +115,13 @@ const QrcodeModal = ({ open, onClose, whatsAppId }) => {
       ) {
         return;
       }
-      const newQr = data.session?.qrcode ?? "";
+      const session = data.session || {};
+      const newQr = session.qrcode ?? "";
       setQrCode(newQr);
-      if (newQr === "") {
+      if (session.status) {
+        setSessionStatus(session.status);
+      }
+      if (shouldCloseQrcodeModalOnSession(session)) {
         setConnected(true);
         toast.success(i18n.t("connections.toasts.connected"));
         setTimeout(() => onClose(), 1500);
@@ -119,7 +132,7 @@ const QrcodeModal = ({ open, onClose, whatsAppId }) => {
     return () => {
       socket.off(event, handler);
     };
-  }, [whatsAppId, onClose, socketManager, authCompanyId]);
+  }, [whatsAppId, open, onClose, socketManager, authCompanyId]);
 
   const handleRequestNewQr = async () => {
     if (!whatsAppId) return;
@@ -128,6 +141,7 @@ const QrcodeModal = ({ open, onClose, whatsAppId }) => {
       await api.put(`/whatsappsession/${whatsAppId}`);
       const { data } = await api.get(`/whatsapp/${whatsAppId}`);
       setQrCode(data.qrcode || "");
+      setSessionStatus(data.status || "");
     } catch (err) {
       toastError(err);
     } finally {
@@ -136,6 +150,14 @@ const QrcodeModal = ({ open, onClose, whatsAppId }) => {
   };
 
   const qrSize = isMobile ? Math.min(240, window.innerWidth - 64) : 256;
+  const waitingLabel =
+    sessionStatus === "OPENING" || sessionStatus === "DISCONNECTED"
+      ? i18n.t("qrCodeModal.waitingStatus", {
+          status: i18n.t(`connections.statusLabel.${sessionStatus}`, {
+            defaultValue: sessionStatus,
+          }),
+        })
+      : i18n.t("qrCodeModal.waiting");
 
   return (
     <AppDialog open={open} onClose={onClose} maxWidth="lg" scroll="paper">
@@ -185,7 +207,7 @@ const QrcodeModal = ({ open, onClose, whatsAppId }) => {
                 </>
               ) : (
                 <Typography variant="body2" color="textSecondary" style={{ padding: 24 }}>
-                  {i18n.t("qrCodeModal.waiting")}
+                  {waitingLabel}
                 </Typography>
               )}
             </Box>

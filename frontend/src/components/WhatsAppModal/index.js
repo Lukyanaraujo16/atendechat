@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import * as Yup from "yup";
 import { Formik, Form, Field } from "formik";
 import { toast } from "react-toastify";
@@ -21,6 +21,7 @@ import {
   InputAdornment,
   Box,
   Typography,
+  Chip,
 } from "@material-ui/core";
 import { FileCopyOutlined, Refresh } from "@material-ui/icons";
 
@@ -32,6 +33,14 @@ import useFeature from "../../hooks/useFeature";
 import { AI_AGENT_ROUTE_PATH } from "../../config/aiAgentFeature";
 import Alert from "@material-ui/lab/Alert";
 import useIsMobile from "../../hooks/useIsMobile";
+import { AuthContext } from "../../context/Auth/AuthContext";
+import {
+  buildWhatsAppMutationPayload,
+  connectionProviderBadgeKey,
+  CONNECTION_PROVIDER_EVOLUTION,
+  CONNECTION_PROVIDER_STANDARD,
+  isPlatformSuperAdmin,
+} from "../../utils/whatsappEvolutionUi";
 import {
   AppDialog,
   AppDialogTitle,
@@ -94,6 +103,8 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
   const classes = useStyles();
   const isMobile = useIsMobile();
   const history = useHistory();
+  const { user } = useContext(AuthContext);
+  const isSuperAdmin = isPlatformSuperAdmin(user);
   const { enabled: openAiEnabled, loaded: openAiLoaded } = useFeature(
     "automation.openai"
   );
@@ -110,7 +121,9 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
     defaultGroupVisible: false,
     ticketVisibility: "all",
     token: "",
+    /** Legado Baileys stable/beta — NÃO é connectionProvider. */
     provider: "beta",
+    connectionProvider: CONNECTION_PROVIDER_STANDARD,
     //timeSendQueue: 0,
     //sendIdQueue: 0,
     expiresInactiveMessage: "",
@@ -244,8 +257,10 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
   }, []);
 
   const handleSaveWhatsApp = async (values) => {
-    const whatsappData = {
-      ...values, queueIds: selectedQueueIds, transferQueueId: selectedQueueId,
+    const whatsappData = buildWhatsAppMutationPayload({
+      values,
+      queueIds: selectedQueueIds,
+      transferQueueId: selectedQueueId,
       promptId: openAiEnabled
         ? (selectedPrompt != null && selectedPrompt !== ""
             ? selectedPrompt
@@ -257,15 +272,9 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
           : null,
       flowIdWelcome: selectedFlowWelcome || null,
       flowIdNotPhrase: selectedFlowNotPhrase || null,
-    };
-    delete whatsappData["aiAgentId"];
-    delete whatsappData["aiAgentMode"];
-    delete whatsappData["aiAgentEnabled"];
-    delete whatsappData["queues"];
-    delete whatsappData["session"];
-    if (!whatsAppId) {
-      delete whatsappData["token"];
-    }
+      isCreate: !whatsAppId,
+      isSuperAdmin,
+    });
 
     try {
       if (whatsAppId) {
@@ -376,6 +385,66 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
                         label={i18n.t("whatsappModal.form.default")}
                       />
                     </Grid>
+                    {isSuperAdmin && !whatsAppId && (
+                      <Grid item xs={12}>
+                        <FormControl
+                          variant="outlined"
+                          margin="dense"
+                          fullWidth
+                          data-testid="whatsapp-connection-provider-select"
+                        >
+                          <InputLabel id="connectionProvider-label">
+                            {i18n.t("whatsappModal.form.connectionProvider")}
+                          </InputLabel>
+                          <Field
+                            as={Select}
+                            name="connectionProvider"
+                            labelId="connectionProvider-label"
+                            label={i18n.t("whatsappModal.form.connectionProvider")}
+                            inputProps={{
+                              "aria-label": i18n.t(
+                                "whatsappModal.form.connectionProvider"
+                              ),
+                            }}
+                          >
+                            <MenuItem value={CONNECTION_PROVIDER_STANDARD}>
+                              {i18n.t(
+                                "whatsappModal.form.connectionProviderStandard"
+                              )}
+                            </MenuItem>
+                            <MenuItem value={CONNECTION_PROVIDER_EVOLUTION}>
+                              {i18n.t(
+                                "whatsappModal.form.connectionProviderEvolution"
+                              )}
+                            </MenuItem>
+                          </Field>
+                        </FormControl>
+                        <Typography
+                          variant="caption"
+                          color="textSecondary"
+                          display="block"
+                        >
+                          {i18n.t("whatsappModal.form.connectionProviderHint")}
+                        </Typography>
+                      </Grid>
+                    )}
+                    {isSuperAdmin && whatsAppId && values.connectionProvider && (
+                      <Grid item xs={12}>
+                        <Typography variant="body2" color="textSecondary">
+                          {i18n.t("whatsappModal.form.connectionProvider")}:{" "}
+                          <Chip
+                            size="small"
+                            variant="outlined"
+                            label={i18n.t(
+                              `connections.providerBadge.${connectionProviderBadgeKey(
+                                values.connectionProvider
+                              )}`
+                            )}
+                            data-testid="whatsapp-connection-provider-readonly"
+                          />
+                        </Typography>
+                      </Grid>
+                    )}
                     <Grid item xs={12}>
                       <FormControlLabel
                         control={

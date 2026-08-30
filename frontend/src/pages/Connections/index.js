@@ -65,6 +65,11 @@ import {
 } from "../../utils/instagramOAuth";
 import { canUseInstagramIntegration } from "../../utils/canUseInstagramIntegration";
 import { canManageWhatsAppConnections } from "../../utils/settingsConnectionsAccess";
+import {
+	connectionProviderBadgeKey,
+	isPlatformSuperAdmin,
+	listConnectionActionKeys,
+} from "../../utils/whatsappEvolutionUi";
 
 const useStyles = makeStyles(theme => ({
 	mainPaper: {
@@ -183,6 +188,7 @@ const Connections = () => {
 	const { user } = useContext(AuthContext);
 	const { whatsApps, loading } = useContext(WhatsAppsContext);
 	const canManageConnections = canManageWhatsAppConnections(planFlags, user);
+	const isSuperAdmin = isPlatformSuperAdmin(user);
 	const [whatsAppModalOpen, setWhatsAppModalOpen] = useState(false);
 	const [qrModalOpen, setQrModalOpen] = useState(false);
 	const [selectedWhatsApp, setSelectedWhatsApp] = useState(null);
@@ -430,8 +436,12 @@ const Connections = () => {
 
 	const buildConnectionActionItems = (whatsApp) => {
 		const items = [];
+		const keys = listConnectionActionKeys({
+			status: whatsApp.status,
+			canManageConnections,
+		});
 
-		if (whatsApp.status === "qrcode") {
+		if (keys.includes("qrcode")) {
 			items.push({
 				key: "qrcode",
 				label: i18n.t("connections.buttons.qrcode"),
@@ -440,12 +450,14 @@ const Connections = () => {
 			});
 		}
 
-		if (whatsApp.status === "DISCONNECTED" || whatsApp.status === "PENDING") {
+		if (keys.includes("tryAgain")) {
 			items.push({
 				key: "tryAgain",
 				label: i18n.t("connections.buttons.tryAgain"),
 				onClick: () => handleStartWhatsAppSession(whatsApp.id),
 			});
+		}
+		if (keys.includes("newQr")) {
 			items.push({
 				key: "newQr",
 				label: i18n.t("connections.buttons.newQr"),
@@ -453,11 +465,7 @@ const Connections = () => {
 			});
 		}
 
-		if (
-			whatsApp.status === "CONNECTED" ||
-			whatsApp.status === "PAIRING" ||
-			whatsApp.status === "TIMEOUT"
-		) {
+		if (keys.includes("disconnect")) {
 			items.push({
 				key: "disconnect",
 				label: i18n.t("connections.buttons.disconnect"),
@@ -465,14 +473,18 @@ const Connections = () => {
 			});
 		}
 
-		if (canManageConnections) {
+		if (keys.includes("edit") || keys.includes("delete")) {
 			items.push({ key: "edit-divider", divider: true });
+		}
+		if (keys.includes("edit")) {
 			items.push({
 				key: "edit",
 				label: i18n.t("connections.mobile.edit"),
 				icon: <Edit fontSize="small" />,
 				onClick: () => handleEditWhatsApp(whatsApp),
 			});
+		}
+		if (keys.includes("delete")) {
 			items.push({
 				key: "delete",
 				label: i18n.t("connections.mobile.delete"),
@@ -483,6 +495,19 @@ const Connections = () => {
 		}
 
 		return items;
+	};
+
+	const renderProviderBadge = (whatsApp) => {
+		if (!isSuperAdmin) return null;
+		const key = connectionProviderBadgeKey(whatsApp.connectionProvider);
+		return (
+			<Chip
+				size="small"
+				variant="outlined"
+				label={i18n.t(`connections.providerBadge.${key}`)}
+				data-testid={`connection-provider-badge-${key}`}
+			/>
+		);
 	};
 
 	const renderConnectionMobileCard = (whatsApp) => {
@@ -513,6 +538,7 @@ const Connections = () => {
 				<Box className={classes.mobileCardMeta}>{renderStatusToolTips(whatsApp)}</Box>
 				<Box className={classes.mobileCardRow}>
 					<Chip size="small" variant="outlined" label={visibilityLabel} />
+					{renderProviderBadge(whatsApp)}
 					{whatsApp.isDefault ? (
 						<Chip
 							size="small"
@@ -735,6 +761,7 @@ const Connections = () => {
 											<TableCell align="left" className={classes.connectionName}>
 												<Box display="flex" alignItems="center" flexWrap="wrap" style={{ gap: 8 }}>
 													<span>{whatsApp.name}</span>
+													{renderProviderBadge(whatsApp)}
 													<Chip
 														size="small"
 														variant="outlined"

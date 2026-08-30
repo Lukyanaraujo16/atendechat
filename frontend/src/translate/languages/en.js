@@ -2228,6 +2228,10 @@ const messages = {
 					visibilityAll: "All",
 					visibilityRestricted: "Restricted",
 				},
+				providerBadge: {
+					standard: "Standard",
+					evolution: "Evolution",
+				},
 				mobile: {
 					actions: "Connection actions",
 					lastUpdate: "Updated",
@@ -2318,6 +2322,11 @@ const messages = {
 					ticketVisibilityAdminSupervisor: "Admin and supervisor only",
 					ticketVisibilityHint:
 						"Restricted connections (e.g. personal WhatsApp) hide tickets from regular users.",
+					connectionProvider: "Connection type",
+					connectionProviderStandard: "Standard WhatsApp",
+					connectionProviderEvolution: "Evolution WhatsApp",
+					connectionProviderHint:
+						"Available to Super Admin only. Evolution infrastructure is provisioned by the server.",
 				},
 				buttons: {
 					okAdd: "Add",
@@ -2372,6 +2381,7 @@ const messages = {
 					four: "Point your phone camera at the QR Code below",
 				},
 				waiting: "Waiting for QR Code scan...",
+				waitingStatus: "Waiting for session ({{status}})...",
 				newQr: "Generate new QR Code",
 				connected: "Connected! You can close this window.",
 			},
@@ -7873,6 +7883,28 @@ const messages = {
 					"This ticket already has an active link. Reassignment is only allowed for orphan tickets.",
 				ERR_WAPP_NOT_CONNECTED:
 					"The selected connection is not connected. Choose an active session.",
+				ERR_EVOLUTION_PROVISION_FORBIDDEN:
+					"Evolution provisioning is restricted to the StreamHub platform.",
+				ERR_EVOLUTION_TECHNICAL_FIELDS_NOT_ALLOWED:
+					"Evolution technical credentials cannot be sent by the client.",
+				ERR_EVOLUTION_CENTRAL_CONFIG_MISSING:
+					"Evolution infrastructure is not configured on the server yet.",
+				ERR_EVOLUTION_CENTRAL_CONFIG_INVALID:
+					"The server Evolution configuration is invalid. Contact platform support.",
+				ERR_WHATSAPP_CONNECTION_PROVIDER_INVALID:
+					"Invalid connection type.",
+				ERR_WHATSAPP_CONNECTION_PROVIDER_IMMUTABLE:
+					"Connection type cannot be changed after creation.",
+				ERR_EVOLUTION_CREDENTIAL_MISSING:
+					"Evolution session credentials were not found. Contact support.",
+				ERR_EVOLUTION_API_ERROR:
+					"Failed to communicate with Evolution infrastructure. Please try again.",
+				ERR_EVOLUTION_TIMEOUT:
+					"Timed out while contacting Evolution infrastructure.",
+				ERR_EVOLUTION_LOGOUT_FAILED:
+					"Could not disconnect the Evolution session. Please try again.",
+				ERR_EVOLUTION_INVALID_INSTANCE_NAME:
+					"Invalid internal Evolution session identifier.",
 				ERR_STAGE_HAS_DEALS:
 					"Cannot delete a stage that has items. Move or remove the items first.",
 				ERR_NO_CRM_STAGE: "CRM stage not found.",
