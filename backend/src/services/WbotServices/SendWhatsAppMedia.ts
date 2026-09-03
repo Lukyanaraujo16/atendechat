@@ -4,6 +4,7 @@ import fs from "fs";
 import { exec } from "child_process";
 import path from "path";
 import ffmpegPath from "@ffmpeg-installer/ffmpeg";
+import { v4 as uuidv4 } from "uuid";
 import AppError from "../../errors/AppError";
 import { getTicketRemoteJid } from "../../helpers/GetTicketRemoteJid";
 import { getWhatsAppOutboundForTicket } from "../../modules/whatsapp/outbound/resolveWhatsAppOutbound";
@@ -14,6 +15,8 @@ import {
   incrementCompanyStorageUsage,
   tryStatFileBytes
 } from "../CompanyService/adjustCompanyStorageUsage";
+import CreateMessageService from "../MessageServices/CreateMessageService";
+import { buildEvolutionOutboundDataJsonFromEnvelope } from "../../modules/whatsapp/providers/evolution/outbound/mapEvolutionSendResponse";
 
 interface Request {
   media: Express.Multer.File;
@@ -218,6 +221,54 @@ const SendWhatsAppMedia = async ({
     const sentMessage = sent.rawSentMessage as WAMessage;
 
     await ticket.update({ lastMessage: bodyMessage });
+
+    const isEvolution =
+      sentMessage &&
+      typeof sentMessage === "object" &&
+      (sentMessage as { provider?: string }).provider === "evolution";
+
+    if (isEvolution) {
+      const { key, status } = sentMessage as {
+        key?: { id?: unknown; remoteJid?: unknown };
+        status?: unknown;
+      };
+      const idToSave =
+        key?.id != null && String(key.id).trim()
+          ? String(key.id).trim()
+          : uuidv4();
+      const mediaType = asSticker
+        ? "sticker"
+        : String(media.mimetype || "image").split("/")[0] || "image";
+      const mediaUrl = path.basename(
+        String(media.filename || path.basename(pathMedia) || idToSave)
+      );
+      await CreateMessageService({
+        messageData: {
+          id: idToSave,
+          ticketId: ticket.id,
+          body: bodyMessage || "-",
+          fromMe: true,
+          read: true,
+          ack: status as number,
+          mediaType,
+          mediaUrl,
+          remoteJid: key?.remoteJid != null ? String(key.remoteJid) : null,
+          externalMessageId: idToSave,
+          dataJson: buildEvolutionOutboundDataJsonFromEnvelope(sentMessage)
+        } as never,
+        companyId: ticket.companyId
+      });
+      if (ticket.whatsappId != null) {
+        const { scheduleReapplyDeferredEvolutionAcks } = await import(
+          "../../modules/whatsapp/providers/evolution/inbound/reapplyDeferredEvolutionAcks"
+        );
+        scheduleReapplyDeferredEvolutionAcks({
+          companyId: ticket.companyId,
+          whatsappId: Number(ticket.whatsappId),
+          providerMessageId: idToSave
+        });
+      }
+    }
 
     if (ticket.companyId && storageAccountPath) {
       const sz = tryStatFileBytes(storageAccountPath);

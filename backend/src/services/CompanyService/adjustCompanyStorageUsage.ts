@@ -46,7 +46,7 @@ function normalizeWatermark(v: unknown): 0 | 80 | 90 | 100 {
 async function applyDeltaAtomic(companyId: number, delta: number): Promise<void> {
   const now = new Date();
   await sequelize.query(
-    `UPDATE Companies SET
+    `UPDATE "Companies" SET
       storageUsedBytes = GREATEST(0, storageUsedBytes + :delta),
       storageCalculatedAt = :now,
       updatedAt = :now
