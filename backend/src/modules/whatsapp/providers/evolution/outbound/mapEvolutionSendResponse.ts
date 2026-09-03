@@ -1,11 +1,16 @@
 import { WhatsAppOutboundSendResult } from "../../../outbound/WhatsAppOutbound";
-import { mapEvolutionStatusToAck } from "../inbound/mapEvolutionStatusToAck";
+import {
+  mapEvolutionStatusToAck,
+  STREAMHUB_ACK
+} from "../inbound/mapEvolutionStatusToAck";
 
 /**
  * Normaliza resposta Evolution send* → WhatsAppOutboundSendResult.
  * rawSentMessage = envelope provider-aware (NÃO proto Baileys).
  * Mantém key.id para callers legados que leem .key.id.
- * status numérico = escala StreamHub 0–5 (Fase 9A).
+ *
+ * Contrato .status = ACK numérico StreamHub 0–5 (igual Baileys WAMessage.status).
+ * O status textual Evolution fica em providerStatus (dataJson), nunca em Messages.ack.
  */
 export function mapEvolutionSendResponseToResult(
   data: unknown,
@@ -32,7 +37,10 @@ export function mapEvolutionSendResponseToResult(
 
   const fromMe = key.fromMe != null ? Boolean(key.fromMe) : true;
 
-  const status = mapEvolutionStatusToAck(root.status);
+  const mappedAck = mapEvolutionStatusToAck(root.status);
+  const ack = mappedAck != null ? mappedAck : STREAMHUB_ACK.PENDING;
+  const providerStatus = root.status != null ? root.status : "PENDING";
+
   const rawSentMessage = {
     provider: "evolution",
     key: {
@@ -42,7 +50,8 @@ export function mapEvolutionSendResponseToResult(
     },
     messageTimestamp:
       root.messageTimestamp != null ? root.messageTimestamp : null,
-    status: root.status != null ? root.status : "PENDING",
+    status: ack,
+    providerStatus,
     messageId,
     remoteJid,
     fromMe
@@ -52,24 +61,41 @@ export function mapEvolutionSendResponseToResult(
     messageId,
     remoteJid,
     fromMe,
-    status,
+    status: ack,
     rawSentMessage
   };
+}
+
+/** Persistência: payload.status textual; Messages.ack usa envelope.status numérico. */
+export function buildEvolutionOutboundDataJsonFromEnvelope(
+  envelope: unknown
+): string {
+  const raw =
+    envelope && typeof envelope === "object"
+      ? (envelope as Record<string, unknown>)
+      : {};
+  const key =
+    raw.key && typeof raw.key === "object"
+      ? (raw.key as Record<string, unknown>)
+      : {};
+  const textualStatus =
+    raw.providerStatus != null ? raw.providerStatus : "PENDING";
+  return JSON.stringify({
+    provider: "evolution",
+    payload: {
+      key: {
+        id: key.id ?? null,
+        remoteJid: key.remoteJid ?? null,
+        fromMe: key.fromMe ?? true
+      },
+      status: textualStatus
+    }
+  });
 }
 
 /** dataJson Evolution outbound sanitizado (sem apikey/base64). */
 export function buildEvolutionOutboundDataJson(
   result: WhatsAppOutboundSendResult
 ): string {
-  return JSON.stringify({
-    provider: "evolution",
-    payload: {
-      key: {
-        id: result.messageId,
-        remoteJid: result.remoteJid,
-        fromMe: result.fromMe
-      },
-      status: result.status
-    }
-  });
+  return buildEvolutionOutboundDataJsonFromEnvelope(result.rawSentMessage);
 }

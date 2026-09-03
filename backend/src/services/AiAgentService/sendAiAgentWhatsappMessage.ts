@@ -7,6 +7,7 @@ import { logger } from "../../utils/logger";
 import { AI_AGENT_MESSAGE_ORIGIN } from "./aiAgentLiveConfig";
 import { formatAiAgentSignedMessage } from "./formatAiAgentSignedMessage";
 import { sanitizeAiAgentClientFacingText } from "./buildAiAgentHandoffTransitionMessage";
+import { buildEvolutionOutboundDataJsonFromEnvelope } from "../../modules/whatsapp/providers/evolution/outbound/mapEvolutionSendResponse";
 
 export type SendAiAgentWhatsappMessageInput = {
   ticket: Ticket;
@@ -73,13 +74,7 @@ export default async function sendAiAgentWhatsappMessage(
         aiAgentRuntimeLogId: input.aiAgentRuntimeLogId ?? null,
         externalMessageId: isEvolution ? messageId : undefined,
         dataJson: isEvolution
-          ? JSON.stringify({
-              provider: "evolution",
-              payload: {
-                key: (sentMessage as { key?: unknown }).key,
-                status: (sentMessage as { status?: unknown }).status
-              }
-            })
+          ? buildEvolutionOutboundDataJsonFromEnvelope(sentMessage)
           : JSON.stringify(sentMessage)
       } as never,
       companyId: input.companyId

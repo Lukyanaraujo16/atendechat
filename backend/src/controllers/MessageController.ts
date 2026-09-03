@@ -20,6 +20,7 @@ import UpdateTicketService from "../services/TicketServices/UpdateTicketService"
 import DeleteWhatsAppMessage from "../services/WbotServices/DeleteWhatsAppMessage";
 import SendWhatsAppMedia from "../services/WbotServices/SendWhatsAppMedia";
 import SendWhatsAppMessage from "../services/WbotServices/SendWhatsAppMessage";
+import { buildEvolutionOutboundDataJsonFromEnvelope } from "../modules/whatsapp/providers/evolution/outbound/mapEvolutionSendResponse";
 import CreateMessageService, {
   serializeMessageForClient
 } from "../services/MessageServices/CreateMessageService";
@@ -507,13 +508,7 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
         ...(sentMessage
           ? {
               dataJson: isEvolution
-                ? JSON.stringify({
-                    provider: "evolution",
-                    payload: {
-                      key: (sentMessage as any).key,
-                      status: (sentMessage as any).status
-                    }
-                  })
+                ? buildEvolutionOutboundDataJsonFromEnvelope(sentMessage)
                 : JSON.stringify(sentMessage as any)
             }
           : {})
@@ -663,6 +658,10 @@ export const send = async (req: Request, res: Response): Promise<Response> => {
         lastMessage: body,
       });
       const idToSave = (sentMessage as any)?.key?.id || uuidv4();
+      const isEvolutionApi =
+        sentMessage &&
+        typeof sentMessage === "object" &&
+        (sentMessage as { provider?: string }).provider === "evolution";
       await CreateMessageService({
         messageData: {
           id: idToSave,
@@ -673,12 +672,15 @@ export const send = async (req: Request, res: Response): Promise<Response> => {
           ack: (sentMessage as any)?.status,
           mediaType: "conversation",
           ...(sentMessage
-            ? { dataJson: JSON.stringify(sentMessage as any) }
+            ? {
+                dataJson: isEvolutionApi
+                  ? buildEvolutionOutboundDataJsonFromEnvelope(sentMessage)
+                  : JSON.stringify(sentMessage as any)
+              }
             : {})
         } as any,
         companyId
       });
-
     }
 
     if (messageData.closeTicket) {

@@ -33,7 +33,11 @@ import {
   EvolutionHttpError
 } from "../../inbound/evolutionHttpClient";
 import { jidToEvolutionNumber } from "../evolutionDestination";
-import { mapEvolutionSendResponseToResult } from "../mapEvolutionSendResponse";
+import {
+  buildEvolutionOutboundDataJson,
+  mapEvolutionSendResponseToResult
+} from "../mapEvolutionSendResponse";
+import { STREAMHUB_ACK } from "../../inbound/mapEvolutionStatusToAck";
 
 const sendText = evolutionSendText as jest.Mock;
 const sendMedia = evolutionSendMedia as jest.Mock;
@@ -79,8 +83,13 @@ describe("EvolutionWhatsAppOutbound Fase 8", () => {
     });
     expect(result.messageId).toBe("BAE594145F4C59B4");
     expect(result.fromMe).toBe(true);
+    expect(result.status).toBe(STREAMHUB_ACK.PENDING);
+    expect(typeof result.status).toBe("number");
     expect((result.rawSentMessage as any).provider).toBe("evolution");
     expect((result.rawSentMessage as any).key.id).toBe("BAE594145F4C59B4");
+    expect((result.rawSentMessage as any).status).toBe(STREAMHUB_ACK.PENDING);
+    expect((result.rawSentMessage as any).status).not.toBe("PENDING");
+    expect((result.rawSentMessage as any).providerStatus).toBe("PENDING");
   });
 
   it("quoted textual semântico envia quoted.key.id sem Baileys", async () => {
@@ -286,6 +295,9 @@ describe("EvolutionWhatsAppOutbound Fase 8", () => {
       })
     );
     expect(img.messageId).toBe("IMG1");
+    expect(img.status).toBe(STREAMHUB_ACK.PENDING);
+    expect((img.rawSentMessage as any).status).toBe(1);
+    expect((img.rawSentMessage as any).providerStatus).toBe("PENDING");
 
     await outbound.sendContent({
       jid: "5511999@s.whatsapp.net",
@@ -310,17 +322,21 @@ describe("EvolutionWhatsAppOutbound Fase 8", () => {
       })
     );
 
-    await outbound.sendContent({
+    const audio = await outbound.sendContent({
       jid: "5511999@s.whatsapp.net",
       content: { audio: Buffer.from("ogg"), ptt: true }
     });
     expect(sendAudio).toHaveBeenCalled();
+    expect(audio.status).toBe(STREAMHUB_ACK.PENDING);
+    expect((audio.rawSentMessage as any).status).not.toBe("PENDING");
 
-    await outbound.sendContent({
+    const sticker = await outbound.sendContent({
       jid: "5511999@s.whatsapp.net",
       content: { sticker: Buffer.from("webp") }
     });
     expect(sendSticker).toHaveBeenCalled();
+    expect(sticker.status).toBe(STREAMHUB_ACK.PENDING);
+    expect((sticker.rawSentMessage as any).status).toBe(1);
   });
 
   it("media too large", async () => {
@@ -347,5 +363,30 @@ describe("evolutionDestination / mapEvolutionSendResponse", () => {
     const r = mapEvolutionSendResponseToResult(evoResponse("X1"), "jid");
     expect(r.messageId).toBe("X1");
     expect(r.remoteJid).toContain("5511");
+  });
+
+  it("PENDING textual → ack 1; dataJson preserva status textual", () => {
+    const r = mapEvolutionSendResponseToResult(
+      evoResponse("3EB0A7B4504D6340FA95A9"),
+      "5511999998888@s.whatsapp.net"
+    );
+    expect(r.status).toBe(1);
+    expect(typeof r.status).toBe("number");
+    const envelope = r.rawSentMessage as {
+      status: unknown;
+      providerStatus: unknown;
+    };
+    expect(envelope.status).toBe(STREAMHUB_ACK.PENDING);
+    expect(envelope.status).not.toBe("PENDING");
+    expect(envelope.providerStatus).toBe("PENDING");
+
+    const persistedAck = envelope.status;
+    expect(persistedAck).toBe(1);
+    expect(JSON.stringify({ ack: persistedAck })).not.toContain("PENDING");
+
+    const dataJson = JSON.parse(buildEvolutionOutboundDataJson(r));
+    expect(dataJson.payload.status).toBe("PENDING");
+    expect(dataJson.payload.key.id).toBe("3EB0A7B4504D6340FA95A9");
+    expect(typeof dataJson.payload.status).toBe("string");
   });
 });
