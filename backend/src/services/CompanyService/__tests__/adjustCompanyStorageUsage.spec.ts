@@ -46,12 +46,23 @@ describe("incrementCompanyStorageUsage — tabela Companies", () => {
     findCompany.mockResolvedValue(null);
   });
 
-  it('atualiza "Companies" (quoted), não a relação inexistente companies', async () => {
+  it('atualiza "Companies" e colunas camelCase quoted, sem lowercase unquoted', async () => {
     await incrementCompanyStorageUsage(1, 4096);
-    expect(sequelizeQuery).toHaveBeenCalled();
-    const sql = String(sequelizeQuery.mock.calls[0][0]);
-    expect(sql).toContain('"Companies"');
-    expect(sql).toMatch(/UPDATE\s+"Companies"\s+SET/);
-    expect(sql.toLowerCase()).not.toContain("update companies set");
+    expect(sequelizeQuery).toHaveBeenCalledTimes(1);
+    const [sql, options] = sequelizeQuery.mock.calls[0];
+    const query = String(sql);
+    expect(query).toMatch(/UPDATE\s+"Companies"\s+SET/);
+    expect(query).toContain('"storageUsedBytes"');
+    expect(query).toContain('"storageCalculatedAt"');
+    expect(query).toContain('"updatedAt"');
+    expect(query).toMatch(/WHERE\s+"id"\s*=\s*:id/);
+    expect(query).toMatch(/GREATEST\(0,\s*"storageUsedBytes"\s*\+\s*:delta\)/);
+    expect(query.toLowerCase()).not.toContain("update companies set");
+    expect(query).not.toMatch(/(?:^|[^"])storageUsedBytes(?:[^"]|$)/);
+    expect(query).not.toMatch(/(?:^|[^"])storageCalculatedAt(?:[^"]|$)/);
+    expect(query).not.toMatch(/(?:^|[^"])updatedAt(?:[^"]|$)/);
+    expect(options.replacements.delta).toBe(4096);
+    expect(options.replacements.id).toBe(1);
+    expect(options.replacements.now).toBeInstanceOf(Date);
   });
 });

@@ -47,10 +47,10 @@ async function applyDeltaAtomic(companyId: number, delta: number): Promise<void>
   const now = new Date();
   await sequelize.query(
     `UPDATE "Companies" SET
-      storageUsedBytes = GREATEST(0, storageUsedBytes + :delta),
-      storageCalculatedAt = :now,
-      updatedAt = :now
-     WHERE id = :id`,
+      "storageUsedBytes" = GREATEST(0, "storageUsedBytes" + :delta),
+      "storageCalculatedAt" = :now,
+      "updatedAt" = :now
+     WHERE "id" = :id`,
     {
       replacements: {
         delta: Math.round(delta),
