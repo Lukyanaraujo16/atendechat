@@ -328,6 +328,7 @@ export async function evolutionDeleteInstance(input: {
 
 /**
  * POST /webhook/set/{instance} — reconfigura eventos se instância já existia.
+ * Contrato Evolution v2.3.7: body.webhook (enabled/url/events/headers/byEvents/base64).
  * headers.apikey: credencial da conexão (em memória) para o receptor StreamHub.
  */
 export async function evolutionSetWebhook(input: {
@@ -339,12 +340,14 @@ export async function evolutionSetWebhook(input: {
     whatsappId: input.whatsappId,
     path: "/webhook/set/{instance}",
     body: {
-      ...buildAuthenticatedWebhookConfig({
-        url: input.webhookUrl,
-        apiKey: cred.apiKey
-      }),
-      webhookByEvents: false,
-      webhookBase64: false
+      webhook: {
+        ...buildAuthenticatedWebhookConfig({
+          url: input.webhookUrl,
+          apiKey: cred.apiKey
+        }),
+        byEvents: false,
+        base64: false
+      }
     }
   });
 }
