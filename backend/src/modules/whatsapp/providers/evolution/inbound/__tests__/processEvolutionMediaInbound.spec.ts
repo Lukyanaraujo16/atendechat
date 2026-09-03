@@ -8,9 +8,21 @@ jest.mock("@whiskeysockets/baileys", () => ({
   proto: {}
 }));
 
-jest.mock("../../../../../../services/CompanyService/adjustCompanyStorageUsage", () => ({
-  incrementCompanyStorageUsage: jest.fn()
-}));
+jest.mock(
+  "../../../../../../services/CompanyService/adjustCompanyStorageUsage",
+  () => ({
+    incrementCompanyStorageUsage: jest.fn()
+  })
+);
+
+jest.mock("../evolutionHttpClient", () => {
+  const actual = jest.requireActual("../evolutionHttpClient");
+  return {
+    ...actual,
+    evolutionGetBase64FromMediaMessage: jest.fn(),
+    evolutionDownloadMediaFromUrl: jest.fn()
+  };
+});
 
 const createEvent = jest.fn();
 const findMessage = jest.fn();
@@ -59,9 +71,17 @@ jest.mock("../../../../inbound/resolveQuotedMessageByStanzaId", () => ({
   resolveQuotedMessageByStanzaId: (...a: unknown[]) => resolveQuoted(...a)
 }));
 
+import { UniqueConstraintError } from "sequelize";
 import { processEvolutionWebhook } from "../processEvolutionWebhook";
 import { processEvolutionTextInbound } from "../processEvolutionTextInbound";
-import { UniqueConstraintError } from "sequelize";
+import {
+  EvolutionHttpError,
+  evolutionDownloadMediaFromUrl,
+  evolutionGetBase64FromMediaMessage
+} from "../evolutionHttpClient";
+
+const getBase64 = evolutionGetBase64FromMediaMessage as jest.Mock;
+const downloadUrl = evolutionDownloadMediaFromUrl as jest.Mock;
 
 describe("processEvolutionWebhook media + idempotency Fase 7", () => {
   const whatsapp = {
@@ -170,7 +190,83 @@ describe("processEvolutionWebhook media + idempotency Fase 7", () => {
     const savedName = createEvoMessage.mock.calls[0][0].mediaUrl as string;
     const saved = await fs.readFile(path.join(tmpDir, savedName));
     expect(saved.toString()).toBe("fake-jpeg-bytes");
-    expect(createEvoMessage.mock.calls[0][0].inbound.rawProviderMessage).toBeNull();
+    expect(
+      createEvoMessage.mock.calls[0][0].inbound.rawProviderMessage
+    ).toBeNull();
+    expect(getBase64).not.toHaveBeenCalled();
+    expect(downloadUrl).not.toHaveBeenCalled();
+  });
+
+  it("imagem com URL CDN bloqueada persiste via getBase64 Evolution", async () => {
+    downloadUrl.mockRejectedValue(
+      new EvolutionHttpError(
+        "ERR_EVOLUTION_MEDIA_URL_BLOCKED",
+        "URL de mídia bloqueada: host_not_evolution_base"
+      )
+    );
+    getBase64.mockResolvedValue({
+      base64: Buffer.from("cdn-fallback-bytes").toString("base64"),
+      mimetype: "image/jpeg"
+    });
+    createEvoMessage.mockResolvedValue({ id: "3A5809589B19B293D6F5" });
+
+    const result = await processEvolutionTextInbound({
+      inbound: {
+        provider: "evolution",
+        companyId: 1,
+        whatsappId: 10,
+        messageId: "3A5809589B19B293D6F5",
+        fromMe: false,
+        timestamp: new Date(),
+        messageType: "imageMessage",
+        body: "oi",
+        pushName: "Ana",
+        isGroup: false,
+        addressing: {
+          remoteJid: "5511999998888@s.whatsapp.net",
+          participant: ""
+        },
+        senderNumber: "5511999998888",
+        quotedStanzaId: null,
+        mentionedJids: [],
+        media: {
+          hasMedia: true,
+          mimetype: "image/jpeg",
+          filename: null,
+          caption: "oi",
+          isPtt: false
+        },
+        wrapping: { isEphemeral: false, isViewOnce: false },
+        messageStubType: null,
+        ack: null,
+        editedMessageId: null,
+        rawProviderMessage: null
+      },
+      whatsapp,
+      evolutionPayloadSanitized: { event: "MESSAGES_UPSERT" },
+      mediaHints: {
+        kind: "image",
+        messageId: "3A5809589B19B293D6F5",
+        mimetype: "image/jpeg",
+        filename: null,
+        mediaUrl: "https://mmg.whatsapp.net/v/t62.7118-24/example"
+      },
+      deps: { publicDir: tmpDir }
+    });
+
+    expect(result.status).toBe("created");
+    expect(downloadUrl).toHaveBeenCalledTimes(1);
+    expect(getBase64).toHaveBeenCalledWith(
+      expect.objectContaining({
+        whatsappId: 10,
+        messageId: "3A5809589B19B293D6F5",
+        convertToMp4: false
+      })
+    );
+    const savedName = createEvoMessage.mock.calls[0][0].mediaUrl as string;
+    const saved = await fs.readFile(path.join(tmpDir, savedName));
+    expect(saved.toString()).toBe("cdn-fallback-bytes");
+    expect(createEvoMessage.mock.calls[0][0].persistedMediaType).toBe("image");
   });
 
   it("replay de mídia não recria ticket/message (webhook unique)", async () => {

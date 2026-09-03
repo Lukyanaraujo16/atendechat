@@ -1,4 +1,5 @@
 import { extension as mimeExtension } from "mime-types";
+import { logger } from "../../../../../utils/logger";
 import {
   EvolutionBinaryMediaKind,
   maxBytesForEvolutionMediaKind
@@ -110,6 +111,13 @@ function pickMediaUrlFromMessageNode(
   return key ? String(node[key]).trim() : null;
 }
 
+function isDirectDownloadNotEligible(err: unknown): boolean {
+  return (
+    err instanceof EvolutionHttpError &&
+    err.code === "ERR_EVOLUTION_MEDIA_URL_BLOCKED"
+  );
+}
+
 function fallbackMime(kind: EvolutionBinaryMediaKind): string {
   switch (kind) {
     case "image":
@@ -144,8 +152,10 @@ export function collectEvolutionMediaHints(input: {
 
 /**
  * Evolution payload/reference → buffer interno.
- * Ordem: inline base64 → URL allowlisted → getBase64FromMediaMessage API.
- * Sem Baileys.
+ * Ordem: inline base64 → download direto só se a URL passar na SSRF
+ * (origem da Evolution) → POST /chat/getBase64FromMediaMessage/{instance}.
+ * URL presente mas recusada pela SSRF NÃO aborta: só impede fetch direto.
+ * Sem Baileys. Sem allowlist de CDN WhatsApp.
  */
 export async function extractEvolutionMedia(input: {
   whatsappId: number;
@@ -157,13 +167,31 @@ export async function extractEvolutionMedia(input: {
 
   if (input.hints.inlineBase64) {
     buffer = decodeEvolutionBase64(input.hints.inlineBase64, maxBytes);
-  } else if (input.hints.mediaUrl) {
-    buffer = await evolutionDownloadMediaFromUrl({
-      whatsappId: input.whatsappId,
-      mediaUrl: input.hints.mediaUrl,
-      maxBytes
-    });
-  } else {
+  }
+
+  if (!buffer && input.hints.mediaUrl) {
+    try {
+      buffer = await evolutionDownloadMediaFromUrl({
+        whatsappId: input.whatsappId,
+        mediaUrl: input.hints.mediaUrl,
+        maxBytes
+      });
+    } catch (err) {
+      if (!isDirectDownloadNotEligible(err)) {
+        throw err;
+      }
+      logger.info(
+        {
+          whatsappId: input.whatsappId,
+          messageId: input.hints.messageId,
+          kind: input.hints.kind
+        },
+        "[EvolutionMedia] url_not_eligible_for_direct_download"
+      );
+    }
+  }
+
+  if (!buffer) {
     const api = await evolutionGetBase64FromMediaMessage({
       whatsappId: input.whatsappId,
       messageId: input.hints.messageId,
