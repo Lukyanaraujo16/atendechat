@@ -197,10 +197,29 @@ export const EVOLUTION_WEBHOOK_EVENTS = [
   "MESSAGES_UPDATE"
 ] as const;
 
+/** Config comum do webhook autenticado (create + set). apiKey só em memória. */
+function buildAuthenticatedWebhookConfig(input: {
+  url: string;
+  apiKey: string;
+}): {
+  enabled: true;
+  url: string;
+  events: Array<(typeof EVOLUTION_WEBHOOK_EVENTS)[number]>;
+  headers: { apikey: string };
+} {
+  return {
+    enabled: true,
+    url: input.url,
+    events: [...EVOLUTION_WEBHOOK_EVENTS],
+    headers: { apikey: input.apiKey }
+  };
+}
+
 /**
  * POST /instance/create
  * Auth: apikey da credencial (global ou instance token).
  * Sem retry automático (não idempotente).
+ * Webhook embutido (Evolution v2): body.webhook + headers.apikey da conexão.
  */
 export async function evolutionCreateInstance(input: {
   whatsappId: number;
@@ -213,12 +232,14 @@ export async function evolutionCreateInstance(input: {
     integration: "WHATSAPP-BAILEYS"
   };
   if (input.webhookUrl) {
+    const cred = await loadEvolutionCredential(input.whatsappId);
     body.webhook = {
-      enabled: true,
-      url: input.webhookUrl,
+      ...buildAuthenticatedWebhookConfig({
+        url: input.webhookUrl,
+        apiKey: cred.apiKey
+      }),
       byEvents: false,
-      base64: false,
-      events: [...EVOLUTION_WEBHOOK_EVENTS]
+      base64: false
     };
   }
   return evolutionPostJson({
@@ -307,20 +328,23 @@ export async function evolutionDeleteInstance(input: {
 
 /**
  * POST /webhook/set/{instance} — reconfigura eventos se instância já existia.
+ * headers.apikey: credencial da conexão (em memória) para o receptor StreamHub.
  */
 export async function evolutionSetWebhook(input: {
   whatsappId: number;
   webhookUrl: string;
 }): Promise<unknown> {
+  const cred = await loadEvolutionCredential(input.whatsappId);
   return evolutionPostJson({
     whatsappId: input.whatsappId,
     path: "/webhook/set/{instance}",
     body: {
-      enabled: true,
-      url: input.webhookUrl,
+      ...buildAuthenticatedWebhookConfig({
+        url: input.webhookUrl,
+        apiKey: cred.apiKey
+      }),
       webhookByEvents: false,
-      webhookBase64: false,
-      events: [...EVOLUTION_WEBHOOK_EVENTS]
+      webhookBase64: false
     }
   });
 }
