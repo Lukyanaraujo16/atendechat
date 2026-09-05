@@ -107,7 +107,8 @@ const SendStickerToTicketService = async ({
     throw new AppError("ERR_SENDING_WAPP_STICKER", 500);
   }
 
-  const bodyLabel = sticker.name || "Figurinha";
+  // Placeholder do produto (Baileys/UI). Nome da biblioteca não é caption.
+  const bodyLabel = "sticker";
   const idToSave =
     (sentMessage as any)?.key?.id != null
       ? String((sentMessage as any).key.id)
