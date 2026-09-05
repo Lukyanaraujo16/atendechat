@@ -118,39 +118,60 @@ function contextStanza(
   return null;
 }
 
-function extractQuotedStanzaId(
+function extractQuotedStanzaIdFromMessageNode(
   messageType: string | null,
   message: EvolutionWebhookMessageContent | null | undefined
 ): string | null {
   if (!message) return null;
   if (messageType === "extendedTextMessage" || message.extendedTextMessage) {
-    return contextStanza(message.extendedTextMessage?.contextInfo);
+    const stanza = contextStanza(message.extendedTextMessage?.contextInfo);
+    if (stanza) return stanza;
   }
   if (messageType === "imageMessage") {
-    return contextStanza(message.imageMessage?.contextInfo);
+    const stanza = contextStanza(message.imageMessage?.contextInfo);
+    if (stanza) return stanza;
   }
   if (messageType === "videoMessage") {
-    return contextStanza(message.videoMessage?.contextInfo);
+    const stanza = contextStanza(message.videoMessage?.contextInfo);
+    if (stanza) return stanza;
   }
   if (messageType === "audioMessage") {
-    return contextStanza(message.audioMessage?.contextInfo);
+    const stanza = contextStanza(message.audioMessage?.contextInfo);
+    if (stanza) return stanza;
   }
   if (messageType === "documentMessage") {
-    return contextStanza(message.documentMessage?.contextInfo);
+    const stanza = contextStanza(message.documentMessage?.contextInfo);
+    if (stanza) return stanza;
   }
   if (messageType === "documentWithCaptionMessage") {
-    return contextStanza(
+    const stanza = contextStanza(
       message.documentWithCaptionMessage?.message?.documentMessage?.contextInfo
     );
+    if (stanza) return stanza;
   }
   if (messageType === "stickerMessage") {
-    return contextStanza(message.stickerMessage?.contextInfo);
+    const stanza = contextStanza(message.stickerMessage?.contextInfo);
+    if (stanza) return stanza;
   }
   if (messageType === "reactionMessage") {
     const id = message.reactionMessage?.key?.id;
-    return typeof id === "string" && id.trim() ? id.trim() : null;
+    if (typeof id === "string" && id.trim()) return id.trim();
   }
   return null;
+}
+
+function extractQuotedStanzaId(
+  messageType: string | null,
+  message: EvolutionWebhookMessageContent | null | undefined,
+  data?: EvolutionWebhookMessageData | null
+): string | null {
+  const fromNode = extractQuotedStanzaIdFromMessageNode(messageType, message);
+  if (fromNode) return fromNode;
+
+  const fromMessageRoot = contextStanza(message?.contextInfo);
+  if (fromMessageRoot) return fromMessageRoot;
+
+  return contextStanza(data?.contextInfo);
 }
 
 function parseTimestamp(
@@ -518,7 +539,7 @@ export function adaptEvolutionInboundMessage(input: {
       participantPn
     },
     senderNumber: senderNumber || null,
-    quotedStanzaId: extractQuotedStanzaId(messageType, message),
+    quotedStanzaId: extractQuotedStanzaId(messageType, message, data),
     mentionedJids: [],
     media: built.media,
     wrapping: { isEphemeral: false, isViewOnce: false },

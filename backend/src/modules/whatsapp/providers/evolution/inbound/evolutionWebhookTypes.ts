@@ -152,6 +152,7 @@ export type EvolutionReactionMessage = {
 
 export type EvolutionWebhookMessageContent = {
   conversation?: string;
+  contextInfo?: EvolutionMediaContextInfo;
   extendedTextMessage?: {
     text?: string;
     contextInfo?: EvolutionMediaContextInfo;
@@ -183,6 +184,8 @@ export type EvolutionWebhookMessageData = {
   messageTimestamp?: number | string;
   instanceId?: string;
   source?: string;
+  /** Evolution prepareMessage copia contextInfo para a raiz de data. */
+  contextInfo?: EvolutionMediaContextInfo;
   [key: string]: unknown;
 };
 

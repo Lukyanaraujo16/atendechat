@@ -84,6 +84,73 @@ describe("adaptEvolutionInboundMessage", () => {
     expect(result.inbound.quotedStanzaId).toBe("QUOTED1");
   });
 
+  it("lê quoted flattenado em data.contextInfo.stanzaId (Evolution prepareMessage)", () => {
+    const result = adaptEvolutionInboundMessage({
+      envelope: textEnvelope({
+        data: {
+          key: {
+            remoteJid: "5511999998888@s.whatsapp.net",
+            fromMe: false,
+            id: "3B475408139E293FB4F6"
+          },
+          message: {
+            messageContextInfo: {},
+            conversation: "TESTE RESPOSTA CITADA INBOUND"
+          },
+          messageType: "conversation",
+          messageTimestamp: 1709553296,
+          contextInfo: {
+            stanzaId: "quoted-message-id",
+            participant: "259313532694573@lid",
+            quotedMessage: { conversation: "mensagem original" }
+          }
+        }
+      }),
+      companyId: 1,
+      whatsappId: 10
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.inbound.body).toBe("TESTE RESPOSTA CITADA INBOUND");
+    expect(result.inbound.quotedStanzaId).toBe("quoted-message-id");
+  });
+
+  it("lê quoted em message.contextInfo.stanzaId", () => {
+    const result = adaptEvolutionInboundMessage({
+      envelope: textEnvelope({
+        data: {
+          key: {
+            remoteJid: "5511999998888@s.whatsapp.net",
+            fromMe: false,
+            id: "MSGCTX"
+          },
+          message: {
+            conversation: "reply no root",
+            contextInfo: { stanzaId: "ROOT_CTX_ID" }
+          },
+          messageType: "conversation",
+          messageTimestamp: 1709553296
+        }
+      }),
+      companyId: 1,
+      whatsappId: 10
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.inbound.quotedStanzaId).toBe("ROOT_CTX_ID");
+  });
+
+  it("texto comum sem contextInfo não inventa quotedStanzaId", () => {
+    const result = adaptEvolutionInboundMessage({
+      envelope: textEnvelope(),
+      companyId: 1,
+      whatsappId: 10
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.inbound.quotedStanzaId).toBeNull();
+  });
+
   it("mapeia grupo com participant", () => {
     const result = adaptEvolutionInboundMessage({
       envelope: textEnvelope({

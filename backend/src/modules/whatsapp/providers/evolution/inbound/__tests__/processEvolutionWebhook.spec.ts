@@ -174,4 +174,78 @@ describe("processEvolutionWebhook idempotency", () => {
     expect(inboundArg.provider).toBe("evolution");
     expect(inboundArg.rawProviderMessage).toBeNull();
   });
+
+  it("quoted flattenado: resolver recebe stanzaId e persiste quotedMsgId", async () => {
+    resolveQuoted.mockResolvedValue({ id: "3EB070435C31AF67E943A0" });
+    const quotedBody = {
+      event: "MESSAGES_UPSERT",
+      instance: "inst",
+      data: {
+        key: {
+          remoteJid: "5511999998888@s.whatsapp.net",
+          fromMe: false,
+          id: "3B475408139E293FB4F6"
+        },
+        pushName: "Ana",
+        message: {
+          messageContextInfo: {},
+          conversation: "TESTE RESPOSTA CITADA INBOUND"
+        },
+        messageType: "conversation",
+        messageTimestamp: 1709553296,
+        contextInfo: {
+          stanzaId: "3EB070435C31AF67E943A0",
+          participant: "259313532694573@lid",
+          quotedMessage: { stickerMessage: { mimetype: "image/webp" } }
+        }
+      }
+    };
+
+    const result = await processEvolutionWebhook({
+      whatsapp,
+      body: quotedBody,
+      apiKeyValid: true
+    });
+
+    expect(result.outcome).toBe("processed");
+    expect(resolveQuoted).toHaveBeenCalledWith("3EB070435C31AF67E943A0");
+    expect(createEvoMessage).toHaveBeenCalledTimes(1);
+    expect(createEvoMessage.mock.calls[0][0].quotedMsgId).toBe(
+      "3EB070435C31AF67E943A0"
+    );
+    expect(createEvoMessage.mock.calls[0][0].inbound.quotedStanzaId).toBe(
+      "3EB070435C31AF67E943A0"
+    );
+  });
+
+  it("stanzaId inexistente: inbound segue e quotedMsgId fica null", async () => {
+    resolveQuoted.mockResolvedValue(null);
+    const quotedBody = {
+      event: "MESSAGES_UPSERT",
+      instance: "inst",
+      data: {
+        key: {
+          remoteJid: "5511999998888@s.whatsapp.net",
+          fromMe: false,
+          id: "REPLY_MISSING"
+        },
+        pushName: "Ana",
+        message: { conversation: "citando fantasma" },
+        messageType: "conversation",
+        messageTimestamp: 1709553296,
+        contextInfo: { stanzaId: "DOES_NOT_EXIST" }
+      }
+    };
+
+    const result = await processEvolutionWebhook({
+      whatsapp,
+      body: quotedBody,
+      apiKeyValid: true
+    });
+
+    expect(result.outcome).toBe("processed");
+    expect(resolveQuoted).toHaveBeenCalledWith("DOES_NOT_EXIST");
+    expect(createEvoMessage).toHaveBeenCalledTimes(1);
+    expect(createEvoMessage.mock.calls[0][0].quotedMsgId).toBeNull();
+  });
 });
