@@ -27,11 +27,32 @@ interface Request {
 
 const publicFolder = path.resolve(__dirname, "..", "..", "..", "public");
 
+const SITE_VOICE_RECORDING = "audio-record-site";
+
+const isSiteVoiceRecording = (originalname?: string): boolean =>
+  String(originalname || "").includes(SITE_VOICE_RECORDING);
+
+/** Baileys PTT: WebM → AAC/MP4 (ipod). Não alterar. */
 const processAudio = async (audio: string): Promise<string> => {
   const outputAudio = `${publicFolder}/${new Date().getTime()}.mp3`;
   return new Promise((resolve, reject) => {
     exec(
       `${ffmpegPath.path} -i ${audio} -vn -ab 128k -ar 44100 -f ipod ${outputAudio} -y`,
+      (error, _stdout, _stderr) => {
+        if (error) reject(error);
+        fs.unlinkSync(audio);
+        resolve(outputAudio);
+      }
+    );
+  });
+};
+
+/** Evolution PTT gravado no site: WebM → OGG/Opus (mesmo formato do inbound aprovado). */
+const processEvolutionPttAudio = async (audio: string): Promise<string> => {
+  const outputAudio = `${publicFolder}/${new Date().getTime()}.ogg`;
+  return new Promise((resolve, reject) => {
+    exec(
+      `${ffmpegPath.path} -i ${audio} -vn -ac 1 -c:a libopus -b:a 64k -f ogg ${outputAudio} -y`,
       (error, _stdout, _stderr) => {
         if (error) reject(error);
         fs.unlinkSync(audio);
@@ -144,9 +165,12 @@ const SendWhatsAppMedia = async ({
     const pathMedia = media.path;
     const typeMessage = media.mimetype.split("/")[0];
     const isWebp = media.mimetype === "image/webp";
+    const siteVoiceRecording = isSiteVoiceRecording(media.originalname);
     let storageAccountPath: string | null = null;
     let options: AnyMessageContent;
-    const bodyMessage = formatBody(body, ticket.contact);
+    const bodyMessage = siteVoiceRecording
+      ? "Áudio"
+      : formatBody(body, ticket.contact);
 
     if (asSticker && (typeMessage === "image" || isWebp)) {
       storageAccountPath = pathMedia;
@@ -162,21 +186,27 @@ const SendWhatsAppMedia = async ({
         // gifPlayback: true
       };
     } else if (typeMessage === "audio") {
-      const typeAudio = media.originalname.includes("audio-record-site");
-      const convert = typeAudio
-        ? await processAudio(media.path)
-        : await processAudioFile(media.path);
+      const typeAudio = siteVoiceRecording;
+      const useEvolutionPtt = typeAudio && outbound.provider === "evolution";
+      let convert: string;
+      if (typeAudio && useEvolutionPtt) {
+        convert = await processEvolutionPttAudio(media.path);
+      } else if (typeAudio) {
+        convert = await processAudio(media.path);
+      } else {
+        convert = await processAudioFile(media.path);
+      }
       storageAccountPath = convert;
       if (typeAudio) {
         options = {
           audio: fs.readFileSync(convert),
-          mimetype: typeAudio ? "audio/mp4" : media.mimetype,
+          mimetype: useEvolutionPtt ? "audio/ogg; codecs=opus" : "audio/mp4",
           ptt: true
         };
       } else {
         options = {
           audio: fs.readFileSync(convert),
-          mimetype: typeAudio ? "audio/mp4" : media.mimetype
+          mimetype: media.mimetype
         };
       }
     } else if (typeMessage === "document" || typeMessage === "text") {
@@ -240,7 +270,11 @@ const SendWhatsAppMedia = async ({
         ? "sticker"
         : String(media.mimetype || "image").split("/")[0] || "image";
       const mediaUrl = path.basename(
-        String(media.filename || path.basename(pathMedia) || idToSave)
+        String(
+          typeMessage === "audio" && storageAccountPath
+            ? storageAccountPath
+            : media.filename || path.basename(pathMedia) || idToSave
+        )
       );
       await CreateMessageService({
         messageData: {
