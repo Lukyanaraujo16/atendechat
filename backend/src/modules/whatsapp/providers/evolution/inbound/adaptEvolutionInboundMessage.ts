@@ -472,11 +472,14 @@ export function adaptEvolutionInboundMessage(input: {
     key.remoteJidAlt != null ? String(key.remoteJidAlt) : undefined;
   const participantPn =
     key.participantPn != null ? String(key.participantPn) : undefined;
+  /**
+   * key.senderPn = PN Baileys-shaped do remetente (LID).
+   * envelope.sender = wrapper do webhook Evolution (instance/wuid da conta
+   * conectada) — NÃO é a mesma semântica e não pode vencer um remoteJid
+   * privado telefônico válido.
+   */
   const senderPnKey = key.senderPn != null ? String(key.senderPn) : undefined;
-  const senderPn = isGroup
-    ? senderPnKey || participantPn
-    : senderPnKey ||
-      (typeof envelope.sender === "string" ? envelope.sender : undefined);
+  const senderPn = isGroup ? senderPnKey || participantPn : senderPnKey;
 
   const jidForNumber = isGroup
     ? participant || remoteJidAlt || senderPn || ""

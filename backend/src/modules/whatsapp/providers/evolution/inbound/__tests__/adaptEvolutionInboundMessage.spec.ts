@@ -454,6 +454,211 @@ describe("adaptEvolutionInboundMessage", () => {
     expect(result).toMatchObject({ reason: "unresolvable_contact" });
   });
 
+  it("privado: envelope.sender da instância NÃO vence remoteJid telefônico (bug produção)", () => {
+    const result = adaptEvolutionInboundMessage({
+      envelope: textEnvelope({
+        data: {
+          key: {
+            remoteJid: "5527998744274@s.whatsapp.net",
+            fromMe: false,
+            id: "3AF146E80A4EAE3A3FF4"
+          },
+          pushName: "Cliente",
+          message: { conversation: "Teste" },
+          messageType: "conversation",
+          messageTimestamp: 1
+        },
+        sender: "5527996530926"
+      }),
+      companyId: 1,
+      whatsappId: 23
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.inbound.senderNumber).toBe("5527998744274");
+    expect(result.inbound.addressing.remoteJid).toBe(
+      "5527998744274@s.whatsapp.net"
+    );
+    expect(result.inbound.addressing.senderPn).toBeUndefined();
+    expect(result.inbound.senderNumber).not.toBe("5527996530926");
+  });
+
+  it("privado: sem envelope.sender usa remoteJid telefônico", () => {
+    const result = adaptEvolutionInboundMessage({
+      envelope: textEnvelope({
+        data: {
+          key: {
+            remoteJid: "5527998744274@s.whatsapp.net",
+            fromMe: false,
+            id: "NOSENDER"
+          },
+          message: { conversation: "Oi" },
+          messageType: "conversation",
+          messageTimestamp: 1
+        },
+        sender: undefined
+      }),
+      companyId: 1,
+      whatsappId: 23
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.inbound.senderNumber).toBe("5527998744274");
+  });
+
+  it("privado: envelope.sender não telefônico é ignorado", () => {
+    const result = adaptEvolutionInboundMessage({
+      envelope: textEnvelope({
+        data: {
+          key: {
+            remoteJid: "5527998744274@s.whatsapp.net",
+            fromMe: false,
+            id: "BADSENDER"
+          },
+          message: { conversation: "Oi" },
+          messageType: "conversation",
+          messageTimestamp: 1
+        },
+        sender: "not-a-phone"
+      }),
+      companyId: 1,
+      whatsappId: 23
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.inbound.senderNumber).toBe("5527998744274");
+  });
+
+  it("privado fromMe: envelope.sender da instância não substitui o peer do remoteJid", () => {
+    const result = adaptEvolutionInboundMessage({
+      envelope: textEnvelope({
+        data: {
+          key: {
+            remoteJid: "5527998744274@s.whatsapp.net",
+            fromMe: true,
+            id: "FROMME1"
+          },
+          message: { conversation: "resposta" },
+          messageType: "conversation",
+          messageTimestamp: 1
+        },
+        sender: "5527996530926"
+      }),
+      companyId: 1,
+      whatsappId: 23
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.inbound.fromMe).toBe(true);
+    expect(result.inbound.senderNumber).toBe("5527998744274");
+  });
+
+  it("privado LID: key.senderPn vence; envelope.sender da instância é ignorado", () => {
+    const result = adaptEvolutionInboundMessage({
+      envelope: textEnvelope({
+        data: {
+          key: {
+            remoteJid: "123456789012345@lid",
+            fromMe: false,
+            id: "LIDPN",
+            senderPn: "5527998744274@s.whatsapp.net"
+          },
+          message: { conversation: "oi lid" },
+          messageType: "conversation",
+          messageTimestamp: 1
+        },
+        sender: "5527996530926"
+      }),
+      companyId: 1,
+      whatsappId: 23
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.inbound.senderNumber).toBe("5527998744274");
+    expect(result.inbound.addressing.senderPn).toBe(
+      "5527998744274@s.whatsapp.net"
+    );
+    expect(result.inbound.addressing.remoteJid).toBe("123456789012345@lid");
+  });
+
+  it("privado LID: remoteJidAlt resolve PN; envelope.sender da instância é ignorado", () => {
+    const result = adaptEvolutionInboundMessage({
+      envelope: textEnvelope({
+        data: {
+          key: {
+            remoteJid: "123456789012345@lid",
+            fromMe: false,
+            id: "LIDALT",
+            remoteJidAlt: "5527998744274@s.whatsapp.net"
+          },
+          message: { conversation: "oi alt" },
+          messageType: "conversation",
+          messageTimestamp: 1
+        },
+        sender: "5527996530926"
+      }),
+      companyId: 1,
+      whatsappId: 23
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.inbound.senderNumber).toBe("5527998744274");
+    expect(result.inbound.addressing.remoteJidAlt).toBe(
+      "5527998744274@s.whatsapp.net"
+    );
+  });
+
+  it("privado LID: envelope.sender da instância NÃO resolve contato sem PN real", () => {
+    const result = adaptEvolutionInboundMessage({
+      envelope: textEnvelope({
+        data: {
+          key: {
+            remoteJid: "123456789012345@lid",
+            fromMe: false,
+            id: "LIDFAKE"
+          },
+          message: { conversation: "oi" },
+          messageType: "conversation",
+          messageTimestamp: 1
+        },
+        sender: "5527996530926"
+      }),
+      companyId: 1,
+      whatsappId: 23
+    });
+    expect(result.ok).toBe(false);
+    expect(result).toMatchObject({
+      reason: "unresolvable_contact",
+      detail: "lid_without_pn"
+    });
+  });
+
+  it("grupo: participantPn resolve o remetente; envelope.sender não interfere", () => {
+    const result = adaptEvolutionInboundMessage({
+      envelope: textEnvelope({
+        data: {
+          key: {
+            remoteJid: "120363111@g.us",
+            participant: "123456789012345@lid",
+            participantPn: "5511777666555@s.whatsapp.net",
+            fromMe: false,
+            id: "GPN1"
+          },
+          message: { conversation: "oi grupo pn" },
+          messageType: "conversation",
+          messageTimestamp: 1
+        },
+        sender: "5527996530926"
+      }),
+      companyId: 1,
+      whatsappId: 10
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.inbound.isGroup).toBe(true);
+    expect(result.inbound.senderNumber).toBe("5511777666555");
+  });
+
   it("evento desconhecido", () => {
     const result = adaptEvolutionInboundMessage({
       envelope: textEnvelope({ event: "CONNECTION_UPDATE" }),
