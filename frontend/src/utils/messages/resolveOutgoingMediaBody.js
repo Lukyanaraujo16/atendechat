@@ -1,12 +1,17 @@
 /**
  * Body enviado com mídia pelo composer do painel.
- * Imagem/sticker sem texto do operador → string vazia (não media.name).
- * Documentos (e vídeo nesta rodada) mantêm filename como fallback.
+ * Imagem e vídeo sem texto do operador → string vazia (não media.name).
+ * Documentos continuam usando filename como fallback.
  */
 
 export function isOutgoingImageOrStickerMedia(media) {
   const type = String(media?.type || media?.mimetype || "").toLowerCase();
   return type.startsWith("image/");
+}
+
+export function isOutgoingVideoMedia(media) {
+  const type = String(media?.type || media?.mimetype || "").toLowerCase();
+  return type.startsWith("video/");
 }
 
 /**
@@ -40,7 +45,7 @@ export function resolveOutgoingMediaBody({
     return "Imagem";
   }
 
-  if (isOutgoingImageOrStickerMedia(media)) {
+  if (isOutgoingImageOrStickerMedia(media) || isOutgoingVideoMedia(media)) {
     return "";
   }
 

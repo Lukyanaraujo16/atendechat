@@ -112,13 +112,32 @@ describe("resolveOutgoingMediaBody — envio pelo painel", () => {
     ).toBe("planilha.xlsx");
   });
 
-  it("vídeo sem caption mantém filename (fora desta rodada)", () => {
+  it("vídeo sem caption → body vazio (não usa filename)", () => {
     expect(
       resolveOutgoingMediaBody({
         typedCaption: "",
         media: media("clip.mp4", "video/mp4"),
       })
-    ).toBe("clip.mp4");
+    ).toBe("");
+
+    expect(
+      resolveOutgoingMediaBody({
+        typedCaption: "   ",
+        media: media(
+          "WhatsApp Video 2026-08-13 at 09.14.03.mp4",
+          "video/mp4"
+        ),
+      })
+    ).toBe("");
+  });
+
+  it("vídeo com caption digitado → body recebe a caption", () => {
+    expect(
+      resolveOutgoingMediaBody({
+        typedCaption: "Reunião de ontem",
+        media: media("clip.mp4", "video/mp4"),
+      })
+    ).toBe("Reunião de ontem");
   });
 });
 
@@ -178,6 +197,18 @@ describe("appendOutgoingMediaFormData — payload de envio", () => {
     });
     expect(collectBodies(formData)).toEqual(["contrato.pdf"]);
     expect(formData.get("medias")).toBeTruthy();
+  });
+
+  it("vídeo sem caption envia body vazio e ainda anexa o arquivo", () => {
+    const file = media("clip.mp4", "video/mp4");
+    const formData = appendOutgoingMediaFormData(new FormData(), {
+      medias: [file],
+      typedCaption: "",
+      isInstagramChannel: false,
+    });
+    expect(collectBodies(formData)).toEqual([""]);
+    expect(formData.get("medias")).toBeTruthy();
+    expect(file.name).toBe("clip.mp4");
   });
 });
 
