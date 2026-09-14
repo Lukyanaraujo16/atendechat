@@ -4468,6 +4468,11 @@ const messages = {
 			},
 			locationPreview: {
 				button: "Preview",
+				title: "Location",
+			},
+			sharedContactPreview: {
+				fallbackName: "Contact",
+				noPhone: "Phone not available",
 			},
 			mainDrawer: {
 				loadingModules: "Loading modules…",

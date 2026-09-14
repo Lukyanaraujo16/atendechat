@@ -3967,6 +3967,11 @@ const messages = {
       },
       locationPreview: {
         button: "Visualizar",
+        title: "Ubicación",
+      },
+      sharedContactPreview: {
+        fallbackName: "Contacto",
+        noPhone: "Teléfono no informado",
       },
       mainDrawer: {
         loadingModules: "Cargando módulos…",

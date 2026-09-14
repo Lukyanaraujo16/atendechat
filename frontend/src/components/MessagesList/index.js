@@ -31,7 +31,10 @@ import {
 } from "@material-ui/icons";
 
 import MarkdownWrapper from "../MarkdownWrapper";
-import { getDisplayableMessageBody } from "../../utils/messages/isTechnicalMediaFallback";
+import {
+  getDisplayableMessageBody,
+  mediaUrlBasename,
+} from "../../utils/messages/isTechnicalMediaFallback";
 import {
   shouldRenderChatMedia,
   shouldShowMessageActionMenu,
@@ -42,7 +45,9 @@ import ModalImageCors from "../ModalImageCors";
 import MessageOptionsMenu from "../MessageOptionsMenu";
 import whatsBackground from "../../assets/wa-background.png";
 import LocationPreview from "../LocationPreview";
-
+import SharedContactPreview from "../SharedContactPreview";
+import { parseWhatsAppLocationBody } from "../../utils/messages/parseWhatsAppLocationBody";
+import { isSharedContactMediaType } from "../../utils/messages/parseSharedContact";
 import whatsBackgroundDark from "../../assets/wa-background-dark.png"; //DARK MODE PLW DESIGN//
 
 import api from "../../services/api";
@@ -52,6 +57,29 @@ import { hasUserVisibleEnrichWarnings } from "../../utils/openTicketEnrichWarnin
 import { i18n } from "../../translate/i18n";
 import { getTicketPanelScrollbarStyles } from "../../theme/ticketPanelStyles";
 import { getBackendBaseURL } from "../../config/backendUrl";
+
+function isSafePersistedMediaUrl(url) {
+  const trimmed = String(url || "").trim();
+  if (!trimmed) return false;
+  if (/^(javascript|data|vbscript):/i.test(trimmed)) return false;
+  if (trimmed.startsWith("/") && !trimmed.startsWith("//")) {
+    return true;
+  }
+  try {
+    const parsed = new URL(trimmed);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch (_err) {
+    return false;
+  }
+}
+
+function resolveInboundVideoDownloadName(message) {
+  const fromUrl = mediaUrlBasename(message?.mediaUrl);
+  if (fromUrl && /\.[a-z0-9]{2,5}$/i.test(fromUrl)) {
+    return fromUrl;
+  }
+  return "video.mp4";
+}
 
 const useStyles = makeStyles((theme) => {
   const isDark = theme.palette.type === "dark";
@@ -298,6 +326,12 @@ const useStyles = makeStyles((theme) => {
     justifyContent: "center",
     backgroundColor: "inherit",
     padding: 10,
+  },
+
+  videoMessageWrap: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "stretch",
   },
 
   instagramShareCard: {
@@ -916,17 +950,21 @@ const MessagesList = forwardRef(function MessagesList(
       }
     }
 
-    if (message.mediaType === "locationMessage" && message.body.split('|').length >= 2) {
-      let locationParts = message.body.split('|')
-      let imageLocation = locationParts[0]
-      let linkLocation = locationParts[1]
-
-      let descriptionLocation = null
-
-      if (locationParts.length > 2)
-        descriptionLocation = message.body.split('|')[2]
-
-      return <LocationPreview image={imageLocation} link={linkLocation} description={descriptionLocation} />
+    if (
+      message.mediaType === "locationMessage" ||
+      message.mediaType === "liveLocationMessage"
+    ) {
+      const location = parseWhatsAppLocationBody(message.body);
+      return (
+        <LocationPreview
+          image={location.thumbnail}
+          link={location.mapsUrl}
+          description={location.description}
+        />
+      );
+    }
+    if (isSharedContactMediaType(message.mediaType)) {
+      return <SharedContactPreview body={message.body} />;
     }
     /* else if (message.mediaType === "vcard") {
       let array = message.body.split("\n");
@@ -968,12 +1006,35 @@ const MessagesList = forwardRef(function MessagesList(
     } else if (message.mediaType === "audio") {
       return <audio controls src={message.mediaUrl} preload="metadata" />;
     } else if (message.mediaType === "video") {
+      const videoUrl = String(message.mediaUrl || "").trim();
+      const canUseUrl = isSafePersistedMediaUrl(videoUrl);
+      const downloadName = resolveInboundVideoDownloadName(message);
       return (
-        <video
-          className={classes.messageMedia}
-          src={message.mediaUrl}
-          controls
-        />
+        <div className={classes.videoMessageWrap} data-testid="chat-video-message">
+          {canUseUrl ? (
+            <video
+              className={classes.messageMedia}
+              src={videoUrl}
+              controls
+            />
+          ) : null}
+          {canUseUrl ? (
+            <div className={classes.downloadMedia}>
+              <Button
+                data-testid="chat-video-download"
+                startIcon={<GetApp />}
+                color="primary"
+                variant="outlined"
+                target="_blank"
+                rel="noopener noreferrer"
+                href={videoUrl}
+                download={downloadName}
+              >
+                {i18n.t("messagesList.header.buttons.download")}
+              </Button>
+            </div>
+          ) : null}
+        </div>
       );
     } else {
       return (

@@ -34,9 +34,21 @@ const MEDIA_TYPES_WITH_URL = new Set([
 ]);
 
 /** Tipos em que o filename não deve virar legenda no balão. Documentos continuam com nome. */
-const TYPES_HIDE_FILENAME_CAPTION = new Set(["image", "sticker"]);
+const TYPES_HIDE_FILENAME_CAPTION = new Set(["image", "sticker", "video"]);
 
 const IMAGE_FILENAME_ONLY = /^[^/\s]+\.(png|jpe?g|gif|webp|bmp|heic|heif|svg)$/i;
+const VIDEO_FILENAME_ONLY = /^[^/\s]+\.(mp4|mov|webm|mkv|avi|3gp|mpeg|m4v)$/i;
+
+const LOCATION_MEDIA_TYPES = new Set([
+  "locationMessage",
+  "liveLocationMessage",
+]);
+
+const SHARED_CONTACT_MEDIA_TYPES = new Set([
+  "vcard",
+  "contactMessage",
+  "contactsArrayMessage",
+]);
 
 export function mediaUrlBasename(mediaUrl) {
   if (!mediaUrl) return "";
@@ -73,6 +85,9 @@ export function isTechnicalFilenameCaption(body, message) {
 
   if (message.mediaType === "image" || message.mediaType === "sticker") {
     return IMAGE_FILENAME_ONLY.test(trimmed);
+  }
+  if (message.mediaType === "video") {
+    return VIDEO_FILENAME_ONLY.test(trimmed);
   }
   return false;
 }
@@ -125,7 +140,7 @@ export function getDisplayableMessageBody(message) {
     return null;
   }
 
-  if (mediaType === "locationMessage") {
+  if (LOCATION_MEDIA_TYPES.has(mediaType) || SHARED_CONTACT_MEDIA_TYPES.has(mediaType)) {
     return null;
   }
 

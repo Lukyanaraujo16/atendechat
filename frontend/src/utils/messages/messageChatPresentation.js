@@ -24,7 +24,10 @@ export function shouldRenderChatMedia(message) {
   return (
     Boolean(message.mediaUrl) ||
     message.mediaType === "locationMessage" ||
-    message.mediaType === "vcard"
+    message.mediaType === "liveLocationMessage" ||
+    message.mediaType === "vcard" ||
+    message.mediaType === "contactMessage" ||
+    message.mediaType === "contactsArrayMessage"
   );
 }
 

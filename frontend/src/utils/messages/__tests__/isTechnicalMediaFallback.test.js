@@ -141,13 +141,56 @@ describe("getDisplayableMessageBody — imagem vs documento", () => {
     ).toBeNull();
   });
 
-  it("vídeo sem caption mantém body atual (contrato não alterado nesta rodada)", () => {
+  it("vídeo sem caption não usa filename como legenda", () => {
     expect(
       getDisplayableMessageBody({
         mediaType: "video",
         mediaUrl: "https://example.com/public/clip.mp4",
         body: "clip.mp4",
       })
-    ).toBe("clip.mp4");
+    ).toBeNull();
+  });
+
+  it("vídeo com caption digitado permanece visível", () => {
+    expect(
+      getDisplayableMessageBody({
+        mediaType: "video",
+        mediaUrl: "https://example.com/public/clip.mp4",
+        body: "Reunião de ontem",
+      })
+    ).toBe("Reunião de ontem");
+  });
+
+  it("contactMessage/vcard não devolvem o vCard cru", () => {
+    const vcard = [
+      "BEGIN:VCARD",
+      "VERSION:3.0",
+      "FN:Maria Silva",
+      "TEL:+5527999999999",
+      "END:VCARD",
+    ].join("\n");
+
+    expect(
+      getDisplayableMessageBody({
+        mediaType: "contactMessage",
+        body: vcard,
+      })
+    ).toBeNull();
+
+    expect(
+      getDisplayableMessageBody({
+        mediaType: "vcard",
+        body: vcard,
+      })
+    ).toBeNull();
+  });
+
+  it("mensagem de texto comum continua visível", () => {
+    expect(
+      getDisplayableMessageBody({
+        mediaType: "conversation",
+        body: "olá, tudo bem?",
+      })
+    ).toBe("olá, tudo bem?");
   });
 });

@@ -128,4 +128,33 @@ describe("apresentação do balão de mídia", () => {
     expect(plan.displayBody).toBe("contrato.pdf");
     expect(plan.showActionMenu).toBe(true);
   });
+
+  it("locationMessage e contactMessage renderizam mídia mesmo sem mediaUrl", () => {
+    expect(
+      shouldRenderChatMedia({
+        mediaType: "locationMessage",
+        body: "https://maps.google.com/maps?q=-20.37%2C-40.34| -20.37, -40.34",
+        isDeleted: false,
+      })
+    ).toBe(true);
+
+    expect(
+      shouldRenderChatMedia({
+        mediaType: "contactMessage",
+        body: "BEGIN:VCARD\nFN:Maria\nEND:VCARD",
+        isDeleted: false,
+      })
+    ).toBe(true);
+
+    const contactPlan = getMessageBubblePresentation({
+      id: "c-1",
+      mediaType: "contactMessage",
+      body: "BEGIN:VCARD\nFN:Maria Silva\nTEL:+5527999\nEND:VCARD",
+      isDeleted: false,
+      fromMe: false,
+      createdAt,
+    });
+    expect(contactPlan.showMedia).toBe(true);
+    expect(contactPlan.displayBody).toBeNull();
+  });
 });

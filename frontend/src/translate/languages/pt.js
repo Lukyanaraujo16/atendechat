@@ -4578,6 +4578,11 @@ const messages = {
       },
       locationPreview: {
         button: "Visualizar",
+        title: "Localização",
+      },
+      sharedContactPreview: {
+        fallbackName: "Contato",
+        noPhone: "Telefone não informado",
       },
       mainDrawer: {
         loadingModules: "A carregar módulos…",
