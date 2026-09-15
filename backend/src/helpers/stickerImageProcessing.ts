@@ -8,6 +8,27 @@ export const STICKER_WEBP_INPUT_MAX_BYTES = 512 * 1024;
 const ALLOWED_MIMES = new Set(["image/webp", "image/png", "image/jpeg"]);
 const ALLOWED_EXTENSIONS = [".webp", ".png", ".jpg", ".jpeg"];
 const WEBP_QUALITIES = [85, 75, 65];
+const WEBP_ANIM_CHUNK = Buffer.from("ANIM");
+const WEBP_ANMF_CHUNK = Buffer.from("ANMF");
+
+/** RIFF WEBP com chunk ANIM/ANMF — mesmo critério estrutural da Evolution 2.3.7. */
+export function isAnimatedWebpBuffer(buffer: Buffer): boolean {
+  if (!buffer || buffer.length < 12) return false;
+  if (buffer.toString("ascii", 0, 4) !== "RIFF") return false;
+  if (buffer.toString("ascii", 8, 12) !== "WEBP") return false;
+  return buffer.includes(WEBP_ANIM_CHUNK) || buffer.includes(WEBP_ANMF_CHUNK);
+}
+
+export async function countWebpPages(buffer: Buffer): Promise<number> {
+  try {
+    const meta = await sharp(buffer, { animated: true, pages: -1 }).metadata();
+    const pages = Number(meta.pages);
+    if (Number.isFinite(pages) && pages > 0) return pages;
+  } catch {
+    /* fallback estrutural */
+  }
+  return isAnimatedWebpBuffer(buffer) ? 2 : 1;
+}
 
 export function isAllowedStickerMime(mime: string): boolean {
   return ALLOWED_MIMES.has(String(mime || "").toLowerCase());
@@ -42,10 +63,14 @@ export function buildStickerFileName(originalname: string): string {
 
 async function encodeStickerWebp(
   buffer: Buffer,
-  quality: number
+  quality: number,
+  animated: boolean
 ): Promise<Buffer> {
-  return sharp(buffer)
-    .rotate()
+  const pipeline = animated
+    ? sharp(buffer, { animated: true, pages: -1 })
+    : sharp(buffer).rotate();
+
+  return pipeline
     .resize(512, 512, {
       fit: "inside",
       withoutEnlargement: true
@@ -83,16 +108,26 @@ export async function processStickerToWebp(
     return buffer;
   }
 
-  for (const quality of WEBP_QUALITIES) {
+  const animated = mime === "image/webp" && isAnimatedWebpBuffer(buffer);
+
+  const tryQuality = async (index: number): Promise<Buffer> => {
+    if (index >= WEBP_QUALITIES.length) {
+      throw new AppError("STICKER_TOO_LARGE", 400);
+    }
     try {
-      const output = await encodeStickerWebp(buffer, quality);
+      const output = await encodeStickerWebp(
+        buffer,
+        WEBP_QUALITIES[index],
+        animated
+      );
       if (output.length <= STICKER_OUTPUT_MAX_BYTES) {
         return output;
       }
     } catch {
       throw new AppError("STICKER_CONVERSION_FAILED", 400);
     }
-  }
+    return tryQuality(index + 1);
+  };
 
-  throw new AppError("STICKER_TOO_LARGE", 400);
+  return tryQuality(0);
 }

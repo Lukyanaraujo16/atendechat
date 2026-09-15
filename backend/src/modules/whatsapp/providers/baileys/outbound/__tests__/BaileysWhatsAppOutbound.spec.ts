@@ -147,6 +147,9 @@ describe("BaileysWhatsAppOutbound", () => {
     expect(wbot.sendMessage).toHaveBeenNthCalledWith(4, "5511@s.whatsapp.net", {
       sticker
     });
+    const stickerCall = wbot.sendMessage.mock.calls[3][1];
+    expect(stickerCall).toEqual({ sticker });
+    expect(stickerCall).not.toHaveProperty("notConvertSticker");
   });
 
   it("deleteMessage usa remoteJid, id e fromMe atuais", async () => {

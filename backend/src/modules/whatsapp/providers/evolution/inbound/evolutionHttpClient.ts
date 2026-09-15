@@ -441,19 +441,25 @@ export async function evolutionSendWhatsAppAudio(input: {
 
 /**
  * POST /message/sendSticker/{instance}
+ * Evolution 2.3.7 SendStickerDto extends Metadata.notConvertSticker.
  */
 export async function evolutionSendSticker(input: {
   whatsappId: number;
   number: string;
   sticker: string;
+  notConvertSticker?: boolean;
 }): Promise<unknown> {
+  const body: Record<string, unknown> = {
+    number: input.number,
+    sticker: input.sticker
+  };
+  if (input.notConvertSticker === true) {
+    body.notConvertSticker = true;
+  }
   return evolutionPostJson({
     whatsappId: input.whatsappId,
     path: "/message/sendSticker/{instance}",
-    body: {
-      number: input.number,
-      sticker: input.sticker
-    }
+    body
   });
 }
 

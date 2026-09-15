@@ -477,7 +477,8 @@ export class EvolutionWhatsAppOutbound implements WhatsAppOutbound {
       const data = await evolutionSendSticker({
         whatsappId: this.whatsappId,
         number,
-        sticker: bufferToBase64(buf, max)
+        sticker: bufferToBase64(buf, max),
+        notConvertSticker: true
       });
       const result = mapEvolutionSendResponseToResult(data, jid);
       if (!result.messageId) {

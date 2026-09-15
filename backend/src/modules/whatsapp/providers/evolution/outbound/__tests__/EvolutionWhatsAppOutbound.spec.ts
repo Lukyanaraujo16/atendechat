@@ -339,6 +339,27 @@ describe("EvolutionWhatsAppOutbound Fase 8", () => {
     expect((sticker.rawSentMessage as any).status).toBe(1);
   });
 
+  it("sendContent sticker envia base64 + notConvertSticker no contrato 2.3.7", async () => {
+    const outbound = new EvolutionWhatsAppOutbound(5);
+    const buf = Buffer.from("webp-bytes");
+    const result = await outbound.sendContent({
+      jid: "5511999@s.whatsapp.net",
+      content: { sticker: buf }
+    });
+    expect(sendSticker).toHaveBeenCalledTimes(1);
+    const arg = sendSticker.mock.calls[0][0];
+    expect(arg).toEqual({
+      whatsappId: 5,
+      number: "5511999@s.whatsapp.net",
+      sticker: buf.toString("base64"),
+      notConvertSticker: true
+    });
+    expect(Buffer.from(arg.sticker, "base64").equals(buf)).toBe(true);
+    expect(JSON.stringify(arg)).not.toMatch(/apikey|apiKey|token|secret/i);
+    expect(result.messageId).toBe("STK1");
+    expect(result.status).toBe(STREAMHUB_ACK.PENDING);
+  });
+
   it("media too large", async () => {
     const outbound = new EvolutionWhatsAppOutbound(1);
     const big = Buffer.alloc(9 * 1024 * 1024, 1);

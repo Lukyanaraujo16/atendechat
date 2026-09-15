@@ -137,6 +137,7 @@ describe("SendStickerToTicketService outbound body", () => {
     const sendArg = sendContent.mock.calls[0][0];
     expect(Buffer.isBuffer(sendArg.content.sticker)).toBe(true);
     expect(sendArg.content.sticker.toString()).toBe("webp-bytes");
+    expect(sendArg.content.notConvertSticker).toBeUndefined();
 
     expect(createMessage).toHaveBeenCalledTimes(1);
     const payload = createMessage.mock.calls[0][0].messageData;
@@ -180,6 +181,9 @@ describe("SendStickerToTicketService outbound body", () => {
     expect(sendContent.mock.calls[0][0].content.sticker.toString()).toBe(
       "webp-bytes"
     );
+    expect(
+      sendContent.mock.calls[0][0].content.notConvertSticker
+    ).toBeUndefined();
     expect(createMessage).toHaveBeenCalledTimes(1);
     const payload = createMessage.mock.calls[0][0].messageData;
     expect(payload.id).toBe("BAILEYSSTK1");

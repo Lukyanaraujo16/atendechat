@@ -30,7 +30,8 @@ jest.mock("../../../../../../models/WhatsappEvolutionCredential", () => ({
 
 import {
   evolutionDownloadMediaFromUrl,
-  evolutionGetBase64FromMediaMessage
+  evolutionGetBase64FromMediaMessage,
+  evolutionSendSticker
 } from "../evolutionHttpClient";
 
 describe("evolutionHttpClient mídia Evolution v2.3.7", () => {
@@ -76,5 +77,37 @@ describe("evolutionHttpClient mídia Evolution v2.3.7", () => {
       })
     ).rejects.toMatchObject({ code: "ERR_EVOLUTION_MEDIA_URL_BLOCKED" });
     expect(mockAxiosGet).not.toHaveBeenCalled();
+  });
+
+  it("sendSticker POST /message/sendSticker com notConvertSticker", async () => {
+    mockPost.mockResolvedValue({
+      status: 200,
+      data: {
+        key: {
+          id: "STK1",
+          remoteJid: "5511999@s.whatsapp.net",
+          fromMe: true
+        }
+      }
+    });
+    const stickerB64 = Buffer.from("webp-bytes").toString("base64");
+    await evolutionSendSticker({
+      whatsappId: 3,
+      number: "5511999@s.whatsapp.net",
+      sticker: stickerB64,
+      notConvertSticker: true
+    });
+    expect(mockPost).toHaveBeenCalledTimes(1);
+    const [path, body] = mockPost.mock.calls[0];
+    expect(path).toBe("/message/sendSticker/streamhub-c1-w3");
+    expect(body).toEqual({
+      number: "5511999@s.whatsapp.net",
+      sticker: stickerB64,
+      notConvertSticker: true
+    });
+    expect(JSON.stringify(body)).not.toMatch(/apikey|apiKey|token|secret/i);
+    expect(JSON.stringify(mockPost.mock.calls)).not.toMatch(
+      /fixture-connection-apikey/
+    );
   });
 });
