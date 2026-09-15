@@ -84,7 +84,8 @@ describe("evolutionSetWebhook — contrato Evolution v2.3.7 body.webhook", () =>
         "QRCODE_UPDATED",
         "CONNECTION_UPDATE",
         "MESSAGES_UPSERT",
-        "MESSAGES_UPDATE"
+        "MESSAGES_UPDATE",
+        "MESSAGES_DELETE"
       ])
     );
     expect(body.webhook.headers.apikey).toBe(FIXTURE_API_KEY);
@@ -133,7 +134,8 @@ describe("evolutionCreateInstance — webhook.headers.apikey da credencial", () 
             "QRCODE_UPDATED",
             "CONNECTION_UPDATE",
             "MESSAGES_UPSERT",
-            "MESSAGES_UPDATE"
+            "MESSAGES_UPDATE",
+            "MESSAGES_DELETE"
           ]),
           headers: expect.objectContaining({
             apikey: expect.any(String)

@@ -4,6 +4,7 @@ import EvolutionWebhookEvent from "../../../../../models/EvolutionWebhookEvent";
 import { isEvolutionConnection } from "../../../connectionProvider";
 import { logger } from "../../../../../utils/logger";
 import { applyNormalizedMessageStatus } from "../../../inbound/applyNormalizedMessageStatus";
+import { applyInboundWhatsAppRevoke } from "../../../inbound/applyInboundWhatsAppRevoke";
 import {
   adaptEvolutionInboundMessage,
   buildEvolutionExternalEventId
@@ -13,8 +14,14 @@ import {
   buildEvolutionAckExternalEventId
 } from "./adaptEvolutionMessageStatus";
 import {
+  adaptEvolutionMessageRevoke,
+  buildEvolutionRevokeExternalEventId,
+  omitRevokeMessageContent
+} from "./adaptEvolutionMessageRevoke";
+import {
   EvolutionWebhookEnvelope,
   isEvolutionConnectionUpdateEvent,
+  isEvolutionMessageDeleteEvent,
   isEvolutionMessageUpdateEvent,
   isEvolutionMessageUpsertEvent,
   isEvolutionQrcodeUpdatedEvent,
@@ -198,6 +205,145 @@ async function processEvolutionStatusUpdate(input: {
   }
 }
 
+async function processEvolutionMessageRevoke(input: {
+  whatsapp: Whatsapp;
+  envelope: EvolutionWebhookEnvelope;
+  sanitized: Record<string, unknown>;
+  apiKeyValid: boolean;
+  eventType: string;
+}): Promise<ProcessEvolutionWebhookResult> {
+  const { whatsapp, envelope, sanitized, apiKeyValid, eventType } = input;
+
+  const adapted = adaptEvolutionMessageRevoke({
+    envelope,
+    companyId: whatsapp.companyId,
+    whatsappId: whatsapp.id
+  });
+
+  const providerMessageId = adapted.ok ? adapted.revoke.messageId : null;
+
+  const externalEventId = adapted.ok
+    ? buildEvolutionRevokeExternalEventId({
+        whatsappId: whatsapp.id,
+        messageId: adapted.revoke.messageId
+      })
+    : buildEvolutionExternalEventId({
+        whatsappId: whatsapp.id,
+        messageId: null,
+        eventType,
+        payloadHashSeed: JSON.stringify(sanitized).slice(0, 2000)
+      });
+
+  let webhookEvent: EvolutionWebhookEvent;
+  try {
+    webhookEvent = await EvolutionWebhookEvent.create({
+      companyId: whatsapp.companyId,
+      whatsappId: whatsapp.id,
+      eventType,
+      externalEventId,
+      providerMessageId,
+      processingStatus: "received",
+      apiKeyValid,
+      processed: false,
+      rawPayload: omitRevokeMessageContent(sanitized),
+      receivedAt: new Date()
+    });
+  } catch (err) {
+    if (err instanceof UniqueConstraintError) {
+      return {
+        outcome: "duplicate",
+        reason: "webhook_event_replay",
+        messageId: providerMessageId || undefined
+      };
+    }
+    throw err;
+  }
+
+  if (adapted.ok === false) {
+    await webhookEvent.update({
+      processed: true,
+      processingStatus: "skipped",
+      skipReason: adapted.reason,
+      errorSummary: adapted.detail?.slice(0, 500) || null
+    });
+    return {
+      outcome: "skipped",
+      reason: adapted.reason,
+      webhookEventId: webhookEvent.id,
+      messageId: providerMessageId || undefined
+    };
+  }
+
+  try {
+    const applied = await applyInboundWhatsAppRevoke({
+      companyId: adapted.revoke.companyId,
+      whatsappId: adapted.revoke.whatsappId,
+      messageId: adapted.revoke.messageId,
+      remoteJid: adapted.revoke.remoteJid
+    });
+
+    if (applied.outcome === "skipped") {
+      await webhookEvent.update({
+        processed: true,
+        processingStatus: "skipped",
+        skipReason: applied.reason
+      });
+      return {
+        outcome: "skipped",
+        reason: applied.reason,
+        messageId: adapted.revoke.messageId,
+        webhookEventId: webhookEvent.id
+      };
+    }
+
+    await webhookEvent.update({
+      processed: true,
+      processingStatus: applied.outcome === "noop" ? "duplicate" : "processed",
+      skipReason: applied.outcome === "noop" ? "already_deleted" : null
+    });
+
+    logger.info(
+      {
+        whatsappId: whatsapp.id,
+        companyId: whatsapp.companyId,
+        messageId: adapted.revoke.messageId,
+        applyOutcome: applied.outcome,
+        eventType
+      },
+      "[EvolutionWebhook] inbound revoke"
+    );
+
+    return {
+      outcome: "processed",
+      reason: applied.outcome,
+      messageId: adapted.revoke.messageId,
+      ticketId: applied.ticketId,
+      webhookEventId: webhookEvent.id
+    };
+  } catch (err) {
+    const summary =
+      err instanceof Error ? err.message.slice(0, 500) : "unknown_error";
+    await webhookEvent.update({
+      processed: true,
+      processingStatus: "error",
+      errorSummary: summary
+    });
+    logger.error(
+      {
+        err,
+        whatsappId: whatsapp.id,
+        webhookEventId: webhookEvent.id
+      },
+      "[EvolutionWebhook] inbound revoke failed"
+    );
+    return {
+      outcome: "error",
+      reason: summary,
+      webhookEventId: webhookEvent.id
+    };
+  }
+}
+
 /**
  * Processamento pós-auth do webhook Evolution.
  * Síncrono controlado (sem fila dedicada nesta fase) — documentado no relatório.
@@ -219,6 +365,16 @@ export async function processEvolutionWebhook(input: {
 
   if (isEvolutionMessageUpdateEvent(eventType)) {
     return processEvolutionStatusUpdate({
+      whatsapp,
+      envelope,
+      sanitized,
+      apiKeyValid,
+      eventType
+    });
+  }
+
+  if (isEvolutionMessageDeleteEvent(eventType)) {
+    return processEvolutionMessageRevoke({
       whatsapp,
       envelope,
       sanitized,

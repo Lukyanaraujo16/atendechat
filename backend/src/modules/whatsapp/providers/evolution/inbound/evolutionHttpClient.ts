@@ -194,7 +194,8 @@ export const EVOLUTION_WEBHOOK_EVENTS = [
   "QRCODE_UPDATED",
   "CONNECTION_UPDATE",
   "MESSAGES_UPSERT",
-  "MESSAGES_UPDATE"
+  "MESSAGES_UPDATE",
+  "MESSAGES_DELETE"
 ] as const;
 
 /** Config comum do webhook autenticado (create + set). apiKey só em memória. */

@@ -33,6 +33,14 @@ export const EVOLUTION_MESSAGE_UPDATE_EVENTS = [
 export type EvolutionMessageUpdateEvent =
   (typeof EVOLUTION_MESSAGE_UPDATE_EVENTS)[number];
 
+export const EVOLUTION_MESSAGE_DELETE_EVENTS = [
+  "MESSAGES_DELETE",
+  "messages.delete"
+] as const;
+
+export type EvolutionMessageDeleteEvent =
+  (typeof EVOLUTION_MESSAGE_DELETE_EVENTS)[number];
+
 /** CONNECTION_UPDATE — lifecycle (Fase 10). */
 export const EVOLUTION_CONNECTION_UPDATE_EVENTS = [
   "CONNECTION_UPDATE",
@@ -218,6 +226,16 @@ export function isEvolutionMessageUpdateEvent(
   if (!event) return false;
   const normalized = String(event).trim();
   return (EVOLUTION_MESSAGE_UPDATE_EVENTS as readonly string[]).includes(
+    normalized
+  );
+}
+
+export function isEvolutionMessageDeleteEvent(
+  event: string | null | undefined
+): event is EvolutionMessageDeleteEvent {
+  if (!event) return false;
+  const normalized = String(event).trim();
+  return (EVOLUTION_MESSAGE_DELETE_EVENTS as readonly string[]).includes(
     normalized
   );
 }
