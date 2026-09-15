@@ -63,6 +63,25 @@ describe("whatsAppMessageReactions", () => {
     expect(getWhatsAppReactionEmojis(target, list)).toEqual(["😂"]);
   });
 
+  it("mensagem apagada continua expondo reações persistidas", () => {
+    const message = {
+      id: "TARGET1",
+      body: "Contrato fechado",
+      isDeleted: true,
+      channel: "whatsapp",
+      metaPayload: {
+        whatsappReactions: [
+          {
+            emoji: "😂",
+            fromMe: false,
+            reactorKey: "peer",
+          },
+        ],
+      },
+    };
+    expect(getWhatsAppReactionEmojis(message)).toEqual(["😂"]);
+  });
+
   it("mensagem comum não ganha reação", () => {
     expect(
       getWhatsAppMessageReactions({

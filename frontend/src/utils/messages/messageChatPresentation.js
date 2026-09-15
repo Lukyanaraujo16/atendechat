@@ -14,11 +14,11 @@ export function shouldShowMessageActionMenu(message) {
 }
 
 /**
- * Mídia visual (imagem, vídeo, áudio, arquivo, mapa).
- * Mensagem apagada nunca reabre preview/lightbox.
+ * Mídia visual (imagem, vídeo, áudio, arquivo, mapa, contato).
+ * isDeleted é estado visual adicional: o conteúdo original continua renderizável.
  */
 export function shouldRenderChatMedia(message) {
-  if (!message || isDeletedChatMessage(message)) {
+  if (!message) {
     return false;
   }
   return (
@@ -39,7 +39,7 @@ export function shouldUseImageLightbox(message) {
 }
 
 export function shouldShowQuotedMessage(message) {
-  return !isDeletedChatMessage(message) && Boolean(message?.quotedMsg);
+  return Boolean(message?.quotedMsg);
 }
 
 /**

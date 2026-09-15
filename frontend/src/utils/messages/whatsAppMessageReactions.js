@@ -59,7 +59,7 @@ function reactionsFromLegacyBubbles(message, allMessages) {
 }
 
 export function getWhatsAppMessageReactions(message, allMessages = []) {
-  if (!message || message.isDeleted) return [];
+  if (!message) return [];
   const channel = String(message.channel || "whatsapp").toLowerCase();
   if (channel === "instagram") return [];
 

@@ -7418,6 +7418,7 @@ const messages = {
 				lostCall: "Missed voice/video call at",
 				deletedMessage: "This message was deleted by the contact",
 				messageDeleted: "Deleted message",
+				messageDeletedByContact: "Message deleted by the contact",
 				edited: "Edited",
 				saudation: "Say hello to your new contact!",
 			},

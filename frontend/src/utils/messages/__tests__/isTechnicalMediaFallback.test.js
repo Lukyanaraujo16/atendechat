@@ -122,7 +122,7 @@ describe("getDisplayableMessageBody — imagem vs documento", () => {
     ).toBe("planilha.xlsx");
   });
 
-  it("mensagem apagada não devolve body/filename", () => {
+  it("mensagem apagada preserva caption real e esconde filename técnico", () => {
     expect(
       getDisplayableMessageBody(
         imageMessage({
@@ -133,12 +133,21 @@ describe("getDisplayableMessageBody — imagem vs documento", () => {
     ).toBeNull();
 
     expect(
+      getDisplayableMessageBody(
+        imageMessage({
+          isDeleted: true,
+          body: "Comprovante do pagamento",
+        })
+      )
+    ).toBe("Comprovante do pagamento");
+
+    expect(
       getDisplayableMessageBody({
         mediaType: "conversation",
         body: "olá",
         isDeleted: true,
       })
-    ).toBeNull();
+    ).toBe("olá");
   });
 
   it("vídeo sem caption não usa filename como legenda", () => {

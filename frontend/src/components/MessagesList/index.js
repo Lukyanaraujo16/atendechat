@@ -260,13 +260,6 @@ const useStyles = makeStyles((theme) => {
     padding: "3px 120px 6px 6px",
   },
 
-  textContentItemDeleted: {
-    fontStyle: "italic",
-    color: theme.palette.text.disabled,
-    overflowWrap: "break-word",
-    padding: "3px 80px 6px 6px",
-  },
-
   messageMedia: {
     objectFit: "cover",
     width: 250,
@@ -319,9 +312,20 @@ const useStyles = makeStyles((theme) => {
   },
 
   deletedIcon: {
-    fontSize: 18,
+    fontSize: 16,
     verticalAlign: "middle",
     marginRight: 4,
+  },
+
+  deletedBanner: {
+    display: "flex",
+    alignItems: "center",
+    fontSize: 12,
+    fontStyle: "italic",
+    color: theme.palette.text.secondary,
+    lineHeight: 1.35,
+    margin: "4px 8px 6px 6px",
+    overflowWrap: "break-word",
   },
 
   ackDoneAllIcon: {
@@ -806,8 +810,7 @@ const MessagesList = forwardRef(function MessagesList(
 
   const shouldRenderMessageMedia = (message) =>
     shouldRenderChatMedia(message) ||
-    (!message.isDeleted &&
-      INSTAGRAM_INTERACTION_MEDIA_TYPES.has(message.mediaType));
+    INSTAGRAM_INTERACTION_MEDIA_TYPES.has(message.mediaType);
 
   const INSTAGRAM_SHARE_CARD_COPY = {
     instagram_post: { icon: "📷", title: "Post compartilhado" },
@@ -1183,6 +1186,17 @@ const MessagesList = forwardRef(function MessagesList(
     }
   };
 
+  const renderDeletedAuditBanner = (message) => {
+    if (!message?.isDeleted) return null;
+    return (
+      <DeletedMessageTombstone
+        className={classes.deletedBanner}
+        iconClassName={classes.deletedIcon}
+        fromMe={message.fromMe}
+      />
+    );
+  };
+
   const renderQuotedMessage = (message) => {
     const quoted = message.quotedMsg;
     if (!quoted) return null;
@@ -1199,10 +1213,13 @@ const MessagesList = forwardRef(function MessagesList(
           })}
         ></span>
         <div className={classes.quotedMsg}>
-          {quoted.isDeleted ? (
-            <DeletedMessageTombstone iconClassName={classes.deletedIcon} />
-          ) : (
-            <>
+          {quoted.isDeleted && (
+            <DeletedMessageTombstone
+              className={classes.deletedBanner}
+              iconClassName={classes.deletedIcon}
+              fromMe={quoted.fromMe}
+            />
+          )}
           {!quoted.fromMe && (
             <span className={classes.messageContactName}>
               {isGroup
@@ -1261,8 +1278,6 @@ const MessagesList = forwardRef(function MessagesList(
                 <span>{quoted.body}</span>
               )
           }
-            </>
-          )}
         </div>
       </div>
     );
@@ -1334,17 +1349,9 @@ const MessagesList = forwardRef(function MessagesList(
                   </span>
                 )}
 
+                {renderDeletedAuditBanner(message)}
                 {shouldRenderMessageMedia(message) && checkMessageMedia(message)}
-                <div
-                  className={clsx(classes.textContentItem, {
-                    [classes.textContentItemDeleted]: message.isDeleted,
-                  })}
-                >
-                  {message.isDeleted && (
-                    <DeletedMessageTombstone
-                      iconClassName={classes.deletedIcon}
-                    />
-                  )}
+                <div className={classes.textContentItem}>
                   {shouldShowQuotedMessage(message) && renderQuotedMessage(message)}
                   {renderMessageBody(message)}
                   <span className={classes.timestamp}>
@@ -1374,18 +1381,13 @@ const MessagesList = forwardRef(function MessagesList(
                   <ExpandMore />
                 </IconButton>
                 )}
+                {renderDeletedAuditBanner(message)}
                 {shouldRenderMessageMedia(message) && checkMessageMedia(message)}
                 <div
                   className={clsx(classes.textContentItem, {
-                    [classes.textContentItemDeleted]: message.isDeleted,
 					[classes.textContentItemEdited]: message.isEdited,
                   })}
                 >
-                  {message.isDeleted && (
-                    <DeletedMessageTombstone
-                      iconClassName={classes.deletedIcon}
-                    />
-                  )}
                   {shouldShowQuotedMessage(message) && renderQuotedMessage(message)}
                   {renderMessageBody(message)}
                   <span className={classes.timestamp}>

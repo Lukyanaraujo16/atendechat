@@ -205,7 +205,7 @@ describe("MessagesList — mídia apagada e imagem sem caption", () => {
     await waitForChat();
 
     const lightboxes = getAllByTestId("chat-lightbox-image");
-    expect(lightboxes).toHaveLength(4);
+    expect(lightboxes).toHaveLength(6);
     expect(
       lightboxes.map((node) => node.getAttribute("src"))
     ).toEqual(
@@ -214,12 +214,6 @@ describe("MessagesList — mídia apagada e imagem sem caption", () => {
         "https://example.com/public/foto.jpeg",
         "https://example.com/public/imagem.png",
         "https://example.com/public/foto.jpg",
-      ])
-    );
-    expect(
-      lightboxes.map((node) => node.getAttribute("src"))
-    ).not.toEqual(
-      expect.arrayContaining([
         "https://example.com/public/apagada.png",
         "https://example.com/public/apagada.jpeg",
       ])
@@ -234,11 +228,11 @@ describe("MessagesList — mídia apagada e imagem sem caption", () => {
 
     const tombstones = getAllByTestId("deleted-message-tombstone");
     expect(tombstones).toHaveLength(3);
-    tombstones.forEach((node) => {
-      expect(node.textContent).toContain("Mensagem apagada");
-    });
+    expect(tombstones.map((node) => node.textContent).join(" ")).toContain(
+      "Mensagem apagada pelo contato"
+    );
 
-    expect(queryByText("texto apagado")).toBeNull();
+    expect(getByText("texto apagado")).toBeTruthy();
     expect(getByText("mensagem viva")).toBeTruthy();
 
     const actionTriggers = container.querySelectorAll("#messageActionsButton");
@@ -256,7 +250,7 @@ describe("MessagesList — mídia apagada e imagem sem caption", () => {
     await waitForChat();
     expect(dark.container.querySelector("#messagesList")).toBeTruthy();
     expect(dark.getAllByTestId("deleted-message-tombstone").length).toBe(3);
-    expect(dark.getAllByTestId("chat-lightbox-image").length).toBe(4);
+    expect(dark.getAllByTestId("chat-lightbox-image").length).toBe(6);
   });
 
   it("MessagesList não deixa o trigger disabled visível em mensagem apagada", () => {
@@ -272,7 +266,7 @@ describe("MessagesList — mídia apagada e imagem sem caption", () => {
     );
   });
 
-  it("quotedMsg.isDeleted renderiza tombstone sem conteúdo antigo nem lightbox", async () => {
+  it("quotedMsg.isDeleted mantém preview original com indicador", async () => {
     const quotedDeleted = {
       id: "quoted-deleted-img",
       ticketId: 1,
@@ -284,22 +278,19 @@ describe("MessagesList — mídia apagada e imagem sem caption", () => {
       createdAt,
       ack: 0,
     };
-    const { queryByText, getByText, getByTestId, queryByTestId } = renderList(
-      "light",
-      [
-        {
-          id: "reply-to-deleted",
-          ticketId: 1,
-          fromMe: true,
-          mediaType: "conversation",
-          body: "respondendo a apagada",
-          isDeleted: false,
-          quotedMsg: quotedDeleted,
-          createdAt,
-          ack: 2,
-        },
-      ]
-    );
+    const { queryByText, getByText, getByTestId } = renderList("light", [
+      {
+        id: "reply-to-deleted",
+        ticketId: 1,
+        fromMe: true,
+        mediaType: "conversation",
+        body: "respondendo a apagada",
+        isDeleted: false,
+        quotedMsg: quotedDeleted,
+        createdAt,
+        ack: 2,
+      },
+    ]);
 
     await waitFor(
       () => {
@@ -309,10 +300,11 @@ describe("MessagesList — mídia apagada e imagem sem caption", () => {
     );
 
     expect(getByTestId("deleted-message-tombstone").textContent).toContain(
-      "Mensagem apagada"
+      "Mensagem apagada pelo contato"
     );
-    expect(queryByText("conteudo antigo da imagem")).toBeNull();
     expect(queryByText("citada-apagada.png")).toBeNull();
-    expect(queryByTestId("chat-lightbox-image")).toBeNull();
+    expect(getByTestId("chat-lightbox-image").getAttribute("src")).toBe(
+      "https://example.com/public/citada-apagada.png"
+    );
   });
 });

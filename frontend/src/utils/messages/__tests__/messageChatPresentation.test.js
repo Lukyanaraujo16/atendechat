@@ -59,7 +59,7 @@ describe("apresentação do balão de mídia", () => {
     expect(jpeg.displayBody).toBe("Comprovante do pagamento");
   });
 
-  it("message.isDeleted → sem mídia, sem filename, sem menu, com tombstone (inbound e outbound)", () => {
+  it("message.isDeleted → indicador + mídia original, sem menu (inbound e outbound)", () => {
     const inboundMessage = imageMessage({
       isDeleted: true,
       fromMe: false,
@@ -76,19 +76,28 @@ describe("apresentação do balão de mídia", () => {
     [inbound, outbound].forEach((plan) => {
       expect(plan.deleted).toBe(true);
       expect(plan.showTombstone).toBe(true);
-      expect(plan.showMedia).toBe(false);
-      expect(plan.useImageLightbox).toBe(false);
+      expect(plan.showMedia).toBe(true);
+      expect(plan.useImageLightbox).toBe(true);
       expect(plan.showActionMenu).toBe(false);
-      expect(plan.showQuoted).toBe(false);
       expect(plan.displayBody).toBeNull();
     });
 
-    expect(shouldRenderChatMedia(inboundMessage)).toBe(false);
-    expect(shouldUseImageLightbox(outboundMessage)).toBe(false);
+    expect(shouldRenderChatMedia(inboundMessage)).toBe(true);
+    expect(shouldUseImageLightbox(outboundMessage)).toBe(true);
     expect(shouldShowMessageActionMenu(inboundMessage)).toBe(false);
+
+    const withCaption = getMessageBubblePresentation(
+      imageMessage({
+        isDeleted: true,
+        body: "Comprovante do pagamento",
+      })
+    );
+    expect(withCaption.showTombstone).toBe(true);
+    expect(withCaption.showMedia).toBe(true);
+    expect(withCaption.displayBody).toBe("Comprovante do pagamento");
   });
 
-  it("texto apagado usa o mesmo isDeleted", () => {
+  it("texto apagado preserva body e mostra tombstone", () => {
     const plan = getMessageBubblePresentation({
       id: "txt-1",
       mediaType: "conversation",
@@ -99,8 +108,22 @@ describe("apresentação do balão de mídia", () => {
     });
     expect(plan.showTombstone).toBe(true);
     expect(plan.showActionMenu).toBe(false);
-    expect(plan.displayBody).toBeNull();
+    expect(plan.displayBody).toBe("olá");
     expect(plan.showMedia).toBe(false);
+  });
+
+  it("mensagem apagada que é reply continua com quoted", () => {
+    const plan = getMessageBubblePresentation({
+      id: "txt-reply",
+      mediaType: "conversation",
+      body: "resposta depois apagada",
+      isDeleted: true,
+      fromMe: false,
+      createdAt,
+      quotedMsg: { id: "orig", body: "original", mediaType: "conversation" },
+    });
+    expect(plan.showQuoted).toBe(true);
+    expect(plan.displayBody).toBe("resposta depois apagada");
   });
 
   it("mensagem viva continua com menu de Reply/Delete (trigger visível)", () => {
@@ -156,5 +179,23 @@ describe("apresentação do balão de mídia", () => {
     });
     expect(contactPlan.showMedia).toBe(true);
     expect(contactPlan.displayBody).toBeNull();
+  });
+
+  it("localização e contato apagados continuam com mídia", () => {
+    expect(
+      shouldRenderChatMedia({
+        mediaType: "locationMessage",
+        body: "https://maps.google.com/maps?q=-20.37%2C-40.34|-20.37, -40.34",
+        isDeleted: true,
+      })
+    ).toBe(true);
+
+    expect(
+      shouldRenderChatMedia({
+        mediaType: "contactMessage",
+        body: "BEGIN:VCARD\nFN:Maria\nEND:VCARD",
+        isDeleted: true,
+      })
+    ).toBe(true);
   });
 });

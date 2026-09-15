@@ -128,7 +128,6 @@ export function isTechnicalMediaFallback(text, mediaType) {
  */
 export function getDisplayableMessageBody(message) {
   if (!message) return null;
-  if (message.isDeleted) return null;
 
   const { body, mediaType, mediaUrl } = message;
 

@@ -166,4 +166,38 @@ describe("MessagesList — reações WhatsApp", () => {
     expect(await screen.findByText("respondendo")).toBeTruthy();
     expect(screen.getByText("original citada")).toBeTruthy();
   });
+
+  it("alvo apagado continua com reação persistida", async () => {
+    renderList([
+      {
+        id: "TARGET1",
+        ticketId: 1,
+        fromMe: true,
+        mediaType: "conversation",
+        body: "Teste de mensagem",
+        isDeleted: true,
+        createdAt,
+        ack: 2,
+        channel: "whatsapp",
+        metaPayload: {
+          whatsappReactions: [
+            {
+              emoji: "😂",
+              fromMe: false,
+              reactorMessageId: "R1",
+              reactorKey: "peer",
+            },
+          ],
+        },
+      },
+    ]);
+
+    expect(await screen.findByText("Teste de mensagem")).toBeTruthy();
+    expect(screen.getByTestId("deleted-message-tombstone").textContent).toContain(
+      "Mensagem apagada"
+    );
+    expect(screen.getByTestId("chat-message-reactions").textContent).toContain(
+      "😂"
+    );
+  });
 });

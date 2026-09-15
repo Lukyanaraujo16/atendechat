@@ -7585,6 +7585,7 @@ const messages = {
         lostCall: "Chamada de voz/vídeo perdida às",
         deletedMessage: "Essa mensagem foi apagada pelo contato",
         messageDeleted: "Mensagem apagada",
+        messageDeletedByContact: "Mensagem apagada pelo contato",
         edited: "Editada",
         saudation: "Diga olá para seu novo contato!",
       },
