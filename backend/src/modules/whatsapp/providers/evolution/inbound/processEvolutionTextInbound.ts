@@ -9,6 +9,7 @@ import { logger } from "../../../../../utils/logger";
 import { NormalizedWhatsAppMessage } from "../../../inbound/NormalizedWhatsAppMessage";
 import { processInboundWhatsAppMessage } from "../../../inbound/ProcessInboundWhatsAppMessage";
 import { resolveQuotedMessageByStanzaId } from "../../../inbound/resolveQuotedMessageByStanzaId";
+import { applyInboundWhatsAppReaction } from "../../../inbound/applyInboundWhatsAppReaction";
 import { createEvolutionInboundMessage } from "./createEvolutionInboundMessage";
 import {
   EvolutionMediaExtractHints,
@@ -74,6 +75,32 @@ export async function processEvolutionTextInbound(input: {
       }
       if (dto.rawProviderMessage != null) {
         throw new Error("ERR_EVOLUTION_MUST_NOT_CARRY_BAILEYS_RAW");
+      }
+
+      if ((dto.kind || "message") === "reaction") {
+        if (!dto.reaction?.targetStanzaId || !dto.reaction.emoji) {
+          result = { status: "skipped", reason: "invalid_reaction" };
+          return;
+        }
+        const applied = await applyInboundWhatsAppReaction({
+          companyId: dto.companyId,
+          whatsappId: dto.whatsappId,
+          reactorMessageId: dto.messageId,
+          fromMe: dto.fromMe,
+          remoteJid: dto.addressing.remoteJid,
+          participant: dto.addressing.participant || null,
+          reaction: dto.reaction
+        });
+        if (applied.outcome === "skipped") {
+          result = { status: "skipped", reason: applied.reason };
+          return;
+        }
+        result = {
+          status: "created",
+          messageId: applied.targetMessageId,
+          ticketId: applied.ticketId
+        };
+        return;
       }
 
       // Dedupe ANTES do download pesado.

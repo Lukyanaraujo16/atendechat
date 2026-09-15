@@ -409,6 +409,53 @@ describe("adaptEvolutionInboundMessage", () => {
     });
     expect(reaction.ok && reaction.inbound.body).toBe("👍");
     expect(reaction.ok && reaction.inbound.quotedStanzaId).toBe("TARGET1");
+    expect(reaction.ok && reaction.inbound.kind).toBe("reaction");
+    expect(reaction.ok && reaction.inbound.reaction).toEqual({
+      targetStanzaId: "TARGET1",
+      emoji: "👍"
+    });
+  });
+
+  it("reaction sem alvo ou sem emoji não vira mensagem de timeline", () => {
+    const missingTarget = adaptEvolutionInboundMessage({
+      envelope: textEnvelope({
+        data: {
+          key: {
+            remoteJid: "5511999998888@s.whatsapp.net",
+            fromMe: false,
+            id: "R2"
+          },
+          message: { reactionMessage: { text: "😂" } },
+          messageType: "reactionMessage",
+          messageTimestamp: 1
+        }
+      }),
+      companyId: 1,
+      whatsappId: 10
+    });
+    expect(missingTarget.ok).toBe(false);
+    expect(missingTarget).toMatchObject({ reason: "missing_reaction_target" });
+
+    const empty = adaptEvolutionInboundMessage({
+      envelope: textEnvelope({
+        data: {
+          key: {
+            remoteJid: "5511999998888@s.whatsapp.net",
+            fromMe: false,
+            id: "R3"
+          },
+          message: {
+            reactionMessage: { text: "   ", key: { id: "TARGET1" } }
+          },
+          messageType: "reactionMessage",
+          messageTimestamp: 1
+        }
+      }),
+      companyId: 1,
+      whatsappId: 10
+    });
+    expect(empty.ok).toBe(false);
+    expect(empty).toMatchObject({ reason: "empty_reaction" });
   });
 
   it("skip controlado para tipo ainda não suportado", () => {

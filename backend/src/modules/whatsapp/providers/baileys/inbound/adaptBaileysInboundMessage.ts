@@ -34,6 +34,12 @@ export function adaptBaileysInboundMessage(
   const meta = extractInboundJidMeta(msg);
   const isGroup = meta.remoteJid.endsWith("@g.us");
   const messageType = getTypeMessage(msg) || null;
+  const reactionNode = msg.message?.reactionMessage;
+  const reactionTarget =
+    reactionNode?.key?.id != null ? String(reactionNode.key.id).trim() : "";
+  const reactionEmoji =
+    typeof reactionNode?.text === "string" ? reactionNode.text.trim() : "";
+  const isReaction = messageType === "reactionMessage";
   const quotedStanzaId = (() => {
     try {
       const quoted = getQuotedMessageId(msg);
@@ -81,6 +87,11 @@ export function adaptBaileysInboundMessage(
       msg.messageStubType != null ? Number(msg.messageStubType) : null,
     ack: extractBaileysAck(msg),
     editedMessageId: extractEditedMessageId(msg),
+    kind: isReaction ? "reaction" : "message",
+    reaction:
+      isReaction && reactionTarget && reactionEmoji
+        ? { targetStanzaId: reactionTarget, emoji: reactionEmoji }
+        : null,
     rawProviderMessage: msg
   };
 }

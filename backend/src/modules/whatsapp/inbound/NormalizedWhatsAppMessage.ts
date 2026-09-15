@@ -30,6 +30,15 @@ export type NormalizedWhatsAppWrapping = {
   isViewOnce: boolean;
 };
 
+export type WhatsAppInboundKind = "message" | "reaction";
+
+export type NormalizedWhatsAppReaction = {
+  /** Stanza/id da mensagem alvo no provider. */
+  targetStanzaId: string;
+  /** Emoji comprovado (text não vazio). Remoção vazia não é contrato desta fase. */
+  emoji: string;
+};
+
 export type NormalizedWhatsAppMessage = {
   provider: WhatsAppInboundProvider;
   companyId: number;
@@ -39,6 +48,12 @@ export type NormalizedWhatsAppMessage = {
   timestamp: Date | null;
   messageType: string | null;
   body: string | null;
+  /**
+   * Semântica do evento. Default "message" quando omitido (fixtures legadas).
+   * reaction NÃO deve persistir como balão de timeline.
+   */
+  kind?: WhatsAppInboundKind;
+  reaction?: NormalizedWhatsAppReaction | null;
   pushName: string | null;
   isGroup: boolean;
   addressing: NormalizedWhatsAppAddressing;

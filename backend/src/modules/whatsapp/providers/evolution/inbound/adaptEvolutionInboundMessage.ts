@@ -1,5 +1,8 @@
 import crypto from "crypto";
-import { NormalizedWhatsAppMessage } from "../../../inbound/NormalizedWhatsAppMessage";
+import {
+  NormalizedWhatsAppMessage,
+  NormalizedWhatsAppReaction
+} from "../../../inbound/NormalizedWhatsAppMessage";
 import { normalizeWhatsAppJidToNumber } from "../../../../../helpers/normalizeWhatsAppJidToNumber";
 import {
   EvolutionAudioMessage,
@@ -35,7 +38,9 @@ export type AdaptEvolutionResult =
         | "missing_remote_jid"
         | "unsupported_message_type"
         | "unresolvable_contact"
-        | "empty_text";
+        | "empty_text"
+        | "missing_reaction_target"
+        | "empty_reaction";
       detail?: string;
     };
 
@@ -158,6 +163,31 @@ function extractQuotedStanzaIdFromMessageNode(
     if (typeof id === "string" && id.trim()) return id.trim();
   }
   return null;
+}
+
+function extractEvolutionReaction(
+  messageType: string | null,
+  message: EvolutionWebhookMessageContent | null | undefined
+):
+  | { ok: true; reaction: NormalizedWhatsAppReaction }
+  | { ok: false; reason: "missing_reaction_target" | "empty_reaction" }
+  | null {
+  if (messageType !== "reactionMessage") return null;
+  const target =
+    message?.reactionMessage?.key?.id != null
+      ? String(message.reactionMessage.key.id).trim()
+      : "";
+  if (!target) {
+    return { ok: false, reason: "missing_reaction_target" };
+  }
+  const text =
+    typeof message?.reactionMessage?.text === "string"
+      ? message.reactionMessage.text.trim()
+      : "";
+  if (!text) {
+    return { ok: false, reason: "empty_reaction" };
+  }
+  return { ok: true, reaction: { targetStanzaId: target, emoji: text } };
 }
 
 function extractQuotedStanzaId(
@@ -400,9 +430,15 @@ function buildBodyAndMedia(input: {
 
   if (messageType === "reactionMessage") {
     const text = message?.reactionMessage?.text;
-    const body =
-      typeof text === "string" && text.trim() ? text.trim() : "reaction";
-    return { body, media: emptyMedia, mediaHints: null };
+    if (typeof text !== "string" || !text.trim()) {
+      return {
+        body: null,
+        media: emptyMedia,
+        mediaHints: null,
+        fail: { ok: false, reason: "empty_reaction" }
+      };
+    }
+    return { body: text.trim(), media: emptyMedia, mediaHints: null };
   }
 
   return {
@@ -452,6 +488,11 @@ export function adaptEvolutionInboundMessage(input: {
   const message = (data.message ||
     null) as EvolutionWebhookMessageContent | null;
   const messageType = detectMessageType(data, message);
+
+  const extractedReaction = extractEvolutionReaction(messageType, message);
+  if (extractedReaction && extractedReaction.ok === false) {
+    return { ok: false, reason: extractedReaction.reason };
+  }
 
   const built = buildBodyAndMedia({ messageType, message, messageId });
   if (built.fail) return built.fail;
@@ -549,6 +590,8 @@ export function adaptEvolutionInboundMessage(input: {
     messageStubType: null,
     ack: null,
     editedMessageId: null,
+    kind: extractedReaction?.ok ? "reaction" : "message",
+    reaction: extractedReaction?.ok ? extractedReaction.reaction : null,
     rawProviderMessage: null
   };
 

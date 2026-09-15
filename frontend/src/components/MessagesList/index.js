@@ -40,6 +40,10 @@ import {
   shouldShowMessageActionMenu,
   shouldShowQuotedMessage,
 } from "../../utils/messages/messageChatPresentation";
+import {
+  getWhatsAppReactionEmojis,
+  isWhatsAppReactionTimelineItem,
+} from "../../utils/messages/whatsAppMessageReactions";
 import DeletedMessageTombstone from "./DeletedMessageTombstone";
 import ModalImageCors from "../ModalImageCors";
 import MessageOptionsMenu from "../MessageOptionsMenu";
@@ -279,6 +283,13 @@ const useStyles = makeStyles((theme) => {
     bottom: 0,
     right: 5,
     color: theme.palette.text.secondary,
+  },
+
+  messageReactions: {
+    fontSize: 16,
+    lineHeight: 1,
+    marginRight: 6,
+    verticalAlign: "middle",
   },
 
   dailyTimestamp: {
@@ -626,6 +637,19 @@ const MessagesList = forwardRef(function MessagesList(
 
   const handleCloseMessageOptionsMenu = (e) => {
     setAnchorEl(null);
+  };
+
+  const renderMessageReactions = (message) => {
+    const emojis = getWhatsAppReactionEmojis(message, messagesList);
+    if (!emojis.length) return null;
+    return (
+      <span
+        className={classes.messageReactions}
+        data-testid="chat-message-reactions"
+      >
+        {emojis.join("")}
+      </span>
+    );
   };
 
   const renderMessageBody = (message) => {
@@ -1249,6 +1273,10 @@ const MessagesList = forwardRef(function MessagesList(
     if (list.length > 0) {
       const viewMessagesList = list.map((message, index) => {
 
+        if (isWhatsAppReactionTimelineItem(message)) {
+          return null;
+        }
+
         if (message.mediaType === "call_log") {
           return (
             <React.Fragment key={message.id}>
@@ -1320,6 +1348,7 @@ const MessagesList = forwardRef(function MessagesList(
                   {shouldShowQuotedMessage(message) && renderQuotedMessage(message)}
                   {renderMessageBody(message)}
                   <span className={classes.timestamp}>
+				    {renderMessageReactions(message)}
 				    {message.isEdited && <span>Editada </span>}
                     {format(parseISO(message.createdAt), "HH:mm")}
                   </span>
@@ -1360,6 +1389,7 @@ const MessagesList = forwardRef(function MessagesList(
                   {shouldShowQuotedMessage(message) && renderQuotedMessage(message)}
                   {renderMessageBody(message)}
                   <span className={classes.timestamp}>
+				    {renderMessageReactions(message)}
 				    {message.isEdited && <span>{i18n.t("messagesList.edited")}</span>}
                     {message.messageOrigin === "ai_agent" && (
                       <span style={{ marginRight: 4, opacity: 0.85 }}>
