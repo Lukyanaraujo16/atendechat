@@ -38,6 +38,7 @@ import ShowTicketService from "../services/TicketServices/ShowTicketService";
 import UpdateTicketService from "../services/TicketServices/UpdateTicketService";
 import PauseTicketAiAgentService from "../services/TicketServices/PauseTicketAiAgentService";
 import ResumeTicketAiAgentService from "../services/TicketServices/ResumeTicketAiAgentService";
+import SendHumanTicketPresenceService from "../services/TicketServices/SendHumanTicketPresenceService";
 import ListTicketsServiceKanban from "../services/TicketServices/ListTicketsServiceKanban";
 import ListTicketsWithoutConnectionService from "../services/TicketServices/ListTicketsWithoutConnectionService";
 import BulkAssignTicketsWhatsappService from "../services/TicketServices/BulkAssignTicketsWhatsappService";
@@ -745,4 +746,30 @@ export const resumeAiAgent = async (
     aiAgentActive: enriched.aiAgentActive,
     aiAgentMode: enriched.aiAgentMode
   });
+};
+
+/**
+ * Presence humano efêmero (composing/paused). Best-effort: não persiste Message.
+ */
+export const sendHumanPresence = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const ticketId = Number(req.params.ticketId);
+  if (!Number.isFinite(ticketId) || ticketId <= 0) {
+    throw new AppError("ERR_INVALID_TICKET_ID", 400);
+  }
+
+  const result = await SendHumanTicketPresenceService({
+    ticketId,
+    companyId: Number(req.user.companyId),
+    actor: {
+      id: req.user.id,
+      profile: req.user.profile,
+      supportMode: req.user.supportMode
+    },
+    presence: req.body?.presence
+  });
+
+  return res.status(200).json(result);
 };

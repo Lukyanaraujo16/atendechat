@@ -43,6 +43,11 @@ ticketRoutes.delete("/tickets/:ticketId/pin", TicketController.unpin);
 ticketRoutes.post("/tickets/:ticketId/active-view", TicketController.registerActiveView);
 
 ticketRoutes.post(
+  "/tickets/:ticketId/presence",
+  TicketController.sendHumanPresence
+);
+
+ticketRoutes.post(
   "/tickets/:ticketId/ai-agent/pause",
   requireEffectiveModule("automation.ai_agent"),
   TicketController.pauseAiAgent

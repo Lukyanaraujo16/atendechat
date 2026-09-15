@@ -48,6 +48,7 @@ import { isOrphanTicket } from "../../utils/isOrphanTicket";
 import ComposerAttachMenu from "./ComposerAttachMenu";
 import ComposerEmojiStickerPanel from "./ComposerEmojiStickerPanel";
 import useStickers from "../../hooks/useStickers";
+import useHumanWhatsAppTypingPresence from "./useHumanWhatsAppTypingPresence";
 
 const useStyles = makeStyles((theme) => {
   const isDark = theme.palette.type === "dark";
@@ -373,6 +374,8 @@ const CustomInput = (props) => {
     handleQuickAnswersClick,
     resolveMessageTemplate,
     onQuickMessageUsed,
+    onComposerTextChange,
+    onComposerBlur,
   } = props;
   const classes = useStyles();
   const [quickMessages, setQuickMessages] = useState([]);
@@ -526,7 +529,11 @@ const CustomInput = (props) => {
         }}
         onInputChange={(event, opt, reason) => {
           if (reason === "input") {
-            setInputMessage(event.target.value);
+            const value = event.target.value;
+            setInputMessage(value);
+            if (onComposerTextChange) {
+              onComposerTextChange(value);
+            }
           }
         }}
         onPaste={onPaste}
@@ -544,6 +551,14 @@ const CustomInput = (props) => {
               className={classes.messageInput}
               maxRows={5}
               onKeyDown={onKeyDown}
+              onBlur={(event) => {
+                if (typeof params.InputProps?.onBlur === "function") {
+                  params.InputProps.onBlur(event);
+                }
+                if (onComposerBlur) {
+                  onComposerBlur();
+                }
+              }}
             />
           );
         }}
@@ -623,6 +638,13 @@ const MessageInputCustom = (props) => {
       onMessageSent,
     });
 
+  const { notifyTyping, pauseNow } = useHumanWhatsAppTypingPresence({
+    ticketId,
+    ticket,
+    ticketStatus,
+    enabled: !loading && !recording,
+  });
+
   useEffect(() => {
     if (!replyingMessage || !inputRef.current) return;
     if (!canAutoFocusMessageInput(focusBlockers)) return;
@@ -651,7 +673,9 @@ const MessageInputCustom = (props) => {
 
   const handleAddEmoji = (e) => {
     let emoji = e.native;
-    setInputMessage((prevState) => prevState + emoji);
+    const next = `${inputMessage || ""}${emoji}`;
+    setInputMessage(next);
+    notifyTyping(next);
   };
 
   const handleChangeMedias = (e, options = {}) => {
@@ -867,6 +891,7 @@ const MessageInputCustom = (props) => {
     if (isOrphanTicket(ticket)) return;
     if (loading) return;
     if (inputMessage.trim() === "") return;
+    pauseNow();
     const sendPerfStart =
       typeof performance !== "undefined" && performance.now
         ? performance.now()
@@ -1149,6 +1174,8 @@ const MessageInputCustom = (props) => {
               handleQuickAnswersClick={handleQuickAnswersClick}
               resolveMessageTemplate={resolveMessageTemplate}
               onQuickMessageUsed={onQuickMessageUsed}
+              onComposerTextChange={notifyTyping}
+              onComposerBlur={pauseNow}
             />
 
             <Tooltip title={i18n.t("messagesInput.signMessage")}>
