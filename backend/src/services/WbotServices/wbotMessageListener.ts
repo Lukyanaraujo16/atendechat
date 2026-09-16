@@ -20,6 +20,7 @@ import Ticket from "../../models/Ticket";
 import Message from "../../models/Message";
 
 import { getIO } from "../../libs/socket";
+import { registerBaileysInboundPresenceListener } from "../../modules/whatsapp/providers/baileys/inbound/processBaileysPresenceInbound";
 import CreateMessageService from "../MessageServices/CreateMessageService";
 import { incrementCompanyStorageUsage } from "../CompanyService/adjustCompanyStorageUsage";
 import { logger } from "../../utils/logger";
@@ -4101,6 +4102,8 @@ const wbotMessageListener = async (
         handleMsgAck(message, message.update.status);
       });
     });
+
+    registerBaileysInboundPresenceListener(wbot, { companyId });
 
     // wbot.ev.on("messages.set", async (messageSet: IMessage) => {
     //   messageSet.messages.filter(filterMessages).map(msg => msg);
