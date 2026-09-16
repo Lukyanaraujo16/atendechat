@@ -706,6 +706,239 @@ describe("adaptEvolutionInboundMessage", () => {
     expect(result.inbound.senderNumber).toBe("5511777666555");
   });
 
+  describe("grupo participantAlt (shape real 442)", () => {
+    const GROUP_REMOTE = "120363000000000000@g.us";
+    const PARTICIPANT_LID = "999999999999999@lid";
+    const PARTICIPANT_ALT_PN = "5511999999999@s.whatsapp.net";
+    const INSTANCE_SENDER = "5511888777666@s.whatsapp.net";
+
+    function group442Envelope(
+      keyOverrides: Record<string, unknown> = {}
+    ): EvolutionWebhookEnvelope {
+      return textEnvelope({
+        event: "messages.upsert",
+        sender: INSTANCE_SENDER,
+        data: {
+          key: {
+            remoteJid: GROUP_REMOTE,
+            participant: PARTICIPANT_LID,
+            participantAlt: PARTICIPANT_ALT_PN,
+            addressingMode: "lid",
+            fromMe: false,
+            id: "GRP442"
+          },
+          pushName: "Participante Teste",
+          message: { conversation: "oi grupo lid" },
+          messageType: "conversation",
+          messageTimestamp: 1,
+          ...keyOverrides
+        }
+      });
+    }
+
+    it("shape 442: participantAlt PN resolve senderNumber e preserva participant LID", () => {
+      const result = adaptEvolutionInboundMessage({
+        envelope: group442Envelope(),
+        companyId: 1,
+        whatsappId: 3
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.inbound.isGroup).toBe(true);
+      expect(result.inbound.senderNumber).toBe("5511999999999");
+      expect(result.inbound.senderNumber).not.toBe("5511888777666");
+      expect(result.inbound.addressing.participant).toBe(PARTICIPANT_LID);
+      expect(result.inbound.addressing.participantAlt).toBe(PARTICIPANT_ALT_PN);
+      expect(result.inbound.addressing.participantPn).toBeUndefined();
+      expect(result.inbound.pushName).toBe("Participante Teste");
+    });
+
+    it("participantAlt @lid não vira PN", () => {
+      const result = adaptEvolutionInboundMessage({
+        envelope: group442Envelope({
+          key: {
+            remoteJid: GROUP_REMOTE,
+            participant: PARTICIPANT_LID,
+            participantAlt: "888888888888888@lid",
+            addressingMode: "lid",
+            fromMe: false,
+            id: "GRP442LID"
+          }
+        }),
+        companyId: 1,
+        whatsappId: 3
+      });
+      expect(result.ok).toBe(false);
+      expect(result).toMatchObject({
+        reason: "unresolvable_contact",
+        detail: "lid_without_pn"
+      });
+    });
+
+    it("participantAlt @g.us não vira PN", () => {
+      const result = adaptEvolutionInboundMessage({
+        envelope: group442Envelope({
+          key: {
+            remoteJid: GROUP_REMOTE,
+            participant: PARTICIPANT_LID,
+            participantAlt: "120363111222333@g.us",
+            addressingMode: "lid",
+            fromMe: false,
+            id: "GRP442G"
+          }
+        }),
+        companyId: 1,
+        whatsappId: 3
+      });
+      expect(result.ok).toBe(false);
+      expect(result).toMatchObject({
+        reason: "unresolvable_contact",
+        detail: "lid_without_pn"
+      });
+    });
+
+    it("participantAlt malformed não vira PN", () => {
+      const result = adaptEvolutionInboundMessage({
+        envelope: group442Envelope({
+          key: {
+            remoteJid: GROUP_REMOTE,
+            participant: PARTICIPANT_LID,
+            participantAlt: "not-a-jid",
+            addressingMode: "lid",
+            fromMe: false,
+            id: "GRP442M"
+          }
+        }),
+        companyId: 1,
+        whatsappId: 3
+      });
+      expect(result.ok).toBe(false);
+      expect(result).toMatchObject({
+        reason: "unresolvable_contact",
+        detail: "lid_without_pn"
+      });
+    });
+
+    it("participantAlt PN não plausível não vira PN", () => {
+      const result = adaptEvolutionInboundMessage({
+        envelope: group442Envelope({
+          key: {
+            remoteJid: GROUP_REMOTE,
+            participant: PARTICIPANT_LID,
+            participantAlt: "11111111111@s.whatsapp.net",
+            addressingMode: "lid",
+            fromMe: false,
+            id: "GRP442P"
+          }
+        }),
+        companyId: 1,
+        whatsappId: 3
+      });
+      expect(result.ok).toBe(false);
+      expect(result).toMatchObject({
+        reason: "unresolvable_contact",
+        detail: "lid_without_pn"
+      });
+    });
+
+    it("participantPn vence participantAlt quando ambos são PN", () => {
+      const result = adaptEvolutionInboundMessage({
+        envelope: group442Envelope({
+          key: {
+            remoteJid: GROUP_REMOTE,
+            participant: PARTICIPANT_LID,
+            participantPn: "5511777666555@s.whatsapp.net",
+            participantAlt: PARTICIPANT_ALT_PN,
+            addressingMode: "lid",
+            fromMe: false,
+            id: "GRP442BOTH"
+          }
+        }),
+        companyId: 1,
+        whatsappId: 3
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.inbound.senderNumber).toBe("5511777666555");
+      expect(result.inbound.addressing.participant).toBe(PARTICIPANT_LID);
+      expect(result.inbound.addressing.participantPn).toBe(
+        "5511777666555@s.whatsapp.net"
+      );
+      expect(result.inbound.addressing.participantAlt).toBe(PARTICIPANT_ALT_PN);
+    });
+
+    it("participant já PN continua sem participantAlt", () => {
+      const result = adaptEvolutionInboundMessage({
+        envelope: group442Envelope({
+          key: {
+            remoteJid: GROUP_REMOTE,
+            participant: "5511777666555@s.whatsapp.net",
+            addressingMode: "pn",
+            fromMe: false,
+            id: "GRP442PN"
+          }
+        }),
+        companyId: 1,
+        whatsappId: 3
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.inbound.senderNumber).toBe("5511777666555");
+      expect(result.inbound.addressing.participant).toBe(
+        "5511777666555@s.whatsapp.net"
+      );
+    });
+
+    it("participant @lid sem participantAlt: envelope.sender NÃO resolve", () => {
+      const result = adaptEvolutionInboundMessage({
+        envelope: group442Envelope({
+          key: {
+            remoteJid: GROUP_REMOTE,
+            participant: PARTICIPANT_LID,
+            addressingMode: "lid",
+            fromMe: false,
+            id: "GRP442NOSENDER"
+          }
+        }),
+        companyId: 1,
+        whatsappId: 3
+      });
+      expect(result.ok).toBe(false);
+      expect(result).toMatchObject({
+        reason: "unresolvable_contact",
+        detail: "lid_without_pn"
+      });
+    });
+  });
+
+  it("private: participantAlt no key não substitui remoteJid telefônico", () => {
+    const result = adaptEvolutionInboundMessage({
+      envelope: textEnvelope({
+        data: {
+          key: {
+            remoteJid: "5511999998888@s.whatsapp.net",
+            participantAlt: "5511777666555@s.whatsapp.net",
+            fromMe: false,
+            id: "PVTALT"
+          },
+          pushName: "Ana",
+          message: { conversation: "oi privado" },
+          messageType: "conversation",
+          messageTimestamp: 1
+        },
+        sender: "5511888777666@s.whatsapp.net"
+      }),
+      companyId: 1,
+      whatsappId: 10
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.inbound.isGroup).toBe(false);
+    expect(result.inbound.senderNumber).toBe("5511999998888");
+    expect(result.inbound.senderNumber).not.toBe("5511777666555");
+    expect(result.inbound.senderNumber).not.toBe("5511888777666");
+  });
+
   it("evento desconhecido", () => {
     const result = adaptEvolutionInboundMessage({
       envelope: textEnvelope({ event: "CONNECTION_UPDATE" }),

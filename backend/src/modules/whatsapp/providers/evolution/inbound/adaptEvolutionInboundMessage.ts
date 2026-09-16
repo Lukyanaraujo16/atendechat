@@ -3,7 +3,10 @@ import {
   NormalizedWhatsAppMessage,
   NormalizedWhatsAppReaction
 } from "../../../inbound/NormalizedWhatsAppMessage";
-import { normalizeWhatsAppJidToNumber } from "../../../../../helpers/normalizeWhatsAppJidToNumber";
+import {
+  normalizeWhatsAppJidToNumber,
+  pickSafeWhatsAppPnJid
+} from "../../../../../helpers/normalizeWhatsAppJidToNumber";
 import {
   EvolutionAudioMessage,
   EvolutionDocumentMessage,
@@ -513,6 +516,18 @@ export function adaptEvolutionInboundMessage(input: {
     key.remoteJidAlt != null ? String(key.remoteJidAlt) : undefined;
   const participantPn =
     key.participantPn != null ? String(key.participantPn) : undefined;
+  const participantAlt =
+    key.participantAlt != null && String(key.participantAlt).trim()
+      ? String(key.participantAlt).trim()
+      : undefined;
+  /**
+   * key.participantAlt = PN alternativo do participante (Baileys 7 / addressingMode=lid).
+   * Só vira número se pickSafeWhatsAppPnJid aceitar (@s.whatsapp.net + dígitos plausíveis).
+   * Nunca strip @lid. Nunca envelope.sender.
+   */
+  const participantAltPn = isGroup
+    ? pickSafeWhatsAppPnJid(participantAlt)
+    : undefined;
   /**
    * key.senderPn = PN Baileys-shaped do remetente (LID).
    * envelope.sender = wrapper do webhook Evolution (instance/wuid da conta
@@ -538,7 +553,8 @@ export function adaptEvolutionInboundMessage(input: {
     jidForNumber.includes("@lid") &&
     !senderPn &&
     !remoteJidAlt &&
-    !participantPn
+    !participantPn &&
+    !participantAltPn
   ) {
     return {
       ok: false,
@@ -550,7 +566,8 @@ export function adaptEvolutionInboundMessage(input: {
   const senderNumber = normalizeWhatsAppJidToNumber(jidForNumber, {
     senderPn,
     remoteJidAlt,
-    participantPn
+    participantPn,
+    participantAlt: participantAltPn
   });
 
   if (!senderNumber && !isGroup) {
@@ -580,7 +597,8 @@ export function adaptEvolutionInboundMessage(input: {
       participant,
       senderPn,
       remoteJidAlt,
-      participantPn
+      participantPn,
+      participantAlt
     },
     senderNumber: senderNumber || null,
     quotedStanzaId: extractQuotedStanzaId(messageType, message, data),

@@ -86,6 +86,8 @@ export type EvolutionWebhookKey = {
   senderPn?: string;
   remoteJidAlt?: string;
   participantPn?: string;
+  participantAlt?: string;
+  addressingMode?: string;
 };
 
 export type EvolutionMediaContextInfo = {

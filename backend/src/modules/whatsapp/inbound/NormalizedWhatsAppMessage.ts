@@ -15,6 +15,8 @@ export type NormalizedWhatsAppAddressing = {
   senderPn?: string;
   remoteJidAlt?: string;
   participantPn?: string;
+  /** WAMessageKey.participantAlt (PN alternativo). Não substitui participant. */
+  participantAlt?: string;
 };
 
 export type NormalizedWhatsAppMediaMetadata = {

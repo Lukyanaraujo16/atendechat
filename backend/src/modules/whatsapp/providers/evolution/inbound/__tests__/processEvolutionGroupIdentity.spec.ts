@@ -347,6 +347,59 @@ describe("processEvolutionTextInbound group identity 12.2-B", () => {
     expect(partArg.number).not.toContain("lid");
   });
 
+  it("shape 442: participantAlt PN + ignore → group_messages_disabled", async () => {
+    resolveSettings.mockResolvedValue({
+      callsGroups: { groupMessagesMode: "ignore" }
+    });
+    const result = await processEvolutionTextInbound({
+      inbound: groupInbound({
+        pushName: "Participante Teste",
+        senderNumber: "5511999999999",
+        addressing: {
+          remoteJid: GROUP_JID,
+          participant: "999999999999999@lid",
+          participantAlt: "5511999999999@s.whatsapp.net"
+        }
+      }),
+      whatsapp,
+      evolutionPayloadSanitized: {}
+    });
+    expect(result).toEqual({
+      status: "skipped",
+      reason: "group_messages_disabled"
+    });
+    expect(createContact).not.toHaveBeenCalled();
+    expect(createEvoMessage).not.toHaveBeenCalled();
+  });
+
+  it("shape 442: participantAlt PN + receive → cria grupo com fallback e participant pushName", async () => {
+    const result = await processEvolutionTextInbound({
+      inbound: groupInbound({
+        pushName: "Participante Teste",
+        senderNumber: "5511999999999",
+        addressing: {
+          remoteJid: GROUP_JID,
+          participant: "999999999999999@lid",
+          participantAlt: "5511999999999@s.whatsapp.net"
+        }
+      }),
+      whatsapp,
+      evolutionPayloadSanitized: {}
+    });
+    expect(result.status).toBe("created");
+    const groupArg = createContact.mock.calls.find(
+      (c: [{ isGroup?: boolean }]) => c[0].isGroup
+    )[0];
+    const partArg = createContact.mock.calls.find(
+      (c: [{ isGroup?: boolean }]) => !c[0].isGroup
+    )[0];
+    expect(groupArg.name).toBe(`Grupo ${GROUP_DIGITS}`);
+    expect(groupArg.name).not.toBe("Participante Teste");
+    expect(partArg.name).toBe("Participante Teste");
+    expect(partArg.number).toBe("5511999999999");
+    expect(partArg.number).not.toContain("lid");
+  });
+
   it("CreateOrUpdateContactService não atualiza name de contato existente", () => {
     const src = fs.readFileSync(
       path.join(

@@ -18,6 +18,8 @@ export type WhatsAppJidNormalizeOptions = {
   senderPn?: string | null;
   remoteJidAlt?: string | null;
   participantPn?: string | null;
+  /** WAMessageKey.participantAlt — só entra no número se for PN seguro. */
+  participantAlt?: string | null;
 };
 
 export type InboundJidMeta = {
@@ -26,6 +28,7 @@ export type InboundJidMeta = {
   senderPn?: string;
   remoteJidAlt?: string;
   participantPn?: string;
+  participantAlt?: string;
   fromMe?: boolean;
 };
 
@@ -108,6 +111,24 @@ function digitsFromJidLocalPart(jid: string): string | null {
   return digits || null;
 }
 
+/**
+ * Aceita JID telefônico seguro para participantAlt / PN candidato.
+ * Rejeita @lid, @g.us, malformed e dígitos não plausíveis.
+ * Nunca faz strip de @lid.
+ */
+export function pickSafeWhatsAppPnJid(
+  jid: string | null | undefined
+): string | undefined {
+  const raw = String(jid ?? "").trim();
+  if (!raw) return undefined;
+  const lower = raw.toLowerCase();
+  if (!lower.endsWith("@s.whatsapp.net")) return undefined;
+  if (isRejectableWhatsAppJid(raw)) return undefined;
+  const digits = digitsFromJidLocalPart(raw);
+  if (!digits || !isPlausibleWhatsAppPhoneNumber(digits)) return undefined;
+  return raw;
+}
+
 function logContactNormalizationResolved(
   source: string,
   number: string,
@@ -177,6 +198,16 @@ export function normalizeWhatsAppJidToNumber(
     }
   }
 
+  if (options.participantAlt) {
+    const safeAlt = pickSafeWhatsAppPnJid(options.participantAlt);
+    if (safeAlt) {
+      const fromAltPn = digitsOnly(safeAlt);
+      if (isPlausibleWhatsAppPhoneNumber(fromAltPn)) {
+        return fromAltPn;
+      }
+    }
+  }
+
   if (options.remoteJidAlt && !isRejectableWhatsAppJid(options.remoteJidAlt)) {
     const fromAlt = digitsFromJidLocalPart(options.remoteJidAlt);
     if (fromAlt && isPlausibleWhatsAppPhoneNumber(fromAlt)) {
@@ -231,10 +262,12 @@ export function extractInboundJidMeta(msg: {
     senderPn?: string;
     remoteJidAlt?: string;
     participantPn?: string;
+    participantAlt?: string;
   };
   participant?: string | null;
   senderPn?: string;
   participantPn?: string;
+  participantAlt?: string;
 }): InboundJidMeta {
   const key = (msg.key || {}) as {
     remoteJid?: string | null;
@@ -243,10 +276,12 @@ export function extractInboundJidMeta(msg: {
     senderPn?: string;
     remoteJidAlt?: string;
     participantPn?: string;
+    participantAlt?: string;
   };
   const loose = msg as {
     senderPn?: string;
     participantPn?: string;
+    participantAlt?: string;
     participant?: string | null;
   };
 
@@ -256,6 +291,7 @@ export function extractInboundJidMeta(msg: {
     senderPn: key.senderPn ?? loose.senderPn,
     remoteJidAlt: key.remoteJidAlt,
     participantPn: key.participantPn ?? loose.participantPn,
+    participantAlt: key.participantAlt ?? loose.participantAlt,
     fromMe: Boolean(key.fromMe)
   };
 }
