@@ -118,4 +118,29 @@ describe("EvolutionWebhookController", () => {
     ).rejects.toMatchObject({ message: "ERR_EVOLUTION_WEBHOOK_INVALID_PAYLOAD" });
     expect(processWebhook).not.toHaveBeenCalled();
   });
+
+  it("presence skipped responde 200 sem 5xx", async () => {
+    findByPkWhatsapp.mockResolvedValue({
+      id: 4,
+      companyId: 1,
+      connectionProvider: "evolution"
+    });
+    processWebhook.mockResolvedValue({
+      outcome: "skipped",
+      reason: "group"
+    });
+    const res = mockRes();
+    await receive(
+      {
+        params: { whatsappId: "4" },
+        headers: { apikey: "ok" },
+        body: { event: "presence.update" }
+      } as never,
+      res
+    );
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ ok: true, outcome: "skipped" })
+    );
+  });
 });

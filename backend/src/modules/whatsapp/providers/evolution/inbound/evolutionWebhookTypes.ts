@@ -58,6 +58,26 @@ export const EVOLUTION_QRCODE_UPDATED_EVENTS = [
 
 export type EvolutionQrcodeUpdatedEvent =
   (typeof EVOLUTION_QRCODE_UPDATED_EVENTS)[number];
+
+/** PRESENCE_UPDATE — typing/recording inbound (12.1-C2b.1). */
+export const EVOLUTION_PRESENCE_UPDATE_EVENTS = [
+  "PRESENCE_UPDATE",
+  "presence.update"
+] as const;
+
+export type EvolutionPresenceUpdateEvent =
+  (typeof EVOLUTION_PRESENCE_UPDATE_EVENTS)[number];
+
+export type EvolutionPresenceEntry = {
+  lastKnownPresence?: string;
+  lastSeen?: number;
+};
+
+export type EvolutionPresenceUpdateData = {
+  id?: string;
+  presences?: Record<string, EvolutionPresenceEntry | undefined>;
+};
+
 export type EvolutionWebhookKey = {
   remoteJid?: string;
   fromMe?: boolean;
@@ -200,7 +220,10 @@ export type EvolutionWebhookMessageData = {
 export type EvolutionWebhookEnvelope = {
   event?: string;
   instance?: string;
-  data?: EvolutionWebhookMessageData | EvolutionWebhookMessageData[];
+  data?:
+    | EvolutionWebhookMessageData
+    | EvolutionWebhookMessageData[]
+    | EvolutionPresenceUpdateData;
   destination?: string;
   date_time?: string;
   sender?: string;
@@ -256,6 +279,16 @@ export function isEvolutionQrcodeUpdatedEvent(
   if (!event) return false;
   const normalized = String(event).trim();
   return (EVOLUTION_QRCODE_UPDATED_EVENTS as readonly string[]).includes(
+    normalized
+  );
+}
+
+export function isEvolutionPresenceUpdateEvent(
+  event: string | null | undefined
+): event is EvolutionPresenceUpdateEvent {
+  if (!event) return false;
+  const normalized = String(event).trim();
+  return (EVOLUTION_PRESENCE_UPDATE_EVENTS as readonly string[]).includes(
     normalized
   );
 }

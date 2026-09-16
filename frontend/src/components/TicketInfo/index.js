@@ -110,6 +110,10 @@ const useStyles = makeStyles((theme) => ({
 		whiteSpace: "nowrap",
 		maxWidth: "100%",
 	},
+	inboundPresence: {
+		fontStyle: "italic",
+		color: theme.palette.text.secondary,
+	},
 	desktopExtras: {
 		display: "block",
 	},
@@ -118,6 +122,7 @@ const useStyles = makeStyles((theme) => ({
 const TicketInfo = ({
 	contact,
 	ticket,
+	inboundPresence,
 	onClick,
 	onLabelsChange,
 	onTicketUpdate,
@@ -159,6 +164,13 @@ const TicketInfo = ({
 		<span className={classes.titleBlock}>{`${contactName} #${ticket.id}`}</span>
 	);
 
+	const presenceLabel =
+		inboundPresence === "composing"
+			? i18n.t("messagesList.header.contactTyping")
+			: inboundPresence === "recording"
+			? i18n.t("messagesList.header.contactRecording")
+			: null;
+
 	const subheaderParts = [];
 	if (String(ticket?.channel || "").toLowerCase() === "instagram") {
 		subheaderParts.push(
@@ -174,9 +186,19 @@ const TicketInfo = ({
 		subheaderParts.push(i18n.t("ticketsList.startedOutsideSystemHint"));
 	}
 
+	const restSubheader = subheaderParts.filter(Boolean).join(" · ");
 	const subheaderNode = (
 		<span className={classes.subheaderBlock}>
-			{subheaderParts.filter(Boolean).join(" · ")}
+			{presenceLabel ? (
+				<span
+					className={classes.inboundPresence}
+					data-testid="ticket-inbound-presence"
+				>
+					{presenceLabel}
+				</span>
+			) : null}
+			{presenceLabel && restSubheader ? " · " : null}
+			{restSubheader}
 		</span>
 	);
 

@@ -12,6 +12,7 @@ import ContactDrawer from "../ContactDrawer";
 import MessageInput from "../MessageInputCustom/";
 import TicketHeader from "../TicketHeader";
 import TicketInfo from "../TicketInfo";
+import useInboundTicketPresence from "./useInboundTicketPresence";
 import ReassignOrphanWhatsappModal from "../ReassignOrphanWhatsappModal";
 import TicketActionButtons from "../TicketActionButtonsCustom";
 import TicketActionModals from "../TicketActionModals";
@@ -172,6 +173,7 @@ const Ticket = () => {
   const messagesListRef = useRef(null);
 
   const socketManager = useContext(SocketContext);
+  const inboundPresence = useInboundTicketPresence({ ticketId: ticket.id });
   const setCurrentTicket = useContext(TicketsSetContext);
   const { currentTicket } = useContext(TicketsContext);
   const inbox = useContext(TicketsInboxContext);
@@ -395,6 +397,7 @@ const Ticket = () => {
       <TicketInfo
         contact={contact}
         ticket={ticket}
+        inboundPresence={inboundPresence}
         onClick={handleDrawerOpen}
         onTicketUpdate={(updated) => setTicket((prev) => ({ ...prev, ...updated }))}
         onLabelsChange={(labels) => {

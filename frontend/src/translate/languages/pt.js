@@ -7570,6 +7570,8 @@ const messages = {
       messagesList: {
         header: {
           assignedTo: "Atribuído à:",
+          contactTyping: "digitando...",
+          contactRecording: "gravando áudio...",
           buttons: {
             return: "Retornar",
             resolve: "Resolver",

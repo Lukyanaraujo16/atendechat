@@ -24,6 +24,7 @@ import {
   isEvolutionMessageDeleteEvent,
   isEvolutionMessageUpdateEvent,
   isEvolutionMessageUpsertEvent,
+  isEvolutionPresenceUpdateEvent,
   isEvolutionQrcodeUpdatedEvent,
   sanitizeEvolutionWebhookPayload
 } from "./evolutionWebhookTypes";
@@ -32,6 +33,7 @@ import {
   processEvolutionConnectionUpdate,
   processEvolutionQrcodeUpdated
 } from "../lifecycle/processEvolutionConnectionWebhook";
+import { processEvolutionPresenceInbound } from "./processEvolutionPresenceInbound";
 
 const MAX_BODY_CHARS = 20000;
 
@@ -361,6 +363,18 @@ export async function processEvolutionWebhook(input: {
 
   if (!isEvolutionConnection(whatsapp)) {
     return { outcome: "error", reason: "not_evolution_connection" };
+  }
+
+  if (isEvolutionPresenceUpdateEvent(eventType)) {
+    const presence = await processEvolutionPresenceInbound({
+      whatsapp,
+      envelope
+    });
+    return {
+      outcome: presence.outcome,
+      reason: presence.reason,
+      ticketId: presence.ticketId
+    };
   }
 
   if (isEvolutionMessageUpdateEvent(eventType)) {
