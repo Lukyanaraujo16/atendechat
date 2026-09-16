@@ -17,6 +17,8 @@ import {
 } from "./EvolutionMediaExtractor";
 import { EvolutionHttpError } from "./evolutionHttpClient";
 import { persistEvolutionMediaFile } from "./persistEvolutionMediaFile";
+import { resolveWhatsappSettings } from "../../../../../helpers/resolveWhatsappSettings";
+import { buildStableGroupContactFallbackName } from "../../../../../helpers/stableGroupContactFallbackName";
 
 export type ProcessEvolutionInboundResult =
   | { status: "created"; messageId: string; ticketId: number }
@@ -77,6 +79,21 @@ export async function processEvolutionTextInbound(input: {
         throw new Error("ERR_EVOLUTION_MUST_NOT_CARRY_BAILEYS_RAW");
       }
 
+      if (dto.isGroup) {
+        const groupSettings = await resolveWhatsappSettings(
+          whatsapp.id,
+          dto.companyId,
+          "evolutionInbound:groupGate"
+        );
+        if (groupSettings.callsGroups.groupMessagesMode === "ignore") {
+          result = {
+            status: "skipped",
+            reason: "group_messages_disabled"
+          };
+          return;
+        }
+      }
+
       if ((dto.kind || "message") === "reaction") {
         if (!dto.reaction?.targetStanzaId || !dto.reaction.emoji) {
           result = { status: "skipped", reason: "invalid_reaction" };
@@ -118,7 +135,7 @@ export async function processEvolutionTextInbound(input: {
         ? dto.addressing.remoteJid.replace(/\D/g, "")
         : dto.senderNumber!;
 
-      const contactName =
+      const privateContactName =
         dto.pushName ||
         dto.senderNumber ||
         dto.addressing.remoteJid ||
@@ -129,7 +146,7 @@ export async function processEvolutionTextInbound(input: {
 
       if (dto.isGroup) {
         groupContact = await CreateOrUpdateContactService({
-          name: contactName,
+          name: buildStableGroupContactFallbackName(contactNumber),
           number: contactNumber,
           isGroup: true,
           companyId: dto.companyId,
@@ -152,7 +169,7 @@ export async function processEvolutionTextInbound(input: {
         });
       } else {
         contact = await CreateOrUpdateContactService({
-          name: contactName,
+          name: privateContactName,
           number: contactNumber,
           isGroup: false,
           companyId: dto.companyId,
