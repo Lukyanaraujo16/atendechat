@@ -37,7 +37,11 @@ import { canUseQuickRepliesFeature } from "../../utils/canUseQuickRepliesFeature
 import { SocketContext } from "../../context/Socket/SocketContext";
 import { useWhatsAppPanelRecorder } from "../../hooks/useWhatsAppPanelRecorder";
 import resolveQuickMessageTemplate from "../../utils/resolveQuickMessageTemplate";
-import { appendOutgoingMediaFormData } from "../../utils/messages/resolveOutgoingMediaBody";
+import {
+  appendOutgoingMediaFormData,
+  findFirstCaptionEligibleMediaIndex,
+} from "../../utils/messages/resolveOutgoingMediaBody";
+import useObjectUrl from "./useObjectUrl";
 import { recordRecentUse } from "../../utils/quickMessageChatStorage";
 import { PANEL_RADIUS, getSubtleBorderColor, getComposerSurface, getComposerTopDivider } from "../../theme/ticketPanelStyles";
 import {
@@ -185,15 +189,100 @@ const useStyles = makeStyles((theme) => {
 
   viewMediaInputWrapper: {
     display: "flex",
+    flexDirection: "column",
+    width: "100%",
+    boxSizing: "border-box",
     padding: theme.spacing(1.25, 1.5),
     position: "relative",
-    justifyContent: "space-between",
-    alignItems: "center",
     backgroundColor: theme.palette.background.paper,
     borderTop: `1px solid ${theme.palette.divider}`,
     borderBottomRightRadius: PANEL_RADIUS,
     borderBottomLeftRadius: 0,
     overflow: "hidden",
+    [theme.breakpoints.down("md")]: {
+      paddingBottom: `calc(${theme.spacing(1.25)}px + env(safe-area-inset-bottom, 0px))`,
+    },
+  },
+
+  viewMediaPreview: {
+    width: "100%",
+    maxHeight: 180,
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    overflow: "hidden",
+    borderRadius: 12,
+    backgroundColor: isDark
+      ? alpha(theme.palette.common.white, 0.06)
+      : alpha(theme.palette.common.black, 0.04),
+    marginBottom: theme.spacing(1),
+    [theme.breakpoints.down("md")]: {
+      maxHeight: 140,
+    },
+  },
+
+  viewMediaPreviewMedia: {
+    maxWidth: "100%",
+    maxHeight: 180,
+    objectFit: "contain",
+    display: "block",
+    [theme.breakpoints.down("md")]: {
+      maxHeight: 140,
+    },
+  },
+
+  viewMediaFileCount: {
+    width: "100%",
+    textAlign: "center",
+    fontSize: "0.75rem",
+    color: theme.palette.text.secondary,
+    marginBottom: theme.spacing(0.75),
+  },
+
+  viewMediaCaptionWrapper: {
+    width: "100%",
+    marginBottom: theme.spacing(0.75),
+    padding: theme.spacing(0.5, 1),
+    backgroundColor: isDark
+      ? alpha(theme.palette.common.white, 0.06)
+      : alpha(theme.palette.common.black, 0.04),
+    borderRadius: 16,
+    border: `1px solid ${getSubtleBorderColor(theme)}`,
+    boxSizing: "border-box",
+    "&:focus-within": {
+      borderColor: alpha(theme.palette.success.main, 0.55),
+      boxShadow: `0 0 0 3px ${alpha(theme.palette.success.main, 0.14)}`,
+    },
+  },
+
+  viewMediaCaptionInput: {
+    width: "100%",
+    fontSize: 16,
+    lineHeight: 1.35,
+    color: theme.palette.text.primary,
+    [theme.breakpoints.up("md")]: {
+      fontSize: "0.9375rem",
+    },
+  },
+
+  viewMediaActionsRow: {
+    display: "flex",
+    width: "100%",
+    justifyContent: "space-between",
+    alignItems: "center",
+    minWidth: 0,
+  },
+
+  viewMediaDocumentName: {
+    flex: 1,
+    minWidth: 0,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    textAlign: "center",
+    fontSize: "0.875rem",
+    color: theme.palette.text.secondary,
+    padding: theme.spacing(0, 1),
   },
 
   circleLoading: {
@@ -593,6 +682,7 @@ const MessageInputCustom = (props) => {
   const [sendingStickerId, setSendingStickerId] = useState(null);
   const [loading, setLoading] = useState(false);
   const inputRef = useRef();
+  const captionInputRef = useRef(null);
   const { setReplyingMessage, replyingMessage } =
     useContext(ReplyMessageContext);
   const { user } = useContext(AuthContext);
@@ -645,11 +735,27 @@ const MessageInputCustom = (props) => {
     enabled: !loading && !recording,
   });
 
+  const captionEligibleIndex = findFirstCaptionEligibleMediaIndex(medias);
+  const captionEligibleMedia =
+    captionEligibleIndex >= 0 ? medias[captionEligibleIndex] : null;
+  const mediaPreviewUrl = useObjectUrl(captionEligibleMedia);
+  const showMediaCaptionComposer = Boolean(captionEligibleMedia);
+
   useEffect(() => {
     if (!replyingMessage || !inputRef.current) return;
     if (!canAutoFocusMessageInput(focusBlockers)) return;
     safeFocusMessageInput(inputRef.current, focusBlockers, "replyingMessage");
   }, [replyingMessage, transferModalOpen, quickRepliesOpen]);
+
+  useEffect(() => {
+    if (!captionEligibleMedia) return;
+    if (!canAutoFocusMessageInput(focusBlockers)) return;
+    safeFocusMessageInput(
+      captionInputRef.current,
+      focusBlockers,
+      "mediaCaption"
+    );
+  }, [captionEligibleMedia, transferModalOpen, quickRepliesOpen]);
 
   useEffect(() => {
     if (inputRef.current && canAutoFocusMessageInput(focusBlockers)) {
@@ -715,14 +821,21 @@ const MessageInputCustom = (props) => {
   };
 
   const handleInputPaste = (e) => {
-    const pastedFile = e.clipboardData.files[0];
+    const pastedFile = e.clipboardData?.files?.[0];
     if (!pastedFile) {
       return;
     }
 
+    const type = String(pastedFile.type || "");
+    const isVisualMedia =
+      type.startsWith("image/") || type.startsWith("video/");
+
+    if (isVisualMedia && typeof e.preventDefault === "function") {
+      e.preventDefault();
+    }
+
     if (isInstagramChannel) {
-      const type = String(pastedFile.type || "");
-      if (type.startsWith("image/") || type.startsWith("video/") || type.startsWith("audio/")) {
+      if (isVisualMedia || type.startsWith("audio/")) {
         setMedias([pastedFile]);
       }
       return;
@@ -1005,35 +1118,100 @@ const MessageInputCustom = (props) => {
     );
   };
 
+  const handleMediaCaptionKeyDown = (e) => {
+    if (e.key !== "Enter") return;
+    if (e.shiftKey) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (loading || disableOption()) return;
+    handleUploadMedia(e);
+  };
+
   if (medias.length > 0)
     return (
-      <Paper elevation={0} square className={classes.viewMediaInputWrapper}>
-        <IconButton
-          aria-label="cancel-upload"
-          component="span"
-          onClick={(e) => setMedias([])}
-        >
-          <CancelIcon className={classes.sendMessageIcons} />
-        </IconButton>
-
-        {loading ? (
+      <Paper
+        elevation={0}
+        square
+        className={clsx(classes.viewMediaInputWrapper, "shc-ticket-composer-safe")}
+        data-testid={
+          showMediaCaptionComposer
+            ? "media-caption-composer"
+            : "media-document-bar"
+        }
+      >
+        {showMediaCaptionComposer && mediaPreviewUrl && (
+          <div className={classes.viewMediaPreview}>
+            {String(captionEligibleMedia?.type || "").startsWith("video/") ? (
+              <video
+                data-testid="media-preview-video"
+                className={classes.viewMediaPreviewMedia}
+                src={mediaPreviewUrl}
+                controls
+                playsInline
+              />
+            ) : (
+              <img
+                data-testid="media-preview-image"
+                className={classes.viewMediaPreviewMedia}
+                src={mediaPreviewUrl}
+                alt={captionEligibleMedia?.name || ""}
+              />
+            )}
+          </div>
+        )}
+        {medias.length > 1 && (
+          <div className={classes.viewMediaFileCount} data-testid="media-file-count">
+            {i18n.t("messagesInput.mediaFileCount", { count: medias.length })}
+          </div>
+        )}
+        {showMediaCaptionComposer && (
+          <div className={classes.viewMediaCaptionWrapper}>
+            <InputBase
+              inputRef={captionInputRef}
+              className={classes.viewMediaCaptionInput}
+              value={inputMessage}
+              onChange={(e) => setInputMessage(e.target.value)}
+              onKeyDown={handleMediaCaptionKeyDown}
+              onPaste={handleInputPaste}
+              placeholder={i18n.t("messagesInput.mediaCaptionPlaceholder")}
+              inputProps={{
+                "data-testid": "media-caption-input",
+                "aria-label": i18n.t("messagesInput.mediaCaptionPlaceholder"),
+              }}
+              multiline
+              maxRows={4}
+              disabled={loading}
+            />
+          </div>
+        )}
+        {loading && (
           <div>
             <CircularProgress className={classes.circleLoading} />
           </div>
-        ) : (
-          <span>
-            {medias[0]?.name}
-            {/* <img src={media.preview} alt=""></img> */}
-          </span>
         )}
-        <IconButton
-          aria-label="send-upload"
-          component="span"
-          onClick={handleUploadMedia}
-          disabled={loading}
-        >
-          <SendIcon className={classes.sendMessageIcons} />
-        </IconButton>
+        <div className={classes.viewMediaActionsRow}>
+          <IconButton
+            aria-label="cancel-upload"
+            component="span"
+            onClick={() => setMedias([])}
+            disabled={loading}
+          >
+            <CancelIcon className={classes.sendMessageIcons} />
+          </IconButton>
+          {!showMediaCaptionComposer && (
+            <span className={classes.viewMediaDocumentName}>
+              {medias[0]?.name}
+            </span>
+          )}
+          <IconButton
+            aria-label="send-upload"
+            component="span"
+            onClick={handleUploadMedia}
+            disabled={loading}
+          >
+            <SendIcon className={classes.sendMessageIcons} />
+          </IconButton>
+        </div>
       </Paper>
     );
   else {

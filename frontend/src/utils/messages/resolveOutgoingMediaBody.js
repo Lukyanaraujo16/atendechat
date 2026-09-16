@@ -14,6 +14,20 @@ export function isOutgoingVideoMedia(media) {
   return type.startsWith("video/");
 }
 
+export function isOutgoingCaptionEligibleMedia(media) {
+  return isOutgoingImageOrStickerMedia(media) || isOutgoingVideoMedia(media);
+}
+
+export function findFirstCaptionEligibleMediaIndex(medias) {
+  const list = medias || [];
+  for (let i = 0; i < list.length; i += 1) {
+    if (isOutgoingCaptionEligibleMedia(list[i])) {
+      return i;
+    }
+  }
+  return -1;
+}
+
 /**
  * @param {object} params
  * @param {string} [params.typedCaption]
@@ -61,16 +75,28 @@ export function appendOutgoingMediaFormData(
   { medias, typedCaption, isInstagramChannel, isInstagramDocumentFor }
 ) {
   formData.append("fromMe", true);
-  (medias || []).forEach((media) => {
+  const list = medias || [];
+  const captionEligibleIndex = findFirstCaptionEligibleMediaIndex(list);
+  const hasVisualCaptionBatch = captionEligibleIndex >= 0;
+
+  list.forEach((media, index) => {
     formData.append("medias", media);
     const isInstagramDocument =
       typeof isInstagramDocumentFor === "function"
         ? Boolean(isInstagramDocumentFor(media))
         : false;
+
+    let captionForThis = typedCaption;
+    if (isOutgoingCaptionEligibleMedia(media)) {
+      captionForThis = index === captionEligibleIndex ? typedCaption : "";
+    } else if (hasVisualCaptionBatch) {
+      captionForThis = "";
+    }
+
     formData.append(
       "body",
       resolveOutgoingMediaBody({
-        typedCaption,
+        typedCaption: captionForThis,
         media,
         isInstagramChannel,
         isInstagramDocument,

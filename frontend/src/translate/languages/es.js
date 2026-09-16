@@ -6727,6 +6727,8 @@ const messages = {
         placeholderOpen: "Escribe un mensaje",
         placeholderClosed: "Reabre o acepta este ticket para enviar un mensaje.",
         signMessage: "Firmar",
+        mediaCaptionPlaceholder: "Agregar una leyenda...",
+        mediaFileCount: "{{count}} archivos",
         sticker: "Enviar sticker (WebP)",
         stickerOnlyWebp: "El sticker debe ser un archivo .webp",
         attach: {

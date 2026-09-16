@@ -7434,6 +7434,8 @@ const messages = {
 				instagramImageHint:
 					"Instagram: text, images, videos, audio and documents are enabled. Other media types will be available in a future phase.",
 				signMessage: "Sign",
+				mediaCaptionPlaceholder: "Add a caption...",
+				mediaFileCount: "{{count}} files",
 				sticker: "Send sticker (WebP)",
 				stickerOnlyWebp: "Sticker must be a .webp file",
 				attach: {

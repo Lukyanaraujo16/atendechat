@@ -7,6 +7,7 @@ import fs from "fs";
 import path from "path";
 import {
   appendOutgoingMediaFormData,
+  findFirstCaptionEligibleMediaIndex,
   resolveOutgoingMediaBody,
 } from "../resolveOutgoingMediaBody";
 
@@ -209,6 +210,122 @@ describe("appendOutgoingMediaFormData — payload de envio", () => {
     expect(collectBodies(formData)).toEqual([""]);
     expect(formData.get("medias")).toBeTruthy();
     expect(file.name).toBe("clip.mp4");
+  });
+
+  it("3 imagens + caption → somente a primeira recebe caption", () => {
+    const files = [
+      media("a.png", "image/png"),
+      media("b.png", "image/png"),
+      media("c.png", "image/png"),
+    ];
+    const formData = appendOutgoingMediaFormData(new FormData(), {
+      medias: files,
+      typedCaption: "Material da obra",
+      isInstagramChannel: false,
+    });
+    expect(collectBodies(formData)).toEqual(["Material da obra", "", ""]);
+  });
+
+  it("vídeo + imagem + caption → somente o vídeo (primeiro visual) recebe", () => {
+    const files = [
+      media("clip.mp4", "video/mp4"),
+      media("foto.png", "image/png"),
+    ];
+    const formData = appendOutgoingMediaFormData(new FormData(), {
+      medias: files,
+      typedCaption: "Material da obra",
+      isInstagramChannel: false,
+    });
+    expect(collectBodies(formData)).toEqual(["Material da obra", ""]);
+  });
+
+  it("documento + imagem + caption → documento preserva filename; imagem recebe caption", () => {
+    const files = [
+      media("contrato.pdf", "application/pdf"),
+      media("foto.jpg", "image/jpeg"),
+    ];
+    const formData = appendOutgoingMediaFormData(new FormData(), {
+      medias: files,
+      typedCaption: "Material da obra",
+      isInstagramChannel: false,
+    });
+    expect(collectBodies(formData)).toEqual(["contrato.pdf", "Material da obra"]);
+  });
+
+  it("imagem + documento + caption → imagem recebe caption; documento preserva filename", () => {
+    const files = [
+      media("foto.jpg", "image/jpeg"),
+      media("contrato.pdf", "application/pdf"),
+    ];
+    const formData = appendOutgoingMediaFormData(new FormData(), {
+      medias: files,
+      typedCaption: "Material da obra",
+      isInstagramChannel: false,
+    });
+    expect(collectBodies(formData)).toEqual(["Material da obra", "contrato.pdf"]);
+  });
+
+  it("documento + documento + vídeo + caption → docs preservados; vídeo recebe caption", () => {
+    const files = [
+      media("a.pdf", "application/pdf"),
+      media("b.pdf", "application/pdf"),
+      media("clip.mp4", "video/mp4"),
+    ];
+    const formData = appendOutgoingMediaFormData(new FormData(), {
+      medias: files,
+      typedCaption: "Material da obra",
+      isInstagramChannel: false,
+    });
+    expect(collectBodies(formData)).toEqual(["a.pdf", "b.pdf", "Material da obra"]);
+  });
+
+  it("múltiplos documentos sem visual media preservam filename (sem caption)", () => {
+    const files = [
+      media("a.pdf", "application/pdf"),
+      media("b.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+    ];
+    const formData = appendOutgoingMediaFormData(new FormData(), {
+      medias: files,
+      typedCaption: "",
+      isInstagramChannel: false,
+    });
+    expect(collectBodies(formData)).toEqual(["a.pdf", "b.docx"]);
+  });
+
+  it("múltiplos documentos com texto no composer preservam o contrato histórico", () => {
+    const files = [
+      media("a.pdf", "application/pdf"),
+      media("b.pdf", "application/pdf"),
+    ];
+    const formData = appendOutgoingMediaFormData(new FormData(), {
+      medias: files,
+      typedCaption: "texto do composer",
+      isInstagramChannel: false,
+    });
+    expect(collectBodies(formData)).toEqual([
+      "texto do composer",
+      "texto do composer",
+    ]);
+  });
+});
+
+describe("findFirstCaptionEligibleMediaIndex", () => {
+  it("ignora documentos e aponta para a primeira image/video", () => {
+    expect(
+      findFirstCaptionEligibleMediaIndex([
+        media("a.pdf", "application/pdf"),
+        media("foto.jpg", "image/jpeg"),
+        media("clip.mp4", "video/mp4"),
+      ])
+    ).toBe(1);
+  });
+
+  it("retorna -1 quando não há image/video", () => {
+    expect(
+      findFirstCaptionEligibleMediaIndex([
+        media("a.pdf", "application/pdf"),
+      ])
+    ).toBe(-1);
   });
 });
 

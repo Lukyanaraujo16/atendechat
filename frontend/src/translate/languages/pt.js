@@ -7602,6 +7602,8 @@ const messages = {
         instagramImageHint:
             "Instagram: texto, imagem, vídeo, áudio e documento liberados. Outros tipos de mídia serão liberados em fase futura.",
         signMessage: "Assinar",
+        mediaCaptionPlaceholder: "Adicionar uma legenda...",
+        mediaFileCount: "{{count}} arquivos",
         sticker: "Enviar figurinha (WebP)",
         stickerOnlyWebp: "Figurinha deve ser um arquivo .webp",
         attach: {
