@@ -10,7 +10,11 @@ import {
   loadUserQueueIds
 } from "../../helpers/groupVisibility";
 import { canUserAccessTicketByWhatsapp } from "../../helpers/whatsappTicketVisibility";
-import { ensureGroupContactDisplayName } from "../../helpers/groupContactName";
+import {
+  createFetchRemoteSubjectFromProvider,
+  ensureGroupContactDisplayName
+} from "../../helpers/groupContactName";
+import { getWhatsAppGroupsProviderForWhatsapp } from "../../modules/whatsapp/groups/resolveWhatsAppGroupsProvider";
 
 export type GroupsInboxAvailableItem = {
   type: "group";
@@ -30,6 +34,40 @@ interface Request {
   actor: GroupAccessActor;
 }
 
+type InboxSubjectFetcher = (digits: string) => Promise<string | null>;
+
+function createInboxRemoteSubjectFetcher(
+  companyId: number,
+  whatsappId: number | null,
+  cache: Map<string, InboxSubjectFetcher | null>
+): InboxSubjectFetcher {
+  return async (digits: string): Promise<string | null> => {
+    if (!whatsappId) return null;
+    const cacheKey = `${companyId}:${whatsappId}`;
+    if (cache.has(cacheKey)) {
+      const cached = cache.get(cacheKey);
+      if (!cached) return null;
+      return cached(digits);
+    }
+    try {
+      const row = await Whatsapp.findByPk(whatsappId, {
+        attributes: ["id", "companyId", "connectionProvider"]
+      });
+      if (!row || Number(row.companyId) !== Number(companyId)) {
+        cache.set(cacheKey, null);
+        return null;
+      }
+      const provider = await getWhatsAppGroupsProviderForWhatsapp(row);
+      const fetcher = createFetchRemoteSubjectFromProvider(provider);
+      cache.set(cacheKey, fetcher);
+      return fetcher(digits);
+    } catch {
+      cache.set(cacheKey, null);
+      return null;
+    }
+  };
+}
+
 /**
  * Grupos autorizados para o utilizador que ainda não têm ticket open/pending.
  * A aba Atendimento → Grupos faz merge com GET /tickets?isGroup=true no frontend.
@@ -38,6 +76,7 @@ const ListGroupsInboxService = async ({
   companyId,
   actor
 }: Request): Promise<{ groups: GroupsInboxAvailableItem[] }> => {
+  const remoteSubjectCache = new Map<string, InboxSubjectFetcher | null>();
   const privileged = isGroupVisibilityPrivileged(actor);
   const userQueueIds = privileged ? [] : await loadUserQueueIds(actor.id);
 
@@ -62,8 +101,8 @@ const ListGroupsInboxService = async ({
   const excludedContactIds = [
     ...new Set(
       activeGroupTickets
-        .map((t) => Number((t as { contactId?: number }).contactId))
-        .filter((id) => Number.isFinite(id) && id > 0)
+        .map(t => Number((t as { contactId?: number }).contactId))
+        .filter(id => Number.isFinite(id) && id > 0)
     )
   ];
 
@@ -104,7 +143,7 @@ const ListGroupsInboxService = async ({
     return { groups: [] };
   }
 
-  const contactIds = contacts.map((c) => c.id);
+  const contactIds = contacts.map(c => c.id);
   const authorizedMap = await loadAuthorizedQueueIdsByContact(
     contactIds,
     companyId
@@ -112,6 +151,7 @@ const ListGroupsInboxService = async ({
 
   const groups: GroupsInboxAvailableItem[] = [];
 
+  /* eslint-disable no-restricted-syntax, no-continue, no-await-in-loop */
   for (const contact of contacts) {
     const authorizedQueueIds = authorizedMap.get(contact.id) || [];
 
@@ -134,8 +174,13 @@ const ListGroupsInboxService = async ({
       continue;
     }
 
+    const inboxWhatsappId = contact.whatsappId ?? whatsapp?.id ?? null;
     const displayName = await ensureGroupContactDisplayName(contact, {
-      whatsappId: contact.whatsappId ?? whatsapp?.id ?? null
+      fetchRemoteSubject: createInboxRemoteSubjectFetcher(
+        companyId,
+        inboxWhatsappId,
+        remoteSubjectCache
+      )
     });
 
     groups.push({
@@ -153,6 +198,7 @@ const ListGroupsInboxService = async ({
         : null
     });
   }
+  /* eslint-enable no-restricted-syntax, no-continue, no-await-in-loop */
 
   return { groups };
 };

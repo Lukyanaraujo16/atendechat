@@ -1,6 +1,5 @@
 import Contact from "../models/Contact";
-import { getWbot } from "../libs/wbot";
-import type { WASocket } from "@whiskeysockets/baileys";
+import type { WhatsAppGroupsProvider } from "../modules/whatsapp/groups/WhatsAppGroupsProvider";
 
 export function groupJidFromDigits(digits: string): string {
   const d = String(digits || "").replace(/\D/g, "");
@@ -8,12 +7,30 @@ export function groupJidFromDigits(digits: string): string {
   return d.includes("@g.us") ? d : `${d}@g.us`;
 }
 
+export function createFetchRemoteSubjectFromProvider(
+  provider: WhatsAppGroupsProvider
+): (digits: string) => Promise<string | null> {
+  return async (digits: string): Promise<string | null> => {
+    const jid = groupJidFromDigits(digits);
+    if (!jid) return null;
+    try {
+      const meta = await provider.getGroupMetadata(jid);
+      const subject = String(meta.subject || "").trim();
+      return subject || null;
+    } catch {
+      return null;
+    }
+  };
+}
+
 /** Nome ainda é placeholder (vazio ou igual ao number/JID). */
 export function contactNeedsGroupNameResolution(
   contact: Pick<Contact, "name" | "number" | "isGroup">
 ): boolean {
   if (contact.isGroup !== true) return false;
-  const num = String(contact.number || "").replace(/\D/g, "").trim();
+  const num = String(contact.number || "")
+    .replace(/\D/g, "")
+    .trim();
   const name = String(contact.name || "").trim();
   if (!name) return true;
   if (!num) return false;
@@ -22,31 +39,15 @@ export function contactNeedsGroupNameResolution(
   return false;
 }
 
-export async function fetchGroupSubjectFromWbot(
-  wbot: WASocket,
-  digits: string
-): Promise<string | null> {
-  const jid = groupJidFromDigits(digits);
-  if (!jid) return null;
-  try {
-    const meta = await wbot.groupMetadata(jid);
-    const subject = String(meta?.subject || "").trim();
-    return subject || null;
-  } catch {
-    return null;
-  }
-}
-
 /**
- * Garante Contact.name com subject do WhatsApp quando ainda é placeholder numérico.
- * Persiste no banco se encontrar subject; senão mantém number como fallback.
+ * Garante Contact.name com subject quando ainda é placeholder numérico.
+ * Resolução remota só via callback — nunca getWbot escondido (Evolution-safe).
  */
 export async function ensureGroupContactDisplayName(
   contact: Contact,
   options?: {
-    wbot?: WASocket;
-    whatsappId?: number | null;
     subjectHint?: string | null;
+    fetchRemoteSubject?: (digits: string) => Promise<string | null>;
   }
 ): Promise<string> {
   const fallback = String(contact.number || "").trim();
@@ -57,16 +58,12 @@ export async function ensureGroupContactDisplayName(
 
   let subject = String(options?.subjectHint || "").trim();
 
-  if (!subject && options?.wbot) {
-    subject = (await fetchGroupSubjectFromWbot(options.wbot, contact.number)) || "";
-  }
-
-  if (!subject && options?.whatsappId) {
+  if (!subject && options?.fetchRemoteSubject) {
     try {
-      const wbot = getWbot(Number(options.whatsappId));
-      subject = (await fetchGroupSubjectFromWbot(wbot, contact.number)) || "";
+      subject =
+        (await options.fetchRemoteSubject(String(contact.number || ""))) || "";
     } catch {
-      // sessão offline ou sem acesso ao grupo
+      subject = "";
     }
   }
 

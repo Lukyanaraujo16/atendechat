@@ -6936,6 +6936,8 @@ const messages = {
         ERR_NO_OTHER_WHATSAPP: "Debe haber al menos un WhatsApp predeterminado.",
         ERR_NO_DEF_WAPP_FOUND: "No se encontró WhatsApp predeterminado. Verifique la página de conexiones.",
         ERR_WAPP_NOT_INITIALIZED: "Esta sesión de WhatsApp no fue inicializada. Verifique la página de conexiones.",
+        ERR_WHATSAPP_GROUPS_PROVIDER_NOT_READY:
+          "La gestión de grupos de este proveedor aún no está disponible.",
         ERR_WAPP_CHECK_CONTACT: "No fue posible verificar el contacto de WhatsApp. Verifique la página de conexiones",
         ERR_WAPP_INVALID_CONTACT: "Este no es un número de WhatsApp válido.",
         ERR_WAPP_DOWNLOAD_MEDIA: "No fue posible descargar el archivo multimedia de WhatsApp. Verifique la página de conexiones.",

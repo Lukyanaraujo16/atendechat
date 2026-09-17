@@ -7695,6 +7695,8 @@ const messages = {
 				ERR_NO_OTHER_WHATSAPP: "There must be at least one default WhatsApp.",
 				ERR_NO_DEF_WAPP_FOUND: "No default WhatsApp found. Check the connections page.",
 				ERR_WAPP_NOT_INITIALIZED: "This WhatsApp session hasn't been initialized. Check the connections page.",
+				ERR_WHATSAPP_GROUPS_PROVIDER_NOT_READY:
+					"Group management for this provider is not available yet.",
 				ERR_WAPP_CHECK_CONTACT: "Couldn't verify WhatsApp contact. Check the connections page",
 				ERR_WAPP_INVALID_CONTACT: "This is not a valid WhatsApp number.",
 				ERR_WAPP_DOWNLOAD_MEDIA: "Couldn't download WhatsApp media. Check the connections page.",

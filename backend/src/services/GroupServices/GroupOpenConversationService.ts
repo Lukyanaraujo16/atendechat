@@ -1,12 +1,15 @@
 import AppError from "../../errors/AppError";
-import { getWbot } from "../../libs/wbot";
 import Contact from "../../models/Contact";
-import Whatsapp from "../../models/Whatsapp";
 import CreateOrUpdateContactService from "../ContactServices/CreateOrUpdateContactService";
 import FindOrCreateTicketService from "../TicketServices/FindOrCreateTicketService";
 import ShowWhatsAppService from "../WhatsappService/ShowWhatsAppService";
-import { ensureGroupContactDisplayName } from "../../helpers/groupContactName";
+import {
+  createFetchRemoteSubjectFromProvider,
+  ensureGroupContactDisplayName
+} from "../../helpers/groupContactName";
 import { ensureGroupTicketPermanentOpen } from "../../helpers/groupTicketRules";
+import { getWhatsAppGroupsProviderForWhatsapp } from "../../modules/whatsapp/groups/resolveWhatsAppGroupsProvider";
+import { ERR_WHATSAPP_GROUPS_PROVIDER_NOT_READY } from "../../modules/whatsapp/groups/groupsErrors";
 
 function normalizeGroupJid(groupId: string): string {
   const s = String(groupId || "").trim();
@@ -39,12 +42,8 @@ const GroupOpenConversationService = async ({
   const jid = normalizeGroupJid(groupId);
   const digits = jid.replace(/\D/g, "");
 
-  await ShowWhatsAppService(whatsappId, companyId);
-  const wbot = getWbot(whatsappId);
-
-  const whatsappRow = await Whatsapp.findByPk(whatsappId, {
-    attributes: ["id", "companyId", "defaultGroupVisible"]
-  });
+  const whatsapp = await ShowWhatsAppService(whatsappId, companyId);
+  const provider = await getWhatsAppGroupsProviderForWhatsapp(whatsapp);
 
   let groupContact = await Contact.findOne({
     where: { companyId, isGroup: true, number: digits }
@@ -52,17 +51,22 @@ const GroupOpenConversationService = async ({
 
   if (!groupContact) {
     let profilePicUrl = `${process.env.FRONTEND_URL}/nopicture.png`;
-    try {
-      profilePicUrl = await wbot.profilePictureUrl(jid);
-    } catch {
-      // mantém placeholder
+    if (provider.getGroupProfilePicture) {
+      const url = await provider.getGroupProfilePicture(jid);
+      if (url) profilePicUrl = url;
     }
 
     let subject = digits;
     try {
-      const meta = await wbot.groupMetadata(jid);
+      const meta = await provider.getGroupMetadata(jid);
       if (meta?.subject) subject = meta.subject;
-    } catch {
+    } catch (err) {
+      if (
+        err instanceof AppError &&
+        err.message === ERR_WHATSAPP_GROUPS_PROVIDER_NOT_READY
+      ) {
+        throw err;
+      }
       throw new AppError(
         "Não foi possível acessar o grupo (sessão sem acesso ou grupo inexistente).",
         400
@@ -73,13 +77,17 @@ const GroupOpenConversationService = async ({
       name: subject,
       number: digits,
       isGroup: true,
-      groupVisible: Boolean((whatsappRow as any)?.defaultGroupVisible),
+      groupVisible: Boolean(
+        (whatsapp as { defaultGroupVisible?: boolean }).defaultGroupVisible
+      ),
       companyId,
       whatsappId,
       profilePicUrl
     });
   } else {
-    await ensureGroupContactDisplayName(groupContact, { wbot, whatsappId });
+    await ensureGroupContactDisplayName(groupContact, {
+      fetchRemoteSubject: createFetchRemoteSubjectFromProvider(provider)
+    });
   }
 
   let ticket = await FindOrCreateTicketService(

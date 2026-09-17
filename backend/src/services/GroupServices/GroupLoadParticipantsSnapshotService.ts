@@ -1,4 +1,3 @@
-import { getWbot } from "../../libs/wbot";
 import Contact from "../../models/Contact";
 import {
   assertCanManageGroupParticipants,
@@ -16,6 +15,8 @@ import {
   buildExistingPhonesLookupWhere,
   wrapGroupAccessError
 } from "../../helpers/groupParticipantsRequest";
+import { toMetadataParticipantInput } from "../../modules/whatsapp/groups/mapGroupMetadataParticipants";
+import { getWhatsAppGroupsProviderForWhatsapp } from "../../modules/whatsapp/groups/resolveWhatsAppGroupsProvider";
 import ShowWhatsAppService from "../WhatsappService/ShowWhatsAppService";
 
 export type GroupParticipantsSnapshot = {
@@ -40,7 +41,7 @@ const GroupLoadParticipantsSnapshotService = async ({
   actor: GroupAccessActor;
 }): Promise<GroupParticipantsSnapshot> => {
   assertCanManageGroupParticipants(actor);
-  await ShowWhatsAppService(whatsappId, companyId);
+  const whatsapp = await ShowWhatsAppService(whatsappId, companyId);
 
   let jid: string;
   try {
@@ -55,10 +56,17 @@ const GroupLoadParticipantsSnapshotService = async ({
   });
   await assertGroupParticipantsVisibility(actor, groupContact);
 
-  const wbot = getWbot(Number(whatsappId));
-  let meta: { subject?: string; participants?: unknown[] };
+  const provider = await getWhatsAppGroupsProviderForWhatsapp(whatsapp);
+  let meta: {
+    subject: string;
+    participants: ReturnType<typeof toMetadataParticipantInput>[];
+  };
   try {
-    meta = await wbot.groupMetadata(jid);
+    const normalized = await provider.getGroupMetadata(jid);
+    meta = {
+      subject: normalized.subject,
+      participants: normalized.participants.map(toMetadataParticipantInput)
+    };
   } catch (err) {
     wrapGroupAccessError(err);
   }
@@ -74,9 +82,9 @@ const GroupLoadParticipantsSnapshotService = async ({
       where: buildExistingPhonesLookupWhere(companyId, phones),
       attributes: ["number"]
     });
-    for (const row of rows) {
+    rows.forEach(row => {
       if (row.number) existingPhones.add(String(row.number));
-    }
+    });
   }
 
   return {
