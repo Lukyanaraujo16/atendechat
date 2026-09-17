@@ -66,7 +66,15 @@ export function buildEvolutionQuotedPayload(
       "quoted Evolution exige stanzaId"
     );
   }
-  if (quoted.isGroup && !String(quoted.participant || "").trim()) {
+  const quotedFromMe = quoted.fromMe === true;
+  // Grupo + alvo de outro participante: participant identifica o autor.
+  // Grupo + fromMe: Baileys 7 (Evolution 2.3.7) usa o JID da sessão;
+  // não inventar participant. Outbound StreamHub persiste participant null.
+  if (
+    quoted.isGroup &&
+    !quotedFromMe &&
+    !String(quoted.participant || "").trim()
+  ) {
     throw new AppError(
       ERR_EVOLUTION_INVALID_QUOTED,
       400,
@@ -77,7 +85,7 @@ export function buildEvolutionQuotedPayload(
   const key: EvolutionQuotedPayload["key"] = {
     id: stanzaId,
     remoteJid: quoted.destinationJid || undefined,
-    fromMe: Boolean(quoted.fromMe)
+    fromMe: quotedFromMe
   };
   if (quoted.isGroup && quoted.participant) {
     key.participant = String(quoted.participant).trim();

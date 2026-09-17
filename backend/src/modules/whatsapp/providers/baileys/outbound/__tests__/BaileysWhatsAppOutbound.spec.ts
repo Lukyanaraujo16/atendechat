@@ -105,6 +105,29 @@ describe("BaileysWhatsAppOutbound", () => {
     expect(opts.quoted.message.conversation).toBe("orig");
   });
 
+  it("quoted group own outbound semântico não inventa participant", async () => {
+    const wbot = mockWbot();
+    const outbound = new BaileysWhatsAppOutbound(wbot as never);
+    const groupJid = "120363111222333@g.us";
+    await outbound.sendText({
+      jid: groupJid,
+      text: "reply own",
+      quoted: {
+        destinationJid: groupJid,
+        isGroup: true,
+        stanzaId: "OWN_A",
+        fromMe: true,
+        participant: null,
+        body: "own outbound"
+      }
+    });
+    const [, , opts] = wbot.sendMessage.mock.calls[0];
+    expect(opts.quoted.key.id).toBe("OWN_A");
+    expect(opts.quoted.key.remoteJid).toBe(groupJid);
+    expect(opts.quoted.key.fromMe).toBe(true);
+    expect(opts.quoted.key.participant).toBeUndefined();
+  });
+
   it("sendContent envia mídia/áudio/documento/sticker sem redesenhar payload", async () => {
     const wbot = mockWbot();
     const outbound = new BaileysWhatsAppOutbound(wbot as never);

@@ -120,7 +120,7 @@ describe("EvolutionWhatsAppOutbound Fase 8", () => {
     });
   });
 
-  it("quoted sem stanzaId / grupo sem participant falha controlado", async () => {
+  it("quoted sem stanzaId / grupo inbound sem participant falha controlado", async () => {
     const outbound = new EvolutionWhatsAppOutbound(1);
     await expect(
       outbound.sendText({
@@ -136,10 +136,68 @@ describe("EvolutionWhatsAppOutbound Fase 8", () => {
         quoted: {
           stanzaId: "G1",
           destinationJid: "120363@g.us",
-          isGroup: true
+          isGroup: true,
+          fromMe: false
         }
       })
     ).rejects.toMatchObject({ message: ERR_EVOLUTION_INVALID_QUOTED });
+  });
+
+  it("quoted group inbound envia participant; own outbound omite sem inventar", async () => {
+    const outbound = new EvolutionWhatsAppOutbound(10);
+    const groupJid = "120363111222333@g.us";
+    const inboundParticipant = "5511888777666@s.whatsapp.net";
+
+    await outbound.sendText({
+      jid: groupJid,
+      text: "reply inbound",
+      quoted: {
+        stanzaId: "INB_A",
+        destinationJid: groupJid,
+        isGroup: true,
+        fromMe: false,
+        participant: inboundParticipant,
+        body: "hello group"
+      }
+    });
+    expect(sendText).toHaveBeenLastCalledWith({
+      whatsappId: 10,
+      number: groupJid,
+      text: "reply inbound",
+      quoted: {
+        key: {
+          id: "INB_A",
+          remoteJid: groupJid,
+          fromMe: false,
+          participant: inboundParticipant
+        },
+        message: { conversation: "hello group" }
+      }
+    });
+
+    await outbound.sendText({
+      jid: groupJid,
+      text: "reply own",
+      quoted: {
+        stanzaId: "OWN_A",
+        destinationJid: groupJid,
+        isGroup: true,
+        fromMe: true,
+        participant: null,
+        body: "own outbound"
+      }
+    });
+    const ownCall = sendText.mock.calls[sendText.mock.calls.length - 1][0];
+    expect(ownCall.number).toBe(groupJid);
+    expect(ownCall.quoted).toEqual({
+      key: {
+        id: "OWN_A",
+        remoteJid: groupJid,
+        fromMe: true
+      },
+      message: { conversation: "own outbound" }
+    });
+    expect(ownCall.quoted.key).not.toHaveProperty("participant");
   });
 
   it("deleteMessage chama deleteMessageForEveryone sem Baileys", async () => {
