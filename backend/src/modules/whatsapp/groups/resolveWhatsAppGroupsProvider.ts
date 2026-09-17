@@ -7,10 +7,11 @@ import {
 import { throwWhatsAppGroupsProviderNotReady } from "./groupsErrors";
 import { WhatsAppGroupsProvider } from "./WhatsAppGroupsProvider";
 import { BaileysGroupsProvider } from "../providers/baileys/groups/BaileysGroupsProvider";
+import { EvolutionGroupsProvider } from "../providers/evolution/groups/EvolutionGroupsProvider";
 
 /**
  * Resolução da gestão de grupos por conexão.
- * Baileys → socket. Evolution → NOT_READY (12.2-F). Nunca getWbot em Evolution.
+ * Baileys → socket. Evolution → HTTP 2.3.7. Nunca getWbot em Evolution.
  */
 export async function getWhatsAppGroupsProviderForWhatsapp(
   whatsapp: Whatsapp
@@ -18,7 +19,7 @@ export async function getWhatsAppGroupsProviderForWhatsapp(
   const provider = resolveWhatsAppConnectionProvider(whatsapp);
 
   if (isEvolutionConnection(provider)) {
-    throwWhatsAppGroupsProviderNotReady();
+    return EvolutionGroupsProvider.fromWhatsapp(whatsapp);
   }
 
   if (!isBaileysConnection(provider)) {

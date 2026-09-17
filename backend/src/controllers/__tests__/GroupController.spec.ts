@@ -85,8 +85,6 @@ jest.mock("../../utils/logger", () => ({
   }
 }));
 
-import AppError from "../../errors/AppError";
-import { ERR_WHATSAPP_GROUPS_PROVIDER_NOT_READY } from "../../modules/whatsapp/groups/groupsErrors";
 import * as GroupController from "../GroupController";
 
 function mockRes() {
@@ -196,23 +194,36 @@ describe("GroupController JSON público", () => {
     expect(mockGetWbot).not.toHaveBeenCalled();
   });
 
-  it("Evolution NOT_READY não é sessão desconectada", async () => {
-    mockListParticipating.mockRejectedValue(
-      new AppError(
-        ERR_WHATSAPP_GROUPS_PROVIDER_NOT_READY,
-        503,
-        "Gestão de grupos deste provider ainda não está disponível."
-      )
-    );
+  it("Evolution lista grupos no JSON público e não chama getWbot", async () => {
+    mockListParticipating.mockResolvedValue({
+      groups: [
+        {
+          id: "120363111222333@g.us",
+          name: "Grupo teste",
+          participantCount: 3,
+          adminCount: 2,
+          adminPreview: ["111222333444555", "101010101010101"],
+          contactId: 9,
+          groupVisible: true,
+          authorizedQueueIds: []
+        }
+      ]
+    });
     const res = mockRes();
     await GroupController.list(
       mockReq({ params: { whatsappId: "8" } }) as never,
       res as never
     );
-    expect(res.status).toHaveBeenCalledWith(503);
+    expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith({
-      error: ERR_WHATSAPP_GROUPS_PROVIDER_NOT_READY,
-      message: "Gestão de grupos deste provider ainda não está disponível."
+      groups: [
+        expect.objectContaining({
+          id: "120363111222333@g.us",
+          name: "Grupo teste",
+          participantCount: 3,
+          adminCount: 2
+        })
+      ]
     });
     expect(mockGetWbot).not.toHaveBeenCalled();
   });

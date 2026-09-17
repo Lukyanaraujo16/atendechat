@@ -103,6 +103,42 @@ describe("ListGroupsInboxService", () => {
     expect(mockGetWbot).not.toHaveBeenCalled();
   });
 
+  it("Evolution com GroupsProvider resolve subject remoto e não chama getWbot", async () => {
+    const contact = {
+      id: 5,
+      name: "120363111",
+      number: "120363111",
+      profilePicUrl: null,
+      whatsappId: 8,
+      updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+      groupVisible: true,
+      isGroup: true,
+      whatsapp: { id: 8, name: "Evo", ticketVisibility: "all" },
+      update: jest.fn().mockResolvedValue(undefined)
+    };
+    mockContactFindAll.mockResolvedValue([contact]);
+    mockWhatsappFindByPk.mockResolvedValue({
+      id: 8,
+      companyId: 19,
+      connectionProvider: "evolution"
+    });
+    mockGetProvider.mockResolvedValue({
+      provider: "evolution",
+      getGroupMetadata: jest.fn().mockResolvedValue({
+        subject: "Grupo teste"
+      })
+    });
+
+    const data = await ListGroupsInboxService({
+      companyId: 19,
+      actor: { id: 1, profile: "admin", companyId: 19 }
+    });
+
+    expect(data.groups[0].name).toBe("Grupo teste");
+    expect(contact.update).toHaveBeenCalledWith({ name: "Grupo teste" });
+    expect(mockGetWbot).not.toHaveBeenCalled();
+  });
+
   it("Baileys pode resolver subject remoto via provider", async () => {
     const contact = {
       id: 4,

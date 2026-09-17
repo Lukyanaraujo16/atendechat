@@ -670,3 +670,70 @@ export async function evolutionDownloadMediaFromUrl(input: {
   }
   return buf;
 }
+
+/** GET /group/fetchAllGroups/{instance}?getParticipants=true|false */
+export async function evolutionFetchAllGroups(input: {
+  whatsappId: number;
+  getParticipants: boolean;
+}): Promise<unknown> {
+  return evolutionGetJson({
+    whatsappId: input.whatsappId,
+    path: "/group/fetchAllGroups/{instance}",
+    query: { getParticipants: input.getParticipants ? "true" : "false" }
+  });
+}
+
+/** GET /group/findGroupInfos/{instance}?groupJid= */
+export async function evolutionFindGroupInfos(input: {
+  whatsappId: number;
+  groupJid: string;
+}): Promise<unknown> {
+  return evolutionGetJson({
+    whatsappId: input.whatsappId,
+    path: "/group/findGroupInfos/{instance}",
+    query: { groupJid: input.groupJid }
+  });
+}
+
+/** POST /group/create/{instance} — participants: dígitos PN. */
+export async function evolutionCreateGroup(input: {
+  whatsappId: number;
+  subject: string;
+  participants: string[];
+}): Promise<unknown> {
+  return evolutionPostJson({
+    whatsappId: input.whatsappId,
+    path: "/group/create/{instance}",
+    body: {
+      subject: input.subject,
+      participants: input.participants
+    }
+  });
+}
+
+/**
+ * GET /group/acceptInviteCode/{instance}?inviteCode=
+ * Evolution 2.3.7: GET, não PUT.
+ */
+export async function evolutionAcceptGroupInvite(input: {
+  whatsappId: number;
+  inviteCode: string;
+}): Promise<unknown> {
+  return evolutionGetJson({
+    whatsappId: input.whatsappId,
+    path: "/group/acceptInviteCode/{instance}",
+    query: { inviteCode: input.inviteCode }
+  });
+}
+
+/** DELETE /group/leaveGroup/{instance} body { groupJid } */
+export async function evolutionLeaveGroup(input: {
+  whatsappId: number;
+  groupJid: string;
+}): Promise<unknown> {
+  return evolutionDeleteJson({
+    whatsappId: input.whatsappId,
+    path: "/group/leaveGroup/{instance}",
+    body: { groupJid: input.groupJid }
+  });
+}

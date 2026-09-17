@@ -1,6 +1,6 @@
 /**
  * Contrato de gestão de grupos WhatsApp independente de WASocket.
- * 12.2-E: único implementador real é Baileys. Evolution → NOT_READY (12.2-F).
+ * 12.2-E: BaileysGroupsProvider. 12.2-F: EvolutionGroupsProvider.
  */
 
 export type WhatsAppGroupsProviderKind = "baileys" | "evolution";

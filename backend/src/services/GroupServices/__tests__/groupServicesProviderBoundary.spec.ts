@@ -72,7 +72,6 @@ jest.mock("../../../helpers/groupTicketRules", () => ({
 }));
 
 import AppError from "../../../errors/AppError";
-import { ERR_WHATSAPP_GROUPS_PROVIDER_NOT_READY } from "../../../modules/whatsapp/groups/groupsErrors";
 import ListParticipatingGroupsService from "../ListParticipatingGroupsService";
 import CreateWhatsAppGroupService from "../CreateWhatsAppGroupService";
 import JoinWhatsAppGroupService, {
@@ -344,15 +343,15 @@ describe("Group services provider boundary", () => {
     expect(mockGetWbot).not.toHaveBeenCalled();
   });
 
-  it("Evolution NOT_READY não usa getWbot", async () => {
+  it("Evolution usa provider e não getWbot", async () => {
     mockShowWhatsAppService.mockResolvedValue({
       id: 8,
       companyId: 19,
       connectionProvider: "evolution"
     });
-    mockGetProvider.mockImplementation(() => {
-      throw new AppError(ERR_WHATSAPP_GROUPS_PROVIDER_NOT_READY, 503);
-    });
+    const provider = mockProvider();
+    provider.listParticipatingGroups.mockResolvedValue([]);
+    mockGetProvider.mockResolvedValue(provider);
 
     await expect(
       ListParticipatingGroupsService({
@@ -360,10 +359,8 @@ describe("Group services provider boundary", () => {
         companyId: 19,
         actor
       })
-    ).rejects.toMatchObject({
-      message: ERR_WHATSAPP_GROUPS_PROVIDER_NOT_READY,
-      statusCode: 503
-    });
+    ).resolves.toEqual({ groups: [] });
+    expect(mockGetProvider).toHaveBeenCalled();
     expect(mockGetWbot).not.toHaveBeenCalled();
   });
 });

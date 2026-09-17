@@ -38,7 +38,30 @@ describe("groupContactName", () => {
     expect(mockGetWbot).not.toHaveBeenCalled();
   });
 
-  it("Evolution sem GroupsProvider não chama getWbot e usa fallback estável", async () => {
+  it("Evolution com callback de provider resolve subject sem getWbot", async () => {
+    const contact = {
+      isGroup: true,
+      name: "120363111",
+      number: "120363111",
+      update: jest.fn().mockResolvedValue(undefined)
+    };
+    const getGroupMetadata = jest.fn().mockResolvedValue({
+      subject: "Grupo teste"
+    });
+
+    const name = await ensureGroupContactDisplayName(contact as never, {
+      fetchRemoteSubject: createFetchRemoteSubjectFromProvider({
+        provider: "evolution",
+        getGroupMetadata
+      } as never)
+    });
+
+    expect(name).toBe("Grupo teste");
+    expect(contact.update).toHaveBeenCalledWith({ name: "Grupo teste" });
+    expect(mockGetWbot).not.toHaveBeenCalled();
+  });
+
+  it("Evolution sem callback remoto usa fallback estável e não chama getWbot", async () => {
     const contact = {
       isGroup: true,
       name: "120363111",
