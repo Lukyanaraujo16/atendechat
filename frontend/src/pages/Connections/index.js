@@ -67,7 +67,6 @@ import { canUseInstagramIntegration } from "../../utils/canUseInstagramIntegrati
 import { canManageWhatsAppConnections } from "../../utils/settingsConnectionsAccess";
 import {
 	connectionProviderBadgeKey,
-	isPlatformSuperAdmin,
 	listConnectionActionKeys,
 } from "../../utils/whatsappEvolutionUi";
 
@@ -188,7 +187,6 @@ const Connections = () => {
 	const { user } = useContext(AuthContext);
 	const { whatsApps, loading } = useContext(WhatsAppsContext);
 	const canManageConnections = canManageWhatsAppConnections(planFlags, user);
-	const isSuperAdmin = isPlatformSuperAdmin(user);
 	const [whatsAppModalOpen, setWhatsAppModalOpen] = useState(false);
 	const [qrModalOpen, setQrModalOpen] = useState(false);
 	const [selectedWhatsApp, setSelectedWhatsApp] = useState(null);
@@ -498,7 +496,7 @@ const Connections = () => {
 	};
 
 	const renderProviderBadge = (whatsApp) => {
-		if (!isSuperAdmin) return null;
+		if (!canManageConnections) return null;
 		const key = connectionProviderBadgeKey(whatsApp.connectionProvider);
 		return (
 			<Chip

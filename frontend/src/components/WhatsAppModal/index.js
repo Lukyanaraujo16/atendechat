@@ -34,12 +34,13 @@ import { AI_AGENT_ROUTE_PATH } from "../../config/aiAgentFeature";
 import Alert from "@material-ui/lab/Alert";
 import useIsMobile from "../../hooks/useIsMobile";
 import { AuthContext } from "../../context/Auth/AuthContext";
+import usePlanFlags from "../../hooks/usePlanFlags";
+import { canManageWhatsAppConnections } from "../../utils/settingsConnectionsAccess";
 import {
   buildWhatsAppMutationPayload,
   connectionProviderBadgeKey,
   CONNECTION_PROVIDER_EVOLUTION,
   CONNECTION_PROVIDER_STANDARD,
-  isPlatformSuperAdmin,
 } from "../../utils/whatsappEvolutionUi";
 import {
   AppDialog,
@@ -104,7 +105,8 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
   const isMobile = useIsMobile();
   const history = useHistory();
   const { user } = useContext(AuthContext);
-  const isSuperAdmin = isPlatformSuperAdmin(user);
+  const planFlags = usePlanFlags();
+  const canManageConnections = canManageWhatsAppConnections(planFlags, user);
   const { enabled: openAiEnabled, loaded: openAiLoaded } = useFeature(
     "automation.openai"
   );
@@ -273,7 +275,7 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
       flowIdWelcome: selectedFlowWelcome || null,
       flowIdNotPhrase: selectedFlowNotPhrase || null,
       isCreate: !whatsAppId,
-      isSuperAdmin,
+      canManageConnections,
     });
 
     try {
@@ -385,7 +387,7 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
                         label={i18n.t("whatsappModal.form.default")}
                       />
                     </Grid>
-                    {isSuperAdmin && !whatsAppId && (
+                    {canManageConnections && !whatsAppId && (
                       <Grid item xs={12}>
                         <FormControl
                           variant="outlined"
@@ -428,7 +430,7 @@ const WhatsAppModal = ({ open, onClose, whatsAppId }) => {
                         </Typography>
                       </Grid>
                     )}
-                    {isSuperAdmin && whatsAppId && values.connectionProvider && (
+                    {canManageConnections && whatsAppId && values.connectionProvider && (
                       <Grid item xs={12}>
                         <Typography variant="body2" color="textSecondary">
                           {i18n.t("whatsappModal.form.connectionProvider")}:{" "}

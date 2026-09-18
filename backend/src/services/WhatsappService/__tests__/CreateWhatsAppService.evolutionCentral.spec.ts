@@ -1,3 +1,4 @@
+/* eslint-disable import/first */
 jest.mock("../../../models/Whatsapp", () => ({
   __esModule: true,
   default: {
@@ -17,10 +18,6 @@ jest.mock("../AssociateWhatsappQueue", () => ({
   default: jest.fn()
 }));
 
-jest.mock("../../../helpers/canProvisionEvolutionConnection", () => ({
-  canProvisionEvolutionConnection: jest.fn()
-}));
-
 jest.mock(
   "../../../modules/whatsapp/providers/evolution/central/provisionCentralEvolutionCredentials",
   () => ({
@@ -33,15 +30,13 @@ import Whatsapp from "../../../models/Whatsapp";
 import Company from "../../../models/Company";
 import AssociateWhatsappQueue from "../AssociateWhatsappQueue";
 import CreateWhatsAppService from "../CreateWhatsAppService";
-import { canProvisionEvolutionConnection } from "../../../helpers/canProvisionEvolutionConnection";
 import { provisionCentralEvolutionCredentials } from "../../../modules/whatsapp/providers/evolution/central/provisionCentralEvolutionCredentials";
 import {
   ERR_EVOLUTION_CENTRAL_CONFIG_MISSING,
-  ERR_EVOLUTION_PROVISION_FORBIDDEN,
   ERR_EVOLUTION_TECHNICAL_FIELDS_NOT_ALLOWED
 } from "../../../modules/whatsapp/providers/evolution/evolutionErrors";
 
-describe("CreateWhatsAppService — Evolution central (Fase 10.5)", () => {
+describe("CreateWhatsAppService — Evolution central (tenant CREATE)", () => {
   const setupBaileysMocks = () => {
     (Company.findOne as jest.Mock).mockResolvedValue({
       plan: { connections: 10 }
@@ -56,9 +51,8 @@ describe("CreateWhatsAppService — Evolution central (Fase 10.5)", () => {
     setupBaileysMocks();
   });
 
-  describe("auth gate", () => {
-    it("Super Admin cria Evolution quando autorizado", async () => {
-      (canProvisionEvolutionConnection as jest.Mock).mockResolvedValue(true);
+  describe("auth / provider", () => {
+    it("admin tenant cria Evolution e provisiona credencial central", async () => {
       const created = {
         id: 11,
         name: "Evo",
@@ -76,7 +70,7 @@ describe("CreateWhatsAppService — Evolution central (Fase 10.5)", () => {
         companyId: 1,
         queueIds: [],
         connectionProvider: "evolution",
-        createdByUserId: 1
+        createdByUserId: 50
       });
 
       expect(result.whatsapp).toBe(created);
@@ -86,47 +80,7 @@ describe("CreateWhatsAppService — Evolution central (Fase 10.5)", () => {
       });
     });
 
-    it("admin empresa com Evolution é bloqueado", async () => {
-      (canProvisionEvolutionConnection as jest.Mock).mockResolvedValue(false);
-      await expect(
-        CreateWhatsAppService({
-          name: "Evo",
-          companyId: 1,
-          queueIds: [],
-          connectionProvider: "evolution",
-          createdByUserId: 50
-        })
-      ).rejects.toMatchObject({ message: ERR_EVOLUTION_PROVISION_FORBIDDEN });
-      expect(Whatsapp.create).not.toHaveBeenCalled();
-    });
-
-    it("supervisor Evolution bloqueado", async () => {
-      (canProvisionEvolutionConnection as jest.Mock).mockResolvedValue(false);
-      await expect(
-        CreateWhatsAppService({
-          name: "Evo",
-          companyId: 1,
-          queueIds: [],
-          connectionProvider: "evolution",
-          createdByUserId: 60
-        })
-      ).rejects.toMatchObject({ message: ERR_EVOLUTION_PROVISION_FORBIDDEN });
-    });
-
-    it("user Evolution bloqueado", async () => {
-      (canProvisionEvolutionConnection as jest.Mock).mockResolvedValue(false);
-      await expect(
-        CreateWhatsAppService({
-          name: "Evo",
-          companyId: 1,
-          queueIds: [],
-          connectionProvider: "evolution",
-          createdByUserId: 70
-        })
-      ).rejects.toMatchObject({ message: ERR_EVOLUTION_PROVISION_FORBIDDEN });
-    });
-
-    it("admin empresa cria Baileys sem gate Evolution", async () => {
+    it("admin empresa cria Baileys sem provision Evolution", async () => {
       const created = { id: 2, name: "Bai" };
       (Whatsapp.create as jest.Mock).mockResolvedValue(created);
       const result = await CreateWhatsAppService({
@@ -137,7 +91,6 @@ describe("CreateWhatsAppService — Evolution central (Fase 10.5)", () => {
         createdByUserId: 50
       });
       expect(result.whatsapp).toBe(created);
-      expect(canProvisionEvolutionConnection).not.toHaveBeenCalled();
       expect(provisionCentralEvolutionCredentials).not.toHaveBeenCalled();
     });
 
@@ -152,13 +105,34 @@ describe("CreateWhatsAppService — Evolution central (Fase 10.5)", () => {
       const createArg = (Whatsapp.create as jest.Mock).mock.calls[0][0];
       expect(createArg.connectionProvider).toBe("baileys");
     });
+
+    it("persiste companyId autenticado, não um id arbitrário no nome", async () => {
+      (Whatsapp.create as jest.Mock).mockResolvedValue({
+        id: 44,
+        destroy: jest.fn()
+      });
+      (provisionCentralEvolutionCredentials as jest.Mock).mockResolvedValue({
+        instanceName: "streamhub-c19-w44"
+      });
+
+      await CreateWhatsAppService({
+        name: "Evo",
+        companyId: 19,
+        queueIds: [],
+        connectionProvider: "evolution",
+        createdByUserId: 50
+      });
+
+      const createArg = (Whatsapp.create as jest.Mock).mock.calls[0][0];
+      expect(createArg.companyId).toBe(19);
+      expect(provisionCentralEvolutionCredentials).toHaveBeenCalledWith({
+        companyId: 19,
+        whatsappId: 44
+      });
+    });
   });
 
   describe("provisionamento", () => {
-    beforeEach(() => {
-      (canProvisionEvolutionConnection as jest.Mock).mockResolvedValue(true);
-    });
-
     it("rollback destroy whatsapp se provision falhar", async () => {
       const destroy = jest.fn().mockResolvedValue(undefined);
       (Whatsapp.create as jest.Mock).mockResolvedValue({
@@ -176,7 +150,7 @@ describe("CreateWhatsAppService — Evolution central (Fase 10.5)", () => {
           companyId: 1,
           queueIds: [],
           connectionProvider: "evolution",
-          createdByUserId: 1
+          createdByUserId: 50
         })
       ).rejects.toMatchObject({
         message: ERR_EVOLUTION_CENTRAL_CONFIG_MISSING
@@ -199,7 +173,7 @@ describe("CreateWhatsAppService — Evolution central (Fase 10.5)", () => {
         companyId: 1,
         queueIds: [],
         connectionProvider: "evolution",
-        createdByUserId: 1
+        createdByUserId: 50
       });
 
       const createArg = (Whatsapp.create as jest.Mock).mock.calls[0][0];
@@ -210,14 +184,13 @@ describe("CreateWhatsAppService — Evolution central (Fase 10.5)", () => {
 
   describe("segurança payload", () => {
     it("rejeita baseUrl/apiKey/instanceName do caller", async () => {
-      (canProvisionEvolutionConnection as jest.Mock).mockResolvedValue(true);
       await expect(
         CreateWhatsAppService({
           name: "Evo",
           companyId: 1,
           queueIds: [],
           connectionProvider: "evolution",
-          createdByUserId: 1,
+          createdByUserId: 50,
           evolution: {
             baseUrl: "https://attacker.evo",
             apiKey: "stolen-key",
@@ -228,6 +201,7 @@ describe("CreateWhatsAppService — Evolution central (Fase 10.5)", () => {
         message: ERR_EVOLUTION_TECHNICAL_FIELDS_NOT_ALLOWED
       });
       expect(Whatsapp.create).not.toHaveBeenCalled();
+      expect(provisionCentralEvolutionCredentials).not.toHaveBeenCalled();
     });
 
     it("response create não inclui secrets (whatsapp model puro)", async () => {
@@ -251,7 +225,7 @@ describe("CreateWhatsAppService — Evolution central (Fase 10.5)", () => {
         companyId: 1,
         queueIds: [],
         connectionProvider: "evolution",
-        createdByUserId: 1
+        createdByUserId: 50
       });
 
       expect(JSON.stringify(whatsapp)).not.toMatch(/evo1:|SECRET|sec••••/);

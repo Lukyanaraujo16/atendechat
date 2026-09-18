@@ -1,9 +1,5 @@
 import AppError from "../../errors/AppError";
-import { canProvisionEvolutionConnection } from "../../helpers/canProvisionEvolutionConnection";
-import {
-  ERR_EVOLUTION_PROVISION_FORBIDDEN,
-  ERR_EVOLUTION_TECHNICAL_FIELDS_NOT_ALLOWED
-} from "../../modules/whatsapp/providers/evolution/evolutionErrors";
+import { ERR_EVOLUTION_TECHNICAL_FIELDS_NOT_ALLOWED } from "../../modules/whatsapp/providers/evolution/evolutionErrors";
 
 export type EvolutionConfigInput = {
   baseUrl?: string;
@@ -28,11 +24,12 @@ export function hasEvolutionTechnicalPayloadFields(
 }
 
 /**
- * Valida gate Evolution central (Fase 10.5).
- * Tenant não pode solicitar Evolution; payload técnico é rejeitado.
+ * Guard de CREATE Evolution: rejeita payload técnico do cliente.
+ * Autorização de quem pode criar conexão é a rota settings.connections.
+ * createdByUserId permanece no input por compatibilidade; identidade não é gate.
  */
 export async function assertEvolutionCentralProvisionAllowed(input: {
-  createdByUserId: number | null | undefined;
+  createdByUserId?: number | null;
   evolution?: EvolutionConfigInput | null;
 }): Promise<void> {
   if (hasEvolutionTechnicalPayloadFields(input.evolution)) {
@@ -40,15 +37,6 @@ export async function assertEvolutionCentralProvisionAllowed(input: {
       ERR_EVOLUTION_TECHNICAL_FIELDS_NOT_ALLOWED,
       400,
       "Credenciais Evolution não podem ser enviadas pelo cliente. Use provisionamento central."
-    );
-  }
-
-  const allowed = await canProvisionEvolutionConnection(input.createdByUserId);
-  if (!allowed) {
-    throw new AppError(
-      ERR_EVOLUTION_PROVISION_FORBIDDEN,
-      403,
-      "Provisionamento Evolution restrito à plataforma StreamHub."
     );
   }
 }

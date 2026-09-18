@@ -66,4 +66,19 @@ describe("whatsapp routes — settings.connections", () => {
       /delete\(\s*"\/whatsappsession\/:whatsappId"[\s\S]*?requireConnectionsManage/
     );
   });
+
+  it("CREATE usa companyId autenticado, não o body", () => {
+    const controller = fs.readFileSync(
+      path.join(__dirname, "../../controllers/WhatsAppController.ts"),
+      "utf8"
+    );
+    expect(controller).toMatch(/const \{ companyId \} = req\.user/);
+    expect(controller).toMatch(
+      /CreateWhatsAppService\(\{[\s\S]*companyId,[\s\S]*createdByUserId: Number\(req\.user\.id\)/
+    );
+    const storeFn = controller.slice(controller.indexOf("export const store"));
+    const storeBody = storeFn.slice(0, storeFn.indexOf("export const show"));
+    expect(storeBody).toMatch(/const \{ companyId \} = req\.user/);
+    expect(storeBody).not.toMatch(/req\.body\.companyId/);
+  });
 });

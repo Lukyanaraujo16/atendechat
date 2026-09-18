@@ -13,7 +13,8 @@ export const CONNECTION_PROVIDER_EVOLUTION = "evolution";
 
 /**
  * Monta payload de create/edit sem secrets Evolution e sem misturar provider legado.
- * connectionProvider só no CREATE e só para Super Admin.
+ * connectionProvider só no CREATE e só se o usuário já gerencia conexões
+ * (settings.connections). UPDATE nunca envia o campo (provider imutável).
  */
 export function buildWhatsAppMutationPayload({
   values,
@@ -24,7 +25,7 @@ export function buildWhatsAppMutationPayload({
   flowIdWelcome,
   flowIdNotPhrase,
   isCreate,
-  isSuperAdmin,
+  canManageConnections,
 }) {
   const whatsappData = {
     ...values,
@@ -51,7 +52,7 @@ export function buildWhatsAppMutationPayload({
 
   if (isCreate) {
     delete whatsappData.token;
-    if (isSuperAdmin) {
+    if (canManageConnections) {
       const selected =
         whatsappData.connectionProvider === CONNECTION_PROVIDER_EVOLUTION
           ? CONNECTION_PROVIDER_EVOLUTION

@@ -1,23 +1,10 @@
-jest.mock("../../../helpers/canProvisionEvolutionConnection", () => ({
-  canProvisionEvolutionConnection: jest.fn()
-}));
-
-import AppError from "../../../errors/AppError";
-import { canProvisionEvolutionConnection } from "../../../helpers/canProvisionEvolutionConnection";
+import { ERR_EVOLUTION_TECHNICAL_FIELDS_NOT_ALLOWED } from "../../../modules/whatsapp/providers/evolution/evolutionErrors";
 import {
   assertEvolutionCentralProvisionAllowed,
   hasEvolutionTechnicalPayloadFields
 } from "../evolutionProvisioningGuard";
-import {
-  ERR_EVOLUTION_PROVISION_FORBIDDEN,
-  ERR_EVOLUTION_TECHNICAL_FIELDS_NOT_ALLOWED
-} from "../../../modules/whatsapp/providers/evolution/evolutionErrors";
 
 describe("evolutionProvisioningGuard", () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
   describe("hasEvolutionTechnicalPayloadFields", () => {
     it.each([
       [{ baseUrl: "https://x" }],
@@ -35,34 +22,33 @@ describe("evolutionProvisioningGuard", () => {
   });
 
   describe("assertEvolutionCentralProvisionAllowed", () => {
-    it("rejeita payload técnico antes do gate de perfil", async () => {
-      (canProvisionEvolutionConnection as jest.Mock).mockResolvedValue(true);
+    it("rejeita payload técnico", async () => {
       await expect(
         assertEvolutionCentralProvisionAllowed({
-          createdByUserId: 1,
+          createdByUserId: 99,
           evolution: { apiKey: "secret" }
         })
       ).rejects.toMatchObject({
         message: ERR_EVOLUTION_TECHNICAL_FIELDS_NOT_ALLOWED,
         statusCode: 400
       });
-      expect(canProvisionEvolutionConnection).not.toHaveBeenCalled();
     });
 
-    it("bloqueia tenant sem permissão Evolution", async () => {
-      (canProvisionEvolutionConnection as jest.Mock).mockResolvedValue(false);
+    it("permite CREATE Evolution sem payload técnico (auth é a rota)", async () => {
+      await expect(
+        assertEvolutionCentralProvisionAllowed({ createdByUserId: 50 })
+      ).resolves.toBeUndefined();
+      await expect(
+        assertEvolutionCentralProvisionAllowed({
+          createdByUserId: 50,
+          evolution: {}
+        })
+      ).resolves.toBeUndefined();
+    });
+
+    it("não usa AppError de provision forbidden neste guard", async () => {
       await expect(
         assertEvolutionCentralProvisionAllowed({ createdByUserId: 99 })
-      ).rejects.toMatchObject({
-        message: ERR_EVOLUTION_PROVISION_FORBIDDEN,
-        statusCode: 403
-      });
-    });
-
-    it("permite Super Admin sem payload técnico", async () => {
-      (canProvisionEvolutionConnection as jest.Mock).mockResolvedValue(true);
-      await expect(
-        assertEvolutionCentralProvisionAllowed({ createdByUserId: 1 })
       ).resolves.toBeUndefined();
     });
   });

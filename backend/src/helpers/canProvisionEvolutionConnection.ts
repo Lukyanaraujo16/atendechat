@@ -2,8 +2,9 @@ import User from "../models/User";
 import { isInternalUser } from "./isInternalUser";
 
 /**
- * Gate Fase 10.5 — apenas Super Admin plataforma pode provisionar Evolution.
- * Identidade: isInternalUser (super === true || profile === superadmin).
+ * Gate legado de identidade interna.
+ * NÃO é usado no CREATE de conexão WhatsApp (autorização = settings.connections).
+ * Mantido para rotas técnicas futuras (ex.: BYO).
  */
 export async function canProvisionEvolutionConnection(
   userId: number | null | undefined

@@ -2288,7 +2288,7 @@ const messages = {
           connectionProviderStandard: "WhatsApp estándar",
           connectionProviderEvolution: "WhatsApp Evolution",
           connectionProviderHint:
-            "Disponible solo para Super Admin. La infraestructura Evolution la provisiona el servidor.",
+            "Elija el tipo de conexión de WhatsApp.",
         },
         buttons: {
           okAdd: "Agregar",

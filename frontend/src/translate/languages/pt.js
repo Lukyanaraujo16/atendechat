@@ -2409,7 +2409,7 @@ const messages = {
           connectionProviderStandard: "WhatsApp padrão",
           connectionProviderEvolution: "WhatsApp Evolution",
           connectionProviderHint:
-            "Disponível apenas para Super Admin. A infraestrutura Evolution é provisionada pelo servidor.",
+            "Escolha o tipo de conexão do WhatsApp.",
         },
         buttons: {
           okAdd: "Adicionar",

@@ -30,7 +30,7 @@ describe("whatsappEvolutionUi — WhatsAppModal payload", () => {
     greetingMessage: "oi",
   };
 
-  it("tenant create não inclui connectionProvider=evolution", () => {
+  it("usuário sem gestão de conexões no create não inclui connectionProvider=evolution", async () => {
     const payload = buildWhatsAppMutationPayload({
       values: {
         ...baseValues,
@@ -43,13 +43,13 @@ describe("whatsappEvolutionUi — WhatsAppModal payload", () => {
       flowIdWelcome: null,
       flowIdNotPhrase: null,
       isCreate: true,
-      isSuperAdmin: false,
+      canManageConnections: false,
     });
     expect(payload.connectionProvider).toBeUndefined();
     expect(payload.provider).toBe("beta");
   });
 
-  it("Super Admin create padrão envia baileys", () => {
+  it("CREATE autorizado padrão envia baileys", async () => {
     const payload = buildWhatsAppMutationPayload({
       values: baseValues,
       queueIds: [1],
@@ -59,12 +59,12 @@ describe("whatsappEvolutionUi — WhatsAppModal payload", () => {
       flowIdWelcome: null,
       flowIdNotPhrase: null,
       isCreate: true,
-      isSuperAdmin: true,
+      canManageConnections: true,
     });
     expect(payload.connectionProvider).toBe(CONNECTION_PROVIDER_STANDARD);
   });
 
-  it("Super Admin create Evolution envia connectionProvider=evolution", () => {
+  it("CREATE autorizado Evolution envia connectionProvider=evolution", async () => {
     const payload = buildWhatsAppMutationPayload({
       values: {
         ...baseValues,
@@ -77,12 +77,12 @@ describe("whatsappEvolutionUi — WhatsAppModal payload", () => {
       flowIdWelcome: null,
       flowIdNotPhrase: null,
       isCreate: true,
-      isSuperAdmin: true,
+      canManageConnections: true,
     });
     expect(payload.connectionProvider).toBe(CONNECTION_PROVIDER_EVOLUTION);
   });
 
-  it("POST/create nunca inclui baseUrl/apiKey/instanceName/instanceId", () => {
+  it("POST/create nunca inclui baseUrl/apiKey/instanceName/instanceId", async () => {
     const payload = buildWhatsAppMutationPayload({
       values: {
         ...baseValues,
@@ -102,7 +102,7 @@ describe("whatsappEvolutionUi — WhatsAppModal payload", () => {
       flowIdWelcome: null,
       flowIdNotPhrase: null,
       isCreate: true,
-      isSuperAdmin: true,
+      canManageConnections: true,
     });
     expect(payload.baseUrl).toBeUndefined();
     expect(payload.apiKey).toBeUndefined();
@@ -127,7 +127,7 @@ describe("whatsappEvolutionUi — WhatsAppModal payload", () => {
       flowIdWelcome: null,
       flowIdNotPhrase: null,
       isCreate: false,
-      isSuperAdmin: true,
+      canManageConnections: true,
     });
     expect(payload.connectionProvider).toBeUndefined();
   });
@@ -142,7 +142,7 @@ describe("whatsappEvolutionUi — WhatsAppModal payload", () => {
       flowIdWelcome: null,
       flowIdNotPhrase: null,
       isCreate: true,
-      isSuperAdmin: true,
+      canManageConnections: true,
     });
     expect(payload.provider).toBe("beta");
     expect(payload.connectionProvider).toBe(CONNECTION_PROVIDER_STANDARD);
