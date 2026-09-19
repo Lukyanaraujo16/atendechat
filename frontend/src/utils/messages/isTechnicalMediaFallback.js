@@ -34,10 +34,16 @@ const MEDIA_TYPES_WITH_URL = new Set([
 ]);
 
 /** Tipos em que o filename não deve virar legenda no balão. Documentos continuam com nome. */
-const TYPES_HIDE_FILENAME_CAPTION = new Set(["image", "sticker", "video"]);
+const TYPES_HIDE_FILENAME_CAPTION = new Set([
+  "image",
+  "sticker",
+  "video",
+  "audio"
+]);
 
 const IMAGE_FILENAME_ONLY = /^[^/\s]+\.(png|jpe?g|gif|webp|bmp|heic|heif|svg)$/i;
 const VIDEO_FILENAME_ONLY = /^[^/\s]+\.(mp4|mov|webm|mkv|avi|3gp|mpeg|m4v)$/i;
+const AUDIO_FILENAME_ONLY = /^[^/\s]+\.(mp3|ogg|opus|m4a|wav|webm|aac|amr)$/i;
 
 const LOCATION_MEDIA_TYPES = new Set([
   "locationMessage",
@@ -88,6 +94,9 @@ export function isTechnicalFilenameCaption(body, message) {
   }
   if (message.mediaType === "video") {
     return VIDEO_FILENAME_ONLY.test(trimmed);
+  }
+  if (message.mediaType === "audio") {
+    return AUDIO_FILENAME_ONLY.test(trimmed);
   }
   return false;
 }

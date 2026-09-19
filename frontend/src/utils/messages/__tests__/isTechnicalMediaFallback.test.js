@@ -170,6 +170,65 @@ describe("getDisplayableMessageBody — imagem vs documento", () => {
     ).toBe("Reunião de ontem");
   });
 
+  it("áudio Flow com filename técnico não vira legenda", () => {
+    const body = "1789843211788.mp3";
+    const message = {
+      mediaType: "audio",
+      mediaUrl: `https://example.com/public/${body}`,
+      body,
+    };
+    expect(isTechnicalFilenameCaption(body, message)).toBe(true);
+    expect(getDisplayableMessageBody(message)).toBeNull();
+  });
+
+  it("áudio com caption real permanece visível", () => {
+    expect(
+      getDisplayableMessageBody({
+        mediaType: "audio",
+        mediaUrl: "https://example.com/public/1789843211788.mp3",
+        body: "Recado sobre seu pedido",
+      })
+    ).toBe("Recado sobre seu pedido");
+  });
+
+  it("áudio inbound placeholder Áudio fica oculto", () => {
+    expect(
+      getDisplayableMessageBody({
+        mediaType: "audio",
+        mediaUrl: "https://example.com/public/voice.ogg",
+        body: "Áudio",
+      })
+    ).toBeNull();
+  });
+
+  it("áudio Typebot placeholder '-' fica oculto", () => {
+    expect(
+      getDisplayableMessageBody({
+        mediaType: "audio",
+        mediaUrl: "https://example.com/public/typebot-audio.ogg",
+        body: "-",
+      })
+    ).toBeNull();
+  });
+
+  it("áudio filename técnico por extensão fica oculto", () => {
+    const cases = [
+      "1789843211788.mp3",
+      "voice.ogg",
+      "note.opus",
+      "clip.m4a",
+    ];
+    cases.forEach((filename) => {
+      expect(
+        getDisplayableMessageBody({
+          mediaType: "audio",
+          mediaUrl: `https://example.com/public/${filename}`,
+          body: filename,
+        })
+      ).toBeNull();
+    });
+  });
+
   it("contactMessage/vcard não devolvem o vCard cru", () => {
     const vcard = [
       "BEGIN:VCARD",
