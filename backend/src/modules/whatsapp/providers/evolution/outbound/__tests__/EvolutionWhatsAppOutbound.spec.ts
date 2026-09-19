@@ -20,7 +20,8 @@ import {
   EvolutionWhatsAppOutbound,
   ERR_EVOLUTION_OPERATION_NOT_SUPPORTED,
   ERR_EVOLUTION_INVALID_READ_KEYS,
-  ERR_EVOLUTION_INVALID_QUOTED
+  ERR_EVOLUTION_INVALID_QUOTED,
+  ERR_EVOLUTION_INVALID_PRESENCE
 } from "../EvolutionWhatsAppOutbound";
 import {
   evolutionSendText,
@@ -308,6 +309,30 @@ describe("EvolutionWhatsAppOutbound Fase 8", () => {
     expect(sendPresenceHttp).toHaveBeenLastCalledWith(
       expect.objectContaining({ presence: "paused", delay: 1000 })
     );
+  });
+
+  it("sendPresence recording continua rejeitado; contrato não inclui recording", async () => {
+    const outbound = new EvolutionWhatsAppOutbound(10);
+    await expect(
+      outbound.sendPresence({
+        jid: "5511999998888@s.whatsapp.net",
+        presence: "recording" as never
+      })
+    ).rejects.toMatchObject({
+      message: ERR_EVOLUTION_INVALID_PRESENCE
+    });
+    expect(sendPresenceHttp).not.toHaveBeenCalled();
+
+    const fs = await import("fs");
+    const path = await import("path");
+    const contract = fs.readFileSync(
+      path.join(__dirname, "../../../../outbound/WhatsAppOutbound.ts"),
+      "utf8"
+    );
+    expect(contract).toMatch(
+      /export type WhatsAppPresence = "composing" \| "paused" \| "unavailable";/
+    );
+    expect(contract).not.toMatch(/export type WhatsAppPresence = .*recording/);
   });
 
   it("timeout/API error tipados", async () => {

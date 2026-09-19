@@ -1286,7 +1286,7 @@ export const ActionsWebhookService = async (
               where: { id: ticket.id }
             });
 
-            await typeSimulation(ticket, "recording");
+            await typeSimulation(ticket, "composing");
 
             await SendWhatsAppMediaFlow({
               media: mediaDirectory,
@@ -1315,7 +1315,7 @@ export const ActionsWebhookService = async (
               where: { id: ticket.id }
             });
 
-            await typeSimulation(ticket, "recording");
+            await typeSimulation(ticket, "composing");
 
             await SendWhatsAppMediaFlow({
               media: mediaDirectory,

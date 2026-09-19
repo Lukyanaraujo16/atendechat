@@ -27,6 +27,10 @@ const setDisableBot = jest.fn().mockResolvedValue({});
 const sendMessage = jest.fn().mockResolvedValue(undefined);
 const addContactList = jest.fn().mockResolvedValue(undefined);
 const getOutbound = jest.fn().mockResolvedValue({ provider: "evolution" });
+const sendWhatsAppMediaFlow = jest
+  .fn()
+  .mockResolvedValue({ key: { id: "M1" } });
+const typeSimulation = jest.fn().mockResolvedValue(undefined);
 const getIO = jest.fn().mockReturnValue({
   to: () => ({ emit: jest.fn() })
 });
@@ -176,8 +180,8 @@ jest.mock("../../../helpers/SetTicketMessagesAsRead", () => ({
 
 jest.mock("../../WbotServices/SendWhatsAppMediaFlow", () => ({
   __esModule: true,
-  default: jest.fn(),
-  typeSimulation: jest.fn()
+  default: (...a: unknown[]) => sendWhatsAppMediaFlow(...a),
+  typeSimulation: (...a: unknown[]) => typeSimulation(...a)
 }));
 
 jest.mock("../../FlowBuilderService/FlowExecutionLogService", () => ({
@@ -403,6 +407,123 @@ describe("ActionsWebhookService provider-neutral 12.3-E", () => {
           body: expect.stringMatching(/1 - Comercial/)
         })
       })
+    );
+  });
+
+  it("singleBlock VIDEO usa composing e chega em SendWhatsAppMediaFlow", async () => {
+    const prevUrl = process.env.BACKEND_URL;
+    process.env.BACKEND_URL = "http://localhost:8090";
+    try {
+      await runNode({
+        id: "sbv1",
+        type: "singleBlock",
+        data: {
+          seq: ["video1"],
+          elements: [{ number: "video1", value: "clip.mp4" }]
+        }
+      });
+      expect(typeSimulation).toHaveBeenCalledWith(
+        expect.anything(),
+        "composing"
+      );
+      expect(typeSimulation).not.toHaveBeenCalledWith(
+        expect.anything(),
+        "recording"
+      );
+      expect(sendWhatsAppMediaFlow).toHaveBeenCalledTimes(1);
+      expect(sendWhatsAppMediaFlow).toHaveBeenCalledWith(
+        expect.objectContaining({
+          media: expect.stringContaining("clip.mp4"),
+          ticket: expect.objectContaining({ id: 77 })
+        })
+      );
+      expect(getWbot).not.toHaveBeenCalled();
+    } finally {
+      process.env.BACKEND_URL = prevUrl;
+    }
+  });
+
+  it("singleBlock AUDIO usa composing e chega em SendWhatsAppMediaFlow", async () => {
+    const prevUrl = process.env.BACKEND_URL;
+    process.env.BACKEND_URL = "http://localhost:8090";
+    try {
+      await runNode({
+        id: "sba1",
+        type: "singleBlock",
+        data: {
+          seq: ["audio1"],
+          elements: [{ number: "audio1", value: "voice.mp3", record: true }]
+        }
+      });
+      expect(typeSimulation).toHaveBeenCalledWith(
+        expect.anything(),
+        "composing"
+      );
+      expect(typeSimulation).not.toHaveBeenCalledWith(
+        expect.anything(),
+        "recording"
+      );
+      expect(sendWhatsAppMediaFlow).toHaveBeenCalledTimes(1);
+      expect(sendWhatsAppMediaFlow).toHaveBeenCalledWith(
+        expect.objectContaining({
+          media: expect.stringContaining("voice.mp3"),
+          ticket: expect.objectContaining({ id: 77 }),
+          isRecord: true
+        })
+      );
+      expect(getWbot).not.toHaveBeenCalled();
+    } finally {
+      process.env.BACKEND_URL = prevUrl;
+    }
+  });
+
+  it("singleBlock IMAGE continua composing e envia mídia", async () => {
+    const prevUrl = process.env.BACKEND_URL;
+    process.env.BACKEND_URL = "http://localhost:8090";
+    try {
+      await runNode({
+        id: "sbi1",
+        type: "singleBlock",
+        data: {
+          seq: ["img1"],
+          elements: [{ number: "img1", value: "foto.jpg" }]
+        }
+      });
+      expect(typeSimulation).toHaveBeenCalledWith(
+        expect.anything(),
+        "composing"
+      );
+      expect(typeSimulation).not.toHaveBeenCalledWith(
+        expect.anything(),
+        "recording"
+      );
+      expect(sendWhatsAppMediaFlow).toHaveBeenCalledTimes(1);
+      expect(sendWhatsAppMediaFlow).toHaveBeenCalledWith(
+        expect.objectContaining({
+          media: expect.stringContaining("foto.jpg"),
+          ticket: expect.objectContaining({ id: 77 }),
+          body: ""
+        })
+      );
+    } finally {
+      process.env.BACKEND_URL = prevUrl;
+    }
+  });
+
+  it("Flow singleBlock não pede recording em vídeo/áudio", () => {
+    const src = fs.readFileSync(
+      path.join(__dirname, "../ActionsWebhookService.ts"),
+      "utf8"
+    );
+    expect(src).not.toMatch(/typeSimulation\([^)]*recording/);
+    expect(src).toMatch(
+      /elementNowSelected\.includes\("video"\)[\s\S]*typeSimulation\(ticket, "composing"\)/
+    );
+    expect(src).toMatch(
+      /elementNowSelected\.includes\("audio"\)[\s\S]*typeSimulation\(ticket, "composing"\)/
+    );
+    expect(src).toMatch(
+      /elementNowSelected\.includes\("img"\)[\s\S]*typeSimulation\(ticketForImg, "composing"\)/
     );
   });
 

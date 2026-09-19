@@ -51,7 +51,9 @@ jest.mock("../../MessageServices/persistWhatsAppOutboundMessage", () => ({
   persistWhatsAppOutboundMessage: (...a: unknown[]) => persistOutbound(...a)
 }));
 
-import SendWhatsAppMediaFlow from "../SendWhatsAppMediaFlow";
+import SendWhatsAppMediaFlow, {
+  typeSimulation
+} from "../SendWhatsAppMediaFlow";
 
 function ticket() {
   return {
@@ -258,5 +260,65 @@ describe("SendWhatsAppMediaFlow 12.3-F automation media", () => {
     expect(text).not.toMatch(/GetTicketWbot/);
     expect(text).not.toMatch(/GetWhatsappWbot/);
     expect(text).not.toMatch(/wrapBaileysSession/);
+  });
+
+  it("typeSimulation usa WhatsAppPresence e não WAPresence/cast", () => {
+    const real = jest.requireActual("fs") as typeof fs;
+    const text = real.readFileSync(
+      path.join(__dirname, "../SendWhatsAppMediaFlow.ts"),
+      "utf8"
+    );
+    expect(text).toMatch(/presence: WhatsAppPresence/);
+    expect(text).not.toMatch(/\bWAPresence\b/);
+    expect(text).not.toMatch(
+      /presence as "composing" \| "paused" \| "unavailable"/
+    );
+  });
+
+  it("typeSimulation envia composing e depois paused", async () => {
+    const sendPresence = jest.fn().mockResolvedValue(true);
+    getOutbound.mockResolvedValue({
+      provider: "evolution",
+      sendContent,
+      sendPresence
+    });
+    const timer = jest
+      .spyOn(global, "setTimeout")
+      .mockImplementation((fn: TimerHandler) => {
+        if (typeof fn === "function") fn();
+        return 0 as unknown as NodeJS.Timeout;
+      });
+    try {
+      await typeSimulation(ticket() as never, "composing");
+      expect(sendPresence).toHaveBeenNthCalledWith(1, {
+        jid: "5511999998888@s.whatsapp.net",
+        presence: "composing",
+        subscribe: false
+      });
+      expect(sendPresence).toHaveBeenNthCalledWith(2, {
+        jid: "5511999998888@s.whatsapp.net",
+        presence: "paused"
+      });
+      expect(sendContent).not.toHaveBeenCalled();
+    } finally {
+      timer.mockRestore();
+    }
+  });
+
+  it("não persiste se sendContent falha (FIX4 intacto)", async () => {
+    mimeLookup.mockReturnValue("image/jpeg");
+    sendContent.mockRejectedValue(new Error("transport fail"));
+    getOutbound.mockResolvedValue({ provider: "evolution", sendContent });
+    await expect(
+      SendWhatsAppMediaFlow({
+        media: "/tmp/foto.jpg",
+        ticket: ticket() as never,
+        body: "legenda",
+        isFlow: true
+      })
+    ).rejects.toMatchObject({
+      message: expect.stringContaining("ERR_SENDING_WAPP_MSG")
+    });
+    expect(persistOutbound).not.toHaveBeenCalled();
   });
 });

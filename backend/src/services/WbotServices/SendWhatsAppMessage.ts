@@ -96,7 +96,7 @@ const SendWhatsAppMessage = async ({
         chatJid,
         hasQuotedMsg: Boolean(quotedMsg)
       },
-      "[SendPerf] baileys_send_start"
+      "[SendPerf] outbound_send_start"
     );
     const sent = await outbound.sendText({
       jid: chatJid,
@@ -109,10 +109,10 @@ const SendWhatsAppMessage = async ({
         companyId: ticket.companyId,
         whatsappId: ticket.whatsappId,
         chatJid,
-        baileysMessageId: sent.messageId,
+        providerMessageId: sent.messageId,
         durationMs: Date.now() - sendStartedAt
       },
-      "[SendPerf] baileys_send_done"
+      "[SendPerf] outbound_send_done"
     );
 
     await ticket.update({ lastMessage: formatBody(body, ticket.contact) });

@@ -1,4 +1,4 @@
-import { WAMessage, AnyMessageContent, WAPresence, jidNormalizedUser } from "@whiskeysockets/baileys";
+import { WAMessage, AnyMessageContent, jidNormalizedUser } from "@whiskeysockets/baileys";
 import * as Sentry from "@sentry/node";
 import fs from "fs";
 import { exec } from "child_process";
@@ -7,6 +7,7 @@ import ffmpegPath from "@ffmpeg-installer/ffmpeg";
 import AppError from "../../errors/AppError";
 import { getTicketRemoteJid } from "../../helpers/GetTicketRemoteJid";
 import { getWhatsAppOutboundForTicket } from "../../modules/whatsapp/outbound/resolveWhatsAppOutbound";
+import { WhatsAppPresence } from "../../modules/whatsapp/outbound/WhatsAppOutbound";
 import Ticket from "../../models/Ticket";
 import mime from "mime-types";
 import Contact from "../../models/Contact";
@@ -72,7 +73,10 @@ function persistMediaTypeFromMimeMajor(typeMessage: string): string {
 
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms))
 
-export const typeSimulation = async (ticket: Ticket, presence: WAPresence) => {
+export const typeSimulation = async (
+  ticket: Ticket,
+  presence: WhatsAppPresence
+) => {
   if (isWhatsAppDisableAllReadAndPresenceSideEffects()) {
     logger.info(
       `[WhatsAppPresence] suppressed context=typeSimulation presence=${presence} ticketId=${ticket.id} reason=WHATSAPP_DISABLE_ALL_READ_AND_PRESENCE_SIDE_EFFECTS`
@@ -98,7 +102,7 @@ export const typeSimulation = async (ticket: Ticket, presence: WAPresence) => {
   const jid = chatJid.includes("@") ? jidNormalizedUser(chatJid) : chatJid;
   await outbound.sendPresence({
     jid,
-    presence: presence as "composing" | "paused" | "unavailable",
+    presence,
     subscribe: false
   });
   await delay(5000);
