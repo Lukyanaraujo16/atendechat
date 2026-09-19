@@ -99,7 +99,7 @@ export const PHASE3_WHATSAPP_SOCKET_CONSUMERS = [
   "controllers/WhatsAppSessionController.ts (logout)",
   "helpers/GetWbotMessage.ts (GetTicketWbot residual; fetch já é DB)",
   "services/AiAgentService/startAiAgentTypingPresence.ts (GetTicketWbot + wrapBaileysSession por compatibilidade de testes)",
-  "services/TypebotServices/typebotListener.ts (ainda recebe WASocket do inbound; envio via wrapBaileysSession)",
+  "services/TypebotServices/typebotListener.ts (12.3-C: textual via WhatsAppOutbound; mídia URL só via typebotLegacyMedia Baileys)",
   "helpers/SendMessageFlow.ts (GetWhatsappWbot; sendMessage comentado)",
   "GroupServices/* groupMetadata (admin de grupo)",
   "helpers/groupContactName.ts (groupMetadata)",

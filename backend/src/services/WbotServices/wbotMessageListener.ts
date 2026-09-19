@@ -71,6 +71,7 @@ import {
   AudioConfig
 } from "microsoft-cognitiveservices-speech-sdk";
 import typebotListener from "../TypebotServices/typebotListener";
+import { createTypebotLegacyUrlMediaSender } from "../TypebotServices/typebotLegacyMedia";
 import QueueIntegrations from "../../models/QueueIntegrations";
 import ShowQueueIntegrationService from "../QueueIntegrationServices/ShowQueueIntegrationService";
 
@@ -101,7 +102,7 @@ import {
   createBaileysIdentityProbe,
   inboundAddressingAsMsgLike
 } from "../../modules/whatsapp/providers/baileys/inbound/baileysIdentityProbe";
-import { wrapBaileysSession } from "../../modules/whatsapp/outbound/resolveWhatsAppOutbound";
+import { wrapBaileysSession, getWhatsAppOutboundForTicket } from "../../modules/whatsapp/outbound/resolveWhatsAppOutbound";
 import type { WhatsAppOutbound } from "../../modules/whatsapp/outbound/WhatsAppOutbound";
 import CreateTicketSystemMessageService from "../TicketServices/CreateTicketSystemMessageService";
 import Company from "../../models/Company";
@@ -2698,7 +2699,8 @@ export const handleMessageIntegration = async (
   inbound?: Pick<
     NormalizedWhatsAppMessage,
     "body" | "pushName" | "addressing" | "fromMe" | "messageType" | "quotedStanzaId"
-  > | null
+  > | null,
+  skipTypebot = false
 ): Promise<void> => {
   const msgType = inbound?.messageType || getTypeMessage(msg);
 
@@ -2730,13 +2732,18 @@ export const handleMessageIntegration = async (
       }
     }
   } else if (queueIntegration.type === "typebot") {
-    // await typebots(ticket, msg, wbot, queueIntegration);
+    if (skipTypebot) {
+      return;
+    }
+    const outbound = await getWhatsAppOutboundForTicket(ticket);
     await typebotListener({
       ticket,
-      msg,
       inbound: inbound || undefined,
-      wbot,
-      typebot: queueIntegration
+      typebot: queueIntegration,
+      media:
+        outbound.provider === "baileys"
+          ? createTypebotLegacyUrlMediaSender(outbound)
+          : undefined
     });
   } else if(queueIntegration.type === "flowbuilder") {
     if (isFlowBuilderDebugEnabled()) {
@@ -3273,7 +3280,9 @@ const handleMessage = async (
         chatbot: ticket.chatbot,
         useIntegration: ticket.useIntegration,
         integrationId: ticket.integrationId,
-        promptId: ticket.promptId
+        promptId: ticket.promptId,
+        typebotSessionId: ticket.typebotSessionId,
+        typebotStatus: ticket.typebotStatus
       },
       contact: {
         id: contact.id,
@@ -3294,11 +3303,26 @@ const handleMessage = async (
     }
 
     const inboundAutomation = await processInboundAutomation(
-      inboundAutomationCtx
+      inboundAutomationCtx,
+      {
+        typebotLegacyMedia: createTypebotLegacyUrlMediaSender(
+          wrapBaileysSession(wbot)
+        )
+      }
     );
     if (inboundAutomation.status === "skipped") {
       return;
     }
+    if (
+      inboundAutomation.status === "executed" &&
+      inboundAutomation.consumer === "typebot" &&
+      inboundAutomation.halt
+    ) {
+      return;
+    }
+    const skipTypebot =
+      inboundAutomation.status === "executed" &&
+      inboundAutomation.consumer === "typebot";
 
     try {
       if (!msg.key.fromMe && effectiveScheduleType !== "disabled") {
@@ -3662,7 +3686,8 @@ const handleMessage = async (
         whatsapp,
         contact,
         null,
-        inbound
+        inbound,
+        skipTypebot
       );
 
       return;
@@ -3713,7 +3738,8 @@ const handleMessage = async (
         whatsapp,
         contact,
         isFirstMsg,
-        inbound
+        inbound,
+        skipTypebot
       );
     }
 
@@ -3808,7 +3834,8 @@ const handleMessage = async (
         whatsapp,
         contact,
         isFirstMsg,
-        inbound
+        inbound,
+        skipTypebot
       );
     }
 

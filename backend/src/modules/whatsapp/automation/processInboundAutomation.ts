@@ -1,5 +1,7 @@
 import { logger } from "../../../utils/logger";
 import { NormalizedWhatsAppMessage } from "../inbound/NormalizedWhatsAppMessage";
+import { dispatchInboundTypebot } from "../../../services/TypebotServices/dispatchInboundTypebot";
+import type { TypebotLegacyMediaCapability } from "../../../services/TypebotServices/typebotLegacyMedia";
 
 /**
  * 12.3-B — Automation Inbound Boundary
@@ -9,16 +11,14 @@ import { NormalizedWhatsAppMessage } from "../inbound/NormalizedWhatsAppMessage"
  *   → Chatbot / Typebot / Flow (consumidores; ainda socket-bound nesta fase)
  *
  * O core NÃO exige sessão WhatsApp in-memory nem payload cru de provider.
- * Consumidores ainda acoplados ao adapter Baileys são classificados e:
- *   - executados pelo caller Baileys (handleMessage) após status "ready";
- *   - deferidos com log explícito no Evolution (sem crash, sem resolver socket).
+ * 12.3-C: Typebot textual é consumidor portado (WhatsAppOutbound).
+ * Flow/OpenAI/chatbot/n8n continuam socket-bound.
  */
 
 export const SOCKET_BOUND_INBOUND_AUTOMATION_CONSUMERS = [
   "verifyQueue",
   "handleChartbot",
   "handleMessageIntegration",
-  "typebotListener",
   "ActionsWebhookService",
   "handleOpenAi",
   "outOfHoursMessage",
@@ -49,6 +49,8 @@ export type InboundAutomationTicket = {
   useIntegration?: boolean | null;
   integrationId?: number | null;
   promptId?: number | null;
+  typebotSessionId?: string | null;
+  typebotStatus?: boolean | null;
 };
 
 export type InboundAutomationContact = {
@@ -89,6 +91,10 @@ export type InboundAutomationCapabilities = {
    * Executa consumidores ainda acoplados ao adapter Baileys.
    */
   runSocketBoundConsumers?: () => Promise<void>;
+  /**
+   * Caller Baileys: mídia Typebot por URL. Evolution omite.
+   */
+  typebotLegacyMedia?: TypebotLegacyMediaCapability;
 };
 
 export type ProcessInboundAutomationResult =
@@ -99,6 +105,14 @@ export type ProcessInboundAutomationResult =
     }
   | {
       status: "ready";
+      context: InboundAutomationSnapshot;
+      intendedConsumers: string[];
+      socketBoundConsumers: readonly string[];
+    }
+  | {
+      status: "executed";
+      consumer: "typebot";
+      halt: boolean;
       context: InboundAutomationSnapshot;
       intendedConsumers: string[];
       socketBoundConsumers: readonly string[];
@@ -286,6 +300,31 @@ export async function processInboundAutomation(
       },
       "[InboundAutomation] ready"
     );
+
+    const typebotDispatch = await dispatchInboundTypebot(ctx, {
+      media: capabilities?.typebotLegacyMedia
+    });
+    if (typebotDispatch.handled) {
+      logger.info(
+        {
+          inboundAutomation: true,
+          status: "executed",
+          consumer: "typebot",
+          halt: typebotDispatch.halt,
+          reason: typebotDispatch.reason,
+          ...context
+        },
+        "[InboundAutomation] typebot executed"
+      );
+      return {
+        status: "executed",
+        consumer: "typebot",
+        halt: typebotDispatch.halt,
+        context,
+        intendedConsumers,
+        socketBoundConsumers: SOCKET_BOUND_INBOUND_AUTOMATION_CONSUMERS
+      };
+    }
 
     if (capabilities?.runSocketBoundConsumers) {
       await capabilities.runSocketBoundConsumers();

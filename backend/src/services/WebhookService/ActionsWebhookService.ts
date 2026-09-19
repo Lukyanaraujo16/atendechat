@@ -47,6 +47,8 @@ import {logger} from "../../utils/logger";
 //import ShowWhatsAppService from "../WhatsappService/ShowWhatsAppService";
 import { delay } from "bluebird";
 import typebotListener from "../TypebotServices/typebotListener";
+import { createTypebotLegacyUrlMediaSender } from "../TypebotServices/typebotLegacyMedia";
+import { getWhatsAppOutboundForTicket } from "../../modules/whatsapp/outbound/resolveWhatsAppOutbound";
 import { getWbot } from "../../libs/wbot";
 import { proto } from "@whiskeysockets/baileys";
 import { handleOpenAi } from "../IntegrationsServices/OpenAiService";
@@ -477,12 +479,24 @@ export const ActionsWebhookService = async (
         await intervalWhats("1");
       }
       if (nodeSelected.type === "typebot") {
-        const wbot = getWbot(whatsapp.id);
+        const outbound = await getWhatsAppOutboundForTicket(ticket);
+        const typebotBody =
+          pressKey != null && String(pressKey) !== "999"
+            ? String(pressKey)
+            : "";
         await typebotListener({
-          wbot: wbot,
-          msg,
           ticket,
-          typebot: nodeSelected.data.typebotIntegration
+          typebot: nodeSelected.data.typebotIntegration,
+          inbound: {
+            body: typebotBody,
+            pushName: ticket.contact?.name || "",
+            addressing: { remoteJid: "", participant: "" },
+            fromMe: false
+          },
+          media:
+            outbound.provider === "baileys"
+              ? createTypebotLegacyUrlMediaSender(outbound)
+              : undefined
         });
       }
 

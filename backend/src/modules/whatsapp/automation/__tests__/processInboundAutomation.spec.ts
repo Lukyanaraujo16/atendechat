@@ -1,5 +1,17 @@
+/* eslint-disable import/first */
 import fs from "fs";
 import path from "path";
+
+jest.mock(
+  "../../../../services/TypebotServices/dispatchInboundTypebot",
+  () => ({
+    dispatchInboundTypebot: jest.fn().mockResolvedValue({
+      handled: false,
+      halt: false
+    })
+  })
+);
+
 import {
   classifyIntendedAutomationConsumers,
   evaluateInboundAutomationEligibility,
@@ -233,7 +245,6 @@ describe("processInboundAutomation 12.3-B", () => {
       expect.arrayContaining([
         "verifyQueue",
         "handleChartbot",
-        "typebotListener",
         "ActionsWebhookService",
         "handleOpenAi"
       ])
