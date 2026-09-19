@@ -252,4 +252,41 @@ describe("processInboundAutomation Flow 12.3-E", () => {
     expect(result.status).toBe("skipped");
     expect(flow).not.toHaveBeenCalled();
   });
+
+  it("E2E conexão: encaminha integrationId=1 ao dispatchInboundFlow e não cai em socket-bound", async () => {
+    flow.mockResolvedValue({
+      handled: true,
+      startedFlow: true,
+      reason: "connection_start"
+    });
+    const result = await processInboundAutomation({
+      inbound: inbound({ provider: "evolution", whatsappId: 3 }),
+      ticket: {
+        id: 77,
+        companyId: 1,
+        whatsappId: 3,
+        contactId: 5,
+        isGroup: false,
+        queueId: null,
+        userId: null,
+        chatbot: false,
+        useIntegration: false,
+        integrationId: null,
+        flowWebhook: false,
+        flowStopped: null,
+        lastFlowId: null
+      },
+      contact: { id: 5, companyId: 1 },
+      whatsapp: { id: 3, companyId: 1, integrationId: 1 },
+      persistedMessageId: "M1"
+    });
+    expect(flow).toHaveBeenCalledTimes(1);
+    expect(flow.mock.calls[0][0].whatsapp.integrationId).toBe(1);
+    expect(result.status).toBe("executed");
+    if (result.status !== "executed") return;
+    expect(result.consumer).toBe("flow");
+    expect(result.startedFlow).toBe(true);
+    expect(queue).not.toHaveBeenCalled();
+    expect(result.status).not.toBe("executed_socket_bound");
+  });
 });

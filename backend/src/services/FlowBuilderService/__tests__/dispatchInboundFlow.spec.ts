@@ -1,4 +1,6 @@
 /* eslint-disable import/first */
+import fs from "fs";
+import path from "path";
 import {
   dispatchInboundFlow,
   DispatchInboundFlowDeps
@@ -444,5 +446,179 @@ describe("dispatchInboundFlow 12.3-E", () => {
     expect(runActions).toHaveBeenCalledWith(
       expect.objectContaining({ idFlowDb: 22, nextStage: "camp" })
     );
+  });
+
+  it("E2E: Flow na conexão Evolution (integrationId=1, flowIdWelcome=1, sem fila)", async () => {
+    const ticket = makeTicket({
+      whatsappId: 3,
+      queueId: null,
+      useIntegration: false,
+      integrationId: null,
+      flowWebhook: false,
+      flowStopped: null,
+      lastFlowId: null
+    });
+    const showIntegration = jest.fn().mockResolvedValue({
+      id: 1,
+      companyId: 1,
+      type: "flowbuilder"
+    });
+    const showWhatsapp = jest.fn().mockResolvedValue({
+      id: 3,
+      companyId: 1,
+      connectionProvider: "evolution",
+      integrationId: 1,
+      flowIdWelcome: 1,
+      flowIdNotPhrase: null
+    });
+    const findFlow = jest.fn().mockResolvedValue(
+      flowGraph([
+        { id: "start", type: "start" },
+        { id: "msg1", type: "message" }
+      ])
+    );
+    const runActions = jest.fn().mockResolvedValue("ds");
+    const src = fs.readFileSync(
+      path.join(__dirname, "../dispatchInboundFlow.ts"),
+      "utf8"
+    );
+    expect(src).not.toMatch(/ctx\.whatsapp\.integrationI[^d]/);
+    expect(src).not.toMatch(/\bif\s*\(\s*provider\s*===\s*["']evolution["']/);
+    expect(src).not.toMatch(/\bgetWbot\s*\(/);
+    expect(src).not.toMatch(/GetTicketWbot|GetWhatsappWbot|wrapBaileysSession/);
+    expect(src).not.toMatch(/from ["']@whiskeysockets\/baileys["']/);
+
+    const result = await dispatchInboundFlow(
+      ctx({
+        inbound: inbound({
+          provider: "evolution",
+          whatsappId: 3,
+          companyId: 1
+        }),
+        ticket: {
+          id: 77,
+          companyId: 1,
+          whatsappId: 3,
+          contactId: 5,
+          isGroup: false,
+          queueId: null,
+          userId: null,
+          chatbot: false,
+          useIntegration: false,
+          integrationId: null,
+          flowWebhook: false,
+          flowStopped: null,
+          lastFlowId: null
+        },
+        whatsapp: { id: 3, companyId: 1, integrationId: 1 }
+      }),
+      {
+        deps: baseDeps(ticket, {
+          showIntegration,
+          showWhatsapp,
+          findFlow,
+          runActions
+        })
+      }
+    );
+
+    expect(showIntegration).toHaveBeenCalledTimes(1);
+    expect(showIntegration).toHaveBeenCalledWith(1, 1);
+    expect(showIntegration.mock.calls[0][0]).toBe(1);
+    expect(showIntegration.mock.calls[0][1]).toBe(1);
+    expect(showIntegration.mock.calls[0][0]).not.toBeUndefined();
+    expect(Number.isNaN(Number(showIntegration.mock.calls[0][0]))).toBe(false);
+    expect(showWhatsapp).toHaveBeenCalledWith(3, 1);
+    expect(findFlow).toHaveBeenCalledWith(1, 1);
+    expect(result.handled).toBe(true);
+    expect(result.startedFlow).toBe(true);
+    expect(result.reason).toBe("connection_start");
+    expect(runActions).toHaveBeenCalledWith(
+      expect.objectContaining({
+        whatsappId: 3,
+        idFlowDb: 1,
+        companyId: 1,
+        nextStage: "msg1",
+        idTicket: 77
+      })
+    );
+    expect(runActions.mock.calls[0][0]).not.toHaveProperty("wbot");
+  });
+
+  it("integrationId null não inicia connectionStart", async () => {
+    const ticket = makeTicket({ whatsappId: 3, queueId: null });
+    const showIntegration = jest.fn();
+    const runActions = jest.fn();
+    const result = await dispatchInboundFlow(
+      ctx({
+        inbound: inbound({ whatsappId: 3 }),
+        ticket: { ...ctx().ticket, whatsappId: 3, queueId: null },
+        whatsapp: { id: 3, companyId: 1, integrationId: null }
+      }),
+      { deps: baseDeps(ticket, { showIntegration, runActions }) }
+    );
+    expect(result.handled).toBe(false);
+    expect(result.reason).toBe("not_candidate");
+    expect(showIntegration).not.toHaveBeenCalled();
+    expect(runActions).not.toHaveBeenCalled();
+  });
+
+  it("integração que não é flowbuilder não inicia Flow", async () => {
+    const ticket = makeTicket({ whatsappId: 3 });
+    const showIntegration = jest.fn().mockResolvedValue({
+      id: 1,
+      companyId: 1,
+      type: "typebot"
+    });
+    const runActions = jest.fn();
+    const result = await dispatchInboundFlow(
+      ctx({
+        inbound: inbound({ whatsappId: 3 }),
+        ticket: { ...ctx().ticket, whatsappId: 3 },
+        whatsapp: { id: 3, companyId: 1, integrationId: 1 }
+      }),
+      { deps: baseDeps(ticket, { showIntegration, runActions }) }
+    );
+    expect(showIntegration).toHaveBeenCalledWith(1, 1);
+    expect(result.handled).toBe(false);
+    expect(runActions).not.toHaveBeenCalled();
+  });
+
+  it("integrationId de outro tenant não executa Flow", async () => {
+    const ticket = makeTicket({ companyId: 42, whatsappId: 3 });
+    const showIntegration = jest.fn().mockResolvedValue({
+      id: 1,
+      companyId: 42,
+      type: "flowbuilder"
+    });
+    const findFlow = jest.fn().mockResolvedValue(null);
+    const runActions = jest.fn();
+    const result = await dispatchInboundFlow(
+      ctx({
+        inbound: inbound({ companyId: 42, whatsappId: 3 }),
+        ticket: {
+          ...ctx().ticket,
+          companyId: 42,
+          whatsappId: 3,
+          queueId: null
+        },
+        contact: { id: 5, companyId: 42 },
+        whatsapp: { id: 3, companyId: 42, integrationId: 1 }
+      }),
+      {
+        deps: {
+          ...baseDeps(ticket, { showIntegration, findFlow, runActions }),
+          showWhatsapp: jest.fn().mockResolvedValue({
+            id: 3,
+            flowIdWelcome: 1,
+            flowIdNotPhrase: null
+          })
+        }
+      }
+    );
+    expect(showIntegration).toHaveBeenCalledWith(1, 42);
+    expect(findFlow).toHaveBeenCalledWith(1, 42);
+    expect(result.handled).toBe(false);
+    expect(runActions).not.toHaveBeenCalled();
   });
 });

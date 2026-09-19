@@ -32,8 +32,20 @@ export const receive = async (
     throw new AppError("ERR_EVOLUTION_WEBHOOK_PAYLOAD_TOO_LARGE", 413);
   }
 
+  /**
+   * Snapshot mínimo da conexão. integrationId/promptId alimentam
+   * processInboundAutomation (Flow/Typebot na conexão). Sem session.
+   */
   const whatsapp = await Whatsapp.findByPk(whatsappId, {
-    attributes: ["id", "companyId", "connectionProvider", "name", "status"]
+    attributes: [
+      "id",
+      "companyId",
+      "connectionProvider",
+      "name",
+      "status",
+      "integrationId",
+      "promptId"
+    ]
   });
 
   if (!whatsapp) {

@@ -245,6 +245,53 @@ describe("processEvolutionTextInbound → inbound automation 12.3-B", () => {
     expect(wrapBaileysSession).not.toHaveBeenCalled();
   });
 
+  it("encaminha whatsapp.integrationId=1 para a boundary (Flow na conexão)", async () => {
+    const connectionWhatsapp = {
+      id: 3,
+      companyId: 1,
+      connectionProvider: "evolution",
+      integrationId: 1,
+      promptId: null
+    } as never;
+    findOrCreateTicket.mockResolvedValue({
+      id: 77,
+      companyId: 1,
+      whatsappId: 3,
+      contactId: 5,
+      isGroup: false,
+      queueId: null,
+      userId: null,
+      chatbot: false,
+      useIntegration: false,
+      integrationId: null,
+      promptId: null,
+      flowWebhook: false,
+      flowStopped: null,
+      lastFlowId: null
+    });
+    await processEvolutionTextInbound({
+      inbound: privateInbound({ whatsappId: 3, messageId: "FLOW1" }),
+      whatsapp: connectionWhatsapp,
+      evolutionPayloadSanitized: {},
+      deps: { processInboundAutomation: runAutomation }
+    });
+    expect(runAutomation).toHaveBeenCalledTimes(1);
+    const arg = runAutomation.mock.calls[0][0];
+    expect(arg.whatsapp).toMatchObject({
+      id: 3,
+      companyId: 1,
+      integrationId: 1
+    });
+    expect(arg.whatsapp.integrationId).toBe(1);
+    expect(arg.whatsapp.integrationId).not.toBeUndefined();
+    expect(Number.isNaN(arg.whatsapp.integrationId)).toBe(false);
+    expect(arg.ticket).toMatchObject({
+      queueId: null,
+      useIntegration: false,
+      integrationId: null
+    });
+  });
+
   it("grupo persistido chama a boundary (skip de grupo fica no core)", async () => {
     findOrCreateTicket.mockResolvedValue({
       id: 88,

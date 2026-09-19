@@ -143,4 +143,38 @@ describe("EvolutionWebhookController", () => {
       expect.objectContaining({ ok: true, outcome: "skipped" })
     );
   });
+
+  it("carrega integrationId da conexão para o start de Flow/Typebot", async () => {
+    findByPkWhatsapp.mockResolvedValue({
+      id: 3,
+      companyId: 1,
+      connectionProvider: "evolution",
+      integrationId: 1,
+      promptId: null
+    });
+    processWebhook.mockResolvedValue({ outcome: "processed" });
+    await receive(
+      {
+        params: { whatsappId: "3" },
+        headers: { apikey: "ok" },
+        body: { event: "MESSAGES_UPSERT" }
+      } as never,
+      mockRes()
+    );
+    expect(findByPkWhatsapp).toHaveBeenCalledWith(
+      3,
+      expect.objectContaining({
+        attributes: expect.arrayContaining(["integrationId", "promptId"])
+      })
+    );
+    expect(processWebhook).toHaveBeenCalledWith(
+      expect.objectContaining({
+        whatsapp: expect.objectContaining({
+          id: 3,
+          companyId: 1,
+          integrationId: 1
+        })
+      })
+    );
+  });
 });
