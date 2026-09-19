@@ -28,9 +28,7 @@ import formatBody from "../../helpers/Mustache";
 import SetTicketMessagesAsRead from "../../helpers/SetTicketMessagesAsRead";
 import SendWhatsAppMessage from "../WbotServices/SendWhatsAppMessage";
 import ShowTicketService from "../TicketServices/ShowTicketService";
-import CreateMessageService, {
-  MessageData
-} from "../MessageServices/CreateMessageService";
+import { persistWhatsAppOutboundMessage } from "../MessageServices/persistWhatsAppOutboundMessage";
 import { randomString } from "../../utils/randomCode";
 import ShowQueueService from "../QueueService/ShowQueueService";
 import { getIO } from "../../libs/socket";
@@ -52,7 +50,6 @@ import { getWbot } from "../../libs/wbot";
 import { proto } from "@whiskeysockets/baileys";
 import { handleOpenAi } from "../IntegrationsServices/OpenAiService";
 import { IOpenAi } from "../../@types/openai";
-import { v4 as uuidv4 } from "uuid";
 import { getTicketRemoteJid, parseTicketDataWebhook } from "../../helpers/GetTicketRemoteJid";
 import {
   evaluateFlowCondition,
@@ -398,22 +395,11 @@ export const ActionsWebhookService = async (
             quotedMsg: null,
             ...(inboundRemoteJid && { remoteJid: inboundRemoteJid })
           });
-          if (sentMessage) {
-            await CreateMessageService({
-              messageData: {
-                id: (sentMessage as any)?.key?.id || uuidv4(),
-                ticketId: ticketDetails.id,
-                body: msg.body,
-                fromMe: true,
-                read: true,
-                ack: (sentMessage as any)?.status,
-                mediaType: "conversation",
-                remoteJid: (sentMessage as any)?.key?.remoteJid,
-                ...((sentMessage as any) ? { dataJson: JSON.stringify(sentMessage as any) } : {})
-              } as MessageData,
-              companyId: ticketDetails.companyId
-            });
-          }
+          await persistWhatsAppOutboundMessage({
+            ticket: ticketDetails,
+            body: msg.body,
+            sent: sentMessage
+          });
           SetTicketMessagesAsRead(ticketDetails);
         } else if (idTicket) {
           const ticketDetails = await ShowTicketService(idTicket, companyId);
@@ -441,22 +427,11 @@ export const ActionsWebhookService = async (
               quotedMsg: null,
               ...(inboundRemoteJid && { remoteJid: inboundRemoteJid })
             });
-            if (sentMessage) {
-              await CreateMessageService({
-                messageData: {
-                  id: (sentMessage as any)?.key?.id || uuidv4(),
-                  ticketId: ticketDetails.id,
-                  body: msg.body,
-                  fromMe: true,
-                  read: true,
-                  ack: (sentMessage as any)?.status,
-                  mediaType: "conversation",
-                  remoteJid: (sentMessage as any)?.key?.remoteJid,
-                  ...((sentMessage as any) ? { dataJson: JSON.stringify(sentMessage as any) } : {})
-                } as MessageData,
-                companyId: ticketDetails.companyId
-              });
-            }
+            await persistWhatsAppOutboundMessage({
+              ticket: ticketDetails,
+              body: msg.body,
+              sent: sentMessage
+            });
             SetTicketMessagesAsRead(ticketDetails);
           } else {
             logger.warn(
@@ -593,10 +568,15 @@ export const ActionsWebhookService = async (
         await delay(3000);
         await typeSimulation(ticket, "composing");
 
-        await SendWhatsAppMessage({
+        const sentQuestion = await SendWhatsAppMessage({
           body: bodyFila,
           ticket: ticketDetails,
           quotedMsg: null
+        });
+        await persistWhatsAppOutboundMessage({
+          ticket: ticketDetails,
+          body: bodyFila,
+          sent: sentQuestion
         });
 
         SetTicketMessagesAsRead(ticketDetails);
@@ -1223,10 +1203,15 @@ export const ActionsWebhookService = async (
             await delay(3000);
             await typeSimulation(ticket, "composing");
 
-            await SendWhatsAppMessage({
+            const sentSingleBlock = await SendWhatsAppMessage({
               body: msg,
               ticket: ticketDetails,
               quotedMsg: null
+            });
+            await persistWhatsAppOutboundMessage({
+              ticket: ticketDetails,
+              body: msg,
+              sent: sentSingleBlock
             });
 
             SetTicketMessagesAsRead(ticketDetails);
@@ -1598,10 +1583,15 @@ export const ActionsWebhookService = async (
                   ticket,
                   ticketDetails.contact
                 );
-                await SendWhatsAppMessage({
+                const sentInvalid = await SendWhatsAppMessage({
                   body,
                   ticket: ticketDetails,
                   quotedMsg: null
+                });
+                await persistWhatsAppOutboundMessage({
+                  ticket: ticketDetails,
+                  body,
+                  sent: sentInvalid
                 });
                 await intervalWhats("1");
               }
@@ -1826,10 +1816,15 @@ export const ActionsWebhookService = async (
 
           await typeSimulation(ticket, "composing");
 
-          await SendWhatsAppMessage({
+          const sentMenu = await SendWhatsAppMessage({
             body: msg.body,
             ticket: ticketDetails,
             quotedMsg: null
+          });
+          await persistWhatsAppOutboundMessage({
+            ticket: ticketDetails,
+            body: msg.body,
+            sent: sentMenu
           });
 
           SetTicketMessagesAsRead(ticketDetails);

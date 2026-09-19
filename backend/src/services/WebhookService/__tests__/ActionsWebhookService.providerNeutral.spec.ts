@@ -162,6 +162,13 @@ jest.mock("../../MessageServices/CreateMessageService", () => ({
   default: jest.fn()
 }));
 
+jest.mock(
+  "../../../modules/whatsapp/providers/evolution/inbound/reapplyDeferredEvolutionAcks",
+  () => ({
+    scheduleReapplyDeferredEvolutionAcks: jest.fn()
+  })
+);
+
 jest.mock("../../../helpers/SetTicketMessagesAsRead", () => ({
   __esModule: true,
   default: jest.fn()
@@ -240,6 +247,9 @@ jest.mock("bluebird", () => ({
 }));
 
 import { ActionsWebhookService } from "../ActionsWebhookService";
+import CreateMessageService from "../../MessageServices/CreateMessageService";
+
+const persistMessage = CreateMessageService as jest.Mock;
 
 async function runNode(
   node: { id: string; type: string; data?: unknown },
@@ -287,6 +297,7 @@ describe("ActionsWebhookService provider-neutral 12.3-E", () => {
     });
     ticketUpdate.mockClear();
     updateTicket.mockResolvedValue({ ticket: ticketRow });
+    persistMessage.mockResolvedValue({ id: "S1" });
     Object.assign(ticketRow, {
       id: 77,
       companyId: 1,
@@ -314,6 +325,17 @@ describe("ActionsWebhookService provider-neutral 12.3-E", () => {
     expect(sendWhatsAppMessage).toHaveBeenCalledWith(
       expect.objectContaining({ body: expect.any(String) })
     );
+    expect(persistMessage).toHaveBeenCalledTimes(1);
+    expect(persistMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messageData: expect.objectContaining({
+          id: "S1",
+          fromMe: true,
+          body: expect.any(String)
+        }),
+        companyId: 1
+      })
+    );
     expect(getWbot).not.toHaveBeenCalled();
   });
 
@@ -326,6 +348,15 @@ describe("ActionsWebhookService provider-neutral 12.3-E", () => {
       }
     });
     expect(sendWhatsAppMessage).toHaveBeenCalled();
+    expect(persistMessage).toHaveBeenCalledTimes(1);
+    expect(persistMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messageData: expect.objectContaining({
+          id: "S1",
+          fromMe: true
+        })
+      })
+    );
     expect(ticketUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         lastFlowId: "q1",
@@ -362,6 +393,60 @@ describe("ActionsWebhookService provider-neutral 12.3-E", () => {
       expect.objectContaining({
         body: expect.stringMatching(/1 - Comercial[\s\S]*2 - Suporte/)
       })
+    );
+    expect(persistMessage).toHaveBeenCalledTimes(1);
+    expect(persistMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messageData: expect.objectContaining({
+          id: "S1",
+          fromMe: true,
+          body: expect.stringMatching(/1 - Comercial/)
+        })
+      })
+    );
+  });
+
+  it("singleBlock texto persiste Message fromMe com provider id", async () => {
+    await runNode({
+      id: "sb1",
+      type: "singleBlock",
+      data: {
+        seq: ["message1"],
+        elements: [{ number: "message1", value: "Bem-vindo à StreamHub" }]
+      }
+    });
+    expect(sendWhatsAppMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: expect.stringContaining("Bem-vindo à StreamHub")
+      })
+    );
+    expect(persistMessage).toHaveBeenCalledTimes(1);
+    expect(persistMessage.mock.calls[0][0].messageData.id).toBe("S1");
+    expect(persistMessage.mock.calls[0][0].messageData.fromMe).toBe(true);
+  });
+
+  it("menu Evolution usa key.id como Messages.id", async () => {
+    sendWhatsAppMessage.mockResolvedValueOnce({
+      provider: "evolution",
+      key: {
+        id: "EVO-MENU-1",
+        remoteJid: "5511999998888@s.whatsapp.net",
+        fromMe: true
+      },
+      status: 1
+    });
+    await runNode({
+      id: "menu1",
+      type: "menu",
+      data: {
+        message: "Escolha",
+        arrayOption: [{ number: 1, value: "Comercial" }]
+      }
+    });
+    expect(persistMessage).toHaveBeenCalledTimes(1);
+    expect(persistMessage.mock.calls[0][0].messageData.id).toBe("EVO-MENU-1");
+    expect(persistMessage.mock.calls[0][0].messageData.externalMessageId).toBe(
+      "EVO-MENU-1"
     );
   });
 

@@ -28,8 +28,13 @@ jest.mock("../../../helpers/whatsappUnavailablePresence", () => ({
   isWhatsAppDisableAllReadAndPresenceSideEffects: () => true
 }));
 
+jest.mock("../../MessageServices/persistWhatsAppOutboundMessage", () => ({
+  persistWhatsAppOutboundMessage: jest.fn().mockResolvedValue({ id: "P1" })
+}));
+
 import typebotListener from "../typebotListener";
 import { getWhatsAppOutboundForTicket } from "../../../modules/whatsapp/outbound/resolveWhatsAppOutbound";
+import { persistWhatsAppOutboundMessage } from "../../MessageServices/persistWhatsAppOutboundMessage";
 
 const getOutbound = getWhatsAppOutboundForTicket as jest.Mock;
 
@@ -75,6 +80,9 @@ describe("typebotListener 12.3-C", () => {
     getTicketRemoteJid.mockResolvedValue(null);
     axiosRequest.mockResolvedValue({ data: { messages: [] } });
     sendRemoteMedia.mockResolvedValue(true);
+    (persistWhatsAppOutboundMessage as jest.Mock).mockResolvedValue({
+      id: "P1"
+    });
     getOutbound.mockResolvedValue({
       provider: "evolution",
       sendText,
@@ -118,6 +126,13 @@ describe("typebotListener 12.3-C", () => {
       jid: "5511999998888@s.whatsapp.net",
       text: "ola"
     });
+    expect(persistWhatsAppOutboundMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ticket: expect.objectContaining({ id: 77, companyId: 1 }),
+        body: "ola",
+        sent: expect.objectContaining({ messageId: "S1" })
+      })
+    );
     expect(sendContent).not.toHaveBeenCalled();
     expect(getOutbound).toHaveBeenCalled();
   });

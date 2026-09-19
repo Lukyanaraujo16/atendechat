@@ -20,10 +20,10 @@ import UpdateTicketService from "../services/TicketServices/UpdateTicketService"
 import DeleteWhatsAppMessage from "../services/WbotServices/DeleteWhatsAppMessage";
 import SendWhatsAppMedia from "../services/WbotServices/SendWhatsAppMedia";
 import SendWhatsAppMessage from "../services/WbotServices/SendWhatsAppMessage";
-import { buildEvolutionOutboundDataJsonFromEnvelope } from "../modules/whatsapp/providers/evolution/outbound/mapEvolutionSendResponse";
-import CreateMessageService, {
+import {
   serializeMessageForClient
 } from "../services/MessageServices/CreateMessageService";
+import { persistWhatsAppOutboundMessage } from "../services/MessageServices/persistWhatsAppOutboundMessage";
 import {
   assertUserCanAccessTicketResource,
   toTicketAccessPayload
@@ -49,7 +49,6 @@ import CheckContactNumber from "../services/WbotServices/CheckNumber";
 import CheckIsValidContact from "../services/WbotServices/CheckIsValidContact";
 import GetProfilePicUrl from "../services/WbotServices/GetProfilePicUrl";
 import CreateOrUpdateContactService from "../services/ContactServices/CreateOrUpdateContactService";
-import { v4 as uuidv4 } from "uuid";
 import { isInstagramChannelTicket } from "../helpers/ticketChannel";
 import { assertInstagramIntegrationInPlan } from "../helpers/assertInstagramIntegrationInPlan";
 import extractMessageUploadMedias from "../helpers/extractMessageUploadMedias";
@@ -484,46 +483,18 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
       baileysStatus: (sentMessage as any)?.status ?? null
     });
     const bodyToSave = formatBody(body, ticket.contact);
-    const idToSave = (sentMessage as any)?.key?.id || uuidv4();
-    const isEvolution =
-      sentMessage &&
-      typeof sentMessage === "object" &&
-      (sentMessage as { provider?: string }).provider === "evolution";
     sendPerfLog("before_persist_message", {
       resolvedTicketId: ticket.id,
-      messageId: idToSave
+      messageId: (sentMessage as any)?.key?.id ?? null
     });
-    const savedMessage = await CreateMessageService({
-      messageData: {
-        id: idToSave,
-        ticketId: ticket.id,
-        body: bodyToSave,
-        fromMe: true,
-        read: true,
-        ack: (sentMessage as any)?.status,
-        mediaType: "conversation",
-        quotedMsgId: quotedMsg?.id || null,
-        remoteJid: (sentMessage as any)?.key?.remoteJid || null,
-        externalMessageId: isEvolution ? idToSave : undefined,
-        ...(sentMessage
-          ? {
-              dataJson: isEvolution
-                ? buildEvolutionOutboundDataJsonFromEnvelope(sentMessage)
-                : JSON.stringify(sentMessage as any)
-            }
-          : {})
-      } as any,
-      companyId: ticket.companyId
+    const savedMessage = await persistWhatsAppOutboundMessage({
+      ticket,
+      body: bodyToSave,
+      sent: sentMessage,
+      quotedMsgId: quotedMsg?.id || null
     });
-    if (isEvolution && ticket.whatsappId != null) {
-      const { scheduleReapplyDeferredEvolutionAcks } = await import(
-        "../modules/whatsapp/providers/evolution/inbound/reapplyDeferredEvolutionAcks"
-      );
-      scheduleReapplyDeferredEvolutionAcks({
-        companyId: ticket.companyId,
-        whatsappId: Number(ticket.whatsappId),
-        providerMessageId: idToSave
-      });
+    if (!savedMessage) {
+      throw new AppError("ERR_CREATING_MESSAGE");
     }
     sendPerfLog("after_persist_message", {
       resolvedTicketId: ticket.id,
@@ -657,29 +628,10 @@ export const send = async (req: Request, res: Response): Promise<Response> => {
       await ticket.update({
         lastMessage: body,
       });
-      const idToSave = (sentMessage as any)?.key?.id || uuidv4();
-      const isEvolutionApi =
-        sentMessage &&
-        typeof sentMessage === "object" &&
-        (sentMessage as { provider?: string }).provider === "evolution";
-      await CreateMessageService({
-        messageData: {
-          id: idToSave,
-          ticketId: ticket.id,
-          body: formatted,
-          fromMe: true,
-          read: true,
-          ack: (sentMessage as any)?.status,
-          mediaType: "conversation",
-          ...(sentMessage
-            ? {
-                dataJson: isEvolutionApi
-                  ? buildEvolutionOutboundDataJsonFromEnvelope(sentMessage)
-                  : JSON.stringify(sentMessage as any)
-              }
-            : {})
-        } as any,
-        companyId
+      await persistWhatsAppOutboundMessage({
+        ticket,
+        body: formatted,
+        sent: sentMessage
       });
     }
 

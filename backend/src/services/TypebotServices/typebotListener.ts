@@ -13,6 +13,7 @@ import type { NormalizedWhatsAppMessage } from "../../modules/whatsapp/inbound/N
 import { typebotSleep } from "./typebotSleep";
 import type { TypebotLegacyMediaCapability } from "./typebotLegacyMedia";
 import { trySendTypebotRemoteMedia } from "./sendTypebotRemoteMedia";
+import { persistWhatsAppOutboundMessage } from "../MessageServices/persistWhatsAppOutboundMessage";
 
 /* Sequential Typebot replies must preserve send order. */
 /* eslint-disable no-restricted-syntax, no-await-in-loop, no-continue */
@@ -68,6 +69,23 @@ async function runTypebotTypingSimulation(
   });
   await sleep(typebotDelayMessage);
   await outbound.sendPresence({ jid: remoteJid, presence: "paused" });
+}
+
+async function sendTypebotTextAndPersist(input: {
+  outbound: WhatsAppOutbound;
+  ticket: Ticket;
+  jid: string;
+  text: string;
+}): Promise<void> {
+  const sent = await input.outbound.sendText({
+    jid: input.jid,
+    text: input.text
+  });
+  await persistWhatsAppOutboundMessage({
+    ticket: input.ticket,
+    body: input.text,
+    sent
+  });
 }
 
 function formatTypebotRichText(message: {
@@ -336,7 +354,9 @@ const typebotListener = async (
       }
 
       if (messages?.length === 0) {
-        await outbound.sendText({
+        await sendTypebotTextAndPersist({
+          outbound,
+          ticket,
           jid: remoteJid,
           text: typebotUnknownMessage
         });
@@ -416,7 +436,9 @@ const typebotListener = async (
               sleep
             );
 
-            await outbound.sendText({
+            await sendTypebotTextAndPersist({
+              outbound,
+              ticket,
               jid: remoteJid,
               text: formattedText
             });
@@ -492,7 +514,9 @@ const typebotListener = async (
               "typebot:choice_input",
               sleep
             );
-            await outbound.sendText({
+            await sendTypebotTextAndPersist({
+              outbound,
+              ticket,
               jid: remoteJid,
               text: formattedText
             });
@@ -508,7 +532,9 @@ const typebotListener = async (
 
       await ticket.reload();
 
-      await outbound.sendText({
+      await sendTypebotTextAndPersist({
+        outbound,
+        ticket,
         jid: remoteJid,
         text: typebotRestartMessage
       });
