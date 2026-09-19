@@ -152,6 +152,17 @@ const SendWhatsAppMediaFlow = async ({
           fileName: mediaName
         };
       } else if (typeMessage === "audio") {
+        if (outbound.provider === "evolution") {
+          logger.info(
+            {
+              flowMediaSend: true,
+              ticketId: ticket.id,
+              pathMedia
+            },
+            "[FlowBuilder] audio deferred for Evolution (12.3-E/F): PTT/ogg not ported"
+          );
+          return undefined;
+        }
         if (isRecord) {
           const convert = await processAudio(pathMedia);
           options = {

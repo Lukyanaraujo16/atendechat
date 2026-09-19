@@ -22,6 +22,16 @@ jest.mock(
   })
 );
 
+jest.mock(
+  "../../../../services/FlowBuilderService/dispatchInboundFlow",
+  () => ({
+    dispatchInboundFlow: jest.fn().mockResolvedValue({
+      handled: false,
+      startedFlow: false
+    })
+  })
+);
+
 import {
   classifyIntendedAutomationConsumers,
   evaluateInboundAutomationEligibility,
@@ -254,9 +264,11 @@ describe("processInboundAutomation 12.3-B", () => {
     expect(result.socketBoundConsumers).toEqual(
       expect.arrayContaining([
         "handleMessageIntegration",
-        "ActionsWebhookService",
         "handleOpenAi"
       ])
+    );
+    expect(result.socketBoundConsumers).not.toEqual(
+      expect.arrayContaining(["ActionsWebhookService"])
     );
     expect(result.socketBoundConsumers).not.toEqual(
       expect.arrayContaining(["verifyQueue", "handleChartbot"])
@@ -351,6 +363,8 @@ describe("12.3-B static coupling", () => {
     expect(gateIdx).toBeGreaterThan(persistIdx);
     expect(chatbotIdx).toBeGreaterThan(gateIdx);
     expect(listenerSrc).toContain("skipQueueRouting");
+    expect(listenerSrc).toContain("skipFlow");
+    expect(listenerSrc).toContain("legacyOpenAiNode");
     expect(listenerSrc).toContain("queueMenuRender");
   });
 });

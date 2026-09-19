@@ -2,6 +2,7 @@ import { logger } from "../../../utils/logger";
 import { NormalizedWhatsAppMessage } from "../inbound/NormalizedWhatsAppMessage";
 import { dispatchInboundTypebot } from "../../../services/TypebotServices/dispatchInboundTypebot";
 import { dispatchInboundQueueRouting } from "../../../services/ChatbotServices/dispatchInboundQueueRouting";
+import { dispatchInboundFlow } from "../../../services/FlowBuilderService/dispatchInboundFlow";
 import type { TypebotLegacyMediaCapability } from "../../../services/TypebotServices/typebotLegacyMedia";
 import type { QueueMenuRenderCapability } from "../../../services/ChatbotServices/queueMenuText";
 
@@ -15,12 +16,12 @@ import type { QueueMenuRenderCapability } from "../../../services/ChatbotService
  * O core NÃO exige sessão WhatsApp in-memory nem payload cru de provider.
  * 12.3-C: Typebot textual (WhatsAppOutbound).
  * 12.3-D: Chatbot / Queue Routing (WhatsAppOutbound + fallback textual).
- * Flow/OpenAI legado/n8n continuam socket-bound / deferidos.
+ * 12.3-E: Flow Builder textual/domínio (WhatsAppOutbound).
+ * OpenAI legado/n8n/mídia audio Evolution continuam deferidos.
  */
 
 export const SOCKET_BOUND_INBOUND_AUTOMATION_CONSUMERS = [
   "handleMessageIntegration",
-  "ActionsWebhookService",
   "handleOpenAi",
   "outOfHoursMessage",
   "greetingMessage"
@@ -53,6 +54,12 @@ export type InboundAutomationTicket = {
   promptId?: number | null;
   typebotSessionId?: string | null;
   typebotStatus?: boolean | null;
+  flowWebhook?: boolean | null;
+  lastFlowId?: string | number | null;
+  flowStopped?: string | number | null;
+  hashFlowId?: string | null;
+  dataWebhook?: unknown;
+  status?: string | null;
 };
 
 export type InboundAutomationContact = {
@@ -101,6 +108,10 @@ export type InboundAutomationCapabilities = {
    * Caller Baileys: buttons/list. Evolution omite (fallback textual).
    */
   queueMenuRender?: QueueMenuRenderCapability;
+  /**
+   * Caller Baileys: deixa continuação do node OpenAI no listener legado.
+   */
+  legacyOpenAiNode?: boolean;
 };
 
 export type ProcessInboundAutomationResult =
@@ -117,10 +128,12 @@ export type ProcessInboundAutomationResult =
     }
   | {
       status: "executed";
-      consumer: "typebot" | "queue_routing";
+      consumer: "typebot" | "queue_routing" | "flow";
       halt: boolean;
       startedTypebot?: boolean;
+      startedFlow?: boolean;
       deferredIntegration?: string;
+      deferredOpenAi?: boolean;
       context: InboundAutomationSnapshot;
       intendedConsumers: string[];
       socketBoundConsumers: readonly string[];
@@ -335,6 +348,35 @@ export async function processInboundAutomation(
       };
     }
 
+    const flowDispatch = await dispatchInboundFlow(ctx, {
+      legacyOpenAiNode: capabilities?.legacyOpenAiNode
+    });
+    if (flowDispatch.handled) {
+      logger.info(
+        {
+          inboundAutomation: true,
+          status: "executed",
+          consumer: "flow",
+          halt: false,
+          startedFlow: flowDispatch.startedFlow,
+          deferredOpenAi: flowDispatch.deferredOpenAi,
+          reason: flowDispatch.reason,
+          ...context
+        },
+        "[InboundAutomation] flow executed"
+      );
+      return {
+        status: "executed",
+        consumer: "flow",
+        halt: false,
+        startedFlow: flowDispatch.startedFlow,
+        deferredOpenAi: flowDispatch.deferredOpenAi,
+        context,
+        intendedConsumers,
+        socketBoundConsumers: SOCKET_BOUND_INBOUND_AUTOMATION_CONSUMERS
+      };
+    }
+
     const queueDispatch = await dispatchInboundQueueRouting(ctx, {
       media: capabilities?.typebotLegacyMedia,
       menuRender: capabilities?.queueMenuRender
@@ -347,6 +389,7 @@ export async function processInboundAutomation(
           consumer: "queue_routing",
           halt: false,
           startedTypebot: queueDispatch.startedTypebot,
+          startedFlow: queueDispatch.startedFlow,
           deferredIntegration: queueDispatch.deferredIntegration,
           reason: queueDispatch.reason,
           ...context
@@ -358,6 +401,7 @@ export async function processInboundAutomation(
         consumer: "queue_routing",
         halt: false,
         startedTypebot: queueDispatch.startedTypebot,
+        startedFlow: queueDispatch.startedFlow,
         deferredIntegration: queueDispatch.deferredIntegration,
         context,
         intendedConsumers,

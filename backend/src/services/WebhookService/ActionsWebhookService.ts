@@ -17,7 +17,6 @@ import Ticket from "../../models/Ticket";
 import Company from "../../models/Company";
 import User from "../../models/User";
 import fs from "fs";
-import GetWhatsappWbot from "../../helpers/GetWhatsappWbot";
 import path from "path";
 import SendWhatsAppMedia from "../WbotServices/SendWhatsAppMedia";
 import SendWhatsAppMediaFlow, {
@@ -70,6 +69,7 @@ import {
   cancelFlowMenuTimeout,
   scheduleFlowMenuTimeout
 } from "../FlowBuilderService/flowMenuTimeoutScheduler";
+import type { FlowInboundHint } from "../FlowBuilderService/flowInboundHint";
 
 interface IAddContact {
   companyId: number;
@@ -92,7 +92,8 @@ export const ActionsWebhookService = async (
   pressKey?: string,
   idTicket?: number,
   numberPhrase: "" | { number: string; name: string; email: string } = "",
-  msg?: proto.IWebMessageInfo
+  msg?: proto.IWebMessageInfo | null,
+  inboundHint?: FlowInboundHint
 ): Promise<string> => {
   try {
     if (
@@ -105,6 +106,8 @@ export const ActionsWebhookService = async (
     }
     const io = getIO();
     const originalWhatsAppMsg = msg;
+    const inboundRemoteJid =
+      inboundHint?.remoteJid || originalWhatsAppMsg?.key?.remoteJid || null;
     let next = nextStage;
     if (isFlowBuilderDebugEnabled()) {
       logger.info(
@@ -373,9 +376,7 @@ export const ActionsWebhookService = async (
         if (ticket && ticket.contact) {
           const ticketDetails = ticketDetailsForMsg;
           const destJid =
-            (await getTicketRemoteJid(ticketDetails)) ||
-            originalWhatsAppMsg?.key?.remoteJid ||
-            null;
+            (await getTicketRemoteJid(ticketDetails)) || inboundRemoteJid;
           if (isFlowBuilderDebugEnabled()) {
             logger.info(
               {
@@ -395,7 +396,7 @@ export const ActionsWebhookService = async (
             body: msg.body,
             ticket: ticketDetails,
             quotedMsg: null,
-            ...(originalWhatsAppMsg?.key?.remoteJid && { remoteJid: originalWhatsAppMsg.key.remoteJid })
+            ...(inboundRemoteJid && { remoteJid: inboundRemoteJid })
           });
           if (sentMessage) {
             await CreateMessageService({
@@ -418,9 +419,7 @@ export const ActionsWebhookService = async (
           const ticketDetails = await ShowTicketService(idTicket, companyId);
           if (ticketDetails.contact) {
             const destJid =
-              (await getTicketRemoteJid(ticketDetails)) ||
-              originalWhatsAppMsg?.key?.remoteJid ||
-              null;
+              (await getTicketRemoteJid(ticketDetails)) || inboundRemoteJid;
             if (isFlowBuilderDebugEnabled()) {
               logger.info(
                 {
@@ -440,7 +439,7 @@ export const ActionsWebhookService = async (
               body: msg.body,
               ticket: ticketDetails,
               quotedMsg: null,
-              ...(originalWhatsAppMsg?.key?.remoteJid && { remoteJid: originalWhatsAppMsg.key.remoteJid })
+              ...(inboundRemoteJid && { remoteJid: inboundRemoteJid })
             });
             if (sentMessage) {
               await CreateMessageService({
@@ -490,7 +489,10 @@ export const ActionsWebhookService = async (
           inbound: {
             body: typebotBody,
             pushName: ticket.contact?.name || "",
-            addressing: { remoteJid: "", participant: "" },
+            addressing: {
+              remoteJid: inboundRemoteJid || "",
+              participant: ""
+            },
             fromMe: false
           },
           media:
@@ -501,6 +503,17 @@ export const ActionsWebhookService = async (
       }
 
       if (nodeSelected.type === "openai") {
+        if (!msg) {
+          logger.info(
+            {
+              ticketId: ticket?.id,
+              companyId,
+              nodeId: nodeSelected.id
+            },
+            "[FlowBuilder] OpenAI node deferred (12.3-E): no Baileys inbound"
+          );
+          await intervalWhats("1");
+        } else {
         let {
           name,
           prompt,
@@ -551,6 +564,7 @@ export const ActionsWebhookService = async (
           null,
           ticketTraking
         );
+        }
       }
 
       if (nodeSelected.type === "question") {
@@ -1366,8 +1380,14 @@ export const ActionsWebhookService = async (
           ticketForCond?.contact || ticket?.contact,
           nodeSelected.data as any,
           (() => {
+            if (pressKey != null && String(pressKey).trim() !== "") {
+              return String(pressKey);
+            }
+            if (inboundHint?.body) {
+              return String(inboundHint.body);
+            }
             const m = originalWhatsAppMsg?.message;
-            if (!m) return pressKey != null ? String(pressKey) : "";
+            if (!m) return "";
             return (
               m.conversation ||
               m.extendedTextMessage?.text ||
@@ -1376,7 +1396,7 @@ export const ActionsWebhookService = async (
               m.documentMessage?.caption ||
               m.buttonsResponseMessage?.selectedButtonId ||
               m.listResponseMessage?.title ||
-              (pressKey != null ? String(pressKey) : "")
+              ""
             );
           })(),
           companyId

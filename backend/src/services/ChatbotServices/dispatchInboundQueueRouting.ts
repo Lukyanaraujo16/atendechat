@@ -23,6 +23,7 @@ import {
   QueueMenuRenderCapability
 } from "./queueMenuText";
 import type { SendQueueRoutingText } from "./sendQueueRoutingText";
+import { dispatchInboundFlow } from "../FlowBuilderService/dispatchInboundFlow";
 
 /* Helpers abaixo são usados pelo dispatch; ordem de leitura do domínio. */
 /* eslint-disable no-use-before-define */
@@ -40,7 +41,8 @@ async function defaultSendText(
 export type QueueRoutingDispatchResult = {
   handled: boolean;
   startedTypebot: boolean;
-  deferredIntegration?: "flowbuilder" | "openai" | "n8n" | "webhook" | string;
+  startedFlow?: boolean;
+  deferredIntegration?: "openai" | "n8n" | "webhook" | string;
   reason?: string;
 };
 
@@ -85,6 +87,7 @@ export type DispatchInboundQueueRoutingDeps = {
   findTracking?: typeof FindOrCreateATicketTrakingService;
   createSystemMessage?: typeof CreateTicketSystemMessageService;
   findCompanyLanguage?: (companyId: number) => Promise<string | null>;
+  dispatchFlow?: typeof dispatchInboundFlow;
 };
 
 async function defaultUpdateTicket(input: {
@@ -157,6 +160,7 @@ export async function dispatchInboundQueueRouting(
   );
 
   let startedTypebot = false;
+  let startedFlow = false;
   let deferredIntegration: QueueRoutingDispatchResult["deferredIntegration"];
 
   const run = async (): Promise<QueueRoutingDispatchResult> => {
@@ -194,6 +198,7 @@ export async function dispatchInboundQueueRouting(
         deps
       });
       startedTypebot = startedTypebot || verify.startedTypebot;
+      startedFlow = startedFlow || verify.startedFlow === true;
       deferredIntegration = deferredIntegration || verify.deferredIntegration;
       await ticket.reload();
       const findTracking =
@@ -210,7 +215,7 @@ export async function dispatchInboundQueueRouting(
     }
 
     const shouldChatbot =
-      Boolean(ticket.queueId && ticket.chatbot) && !hashReset;
+      Boolean(ticket.queueId && ticket.chatbot) && !hashReset && !startedFlow;
     if (shouldChatbot) {
       const dontReadTheFirstQuestion = shouldVerify && queues.length > 1;
       await runHandleChatbot({
@@ -237,6 +242,7 @@ export async function dispatchInboundQueueRouting(
     return {
       handled: true,
       startedTypebot,
+      startedFlow,
       deferredIntegration,
       reason
     };
@@ -261,6 +267,7 @@ async function runVerifyQueue(input: {
   deps: DispatchInboundQueueRoutingDeps;
 }): Promise<{
   startedTypebot: boolean;
+  startedFlow?: boolean;
   deferredIntegration?: QueueRoutingDispatchResult["deferredIntegration"];
 }> {
   const {
@@ -451,7 +458,7 @@ async function runVerifyQueue(input: {
         deps
       });
 
-      if (choosenQueue.greetingMessage) {
+      if (choosenQueue.greetingMessage && !started.startedFlow) {
         const body = `\u200e${choosenQueue.greetingMessage}`;
         await sendText(ticket, body, ctx.inbound);
       }
@@ -512,6 +519,7 @@ async function maybeStartQueueIntegration(input: {
   deps: DispatchInboundQueueRoutingDeps;
 }): Promise<{
   startedTypebot: boolean;
+  startedFlow?: boolean;
   deferredIntegration?: QueueRoutingDispatchResult["deferredIntegration"];
 }> {
   const { ticket, queue, ctx, media, deps } = input;
@@ -547,6 +555,20 @@ async function maybeStartQueueIntegration(input: {
       return { startedTypebot: true };
     }
 
+    if (type === "flowbuilder") {
+      await ticket.update({
+        useIntegration: true,
+        integrationId: integration.id,
+        chatbot: true
+      });
+      const dispatchFlow = deps.dispatchFlow || dispatchInboundFlow;
+      const flow = await dispatchFlow(ctx, { forceStart: true });
+      return {
+        startedTypebot: false,
+        startedFlow: Boolean(flow.handled || flow.startedFlow)
+      };
+    }
+
     logger.info(
       {
         ticketId: ticket.id,
@@ -558,7 +580,7 @@ async function maybeStartQueueIntegration(input: {
     );
     return {
       startedTypebot: false,
-      deferredIntegration: type === "flowbuilder" ? "flowbuilder" : type
+      deferredIntegration: type
     };
   }
 

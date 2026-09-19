@@ -82,6 +82,7 @@ import { IOpenAi } from "../../@types/openai";
 
 import { IConnections, INodes } from "../WebhookService/DispatchWebHookService";
 import { ActionsWebhookService } from "../WebhookService/ActionsWebhookService";
+import { resolveFirstFlowExecutableNodeId } from "../FlowBuilderService/resolveFirstFlowExecutableNode";
 import { WebhookModel } from "../../models/Webhook";
 
 import {differenceInMilliseconds} from "date-fns";
@@ -142,9 +143,9 @@ const fs = require("fs");
  *   Baileys socket → filter/retry (listener) → adaptBaileysInboundMessage
  *   → processInboundWhatsAppMessage → handleMessage(NormalizedWhatsAppMessage).
  *
- * 12.3-B/C/D: após persistir, handleMessage entra em processInboundAutomation.
- * Typebot e Chatbot/Queue Routing são domínio compartilhado; este adapter
- * só oferece buttons/list e mídia Typebot por URL.
+ * 12.3-B/C/D/E: após persistir, handleMessage entra em processInboundAutomation.
+ * Typebot, Chatbot/Queue Routing e Flow Builder são domínio compartilhado;
+ * este adapter só oferece buttons/list, mídia Typebot por URL e OpenAI legado.
  *
  * Mídia: BaileysMediaExtractor. Quoted: quotedStanzaId. Identidade: baileysIdentityProbe.
  * rawProviderMessage opcional no gate; lazy via tryGet/requireBaileysRawMessage.
@@ -1352,59 +1353,6 @@ const Push = (msg: proto.IWebMessageInfo) => {
 };
 
 /** Fluxos novos: primeiro node é `start`; o executável é o target da primeira aresta. Fluxos antigos: primeiro node já é message/menu/etc. */
-const resolveFirstFlowExecutableNodeId = (
-  nodes: INodes[],
-  connections: IConnections[]
-): {
-  startNodeId: string | null;
-  firstEdgeTarget: string | null;
-  firstExecutableNodeId: string | null;
-  firstExecutableNodeType: string | null;
-} => {
-  const safeNodes = Array.isArray(nodes) ? nodes : [];
-  const safeConnections = Array.isArray(connections) ? connections : [];
-  const first = safeNodes[0];
-  if (!first) {
-    return {
-      startNodeId: null,
-      firstEdgeTarget: null,
-      firstExecutableNodeId: null,
-      firstExecutableNodeType: null
-    };
-  }
-
-  if (first.type !== "start") {
-    return {
-      startNodeId: first.id,
-      firstEdgeTarget: null,
-      firstExecutableNodeId: first.id,
-      firstExecutableNodeType: first.type
-    };
-  }
-
-  const startNodeId = first.id;
-  const outgoing = safeConnections.filter(c => c && c.source === startNodeId);
-  const firstEdge = outgoing[0];
-  const firstEdgeTarget = firstEdge?.target ?? null;
-
-  if (!firstEdgeTarget) {
-    return {
-      startNodeId,
-      firstEdgeTarget: null,
-      firstExecutableNodeId: null,
-      firstExecutableNodeType: null
-    };
-  }
-
-  const targetNode = safeNodes.find(n => n.id === firstEdgeTarget);
-  return {
-    startNodeId,
-    firstEdgeTarget,
-    firstExecutableNodeId: targetNode?.id ?? firstEdgeTarget,
-    firstExecutableNodeType: targetNode?.type ?? null
-  };
-};
-
 const createWhatsappSettingsLoader = (
   tracker: ReturnType<typeof createMessageSettingsTracker>
 ) => {
@@ -2698,7 +2646,8 @@ export const handleMessageIntegration = async (
     NormalizedWhatsAppMessage,
     "body" | "pushName" | "addressing" | "fromMe" | "messageType" | "quotedStanzaId"
   > | null,
-  skipTypebot = false
+  skipTypebot = false,
+  skipFlow = false
 ): Promise<void> => {
   const msgType = inbound?.messageType || getTypeMessage(msg);
 
@@ -2744,6 +2693,9 @@ export const handleMessageIntegration = async (
           : undefined
     });
   } else if(queueIntegration.type === "flowbuilder") {
+    if (skipFlow) {
+      return;
+    }
     if (isFlowBuilderDebugEnabled()) {
       logger.info(
         {
@@ -3281,7 +3233,13 @@ const handleMessage = async (
         integrationId: ticket.integrationId,
         promptId: ticket.promptId,
         typebotSessionId: ticket.typebotSessionId,
-        typebotStatus: ticket.typebotStatus
+        typebotStatus: ticket.typebotStatus,
+        flowWebhook: ticket.flowWebhook,
+        lastFlowId: ticket.lastFlowId,
+        flowStopped: ticket.flowStopped,
+        hashFlowId: ticket.hashFlowId,
+        dataWebhook: ticket.dataWebhook,
+        status: ticket.status
       },
       contact: {
         id: contact.id,
@@ -3307,7 +3265,8 @@ const handleMessage = async (
         typebotLegacyMedia: createTypebotLegacyUrlMediaSender(
           wrapBaileysSession(wbot)
         ),
-        queueMenuRender: createBaileysQueueMenuRender(wbot, ticket, contact)
+        queueMenuRender: createBaileysQueueMenuRender(wbot, ticket, contact),
+        legacyOpenAiNode: true
       }
     );
     if (inboundAutomation.status === "skipped") {
@@ -3324,9 +3283,16 @@ const handleMessage = async (
       inboundAutomation.status === "executed" &&
       (inboundAutomation.consumer === "typebot" ||
         inboundAutomation.startedTypebot === true);
+    const skipFlow =
+      inboundAutomation.status === "executed" &&
+      (inboundAutomation.consumer === "flow" ||
+        inboundAutomation.startedFlow === true);
     const skipQueueRouting =
       inboundAutomation.status === "executed" &&
-      inboundAutomation.consumer === "queue_routing";
+      (inboundAutomation.consumer === "queue_routing" ||
+        inboundAutomation.consumer === "flow" ||
+        inboundAutomation.startedTypebot === true ||
+        inboundAutomation.startedFlow === true);
 
     try {
       if (!msg.key.fromMe && effectiveScheduleType !== "disabled") {
@@ -3429,7 +3395,7 @@ const handleMessage = async (
           ?.type === "waitForInteraction";
     }
 
-    if (!isNil(flow) && isWaitForInteraction && !msg.key.fromMe) {
+    if (!skipFlow && !isNil(flow) && isWaitForInteraction && !msg.key.fromMe) {
       const connections: IConnections[] = flow.flow["connections"];
       const nextConnection = connections.find(
         (c: any) => c.source === ticket.lastFlowId
@@ -3464,7 +3430,7 @@ const handleMessage = async (
       return;
     }
 
-    if (!isNil(flow) && isQuestion && !msg.key.fromMe) {
+    if (!skipFlow && !isNil(flow) && isQuestion && !msg.key.fromMe) {
       const body = getBodyMessage(msg);
       if (body) {
         const nodes: INodes[] = flow.flow["nodes"];
@@ -3558,7 +3524,16 @@ const handleMessage = async (
       return;
     }
 
-    if (isOpenai && !isNil(flow) && !ticket.queue) {
+    const continueLegacyOpenAi =
+      inboundAutomation.status === "executed" &&
+      inboundAutomation.deferredOpenAi === true;
+
+    if (
+      isOpenai &&
+      !isNil(flow) &&
+      !ticket.queue &&
+      (!skipFlow || continueLegacyOpenAi)
+    ) {
       const nodeSelected = flow.flow["nodes"].find(
         (node: any) => node.id === ticket.lastFlowId
       );
@@ -3691,7 +3666,8 @@ const handleMessage = async (
         contact,
         null,
         inbound,
-        skipTypebot
+        skipTypebot,
+        skipFlow
       );
 
       return;
@@ -3743,7 +3719,8 @@ const handleMessage = async (
         contact,
         isFirstMsg,
         inbound,
-        skipTypebot
+        skipTypebot,
+        skipFlow
       );
     }
 
@@ -3840,7 +3817,8 @@ const handleMessage = async (
         contact,
         isFirstMsg,
         inbound,
-        skipTypebot
+        skipTypebot,
+        skipFlow
       );
     }
 

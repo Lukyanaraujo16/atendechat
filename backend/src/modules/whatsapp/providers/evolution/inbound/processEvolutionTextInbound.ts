@@ -76,7 +76,13 @@ function toInboundAutomationContext(input: {
       integrationId: input.ticket.integrationId,
       promptId: input.ticket.promptId,
       typebotSessionId: input.ticket.typebotSessionId,
-      typebotStatus: input.ticket.typebotStatus
+      typebotStatus: input.ticket.typebotStatus,
+      flowWebhook: input.ticket.flowWebhook,
+      lastFlowId: input.ticket.lastFlowId,
+      flowStopped: input.ticket.flowStopped,
+      hashFlowId: input.ticket.hashFlowId,
+      dataWebhook: input.ticket.dataWebhook,
+      status: input.ticket.status
     },
     contact: {
       id: input.contact.id,
@@ -97,7 +103,7 @@ function toInboundAutomationContext(input: {
  * Sem WASocket / GetTicketWbot / raw Baileys / outbound neste handler.
  * 12.3-C: Typebot textual via processInboundAutomation (sem sessão Baileys).
  * 12.3-D: Chatbot / Queue Routing textual via a mesma boundary.
- * Flow/OpenAI legado ainda deferidos.
+ * 12.3-E: Flow Builder textual/domínio via a mesma boundary.
  */
 export async function processEvolutionTextInbound(input: {
   inbound: NormalizedWhatsAppMessage;

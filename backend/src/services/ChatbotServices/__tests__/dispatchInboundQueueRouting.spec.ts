@@ -379,11 +379,17 @@ describe("dispatchInboundQueueRouting 12.3-D", () => {
     );
   });
 
-  it("Flow na fila é deferido sem crash e sem Typebot", async () => {
+  it("Flow na fila inicia o executor provider-neutral sem Typebot", async () => {
     const ticket = makeTicket();
     const runTypebot = jest.fn();
+    const dispatchFlow = jest.fn().mockResolvedValue({
+      handled: true,
+      startedFlow: true,
+      reason: "queue_start"
+    });
     const deps = baseDeps(ticket, {
       runTypebot,
+      dispatchFlow,
       showIntegration: jest.fn().mockResolvedValue({
         id: 8,
         type: "flowbuilder",
@@ -397,9 +403,15 @@ describe("dispatchInboundQueueRouting 12.3-D", () => {
 
     const result = await dispatchInboundQueueRouting(ctx(), { deps });
     expect(result.handled).toBe(true);
-    expect(result.deferredIntegration).toBe("flowbuilder");
+    expect(result.startedFlow).toBe(true);
+    expect(result.deferredIntegration).toBeUndefined();
     expect(runTypebot).not.toHaveBeenCalled();
-    expect(ticket.useIntegration).toBe(false);
+    expect(dispatchFlow).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ forceStart: true })
+    );
+    expect(ticket.useIntegration).toBe(true);
+    expect(ticket.integrationId).toBe(8);
   });
 
   it("OpenAI legado na fila é deferido sem crash", async () => {

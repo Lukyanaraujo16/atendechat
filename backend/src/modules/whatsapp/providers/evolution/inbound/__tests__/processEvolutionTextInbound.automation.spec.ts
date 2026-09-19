@@ -103,6 +103,16 @@ jest.mock(
   })
 );
 
+jest.mock(
+  "../../../../../../services/FlowBuilderService/dispatchInboundFlow",
+  () => ({
+    dispatchInboundFlow: jest.fn().mockResolvedValue({
+      handled: false,
+      startedFlow: false
+    })
+  })
+);
+
 import { processEvolutionTextInbound } from "../processEvolutionTextInbound";
 import { processInboundAutomation } from "../../../../automation/processInboundAutomation";
 

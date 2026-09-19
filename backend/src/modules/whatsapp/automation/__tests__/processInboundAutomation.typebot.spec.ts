@@ -20,6 +20,16 @@ jest.mock(
   })
 );
 
+jest.mock(
+  "../../../../services/FlowBuilderService/dispatchInboundFlow",
+  () => ({
+    dispatchInboundFlow: jest.fn().mockResolvedValue({
+      handled: false,
+      startedFlow: false
+    })
+  })
+);
+
 const dispatch = dispatchInboundTypebot as jest.Mock;
 
 function inbound(
