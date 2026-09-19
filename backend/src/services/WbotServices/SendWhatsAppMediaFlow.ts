@@ -14,6 +14,7 @@ import { isFlowBuilderDebugEnabled } from "../../utils/flowBuilderDebug";
 import { logger } from "../../utils/logger";
 import { isWhatsAppDisableAllReadAndPresenceSideEffects } from "../../helpers/whatsappUnavailablePresence";
 import { prepareWhatsAppPttAudio } from "../WhatsAppMediaService/prepareWhatsAppPttAudio";
+import { persistWhatsAppOutboundMessage } from "../MessageServices/persistWhatsAppOutboundMessage";
 
 interface Request {
   media: Express.Multer.File;
@@ -49,6 +50,24 @@ const nameFileDiscovery = (pathMedia: string) => {
   const spliting = pathMedia.split('/')
   const first = spliting[spliting.length - 1]
   return first.split(".")[0]
+}
+
+function persistMediaTypeFromMimeMajor(typeMessage: string): string {
+  if (
+    typeMessage === "video" ||
+    typeMessage === "audio" ||
+    typeMessage === "image"
+  ) {
+    return typeMessage;
+  }
+  if (
+    typeMessage === "document" ||
+    typeMessage === "text" ||
+    typeMessage === "application"
+  ) {
+    return "document";
+  }
+  return "image";
 }
 
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms))
@@ -236,6 +255,17 @@ const SendWhatsAppMediaFlow = async ({
       content: { ...options }
     });
     const sentMessage = sent.rawSentMessage as WAMessage;
+    const persistMediaUrl = path.basename(pathMedia);
+    const persistBody =
+      typeof body === "string" && body.trim() !== "" ? body : persistMediaUrl;
+
+    await persistWhatsAppOutboundMessage({
+      ticket,
+      body: persistBody,
+      sent,
+      mediaType: persistMediaTypeFromMimeMajor(typeMessage),
+      mediaUrl: persistMediaUrl
+    });
 
     if (isFlowBuilderDebugEnabled()) {
       logger.info(
@@ -243,7 +273,7 @@ const SendWhatsAppMediaFlow = async ({
           flowMediaSend: true,
           ticketId: ticket.id,
           destJid: dest,
-          messageId: (sentMessage as any)?.key?.id,
+          messageId: sent.messageId,
           success: true
         },
         "[FlowBuilder][debug] SendWhatsAppMediaFlow: envio concluído"

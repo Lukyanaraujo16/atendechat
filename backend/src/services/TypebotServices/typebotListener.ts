@@ -465,7 +465,8 @@ const typebotListener = async (
                 jid: remoteJid,
                 kind: "audio",
                 url: urlMedia,
-                ticketId: ticket.id
+                ticketId: ticket.id,
+                ticket
               });
             }
           }
@@ -494,7 +495,8 @@ const typebotListener = async (
                 kind: "image",
                 url: urlMedia,
                 caption: imageContent?.caption || null,
-                ticketId: ticket.id
+                ticketId: ticket.id,
+                ticket
               });
             }
           }

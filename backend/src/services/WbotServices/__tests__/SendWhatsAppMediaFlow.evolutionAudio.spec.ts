@@ -46,14 +46,34 @@ jest.mock("../../WhatsAppMediaService/prepareWhatsAppPttAudio", () => ({
   prepareWhatsAppPttAudio: (...a: unknown[]) => preparePtt(...a)
 }));
 
+const persistOutbound = jest.fn();
+jest.mock("../../MessageServices/persistWhatsAppOutboundMessage", () => ({
+  persistWhatsAppOutboundMessage: (...a: unknown[]) => persistOutbound(...a)
+}));
+
 import SendWhatsAppMediaFlow from "../SendWhatsAppMediaFlow";
 
 function ticket() {
   return {
     id: 77,
+    companyId: 1,
+    whatsappId: 10,
     isGroup: false,
     contactId: 5,
     update: ticketUpdate
+  };
+}
+
+function sentResult(id: string) {
+  return {
+    messageId: id,
+    remoteJid: "5511999998888@s.whatsapp.net",
+    fromMe: true,
+    status: 1,
+    rawSentMessage: {
+      provider: "evolution",
+      key: { id, remoteJid: "5511999998888@s.whatsapp.net", fromMe: true }
+    }
   };
 }
 
@@ -61,9 +81,8 @@ describe("SendWhatsAppMediaFlow 12.3-F automation media", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     ticketUpdate.mockResolvedValue(undefined);
-    sendContent.mockResolvedValue({
-      rawSentMessage: { key: { id: "M1" } }
-    });
+    persistOutbound.mockResolvedValue({ id: "M1" });
+    sendContent.mockResolvedValue(sentResult("M1"));
     (fs.existsSync as jest.Mock).mockReturnValue(true);
     (fs.readFileSync as jest.Mock).mockImplementation((p: string) =>
       Buffer.from(String(p))
@@ -84,6 +103,16 @@ describe("SendWhatsAppMediaFlow 12.3-F automation media", () => {
     expect(Buffer.isBuffer(content.image)).toBe(true);
     expect(content.caption).toBe("legenda");
     expect(content.fileName).toBeUndefined();
+    expect(persistOutbound).toHaveBeenCalledTimes(1);
+    expect(persistOutbound).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ticket: expect.objectContaining({ id: 77, companyId: 1 }),
+        body: "legenda",
+        sent: expect.objectContaining({ messageId: "M1" }),
+        mediaType: "image",
+        mediaUrl: "foto.jpg"
+      })
+    );
   });
 
   it("vídeo Buffer envia no Evolution sem filename como caption", async () => {
@@ -100,6 +129,14 @@ describe("SendWhatsAppMediaFlow 12.3-F automation media", () => {
     expect(content.caption).toBe("video cap");
     expect(content.caption).not.toBe("clip");
     expect(content.fileName).toBeUndefined();
+    expect(persistOutbound).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sent: expect.objectContaining({ messageId: "M1" }),
+        mediaType: "video",
+        mediaUrl: "clip.mp4",
+        body: "video cap"
+      })
+    );
   });
 
   it("documento Buffer preserva filename no Evolution", async () => {
@@ -116,6 +153,14 @@ describe("SendWhatsAppMediaFlow 12.3-F automation media", () => {
     expect(content.fileName).toBe("contrato.pdf");
     expect(content.mimetype).toBe("application/pdf");
     expect(content.caption).toBe("doc cap");
+    expect(persistOutbound).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sent: expect.objectContaining({ messageId: "M1" }),
+        mediaType: "document",
+        mediaUrl: "contrato.pdf",
+        body: "doc cap"
+      })
+    );
   });
 
   it("áudio Flow é preparado para Evolution com ptt", async () => {
@@ -144,6 +189,13 @@ describe("SendWhatsAppMediaFlow 12.3-F automation media", () => {
     expect(content.mimetype).toBe("audio/ogg; codecs=opus");
     expect(content.mimetype).not.toBe("audio/mp4");
     expect(Buffer.isBuffer(content.audio)).toBe(true);
+    expect(persistOutbound).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sent: expect.objectContaining({ messageId: "M1" }),
+        mediaType: "audio",
+        mediaUrl: "voice.mp3"
+      })
+    );
   });
 
   it("áudio Flow continua funcionando no Baileys", async () => {
@@ -167,6 +219,33 @@ describe("SendWhatsAppMediaFlow 12.3-F automation media", () => {
     expect(content.ptt).toBe(true);
     expect(content.mimetype).toBe("audio/mp4");
     expect(sendContent).toHaveBeenCalled();
+    expect(persistOutbound).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sent: expect.objectContaining({ messageId: "M1" }),
+        mediaType: "audio"
+      })
+    );
+  });
+
+  it("imagem sem body persiste filename e não inventa caption no WhatsApp", async () => {
+    mimeLookup.mockReturnValue("image/jpeg");
+    getOutbound.mockResolvedValue({ provider: "evolution", sendContent });
+    await SendWhatsAppMediaFlow({
+      media: "/tmp/flow-img.png",
+      ticket: ticket() as never,
+      body: "",
+      isFlow: true
+    });
+    const { content } = sendContent.mock.calls[0][0];
+    expect(content.caption).toBe("");
+    expect(persistOutbound).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: "flow-img.png",
+        mediaType: "image",
+        mediaUrl: "flow-img.png",
+        sent: expect.objectContaining({ messageId: "M1" })
+      })
+    );
   });
 
   it("Flow não chama getWbot para mídia provider-neutral", () => {

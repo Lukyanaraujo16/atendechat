@@ -6,6 +6,8 @@ import { logger } from "../../utils/logger";
 import { AutomationMediaError } from "../WhatsAppMediaService/AutomationMediaError";
 import { downloadPublicHttpMedia } from "../WhatsAppMediaService/downloadPublicHttpMedia";
 import { prepareWhatsAppPttAudio } from "../WhatsAppMediaService/prepareWhatsAppPttAudio";
+import { persistWhatsAppOutboundMessage } from "../MessageServices/persistWhatsAppOutboundMessage";
+import type Ticket from "../../models/Ticket";
 
 export type TypebotRemoteMediaKind = "image" | "audio";
 
@@ -36,6 +38,7 @@ export async function sendTypebotRemoteMedia(input: {
   url: string;
   caption?: string | null;
   ticketId?: number;
+  ticket?: Pick<Ticket, "id" | "companyId" | "whatsappId">;
   deps?: SendTypebotRemoteMediaDeps;
 }): Promise<void> {
   const download = input.deps?.download || downloadPublicHttpMedia;
@@ -49,6 +52,22 @@ export async function sendTypebotRemoteMedia(input: {
     kind: input.kind
   });
 
+  const persistBody =
+    typeof input.caption === "string" && input.caption.trim() !== ""
+      ? input.caption
+      : "-";
+
+  const persistSent = async (sent: unknown) => {
+    if (!input.ticket?.id) return;
+    await persistWhatsAppOutboundMessage({
+      ticket: input.ticket,
+      body: persistBody,
+      sent,
+      mediaType: input.kind,
+      mediaUrl: input.url
+    });
+  };
+
   if (input.kind === "image") {
     const content: Record<string, unknown> = {
       image: downloaded.buffer,
@@ -57,7 +76,8 @@ export async function sendTypebotRemoteMedia(input: {
     if (input.caption) {
       content.caption = input.caption;
     }
-    await input.outbound.sendContent({ jid: input.jid, content });
+    const sent = await input.outbound.sendContent({ jid: input.jid, content });
+    await persistSent(sent);
     return;
   }
 
@@ -76,7 +96,7 @@ export async function sendTypebotRemoteMedia(input: {
     });
     outputPath = prepared.outputPath;
     const audio = readFileSync(prepared.outputPath);
-    await input.outbound.sendContent({
+    const sent = await input.outbound.sendContent({
       jid: input.jid,
       content: {
         audio,
@@ -84,6 +104,7 @@ export async function sendTypebotRemoteMedia(input: {
         ptt: prepared.ptt
       }
     });
+    await persistSent(sent);
   } finally {
     try {
       unlinkSync(tmpSource);

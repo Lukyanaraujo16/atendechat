@@ -177,6 +177,33 @@ describe("persistWhatsAppOutboundMessage", () => {
     );
   });
 
+  it("mediaType e mediaUrl de mídia outbound não viram conversation", async () => {
+    const envelope = evolutionEnvelope("IMG-1");
+    await persistWhatsAppOutboundMessage({
+      ticket,
+      body: "foto.jpg",
+      sent: {
+        messageId: "IMG-1",
+        remoteJid: "5511999998888@s.whatsapp.net",
+        fromMe: true,
+        status: 1,
+        rawSentMessage: envelope
+      },
+      mediaType: "image",
+      mediaUrl: "foto.jpg"
+    });
+    expect(createMessage.mock.calls[0][0].messageData).toEqual(
+      expect.objectContaining({
+        id: "IMG-1",
+        fromMe: true,
+        mediaType: "image",
+        mediaUrl: "foto.jpg",
+        body: "foto.jpg"
+      })
+    );
+    expect(uuid).not.toHaveBeenCalled();
+  });
+
   it("UUID só quando não há provider id", async () => {
     await persistWhatsAppOutboundMessage({
       ticket,

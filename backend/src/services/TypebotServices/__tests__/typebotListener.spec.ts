@@ -392,14 +392,16 @@ describe("typebotListener 12.3-C", () => {
         kind: "image",
         url: "https://cdn.typebot.io/x.jpg",
         caption: "foto",
-        jid: "5511999998888@s.whatsapp.net"
+        jid: "5511999998888@s.whatsapp.net",
+        ticket: expect.objectContaining({ id: 77, companyId: 1 })
       })
     );
     expect(sendRemoteMedia).toHaveBeenCalledWith(
       expect.objectContaining({
         kind: "audio",
         url: "https://cdn.typebot.io/a.mp4",
-        jid: "5511999998888@s.whatsapp.net"
+        jid: "5511999998888@s.whatsapp.net",
+        ticket: expect.objectContaining({ id: 77, companyId: 1 })
       })
     );
     expect(sendContent).not.toHaveBeenCalled();

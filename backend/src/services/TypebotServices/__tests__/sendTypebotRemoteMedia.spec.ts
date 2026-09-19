@@ -3,6 +3,11 @@ import {
   sendTypebotRemoteMedia,
   trySendTypebotRemoteMedia
 } from "../sendTypebotRemoteMedia";
+import { persistWhatsAppOutboundMessage } from "../../MessageServices/persistWhatsAppOutboundMessage";
+
+jest.mock("../../MessageServices/persistWhatsAppOutboundMessage", () => ({
+  persistWhatsAppOutboundMessage: jest.fn().mockResolvedValue({ id: "P1" })
+}));
 
 function outbound(provider: "evolution" | "baileys", sendContent: jest.Mock) {
   return {
@@ -19,6 +24,10 @@ function outbound(provider: "evolution" | "baileys", sendContent: jest.Mock) {
 describe("sendTypebotRemoteMedia 12.3-F", () => {
   const imgBuf = Buffer.from("img");
   const audioBuf = Buffer.from("ogg");
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
   it("imagem URL válida vira Buffer no Evolution sem {url}", async () => {
     const sendContent = jest.fn().mockResolvedValue({ messageId: "I1" });
@@ -49,6 +58,7 @@ describe("sendTypebotRemoteMedia 12.3-F", () => {
     expect(content.caption).toBe("olá");
     expect(content.image).not.toEqual({ url: expect.anything() });
     expect(JSON.stringify(content)).not.toMatch(/"url"/);
+    expect(persistWhatsAppOutboundMessage).not.toHaveBeenCalled();
   });
 
   it("imagem continua Buffer no Baileys", async () => {
@@ -160,5 +170,81 @@ describe("sendTypebotRemoteMedia 12.3-F", () => {
     });
     expect(ok).toBe(false);
     expect(sendContent).not.toHaveBeenCalled();
+  });
+
+  it("imagem com ticket persiste o sent do provider", async () => {
+    const sent = {
+      messageId: "TB-IMG-1",
+      remoteJid: "5511999998888@s.whatsapp.net",
+      fromMe: true,
+      status: 1,
+      rawSentMessage: { provider: "evolution", key: { id: "TB-IMG-1" } }
+    };
+    const sendContent = jest.fn().mockResolvedValue(sent);
+    await sendTypebotRemoteMedia({
+      outbound: outbound("evolution", sendContent) as never,
+      jid: "5511999998888@s.whatsapp.net",
+      kind: "image",
+      url: "https://cdn.typebot.io/x.png",
+      caption: "olá",
+      ticket: { id: 77, companyId: 1, whatsappId: 10 },
+      deps: {
+        download: async () => ({
+          buffer: imgBuf,
+          contentType: "image/png",
+          byteLength: imgBuf.length
+        })
+      }
+    });
+    expect(persistWhatsAppOutboundMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ticket: { id: 77, companyId: 1, whatsappId: 10 },
+        body: "olá",
+        sent,
+        mediaType: "image",
+        mediaUrl: "https://cdn.typebot.io/x.png"
+      })
+    );
+  });
+
+  it("áudio com ticket persiste mediaType audio e o mesmo provider id", async () => {
+    const sent = {
+      messageId: "TB-AUD-1",
+      remoteJid: "5511999998888@s.whatsapp.net",
+      fromMe: true,
+      status: 1,
+      rawSentMessage: { provider: "evolution", key: { id: "TB-AUD-1" } }
+    };
+    const sendContent = jest.fn().mockResolvedValue(sent);
+    await sendTypebotRemoteMedia({
+      outbound: outbound("evolution", sendContent) as never,
+      jid: "5511999998888@s.whatsapp.net",
+      kind: "audio",
+      url: "https://cdn.typebot.io/a.mp4",
+      ticket: { id: 77, companyId: 1, whatsappId: 10 },
+      deps: {
+        download: async () => ({
+          buffer: Buffer.from("src"),
+          contentType: "audio/mp4",
+          byteLength: 3
+        }),
+        preparePtt: async () => ({
+          outputPath: "/tmp/out.ogg",
+          mimetype: "audio/ogg; codecs=opus",
+          ptt: true as const
+        }),
+        writeFileSync: jest.fn() as never,
+        readFileSync: jest.fn().mockReturnValue(audioBuf) as never,
+        unlinkSync: jest.fn()
+      }
+    });
+    expect(persistWhatsAppOutboundMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sent,
+        mediaType: "audio",
+        mediaUrl: "https://cdn.typebot.io/a.mp4",
+        body: "-"
+      })
+    );
   });
 });
