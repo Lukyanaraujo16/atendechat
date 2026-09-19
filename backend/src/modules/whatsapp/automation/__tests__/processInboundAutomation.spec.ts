@@ -12,6 +12,16 @@ jest.mock(
   })
 );
 
+jest.mock(
+  "../../../../services/ChatbotServices/dispatchInboundQueueRouting",
+  () => ({
+    dispatchInboundQueueRouting: jest.fn().mockResolvedValue({
+      handled: false,
+      startedTypebot: false
+    })
+  })
+);
+
 import {
   classifyIntendedAutomationConsumers,
   evaluateInboundAutomationEligibility,
@@ -243,11 +253,13 @@ describe("processInboundAutomation 12.3-B", () => {
     expect(result.socketBoundConsumers.length).toBeGreaterThan(0);
     expect(result.socketBoundConsumers).toEqual(
       expect.arrayContaining([
-        "verifyQueue",
-        "handleChartbot",
+        "handleMessageIntegration",
         "ActionsWebhookService",
         "handleOpenAi"
       ])
+    );
+    expect(result.socketBoundConsumers).not.toEqual(
+      expect.arrayContaining(["verifyQueue", "handleChartbot"])
     );
   });
 
@@ -338,5 +350,7 @@ describe("12.3-B static coupling", () => {
     expect(persistIdx).toBeGreaterThan(0);
     expect(gateIdx).toBeGreaterThan(persistIdx);
     expect(chatbotIdx).toBeGreaterThan(gateIdx);
+    expect(listenerSrc).toContain("skipQueueRouting");
+    expect(listenerSrc).toContain("queueMenuRender");
   });
 });

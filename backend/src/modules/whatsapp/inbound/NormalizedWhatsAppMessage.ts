@@ -104,6 +104,6 @@ export const PHASE5_BAILEYS_RAW_CONSUMERS = [
   "CheckNumber/CheckIsValidContact (onWhatsApp utilitário)",
   "SetTicketMessagesAsRead (dataJson → keys de recibo) — só payloads Baileys",
   "chatbot list/button messages em wbotMessageListener (payload Baileys específico)",
-  "Evolution inbound: 12.3-B entra em processInboundAutomation; Chatbot/Typebot/Flow ainda socket-bound (deferidos)",
+  "Evolution inbound: 12.3-B entra em processInboundAutomation; 12.3-C Typebot; 12.3-D Chatbot/Queue Routing; Flow ainda deferido",
   "Evolution outbound / Live AI reply (ainda NOT_READY)"
 ] as const;

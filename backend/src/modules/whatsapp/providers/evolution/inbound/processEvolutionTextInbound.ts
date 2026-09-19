@@ -69,6 +69,7 @@ function toInboundAutomationContext(input: {
       contactId: input.ticket.contactId,
       isGroup: Boolean(input.ticket.isGroup),
       queueId: input.ticket.queueId,
+      queueOptionId: input.ticket.queueOptionId,
       userId: input.ticket.userId,
       chatbot: input.ticket.chatbot,
       useIntegration: input.ticket.useIntegration,
@@ -95,7 +96,8 @@ function toInboundAutomationContext(input: {
  * Domínio Evolution inbound (texto + mídia Fase 7).
  * Sem WASocket / GetTicketWbot / raw Baileys / outbound neste handler.
  * 12.3-C: Typebot textual via processInboundAutomation (sem sessão Baileys).
- * Flow/OpenAI/chatbot ainda deferidos.
+ * 12.3-D: Chatbot / Queue Routing textual via a mesma boundary.
+ * Flow/OpenAI legado ainda deferidos.
  */
 export async function processEvolutionTextInbound(input: {
   inbound: NormalizedWhatsAppMessage;

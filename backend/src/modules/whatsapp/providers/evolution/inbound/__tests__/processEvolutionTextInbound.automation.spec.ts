@@ -82,6 +82,27 @@ jest.mock("../../../../../../helpers/resolveWhatsappSettings", () => ({
   resolveWhatsappSettings: (...a: unknown[]) => resolveSettings(...a)
 }));
 
+const dispatchQueueRouting = jest.fn().mockResolvedValue({
+  handled: false,
+  startedTypebot: false
+});
+jest.mock(
+  "../../../../../../services/ChatbotServices/dispatchInboundQueueRouting",
+  () => ({
+    dispatchInboundQueueRouting: (...a: unknown[]) => dispatchQueueRouting(...a)
+  })
+);
+
+jest.mock(
+  "../../../../../../services/TypebotServices/dispatchInboundTypebot",
+  () => ({
+    dispatchInboundTypebot: jest.fn().mockResolvedValue({
+      handled: false,
+      halt: false
+    })
+  })
+);
+
 import { processEvolutionTextInbound } from "../processEvolutionTextInbound";
 import { processInboundAutomation } from "../../../../automation/processInboundAutomation";
 
@@ -159,6 +180,10 @@ describe("processEvolutionTextInbound → inbound automation 12.3-B", () => {
     createEvoMessage.mockResolvedValue({ id: "EVO1" });
     resolveSettings.mockResolvedValue({
       callsGroups: { groupMessagesMode: "receive" }
+    });
+    dispatchQueueRouting.mockResolvedValue({
+      handled: false,
+      startedTypebot: false
     });
     runAutomation.mockResolvedValue({
       status: "ready",
@@ -346,5 +371,33 @@ describe("processEvolutionTextInbound → inbound automation 12.3-B", () => {
     expect(groupResult.status).toBe("created");
     expect(getWbot).not.toHaveBeenCalled();
     expect(wrapBaileysSession).not.toHaveBeenCalled();
+  });
+
+  it("privado created dispara queue routing; duplicate não dispara", async () => {
+    await processEvolutionTextInbound({
+      inbound: privateInbound({ messageId: "QR1" }),
+      whatsapp,
+      evolutionPayloadSanitized: {},
+      deps: { processInboundAutomation }
+    });
+    expect(dispatchQueueRouting).toHaveBeenCalledTimes(1);
+    expect(dispatchQueueRouting.mock.calls[0][0].inbound.provider).toBe(
+      "evolution"
+    );
+    expect(dispatchQueueRouting.mock.calls[0][0].ticket.companyId).toBe(1);
+    expect(getWbot).not.toHaveBeenCalled();
+    expect(getTicketWbot).not.toHaveBeenCalled();
+    expect(getWhatsappWbot).not.toHaveBeenCalled();
+    expect(wrapBaileysSession).not.toHaveBeenCalled();
+
+    dispatchQueueRouting.mockClear();
+    findMessage.mockResolvedValue({ id: "QR1" });
+    await processEvolutionTextInbound({
+      inbound: privateInbound({ messageId: "QR1" }),
+      whatsapp,
+      evolutionPayloadSanitized: {},
+      deps: { processInboundAutomation }
+    });
+    expect(dispatchQueueRouting).not.toHaveBeenCalled();
   });
 });

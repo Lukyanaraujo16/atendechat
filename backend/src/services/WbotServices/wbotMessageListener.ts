@@ -130,6 +130,8 @@ import {
 import { adaptBaileysInboundMessage } from "../../modules/whatsapp/providers/baileys/inbound/adaptBaileysInboundMessage";
 import { processInboundWhatsAppMessage } from "../../modules/whatsapp/inbound/ProcessInboundWhatsAppMessage";
 import { processInboundAutomation } from "../../modules/whatsapp/automation/processInboundAutomation";
+import { releaseTicketFromChatbotToWaiting } from "../ChatbotServices/releaseTicketFromChatbotToWaiting";
+import type { QueueMenuRenderCapability } from "../ChatbotServices/queueMenuText";
 
 const request = require("request");
 
@@ -140,10 +142,9 @@ const fs = require("fs");
  *   Baileys socket → filter/retry (listener) → adaptBaileysInboundMessage
  *   → processInboundWhatsAppMessage → handleMessage(NormalizedWhatsAppMessage).
  *
- * 12.3-B: após persistir ticket/mensagem, handleMessage entra em
- * processInboundAutomation (gate provider-agnostic, sem WASocket).
- * Consumidores ainda socket-bound (verifyQueue/Typebot/Flow/OpenAI)
- * permanecem neste adapter Baileys após status "ready".
+ * 12.3-B/C/D: após persistir, handleMessage entra em processInboundAutomation.
+ * Typebot e Chatbot/Queue Routing são domínio compartilhado; este adapter
+ * só oferece buttons/list e mídia Typebot por URL.
  *
  * Mídia: BaileysMediaExtractor. Quoted: quotedStanzaId. Identidade: baileysIdentityProbe.
  * rawProviderMessage opcional no gate; lazy via tryGet/requireBaileysRawMessage.
@@ -350,6 +351,42 @@ async function sendOutboundContent(
 ): Promise<proto.IWebMessageInfo> {
   const sent = await outboundForSession(wbot).sendContent({ jid, content });
   return sent.rawSentMessage as proto.IWebMessageInfo;
+}
+
+function createBaileysQueueMenuRender(
+  wbot: Session,
+  ticket: Ticket,
+  contact: Contact
+): QueueMenuRenderCapability {
+  return {
+    sendInteractiveMenu: async ({ kind, text, items }) => {
+      const jid = contactChatJid(contact, ticket);
+      if (kind === "button") {
+        const buttons = items.map(item => ({
+          buttonId: item.id,
+          buttonText: { displayText: item.title },
+          type: 4
+        }));
+        const sendMsg = await sendOutboundContent(wbot, jid, {
+          text,
+          buttons,
+          headerType: 4
+        });
+        await verifyMessage(sendMsg, ticket, contact);
+        return;
+      }
+      const sectionsRows = items.map(item => ({
+        title: item.title,
+        rowId: item.id
+      }));
+      const sendMsg = await sendOutboundContent(wbot, jid, {
+        text,
+        buttonText: "Escolha uma opção",
+        sections: [{ rows: sectionsRows }]
+      });
+      await verifyMessage(sendMsg, ticket, contact);
+    }
+  };
 }
 
 export const sendMessageImage = async (
@@ -1812,45 +1849,6 @@ export const handleRating = async (
     });
 };
 
-/**
- * Menu de fila (chatbot): ao concluir opção folha, libera para Aguardando e emite socket.
- * Antes só `ticket.update` — inbox não recebia `company-{id}-ticket` update.
- */
-const releaseTicketFromChatbotToWaiting = async (
-  ticket: Ticket,
-  companyId: number
-): Promise<void> => {
-  if (!ticket?.id || !ticket.chatbot) {
-    return;
-  }
-  const previousChatbot = ticket.chatbot;
-  const previousQueueOptionId = ticket.queueOptionId;
-  await UpdateTicketService({
-    ticketData: {
-      status: "pending",
-      chatbot: false,
-      queueOptionId: null,
-      userId: null,
-      queueId: ticket.queueId ?? null,
-      useIntegration: false,
-      integrationId: null,
-      promptId: null
-    },
-    ticketId: ticket.id,
-    companyId
-  });
-  logger.info(
-    {
-      ticketId: ticket.id,
-      companyId,
-      queueId: ticket.queueId,
-      chatbotBefore: previousChatbot,
-      queueOptionIdBefore: previousQueueOptionId
-    },
-    "[Chatbot] ticket released to waiting (pending, chatbot=false)"
-  );
-};
-
 const handleChartbot = async (
   ticket: Ticket,
   msg: proto.IWebMessageInfo,
@@ -3276,6 +3274,7 @@ const handleMessage = async (
         contactId: ticket.contactId ?? contact.id,
         isGroup: Boolean(ticket.isGroup),
         queueId: ticket.queueId,
+        queueOptionId: ticket.queueOptionId,
         userId: ticket.userId,
         chatbot: ticket.chatbot,
         useIntegration: ticket.useIntegration,
@@ -3307,7 +3306,8 @@ const handleMessage = async (
       {
         typebotLegacyMedia: createTypebotLegacyUrlMediaSender(
           wrapBaileysSession(wbot)
-        )
+        ),
+        queueMenuRender: createBaileysQueueMenuRender(wbot, ticket, contact)
       }
     );
     if (inboundAutomation.status === "skipped") {
@@ -3322,7 +3322,11 @@ const handleMessage = async (
     }
     const skipTypebot =
       inboundAutomation.status === "executed" &&
-      inboundAutomation.consumer === "typebot";
+      (inboundAutomation.consumer === "typebot" ||
+        inboundAutomation.startedTypebot === true);
+    const skipQueueRouting =
+      inboundAutomation.status === "executed" &&
+      inboundAutomation.consumer === "queue_routing";
 
     try {
       if (!msg.key.fromMe && effectiveScheduleType !== "disabled") {
@@ -3744,6 +3748,7 @@ const handleMessage = async (
     }
 
     if (
+      !skipQueueRouting &&
       !ticket.queue &&
       !ticket.isGroup &&
       !msg.key.fromMe &&
@@ -3933,13 +3938,13 @@ const handleMessage = async (
       }
     }
 
-    if (whatsapp.queues.length == 1 && ticket.queue) {
+    if (!skipQueueRouting && whatsapp.queues.length == 1 && ticket.queue) {
       if (ticket.chatbot && !msg.key.fromMe) {
         await handleChartbot(ticket, msg, wbot, false, whatsappSettings, bodyMessage);
       }
     }
 
-    if (whatsapp.queues.length > 1 && ticket.queue) {
+    if (!skipQueueRouting && whatsapp.queues.length > 1 && ticket.queue) {
       if (ticket.chatbot && !msg.key.fromMe) {
         await handleChartbot(
           ticket,

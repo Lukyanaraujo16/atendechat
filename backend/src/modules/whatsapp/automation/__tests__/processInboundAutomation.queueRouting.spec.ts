@@ -1,26 +1,26 @@
+/* eslint-disable import/first */
 import { processInboundAutomation } from "../processInboundAutomation";
-import { dispatchInboundTypebot } from "../../../../services/TypebotServices/dispatchInboundTypebot";
 import { dispatchInboundQueueRouting } from "../../../../services/ChatbotServices/dispatchInboundQueueRouting";
 import { NormalizedWhatsAppMessage } from "../../inbound/NormalizedWhatsAppMessage";
 
 jest.mock(
   "../../../../services/TypebotServices/dispatchInboundTypebot",
   () => ({
-    dispatchInboundTypebot: jest.fn()
+    dispatchInboundTypebot: jest.fn().mockResolvedValue({
+      handled: false,
+      halt: false
+    })
   })
 );
 
 jest.mock(
   "../../../../services/ChatbotServices/dispatchInboundQueueRouting",
   () => ({
-    dispatchInboundQueueRouting: jest.fn().mockResolvedValue({
-      handled: false,
-      startedTypebot: false
-    })
+    dispatchInboundQueueRouting: jest.fn()
   })
 );
 
-const dispatch = dispatchInboundTypebot as jest.Mock;
+const dispatch = dispatchInboundQueueRouting as jest.Mock;
 
 function inbound(
   partial: Partial<NormalizedWhatsAppMessage> = {}
@@ -59,16 +59,16 @@ function inbound(
   };
 }
 
-describe("processInboundAutomation Typebot 12.3-C", () => {
+describe("processInboundAutomation queue routing 12.3-D", () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  it("Evolution privado executa Typebot na boundary", async () => {
+  it("Evolution privado elegível entra no Chatbot/Queue Routing core", async () => {
     dispatch.mockResolvedValue({
       handled: true,
-      halt: true,
-      reason: "connection_start"
+      startedTypebot: false,
+      reason: "verify_queue"
     });
 
     const result = await processInboundAutomation({
@@ -83,40 +83,71 @@ describe("processInboundAutomation Typebot 12.3-C", () => {
         userId: null
       },
       contact: { id: 5, companyId: 1 },
-      whatsapp: { id: 10, companyId: 1, integrationId: 9 },
+      whatsapp: { id: 10, companyId: 1 },
       persistedMessageId: "M1"
     });
 
     expect(dispatch).toHaveBeenCalledTimes(1);
     expect(result.status).toBe("executed");
     if (result.status !== "executed") return;
-    expect(result.consumer).toBe("typebot");
-    expect(result.halt).toBe(true);
+    expect(result.consumer).toBe("queue_routing");
+    expect(result.halt).toBe(false);
     expect(result.context).toMatchObject({
       companyId: 1,
       ticketId: 77,
       whatsappId: 10,
-      contactId: 5,
       provider: "evolution"
     });
-    expect(dispatchInboundQueueRouting).not.toHaveBeenCalled();
   });
 
-  it("grupo não chega a executar Typebot", async () => {
+  it("Typebot de fila marca startedTypebot para o adapter Baileys não duplicar", async () => {
+    dispatch.mockResolvedValue({
+      handled: true,
+      startedTypebot: true,
+      reason: "verify_queue"
+    });
+
     const result = await processInboundAutomation({
-      inbound: inbound({ isGroup: true }),
+      inbound: inbound({ body: "1" }),
       ticket: {
         id: 77,
         companyId: 1,
         whatsappId: 10,
         contactId: 5,
-        isGroup: true
+        isGroup: false,
+        queueId: null,
+        userId: null
       },
       contact: { id: 5, companyId: 1 },
-      whatsapp: { id: 10, companyId: 1, integrationId: 9 },
+      whatsapp: { id: 10, companyId: 1 },
+      persistedMessageId: "M1"
+    });
+
+    expect(result.status).toBe("executed");
+    if (result.status !== "executed") return;
+    expect(result.startedTypebot).toBe(true);
+  });
+
+  it("reaction não entra no chatbot", async () => {
+    const result = await processInboundAutomation({
+      inbound: inbound({
+        kind: "reaction",
+        reaction: { targetStanzaId: "X", emoji: "👍" }
+      }),
+      ticket: {
+        id: 77,
+        companyId: 1,
+        whatsappId: 10,
+        contactId: 5,
+        isGroup: false
+      },
+      contact: { id: 5, companyId: 1 },
+      whatsapp: { id: 10, companyId: 1 },
       persistedMessageId: "M1"
     });
     expect(result.status).toBe("skipped");
+    if (result.status !== "skipped") return;
+    expect(result.reason).toBe("reaction");
     expect(dispatch).not.toHaveBeenCalled();
   });
 });

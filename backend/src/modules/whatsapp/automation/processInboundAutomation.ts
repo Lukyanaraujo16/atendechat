@@ -1,23 +1,24 @@
 import { logger } from "../../../utils/logger";
 import { NormalizedWhatsAppMessage } from "../inbound/NormalizedWhatsAppMessage";
 import { dispatchInboundTypebot } from "../../../services/TypebotServices/dispatchInboundTypebot";
+import { dispatchInboundQueueRouting } from "../../../services/ChatbotServices/dispatchInboundQueueRouting";
 import type { TypebotLegacyMediaCapability } from "../../../services/TypebotServices/typebotLegacyMedia";
+import type { QueueMenuRenderCapability } from "../../../services/ChatbotServices/queueMenuText";
 
 /**
  * 12.3-B — Automation Inbound Boundary
  *
  * provider inbound persistido
  *   → processInboundAutomation (este módulo)
- *   → Chatbot / Typebot / Flow (consumidores; ainda socket-bound nesta fase)
+ *   → Chatbot / Typebot / Flow
  *
  * O core NÃO exige sessão WhatsApp in-memory nem payload cru de provider.
- * 12.3-C: Typebot textual é consumidor portado (WhatsAppOutbound).
- * Flow/OpenAI/chatbot/n8n continuam socket-bound.
+ * 12.3-C: Typebot textual (WhatsAppOutbound).
+ * 12.3-D: Chatbot / Queue Routing (WhatsAppOutbound + fallback textual).
+ * Flow/OpenAI legado/n8n continuam socket-bound / deferidos.
  */
 
 export const SOCKET_BOUND_INBOUND_AUTOMATION_CONSUMERS = [
-  "verifyQueue",
-  "handleChartbot",
   "handleMessageIntegration",
   "ActionsWebhookService",
   "handleOpenAi",
@@ -44,6 +45,7 @@ export type InboundAutomationTicket = {
   contactId: number;
   isGroup: boolean;
   queueId?: number | null;
+  queueOptionId?: number | null;
   userId?: number | null;
   chatbot?: boolean | null;
   useIntegration?: boolean | null;
@@ -95,6 +97,10 @@ export type InboundAutomationCapabilities = {
    * Caller Baileys: mídia Typebot por URL. Evolution omite.
    */
   typebotLegacyMedia?: TypebotLegacyMediaCapability;
+  /**
+   * Caller Baileys: buttons/list. Evolution omite (fallback textual).
+   */
+  queueMenuRender?: QueueMenuRenderCapability;
 };
 
 export type ProcessInboundAutomationResult =
@@ -111,8 +117,10 @@ export type ProcessInboundAutomationResult =
     }
   | {
       status: "executed";
-      consumer: "typebot";
+      consumer: "typebot" | "queue_routing";
       halt: boolean;
+      startedTypebot?: boolean;
+      deferredIntegration?: string;
       context: InboundAutomationSnapshot;
       intendedConsumers: string[];
       socketBoundConsumers: readonly string[];
@@ -320,6 +328,37 @@ export async function processInboundAutomation(
         status: "executed",
         consumer: "typebot",
         halt: typebotDispatch.halt,
+        startedTypebot: true,
+        context,
+        intendedConsumers,
+        socketBoundConsumers: SOCKET_BOUND_INBOUND_AUTOMATION_CONSUMERS
+      };
+    }
+
+    const queueDispatch = await dispatchInboundQueueRouting(ctx, {
+      media: capabilities?.typebotLegacyMedia,
+      menuRender: capabilities?.queueMenuRender
+    });
+    if (queueDispatch.handled) {
+      logger.info(
+        {
+          inboundAutomation: true,
+          status: "executed",
+          consumer: "queue_routing",
+          halt: false,
+          startedTypebot: queueDispatch.startedTypebot,
+          deferredIntegration: queueDispatch.deferredIntegration,
+          reason: queueDispatch.reason,
+          ...context
+        },
+        "[InboundAutomation] queue routing executed"
+      );
+      return {
+        status: "executed",
+        consumer: "queue_routing",
+        halt: false,
+        startedTypebot: queueDispatch.startedTypebot,
+        deferredIntegration: queueDispatch.deferredIntegration,
         context,
         intendedConsumers,
         socketBoundConsumers: SOCKET_BOUND_INBOUND_AUTOMATION_CONSUMERS
