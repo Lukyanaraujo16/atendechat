@@ -170,10 +170,13 @@ describe("dispatchInboundFlow 12.3-E", () => {
   });
 
   it("inicia Flow welcome da conexão sem WASocket", async () => {
-    const ticket = makeTicket();
+    const ticket = makeTicket({ status: "pending", chatbot: false });
     const runActions = jest.fn().mockResolvedValue("ds");
     const deps = baseDeps(ticket, { runActions });
-    const result = await dispatchInboundFlow(ctx(), { deps });
+    const result = await dispatchInboundFlow(
+      ctx({ ticket: { ...ctx().ticket, status: "pending", chatbot: false } }),
+      { deps }
+    );
     expect(result.handled).toBe(true);
     expect(result.startedFlow).toBe(true);
     expect(runActions).toHaveBeenCalledWith(

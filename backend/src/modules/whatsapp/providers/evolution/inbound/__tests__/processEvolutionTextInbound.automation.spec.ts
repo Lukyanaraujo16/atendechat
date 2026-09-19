@@ -213,6 +213,44 @@ describe("processEvolutionTextInbound → inbound automation 12.3-B", () => {
     });
   });
 
+  it("ticket privado previamente closed chega na automação já pending", async () => {
+    findOrCreateTicket.mockResolvedValue({
+      id: 11,
+      companyId: 1,
+      whatsappId: 10,
+      contactId: 5,
+      isGroup: false,
+      queueId: null,
+      userId: null,
+      chatbot: false,
+      status: "pending",
+      flowWebhook: false,
+      lastFlowId: null,
+      flowStopped: null
+    });
+
+    await processEvolutionTextInbound({
+      inbound: privateInbound({ messageId: "CLOSED1" }),
+      whatsapp,
+      evolutionPayloadSanitized: {},
+      deps: { processInboundAutomation: runAutomation }
+    });
+
+    expect(findOrCreateTicket).toHaveBeenCalledTimes(1);
+    expect(runAutomation).toHaveBeenCalledTimes(1);
+    expect(runAutomation.mock.calls[0][0].ticket).toMatchObject({
+      id: 11,
+      status: "pending",
+      chatbot: false,
+      queueId: null,
+      userId: null,
+      flowWebhook: false,
+      lastFlowId: null,
+      flowStopped: null
+    });
+    expect(runAutomation.mock.calls[0][0].ticket.status).not.toBe("closed");
+  });
+
   it("mensagem privada persistida entra na boundary com tenant correto", async () => {
     const result = await processEvolutionTextInbound({
       inbound: privateInbound(),

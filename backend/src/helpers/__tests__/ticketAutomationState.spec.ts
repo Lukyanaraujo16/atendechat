@@ -253,6 +253,18 @@ describe("ticketAutomationState", () => {
       ).toBe(false);
     });
 
+    it("closed não entra em AUTO mesmo com chatbot true", () => {
+      expect(
+        isUnqueuedPendingAutomationTicket({
+          status: "closed",
+          chatbot: true,
+          queueId: null,
+          userId: null,
+          isGroup: false
+        })
+      ).toBe(false);
+    });
+
     it("após setor (queueId + chatbot false) sai de AUTO", () => {
       expect(
         isUnqueuedPendingAutomationTicket({

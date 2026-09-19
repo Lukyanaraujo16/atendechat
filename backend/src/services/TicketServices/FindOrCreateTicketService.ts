@@ -85,6 +85,11 @@ const FindOrCreateTicketService = async (
    * Ticket fechado reutilizado (unique contactId+companyId+whatsappId não permite novo registro).
    * Sem limpar flowWebhook/lastFlowId/flowStopped, o handleMessageIntegration não dispara welcome
    * (`!ticket.flowWebhook`) e o fluxo continua como se o bot já tivesse corrido.
+   *
+   * Conversa privada: o novo ciclo inbound reabre o MESMO ticket como pending.
+   * Sem isso, Evolution (e qualquer provider sem listener compensatório) executa
+   * automação ainda closed; UpdateTicketService(oldStatus=closed) anula chatbot=true.
+   * Grupos têm lifecycle próprio (permanecem open) — não forçar pending aqui.
    */
   if (ticket?.status === "closed") {
     const dw = parseTicketDataWebhook(ticket.dataWebhook);
@@ -96,6 +101,7 @@ const FindOrCreateTicketService = async (
     if (dw.startedOutsideSystem === true) {
       preserved.startedOutsideSystem = true;
     }
+    const reopenPrivateAsPending = !groupContact && !ticket.isGroup;
     await ticket.update({
       queueId: null,
       userId: null,
@@ -111,10 +117,16 @@ const FindOrCreateTicketService = async (
       amountUsedBotQueues: 0,
       typebotSessionId: null,
       typebotStatus: false,
-      dataWebhook: Object.keys(preserved).length > 0 ? (preserved as any) : null
+      dataWebhook:
+        Object.keys(preserved).length > 0 ? (preserved as any) : null,
+      ...(reopenPrivateAsPending ? { status: "pending" } : {})
     });
     logger.info(
-      `[WhatsAppInbound] ticket_reopen_cycle_reset ticketId=${ticket.id} companyId=${companyId} contactId=${groupContact ? groupContact.id : contact.id} whatsappId=${whatsappId}`
+      `[WhatsAppInbound] ticket_reopen_cycle_reset ticketId=${
+        ticket.id
+      } companyId=${companyId} contactId=${
+        groupContact ? groupContact.id : contact.id
+      } whatsappId=${whatsappId} status=${ticket.status}`
     );
   }
 
