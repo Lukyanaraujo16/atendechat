@@ -12,6 +12,7 @@ import { getWhatsAppOutboundForTicket } from "../../modules/whatsapp/outbound/re
 import type { NormalizedWhatsAppMessage } from "../../modules/whatsapp/inbound/NormalizedWhatsAppMessage";
 import { typebotSleep } from "./typebotSleep";
 import type { TypebotLegacyMediaCapability } from "./typebotLegacyMedia";
+import { trySendTypebotRemoteMedia } from "./sendTypebotRemoteMedia";
 
 /* Sequential Typebot replies must preserve send order. */
 /* eslint-disable no-restricted-syntax, no-await-in-loop, no-continue */
@@ -26,7 +27,8 @@ export type TypebotListenerRequest = {
   typebot: QueueIntegrations;
   inbound?: TypebotInbound;
   /**
-   * Caller Baileys: mídia URL legada. Evolution omite.
+   * @deprecated 12.3-F — mídia Typebot usa Buffer via sendTypebotRemoteMedia.
+   * Mantido na assinatura para não quebrar callers 12.3-C.
    */
   media?: TypebotLegacyMediaCapability;
   /**
@@ -43,6 +45,7 @@ export type TypebotListenerDeps = {
   getOutbound?: (ticket: Ticket) => Promise<WhatsAppOutbound>;
   sleep?: (ms: number) => Promise<void>;
   axiosRequest?: typeof axios.request;
+  sendRemoteMedia?: typeof trySendTypebotRemoteMedia;
 };
 
 async function runTypebotTypingSimulation(
@@ -200,12 +203,13 @@ export async function resolveTypebotDestinationJid(
 }
 
 const typebotListener = async (
-  { ticket, typebot, inbound, media }: TypebotListenerRequest,
+  { ticket, typebot, inbound }: TypebotListenerRequest,
   deps?: TypebotListenerDeps
 ): Promise<void> => {
   const getOutbound = deps?.getOutbound || getWhatsAppOutboundForTicket;
   const sleep = deps?.sleep || typebotSleep;
   const axiosRequest = deps?.axiosRequest || axios.request.bind(axios);
+  const sendRemoteMedia = deps?.sendRemoteMedia || trySendTypebotRemoteMedia;
 
   const remoteJid = await resolveTypebotDestinationJid(ticket, inbound);
   if (!remoteJid || remoteJid === "status@broadcast") {
@@ -421,14 +425,10 @@ const typebotListener = async (
           if (message.type === "audio") {
             const urlMedia = (message.content as { url?: string } | undefined)
               ?.url;
-            if (!media || !urlMedia) {
+            if (!urlMedia) {
               logger.info(
-                {
-                  ticketId: ticket.id,
-                  kind: "audio",
-                  hasCapability: Boolean(media)
-                },
-                "[Typebot] media deferred — not ported (12.3-C)"
+                { ticketId: ticket.id, kind: "audio" },
+                "[Typebot] audio skipped: missing url"
               );
             } else {
               await runTypebotTypingSimulation(
@@ -438,25 +438,25 @@ const typebotListener = async (
                 "typebot:audio",
                 sleep
               );
-              await media.sendUrlMedia({
+              await sendRemoteMedia({
+                outbound,
                 jid: remoteJid,
                 kind: "audio",
-                url: urlMedia
+                url: urlMedia,
+                ticketId: ticket.id
               });
             }
           }
 
           if (message.type === "image") {
-            const urlMedia = (message.content as { url?: string } | undefined)
-              ?.url;
-            if (!media || !urlMedia) {
+            const imageContent = message.content as
+              | { url?: string; caption?: string }
+              | undefined;
+            const urlMedia = imageContent?.url;
+            if (!urlMedia) {
               logger.info(
-                {
-                  ticketId: ticket.id,
-                  kind: "image",
-                  hasCapability: Boolean(media)
-                },
-                "[Typebot] media deferred — not ported (12.3-C)"
+                { ticketId: ticket.id, kind: "image" },
+                "[Typebot] image skipped: missing url"
               );
             } else {
               await runTypebotTypingSimulation(
@@ -466,10 +466,13 @@ const typebotListener = async (
                 "typebot:image",
                 sleep
               );
-              await media.sendUrlMedia({
+              await sendRemoteMedia({
+                outbound,
                 jid: remoteJid,
                 kind: "image",
-                url: urlMedia
+                url: urlMedia,
+                caption: imageContent?.caption || null,
+                ticketId: ticket.id
               });
             }
           }

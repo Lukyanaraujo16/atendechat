@@ -13,6 +13,7 @@ import Contact from "../../models/Contact";
 import { isFlowBuilderDebugEnabled } from "../../utils/flowBuilderDebug";
 import { logger } from "../../utils/logger";
 import { isWhatsAppDisableAllReadAndPresenceSideEffects } from "../../helpers/whatsappUnavailablePresence";
+import { prepareWhatsAppPttAudio } from "../WhatsAppMediaService/prepareWhatsAppPttAudio";
 
 interface Request {
   media: Express.Multer.File;
@@ -29,20 +30,6 @@ interface RequestFlow {
 }
 
 const publicFolder = path.resolve(__dirname, "..", "..", "..", "public");
-
-const processAudio = async (audio: string): Promise<string> => {
-  const outputAudio = `${publicFolder}/${new Date().getTime()}.mp3`;
-  return new Promise((resolve, reject) => {
-    exec(
-      `${ffmpegPath.path} -i ${audio} -vn -ab 128k -ar 44100 -f ipod ${outputAudio} -y`,
-      (error, _stdout, _stderr) => {
-        if (error) reject(error);
-        //fs.unlinkSync(audio);
-        resolve(outputAudio);
-      }
-    );
-  });
-};
 
 const processAudioFile = async (audio: string): Promise<string> => {
   const outputAudio = `${publicFolder}/${new Date().getTime()}.mp3`;
@@ -148,33 +135,26 @@ const SendWhatsAppMediaFlow = async ({
       if (typeMessage === "video") {
         options = {
           video: fs.readFileSync(pathMedia),
-          caption: body,
-          fileName: mediaName
+          caption: body || ""
         };
       } else if (typeMessage === "audio") {
-        if (outbound.provider === "evolution") {
-          logger.info(
-            {
-              flowMediaSend: true,
-              ticketId: ticket.id,
-              pathMedia
-            },
-            "[FlowBuilder] audio deferred for Evolution (12.3-E/F): PTT/ogg not ported"
-          );
-          return undefined;
-        }
         if (isRecord) {
-          const convert = await processAudio(pathMedia);
+          const prepared = await prepareWhatsAppPttAudio({
+            sourcePath: pathMedia,
+            provider: outbound.provider,
+            unlinkSource: false
+          });
           options = {
-            audio: fs.readFileSync(convert),
-            mimetype: typeMessage ? "audio/mp4" : mimetype,
-            ptt: true
+            audio: fs.readFileSync(prepared.outputPath),
+            mimetype: prepared.mimetype,
+            ptt: prepared.ptt
           };
         } else {
           const convert = await processAudioFile(pathMedia);
           options = {
             audio: fs.readFileSync(convert),
-            mimetype: typeMessage ? "audio/mp4" : mimetype,
+            mimetype:
+              outbound.provider === "evolution" ? "audio/mpeg" : "audio/mp4",
             ptt: false
           };
         }
@@ -188,14 +168,14 @@ const SendWhatsAppMediaFlow = async ({
         options = {
           document: fs.readFileSync(pathMedia),
           caption: body,
-          fileName: mediaName,
+          fileName: path.basename(pathMedia),
           mimetype: mimetype
         };
       } else if (typeMessage === "application") {
         options = {
           document: fs.readFileSync(pathMedia),
           caption: body,
-          fileName: mediaName,
+          fileName: path.basename(pathMedia),
           mimetype: mimetype
         };
       }

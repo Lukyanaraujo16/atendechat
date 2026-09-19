@@ -17,6 +17,7 @@ import {
 } from "../CompanyService/adjustCompanyStorageUsage";
 import CreateMessageService from "../MessageServices/CreateMessageService";
 import { buildEvolutionOutboundDataJsonFromEnvelope } from "../../modules/whatsapp/providers/evolution/outbound/mapEvolutionSendResponse";
+import { prepareWhatsAppPttAudio } from "../WhatsAppMediaService/prepareWhatsAppPttAudio";
 
 interface Request {
   media: Express.Multer.File;
@@ -32,27 +33,12 @@ const SITE_VOICE_RECORDING = "audio-record-site";
 const isSiteVoiceRecording = (originalname?: string): boolean =>
   String(originalname || "").includes(SITE_VOICE_RECORDING);
 
-/** Baileys PTT: WebM → AAC/MP4 (ipod). Não alterar. */
+/** Baileys PTT / campanhas via getMessageOptions: WebM → AAC/MP4 (ipod). Não alterar. */
 const processAudio = async (audio: string): Promise<string> => {
   const outputAudio = `${publicFolder}/${new Date().getTime()}.mp3`;
   return new Promise((resolve, reject) => {
     exec(
       `${ffmpegPath.path} -i ${audio} -vn -ab 128k -ar 44100 -f ipod ${outputAudio} -y`,
-      (error, _stdout, _stderr) => {
-        if (error) reject(error);
-        fs.unlinkSync(audio);
-        resolve(outputAudio);
-      }
-    );
-  });
-};
-
-/** Evolution PTT gravado no site: WebM → OGG/Opus (mesmo formato do inbound aprovado). */
-const processEvolutionPttAudio = async (audio: string): Promise<string> => {
-  const outputAudio = `${publicFolder}/${new Date().getTime()}.ogg`;
-  return new Promise((resolve, reject) => {
-    exec(
-      `${ffmpegPath.path} -i ${audio} -vn -ac 1 -c:a libopus -b:a 64k -f ogg ${outputAudio} -y`,
       (error, _stdout, _stderr) => {
         if (error) reject(error);
         fs.unlinkSync(audio);
@@ -187,12 +173,18 @@ const SendWhatsAppMedia = async ({
       };
     } else if (typeMessage === "audio") {
       const typeAudio = siteVoiceRecording;
-      const useEvolutionPtt = typeAudio && outbound.provider === "evolution";
       let convert: string;
-      if (typeAudio && useEvolutionPtt) {
-        convert = await processEvolutionPttAudio(media.path);
-      } else if (typeAudio) {
-        convert = await processAudio(media.path);
+      let pttMimetype: string | undefined;
+      let pttFlag: boolean | undefined;
+      if (typeAudio) {
+        const prepared = await prepareWhatsAppPttAudio({
+          sourcePath: media.path,
+          provider: outbound.provider,
+          unlinkSource: true
+        });
+        convert = prepared.outputPath;
+        pttMimetype = prepared.mimetype;
+        pttFlag = prepared.ptt;
       } else {
         convert = await processAudioFile(media.path);
       }
@@ -200,8 +192,8 @@ const SendWhatsAppMedia = async ({
       if (typeAudio) {
         options = {
           audio: fs.readFileSync(convert),
-          mimetype: useEvolutionPtt ? "audio/ogg; codecs=opus" : "audio/mp4",
-          ptt: true
+          mimetype: pttMimetype,
+          ptt: pttFlag
         };
       } else {
         options = {

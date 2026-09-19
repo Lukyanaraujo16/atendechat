@@ -1,9 +1,9 @@
 import type { WhatsAppOutbound } from "../../modules/whatsapp/outbound/WhatsAppOutbound";
 
 /**
- * Capability temporária (12.3-C) para mídia Typebot por URL.
- * Somente o caller Baileys deve fornecer. Evolution omite — o core
- * defere image/audio sem sendContent({ url }).
+ * @deprecated 12.3-F — Typebot envia Buffer via sendTypebotRemoteMedia.
+ * Payload `{ image: { url } }` / `{ audio: { url } }` NÃO deve ir ao Evolution.
+ * Mantido isolado caso um adapter Baileys legado precise do contrato URL.
  */
 export type TypebotLegacyMediaKind = "image" | "audio";
 

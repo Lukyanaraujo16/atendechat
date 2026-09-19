@@ -1,5 +1,8 @@
 import { lookup } from "dns/promises";
-import { isIP } from "net";
+import {
+  PRIVATE_IP_RE,
+  isPrivateOrLocalHost
+} from "../../../../../helpers/httpUrlSafety";
 
 /**
  * Proteção SSRF para URLs de mídia Evolution.
@@ -9,31 +12,14 @@ import { isIP } from "net";
  * mesmo se coincidirem com typos.
  */
 
-const PRIVATE_IP_RE =
-  /^(10\.|127\.|169\.254\.|192\.168\.|172\.(1[6-9]|2\d|3[0-1])\.|0\.|::1$|fc|fd|fe80)/i;
-
-const BLOCKED_HOSTS = new Set([
-  "localhost",
-  "metadata.google.internal",
-  "metadata",
-  "169.254.169.254"
-]);
-
 export type EvolutionUrlSafetyResult =
   | { ok: true; url: URL }
   | { ok: false; reason: string };
 
+export { isPrivateOrLocalHost };
+
 function normalizeHost(host: string): string {
   return host.trim().toLowerCase().replace(/\.$/, "");
-}
-
-export function isPrivateOrLocalHost(host: string): boolean {
-  const h = normalizeHost(host);
-  if (BLOCKED_HOSTS.has(h)) return true;
-  if (h === "metadata.google.internal") return true;
-  if (PRIVATE_IP_RE.test(h)) return true;
-  if (isIP(h) && PRIVATE_IP_RE.test(h)) return true;
-  return false;
 }
 
 /**

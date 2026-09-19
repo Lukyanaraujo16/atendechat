@@ -428,6 +428,24 @@ describe("EvolutionWhatsAppOutbound Fase 8", () => {
       })
     ).rejects.toMatchObject({ message: "ERR_EVOLUTION_MEDIA_TOO_LARGE" });
   });
+
+  it("rejeita { image: { url } } e { audio: { url } }", async () => {
+    const outbound = new EvolutionWhatsAppOutbound(1);
+    await expect(
+      outbound.sendContent({
+        jid: "5511@s.whatsapp.net",
+        content: { image: { url: "https://cdn.example/x.jpg" } }
+      })
+    ).rejects.toMatchObject({ message: "ERR_EVOLUTION_INVALID_MEDIA" });
+    await expect(
+      outbound.sendContent({
+        jid: "5511@s.whatsapp.net",
+        content: { audio: { url: "https://cdn.example/a.mp4" } }
+      })
+    ).rejects.toMatchObject({ message: "ERR_EVOLUTION_INVALID_MEDIA" });
+    expect(sendMedia).not.toHaveBeenCalled();
+    expect(sendAudio).not.toHaveBeenCalled();
+  });
 });
 
 describe("evolutionDestination / mapEvolutionSendResponse", () => {
