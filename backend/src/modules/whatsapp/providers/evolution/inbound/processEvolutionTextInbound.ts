@@ -8,6 +8,10 @@ import { classifyInboundMessageFromNormalized } from "../../../../../services/Ai
 import { logger } from "../../../../../utils/logger";
 import { NormalizedWhatsAppMessage } from "../../../inbound/NormalizedWhatsAppMessage";
 import { processInboundWhatsAppMessage } from "../../../inbound/ProcessInboundWhatsAppMessage";
+import {
+  processInboundAutomation,
+  type InboundAutomationContext
+} from "../../../automation/processInboundAutomation";
 import { resolveQuotedMessageByStanzaId } from "../../../inbound/resolveQuotedMessageByStanzaId";
 import { applyInboundWhatsAppReaction } from "../../../inbound/applyInboundWhatsAppReaction";
 import { createEvolutionInboundMessage } from "./createEvolutionInboundMessage";
@@ -46,12 +50,51 @@ export type ProcessEvolutionInboundDeps = {
   extractMedia?: typeof extractEvolutionMedia;
   persistMedia?: typeof persistEvolutionMediaFile;
   publicDir?: string;
+  processInboundAutomation?: typeof processInboundAutomation;
 };
+
+function toInboundAutomationContext(input: {
+  inbound: NormalizedWhatsAppMessage;
+  ticket: Ticket;
+  contact: Contact;
+  whatsapp: Whatsapp;
+  persistedMessageId: string;
+}): InboundAutomationContext {
+  return {
+    inbound: input.inbound,
+    ticket: {
+      id: input.ticket.id,
+      companyId: input.ticket.companyId,
+      whatsappId: input.ticket.whatsappId,
+      contactId: input.ticket.contactId,
+      isGroup: Boolean(input.ticket.isGroup),
+      queueId: input.ticket.queueId,
+      userId: input.ticket.userId,
+      chatbot: input.ticket.chatbot,
+      useIntegration: input.ticket.useIntegration,
+      integrationId: input.ticket.integrationId,
+      promptId: input.ticket.promptId
+    },
+    contact: {
+      id: input.contact.id,
+      companyId: input.contact.companyId
+    },
+    whatsapp: {
+      id: input.whatsapp.id,
+      companyId: input.whatsapp.companyId,
+      integrationId: input.whatsapp.integrationId,
+      promptId: input.whatsapp.promptId
+    },
+    persistedMessageId: input.persistedMessageId
+  };
+}
 
 /**
  * Domínio Evolution inbound (texto + mídia Fase 7).
- * Sem WASocket / GetTicketWbot / raw Baileys / outbound.
- * Chatbot/Typebot/Flow: skip consciente (ainda session-bound).
+ * Sem WASocket / GetTicketWbot / raw Baileys / outbound neste handler.
+ * 12.3-B: após persistência válida, entra em processInboundAutomation.
+ * Consumidores Chatbot/Typebot/Flow ainda socket-bound são deferidos
+ * (sem getWbot / wrapBaileysSession).
  */
 export async function processEvolutionTextInbound(input: {
   inbound: NormalizedWhatsAppMessage;
@@ -64,6 +107,8 @@ export async function processEvolutionTextInbound(input: {
     input;
   const extractMedia = deps?.extractMedia || extractEvolutionMedia;
   const persistMedia = deps?.persistMedia || persistEvolutionMediaFile;
+  const runInboundAutomation =
+    deps?.processInboundAutomation || processInboundAutomation;
 
   let result: ProcessEvolutionInboundResult = {
     status: "skipped",
@@ -283,6 +328,16 @@ export async function processEvolutionTextInbound(input: {
         messageId: message.id,
         ticketId: ticket.id
       };
+
+      await runInboundAutomation(
+        toInboundAutomationContext({
+          inbound: dto,
+          ticket,
+          contact,
+          whatsapp,
+          persistedMessageId: message.id
+        })
+      );
     }
   });
 

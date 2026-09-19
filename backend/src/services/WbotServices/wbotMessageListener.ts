@@ -128,6 +128,7 @@ import {
 } from "../../modules/whatsapp/providers/baileys/inbound/baileysInboundParsing";
 import { adaptBaileysInboundMessage } from "../../modules/whatsapp/providers/baileys/inbound/adaptBaileysInboundMessage";
 import { processInboundWhatsAppMessage } from "../../modules/whatsapp/inbound/ProcessInboundWhatsAppMessage";
+import { processInboundAutomation } from "../../modules/whatsapp/automation/processInboundAutomation";
 
 const request = require("request");
 
@@ -137,6 +138,11 @@ const fs = require("fs");
  * Fase 4 — fronteira inbound WhatsApp:
  *   Baileys socket → filter/retry (listener) → adaptBaileysInboundMessage
  *   → processInboundWhatsAppMessage → handleMessage(NormalizedWhatsAppMessage).
+ *
+ * 12.3-B: após persistir ticket/mensagem, handleMessage entra em
+ * processInboundAutomation (gate provider-agnostic, sem WASocket).
+ * Consumidores ainda socket-bound (verifyQueue/Typebot/Flow/OpenAI)
+ * permanecem neste adapter Baileys após status "ready".
  *
  * Mídia: BaileysMediaExtractor. Quoted: quotedStanzaId. Identidade: baileysIdentityProbe.
  * rawProviderMessage opcional no gate; lazy via tryGet/requireBaileysRawMessage.
@@ -3254,7 +3260,43 @@ const handleMessage = async (
       });
     }
 
+    const inboundAutomationCtx = {
+      inbound,
+      ticket: {
+        id: ticket.id,
+        companyId: ticket.companyId,
+        whatsappId: ticket.whatsappId,
+        contactId: ticket.contactId ?? contact.id,
+        isGroup: Boolean(ticket.isGroup),
+        queueId: ticket.queueId,
+        userId: ticket.userId,
+        chatbot: ticket.chatbot,
+        useIntegration: ticket.useIntegration,
+        integrationId: ticket.integrationId,
+        promptId: ticket.promptId
+      },
+      contact: {
+        id: contact.id,
+        companyId: contact.companyId
+      },
+      whatsapp: {
+        id: whatsapp.id,
+        companyId: whatsapp.companyId,
+        integrationId: whatsapp.integrationId,
+        promptId: whatsapp.promptId
+      },
+      persistedMessageId: mediaSent?.id || inbound.messageId || ""
+    };
+
     if (ticket.isGroup) {
+      await processInboundAutomation(inboundAutomationCtx);
+      return;
+    }
+
+    const inboundAutomation = await processInboundAutomation(
+      inboundAutomationCtx
+    );
+    if (inboundAutomation.status === "skipped") {
       return;
     }
 
