@@ -104,6 +104,44 @@ export function isTicketAiAgentAutomationCandidate(
   return whatsapp?.aiAgentId != null;
 }
 
+export type UnqueuedPendingAutomationTicket = {
+  status?: string | null;
+  isGroup?: boolean | number | string | null;
+  userId?: number | string | null;
+  queueId?: number | string | null;
+  chatbot?: boolean | null;
+};
+
+/**
+ * Ticket privado pending, sem humano, sem fila, com chatbot ativo.
+ * Exceção de visibilidade AUTO — NÃO inclui órfão humano (chatbot false/null).
+ */
+export function isUnqueuedPendingAutomationTicket(
+  ticket: UnqueuedPendingAutomationTicket | null | undefined
+): boolean {
+  if (!ticket) return false;
+  const isGroup =
+    ticket.isGroup === true ||
+    ticket.isGroup === 1 ||
+    ticket.isGroup === "true";
+  if (isGroup) return false;
+  if (String(ticket.status || "").toLowerCase() !== "pending") return false;
+  const uid = ticket.userId;
+  if (
+    uid != null &&
+    uid !== "" &&
+    !Number.isNaN(Number(uid)) &&
+    Number(uid) > 0
+  ) {
+    return false;
+  }
+  const qid = ticket.queueId;
+  if (qid != null && qid !== "" && !Number.isNaN(Number(qid))) {
+    return false;
+  }
+  return ticket.chatbot === true;
+}
+
 export function isTicketInAutomationsColumn(input: ResolveInput): boolean {
   const { ticket } = input;
   if (ticket.userId != null || ticket.isGroup || ticket.status === "closed") {

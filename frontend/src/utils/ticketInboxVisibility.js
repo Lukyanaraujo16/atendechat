@@ -5,6 +5,8 @@
  * selectedQueueIds é só filtro visual — nunca amplia membership.
  */
 
+import { isUnqueuedPendingAutomationTicket } from "./ticketAutomationUi";
+
 export function getMembershipQueueIds(user) {
   const queues = Array.isArray(user?.queues) ? user.queues : [];
   return queues
@@ -96,6 +98,9 @@ export function decideUserTicketInboxVisibility(
   if (qid == null) {
     if (canUserSeeNullQueueTickets(user)) {
       return { allowed: true, reason: "queue_null_allowed" };
+    }
+    if (isUnqueuedPendingAutomationTicket(ticket)) {
+      return { allowed: true, reason: "unqueued_automation" };
     }
     return { allowed: false, reason: "queue_null_denied" };
   }

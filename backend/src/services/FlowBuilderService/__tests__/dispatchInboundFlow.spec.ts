@@ -192,6 +192,13 @@ describe("dispatchInboundFlow 12.3-E", () => {
     const call = runActions.mock.calls[0][0];
     expect(call).not.toHaveProperty("wbot");
     expect(JSON.stringify(call)).not.toMatch(/WASocket|getWbot|proto/);
+    expect(deps.updateTicket).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ticketData: { chatbot: true },
+        ticketId: 77,
+        companyId: 1
+      })
+    );
   });
 
   it("forceStart pela fila inicia o Flow da conexão", async () => {

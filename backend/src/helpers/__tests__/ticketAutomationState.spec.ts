@@ -3,6 +3,7 @@ import Whatsapp from "../../models/Whatsapp";
 import {
   isTicketAiAgentAutomationCandidate,
   isTicketInAutomationsColumn,
+  isUnqueuedPendingAutomationTicket,
   resolveTicketAutomationState
 } from "../ticketAutomationState";
 
@@ -198,6 +199,68 @@ describe("ticketAutomationState", () => {
           }),
           hasAiAgentOutboundMessage: false,
           hasLiveRuntimeActivity: false
+        })
+      ).toBe(false);
+    });
+  });
+
+  describe("isUnqueuedPendingAutomationTicket", () => {
+    it("pending chatbot sem fila e sem user entra em AUTO", () => {
+      expect(
+        isUnqueuedPendingAutomationTicket({
+          status: "pending",
+          chatbot: true,
+          queueId: null,
+          userId: null,
+          isGroup: false
+        })
+      ).toBe(true);
+    });
+
+    it("órfão humano sem fila NÃO entra", () => {
+      expect(
+        isUnqueuedPendingAutomationTicket({
+          status: "pending",
+          chatbot: false,
+          queueId: null,
+          userId: null,
+          isGroup: false
+        })
+      ).toBe(false);
+    });
+
+    it("grupo NÃO entra", () => {
+      expect(
+        isUnqueuedPendingAutomationTicket({
+          status: "pending",
+          chatbot: true,
+          queueId: null,
+          userId: null,
+          isGroup: true
+        })
+      ).toBe(false);
+    });
+
+    it("userId preenchido NÃO é AUTO pendente", () => {
+      expect(
+        isUnqueuedPendingAutomationTicket({
+          status: "pending",
+          chatbot: true,
+          queueId: null,
+          userId: 12,
+          isGroup: false
+        })
+      ).toBe(false);
+    });
+
+    it("após setor (queueId + chatbot false) sai de AUTO", () => {
+      expect(
+        isUnqueuedPendingAutomationTicket({
+          status: "pending",
+          chatbot: false,
+          queueId: 4,
+          userId: null,
+          isGroup: false
         })
       ).toBe(false);
     });

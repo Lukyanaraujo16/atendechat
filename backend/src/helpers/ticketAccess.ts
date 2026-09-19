@@ -16,6 +16,7 @@ import {
   allowsNullQueueVisibility,
   loadCompanyUnassignedTicketsQueueId
 } from "./unassignedTicketsVisibility";
+import { isUnqueuedPendingAutomationTicket } from "./ticketAutomationState";
 
 export type TicketAccessUser = {
   id: string | number;
@@ -35,6 +36,8 @@ export type TicketAccessTicket = {
   companyId?: number;
   whatsapp?: { ticketVisibility?: string | null } | null;
   isGroup?: boolean | number | string | null;
+  status?: string | null;
+  chatbot?: boolean | null;
   contact?: TicketAccessContact | null;
   contactId?: number | string | null;
 };
@@ -46,6 +49,8 @@ export function toTicketAccessPayload(ticket: {
   companyId?: number;
   whatsapp?: { ticketVisibility?: string | null } | null;
   isGroup?: boolean | number | string | null;
+  status?: string | null;
+  chatbot?: boolean | null;
   contact?: TicketAccessContact | null;
   contactId?: number | string | null;
 }): TicketAccessTicket {
@@ -56,6 +61,8 @@ export function toTicketAccessPayload(ticket: {
     companyId: ticket.companyId,
     whatsapp: ticket.whatsapp,
     isGroup: ticket.isGroup,
+    status: ticket.status,
+    chatbot: ticket.chatbot,
     contact: ticket.contact ?? null,
     contactId: ticket.contactId
   };
@@ -106,6 +113,12 @@ export function canAccessTicket(
     if (
       (qid == null || Number.isNaN(qid)) &&
       allowNullQueueTickets === true
+    ) {
+      return true;
+    }
+    if (
+      (qid == null || Number.isNaN(qid)) &&
+      isUnqueuedPendingAutomationTicket(ticket)
     ) {
       return true;
     }

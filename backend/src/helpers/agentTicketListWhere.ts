@@ -32,10 +32,25 @@ export function resolveEffectiveQueueIdsForAgent(
 }
 
 /**
+ * pending + chatbot + queueId null + sem humano + não grupo.
+ * Visível na coluna AUTO mesmo sem allTicket. Não inclui órfão humano.
+ */
+export function unqueuedPendingAutomationWhere(): Filterable["where"] {
+  return {
+    userId: { [Op.is]: null },
+    status: "pending",
+    isGroup: false,
+    queueId: { [Op.is]: null },
+    chatbot: true
+  };
+}
+
+/**
  * Visibilidade para atendente (não showAll):
  * - tickets com userId = eu (qualquer fila / null / status filtrado pela query);
  * - tickets pending sem responsável, na “piscina” das filas do utilizador
- *   (e opcionalmente sem fila se allTicket ou setor de contingência da empresa).
+ *   (e opcionalmente sem fila se allTicket ou setor de contingência da empresa);
+ * - tickets automáticos pending sem fila (chatbot=true), para a aba AUTO.
  */
 export function buildNonAdminTicketListWhere(
   userPk: string | number,
@@ -68,7 +83,8 @@ export function buildNonAdminTicketListWhere(
           { status: "pending" },
           unassignedQueueClause
         ]
-      }
+      },
+      unqueuedPendingAutomationWhere()
     ]
   };
 }

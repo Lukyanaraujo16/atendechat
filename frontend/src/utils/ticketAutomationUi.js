@@ -12,6 +12,18 @@ export function isPendingAutomationTicket(ticket) {
   return !!ticket?.chatbot;
 }
 
+/**
+ * Automação pending ainda sem setor — visível na aba AUTO.
+ * Não inclui ticket humano órfão (chatbot/automationActive falsy).
+ */
+export function isUnqueuedPendingAutomationTicket(ticket) {
+  if (!ticket) return false;
+  if (String(ticket.status || "").toLowerCase() !== "pending") return false;
+  const qid = ticket.queueId;
+  if (qid != null && qid !== "" && !Number.isNaN(Number(qid))) return false;
+  return isPendingAutomationTicket(ticket);
+}
+
 export function isPendingWaitingTicket(ticket) {
   if (!ticket || ticket.status !== "pending") return true;
   return !isPendingAutomationTicket(ticket);

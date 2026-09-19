@@ -46,6 +46,40 @@ describe("canAccessTicket + null queue contingency", () => {
     ).toBe(false);
   });
 
+  it("automação pending sem fila é visível mesmo sem allTicket", () => {
+    expect(
+      canAccessTicket(
+        user,
+        {
+          userId: null,
+          queueId: null,
+          status: "pending",
+          chatbot: true,
+          isGroup: false
+        },
+        [3, 7],
+        false
+      )
+    ).toBe(true);
+  });
+
+  it("órfão humano pending sem fila continua bloqueado", () => {
+    expect(
+      canAccessTicket(
+        user,
+        {
+          userId: null,
+          queueId: null,
+          status: "pending",
+          chatbot: false,
+          isGroup: false
+        },
+        [3, 7],
+        false
+      )
+    ).toBe(false);
+  });
+
   it("ticket com setor real continua pela membership", () => {
     expect(
       canAccessTicket(user, { userId: null, queueId: 3 }, [3, 7], false)
@@ -83,7 +117,7 @@ describe("buildNonAdminTicketListWhere null clause", () => {
     );
   });
 
-  it("sem allowNull usa apenas Op.in das filas", () => {
+  it("sem allowNull usa apenas Op.in das filas no pool humano", () => {
     const where = buildNonAdminTicketListWhere(10, [1, 2], false) as any;
     const orKey = Object.getOwnPropertySymbols(where)[0];
     const poolAnd = where[orKey][1];
@@ -92,5 +126,18 @@ describe("buildNonAdminTicketListWhere null clause", () => {
     expect(queueClause).toEqual({
       queueId: { [Object.getOwnPropertySymbols(queueClause.queueId)[0]]: [1, 2] }
     });
+  });
+
+  it("inclui ramo AUTO para chatbot pending sem fila", () => {
+    const where = buildNonAdminTicketListWhere(10, [1, 2], false) as any;
+    const orKey = Object.getOwnPropertySymbols(where)[0];
+    const autoBranch = where[orKey][2];
+    expect(autoBranch).toEqual(
+      expect.objectContaining({
+        status: "pending",
+        isGroup: false,
+        chatbot: true
+      })
+    );
   });
 });
