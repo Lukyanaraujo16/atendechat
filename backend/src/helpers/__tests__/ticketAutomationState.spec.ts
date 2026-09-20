@@ -29,6 +29,37 @@ describe("ticketAutomationState", () => {
       expect(state.automationLabel).toBe("Chatbot");
     });
 
+    it("identifica Typebot quando chatbot está ativo", () => {
+      const state = resolveTicketAutomationState({
+        ticket: ticket({
+          status: "pending",
+          chatbot: true,
+          userId: null,
+          typebotStatus: true,
+          typebotSessionId: "sess-1"
+        }),
+        whatsapp: whatsapp({ aiAgentMode: "disabled", aiAgentId: null })
+      });
+      expect(state.automationActive).toBe(true);
+      expect(state.automationType).toBe("typebot");
+    });
+
+    it("Typebot sem chatbot não entra em AUTO", () => {
+      const state = resolveTicketAutomationState({
+        ticket: ticket({
+          status: "pending",
+          chatbot: false,
+          userId: null,
+          typebotStatus: true,
+          typebotSessionId: "sess-1",
+          useIntegration: true
+        }),
+        whatsapp: whatsapp({ aiAgentMode: "disabled", aiAgentId: null })
+      });
+      expect(state.automationActive).toBe(false);
+      expect(state.reason).toBe("none");
+    });
+
     it("identifica IA ativa em live mode", () => {
       const state = resolveTicketAutomationState({
         ticket: ticket({

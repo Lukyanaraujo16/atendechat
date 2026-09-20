@@ -105,6 +105,42 @@ describe("resolveInboundTypebotDispatch", () => {
     );
     expect(r.candidate).toBe(false);
   });
+
+  it("sessão ativa na conexão continua sem halt", () => {
+    const r = resolveInboundTypebotDispatch(
+      {
+        ...ctx().ticket,
+        useIntegration: true,
+        integrationId: 9,
+        typebotStatus: true,
+        typebotSessionId: "sess-1"
+      },
+      ctx().whatsapp
+    );
+    expect(r).toMatchObject({
+      candidate: true,
+      halt: false,
+      reason: "connection_session"
+    });
+  });
+
+  it("sessão zerada com Typebot ainda ativo reinicia connection_start", () => {
+    const r = resolveInboundTypebotDispatch(
+      {
+        ...ctx().ticket,
+        useIntegration: true,
+        integrationId: 9,
+        typebotStatus: true,
+        typebotSessionId: null
+      },
+      ctx().whatsapp
+    );
+    expect(r).toMatchObject({
+      candidate: true,
+      halt: true,
+      reason: "connection_start"
+    });
+  });
 });
 
 describe("dispatchInboundTypebot", () => {

@@ -88,6 +88,51 @@ async function sendTypebotTextAndPersist(input: {
   });
 }
 
+function hasTypebotSessionId(sessionId: unknown): sessionId is string {
+  return typeof sessionId === "string" && sessionId.trim() !== "";
+}
+
+/**
+ * Sessão Typebot é específica do motor; chatbot/useIntegration/integrationId
+ * passam por UpdateTicketService para persistir lifecycle AUTO e emitir socket.
+ */
+async function persistTypebotSessionStart(
+  ticket: Ticket,
+  typebot: QueueIntegrations,
+  sessionId: string
+): Promise<void> {
+  await ticket.update({
+    typebotSessionId: sessionId,
+    typebotStatus: true
+  });
+  await UpdateTicketService({
+    ticketData: {
+      chatbot: true,
+      useIntegration: true,
+      integrationId: typebot.id
+    },
+    ticketId: ticket.id,
+    companyId: ticket.companyId
+  });
+  await ticket.reload();
+}
+
+async function persistTypebotStopped(ticket: Ticket): Promise<void> {
+  await ticket.update({
+    typebotSessionId: null,
+    typebotStatus: false
+  });
+  await UpdateTicketService({
+    ticketData: {
+      chatbot: false,
+      useIntegration: false,
+      integrationId: null
+    },
+    ticketId: ticket.id,
+    companyId: ticket.companyId
+  });
+}
+
 function formatTypebotRichText(message: {
   content?: { richText?: unknown[] };
 }): { formattedText: string; linkPreview: boolean } {
@@ -298,8 +343,7 @@ const typebotListener = async (
 
     if (typebotExpires > 0 && ticket.updatedAt < dataLimite) {
       await ticket.update({
-        typebotSessionId: null,
-        isBot: true
+        typebotSessionId: null
       });
 
       await ticket.reload();
@@ -307,14 +351,13 @@ const typebotListener = async (
 
     if (isNil(ticket.typebotSessionId)) {
       dataStart = await createSession(typebot, number);
-      sessionId = dataStart.sessionId;
+      const startedSessionId = dataStart?.sessionId;
+      if (!hasTypebotSessionId(startedSessionId)) {
+        throw new Error("Typebot startChat returned empty sessionId");
+      }
+      sessionId = startedSessionId;
       status = true;
-      await ticket.update({
-        typebotSessionId: sessionId,
-        typebotStatus: true,
-        useIntegration: true,
-        integrationId: typebot.id
-      });
+      await persistTypebotSessionStart(ticket, typebot, sessionId);
     } else {
       sessionId = ticket.typebotSessionId;
       status = ticket.typebotStatus;
@@ -380,10 +423,7 @@ const typebotListener = async (
                 isNil(jsonGatilho.userId) &&
                 isNil(jsonGatilho.queueId)
               ) {
-                await ticket.update({
-                  useIntegration: false,
-                  isBot: false
-                });
+                await persistTypebotStopped(ticket);
 
                 return;
               }
@@ -528,11 +568,18 @@ const typebotListener = async (
     }
     if (body === typebotKeywordRestart) {
       await ticket.update({
-        isBot: true,
         typebotSessionId: null
       });
 
       await ticket.reload();
+
+      await UpdateTicketService({
+        ticketData: {
+          chatbot: true
+        },
+        ticketId: ticket.id,
+        companyId: ticket.companyId
+      });
 
       await sendTypebotTextAndPersist({
         outbound,
@@ -545,6 +592,7 @@ const typebotListener = async (
       await UpdateTicketService({
         ticketData: {
           status: "closed",
+          chatbot: false,
           useIntegration: false,
           integrationId: null
         },

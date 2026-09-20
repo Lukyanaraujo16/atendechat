@@ -41,12 +41,23 @@ export function resolveInboundTypebotDispatch(
     return { candidate: false, integrationId: null, halt: false };
   }
 
+  const hasTypebotSession =
+    ticket.typebotSessionId != null &&
+    String(ticket.typebotSessionId).trim() !== "";
+
   const connectionStart =
     ticket.queueId == null &&
     whatsapp.integrationId != null &&
     !ticket.useIntegration;
 
-  if (connectionStart) {
+  const connectionRestart =
+    ticket.queueId == null &&
+    whatsapp.integrationId != null &&
+    ticket.useIntegration === true &&
+    ticket.typebotStatus === true &&
+    !hasTypebotSession;
+
+  if (connectionStart || connectionRestart) {
     return {
       candidate: true,
       integrationId: Number(whatsapp.integrationId),

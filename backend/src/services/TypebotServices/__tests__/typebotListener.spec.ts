@@ -179,7 +179,12 @@ describe("typebotListener 12.3-C", () => {
   it("sessão existente reutiliza typebotSessionId (continueChat)", async () => {
     await typebotListener(
       {
-        ticket: ticket({ typebotSessionId: "sess-keep" }),
+        ticket: ticket({
+          typebotSessionId: "sess-keep",
+          typebotStatus: true,
+          chatbot: true,
+          useIntegration: true
+        }),
         typebot: typebotCfg(),
         inbound: {
           body: "continua",
@@ -198,6 +203,8 @@ describe("typebotListener 12.3-C", () => {
     expect(axiosRequest.mock.calls[0][0].url).toContain(
       "/api/v1/sessions/sess-keep/continueChat"
     );
+    expect(updateTicketService).not.toHaveBeenCalled();
+    expect(updateTicket).not.toHaveBeenCalled();
   });
 
   it("nova sessão persiste typebotSessionId e flags", async () => {
@@ -235,9 +242,125 @@ describe("typebotListener 12.3-C", () => {
     );
     expect(updateTicket).toHaveBeenCalledWith({
       typebotSessionId: "new-sess",
-      typebotStatus: true,
-      useIntegration: true,
-      integrationId: 9
+      typebotStatus: true
+    });
+    expect(updateTicketService).toHaveBeenCalledWith({
+      ticketData: {
+        chatbot: true,
+        useIntegration: true,
+        integrationId: 9
+      },
+      ticketId: 77,
+      companyId: 1
+    });
+    expect(updateTicket).not.toHaveBeenCalledWith(
+      expect.objectContaining({ chatbot: false })
+    );
+  });
+
+  it("startChat HTTP falho não marca chatbot=true", async () => {
+    axiosRequest.mockRejectedValue(new Error("typebot down"));
+
+    await expect(
+      typebotListener(
+        {
+          ticket: ticket({ typebotSessionId: null, typebotStatus: false }),
+          typebot: typebotCfg(),
+          inbound: {
+            body: "oi",
+            pushName: "Ana",
+            fromMe: false,
+            addressing: {
+              remoteJid: "5511999998888@s.whatsapp.net",
+              participant: ""
+            }
+          }
+        },
+        { axiosRequest, sleep: async () => undefined }
+      )
+    ).rejects.toThrow("typebot down");
+
+    expect(updateTicketService).not.toHaveBeenCalled();
+    expect(updateTicket).toHaveBeenCalledWith({ typebotSessionId: null });
+    expect(updateTicket).not.toHaveBeenCalledWith(
+      expect.objectContaining({ chatbot: true })
+    );
+  });
+
+  it("startChat sem sessionId não marca chatbot=true", async () => {
+    axiosRequest.mockResolvedValue({
+      data: { messages: [{ type: "text" }] }
+    });
+
+    await expect(
+      typebotListener(
+        {
+          ticket: ticket({ typebotSessionId: null, typebotStatus: false }),
+          typebot: typebotCfg(),
+          inbound: {
+            body: "oi",
+            pushName: "Ana",
+            fromMe: false,
+            addressing: {
+              remoteJid: "5511999998888@s.whatsapp.net",
+              participant: ""
+            }
+          }
+        },
+        { axiosRequest, sleep: async () => undefined }
+      )
+    ).rejects.toThrow(/empty sessionId/);
+
+    expect(updateTicketService).not.toHaveBeenCalled();
+    expect(updateTicket).not.toHaveBeenCalledWith(
+      expect.objectContaining({ chatbot: true })
+    );
+  });
+
+  it("startChat Baileys usa o mesmo lifecycle chatbot=true", async () => {
+    axiosRequest.mockResolvedValue({
+      data: {
+        sessionId: "new-sess",
+        messages: [
+          {
+            type: "text",
+            content: { richText: [{ children: [{ text: "start" }] }] }
+          }
+        ]
+      }
+    });
+    getOutbound.mockResolvedValue({
+      provider: "baileys",
+      sendText,
+      sendContent,
+      sendPresence
+    });
+
+    await typebotListener(
+      {
+        ticket: ticket({ typebotSessionId: null, typebotStatus: false }),
+        typebot: typebotCfg(),
+        inbound: {
+          body: "oi",
+          pushName: "Ana",
+          fromMe: false,
+          addressing: {
+            remoteJid: "5511999998888@s.whatsapp.net",
+            participant: ""
+          }
+        }
+      },
+      { axiosRequest, sleep: async () => undefined }
+    );
+
+    expect(updateTicketService).toHaveBeenCalledWith({
+      ticketData: {
+        chatbot: true,
+        useIntegration: true,
+        integrationId: 9
+      },
+      ticketId: 77,
+      companyId: 1
     });
   });
 
@@ -273,8 +396,17 @@ describe("typebotListener 12.3-C", () => {
     );
 
     expect(updateTicket).toHaveBeenCalledWith({
-      useIntegration: false,
-      isBot: false
+      typebotSessionId: null,
+      typebotStatus: false
+    });
+    expect(updateTicketService).toHaveBeenCalledWith({
+      ticketData: {
+        chatbot: false,
+        useIntegration: false,
+        integrationId: null
+      },
+      ticketId: 77,
+      companyId: 1
     });
     expect(sendText).not.toHaveBeenCalled();
   });
@@ -343,11 +475,96 @@ describe("typebotListener 12.3-C", () => {
     expect(updateTicketService).toHaveBeenCalledWith({
       ticketData: {
         status: "closed",
+        chatbot: false,
         useIntegration: false,
         integrationId: null
       },
       ticketId: 77,
       companyId: 1
+    });
+    expect(axiosRequest).not.toHaveBeenCalled();
+  });
+
+  it("#JSON queueId+userId transfere e sai de AUTO", async () => {
+    axiosRequest.mockResolvedValue({
+      data: {
+        messages: [
+          {
+            type: "text",
+            content: {
+              richText: [{ children: [{ text: '#{"queueId":4,"userId":12}' }] }]
+            }
+          }
+        ]
+      }
+    });
+
+    await typebotListener(
+      {
+        ticket: ticket(),
+        typebot: typebotCfg(),
+        inbound: {
+          body: "x",
+          pushName: "Ana",
+          fromMe: false,
+          addressing: {
+            remoteJid: "5511999998888@s.whatsapp.net",
+            participant: ""
+          }
+        }
+      },
+      { axiosRequest, sleep: async () => undefined }
+    );
+
+    expect(updateTicketService).toHaveBeenCalledWith({
+      ticketData: {
+        queueId: 4,
+        userId: 12,
+        chatbot: false,
+        useIntegration: false,
+        integrationId: null
+      },
+      ticketId: 77,
+      companyId: 1
+    });
+  });
+
+  it("keyword restart zera sessão e mantém chatbot=true", async () => {
+    await typebotListener(
+      {
+        ticket: ticket({ chatbot: true, useIntegration: true }),
+        typebot: typebotCfg(),
+        inbound: {
+          body: "#reiniciar",
+          pushName: "Ana",
+          fromMe: false,
+          addressing: {
+            remoteJid: "5511999998888@s.whatsapp.net",
+            participant: ""
+          }
+        }
+      },
+      { axiosRequest, sleep: async () => undefined }
+    );
+
+    expect(updateTicket).toHaveBeenCalledWith({
+      typebotSessionId: null
+    });
+    expect(updateTicketService).toHaveBeenCalledWith({
+      ticketData: {
+        chatbot: true
+      },
+      ticketId: 77,
+      companyId: 1
+    });
+    expect(updateTicketService).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        ticketData: expect.objectContaining({ chatbot: false })
+      })
+    );
+    expect(sendText).toHaveBeenCalledWith({
+      jid: "5511999998888@s.whatsapp.net",
+      text: "reiniciado"
     });
     expect(axiosRequest).not.toHaveBeenCalled();
   });
