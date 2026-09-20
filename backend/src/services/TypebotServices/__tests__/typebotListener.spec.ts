@@ -529,6 +529,277 @@ describe("typebotListener 12.3-C", () => {
     });
   });
 
+  it("#JSON queueId 1 transfere para Vendas", async () => {
+    axiosRequest.mockResolvedValue({
+      data: {
+        messages: [
+          {
+            type: "text",
+            content: {
+              richText: [{ children: [{ text: '#{"queueId":1}' }] }]
+            }
+          }
+        ]
+      }
+    });
+
+    await typebotListener(
+      {
+        ticket: ticket(),
+        typebot: typebotCfg(),
+        inbound: {
+          body: "Comercial",
+          pushName: "Ana",
+          fromMe: false,
+          addressing: {
+            remoteJid: "5511999998888@s.whatsapp.net",
+            participant: ""
+          }
+        }
+      },
+      { axiosRequest, sleep: async () => undefined }
+    );
+
+    expect(updateTicketService).toHaveBeenCalledWith({
+      ticketData: {
+        queueId: 1,
+        chatbot: false,
+        useIntegration: false,
+        integrationId: null
+      },
+      ticketId: 77,
+      companyId: 1
+    });
+    expect(sendText).not.toHaveBeenCalled();
+  });
+
+  it("#JSON queueId 1 em richText Cloud type=p transfere", async () => {
+    axiosRequest.mockResolvedValue({
+      data: {
+        messages: [
+          {
+            type: "text",
+            content: {
+              richText: [
+                {
+                  type: "p",
+                  children: [{ text: '#{"queueId":1}' }]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    });
+
+    await typebotListener(
+      {
+        ticket: ticket(),
+        typebot: typebotCfg(),
+        inbound: {
+          body: "Comercial",
+          pushName: "Ana",
+          fromMe: false,
+          addressing: {
+            remoteJid: "5511999998888@s.whatsapp.net",
+            participant: ""
+          }
+        }
+      },
+      { axiosRequest, sleep: async () => undefined }
+    );
+
+    expect(updateTicketService).toHaveBeenCalledWith({
+      ticketData: {
+        queueId: 1,
+        chatbot: false,
+        useIntegration: false,
+        integrationId: null
+      },
+      ticketId: 77,
+      companyId: 1
+    });
+    expect(sendText).not.toHaveBeenCalled();
+  });
+
+  it("#JSON queueId 1 com whitespace/newline externo transfere", async () => {
+    axiosRequest.mockResolvedValue({
+      data: {
+        messages: [
+          {
+            type: "text",
+            content: {
+              richText: [{ children: [{ text: '  #{"queueId":1}\n' }] }]
+            }
+          }
+        ]
+      }
+    });
+
+    await typebotListener(
+      {
+        ticket: ticket(),
+        typebot: typebotCfg(),
+        inbound: {
+          body: "Comercial",
+          pushName: "Ana",
+          fromMe: false,
+          addressing: {
+            remoteJid: "5511999998888@s.whatsapp.net",
+            participant: ""
+          }
+        }
+      },
+      { axiosRequest, sleep: async () => undefined }
+    );
+
+    expect(updateTicketService).toHaveBeenCalledWith({
+      ticketData: {
+        queueId: 1,
+        chatbot: false,
+        useIntegration: false,
+        integrationId: null
+      },
+      ticketId: 77,
+      companyId: 1
+    });
+    expect(sendText).not.toHaveBeenCalled();
+  });
+
+  it("#JSON queueId 1 com parágrafo vazio extra ainda transfere", async () => {
+    axiosRequest.mockResolvedValue({
+      data: {
+        messages: [
+          {
+            type: "text",
+            content: {
+              richText: [
+                { type: "p", children: [{ text: '#{"queueId":1}' }] },
+                { type: "p", children: [{ text: "" }] }
+              ]
+            }
+          }
+        ]
+      }
+    });
+
+    await typebotListener(
+      {
+        ticket: ticket(),
+        typebot: typebotCfg(),
+        inbound: {
+          body: "Comercial",
+          pushName: "Ana",
+          fromMe: false,
+          addressing: {
+            remoteJid: "5511999998888@s.whatsapp.net",
+            participant: ""
+          }
+        }
+      },
+      { axiosRequest, sleep: async () => undefined }
+    );
+
+    expect(updateTicketService).toHaveBeenCalledWith({
+      ticketData: {
+        queueId: 1,
+        chatbot: false,
+        useIntegration: false,
+        integrationId: null
+      },
+      ticketId: 77,
+      companyId: 1
+    });
+    expect(sendText).not.toHaveBeenCalled();
+    expect(updateTicket).not.toHaveBeenCalledWith({ typebotSessionId: null });
+  });
+
+  it("#JSON inválido não envia, não transfere e não zera sessão", async () => {
+    axiosRequest.mockResolvedValue({
+      data: {
+        messages: [
+          {
+            type: "text",
+            content: {
+              richText: [{ children: [{ text: '#{"queueId":' }] }]
+            }
+          }
+        ]
+      }
+    });
+
+    await expect(
+      typebotListener(
+        {
+          ticket: ticket({
+            typebotSessionId: "sess-keep",
+            typebotStatus: true,
+            chatbot: true,
+            useIntegration: true,
+            integrationId: 9
+          }),
+          typebot: typebotCfg(),
+          inbound: {
+            body: "x",
+            pushName: "Ana",
+            fromMe: false,
+            addressing: {
+              remoteJid: "5511999998888@s.whatsapp.net",
+              participant: ""
+            }
+          }
+        },
+        { axiosRequest, sleep: async () => undefined }
+      )
+    ).resolves.toBeUndefined();
+
+    expect(sendText).not.toHaveBeenCalled();
+    expect(updateTicketService).not.toHaveBeenCalled();
+    expect(updateTicket).not.toHaveBeenCalledWith({ typebotSessionId: null });
+  });
+
+  it("#JSON desconhecido não aparece no WhatsApp e mantém sessão", async () => {
+    axiosRequest.mockResolvedValue({
+      data: {
+        messages: [
+          {
+            type: "text",
+            content: {
+              richText: [{ children: [{ text: '#{"foo":"bar"}' }] }]
+            }
+          }
+        ]
+      }
+    });
+
+    await typebotListener(
+      {
+        ticket: ticket({
+          typebotSessionId: "sess-keep",
+          typebotStatus: true,
+          chatbot: true,
+          useIntegration: true,
+          integrationId: 9
+        }),
+        typebot: typebotCfg(),
+        inbound: {
+          body: "x",
+          pushName: "Ana",
+          fromMe: false,
+          addressing: {
+            remoteJid: "5511999998888@s.whatsapp.net",
+            participant: ""
+          }
+        }
+      },
+      { axiosRequest, sleep: async () => undefined }
+    );
+
+    expect(sendText).not.toHaveBeenCalled();
+    expect(updateTicketService).not.toHaveBeenCalled();
+    expect(updateTicket).not.toHaveBeenCalledWith({ typebotSessionId: null });
+  });
+
   it("keyword restart zera sessão e mantém chatbot=true", async () => {
     await typebotListener(
       {

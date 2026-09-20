@@ -133,6 +133,63 @@ async function persistTypebotStopped(ticket: Ticket): Promise<void> {
   });
 }
 
+type TypebotInternalCommand =
+  | { kind: "not_command" }
+  | { kind: "invalid"; reason: "json_parse" | "unsupported_command" }
+  | { kind: "stopBot" }
+  | { kind: "queue"; queueId: number }
+  | { kind: "queue_user"; queueId: number; userId: number };
+
+type TypebotCommandJson = {
+  stopBot?: unknown;
+  queueId?: number;
+  userId?: number;
+};
+
+function parseTypebotInternalCommand(
+  formattedText: string
+): TypebotInternalCommand {
+  const normalized = String(formattedText || "").trim();
+  if (!normalized.startsWith("#")) {
+    return { kind: "not_command" };
+  }
+
+  const jsonText = normalized.slice(1).trim();
+  let parsed: TypebotCommandJson;
+  try {
+    parsed = JSON.parse(jsonText) as TypebotCommandJson;
+  } catch {
+    return { kind: "invalid", reason: "json_parse" };
+  }
+
+  if (parsed == null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return { kind: "invalid", reason: "unsupported_command" };
+  }
+
+  if (parsed.stopBot && isNil(parsed.userId) && isNil(parsed.queueId)) {
+    return { kind: "stopBot" };
+  }
+
+  if (!isNil(parsed.queueId) && parsed.queueId > 0 && isNil(parsed.userId)) {
+    return { kind: "queue", queueId: parsed.queueId };
+  }
+
+  if (
+    !isNil(parsed.queueId) &&
+    parsed.queueId > 0 &&
+    !isNil(parsed.userId) &&
+    parsed.userId > 0
+  ) {
+    return {
+      kind: "queue_user",
+      queueId: parsed.queueId,
+      userId: parsed.userId
+    };
+  }
+
+  return { kind: "invalid", reason: "unsupported_command" };
+}
+
 function formatTypebotRichText(message: {
   content?: { richText?: unknown[] };
 }): { formattedText: string; linkPreview: boolean } {
@@ -414,27 +471,16 @@ const typebotListener = async (
               formattedText = typebotUnknownMessage;
             }
 
-            if (formattedText.startsWith("#")) {
-              const gatilho = formattedText.replace("#", "");
-              const jsonGatilho = JSON.parse(gatilho);
-
-              if (
-                jsonGatilho.stopBot &&
-                isNil(jsonGatilho.userId) &&
-                isNil(jsonGatilho.queueId)
-              ) {
+            const internalCommand = parseTypebotInternalCommand(formattedText);
+            if (internalCommand.kind !== "not_command") {
+              if (internalCommand.kind === "stopBot") {
                 await persistTypebotStopped(ticket);
-
                 return;
               }
-              if (
-                !isNil(jsonGatilho.queueId) &&
-                jsonGatilho.queueId > 0 &&
-                isNil(jsonGatilho.userId)
-              ) {
+              if (internalCommand.kind === "queue") {
                 await UpdateTicketService({
                   ticketData: {
-                    queueId: jsonGatilho.queueId,
+                    queueId: internalCommand.queueId,
                     chatbot: false,
                     useIntegration: false,
                     integrationId: null
@@ -442,20 +488,13 @@ const typebotListener = async (
                   ticketId: ticket.id,
                   companyId: ticket.companyId
                 });
-
                 return;
               }
-
-              if (
-                !isNil(jsonGatilho.queueId) &&
-                jsonGatilho.queueId > 0 &&
-                !isNil(jsonGatilho.userId) &&
-                jsonGatilho.userId > 0
-              ) {
+              if (internalCommand.kind === "queue_user") {
                 await UpdateTicketService({
                   ticketData: {
-                    queueId: jsonGatilho.queueId,
-                    userId: jsonGatilho.userId,
+                    queueId: internalCommand.queueId,
+                    userId: internalCommand.userId,
                     chatbot: false,
                     useIntegration: false,
                     integrationId: null
@@ -463,9 +502,18 @@ const typebotListener = async (
                   ticketId: ticket.id,
                   companyId: ticket.companyId
                 });
-
                 return;
               }
+
+              logger.info(
+                {
+                  ticketId: ticket.id,
+                  integrationId: ticket.integrationId ?? typebot.id,
+                  reason: internalCommand.reason
+                },
+                "[Typebot] internal command ignored"
+              );
+              continue;
             }
 
             await runTypebotTypingSimulation(
