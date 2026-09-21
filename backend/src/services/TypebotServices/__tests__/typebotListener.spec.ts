@@ -32,13 +32,24 @@ jest.mock("../../MessageServices/persistWhatsAppOutboundMessage", () => ({
   persistWhatsAppOutboundMessage: jest.fn().mockResolvedValue({ id: "P1" })
 }));
 
+jest.mock("../../../utils/logger", () => ({
+  logger: {
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    debug: jest.fn()
+  }
+}));
+
 import typebotListener, {
   normalizeTypebotInternalCommandJsonText,
   parseTypebotInternalCommand,
-  summarizeTypebotContinueChatStructure
+  summarizeTypebotContinueChatStructure,
+  summarizeTypebotInternalCommandJsonParseDiagnostics
 } from "../typebotListener";
 import { getWhatsAppOutboundForTicket } from "../../../modules/whatsapp/outbound/resolveWhatsAppOutbound";
 import { persistWhatsAppOutboundMessage } from "../../MessageServices/persistWhatsAppOutboundMessage";
+import { logger } from "../../../utils/logger";
 
 const getOutbound = getWhatsAppOutboundForTicket as jest.Mock;
 
@@ -1418,6 +1429,138 @@ describe("typebotListener 12.3-C", () => {
     });
     expect(sendText).not.toHaveBeenCalled();
   });
+
+  it("FIX11-OBS loga json_parse e não loga comando válido/unsupported/texto", async () => {
+    const marker = "[Typebot][OBS] internal command json parse diagnostics";
+    const obsCalls = () =>
+      (logger.info as jest.Mock).mock.calls.filter(
+        (c: unknown[]) => c[1] === marker
+      );
+
+    axiosRequest.mockResolvedValue({
+      data: {
+        messages: [
+          {
+            type: "text",
+            content: {
+              richText: [{ children: [{ text: "texto normal" }] }]
+            }
+          }
+        ]
+      }
+    });
+    await typebotListener(
+      { ticket: ticket(), typebot: typebotCfg(), inbound: inboundX },
+      { axiosRequest, sleep: async () => undefined }
+    );
+    expect(obsCalls()).toHaveLength(0);
+
+    jest.clearAllMocks();
+    getOutbound.mockResolvedValue({
+      provider: "evolution",
+      sendText,
+      sendContent,
+      sendPresence
+    });
+    axiosRequest.mockResolvedValue({
+      data: {
+        messages: [
+          {
+            type: "text",
+            content: {
+              richText: [{ children: [{ text: '#{"queueId":1}' }] }]
+            }
+          }
+        ]
+      }
+    });
+    await typebotListener(
+      {
+        ticket: ticket({
+          chatbot: true,
+          useIntegration: true,
+          integrationId: 2
+        }),
+        typebot: typebotCfg({ id: 2 }),
+        inbound: inboundX
+      },
+      { axiosRequest, sleep: async () => undefined }
+    );
+    expect(obsCalls()).toHaveLength(0);
+    expect(updateTicketService).toHaveBeenCalled();
+
+    jest.clearAllMocks();
+    getOutbound.mockResolvedValue({
+      provider: "evolution",
+      sendText,
+      sendContent,
+      sendPresence
+    });
+    axiosRequest.mockResolvedValue({
+      data: {
+        messages: [
+          {
+            type: "text",
+            content: {
+              richText: [{ children: [{ text: '#{"foo":"bar"}' }] }]
+            }
+          }
+        ]
+      }
+    });
+    await typebotListener(
+      {
+        ticket: ticket({
+          chatbot: true,
+          useIntegration: true,
+          integrationId: 2
+        }),
+        typebot: typebotCfg({ id: 2 }),
+        inbound: inboundX
+      },
+      { axiosRequest, sleep: async () => undefined }
+    );
+    expect(obsCalls()).toHaveLength(0);
+    expect(updateTicketService).not.toHaveBeenCalled();
+
+    jest.clearAllMocks();
+    getOutbound.mockResolvedValue({
+      provider: "evolution",
+      sendText,
+      sendContent,
+      sendPresence
+    });
+    axiosRequest.mockResolvedValue({
+      data: {
+        messages: [
+          {
+            type: "text",
+            content: {
+              richText: [{ children: [{ text: '#{"queueId":' }] }]
+            }
+          }
+        ]
+      }
+    });
+    await typebotListener(
+      {
+        ticket: ticket({
+          chatbot: true,
+          useIntegration: true,
+          integrationId: 2
+        }),
+        typebot: typebotCfg({ id: 2 }),
+        inbound: inboundX
+      },
+      { axiosRequest, sleep: async () => undefined }
+    );
+    expect(obsCalls()).toHaveLength(1);
+    expect(updateTicketService).not.toHaveBeenCalled();
+    expect(parseTypebotInternalCommand('#{"queueId":1}')).toEqual({
+      kind: "queue",
+      queueId: 1
+    });
+  });
 });
 
 describe("summarizeTypebotContinueChatStructure FIX9-OBS", () => {
@@ -1521,6 +1664,154 @@ describe("summarizeTypebotContinueChatStructure FIX9-OBS", () => {
     expect(serialized).not.toContain("evil.example");
     expect(serialized).not.toContain("Comercial");
     expect(serialized).not.toContain(secret);
+  });
+});
+
+describe("summarizeTypebotInternalCommandJsonParseDiagnostics FIX11-OBS", () => {
+  const secret = '#{"queueId":1}';
+  const phone = "5511999998888";
+  const url = "https://cdn.typebot.io/secret.jpg";
+
+  it("expõe code points U+XXXX e não vaza conteúdo", () => {
+    const message = {
+      type: "text",
+      content: {
+        richText: [
+          {
+            type: "p",
+            children: [
+              { text: `${secret}\u0007` },
+              { text: "Comercial" },
+              { text: phone }
+            ]
+          }
+        ]
+      }
+    };
+    const summary = summarizeTypebotInternalCommandJsonParseDiagnostics({
+      ticketId: 11,
+      integrationId: 2,
+      formattedText: `${secret}\u0007`,
+      message
+    });
+
+    expect(summary.ticketId).toBe(11);
+    expect(summary.integrationId).toBe(2);
+    expect(summary.payloadLength).toBeGreaterThan(0);
+    expect(summary.firstCodePoint).toMatch(/^U\+[0-9A-F]{4,}$/);
+    expect(summary.lastCodePoint).toBe("U+0007");
+    expect(
+      summary.specialCodePoints.some(item => item.codePoint === "U+0007")
+    ).toBe(true);
+    expect(
+      summary.specialCodePoints.every(item =>
+        /^U\+[0-9A-F]{4,}$/.test(item.codePoint)
+      )
+    ).toBe(true);
+    expect(summary.richText.blockCount).toBe(1);
+    expect(summary.richText.totalChildren).toBe(3);
+    expect(summary.richText.blocks[0].childrenCount).toBe(3);
+    expect(summary.richText.blocks[0].children[0].textLength).toBeGreaterThan(
+      0
+    );
+    expect(summary.richText.blocks[0].children[0].isEmpty).toBe(false);
+    expect(summary.richText.blocks[0].children[1].textLength).toBe(
+      "Comercial".length
+    );
+
+    const serialized = JSON.stringify(summary);
+    expect(serialized).not.toContain("queueId");
+    expect(serialized).not.toContain(secret);
+    expect(serialized).not.toContain("Comercial");
+    expect(serialized).not.toContain(phone);
+    expect(serialized).not.toContain(url);
+    expect(serialized).not.toContain("Olá cliente");
+    expect(serialized).not.toMatch(/[{]["']queueId["']/);
+  });
+
+  it("trailing caractere desconhecido aparece só como code point/posição", () => {
+    const summary = summarizeTypebotInternalCommandJsonParseDiagnostics({
+      ticketId: 11,
+      integrationId: 2,
+      formattedText: '#{"queueId":1}\u2060',
+      message: {
+        type: "text",
+        content: {
+          richText: [{ children: [{ text: '#{"queueId":1}\u2060' }] }]
+        }
+      }
+    });
+
+    expect(summary.lastCodePoint).toBe("U+2060");
+    expect(summary.suffixLength).toBeGreaterThan(0);
+    expect(summary.suffixCodePoints).toContain("U+2060");
+    expect(
+      summary.specialCodePoints.some(
+        item => item.codePoint === "U+2060" && item.kind === "format"
+      )
+    ).toBe(true);
+    expect(JSON.stringify(summary)).not.toContain("queueId");
+  });
+
+  it("caractere interno especial mostra posição sem conteúdo", () => {
+    const summary = summarizeTypebotInternalCommandJsonParseDiagnostics({
+      ticketId: 11,
+      integrationId: 2,
+      formattedText: '#{"queueId":\u200C1}',
+      message: {
+        type: "text",
+        content: {
+          richText: [{ children: [{ text: '#{"queueId":\u200C1}' }] }]
+        }
+      }
+    });
+
+    const zwnj = summary.specialCodePoints.find(
+      item => item.codePoint === "U+200C"
+    );
+    expect(zwnj).toEqual(
+      expect.objectContaining({
+        codePoint: "U+200C",
+        kind: "format"
+      })
+    );
+    expect(typeof zwnj?.index).toBe("number");
+    expect(zwnj?.index).toBeGreaterThan(0);
+    expect(JSON.stringify(summary)).not.toContain("queueId");
+  });
+
+  it("richText registra counts/lengths/code points e não child.text", () => {
+    const summary = summarizeTypebotInternalCommandJsonParseDiagnostics({
+      ticketId: 11,
+      integrationId: 2,
+      formattedText: '#{"queueId":',
+      message: {
+        type: "text",
+        content: {
+          richText: [
+            {
+              type: "p",
+              children: [
+                { text: '#{"queueId":1}' },
+                { text: "\u200C" },
+                { children: [{ text: "Olá cliente" }] }
+              ]
+            }
+          ]
+        }
+      }
+    });
+
+    expect(summary.richText.blockCount).toBe(1);
+    expect(summary.richText.totalChildren).toBe(3);
+    expect(summary.richText.textNodeCount).toBeGreaterThanOrEqual(2);
+    expect(summary.richText.blocks[0].children[1].specialCodePoints).toEqual([
+      expect.objectContaining({ codePoint: "U+200C", kind: "format" })
+    ]);
+    const serialized = JSON.stringify(summary);
+    expect(serialized).not.toContain("Olá cliente");
+    expect(serialized).not.toContain("queueId");
+    expect(serialized).not.toMatch(/"text":"#/);
   });
 });
 
