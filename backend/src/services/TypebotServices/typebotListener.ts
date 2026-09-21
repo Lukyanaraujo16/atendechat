@@ -146,7 +146,51 @@ type TypebotCommandJson = {
   userId?: number;
 };
 
-function parseTypebotInternalCommand(
+/**
+ * Caracteres de formato que o Typebot/Slate podem colar nas bordas do JSON.
+ * U+00A0 (NBSP) não entra: String.trim() já o remove nas bordas.
+ * U+FEFF também é WhiteSpace do trim, mas permanece no set para o caso em que
+ * fica escondido atrás de U+200B (trim não atravessa ZWSP).
+ * Remoção SOMENTE nas bordas externas — interior de strings JSON é preservado.
+ */
+const TYPEBOT_INTERNAL_COMMAND_BOUNDARY_FORMAT_CODES = new Set([
+  0x200b, // ZERO WIDTH SPACE
+  0xfeff // BYTE ORDER MARK / ZERO WIDTH NO-BREAK SPACE
+]);
+
+function isTypebotCommandBoundaryFormatChar(ch: number): boolean {
+  return TYPEBOT_INTERNAL_COMMAND_BOUNDARY_FORMAT_CODES.has(ch);
+}
+
+/** Bordas de formato do payload JSON de comando interno Typebot. */
+export function normalizeTypebotInternalCommandJsonText(
+  jsonText: string
+): string {
+  let payload = String(jsonText || "");
+  let previous = "";
+  while (payload !== previous) {
+    previous = payload;
+    const trimmed = payload.trim();
+    let start = 0;
+    let end = trimmed.length;
+    while (
+      start < end &&
+      isTypebotCommandBoundaryFormatChar(trimmed.charCodeAt(start))
+    ) {
+      start += 1;
+    }
+    while (
+      end > start &&
+      isTypebotCommandBoundaryFormatChar(trimmed.charCodeAt(end - 1))
+    ) {
+      end -= 1;
+    }
+    payload = trimmed.slice(start, end);
+  }
+  return payload;
+}
+
+export function parseTypebotInternalCommand(
   formattedText: string
 ): TypebotInternalCommand {
   const normalized = String(formattedText || "").trim();
@@ -154,7 +198,7 @@ function parseTypebotInternalCommand(
     return { kind: "not_command" };
   }
 
-  const jsonText = normalized.slice(1).trim();
+  const jsonText = normalizeTypebotInternalCommandJsonText(normalized.slice(1));
   let parsed: TypebotCommandJson;
   try {
     parsed = JSON.parse(jsonText) as TypebotCommandJson;

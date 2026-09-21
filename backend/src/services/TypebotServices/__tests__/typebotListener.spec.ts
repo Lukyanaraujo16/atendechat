@@ -33,6 +33,8 @@ jest.mock("../../MessageServices/persistWhatsAppOutboundMessage", () => ({
 }));
 
 import typebotListener, {
+  normalizeTypebotInternalCommandJsonText,
+  parseTypebotInternalCommand,
   summarizeTypebotContinueChatStructure
 } from "../typebotListener";
 import { getWhatsAppOutboundForTicket } from "../../../modules/whatsapp/outbound/resolveWhatsAppOutbound";
@@ -70,6 +72,116 @@ function ticket(partial: Record<string, unknown> = {}) {
     ...partial
   } as never;
 }
+
+const inboundX = {
+  body: "x",
+  pushName: "Ana",
+  fromMe: false,
+  addressing: {
+    remoteJid: "5511999998888@s.whatsapp.net",
+    participant: ""
+  }
+};
+
+describe("normalizeTypebotInternalCommandJsonText FIX10", () => {
+  it("não altera JSON limpo", () => {
+    expect(normalizeTypebotInternalCommandJsonText('{"queueId":1}')).toBe(
+      '{"queueId":1}'
+    );
+  });
+
+  it("remove U+200B só nas bordas", () => {
+    expect(
+      normalizeTypebotInternalCommandJsonText('\u200B{"queueId":1}\u200B')
+    ).toBe('{"queueId":1}');
+  });
+
+  it("remove U+FEFF só nas bordas", () => {
+    expect(
+      normalizeTypebotInternalCommandJsonText('\uFEFF{"queueId":1}\uFEFF')
+    ).toBe('{"queueId":1}');
+  });
+
+  it("remove ZWSP misturado com whitespace nas bordas", () => {
+    expect(
+      normalizeTypebotInternalCommandJsonText(' \u200B {"queueId":1}\u200B\n')
+    ).toBe('{"queueId":1}');
+  });
+
+  it("preserva U+200B dentro de string JSON", () => {
+    const payload = '{"value":"a\u200Bb"}';
+    expect(normalizeTypebotInternalCommandJsonText(payload)).toBe(payload);
+    expect(JSON.parse(payload)).toEqual({ value: "a\u200Bb" });
+  });
+});
+
+describe("parseTypebotInternalCommand FIX10", () => {
+  it("A JSON limpo queueId 1", () => {
+    expect(parseTypebotInternalCommand('#{"queueId":1}')).toEqual({
+      kind: "queue",
+      queueId: 1
+    });
+  });
+
+  it("B trailing U+200B transfere", () => {
+    expect(parseTypebotInternalCommand('#{"queueId":1}\u200B')).toEqual({
+      kind: "queue",
+      queueId: 1
+    });
+  });
+
+  it("C leading U+200B após # transfere", () => {
+    expect(parseTypebotInternalCommand('#\u200B{"queueId":1}')).toEqual({
+      kind: "queue",
+      queueId: 1
+    });
+  });
+
+  it("D U+FEFF nas bordas do JSON transfere", () => {
+    expect(parseTypebotInternalCommand('#\uFEFF{"queueId":1}\uFEFF')).toEqual({
+      kind: "queue",
+      queueId: 1
+    });
+  });
+
+  it("G JSON inválido com format chars externos continua json_parse", () => {
+    expect(parseTypebotInternalCommand('#{"queueId":\u200B')).toEqual({
+      kind: "invalid",
+      reason: "json_parse"
+    });
+    expect(parseTypebotInternalCommand('#\u200B{"queueId":')).toEqual({
+      kind: "invalid",
+      reason: "json_parse"
+    });
+  });
+
+  it("H unsupported_command inalterado", () => {
+    expect(parseTypebotInternalCommand('#{"foo":"bar"}')).toEqual({
+      kind: "invalid",
+      reason: "unsupported_command"
+    });
+  });
+
+  it("I não muta U+200B interno; JSON continua válido", () => {
+    expect(parseTypebotInternalCommand('#{"foo":"a\u200Bb"}')).toEqual({
+      kind: "invalid",
+      reason: "unsupported_command"
+    });
+  });
+
+  it("J queue_user e stopBot com bordas de formato", () => {
+    expect(
+      parseTypebotInternalCommand('#\u200B{"queueId":1,"userId":2}\u200B')
+    ).toEqual({
+      kind: "queue_user",
+      queueId: 1,
+      userId: 2
+    });
+    expect(parseTypebotInternalCommand('#{"stopBot":true}\u200B')).toEqual({
+      kind: "stopBot"
+    });
+  });
+});
 
 describe("typebotListener 12.3-C", () => {
   beforeEach(() => {
@@ -1011,6 +1123,300 @@ describe("typebotListener 12.3-C", () => {
     });
     const jids = sendText.mock.calls.map((c: { jid: string }[]) => c[0].jid);
     expect(jids.join(" ")).not.toMatch(/@c\.us/);
+  });
+
+  it("FIX10-A #JSON queueId 1 limpo transfere e sai de AUTO", async () => {
+    axiosRequest.mockResolvedValue({
+      data: {
+        messages: [
+          {
+            type: "text",
+            content: {
+              richText: [{ children: [{ text: '#{"queueId":1}' }] }]
+            }
+          }
+        ]
+      }
+    });
+
+    await typebotListener(
+      {
+        ticket: ticket({
+          chatbot: true,
+          useIntegration: true,
+          integrationId: 2
+        }),
+        typebot: typebotCfg({ id: 2 }),
+        inbound: inboundX
+      },
+      { axiosRequest, sleep: async () => undefined }
+    );
+
+    expect(updateTicketService).toHaveBeenCalledWith({
+      ticketData: {
+        queueId: 1,
+        chatbot: false,
+        useIntegration: false,
+        integrationId: null
+      },
+      ticketId: 77,
+      companyId: 1
+    });
+    expect(sendText).not.toHaveBeenCalled();
+  });
+
+  it("FIX10-B/E/F sequência E2E com U+200B no comando transfere", async () => {
+    axiosRequest.mockResolvedValue({
+      data: {
+        messages: [
+          {
+            type: "text",
+            content: {
+              richText: [{ children: [{ text: "texto final" }] }]
+            }
+          },
+          {
+            type: "image",
+            content: { url: "https://cdn.typebot.io/x.jpg" }
+          },
+          {
+            type: "audio",
+            content: { url: "https://cdn.typebot.io/a.mp4" }
+          },
+          {
+            type: "text",
+            content: {
+              richText: [
+                {
+                  type: "p",
+                  children: [{ text: '#{"queueId":1}\u200B' }]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    });
+
+    await typebotListener(
+      {
+        ticket: ticket({
+          chatbot: true,
+          useIntegration: true,
+          integrationId: 2,
+          typebotSessionId: "sess-1",
+          typebotStatus: true
+        }),
+        typebot: typebotCfg({ id: 2 }),
+        inbound: { ...inboundX, body: "Comercial" }
+      },
+      { axiosRequest, sleep: async () => undefined, sendRemoteMedia }
+    );
+
+    expect(sendText).toHaveBeenCalledTimes(1);
+    expect(sendText).toHaveBeenCalledWith({
+      jid: "5511999998888@s.whatsapp.net",
+      text: "texto final"
+    });
+    expect(sendRemoteMedia).toHaveBeenCalledTimes(2);
+    expect(updateTicketService).toHaveBeenCalledWith({
+      ticketData: {
+        queueId: 1,
+        chatbot: false,
+        useIntegration: false,
+        integrationId: null
+      },
+      ticketId: 77,
+      companyId: 1
+    });
+    expect(
+      sendText.mock.calls.some((c: { text: string }[]) =>
+        String(c[0].text).includes("queueId")
+      )
+    ).toBe(false);
+    expect(updateTicket).not.toHaveBeenCalledWith({ typebotSessionId: null });
+  });
+
+  it("FIX10-C/D leading ZWSP e FEFF no comando transfere", async () => {
+    axiosRequest.mockResolvedValue({
+      data: {
+        messages: [
+          {
+            type: "text",
+            content: {
+              richText: [{ children: [{ text: '#\u200B{"queueId":1}\uFEFF' }] }]
+            }
+          }
+        ]
+      }
+    });
+
+    await typebotListener(
+      {
+        ticket: ticket({
+          chatbot: true,
+          useIntegration: true,
+          integrationId: 2
+        }),
+        typebot: typebotCfg({ id: 2 }),
+        inbound: inboundX
+      },
+      { axiosRequest, sleep: async () => undefined }
+    );
+
+    expect(updateTicketService).toHaveBeenCalledWith({
+      ticketData: {
+        queueId: 1,
+        chatbot: false,
+        useIntegration: false,
+        integrationId: null
+      },
+      ticketId: 77,
+      companyId: 1
+    });
+    expect(sendText).not.toHaveBeenCalled();
+  });
+
+  it("FIX10-G JSON inválido com format externo não transfere nem zera sessão", async () => {
+    axiosRequest.mockResolvedValue({
+      data: {
+        messages: [
+          {
+            type: "text",
+            content: {
+              richText: [{ children: [{ text: '#{"queueId":\u200B' }] }]
+            }
+          }
+        ]
+      }
+    });
+
+    await expect(
+      typebotListener(
+        {
+          ticket: ticket({
+            typebotSessionId: "sess-keep",
+            typebotStatus: true,
+            chatbot: true,
+            useIntegration: true,
+            integrationId: 2
+          }),
+          typebot: typebotCfg({ id: 2 }),
+          inbound: inboundX
+        },
+        { axiosRequest, sleep: async () => undefined }
+      )
+    ).resolves.toBeUndefined();
+
+    expect(sendText).not.toHaveBeenCalled();
+    expect(updateTicketService).not.toHaveBeenCalled();
+    expect(updateTicket).not.toHaveBeenCalledWith({ typebotSessionId: null });
+  });
+
+  it("FIX10-H unsupported não transfere nem envia", async () => {
+    axiosRequest.mockResolvedValue({
+      data: {
+        messages: [
+          {
+            type: "text",
+            content: {
+              richText: [{ children: [{ text: '#{"foo":"bar"}' }] }]
+            }
+          }
+        ]
+      }
+    });
+
+    await typebotListener(
+      {
+        ticket: ticket({
+          typebotSessionId: "sess-keep",
+          chatbot: true,
+          useIntegration: true,
+          integrationId: 2
+        }),
+        typebot: typebotCfg({ id: 2 }),
+        inbound: inboundX
+      },
+      { axiosRequest, sleep: async () => undefined }
+    );
+
+    expect(sendText).not.toHaveBeenCalled();
+    expect(updateTicketService).not.toHaveBeenCalled();
+    expect(updateTicket).not.toHaveBeenCalledWith({ typebotSessionId: null });
+  });
+
+  it("FIX10-J queue_user e stopBot com ZWSP de borda", async () => {
+    axiosRequest.mockResolvedValue({
+      data: {
+        messages: [
+          {
+            type: "text",
+            content: {
+              richText: [
+                { children: [{ text: '#{"queueId":1,"userId":2}\u200B' }] }
+              ]
+            }
+          }
+        ]
+      }
+    });
+
+    await typebotListener(
+      {
+        ticket: ticket({
+          chatbot: true,
+          useIntegration: true,
+          integrationId: 2
+        }),
+        typebot: typebotCfg({ id: 2 }),
+        inbound: inboundX
+      },
+      { axiosRequest, sleep: async () => undefined }
+    );
+
+    expect(updateTicketService).toHaveBeenCalledWith({
+      ticketData: {
+        queueId: 1,
+        userId: 2,
+        chatbot: false,
+        useIntegration: false,
+        integrationId: null
+      },
+      ticketId: 77,
+      companyId: 1
+    });
+    expect(sendText).not.toHaveBeenCalled();
+  });
+
+  it("FIX10-J stopBot com ZWSP de borda encerra sem sendText", async () => {
+    axiosRequest.mockResolvedValue({
+      data: {
+        messages: [
+          {
+            type: "text",
+            content: {
+              richText: [{ children: [{ text: '#\u200B{"stopBot":true}' }] }]
+            }
+          }
+        ]
+      }
+    });
+
+    await typebotListener(
+      {
+        ticket: ticket(),
+        typebot: typebotCfg({ id: 2 }),
+        inbound: inboundX
+      },
+      { axiosRequest, sleep: async () => undefined }
+    );
+
+    expect(updateTicket).toHaveBeenCalledWith({
+      typebotSessionId: null,
+      typebotStatus: false
+    });
+    expect(sendText).not.toHaveBeenCalled();
   });
 });
 
