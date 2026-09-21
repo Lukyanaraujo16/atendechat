@@ -337,369 +337,41 @@ function formatTypebotRichText(message: {
   return { formattedText, linkPreview };
 }
 
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  return value != null && typeof value === "object" && !Array.isArray(value);
-}
-
-const TYPEBOT_JSON_PARSE_OBS_MARKER =
-  "[Typebot][OBS] internal command json parse diagnostics";
-const TYPEBOT_OBS_CODE_POINT_CAP = 32;
-const TYPEBOT_OBS_SPECIAL_CAP = 64;
-
-type TypebotObsSpecialKind =
-  | "control"
-  | "format"
-  | "line_break"
-  | "tab"
-  | "non_json_space";
-
-type TypebotObsSpecialCodePoint = {
-  index: number;
-  codePoint: string;
-  kind: TypebotObsSpecialKind;
-};
-
-function formatTypebotObsCodePoint(cp: number): string {
-  return `U+${cp.toString(16).toUpperCase().padStart(4, "0")}`;
-}
-
-function classifyTypebotObsCodePoint(cp: number): TypebotObsSpecialKind | null {
-  if (cp === 0x0009) return "tab";
-  if (cp === 0x000a || cp === 0x000d || cp === 0x2028 || cp === 0x2029) {
-    return "line_break";
+/**
+ * Texto semântico do richText Typebot/Slate.
+ * Não converte links em Markdown e não injeta sintaxe visual (* _ ~).
+ * Usado só para o protocolo interno `#JSON`.
+ */
+export function extractTypebotRichTextPlain(message: {
+  content?: { richText?: unknown[] };
+}): string {
+  const richText = message.content?.richText;
+  if (!Array.isArray(richText)) {
+    return "";
   }
-  if (cp <= 0x001f || (cp >= 0x007f && cp <= 0x009f)) return "control";
-  if (
-    cp === 0x00ad ||
-    cp === 0x061c ||
-    cp === 0x180e ||
-    (cp >= 0x200b && cp <= 0x200f) ||
-    (cp >= 0x202a && cp <= 0x202e) ||
-    (cp >= 0x2060 && cp <= 0x2064) ||
-    (cp >= 0x2066 && cp <= 0x206f) ||
-    cp === 0xfeff ||
-    (cp >= 0xfff9 && cp <= 0xfffb)
-  ) {
-    return "format";
-  }
-  if (
-    cp === 0x00a0 ||
-    cp === 0x1680 ||
-    (cp >= 0x2000 && cp <= 0x200a) ||
-    cp === 0x202f ||
-    cp === 0x205f ||
-    cp === 0x3000
-  ) {
-    return "non_json_space";
-  }
-  return null;
-}
 
-function iterateTypebotObsCodePoints(
-  text: string
-): Array<{ index: number; codePoint: number }> {
-  const out: Array<{ index: number; codePoint: number }> = [];
-  for (let i = 0; i < text.length; ) {
-    const codePoint = text.codePointAt(i);
-    if (codePoint == null) break;
-    out.push({ index: i, codePoint });
-    i += codePoint > 0xffff ? 2 : 1;
-  }
-  return out;
-}
-
-function mapTypebotObsCodePoints(
-  text: string,
-  cap = TYPEBOT_OBS_CODE_POINT_CAP
-): string[] {
-  return iterateTypebotObsCodePoints(text)
-    .slice(0, cap)
-    .map(item => formatTypebotObsCodePoint(item.codePoint));
-}
-
-function collectTypebotObsSpecialCodePoints(
-  text: string
-): TypebotObsSpecialCodePoint[] {
-  const out: TypebotObsSpecialCodePoint[] = [];
-  for (const item of iterateTypebotObsCodePoints(text)) {
-    const kind = classifyTypebotObsCodePoint(item.codePoint);
-    if (!kind) continue;
-    out.push({
-      index: item.index,
-      codePoint: formatTypebotObsCodePoint(item.codePoint),
-      kind
-    });
-    if (out.length >= TYPEBOT_OBS_SPECIAL_CAP) break;
-  }
-  return out;
-}
-
-function summarizeTypebotObsChildText(child: unknown): {
-  textLength: number;
-  isEmpty: boolean;
-  firstCodePoint: string | null;
-  lastCodePoint: string | null;
-  hasFormatOrControl: boolean;
-  nestedChildCount: number;
-  specialCodePoints: TypebotObsSpecialCodePoint[];
-} {
-  const rec = isPlainRecord(child) ? child : null;
-  const text = typeof rec?.text === "string" ? rec.text : "";
-  const cps = iterateTypebotObsCodePoints(text);
-  const specialCodePoints = collectTypebotObsSpecialCodePoints(text);
-  return {
-    textLength: text.length,
-    isEmpty: text.length === 0,
-    firstCodePoint:
-      cps.length > 0 ? formatTypebotObsCodePoint(cps[0].codePoint) : null,
-    lastCodePoint:
-      cps.length > 0
-        ? formatTypebotObsCodePoint(cps[cps.length - 1].codePoint)
-        : null,
-    hasFormatOrControl: specialCodePoints.length > 0,
-    nestedChildCount: Array.isArray(rec?.children) ? rec.children.length : 0,
-    specialCodePoints
-  };
-}
-
-function collectTypebotObsTextNodes(
-  node: unknown,
-  depth: number,
-  acc: Array<{
-    depth: number;
-    textLength: number;
-    isEmpty: boolean;
-    firstCodePoint: string | null;
-    lastCodePoint: string | null;
-    hasFormatOrControl: boolean;
-    specialCodePoints: TypebotObsSpecialCodePoint[];
-  }>
-): void {
-  if (!isPlainRecord(node)) return;
-  if (typeof node.text === "string") {
-    const summary = summarizeTypebotObsChildText(node);
-    acc.push({
-      depth,
-      textLength: summary.textLength,
-      isEmpty: summary.isEmpty,
-      firstCodePoint: summary.firstCodePoint,
-      lastCodePoint: summary.lastCodePoint,
-      hasFormatOrControl: summary.hasFormatOrControl,
-      specialCodePoints: summary.specialCodePoints
-    });
-  }
-  if (Array.isArray(node.children)) {
-    for (const child of node.children) {
-      collectTypebotObsTextNodes(child, depth + 1, acc);
+  const walk = (node: unknown, acc: string[]): void => {
+    if (node == null || typeof node !== "object" || Array.isArray(node)) {
+      return;
     }
-  }
-}
-
-/** TEMPORÁRIO FIX11-OBS — metadados Unicode do json_parse, sem conteúdo. */
-export function summarizeTypebotInternalCommandJsonParseDiagnostics(input: {
-  ticketId: number;
-  integrationId: number | null;
-  formattedText: string;
-  message?: unknown;
-}): {
-  ticketId: number;
-  integrationId: number | null;
-  payloadLength: number;
-  firstCodePoint: string | null;
-  lastCodePoint: string | null;
-  firstBraceIndex: number | null;
-  lastBraceIndex: number | null;
-  prefixLength: number;
-  suffixLength: number;
-  prefixCodePoints: string[];
-  suffixCodePoints: string[];
-  controlCodePoints: string[];
-  formatCodePoints: string[];
-  lineBreakCount: number;
-  tabCount: number;
-  specialCodePoints: TypebotObsSpecialCodePoint[];
-  richText: {
-    blockCount: number;
-    totalChildren: number;
-    blocks: Array<{
-      childrenCount: number;
-      children: ReturnType<typeof summarizeTypebotObsChildText>[];
-    }>;
-    textNodeCount: number;
-    textNodes: Array<{
-      depth: number;
-      textLength: number;
-      isEmpty: boolean;
-      firstCodePoint: string | null;
-      lastCodePoint: string | null;
-      hasFormatOrControl: boolean;
-      specialCodePoints: TypebotObsSpecialCodePoint[];
-    }>;
+    const rec = node as Record<string, unknown>;
+    if (typeof rec.text === "string") {
+      acc.push(rec.text);
+    }
+    if (Array.isArray(rec.children)) {
+      for (const child of rec.children) {
+        walk(child, acc);
+      }
+    }
   };
-} {
-  const normalized = String(input.formattedText || "").trim();
-  const jsonText = normalized.startsWith("#")
-    ? normalizeTypebotInternalCommandJsonText(normalized.slice(1))
-    : "";
-  const cps = iterateTypebotObsCodePoints(jsonText);
-  const specialCodePoints = collectTypebotObsSpecialCodePoints(jsonText);
-  const firstBraceIndex = jsonText.indexOf("{");
-  const lastBraceIndex = jsonText.lastIndexOf("}");
-  const prefix =
-    firstBraceIndex >= 0 ? jsonText.slice(0, firstBraceIndex) : jsonText;
-  const suffix =
-    lastBraceIndex >= 0 && lastBraceIndex >= firstBraceIndex
-      ? jsonText.slice(lastBraceIndex + 1)
-      : "";
 
-  const rec = isPlainRecord(input.message) ? input.message : null;
-  const content = isPlainRecord(rec?.content) ? rec.content : null;
-  const richText = Array.isArray(content?.richText) ? content.richText : [];
-  const blocks = richText.map(block => {
-    const children =
-      isPlainRecord(block) && Array.isArray(block.children)
-        ? block.children
-        : [];
-    return {
-      childrenCount: children.length,
-      children: children.map(child => summarizeTypebotObsChildText(child))
-    };
-  });
-  const textNodes: Array<{
-    depth: number;
-    textLength: number;
-    isEmpty: boolean;
-    firstCodePoint: string | null;
-    lastCodePoint: string | null;
-    hasFormatOrControl: boolean;
-    specialCodePoints: TypebotObsSpecialCodePoint[];
-  }> = [];
+  const blocks: string[] = [];
   for (const block of richText) {
-    collectTypebotObsTextNodes(block, 0, textNodes);
+    const parts: string[] = [];
+    walk(block, parts);
+    blocks.push(parts.join(""));
   }
-
-  return {
-    ticketId: input.ticketId,
-    integrationId: input.integrationId,
-    payloadLength: jsonText.length,
-    firstCodePoint:
-      cps.length > 0 ? formatTypebotObsCodePoint(cps[0].codePoint) : null,
-    lastCodePoint:
-      cps.length > 0
-        ? formatTypebotObsCodePoint(cps[cps.length - 1].codePoint)
-        : null,
-    firstBraceIndex: firstBraceIndex >= 0 ? firstBraceIndex : null,
-    lastBraceIndex: lastBraceIndex >= 0 ? lastBraceIndex : null,
-    prefixLength: prefix.length,
-    suffixLength: suffix.length,
-    prefixCodePoints: mapTypebotObsCodePoints(prefix),
-    suffixCodePoints: mapTypebotObsCodePoints(suffix),
-    controlCodePoints: specialCodePoints
-      .filter(item => item.kind === "control")
-      .map(item => item.codePoint),
-    formatCodePoints: specialCodePoints
-      .filter(item => item.kind === "format")
-      .map(item => item.codePoint),
-    lineBreakCount: specialCodePoints.filter(item => item.kind === "line_break")
-      .length,
-    tabCount: specialCodePoints.filter(item => item.kind === "tab").length,
-    specialCodePoints,
-    richText: {
-      blockCount: richText.length,
-      totalChildren: blocks.reduce((n, block) => n + block.childrenCount, 0),
-      blocks,
-      textNodeCount: textNodes.length,
-      textNodes
-    }
-  };
-}
-
-function summarizeTypebotContinueChatMessage(
-  message: unknown,
-  index: number
-): {
-  index: number;
-  type: string | null;
-  hasRichText: boolean;
-  richTextBlockCount: number;
-  hasMarkdown: boolean;
-  startsWithHash: boolean;
-} {
-  const rec = isPlainRecord(message) ? message : null;
-  const type = typeof rec?.type === "string" ? rec.type : null;
-  const content = isPlainRecord(rec?.content) ? rec.content : null;
-  const richText = Array.isArray(content?.richText) ? content.richText : null;
-  const hasMarkdown =
-    content != null &&
-    (content.type === "markdown" || typeof content.markdown === "string");
-
-  let startsWithHash = false;
-  if (type === "text") {
-    const { formattedText } = formatTypebotRichText(
-      rec as { content?: { richText?: unknown[] } }
-    );
-    startsWithHash = formattedText.trim().startsWith("#");
-  }
-
-  return {
-    index,
-    type,
-    hasRichText: richText != null,
-    richTextBlockCount: richText ? richText.length : 0,
-    hasMarkdown,
-    startsWithHash
-  };
-}
-
-/** TEMPORÁRIO homologação FIX9 — só metadados estruturais do continueChat. */
-export function summarizeTypebotContinueChatStructure(input: {
-  ticketId: number;
-  companyId: number;
-  integrationId: number | null;
-  messages: unknown;
-  input: unknown;
-  clientSideActions: unknown;
-}): {
-  ticketId: number;
-  companyId: number;
-  integrationId: number | null;
-  messagesCount: number;
-  messages: Array<{
-    index: number;
-    type: string | null;
-    hasRichText: boolean;
-    richTextBlockCount: number;
-    hasMarkdown: boolean;
-    startsWithHash: boolean;
-  }>;
-  hasInput: boolean;
-  inputType: string | null;
-  clientSideActionsCount: number;
-  clientSideActionTypes: string[];
-} {
-  const messages = Array.isArray(input.messages) ? input.messages : [];
-  const actions = Array.isArray(input.clientSideActions)
-    ? input.clientSideActions
-    : [];
-  const inputRec = isPlainRecord(input.input) ? input.input : null;
-
-  return {
-    ticketId: input.ticketId,
-    companyId: input.companyId,
-    integrationId: input.integrationId,
-    messagesCount: messages.length,
-    messages: messages.map((message, index) =>
-      summarizeTypebotContinueChatMessage(message, index)
-    ),
-    hasInput: inputRec != null,
-    inputType: typeof inputRec?.type === "string" ? inputRec.type : null,
-    clientSideActionsCount: actions.length,
-    clientSideActionTypes: actions.map(action =>
-      isPlainRecord(action) && typeof action.type === "string"
-        ? action.type
-        : "unknown"
-    )
-  };
+  return blocks.join("\n").replace(/\n$/, "");
 }
 
 export async function resolveTypebotDestinationJid(
@@ -832,22 +504,9 @@ const typebotListener = async (
     if (!status) return;
 
     if (body !== typebotKeywordFinish && body !== typebotKeywordRestart) {
-      let requestContinue: {
-        data?: {
-          messages?: unknown[];
-          input?: unknown;
-          clientSideActions?: unknown;
-        };
-      };
+      let requestContinue: { data?: { messages?: unknown[]; input?: unknown } };
       let messages: Array<Record<string, unknown>>;
       let input: { type?: string; items?: Array<{ content?: string }> };
-      let continueChatData:
-        | {
-            messages?: unknown[];
-            input?: unknown;
-            clientSideActions?: unknown;
-          }
-        | undefined;
       if (dataStart?.messages?.length === 0 || dataStart === undefined) {
         const reqData = JSON.stringify({
           message: body
@@ -864,30 +523,15 @@ const typebotListener = async (
           data: reqData
         };
         requestContinue = await axiosRequest(config);
-        continueChatData = requestContinue.data;
-        messages = (continueChatData?.messages || []) as Array<
+        messages = (requestContinue.data?.messages || []) as Array<
           Record<string, unknown>
         >;
-        input = continueChatData?.input as typeof input;
+        input = requestContinue.data?.input as typeof input;
       } else {
         messages = (dataStart?.messages || []) as Array<
           Record<string, unknown>
         >;
         input = dataStart?.input as typeof input;
-      }
-
-      if (continueChatData !== undefined) {
-        logger.info(
-          summarizeTypebotContinueChatStructure({
-            ticketId: ticket.id,
-            companyId: ticket.companyId,
-            integrationId: ticket.integrationId ?? typebot.id,
-            messages,
-            input,
-            clientSideActions: continueChatData.clientSideActions
-          }),
-          "[Typebot][OBS] continueChat response structure"
-        );
       }
 
       if (messages?.length === 0) {
@@ -908,7 +552,11 @@ const typebotListener = async (
               formattedText = typebotUnknownMessage;
             }
 
-            const internalCommand = parseTypebotInternalCommand(formattedText);
+            const internalCommand = parseTypebotInternalCommand(
+              extractTypebotRichTextPlain(
+                message as { content?: { richText?: unknown[] } }
+              )
+            );
             if (internalCommand.kind !== "not_command") {
               if (internalCommand.kind === "stopBot") {
                 await persistTypebotStopped(ticket);
@@ -950,17 +598,6 @@ const typebotListener = async (
                 },
                 "[Typebot] internal command ignored"
               );
-              if (internalCommand.reason === "json_parse") {
-                logger.info(
-                  summarizeTypebotInternalCommandJsonParseDiagnostics({
-                    ticketId: ticket.id,
-                    integrationId: ticket.integrationId ?? typebot.id,
-                    formattedText,
-                    message
-                  }),
-                  TYPEBOT_JSON_PARSE_OBS_MARKER
-                );
-              }
               continue;
             }
 
