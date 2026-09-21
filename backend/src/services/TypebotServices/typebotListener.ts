@@ -293,6 +293,98 @@ function formatTypebotRichText(message: {
   return { formattedText, linkPreview };
 }
 
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return value != null && typeof value === "object" && !Array.isArray(value);
+}
+
+function summarizeTypebotContinueChatMessage(
+  message: unknown,
+  index: number
+): {
+  index: number;
+  type: string | null;
+  hasRichText: boolean;
+  richTextBlockCount: number;
+  hasMarkdown: boolean;
+  startsWithHash: boolean;
+} {
+  const rec = isPlainRecord(message) ? message : null;
+  const type = typeof rec?.type === "string" ? rec.type : null;
+  const content = isPlainRecord(rec?.content) ? rec.content : null;
+  const richText = Array.isArray(content?.richText) ? content.richText : null;
+  const hasMarkdown =
+    content != null &&
+    (content.type === "markdown" || typeof content.markdown === "string");
+
+  let startsWithHash = false;
+  if (type === "text") {
+    const { formattedText } = formatTypebotRichText(
+      rec as { content?: { richText?: unknown[] } }
+    );
+    startsWithHash = formattedText.trim().startsWith("#");
+  }
+
+  return {
+    index,
+    type,
+    hasRichText: richText != null,
+    richTextBlockCount: richText ? richText.length : 0,
+    hasMarkdown,
+    startsWithHash
+  };
+}
+
+/** TEMPORÁRIO homologação FIX9 — só metadados estruturais do continueChat. */
+export function summarizeTypebotContinueChatStructure(input: {
+  ticketId: number;
+  companyId: number;
+  integrationId: number | null;
+  messages: unknown;
+  input: unknown;
+  clientSideActions: unknown;
+}): {
+  ticketId: number;
+  companyId: number;
+  integrationId: number | null;
+  messagesCount: number;
+  messages: Array<{
+    index: number;
+    type: string | null;
+    hasRichText: boolean;
+    richTextBlockCount: number;
+    hasMarkdown: boolean;
+    startsWithHash: boolean;
+  }>;
+  hasInput: boolean;
+  inputType: string | null;
+  clientSideActionsCount: number;
+  clientSideActionTypes: string[];
+} {
+  const messages = Array.isArray(input.messages) ? input.messages : [];
+  const actions = Array.isArray(input.clientSideActions)
+    ? input.clientSideActions
+    : [];
+  const inputRec = isPlainRecord(input.input) ? input.input : null;
+
+  return {
+    ticketId: input.ticketId,
+    companyId: input.companyId,
+    integrationId: input.integrationId,
+    messagesCount: messages.length,
+    messages: messages.map((message, index) =>
+      summarizeTypebotContinueChatMessage(message, index)
+    ),
+    hasInput: inputRec != null,
+    inputType: typeof inputRec?.type === "string" ? inputRec.type : null,
+    clientSideActionsCount: actions.length,
+    clientSideActionTypes: actions.map(action =>
+      isPlainRecord(action) && typeof action.type === "string"
+        ? action.type
+        : "unknown"
+    )
+  };
+}
+
 export async function resolveTypebotDestinationJid(
   ticket: Ticket,
   inbound?: TypebotInbound
@@ -423,9 +515,22 @@ const typebotListener = async (
     if (!status) return;
 
     if (body !== typebotKeywordFinish && body !== typebotKeywordRestart) {
-      let requestContinue: { data?: { messages?: unknown[]; input?: unknown } };
+      let requestContinue: {
+        data?: {
+          messages?: unknown[];
+          input?: unknown;
+          clientSideActions?: unknown;
+        };
+      };
       let messages: Array<Record<string, unknown>>;
       let input: { type?: string; items?: Array<{ content?: string }> };
+      let continueChatData:
+        | {
+            messages?: unknown[];
+            input?: unknown;
+            clientSideActions?: unknown;
+          }
+        | undefined;
       if (dataStart?.messages?.length === 0 || dataStart === undefined) {
         const reqData = JSON.stringify({
           message: body
@@ -442,15 +547,30 @@ const typebotListener = async (
           data: reqData
         };
         requestContinue = await axiosRequest(config);
-        messages = (requestContinue.data?.messages || []) as Array<
+        continueChatData = requestContinue.data;
+        messages = (continueChatData?.messages || []) as Array<
           Record<string, unknown>
         >;
-        input = requestContinue.data?.input as typeof input;
+        input = continueChatData?.input as typeof input;
       } else {
         messages = (dataStart?.messages || []) as Array<
           Record<string, unknown>
         >;
         input = dataStart?.input as typeof input;
+      }
+
+      if (continueChatData !== undefined) {
+        logger.info(
+          summarizeTypebotContinueChatStructure({
+            ticketId: ticket.id,
+            companyId: ticket.companyId,
+            integrationId: ticket.integrationId ?? typebot.id,
+            messages,
+            input,
+            clientSideActions: continueChatData.clientSideActions
+          }),
+          "[Typebot][OBS] continueChat response structure"
+        );
       }
 
       if (messages?.length === 0) {

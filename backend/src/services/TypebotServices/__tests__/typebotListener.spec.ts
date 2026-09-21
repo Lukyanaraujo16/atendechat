@@ -32,7 +32,9 @@ jest.mock("../../MessageServices/persistWhatsAppOutboundMessage", () => ({
   persistWhatsAppOutboundMessage: jest.fn().mockResolvedValue({ id: "P1" })
 }));
 
-import typebotListener from "../typebotListener";
+import typebotListener, {
+  summarizeTypebotContinueChatStructure
+} from "../typebotListener";
 import { getWhatsAppOutboundForTicket } from "../../../modules/whatsapp/outbound/resolveWhatsAppOutbound";
 import { persistWhatsAppOutboundMessage } from "../../MessageServices/persistWhatsAppOutboundMessage";
 
@@ -1009,6 +1011,110 @@ describe("typebotListener 12.3-C", () => {
     });
     const jids = sendText.mock.calls.map((c: { jid: string }[]) => c[0].jid);
     expect(jids.join(" ")).not.toMatch(/@c\.us/);
+  });
+});
+
+describe("summarizeTypebotContinueChatStructure FIX9-OBS", () => {
+  it("expõe só metadados e não vaza conteúdo textual", () => {
+    const secret = '#{"queueId":1}';
+    const summary = summarizeTypebotContinueChatStructure({
+      ticketId: 77,
+      companyId: 1,
+      integrationId: 2,
+      messages: [
+        {
+          type: "text",
+          content: {
+            type: "richText",
+            richText: [{ type: "p", children: [{ text: "Olá cliente" }] }]
+          }
+        },
+        {
+          type: "image",
+          content: { url: "https://cdn.typebot.io/secret.jpg" }
+        },
+        {
+          type: "audio",
+          content: { url: "https://cdn.typebot.io/secret.mp4" }
+        },
+        {
+          type: "text",
+          content: {
+            richText: [{ children: [{ text: secret }] }]
+          }
+        },
+        {
+          type: "text",
+          content: { type: "markdown", markdown: secret }
+        }
+      ],
+      input: { type: "choice input", items: [{ content: "Comercial" }] },
+      clientSideActions: [
+        { type: "redirect", redirect: { url: "https://evil.example" } },
+        { foo: true }
+      ]
+    });
+
+    expect(summary).toMatchObject({
+      ticketId: 77,
+      companyId: 1,
+      integrationId: 2,
+      messagesCount: 5,
+      hasInput: true,
+      inputType: "choice input",
+      clientSideActionsCount: 2,
+      clientSideActionTypes: ["redirect", "unknown"]
+    });
+    expect(summary.messages).toEqual([
+      {
+        index: 0,
+        type: "text",
+        hasRichText: true,
+        richTextBlockCount: 1,
+        hasMarkdown: false,
+        startsWithHash: false
+      },
+      {
+        index: 1,
+        type: "image",
+        hasRichText: false,
+        richTextBlockCount: 0,
+        hasMarkdown: false,
+        startsWithHash: false
+      },
+      {
+        index: 2,
+        type: "audio",
+        hasRichText: false,
+        richTextBlockCount: 0,
+        hasMarkdown: false,
+        startsWithHash: false
+      },
+      {
+        index: 3,
+        type: "text",
+        hasRichText: true,
+        richTextBlockCount: 1,
+        hasMarkdown: false,
+        startsWithHash: true
+      },
+      {
+        index: 4,
+        type: "text",
+        hasRichText: false,
+        richTextBlockCount: 0,
+        hasMarkdown: true,
+        startsWithHash: false
+      }
+    ]);
+
+    const serialized = JSON.stringify(summary);
+    expect(serialized).not.toContain("Olá cliente");
+    expect(serialized).not.toContain("queueId");
+    expect(serialized).not.toContain("cdn.typebot.io");
+    expect(serialized).not.toContain("evil.example");
+    expect(serialized).not.toContain("Comercial");
+    expect(serialized).not.toContain(secret);
   });
 });
 
