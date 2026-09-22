@@ -8,7 +8,10 @@ import {
   AI_AGENT_CONTEXT_MAX_CHARS,
   AI_AGENT_CONTEXT_MAX_MESSAGES
 } from "./aiAgentShadowConfig";
-import { shouldOmitAiAgentHistoryLineForVision } from "./detectAiAgentFalseMediaCapabilityDenial";
+import {
+  AI_AGENT_VISION_ATTACHED_TURN_INSTRUCTION,
+  shouldOmitAiAgentHistoryLineForVision
+} from "./detectAiAgentFalseMediaCapabilityDenial";
 
 const EXCLUDED_MEDIA_TYPES = new Set([
   "reactionMessage",
@@ -17,8 +20,38 @@ const EXCLUDED_MEDIA_TYPES = new Set([
   "editedMessage"
 ]);
 
+/** Teto por linha de histórico (cliente/atendente). Não aplicar ao turno visual. */
+const HISTORY_LINE_MAX_CHARS = 500;
+
+/**
+ * Teto do current inbound preparado por prepareAiAgentMultimodalTurn.
+ * O bloco visual atual tem ~1k chars; 4000 evita explosion sem cortar instruções.
+ */
+const PREPARED_VISION_TURN_MAX_CHARS = 4000;
+
 function sanitizeLine(text: string): string {
-  return text.replace(/\s+/g, " ").trim().slice(0, 500);
+  return text.replace(/\s+/g, " ").trim().slice(0, HISTORY_LINE_MAX_CHARS);
+}
+
+function isPreparedVisionTurn(text: string): boolean {
+  return text.includes(AI_AGENT_VISION_ATTACHED_TURN_INSTRUCTION);
+}
+
+/**
+ * Histórico textual continua em sanitizeLine (500).
+ * Turno visual controlado (prepare) preserva newlines e instruções críticas.
+ */
+function sanitizeCurrentInbound(text: string): string {
+  const raw = String(text || "")
+    .replace(/\r\n/g, "\n")
+    .trim();
+  if (!raw) return "";
+  if (isPreparedVisionTurn(raw)) {
+    return raw.length > PREPARED_VISION_TURN_MAX_CHARS
+      ? raw.slice(0, PREPARED_VISION_TURN_MAX_CHARS)
+      : raw;
+  }
+  return sanitizeLine(raw);
 }
 
 function firstName(contact: Contact | null | undefined): string | null {
@@ -105,7 +138,7 @@ export async function buildAiAgentPromptContext(
     charCount += line.length;
   }
 
-  const current = sanitizeLine(input.currentInboundText);
+  const current = sanitizeCurrentInbound(input.currentInboundText);
   const contextBlock = [
     `Canal: whatsapp`,
     input.ticket.queueId != null ? `Fila: ${input.ticket.queueId}` : null,

@@ -40,20 +40,30 @@ const LEGITIMATE_LIMITATION_RE = [
   /\b(blurry|out\s+of\s+focus|illegible|too\s+dark|cropped)\b/
 ];
 
+const IMAGE_OR_PHOTO =
+  "(imagens?|fotos?|a\\s+imagem|a\\s+foto|essa\\s+imagem|essa\\s+foto|esta\\s+imagem|esta\\s+foto)";
+
 const CAPABILITY_DENIAL_RE = [
   // PT — incapacidade genérica de ver/analisar imagens
-  /\bnao\s+consigo\s+(visualizar|ver|analisar|enxergar|abrir|interpretar)\s+(imagens?|fotos?|a\s+imagem|a\s+foto|essa\s+imagem|essa\s+foto)\b/,
+  new RegExp(
+    `\\bnao\\s+consigo\\s+(visualizar|ver|analisar|enxergar|abrir|interpretar|descrever)\\s+${IMAGE_OR_PHOTO}\\b`
+  ),
   /\bnao\s+tenho\s+(a\s+)?capacidade\s+(de\s+)?(visualizar|ver|analisar)\b/,
   /\bnao\s+tenho\s+acesso\s+(a|à|á)?\s*(imagem|foto|imagens|fotos)\b/,
-  /\bnao\s+posso\s+(acessar|ver|visualizar|analisar)\s+(imagens?|fotos?|a\s+imagem|a\s+foto)\b/,
+  new RegExp(
+    `\\bnao\\s+posso\\s+(acessar|ver|visualizar|analisar|descrever)\\s+${IMAGE_OR_PHOTO}\\b`
+  ),
   /\bnao\s+sou\s+capaz\s+de\s+(ver|visualizar|analisar)\s+(imagens?|fotos?)?\b/,
   /\bnao\s+tenho\s+acesso\s+(a|à|á)?\s*(imagem|foto|imagens|fotos)\b/,
-  /\b(desculpe|desculpa).{0,40}nao\s+consigo\s+(visualizar|ver)\s+(imagens?|fotos?)\b/,
+  /\b(desculpe|desculpa).{0,40}nao\s+consigo\s+(visualizar|ver|descrever)\s+(imagens?|fotos?)\b/,
   /\benvie\s+(uma\s+)?descricao\s+(da\s+imagem|em\s+texto|do\s+que\s+aparece)\b/,
   /\bdescreva\s+(o\s+que\s+(aparece|ha|tem)\s+na\s+imagem|a\s+imagem\s+em\s+texto)\b/,
   /\bnao\s+consigo\s+interpretar\s+(fotos?|imagens?)\b/,
+  // "não consigo descrever o que aparece nesta/na imagem" (E2E 12.4-F)
+  /\bnao\s+consigo\s+descrever\s+o\s+que\s+(aparece|ha|tem)\s+(nesta|nessa|na|desta|dessa)\s+(imagem|foto)\b/,
   // EN
   /\bi\s+(cannot|cant)\s+(see|view|visualize|analyse|analyze|inspect|open)\s+(images?|photos?|the\s+image|the\s+photo)\b/,
+  /\bi\s+(cannot|cant|am\s+unable\s+to)\s+describe\s+(what\s+(appears|is)\s+in\s+(the\s+)?(image|photo)|this\s+image|this\s+photo|the\s+image|the\s+photo)\b/,
   /\bi\s+(do\s+not|dont)\s+have\s+(access|the\s+ability)\s+to\s+(see|view|images?|photos?)\b/,
   /\bplease\s+describe\s+(the\s+)?(image|photo)\b/,
   /\bi\s+am\s+unable\s+to\s+(see|view|analyze|analyse)\s+(images?|photos?)\b/
