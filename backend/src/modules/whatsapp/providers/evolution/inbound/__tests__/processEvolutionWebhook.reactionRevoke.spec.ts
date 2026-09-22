@@ -73,6 +73,13 @@ jest.mock("../../../../inbound/applyInboundWhatsAppRevoke", () => ({
   applyInboundWhatsAppRevoke: (...a: unknown[]) => applyRevoke(...a)
 }));
 
+jest.mock(
+  "../../../../../../services/AiAgentService/runAiAgentDryRunHook",
+  () => ({
+    scheduleAiAgentDryRunFromInbound: jest.fn()
+  })
+);
+
 import { processEvolutionWebhook } from "../processEvolutionWebhook";
 
 describe("processEvolutionWebhook — reaction e revoke", () => {

@@ -367,4 +367,23 @@ describe("12.3-B static coupling", () => {
     expect(listenerSrc).toContain("legacyOpenAiNode");
     expect(listenerSrc).toContain("queueMenuRender");
   });
+
+  it("Evolution inbound chama o mesmo boundary do Agente após persistir", () => {
+    const evoSrc = fs.readFileSync(
+      path.join(
+        __dirname,
+        "../../providers/evolution/inbound/processEvolutionTextInbound.ts"
+      ),
+      "utf8"
+    );
+    const persistIdx = evoSrc.indexOf("await createEvolutionInboundMessage");
+    const hookIdx = evoSrc.indexOf("scheduleAiAgentDryRunFromInbound({");
+    const autoIdx = evoSrc.indexOf("await runInboundAutomation(");
+    expect(persistIdx).toBeGreaterThan(0);
+    expect(hookIdx).toBeGreaterThan(persistIdx);
+    expect(autoIdx).toBeGreaterThan(hookIdx);
+    expect(evoSrc).not.toMatch(/AiAgentShadowService/);
+    expect(evoSrc).not.toMatch(/AiAgentLiveService/);
+    expect(evoSrc).not.toMatch(/scheduleEvolutionAiAgent/);
+  });
 });

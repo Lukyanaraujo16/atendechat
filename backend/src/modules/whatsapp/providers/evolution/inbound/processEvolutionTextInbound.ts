@@ -4,7 +4,11 @@ import Ticket from "../../../../../models/Ticket";
 import Whatsapp from "../../../../../models/Whatsapp";
 import CreateOrUpdateContactService from "../../../../../services/ContactServices/CreateOrUpdateContactService";
 import FindOrCreateTicketService from "../../../../../services/TicketServices/FindOrCreateTicketService";
-import { classifyInboundMessageFromNormalized } from "../../../../../services/AiAgentService/classifyInboundMessage";
+import {
+  classifyInboundMessageFromNormalized,
+  type InboundMessageClassification
+} from "../../../../../services/AiAgentService/classifyInboundMessage";
+import { scheduleAiAgentDryRunFromInbound } from "../../../../../services/AiAgentService/runAiAgentDryRunHook";
 import { logger } from "../../../../../utils/logger";
 import { NormalizedWhatsAppMessage } from "../../../inbound/NormalizedWhatsAppMessage";
 import { processInboundWhatsAppMessage } from "../../../inbound/ProcessInboundWhatsAppMessage";
@@ -312,11 +316,9 @@ export async function processEvolutionTextInbound(input: {
         persistedMediaType
       });
 
+      let classification: InboundMessageClassification | null = null;
       try {
-        const classification = classifyInboundMessageFromNormalized(
-          dto,
-          dto.body
-        );
+        classification = classifyInboundMessageFromNormalized(dto, dto.body);
         logger.info(
           {
             messageId: dto.messageId,
@@ -337,6 +339,21 @@ export async function processEvolutionTextInbound(input: {
         messageId: message.id,
         ticketId: ticket.id
       };
+
+      // Espelha Baileys: hook após persistir, só !fromMe. messageId semântico
+      // preenche o campo legado baileysMessageId (dívida P2 de nomenclatura).
+      if (!dto.fromMe && classification) {
+        scheduleAiAgentDryRunFromInbound({
+          companyId: dto.companyId,
+          ticket,
+          contact,
+          whatsapp,
+          messageId: dto.messageId || null,
+          bodyMessage: dto.body ?? null,
+          persistedMessageId: message.id,
+          classification
+        });
+      }
 
       await runInboundAutomation(
         toInboundAutomationContext({

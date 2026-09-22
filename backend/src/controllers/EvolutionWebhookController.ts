@@ -34,7 +34,9 @@ export const receive = async (
 
   /**
    * Snapshot mínimo da conexão. integrationId/promptId alimentam
-   * processInboundAutomation (Flow/Typebot na conexão). Sem session.
+   * processInboundAutomation (Flow/Typebot na conexão).
+   * aiAgent* alimentam o mesmo scheduleAiAgentDryRunFromInbound do Baileys.
+   * Sem session.
    */
   const whatsapp = await Whatsapp.findByPk(whatsappId, {
     attributes: [
@@ -44,7 +46,10 @@ export const receive = async (
       "name",
       "status",
       "integrationId",
-      "promptId"
+      "promptId",
+      "aiAgentId",
+      "aiAgentEnabled",
+      "aiAgentMode"
     ]
   });
 

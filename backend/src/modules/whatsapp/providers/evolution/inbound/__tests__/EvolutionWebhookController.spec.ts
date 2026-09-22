@@ -164,7 +164,13 @@ describe("EvolutionWebhookController", () => {
     expect(findByPkWhatsapp).toHaveBeenCalledWith(
       3,
       expect.objectContaining({
-        attributes: expect.arrayContaining(["integrationId", "promptId"])
+        attributes: expect.arrayContaining([
+          "integrationId",
+          "promptId",
+          "aiAgentId",
+          "aiAgentEnabled",
+          "aiAgentMode"
+        ])
       })
     );
     expect(processWebhook).toHaveBeenCalledWith(

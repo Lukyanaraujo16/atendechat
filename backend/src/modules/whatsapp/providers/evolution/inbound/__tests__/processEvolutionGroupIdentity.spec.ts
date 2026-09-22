@@ -62,6 +62,13 @@ jest.mock("../../../../../../helpers/resolveWhatsappSettings", () => ({
   resolveWhatsappSettings: (...a: unknown[]) => resolveSettings(...a)
 }));
 
+jest.mock(
+  "../../../../../../services/AiAgentService/runAiAgentDryRunHook",
+  () => ({
+    scheduleAiAgentDryRunFromInbound: jest.fn()
+  })
+);
+
 import { processEvolutionTextInbound } from "../processEvolutionTextInbound";
 
 const GROUP_JID = "120363111222333@g.us";

@@ -71,6 +71,13 @@ jest.mock("../../../../inbound/resolveQuotedMessageByStanzaId", () => ({
   resolveQuotedMessageByStanzaId: (...a: unknown[]) => resolveQuoted(...a)
 }));
 
+jest.mock(
+  "../../../../../../services/AiAgentService/runAiAgentDryRunHook",
+  () => ({
+    scheduleAiAgentDryRunFromInbound: jest.fn()
+  })
+);
+
 import { UniqueConstraintError } from "sequelize";
 import { processEvolutionWebhook } from "../processEvolutionWebhook";
 import { processEvolutionTextInbound } from "../processEvolutionTextInbound";

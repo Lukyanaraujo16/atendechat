@@ -113,6 +113,15 @@ jest.mock(
   })
 );
 
+const scheduleAiAgentDryRunFromInbound = jest.fn();
+jest.mock(
+  "../../../../../../services/AiAgentService/runAiAgentDryRunHook",
+  () => ({
+    scheduleAiAgentDryRunFromInbound: (...a: unknown[]) =>
+      scheduleAiAgentDryRunFromInbound(...a)
+  })
+);
+
 import { processEvolutionTextInbound } from "../processEvolutionTextInbound";
 import { processInboundAutomation } from "../../../../automation/processInboundAutomation";
 
@@ -277,6 +286,29 @@ describe("processEvolutionTextInbound → inbound automation 12.3-B", () => {
     expect(arg.whatsapp).toMatchObject({ id: 10, companyId: 1 });
     expect(arg.persistedMessageId).toBe("EVO1");
     expect(runAutomation.mock.calls[0][1]).toBeUndefined();
+    expect(scheduleAiAgentDryRunFromInbound).toHaveBeenCalledTimes(1);
+    expect(scheduleAiAgentDryRunFromInbound).toHaveBeenCalledWith(
+      expect.objectContaining({
+        companyId: 1,
+        messageId: "EVO1",
+        persistedMessageId: "EVO1",
+        bodyMessage: "oi",
+        ticket: expect.objectContaining({
+          id: 77,
+          companyId: 1,
+          whatsappId: 10
+        }),
+        contact: expect.objectContaining({ id: 5, companyId: 1 }),
+        whatsapp: expect.objectContaining({ id: 10, companyId: 1 }),
+        classification: expect.objectContaining({
+          messageType: "text",
+          hasText: true
+        })
+      })
+    );
+    expect(
+      scheduleAiAgentDryRunFromInbound.mock.invocationCallOrder[0]
+    ).toBeLessThan(runAutomation.mock.invocationCallOrder[0]);
     expect(getWbot).not.toHaveBeenCalled();
     expect(getTicketWbot).not.toHaveBeenCalled();
     expect(getWhatsappWbot).not.toHaveBeenCalled();
@@ -361,6 +393,14 @@ describe("processEvolutionTextInbound → inbound automation 12.3-B", () => {
     expect(runAutomation).toHaveBeenCalledTimes(1);
     expect(runAutomation.mock.calls[0][0].ticket.isGroup).toBe(true);
     expect(runAutomation.mock.calls[0][0].inbound.isGroup).toBe(true);
+    expect(scheduleAiAgentDryRunFromInbound).toHaveBeenCalledTimes(1);
+    expect(scheduleAiAgentDryRunFromInbound).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messageId: "GRP1",
+        persistedMessageId: "GRP1",
+        ticket: expect.objectContaining({ isGroup: true })
+      })
+    );
     expect(getWbot).not.toHaveBeenCalled();
   });
 
@@ -374,6 +414,7 @@ describe("processEvolutionTextInbound → inbound automation 12.3-B", () => {
     expect(createEvoMessage).toHaveBeenCalled();
     expect(runAutomation).toHaveBeenCalledTimes(1);
     expect(runAutomation.mock.calls[0][0].inbound.fromMe).toBe(true);
+    expect(scheduleAiAgentDryRunFromInbound).not.toHaveBeenCalled();
   });
 
   it("evento duplicado não executa automação duas vezes", async () => {
@@ -398,6 +439,7 @@ describe("processEvolutionTextInbound → inbound automation 12.3-B", () => {
     });
     expect(second).toEqual({ status: "duplicate", messageId: "EVO1" });
     expect(runAutomation).not.toHaveBeenCalled();
+    expect(scheduleAiAgentDryRunFromInbound).not.toHaveBeenCalled();
     expect(getWbot).not.toHaveBeenCalled();
     expect(getWhatsappWbot).not.toHaveBeenCalled();
   });
@@ -422,6 +464,7 @@ describe("processEvolutionTextInbound → inbound automation 12.3-B", () => {
     });
     expect(result.status).toBe("media_failed");
     expect(runAutomation).not.toHaveBeenCalled();
+    expect(scheduleAiAgentDryRunFromInbound).not.toHaveBeenCalled();
   });
 
   it("core real: privado Evolution ready sem getWbot; grupo skipped", async () => {
