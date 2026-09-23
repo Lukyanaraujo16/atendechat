@@ -90,6 +90,13 @@ function makeTicket(partial: Record<string, unknown> = {}) {
     amountUsedBotQueues: 3,
     typebotSessionId: "tb",
     typebotStatus: true,
+    aiAgentPaused: false,
+    aiAgentPausedAt: null,
+    aiAgentPausedBy: null,
+    aiAgentHandoffRequested: false,
+    aiAgentHandoffRequestedAt: null,
+    aiAgentHandoffReason: null,
+    aiAgentHandoffBy: null,
     dataWebhook: { remoteJid: "5511999998888@s.whatsapp.net" },
     update: jest.fn(async (data: Record<string, unknown>) => {
       Object.assign(ticket, data);
@@ -317,5 +324,171 @@ describe("FindOrCreateTicketService — ciclo inbound closed", () => {
       ([payload]: [Record<string, unknown>]) => payload.status === "pending"
     );
     expect(closedResets).toHaveLength(1);
+  });
+
+  it("CASO 1 — closed com handoff/pause anteriores limpa estado transitório da IA", async () => {
+    const pausedAt = new Date("2026-09-23T12:00:00.000Z");
+    const handoffAt = new Date("2026-09-23T12:00:01.000Z");
+    const ticket = makeTicket({
+      aiAgentPaused: true,
+      aiAgentPausedAt: pausedAt,
+      aiAgentPausedBy: 9,
+      aiAgentHandoffRequested: true,
+      aiAgentHandoffRequestedAt: handoffAt,
+      aiAgentHandoffReason: "model_requested_handoff",
+      aiAgentHandoffBy: "ai_agent"
+    });
+    findOne.mockResolvedValue(ticket);
+    showTicket.mockImplementation(async () => ticket);
+
+    const result = await FindOrCreateTicketService(contact(), 3, 1, 1);
+
+    expect(createTicket).not.toHaveBeenCalled();
+    expect(result.id).toBe(11);
+    expect(result.status).toBe("pending");
+    expect(result.aiAgentPaused).toBe(false);
+    expect(result.aiAgentPausedAt).toBeNull();
+    expect(result.aiAgentPausedBy).toBeNull();
+    expect(result.aiAgentHandoffRequested).toBe(false);
+    expect(result.aiAgentHandoffRequestedAt).toBeNull();
+    expect(result.aiAgentHandoffReason).toBeNull();
+    expect(result.aiAgentHandoffBy).toBeNull();
+
+    const reset = cycleResetPayload(ticket);
+    expect(reset).toMatchObject({
+      status: "pending",
+      queueId: null,
+      userId: null,
+      chatbot: false,
+      aiAgentPaused: false,
+      aiAgentPausedAt: null,
+      aiAgentPausedBy: null,
+      aiAgentHandoffRequested: false,
+      aiAgentHandoffRequestedAt: null,
+      aiAgentHandoffReason: null,
+      aiAgentHandoffBy: null
+    });
+  });
+
+  it("CASO 2 — pending com handoff no mesmo ciclo não reseta a IA", async () => {
+    const ticket = makeTicket({
+      status: "pending",
+      chatbot: false,
+      queueId: null,
+      userId: null,
+      flowStopped: null,
+      lastFlowId: null,
+      flowWebhook: false,
+      aiAgentPaused: true,
+      aiAgentPausedAt: new Date("2026-09-23T12:00:00.000Z"),
+      aiAgentPausedBy: 9,
+      aiAgentHandoffRequested: true,
+      aiAgentHandoffRequestedAt: new Date("2026-09-23T12:00:01.000Z"),
+      aiAgentHandoffReason: "model_requested_handoff",
+      aiAgentHandoffBy: "ai_agent"
+    });
+    findOne.mockResolvedValue(ticket);
+    showTicket.mockImplementation(async () => ticket);
+
+    const result = await FindOrCreateTicketService(contact(), 3, 1, 1);
+    expect(result.status).toBe("pending");
+    expect(result.aiAgentPaused).toBe(true);
+    expect(result.aiAgentHandoffRequested).toBe(true);
+    expect(result.aiAgentHandoffReason).toBe("model_requested_handoff");
+    expect(cycleResetPayload(ticket)).toBeUndefined();
+  });
+
+  it("CASO 3 — open com handoff/pause no mesmo ciclo não reseta a IA", async () => {
+    const ticket = makeTicket({
+      status: "open",
+      userId: 9,
+      queueId: 4,
+      chatbot: false,
+      aiAgentPaused: true,
+      aiAgentPausedAt: new Date("2026-09-23T12:00:00.000Z"),
+      aiAgentPausedBy: 9,
+      aiAgentHandoffRequested: true,
+      aiAgentHandoffRequestedAt: new Date("2026-09-23T12:00:01.000Z"),
+      aiAgentHandoffReason: "model_requested_handoff",
+      aiAgentHandoffBy: "ai_agent"
+    });
+    findOne.mockResolvedValue(ticket);
+    showTicket.mockImplementation(async () => ticket);
+
+    const result = await FindOrCreateTicketService(contact(), 3, 1, 1);
+    expect(result.status).toBe("open");
+    expect(result.userId).toBe(9);
+    expect(result.aiAgentPaused).toBe(true);
+    expect(result.aiAgentHandoffRequested).toBe(true);
+    expect(cycleResetPayload(ticket)).toBeUndefined();
+  });
+
+  it("CASO 4 — closed sem handoff continua o reopen normal", async () => {
+    const ticket = makeTicket();
+    findOne.mockResolvedValue(ticket);
+    showTicket.mockImplementation(async () => ticket);
+
+    const result = await FindOrCreateTicketService(contact(), 3, 1, 1);
+    expect(result.status).toBe("pending");
+    expect(result.id).toBe(11);
+    const reset = cycleResetPayload(ticket);
+    expect(reset).toMatchObject({
+      status: "pending",
+      aiAgentPaused: false,
+      aiAgentHandoffRequested: false,
+      aiAgentHandoffReason: null
+    });
+  });
+
+  it("CASO 5 — grupo closed não é forçado a pending e segue o reset transitório existente", async () => {
+    const groupContact = contact({
+      id: 90,
+      number: "120363111222333",
+      isGroup: true
+    });
+    const ticket = makeTicket({
+      id: 20,
+      contactId: 90,
+      isGroup: true,
+      status: "closed",
+      aiAgentPaused: true,
+      aiAgentPausedAt: new Date("2026-09-23T12:00:00.000Z"),
+      aiAgentPausedBy: 9,
+      aiAgentHandoffRequested: true,
+      aiAgentHandoffRequestedAt: new Date("2026-09-23T12:00:01.000Z"),
+      aiAgentHandoffReason: "model_requested_handoff",
+      aiAgentHandoffBy: "ai_agent"
+    });
+    findOne.mockResolvedValue(ticket);
+    showTicket.mockImplementation(async () => ticket);
+
+    const result = await FindOrCreateTicketService(
+      contact(),
+      3,
+      1,
+      1,
+      groupContact
+    );
+
+    expect(createTicket).not.toHaveBeenCalled();
+    expect(result.id).toBe(20);
+    expect(result.status).toBe("closed");
+    expect(result.status).not.toBe("pending");
+
+    const reset = cycleResetPayload(ticket);
+    expect(reset).toBeDefined();
+    expect(reset).not.toHaveProperty("status");
+    expect(reset).toMatchObject({
+      queueId: null,
+      userId: null,
+      chatbot: false,
+      aiAgentPaused: false,
+      aiAgentPausedAt: null,
+      aiAgentPausedBy: null,
+      aiAgentHandoffRequested: false,
+      aiAgentHandoffRequestedAt: null,
+      aiAgentHandoffReason: null,
+      aiAgentHandoffBy: null
+    });
   });
 });

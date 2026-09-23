@@ -117,6 +117,13 @@ const FindOrCreateTicketService = async (
       amountUsedBotQueues: 0,
       typebotSessionId: null,
       typebotStatus: false,
+      aiAgentPaused: false,
+      aiAgentPausedAt: null,
+      aiAgentPausedBy: null,
+      aiAgentHandoffRequested: false,
+      aiAgentHandoffRequestedAt: null,
+      aiAgentHandoffReason: null,
+      aiAgentHandoffBy: null,
       dataWebhook:
         Object.keys(preserved).length > 0 ? (preserved as any) : null,
       ...(reopenPrivateAsPending ? { status: "pending" } : {})
