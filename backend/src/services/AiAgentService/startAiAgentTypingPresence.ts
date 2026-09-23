@@ -287,23 +287,39 @@ export async function startAiAgentTypingPresence(
     const setIntervalFn = input.timers?.setInterval || setInterval;
     const setTimeoutFn = input.timers?.setTimeout || setTimeout;
 
+    const presenceMeta = {
+      companyId: input.companyId,
+      ticketId: input.ticket.id,
+      agentId: input.agentId,
+      whatsappId: input.whatsapp?.id,
+      executionId: input.executionId
+    };
+
     session.renewTimer = setIntervalFn(() => {
       if (session.stopped || !session.outbound || !session.jid) return;
-      sendPresenceSafe(session.outbound, session.jid, "composing", {
-        companyId: input.companyId,
-        ticketId: input.ticket.id,
-        agentId: input.agentId,
-        whatsappId: input.whatsapp?.id,
-        executionId: input.executionId
-      })
-        .then(renewed => {
+      sendPresenceSafe(session.outbound, session.jid, "composing", presenceMeta)
+        .then(async renewed => {
+          // Revalidar APÓS o await: composing em voo pode completar depois do stop().
+          if (session.stopped) {
+            if (
+              renewed &&
+              session.outbound &&
+              session.jid &&
+              !isWhatsAppDisableAllReadAndPresenceSideEffects()
+            ) {
+              // Compensa composing tardio para o estado terminal permanecer paused.
+              await sendPresenceSafe(
+                session.outbound,
+                session.jid,
+                "paused",
+                presenceMeta
+              );
+            }
+            return;
+          }
           if (renewed) {
             emitAiAgentTypingMetric("ai_agent.typing_renewed", {
-              companyId: input.companyId,
-              ticketId: input.ticket.id,
-              agentId: input.agentId,
-              whatsappId: input.whatsapp?.id,
-              executionId: input.executionId,
+              ...presenceMeta,
               result: "ok"
             });
           }
