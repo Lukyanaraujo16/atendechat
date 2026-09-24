@@ -1,8 +1,16 @@
 import {
   AI_AGENT_HANDOFF_MARKER,
+  containsKnownAiAgentHandoffMarker,
   parseAiAgentHandoffSignal,
   stripKnownAiAgentHandoffMarkers
 } from "../parseAiAgentHandoffSignal";
+
+const REAL_E2E_FIM_HUMAN = `Olá, Lukyan! Vou encaminhar seu atendimento para outro atendente da nossa equipe, que poderá ajudar com suas dúvidas.
+
+[FIM_HUMAN]`;
+
+const REAL_E2E_CLEAN =
+  "Olá, Lukyan! Vou encaminhar seu atendimento para outro atendente da nossa equipe, que poderá ajudar com suas dúvidas.";
 
 describe("parseAiAgentHandoffSignal", () => {
   it("mantém resposta sem marcador", () => {
@@ -109,6 +117,29 @@ describe("parseAiAgentHandoffSignal", () => {
     expect(result.handoffRequested).toBe(false);
     expect(result.cleanText).toBe("Áudio [INAUDIVEL] recebido.");
   });
+
+  it("reconhece o alias real E2E [FIM_HUMAN]", () => {
+    const result = parseAiAgentHandoffSignal(REAL_E2E_FIM_HUMAN);
+    expect(result.handoffRequested).toBe(true);
+    expect(result.handoffReason).toBe("model_requested_handoff");
+    expect(result.cleanText).toBe(REAL_E2E_CLEAN);
+    expect(result.cleanText).not.toMatch(/FIM_HUMAN/i);
+    expect(result.cleanText).not.toContain("[FIM_HUMAN]");
+  });
+
+  it("não trata palavras comuns sem protocolo como handoff", () => {
+    const phrases = [
+      "O atendimento humano segue normalmente.",
+      "Fale com um atendente humano se preferir.",
+      "Chegamos ao fim da conversa.",
+      "This is a human question."
+    ];
+    phrases.forEach(phrase => {
+      const result = parseAiAgentHandoffSignal(phrase);
+      expect(result.handoffRequested).toBe(false);
+      expect(result.cleanText).toBe(phrase);
+    });
+  });
 });
 
 describe("stripKnownAiAgentHandoffMarkers", () => {
@@ -117,5 +148,24 @@ describe("stripKnownAiAgentHandoffMarkers", () => {
     expect(stripKnownAiAgentHandoffMarkers("Olá [EXEMPLO]")).toBe(
       "Olá [EXEMPLO]"
     );
+  });
+
+  it("remove o alias real E2E [FIM_HUMAN] e preserva a frase", () => {
+    const stripped = stripKnownAiAgentHandoffMarkers(REAL_E2E_FIM_HUMAN);
+    expect(stripped).toBe(REAL_E2E_CLEAN);
+    expect(stripped).not.toMatch(/FIM_HUMAN/i);
+  });
+});
+
+describe("containsKnownAiAgentHandoffMarker", () => {
+  it("reconhece [FIM_HUMAN] do E2E real", () => {
+    expect(containsKnownAiAgentHandoffMarker(REAL_E2E_FIM_HUMAN)).toBe(true);
+  });
+
+  it("não reconhece texto sem protocolo delimitado", () => {
+    expect(
+      containsKnownAiAgentHandoffMarker("O atendimento humano segue.")
+    ).toBe(false);
+    expect(containsKnownAiAgentHandoffMarker("This is human.")).toBe(false);
   });
 });

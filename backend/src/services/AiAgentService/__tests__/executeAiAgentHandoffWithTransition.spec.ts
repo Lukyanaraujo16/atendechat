@@ -90,4 +90,40 @@ describe("executeAiAgentHandoffWithTransition", () => {
     expect(sendMock).not.toHaveBeenCalled();
     expect(handoffMock).not.toHaveBeenCalled();
   });
+
+  it("domínio: [FIM_HUMAN] no modelCleanText sai da transição e handoff só após envio", async () => {
+    sendMock.mockResolvedValue({
+      ok: true,
+      messageId: "m-fim-human",
+      bodySent:
+        "Eduardo:\nOlá, Lukyan! Vou encaminhar seu atendimento para outro atendente da nossa equipe, que poderá ajudar com suas dúvidas."
+    });
+    const ticket = {
+      id: 13,
+      aiAgentHandoffRequested: false
+    } as never;
+
+    const result = await executeAiAgentHandoffWithTransition({
+      ticket,
+      companyId: 1,
+      aiAgentId: 7,
+      agentName: "Eduardo",
+      aiAgentRuntimeLogId: 20,
+      reason: "model_requested_handoff",
+      tone: "professional",
+      modelCleanText: `Olá, Lukyan! Vou encaminhar seu atendimento para outro atendente da nossa equipe, que poderá ajudar com suas dúvidas.
+
+[FIM_HUMAN]`
+    });
+
+    expect(result.ok).toBe(true);
+    expect(sendMock).toHaveBeenCalledTimes(1);
+    const body = sendMock.mock.calls[0][0].body as string;
+    expect(body).toContain("Olá, Lukyan!");
+    expect(body).not.toMatch(/FIM_HUMAN/i);
+    expect(handoffMock).toHaveBeenCalledTimes(1);
+    expect(handoffMock.mock.invocationCallOrder[0]).toBeGreaterThan(
+      sendMock.mock.invocationCallOrder[0]
+    );
+  });
 });

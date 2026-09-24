@@ -3,11 +3,13 @@ export const AI_AGENT_HANDOFF_MARKER = "[HANDOFF_HUMAN]";
 
 /**
  * Identificadores conhecidos (sem colchetes).
- * Canônico + único alias observado em produção. Sem traduções especulativas.
+ * Canônico + aliases observados em produção. Sem traduções especulativas.
+ * Ordem: aliases mais longos primeiro (FIM_HUMANO antes de FIM_HUMAN).
  */
 export const AI_AGENT_HANDOFF_MARKER_IDS = [
   "HANDOFF_HUMAN",
-  "FIM_HUMANO"
+  "FIM_HUMANO",
+  "FIM_HUMAN"
 ] as const;
 
 const HANDOFF_MARKER_ID_ALT = AI_AGENT_HANDOFF_MARKER_IDS.join("|");
