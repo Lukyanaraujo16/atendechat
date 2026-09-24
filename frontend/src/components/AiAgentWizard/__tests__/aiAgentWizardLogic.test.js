@@ -2,11 +2,17 @@ import {
   createDefaultWizardFormState,
   LOCKED_FORBIDDEN_ACTIONS,
   LOCKED_HANDOFF_RULES,
+  LEGACY_NEGOTIATION_POLICY_ALIASES,
   NEGOTIATION_POLICY_PRESETS,
+  PRICING_POLICY_PRESETS,
+  SCHEDULING_POLICY_PRESETS,
 } from "../aiAgentWizardDefaults";
 import {
+  detectPolicyPreset,
   normalizeForbiddenActions,
   normalizeHandoffRules,
+  profileToWizardFormState,
+  resolvePolicyText,
   wizardFormStateToProfilePayload,
 } from "../aiAgentWizardMappers";
 import {
@@ -127,6 +133,122 @@ describe("aiAgentWizard mappers", () => {
   it("M — política de não negociar não instrui handoff escondido", () => {
     expect(NEGOTIATION_POLICY_PRESETS.handoff).not.toMatch(/encaminha/i);
     expect(NEGOTIATION_POLICY_PRESETS.handoff).toMatch(/recuse|explique/i);
+  });
+
+  it("H5-C I — snapshot legado conhecido de negociação mapeia para o preset atual", () => {
+    const legacy = "Não negocia valores; encaminha para atendimento humano.";
+    expect(LEGACY_NEGOTIATION_POLICY_ALIASES[legacy]).toBe("handoff");
+    const form = profileToWizardFormState({
+      companyName: "Empresa",
+      businessSegment: "clinic",
+      attendantName: "Ana",
+      departments: ["sales"],
+      negotiationPolicy: legacy,
+    });
+    expect(form.negotiationPolicyPreset).toBe("handoff");
+    expect(form.negotiationPolicyCustom).toBe("");
+    const payload = wizardFormStateToProfilePayload({
+      ...form,
+      companyName: "Empresa",
+      businessSegment: "clinic",
+      attendantName: "Ana",
+      departments: ["sales"],
+    });
+    expect(payload.negotiationPolicy).toBe(NEGOTIATION_POLICY_PRESETS.handoff);
+    expect(payload.negotiationPolicy).not.toBe(legacy);
+    expect(payload.negotiationPolicy).not.toMatch(/encaminha para atendimento humano/);
+  });
+
+  it("H5-C J — preset atual de negociação faz round-trip", () => {
+    const current = NEGOTIATION_POLICY_PRESETS.handoff;
+    const form = profileToWizardFormState({
+      companyName: "Empresa",
+      businessSegment: "clinic",
+      attendantName: "Ana",
+      departments: ["sales"],
+      negotiationPolicy: current,
+    });
+    expect(form.negotiationPolicyPreset).toBe("handoff");
+    expect(form.negotiationPolicyCustom).toBe("");
+    const payload = wizardFormStateToProfilePayload({
+      ...form,
+      companyName: "Empresa",
+      businessSegment: "clinic",
+      attendantName: "Ana",
+      departments: ["sales"],
+    });
+    expect(payload.negotiationPolicy).toBe(current);
+  });
+
+  it("H5-C K — texto realmente customizado permanece custom", () => {
+    const custom = "Negocia até 10% somente com aprovação do gerente.";
+    const form = profileToWizardFormState({
+      companyName: "Empresa",
+      businessSegment: "clinic",
+      attendantName: "Ana",
+      departments: ["sales"],
+      negotiationPolicy: custom,
+    });
+    expect(form.negotiationPolicyPreset).toBe("custom");
+    expect(form.negotiationPolicyCustom).toBe(custom);
+    expect(
+      detectPolicyPreset(custom, NEGOTIATION_POLICY_PRESETS, "custom", LEGACY_NEGOTIATION_POLICY_ALIASES)
+    ).toBe("custom");
+    expect(
+      detectPolicyPreset(
+        "A política menciona atendimento humano, mas é texto próprio.",
+        NEGOTIATION_POLICY_PRESETS,
+        "custom",
+        LEGACY_NEGOTIATION_POLICY_ALIASES
+      )
+    ).toBe("custom");
+    const payload = wizardFormStateToProfilePayload({
+      ...form,
+      companyName: "Empresa",
+      businessSegment: "clinic",
+      attendantName: "Ana",
+      departments: ["sales"],
+    });
+    expect(payload.negotiationPolicy).toBe(custom);
+  });
+
+  it("H5-C L — customer_requests_human permanece checked/locked/mandatory", () => {
+    expect(isHandoffRuleLocked("customer_requests_human")).toBe(true);
+    expect(LOCKED_HANDOFF_RULES).toEqual(["customer_requests_human"]);
+    const form = profileToWizardFormState({
+      companyName: "Empresa",
+      businessSegment: "clinic",
+      attendantName: "Ana",
+      departments: ["sales"],
+      handoffRules: ["complaint"],
+    });
+    expect(form.handoffRules).toContain("customer_requests_human");
+    expect(form.handoffRules).toContain("complaint");
+    const payload = wizardFormStateToProfilePayload({
+      ...form,
+      handoffRules: ["complaint"],
+    });
+    expect(payload.handoffRules).toEqual(
+      expect.arrayContaining(["customer_requests_human", "complaint"])
+    );
+  });
+
+  it("H5-C — no_prices/no_scheduling atuais não viram alias legado", () => {
+    expect(
+      detectPolicyPreset(
+        PRICING_POLICY_PRESETS.no_prices,
+        PRICING_POLICY_PRESETS
+      )
+    ).toBe("no_prices");
+    expect(
+      detectPolicyPreset(
+        SCHEDULING_POLICY_PRESETS.no_scheduling,
+        SCHEDULING_POLICY_PRESETS
+      )
+    ).toBe("no_scheduling");
+    expect(resolvePolicyText("handoff", "", NEGOTIATION_POLICY_PRESETS)).toBe(
+      NEGOTIATION_POLICY_PRESETS.handoff
+    );
   });
 
   it("mapeia payload com segmento other", () => {

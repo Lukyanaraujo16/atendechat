@@ -63,6 +63,15 @@ export const NEGOTIATION_POLICY_PRESETS = {
   custom: "custom",
 };
 
+/**
+ * Snapshots pré-H5-B conhecidos e exatos.
+ * Somente igualdade integral — sem contains genérico de "humano".
+ * no_prices / no_scheduling atuais ainda dizem "encaminha"; não são aliases.
+ */
+export const LEGACY_NEGOTIATION_POLICY_ALIASES = {
+  "Não negocia valores; encaminha para atendimento humano.": "handoff",
+};
+
 export const SCHEDULING_POLICY_PRESETS = {
   collect_preference:
     "Pode coletar preferência de data/horário, mas não confirma agendamento.",

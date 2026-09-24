@@ -2,26 +2,30 @@ import {
   PRICING_POLICY_PRESETS,
   NEGOTIATION_POLICY_PRESETS,
   SCHEDULING_POLICY_PRESETS,
+  LEGACY_NEGOTIATION_POLICY_ALIASES,
   LOCKED_FORBIDDEN_ACTIONS,
   LOCKED_HANDOFF_RULES,
   createEmptyFaqItem,
   createDefaultWizardFormState,
 } from "./aiAgentWizardDefaults";
 
-function resolvePolicyText(preset, custom, presets) {
+export function resolvePolicyText(preset, custom, presets) {
   if (preset === "custom") {
     return String(custom || "").trim() || null;
   }
   return presets[preset] || null;
 }
 
-function detectPolicyPreset(text, presets, fallback = "custom") {
+export function detectPolicyPreset(text, presets, fallback = "custom", aliases = null) {
   const normalized = String(text || "").trim();
   if (!normalized) return Object.keys(presets).find((k) => k !== "custom") || fallback;
   const match = Object.entries(presets).find(
     ([key, value]) => key !== "custom" && value === normalized
   );
   if (match) return match[0];
+  if (aliases && Object.prototype.hasOwnProperty.call(aliases, normalized)) {
+    return aliases[normalized];
+  }
   return "custom";
 }
 
@@ -80,11 +84,16 @@ export function profileToWizardFormState(profile) {
     negotiationPolicyPreset: detectPolicyPreset(
       profile.negotiationPolicy,
       NEGOTIATION_POLICY_PRESETS,
-      "handoff"
+      "handoff",
+      LEGACY_NEGOTIATION_POLICY_ALIASES
     ),
     negotiationPolicyCustom:
-      detectPolicyPreset(profile.negotiationPolicy, NEGOTIATION_POLICY_PRESETS) ===
-      "custom"
+      detectPolicyPreset(
+        profile.negotiationPolicy,
+        NEGOTIATION_POLICY_PRESETS,
+        "custom",
+        LEGACY_NEGOTIATION_POLICY_ALIASES
+      ) === "custom"
         ? profile.negotiationPolicy || ""
         : "",
     schedulingPolicyPreset: detectPolicyPreset(
