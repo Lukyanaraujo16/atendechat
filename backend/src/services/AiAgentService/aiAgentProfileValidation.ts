@@ -13,6 +13,7 @@ import {
   AI_AGENT_TONES
 } from "../../config/aiAgentProfileConfig";
 import { normalizeOptionalString } from "./aiAgentTenant";
+import { ensurePlatformHandoffInvariants } from "./aiAgentHandoffPolicy";
 
 export type AiAgentProfileInput = {
   setupMode?: string;
@@ -292,10 +293,12 @@ export function validateAiAgentProfileInput(
     AI_AGENT_FORBIDDEN_ACTIONS,
     "Ações proibidas"
   );
-  const handoffRules = parseStringArray(
-    body.handoffRules,
-    AI_AGENT_HANDOFF_RULES,
-    "Regras de handoff"
+  const handoffRules = ensurePlatformHandoffInvariants(
+    parseStringArray(
+      body.handoffRules,
+      AI_AGENT_HANDOFF_RULES,
+      "Regras de handoff"
+    )
   );
 
   return {

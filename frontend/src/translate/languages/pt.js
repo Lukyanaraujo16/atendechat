@@ -3432,7 +3432,7 @@ const messages = {
           preview: {
             title: "Configuração gerada",
             warning:
-              "Esta é uma visualização avançada. As regras internas de segurança do sistema não são exibidas.",
+              "Esta visualização inclui as regras obrigatórias do atendimento e as situações de encaminhamento que você escolheu. Detalhes técnicos internos não são exibidos.",
             empty: "Nenhuma configuração gerada para exibir.",
           },
           toasts: {
@@ -3539,6 +3539,8 @@ const messages = {
               "Algumas restrições são obrigatórias por segurança e não podem ser removidas.",
             handoff:
               "Nessas situações, o atendente pausa automaticamente e deixa a conversa disponível para sua equipe.",
+            handoffInvariant:
+              "Se o cliente pedir explicitamente outro atendente da equipe, o encaminhamento é obrigatório.",
             handoffFooter:
               "O sistema cuidará da transferência internamente; você não precisa configurar marcadores técnicos.",
             productsAndServices:
@@ -3587,7 +3589,7 @@ const messages = {
               noPrices: "Não informar preços",
             },
             negotiation: {
-              handoff: "Não negocia; encaminha para humano",
+              handoff: "Não negocia valores",
               collectOnly: "Pode coletar proposta, mas não confirmar",
             },
             scheduling: {

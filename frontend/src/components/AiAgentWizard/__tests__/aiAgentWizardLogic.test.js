@@ -1,9 +1,12 @@
 import {
   createDefaultWizardFormState,
   LOCKED_FORBIDDEN_ACTIONS,
+  LOCKED_HANDOFF_RULES,
+  NEGOTIATION_POLICY_PRESETS,
 } from "../aiAgentWizardDefaults";
 import {
   normalizeForbiddenActions,
+  normalizeHandoffRules,
   wizardFormStateToProfilePayload,
 } from "../aiAgentWizardMappers";
 import {
@@ -23,6 +26,7 @@ import { AI_AGENT_BUSINESS_SEGMENTS } from "../../../config/aiAgentProfileOption
 import {
   hasWizardValidationErrors,
   isForbiddenActionLocked,
+  isHandoffRuleLocked,
   validateWizardStep,
 } from "../aiAgentWizardValidation";
 
@@ -98,6 +102,31 @@ describe("aiAgentWizard mappers", () => {
     const normalized = normalizeForbiddenActions([]);
     expect(normalized).toEqual(expect.arrayContaining(LOCKED_FORBIDDEN_ACTIONS));
     expect(isForbiddenActionLocked("invent_information")).toBe(true);
+  });
+
+  it("K — customer_requests_human não pode ser desativado", () => {
+    expect(isHandoffRuleLocked("customer_requests_human")).toBe(true);
+    expect(isHandoffRuleLocked("complaint")).toBe(false);
+    expect(LOCKED_HANDOFF_RULES).toEqual(["customer_requests_human"]);
+    expect(normalizeHandoffRules([])).toContain("customer_requests_human");
+    expect(normalizeHandoffRules(["complaint"])).toEqual(
+      expect.arrayContaining(["customer_requests_human", "complaint"])
+    );
+    const payload = wizardFormStateToProfilePayload({
+      ...createDefaultWizardFormState(),
+      companyName: "Empresa X",
+      businessSegment: "clinic",
+      attendantName: "Ana",
+      departments: ["sales"],
+      handoffRules: ["complaint"],
+    });
+    expect(payload.handoffRules).toContain("customer_requests_human");
+    expect(payload.handoffRules).toContain("complaint");
+  });
+
+  it("M — política de não negociar não instrui handoff escondido", () => {
+    expect(NEGOTIATION_POLICY_PRESETS.handoff).not.toMatch(/encaminha/i);
+    expect(NEGOTIATION_POLICY_PRESETS.handoff).toMatch(/recuse|explique/i);
   });
 
   it("mapeia payload com segmento other", () => {

@@ -214,7 +214,12 @@ export default function ReviewStep({
           title={i18n.t("aiAgent.wizard.sections.handoff")}
           onEdit={structuralLocked ? null : () => onEditStep("handoff")}
         >
-          {joinLabels(formState.handoffRules, AI_AGENT_HANDOFF_RULES)}
+          <div>
+            {joinLabels(formState.handoffRules, AI_AGENT_HANDOFF_RULES)}
+          </div>
+          <Typography variant="caption" color="textSecondary">
+            {i18n.t("aiAgent.wizard.hints.handoffInvariant")}
+          </Typography>
         </ReviewSection>
 
         <ReviewSection

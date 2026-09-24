@@ -1,5 +1,6 @@
 import { Request } from "express";
 import { buildAiAgentPromptFromProfile } from "../AiAgentService/buildAiAgentPromptFromProfile";
+import { buildAiAgentAdminPromptPreview } from "../AiAgentService/aiAgentHandoffPolicy";
 import { validateAiAgentProfileInput } from "../AiAgentService/aiAgentProfileValidation";
 import {
   assertAiAgentProductConfigurationAccess,
@@ -26,7 +27,9 @@ export default async function PreviewAiAgentProductConfigurationService(input: {
   const profile = validateAiAgentProfileInput(
     pickProfileFieldsFromBody(input.body)
   );
-  const preview = buildAiAgentPromptFromProfile(profile);
+  const preview = buildAiAgentAdminPromptPreview(
+    buildAiAgentPromptFromProfile(profile)
+  );
 
   return serializeAiAgentProductConfigurationPreview({ preview });
 }

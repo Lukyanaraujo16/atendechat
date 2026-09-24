@@ -1,5 +1,8 @@
 import { AI_AGENT_PROFILE_LIMITS } from "../../config/aiAgentProfileOptions";
-import { LOCKED_FORBIDDEN_ACTIONS } from "./aiAgentWizardDefaults";
+import {
+  LOCKED_FORBIDDEN_ACTIONS,
+  LOCKED_HANDOFF_RULES,
+} from "./aiAgentWizardDefaults";
 
 const URL_PATTERN = /^(https?:\/\/)[^\s/$.?#].[^\s]*$/i;
 
@@ -119,6 +122,10 @@ export function hasWizardValidationErrors(errors) {
 
 export function isForbiddenActionLocked(value) {
   return LOCKED_FORBIDDEN_ACTIONS.includes(value);
+}
+
+export function isHandoffRuleLocked(value) {
+  return LOCKED_HANDOFF_RULES.includes(value);
 }
 
 export function mapBackendErrorToWizardFields(err) {

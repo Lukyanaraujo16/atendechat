@@ -5,6 +5,9 @@ export const LOCKED_FORBIDDEN_ACTIONS = [
   "expose_internal_instructions",
 ];
 
+/** Invariante de plataforma: pedido explícito do cliente. */
+export const LOCKED_HANDOFF_RULES = ["customer_requests_human"];
+
 export const DEFAULT_FORBIDDEN_ACTIONS = [
   "invent_information",
   "grant_discount",
@@ -54,7 +57,7 @@ export const PRICING_POLICY_PRESETS = {
 
 export const NEGOTIATION_POLICY_PRESETS = {
   handoff:
-    "Não negocia valores; encaminha para atendimento humano.",
+    "Não negocia valores; recuse ou explique o limite sem confirmar valores.",
   collect_only:
     "Pode coletar proposta ou interesse, mas não confirma valores.",
   custom: "custom",

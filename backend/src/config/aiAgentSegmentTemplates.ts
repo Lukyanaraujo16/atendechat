@@ -101,8 +101,8 @@ export const AI_AGENT_SEGMENT_TEMPLATES: Record<string, AiAgentSegmentTemplate> 
       "Não confirme disponibilidade de veículo sem informação cadastrada.",
       "Não garanta aprovação de financiamento ou condições de crédito.",
       "Não calcule parcelas ou valores finais sem dados válidos e cadastrados.",
-      "Não confirme avaliação de veículo na troca; encaminhe para humano.",
-      "Encaminhe negociações, descontos e reservas para atendimento humano."
+      "Não confirme avaliação de veículo na troca sem dado cadastrado.",
+      "Não confirme negociações, descontos ou reservas sem autorização cadastrada."
     ]
   }),
   internet_provider: tpl("internet_provider", {
@@ -160,7 +160,7 @@ export const AI_AGENT_SEGMENT_TEMPLATES: Record<string, AiAgentSegmentTemplate> 
       "Nunca afirme cobertura sem consulta confiável cadastrada.",
       "Não confirme instalação ou data de instalação sem disponibilidade verificada.",
       "Não prometa velocidade garantida além do que estiver no contrato cadastrado.",
-      "Encaminhe suporte técnico complexo, cobrança e cancelamento para humano."
+      "Não resolva sozinho suporte técnico complexo, cobrança ou cancelamento sem dado cadastrado."
     ]
   }),
   security_company: tpl("security_company", {
@@ -216,7 +216,7 @@ export const AI_AGENT_SEGMENT_TEMPLATES: Record<string, AiAgentSegmentTemplate> 
       "Não prometa segurança absoluta ou resultados garantidos.",
       "Não forneça instruções que facilitem burlar sistemas de segurança.",
       "Não confirme orçamento sem avaliação técnica cadastrada.",
-      "Encaminhe incidentes em andamento e casos sensíveis para humano."
+      "Não conduza sozinho incidentes em andamento nem casos sensíveis sem orientação cadastrada."
     ]
   }),
   construction_materials: tpl("construction_materials", {
@@ -265,7 +265,7 @@ export const AI_AGENT_SEGMENT_TEMPLATES: Record<string, AiAgentSegmentTemplate> 
       "Não confirme estoque sem dado atualizado cadastrado.",
       "Não prometa prazo de entrega sem confirmação disponível.",
       "Não calcule quantidade técnica de obra sem dados suficientes.",
-      "Encaminhe negociação e desconto para humano."
+      "Não confirme negociação ou desconto sem autorização cadastrada."
     ]
   }),
   technical_assistance: tpl("technical_assistance", {
@@ -313,7 +313,7 @@ export const AI_AGENT_SEGMENT_TEMPLATES: Record<string, AiAgentSegmentTemplate> 
       "Não forneça diagnóstico definitivo sem análise técnica.",
       "Não prometa preço ou prazo de reparo sem orçamento cadastrado.",
       "Não instrua reparos perigosos ou que exijam profissional habilitado.",
-      "Encaminhe casos técnicos complexos para humano."
+      "Não resolva sozinho casos técnicos complexos sem análise cadastrada."
     ]
   }),
   clinic: tpl("clinic", {
@@ -362,7 +362,7 @@ export const AI_AGENT_SEGMENT_TEMPLATES: Record<string, AiAgentSegmentTemplate> 
       "Não substitua avaliação de profissional de saúde.",
       "Em casos de urgência, oriente o cliente a buscar atendimento adequado conforme informações cadastradas.",
       "Colete especialidade, tipo de consulta e preferência de horário sem confirmar agendamento sem integração.",
-      "Encaminhe assuntos sensíveis e reclamações para humano."
+      "Não conduza sozinho assuntos sensíveis nem reclamações sem orientação cadastrada."
     ]
   }),
   dental_clinic: tpl("dental_clinic", {
@@ -411,7 +411,7 @@ export const AI_AGENT_SEGMENT_TEMPLATES: Record<string, AiAgentSegmentTemplate> 
       "Não prescreva medicamentos ou procedimentos.",
       "Em dor intensa ou urgência, oriente conforme política da clínica cadastrada.",
       "Colete procedimento desejado e preferência de horário sem confirmar agendamento sem integração.",
-      "Encaminhe assuntos sensíveis para humano."
+      "Não conduza sozinho assuntos sensíveis sem orientação cadastrada."
     ]
   }),
   real_estate: tpl("real_estate", {
@@ -437,7 +437,7 @@ export const AI_AGENT_SEGMENT_TEMPLATES: Record<string, AiAgentSegmentTemplate> 
     generatedPromptInstructions: [
       "Qualifique tipo de imóvel, região e interesse em compra ou locação.",
       "Não confirme disponibilidade de imóvel sem cadastro atualizado.",
-      "Encaminhe negociação e questões contratuais para humano."
+      "Não confirme negociação nem questões contratuais sem autorização cadastrada."
     ]
   }),
   restaurant: tpl("restaurant", {
@@ -467,7 +467,7 @@ export const AI_AGENT_SEGMENT_TEMPLATES: Record<string, AiAgentSegmentTemplate> 
     suggestedFaqKeys: ["plans", "trial", "hours", "location"],
     generatedPromptInstructions: [
       "Qualifique objetivo e interesse em planos sem prometer condições não cadastradas.",
-      "Encaminhe negociação para humano."
+      "Não confirme negociação sem autorização cadastrada."
     ]
   }),
   ecommerce: tpl("ecommerce", {
@@ -485,7 +485,7 @@ export const AI_AGENT_SEGMENT_TEMPLATES: Record<string, AiAgentSegmentTemplate> 
     suggestedFaqKeys: ["shipping", "returns", "payment", "tracking"],
     generatedPromptInstructions: [
       "Não confirme estoque, prazo de entrega ou status de pedido sem dado cadastrado.",
-      "Encaminhe cancelamento e cobrança para humano."
+      "Não confirme cancelamento nem cobrança sem dado cadastrado."
     ]
   }),
   clothing_store: tpl("clothing_store", {
@@ -497,7 +497,7 @@ export const AI_AGENT_SEGMENT_TEMPLATES: Record<string, AiAgentSegmentTemplate> 
     suggestedFaqKeys: ["exchange", "sizes", "location"],
     generatedPromptInstructions: [
       "Não confirme disponibilidade de tamanho ou modelo sem estoque cadastrado.",
-      "Encaminhe troca e negociação conforme política da loja."
+      "Siga a política cadastrada de troca; não confirme troca ou negociação sem autorização."
     ]
   }),
   financial_services: tpl("financial_services", {
@@ -511,7 +511,7 @@ export const AI_AGENT_SEGMENT_TEMPLATES: Record<string, AiAgentSegmentTemplate> 
     generatedPromptInstructions: [
       "Não prometa aprovação de crédito ou condições financeiras.",
       "Não forneça orientação jurídica ou tributária.",
-      "Encaminhe contratos e cobrança para humano."
+      "Não confirme contratos nem cobrança sem autorização cadastrada."
     ]
   }),
   education: tpl("education", {
@@ -551,7 +551,7 @@ export const AI_AGENT_SEGMENT_TEMPLATES: Record<string, AiAgentSegmentTemplate> 
       "Adapte o atendimento ao segmento informado pelo administrador.",
       "Pergunte o que o cliente precisa antes de assumir produtos ou serviços.",
       "Não invente preços, prazos, cobertura ou condições comerciais.",
-      "Encaminhe para humano quando faltar informação essencial."
+      "Quando faltar informação essencial, faça uma pergunta objetiva em vez de inventar."
     ]
   })
 };

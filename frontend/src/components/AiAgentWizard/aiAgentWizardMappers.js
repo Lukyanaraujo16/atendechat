@@ -3,6 +3,7 @@ import {
   NEGOTIATION_POLICY_PRESETS,
   SCHEDULING_POLICY_PRESETS,
   LOCKED_FORBIDDEN_ACTIONS,
+  LOCKED_HANDOFF_RULES,
   createEmptyFaqItem,
   createDefaultWizardFormState,
 } from "./aiAgentWizardDefaults";
@@ -27,9 +28,9 @@ function detectPolicyPreset(text, presets, fallback = "custom") {
 export function profileToWizardFormState(profile) {
   if (!profile) return createDefaultWizardFormState();
 
-  const handoffRules = Array.isArray(profile.handoffRules)
-    ? [...profile.handoffRules]
-    : [];
+  const handoffRules = normalizeHandoffRules(
+    Array.isArray(profile.handoffRules) ? profile.handoffRules : []
+  );
   const hasCustomHandoff = handoffRules.includes("custom");
 
   return {
@@ -108,9 +109,9 @@ export function wizardFormStateToProfilePayload(formState) {
     ])
   );
 
-  const handoffRules = Array.isArray(formState.handoffRules)
-    ? [...formState.handoffRules]
-    : [];
+  const handoffRules = normalizeHandoffRules(
+    Array.isArray(formState.handoffRules) ? formState.handoffRules : []
+  );
   const hasCustomHandoff = handoffRules.includes("custom");
 
   const faqs = (formState.frequentlyAskedQuestions || [])
@@ -181,6 +182,10 @@ export function wizardFormStateToProfilePayload(formState) {
 
 export function normalizeForbiddenActions(selected = []) {
   return Array.from(new Set([...LOCKED_FORBIDDEN_ACTIONS, ...selected]));
+}
+
+export function normalizeHandoffRules(selected = []) {
+  return Array.from(new Set([...LOCKED_HANDOFF_RULES, ...selected]));
 }
 
 export function toggleArrayValue(list, value) {

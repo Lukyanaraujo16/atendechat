@@ -6,12 +6,21 @@ import FormControlLabel from "@material-ui/core/FormControlLabel";
 import Checkbox from "@material-ui/core/Checkbox";
 import Alert from "@material-ui/lab/Alert";
 import { AI_AGENT_HANDOFF_RULES } from "../../../config/aiAgentProfileOptions";
-import { toggleArrayValue } from "../aiAgentWizardMappers";
+import {
+  normalizeHandoffRules,
+  toggleArrayValue,
+} from "../aiAgentWizardMappers";
+import { isHandoffRuleLocked } from "../aiAgentWizardValidation";
 import { i18n } from "../../../translate/i18n";
 
 export default function HandoffStep({ formState, onChange, errors = {} }) {
   const toggle = (value) => {
-    onChange({ handoffRules: toggleArrayValue(formState.handoffRules, value) });
+    if (isHandoffRuleLocked(value)) return;
+    onChange({
+      handoffRules: normalizeHandoffRules(
+        toggleArrayValue(formState.handoffRules, value)
+      ),
+    });
   };
 
   const hasCustom = (formState.handoffRules || []).includes("custom");
@@ -23,20 +32,29 @@ export default function HandoffStep({ formState, onChange, errors = {} }) {
           {i18n.t("aiAgent.wizard.hints.handoff")}
         </Alert>
       </Grid>
-      {AI_AGENT_HANDOFF_RULES.map((item) => (
-        <Grid item xs={12} sm={6} key={item.value}>
-          <FormControlLabel
-            control={
-              <Checkbox
-                color="primary"
-                checked={(formState.handoffRules || []).includes(item.value)}
-                onChange={() => toggle(item.value)}
-              />
-            }
-            label={item.label}
-          />
-        </Grid>
-      ))}
+      {AI_AGENT_HANDOFF_RULES.map((item) => {
+        const locked = isHandoffRuleLocked(item.value);
+        const checked = (formState.handoffRules || []).includes(item.value);
+        return (
+          <Grid item xs={12} sm={6} key={item.value}>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  color="primary"
+                  checked={checked || locked}
+                  disabled={locked}
+                  onChange={() => toggle(item.value)}
+                />
+              }
+              label={
+                locked
+                  ? `${item.label} (${i18n.t("aiAgent.wizard.labels.required")})`
+                  : item.label
+              }
+            />
+          </Grid>
+        );
+      })}
       {hasCustom ? (
         <Grid item xs={12}>
           <TextField

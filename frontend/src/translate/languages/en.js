@@ -3333,7 +3333,7 @@ const messages = {
 					preview: {
 						title: "Generated configuration",
 						warning:
-							"This is an advanced preview. Internal product safety rules are not shown.",
+							"This preview includes mandatory attendance rules and the handoff situations you selected. Internal technical details are not shown.",
 						empty: "No generated configuration to display.",
 					},
 					toasts: {
@@ -3440,6 +3440,8 @@ const messages = {
 							"Some restrictions are mandatory for safety and cannot be removed.",
 						handoff:
 							"In these situations, the attendant pauses and leaves the conversation available for your team.",
+						handoffInvariant:
+							"If the customer explicitly asks for another team attendant, handoff is mandatory.",
 						handoffFooter:
 							"The system handles transfer internally; you do not need technical markers.",
 						productsAndServices:
@@ -3488,7 +3490,7 @@ const messages = {
 							noPrices: "Do not share prices",
 						},
 						negotiation: {
-							handoff: "Does not negotiate; hands off to human",
+							handoff: "Does not negotiate prices",
 							collectOnly: "May collect proposal, but not confirm",
 						},
 						scheduling: {

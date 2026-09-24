@@ -1,4 +1,8 @@
-import { LOCKED_FORBIDDEN_ACTIONS, createEmptyFaqItem } from "./aiAgentWizardDefaults";
+import {
+  LOCKED_FORBIDDEN_ACTIONS,
+  LOCKED_HANDOFF_RULES,
+  createEmptyFaqItem,
+} from "./aiAgentWizardDefaults";
 import { getSegmentTemplate, segmentI18nKey } from "../../config/aiAgentSegmentTemplates";
 import { i18n } from "../../translate/i18n";
 
@@ -52,7 +56,10 @@ export function applySegmentRecommendations(formState, segment) {
     mergeUnique(formState.forbiddenActions, template.suggestedForbiddenActions),
     LOCKED_FORBIDDEN_ACTIONS
   );
-  patch.handoffRules = mergeUnique(formState.handoffRules, template.suggestedHandoffRules);
+  patch.handoffRules = mergeUnique(
+    mergeUnique(formState.handoffRules, template.suggestedHandoffRules),
+    LOCKED_HANDOFF_RULES
+  );
 
   if (isEmptyText(formState.attendantRole) && template.suggestedAttendantRole) {
     patch.attendantRole = template.suggestedAttendantRole;
