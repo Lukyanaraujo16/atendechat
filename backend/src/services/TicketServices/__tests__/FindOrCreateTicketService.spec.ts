@@ -97,6 +97,7 @@ function makeTicket(partial: Record<string, unknown> = {}) {
     aiAgentHandoffRequestedAt: null,
     aiAgentHandoffReason: null,
     aiAgentHandoffBy: null,
+    aiAgentCycleStartedAt: null,
     dataWebhook: { remoteJid: "5511999998888@s.whatsapp.net" },
     update: jest.fn(async (data: Record<string, unknown>) => {
       Object.assign(ticket, data);
@@ -272,6 +273,9 @@ describe("FindOrCreateTicketService — ciclo inbound closed", () => {
       whatsappId: 3,
       companyId: 1
     });
+    expect(createTicket.mock.calls[0][0].aiAgentCycleStartedAt).toBeInstanceOf(
+      Date
+    );
     expect(result.id).toBe(30);
     expect(result.status).toBe("pending");
   });
@@ -368,6 +372,7 @@ describe("FindOrCreateTicketService — ciclo inbound closed", () => {
       aiAgentHandoffReason: null,
       aiAgentHandoffBy: null
     });
+    expect(reset?.aiAgentCycleStartedAt).toBeInstanceOf(Date);
   });
 
   it("CASO 2 — pending com handoff no mesmo ciclo não reseta a IA", async () => {
@@ -490,5 +495,87 @@ describe("FindOrCreateTicketService — ciclo inbound closed", () => {
       aiAgentHandoffReason: null,
       aiAgentHandoffBy: null
     });
+    expect(reset?.aiAgentCycleStartedAt).toBeInstanceOf(Date);
+  });
+
+  it("CASO 7 — closed → inbound renova aiAgentCycleStartedAt e mantém o reset H1", async () => {
+    const previousCycle = new Date("2026-09-20T10:00:00.000Z");
+    const ticket = makeTicket({
+      aiAgentCycleStartedAt: previousCycle,
+      aiAgentPaused: true,
+      aiAgentHandoffRequested: true,
+      aiAgentHandoffReason: "live_ticket_limit_reached_handoff",
+      aiAgentHandoffBy: "ai_agent"
+    });
+    findOne.mockResolvedValue(ticket);
+    showTicket.mockImplementation(async () => ticket);
+
+    const result = await FindOrCreateTicketService(contact(), 3, 1, 1);
+
+    expect(createTicket).not.toHaveBeenCalled();
+    expect(result.id).toBe(11);
+    expect(result.status).toBe("pending");
+    expect(result.aiAgentPaused).toBe(false);
+    expect(result.aiAgentHandoffRequested).toBe(false);
+    expect(result.aiAgentHandoffReason).toBeNull();
+    expect(result.aiAgentHandoffBy).toBeNull();
+    expect(result.aiAgentCycleStartedAt).toBeInstanceOf(Date);
+    expect(result.aiAgentCycleStartedAt).not.toBe(previousCycle);
+    expect(
+      (result.aiAgentCycleStartedAt as Date).getTime()
+    ).toBeGreaterThan(previousCycle.getTime());
+
+    const reset = cycleResetPayload(ticket);
+    expect(reset).toMatchObject({
+      status: "pending",
+      aiAgentPaused: false,
+      aiAgentPausedAt: null,
+      aiAgentPausedBy: null,
+      aiAgentHandoffRequested: false,
+      aiAgentHandoffRequestedAt: null,
+      aiAgentHandoffReason: null,
+      aiAgentHandoffBy: null
+    });
+    expect(reset?.aiAgentCycleStartedAt).toBeInstanceOf(Date);
+  });
+
+  it("CASO 8 — pending não altera aiAgentCycleStartedAt", async () => {
+    const cycleStartedAt = new Date("2026-09-22T08:00:00.000Z");
+    const ticket = makeTicket({
+      status: "pending",
+      chatbot: false,
+      queueId: null,
+      userId: null,
+      flowStopped: null,
+      lastFlowId: null,
+      flowWebhook: false,
+      aiAgentCycleStartedAt: cycleStartedAt
+    });
+    findOne.mockResolvedValue(ticket);
+    showTicket.mockImplementation(async () => ticket);
+
+    const result = await FindOrCreateTicketService(contact(), 3, 1, 1);
+    expect(result.status).toBe("pending");
+    expect(result.aiAgentCycleStartedAt).toBe(cycleStartedAt);
+    expect(cycleResetPayload(ticket)).toBeUndefined();
+  });
+
+  it("CASO 9 — open não altera aiAgentCycleStartedAt", async () => {
+    const cycleStartedAt = new Date("2026-09-22T08:00:00.000Z");
+    const ticket = makeTicket({
+      status: "open",
+      userId: 9,
+      queueId: 4,
+      chatbot: false,
+      aiAgentCycleStartedAt: cycleStartedAt
+    });
+    findOne.mockResolvedValue(ticket);
+    showTicket.mockImplementation(async () => ticket);
+
+    const result = await FindOrCreateTicketService(contact(), 3, 1, 1);
+    expect(result.status).toBe("open");
+    expect(result.userId).toBe(9);
+    expect(result.aiAgentCycleStartedAt).toBe(cycleStartedAt);
+    expect(cycleResetPayload(ticket)).toBeUndefined();
   });
 });

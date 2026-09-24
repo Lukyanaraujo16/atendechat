@@ -124,6 +124,7 @@ const FindOrCreateTicketService = async (
       aiAgentHandoffRequestedAt: null,
       aiAgentHandoffReason: null,
       aiAgentHandoffBy: null,
+      aiAgentCycleStartedAt: new Date(),
       dataWebhook:
         Object.keys(preserved).length > 0 ? (preserved as any) : null,
       ...(reopenPrivateAsPending ? { status: "pending" } : {})
@@ -265,6 +266,7 @@ const FindOrCreateTicketService = async (
         contactId: groupContact ? groupContact.id : contact.id,
         status: initialStatus,
         isGroup: !!groupContact,
+        aiAgentCycleStartedAt: new Date(),
         ...(groupContact ? { chatbot: false } : {}),
         ...(outboundMeta
           ? {

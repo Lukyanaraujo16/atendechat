@@ -216,6 +216,10 @@ class Ticket extends Model<Ticket> {
   @AllowNull(true)
   @Column(DataType.STRING(64))
   aiAgentHandoffBy: string | null;
+
+  @AllowNull(true)
+  @Column
+  aiAgentCycleStartedAt: Date | null;
 }
 
 export default Ticket;

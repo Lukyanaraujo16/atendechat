@@ -204,7 +204,8 @@ export async function generateAndSendLiveResponseForLog(
 
   const limits = await checkAiAgentLiveLimits({
     companyId,
-    ticketId: ticket.id
+    ticketId: ticket.id,
+    aiAgentCycleStartedAt: ticket.aiAgentCycleStartedAt
   });
   if (limits.allowed === false) {
     await maybeApplySafetyHandoffForLiveBlock({

@@ -371,7 +371,8 @@ export default class AiAgentOrchestrator {
       if (runtimeMode === "live") {
         const liveLimits = await checkAiAgentLiveLimits({
           companyId: input.companyId,
-          ticketId: ctx.ticket.id
+          ticketId: ctx.ticket.id,
+          aiAgentCycleStartedAt: ctx.ticket.aiAgentCycleStartedAt
         });
         if (liveLimits.allowed === false) {
           await maybeApplySafetyHandoffForLiveBlock({
