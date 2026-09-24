@@ -21,6 +21,10 @@ import { isPendingAutomationTicket } from "../utils/ticketAutomationUi";
 import {
   decideUserTicketInboxVisibility,
 } from "../utils/ticketInboxVisibility";
+import {
+  collectProtectedPendingIds,
+  reconcilePendingInboxColumns,
+} from "../utils/reconcilePendingInboxColumns";
 
 /** Mantém a mesma referência de array se todos os elementos forem === aos anteriores (ordem e tamanho iguais). */
 function stabilizeListByRef(prevList, nextList) {
@@ -309,8 +313,10 @@ export function TicketsInboxProvider({
   const mismatchRetryCountRef = useRef({ open: 0, pending: 0, chatbot: 0 });
   const waitingSyncAtRef = useRef(0);
   const chatbotSyncAtRef = useRef(0);
-  const syncWaitingTimerRef = useRef(null);
-  const syncChatbotTimerRef = useRef(null);
+  const syncBothPendingTimerRef = useRef(null);
+  /** Últimos IDs autoritativos das APIs pending (waiting × AUTO). */
+  const lastWaitingApiIdsRef = useRef(new Set());
+  const lastChatbotApiIdsRef = useRef(new Set());
   /** IDs inseridos/atualizados via socket antes do GET refletir no banco. */
   const recentSocketPendingIdsRef = useRef(new Set());
   /** Movimentação otimista (aceitar, transferir, socket) — protege contra GET vazio. */
@@ -361,6 +367,8 @@ export function TicketsInboxProvider({
     setPinnedMeta([]);
     setTabCounts({ open: 0, pending: 0, chatbot: 0 });
     recentlyDeletedIdsRef.current = new Set();
+    lastWaitingApiIdsRef.current = new Set();
+    lastChatbotApiIdsRef.current = new Set();
     lastMismatchReloadAtRef.current = { open: 0, pending: 0, chatbot: 0 };
     mismatchRetryCountRef.current = { open: 0, pending: 0, chatbot: 0 };
     console.info("[DiagTicketsAdmin] list_cleared", {
@@ -418,6 +426,47 @@ export function TicketsInboxProvider({
     [showAll, queueIdsJson]
   );
 
+  const applyPendingColumnsReconciliation = useCallback(
+    ({ waitingApiTickets, chatbotApiTickets } = {}) => {
+      const protectedIds = collectProtectedPendingIds({
+        recentSocketIds: recentSocketPendingIdsRef.current,
+        recentOptimisticMoves: recentOptimisticMovesRef.current,
+      });
+      const result = reconcilePendingInboxColumns({
+        waitingPrev: waitingListRef.current,
+        chatbotPrev: chatbotListRef.current,
+        waitingApiTickets,
+        chatbotApiTickets,
+        lastWaitingApiIds: lastWaitingApiIdsRef.current,
+        lastChatbotApiIds: lastChatbotApiIdsRef.current,
+        protectedIds,
+        retainLocalWhenColumnApiEmpty: isPrivilegedProfile,
+      });
+      if (Array.isArray(waitingApiTickets)) {
+        lastWaitingApiIdsRef.current = result.waitingApiIds;
+        waitingApiTickets.forEach((t) => {
+          if (t?.id != null) {
+            recentSocketPendingIdsRef.current.delete(Number(t.id));
+          }
+        });
+      }
+      if (Array.isArray(chatbotApiTickets)) {
+        lastChatbotApiIdsRef.current = result.chatbotApiIds;
+        chatbotApiTickets.forEach((t) => {
+          if (t?.id != null) {
+            recentSocketPendingIdsRef.current.delete(Number(t.id));
+          }
+        });
+      }
+      waitingListRef.current = result.waiting;
+      chatbotListRef.current = result.chatbot;
+      setWaitingTicketsList(result.waiting);
+      setChatbotTicketsList(result.chatbot);
+      return result;
+    },
+    [isPrivilegedProfile]
+  );
+
   const syncWaitingColumnFromApi = useCallback(
     async ({ ignoreUiGate = false } = {}) => {
       if (!fetchEnabled && !ignoreUiGate) return;
@@ -432,21 +481,8 @@ export function TicketsInboxProvider({
         }
         const { tickets, hasMore } = result;
         waitingSyncAtRef.current = Date.now();
-        setWaitingTicketsList((prev) => {
-          const next = applySafeColumnMerge(
-            prev,
-            tickets,
-            recentOptimisticMovesRef,
-            recentSocketPendingIdsRef,
-            safeMergeOpts
-          );
-          tickets.forEach((t) => {
-            if (t?.id != null) {
-              recentSocketPendingIdsRef.current.delete(Number(t.id));
-            }
-          });
-          waitingListRef.current = next;
-          return next;
+        applyPendingColumnsReconciliation({
+          waitingApiTickets: tickets,
         });
         setPendingHasMore(Boolean(hasMore));
         setPendingPage(1);
@@ -457,7 +493,7 @@ export function TicketsInboxProvider({
         setPendingColumnLoading(false);
       }
     },
-    [fetchEnabled, fetchAllTicketsForColumn]
+    [fetchEnabled, fetchAllTicketsForColumn, applyPendingColumnsReconciliation]
   );
 
   const syncChatbotColumnFromApi = useCallback(
@@ -474,16 +510,8 @@ export function TicketsInboxProvider({
         }
         const { tickets, hasMore } = result;
         chatbotSyncAtRef.current = Date.now();
-        setChatbotTicketsList((prev) => {
-          const next = applySafeColumnMerge(
-            prev,
-            tickets,
-            recentOptimisticMovesRef,
-            recentSocketPendingIdsRef,
-            safeMergeOpts
-          );
-          chatbotListRef.current = next;
-          return next;
+        applyPendingColumnsReconciliation({
+          chatbotApiTickets: tickets,
         });
         setChatbotHasMore(Boolean(hasMore));
         setChatbotPage(1);
@@ -494,33 +522,67 @@ export function TicketsInboxProvider({
         setChatbotColumnLoading(false);
       }
     },
-    [fetchEnabled, fetchAllTicketsForColumn]
+    [fetchEnabled, fetchAllTicketsForColumn, applyPendingColumnsReconciliation]
   );
 
-  const scheduleSyncWaitingColumn = useCallback(() => {
-    if (!fetchEnabled) return;
-    if (syncWaitingTimerRef.current) {
-      clearTimeout(syncWaitingTimerRef.current);
-    }
-    syncWaitingTimerRef.current = setTimeout(() => {
-      syncWaitingColumnFromApi({ ignoreUiGate: true });
-    }, 350);
-  }, [fetchEnabled, syncWaitingColumnFromApi]);
-
-  const scheduleSyncChatbotColumn = useCallback(() => {
-    if (!fetchEnabled) return;
-    if (syncChatbotTimerRef.current) {
-      clearTimeout(syncChatbotTimerRef.current);
-    }
-    syncChatbotTimerRef.current = setTimeout(() => {
-      syncChatbotColumnFromApi({ ignoreUiGate: true });
-    }, 350);
-  }, [fetchEnabled, syncChatbotColumnFromApi]);
+  const syncBothPendingColumnsFromApi = useCallback(
+    async ({ ignoreUiGate = false } = {}) => {
+      if (!fetchEnabled && !ignoreUiGate) return;
+      setPendingColumnLoading(true);
+      setChatbotColumnLoading(true);
+      try {
+        const [waitingResult, chatbotResult] = await Promise.all([
+          fetchAllTicketsForColumn({
+            status: "pending",
+            chatbot: "false",
+          }),
+          fetchAllTicketsForColumn({
+            status: "pending",
+            chatbot: "true",
+          }),
+        ]);
+        if (waitingResult.skipped && chatbotResult.skipped) {
+          return;
+        }
+        if (!waitingResult.skipped) {
+          waitingSyncAtRef.current = Date.now();
+          setPendingHasMore(Boolean(waitingResult.hasMore));
+          setPendingPage(1);
+          mismatchRetryCountRef.current.pending = 0;
+        }
+        if (!chatbotResult.skipped) {
+          chatbotSyncAtRef.current = Date.now();
+          setChatbotHasMore(Boolean(chatbotResult.hasMore));
+          setChatbotPage(1);
+          mismatchRetryCountRef.current.chatbot = 0;
+        }
+        applyPendingColumnsReconciliation({
+          waitingApiTickets: waitingResult.skipped
+            ? undefined
+            : waitingResult.tickets,
+          chatbotApiTickets: chatbotResult.skipped
+            ? undefined
+            : chatbotResult.tickets,
+        });
+      } catch (err) {
+        toastError(err);
+      } finally {
+        setPendingColumnLoading(false);
+        setChatbotColumnLoading(false);
+      }
+    },
+    [fetchEnabled, fetchAllTicketsForColumn, applyPendingColumnsReconciliation]
+  );
 
   const scheduleSyncBothPendingColumns = useCallback(() => {
-    scheduleSyncWaitingColumn();
-    scheduleSyncChatbotColumn();
-  }, [scheduleSyncWaitingColumn, scheduleSyncChatbotColumn]);
+    if (!fetchEnabled) return;
+    if (syncBothPendingTimerRef.current) {
+      clearTimeout(syncBothPendingTimerRef.current);
+    }
+    syncBothPendingTimerRef.current = setTimeout(() => {
+      syncBothPendingColumnsFromApi({ ignoreUiGate: true });
+    }, 350);
+  }, [fetchEnabled, syncBothPendingColumnsFromApi]);
 
   const refreshTabCounts = useCallback(async () => {
     if (!fetchEnabled) return;
@@ -535,10 +597,7 @@ export function TicketsInboxProvider({
         },
         headers: TICKETS_NO_CACHE_HEADERS,
       });
-      await Promise.all([
-        syncWaitingColumnFromApi(),
-        syncChatbotColumnFromApi(),
-      ]);
+      await syncBothPendingColumnsFromApi();
       if (isValidTicketsApiResponse(openResponse)) {
         setTabCounts((prev) => ({
           ...prev,
@@ -552,8 +611,7 @@ export function TicketsInboxProvider({
     fetchEnabled,
     showAll,
     queueIdsJson,
-    syncWaitingColumnFromApi,
-    syncChatbotColumnFromApi,
+    syncBothPendingColumnsFromApi,
   ]);
 
   const scheduleRefreshTabCounts = useCallback(() => {
@@ -581,11 +639,8 @@ export function TicketsInboxProvider({
       if (reloadChatbotTimerRef.current) {
         clearTimeout(reloadChatbotTimerRef.current);
       }
-      if (syncWaitingTimerRef.current) {
-        clearTimeout(syncWaitingTimerRef.current);
-      }
-      if (syncChatbotTimerRef.current) {
-        clearTimeout(syncChatbotTimerRef.current);
+      if (syncBothPendingTimerRef.current) {
+        clearTimeout(syncBothPendingTimerRef.current);
       }
       Object.values(mismatchReloadTimersRef.current).forEach((id) => {
         if (id) clearTimeout(id);
@@ -901,6 +956,19 @@ export function TicketsInboxProvider({
         ticket,
         { pinnedOrderIds, pinnedIdSet, userId, bumpToTop }
       );
+      const reconciledPending = reconcilePendingInboxColumns({
+        waitingPrev: result.wait,
+        chatbotPrev: result.chat,
+        lastWaitingApiIds: lastWaitingApiIdsRef.current,
+        lastChatbotApiIds: lastChatbotApiIdsRef.current,
+        protectedIds: collectProtectedPendingIds({
+          recentSocketIds: recentSocketPendingIdsRef.current,
+          recentOptimisticMoves: recentOptimisticMovesRef.current,
+        }),
+        retainLocalWhenColumnApiEmpty: isPrivilegedProfile,
+      });
+      result.wait = reconciledPending.waiting;
+      result.chat = reconciledPending.chatbot;
       openListRef.current = result.open;
       waitingListRef.current = result.wait;
       chatbotListRef.current = result.chat;
@@ -908,7 +976,7 @@ export function TicketsInboxProvider({
       setWaitingTicketsList(result.wait);
       setChatbotTicketsList(result.chat);
     },
-    [isRecentlyDeleted, pinnedOrderIds, pinnedIdSet, userId]
+    [isRecentlyDeleted, pinnedOrderIds, pinnedIdSet, userId, isPrivilegedProfile]
   );
 
   const reconcilePendingTicket = useCallback(
@@ -1268,7 +1336,17 @@ export function TicketsInboxProvider({
       const batch = Array.isArray(response.data?.tickets)
         ? response.data.tickets
         : [];
-      setWaitingTicketsList((prev) => mergeLoadBatch(prev, batch));
+      setWaitingTicketsList((prev) => {
+        const merged = mergeLoadBatch(prev, batch);
+        const next = merged.filter(
+          (t) => !lastChatbotApiIdsRef.current.has(Number(t.id))
+        );
+        batch.forEach((t) => {
+          if (t?.id != null) lastWaitingApiIdsRef.current.add(Number(t.id));
+        });
+        waitingListRef.current = next;
+        return next;
+      });
       setPendingPage(nextPage);
       setPendingHasMore(Boolean(response.data?.hasMore));
     } catch (err) {
@@ -1306,7 +1384,17 @@ export function TicketsInboxProvider({
       const batch = Array.isArray(response.data?.tickets)
         ? response.data.tickets
         : [];
-      setChatbotTicketsList((prev) => mergeLoadBatch(prev, batch));
+      setChatbotTicketsList((prev) => {
+        const merged = mergeLoadBatch(prev, batch);
+        const next = merged.filter(
+          (t) => !lastWaitingApiIdsRef.current.has(Number(t.id))
+        );
+        batch.forEach((t) => {
+          if (t?.id != null) lastChatbotApiIdsRef.current.add(Number(t.id));
+        });
+        chatbotListRef.current = next;
+        return next;
+      });
       setChatbotPage(nextPage);
       setChatbotHasMore(Boolean(response.data?.hasMore));
     } catch (err) {
