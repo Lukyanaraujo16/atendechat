@@ -3,6 +3,8 @@
  * Proíbe "humano"/"IA" em diferenciação do próximo atendente.
  */
 
+import { stripKnownAiAgentHandoffMarkers } from "./parseAiAgentHandoffSignal";
+
 export type AiAgentHandoffReasonKind =
   | "low_confidence"
   | "out_of_scope"
@@ -167,7 +169,7 @@ export function mapHandoffReasonToKind(
 export function sanitizeAiAgentClientFacingText(
   text: string | null | undefined
 ): string {
-  let out = String(text ?? "");
+  let out = stripKnownAiAgentHandoffMarkers(text);
   out = out.replace(/\batendente\s+humano\b/gi, "outro atendente");
   out = out.replace(/\boperador\s+humano\b/gi, "atendente da equipe");
   out = out.replace(

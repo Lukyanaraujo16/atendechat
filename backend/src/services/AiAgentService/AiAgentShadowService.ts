@@ -32,6 +32,7 @@ import {
   updateAiAgentShadowLog
 } from "./AiAgentShadowLogService";
 import { resolveWhatsappAiAgentRuntimeMode } from "./aiAgentRuntimeMode";
+import { stripKnownAiAgentHandoffMarkers } from "./parseAiAgentHandoffSignal";
 import { InboundMessageClassification } from "./classifyInboundMessage";
 import {
   applyKnowledgeToSystemPrompt,
@@ -514,7 +515,7 @@ export async function generateShadowSuggestionForLog(
 
     await updateAiAgentShadowLog(logId, companyId, {
       shadowStatus: AI_AGENT_SHADOW_STATUSES.GENERATED,
-      suggestedReply: content,
+      suggestedReply: stripKnownAiAgentHandoffMarkers(content),
       suggestionSource: visionGuard.meta.visionFalseDenialFallback
         ? "fallback"
         : "model",

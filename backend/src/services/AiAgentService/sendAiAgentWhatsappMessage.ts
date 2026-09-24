@@ -7,6 +7,7 @@ import { logger } from "../../utils/logger";
 import { AI_AGENT_MESSAGE_ORIGIN } from "./aiAgentLiveConfig";
 import { formatAiAgentSignedMessage } from "./formatAiAgentSignedMessage";
 import { sanitizeAiAgentClientFacingText } from "./buildAiAgentHandoffTransitionMessage";
+import { stripKnownAiAgentHandoffMarkers } from "./parseAiAgentHandoffSignal";
 import { buildEvolutionOutboundDataJsonFromEnvelope } from "../../modules/whatsapp/providers/evolution/outbound/mapEvolutionSendResponse";
 
 export type SendAiAgentWhatsappMessageInput = {
@@ -27,7 +28,8 @@ export default async function sendAiAgentWhatsappMessage(
   input: SendAiAgentWhatsappMessageInput
 ): Promise<SendAiAgentWhatsappMessageResult> {
   try {
-    const sanitized = sanitizeAiAgentClientFacingText(input.body);
+    const stripped = stripKnownAiAgentHandoffMarkers(input.body);
+    const sanitized = sanitizeAiAgentClientFacingText(stripped);
     const signed = input.alreadySigned
       ? {
           body: sanitized,

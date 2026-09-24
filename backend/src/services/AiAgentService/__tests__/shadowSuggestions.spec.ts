@@ -80,6 +80,23 @@ describe("Shadow suggestions observability", () => {
     expect((row as { metadata?: unknown }).metadata).toBeUndefined();
   });
 
+  it("suggestedReply serializado não expõe marcador interno de handoff", () => {
+    const row = serializeShadowSuggestionRow({
+      log: {
+        ...baseLog,
+        suggestedReply:
+          "Sugestão útil para o admin.\n[FIM_HUMANO]\n[HANDOFF_HUMAN]"
+      } as never,
+      aiAgent: baseLog.aiAgent as never,
+      ticket: baseLog.ticket as never,
+      review: null
+    });
+
+    expect(row.suggestedReply).toBe("Sugestão útil para o admin.");
+    expect(row.suggestedReply).not.toMatch(/FIM_HUMANO|HANDOFF_HUMAN/i);
+    expect(row.deliveryStatus).toBe("not_sent");
+  });
+
   it("lista com filtro provider openai", async () => {
     (AiAgentRuntimeLog.findAndCountAll as jest.Mock).mockResolvedValue({
       count: 1,

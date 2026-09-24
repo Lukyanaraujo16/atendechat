@@ -281,6 +281,88 @@ describe("AiAgent handoff 1.5", () => {
     );
   });
 
+  it("alias [FIM_HUMANO] dispara o mesmo handoff e não vaza o marcador", async () => {
+    const ticketRow = ticket({
+      id: 1,
+      companyId: 1,
+      contactId: 2,
+      status: "pending",
+      userId: null,
+      aiAgentPaused: false,
+      aiAgentHandoffRequested: false,
+      chatbot: false,
+      isGroup: false,
+      contact: contact({ id: 2, name: "João" })
+    });
+
+    (AiAgentRuntimeLog.findOne as jest.Mock).mockResolvedValue({
+      id: 81,
+      companyId: 1,
+      ticketId: 1,
+      contactId: 2,
+      whatsappId: 3,
+      aiAgentId: 9,
+      eligible: true,
+      mode: "live",
+      liveStatus: AI_AGENT_LIVE_STATUSES.QUEUED
+    });
+    (Ticket.findOne as jest.Mock).mockResolvedValue(ticketRow);
+    (Contact.findOne as jest.Mock).mockResolvedValue(
+      contact({ id: 2, name: "João" })
+    );
+    (Whatsapp.findOne as jest.Mock).mockResolvedValue({
+      id: 3,
+      aiAgentMode: "live",
+      aiAgentEnabled: true,
+      aiAgentId: 9
+    });
+    (AiAgent.findOne as jest.Mock).mockResolvedValue(
+      agent({
+        id: 9,
+        name: "Eduardo",
+        enabled: true,
+        model: "gpt-4o-mini",
+        maxTokens: 256,
+        temperature: 0.2
+      })
+    );
+
+    mockedLiveGenerate.mockResolvedValue({
+      ok: true,
+      text: "Vou deixar disponível para um atendente.\n[FIM_HUMANO]",
+      provider: "openai",
+      model: "gpt-4o-mini",
+      latencyMs: 100,
+      promptTokens: 10,
+      completionTokens: 8,
+      totalTokens: 18,
+      forceHandoff: false
+    });
+    mockedSend.mockResolvedValue({
+      ok: true,
+      messageId: "OUT-FIM",
+      bodySent: "Eduardo:\nVou deixar disponível para um atendente."
+    });
+
+    await generateAndSendLiveResponseForLog(
+      81,
+      1,
+      "Quero falar com alguém",
+      textClassification
+    );
+
+    expect(mockedSend).toHaveBeenCalled();
+    const sentBody = String(mockedSend.mock.calls[0][0].body);
+    expect(sentBody).not.toMatch(/FIM_HUMANO/i);
+    expect(sentBody).not.toMatch(/HANDOFF_HUMAN/i);
+    expect(ticketUpdateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        aiAgentHandoffRequested: true,
+        aiAgentPaused: true
+      })
+    );
+  });
+
   it("bloqueia nova resposta quando handoff solicitado", async () => {
     mockedBuildCtx.mockResolvedValue({
       planHasAiAgent: true,

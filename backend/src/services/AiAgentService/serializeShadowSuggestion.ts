@@ -3,6 +3,7 @@ import AiAgentSuggestionReview from "../../models/AiAgentSuggestionReview";
 import Ticket from "../../models/Ticket";
 import AiAgent from "../../models/AiAgent";
 import { sanitizeAiAgentRuntimeMetadata } from "./sanitizeAiAgentRuntimeMetadata";
+import { stripKnownAiAgentHandoffMarkers } from "./parseAiAgentHandoffSignal";
 
 export type SerializedShadowSuggestion = {
   id: number;
@@ -92,7 +93,9 @@ export function serializeShadowSuggestionRow(input: RowInput): SerializedShadowS
     shadowStatus: log.shadowStatus,
     errorCode: log.errorCode,
     suggestionSource: log.suggestionSource,
-    suggestedReply: log.suggestedReply,
+    suggestedReply: log.suggestedReply
+      ? stripKnownAiAgentHandoffMarkers(log.suggestedReply)
+      : log.suggestedReply,
     shadowProvider: log.shadowProvider,
     shadowModel: log.shadowModel,
     model: log.shadowModel,
