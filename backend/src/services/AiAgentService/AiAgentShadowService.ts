@@ -322,7 +322,8 @@ export async function generateShadowSuggestionForLog(
         ticket,
         contact,
         agent,
-        currentInboundText: effectiveInboundText
+        currentInboundText: effectiveInboundText,
+        currentMessageId: log.messageId || null
       });
     } catch {
       await updateAiAgentShadowLog(logId, companyId, {

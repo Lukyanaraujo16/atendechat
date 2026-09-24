@@ -344,7 +344,8 @@ export async function generateLiveResponseWithOptionalFc(input: {
       ticket: input.ticket,
       contact: input.contact,
       agent: input.agent,
-      currentInboundText: input.inboundText
+      currentInboundText: input.inboundText,
+      currentMessageId: input.messageId
     });
     const retrieval = await safeRetrieveKnowledgeForAgent({
       companyId: input.companyId,

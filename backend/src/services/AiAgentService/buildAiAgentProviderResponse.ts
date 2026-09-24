@@ -111,7 +111,8 @@ export async function buildAiAgentProviderResponse(
       ticket: input.ticket,
       contact: input.contact,
       agent: input.agent,
-      currentInboundText: input.inboundText
+      currentInboundText: input.inboundText,
+      currentMessageId: input.messageId
     });
   } catch {
     return {

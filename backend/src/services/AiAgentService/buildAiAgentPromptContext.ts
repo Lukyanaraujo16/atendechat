@@ -1,4 +1,5 @@
 import { createHash } from "crypto";
+import { Op } from "sequelize";
 import { ChatCompletionRequestMessage } from "openai";
 import Message from "../../models/Message";
 import Ticket from "../../models/Ticket";
@@ -8,10 +9,12 @@ import {
   AI_AGENT_CONTEXT_MAX_CHARS,
   AI_AGENT_CONTEXT_MAX_MESSAGES
 } from "./aiAgentShadowConfig";
+import { resolveAiAgentLiveCycleCutoff } from "./checkAiAgentLiveLimits";
 import {
   AI_AGENT_VISION_ATTACHED_TURN_INSTRUCTION,
   shouldOmitAiAgentHistoryLineForVision
 } from "./detectAiAgentFalseMediaCapabilityDenial";
+import { stripKnownAiAgentHandoffMarkers } from "./parseAiAgentHandoffSignal";
 
 const EXCLUDED_MEDIA_TYPES = new Set([
   "reactionMessage",
@@ -70,6 +73,34 @@ function isExcludedMessage(row: Message): boolean {
   return false;
 }
 
+function normalizeMessageId(
+  value: string | number | null | undefined
+): string | null {
+  if (value == null) return null;
+  const trimmed = String(value).trim();
+  return trimmed ? trimmed : null;
+}
+
+function isCurrentTurnRow(
+  row: Message,
+  currentMessageId: string | null
+): boolean {
+  if (!currentMessageId) return false;
+  const rowId = normalizeMessageId(row.id);
+  return rowId != null && rowId === currentMessageId;
+}
+
+function isBeforeCycleStart(
+  createdAt: Date | string | null | undefined,
+  cutoff: Date
+): boolean {
+  if (createdAt == null || createdAt === "") return false;
+  const date =
+    createdAt instanceof Date ? createdAt : new Date(createdAt);
+  if (Number.isNaN(date.getTime())) return false;
+  return date.getTime() < cutoff.getTime();
+}
+
 export type AiAgentPromptContext = {
   messages: ChatCompletionRequestMessage[];
   contextMessageCount: number;
@@ -83,6 +114,8 @@ export type BuildAiAgentPromptContextInput = {
   contact: Contact;
   agent: AiAgent;
   currentInboundText: string;
+  /** ID persistido do inbound atual — excluir só essa row do histórico. */
+  currentMessageId?: string | number | null;
 };
 
 /**
@@ -92,11 +125,21 @@ export type BuildAiAgentPromptContextInput = {
 export async function buildAiAgentPromptContext(
   input: BuildAiAgentPromptContextInput
 ): Promise<AiAgentPromptContext> {
+  const cycleCutoff = resolveAiAgentLiveCycleCutoff(
+    input.ticket.aiAgentCycleStartedAt
+  );
+  const currentMessageId = normalizeMessageId(input.currentMessageId);
+
+  const where: Record<string, unknown> = {
+    ticketId: input.ticket.id,
+    companyId: input.companyId
+  };
+  if (cycleCutoff) {
+    where.createdAt = { [Op.gte]: cycleCutoff };
+  }
+
   const rows = await Message.findAll({
-    where: {
-      ticketId: input.ticket.id,
-      companyId: input.companyId
-    },
+    where,
     order: [["createdAt", "DESC"]],
     limit: AI_AGENT_CONTEXT_MAX_MESSAGES * 2,
     attributes: ["id", "body", "fromMe", "mediaType", "createdAt"]
@@ -104,6 +147,10 @@ export async function buildAiAgentPromptContext(
 
   const filtered = rows
     .filter((row) => !isExcludedMessage(row))
+    .filter((row) => !isCurrentTurnRow(row, currentMessageId))
+    .filter(
+      (row) => !cycleCutoff || !isBeforeCycleStart(row.createdAt, cycleCutoff)
+    )
     .slice(0, AI_AGENT_CONTEXT_MAX_MESSAGES)
     .reverse();
 
@@ -112,7 +159,9 @@ export async function buildAiAgentPromptContext(
   let charCount = 0;
 
   for (const row of filtered) {
-    const body = sanitizeLine(String(row.body || ""));
+    const body = sanitizeLine(
+      stripKnownAiAgentHandoffMarkers(String(row.body || ""))
+    );
     if (!body || body.startsWith("[")) continue;
     // Placeholders de mídia sem conteúdo útil — não poluir o histórico
     if (
