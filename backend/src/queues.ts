@@ -20,6 +20,7 @@ import CampaignShipping from "./models/CampaignShipping";
 import { getWhatsAppOutboundForWhatsapp } from "./modules/whatsapp/outbound/resolveWhatsAppOutbound";
 import sequelize from "./database";
 import { getMessageOptions } from "./services/WbotServices/SendWhatsAppMedia";
+import { CAMPAIGN_DISPATCH_WHATSAPP_ATTRIBUTES } from "./services/CampaignService/campaignDispatchWhatsappAttributes";
 import { getIO } from "./libs/socket";
 import { toCompanyTicketAudience } from "./helpers/companyTicketSocket";
 import path from "path";
@@ -714,7 +715,7 @@ async function getCampaign(id) {
       {
         model: Whatsapp,
         as: "whatsapp",
-        attributes: ["id", "name"]
+        attributes: [...CAMPAIGN_DISPATCH_WHATSAPP_ATTRIBUTES]
       },
       {
         model: CampaignShipping,
@@ -1149,15 +1150,25 @@ async function handleDispatchCampaign(job) {
       return;
     }
 
+    if (!campaign.whatsapp) {
+      logger.error(`[🚨] - WhatsApp não encontrado para campanha ${campaignId}`);
+      return;
+    }
+
+    if (
+      campaign.whatsapp.companyId != null &&
+      Number(campaign.whatsapp.companyId) !== Number(campaign.companyId)
+    ) {
+      logger.error(
+        `[🚨] - WhatsApp ${campaign.whatsapp.id} não pertence à empresa da campanha ${campaignId}`
+      );
+      return;
+    }
+
     const outbound = await getWhatsAppOutboundForWhatsapp(campaign.whatsapp);
 
     if (!outbound) {
       logger.error(`[🚨] - Wbot não encontrado para campanha ${campaignId}`);
-      return;
-    }
-
-    if (!campaign.whatsapp) {
-      logger.error(`[🚨] - WhatsApp não encontrado para campanha ${campaignId}`);
       return;
     }
 
