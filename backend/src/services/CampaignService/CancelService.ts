@@ -1,8 +1,8 @@
-import { Op } from "sequelize";
 import AppError from "../../errors/AppError";
 import Campaign from "../../models/Campaign";
 import CampaignShipping from "../../models/CampaignShipping";
 import { campaignQueue } from "../../queues";
+import { buildDispatchCampaignJobId } from "./campaignQueueJobIds";
 
 export async function CancelService(id: number, companyId: number) {
   const campaign = await Campaign.findOne({
@@ -18,7 +18,6 @@ export async function CancelService(id: number, companyId: number) {
   const recordsToCancel = await CampaignShipping.findAll({
     where: {
       campaignId: campaign.id,
-      jobId: { [Op.not]: null },
       deliveredAt: null
     }
   });
@@ -26,9 +25,17 @@ export async function CancelService(id: number, companyId: number) {
   const promises = [];
 
   for (const record of recordsToCancel) {
-    const job = await campaignQueue.getJob(+record.jobId);
-    if (job) {
-      promises.push(job.remove());
+    const idsToRemove = new Set<string>();
+    if (record.jobId) {
+      idsToRemove.add(String(record.jobId));
+    }
+    idsToRemove.add(buildDispatchCampaignJobId(record.id));
+
+    for (const jobKey of idsToRemove) {
+      const job = await campaignQueue.getJob(jobKey);
+      if (job) {
+        promises.push(job.remove());
+      }
     }
   }
 

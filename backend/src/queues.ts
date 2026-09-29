@@ -21,6 +21,11 @@ import { getWhatsAppOutboundForWhatsapp } from "./modules/whatsapp/outbound/reso
 import sequelize from "./database";
 import { getMessageOptions } from "./services/WbotServices/SendWhatsAppMedia";
 import { CAMPAIGN_DISPATCH_WHATSAPP_ATTRIBUTES } from "./services/CampaignService/campaignDispatchWhatsappAttributes";
+import {
+  buildDispatchCampaignJobId,
+  buildProcessCampaignJobId,
+  isBullDuplicateJobError
+} from "./services/CampaignService/campaignQueueJobIds";
 import { getIO } from "./libs/socket";
 import { toCompanyTicketAudience } from "./helpers/companyTicketSocket";
 import path from "path";
@@ -677,17 +682,29 @@ async function handleVerifyCampaigns(job) {
       const now = moment();
       const scheduledAt = moment(campaign.scheduledAt);
       const delay = Math.max(0, scheduledAt.diff(now, "milliseconds"));
+      const jobId = buildProcessCampaignJobId(campaign.id, campaign.scheduledAt);
       logger.info(
-        `[📌] - Campanha enviada para a fila de processamento: Campanha=${campaign.id}, Delay Inicial=${delay}`
+        `[📌] - Campanha enviada para a fila de processamento: Campanha=${campaign.id}, Delay Inicial=${delay}, jobId=${jobId}`
       );
-      campaignQueue.add(
-        "ProcessCampaign",
-        { id: campaign.id },
-        {
-          delay,
-          removeOnComplete: true
+      try {
+        await campaignQueue.add(
+          "ProcessCampaign",
+          { id: campaign.id },
+          {
+            jobId,
+            delay,
+            removeOnComplete: true
+          }
+        );
+      } catch (addErr: any) {
+        if (isBullDuplicateJobError(addErr)) {
+          logger.info(
+            `[📌] - ProcessCampaign já enfileirado (idempotente): Campanha=${campaign.id} jobId=${jobId}`
+          );
+        } else {
+          throw addErr;
         }
-      );
+      }
     } catch (err: any) {
       Sentry.captureException(err);
     }
@@ -1106,22 +1123,87 @@ async function handlePrepareContact(job) {
       await record.save();
     }
 
-    if (
-      record.deliveredAt === null
-    ) {
-      const nextJob = await campaignQueue.add(
-        "DispatchCampaign",
-        {
-          campaignId: campaign.id,
-          campaignShippingId: record.id,
-          contactListItemId: contactId
-        },
-        {
-          delay
-        }
-      );
+    if (record.deliveredAt === null) {
+      const dispatchJobId = buildDispatchCampaignJobId(record.id);
 
-      await record.update({ jobId: nextJob.id });
+      let skipEnqueue = false;
+      if (record.jobId) {
+        try {
+          const existingByStoredId = await campaignQueue.getJob(record.jobId);
+          if (existingByStoredId) {
+            const state = await existingByStoredId.getState();
+            if (
+              state === "waiting" ||
+              state === "delayed" ||
+              state === "active"
+            ) {
+              skipEnqueue = true;
+              logger.info(
+                `[📌] - Dispatch já ativo para shipping ${record.id} (jobId=${record.jobId} state=${state}); PrepareContact idempotente`
+              );
+            }
+          }
+        } catch (lookupErr: any) {
+          logger.warn(
+            `[📌] - Falha ao inspecionar job existente do shipping ${record.id}: ${lookupErr?.message || lookupErr}`
+          );
+        }
+      }
+
+      if (!skipEnqueue) {
+        try {
+          const existingByDeterministic = await campaignQueue.getJob(
+            dispatchJobId
+          );
+          if (existingByDeterministic) {
+            const state = await existingByDeterministic.getState();
+            if (
+              state === "waiting" ||
+              state === "delayed" ||
+              state === "active"
+            ) {
+              skipEnqueue = true;
+              await record.update({ jobId: String(existingByDeterministic.id) });
+              logger.info(
+                `[📌] - Dispatch determinístico já ativo shipping=${record.id} jobId=${dispatchJobId} state=${state}`
+              );
+            }
+          }
+        } catch (lookupErr: any) {
+          logger.warn(
+            `[📌] - Falha ao inspecionar job determinístico ${dispatchJobId}: ${lookupErr?.message || lookupErr}`
+          );
+        }
+      }
+
+      if (!skipEnqueue) {
+        try {
+          const nextJob = await campaignQueue.add(
+            "DispatchCampaign",
+            {
+              campaignId: campaign.id,
+              campaignShippingId: record.id,
+              contactListItemId: contactId
+            },
+            {
+              jobId: dispatchJobId,
+              delay,
+              removeOnComplete: true
+            }
+          );
+
+          await record.update({ jobId: String(nextJob.id) });
+        } catch (addErr: any) {
+          if (isBullDuplicateJobError(addErr)) {
+            logger.info(
+              `[📌] - DispatchCampaign duplicado ignorado (idempotente) shipping=${record.id} jobId=${dispatchJobId}`
+            );
+            await record.update({ jobId: dispatchJobId });
+          } else {
+            throw addErr;
+          }
+        }
+      }
     }
 
     await verifyAndFinalizeCampaign(campaign);
@@ -1188,6 +1270,20 @@ async function handleDispatchCampaign(job) {
 
     if (!campaignShipping) {
       logger.error(`[🚨] - CampaignShipping ${campaignShippingId} não encontrado`);
+      return;
+    }
+
+    if (Number(campaignShipping.campaignId) !== Number(campaignId)) {
+      logger.error(
+        `[🚨] - CampaignShipping ${campaignShippingId} não pertence à campanha ${campaignId}`
+      );
+      return;
+    }
+
+    if (campaignShipping.deliveredAt != null) {
+      logger.info(
+        `[📌] - Dispatch idempotente: shipping ${campaignShippingId} já entregue em ${campaignShipping.deliveredAt}; outbound omitido`
+      );
       return;
     }
 

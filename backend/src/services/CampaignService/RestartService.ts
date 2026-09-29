@@ -1,6 +1,7 @@
 import AppError from "../../errors/AppError";
 import Campaign from "../../models/Campaign";
 import { campaignQueue } from "../../queues";
+import { buildProcessCampaignRestartJobId } from "./campaignQueueJobIds";
 
 export async function RestartService(id: number, companyId: number) {
   const campaign = await Campaign.findOne({
@@ -20,6 +21,10 @@ export async function RestartService(id: number, companyId: number) {
   await campaignQueue.add(
     "ProcessCampaign",
     { id: campaign.id },
-    { delay: 3000 }
+    {
+      jobId: buildProcessCampaignRestartJobId(campaign.id),
+      delay: 3000,
+      removeOnComplete: true
+    }
   );
 }

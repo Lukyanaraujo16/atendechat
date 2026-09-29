@@ -1,8 +1,12 @@
-import { Op } from "sequelize";
 import AppError from "../../errors/AppError";
 import Campaign from "../../models/Campaign";
 import CampaignShipping from "../../models/CampaignShipping";
 import { campaignQueue } from "../../queues";
+import { Op } from "sequelize";
+import {
+  buildDispatchCampaignJobId,
+  isBullDuplicateJobError
+} from "./campaignQueueJobIds";
 
 export async function RetryFailedService(
   id: number,
@@ -34,25 +38,46 @@ export async function RetryFailedService(
   }
 
   for (const row of rows) {
+    const dispatchJobId = buildDispatchCampaignJobId(row.id);
+
+    try {
+      const existing = await campaignQueue.getJob(dispatchJobId);
+      if (existing) {
+        await existing.remove();
+      }
+    } catch {
+      // best-effort: job pode já ter sido limpo
+    }
+
     await row.update({ failedAt: null, jobId: null });
 
-    await campaignQueue.add(
-      "DispatchCampaign",
-      {
-        campaignId: campaign.id,
-        campaignShippingId: row.id,
-        contactListItemId: row.contactId
-      },
-      {
-        delay: 0,
-        removeOnComplete: true,
-        attempts: 3,
-        backoff: {
-          type: "exponential",
-          delay: 1000
+    try {
+      const nextJob = await campaignQueue.add(
+        "DispatchCampaign",
+        {
+          campaignId: campaign.id,
+          campaignShippingId: row.id,
+          contactListItemId: row.contactId
+        },
+        {
+          jobId: dispatchJobId,
+          delay: 0,
+          removeOnComplete: true,
+          attempts: 3,
+          backoff: {
+            type: "exponential",
+            delay: 1000
+          }
         }
+      );
+      await row.update({ jobId: String(nextJob.id) });
+    } catch (addErr: unknown) {
+      if (isBullDuplicateJobError(addErr)) {
+        await row.update({ jobId: dispatchJobId });
+        continue;
       }
-    );
+      throw addErr;
+    }
   }
 
   return { retried: rows.length };
