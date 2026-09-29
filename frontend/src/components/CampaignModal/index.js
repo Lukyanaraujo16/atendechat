@@ -223,7 +223,8 @@ const useStyles = makeStyles((theme) => ({
   previewBox: {
     marginTop: theme.spacing(1),
     padding: theme.spacing(1.5),
-    backgroundColor: theme.palette.grey[100],
+    backgroundColor: theme.palette.background.default,
+    color: theme.palette.text.primary,
     borderRadius: theme.shape.borderRadius,
     border: `1px solid ${theme.palette.divider}`,
     whiteSpace: "pre-wrap",
