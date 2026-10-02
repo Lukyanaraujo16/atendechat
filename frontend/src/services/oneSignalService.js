@@ -90,8 +90,13 @@ const ONESIGNAL_PAGE_SCRIPT_SRC =
 
 const SUBSCRIPTION_WAIT_MS_DEFAULT = 15000;
 const PERMISSION_WAIT_MS_DEFAULT = 120000;
+/** Associação de identidade — não cria a Push Subscription. */
+const LOGIN_WAIT_MS_DEFAULT = 15000;
+const PUSH_CONFIG_WAIT_MS = 15000;
+const INIT_WAIT_MS = 20000;
 let SUBSCRIPTION_WAIT_MS = SUBSCRIPTION_WAIT_MS_DEFAULT;
 let PERMISSION_WAIT_MS = PERMISSION_WAIT_MS_DEFAULT;
+let LOGIN_WAIT_MS = LOGIN_WAIT_MS_DEFAULT;
 
 function publicUrlBase() {
   return (process.env.PUBLIC_URL || "").replace(/\/$/, "");
@@ -348,198 +353,204 @@ function isPushSupportedBySdk(api) {
   );
 }
 
+function observePollMs() {
+  const fromWait = Math.floor(Number(SUBSCRIPTION_WAIT_MS) / 5) || 10;
+  return Math.min(250, Math.max(10, fromWait));
+}
+
+/**
+ * Confirma inscrição efetiva só depois do helper de estabilidade
+ * (leituras consecutivas da mesma assinatura). Um único snapshot,
+ * permission granted ou optedIn sem id/token não conclui.
+ */
+async function confirmStableEffectiveSubscription(api, phase) {
+  const detected = readSubscriptionSnapshot(api);
+  if (!isEffectivelySubscribed(detected)) {
+    return null;
+  }
+  recordPushDiagnosticEvent("subscription_detected_by_poll", {
+    phase,
+    optedIn: detected.optedIn,
+    hasId: Boolean(detected.subscriptionId),
+    hasToken: Boolean(detected.token),
+  });
+  logPush("subscription_detected_by_poll", {
+    phase,
+    hasId: Boolean(detected.subscriptionId),
+    hasToken: Boolean(detected.token),
+  });
+  await waitForStableSubscriptionSnapshot(api);
+  const confirmed = readSubscriptionSnapshot(api);
+  if (!isEffectivelySubscribed(confirmed)) {
+    return null;
+  }
+  recordPushDiagnosticEvent("subscription_stability_confirmed", {
+    phase,
+    hasId: Boolean(confirmed.subscriptionId),
+    hasToken: Boolean(confirmed.token),
+  });
+  logPush("subscription_stability_confirmed", {
+    phase,
+    hasId: Boolean(confirmed.subscriptionId),
+    hasToken: Boolean(confirmed.token),
+  });
+  if (confirmed.subscriptionId) {
+    recordPushDiagnosticEvent("subscription_id_available", { phase });
+  }
+  if (confirmed.token) {
+    recordPushDiagnosticEvent("subscription_token_available", { phase });
+  }
+  return confirmed;
+}
+
 async function waitForEffectiveSubscription(api, timeoutMs = SUBSCRIPTION_WAIT_MS) {
   const waitStartedAt = Date.now();
-  const immediate = readSubscriptionSnapshot(api);
-  recordPushDiagnosticEvent("subscription_state_read", {
-    phase: "wait_immediate",
-    optedIn: immediate.optedIn,
-    hasId: Boolean(immediate.subscriptionId),
-    hasToken: Boolean(immediate.token),
-  });
-  if (isEffectivelySubscribed(immediate)) {
-    if (immediate.subscriptionId) {
-      recordPushDiagnosticEvent("subscription_id_available", { phase: "immediate" });
-    }
-    if (immediate.token) {
-      recordPushDiagnosticEvent("subscription_token_available", { phase: "immediate" });
-    }
-    setLastWaitMeta({
+  const pollMs = observePollMs();
+  let pollCount = 0;
+
+  while (Date.now() - waitStartedAt < timeoutMs) {
+    pollCount += 1;
+    const snap = readSubscriptionSnapshot(api);
+    recordPushDiagnosticEvent("subscription_state_read", {
+      phase: "poll",
+      pollCount,
+      optedIn: snap.optedIn,
+      hasId: Boolean(snap.subscriptionId),
+      hasToken: Boolean(snap.token),
       elapsedMs: Date.now() - waitStartedAt,
-      timeoutMs,
-      resolvedBy: "immediate",
-      browser: detectBrowserLabel(
-        typeof navigator !== "undefined" ? navigator.userAgent : ""
-      ),
+      effectivelySubscribed: isEffectivelySubscribed(snap),
     });
-    return immediate;
+    if (isEffectivelySubscribed(snap)) {
+      try {
+        const confirmed = await confirmStableEffectiveSubscription(api, "poll_stable");
+        if (confirmed) {
+          setLastWaitMeta({
+            elapsedMs: Date.now() - waitStartedAt,
+            timeoutMs,
+            resolvedBy: "poll_stable",
+            pollCount,
+            browser: detectBrowserLabel(
+              typeof navigator !== "undefined" ? navigator.userAgent : ""
+            ),
+          });
+          recordPushDiagnosticEvent("subscribed_confirmed", {
+            resolvedBy: "poll_stable",
+            elapsedMs: Date.now() - waitStartedAt,
+            optedIn: confirmed.optedIn,
+            hasId: Boolean(confirmed.subscriptionId),
+            hasToken: Boolean(confirmed.token),
+          });
+          return confirmed;
+        }
+      } catch (err) {
+        const last = readSubscriptionSnapshot(api);
+        if (!isEffectivelySubscribed(last)) {
+          break;
+        }
+        recordPushDiagnosticEvent("timeout", {
+          phase: "stability",
+          elapsedMs: Date.now() - waitStartedAt,
+          error: err,
+        });
+      }
+    }
+    await delayMs(pollMs);
   }
 
-  return new Promise((resolve, reject) => {
-    let settled = false;
-    const sub = api?.User?.PushSubscription;
-    let changeCount = 0;
-    let pollCount = 0;
-
-    const finishOk = (snap, resolvedBy) => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      const elapsedMs = Date.now() - waitStartedAt;
-      setLastWaitMeta({
-        elapsedMs,
-        timeoutMs,
-        resolvedBy,
-        changeCount,
-        pollCount,
-        browser: detectBrowserLabel(
-          typeof navigator !== "undefined" ? navigator.userAgent : ""
-        ),
-      });
-      if (snap.subscriptionId) {
-        recordPushDiagnosticEvent("subscription_id_available", {
-          phase: resolvedBy,
-          elapsedMs,
-        });
-      }
-      if (snap.token) {
-        recordPushDiagnosticEvent("subscription_token_available", {
-          phase: resolvedBy,
-          elapsedMs,
-        });
-      }
-      recordPushDiagnosticEvent("subscribed_confirmed", {
-        resolvedBy,
-        elapsedMs,
-        optedIn: snap.optedIn,
-        hasId: Boolean(snap.subscriptionId),
-        hasToken: Boolean(snap.token),
-      });
-      resolve(snap);
-    };
-    const finishErr = (err) => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      const elapsedMs = Date.now() - waitStartedAt;
-      const last = readSubscriptionSnapshot(api);
-      setLastWaitMeta({
-        elapsedMs,
-        timeoutMs,
-        resolvedBy: "timeout",
-        changeCount,
-        pollCount,
-        optedIn: last.optedIn,
-        hasId: Boolean(last.subscriptionId),
-        hasToken: Boolean(last.token),
-        browser: detectBrowserLabel(
-          typeof navigator !== "undefined" ? navigator.userAgent : ""
-        ),
-      });
-      recordPushDiagnosticEvent("timeout", {
-        elapsedMs,
-        timeoutMs,
-        optedIn: last.optedIn,
-        hasId: Boolean(last.subscriptionId),
-        hasToken: Boolean(last.token),
-        changeCount,
-        error: err,
-      });
-      reject(err);
-    };
-
-    const onChange = (event) => {
-      changeCount += 1;
-      const normalized = normalizeSubscriptionChangeEvent(event, api);
-      recordPushDiagnosticEvent("subscription_change_received", {
-        phase: "wait",
-        changeCount,
-        optedIn: normalized.optedIn,
-        hasId: Boolean(normalized.subscriptionId),
-        hasToken: Boolean(normalized.token),
-        elapsedMs: Date.now() - waitStartedAt,
-      });
-      if (isEffectivelySubscribed(normalized)) {
-        finishOk(normalized, "change_event");
-        return;
-      }
-      const snap = readSubscriptionSnapshot(api);
-      recordPushDiagnosticEvent("subscription_state_read", {
-        phase: "after_change",
-        optedIn: snap.optedIn,
-        hasId: Boolean(snap.subscriptionId),
-        hasToken: Boolean(snap.token),
-      });
-      if (isEffectivelySubscribed(snap)) {
-        finishOk(snap, "change_then_read");
-      }
-    };
-
-    function cleanup() {
-      clearTimeout(timer);
-      clearInterval(pollTimer);
-      try {
-        if (sub && typeof sub.removeEventListener === "function") {
-          sub.removeEventListener("change", onChange);
-        }
-      } catch {
-        /* ignore */
-      }
-    }
-
-    const timer = setTimeout(() => {
-      const last = readSubscriptionSnapshot(api);
-      if (isEffectivelySubscribed(last)) {
-        finishOk(last, "timeout_final_read");
-      } else {
-        logPush("subscription_missing_after_permission", {
-          permission: readNativePermission(),
-          optedIn: last.optedIn,
-          hasId: Boolean(last.subscriptionId),
-          hasToken: Boolean(last.token),
-        });
-        finishErr(new Error("subscription_missing_after_permission"));
-      }
-    }, timeoutMs);
-
-    // Polling somente diagnóstico (não altera critério de sucesso nesta fase).
-    const pollTimer = setInterval(() => {
-      if (settled) return;
-      pollCount += 1;
-      const snap = readSubscriptionSnapshot(api);
-      recordPushDiagnosticEvent("subscription_state_read", {
-        phase: "poll",
-        pollCount,
-        optedIn: snap.optedIn,
-        hasId: Boolean(snap.subscriptionId),
-        hasToken: Boolean(snap.token),
-        elapsedMs: Date.now() - waitStartedAt,
-        effectivelySubscribed: isEffectivelySubscribed(snap),
-      });
-    }, 1000);
-
-    try {
-      if (sub && typeof sub.addEventListener === "function") {
-        sub.addEventListener("change", onChange);
-      }
-    } catch {
-      /* ignore */
-    }
-
-    // Re-check após microtask (SDK pode atualizar sync após optIn).
-    Promise.resolve().then(() => {
-      const snap = readSubscriptionSnapshot(api);
-      recordPushDiagnosticEvent("subscription_state_read", {
-        phase: "microtask",
-        optedIn: snap.optedIn,
-        hasId: Boolean(snap.subscriptionId),
-        hasToken: Boolean(snap.token),
-      });
-      if (isEffectivelySubscribed(snap)) {
-        finishOk(snap, "microtask");
-      }
-    });
+  const last = readSubscriptionSnapshot(api);
+  setLastWaitMeta({
+    elapsedMs: Date.now() - waitStartedAt,
+    timeoutMs,
+    resolvedBy: "timeout",
+    pollCount,
+    optedIn: last.optedIn,
+    hasId: Boolean(last.subscriptionId),
+    hasToken: Boolean(last.token),
+    browser: detectBrowserLabel(
+      typeof navigator !== "undefined" ? navigator.userAgent : ""
+    ),
   });
+  logPush("subscription_missing_after_permission", {
+    permission: readNativePermission(),
+    optedIn: last.optedIn,
+    hasId: Boolean(last.subscriptionId),
+    hasToken: Boolean(last.token),
+  });
+  recordPushDiagnosticEvent("timeout", {
+    elapsedMs: Date.now() - waitStartedAt,
+    timeoutMs,
+    optedIn: last.optedIn,
+    hasId: Boolean(last.subscriptionId),
+    hasToken: Boolean(last.token),
+    pollCount,
+  });
+  throw new Error("subscription_missing_after_permission");
+}
+
+/**
+ * optIn pode permanecer pendente. Em paralelo, um snapshot estável
+ * (optedIn + id/token) conclui sem esperar o timeout de 120s.
+ * A Promise do optIn é sempre capturada — rejection tardia não fica solta.
+ */
+async function settlePushSubscriptionAfterOptIn(api, pushSub) {
+  let optInResult = null;
+  let settledBySnapshot = false;
+  const optInTask = withTimeout(
+    Promise.resolve().then(() => pushSub.optIn()),
+    PERMISSION_WAIT_MS,
+    "opt_in_timeout"
+  ).then(
+    () => {
+      optInResult = { ok: true };
+      if (settledBySnapshot) return;
+      recordPushDiagnosticEvent("optin_resolved");
+      setPushLifecycleStage("optin_resolved");
+      logPush("optin_resolved");
+    },
+    (error) => {
+      optInResult = { ok: false, error };
+      if (settledBySnapshot) return;
+      const stage =
+        error?.message === "opt_in_timeout" ? "opt_in_timeout" : "opt_in_failed";
+      logPush(stage, { message: error?.message || "optIn" });
+      recordPushDiagnosticEvent("error", { stage, error });
+    }
+  );
+
+  const started = Date.now();
+  const pollMs = observePollMs();
+  while (!optInResult && Date.now() - started < PERMISSION_WAIT_MS) {
+    const snap = readSubscriptionSnapshot(api);
+    if (isEffectivelySubscribed(snap)) {
+      try {
+        const confirmed = await confirmStableEffectiveSubscription(
+          api,
+          "during_opt_in"
+        );
+        if (confirmed) {
+          settledBySnapshot = true;
+          return confirmed;
+        }
+      } catch (stabilityErr) {
+        recordPushDiagnosticEvent("timeout", {
+          phase: "stability_during_opt_in",
+          error: stabilityErr,
+        });
+      }
+    }
+    if (optInResult && !optInResult.ok) {
+      break;
+    }
+    await delayMs(pollMs);
+  }
+
+  if (!optInResult) {
+    await optInTask;
+  }
+  if (optInResult && !optInResult.ok) {
+    throw optInResult.error || new Error("opt_in_failed");
+  }
+  return waitForEffectiveSubscription(api, SUBSCRIPTION_WAIT_MS);
 }
 
 async function initOneSignalFromConfig(cfg) {
@@ -834,9 +845,27 @@ async function applyUserIdentity(user, { skipStabilityWait = false } = {}) {
         snapshotChangesCount: getSnapshotChangesCount(),
         endpointHost: stableSnap?.endpointHost || null,
       });
+      logPush("identity_login_started", { attempt });
       setPushLifecycleStage("login_started");
-      await oneSignalApi.login(externalId);
+      const loginPromise = Promise.resolve().then(() => oneSignalApi.login(externalId));
+      const guardedLogin = loginPromise.then(
+        (value) => ({ ok: true, value }),
+        (error) => ({ ok: false, error })
+      );
+      const loginOutcome = await withTimeout(
+        guardedLogin,
+        LOGIN_WAIT_MS,
+        "identity_login_timeout"
+      );
+      if (!loginOutcome?.ok) {
+        throw loginOutcome.error || new Error("identity_login_failed");
+      }
       identityUserId = externalId;
+      recordPushDiagnosticEvent("identity_login_succeeded", {
+        externalIdApplied: identityUserId,
+        attempt,
+      });
+      logPush("identity_login_succeeded", { attempt });
       recordPushDiagnosticEvent("identity_login_completed", {
         externalIdApplied: identityUserId,
         attempt,
@@ -894,11 +923,13 @@ async function applyUserIdentity(user, { skipStabilityWait = false } = {}) {
       const stage =
         e?.message === "subscription_stability_timeout"
           ? "stability_timeout"
-          : e?.message === "external_id_would_be_company_id"
-            ? "identity_login_failed"
-            : identityUserId === externalId
-              ? "tags_sync_failed"
-              : "identity_login_failed";
+          : e?.message === "identity_login_timeout"
+            ? "identity_login_timeout"
+            : e?.message === "external_id_would_be_company_id"
+              ? "identity_login_failed"
+              : identityUserId === externalId
+                ? "tags_sync_failed"
+                : "identity_login_failed";
       recordPushDiagnosticEvent(stage, {
         error: e,
         externalId,
@@ -906,7 +937,11 @@ async function applyUserIdentity(user, { skipStabilityWait = false } = {}) {
         attempt,
         typedError: typed?.code || null,
       });
-      if (stage === "identity_login_failed" || stage === "stability_timeout") {
+      if (
+        stage === "identity_login_failed" ||
+        stage === "identity_login_timeout" ||
+        stage === "stability_timeout"
+      ) {
         logPush(stage, { message: e?.message || "unknown" });
       } else {
         recordPushDiagnosticEvent("tags_sync_failed", {
@@ -1082,7 +1117,11 @@ export function enableOneSignalPushSubscription({ user } = {}) {
     setPushLifecycleStage("optin_started");
 
     try {
-      const cfg = await fetchPublicPushConfig();
+      const cfg = await withTimeout(
+        fetchPublicPushConfig(),
+        PUSH_CONFIG_WAIT_MS,
+        "push_config_timeout"
+      );
       if (!cfg.onesignalEnabled || !cfg.onesignalAppId) {
         const status = setPushStatus({
           onesignalEnabled: false,
@@ -1093,7 +1132,11 @@ export function enableOneSignalPushSubscription({ user } = {}) {
         return { ok: false, domainState: status.domainState, errorCode: "not_configured", status };
       }
 
-      const ok = await initOneSignalFromConfig(cfg);
+      const ok = await withTimeout(
+        initOneSignalFromConfig(cfg),
+        INIT_WAIT_MS,
+        "init_timeout"
+      );
       if (!ok || !oneSignalApi) {
         const status = setPushStatus({
           subscribing: false,
@@ -1155,19 +1198,21 @@ export function enableOneSignalPushSubscription({ user } = {}) {
         return { ok: false, domainState: status.domainState, errorCode: "opt_in_unavailable", status };
       }
 
+      let confirmed;
+      let permAfter = readNativePermission();
       try {
         recordPushDiagnosticEvent("permission_requested");
-        await withTimeout(Promise.resolve(pushSub.optIn()), PERMISSION_WAIT_MS, "opt_in_timeout");
-        recordPushDiagnosticEvent("optin_resolved");
-        setPushLifecycleStage("optin_resolved");
+        confirmed = await settlePushSubscriptionAfterOptIn(oneSignalApi, pushSub);
+        permAfter = readNativePermission();
+        setPushStatus({ permissionNative: permAfter });
+        if (permAfter === "granted") {
+          logPush("permission_granted");
+          recordPushDiagnosticEvent("permission_granted");
+        }
       } catch (e) {
-        logPush("opt_in_failed", { message: e?.message || "optIn" });
-        recordPushDiagnosticEvent("error", {
-          stage: e?.message === "opt_in_timeout" ? "opt_in_timeout" : "opt_in_failed",
-          error: e,
-        });
-        const perm = readNativePermission();
-        if (perm === "denied") {
+        permAfter = readNativePermission();
+        if (permAfter === "denied") {
+          logPush("permission_denied");
           const status = setPushStatus({
             permissionNative: "denied",
             subscribing: false,
@@ -1175,38 +1220,19 @@ export function enableOneSignalPushSubscription({ user } = {}) {
           });
           return { ok: false, domainState: status.domainState, errorCode: "permission_denied", status };
         }
-        const status = setPushStatus({
-          permissionNative: perm,
-          subscribing: false,
-          errorCode: e?.message === "opt_in_timeout" ? "opt_in_timeout" : "opt_in_failed",
-        });
-        return {
-          ok: false,
-          domainState: status.domainState,
-          errorCode: status.errorCode,
-          status,
-        };
-      }
-
-      const permAfter = readNativePermission();
-      setPushStatus({ permissionNative: permAfter });
-      if (permAfter === "denied") {
-        logPush("permission_denied");
-        const status = setPushStatus({
-          subscribing: false,
-          errorCode: "permission_denied",
-        });
-        return { ok: false, domainState: status.domainState, errorCode: "permission_denied", status };
-      }
-      if (permAfter === "granted") {
-        logPush("permission_granted");
-        recordPushDiagnosticEvent("permission_granted");
-      }
-
-      let confirmed;
-      try {
-        confirmed = await waitForEffectiveSubscription(oneSignalApi, SUBSCRIPTION_WAIT_MS);
-      } catch (e) {
+        if (e?.message !== "subscription_missing_after_permission") {
+          const status = setPushStatus({
+            permissionNative: permAfter,
+            subscribing: false,
+            errorCode: e?.message === "opt_in_timeout" ? "opt_in_timeout" : "opt_in_failed",
+          });
+          return {
+            ok: false,
+            domainState: status.domainState,
+            errorCode: status.errorCode,
+            status,
+          };
+        }
         // Fallback: requestPermission + segundo optIn (alguns browsers liberam token só após grant explícito).
         try {
           if (
@@ -1221,9 +1247,7 @@ export function enableOneSignalPushSubscription({ user } = {}) {
               "permission_timeout"
             );
           }
-          await withTimeout(Promise.resolve(pushSub.optIn()), PERMISSION_WAIT_MS, "opt_in_timeout");
-          recordPushDiagnosticEvent("optin_resolved", { phase: "fallback" });
-          confirmed = await waitForEffectiveSubscription(oneSignalApi, SUBSCRIPTION_WAIT_MS);
+          confirmed = await settlePushSubscriptionAfterOptIn(oneSignalApi, pushSub);
         } catch (e2) {
           logPush("opt_in_failed", { message: e2?.message || e?.message || "confirm" });
           recordPushDiagnosticEvent("error", {
@@ -1268,14 +1292,31 @@ export function enableOneSignalPushSubscription({ user } = {}) {
       });
       return { ok: true, domainState: status.domainState, status };
     } catch (e) {
-      logPush("opt_in_failed", { message: e?.message || "unknown" });
+      const errorCode =
+        e?.message === "push_config_timeout"
+          ? "push_config_timeout"
+          : e?.message === "init_timeout"
+            ? "init_failed"
+            : "opt_in_failed";
+      logPush(errorCode, { message: e?.message || "unknown" });
       const status = setPushStatus({
         subscribing: false,
-        errorCode: "opt_in_failed",
+        errorCode,
         permissionNative: readNativePermission(),
       });
-      return { ok: false, domainState: status.domainState, errorCode: "opt_in_failed", status };
+      return { ok: false, domainState: status.domainState, errorCode, status };
     } finally {
+      if (pushStatus.subscribing) {
+        setPushStatus({ subscribing: false });
+      }
+      logPush("subscribing_finished", {
+        domainState: pushStatus.domainState,
+        errorCode: pushStatus.errorCode,
+      });
+      recordPushDiagnosticEvent("subscribing_finished", {
+        domainState: pushStatus.domainState,
+        errorCode: pushStatus.errorCode,
+      });
       enableInFlight = null;
     }
   })();
@@ -1410,11 +1451,12 @@ export function exposeOneSignalPushDiagnosticsGlobal(user) {
 }
 
 /** Test helpers */
-export function __setPushWaitMsForTests(subscriptionMs, permissionMs) {
+export function __setPushWaitMsForTests(subscriptionMs, permissionMs, loginMs) {
   SUBSCRIPTION_WAIT_MS =
     subscriptionMs != null ? subscriptionMs : SUBSCRIPTION_WAIT_MS_DEFAULT;
   PERMISSION_WAIT_MS =
     permissionMs != null ? permissionMs : PERMISSION_WAIT_MS_DEFAULT;
+  LOGIN_WAIT_MS = loginMs != null ? loginMs : LOGIN_WAIT_MS_DEFAULT;
 }
 
 export function __resetOneSignalServiceForTests() {
@@ -1431,6 +1473,7 @@ export function __resetOneSignalServiceForTests() {
   identitySyncAttempt = 0;
   SUBSCRIPTION_WAIT_MS = SUBSCRIPTION_WAIT_MS_DEFAULT;
   PERMISSION_WAIT_MS = PERMISSION_WAIT_MS_DEFAULT;
+  LOGIN_WAIT_MS = LOGIN_WAIT_MS_DEFAULT;
   statusListeners.clear();
   __resetPushDiagnosticsForTests();
   __resetStabilityStateForTests();
