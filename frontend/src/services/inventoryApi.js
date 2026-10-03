@@ -29,8 +29,8 @@ export const updateInventoryCategory = (id, body) =>
 export const deleteInventoryCategory = (id) =>
   api.delete(`/inventory/categories/${id}`);
 
-export const listInventoryProducts = (params) =>
-  api.get("/inventory/products", { params });
+export const listInventoryProducts = (params, config = {}) =>
+  api.get("/inventory/products", { ...config, params });
 
 export const getInventoryProduct = (id) =>
   api.get(`/inventory/products/${id}`);

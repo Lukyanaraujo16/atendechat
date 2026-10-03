@@ -1,11 +1,8 @@
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Box,
-  FormControl,
+  CircularProgress,
   IconButton,
-  InputLabel,
-  MenuItem,
-  Select,
   Table,
   TableBody,
   TableCell,
@@ -15,6 +12,7 @@ import {
   Typography,
 } from "@material-ui/core";
 import { makeStyles } from "@material-ui/core/styles";
+import Autocomplete from "@material-ui/lab/Autocomplete";
 import DeleteOutlineIcon from "@material-ui/icons/DeleteOutline";
 import SaveIcon from "@material-ui/icons/Save";
 import AddIcon from "@material-ui/icons/Add";
@@ -30,6 +28,7 @@ import {
 import {
   addInventorySaleItem,
   deleteInventorySaleItem,
+  listInventoryProducts,
   updateInventorySaleItem,
 } from "../../services/inventoryApi";
 import toastError from "../../errors/toastError";
@@ -48,6 +47,14 @@ import {
   identifierValuesFromItem,
   validateIdentifiersForSubmit,
 } from "./saleItemIdentifiers";
+import {
+  axiosAbortConfig,
+  isAbortError,
+  pickExactSaleProduct,
+  saleProductShowsBarcode,
+  saleProductStockLabel,
+  shouldAutofocusSaleProductSearch,
+} from "./saleProductSearch";
 
 const useStyles = makeStyles(() => ({
   tableContainer: {
@@ -128,7 +135,6 @@ function toastIdentifierValidation(result) {
 
 export default function SaleItemsEditor({
   sale,
-  products,
   readOnly,
   onSaleUpdated,
 }) {
@@ -138,9 +144,144 @@ export default function SaleItemsEditor({
   const [adding, setAdding] = useState(false);
   const [rowSaving, setRowSaving] = useState(null);
   const [rowDrafts, setRowDrafts] = useState({});
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [inputValue, setInputValue] = useState("");
+  const [options, setOptions] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState(false);
+  const [popupOpen, setPopupOpen] = useState(false);
+  const abortRef = useRef(null);
+  const requestSeqRef = useRef(0);
+  const debounceTimerRef = useRef(null);
+  const searchInputRef = useRef(null);
+  const highlightedRef = useRef(null);
+  const highlightChosenRef = useRef(false);
+  const typedQueryRef = useRef("");
 
   const items = Array.isArray(sale?.items) ? sale.items : [];
-  const activeProducts = (products || []).filter((p) => p.active !== false);
+  const saleId = sale?.id;
+
+  const clearProductSearch = useCallback(() => {
+    setSelectedProduct(null);
+    setInputValue("");
+    setOptions([]);
+    setSearchError(false);
+    setSearchLoading(false);
+    setPopupOpen(false);
+    highlightedRef.current = null;
+    highlightChosenRef.current = false;
+    typedQueryRef.current = "";
+  }, []);
+
+  const runSearch = useCallback(async (rawTerm, { exactOnSingle }) => {
+    const query = String(rawTerm ?? "").trim();
+    if (!query) {
+      setOptions([]);
+      setSearchLoading(false);
+      setSearchError(false);
+      setPopupOpen(false);
+      return;
+    }
+
+    typedQueryRef.current = query;
+    if (abortRef.current) abortRef.current.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const requestId = ++requestSeqRef.current;
+    setSearchLoading(true);
+    setSearchError(false);
+    setPopupOpen(true);
+
+    try {
+      const { data } = await listInventoryProducts(
+        { active: true, search: query, limit: 20 },
+        axiosAbortConfig(controller)
+      );
+      if (
+        controller.signal.aborted ||
+        requestId !== requestSeqRef.current ||
+        typedQueryRef.current !== query
+      ) {
+        return;
+      }
+      const rows = Array.isArray(data) ? data : [];
+      setOptions(rows);
+      setPopupOpen(true);
+      if (exactOnSingle) {
+        const picked = pickExactSaleProduct(rows, query);
+        if (picked) {
+          setSelectedProduct(picked);
+          setInputValue(picked.name || "");
+          setAddForm((prev) => ({ ...prev, productId: String(picked.id) }));
+        }
+      }
+    } catch (err) {
+      if (
+        controller.signal.aborted ||
+        isAbortError(err) ||
+        requestId !== requestSeqRef.current ||
+        typedQueryRef.current !== query
+      ) {
+        return;
+      }
+      setSearchError(true);
+      setOptions([]);
+      setPopupOpen(true);
+    } finally {
+      if (requestId === requestSeqRef.current && !controller.signal.aborted) {
+        setSearchLoading(false);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    clearProductSearch();
+    setAddForm(emptyAddForm);
+    return () => {
+      if (abortRef.current) abortRef.current.abort();
+      clearTimeout(debounceTimerRef.current);
+    };
+  }, [saleId, clearProductSearch]);
+
+  useEffect(() => {
+    if (readOnly) return undefined;
+    const query = inputValue.trim();
+    typedQueryRef.current = query;
+    if (abortRef.current) {
+      abortRef.current.abort();
+      abortRef.current = null;
+    }
+    if (!query) {
+      setOptions([]);
+      setSearchLoading(false);
+      setSearchError(false);
+      setPopupOpen(false);
+      return undefined;
+    }
+    if (
+      selectedProduct &&
+      query === String(selectedProduct.name || "").trim()
+    ) {
+      setSearchLoading(false);
+      return undefined;
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      runSearch(query, { exactOnSingle: false });
+    }, 300);
+    return () => clearTimeout(debounceTimerRef.current);
+  }, [inputValue, readOnly, selectedProduct, runSearch]);
+
+  const focusSearchIfWide = () => {
+    if (!shouldAutofocusSaleProductSearch()) return;
+    window.requestAnimationFrame(() => {
+      if (searchInputRef.current) searchInputRef.current.focus();
+    });
+  };
+
+  const displayOptions =
+    selectedProduct && !options.some((row) => row.id === selectedProduct.id)
+      ? [selectedProduct, ...options]
+      : options;
 
   const getRowDraft = (item) => {
     const identifierDefaults = identifierDraftFromItem(item);
@@ -254,6 +395,8 @@ export default function SaleItemsEditor({
       await addInventorySaleItem(sale.id, payload);
       toast.success(i18n.t("inventorySales.sales.items.toasts.added"));
       setAddForm(emptyAddForm);
+      clearProductSearch();
+      focusSearchIfWide();
       if (onSaleUpdated) await onSaleUpdated();
     } catch (err) {
       toastError(err);
@@ -631,29 +774,117 @@ export default function SaleItemsEditor({
             {i18n.t("inventorySales.sales.items.addTitle")}
           </Typography>
           <Box display="flex" flexDirection="column" style={{ gap: 12 }}>
-            <FormControl variant="outlined" size="small" fullWidth>
-              <InputLabel id="sale-add-product">
-                {i18n.t("inventorySales.sales.items.product")}
-              </InputLabel>
-              <Select
-                labelId="sale-add-product"
-                value={addForm.productId}
-                onChange={(e) =>
-                  setAddForm((prev) => ({ ...prev, productId: e.target.value }))
+            <Autocomplete
+              options={displayOptions}
+              value={selectedProduct}
+              inputValue={inputValue}
+              open={popupOpen}
+              onOpen={() => {
+                if (inputValue.trim()) setPopupOpen(true);
+              }}
+              onClose={() => {
+                highlightedRef.current = null;
+                highlightChosenRef.current = false;
+                setPopupOpen(false);
+              }}
+              onHighlightChange={(_, option, reason) => {
+                highlightedRef.current = option || null;
+                if (reason === "keyboard" || reason === "mouse") {
+                  highlightChosenRef.current = true;
                 }
-                label={i18n.t("inventorySales.sales.items.product")}
-              >
-                <MenuItem value="">
-                  <em>{i18n.t("inventorySales.common.select")}</em>
-                </MenuItem>
-                {activeProducts.map((p) => (
-                  <MenuItem key={p.id} value={String(p.id)}>
-                    {p.name}
-                    {p.sku ? ` (${p.sku})` : ""} — {formatCurrencyBRL(p.salePrice)}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+              }}
+              onChange={(_, value) => {
+                setSelectedProduct(value);
+                setAddForm((prev) => ({
+                  ...prev,
+                  productId: value?.id != null ? String(value.id) : "",
+                }));
+              }}
+              onInputChange={(_, value, reason) => {
+                setInputValue(value);
+                if (reason === "input" || reason === "clear") {
+                  highlightChosenRef.current = false;
+                  setSelectedProduct(null);
+                  setAddForm((prev) => ({ ...prev, productId: "" }));
+                  if (reason === "clear") {
+                    setOptions([]);
+                    setPopupOpen(false);
+                    setSearchError(false);
+                  }
+                }
+              }}
+              loading={searchLoading}
+              filterOptions={(opts) => opts}
+              getOptionSelected={(option, value) => option.id === value.id}
+              getOptionLabel={(option) => option?.name || ""}
+              noOptionsText={
+                searchError
+                  ? i18n.t("inventorySales.sales.items.search.error")
+                  : i18n.t("inventorySales.sales.items.search.empty")
+              }
+              loadingText={i18n.t("inventorySales.sales.items.search.loading")}
+              renderOption={(option) => (
+                <Box>
+                  <Typography variant="body2">{option.name}</Typography>
+                  {option.sku && String(option.sku).trim() ? (
+                    <Typography variant="caption" color="textSecondary" display="block">
+                      {i18n.t("inventorySales.sales.items.search.sku", {
+                        sku: String(option.sku).trim(),
+                      })}
+                    </Typography>
+                  ) : null}
+                  <Typography variant="caption" color="textSecondary" display="block">
+                    {formatCurrencyBRL(option.salePrice)}
+                    {" · "}
+                    {saleProductStockLabel(option)}
+                    {saleProductShowsBarcode(option, inputValue)
+                      ? ` · ${option.barcode}`
+                      : ""}
+                  </Typography>
+                </Box>
+              )}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label={i18n.t("inventorySales.sales.items.product")}
+                  placeholder={i18n.t("inventorySales.sales.items.search.placeholder")}
+                  variant="outlined"
+                  size="small"
+                  autoFocus={shouldAutofocusSaleProductSearch()}
+                  inputProps={{
+                    ...params.inputProps,
+                    "data-testid": "sale-product-search",
+                    onKeyDownCapture: (event) => {
+                      if (event.key !== "Enter") return;
+                      if (popupOpen && highlightedRef.current && highlightChosenRef.current) {
+                        return;
+                      }
+                      event.preventDefault();
+                      event.stopPropagation();
+                      clearTimeout(debounceTimerRef.current);
+                      runSearch(event.currentTarget.value, { exactOnSingle: true });
+                    },
+                    ref: (node) => {
+                      const inputRef = params.inputProps.ref;
+                      if (typeof inputRef === "function") inputRef(node);
+                      else if (inputRef) inputRef.current = node;
+                      searchInputRef.current = node;
+                    },
+                  }}
+                  InputProps={{
+                    ...params.InputProps,
+                    endAdornment: (
+                      <>
+                        {searchLoading ? (
+                          <CircularProgress color="inherit" size={18} />
+                        ) : null}
+                        {params.InputProps.endAdornment}
+                      </>
+                    ),
+                  }}
+                />
+              )}
+            />
             <Box display="flex" flexWrap="wrap" style={{ gap: 12 }}>
               <TextField
                 size="small"

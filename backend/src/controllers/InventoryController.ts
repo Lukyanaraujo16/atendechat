@@ -150,7 +150,8 @@ export const listProducts = async (
     search: req.query.search,
     categoryId: req.query.categoryId,
     active: req.query.active,
-    lowStock: req.query.lowStock
+    lowStock: req.query.lowStock,
+    limit: req.query.limit
   });
   return res.json(rows);
 };

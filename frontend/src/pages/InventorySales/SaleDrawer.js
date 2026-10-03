@@ -29,7 +29,6 @@ import {
   completeInventorySale,
   deleteInventorySale,
   getInventorySale,
-  listInventoryProducts,
   updateInventorySale,
   updateInventorySalePayment,
 } from "../../services/inventoryApi";
@@ -129,7 +128,6 @@ export default function SaleDrawer({
   const [loadError, setLoadError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [sale, setSale] = useState(null);
-  const [products, setProducts] = useState([]);
   const [users, setUsers] = useState([]);
   const [contacts, setContacts] = useState([]);
   const [contactSearch, setContactSearch] = useState("");
@@ -197,12 +195,8 @@ export default function SaleDrawer({
 
   const loadRefs = useCallback(async () => {
     try {
-      const [productsRes, usersRes] = await Promise.all([
-        listInventoryProducts({ active: true }),
-        api.get("/users/list"),
-      ]);
-      setProducts(Array.isArray(productsRes.data) ? productsRes.data : []);
-      setUsers(Array.isArray(usersRes.data) ? usersRes.data : []);
+      const { data } = await api.get("/users/list");
+      setUsers(Array.isArray(data) ? data : []);
     } catch (err) {
       toastError(err);
     }
@@ -686,7 +680,6 @@ export default function SaleDrawer({
 
                 <SaleItemsEditor
                   sale={sale}
-                  products={products}
                   readOnly={!editable}
                   onSaleUpdated={refreshSale}
                 />

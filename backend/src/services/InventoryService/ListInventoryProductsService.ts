@@ -1,15 +1,46 @@
 import { Op, col, where as sequelizeWhere } from "sequelize";
+import AppError from "../../errors/AppError";
 import InventoryCategory from "../../models/InventoryCategory";
 import InventoryProduct from "../../models/InventoryProduct";
 import { parseBooleanQuery } from "./inventoryTenant";
 
-export default async function ListInventoryProductsService(input: {
+const MAX_PRODUCT_LIST_LIMIT = 50;
+
+/**
+ * Limite opcional da listagem.
+ * Ausente, null ou string vazia preserva o comportamento legado (sem LIMIT).
+ * Valor presente precisa ser inteiro de 1 a 50. Fora disso, 400.
+ * Não faz clamp: a aba Produtos omite o parâmetro e continua recebendo a lista inteira.
+ */
+export function parseOptionalProductListLimit(
+  value: unknown
+): number | undefined {
+  if (value === undefined || value === null || value === "") return undefined;
+  if (typeof value === "object") {
+    throw new AppError("ERR_VALIDATION_ERROR", 400, "Limite inválido.");
+  }
+  const raw = String(value).trim();
+  if (!/^\d+$/.test(raw)) {
+    throw new AppError("ERR_VALIDATION_ERROR", 400, "Limite inválido.");
+  }
+  const limit = Number(raw);
+  if (!Number.isInteger(limit) || limit < 1 || limit > MAX_PRODUCT_LIST_LIMIT) {
+    throw new AppError("ERR_VALIDATION_ERROR", 400, "Limite inválido.");
+  }
+  return limit;
+}
+
+function normalizeSearch(value: unknown): string {
+  if (value == null) return "";
+  return String(value).trim();
+}
+
+function buildBaseWhere(input: {
   companyId: number;
-  search?: unknown;
   categoryId?: unknown;
   active?: unknown;
   lowStock?: unknown;
-}): Promise<InventoryProduct[]> {
+}): any {
   const where: any = { companyId: input.companyId };
 
   const active = parseBooleanQuery(input.active);
@@ -30,43 +61,130 @@ export default async function ListInventoryProductsService(input: {
     }
   }
 
-  const search =
-    input.search != null && String(input.search).trim() !== ""
-      ? String(input.search).trim()
-      : "";
-  if (search) {
-    const term = `%${search}%`;
-    where[Op.or] = [
-      { name: { [Op.like]: term } },
-      { sku: { [Op.like]: term } },
-      { barcode: { [Op.like]: term } }
+  const lowStock = parseBooleanQuery(input.lowStock);
+  if (lowStock === true) {
+    where[Op.and] = [
+      { minStock: { [Op.ne]: null } },
+      sequelizeWhere(col("currentQuantity"), "<=", col("minStock"))
     ];
   }
 
-  const lowStock = parseBooleanQuery(input.lowStock);
-  const andClauses: any[] = [];
-  if (lowStock === true) {
-    andClauses.push({ minStock: { [Op.ne]: null } });
-    andClauses.push(
-      sequelizeWhere(col("currentQuantity"), "<=", col("minStock"))
-    );
-  }
-  if (andClauses.length) {
-    where[Op.and] = andClauses;
-  }
+  return where;
+}
 
+function partialMatch(search: string) {
+  const term = `%${search}%`;
+  return [
+    { name: { [Op.like]: term } },
+    { sku: { [Op.like]: term } },
+    { barcode: { [Op.like]: term } }
+  ];
+}
+
+const productInclude = [
+  {
+    model: InventoryCategory,
+    attributes: ["id", "name"],
+    required: false
+  }
+];
+
+function findProducts(where: any, limit?: number) {
   return InventoryProduct.findAll({
     where,
     order: [
       ["name", "ASC"],
       ["id", "ASC"]
     ],
-    include: [
-      {
-        model: InventoryCategory,
-        attributes: ["id", "name"],
-        required: false
-      }
-    ]
+    include: productInclude,
+    ...(limit != null ? { limit } : {})
   });
+}
+
+function appendUnique(
+  current: InventoryProduct[],
+  extra: InventoryProduct[]
+): InventoryProduct[] {
+  const seen = new Set(current.map(row => row.id));
+  const next = current.slice();
+  extra.forEach(row => {
+    if (seen.has(row.id)) return;
+    seen.add(row.id);
+    next.push(row);
+  });
+  return next;
+}
+
+function excludeIds(where: any, ids: number[]) {
+  if (!ids.length) return where;
+  return {
+    ...where,
+    id: { [Op.notIn]: ids }
+  };
+}
+
+/**
+ * Com search + limit, a ordem é:
+ * 1. barcode igual ao termo (comparação do banco, depois do trim; sem lower/unaccent);
+ * 2. SKU igual ao termo, que ainda não entrou;
+ * 3. LIKE parcial em nome, SKU e barcode.
+ * Duplicatas exatas permanecem, até o limit. Sem limit, uma única query LIKE, como antes.
+ */
+async function findRanked(
+  baseWhere: any,
+  search: string,
+  limit: number
+): Promise<InventoryProduct[]> {
+  const exactBarcode = await findProducts(
+    { ...baseWhere, barcode: search },
+    limit
+  );
+  let merged = exactBarcode;
+
+  if (merged.length < limit) {
+    const exactSku = await findProducts(
+      excludeIds(
+        { ...baseWhere, sku: search },
+        merged.map(row => row.id)
+      ),
+      limit - merged.length
+    );
+    merged = appendUnique(merged, exactSku);
+  }
+
+  if (merged.length < limit) {
+    const partial = await findProducts(
+      excludeIds(
+        { ...baseWhere, [Op.or]: partialMatch(search) },
+        merged.map(row => row.id)
+      ),
+      limit - merged.length
+    );
+    merged = appendUnique(merged, partial);
+  }
+
+  return merged.slice(0, limit);
+}
+
+export default async function ListInventoryProductsService(input: {
+  companyId: number;
+  search?: unknown;
+  categoryId?: unknown;
+  active?: unknown;
+  lowStock?: unknown;
+  limit?: unknown;
+}): Promise<InventoryProduct[]> {
+  const limit = parseOptionalProductListLimit(input.limit);
+  const baseWhere = buildBaseWhere(input);
+  const search = normalizeSearch(input.search);
+
+  if (search && limit != null) {
+    return findRanked(baseWhere, search, limit);
+  }
+
+  const where = search
+    ? { ...baseWhere, [Op.or]: partialMatch(search) }
+    : baseWhere;
+
+  return findProducts(where, limit);
 }

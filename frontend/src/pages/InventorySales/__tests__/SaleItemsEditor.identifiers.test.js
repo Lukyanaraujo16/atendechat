@@ -9,6 +9,7 @@ import { changeLanguage, i18n } from "../../../translate/i18n";
 import SaleItemsEditor from "../SaleItemsEditor";
 import {
   addInventorySaleItem,
+  listInventoryProducts,
   updateInventorySaleItem,
 } from "../../../services/inventoryApi";
 import useIsMobile from "../../../hooks/useIsMobile";
@@ -23,10 +24,28 @@ if (typeof global.MutationObserver === "undefined") {
   };
 }
 
+if (typeof document.createRange !== "function") {
+  document.createRange = () => ({
+    setStart: () => {},
+    setEnd: () => {},
+    commonAncestorContainer: document.body,
+    getBoundingClientRect: () => ({
+      top: 0,
+      left: 0,
+      bottom: 0,
+      right: 0,
+      width: 0,
+      height: 0,
+    }),
+    getClientRects: () => [],
+  });
+}
+
 jest.mock("../../../services/inventoryApi", () => ({
   addInventorySaleItem: jest.fn(),
   updateInventorySaleItem: jest.fn(),
   deleteInventorySaleItem: jest.fn(),
+  listInventoryProducts: jest.fn(() => Promise.resolve({ data: [] })),
 }));
 
 jest.mock("../../../hooks/useIsMobile", () => ({
@@ -69,6 +88,28 @@ function saleBase(overrides = {}) {
     totalAmount: "100",
     ...overrides,
   };
+}
+
+async function selectAddProduct(getByTestId) {
+  listInventoryProducts.mockResolvedValue({
+    data: [
+      {
+        id: 10,
+        name: "Roteador XYZ",
+        sku: "RT-1",
+        barcode: "RT-1",
+        salePrice: 100,
+        active: true,
+        unit: "un",
+        trackStock: true,
+        currentQuantity: 4,
+      },
+    ],
+  });
+  const input = getByTestId("sale-product-search");
+  fireEvent.change(input, { target: { value: "RT-1" } });
+  fireEvent.keyDown(input, { key: "Enter" });
+  await waitFor(() => expect(input.value).toBe("Roteador XYZ"));
 }
 
 function renderEditor(props = {}) {
@@ -230,11 +271,10 @@ describe("SaleItemsEditor identifiers", () => {
   });
 
   it("22. payload create envia identifiers preenchidos e omite vazios", async () => {
-    const { getByTestId, getByLabelText, getByText } = renderEditor({
+    const { getByTestId, getByText } = renderEditor({
       sale: saleBase({ items: [] }),
     });
-    fireEvent.mouseDown(getByLabelText("Produto"));
-    fireEvent.click(getByText(/Roteador XYZ/));
+    await selectAddProduct(getByTestId);
     fireEvent.change(getByTestId("sale-item-identifier-input-add-1"), {
       target: { value: "  SN123  " },
     });
@@ -248,11 +288,10 @@ describe("SaleItemsEditor identifiers", () => {
   });
 
   it("22b. payload create sem identifier omite o campo", async () => {
-    const { getByLabelText, getByText } = renderEditor({
+    const { getByTestId, getByText } = renderEditor({
       sale: saleBase({ items: [] }),
     });
-    fireEvent.mouseDown(getByLabelText("Produto"));
-    fireEvent.click(getByText(/Roteador XYZ/));
+    await selectAddProduct(getByTestId);
     fireEvent.click(getByText("Adicionar item"));
     await waitFor(() => expect(addInventorySaleItem).toHaveBeenCalled());
     const payload = addInventorySaleItem.mock.calls[0][1];
