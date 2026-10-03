@@ -21,6 +21,7 @@ import {
   toNumber,
 } from "./utils";
 import { identifiersFromSaleItem } from "./saleItemIdentifiers";
+import { isThermalSaleReceiptFormat } from "./saleReceiptPrintFormats";
 
 const useStyles = makeStyles((theme) => ({
   receiptRoot: {
@@ -205,16 +206,181 @@ function getPendingAmount(sale) {
   return Math.max(0, Math.round((total - paid) * 100) / 100);
 }
 
+function ThermalReceipt({ sale, classes }) {
+  const items = Array.isArray(sale.items) ? sale.items : [];
+  const isCancelled = sale.status === "cancelled";
+  const customerName = sale.contact?.name || "";
+  const sellerName = sale.seller?.name || "";
+  const statusLabel = i18n.t(`inventorySales.sales.status.${sale.status}`, sale.status);
+  const paymentStatusLabel = i18n.t(
+    `inventorySales.sales.paymentStatus.${sale.paymentStatus || "unpaid"}`,
+    sale.paymentStatus || "unpaid"
+  );
+  const paymentMethodLabel = sale.paymentMethod
+    ? i18n.t(`inventorySales.sales.paymentMethods.${sale.paymentMethod}`, sale.paymentMethod)
+    : "";
+
+  return (
+    <div className="sale-receipt-print-page sale-receipt-thermal">
+      <div className="sale-receipt-thermal-top">
+        <div className="sale-receipt-thermal-title">
+          {i18n.t("inventorySales.sales.receipt.title")}
+        </div>
+        {isCancelled ? (
+          <div className="sale-receipt-thermal-cancelled">
+            {i18n.t("inventorySales.sales.receipt.cancelled")}
+          </div>
+        ) : null}
+      </div>
+
+      <div className="sale-receipt-thermal-line">
+        <span className="sale-receipt-thermal-label">
+          {i18n.t("inventorySales.sales.receipt.saleNumber")}:{" "}
+        </span>
+        {formatSaleNumber(sale)}
+      </div>
+      <div className="sale-receipt-thermal-line">
+        <span className="sale-receipt-thermal-label">
+          {i18n.t("inventorySales.sales.receipt.saleDate")}:{" "}
+        </span>
+        {formatReceiptDate(getSaleDisplayDate(sale))}
+      </div>
+      <div className="sale-receipt-thermal-line">
+        <span className="sale-receipt-thermal-label">
+          {i18n.t("inventorySales.sales.receipt.operationalStatus")}:{" "}
+        </span>
+        {statusLabel}
+      </div>
+      <div className="sale-receipt-thermal-line">
+        <span className="sale-receipt-thermal-label">
+          {i18n.t("inventorySales.sales.receipt.paymentStatus")}:{" "}
+        </span>
+        {paymentStatusLabel}
+      </div>
+      {customerName ? (
+        <div className="sale-receipt-thermal-line">
+          <span className="sale-receipt-thermal-label">
+            {i18n.t("inventorySales.sales.receipt.customer")}:{" "}
+          </span>
+          {customerName}
+        </div>
+      ) : null}
+      {sellerName ? (
+        <div className="sale-receipt-thermal-line">
+          <span className="sale-receipt-thermal-label">
+            {i18n.t("inventorySales.sales.receipt.seller")}:{" "}
+          </span>
+          {sellerName}
+        </div>
+      ) : null}
+      {paymentMethodLabel ? (
+        <div className="sale-receipt-thermal-line">
+          <span className="sale-receipt-thermal-label">
+            {i18n.t("inventorySales.sales.receipt.paymentMethod")}:{" "}
+          </span>
+          {paymentMethodLabel}
+        </div>
+      ) : null}
+
+      <hr className="sale-receipt-thermal-rule" />
+
+      {items.length === 0 ? (
+        <div className="sale-receipt-thermal-line">
+          {i18n.t("inventorySales.sales.receipt.noItems")}
+        </div>
+      ) : (
+        items.map((item) => (
+          <div key={item.id} className="sale-receipt-thermal-item">
+            <div className="sale-receipt-thermal-item-name">{getItemName(item)}</div>
+            {item.productSku ? (
+              <div className="sale-receipt-thermal-line">{item.productSku}</div>
+            ) : null}
+            <div className="sale-receipt-thermal-line">
+              {formatQuantity(item.quantity)}
+              {item.unit ? ` ${item.unit}` : ""} × {formatCurrencyBRL(item.unitPrice)}
+            </div>
+            <div className="sale-receipt-thermal-money">
+              <span>
+                {i18n.t("inventorySales.sales.receipt.columns.discount")}:{" "}
+                {formatCurrencyBRL(item.discountAmount)}
+              </span>
+              <span>{formatCurrencyBRL(item.totalAmount)}</span>
+            </div>
+            <ReceiptItemIdentifiers item={item} classes={classes} />
+          </div>
+        ))
+      )}
+
+      <hr className="sale-receipt-thermal-rule" />
+
+      <div className="sale-receipt-totals">
+        <div className="sale-receipt-thermal-total-row">
+          <span>{i18n.t("inventorySales.sales.receipt.subtotal")}</span>
+          <span>{formatCurrencyBRL(sale.subtotalAmount)}</span>
+        </div>
+        <div className="sale-receipt-thermal-total-row">
+          <span>{i18n.t("inventorySales.sales.receipt.totalDiscount")}</span>
+          <span>{formatCurrencyBRL(sale.discountAmount)}</span>
+        </div>
+        <div className="sale-receipt-thermal-total-row sale-receipt-thermal-total">
+          <span>{i18n.t("inventorySales.sales.receipt.total")}</span>
+          <span>{formatCurrencyBRL(sale.totalAmount)}</span>
+        </div>
+        <div className="sale-receipt-thermal-total-row">
+          <span>{i18n.t("inventorySales.sales.receipt.paidAmount")}</span>
+          <span>{formatCurrencyBRL(sale.paidAmount)}</span>
+        </div>
+        <div className="sale-receipt-thermal-total-row">
+          <span>{i18n.t("inventorySales.sales.receipt.pendingAmount")}</span>
+          <span>{formatCurrencyBRL(getPendingAmount(sale))}</span>
+        </div>
+      </div>
+
+      {sale.notes ? (
+        <div className="sale-receipt-thermal-notes">
+          <div className="sale-receipt-thermal-label">
+            {i18n.t("inventorySales.sales.receipt.notes")}
+          </div>
+          <div>{displayValue(sale.notes)}</div>
+        </div>
+      ) : null}
+
+      {sale.paymentNotes ? (
+        <div className="sale-receipt-thermal-notes">
+          <div className="sale-receipt-thermal-label">
+            {i18n.t("inventorySales.sales.receipt.paymentNotes")}
+          </div>
+          <div>{displayValue(sale.paymentNotes)}</div>
+        </div>
+      ) : null}
+
+      {isCancelled && sale.cancelReason ? (
+        <div className="sale-receipt-thermal-notes">
+          <div className="sale-receipt-thermal-label">
+            {i18n.t("inventorySales.sales.cancelReasonLabel")}
+          </div>
+          <div>{displayValue(sale.cancelReason)}</div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 /**
  * Conteúdo do recibo compartilhado pelo diálogo e pelo documento de impressão.
- * `layout="print"` força a tabela de cinco colunas, independente da viewport.
+ * `layout="print"` no A4 força a tabela. Térmica usa blocos, sem a viewport da tela.
  */
-export default function SaleReceiptContent({ sale, layout = "screen" }) {
+export default function SaleReceiptContent({ sale, layout = "screen", format }) {
   const classes = useStyles();
   const isMobileViewport = useIsMobile();
+  const isThermalPrint = layout === "print" && isThermalSaleReceiptFormat(format);
   const isMobile = layout === "print" ? false : isMobileViewport;
 
   if (!sale) return null;
+
+  if (isThermalPrint) {
+    return <ThermalReceipt sale={sale} classes={classes} />;
+  }
 
   const items = Array.isArray(sale.items) ? sale.items : [];
   const isCancelled = sale.status === "cancelled";

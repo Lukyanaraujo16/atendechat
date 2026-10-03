@@ -481,6 +481,12 @@ const messages = {
 						open: "Receipt",
 						print: "Print",
 						printError: "Could not prepare the receipt for printing.",
+						format: "Print format",
+						formats: {
+							a4: "A4",
+							thermal80: "80 mm",
+							thermal58: "58 mm",
+						},
 						saleNumber: "Number",
 						saleDate: "Date",
 						operationalStatus: "Sale status",

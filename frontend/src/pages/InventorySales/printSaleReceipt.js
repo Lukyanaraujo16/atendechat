@@ -4,12 +4,11 @@ import { createTheme, ThemeProvider } from "@material-ui/core/styles";
 
 import { getThemeOptions } from "../../theme/appThemeOptions";
 import SaleReceiptContent from "./SaleReceiptContent";
-
-/**
- * Perfil único desta fase. Um perfil futuro escolhe outra folha;
- * 80 mm e 58 mm não existem aqui.
- */
-const PRINT_PROFILE = "a4";
+import {
+  DEFAULT_SALE_RECEIPT_PRINT_FORMAT,
+  SALE_RECEIPT_PRINT_FORMATS,
+  isSaleReceiptPrintFormat,
+} from "./saleReceiptPrintFormats";
 
 const PRINT_FRAME_ATTRIBUTE = "data-sale-receipt-print";
 
@@ -79,6 +78,154 @@ html, body {
   color: #666 !important;
 }
 `;
+
+/**
+ * `size: 80mm auto` é inválido: a gramática aceita um ou dois comprimentos,
+ * `auto` sozinho, ou um papel nomeado. O Chromium descarta a declaração inteira
+ * quando o segundo valor é `auto`, e a página volta ao papel do diálogo.
+ * Um único comprimento vira página quadrada.
+ *
+ * A largura usada é a área imprimível típica da bobina a 203 dpi:
+ * 72 mm em 80 mm nominais (576 pontos) e 48 mm em 58 mm nominais (384 pontos).
+ * A altura de 100 mm é o tamanho de cada página. O CSS não expressa
+ * “altura igual ao conteúdo”. O espaço vazio fica no fim da última página,
+ * no máximo essa altura, e o recibo longo segue na página seguinte.
+ * O driver ainda precisa da bobina correspondente.
+ */
+function thermalPrintCss({ pageSize, fontSize }) {
+  return `
+@page {
+  size: ${pageSize};
+  margin: 0;
+}
+html {
+  color-scheme: light;
+}
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: auto;
+  background: #fff !important;
+  color: #111 !important;
+  font-family: Montserrat, Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+.sale-receipt-print-page {
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  box-sizing: border-box;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: #fff !important;
+  color: #111 !important;
+  box-shadow: none !important;
+}
+.sale-receipt-thermal,
+.sale-receipt-thermal * {
+  box-sizing: border-box;
+  color: #111 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+.sale-receipt-thermal {
+  background: #fff !important;
+  width: 100%;
+  height: auto;
+  font-size: ${fontSize};
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.sale-receipt-thermal-top {
+  text-align: center;
+  margin-bottom: 6px;
+}
+.sale-receipt-thermal-title {
+  font-weight: 700;
+  font-size: 1.15em;
+}
+.sale-receipt-thermal-cancelled {
+  margin-top: 6px;
+  padding: 4px 2px;
+  border: 2px solid #111;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-align: center;
+}
+.sale-receipt-thermal-line {
+  margin: 2px 0;
+}
+.sale-receipt-thermal-label {
+  font-weight: 600;
+}
+.sale-receipt-thermal-rule {
+  border: 0;
+  border-top: 1px solid #111;
+  margin: 6px 0;
+}
+.sale-receipt-thermal-item {
+  margin: 0 0 8px;
+}
+.sale-receipt-thermal-item-name {
+  font-weight: 700;
+}
+.sale-receipt-thermal-money,
+.sale-receipt-thermal-total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.sale-receipt-thermal-total {
+  border-top: 2px solid #111;
+  margin-top: 4px;
+  padding-top: 4px;
+  font-weight: 700;
+}
+.sale-receipt-thermal-notes {
+  margin-top: 6px;
+  white-space: pre-wrap;
+}
+`;
+}
+
+const PRINT_PROFILES = {
+  [SALE_RECEIPT_PRINT_FORMATS.a4]: {
+    id: SALE_RECEIPT_PRINT_FORMATS.a4,
+    frameWidth: "210mm",
+    frameHeight: "297mm",
+    css: A4_PRINT_CSS,
+  },
+  [SALE_RECEIPT_PRINT_FORMATS.thermal80]: {
+    id: SALE_RECEIPT_PRINT_FORMATS.thermal80,
+    frameWidth: "72mm",
+    frameHeight: "200mm",
+    css: thermalPrintCss({
+      pageSize: "72mm 100mm",
+      fontSize: "12px",
+    }),
+  },
+  [SALE_RECEIPT_PRINT_FORMATS.thermal58]: {
+    id: SALE_RECEIPT_PRINT_FORMATS.thermal58,
+    frameWidth: "48mm",
+    frameHeight: "200mm",
+    css: thermalPrintCss({
+      pageSize: "48mm 100mm",
+      fontSize: "11px",
+    }),
+  },
+};
+
+function getPrintProfile(format) {
+  const profile = PRINT_PROFILES[format];
+  if (!profile) {
+    throw new Error("print-format-invalid");
+  }
+  return profile;
+}
 
 let activeJob = null;
 
@@ -152,10 +299,10 @@ function copyComponentStyles(targetDoc) {
   });
 }
 
-function appendPrintCss(targetDoc) {
+function appendPrintCss(targetDoc, profile) {
   const style = targetDoc.createElement("style");
-  style.setAttribute("data-sale-receipt-print-css", PRINT_PROFILE);
-  style.textContent = A4_PRINT_CSS;
+  style.setAttribute("data-sale-receipt-print-css", profile.id);
+  style.textContent = profile.css;
   targetDoc.head.appendChild(style);
 }
 
@@ -169,19 +316,20 @@ function openStandardsDocument(doc) {
   doc.close();
 }
 
-function createPrintFrame() {
+function createPrintFrame(profile) {
   const iframe = document.createElement("iframe");
-  iframe.setAttribute(PRINT_FRAME_ATTRIBUTE, PRINT_PROFILE);
+  iframe.setAttribute(PRINT_FRAME_ATTRIBUTE, profile.id);
   iframe.setAttribute("aria-hidden", "true");
   iframe.setAttribute("title", "Impressão do recibo");
   iframe.tabIndex = -1;
-  // Fora da tela, com largura A4. Sem display:none, visibility:hidden ou opacity:0,
-  // que em alguns browsers geram página em branco. Sem popup.
+  // Fora da tela, na largura do perfil. A altura do iframe só organiza o layout;
+  // o @page térmico não fixa a altura da bobina. Sem display:none, visibility:hidden
+  // ou opacity:0, que em alguns browsers geram página em branco. Sem popup.
   iframe.style.position = "fixed";
   iframe.style.left = "-10000px";
   iframe.style.top = "0";
-  iframe.style.width = "210mm";
-  iframe.style.height = "297mm";
+  iframe.style.width = profile.frameWidth;
+  iframe.style.height = profile.frameHeight;
   iframe.style.border = "0";
   iframe.style.pointerEvents = "none";
   document.body.appendChild(iframe);
@@ -201,7 +349,7 @@ function destroyPrintFrame(iframe, mount) {
   }
 }
 
-function runPrint(sale) {
+function runPrint(sale, format) {
   return new Promise((resolve, reject) => {
     let iframe = null;
     let mount = null;
@@ -232,7 +380,8 @@ function runPrint(sale) {
     };
 
     try {
-      iframe = createPrintFrame();
+      const profile = getPrintProfile(format);
+      iframe = createPrintFrame(profile);
       const initialDoc = iframe.contentDocument;
       if (!initialDoc) {
         throw new Error("print-frame-unavailable");
@@ -251,14 +400,14 @@ function runPrint(sale) {
 
       ReactDOM.render(
         <ThemeProvider theme={printTheme}>
-          <SaleReceiptContent sale={sale} layout="print" />
+          <SaleReceiptContent sale={sale} layout="print" format={profile.id} />
         </ThemeProvider>,
         mount
       );
 
       copyFontLinks(doc);
       copyComponentStyles(doc);
-      appendPrintCss(doc);
+      appendPrintCss(doc, profile);
 
       waitForPrintResources(doc)
         .then(() => {
@@ -293,9 +442,12 @@ function runPrint(sale) {
  * Imprime o recibo num iframe isolado. Chamadas sobrepostas reutilizam o mesmo trabalho.
  * Dados da venda entram só pelo React, nunca por concatenação de HTML.
  */
-export function printSaleReceipt(sale) {
+export function printSaleReceipt(sale, format = DEFAULT_SALE_RECEIPT_PRINT_FORMAT) {
+  if (!isSaleReceiptPrintFormat(format)) {
+    return Promise.reject(new Error("print-format-invalid"));
+  }
   if (activeJob) return activeJob;
-  activeJob = runPrint(sale).finally(() => {
+  activeJob = runPrint(sale, format).finally(() => {
     activeJob = null;
   });
   return activeJob;

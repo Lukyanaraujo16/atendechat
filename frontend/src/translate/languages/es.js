@@ -475,6 +475,12 @@ const messages = {
             open: "Recibo",
             print: "Imprimir",
             printError: "No fue posible preparar la impresión del recibo.",
+            format: "Formato de impresión",
+            formats: {
+              a4: "A4",
+              thermal80: "80 mm",
+              thermal58: "58 mm",
+            },
             saleNumber: "Número",
             saleDate: "Fecha",
             operationalStatus: "Estado de la venta",

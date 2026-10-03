@@ -11,6 +11,7 @@ import { formatCurrencyBRL } from "../../../utils/brazilianCurrency";
 import useIsMobile from "../../../hooks/useIsMobile";
 import SaleReceiptDialog from "../SaleReceiptDialog";
 import { printSaleReceipt, waitForPrintResources } from "../printSaleReceipt";
+import { SALE_RECEIPT_PRINT_FORMATS } from "../saleReceiptPrintFormats";
 
 jest.mock("../../../hooks/useIsMobile", () => ({
   __esModule: true,
@@ -30,6 +31,7 @@ class MutationObserverMock {
 }
 global.MutationObserver = MutationObserverMock;
 
+const PRINT_FORMAT_IDS = new Set(Object.values(SALE_RECEIPT_PRINT_FORMATS));
 const theme = createTheme();
 const originalAppend = HTMLElement.prototype.appendChild;
 
@@ -43,7 +45,7 @@ function installBridge() {
       child &&
       child.nodeType === 1 &&
       child.getAttribute &&
-      child.getAttribute("data-sale-receipt-print") === "a4"
+      PRINT_FORMAT_IDS.has(child.getAttribute("data-sale-receipt-print"))
     ) {
       const win = child.contentWindow;
       if (win) {
@@ -176,6 +178,9 @@ describe("SaleReceiptDialog impressão isolada A4", () => {
     expect(html).not.toContain("APP-SENTINEL-NOT-IN-PRINT");
     expect(html).toContain("sale-receipt-items-desktop");
     expect(html).toContain("sale-receipt-print-page");
+    expect(html).not.toContain("sale-receipt-thermal");
+    expect(printCalls[0].frame.getAttribute("data-sale-receipt-print")).toBe("a4");
+    expect(printCalls[0].frame.style.width).toBe("210mm");
 
     await waitFor(() => {
       expect(document.querySelector("[data-sale-receipt-print]")).toBeNull();
@@ -348,5 +353,216 @@ describe("SaleReceiptDialog impressão isolada A4", () => {
     img.dispatchEvent(new Event("error"));
     await pending;
     expect(settled).toBe(true);
+  });
+});
+
+function assertThermalReceipt(printed, { formatId, pageSize, frameWidth, productName = "Roteador XYZ" }) {
+  const { html, text, frame } = printed;
+  expect(frame.getAttribute("data-sale-receipt-print")).toBe(formatId);
+  expect(frame.style.width).toBe(frameWidth);
+  const cssMatch = html.match(
+    /<style data-sale-receipt-print-css="[^"]+">([\s\S]*?)<\/style>/
+  );
+  const printCss = cssMatch ? cssMatch[1] : "";
+  expect(printCss).toContain(`size: ${pageSize}`);
+  expect(printCss).toContain("margin: 0");
+  expect(printCss).not.toMatch(/size:\s*\d+mm auto/);
+  expect(printCss).not.toContain("A4 portrait");
+  expect(printCss).not.toContain("297mm");
+  expect(printCss).not.toMatch(/transform\s*:|scale\s*\(|zoom\s*:/);
+  expect(html).not.toContain("<table");
+  expect(html).not.toContain("sale-receipt-items-desktop");
+  expect(html).toContain("sale-receipt-thermal");
+  expect(html).toContain("overflow-wrap: anywhere");
+  expect(text).toContain("Cliente Silva");
+  expect(text).toContain("Vendedor Souza");
+  expect(text).toContain(productName);
+  expect(text).toContain("SKU-1");
+  expect(text).toContain("SN-A123");
+  expect(text).toContain("un");
+  expect(text).toContain("PIX");
+  expect(text).toContain("Concluída");
+  expect(text).toContain("Pago");
+  expect(text).toContain(formatCurrencyBRL("100"));
+  expect(text).toContain(formatCurrencyBRL("190"));
+  expect(text).toContain(formatCurrencyBRL("180"));
+  expect(text).toContain(formatCurrencyBRL("10"));
+  expect(text).toContain(formatCurrencyBRL("200"));
+  expect(text).toContain(formatCurrencyBRL("150"));
+  expect(text).toContain(formatCurrencyBRL("50"));
+  expect(text).toContain("Obs <script>alert(1)</script>");
+  expect(text).toContain("Pago no balcão");
+  expect(html).not.toMatch(/<script/i);
+  expect(html).not.toMatch(/<img[\s>]/i);
+  expect(html).not.toContain("APP-SENTINEL-NOT-IN-PRINT");
+}
+
+describe("SaleReceiptDialog formatos térmicos", () => {
+  it("80 mm usa lista térmica no mesmo pipeline, sem tabela A4", async () => {
+    const fetchSpy = jest.spyOn(global, "fetch").mockResolvedValue({ ok: true });
+    const { getByRole } = renderDialog(baseSale());
+
+    expect(document.querySelector(".sale-receipt-items-desktop")).not.toBeNull();
+    fireEvent.click(getByRole("button", { name: "80 mm" }));
+    expect(document.querySelector(".sale-receipt-thermal")).toBeNull();
+    expect(document.querySelector(".sale-receipt-items-desktop")).not.toBeNull();
+
+    fireEvent.click(getByRole("button", { name: "Imprimir" }));
+    await waitFor(() => expect(printCalls.length).toBe(1));
+
+    expect(window.print).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    assertThermalReceipt(printCalls[0], {
+      formatId: "thermal80",
+      pageSize: "72mm 100mm",
+      frameWidth: "72mm",
+    });
+    fetchSpy.mockRestore();
+  });
+
+  it("58 mm quebra nome longo e não usa a altura A4", async () => {
+    useIsMobile.mockReturnValue(false);
+    const longName = "Capinha transparente extra grande para aparelho com nome muito longo";
+    const { getByRole } = renderDialog(
+      baseSale({
+        items: [
+          {
+            ...baseSale().items[0],
+            productName: longName,
+          },
+        ],
+      })
+    );
+
+    fireEvent.click(getByRole("button", { name: "58 mm" }));
+    fireEvent.click(getByRole("button", { name: "Imprimir" }));
+    await waitFor(() => expect(printCalls.length).toBe(1));
+
+    assertThermalReceipt(printCalls[0], {
+      formatId: "thermal58",
+      pageSize: "48mm 100mm",
+      frameWidth: "48mm",
+      productName: longName,
+    });
+    expect(printCalls[0].text).toContain(longName);
+    expect(window.print).not.toHaveBeenCalled();
+  });
+
+  it("térmica 80 imprime venda cancelada em texto", async () => {
+    const { getByRole, getByText } = renderDialog(
+      baseSale({
+        status: "cancelled",
+        paymentStatus: "unpaid",
+        paidAmount: "0",
+        cancelReason: "Cliente desistiu <img src=x onerror=alert(1)>",
+      })
+    );
+
+    fireEvent.click(getByRole("button", { name: "80 mm" }));
+    fireEvent.click(getByRole("button", { name: "Imprimir" }));
+    await waitFor(() => expect(printCalls.length).toBe(1));
+
+    const { html, text } = printCalls[0];
+    expect(text).toContain("VENDA CANCELADA");
+    expect(text).toContain("Cancelada");
+    expect(text).toContain("Cliente desistiu <img src=x onerror=alert(1)>");
+    expect(html).not.toMatch(/<img[\s>]/i);
+    expect(html).toContain("sale-receipt-thermal-cancelled");
+    expect(getByText("Cliente Silva")).toBeTruthy();
+  });
+
+  it("não imprime linhas de cliente, vendedor ou pagamento quando faltam", async () => {
+    const { getByRole } = renderDialog(
+      baseSale({
+        contact: null,
+        seller: null,
+        paymentMethod: null,
+        notes: "",
+        paymentNotes: "",
+      })
+    );
+
+    fireEvent.click(getByRole("button", { name: "58 mm" }));
+    fireEvent.click(getByRole("button", { name: "Imprimir" }));
+    await waitFor(() => expect(printCalls.length).toBe(1));
+
+    const text = printCalls[0].text;
+    expect(text).not.toContain("Sem cliente");
+    expect(text).not.toContain("Sem vendedor");
+    expect(text).not.toContain("Sem forma definida");
+    expect(text).not.toContain("Cliente Silva");
+    expect(text).toContain("Roteador XYZ");
+    expect(text).toContain(formatCurrencyBRL("200"));
+  });
+
+  it("tela mobile com A4 continua A4 e tela desktop com 58 continua 58", async () => {
+    useIsMobile.mockReturnValue(true);
+    const mobile = renderDialog(baseSale());
+    fireEvent.click(mobile.getByRole("button", { name: "Imprimir" }));
+    await waitFor(() => expect(printCalls.length).toBe(1));
+    expect(printCalls[0].html).toContain("size: A4 portrait");
+    expect(printCalls[0].html).toContain("sale-receipt-items-desktop");
+    mobile.unmount();
+    printCalls = [];
+
+    useIsMobile.mockReturnValue(false);
+    const desktop = renderDialog(baseSale());
+    fireEvent.click(desktop.getByRole("button", { name: "58 mm" }));
+    fireEvent.click(desktop.getByRole("button", { name: "Imprimir" }));
+    await waitFor(() => expect(printCalls.length).toBe(1));
+    expect(printCalls[0].frame.style.width).toBe("48mm");
+    expect(printCalls[0].html).toContain("sale-receipt-thermal");
+    expect(printCalls[0].html).not.toContain("sale-receipt-items-desktop");
+  });
+
+  it("reabre o recibo em A4 e rejeita formato desconhecido", async () => {
+    function Harness() {
+      const [open, setOpen] = React.useState(true);
+      return (
+        <ThemeProvider theme={theme}>
+          <button type="button" onClick={() => setOpen(false)}>
+            fechar-recibo
+          </button>
+          <button type="button" onClick={() => setOpen(true)}>
+            reabrir-recibo
+          </button>
+          <SaleReceiptDialog open={open} onClose={() => setOpen(false)} sale={baseSale()} />
+        </ThemeProvider>
+      );
+    }
+
+    const { getByRole } = render(<Harness />);
+    fireEvent.click(getByRole("button", { name: "80 mm" }));
+    fireEvent.click(getByRole("button", { name: "fechar-recibo", hidden: true }));
+    fireEvent.click(getByRole("button", { name: "reabrir-recibo", hidden: true }));
+
+    await waitFor(() => {
+      expect(getByRole("button", { name: "A4" }).getAttribute("aria-pressed")).toBe("true");
+    });
+
+    fireEvent.click(getByRole("button", { name: "Imprimir" }));
+    await waitFor(() => expect(printCalls.length).toBe(1));
+    expect(printCalls[0].html).toContain("size: A4 portrait");
+    expect(printCalls[0].html).not.toContain("sale-receipt-thermal");
+
+    await expect(printSaleReceipt(baseSale(), "thermal")).rejects.toThrow(
+      /print-format-invalid/
+    );
+    expect(document.querySelectorAll("[data-sale-receipt-print]")).toHaveLength(0);
+  });
+
+  it("desabilita a troca de formato enquanto a impressão está em andamento", async () => {
+    printMode = "hold";
+    const { getByRole } = renderDialog(baseSale());
+    fireEvent.click(getByRole("button", { name: "80 mm" }));
+    fireEvent.click(getByRole("button", { name: "Imprimir" }));
+    await waitFor(() => expect(printCalls.length).toBe(1));
+    expect(getByRole("button", { name: "58 mm" }).disabled).toBe(true);
+    expect(printCalls).toHaveLength(1);
+    expect(printCalls[0].frame.style.width).toBe("72mm");
+    printCalls[0].frame.contentWindow.dispatchEvent(new Event("afterprint"));
+    await waitFor(() => {
+      expect(document.querySelector("[data-sale-receipt-print]")).toBeNull();
+    });
   });
 });
