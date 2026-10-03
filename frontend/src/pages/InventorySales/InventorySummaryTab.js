@@ -4,6 +4,7 @@ import { makeStyles, alpha } from "@material-ui/core/styles";
 import AddIcon from "@material-ui/icons/Add";
 import SwapHorizIcon from "@material-ui/icons/SwapHoriz";
 import WarningIcon from "@material-ui/icons/Warning";
+import ReceiptIcon from "@material-ui/icons/Receipt";
 
 import {
   AppEmptyState,
@@ -15,14 +16,16 @@ import {
 import {
   listInventoryCategories,
   listInventoryProducts,
+  listInventorySales,
   listLowStockProducts,
 } from "../../services/inventoryApi";
 import toastError from "../../errors/toastError";
 import { i18n } from "../../translate/i18n";
 import { INVENTORY_TABS } from "./constants";
-import { formatQuantity } from "./utils";
+import { formatQuantity, formatSaleNumber, getSaleDisplayDate } from "./utils";
 import { formatCurrencyBRL } from "../../utils/brazilianCurrency";
 import { useInventoryPermissions } from "../../utils/inventoryAccess";
+import { useManualSale } from "./ManualSaleProvider";
 
 const useStyles = makeStyles((theme) => ({
   statCard: {
@@ -82,6 +85,7 @@ export default function InventorySummaryTab({
 }) {
   const classes = useStyles();
   const perms = useInventoryPermissions();
+  const { startManualSale, creating } = useManualSale();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [stats, setStats] = useState({
@@ -90,15 +94,21 @@ export default function InventorySummaryTab({
     lowStock: 0,
   });
   const [lowStockItems, setLowStockItems] = useState([]);
+  const [recentSales, setRecentSales] = useState([]);
+  const [recentSalesError, setRecentSalesError] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     setLoadError(false);
     try {
-      const [productsRes, categoriesRes, lowStockRes] = await Promise.all([
+      const [productsRes, categoriesRes, lowStockRes, salesRes] = await Promise.all([
         listInventoryProducts({ active: true }),
         listInventoryCategories({ active: true }),
         listLowStockProducts(),
+        listInventorySales({ page: 1, limit: 5 }).then(
+          (res) => ({ ok: true, res }),
+          () => ({ ok: false, res: null })
+        ),
       ]);
       const products = Array.isArray(productsRes.data) ? productsRes.data : [];
       const categories = Array.isArray(categoriesRes.data)
@@ -111,6 +121,16 @@ export default function InventorySummaryTab({
         lowStock: lowStock.length,
       });
       setLowStockItems(lowStock.slice(0, 8));
+      if (salesRes.ok) {
+        const sales = Array.isArray(salesRes.res.data?.sales)
+          ? salesRes.res.data.sales
+          : [];
+        setRecentSales(sales.slice(0, 5));
+        setRecentSalesError(false);
+      } else {
+        setRecentSales([]);
+        setRecentSalesError(true);
+      }
     } catch (err) {
       setLoadError(true);
       toastError(err);
@@ -162,10 +182,19 @@ export default function InventorySummaryTab({
       </Grid>
 
       <Box className={classes.actionsRow}>
-        {perms.canManageProducts ? (
-          <AppPrimaryButton startIcon={<AddIcon />} onClick={onNewProduct}>
-            {i18n.t("inventorySales.summary.actions.newProduct")}
+        {perms.canCreateSale ? (
+          <AppPrimaryButton
+            startIcon={<ReceiptIcon />}
+            onClick={startManualSale}
+            disabled={creating}
+          >
+            {i18n.t("inventorySales.summary.actions.newSale")}
           </AppPrimaryButton>
+        ) : null}
+        {perms.canManageProducts ? (
+          <AppSecondaryButton startIcon={<AddIcon />} onClick={onNewProduct}>
+            {i18n.t("inventorySales.summary.actions.newProduct")}
+          </AppSecondaryButton>
         ) : null}
         {perms.canManageStock ? (
           <AppSecondaryButton startIcon={<SwapHorizIcon />} onClick={onNewMovement}>
@@ -205,6 +234,57 @@ export default function InventorySummaryTab({
                   </Typography>
                 </div>
               ))}
+            </Box>
+          )}
+        </AppSectionCard>
+      </Box>
+
+      <Box mt={3}>
+        <AppSectionCard variant="outlined">
+          <Typography variant="subtitle1" style={{ fontWeight: 600 }}>
+            {i18n.t("inventorySales.summary.recentSalesTitle")}
+          </Typography>
+          {recentSalesError ? (
+            <Box mt={1.5}>
+              <Typography variant="body2" color="textSecondary">
+                {i18n.t("inventorySales.summary.recentSalesError")}
+              </Typography>
+              <Box mt={1}>
+                <AppSecondaryButton onClick={load}>
+                  {i18n.t("inventorySales.common.retry")}
+                </AppSecondaryButton>
+              </Box>
+            </Box>
+          ) : recentSales.length === 0 ? (
+            <Typography variant="body2" color="textSecondary" style={{ marginTop: 12 }}>
+              {i18n.t("inventorySales.summary.noRecentSales")}
+            </Typography>
+          ) : (
+            <Box mt={1}>
+              {recentSales.map((sale) => {
+                const displayDate = getSaleDisplayDate(sale);
+                return (
+                  <div key={sale.id} className={classes.lowStockItem}>
+                    <Box minWidth={0}>
+                      <Typography variant="body2" noWrap>
+                        {formatSaleNumber(sale)}
+                        {sale.contact?.name ? ` · ${sale.contact.name}` : ""}
+                      </Typography>
+                      <Typography variant="caption" color="textSecondary">
+                        {displayDate
+                          ? new Date(displayDate).toLocaleString()
+                          : "—"}
+                        {sale.seller?.name ? ` · ${sale.seller.name}` : ""}
+                        {" · "}
+                        {i18n.t(`inventorySales.sales.status.${sale.status}`, sale.status)}
+                      </Typography>
+                    </Box>
+                    <Typography variant="body2">
+                      {formatCurrencyBRL(sale.totalAmount)}
+                    </Typography>
+                  </div>
+                );
+              })}
             </Box>
           )}
         </AppSectionCard>

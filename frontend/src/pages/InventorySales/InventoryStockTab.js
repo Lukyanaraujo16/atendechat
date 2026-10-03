@@ -36,8 +36,8 @@ import { i18n } from "../../translate/i18n";
 import useIsMobile from "../../hooks/useIsMobile";
 import { useInventoryPermissions } from "../../utils/inventoryAccess";
 import StockMovementFormDialog from "./StockMovementFormDialog";
-import { STOCK_MOVEMENT_TYPES } from "./constants";
-import { formatQuantity } from "./utils";
+import { LISTABLE_STOCK_MOVEMENT_TYPES } from "./constants";
+import { formatQuantity, formatSignedQuantity } from "./utils";
 
 const useStyles = makeStyles((theme) => ({
   headerRow: {
@@ -177,7 +177,7 @@ export default function InventoryStockTab({
             label={i18n.t("inventorySales.stock.filterType")}
           >
             <MenuItem value="">{i18n.t("inventorySales.common.all")}</MenuItem>
-            {STOCK_MOVEMENT_TYPES.map((type) => (
+            {LISTABLE_STOCK_MOVEMENT_TYPES.map((type) => (
               <MenuItem key={type} value={type}>
                 {typeLabel(type)}
               </MenuItem>
@@ -221,7 +221,7 @@ export default function InventoryStockTab({
               >
                 <Typography variant="body2">
                   {i18n.t("inventorySales.stock.columns.quantity")}:{" "}
-                  {formatQuantity(m.quantity)}
+                  {formatSignedQuantity(m.quantity)}
                 </Typography>
                 <Typography variant="caption" color="textSecondary">
                   {i18n.t("inventorySales.stock.columns.balance")}:{" "}
@@ -258,7 +258,7 @@ export default function InventoryStockTab({
                     <TableCell>{formatDate(m.createdAt)}</TableCell>
                     <TableCell>{m.product?.name || "—"}</TableCell>
                     <TableCell>{typeLabel(m.type)}</TableCell>
-                    <TableCell align="right">{formatQuantity(m.quantity)}</TableCell>
+                    <TableCell align="right">{formatSignedQuantity(m.quantity)}</TableCell>
                     <TableCell align="right">{formatQuantity(m.balanceAfter)}</TableCell>
                     <TableCell>{m.notes || "—"}</TableCell>
                   </TableRow>

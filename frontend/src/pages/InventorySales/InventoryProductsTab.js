@@ -23,7 +23,6 @@ import EditIcon from "@material-ui/icons/Edit";
 import DeleteOutlineIcon from "@material-ui/icons/DeleteOutline";
 import SearchIcon from "@material-ui/icons/Search";
 import HistoryIcon from "@material-ui/icons/History";
-import WarningIcon from "@material-ui/icons/Warning";
 
 import {
   AppEmptyState,
@@ -47,7 +46,7 @@ import useIsMobile from "../../hooks/useIsMobile";
 import ProductFormDialog from "./ProductFormDialog";
 import ConfirmationModal from "../../components/ConfirmationModal";
 import { formatCurrencyBRL } from "../../utils/brazilianCurrency";
-import { formatQuantity, isProductLowStock } from "./utils";
+import { describeProductStock } from "./utils";
 import { toast } from "react-toastify";
 import { useInventoryPermissions } from "../../utils/inventoryAccess";
 
@@ -166,23 +165,36 @@ export default function InventoryProductsTab({
   };
 
   const renderStockCell = (product) => {
-    if (!product.trackStock) {
+    const stock = describeProductStock(product);
+    if (stock.status === "untracked") {
       return (
         <Typography variant="body2" color="textSecondary">
           {i18n.t("inventorySales.products.noStockTracking")}
         </Typography>
       );
     }
-    const low = isProductLowStock(product);
+    const detail =
+      stock.status === "out"
+        ? i18n.t("inventorySales.products.outOfStock")
+        : stock.status === "low"
+          ? [
+              stock.minText
+                ? i18n.t("inventorySales.products.minLabel", { value: stock.minText })
+                : null,
+              i18n.t("inventorySales.products.lowStockBadge"),
+            ]
+              .filter(Boolean)
+              .join(" · ")
+          : stock.minText
+            ? i18n.t("inventorySales.products.minLabel", { value: stock.minText })
+            : null;
     return (
-      <Box display="flex" alignItems="center" style={{ gap: 4 }}>
-        <Typography variant="body2">
-          {formatQuantity(product.currentQuantity)} {product.unit}
-        </Typography>
-        {low ? (
-          <Tooltip title={i18n.t("inventorySales.products.lowStockBadge")}>
-            <WarningIcon fontSize="small" color="secondary" />
-          </Tooltip>
+      <Box>
+        <Typography variant="body2">{stock.quantityText}</Typography>
+        {detail ? (
+          <Typography variant="caption" color="textSecondary">
+            {detail}
+          </Typography>
         ) : null}
       </Box>
     );
@@ -226,9 +238,16 @@ export default function InventoryProductsTab({
   return (
     <Box>
       <div className={classes.headerRow}>
-        <Typography variant="h6" style={{ fontWeight: 600 }}>
-          {i18n.t("inventorySales.products.title")}
-        </Typography>
+        <Box>
+          <Typography variant="h6" style={{ fontWeight: 600 }}>
+            {i18n.t("inventorySales.products.title")}
+          </Typography>
+          {!loading && !loadError ? (
+            <Typography variant="caption" color="textSecondary">
+              {i18n.t("inventorySales.products.count", { count: products.length })}
+            </Typography>
+          ) : null}
+        </Box>
         {perms.canManageProducts ? (
           <AppPrimaryButton startIcon={<AddIcon />} onClick={openCreate}>
             {i18n.t("inventorySales.products.new")}
@@ -324,13 +343,6 @@ export default function InventoryProductsTab({
                       <Chip
                         size="small"
                         label={i18n.t("inventorySales.common.inactive")}
-                      />
-                    ) : null}
-                    {isProductLowStock(product) ? (
-                      <Chip
-                        size="small"
-                        color="secondary"
-                        label={i18n.t("inventorySales.products.lowStockBadge")}
                       />
                     ) : null}
                   </Box>

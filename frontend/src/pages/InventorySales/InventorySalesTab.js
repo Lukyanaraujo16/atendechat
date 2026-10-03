@@ -23,7 +23,6 @@ import ChevronLeftIcon from "@material-ui/icons/ChevronLeft";
 import ChevronRightIcon from "@material-ui/icons/ChevronRight";
 import VisibilityIcon from "@material-ui/icons/Visibility";
 import { format } from "date-fns";
-import { toast } from "react-toastify";
 
 import {
   AppEmptyState,
@@ -38,14 +37,12 @@ import {
 } from "../../ui";
 import api from "../../services/api";
 import {
-  createInventorySale,
   listInventorySales,
 } from "../../services/inventoryApi";
 import toastError from "../../errors/toastError";
 import { i18n } from "../../translate/i18n";
 import useIsMobile from "../../hooks/useIsMobile";
 import { useInventoryPermissions } from "../../utils/inventoryAccess";
-import SaleDrawer from "./SaleDrawer";
 import { formatCurrencyBRL } from "../../utils/brazilianCurrency";
 import {
   formatSaleNumber,
@@ -53,6 +50,7 @@ import {
   paymentStatusChipColor,
 } from "./utils";
 import { SALE_STATUSES, PAYMENT_STATUSES } from "./constants";
+import { useManualSale } from "./ManualSaleProvider";
 
 const useStyles = makeStyles((theme) => ({
   headerRow: {
@@ -91,9 +89,9 @@ export default function InventorySalesTab() {
   const classes = useStyles();
   const isMobile = useIsMobile();
   const perms = useInventoryPermissions();
+  const { startManualSale, openSale, creating, subscribe } = useManualSale();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
-  const [creating, setCreating] = useState(false);
   const [sales, setSales] = useState([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
@@ -107,9 +105,6 @@ export default function InventorySalesTab() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [users, setUsers] = useState([]);
-
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [selectedSaleId, setSelectedSaleId] = useState(null);
 
   const loadUsers = useCallback(async () => {
     try {
@@ -151,6 +146,8 @@ export default function InventorySalesTab() {
     loadUsers();
   }, [loadUsers]);
 
+  useEffect(() => subscribe(loadSales), [subscribe, loadSales]);
+
   useEffect(() => {
     const t = setTimeout(loadSales, search ? 300 : 0);
     return () => clearTimeout(t);
@@ -160,25 +157,7 @@ export default function InventorySalesTab() {
     setPage(1);
   }, [status, paymentStatus, sellerUserId, startDate, endDate, search]);
 
-  const openSale = (id) => {
-    setSelectedSaleId(id);
-    setDrawerOpen(true);
-  };
-
-  const handleNewSale = async () => {
-    setCreating(true);
-    try {
-      const { data } = await createInventorySale({ source: "manual" });
-      toast.success(i18n.t("inventorySales.sales.toasts.created"));
-      setSelectedSaleId(data.id);
-      setDrawerOpen(true);
-      loadSales();
-    } catch (err) {
-      toastError(err);
-    } finally {
-      setCreating(false);
-    }
-  };
+  const handleNewSale = () => startManualSale();
 
   const formatDate = (value) => {
     if (!value) return "—";
@@ -479,15 +458,6 @@ export default function InventorySalesTab() {
         </div>
       ) : null}
 
-      <SaleDrawer
-        open={drawerOpen}
-        saleId={selectedSaleId}
-        onClose={() => {
-          setDrawerOpen(false);
-          setSelectedSaleId(null);
-        }}
-        onChanged={loadSales}
-      />
     </Box>
   );
 }

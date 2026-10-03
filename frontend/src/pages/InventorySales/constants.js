@@ -10,6 +10,13 @@ export const INVENTORY_TABS = {
 
 export const STOCK_MOVEMENT_TYPES = ["in", "out", "adjustment", "initial"];
 
+/** Filtro da listagem. Inclui tipos gerados por venda, que o POST manual recusa. */
+export const LISTABLE_STOCK_MOVEMENT_TYPES = [
+  ...STOCK_MOVEMENT_TYPES,
+  "sale",
+  "sale_reversal",
+];
+
 export const SALE_STATUSES = ["draft", "completed", "cancelled"];
 
 export const PAYMENT_STATUSES = ["unpaid", "paid", "partial", "refunded"];

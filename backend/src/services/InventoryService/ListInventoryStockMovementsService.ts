@@ -4,8 +4,8 @@ import InventoryStockMovement from "../../models/InventoryStockMovement";
 import InventoryProduct from "../../models/InventoryProduct";
 import User from "../../models/User";
 import {
-  isInventoryStockMovementType,
-  InventoryStockMovementType
+  isListableInventoryStockMovementType,
+  ListableInventoryStockMovementType
 } from "./inventoryStockMovementTypes";
 import {
   findInventoryProductOrThrow,
@@ -62,10 +62,10 @@ export default async function ListInventoryStockMovementsService(input: {
 
   if (input.type !== undefined && input.type !== null && input.type !== "") {
     const typeRaw = String(input.type).trim();
-    if (!isInventoryStockMovementType(typeRaw)) {
+    if (!isListableInventoryStockMovementType(typeRaw)) {
       throw new AppError("ERR_VALIDATION_ERROR", 400, "Tipo inválido.");
     }
-    where.type = typeRaw as InventoryStockMovementType;
+    where.type = typeRaw as ListableInventoryStockMovementType;
   }
 
   const startDate = parseOptionalDateQuery(input.startDate);

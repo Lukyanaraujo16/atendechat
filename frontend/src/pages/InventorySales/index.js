@@ -15,6 +15,7 @@ import InventoryStockTab from "./InventoryStockTab";
 import InventorySalesTab from "./InventorySalesTab";
 import InventoryReportsTab from "./InventoryReportsTab";
 import InventorySettingsTab from "./InventorySettingsTab";
+import { ManualSaleProvider } from "./ManualSaleProvider";
 
 const useStyles = makeStyles((theme) => ({
   pageRoot: {
@@ -153,6 +154,7 @@ const InventorySales = () => {
         )}
 
         <Box className={classes.tabContent}>
+          <ManualSaleProvider>
           {perms.canView ? (
             <TabPanel value={tab} name={INVENTORY_TABS.SUMMARY}>
               <InventorySummaryTab
@@ -200,6 +202,7 @@ const InventorySales = () => {
               <InventorySettingsTab />
             </TabPanel>
           ) : null}
+          </ManualSaleProvider>
         </Box>
       </div>
     </MainContainer>

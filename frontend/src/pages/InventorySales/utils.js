@@ -16,6 +16,39 @@ export function formatQuantity(value) {
   });
 }
 
+/** Sinal único: positivo ganha +, negativo um só "-", zero fica 0. */
+export function formatSignedQuantity(value) {
+  const n = toNumber(value);
+  const body = formatQuantity(Math.abs(n));
+  if (n > 0) return `+${body}`;
+  if (n < 0) return `-${body}`;
+  return body;
+}
+
+/**
+ * Quantidade e unidade permanecem separados de minStock.
+ * unit é exibido cru, inclusive quando o cadastro guardou "un50".
+ */
+export function describeProductStock(product) {
+  if (!product?.trackStock) {
+    return { status: "untracked", quantityText: "", minText: null };
+  }
+  const qty = toNumber(product.currentQuantity);
+  const unit = typeof product.unit === "string" ? product.unit.trim() : "";
+  const quantityText = unit ? `${formatQuantity(qty)} ${unit}` : formatQuantity(qty);
+  const minText =
+    product.minStock != null && product.minStock !== ""
+      ? formatQuantity(product.minStock)
+      : null;
+  if (qty === 0) {
+    return { status: "out", quantityText, minText };
+  }
+  if (isProductLowStock(product)) {
+    return { status: "low", quantityText, minText };
+  }
+  return { status: "ok", quantityText, minText };
+}
+
 export function formatSaleNumber(sale) {
   if (!sale) return "—";
   if (sale.status === "draft") {
