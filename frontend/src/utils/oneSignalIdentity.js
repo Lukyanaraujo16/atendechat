@@ -158,6 +158,32 @@ export function assertExternalIdIsNotCompanyId(externalId, companyIdTag) {
   return { ok: true };
 }
 
+const LOCAL_ONESIGNAL_ID_PREFIX = "local-";
+
+/**
+ * OneSignal ID remoto: string não vazia que não é o placeholder local-* do SDK.
+ * null/undefined (o getter público esconde local-*) não conta.
+ */
+export function isRemoteOnesignalUserId(onesignalId) {
+  if (typeof onesignalId !== "string") return false;
+  const id = onesignalId.trim();
+  return Boolean(id) && !id.startsWith(LOCAL_ONESIGNAL_ID_PREFIX);
+}
+
+/**
+ * Confirmação remota: External ID esperado E OneSignal ID remoto.
+ * Promise de login resolvida, sozinha, não basta.
+ */
+export function isRemoteOneSignalIdentityConfirmed(snapshot, expectedExternalId) {
+  if (typeof expectedExternalId !== "string" || !expectedExternalId) {
+    return false;
+  }
+  if (!snapshot || snapshot.externalId !== expectedExternalId) {
+    return false;
+  }
+  return isRemoteOnesignalUserId(snapshot.onesignalId);
+}
+
 /**
  * SupportMode: External ID continua a ser o utilizador autenticado da sessão
  * (ex.: Super Admin), nunca o companyId do tenant visitado.

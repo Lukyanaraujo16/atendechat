@@ -37,8 +37,10 @@ function createMockSdk({
   id = "sub-chrome",
   token = "tok-chrome",
   loginImpl,
+  confirmRemote = true,
 } = {}) {
   const state = { optedIn, id, token };
+  const identity = { externalId: null, onesignalId: null };
   const PushSubscription = {
     get optedIn() {
       return state.optedIn;
@@ -62,6 +64,12 @@ function createMockSdk({
     User: {
       PushSubscription,
       addTags: jest.fn(),
+      get externalId() {
+        return identity.externalId;
+      },
+      get onesignalId() {
+        return identity.onesignalId;
+      },
     },
     Notifications: {
       isPushSupported: jest.fn(() => true),
@@ -70,9 +78,12 @@ function createMockSdk({
     },
     login: jest.fn(async (externalId) => {
       if (typeof loginImpl === "function") {
-        return loginImpl(externalId);
+        await loginImpl(externalId);
       }
-      return undefined;
+      identity.externalId = externalId;
+      identity.onesignalId = confirmRemote
+        ? "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"
+        : null;
     }),
     logout: jest.fn(async () => {}),
     init: jest.fn(async () => {}),
@@ -475,5 +486,23 @@ describe("oneSignal identity sync single-flight (2.13E)", () => {
     expect(json).not.toContain("full-subscription-id-secret");
     expect(json).not.toMatch(/eyJ[A-Za-z0-9_-]+\./);
     expect(diag.identitySync.lastExternalId).toBe("streamhub_user_25");
+  });
+
+  it("promise de login sem OneSignal ID remoto não trava o próximo sync", async () => {
+    const api = createMockSdk({ confirmRemote: false });
+    __forceOneSignalReadyForTests(api);
+    const first = await syncOneSignalUser({ id: 25, companyId: 1, profile: "admin" });
+    expect(first.ok).toBe(true);
+    expect(first.remoteConfirmed).toBe(false);
+    expect(getOneSignalPushStatus().externalUserId).toBeNull();
+    const tl = getPushDiagnosticTimeline();
+    expect(tl.some((e) => e.name === "identity_login_promise_resolved")).toBe(true);
+    expect(tl.some((e) => e.name === "identity_remote_confirmed")).toBe(false);
+    expect(tl.some((e) => e.name === "identity_remote_pending")).toBe(true);
+
+    const second = await syncOneSignalUser({ id: 25, companyId: 1, profile: "admin" });
+    expect(second.remoteConfirmed).toBe(false);
+    expect(api.login).toHaveBeenCalledTimes(2);
+    expect(api.login).toHaveBeenCalledWith("streamhub_user_25");
   });
 });

@@ -47,6 +47,7 @@ function createMockSdk({
   loginImpl,
 } = {}) {
   const listeners = { change: [] };
+  const identity = { externalId: null, onesignalId: null };
   const state = {
     optedIn,
     id,
@@ -100,7 +101,16 @@ function createMockSdk({
       state.seq += 1;
       listeners.change.forEach((fn) => fn({ current: { optedIn: true, id: state.id, token: PushSubscription.token } }));
     },
-    User: { PushSubscription, addTags: jest.fn() },
+    User: {
+      PushSubscription,
+      addTags: jest.fn(),
+      get externalId() {
+        return identity.externalId;
+      },
+      get onesignalId() {
+        return identity.onesignalId;
+      },
+    },
     Notifications: {
       isPushSupported: jest.fn(() => true),
       requestPermission: jest.fn(async () => true),
@@ -108,9 +118,10 @@ function createMockSdk({
     },
     login: jest.fn(async (externalId) => {
       if (typeof loginImpl === "function") {
-        return loginImpl(externalId);
+        await loginImpl(externalId);
       }
-      return undefined;
+      identity.externalId = externalId;
+      identity.onesignalId = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
     }),
     logout: jest.fn(async () => {}),
     init: jest.fn(async () => {}),

@@ -27,10 +27,12 @@ import {
   assertExternalIdIsNotCompanyId,
   buildOneSignalIdentitySyncKey,
   buildOneSignalIdentityTags,
+  isRemoteOneSignalIdentityConfirmed,
   oneSignalTagsSignature,
   resolveOneSignalCompanyIdTag,
   resolveOneSignalExternalId,
 } from "../utils/oneSignalIdentity";
+import { recoverLegacyOneSignalIdentityBeforeInit } from "../utils/oneSignalLegacyIdentityRecovery";
 import {
   buildSanitizedSubscriptionSnapshot,
   classifyInvalidTokenDeviceTypeError,
@@ -97,6 +99,8 @@ const INIT_WAIT_MS = 20000;
 let SUBSCRIPTION_WAIT_MS = SUBSCRIPTION_WAIT_MS_DEFAULT;
 let PERMISSION_WAIT_MS = PERMISSION_WAIT_MS_DEFAULT;
 let LOGIN_WAIT_MS = LOGIN_WAIT_MS_DEFAULT;
+let REMOTE_CONFIRM_ATTEMPTS = 3;
+let REMOTE_CONFIRM_INTERVAL_MS = 40;
 
 function publicUrlBase() {
   return (process.env.PUBLIC_URL || "").replace(/\/$/, "");
@@ -636,6 +640,14 @@ async function initOneSignalFromConfig(cfg) {
 
   initPromise = (async () => {
     try {
+      try {
+        await recoverLegacyOneSignalIdentityBeforeInit({
+          appId: cfg.onesignalAppId,
+          log: logPush,
+        });
+      } catch (recoveryError) {
+        logPush("legacy_identity_recovery_failed", { reason: "unexpected" });
+      }
       await loadOneSignalPageScript();
       const serviceWorkerPath = getOneSignalServiceWorkerPath();
       const serviceWorkerUpdaterPath = getOneSignalServiceWorkerUpdaterPath();
@@ -790,6 +802,33 @@ async function ensureStableSubscriptionBeforeLogin(api) {
   return stabilityWaitInFlight;
 }
 
+function readPublicOneSignalIdentity(api) {
+  const user = api && api.User;
+  if (!user) return { externalId: null, onesignalId: null };
+  return {
+    externalId: user.externalId,
+    onesignalId: user.onesignalId,
+  };
+}
+
+async function confirmRemoteOneSignalIdentity(api, expectedExternalId) {
+  const attempts = Math.max(1, REMOTE_CONFIRM_ATTEMPTS);
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    if (attempt > 0 && REMOTE_CONFIRM_INTERVAL_MS > 0) {
+      await delayMs(REMOTE_CONFIRM_INTERVAL_MS);
+    }
+    if (
+      isRemoteOneSignalIdentityConfirmed(
+        readPublicOneSignalIdentity(api),
+        expectedExternalId
+      )
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 async function applyUserIdentity(user, { skipStabilityWait = false, confirmedStableSnapshot = null } = {}) {
   if (!oneSignalApi) {
     return { ok: false, reason: "sdk_not_ready" };
@@ -827,7 +866,7 @@ async function applyUserIdentity(user, { skipStabilityWait = false, confirmedSta
       companyIdTag,
       ambiguous: ambiguity.reason === "external_id_equals_company_id_ambiguous",
     });
-    return { ok: true, deduplicated: true, externalId };
+    return { ok: true, deduplicated: true, externalId, remoteConfirmed: true };
   }
 
   // Single-flight: callers concorrentes reutilizam a mesma Promise.
@@ -970,16 +1009,21 @@ async function applyUserIdentity(user, { skipStabilityWait = false, confirmedSta
       if (!loginOutcome?.ok) {
         throw loginOutcome.error || new Error("identity_login_failed");
       }
-      identityUserId = externalId;
-      recordPushDiagnosticEvent("identity_login_succeeded", {
-        externalIdApplied: identityUserId,
-        attempt,
-      });
-      logPush("identity_login_succeeded", { attempt });
-      recordPushDiagnosticEvent("identity_login_completed", {
-        externalIdApplied: identityUserId,
-        attempt,
-      });
+      recordPushDiagnosticEvent("identity_login_promise_resolved", { attempt });
+      logPush("identity_login_promise_resolved", { attempt });
+      const remoteConfirmed = await confirmRemoteOneSignalIdentity(
+        oneSignalApi,
+        externalId
+      );
+      if (remoteConfirmed) {
+        identityUserId = externalId;
+        recordPushDiagnosticEvent("identity_remote_confirmed", { attempt });
+        logPush("identity_remote_confirmed", { attempt });
+      } else {
+        identityUserId = null;
+        recordPushDiagnosticEvent("identity_remote_pending", { attempt });
+        logPush("identity_remote_pending", { attempt });
+      }
 
       if (
         lastIdentitySync &&
@@ -1009,15 +1053,20 @@ async function applyUserIdentity(user, { skipStabilityWait = false, confirmedSta
         });
       }
 
-      lastIdentitySync = {
-        key: syncKey,
-        tagsSignature: tagsSig,
-        externalId,
-        completedAt: Date.now(),
-      };
+      if (remoteConfirmed) {
+        lastIdentitySync = {
+          key: syncKey,
+          tagsSignature: tagsSig,
+          externalId,
+          remoteConfirmed: true,
+          completedAt: Date.now(),
+        };
+      }
       setPushLifecycleStage("tags_completed");
-      setPushStatus({ externalUserId: identityUserId });
-      return { ok: true, externalId, attempt };
+      setPushStatus({
+        externalUserId: remoteConfirmed ? externalId : null,
+      });
+      return { ok: true, externalId, attempt, remoteConfirmed };
     } catch (e) {
       const typed = classifyInvalidTokenDeviceTypeError(e);
       if (typed) {
@@ -1147,6 +1196,7 @@ export async function syncOneSignalUser(user, options = {}) {
           attempts: attempt,
           deduplicated: Boolean(result.deduplicated),
           deferredLogin: Boolean(result.deferredLogin),
+          remoteConfirmed: Boolean(result.remoteConfirmed),
         };
       }
       lastResult = {
@@ -1586,6 +1636,8 @@ export function __resetOneSignalServiceForTests() {
   SUBSCRIPTION_WAIT_MS = SUBSCRIPTION_WAIT_MS_DEFAULT;
   PERMISSION_WAIT_MS = PERMISSION_WAIT_MS_DEFAULT;
   LOGIN_WAIT_MS = LOGIN_WAIT_MS_DEFAULT;
+  REMOTE_CONFIRM_ATTEMPTS = 1;
+  REMOTE_CONFIRM_INTERVAL_MS = 0;
   statusListeners.clear();
   __resetPushDiagnosticsForTests();
   __resetStabilityStateForTests();

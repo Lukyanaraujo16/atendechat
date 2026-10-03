@@ -12,6 +12,7 @@ import {
   subscribeOneSignalPushStatus,
 } from "../oneSignalService";
 import { PUSH_DOMAIN_STATES } from "../../utils/oneSignalPushDomain";
+import { getPushDiagnosticTimeline } from "../../utils/oneSignalPushDiagnostics";
 import * as openApiModule from "../api";
 
 jest.mock("../api", () => ({
@@ -30,8 +31,10 @@ function createMockSdk({
   id = null,
   token = null,
   optInImpl,
+  confirmRemote = true,
 } = {}) {
   const listeners = { change: [] };
+  const identity = { externalId: null, onesignalId: null };
   const state = {
     optedIn,
     id,
@@ -83,13 +86,24 @@ function createMockSdk({
     User: {
       PushSubscription,
       addTags: jest.fn(),
+      get externalId() {
+        return identity.externalId;
+      },
+      get onesignalId() {
+        return identity.onesignalId;
+      },
     },
     Notifications: {
       isPushSupported: jest.fn(() => true),
       requestPermission: jest.fn(async () => true),
       addEventListener: jest.fn(),
     },
-    login: jest.fn(async () => {}),
+    login: jest.fn(async (externalId) => {
+      identity.externalId = externalId;
+      identity.onesignalId = confirmRemote
+        ? "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"
+        : null;
+    }),
     logout: jest.fn(async () => {}),
     init: jest.fn(async () => {}),
   };
@@ -176,6 +190,24 @@ describe("enableOneSignalPushSubscription", () => {
     expect(updates).toContain(PUSH_DOMAIN_STATES.SUBSCRIBED);
 
     unsubscribe();
+  });
+
+  it("subscription fica pronta mesmo sem confirmação remota da identidade", async () => {
+    const api = createMockSdk({ confirmRemote: false });
+    __forceOneSignalReadyForTests(api);
+
+    const result = await enableOneSignalPushSubscription({
+      user: { id: 25, companyId: 1, profile: "admin" },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.domainState).toBe(PUSH_DOMAIN_STATES.SUBSCRIBED);
+    expect(getOneSignalPushStatus().subscriptionId).toBe("sub-confirmed");
+    expect(getOneSignalPushStatus().externalUserId).toBeNull();
+    const tl = getPushDiagnosticTimeline();
+    expect(tl.some((e) => e.name === "identity_login_promise_resolved")).toBe(true);
+    expect(tl.some((e) => e.name === "identity_remote_confirmed")).toBe(false);
+    expect(api.login).toHaveBeenCalledWith("streamhub_user_25");
   });
 
   it("permission granted sem subscription não marca sucesso", async () => {
