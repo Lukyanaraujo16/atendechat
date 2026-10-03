@@ -4,7 +4,7 @@ import { alpha, darken } from "@material-ui/core/styles";
 export const BRAND_PRIMARY = "#24c776";
 
 /** Neutros do tema claro. O tema escuro não usa estes valores. */
-export const LIGHT_CANVAS = "#F5F8F7";
+export const LIGHT_CANVAS = "#FAFAFA";
 export const LIGHT_SIDEBAR = "#F8FAF9";
 export const LIGHT_SURFACE = "#F3F7F5";
 export const LIGHT_PAPER = "#FFFFFF";
