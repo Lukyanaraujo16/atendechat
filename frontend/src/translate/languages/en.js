@@ -480,6 +480,7 @@ const messages = {
 						title: "Sale receipt",
 						open: "Receipt",
 						print: "Print",
+						printError: "Could not prepare the receipt for printing.",
 						saleNumber: "Number",
 						saleDate: "Date",
 						operationalStatus: "Sale status",

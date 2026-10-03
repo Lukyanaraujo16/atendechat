@@ -474,6 +474,7 @@ const messages = {
             title: "Recibo de venta",
             open: "Recibo",
             print: "Imprimir",
+            printError: "No fue posible preparar la impresión del recibo.",
             saleNumber: "Número",
             saleDate: "Fecha",
             operationalStatus: "Estado de la venta",
