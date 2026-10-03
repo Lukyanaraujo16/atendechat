@@ -1,3 +1,5 @@
+import { getApiUrl } from "../../config/backendUrl";
+
 export const EMPTY_RECEIPT_BRANDING = {
   tradeName: "",
   legalName: "",
@@ -5,11 +7,19 @@ export const EMPTY_RECEIPT_BRANDING = {
   phone: "",
   address: "",
   footerMessage: "",
+  logoUrl: "",
 };
 
 function asText(value) {
   if (value == null) return "";
   return String(value).trim();
+}
+
+function asLogoUrl(value) {
+  const text = asText(value);
+  if (!text.startsWith("/public/inventory-receipts/company-")) return "";
+  if (text.includes("..") || text.includes("\\") || text.includes("//")) return "";
+  return getApiUrl(text);
 }
 
 export function receiptBrandingFromSettings(data) {
@@ -21,7 +31,12 @@ export function receiptBrandingFromSettings(data) {
     phone: asText(source.receiptPhone),
     address: asText(source.receiptAddress),
     footerMessage: asText(source.receiptFooterMessage),
+    logoUrl: asLogoUrl(source.receiptLogoUrl),
   };
+}
+
+export function receiptLogoDisplayUrl(stored) {
+  return asLogoUrl(stored);
 }
 
 export function hasReceiptBrandingHeader(branding) {
@@ -48,6 +63,7 @@ export function sameReceiptBranding(left, right) {
     a.document === b.document &&
     a.phone === b.phone &&
     a.address === b.address &&
-    a.footerMessage === b.footerMessage
+    a.footerMessage === b.footerMessage &&
+    a.logoUrl === b.logoUrl
   );
 }

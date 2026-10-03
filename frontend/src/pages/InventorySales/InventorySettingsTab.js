@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Box,
   FormControlLabel,
@@ -15,17 +15,35 @@ import {
   AppSectionCard,
   AppSecondaryButton,
 } from "../../ui";
+import ConfirmationModal from "../../components/ConfirmationModal";
 import {
+  deleteInventoryReceiptLogo,
   getInventorySettings,
   updateInventorySettings,
+  uploadInventoryReceiptLogo,
 } from "../../services/inventoryApi";
 import toastError from "../../errors/toastError";
 import { i18n } from "../../translate/i18n";
+import { receiptLogoDisplayUrl } from "./receiptBranding";
+
+const RECEIPT_LOGO_MAX_BYTES = 2 * 1024 * 1024;
+
+function logoFileAllowed(file) {
+  const type = (file.type || "").toLowerCase();
+  const name = (file.name || "").toLowerCase();
+  const typeOk = ["image/png", "image/jpeg", "image/jpg", "image/webp"].includes(type);
+  const nameOk = /\.(png|jpe?g|webp)$/.test(name);
+  return typeOk && nameOk;
+}
 
 export default function InventorySettingsTab() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [logoUrl, setLogoUrl] = useState("");
+  const [logoBusy, setLogoBusy] = useState(false);
+  const [confirmRemoveLogo, setConfirmRemoveLogo] = useState(false);
+  const logoInputRef = useRef(null);
   const [form, setForm] = useState({
     defaultCommissionRate: "0",
     allowNegativeStock: false,
@@ -57,6 +75,7 @@ export default function InventorySettingsTab() {
         receiptAddress: data.receiptAddress || "",
         receiptFooterMessage: data.receiptFooterMessage || "",
       });
+      setLogoUrl(data.receiptLogoUrl || "");
     } catch (err) {
       setLoadError(true);
       toastError(err);
@@ -102,6 +121,42 @@ export default function InventorySettingsTab() {
       toastError(err);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleLogoFile = async (event) => {
+    const file = event.target.files && event.target.files[0];
+    event.target.value = "";
+    if (!file || logoBusy) return;
+    if (!logoFileAllowed(file)) {
+      toast.error(i18n.t("inventorySales.settings.receiptData.logo.invalidType"));
+      return;
+    }
+    if (file.size > RECEIPT_LOGO_MAX_BYTES) {
+      toast.error(i18n.t("inventorySales.settings.receiptData.logo.tooLarge"));
+      return;
+    }
+    setLogoBusy(true);
+    try {
+      const { data } = await uploadInventoryReceiptLogo(file);
+      setLogoUrl((data && data.receiptLogoUrl) || "");
+    } catch (err) {
+      toastError(err);
+    } finally {
+      setLogoBusy(false);
+    }
+  };
+
+  const handleRemoveLogo = async () => {
+    setLogoBusy(true);
+    try {
+      await deleteInventoryReceiptLogo();
+      setLogoUrl("");
+      setConfirmRemoveLogo(false);
+    } catch (err) {
+      toastError(err);
+    } finally {
+      setLogoBusy(false);
     }
   };
 
@@ -168,6 +223,67 @@ export default function InventorySettingsTab() {
           </Typography>
           <AppSectionCard variant="outlined">
             <Box display="flex" flexDirection="column" style={{ gap: 20 }}>
+              <Box>
+                <Typography variant="subtitle2" style={{ fontWeight: 600 }}>
+                  {i18n.t("inventorySales.settings.receiptData.logo.title")}
+                </Typography>
+                <Typography variant="caption" color="textSecondary" display="block">
+                  {i18n.t("inventorySales.settings.receiptData.logo.hint")}
+                </Typography>
+                <Box
+                  mt={1}
+                  style={{
+                    width: 160,
+                    height: 80,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    background: "#f5f5f5",
+                    border: "1px solid #e0e0e0",
+                    borderRadius: 4,
+                  }}
+                >
+                  {receiptLogoDisplayUrl(logoUrl) ? (
+                    <img
+                      data-testid="receipt-logo-preview"
+                      alt={i18n.t("inventorySales.settings.receiptData.logo.alt")}
+                      src={receiptLogoDisplayUrl(logoUrl)}
+                      style={{
+                        maxWidth: "100%",
+                        maxHeight: "100%",
+                        objectFit: "contain",
+                      }}
+                    />
+                  ) : null}
+                </Box>
+                <input
+                  ref={logoInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  hidden
+                  onChange={handleLogoFile}
+                />
+                <Box mt={1} display="flex" style={{ gap: 8 }}>
+                  <AppSecondaryButton
+                    type="button"
+                    loading={logoBusy}
+                    onClick={() => logoInputRef.current && logoInputRef.current.click()}
+                  >
+                    {logoUrl
+                      ? i18n.t("inventorySales.settings.receiptData.logo.replace")
+                      : i18n.t("inventorySales.settings.receiptData.logo.select")}
+                  </AppSecondaryButton>
+                  {logoUrl ? (
+                    <AppSecondaryButton
+                      type="button"
+                      disabled={logoBusy}
+                      onClick={() => setConfirmRemoveLogo(true)}
+                    >
+                      {i18n.t("inventorySales.settings.receiptData.logo.remove")}
+                    </AppSecondaryButton>
+                  ) : null}
+                </Box>
+              </Box>
               <TextField
                 id="receipt-trade-name"
                 label={i18n.t("inventorySales.settings.receiptData.fields.tradeName")}
@@ -241,6 +357,18 @@ export default function InventorySettingsTab() {
           </AppPrimaryButton>
         </Box>
       </form>
+      <ConfirmationModal
+        open={confirmRemoveLogo}
+        title={i18n.t("inventorySales.settings.receiptData.logo.removeTitle")}
+        onClose={() => !logoBusy && setConfirmRemoveLogo(false)}
+        onConfirm={handleRemoveLogo}
+        asyncConfirm
+        loading={logoBusy}
+        destructive
+        confirmText={i18n.t("inventorySales.settings.receiptData.logo.remove")}
+      >
+        {i18n.t("inventorySales.settings.receiptData.logo.removeMessage")}
+      </ConfirmationModal>
     </Box>
   );
 }

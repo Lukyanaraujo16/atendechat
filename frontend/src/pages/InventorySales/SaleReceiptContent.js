@@ -58,6 +58,15 @@ const useStyles = makeStyles((theme) => ({
     fontSize: "1.125rem",
     wordBreak: "break-word",
   },
+  brandingLogo: {
+    display: "block",
+    margin: "0 auto 8px",
+    maxWidth: 160,
+    maxHeight: 80,
+    width: "auto",
+    height: "auto",
+    objectFit: "contain",
+  },
   brandingLine: {
     fontSize: "0.8125rem",
     wordBreak: "break-word",
@@ -227,16 +236,36 @@ function ReceiptItemIdentifiers({ item, classes }) {
   );
 }
 
+function ReceiptLogo({ branding, className }) {
+  const [hidden, setHidden] = React.useState(false);
+  if (!branding || !branding.logoUrl || hidden) return null;
+  return (
+    <img
+      alt=""
+      src={branding.logoUrl}
+      className={className}
+      onError={(event) => {
+        event.currentTarget.style.display = "none";
+        window.setTimeout(() => setHidden(true), 0);
+      }}
+    />
+  );
+}
+
 function ReceiptBrandingHeader({ branding, classes, thermal }) {
-  if (!hasReceiptBrandingHeader(branding)) return null;
-  const prominent = branding.tradeName || branding.legalName;
-  const legalBelow = Boolean(branding.tradeName && branding.legalName);
+  const hasText = hasReceiptBrandingHeader(branding);
+  const hasLogo = Boolean(branding && branding.logoUrl);
+  if (!hasText && !hasLogo) return null;
+  const prominent = hasText ? branding.tradeName || branding.legalName : "";
+  const legalBelow = Boolean(hasText && branding.tradeName && branding.legalName);
   const documentLabel = i18n.t("inventorySales.sales.receipt.branding.document");
   const phoneLabel = i18n.t("inventorySales.sales.receipt.branding.phone");
+  const logoClass = thermal ? "sale-receipt-branding-logo" : classes.brandingLogo;
 
   if (thermal) {
     return (
       <div className="sale-receipt-branding">
+        <ReceiptLogo branding={branding} className={logoClass} />
         {prominent ? (
           <div className="sale-receipt-branding-trade">{prominent}</div>
         ) : null}
@@ -262,6 +291,7 @@ function ReceiptBrandingHeader({ branding, classes, thermal }) {
 
   return (
     <div className={classes.branding}>
+      <ReceiptLogo branding={branding} className={logoClass} />
       {prominent ? (
         <div className={classes.brandingTrade}>{prominent}</div>
       ) : null}

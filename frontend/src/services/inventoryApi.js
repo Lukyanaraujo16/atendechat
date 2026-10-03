@@ -8,6 +8,15 @@ export const updateInventorySettings = (body) =>
 export const getInventoryReceiptBranding = () =>
   api.get("/inventory/receipt-branding");
 
+export const uploadInventoryReceiptLogo = (file) => {
+  const body = new FormData();
+  body.append("logo", file);
+  return api.post("/inventory/settings/receipt-logo", body);
+};
+
+export const deleteInventoryReceiptLogo = () =>
+  api.delete("/inventory/settings/receipt-logo");
+
 export const listInventoryCategories = (params) =>
   api.get("/inventory/categories", { params });
 

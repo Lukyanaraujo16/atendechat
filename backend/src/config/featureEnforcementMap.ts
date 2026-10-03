@@ -215,7 +215,7 @@ export const FEATURE_ENFORCEMENT_MAP: Array<{
   },
   {
     feature: "inventory.sales.view | inventory.sales.manageSettings",
-    notes: "Leitura dos textos do recibo. Edição continua em PUT /inventory/settings.",
+    notes: "Leitura dos textos e da logo do recibo. Edição continua em /inventory/settings.",
     backendRoutes: ["GET /inventory/receipt-branding"],
   },
   {
@@ -270,6 +270,7 @@ export const FEATURE_ENFORCEMENT_MAP: Array<{
     feature: "inventory.sales.manageSettings",
     backendRoutes: [
       "GET/PUT /inventory/settings",
+      "POST/DELETE /inventory/settings/receipt-logo",
       "GET/POST/PUT/DELETE /inventory/seller-profiles/*",
     ],
   },

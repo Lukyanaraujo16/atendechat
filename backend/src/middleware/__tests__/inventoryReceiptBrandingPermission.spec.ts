@@ -95,5 +95,9 @@ describe("permissão de leitura do branding do recibo", () => {
     expect(settingsBlock).toContain("INVENTORY_SALES_MANAGE_SETTINGS");
     expect(settingsBlock).not.toContain("INVENTORY_SALES_VIEW");
     expect(settingsBlock).toContain("updateSettings");
+    expect(settingsBlock).toContain('"/inventory/settings/receipt-logo"');
+    expect(settingsBlock).toContain("uploadReceiptLogo");
+    expect(settingsBlock).toContain("deleteReceiptLogo");
+    expect(settingsBlock).not.toContain("INVENTORY_SALES_VIEW");
   });
 });

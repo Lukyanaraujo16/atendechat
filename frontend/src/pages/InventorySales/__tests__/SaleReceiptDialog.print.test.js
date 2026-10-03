@@ -589,7 +589,7 @@ async function printCurrent(view, formatLabel) {
     fireEvent.click(view.getByRole("button", { name: formatLabel }));
   }
   fireEvent.click(view.getByRole("button", { name: "Imprimir" }));
-  await waitFor(() => expect(printCalls.length).toBe(1));
+  await waitFor(() => expect(printCalls.length).toBe(1), { timeout: 4000 });
   return printCalls[0];
 }
 
@@ -698,5 +698,70 @@ describe("SaleReceiptDialog branding textual", () => {
     expect(printed.text).toContain("Recibo de venda");
     expect(printed.html).not.toMatch(/class="[^"]*sale-receipt-branding/);
     expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["A4", null, null],
+    ["80 mm", "80 mm", "48mm"],
+    ["58 mm", "58 mm", "36mm"],
+  ])("%s imprime a logo sem mudar a página", async (_label, formatLabel, logoWidth) => {
+    const stored =
+      "/public/inventory-receipts/company-4/11111111-1111-4111-8111-111111111111.png";
+    mockGetInventoryReceiptBranding.mockResolvedValue({
+      data: { ...FULL_BRANDING, receiptLogoUrl: stored },
+    });
+    const view = renderDialog(baseSale());
+    await waitFor(() => expect(view.baseElement.querySelector("img")).toBeTruthy());
+    const preview = view.baseElement.querySelector("img");
+    expect(preview.getAttribute("src")).toMatch(/^https?:\/\//);
+    expect(preview.getAttribute("src")).toContain(stored);
+
+    const printed = await printCurrent(view, formatLabel);
+    expect(printed.html).toContain("<img");
+    expect(printed.html).toContain(stored);
+    expect(printed.html).not.toMatch(/src="\/public\//);
+    expect(printed.text).toContain("Loja ABC");
+    expect(printed.text).toContain("Recibo de venda");
+    if (logoWidth) {
+      expect(printed.html).toContain(`max-width: ${logoWidth}`);
+      expect(printed.html).toContain("object-fit: contain");
+    } else {
+      expect(printed.html).toContain("max-width: 160px");
+      expect(printed.html).toContain("size: A4 portrait");
+      expect(printed.html).not.toContain("72mm 100mm");
+    }
+    if (formatLabel === "80 mm") expect(printed.html).toContain("size: 72mm 100mm");
+    if (formatLabel === "58 mm") expect(printed.html).toContain("size: 48mm 100mm");
+  });
+
+  it("esconde a logo quebrada e segue a impressão depois do erro da imagem", async () => {
+    const stored =
+      "/public/inventory-receipts/company-4/11111111-1111-4111-8111-111111111111.png";
+    mockGetInventoryReceiptBranding.mockResolvedValue({
+      data: { receiptLogoUrl: stored },
+    });
+    const view = renderDialog(baseSale());
+    await waitFor(() => expect(view.baseElement.querySelector("img")).toBeTruthy());
+    fireEvent.error(view.baseElement.querySelector("img"));
+    await waitFor(() => expect(view.baseElement.querySelector("img")).toBeNull());
+
+    const img = document.createElement("img");
+    Object.defineProperty(img, "complete", { configurable: true, get: () => false });
+    let settled = false;
+    const pending = waitForPrintResources(
+      {
+        querySelectorAll(selector) {
+          if (selector === "img") return [img];
+          return [];
+        },
+        fonts: { ready: Promise.resolve() },
+      },
+      500
+    ).then(() => {
+      settled = true;
+    });
+    img.dispatchEvent(new Event("error"));
+    await pending;
+    expect(settled).toBe(true);
   });
 });

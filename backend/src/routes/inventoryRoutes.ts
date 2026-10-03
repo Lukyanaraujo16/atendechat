@@ -1,5 +1,6 @@
 import express from "express";
 import isAuth from "../middleware/isAuth";
+import { inventoryReceiptLogoUpload } from "../config/inventoryReceiptLogoUpload";
 import requireInventorySalesPermission from "../middleware/requireInventorySalesPermission";
 import {
   INVENTORY_SALES_CANCEL_SALE,
@@ -35,6 +36,19 @@ inventoryRoutes.put(
   isAuth,
   requireInventorySalesPermission(INVENTORY_SALES_MANAGE_SETTINGS),
   InventoryController.updateSettings
+);
+inventoryRoutes.post(
+  "/inventory/settings/receipt-logo",
+  isAuth,
+  requireInventorySalesPermission(INVENTORY_SALES_MANAGE_SETTINGS),
+  inventoryReceiptLogoUpload.single("logo"),
+  InventoryController.uploadReceiptLogo
+);
+inventoryRoutes.delete(
+  "/inventory/settings/receipt-logo",
+  isAuth,
+  requireInventorySalesPermission(INVENTORY_SALES_MANAGE_SETTINGS),
+  InventoryController.deleteReceiptLogo
 );
 inventoryRoutes.get(
   "/inventory/receipt-branding",

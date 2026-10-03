@@ -92,7 +92,7 @@ html, body {
  * no máximo essa altura, e o recibo longo segue na página seguinte.
  * O driver ainda precisa da bobina correspondente.
  */
-function thermalPrintCss({ pageSize, fontSize }) {
+function thermalPrintCss({ pageSize, fontSize, logoMaxWidth }) {
   return `
 @page {
   size: ${pageSize};
@@ -154,6 +154,15 @@ html, body {
 .sale-receipt-branding-trade {
   font-weight: 700;
   font-size: 1.2em;
+}
+.sale-receipt-branding-logo {
+  display: block;
+  margin: 0 auto 4px;
+  max-width: ${logoMaxWidth};
+  max-height: 16mm;
+  width: auto;
+  height: auto;
+  object-fit: contain;
 }
 .sale-receipt-branding-line,
 .sale-receipt-branding-footer {
@@ -225,6 +234,7 @@ const PRINT_PROFILES = {
     css: thermalPrintCss({
       pageSize: "72mm 100mm",
       fontSize: "12px",
+      logoMaxWidth: "48mm",
     }),
   },
   [SALE_RECEIPT_PRINT_FORMATS.thermal58]: {
@@ -234,6 +244,7 @@ const PRINT_PROFILES = {
     css: thermalPrintCss({
       pageSize: "48mm 100mm",
       fontSize: "11px",
+      logoMaxWidth: "36mm",
     }),
   },
 };

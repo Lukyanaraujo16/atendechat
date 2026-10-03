@@ -77,6 +77,10 @@ class InventorySettings extends Model<InventorySettings> {
   @Column(DataType.STRING(500))
   receiptFooterMessage: string | null;
 
+  @AllowNull
+  @Column(DataType.STRING(255))
+  receiptLogoUrl: string | null;
+
   @CreatedAt
   createdAt: Date;
 

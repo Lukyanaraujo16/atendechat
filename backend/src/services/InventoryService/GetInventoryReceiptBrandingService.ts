@@ -1,4 +1,5 @@
 import GetOrCreateInventorySettingsService from "./GetOrCreateInventorySettingsService";
+import { receiptLogoReference } from "./inventoryReceiptLogo";
 
 export type InventoryReceiptBranding = {
   receiptTradeName: string | null;
@@ -7,6 +8,7 @@ export type InventoryReceiptBranding = {
   receiptPhone: string | null;
   receiptAddress: string | null;
   receiptFooterMessage: string | null;
+  receiptLogoUrl: string | null;
 };
 
 export default async function GetInventoryReceiptBrandingService(
@@ -19,6 +21,7 @@ export default async function GetInventoryReceiptBrandingService(
     receiptDocument: settings.receiptDocument ?? null,
     receiptPhone: settings.receiptPhone ?? null,
     receiptAddress: settings.receiptAddress ?? null,
-    receiptFooterMessage: settings.receiptFooterMessage ?? null
+    receiptFooterMessage: settings.receiptFooterMessage ?? null,
+    receiptLogoUrl: receiptLogoReference(settings)
   };
 }

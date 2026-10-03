@@ -71,10 +71,12 @@ describe("InventorySettings branding do recibo", () => {
       receiptDocument: null,
       receiptPhone: "(27) 99999-9999",
       receiptAddress: null,
-      receiptFooterMessage: null
+      receiptFooterMessage: null,
+      receiptLogoUrl: null
     });
     expect(branding).not.toHaveProperty("nextSaleNumber");
     expect(branding).not.toHaveProperty("companyId");
+    expect(branding.receiptLogoUrl).toBeNull();
   });
 
   it("update faz trim, vazio vira null e preserva campos omitidos", async () => {
@@ -168,5 +170,31 @@ describe("InventorySettings branding do recibo", () => {
         body: { receiptAddress: { street: "Rua X" } }
       })
     ).rejects.toBeInstanceOf(AppError);
+  });
+
+  it("ignora receiptLogoUrl enviado no JSON das configurações", async () => {
+    const stored =
+      "/public/inventory-receipts/company-4/11111111-1111-4111-8111-111111111111.png";
+    const row = settingsRow({ receiptLogoUrl: stored });
+    findOrCreate.mockResolvedValue([row, false] as never);
+
+    await UpdateInventorySettingsService({
+      companyId: 4,
+      body: {
+        receiptTradeName: "Loja",
+        receiptLogoUrl: "https://evil.example/logo.png"
+      } as never
+    });
+
+    expect(row.update).toHaveBeenCalledWith({ receiptTradeName: "Loja" });
+    expect(row.receiptLogoUrl).toBe(stored);
+
+    (row.update as jest.Mock).mockClear();
+    await UpdateInventorySettingsService({
+      companyId: 4,
+      body: { receiptLogoUrl: "https://evil.example/logo.png" } as never
+    });
+    expect(row.update).not.toHaveBeenCalled();
+    expect(row.receiptLogoUrl).toBe(stored);
   });
 });

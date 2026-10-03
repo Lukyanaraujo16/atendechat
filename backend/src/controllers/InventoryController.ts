@@ -3,6 +3,10 @@ import AppError from "../errors/AppError";
 import GetOrCreateInventorySettingsService from "../services/InventoryService/GetOrCreateInventorySettingsService";
 import GetInventoryReceiptBrandingService from "../services/InventoryService/GetInventoryReceiptBrandingService";
 import UpdateInventorySettingsService from "../services/InventoryService/UpdateInventorySettingsService";
+import {
+  removeInventoryReceiptLogo,
+  uploadInventoryReceiptLogo
+} from "../services/InventoryService/inventoryReceiptLogo";
 import ListInventoryCategoriesService from "../services/InventoryService/ListInventoryCategoriesService";
 import CreateInventoryCategoryService from "../services/InventoryService/CreateInventoryCategoryService";
 import UpdateInventoryCategoryService from "../services/InventoryService/UpdateInventoryCategoryService";
@@ -47,6 +51,33 @@ export const getReceiptBranding = async (
   const companyId = companyIdOrThrow(req);
   const branding = await GetInventoryReceiptBrandingService(companyId);
   return res.json(branding);
+};
+
+export const uploadReceiptLogo = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const { file } = req;
+  if (!file || !file.buffer) {
+    throw new AppError("ERR_VALIDATION_ERROR", 400, "Selecione uma imagem.");
+  }
+  const result = await uploadInventoryReceiptLogo({
+    companyId,
+    buffer: file.buffer,
+    mimetype: file.mimetype,
+    originalName: file.originalname
+  });
+  return res.json(result);
+};
+
+export const deleteReceiptLogo = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const result = await removeInventoryReceiptLogo(companyId);
+  return res.json(result);
 };
 
 export const updateSettings = async (

@@ -11,8 +11,11 @@ import InventorySales from "../index";
 import {
   getInventorySettings,
   updateInventorySettings,
+  uploadInventoryReceiptLogo,
+  deleteInventoryReceiptLogo,
 } from "../../../services/inventoryApi";
 import toastError from "../../../errors/toastError";
+import { toast } from "react-toastify";
 
 class MutationObserverMock {
   observe() {}
@@ -39,6 +42,8 @@ jest.mock("../../../utils/inventoryAccess", () => ({
 jest.mock("../../../services/inventoryApi", () => ({
   getInventorySettings: jest.fn(),
   updateInventorySettings: jest.fn(),
+  uploadInventoryReceiptLogo: jest.fn(),
+  deleteInventoryReceiptLogo: jest.fn(),
   getInventoryReceiptBranding: jest.fn(() => Promise.resolve({ data: {} })),
   listInventoryProducts: jest.fn(() => Promise.resolve({ data: [] })),
   listInventoryCategories: jest.fn(() => Promise.resolve({ data: [] })),
@@ -80,7 +85,10 @@ beforeEach(() => {
   mockPerms.canManageSettings = false;
   getInventorySettings.mockReset();
   updateInventorySettings.mockReset();
+  uploadInventoryReceiptLogo.mockReset();
+  deleteInventoryReceiptLogo.mockReset();
   toastError.mockReset();
+  toast.error.mockReset();
   getInventorySettings.mockResolvedValue({ data: savedSettings });
   updateInventorySettings.mockResolvedValue({ data: savedSettings });
 });
@@ -150,5 +158,85 @@ describe("InventorySettings dados do recibo", () => {
     updateInventorySettings.mockRejectedValueOnce(new Error("save-failed"));
     fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
     await waitFor(() => expect(toastError).toHaveBeenCalledTimes(2));
+  });
+});
+
+describe("InventorySettings logo do recibo", () => {
+  function fileInput() {
+    return document.querySelector('input[type="file"]');
+  }
+
+  it("mostra selecionar, o accept e rejeita tipo ou tamanho antes do request", async () => {
+    renderTab();
+    expect(await screen.findByRole("button", { name: "Selecionar logo" })).toBeTruthy();
+    expect(screen.queryByTestId("receipt-logo-preview")).toBeNull();
+    expect(fileInput().getAttribute("accept")).toBe("image/png,image/jpeg,image/webp");
+
+    fireEvent.change(fileInput(), {
+      target: {
+        files: [new File(["<svg></svg>"], "logo.svg", { type: "image/svg+xml" })],
+      },
+    });
+    expect(uploadInventoryReceiptLogo).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalled();
+
+    toast.error.mockClear();
+    fireEvent.change(fileInput(), {
+      target: {
+        files: [
+          new File([new Uint8Array(2 * 1024 * 1024 + 1)], "grande.png", {
+            type: "image/png",
+          }),
+        ],
+      },
+    });
+    expect(uploadInventoryReceiptLogo).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalled();
+  });
+
+  it("envia a logo, mostra o preview absoluto e remove depois de confirmar", async () => {
+    const stored =
+      "/public/inventory-receipts/company-4/11111111-1111-4111-8111-111111111111.png";
+    uploadInventoryReceiptLogo.mockResolvedValue({ data: { receiptLogoUrl: stored } });
+    deleteInventoryReceiptLogo.mockResolvedValue({ data: { receiptLogoUrl: null } });
+    renderTab();
+    await screen.findByRole("button", { name: "Selecionar logo" });
+
+    fireEvent.change(fileInput(), {
+      target: {
+        files: [new File([new Uint8Array([1, 2, 3])], "logo.png", { type: "image/png" })],
+      },
+    });
+
+    const preview = await screen.findByTestId("receipt-logo-preview");
+    expect(uploadInventoryReceiptLogo).toHaveBeenCalledTimes(1);
+    expect(preview.getAttribute("src")).toMatch(/^https?:\/\//);
+    expect(preview.getAttribute("src")).toContain(stored);
+    expect(preview.getAttribute("src").startsWith("/public")).toBe(false);
+    expect(preview.style.objectFit).toBe("contain");
+
+    fireEvent.click(screen.getByRole("button", { name: "Remover" }));
+    expect(screen.getByText("Remover a logo do recibo?")).toBeTruthy();
+    fireEvent.click(screen.getAllByRole("button", { name: "Remover" }).pop());
+    await waitFor(() => expect(deleteInventoryReceiptLogo).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.queryByTestId("receipt-logo-preview")).toBeNull());
+  });
+
+  it("mantém a logo atual quando o upload falha", async () => {
+    const stored =
+      "/public/inventory-receipts/company-4/11111111-1111-4111-8111-111111111111.png";
+    getInventorySettings.mockResolvedValue({
+      data: { ...savedSettings, receiptLogoUrl: stored },
+    });
+    uploadInventoryReceiptLogo.mockRejectedValue(new Error("upload-failed"));
+    renderTab();
+    expect(await screen.findByTestId("receipt-logo-preview")).toBeTruthy();
+    fireEvent.change(fileInput(), {
+      target: {
+        files: [new File([new Uint8Array([1])], "nova.png", { type: "image/png" })],
+      },
+    });
+    await waitFor(() => expect(toastError).toHaveBeenCalled());
+    expect(screen.getByTestId("receipt-logo-preview").getAttribute("src")).toContain(stored);
   });
 });
