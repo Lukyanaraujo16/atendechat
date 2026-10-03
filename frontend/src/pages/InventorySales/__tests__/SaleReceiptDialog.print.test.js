@@ -22,6 +22,12 @@ jest.mock("react-toastify", () => ({
   toast: { error: jest.fn(), success: jest.fn() },
 }));
 
+const mockGetInventoryReceiptBranding = jest.fn(() => Promise.resolve({ data: {} }));
+
+jest.mock("../../../services/inventoryApi", () => ({
+  getInventoryReceiptBranding: (...args) => mockGetInventoryReceiptBranding(...args),
+}));
+
 class MutationObserverMock {
   observe() {}
   disconnect() {}
@@ -128,6 +134,8 @@ beforeEach(() => {
   printMode = "complete";
   printCalls = [];
   toast.error.mockClear();
+  mockGetInventoryReceiptBranding.mockReset();
+  mockGetInventoryReceiptBranding.mockResolvedValue({ data: {} });
   installBridge();
   jest.spyOn(window, "print").mockImplementation(() => {
     throw new Error("parent-print");
@@ -564,5 +572,131 @@ describe("SaleReceiptDialog formatos térmicos", () => {
     await waitFor(() => {
       expect(document.querySelector("[data-sale-receipt-print]")).toBeNull();
     });
+  });
+});
+
+const FULL_BRANDING = {
+  receiptTradeName: "Loja ABC",
+  receiptLegalName: "Loja ABC LTDA",
+  receiptDocument: "12.345.678/0001-90",
+  receiptPhone: "(27) 99999-9999",
+  receiptAddress: "Rua X, 123\nCentro",
+  receiptFooterMessage: "Obrigado pela preferência.\nVolte sempre.",
+};
+
+async function printCurrent(view, formatLabel) {
+  if (formatLabel) {
+    fireEvent.click(view.getByRole("button", { name: formatLabel }));
+  }
+  fireEvent.click(view.getByRole("button", { name: "Imprimir" }));
+  await waitFor(() => expect(printCalls.length).toBe(1));
+  return printCalls[0];
+}
+
+describe("SaleReceiptDialog branding textual", () => {
+  it.each([
+    ["A4", null],
+    ["80 mm", "80 mm"],
+    ["58 mm", "58 mm"],
+  ])("%s sem branding não cria bloco vazio", async (_label, formatLabel) => {
+    const view = renderDialog(baseSale());
+    expect(view.queryByText("Documento:")).toBeNull();
+    expect(view.queryByText("Loja ABC")).toBeNull();
+
+    const printed = await printCurrent(view, formatLabel);
+    expect(printed.text).toContain("Recibo de venda");
+    expect(printed.text).not.toContain("Loja ABC");
+    expect(printed.text).not.toContain("Documento:");
+    expect(printed.text).not.toContain("Telefone:");
+    expect(printed.html).not.toMatch(/class="[^"]*sale-receipt-branding/);
+  });
+
+  it.each([
+    ["A4", null],
+    ["80 mm", "80 mm"],
+    ["58 mm", "58 mm"],
+  ])("%s imprime o branding completo e escapa HTML", async (_label, formatLabel) => {
+    mockGetInventoryReceiptBranding.mockResolvedValue({
+      data: {
+        ...FULL_BRANDING,
+        receiptTradeName: "<script>alert(1)</script>",
+        receiptAddress: "<img src=x onerror=alert(1)>\nLinha 2",
+      },
+    });
+    const view = renderDialog(baseSale());
+    await waitFor(() => expect(view.getByText("<script>alert(1)</script>")).toBeTruthy());
+
+    const printed = await printCurrent(view, formatLabel);
+    expect(printed.text).toContain("<script>alert(1)</script>");
+    expect(printed.text).toContain("Loja ABC LTDA");
+    expect(printed.text).toContain("Documento: 12.345.678/0001-90");
+    expect(printed.text).toContain("Telefone: (27) 99999-9999");
+    expect(printed.text).toContain("<img src=x onerror=alert(1)>");
+    expect(printed.text).toContain("Linha 2");
+    expect(printed.text).toContain("Obrigado pela preferência.");
+    expect(printed.text).toContain("Volte sempre.");
+    expect(printed.text.indexOf("<script>alert(1)</script>")).toBeLessThan(
+      printed.text.indexOf("Recibo de venda")
+    );
+    expect(printed.text.indexOf("Volte sempre.")).toBeGreaterThan(
+      printed.text.indexOf("Obs <script>alert(1)</script>")
+    );
+    expect(printed.html).not.toMatch(/<script/i);
+    expect(printed.html).not.toMatch(/<img[\s>]/i);
+    expect(printed.html).not.toContain("<br");
+    expect(printed.html).toContain("white-space: pre-line");
+    expect(view.container.querySelector("script")).toBeNull();
+    expect(view.container.querySelector("img")).toBeNull();
+  });
+
+  it("imprime só o nome fantasia, só o documento ou só o rodapé", async () => {
+    mockGetInventoryReceiptBranding.mockResolvedValue({
+      data: { receiptTradeName: "Somente Nome" },
+    });
+    const trade = renderDialog(baseSale());
+    const tradePrint = await printCurrent(trade, null);
+    expect(tradePrint.text).toContain("Somente Nome");
+    expect(tradePrint.text).not.toContain("Documento:");
+    expect(tradePrint.text).not.toContain("Telefone:");
+    expect(tradePrint.html).not.toContain("sale-receipt-branding-footer");
+
+    printCalls = [];
+    mockGetInventoryReceiptBranding.mockResolvedValue({
+      data: { receiptDocument: "ABC-9" },
+    });
+    const documentView = renderDialog(baseSale({ id: 8 }));
+    const documentPrint = await printCurrent(documentView, "80 mm");
+    expect(documentPrint.text).toContain("Documento: ABC-9");
+    expect(documentPrint.text).not.toContain("Somente Nome");
+    expect(documentPrint.text).not.toContain("Telefone:");
+
+    printCalls = [];
+    mockGetInventoryReceiptBranding.mockResolvedValue({
+      data: { receiptFooterMessage: "Rodapé único" },
+    });
+    const footerView = renderDialog(baseSale({ id: 9 }));
+    const footerPrint = await printCurrent(footerView, "58 mm");
+    expect(footerPrint.text).toContain("Rodapé único");
+    expect(footerPrint.text).not.toContain("Documento:");
+    expect(footerPrint.html).toContain("sale-receipt-branding-footer");
+    expect(footerPrint.html).not.toContain('class="sale-receipt-branding"');
+  });
+
+  it("busca o branding uma vez e imprime mesmo se a leitura falhar", async () => {
+    const view = renderDialog(baseSale());
+    await printCurrent(view, null);
+    printCalls = [];
+    fireEvent.click(view.getByRole("button", { name: "80 mm" }));
+    fireEvent.click(view.getByRole("button", { name: "Imprimir" }));
+    await waitFor(() => expect(printCalls.length).toBe(1));
+    expect(mockGetInventoryReceiptBranding).toHaveBeenCalledTimes(1);
+
+    printCalls = [];
+    mockGetInventoryReceiptBranding.mockRejectedValue(new Error("branding-down"));
+    const failed = renderDialog(baseSale({ id: 11 }));
+    const printed = await printCurrent(failed, null);
+    expect(printed.text).toContain("Recibo de venda");
+    expect(printed.html).not.toMatch(/class="[^"]*sale-receipt-branding/);
+    expect(toast.error).not.toHaveBeenCalled();
   });
 });

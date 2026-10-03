@@ -5,6 +5,9 @@ export const getInventorySettings = () => api.get("/inventory/settings");
 export const updateInventorySettings = (body) =>
   api.put("/inventory/settings", body);
 
+export const getInventoryReceiptBranding = () =>
+  api.get("/inventory/receipt-branding");
+
 export const listInventoryCategories = (params) =>
   api.get("/inventory/categories", { params });
 

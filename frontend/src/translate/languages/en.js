@@ -506,6 +506,10 @@ const messages = {
 						pendingAmount: "Pending amount",
 						notes: "Notes",
 						paymentNotes: "Payment notes",
+						branding: {
+							document: "Document",
+							phone: "Phone",
+						},
 						columns: {
 							product: "Product",
 							quantity: "Qty.",
@@ -684,6 +688,18 @@ const messages = {
 					},
 					toasts: {
 						saved: "Settings saved.",
+					},
+					receiptData: {
+						title: "Receipt details",
+						hint: "These details appear in the header and footer of printed receipts. All fields are optional.",
+						fields: {
+							tradeName: "Trade name",
+							legalName: "Legal name",
+							document: "Tax ID / Document",
+							phone: "Phone",
+							address: "Address",
+							footerMessage: "Footer message",
+						},
 					},
 				},
 			},

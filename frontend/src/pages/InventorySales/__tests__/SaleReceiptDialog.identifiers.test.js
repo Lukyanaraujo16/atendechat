@@ -13,6 +13,10 @@ jest.mock("../../../hooks/useIsMobile", () => ({
   default: jest.fn(() => false),
 }));
 
+jest.mock("../../../services/inventoryApi", () => ({
+  getInventoryReceiptBranding: jest.fn(() => Promise.resolve({ data: {} })),
+}));
+
 const theme = createTheme();
 
 function saleWithItems(items) {

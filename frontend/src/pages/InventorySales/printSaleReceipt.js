@@ -146,6 +146,25 @@ html, body {
   font-weight: 700;
   font-size: 1.15em;
 }
+.sale-receipt-branding {
+  margin-bottom: 6px;
+  text-align: center;
+  white-space: pre-line;
+}
+.sale-receipt-branding-trade {
+  font-weight: 700;
+  font-size: 1.2em;
+}
+.sale-receipt-branding-line,
+.sale-receipt-branding-footer {
+  white-space: pre-line;
+}
+.sale-receipt-branding-footer {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid #111;
+  text-align: center;
+}
 .sale-receipt-thermal-cancelled {
   margin-top: 6px;
   padding: 4px 2px;
@@ -349,7 +368,7 @@ function destroyPrintFrame(iframe, mount) {
   }
 }
 
-function runPrint(sale, format) {
+function runPrint(sale, format, branding) {
   return new Promise((resolve, reject) => {
     let iframe = null;
     let mount = null;
@@ -400,7 +419,12 @@ function runPrint(sale, format) {
 
       ReactDOM.render(
         <ThemeProvider theme={printTheme}>
-          <SaleReceiptContent sale={sale} layout="print" format={profile.id} />
+          <SaleReceiptContent
+            sale={sale}
+            layout="print"
+            format={profile.id}
+            branding={branding}
+          />
         </ThemeProvider>,
         mount
       );
@@ -442,12 +466,16 @@ function runPrint(sale, format) {
  * Imprime o recibo num iframe isolado. Chamadas sobrepostas reutilizam o mesmo trabalho.
  * Dados da venda entram só pelo React, nunca por concatenação de HTML.
  */
-export function printSaleReceipt(sale, format = DEFAULT_SALE_RECEIPT_PRINT_FORMAT) {
+export function printSaleReceipt(
+  sale,
+  format = DEFAULT_SALE_RECEIPT_PRINT_FORMAT,
+  branding = null
+) {
   if (!isSaleReceiptPrintFormat(format)) {
     return Promise.reject(new Error("print-format-invalid"));
   }
   if (activeJob) return activeJob;
-  activeJob = runPrint(sale, format).finally(() => {
+  activeJob = runPrint(sale, format, branding).finally(() => {
     activeJob = null;
   });
   return activeJob;

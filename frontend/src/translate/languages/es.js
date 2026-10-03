@@ -500,6 +500,10 @@ const messages = {
             pendingAmount: "Valor pendiente",
             notes: "Observaciones",
             paymentNotes: "Observaciones de pago",
+            branding: {
+              document: "Documento",
+              phone: "Teléfono",
+            },
             columns: {
               product: "Producto",
               quantity: "Cant.",
@@ -678,6 +682,18 @@ const messages = {
           },
           toasts: {
             saved: "Configuración guardada.",
+          },
+          receiptData: {
+            title: "Datos del recibo",
+            hint: "Esta información aparece en el encabezado y en el pie de los recibos impresos. Todos los campos son opcionales.",
+            fields: {
+              tradeName: "Nombre comercial",
+              legalName: "Razón social",
+              document: "Documento de identificación",
+              phone: "Teléfono",
+              address: "Dirección",
+              footerMessage: "Mensaje de pie",
+            },
           },
         },
       },

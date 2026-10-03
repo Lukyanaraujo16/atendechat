@@ -53,6 +53,30 @@ class InventorySettings extends Model<InventorySettings> {
   @Column
   nextSaleNumber: number;
 
+  @AllowNull
+  @Column(DataType.STRING(120))
+  receiptTradeName: string | null;
+
+  @AllowNull
+  @Column(DataType.STRING(160))
+  receiptLegalName: string | null;
+
+  @AllowNull
+  @Column(DataType.STRING(32))
+  receiptDocument: string | null;
+
+  @AllowNull
+  @Column(DataType.STRING(32))
+  receiptPhone: string | null;
+
+  @AllowNull
+  @Column(DataType.STRING(255))
+  receiptAddress: string | null;
+
+  @AllowNull
+  @Column(DataType.STRING(500))
+  receiptFooterMessage: string | null;
+
   @CreatedAt
   createdAt: Date;
 

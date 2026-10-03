@@ -22,6 +22,10 @@ import {
 } from "./utils";
 import { identifiersFromSaleItem } from "./saleItemIdentifiers";
 import { isThermalSaleReceiptFormat } from "./saleReceiptPrintFormats";
+import {
+  hasReceiptBrandingFooter,
+  hasReceiptBrandingHeader,
+} from "./receiptBranding";
 
 const useStyles = makeStyles((theme) => ({
   receiptRoot: {
@@ -44,6 +48,29 @@ const useStyles = makeStyles((theme) => ({
     fontWeight: 700,
     fontSize: "1.25rem",
     letterSpacing: "0.02em",
+  },
+  branding: {
+    textAlign: "center",
+    marginBottom: theme.spacing(2),
+  },
+  brandingTrade: {
+    fontWeight: 700,
+    fontSize: "1.125rem",
+    wordBreak: "break-word",
+  },
+  brandingLine: {
+    fontSize: "0.8125rem",
+    wordBreak: "break-word",
+    whiteSpace: "pre-line",
+  },
+  brandingFooter: {
+    marginTop: theme.spacing(2),
+    paddingTop: theme.spacing(1.5),
+    borderTop: "1px solid #ddd",
+    textAlign: "center",
+    fontSize: "0.8125rem",
+    whiteSpace: "pre-line",
+    wordBreak: "break-word",
   },
   cancelledBanner: {
     marginTop: theme.spacing(1.5),
@@ -200,13 +227,81 @@ function ReceiptItemIdentifiers({ item, classes }) {
   );
 }
 
+function ReceiptBrandingHeader({ branding, classes, thermal }) {
+  if (!hasReceiptBrandingHeader(branding)) return null;
+  const prominent = branding.tradeName || branding.legalName;
+  const legalBelow = Boolean(branding.tradeName && branding.legalName);
+  const documentLabel = i18n.t("inventorySales.sales.receipt.branding.document");
+  const phoneLabel = i18n.t("inventorySales.sales.receipt.branding.phone");
+
+  if (thermal) {
+    return (
+      <div className="sale-receipt-branding">
+        {prominent ? (
+          <div className="sale-receipt-branding-trade">{prominent}</div>
+        ) : null}
+        {legalBelow ? (
+          <div className="sale-receipt-branding-line">{branding.legalName}</div>
+        ) : null}
+        {branding.document ? (
+          <div className="sale-receipt-branding-line">
+            {documentLabel}: {branding.document}
+          </div>
+        ) : null}
+        {branding.address ? (
+          <div className="sale-receipt-branding-line">{branding.address}</div>
+        ) : null}
+        {branding.phone ? (
+          <div className="sale-receipt-branding-line">
+            {phoneLabel}: {branding.phone}
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <div className={classes.branding}>
+      {prominent ? (
+        <div className={classes.brandingTrade}>{prominent}</div>
+      ) : null}
+      {legalBelow ? (
+        <div className={classes.brandingLine}>{branding.legalName}</div>
+      ) : null}
+      {branding.document ? (
+        <div className={classes.brandingLine}>
+          {documentLabel}: {branding.document}
+        </div>
+      ) : null}
+      {branding.address ? (
+        <div className={classes.brandingLine}>{branding.address}</div>
+      ) : null}
+      {branding.phone ? (
+        <div className={classes.brandingLine}>
+          {phoneLabel}: {branding.phone}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function ReceiptBrandingFooter({ branding, classes, thermal }) {
+  if (!hasReceiptBrandingFooter(branding)) return null;
+  if (thermal) {
+    return (
+      <div className="sale-receipt-branding-footer">{branding.footerMessage}</div>
+    );
+  }
+  return <div className={classes.brandingFooter}>{branding.footerMessage}</div>;
+}
+
 function getPendingAmount(sale) {
   const total = toNumber(sale?.totalAmount);
   const paid = toNumber(sale?.paidAmount);
   return Math.max(0, Math.round((total - paid) * 100) / 100);
 }
 
-function ThermalReceipt({ sale, classes }) {
+function ThermalReceipt({ sale, classes, branding }) {
   const items = Array.isArray(sale.items) ? sale.items : [];
   const isCancelled = sale.status === "cancelled";
   const customerName = sale.contact?.name || "";
@@ -223,6 +318,7 @@ function ThermalReceipt({ sale, classes }) {
   return (
     <div className="sale-receipt-print-page sale-receipt-thermal">
       <div className="sale-receipt-thermal-top">
+        <ReceiptBrandingHeader branding={branding} classes={classes} thermal />
         <div className="sale-receipt-thermal-title">
           {i18n.t("inventorySales.sales.receipt.title")}
         </div>
@@ -362,6 +458,8 @@ function ThermalReceipt({ sale, classes }) {
           <div>{displayValue(sale.cancelReason)}</div>
         </div>
       ) : null}
+
+      <ReceiptBrandingFooter branding={branding} classes={classes} thermal />
     </div>
   );
 }
@@ -370,7 +468,12 @@ function ThermalReceipt({ sale, classes }) {
  * Conteúdo do recibo compartilhado pelo diálogo e pelo documento de impressão.
  * `layout="print"` no A4 força a tabela. Térmica usa blocos, sem a viewport da tela.
  */
-export default function SaleReceiptContent({ sale, layout = "screen", format }) {
+export default function SaleReceiptContent({
+  sale,
+  layout = "screen",
+  format,
+  branding = null,
+}) {
   const classes = useStyles();
   const isMobileViewport = useIsMobile();
   const isThermalPrint = layout === "print" && isThermalSaleReceiptFormat(format);
@@ -379,7 +482,7 @@ export default function SaleReceiptContent({ sale, layout = "screen", format }) 
   if (!sale) return null;
 
   if (isThermalPrint) {
-    return <ThermalReceipt sale={sale} classes={classes} />;
+    return <ThermalReceipt sale={sale} classes={classes} branding={branding} />;
   }
 
   const items = Array.isArray(sale.items) ? sale.items : [];
@@ -433,6 +536,7 @@ export default function SaleReceiptContent({ sale, layout = "screen", format }) 
 
   return (
     <div className={rootClass}>
+      <ReceiptBrandingHeader branding={branding} classes={classes} />
       <div className={classes.receiptHeader}>
         <Typography className={classes.receiptTitle}>
           {i18n.t("inventorySales.sales.receipt.title")}
@@ -593,6 +697,8 @@ export default function SaleReceiptContent({ sale, layout = "screen", format }) 
           </div>
         </Box>
       ) : null}
+
+      <ReceiptBrandingFooter branding={branding} classes={classes} />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import AppError from "../errors/AppError";
 import GetOrCreateInventorySettingsService from "../services/InventoryService/GetOrCreateInventorySettingsService";
+import GetInventoryReceiptBrandingService from "../services/InventoryService/GetInventoryReceiptBrandingService";
 import UpdateInventorySettingsService from "../services/InventoryService/UpdateInventorySettingsService";
 import ListInventoryCategoriesService from "../services/InventoryService/ListInventoryCategoriesService";
 import CreateInventoryCategoryService from "../services/InventoryService/CreateInventoryCategoryService";
@@ -37,6 +38,15 @@ export const getSettings = async (
   const companyId = companyIdOrThrow(req);
   const settings = await GetOrCreateInventorySettingsService(companyId);
   return res.json(settings);
+};
+
+export const getReceiptBranding = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const branding = await GetInventoryReceiptBrandingService(companyId);
+  return res.json(branding);
 };
 
 export const updateSettings = async (

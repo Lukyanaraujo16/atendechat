@@ -15,16 +15,24 @@ import {
 import { i18n } from "../../translate/i18n";
 import SaleReceiptContent from "./SaleReceiptContent";
 import { printSaleReceipt } from "./printSaleReceipt";
+import { getInventoryReceiptBranding } from "../../services/inventoryApi";
 import {
   DEFAULT_SALE_RECEIPT_PRINT_FORMAT,
   SALE_RECEIPT_PRINT_FORMAT_LIST,
 } from "./saleReceiptPrintFormats";
+import {
+  EMPTY_RECEIPT_BRANDING,
+  receiptBrandingFromSettings,
+  sameReceiptBranding,
+} from "./receiptBranding";
 
 export default function SaleReceiptDialog({ open, onClose, sale }) {
   const [printing, setPrinting] = useState(false);
   const [format, setFormat] = useState(DEFAULT_SALE_RECEIPT_PRINT_FORMAT);
+  const [branding, setBranding] = useState(EMPTY_RECEIPT_BRANDING);
   const printingRef = useRef(false);
   const mountedRef = useRef(true);
+  const brandingRequestRef = useRef(null);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -39,6 +47,25 @@ export default function SaleReceiptDialog({ open, onClose, sale }) {
     if (open) setFormat(DEFAULT_SALE_RECEIPT_PRINT_FORMAT);
   }, [open, saleId]);
 
+  useEffect(() => {
+    if (!open) {
+      brandingRequestRef.current = null;
+      return undefined;
+    }
+    let cancelled = false;
+    const request = getInventoryReceiptBranding()
+      .then(({ data }) => receiptBrandingFromSettings(data))
+      .catch(() => ({ ...EMPTY_RECEIPT_BRANDING }));
+    brandingRequestRef.current = request;
+    request.then((next) => {
+      if (cancelled || !mountedRef.current) return;
+      setBranding((current) => (sameReceiptBranding(current, next) ? current : next));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, saleId]);
+
   if (!sale) return null;
 
   const handleFormat = (_event, next) => {
@@ -50,7 +77,11 @@ export default function SaleReceiptDialog({ open, onClose, sale }) {
     if (printingRef.current) return;
     printingRef.current = true;
     setPrinting(true);
-    printSaleReceipt(sale, format)
+    const pending = brandingRequestRef.current || Promise.resolve(branding);
+    pending
+      .then((loaded) =>
+        printSaleReceipt(sale, format, loaded || EMPTY_RECEIPT_BRANDING)
+      )
       .catch(() => {
         toast.error(i18n.t("inventorySales.sales.receipt.printError"));
       })
@@ -74,7 +105,7 @@ export default function SaleReceiptDialog({ open, onClose, sale }) {
         {i18n.t("inventorySales.sales.receipt.title")}
       </AppDialogTitle>
       <AppDialogContent dividers style={{ padding: 0, backgroundColor: "#fff" }}>
-        <SaleReceiptContent sale={sale} layout="screen" />
+        <SaleReceiptContent sale={sale} layout="screen" branding={branding} />
       </AppDialogContent>
       <AppDialogActions
         className="sale-receipt-no-print"

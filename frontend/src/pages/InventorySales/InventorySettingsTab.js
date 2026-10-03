@@ -30,6 +30,12 @@ export default function InventorySettingsTab() {
     defaultCommissionRate: "0",
     allowNegativeStock: false,
     saleNumberPrefix: "",
+    receiptTradeName: "",
+    receiptLegalName: "",
+    receiptDocument: "",
+    receiptPhone: "",
+    receiptAddress: "",
+    receiptFooterMessage: "",
   });
 
   const load = useCallback(async () => {
@@ -44,6 +50,12 @@ export default function InventorySettingsTab() {
             : "0",
         allowNegativeStock: data.allowNegativeStock === true,
         saleNumberPrefix: data.saleNumberPrefix || "",
+        receiptTradeName: data.receiptTradeName || "",
+        receiptLegalName: data.receiptLegalName || "",
+        receiptDocument: data.receiptDocument || "",
+        receiptPhone: data.receiptPhone || "",
+        receiptAddress: data.receiptAddress || "",
+        receiptFooterMessage: data.receiptFooterMessage || "",
       });
     } catch (err) {
       setLoadError(true);
@@ -77,6 +89,12 @@ export default function InventorySettingsTab() {
         defaultCommissionRate: rate,
         allowNegativeStock: form.allowNegativeStock,
         saleNumberPrefix: form.saleNumberPrefix.trim() || null,
+        receiptTradeName: form.receiptTradeName.trim() || null,
+        receiptLegalName: form.receiptLegalName.trim() || null,
+        receiptDocument: form.receiptDocument.trim() || null,
+        receiptPhone: form.receiptPhone.trim() || null,
+        receiptAddress: form.receiptAddress.trim() || null,
+        receiptFooterMessage: form.receiptFooterMessage.trim() || null,
       });
       toast.success(i18n.t("inventorySales.settings.toasts.saved"));
       load();
@@ -103,11 +121,11 @@ export default function InventorySettingsTab() {
 
   return (
     <Box maxWidth={520}>
-      <Typography variant="h6" style={{ fontWeight: 600, marginBottom: 16 }}>
-        {i18n.t("inventorySales.settings.title")}
-      </Typography>
-      <AppSectionCard variant="outlined">
-        <form onSubmit={handleSave}>
+      <form onSubmit={handleSave}>
+        <Typography variant="h6" style={{ fontWeight: 600, marginBottom: 16 }}>
+          {i18n.t("inventorySales.settings.title")}
+        </Typography>
+        <AppSectionCard variant="outlined">
           <Box display="flex" flexDirection="column" style={{ gap: 20 }}>
             <TextField
               label={i18n.t("inventorySales.settings.fields.defaultCommissionRate")}
@@ -139,14 +157,90 @@ export default function InventorySettingsTab() {
               }
               label={i18n.t("inventorySales.settings.fields.allowNegativeStock")}
             />
-            <Box>
-              <AppPrimaryButton type="submit" disabled={saving}>
-                {i18n.t("inventorySales.common.save")}
-              </AppPrimaryButton>
-            </Box>
           </Box>
-        </form>
-      </AppSectionCard>
+        </AppSectionCard>
+        <Box mt={3}>
+          <Typography variant="h6" style={{ fontWeight: 600, marginBottom: 8 }}>
+            {i18n.t("inventorySales.settings.receiptData.title")}
+          </Typography>
+          <Typography variant="body2" color="textSecondary" style={{ marginBottom: 16 }}>
+            {i18n.t("inventorySales.settings.receiptData.hint")}
+          </Typography>
+          <AppSectionCard variant="outlined">
+            <Box display="flex" flexDirection="column" style={{ gap: 20 }}>
+              <TextField
+                id="receipt-trade-name"
+                label={i18n.t("inventorySales.settings.receiptData.fields.tradeName")}
+                value={form.receiptTradeName}
+                onChange={setField("receiptTradeName")}
+                variant="outlined"
+                size="small"
+                fullWidth
+                inputProps={{ maxLength: 120 }}
+              />
+              <TextField
+                id="receipt-legal-name"
+                label={i18n.t("inventorySales.settings.receiptData.fields.legalName")}
+                value={form.receiptLegalName}
+                onChange={setField("receiptLegalName")}
+                variant="outlined"
+                size="small"
+                fullWidth
+                inputProps={{ maxLength: 160 }}
+              />
+              <TextField
+                id="receipt-document"
+                label={i18n.t("inventorySales.settings.receiptData.fields.document")}
+                value={form.receiptDocument}
+                onChange={setField("receiptDocument")}
+                variant="outlined"
+                size="small"
+                fullWidth
+                inputProps={{ maxLength: 32 }}
+              />
+              <TextField
+                id="receipt-phone"
+                label={i18n.t("inventorySales.settings.receiptData.fields.phone")}
+                value={form.receiptPhone}
+                onChange={setField("receiptPhone")}
+                variant="outlined"
+                size="small"
+                fullWidth
+                inputProps={{ maxLength: 32 }}
+              />
+              <TextField
+                id="receipt-address"
+                label={i18n.t("inventorySales.settings.receiptData.fields.address")}
+                value={form.receiptAddress}
+                onChange={setField("receiptAddress")}
+                variant="outlined"
+                size="small"
+                fullWidth
+                multiline
+                rows={3}
+                inputProps={{ maxLength: 255 }}
+              />
+              <TextField
+                id="receipt-footer-message"
+                label={i18n.t("inventorySales.settings.receiptData.fields.footerMessage")}
+                value={form.receiptFooterMessage}
+                onChange={setField("receiptFooterMessage")}
+                variant="outlined"
+                size="small"
+                fullWidth
+                multiline
+                rows={3}
+                inputProps={{ maxLength: 500 }}
+              />
+            </Box>
+          </AppSectionCard>
+        </Box>
+        <Box mt={2}>
+          <AppPrimaryButton type="submit" disabled={saving}>
+            {i18n.t("inventorySales.common.save")}
+          </AppPrimaryButton>
+        </Box>
+      </form>
     </Box>
   );
 }

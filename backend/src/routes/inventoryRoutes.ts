@@ -36,6 +36,15 @@ inventoryRoutes.put(
   requireInventorySalesPermission(INVENTORY_SALES_MANAGE_SETTINGS),
   InventoryController.updateSettings
 );
+inventoryRoutes.get(
+  "/inventory/receipt-branding",
+  isAuth,
+  requireInventorySalesPermission(
+    INVENTORY_SALES_VIEW,
+    INVENTORY_SALES_MANAGE_SETTINGS
+  ),
+  InventoryController.getReceiptBranding
+);
 
 inventoryRoutes.get(
   "/inventory/seller-profiles",
