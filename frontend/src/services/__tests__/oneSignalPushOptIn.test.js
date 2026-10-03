@@ -168,7 +168,8 @@ describe("enableOneSignalPushSubscription", () => {
     expect(result.ok).toBe(true);
     expect(result.domainState).toBe(PUSH_DOMAIN_STATES.SUBSCRIBED);
     expect(api.User.PushSubscription.optIn).toHaveBeenCalled();
-    expect(api.login).toHaveBeenCalledWith("42");
+    expect(api.login).toHaveBeenCalledWith("streamhub_user_42");
+    expect(api.login).not.toHaveBeenCalledWith("42");
     expect(api.User.addTags).toHaveBeenCalled();
     expect(getOneSignalPushStatus().subscriptionId).toBe("sub-confirmed");
     expect(updates).toContain(PUSH_DOMAIN_STATES.SUBSCRIBING);
@@ -206,7 +207,7 @@ describe("enableOneSignalPushSubscription", () => {
     const result = await enableOneSignalPushSubscription({ user: { id: 5 } });
     expect(result.ok).toBe(true);
     expect(api.User.PushSubscription.optIn).not.toHaveBeenCalled();
-    expect(api.login).toHaveBeenCalledWith("5");
+    expect(api.login).toHaveBeenCalledWith("streamhub_user_5");
   });
 
   it("logout limpa identidade sem destruir opt-in físico", async () => {
@@ -276,12 +277,13 @@ describe("enableOneSignalPushSubscription", () => {
     });
     __forceOneSignalReadyForTests(api);
     await enableOneSignalPushSubscription({ user: { id: 11 } });
-    expect(api.login).toHaveBeenCalledWith("11");
+    expect(api.login).toHaveBeenCalledWith("streamhub_user_11");
     await oneSignalLogout();
     expect(getOneSignalPushStatus().externalUserId).toBeNull();
     await enableOneSignalPushSubscription({ user: { id: 22 } });
-    expect(api.login).toHaveBeenLastCalledWith("22");
-    expect(getOneSignalPushStatus().externalUserId).toBe("22");
+    expect(api.login).toHaveBeenLastCalledWith("streamhub_user_22");
+    expect(api.login).not.toHaveBeenCalledWith("22");
+    expect(getOneSignalPushStatus().externalUserId).toBe("streamhub_user_22");
   });
 
   it("permission default concedida no optIn confirma id e token", async () => {
@@ -520,7 +522,7 @@ describe("enableOneSignalPushSubscription", () => {
     expect(waitsBeforeLogin).toBe(1);
     expect(names).toContain("subscription_stability_reused");
     expect(names).not.toContain("subscription_stability_revalidation_required");
-    expect(api.login).toHaveBeenCalledWith("30");
+    expect(api.login).toHaveBeenCalledWith("streamhub_user_30");
     expect(getOneSignalPushStatus().subscribing).toBe(false);
   });
 
@@ -552,7 +554,7 @@ describe("enableOneSignalPushSubscription", () => {
     expect(result.ok).toBe(true);
     expect(waitsBeforeLogin).toBe(2);
     expect(names).toContain("subscription_stability_revalidation_required");
-    expect(api.login).toHaveBeenCalledWith("31");
+    expect(api.login).toHaveBeenCalledWith("streamhub_user_31");
     expect(getOneSignalPushStatus().subscriptionId).toBe("id-mutated");
   });
 

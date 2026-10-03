@@ -340,7 +340,7 @@ describe("oneSignalSubscriptionStability (2.13F)", () => {
       timeoutMs: 600,
     });
     await syncOneSignalUser({ id: 25, companyId: 1, profile: "admin" });
-    expect(api.login).toHaveBeenCalledWith("25");
+    expect(api.login).toHaveBeenCalledWith("streamhub_user_25");
   });
 
   it("chamadas concorrentes reutilizam Promise de estabilidade/login", async () => {
@@ -405,7 +405,7 @@ describe("oneSignalSubscriptionStability (2.13F)", () => {
     await enableOneSignalPushSubscription({
       user: { id: 25, companyId: 1, profile: "admin" },
     });
-    expect(api.login).toHaveBeenCalledWith("25");
+    expect(api.login).toHaveBeenCalledWith("streamhub_user_25");
     expect(api.User.addTags).toHaveBeenCalledTimes(1);
   });
 
@@ -425,7 +425,7 @@ describe("oneSignalSubscriptionStability (2.13F)", () => {
     const probe = getOneSignalAnonymousProbe();
     expect(probe.phase).toBe("before_login");
     await completeOneSignalLoginAfterProbe(user);
-    expect(api.login).toHaveBeenCalledWith("25");
+    expect(api.login).toHaveBeenCalledWith("streamhub_user_25");
   });
 
   it("logout invalida e workers/scopes intactos", async () => {

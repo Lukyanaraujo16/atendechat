@@ -1,24 +1,25 @@
 /**
- * Contrato de identidade OneSignal Web (Fase 2.13E).
+ * Contrato de identidade OneSignal Web.
  *
- * External ID = String(user.id) — o mesmo valor que o backend envia em
- * include_aliases.external_id (e legado include_external_user_ids).
+ * External ID de login = streamhub_user_<User.id>.
+ * O backend continua enviando o par legado + namespaced.
  * Nunca companyId, e-mail, JWT ou subscription id.
  *
  * companyId / profile / queues são apenas tags (metadados).
+ * A tag user_id permanece o id interno do StreamHub, não o External ID.
  */
 
+const ONESIGNAL_EXTERNAL_ID_PREFIX = "streamhub_user_";
+
 /**
- * Resolve o External ID individual do utilizador.
+ * Id interno aceito pelo contrato atual: user.id, senão user.userId.
  * @param {object|null|undefined} user
  * @returns {string|null}
  */
-export function resolveOneSignalExternalId(user) {
+function resolveStreamHubUserId(user) {
   if (user == null || typeof user !== "object") {
     return null;
   }
-  // Preferir user.id (contrato backend include_aliases.external_id).
-  // Nunca usar companyId / company.id.
   const raw =
     user.id != null && user.id !== ""
       ? user.id
@@ -28,16 +29,29 @@ export function resolveOneSignalExternalId(user) {
   if (raw == null || raw === "") {
     return null;
   }
-  const externalId = String(raw).trim();
+  const userId = String(raw).trim();
   if (
-    !externalId ||
-    externalId === "undefined" ||
-    externalId === "null" ||
-    externalId === "[object Object]"
+    !userId ||
+    userId === "undefined" ||
+    userId === "null" ||
+    userId === "[object Object]"
   ) {
     return null;
   }
-  return externalId;
+  return userId;
+}
+
+/**
+ * Resolve o External ID individual do utilizador.
+ * @param {object|null|undefined} user
+ * @returns {string|null}
+ */
+export function resolveOneSignalExternalId(user) {
+  const userId = resolveStreamHubUserId(user);
+  if (!userId) {
+    return null;
+  }
+  return `${ONESIGNAL_EXTERNAL_ID_PREFIX}${userId}`;
 }
 
 /**
@@ -83,12 +97,14 @@ export function resolveOneSignalQueueIdsTag(user) {
 
 /**
  * Tags metadado — não definem identidade.
+ * user_id é o id interno do StreamHub. O argumento externalId é o alias de
+ * login e não é copiado para a tag.
  * @param {object} user
- * @param {string} externalId
+ * @param {string} [_externalId]
  * @returns {Record<string, string>}
  */
-export function buildOneSignalIdentityTags(user, externalId) {
-  const uid = externalId || resolveOneSignalExternalId(user) || "";
+export function buildOneSignalIdentityTags(user, _externalId) {
+  const uid = resolveStreamHubUserId(user) || "";
   return {
     user_id: String(uid),
     company_id: resolveOneSignalCompanyIdTag(user),

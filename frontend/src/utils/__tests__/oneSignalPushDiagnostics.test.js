@@ -214,7 +214,7 @@ describe("oneSignalPushDiagnostics (2.13D)", () => {
 
     const result = await enableOneSignalPushSubscription({ user: { id: 77 } });
     expect(result.ok).toBe(true);
-    expect(api.login).toHaveBeenCalledWith("77");
+    expect(api.login).toHaveBeenCalledWith("streamhub_user_77");
     const tl = getPushDiagnosticTimeline();
     expect(tl.some((e) => e.name === "optin_resolved")).toBe(true);
     expect(tl.some((e) => e.name === "subscription_change_received")).toBe(true);
@@ -326,7 +326,7 @@ describe("oneSignalPushDiagnostics (2.13D)", () => {
     });
     __forceOneSignalReadyForTests(chromeApi);
     await enableOneSignalPushSubscription({ user: { id: 100 } });
-    expect(chromeApi.login).toHaveBeenCalledWith("100");
+    expect(chromeApi.login).toHaveBeenCalledWith("streamhub_user_100");
     const chromeId = getOneSignalPushStatus().subscriptionId;
 
     await oneSignalLogout();
@@ -350,7 +350,7 @@ describe("oneSignalPushDiagnostics (2.13D)", () => {
     });
     __forceOneSignalReadyForTests(firefoxApi);
     await enableOneSignalPushSubscription({ user: { id: 100 } });
-    expect(firefoxApi.login).toHaveBeenCalledWith("100");
+    expect(firefoxApi.login).toHaveBeenCalledWith("streamhub_user_100");
     expect(getOneSignalPushStatus().subscriptionId).toBe("firefox-sub-id");
     expect(chromeId).toBe("chrome-sub-id");
     expect(chromeId).not.toBe(getOneSignalPushStatus().subscriptionId);

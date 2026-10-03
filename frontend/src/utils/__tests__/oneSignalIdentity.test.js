@@ -80,29 +80,65 @@ function createMockSdk({
 }
 
 describe("oneSignalIdentity contract (2.13E)", () => {
-  it("user 25 / company 1 → external id 25, nunca 1", () => {
+  it("user 25 / company 1 → streamhub_user_25, tag user_id 25", () => {
     const user = { id: 25, companyId: 1, profile: "admin", queues: [{ id: 3 }] };
-    expect(resolveOneSignalExternalId(user)).toBe("25");
+    expect(resolveOneSignalExternalId(user)).toBe("streamhub_user_25");
     expect(resolveOneSignalCompanyIdTag(user)).toBe("1");
-    const tags = buildOneSignalIdentityTags(user, "25");
+    const tags = buildOneSignalIdentityTags(user, "streamhub_user_25");
     expect(tags.user_id).toBe("25");
     expect(tags.company_id).toBe("1");
     expect(resolveOneSignalExternalId(user)).not.toBe(
       resolveOneSignalCompanyIdTag(user)
     );
+    expect(resolveOneSignalExternalId(user)).not.toContain("1");
   });
 
-  it("user 26 / company 1 → external id 26", () => {
+  it("user 32 → streamhub_user_32", () => {
+    expect(resolveOneSignalExternalId({ id: 32 })).toBe("streamhub_user_32");
+  });
+
+  it("companyId não altera o External ID", () => {
+    expect(resolveOneSignalExternalId({ id: 25, companyId: 1 })).toBe(
+      "streamhub_user_25"
+    );
+    expect(resolveOneSignalExternalId({ id: 25, companyId: 999 })).toBe(
+      "streamhub_user_25"
+    );
+  });
+
+  it("fallback user.userId também é namespaced", () => {
+    expect(resolveOneSignalExternalId({ userId: 25 })).toBe("streamhub_user_25");
+    expect(resolveOneSignalExternalId({ id: "", userId: 32 })).toBe(
+      "streamhub_user_32"
+    );
+  });
+
+  it("ids inválidos não geram namespace vazio", () => {
+    expect(resolveOneSignalExternalId(null)).toBeNull();
+    expect(resolveOneSignalExternalId(undefined)).toBeNull();
+    expect(resolveOneSignalExternalId({})).toBeNull();
+    expect(resolveOneSignalExternalId({ id: null })).toBeNull();
+    expect(resolveOneSignalExternalId({ id: undefined })).toBeNull();
+    expect(resolveOneSignalExternalId({ id: "" })).toBeNull();
+    expect(resolveOneSignalExternalId({ id: "null" })).toBeNull();
+    expect(resolveOneSignalExternalId({ id: "undefined" })).toBeNull();
+    expect(resolveOneSignalExternalId({ userId: "null" })).toBeNull();
+    expect(resolveOneSignalExternalId({ id: "  " })).toBeNull();
+  });
+
+  it("user 26 / company 1 → streamhub_user_26", () => {
     expect(
       resolveOneSignalExternalId({ id: 26, companyId: 1, profile: "user" })
-    ).toBe("26");
+    ).toBe("streamhub_user_26");
   });
 
   it("não resolve External ID a partir de companyId puro ou número", () => {
     expect(resolveOneSignalExternalId(1)).toBeNull();
     expect(resolveOneSignalExternalId("1")).toBeNull();
     expect(resolveOneSignalExternalId({ companyId: 1 })).toBeNull();
-    expect(resolveOneSignalExternalId({ id: 1, companyId: 1 })).toBe("1");
+    expect(resolveOneSignalExternalId({ id: 1, companyId: 1 })).toBe(
+      "streamhub_user_1"
+    );
   });
 
   it("tags signature é estável independente da ordem de construção", () => {
@@ -138,10 +174,11 @@ describe("oneSignalIdentity contract (2.13E)", () => {
       profile: "admin",
     };
     const desc = describeOneSignalSupportModeIdentity(user);
-    expect(desc.sessionUserExternalId).toBe("99");
+    expect(desc.sessionUserExternalId).toBe("streamhub_user_99");
     expect(desc.selectedCompanyIdTag).toBe("1");
     expect(desc.usesTenantCompanyIdAsExternalId).toBe(false);
-    expect(resolveOneSignalExternalId(user)).toBe("99");
+    expect(resolveOneSignalExternalId(user)).toBe("streamhub_user_99");
+    expect(resolveOneSignalExternalId(user)).not.toContain("company");
   });
 
   it("sync key inclui app + external + subscription", () => {
@@ -152,6 +189,13 @@ describe("oneSignalIdentity contract (2.13E)", () => {
         subscriptionId: "sub-a",
       })
     ).toBe("app:25:sub-a");
+    const namespaced = buildOneSignalIdentitySyncKey({
+      appId: "app",
+      externalId: resolveOneSignalExternalId({ id: 25 }),
+      subscriptionId: "sub-a",
+    });
+    expect(namespaced).toBe("app:streamhub_user_25:sub-a");
+    expect(namespaced).not.toBe("app:25:sub-a");
   });
 
   it("assertExternalIdIsNotCompanyId documenta ambiguidade user=company", () => {
@@ -183,13 +227,14 @@ describe("oneSignal identity sync single-flight (2.13E)", () => {
     global.Notification = originalNotification;
   });
 
-  it("userId 25/companyId 1 → login \"25\", nunca \"1\"", async () => {
+  it("userId 25/companyId 1 → login streamhub_user_25, nunca \"25\" nem \"1\"", async () => {
     const api = createMockSdk();
     __forceOneSignalReadyForTests(api);
     await enableOneSignalPushSubscription({
       user: { id: 25, companyId: 1, profile: "admin", queues: [{ id: 1 }] },
     });
-    expect(api.login).toHaveBeenCalledWith("25");
+    expect(api.login).toHaveBeenCalledWith("streamhub_user_25");
+    expect(api.login).not.toHaveBeenCalledWith("25");
     expect(api.login).not.toHaveBeenCalledWith("1");
     expect(api.User.addTags).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -198,7 +243,7 @@ describe("oneSignal identity sync single-flight (2.13E)", () => {
         profile: "admin",
       })
     );
-    expect(getOneSignalPushStatus().externalUserId).toBe("25");
+    expect(getOneSignalPushStatus().externalUserId).toBe("streamhub_user_25");
   });
 
   it("Chrome e Firefox: mesmo External ID, subscriptions distintas", async () => {
@@ -207,7 +252,7 @@ describe("oneSignal identity sync single-flight (2.13E)", () => {
     await enableOneSignalPushSubscription({
       user: { id: 25, companyId: 1, profile: "admin" },
     });
-    expect(chrome.login).toHaveBeenCalledWith("25");
+    expect(chrome.login).toHaveBeenCalledWith("streamhub_user_25");
     const chromeSub = getOneSignalPushStatus().subscriptionId;
 
     await oneSignalLogout();
@@ -227,7 +272,7 @@ describe("oneSignal identity sync single-flight (2.13E)", () => {
     await enableOneSignalPushSubscription({
       user: { id: 25, companyId: 1, profile: "admin" },
     });
-    expect(firefox.login).toHaveBeenCalledWith("25");
+    expect(firefox.login).toHaveBeenCalledWith("streamhub_user_25");
     expect(getOneSignalPushStatus().subscriptionId).toBe("firefox-sub");
     expect(chromeSub).toBe("chrome-sub");
     expect(chromeSub).not.toBe(getOneSignalPushStatus().subscriptionId);
@@ -254,7 +299,7 @@ describe("oneSignal identity sync single-flight (2.13E)", () => {
     await Promise.resolve();
     await new Promise((r) => setTimeout(r, 120));
     expect(api.login).toHaveBeenCalledTimes(1);
-    expect(api.login).toHaveBeenCalledWith("25");
+    expect(api.login).toHaveBeenCalledWith("streamhub_user_25");
     expect(typeof releaseLogin).toBe("function");
     releaseLogin();
     await Promise.all([p1, p2, p3, p4]);
@@ -318,7 +363,8 @@ describe("oneSignal identity sync single-flight (2.13E)", () => {
       { maxAttempts: 2, baseDelayMs: 20 }
     );
     expect(result.ok).toBe(false);
-    expect(api.login).toHaveBeenCalledWith("25");
+    expect(api.login).toHaveBeenCalledWith("streamhub_user_25");
+    expect(api.login).not.toHaveBeenCalledWith("25");
     expect(api.login.mock.calls.length).toBeGreaterThanOrEqual(2);
     expect(api.User.addTags).not.toHaveBeenCalled();
     expect(getOneSignalPushStatus().externalUserId).toBeNull();
@@ -344,7 +390,7 @@ describe("oneSignal identity sync single-flight (2.13E)", () => {
     expect(result.ok).toBe(true);
     expect(api.login).toHaveBeenCalledTimes(2);
     expect(api.User.addTags).toHaveBeenCalledTimes(1);
-    expect(getOneSignalPushStatus().externalUserId).toBe("25");
+    expect(getOneSignalPushStatus().externalUserId).toBe("streamhub_user_25");
   });
 
   it("push desabilitado → sync falha sem login", async () => {
@@ -371,8 +417,9 @@ describe("oneSignal identity sync single-flight (2.13E)", () => {
     expect(api.logout).toHaveBeenCalled();
     expect(getOneSignalPushStatus().externalUserId).toBeNull();
     await syncOneSignalUser({ id: 25, companyId: 1, profile: "admin" });
-    expect(api.login).toHaveBeenLastCalledWith("25");
-    expect(getOneSignalPushStatus().externalUserId).toBe("25");
+    expect(api.login).toHaveBeenLastCalledWith("streamhub_user_25");
+    expect(api.login).not.toHaveBeenCalledWith("25");
+    expect(getOneSignalPushStatus().externalUserId).toBe("streamhub_user_25");
   });
 
   it("troca de conta troca o External ID", async () => {
@@ -381,8 +428,12 @@ describe("oneSignal identity sync single-flight (2.13E)", () => {
     await syncOneSignalUser({ id: 25, companyId: 1, profile: "admin" });
     await oneSignalLogout();
     await syncOneSignalUser({ id: 26, companyId: 1, profile: "user" });
-    expect(api.login.mock.calls.map((c) => c[0])).toEqual(["25", "26"]);
-    expect(getOneSignalPushStatus().externalUserId).toBe("26");
+    expect(api.login.mock.calls.map((c) => c[0])).toEqual([
+      "streamhub_user_25",
+      "streamhub_user_26",
+    ]);
+    expect(api.login).not.toHaveBeenCalledWith("25");
+    expect(getOneSignalPushStatus().externalUserId).toBe("streamhub_user_26");
   });
 
   it("opt-out: sync ainda associa External ID (permissão ≠ preferência backend)", async () => {
@@ -394,19 +445,21 @@ describe("oneSignal identity sync single-flight (2.13E)", () => {
       profile: "admin",
     });
     expect(result.ok).toBe(true);
-    expect(api.login).toHaveBeenCalledWith("25");
+    expect(api.login).toHaveBeenCalledWith("streamhub_user_25");
+    expect(api.login).not.toHaveBeenCalledWith("25");
   });
 
   it("logout invalida cache e utilizador B não herda A", async () => {
     const api = createMockSdk();
     __forceOneSignalReadyForTests(api);
     await syncOneSignalUser({ id: 25, companyId: 1, profile: "admin" });
-    expect(getOneSignalPushStatus().externalUserId).toBe("25");
+    expect(getOneSignalPushStatus().externalUserId).toBe("streamhub_user_25");
     await oneSignalLogout();
     expect(getOneSignalPushStatus().externalUserId).toBeNull();
     await syncOneSignalUser({ id: 26, companyId: 1, profile: "user" });
-    expect(api.login).toHaveBeenLastCalledWith("26");
-    expect(getOneSignalPushStatus().externalUserId).toBe("26");
+    expect(api.login).toHaveBeenLastCalledWith("streamhub_user_26");
+    expect(api.logout).toHaveBeenCalled();
+    expect(getOneSignalPushStatus().externalUserId).toBe("streamhub_user_26");
   });
 
   it("diagnóstico não expõe JWT/token/subscription completa", async () => {
@@ -421,6 +474,6 @@ describe("oneSignal identity sync single-flight (2.13E)", () => {
     expect(json).not.toContain("full-push-token-secret-value");
     expect(json).not.toContain("full-subscription-id-secret");
     expect(json).not.toMatch(/eyJ[A-Za-z0-9_-]+\./);
-    expect(diag.identitySync.lastExternalId).toBe("25");
+    expect(diag.identitySync.lastExternalId).toBe("streamhub_user_25");
   });
 });
