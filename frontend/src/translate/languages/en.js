@@ -250,7 +250,9 @@ const messages = {
 					categories: "Categories",
 					lowStockListTitle: "Low stock products",
 					noLowStock: "No products with low stock right now.",
+					quickActions: "Quick actions",
 					recentSalesTitle: "Recent sales",
+					viewAllSales: "View all",
 					noRecentSales: "No recent sales.",
 					recentSalesError: "Could not load recent sales.",
 					actions: {

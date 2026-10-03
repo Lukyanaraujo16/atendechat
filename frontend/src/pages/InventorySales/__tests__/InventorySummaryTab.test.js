@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 
 import InventorySummaryTab from "../InventorySummaryTab";
 import { ManualSaleProvider } from "../ManualSaleProvider";
+import { INVENTORY_TABS } from "../constants";
 
 class MockMutationObserver {
   observe() {}
@@ -47,11 +48,13 @@ jest.mock("react-toastify", () => ({
   toast: { success: jest.fn(), error: jest.fn() },
 }));
 
+const mockNavigateTab = jest.fn();
+
 function renderSummary() {
   return render(
     <ManualSaleProvider>
       <InventorySummaryTab
-        onNavigateTab={jest.fn()}
+        onNavigateTab={mockNavigateTab}
         onNewProduct={jest.fn()}
         onNewMovement={jest.fn()}
       />
@@ -61,6 +64,7 @@ function renderSummary() {
 
 describe("aba Resumo", () => {
   beforeEach(() => {
+    mockNavigateTab.mockClear();
     mockPerms.canCreateSale = true;
     mockPerms.canManageProducts = true;
     mockPerms.canManageStock = true;
@@ -94,7 +98,14 @@ describe("aba Resumo", () => {
       expect(mockListInventorySales).toHaveBeenCalledWith({ page: 1, limit: 5 });
     });
     expect(await screen.findByText(/Ana/)).toBeTruthy();
+    expect(screen.getByText("Concluída")).toBeTruthy();
+    expect(screen.getByText("1")).toBeTruthy();
+    expect(screen.getByText("2")).toBeTruthy();
     expect(screen.queryByText(/totalSold|totalPaid|totalPending/)).toBeNull();
+    userEvent.click(screen.getByText("Ver todas"));
+    expect(mockNavigateTab).toHaveBeenCalledWith(INVENTORY_TABS.SALES);
+    userEvent.click(screen.getByText("Ver movimentações"));
+    expect(mockNavigateTab).toHaveBeenCalledWith(INVENTORY_TABS.STOCK);
   });
 
   it("oculta Nova venda sem createSale e respeita as outras permissões", async () => {
@@ -108,6 +119,17 @@ describe("aba Resumo", () => {
     expect(screen.queryByText("Novo produto")).toBeNull();
     expect(screen.queryByText("Entrada / ajuste")).toBeNull();
     expect(screen.getByText("Ver movimentações")).toBeTruthy();
+    expect(screen.getByText("Nenhum produto com estoque baixo no momento.")).toBeTruthy();
+  });
+
+  it("mostra retry quando as vendas recentes falham", async () => {
+    mockListInventorySales.mockRejectedValue(new Error("fail"));
+    renderSummary();
+    expect(await screen.findByText("Não foi possível carregar as vendas recentes.")).toBeTruthy();
+    expect(screen.getByText("Produtos ativos")).toBeTruthy();
+    mockListInventorySales.mockResolvedValue({ data: { sales: [] } });
+    userEvent.click(screen.getByText("Tentar novamente"));
+    expect(await screen.findByText("Nenhuma venda recente.")).toBeTruthy();
   });
 
   it("reusa o POST manual ao criar a venda", async () => {

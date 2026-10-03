@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Box, Paper, Tab } from "@material-ui/core";
+import { Box, Paper, Tab, Typography } from "@material-ui/core";
 import { makeStyles } from "@material-ui/core/styles";
 
 import MainContainer from "../../components/MainContainer";
@@ -32,6 +32,11 @@ const useStyles = makeStyles((theme) => ({
     borderRadius: theme.shape.borderRadius,
     border: `1px solid ${theme.palette.divider}`,
     overflow: "hidden",
+  },
+  pageSubtitle: {
+    display: "block",
+    marginTop: theme.spacing(0.5),
+    color: theme.palette.text.secondary,
   },
   tabContent: {
     paddingTop: theme.spacing(1),
@@ -127,8 +132,20 @@ const InventorySales = () => {
     <MainContainer>
       <div className={classes.pageRoot}>
         <AppPageHeader
-          title={i18n.t("inventorySales.title")}
-          subtitle={i18n.t("inventorySales.subtitle")}
+          title={
+            <Typography variant="h5" component="h1">
+              {i18n.t("inventorySales.title")}
+            </Typography>
+          }
+          subtitle={
+            <Typography
+              variant="body2"
+              component="p"
+              className={classes.pageSubtitle}
+            >
+              {i18n.t("inventorySales.subtitle")}
+            </Typography>
+          }
         />
 
         {tabDefs.length > 0 ? (

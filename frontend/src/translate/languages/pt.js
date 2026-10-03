@@ -252,7 +252,9 @@ const messages = {
           categories: "Categorias",
           lowStockListTitle: "Produtos com estoque baixo",
           noLowStock: "Nenhum produto com estoque baixo no momento.",
+          quickActions: "Ações rápidas",
           recentSalesTitle: "Últimas vendas",
+          viewAllSales: "Ver todas",
           noRecentSales: "Nenhuma venda recente.",
           recentSalesError: "Não foi possível carregar as vendas recentes.",
           actions: {
