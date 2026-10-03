@@ -88,7 +88,7 @@ describe("SendOneSignalPushNotificationService — API responses", () => {
     expect(result.success).toBe(true);
     expect(result.apiRecipients).toBe(2);
     expect(result.notificationId).toBe("n-ok");
-    expect(result.externalUserIds).toEqual(["25"]);
+    expect(result.externalUserIds).toEqual(["25", "streamhub_user_25"]);
   });
 
   it("HTTP 200 com recipients = 0 → não é sucesso", async () => {
@@ -182,7 +182,9 @@ describe("SendOneSignalPushNotificationService — API responses", () => {
     });
     expect(axiosPost.mock.calls[0][1].include_aliases.external_id).toEqual([
       "25",
-      "26"
+      "streamhub_user_25",
+      "26",
+      "streamhub_user_26"
     ]);
   });
 
@@ -197,7 +199,8 @@ describe("SendOneSignalPushNotificationService — API responses", () => {
     });
     expect(result.success).toBe(true);
     expect(axiosPost.mock.calls[0][1].include_aliases.external_id).toEqual([
-      "25"
+      "25",
+      "streamhub_user_25"
     ]);
     expect(axiosPost.mock.calls[0][1].data.type).toBe(
       "onesignal_directed_test"

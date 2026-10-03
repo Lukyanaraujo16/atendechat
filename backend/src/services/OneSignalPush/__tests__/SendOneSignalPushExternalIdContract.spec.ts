@@ -1,6 +1,6 @@
 /**
- * Contrato External ID OneSignal = String(userId), nunca companyId.
- * Targeting atual: include_aliases.external_id + target_channel=push.
+ * Fase 1: cada destinatário vai como alias legado e namespaced.
+ * companyId nunca é External ID. target_channel permanece push.
  */
 jest.mock("axios", () => ({
   __esModule: true,
@@ -90,8 +90,14 @@ describe("SendOneSignalPushNotificationService — external id contract (2.13E)"
 
     expect(axiosPost).toHaveBeenCalledTimes(1);
     const payload = axiosPost.mock.calls[0][1];
-    expect(payload.include_aliases.external_id).toEqual(["25"]);
+    expect(payload.include_aliases.external_id).toEqual([
+      "25",
+      "streamhub_user_25"
+    ]);
     expect(payload.include_aliases.external_id).not.toContain("1");
+    expect(payload.include_aliases.external_id).not.toContain(
+      "streamhub_user_1"
+    );
     expect(payload.target_channel).toBe("push");
     expect(payload.app_id).toBe("app-test");
     expect(payload).not.toHaveProperty("include_external_user_ids");
@@ -115,7 +121,8 @@ describe("SendOneSignalPushNotificationService — external id contract (2.13E)"
       }
     });
     expect(axiosPost.mock.calls[0][1].include_aliases.external_id).toEqual([
-      "26"
+      "26",
+      "streamhub_user_26"
     ]);
   });
 
@@ -136,7 +143,7 @@ describe("SendOneSignalPushNotificationService — external id contract (2.13E)"
       }
     });
     const ids = axiosPost.mock.calls[0][1].include_aliases.external_id;
-    expect(ids).toEqual(["25", "26"]);
+    expect(ids).toEqual(["25", "streamhub_user_25", "26", "streamhub_user_26"]);
     expect(ids).not.toContain(1);
     expect(ids).not.toContain("1");
   });
@@ -188,7 +195,8 @@ describe("SendOneSignalPushNotificationService — external id contract (2.13E)"
     });
     expect(filterOutUsersViewingTicket).not.toHaveBeenCalled();
     expect(axiosPost.mock.calls[0][1].include_aliases.external_id).toEqual([
-      "25"
+      "25",
+      "streamhub_user_25"
     ]);
     expect(axiosPost.mock.calls[0][1].include_aliases.external_id).not.toEqual([
       "1"
@@ -215,10 +223,69 @@ describe("SendOneSignalPushNotificationService — external id contract (2.13E)"
       }
     });
     expect(axiosPost.mock.calls[0][1].include_aliases.external_id).toEqual([
-      "25"
+      "25",
+      "streamhub_user_25"
     ]);
     expect(
       axiosPost.mock.calls[0][1].include_aliases.external_id
     ).not.toContain("26");
+    expect(
+      axiosPost.mock.calls[0][1].include_aliases.external_id
+    ).not.toContain("streamhub_user_26");
+  });
+
+  it("25 e 32 geram os dois pares e um único POST", async () => {
+    await SendOneSignalPushNotificationService({
+      eventType: "ticket.message",
+      preferenceCategory: "message",
+      companyId: 9,
+      ticketId: 14,
+      recipientUserIds: [25, 32],
+      title: "t",
+      body: "b",
+      data: {
+        type: "ticket.message",
+        ticketId: 14,
+        companyId: 9,
+        status: "open"
+      }
+    });
+    expect(axiosPost).toHaveBeenCalledTimes(1);
+    const payload = axiosPost.mock.calls[0][1];
+    expect(payload.include_aliases.external_id).toEqual([
+      "25",
+      "streamhub_user_25",
+      "32",
+      "streamhub_user_32"
+    ]);
+    expect(payload.target_channel).toBe("push");
+    expect(payload.include_aliases.external_id).not.toContain("9");
+    expect(payload.include_aliases.external_id).not.toContain(
+      "streamhub_user_9"
+    );
+  });
+
+  it("ids duplicados não repetem aliases", async () => {
+    await SendOneSignalPushNotificationService({
+      eventType: "ticket.message",
+      preferenceCategory: "message",
+      companyId: 1,
+      ticketId: 15,
+      recipientUserIds: [25, 25, 32],
+      title: "t",
+      body: "b",
+      data: {
+        type: "ticket.message",
+        ticketId: 15,
+        companyId: 1,
+        status: "open"
+      }
+    });
+    expect(axiosPost.mock.calls[0][1].include_aliases.external_id).toEqual([
+      "25",
+      "streamhub_user_25",
+      "32",
+      "streamhub_user_32"
+    ]);
   });
 });

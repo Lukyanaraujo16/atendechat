@@ -3,6 +3,7 @@ import { logger } from "../../utils/logger";
 import GetOneSignalServerSettingsService from "./GetOneSignalServerSettingsService";
 import { filterOutUsersViewingTicket } from "../../libs/cache";
 import persistInAppNotificationsFromPush from "../UserNotificationService/persistInAppNotificationsFromPush";
+import { expandOneSignalExternalIdAliases } from "./oneSignalExternalId";
 import {
   PushPreferenceCategory,
   filterUserIdsByPushPreference,
@@ -262,14 +263,15 @@ const SendOneSignalPushNotificationService = async (
     );
   }
 
-  const externalUserIds = finalUserIds.map(id => String(id));
+  const externalUserIds = expandOneSignalExternalIdAliases(finalUserIds);
+  const recipientCount = finalUserIds.length;
 
   const settings = await GetOneSignalServerSettingsService();
   if (!settings.enabled || !settings.appId || !settings.restApiKey) {
     logger.info(
       {
         ...logBase,
-        recipientCount: externalUserIds.length,
+        recipientCount,
         skipped: "disabled_or_incomplete_config",
         inAppPersisted: true
       },
@@ -295,7 +297,7 @@ const SendOneSignalPushNotificationService = async (
     {
       ...logBase,
       phase: "onesignal_request_started",
-      recipientCount: externalUserIds.length,
+      recipientCount,
       targeting: "include_aliases.external_id"
     },
     "[OneSignalPush]"
@@ -319,7 +321,7 @@ const SendOneSignalPushNotificationService = async (
       logger.warn(
         {
           ...logBase,
-          recipientCount: externalUserIds.length,
+          recipientCount,
           recipients: externalUserIds,
           success: false,
           errorCode: "zero_recipients",
@@ -343,7 +345,7 @@ const SendOneSignalPushNotificationService = async (
     logger.info(
       {
         ...logBase,
-        recipientCount: externalUserIds.length,
+        recipientCount,
         recipients: externalUserIds,
         success: true,
         httpStatus: res.status,
@@ -388,7 +390,7 @@ const SendOneSignalPushNotificationService = async (
     logger.warn(
       {
         ...logBase,
-        recipientCount: externalUserIds.length,
+        recipientCount,
         recipients: externalUserIds,
         success: false,
         httpStatus,
