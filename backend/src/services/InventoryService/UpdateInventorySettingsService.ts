@@ -1,6 +1,7 @@
 import AppError from "../../errors/AppError";
 import InventorySettings from "../../models/InventorySettings";
 import GetOrCreateInventorySettingsService from "./GetOrCreateInventorySettingsService";
+import { isReceiptPrintFormat } from "./inventoryReceiptPrintFormat";
 import { parseDecimal } from "./inventoryTenant";
 
 type UpdateBody = {
@@ -13,6 +14,7 @@ type UpdateBody = {
   receiptPhone?: unknown;
   receiptAddress?: unknown;
   receiptFooterMessage?: unknown;
+  receiptPrintFormat?: unknown;
 };
 
 const RECEIPT_TEXT_FIELDS: Array<{
@@ -102,6 +104,18 @@ export default async function UpdateInventorySettingsService(input: {
       );
     }
   });
+
+  if (input.body.receiptPrintFormat !== undefined) {
+    const requestedFormat = input.body.receiptPrintFormat;
+    if (!isReceiptPrintFormat(requestedFormat)) {
+      throw new AppError(
+        "ERR_VALIDATION_ERROR",
+        400,
+        "Formato de impressão inválido."
+      );
+    }
+    patch.receiptPrintFormat = requestedFormat;
+  }
 
   if (Object.keys(patch).length === 0) {
     return settings;

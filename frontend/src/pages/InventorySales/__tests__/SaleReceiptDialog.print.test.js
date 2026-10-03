@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 import React from "react";
-import { fireEvent, render, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, waitFor } from "@testing-library/react";
 import { createTheme, ThemeProvider } from "@material-ui/core/styles";
 import { toast } from "react-toastify";
 
@@ -23,9 +23,11 @@ jest.mock("react-toastify", () => ({
 }));
 
 const mockGetInventoryReceiptBranding = jest.fn(() => Promise.resolve({ data: {} }));
+const mockUpdateInventorySettings = jest.fn();
 
 jest.mock("../../../services/inventoryApi", () => ({
   getInventoryReceiptBranding: (...args) => mockGetInventoryReceiptBranding(...args),
+  updateInventorySettings: (...args) => mockUpdateInventorySettings(...args),
 }));
 
 class MutationObserverMock {
@@ -86,6 +88,12 @@ function renderDialog(currentSale, onClose = () => {}) {
   );
 }
 
+async function whenPrintReady(view) {
+  await waitFor(() => {
+    expect(view.getByRole("button", { name: "Imprimir" }).disabled).toBe(false);
+  });
+}
+
 function baseSale(overrides = {}) {
   return {
     id: 7,
@@ -136,6 +144,7 @@ beforeEach(() => {
   toast.error.mockClear();
   mockGetInventoryReceiptBranding.mockReset();
   mockGetInventoryReceiptBranding.mockResolvedValue({ data: {} });
+  mockUpdateInventorySettings.mockReset();
   installBridge();
   jest.spyOn(window, "print").mockImplementation(() => {
     throw new Error("parent-print");
@@ -157,6 +166,7 @@ describe("SaleReceiptDialog impressão isolada A4", () => {
   it("o botão Imprimir abre documento isolado com CSS A4 e não usa window.print", async () => {
     const fetchSpy = jest.spyOn(global, "fetch").mockResolvedValue({ ok: true });
     const { getByRole } = renderDialog(baseSale());
+    await whenPrintReady({ getByRole });
 
     fireEvent.click(getByRole("button", { name: "Imprimir" }));
 
@@ -208,6 +218,7 @@ describe("SaleReceiptDialog impressão isolada A4", () => {
       }),
       onClose
     );
+    await whenPrintReady({ getByRole });
 
     fireEvent.click(getByRole("button", { name: "Imprimir" }));
     await waitFor(() => expect(printCalls.length).toBe(1));
@@ -224,6 +235,7 @@ describe("SaleReceiptDialog impressão isolada A4", () => {
     useIsMobile.mockReturnValue(true);
     const { getByRole } = renderDialog(baseSale());
     expect(document.querySelector(".sale-receipt-items-mobile")).not.toBeNull();
+    await whenPrintReady({ getByRole });
 
     fireEvent.click(getByRole("button", { name: "Imprimir" }));
     await waitFor(() => expect(printCalls.length).toBe(1));
@@ -237,6 +249,7 @@ describe("SaleReceiptDialog impressão isolada A4", () => {
     printMode = "throw";
     const onClose = jest.fn();
     const { getByRole, getByText } = renderDialog(baseSale(), onClose);
+    await whenPrintReady({ getByRole });
 
     fireEvent.click(getByRole("button", { name: "Imprimir" }));
 
@@ -251,6 +264,7 @@ describe("SaleReceiptDialog impressão isolada A4", () => {
   it("não fecha o modal quando o iframe não pode ser criado", async () => {
     const onClose = jest.fn();
     const { getByRole, getByText } = renderDialog(baseSale(), onClose);
+    await whenPrintReady({ getByRole });
 
     HTMLElement.prototype.appendChild = function appendChild(child) {
       if (
@@ -275,6 +289,7 @@ describe("SaleReceiptDialog impressão isolada A4", () => {
   it("ignora clique duplo e remove o iframe só depois do afterprint", async () => {
     printMode = "hold";
     const { getByRole } = renderDialog(baseSale());
+    await whenPrintReady({ getByRole });
     const button = getByRole("button", { name: "Imprimir" });
 
     fireEvent.click(button);
@@ -409,6 +424,7 @@ describe("SaleReceiptDialog formatos térmicos", () => {
   it("80 mm usa lista térmica no mesmo pipeline, sem tabela A4", async () => {
     const fetchSpy = jest.spyOn(global, "fetch").mockResolvedValue({ ok: true });
     const { getByRole } = renderDialog(baseSale());
+    await whenPrintReady({ getByRole });
 
     expect(document.querySelector(".sale-receipt-items-desktop")).not.toBeNull();
     fireEvent.click(getByRole("button", { name: "80 mm" }));
@@ -441,6 +457,7 @@ describe("SaleReceiptDialog formatos térmicos", () => {
         ],
       })
     );
+    await whenPrintReady({ getByRole });
 
     fireEvent.click(getByRole("button", { name: "58 mm" }));
     fireEvent.click(getByRole("button", { name: "Imprimir" }));
@@ -465,6 +482,7 @@ describe("SaleReceiptDialog formatos térmicos", () => {
         cancelReason: "Cliente desistiu <img src=x onerror=alert(1)>",
       })
     );
+    await whenPrintReady({ getByRole });
 
     fireEvent.click(getByRole("button", { name: "80 mm" }));
     fireEvent.click(getByRole("button", { name: "Imprimir" }));
@@ -489,6 +507,7 @@ describe("SaleReceiptDialog formatos térmicos", () => {
         paymentNotes: "",
       })
     );
+    await whenPrintReady({ getByRole });
 
     fireEvent.click(getByRole("button", { name: "58 mm" }));
     fireEvent.click(getByRole("button", { name: "Imprimir" }));
@@ -506,6 +525,7 @@ describe("SaleReceiptDialog formatos térmicos", () => {
   it("tela mobile com A4 continua A4 e tela desktop com 58 continua 58", async () => {
     useIsMobile.mockReturnValue(true);
     const mobile = renderDialog(baseSale());
+    await whenPrintReady(mobile);
     fireEvent.click(mobile.getByRole("button", { name: "Imprimir" }));
     await waitFor(() => expect(printCalls.length).toBe(1));
     expect(printCalls[0].html).toContain("size: A4 portrait");
@@ -515,6 +535,7 @@ describe("SaleReceiptDialog formatos térmicos", () => {
 
     useIsMobile.mockReturnValue(false);
     const desktop = renderDialog(baseSale());
+    await whenPrintReady(desktop);
     fireEvent.click(desktop.getByRole("button", { name: "58 mm" }));
     fireEvent.click(desktop.getByRole("button", { name: "Imprimir" }));
     await waitFor(() => expect(printCalls.length).toBe(1));
@@ -540,10 +561,12 @@ describe("SaleReceiptDialog formatos térmicos", () => {
     }
 
     const { getByRole } = render(<Harness />);
+    await whenPrintReady({ getByRole });
     fireEvent.click(getByRole("button", { name: "80 mm" }));
     fireEvent.click(getByRole("button", { name: "fechar-recibo", hidden: true }));
     fireEvent.click(getByRole("button", { name: "reabrir-recibo", hidden: true }));
 
+    await whenPrintReady({ getByRole });
     await waitFor(() => {
       expect(getByRole("button", { name: "A4" }).getAttribute("aria-pressed")).toBe("true");
     });
@@ -562,6 +585,7 @@ describe("SaleReceiptDialog formatos térmicos", () => {
   it("desabilita a troca de formato enquanto a impressão está em andamento", async () => {
     printMode = "hold";
     const { getByRole } = renderDialog(baseSale());
+    await whenPrintReady({ getByRole });
     fireEvent.click(getByRole("button", { name: "80 mm" }));
     fireEvent.click(getByRole("button", { name: "Imprimir" }));
     await waitFor(() => expect(printCalls.length).toBe(1));
@@ -585,6 +609,7 @@ const FULL_BRANDING = {
 };
 
 async function printCurrent(view, formatLabel) {
+  await whenPrintReady(view);
   if (formatLabel) {
     fireEvent.click(view.getByRole("button", { name: formatLabel }));
   }
@@ -763,5 +788,135 @@ describe("SaleReceiptDialog branding textual", () => {
     img.dispatchEvent(new Event("error"));
     await pending;
     expect(settled).toBe(true);
+  });
+});
+
+describe("SaleReceiptDialog formato padrão da empresa", () => {
+  function Harness({ sale }) {
+    const [open, setOpen] = React.useState(true);
+    const [current, setCurrent] = React.useState(sale);
+    return (
+      <ThemeProvider theme={theme}>
+        <button type="button" onClick={() => setOpen(false)}>
+          fechar-formato
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setCurrent(baseSale({ id: current.id + 1 }));
+            setOpen(true);
+          }}
+        >
+          reabrir-formato
+        </button>
+        <SaleReceiptDialog open={open} onClose={() => setOpen(false)} sale={current} />
+      </ThemeProvider>
+    );
+  }
+
+  async function expectPressed(view, name) {
+    await whenPrintReady(view);
+    expect(view.getByRole("button", { name }).getAttribute("aria-pressed")).toBe("true");
+  }
+
+  it("abre em A4, imprime A4 e não busca settings de novo ao trocar o formato", async () => {
+    const view = renderDialog(baseSale());
+    await expectPressed(view, "A4");
+    const printed = await printCurrent(view, null);
+    expect(printed.html).toContain("size: A4 portrait");
+    expect(mockGetInventoryReceiptBranding).toHaveBeenCalledTimes(1);
+    expect(mockUpdateInventorySettings).not.toHaveBeenCalled();
+    fireEvent.click(view.getByRole("button", { name: "80 mm" }));
+    expect(mockGetInventoryReceiptBranding).toHaveBeenCalledTimes(1);
+    expect(mockUpdateInventorySettings).not.toHaveBeenCalled();
+  });
+
+  it("abre em 80 mm, permite A4 só naquela abertura e volta ao padrão ao reabrir", async () => {
+    mockGetInventoryReceiptBranding.mockResolvedValue({
+      data: { receiptPrintFormat: "thermal80" },
+    });
+    const view = render(<Harness sale={baseSale()} />);
+    await expectPressed(view, "80 mm");
+
+    printCalls = [];
+    fireEvent.click(view.getByRole("button", { name: "A4" }));
+    fireEvent.click(view.getByRole("button", { name: "Imprimir" }));
+    await waitFor(() => expect(printCalls.length).toBe(1));
+    expect(printCalls[0].html).toContain("size: A4 portrait");
+    expect(printCalls[0].html).not.toContain("72mm 100mm");
+    expect(mockUpdateInventorySettings).not.toHaveBeenCalled();
+    expect(mockGetInventoryReceiptBranding).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(view.getByRole("button", { name: "fechar-formato", hidden: true }));
+    fireEvent.click(view.getByRole("button", { name: "reabrir-formato", hidden: true }));
+    await expectPressed(view, "80 mm");
+    expect(mockGetInventoryReceiptBranding).toHaveBeenCalledTimes(2);
+    expect(mockUpdateInventorySettings).not.toHaveBeenCalled();
+  });
+
+  it("abre em 58 mm e a troca manual não persiste", async () => {
+    mockGetInventoryReceiptBranding.mockResolvedValue({
+      data: { receiptPrintFormat: "thermal58" },
+    });
+    const view = render(<Harness sale={baseSale({ id: 21 })} />);
+    await expectPressed(view, "58 mm");
+    fireEvent.click(view.getByRole("button", { name: "A4" }));
+    expect(view.getByRole("button", { name: "A4" }).getAttribute("aria-pressed")).toBe("true");
+    expect(mockUpdateInventorySettings).not.toHaveBeenCalled();
+
+    fireEvent.click(view.getByRole("button", { name: "fechar-formato", hidden: true }));
+    fireEvent.click(view.getByRole("button", { name: "reabrir-formato", hidden: true }));
+    await expectPressed(view, "58 mm");
+  });
+
+  it("se a leitura falha, fica em A4 e a impressão segue", async () => {
+    mockGetInventoryReceiptBranding.mockRejectedValue(new Error("branding-down"));
+    const view = renderDialog(baseSale({ id: 30 }));
+    await expectPressed(view, "A4");
+    const printed = await printCurrent(view, null);
+    expect(printed.text).toContain("Recibo de venda");
+    expect(printed.html).toContain("size: A4 portrait");
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it("aplica o padrão tardio uma única vez e não deixa imprimir antes", async () => {
+    let resolveBranding;
+    mockGetInventoryReceiptBranding.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveBranding = resolve;
+        })
+    );
+    const view = renderDialog(baseSale({ id: 40 }));
+    expect(view.getByRole("button", { name: "Imprimir" }).disabled).toBe(true);
+    expect(view.getByRole("button", { name: "80 mm" }).disabled).toBe(true);
+
+    await act(async () => {
+      resolveBranding({ data: { receiptPrintFormat: "thermal80" } });
+    });
+    await expectPressed(view, "80 mm");
+    expect(mockGetInventoryReceiptBranding).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(view.getByRole("button", { name: "A4" }));
+    expect(view.getByRole("button", { name: "A4" }).getAttribute("aria-pressed")).toBe("true");
+    expect(mockUpdateInventorySettings).not.toHaveBeenCalled();
+  });
+
+  it("libera A4 se a leitura do padrão não responde", async () => {
+    jest.useFakeTimers();
+    try {
+      mockGetInventoryReceiptBranding.mockImplementation(() => new Promise(() => {}));
+      const view = renderDialog(baseSale({ id: 41 }));
+      expect(view.getByRole("button", { name: "Imprimir" }).disabled).toBe(true);
+      await act(async () => {
+        jest.advanceTimersByTime(4000);
+      });
+      expect(view.getByRole("button", { name: "Imprimir" }).disabled).toBe(false);
+      expect(view.getByRole("button", { name: "A4" }).getAttribute("aria-pressed")).toBe(
+        "true"
+      );
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

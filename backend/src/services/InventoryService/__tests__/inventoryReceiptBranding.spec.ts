@@ -72,7 +72,8 @@ describe("InventorySettings branding do recibo", () => {
       receiptPhone: "(27) 99999-9999",
       receiptAddress: null,
       receiptFooterMessage: null,
-      receiptLogoUrl: null
+      receiptLogoUrl: null,
+      receiptPrintFormat: "a4"
     });
     expect(branding).not.toHaveProperty("nextSaleNumber");
     expect(branding).not.toHaveProperty("companyId");
@@ -196,5 +197,107 @@ describe("InventorySettings branding do recibo", () => {
     });
     expect(row.update).not.toHaveBeenCalled();
     expect(row.receiptLogoUrl).toBe(stored);
+  });
+
+  it("persiste só a4, thermal80 e thermal58 e faz update parcial", async () => {
+    const row = settingsRow({
+      receiptPrintFormat: "a4",
+      receiptTradeName: "Loja ABC",
+      receiptLogoUrl: "/public/inventory-receipts/company-4/logo.png",
+      nextSaleNumber: 9
+    });
+    findOrCreate.mockResolvedValue([row, false] as never);
+
+    await UpdateInventorySettingsService({
+      companyId: 4,
+      body: { receiptPrintFormat: "a4" }
+    });
+    expect(row.update).toHaveBeenCalledWith({ receiptPrintFormat: "a4" });
+
+    await UpdateInventorySettingsService({
+      companyId: 4,
+      body: { receiptPrintFormat: "thermal80" }
+    });
+    expect(row.receiptPrintFormat).toBe("thermal80");
+    expect(row.receiptTradeName).toBe("Loja ABC");
+    expect(row.receiptLogoUrl).toBe(
+      "/public/inventory-receipts/company-4/logo.png"
+    );
+    expect(row.nextSaleNumber).toBe(9);
+    expect(row.defaultCommissionRate).toBe(5);
+
+    await UpdateInventorySettingsService({
+      companyId: 4,
+      body: { receiptPrintFormat: "thermal58" }
+    });
+    expect(row.receiptPrintFormat).toBe("thermal58");
+
+    (row.update as jest.Mock).mockClear();
+    await UpdateInventorySettingsService({
+      companyId: 4,
+      body: { defaultCommissionRate: 7 }
+    });
+    expect(row.update).toHaveBeenCalledWith({ defaultCommissionRate: 7 });
+    expect(row.receiptPrintFormat).toBe("thermal58");
+
+    const invalid = ["thermal-80", "80", "", null, 80, { format: "a4" }];
+    await invalid.reduce(async (previous, value) => {
+      await previous;
+      await expect(
+        UpdateInventorySettingsService({
+          companyId: 4,
+          body: { receiptPrintFormat: value }
+        })
+      ).rejects.toBeInstanceOf(AppError);
+    }, Promise.resolve());
+    expect(row.receiptPrintFormat).toBe("thermal58");
+  });
+
+  it("a leitura do recibo devolve o formato e cai em A4 se o valor for inesperado", async () => {
+    const row = settingsRow({ receiptPrintFormat: "thermal80" });
+    findOrCreate.mockResolvedValue([row, false] as never);
+
+    expect(
+      (await GetInventoryReceiptBrandingService(4)).receiptPrintFormat
+    ).toBe("thermal80");
+
+    row.receiptPrintFormat = "thermal58";
+    expect(
+      (await GetInventoryReceiptBrandingService(4)).receiptPrintFormat
+    ).toBe("thermal58");
+
+    row.receiptPrintFormat = "80mm";
+    expect(
+      (await GetInventoryReceiptBrandingService(4)).receiptPrintFormat
+    ).toBe("a4");
+
+    row.receiptPrintFormat = null;
+    expect(
+      (await GetInventoryReceiptBrandingService(4)).receiptPrintFormat
+    ).toBe("a4");
+  });
+
+  it("o formato de uma empresa não altera a outra", async () => {
+    const companyA = settingsRow({ companyId: 4, receiptPrintFormat: "a4" });
+    const companyB = settingsRow({
+      companyId: 8,
+      receiptPrintFormat: "thermal80"
+    });
+    findOrCreate.mockImplementation(((options: {
+      where?: { companyId?: number };
+    }) => {
+      const companyId = options.where && options.where.companyId;
+      return Promise.resolve([companyId === 8 ? companyB : companyA, false]);
+    }) as never);
+
+    await UpdateInventorySettingsService({
+      companyId: 8,
+      body: { companyId: 4, nextSaleNumber: 1, receiptPrintFormat: "thermal58" }
+    });
+
+    expect(companyB.receiptPrintFormat).toBe("thermal58");
+    expect(companyB.nextSaleNumber).toBe(9);
+    expect(companyA.update).not.toHaveBeenCalled();
+    expect(companyA.receiptPrintFormat).toBe("a4");
   });
 });

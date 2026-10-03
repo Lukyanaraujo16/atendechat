@@ -1,4 +1,8 @@
 import { getApiUrl } from "../../config/backendUrl";
+import {
+  DEFAULT_SALE_RECEIPT_PRINT_FORMAT,
+  isSaleReceiptPrintFormat,
+} from "./saleReceiptPrintFormats";
 
 export const EMPTY_RECEIPT_BRANDING = {
   tradeName: "",
@@ -37,6 +41,12 @@ export function receiptBrandingFromSettings(data) {
 
 export function receiptLogoDisplayUrl(stored) {
   return asLogoUrl(stored);
+}
+
+export function receiptPrintFormatFromPayload(data) {
+  const value = data && data.receiptPrintFormat;
+  if (isSaleReceiptPrintFormat(value)) return value;
+  return DEFAULT_SALE_RECEIPT_PRINT_FORMAT;
 }
 
 export function hasReceiptBrandingHeader(branding) {

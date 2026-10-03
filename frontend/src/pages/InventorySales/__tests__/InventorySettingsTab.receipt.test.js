@@ -142,6 +142,7 @@ describe("InventorySettings dados do recibo", () => {
       receiptPhone: "(27) 98888-8888",
       receiptAddress: "Rua X, 123",
       receiptFooterMessage: "Obrigado.",
+      receiptPrintFormat: "a4",
     });
   });
 
@@ -158,6 +159,79 @@ describe("InventorySettings dados do recibo", () => {
     updateInventorySettings.mockRejectedValueOnce(new Error("save-failed"));
     fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
     await waitFor(() => expect(toastError).toHaveBeenCalledTimes(2));
+  });
+
+  it("mostra A4 quando o formato não vem na resposta e envia a escolha no Guardar", async () => {
+    renderTab();
+    expect(await screen.findByRole("button", { name: "Térmica 80 mm" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "A4" }).getAttribute("aria-pressed")).toBe(
+      "true"
+    );
+    expect(screen.getByText("Preferências de impressão")).toBeTruthy();
+    expect(screen.getByText("Configurações do estoque")).toBeTruthy();
+    expect(screen.getByText("Dados do recibo")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Esse formato será selecionado automaticamente ao abrir um recibo. Você ainda poderá alterá-lo antes de imprimir."
+      )
+    ).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Térmica 58 mm" }));
+    fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
+
+    await waitFor(() => expect(updateInventorySettings).toHaveBeenCalledTimes(1));
+    expect(updateInventorySettings.mock.calls[0][0].receiptPrintFormat).toBe("thermal58");
+    expect(updateInventorySettings.mock.calls[0][0].receiptTradeName).toBe("Loja ABC");
+    expect(uploadInventoryReceiptLogo).not.toHaveBeenCalled();
+  });
+
+  it("carrega 80 mm e 58 mm e mantém o valor depois de salvar", async () => {
+    getInventorySettings.mockResolvedValue({
+      data: { ...savedSettings, receiptPrintFormat: "thermal80" },
+    });
+    renderTab();
+    expect(
+      (await screen.findByRole("button", { name: "Térmica 80 mm" })).getAttribute(
+        "aria-pressed"
+      )
+    ).toBe("true");
+
+    fireEvent.click(screen.getByRole("button", { name: "Térmica 58 mm" }));
+    updateInventorySettings.mockResolvedValue({
+      data: { ...savedSettings, receiptPrintFormat: "thermal58" },
+    });
+    getInventorySettings.mockResolvedValue({
+      data: { ...savedSettings, receiptPrintFormat: "thermal58" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
+
+    await waitFor(() =>
+      expect(updateInventorySettings.mock.calls[0][0].receiptPrintFormat).toBe("thermal58")
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Térmica 58 mm" }).getAttribute("aria-pressed")).toBe(
+        "true"
+      )
+    );
+  });
+
+  it("trata formato desconhecido como A4 e mantém o formulário se o Guardar falhar", async () => {
+    getInventorySettings.mockResolvedValue({
+      data: { ...savedSettings, receiptPrintFormat: "80mm" },
+    });
+    renderTab();
+    expect(
+      (await screen.findByRole("button", { name: "A4" })).getAttribute("aria-pressed")
+    ).toBe("true");
+
+    fireEvent.click(screen.getByRole("button", { name: "Térmica 80 mm" }));
+    updateInventorySettings.mockRejectedValueOnce(new Error("save-failed"));
+    fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
+    await waitFor(() => expect(toastError).toHaveBeenCalled());
+    expect(screen.getByRole("button", { name: "Térmica 80 mm" }).getAttribute("aria-pressed")).toBe(
+      "true"
+    );
+    expect(screen.getByLabelText("Nome fantasia").value).toBe("Loja ABC");
   });
 });
 

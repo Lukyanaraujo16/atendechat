@@ -23,16 +23,24 @@ import {
 import {
   EMPTY_RECEIPT_BRANDING,
   receiptBrandingFromSettings,
+  receiptPrintFormatFromPayload,
   sameReceiptBranding,
 } from "./receiptBranding";
+
+const PREFERENCE_TIMEOUT_MS = 4000;
 
 export default function SaleReceiptDialog({ open, onClose, sale }) {
   const [printing, setPrinting] = useState(false);
   const [format, setFormat] = useState(DEFAULT_SALE_RECEIPT_PRINT_FORMAT);
+  const [formatReady, setFormatReady] = useState(false);
   const [branding, setBranding] = useState(EMPTY_RECEIPT_BRANDING);
+  const [trackedOpen, setTrackedOpen] = useState(false);
+  const [trackedSaleId, setTrackedSaleId] = useState(null);
   const printingRef = useRef(false);
   const mountedRef = useRef(true);
   const brandingRequestRef = useRef(null);
+  const formatTouchedRef = useRef(false);
+  const preferenceTimedOutRef = useRef(false);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -43,9 +51,18 @@ export default function SaleReceiptDialog({ open, onClose, sale }) {
 
   const saleId = sale ? sale.id : null;
 
-  useEffect(() => {
-    if (open) setFormat(DEFAULT_SALE_RECEIPT_PRINT_FORMAT);
-  }, [open, saleId]);
+  if (open) {
+    if (!trackedOpen || trackedSaleId !== saleId) {
+      setTrackedOpen(true);
+      setTrackedSaleId(saleId);
+      setFormat(DEFAULT_SALE_RECEIPT_PRINT_FORMAT);
+      setFormatReady(false);
+      formatTouchedRef.current = false;
+      preferenceTimedOutRef.current = false;
+    }
+  } else if (trackedOpen) {
+    setTrackedOpen(false);
+  }
 
   useEffect(() => {
     if (!open) {
@@ -53,32 +70,61 @@ export default function SaleReceiptDialog({ open, onClose, sale }) {
       return undefined;
     }
     let cancelled = false;
+    let formatSettled = false;
     const request = getInventoryReceiptBranding()
-      .then(({ data }) => receiptBrandingFromSettings(data))
-      .catch(() => ({ ...EMPTY_RECEIPT_BRANDING }));
-    brandingRequestRef.current = request;
+      .then(({ data }) => ({
+        branding: receiptBrandingFromSettings(data),
+        format: receiptPrintFormatFromPayload(data),
+      }))
+      .catch(() => ({
+        branding: { ...EMPTY_RECEIPT_BRANDING },
+        format: DEFAULT_SALE_RECEIPT_PRINT_FORMAT,
+      }));
+    brandingRequestRef.current = request.then((loaded) => loaded.branding);
+    const applyFormat = (nextFormat) => {
+      if (cancelled || formatSettled || !mountedRef.current) return;
+      formatSettled = true;
+      if (!formatTouchedRef.current) setFormat(nextFormat);
+      setFormatReady(true);
+    };
+    const timer = setTimeout(() => {
+      preferenceTimedOutRef.current = true;
+      applyFormat(DEFAULT_SALE_RECEIPT_PRINT_FORMAT);
+    }, PREFERENCE_TIMEOUT_MS);
     request.then((next) => {
       if (cancelled || !mountedRef.current) return;
-      setBranding((current) => (sameReceiptBranding(current, next) ? current : next));
+      clearTimeout(timer);
+      setBranding((current) =>
+        sameReceiptBranding(current, next.branding) ? current : next.branding
+      );
+      applyFormat(next.format);
     });
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
   }, [open, saleId]);
 
   if (!sale) return null;
 
   const handleFormat = (_event, next) => {
-    if (printingRef.current || !next) return;
+    if (printingRef.current || !formatReady || !next) return;
+    formatTouchedRef.current = true;
     setFormat(next);
   };
 
   const handlePrint = () => {
-    if (printingRef.current) return;
+    if (printingRef.current || !formatReady) return;
     printingRef.current = true;
     setPrinting(true);
     const pending = brandingRequestRef.current || Promise.resolve(branding);
-    pending
+    const limitMs = preferenceTimedOutRef.current ? 0 : PREFERENCE_TIMEOUT_MS;
+    Promise.race([
+      pending,
+      new Promise((resolve) => {
+        setTimeout(() => resolve(branding), limitMs);
+      }),
+    ])
       .then((loaded) =>
         printSaleReceipt(sale, format, loaded || EMPTY_RECEIPT_BRANDING)
       )
@@ -90,6 +136,8 @@ export default function SaleReceiptDialog({ open, onClose, sale }) {
         if (mountedRef.current) setPrinting(false);
       });
   };
+
+  const formatLocked = printing || !formatReady;
 
   return (
     <AppDialog
@@ -128,7 +176,7 @@ export default function SaleReceiptDialog({ open, onClose, sale }) {
             aria-labelledby="sale-receipt-format-label"
           >
             {SALE_RECEIPT_PRINT_FORMAT_LIST.map((id) => (
-              <ToggleButton key={id} value={id} disabled={printing}>
+              <ToggleButton key={id} value={id} disabled={formatLocked}>
                 {i18n.t(`inventorySales.sales.receipt.formats.${id}`)}
               </ToggleButton>
             ))}
@@ -142,7 +190,7 @@ export default function SaleReceiptDialog({ open, onClose, sale }) {
             startIcon={<PrintIcon />}
             onClick={handlePrint}
             loading={printing}
-            disabled={printing}
+            disabled={formatLocked}
           >
             {i18n.t("inventorySales.sales.receipt.print")}
           </AppPrimaryButton>

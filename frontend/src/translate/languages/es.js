@@ -669,6 +669,19 @@ const messages = {
         },
         settings: {
           title: "Configuración del inventario",
+          stockHint: "Defina reglas generales para ventas y movimientos.",
+          printPreferences: {
+            title: "Preferencias de impresión",
+            hint: "Elija el formato usado por defecto al abrir un recibo.",
+            format: "Formato de impresión predeterminado",
+            helper:
+              "Este formato se seleccionará automáticamente al abrir un recibo. Aún podrá cambiarlo antes de imprimir.",
+            options: {
+              a4: "A4",
+              thermal80: "Térmica 80 mm",
+              thermal58: "Térmica 58 mm",
+            },
+          },
           fields: {
             defaultCommissionRate: "Comisión predeterminada (%)",
             allowNegativeStock: "Permitir stock negativo",

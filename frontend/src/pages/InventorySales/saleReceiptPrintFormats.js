@@ -1,6 +1,7 @@
 /**
- * Formatos de impressão do recibo. A preferência da empresa entra numa fase
- * posterior; aqui nada é persistido.
+ * Identificadores dos formatos de impressão do recibo.
+ * A preferência da empresa fica em InventorySettings e é aplicada pelo modal.
+ * Este módulo não persiste nada.
  */
 export const SALE_RECEIPT_PRINT_FORMATS = {
   a4: "a4",

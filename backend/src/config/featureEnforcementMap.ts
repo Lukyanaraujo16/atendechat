@@ -215,7 +215,7 @@ export const FEATURE_ENFORCEMENT_MAP: Array<{
   },
   {
     feature: "inventory.sales.view | inventory.sales.manageSettings",
-    notes: "Leitura dos textos e da logo do recibo. Edição continua em /inventory/settings.",
+    notes: "Leitura dos textos, da logo e do formato padrão do recibo. Edição continua em /inventory/settings.",
     backendRoutes: ["GET /inventory/receipt-branding"],
   },
   {

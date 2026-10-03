@@ -81,6 +81,10 @@ class InventorySettings extends Model<InventorySettings> {
   @Column(DataType.STRING(255))
   receiptLogoUrl: string | null;
 
+  @Default("a4")
+  @Column({ type: DataType.STRING(16), allowNull: false, defaultValue: "a4" })
+  receiptPrintFormat: string;
+
   @CreatedAt
   createdAt: Date;
 

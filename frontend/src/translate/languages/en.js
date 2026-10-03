@@ -675,6 +675,19 @@ const messages = {
 				},
 				settings: {
 					title: "Inventory settings",
+					stockHint: "Set general rules for sales and stock movements.",
+					printPreferences: {
+						title: "Print preferences",
+						hint: "Choose the format selected by default when a receipt opens.",
+						format: "Default print format",
+						helper:
+							"This format is selected automatically when a receipt opens. You can still change it before printing.",
+						options: {
+							a4: "A4",
+							thermal80: "Thermal 80 mm",
+							thermal58: "Thermal 58 mm",
+						},
+					},
 					fields: {
 						defaultCommissionRate: "Default commission (%)",
 						allowNegativeStock: "Allow negative stock",
