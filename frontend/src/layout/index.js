@@ -228,7 +228,7 @@ const useStyles = makeStyles((theme) => ({
     flexShrink: 0,
     padding: theme.spacing(1.25, 2),
     borderTop: `1px solid ${theme.palette.divider}`,
-    backgroundColor: theme.palette.background.paper,
+    backgroundColor: theme.palette.sidebar,
   },
   drawerUtilitiesTitle: {
     fontSize: "0.6875rem",
@@ -278,7 +278,7 @@ const useStyles = makeStyles((theme) => ({
     whiteSpace: "nowrap",
     width: drawerWidth,
     height: "100%",
-    backgroundColor: theme.palette.background.paper,
+    backgroundColor: theme.palette.sidebar,
     borderRight: `1px solid ${theme.palette.divider}`,
     overflowX: "hidden",
     transition: theme.transitions.create("width", {
@@ -297,7 +297,7 @@ const useStyles = makeStyles((theme) => ({
   },
   drawerPaperClose: {
     overflowX: "hidden",
-    backgroundColor: theme.palette.background.paper,
+    backgroundColor: theme.palette.sidebar,
     borderRight: `1px solid ${theme.palette.divider}`,
     transition: theme.transitions.create("width", {
       easing: theme.transitions.easing.sharp,
@@ -362,7 +362,7 @@ const useStyles = makeStyles((theme) => ({
     flexShrink: 0,
     padding: theme.spacing(1.25, 2),
     borderTop: `1px solid ${theme.palette.divider}`,
-    backgroundColor: theme.palette.background.paper,
+    backgroundColor: theme.palette.sidebar,
   },
   drawerFooterUser: {
     display: "flex",

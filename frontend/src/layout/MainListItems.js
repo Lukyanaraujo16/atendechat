@@ -68,8 +68,15 @@ const useStyles = makeStyles((theme) => {
   const brand = theme.palette.primary.main;
   return {
     listItemIcon: {
-      color: brand,
+      color: theme.palette.type === "light" ? theme.palette.text.secondary : brand,
       minWidth: 40,
+      ...(theme.palette.type === "light"
+        ? {
+            "& .MuiSvgIcon-root": {
+              color: "inherit",
+            },
+          }
+        : {}),
     },
     listItemText: {
       color: theme.palette.text.primary,
@@ -86,7 +93,8 @@ const useStyles = makeStyles((theme) => {
     listItem: {
       minWidth: 0,
       "&:hover": {
-        backgroundColor: alpha(brand, 0.1),
+        backgroundColor:
+          theme.palette.type === "light" ? alpha(brand, 0.06) : alpha(brand, 0.1),
       },
       "&.Mui-selected": {
         backgroundColor:
@@ -97,8 +105,16 @@ const useStyles = makeStyles((theme) => {
         "& .MuiListItemIcon-root": {
           color: brand,
         },
+        ...(theme.palette.type === "light"
+          ? {
+              "& .MuiListItemIcon-root .MuiSvgIcon-root": {
+                color: brand,
+              },
+            }
+          : {}),
         "& .MuiTypography-root": {
           color: theme.palette.text.primary,
+          ...(theme.palette.type === "light" ? { fontWeight: 600 } : {}),
         },
       },
     },

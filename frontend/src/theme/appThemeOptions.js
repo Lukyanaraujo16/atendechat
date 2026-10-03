@@ -3,6 +3,18 @@ import { alpha, darken } from "@material-ui/core/styles";
 /** Cor primária da marca (alinhada ao login / identidade). */
 export const BRAND_PRIMARY = "#24c776";
 
+/** Neutros do tema claro. O tema escuro não usa estes valores. */
+export const LIGHT_CANVAS = "#F5F8F7";
+export const LIGHT_SIDEBAR = "#F8FAF9";
+export const LIGHT_SURFACE = "#F3F7F5";
+export const LIGHT_PAPER = "#FFFFFF";
+export const LIGHT_TEXT_PRIMARY = "#202522";
+export const LIGHT_TEXT_SECONDARY = "#66706B";
+export const LIGHT_TEXT_DISABLED = "#8A938E";
+export const LIGHT_DIVIDER = "#E3E9E6";
+export const LIGHT_BORDER_STRONG = "#C5D1CB";
+export const LIGHT_BORDER_HOVER = "#A9B7B0";
+
 /**
  * Opções de tema (palette + overrides de componentes) por modo claro/escuro.
  * Botões: padrão SaaS — texto legível, sombras leves, hover consistente.
@@ -10,21 +22,24 @@ export const BRAND_PRIMARY = "#24c776";
 export function getThemeOptions(mode) {
   const isLight = mode === "light";
   const primaryMain = BRAND_PRIMARY;
-  const bgDefault = isLight ? "#fafafa" : "#121212";
-  const bgPaper = isLight ? "#ffffff" : "#1e1e1e";
-  const textOnSurface = isLight ? "rgba(0, 0, 0, 0.87)" : "#ffffff";
-  const textSecondary = isLight ? "rgba(0, 0, 0, 0.54)" : "rgba(255, 255, 255, 0.7)";
-  const borderNeutral = isLight ? "rgba(0, 0, 0, 0.23)" : "rgba(255, 255, 255, 0.23)";
-  const dividerColor = isLight ? "rgba(0, 0, 0, 0.12)" : "rgba(255, 255, 255, 0.12)";
+  const bgDefault = isLight ? LIGHT_CANVAS : "#121212";
+  const bgPaper = isLight ? LIGHT_PAPER : "#1e1e1e";
+  const sidebarSurface = isLight ? LIGHT_SIDEBAR : bgPaper;
+  const textOnSurface = isLight ? LIGHT_TEXT_PRIMARY : "#ffffff";
+  const textSecondary = isLight ? LIGHT_TEXT_SECONDARY : "rgba(255, 255, 255, 0.7)";
+  const borderNeutral = isLight ? LIGHT_BORDER_STRONG : "rgba(255, 255, 255, 0.23)";
+  const dividerColor = isLight ? LIGHT_DIVIDER : "rgba(255, 255, 255, 0.12)";
   /** Separadores de modal (título / corpo / ações). */
-  const dialogDivider = isLight ? "rgba(0, 0, 0, 0.08)" : "rgba(255, 255, 255, 0.12)";
+  const dialogDivider = isLight ? LIGHT_DIVIDER : "rgba(255, 255, 255, 0.12)";
   const errorMain = isLight ? "#d32f2f" : "#f44336";
   /** Transição curta para hover/active em componentes interativos (SaaS premium, sem exagero). */
   const interactionMs = 200;
   const ease = "cubic-bezier(0.4, 0, 0.2, 1)";
   const transitionButton = `background-color ${interactionMs}ms ${ease}, color ${interactionMs}ms ${ease}, border-color ${interactionMs}ms ${ease}, box-shadow ${interactionMs}ms ${ease}`;
   const transitionSurface = `background-color ${interactionMs}ms ${ease}, box-shadow ${interactionMs}ms ${ease}`;
-  const tableRowHoverBg = alpha(isLight ? "#000000" : "#ffffff", 0.06);
+  const tableRowHoverBg = isLight
+    ? alpha(LIGHT_TEXT_PRIMARY, 0.035)
+    : alpha("#ffffff", 0.06);
 
   return {
     typography: {
@@ -69,14 +84,16 @@ export function getThemeOptions(mode) {
       text: {
         primary: textOnSurface,
         secondary: textSecondary,
-        disabled: isLight ? "rgba(0, 0, 0, 0.38)" : "rgba(255, 255, 255, 0.5)",
+        disabled: isLight ? LIGHT_TEXT_DISABLED : "rgba(255, 255, 255, 0.5)",
       },
       action: {
-        active: isLight ? "rgba(0, 0, 0, 0.54)" : "rgba(255, 255, 255, 0.56)",
-        hover: isLight ? "rgba(0, 0, 0, 0.04)" : "rgba(255, 255, 255, 0.08)",
-        selected: isLight ? "rgba(0, 0, 0, 0.08)" : "rgba(255, 255, 255, 0.16)",
-        disabled: isLight ? "rgba(0, 0, 0, 0.26)" : "rgba(255, 255, 255, 0.3)",
-        disabledBackground: isLight ? "rgba(0, 0, 0, 0.12)" : "rgba(255, 255, 255, 0.12)",
+        active: isLight ? LIGHT_TEXT_SECONDARY : "rgba(255, 255, 255, 0.56)",
+        hover: isLight ? alpha(LIGHT_TEXT_PRIMARY, 0.04) : "rgba(255, 255, 255, 0.08)",
+        selected: isLight ? alpha(primaryMain, 0.1) : "rgba(255, 255, 255, 0.16)",
+        disabled: isLight ? alpha(LIGHT_TEXT_PRIMARY, 0.38) : "rgba(255, 255, 255, 0.3)",
+        disabledBackground: isLight
+          ? alpha(LIGHT_TEXT_PRIMARY, 0.12)
+          : "rgba(255, 255, 255, 0.12)",
       },
       primary: {
         main: primaryMain,
@@ -90,28 +107,29 @@ export function getThemeOptions(mode) {
       borderPrimary: isLight ? BRAND_PRIMARY : BRAND_PRIMARY,
       dark: { main: isLight ? "#333333" : "#F3F3F3" },
       light: { main: isLight ? "#F3F3F3" : "#333333" },
-      tabHeaderBackground: isLight ? "#EEE" : "#2a2a2a",
-      optionsBackground: isLight ? "#fafafa" : "#2a2a2a",
-      options: isLight ? "#fafafa" : "#3a3a3a",
+      sidebar: sidebarSurface,
+      tabHeaderBackground: isLight ? LIGHT_SURFACE : "#2a2a2a",
+      optionsBackground: isLight ? LIGHT_CANVAS : "#2a2a2a",
+      options: isLight ? LIGHT_CANVAS : "#3a3a3a",
       fontecor: isLight ? "#128c7e" : "#fff",
       fancyBackground: bgDefault,
-      bordabox: isLight ? "#eee" : dividerColor,
-      newmessagebox: isLight ? "#eee" : "#2a2a2a",
+      bordabox: isLight ? LIGHT_DIVIDER : dividerColor,
+      newmessagebox: isLight ? LIGHT_SURFACE : "#2a2a2a",
       inputdigita: isLight ? "#fff" : "#2a2a2a",
       contactdrawer: isLight ? "#fff" : bgPaper,
-      announcements: isLight ? "#ededed" : "#2a2a2a",
+      announcements: isLight ? LIGHT_SURFACE : "#2a2a2a",
       login: isLight ? "#fff" : "#1C1C1C",
       announcementspopover: isLight ? "#fff" : bgPaper,
-      chatlist: isLight ? "#eee" : "#2a2a2a",
-      boxlist: isLight ? "#ededed" : "#2a2a2a",
-      boxchatlist: isLight ? "#ededed" : "#2a2a2a",
+      chatlist: isLight ? LIGHT_CANVAS : "#2a2a2a",
+      boxlist: isLight ? LIGHT_CANVAS : "#2a2a2a",
+      boxchatlist: isLight ? LIGHT_CANVAS : "#2a2a2a",
       total: isLight ? "#fff" : bgDefault,
       messageIcons: isLight ? "grey" : "#F3F3F3",
       inputBackground: isLight ? "#FFFFFF" : "#2a2a2a",
       barraSuperior: isLight ? "#2c3145" : "#2c3145",
-      boxticket: isLight ? "#EEE" : "#3a3a3a",
-      campaigntab: isLight ? "#ededed" : "#2a2a2a",
-      mediainput: isLight ? "#ededed" : "#1c1c1c",
+      boxticket: isLight ? LIGHT_CANVAS : "#3a3a3a",
+      campaigntab: isLight ? LIGHT_SURFACE : "#2a2a2a",
+      mediainput: isLight ? LIGHT_SURFACE : "#1c1c1c",
     },
     overrides: {
       MuiCssBaseline: {
@@ -141,10 +159,10 @@ export function getThemeOptions(mode) {
           color: textOnSurface,
         },
         colorAction: {
-          color: isLight ? "rgba(0, 0, 0, 0.54)" : "rgba(255, 255, 255, 0.56)",
+          color: isLight ? LIGHT_TEXT_SECONDARY : "rgba(255, 255, 255, 0.56)",
         },
         colorDisabled: {
-          color: isLight ? "rgba(0, 0, 0, 0.26)" : "rgba(255, 255, 255, 0.3)",
+          color: isLight ? LIGHT_TEXT_DISABLED : "rgba(255, 255, 255, 0.3)",
         },
         colorPrimary: {
           color: primaryMain,
@@ -165,6 +183,14 @@ export function getThemeOptions(mode) {
         },
         input: {
           color: textOnSurface,
+          ...(isLight
+            ? {
+                "&::placeholder": {
+                  color: LIGHT_TEXT_SECONDARY,
+                  opacity: 1,
+                },
+              }
+            : {}),
         },
       },
       MuiInputAdornment: {
@@ -198,6 +224,7 @@ export function getThemeOptions(mode) {
       MuiDialog: {
         paper: {
           borderRadius: 12,
+          ...(isLight ? { border: `1px solid ${LIGHT_DIVIDER}` } : {}),
         },
       },
       MuiDialogTitle: {
@@ -326,6 +353,13 @@ export function getThemeOptions(mode) {
           },
         },
       },
+      MuiMenu: {
+        paper: isLight
+          ? {
+              border: `1px solid ${LIGHT_DIVIDER}`,
+            }
+          : {},
+      },
       MuiPaper: {
         root: {
           backgroundImage: "none",
@@ -335,10 +369,9 @@ export function getThemeOptions(mode) {
           transition: `box-shadow ${interactionMs}ms ${ease}`,
         },
         elevation1: {
-          boxShadow:
-            mode === "light"
-              ? "0 10px 30px rgba(15, 23, 42, 0.08)"
-              : "0 10px 30px rgba(0,0,0,0.7)",
+          boxShadow: isLight
+            ? `0 0 0 1px ${LIGHT_DIVIDER}, 0 1px 2px rgba(32, 37, 34, 0.04), 0 8px 20px rgba(32, 37, 34, 0.04)`
+            : "0 10px 30px rgba(0,0,0,0.7)",
           transition: `box-shadow ${interactionMs}ms ${ease}`,
         },
       },
@@ -349,6 +382,19 @@ export function getThemeOptions(mode) {
           "& .MuiSvgIcon-root": {
             color: "inherit",
           },
+          ...(isLight
+            ? {
+                "& .MuiOutlinedInput-notchedOutline": {
+                  borderColor: LIGHT_BORDER_STRONG,
+                },
+                "&:hover .MuiOutlinedInput-notchedOutline": {
+                  borderColor: LIGHT_BORDER_HOVER,
+                },
+                "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                  borderColor: primaryMain,
+                },
+              }
+            : {}),
         },
         input: {
           color: textOnSurface,

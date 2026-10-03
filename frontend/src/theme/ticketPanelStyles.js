@@ -1,4 +1,5 @@
 import { alpha } from "@material-ui/core/styles";
+import { LIGHT_CANVAS, LIGHT_DIVIDER, LIGHT_PAPER, LIGHT_SURFACE } from "./appThemeOptions";
 
 export const PANEL_RADIUS = 14;
 /** Radius do painel esquerdo: ambos os cantos superiores arredondados; base reta à direita. */
@@ -11,7 +12,7 @@ export const LIST_SIDE_PADDING_PX = 12;
 export function getSubtleBorderColor(theme) {
   return theme.palette.type === "dark"
     ? "rgba(255,255,255,0.07)"
-    : "rgba(0,0,0,0.06)";
+    : LIGHT_DIVIDER;
 }
 
 /** Borda 1px sutil para divisores horizontais/verticais. */
@@ -21,46 +22,46 @@ export function getSubtleBorder(theme) {
 
 /** Superfície da coluna de lista (fundo recuado). */
 export function getInboxListSurface(theme) {
-  return theme.palette.type === "dark" ? "#161616" : "#F6F7F8";
+  return theme.palette.type === "dark" ? "#161616" : LIGHT_CANVAS;
 }
 
 /** Superfície de card/item na lista. */
 export function getInboxCardSurface(theme) {
-  return theme.palette.type === "dark" ? "#191919" : "#FFFFFF";
+  return theme.palette.type === "dark" ? "#191919" : LIGHT_PAPER;
 }
 
 /** Superfície de card em hover. */
 export function getInboxCardSurfaceHover(theme) {
-  return theme.palette.type === "dark" ? "#1D1D1D" : "#FAFAFA";
+  return theme.palette.type === "dark" ? "#1D1D1D" : LIGHT_SURFACE;
 }
 
 /** Header da conversa aberta. */
 export function getChatHeaderSurface(theme) {
-  return theme.palette.type === "dark" ? "#191919" : "#FFFFFF";
+  return theme.palette.type === "dark" ? "#191919" : LIGHT_PAPER;
 }
 
 /** Área de mensagens (fundo do chat). */
 export function getChatBodySurface(theme) {
-  return theme.palette.type === "dark" ? "#161616" : "#F6F7F8";
+  return theme.palette.type === "dark" ? "#161616" : LIGHT_CANVAS;
 }
 
 /** Composer / rodapé de input. */
 export function getComposerSurface(theme) {
-  return theme.palette.type === "dark" ? "#191919" : "#FFFFFF";
+  return theme.palette.type === "dark" ? "#191919" : LIGHT_PAPER;
 }
 
 /** Sombra leve para cards da lista. */
 export function getCardElevation(theme) {
   return theme.palette.type === "dark"
     ? "0 1px 2px rgba(0,0,0,0.18)"
-    : "0 1px 3px rgba(0,0,0,0.05)";
+    : "0 1px 2px rgba(32, 37, 34, 0.05)";
 }
 
 /** Sombra leve em hover (elevação discreta). */
 export function getCardElevationHover(theme) {
   return theme.palette.type === "dark"
     ? "0 2px 6px rgba(0,0,0,0.28)"
-    : "0 2px 8px rgba(0,0,0,0.08)";
+    : "0 2px 8px rgba(32, 37, 34, 0.06)";
 }
 
 /** Realce do card selecionado — fundo + borda mínima, sem contorno grosso. */
