@@ -6,6 +6,7 @@ import {
   __resetOneSignalServiceForTests,
   __setPushWaitMsForTests,
   enableOneSignalPushSubscription,
+  getOneSignalPushDiagnostics,
   getOneSignalPushStatus,
   oneSignalLogout,
   subscribeOneSignalPushStatus,
@@ -495,6 +496,88 @@ describe("enableOneSignalPushSubscription", () => {
     process.off("unhandledRejection", onUnhandled);
     expect(unhandled).not.toHaveBeenCalled();
     expect(api.User.PushSubscription.optOut).not.toHaveBeenCalled();
+    expect(getOneSignalPushStatus().subscribing).toBe(false);
+  });
+
+  function timelineNames(diag) {
+    return (diag.timeline || []).map((entry) => entry.name);
+  }
+
+  it("reutiliza a estabilidade recém-confirmada e não abre segunda janela", async () => {
+    const api = createMockSdk();
+    __forceOneSignalReadyForTests(api);
+
+    const result = await enableOneSignalPushSubscription({ user: { id: 30 } });
+    const diag = await getOneSignalPushDiagnostics();
+    const names = timelineNames(diag);
+    const loginAt = names.indexOf("identity_login_started");
+    const waitsBeforeLogin = names
+      .slice(0, loginAt)
+      .filter((name) => name === "stability_wait_started").length;
+
+    expect(result.ok).toBe(true);
+    expect(result.domainState).toBe(PUSH_DOMAIN_STATES.SUBSCRIBED);
+    expect(waitsBeforeLogin).toBe(1);
+    expect(names).toContain("subscription_stability_reused");
+    expect(names).not.toContain("subscription_stability_revalidation_required");
+    expect(api.login).toHaveBeenCalledWith("30");
+    expect(getOneSignalPushStatus().subscribing).toBe(false);
+  });
+
+  it("token ou id diferente exige nova estabilidade antes do login", async () => {
+    const api = createMockSdk();
+    const originalAdd = api.User.PushSubscription.addEventListener;
+    let adds = 0;
+    api.User.PushSubscription.addEventListener = jest.fn((event, fn) => {
+      if (event === "change") adds += 1;
+      originalAdd(event, fn);
+      // 1 = listener de status; 2 = primeira estabilidade; 3 = releitura antes do login.
+      if (event === "change" && adds === 3) {
+        api.state.id = "id-mutated";
+        api.state.token = "tok-mutated";
+        fn({
+          current: { optedIn: true, id: "id-mutated", token: "tok-mutated" },
+        });
+      }
+    });
+    __forceOneSignalReadyForTests(api);
+
+    const result = await enableOneSignalPushSubscription({ user: { id: 31 } });
+    const names = timelineNames(await getOneSignalPushDiagnostics());
+    const loginAt = names.indexOf("identity_login_started");
+    const waitsBeforeLogin = names
+      .slice(0, loginAt)
+      .filter((name) => name === "stability_wait_started").length;
+
+    expect(result.ok).toBe(true);
+    expect(waitsBeforeLogin).toBe(2);
+    expect(names).toContain("subscription_stability_revalidation_required");
+    expect(api.login).toHaveBeenCalledWith("31");
+    expect(getOneSignalPushStatus().subscriptionId).toBe("id-mutated");
+  });
+
+  it("optedIn falso depois da confirmação não faz login com a estabilidade antiga", async () => {
+    const api = createMockSdk();
+    const originalAdd = api.User.PushSubscription.addEventListener;
+    let adds = 0;
+    api.User.PushSubscription.addEventListener = jest.fn((event, fn) => {
+      if (event === "change") adds += 1;
+      originalAdd(event, fn);
+      if (event === "change" && adds === 3) {
+        api.state.optedIn = false;
+        api.state.id = null;
+        api.state.token = null;
+        fn({ current: { optedIn: false, id: null, token: null } });
+      }
+    });
+    __forceOneSignalReadyForTests(api);
+
+    const result = await enableOneSignalPushSubscription({ user: { id: 32 } });
+    const names = timelineNames(await getOneSignalPushDiagnostics());
+    expect(api.login).not.toHaveBeenCalled();
+    expect(names).toContain("subscription_stability_revalidation_required");
+    expect(names.filter((name) => name === "stability_wait_started").length).toBeGreaterThan(1);
+    expect(result.ok).toBe(true);
     expect(getOneSignalPushStatus().subscribing).toBe(false);
   });
 });

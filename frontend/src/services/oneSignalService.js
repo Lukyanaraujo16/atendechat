@@ -379,9 +379,9 @@ async function confirmStableEffectiveSubscription(api, phase) {
     hasId: Boolean(detected.subscriptionId),
     hasToken: Boolean(detected.token),
   });
-  await waitForStableSubscriptionSnapshot(api);
+  const stableSnapshot = await waitForStableSubscriptionSnapshot(api);
   const confirmed = readSubscriptionSnapshot(api);
-  if (!isEffectivelySubscribed(confirmed)) {
+  if (!isEffectivelySubscribed(confirmed) || !stableSnapshot?.signature) {
     return null;
   }
   recordPushDiagnosticEvent("subscription_stability_confirmed", {
@@ -400,7 +400,69 @@ async function confirmStableEffectiveSubscription(api, phase) {
   if (confirmed.token) {
     recordPushDiagnosticEvent("subscription_token_available", { phase });
   }
-  return confirmed;
+  return { ...confirmed, stableSnapshot };
+}
+
+function subscriptionFieldsForStatus(snap) {
+  if (!snap) return {};
+  return {
+    optedIn: Boolean(snap.optedIn),
+    subscriptionId: snap.subscriptionId || null,
+    token: snap.token || null,
+  };
+}
+
+function watchPushSubscriptionChange(api) {
+  const sub = api?.User?.PushSubscription;
+  let changed = false;
+  const onChange = () => {
+    changed = true;
+  };
+  try {
+    if (sub && typeof sub.addEventListener === "function") {
+      sub.addEventListener("change", onChange);
+    }
+  } catch {
+    /* ignore */
+  }
+  return {
+    changed: () => changed,
+    stop() {
+      try {
+        if (sub && typeof sub.removeEventListener === "function") {
+          sub.removeEventListener("change", onChange);
+        }
+      } catch {
+        /* ignore */
+      }
+    },
+  };
+}
+
+/**
+ * Reutiliza a estabilidade recém-confirmada só se a assinatura sanitizada
+ * continua igual. O listener permanece até o login para um `change`
+ * posterior invalidar a reutilização.
+ */
+async function reuseConfirmedStabilityIfUnchanged(api, confirmedStableSnapshot) {
+  if (!confirmedStableSnapshot?.signature) return null;
+  const watch = watchPushSubscriptionChange(api);
+  try {
+    const current = await buildSanitizedSubscriptionSnapshot(api, "pre_login_reuse");
+    if (
+      watch.changed() ||
+      current.blocksLogin ||
+      !current.effectivelySubscribed ||
+      current.signature !== confirmedStableSnapshot.signature
+    ) {
+      watch.stop();
+      return null;
+    }
+    return { snapshot: current, watch };
+  } catch (error) {
+    watch.stop();
+    throw error;
+  }
 }
 
 async function waitForEffectiveSubscription(api, timeoutMs = SUBSCRIPTION_WAIT_MS) {
@@ -658,11 +720,15 @@ export async function bootstrapPushAndPwaServiceWorker() {
   let onesignalResult = "skipped";
   try {
     const cfg = await fetchPublicPushConfig();
-    setPushStatus({
-      onesignalEnabled: cfg.onesignalEnabled,
-      onesignalAppId: cfg.onesignalAppId,
-    });
     if (cfg.onesignalEnabled && cfg.onesignalAppId) {
+      sdkLoading = true;
+      oneSignalReady = false;
+      setPushStatus({
+        onesignalEnabled: true,
+        onesignalAppId: cfg.onesignalAppId,
+        sdkLoading: true,
+        sdkReady: false,
+      });
       const ok = await initOneSignalFromConfig(cfg);
       onesignalResult = ok ? "onesignal" : "onesignal_failed";
     } else {
@@ -688,11 +754,17 @@ export function isOneSignalReady() {
 export async function refreshOneSignalPushStatus() {
   try {
     const cfg = lastConfig || (await fetchPublicPushConfig());
+    const willInit = Boolean(cfg.onesignalEnabled && cfg.onesignalAppId && !oneSignalReady);
+    if (willInit) {
+      sdkLoading = true;
+      oneSignalReady = false;
+    }
     setPushStatus({
       onesignalEnabled: Boolean(cfg.onesignalEnabled),
       onesignalAppId: cfg.onesignalAppId || "",
+      ...(willInit ? { sdkLoading: true, sdkReady: false } : {}),
     });
-    if (cfg.onesignalEnabled && cfg.onesignalAppId && !oneSignalReady) {
+    if (willInit) {
       await initOneSignalFromConfig(cfg);
     }
   } catch {
@@ -718,7 +790,7 @@ async function ensureStableSubscriptionBeforeLogin(api) {
   return stabilityWaitInFlight;
 }
 
-async function applyUserIdentity(user, { skipStabilityWait = false } = {}) {
+async function applyUserIdentity(user, { skipStabilityWait = false, confirmedStableSnapshot = null } = {}) {
   if (!oneSignalApi) {
     return { ok: false, reason: "sdk_not_ready" };
   }
@@ -803,12 +875,38 @@ async function applyUserIdentity(user, { skipStabilityWait = false } = {}) {
         (isEffectivelySubscribed(pre) || Boolean(pre.token) || Boolean(pre.subscriptionId));
 
       let stableSnap = null;
+      let stabilityWatch = null;
       if (needsStability) {
         setPushLifecycleStage("stability_wait");
-        stableSnap = await ensureStableSubscriptionBeforeLogin(oneSignalApi);
+        const reused = await reuseConfirmedStabilityIfUnchanged(
+          oneSignalApi,
+          confirmedStableSnapshot
+        );
+        if (reused) {
+          stableSnap = reused.snapshot;
+          stabilityWatch = reused.watch;
+          recordPushDiagnosticEvent("subscription_stability_reused", {
+            hasId: Boolean(reused.snapshot.maskedSubscriptionId),
+            hasToken: Boolean(reused.snapshot.tokenHash),
+          });
+          logPush("subscription_stability_reused", {
+            hasId: Boolean(reused.snapshot.maskedSubscriptionId),
+            hasToken: Boolean(reused.snapshot.tokenHash),
+          });
+        } else {
+          if (confirmedStableSnapshot?.signature) {
+            recordPushDiagnosticEvent("subscription_stability_revalidation_required", {
+              reason: "signature_or_worker_changed",
+            });
+            logPush("subscription_stability_revalidation_required");
+          }
+          stableSnap = await ensureStableSubscriptionBeforeLogin(oneSignalApi);
+        }
       }
 
       if (deferLoginForProbe && isAnonymousStabilityProbeAllowed(user)) {
+        if (stabilityWatch) stabilityWatch.stop();
+        stabilityWatch = null;
         lastAnonymousProbe = {
           at: new Date().toISOString(),
           phase: "before_login",
@@ -845,6 +943,18 @@ async function applyUserIdentity(user, { skipStabilityWait = false } = {}) {
         snapshotChangesCount: getSnapshotChangesCount(),
         endpointHost: stableSnap?.endpointHost || null,
       });
+      if (stabilityWatch?.changed()) {
+        stabilityWatch.stop();
+        stabilityWatch = null;
+        recordPushDiagnosticEvent("subscription_stability_revalidation_required", {
+          reason: "change_before_login",
+        });
+        logPush("subscription_stability_revalidation_required", {
+          reason: "change_before_login",
+        });
+        stableSnap = await ensureStableSubscriptionBeforeLogin(oneSignalApi);
+      }
+      if (stabilityWatch) stabilityWatch.stop();
       logPush("identity_login_started", { attempt });
       setPushLifecycleStage("login_started");
       const loginPromise = Promise.resolve().then(() => oneSignalApi.login(externalId));
@@ -1168,7 +1278,7 @@ export function enableOneSignalPushSubscription({ user } = {}) {
         const status = setPushStatus({
           subscribing: false,
           errorCode: null,
-          ...before,
+          ...subscriptionFieldsForStatus(before),
           permissionNative: readNativePermission(),
         });
         return { ok: true, domainState: status.domainState, status };
@@ -1278,7 +1388,9 @@ export function enableOneSignalPushSubscription({ user } = {}) {
 
       if (user?.id) {
         try {
-          await applyUserIdentity(user);
+          await applyUserIdentity(user, {
+            confirmedStableSnapshot: confirmed.stableSnapshot || null,
+          });
         } catch {
           /* subscription ok; identidade pode falhar temporariamente */
         }
@@ -1288,7 +1400,7 @@ export function enableOneSignalPushSubscription({ user } = {}) {
         subscribing: false,
         errorCode: null,
         permissionNative: readNativePermission(),
-        ...confirmed,
+        ...subscriptionFieldsForStatus(confirmed),
       });
       return { ok: true, domainState: status.domainState, status };
     } catch (e) {

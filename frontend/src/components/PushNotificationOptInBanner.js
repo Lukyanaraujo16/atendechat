@@ -106,6 +106,8 @@ export default function PushNotificationOptInBanner() {
     domainState,
     errorCode: status.errorCode,
     dismissed,
+    sdkReady: status.sdkReady,
+    sdkLoading: status.sdkLoading,
   });
 
   // “Notificações ativadas” não precisa de banner persistente

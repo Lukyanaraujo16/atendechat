@@ -28,12 +28,16 @@ export const PWA_PUSH_UI_STATES = Object.freeze({
  * @param {string} [input.domainState] - PUSH_DOMAIN_STATES
  * @param {string|null} [input.errorCode]
  * @param {boolean} [input.dismissed]
+ * @param {boolean} [input.sdkReady] - omitido = chamador não informa bootstrap
+ * @param {boolean} [input.sdkLoading]
  */
 export function derivePwaPushUiState({
   env = getDefaultPlatformEnv(),
   domainState,
   errorCode = null,
   dismissed = false,
+  sdkReady,
+  sdkLoading,
 } = {}) {
   if (dismissed) return PWA_PUSH_UI_STATES.HIDDEN;
 
@@ -77,11 +81,20 @@ export function derivePwaPushUiState({
     return PWA_PUSH_UI_STATES.IOS_NEEDS_INSTALL;
   }
 
+  // Bootstrap: config já chegou, mas a subscription real ainda não foi lida.
+  // sdkReady/sdkLoading omitidos preservam chamadas antigas que só passam o domínio.
+  const subscriptionNotRead =
+    sdkLoading === true ||
+    sdkReady === false ||
+    domainState === PUSH_DOMAIN_STATES.SDK_LOADING;
+  if (subscriptionNotRead) {
+    return PWA_PUSH_UI_STATES.HIDDEN;
+  }
+
   if (
     domainState === PUSH_DOMAIN_STATES.PERMISSION_DEFAULT ||
     domainState === PUSH_DOMAIN_STATES.PERMISSION_GRANTED_UNSUBSCRIBED ||
-    domainState === PUSH_DOMAIN_STATES.SUBSCRIBING ||
-    domainState === PUSH_DOMAIN_STATES.SDK_LOADING
+    domainState === PUSH_DOMAIN_STATES.SUBSCRIBING
   ) {
     return PWA_PUSH_UI_STATES.ACTIVATE;
   }
