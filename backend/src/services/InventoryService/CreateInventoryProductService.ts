@@ -1,5 +1,6 @@
 import AppError from "../../errors/AppError";
 import InventoryProduct from "../../models/InventoryProduct";
+import { assertNewInventoryProductUnit } from "./inventoryProductUnit";
 import {
   assertInventoryCategoryBelongsToCompany,
   assertInventoryProductSkuUnique,
@@ -30,8 +31,17 @@ export default async function CreateInventoryProductService(input: {
 }): Promise<InventoryProduct> {
   const name = normalizeOptionalString(input.body.name, 200);
   if (!name) {
-    throw new AppError("ERR_VALIDATION_ERROR", 400, "Nome do produto é obrigatório.");
+    throw new AppError(
+      "ERR_VALIDATION_ERROR",
+      400,
+      "Nome do produto é obrigatório."
+    );
   }
+
+  const unit =
+    input.body.unit === undefined || input.body.unit === null
+      ? "un"
+      : assertNewInventoryProductUnit(input.body.unit);
 
   let categoryId: number | null = null;
   if (
@@ -60,10 +70,20 @@ export default async function CreateInventoryProductService(input: {
   }
 
   let currentQuantity = 0;
-  if (input.body.currentQuantity !== undefined && input.body.currentQuantity !== null) {
-    currentQuantity = parseRequiredDecimal(input.body.currentQuantity, "currentQuantity");
+  if (
+    input.body.currentQuantity !== undefined &&
+    input.body.currentQuantity !== null
+  ) {
+    currentQuantity = parseRequiredDecimal(
+      input.body.currentQuantity,
+      "currentQuantity"
+    );
     if (currentQuantity < 0) {
-      throw new AppError("ERR_VALIDATION_ERROR", 400, "currentQuantity inválido.");
+      throw new AppError(
+        "ERR_VALIDATION_ERROR",
+        400,
+        "currentQuantity inválido."
+      );
     }
   }
 
@@ -71,8 +91,6 @@ export default async function CreateInventoryProductService(input: {
   if (minStock !== null && minStock < 0) {
     throw new AppError("ERR_VALIDATION_ERROR", 400, "minStock inválido.");
   }
-
-  const unit = normalizeOptionalString(input.body.unit, 16) || "un";
 
   const trackStock =
     input.body.trackStock === undefined

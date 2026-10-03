@@ -3,12 +3,14 @@ import {
   Box,
   FormControl,
   FormControlLabel,
+  FormHelperText,
   Grid,
   InputLabel,
   MenuItem,
   Select,
   Switch,
   TextField,
+  Typography,
 } from "@material-ui/core";
 import { toast } from "react-toastify";
 
@@ -30,13 +32,22 @@ import { i18n } from "../../translate/i18n";
 import {
   parseBrazilianCurrencyToNumber,
 } from "../../utils/brazilianCurrency";
+import {
+  KNOWN_PRODUCT_UNITS,
+  PRODUCT_UNIT_MAX_LENGTH,
+  PRODUCT_UNIT_OTHER,
+  inspectProductUnit,
+  resolveProductUnit,
+  splitProductUnit,
+} from "./productUnit";
 
 const emptyForm = {
   name: "",
   sku: "",
   barcode: "",
   categoryId: "",
-  unit: "un",
+  unitChoice: "un",
+  customUnit: "",
   salePrice: "",
   costPrice: "",
   trackStock: true,
@@ -45,6 +56,18 @@ const emptyForm = {
   imageUrl: "",
   active: true,
 };
+
+function SectionLabel({ children }) {
+  return (
+    <Typography
+      variant="caption"
+      color="textSecondary"
+      style={{ fontWeight: 600, letterSpacing: "0.04em" }}
+    >
+      {children}
+    </Typography>
+  );
+}
 
 export default function ProductFormDialog({
   open,
@@ -57,11 +80,13 @@ export default function ProductFormDialog({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(emptyForm);
+  const [loadedUnit, setLoadedUnit] = useState(null);
 
   useEffect(() => {
     if (!open) return;
     if (!isEdit) {
       setForm(emptyForm);
+      setLoadedUnit(null);
       return;
     }
     let cancelled = false;
@@ -69,12 +94,14 @@ export default function ProductFormDialog({
     getInventoryProduct(productId)
       .then(({ data }) => {
         if (cancelled) return;
+        const storedUnit = data.unit == null ? "" : String(data.unit);
+        setLoadedUnit(storedUnit);
         setForm({
           name: data.name || "",
           sku: data.sku || "",
           barcode: data.barcode || "",
           categoryId: data.categoryId != null ? String(data.categoryId) : "",
-          unit: data.unit || "un",
+          ...splitProductUnit(storedUnit),
           salePrice: data.salePrice != null ? String(data.salePrice) : "",
           costPrice: data.costPrice != null ? String(data.costPrice) : "",
           trackStock: data.trackStock !== false,
@@ -116,12 +143,31 @@ export default function ProductFormDialog({
       : null;
     const minStock = form.minStock ? Number(form.minStock) : null;
 
+    const unit = resolveProductUnit(form.unitChoice, form.customUnit);
+    const unitIssue = inspectProductUnit(unit).issue;
+    const keepsLegacyUnit =
+      isEdit &&
+      loadedUnit != null &&
+      unit === String(loadedUnit).trim();
+    if (unitIssue && !keepsLegacyUnit) {
+      const messageKey =
+        unitIssue === "numeric"
+          ? "unitNumeric"
+          : unitIssue === "suspicious"
+            ? "unitSuspicious"
+            : unitIssue === "too_long"
+              ? "unitTooLong"
+              : "unitRequired";
+      toast.error(i18n.t(`inventorySales.products.validation.${messageKey}`));
+      return;
+    }
+
     const payload = {
       name: form.name.trim(),
       sku: form.sku.trim() || null,
       barcode: form.barcode.trim() || null,
       categoryId: form.categoryId ? Number(form.categoryId) : null,
-      unit: form.unit.trim() || "un",
+      unit,
       salePrice,
       costPrice,
       trackStock: form.trackStock,
@@ -157,6 +203,14 @@ export default function ProductFormDialog({
     }
   };
 
+  const resolvedUnit = resolveProductUnit(form.unitChoice, form.customUnit);
+  const unitIssue = inspectProductUnit(resolvedUnit).issue;
+  const keepsLegacyUnit =
+    isEdit &&
+    loadedUnit != null &&
+    resolvedUnit === String(loadedUnit).trim();
+  const showLegacyWarning = Boolean(unitIssue && keepsLegacyUnit);
+
   return (
     <AppDialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <form onSubmit={handleSubmit}>
@@ -167,7 +221,11 @@ export default function ProductFormDialog({
         </AppDialogTitle>
         <AppDialogContent>
           <Box display="flex" flexDirection="column" style={{ gap: 16 }}>
+            <SectionLabel>
+              {i18n.t("inventorySales.products.sections.identity")}
+            </SectionLabel>
             <TextField
+              id="product-name"
               label={i18n.t("inventorySales.products.fields.name")}
               value={form.name}
               onChange={setField("name")}
@@ -222,20 +280,73 @@ export default function ProductFormDialog({
                 ))}
               </Select>
             </FormControl>
+
+            <SectionLabel>
+              {i18n.t("inventorySales.products.sections.commercial")}
+            </SectionLabel>
+            <FormControl variant="outlined" size="small" fullWidth>
+              <InputLabel id="product-unit-label">
+                {i18n.t("inventorySales.products.fields.unit")}
+              </InputLabel>
+              <Select
+                labelId="product-unit-label"
+                value={form.unitChoice}
+                onChange={setField("unitChoice")}
+                label={i18n.t("inventorySales.products.fields.unit")}
+                disabled={loading}
+              >
+                {KNOWN_PRODUCT_UNITS.map((code) => (
+                  <MenuItem key={code} value={code}>
+                    {i18n.t(`inventorySales.products.units.${code}`)}
+                  </MenuItem>
+                ))}
+                <MenuItem value={PRODUCT_UNIT_OTHER}>
+                  {i18n.t("inventorySales.products.fields.unitOther")}
+                </MenuItem>
+              </Select>
+              <FormHelperText>
+                {i18n.t("inventorySales.products.fields.unitHelp")}
+              </FormHelperText>
+            </FormControl>
+            {form.unitChoice === PRODUCT_UNIT_OTHER ? (
+              <TextField
+                id="product-custom-unit"
+                label={i18n.t("inventorySales.products.fields.unitCustom")}
+                value={form.customUnit}
+                onChange={setField("customUnit")}
+                variant="outlined"
+                size="small"
+                fullWidth
+                disabled={loading}
+                helperText={
+                  showLegacyWarning
+                    ? i18n.t("inventorySales.products.validation.unitLegacyWarning")
+                    : unitIssue && String(form.customUnit).trim()
+                      ? i18n.t(
+                          `inventorySales.products.validation.${
+                            unitIssue === "numeric"
+                              ? "unitNumeric"
+                              : unitIssue === "suspicious"
+                                ? "unitSuspicious"
+                                : unitIssue === "too_long"
+                                  ? "unitTooLong"
+                                  : "unitRequired"
+                          }`
+                        )
+                      : i18n.t("inventorySales.products.fields.unitCustomHelp")
+                }
+                error={Boolean(
+                  unitIssue &&
+                    String(form.customUnit).trim() &&
+                    !keepsLegacyUnit
+                )}
+                inputProps={{ maxLength: PRODUCT_UNIT_MAX_LENGTH }}
+              />
+            ) : null}
             <Grid container spacing={2}>
-              <Grid item xs={12} sm={4}>
+              <Grid item xs={12} sm={6}>
                 <TextField
-                  label={i18n.t("inventorySales.products.fields.unit")}
-                  value={form.unit}
-                  onChange={setField("unit")}
-                  variant="outlined"
-                  size="small"
-                  fullWidth
-                  disabled={loading}
-                />
-              </Grid>
-              <Grid item xs={12} sm={4}>
-                <TextField
+                  id="product-sale-price"
                   label={i18n.t("inventorySales.products.fields.salePrice")}
                   value={form.salePrice}
                   onChange={setField("salePrice")}
@@ -246,7 +357,7 @@ export default function ProductFormDialog({
                   disabled={loading}
                 />
               </Grid>
-              <Grid item xs={12} sm={4}>
+              <Grid item xs={12} sm={6}>
                 <TextField
                   label={i18n.t("inventorySales.products.fields.costPrice")}
                   value={form.costPrice}
@@ -258,6 +369,10 @@ export default function ProductFormDialog({
                 />
               </Grid>
             </Grid>
+
+            <SectionLabel>
+              {i18n.t("inventorySales.products.sections.stock")}
+            </SectionLabel>
             <FormControlLabel
               control={
                 <Switch
@@ -271,6 +386,7 @@ export default function ProductFormDialog({
             />
             {form.trackStock && !isEdit ? (
               <TextField
+                id="product-initial-quantity"
                 label={i18n.t("inventorySales.products.fields.initialQuantity")}
                 value={form.currentQuantity}
                 onChange={setField("currentQuantity")}
@@ -278,12 +394,16 @@ export default function ProductFormDialog({
                 size="small"
                 fullWidth
                 type="number"
+                helperText={i18n.t(
+                  "inventorySales.products.fields.initialQuantityHelp"
+                )}
                 inputProps={{ min: 0, step: "any" }}
                 disabled={loading}
               />
             ) : null}
             {form.trackStock ? (
               <TextField
+                id="product-min-stock"
                 label={i18n.t("inventorySales.products.fields.minStock")}
                 value={form.minStock}
                 onChange={setField("minStock")}
@@ -291,10 +411,15 @@ export default function ProductFormDialog({
                 size="small"
                 fullWidth
                 type="number"
+                helperText={i18n.t("inventorySales.products.fields.minStockHelp")}
                 inputProps={{ min: 0, step: "any" }}
                 disabled={loading}
               />
             ) : null}
+
+            <SectionLabel>
+              {i18n.t("inventorySales.products.sections.other")}
+            </SectionLabel>
             <TextField
               label={i18n.t("inventorySales.products.fields.imageUrl")}
               value={form.imageUrl}

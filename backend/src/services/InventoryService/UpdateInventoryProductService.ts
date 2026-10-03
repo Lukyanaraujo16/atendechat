@@ -1,5 +1,6 @@
 import AppError from "../../errors/AppError";
 import InventoryProduct from "../../models/InventoryProduct";
+import { resolveInventoryProductUnitForUpdate } from "./inventoryProductUnit";
 import {
   assertInventoryCategoryBelongsToCompany,
   assertInventoryProductSkuUnique,
@@ -49,7 +50,10 @@ export default async function UpdateInventoryProductService(input: {
       if (!Number.isFinite(categoryId)) {
         throw new AppError("ERR_VALIDATION_ERROR", 400, "categoryId inválido.");
       }
-      await assertInventoryCategoryBelongsToCompany(input.companyId, categoryId);
+      await assertInventoryCategoryBelongsToCompany(
+        input.companyId,
+        categoryId
+      );
       patch.categoryId = categoryId;
     }
   }
@@ -67,7 +71,11 @@ export default async function UpdateInventoryProductService(input: {
   if (input.body.name !== undefined) {
     const name = normalizeOptionalString(input.body.name, 200);
     if (!name) {
-      throw new AppError("ERR_VALIDATION_ERROR", 400, "Nome do produto é obrigatório.");
+      throw new AppError(
+        "ERR_VALIDATION_ERROR",
+        400,
+        "Nome do produto é obrigatório."
+      );
     }
     patch.name = name;
   }
@@ -77,11 +85,10 @@ export default async function UpdateInventoryProductService(input: {
   }
 
   if (input.body.unit !== undefined) {
-    const unit = normalizeOptionalString(input.body.unit, 16);
-    if (!unit) {
-      throw new AppError("ERR_VALIDATION_ERROR", 400, "unit inválido.");
-    }
-    patch.unit = unit;
+    patch.unit = resolveInventoryProductUnitForUpdate(
+      input.body.unit,
+      product.unit
+    );
   }
 
   if (input.body.salePrice !== undefined) {
