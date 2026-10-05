@@ -281,6 +281,13 @@ const messages = {
 					emptyDescription: "Create your first product to get started.",
 					deactivateTitle: "Deactivate product",
 					deactivateMessage: "Deactivate \"{{name}}\"? History will be preserved.",
+					deactivateAction: "Deactivate product",
+					reactivateAction: "Reactivate product",
+					deleteAction: "Delete permanently",
+					deleteTitle: "Delete product?",
+					deleteMessage:
+						"This permanently removes \"{{name}}\". Products with sales or stock movement history cannot be deleted — deactivate the product instead.",
+					deleteConfirm: "Delete permanently",
 					columns: {
 						name: "Name",
 						sku: "SKU",
@@ -340,6 +347,8 @@ const messages = {
 						created: "Product created.",
 						updated: "Product updated.",
 						deactivated: "Product deactivated.",
+						reactivated: "Product reactivated.",
+						deleted: "Product deleted.",
 					},
 				},
 				categories: {
@@ -7807,6 +7816,8 @@ const messages = {
 			},
 			backendErrors: {
 				ERR_INVENTORY_PRODUCT_BARCODE_DUPLICATE: "This barcode is already being used by another product.",
+				ERR_INVENTORY_PRODUCT_HAS_HISTORY:
+					"This product has sales or stock history and cannot be deleted. You can deactivate it instead.",
 				ERR_INTERNAL_SERVER_ERROR: "An unexpected error occurred. Please try again later",
 				ERR_NO_OTHER_WHATSAPP: "There must be at least one default WhatsApp.",
 				ERR_NO_DEF_WAPP_FOUND: "No default WhatsApp found. Check the connections page.",

@@ -21,6 +21,8 @@ import { makeStyles } from "@material-ui/core/styles";
 import AddIcon from "@material-ui/icons/Add";
 import EditIcon from "@material-ui/icons/Edit";
 import DeleteOutlineIcon from "@material-ui/icons/DeleteOutline";
+import BlockIcon from "@material-ui/icons/Block";
+import ReplayIcon from "@material-ui/icons/Replay";
 import SearchIcon from "@material-ui/icons/Search";
 import HistoryIcon from "@material-ui/icons/History";
 
@@ -39,6 +41,7 @@ import {
   deleteInventoryProduct,
   listInventoryCategories,
   listInventoryProducts,
+  updateInventoryProduct,
 } from "../../services/inventoryApi";
 import toastError from "../../errors/toastError";
 import { i18n } from "../../translate/i18n";
@@ -92,7 +95,10 @@ export default function InventoryProductsTab({
   const [formOpen, setFormOpen] = useState(false);
   const [editId, setEditId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [deactivateTarget, setDeactivateTarget] = useState(null);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [confirmDeactivateOpen, setConfirmDeactivateOpen] = useState(false);
+  const [confirmLoading, setConfirmLoading] = useState(false);
 
   const loadCategories = useCallback(async () => {
     try {
@@ -151,13 +157,42 @@ export default function InventoryProductsTab({
     setFormOpen(true);
   };
 
-  const handleDeactivate = async () => {
+  const handleDeletePermanently = async () => {
     if (!deleteTarget) return;
+    setConfirmLoading(true);
     try {
       await deleteInventoryProduct(deleteTarget.id);
-      toast.success(i18n.t("inventorySales.products.toasts.deactivated"));
-      setConfirmOpen(false);
+      toast.success(i18n.t("inventorySales.products.toasts.deleted"));
+      setConfirmDeleteOpen(false);
       setDeleteTarget(null);
+      loadProducts();
+    } catch (err) {
+      toastError(err);
+    } finally {
+      setConfirmLoading(false);
+    }
+  };
+
+  const handleDeactivate = async () => {
+    if (!deactivateTarget) return;
+    setConfirmLoading(true);
+    try {
+      await updateInventoryProduct(deactivateTarget.id, { active: false });
+      toast.success(i18n.t("inventorySales.products.toasts.deactivated"));
+      setConfirmDeactivateOpen(false);
+      setDeactivateTarget(null);
+      loadProducts();
+    } catch (err) {
+      toastError(err);
+    } finally {
+      setConfirmLoading(false);
+    }
+  };
+
+  const handleReactivate = async (product) => {
+    try {
+      await updateInventoryProduct(product.id, { active: true });
+      toast.success(i18n.t("inventorySales.products.toasts.reactivated"));
       loadProducts();
     } catch (err) {
       toastError(err);
@@ -220,16 +255,41 @@ export default function InventoryProductsTab({
             <EditIcon fontSize="small" />
           </IconButton>
           {product.active !== false ? (
+            <Tooltip title={i18n.t("inventorySales.products.deactivateAction")}>
+              <IconButton
+                size="small"
+                aria-label={i18n.t("inventorySales.products.deactivateAction")}
+                onClick={() => {
+                  setDeactivateTarget(product);
+                  setConfirmDeactivateOpen(true);
+                }}
+              >
+                <BlockIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          ) : (
+            <Tooltip title={i18n.t("inventorySales.products.reactivateAction")}>
+              <IconButton
+                size="small"
+                aria-label={i18n.t("inventorySales.products.reactivateAction")}
+                onClick={() => handleReactivate(product)}
+              >
+                <ReplayIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
+          <Tooltip title={i18n.t("inventorySales.products.deleteAction")}>
             <IconButton
               size="small"
+              aria-label={i18n.t("inventorySales.products.deleteAction")}
               onClick={() => {
                 setDeleteTarget(product);
-                setConfirmOpen(true);
+                setConfirmDeleteOpen(true);
               }}
             >
               <DeleteOutlineIcon fontSize="small" />
             </IconButton>
-          ) : null}
+          </Tooltip>
         </>
       ) : null}
     </Box>
@@ -415,12 +475,29 @@ export default function InventoryProductsTab({
       />
 
       <ConfirmationModal
-        open={confirmOpen}
-        onClose={() => setConfirmOpen(false)}
+        open={confirmDeactivateOpen}
+        onClose={() => !confirmLoading && setConfirmDeactivateOpen(false)}
         onConfirm={handleDeactivate}
         title={i18n.t("inventorySales.products.deactivateTitle")}
+        asyncConfirm
+        loading={confirmLoading}
       >
         {i18n.t("inventorySales.products.deactivateMessage", {
+          name: deactivateTarget?.name || "",
+        })}
+      </ConfirmationModal>
+
+      <ConfirmationModal
+        open={confirmDeleteOpen}
+        onClose={() => !confirmLoading && setConfirmDeleteOpen(false)}
+        onConfirm={handleDeletePermanently}
+        title={i18n.t("inventorySales.products.deleteTitle")}
+        confirmText={i18n.t("inventorySales.products.deleteConfirm")}
+        destructive
+        asyncConfirm
+        loading={confirmLoading}
+      >
+        {i18n.t("inventorySales.products.deleteMessage", {
           name: deleteTarget?.name || "",
         })}
       </ConfirmationModal>

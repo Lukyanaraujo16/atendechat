@@ -275,6 +275,13 @@ const messages = {
           emptyDescription: "Registre el primer producto para comenzar.",
           deactivateTitle: "Desactivar producto",
           deactivateMessage: "¿Desea desactivar «{{name}}»? El historial se conservará.",
+          deactivateAction: "Desactivar producto",
+          reactivateAction: "Reactivar producto",
+          deleteAction: "Eliminar definitivamente",
+          deleteTitle: "¿Eliminar producto?",
+          deleteMessage:
+            "Esta acción elimina definitivamente «{{name}}». Los productos con historial de ventas o movimientos de stock no pueden eliminarse; desactívelo en su lugar.",
+          deleteConfirm: "Eliminar definitivamente",
           columns: {
             name: "Nombre",
             sku: "SKU",
@@ -334,6 +341,8 @@ const messages = {
             created: "Producto creado.",
             updated: "Producto actualizado.",
             deactivated: "Producto desactivado.",
+            reactivated: "Producto reactivado.",
+            deleted: "Producto eliminado.",
           },
         },
         categories: {
@@ -7046,6 +7055,8 @@ const messages = {
       },
       backendErrors: {
         ERR_INVENTORY_PRODUCT_BARCODE_DUPLICATE: "Este código de barras ya está siendo utilizado por otro producto.",
+        ERR_INVENTORY_PRODUCT_HAS_HISTORY:
+          "Este producto tiene historial de ventas o movimientos y no puede eliminarse. Puede desactivarlo.",
         ERR_INTERNAL_SERVER_ERROR: "Ocurrió un error inesperado. Por favor, intente nuevamente más tarde",
         ERR_NO_OTHER_WHATSAPP: "Debe haber al menos un WhatsApp predeterminado.",
         ERR_NO_DEF_WAPP_FOUND: "No se encontró WhatsApp predeterminado. Verifique la página de conexiones.",

@@ -283,6 +283,13 @@ const messages = {
           emptyDescription: "Cadastre o primeiro produto para começar.",
           deactivateTitle: "Desativar produto",
           deactivateMessage: "Deseja desativar «{{name}}»? O histórico será preservado.",
+          deactivateAction: "Desativar produto",
+          reactivateAction: "Reativar produto",
+          deleteAction: "Excluir definitivamente",
+          deleteTitle: "Excluir produto?",
+          deleteMessage:
+            "Esta ação remove definitivamente «{{name}}». Produtos com histórico de vendas ou movimentações de estoque não podem ser excluídos — nesse caso, desative o produto.",
+          deleteConfirm: "Excluir definitivamente",
           columns: {
             name: "Nome",
             sku: "SKU",
@@ -342,6 +349,8 @@ const messages = {
             created: "Produto criado.",
             updated: "Produto atualizado.",
             deactivated: "Produto desativado.",
+            reactivated: "Produto reativado.",
+            deleted: "Produto excluído.",
           },
         },
         categories: {
@@ -7980,6 +7989,8 @@ const messages = {
       },
       backendErrors: {
         ERR_INVENTORY_PRODUCT_BARCODE_DUPLICATE: "Este código de barras já está sendo usado por outro produto.",
+        ERR_INVENTORY_PRODUCT_HAS_HISTORY:
+          "Este produto possui histórico de vendas ou movimentações e não pode ser excluído. Você pode desativá-lo.",
         ERR_KNOWLEDGE_BASE_NOT_FOUND: "Base de conhecimento não encontrada.",
         ERR_KNOWLEDGE_DOCUMENT_NOT_FOUND: "Documento não encontrado.",
         ERR_KNOWLEDGE_BASE_HAS_DOCUMENTS:

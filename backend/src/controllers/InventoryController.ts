@@ -198,8 +198,8 @@ export const deleteProduct = async (
 ): Promise<Response> => {
   const companyId = companyIdOrThrow(req);
   const id = parseIdParam(req.params.id);
-  const row = await DeleteInventoryProductService({ companyId, id });
-  return res.json(row);
+  await DeleteInventoryProductService({ companyId, id });
+  return res.status(204).send();
 };
 
 export const createStockMovement = async (
