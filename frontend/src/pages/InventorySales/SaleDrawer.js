@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Box,
   Chip,
@@ -13,6 +13,7 @@ import {
   Typography,
 } from "@material-ui/core";
 import { makeStyles } from "@material-ui/core/styles";
+import Autocomplete from "@material-ui/lab/Autocomplete";
 import CloseIcon from "@material-ui/icons/Close";
 import ReceiptIcon from "@material-ui/icons/Receipt";
 import { toast } from "react-toastify";
@@ -29,6 +30,7 @@ import {
   completeInventorySale,
   deleteInventorySale,
   getInventorySale,
+  searchInventoryCustomers,
   updateInventorySale,
   updateInventorySalePayment,
 } from "../../services/inventoryApi";
@@ -49,6 +51,27 @@ import { formatCurrencyBRL } from "../../utils/brazilianCurrency";
 import { format } from "date-fns";
 import useIsMobile from "../../hooks/useIsMobile";
 import { useInventoryPermissions } from "../../utils/inventoryAccess";
+import {
+  axiosAbortConfig,
+  isAbortError,
+  shouldAutofocusSaleProductSearch,
+} from "./saleProductSearch";
+
+function contactOptionFromSale(data) {
+  const contact = data?.contact;
+  if (contact?.id == null) return null;
+  return {
+    id: contact.id,
+    name: contact.name || "",
+    number: contact.number || "",
+  };
+}
+
+function sameHeaderId(left, right) {
+  const a = left == null || left === "" ? "" : String(left);
+  const b = right == null || right === "" ? "" : String(right);
+  return a === b;
+}
 
 const useStyles = makeStyles((theme) => ({
   drawerPaper: {
@@ -126,11 +149,21 @@ export default function SaleDrawer({
   const perms = useInventoryPermissions();
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [savingHeader, setSavingHeader] = useState(false);
+  const [savingPayment, setSavingPayment] = useState(false);
   const [sale, setSale] = useState(null);
   const [users, setUsers] = useState([]);
-  const [contacts, setContacts] = useState([]);
-  const [contactSearch, setContactSearch] = useState("");
+  const [selectedContact, setSelectedContact] = useState(null);
+  const [contactOptions, setContactOptions] = useState([]);
+  const [contactInput, setContactInput] = useState("");
+  const [contactSearchLoading, setContactSearchLoading] = useState(false);
+  const [contactSearchError, setContactSearchError] = useState(false);
+  const contactAbortRef = useRef(null);
+  const contactRequestRef = useRef(0);
+  const contactTypedRef = useRef("");
+  const contactDebounceRef = useRef(null);
+  const openRef = useRef(open);
+  const mountedRef = useRef(true);
 
   const [headerForm, setHeaderForm] = useState({
     contactId: "",
@@ -149,6 +182,14 @@ export default function SaleDrawer({
   const [cancelReason, setCancelReason] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
 
+  const applyContact = useCallback((contact) => {
+    setSelectedContact(contact);
+    setContactInput(contact?.name || "");
+    setContactOptions(contact ? [contact] : []);
+    setContactSearchError(false);
+    setContactSearchLoading(false);
+  }, []);
+
   const applySaleToForm = useCallback((data) => {
     setHeaderForm({
       contactId: data.contactId != null ? String(data.contactId) : "",
@@ -158,7 +199,8 @@ export default function SaleDrawer({
       paymentMethod: data.paymentMethod || "",
       paymentNotes: data.paymentNotes || "",
     });
-  }, []);
+    applyContact(contactOptionFromSale(data));
+  }, [applyContact]);
 
   const loadSale = useCallback(async () => {
     if (!saleId) return null;
@@ -202,37 +244,114 @@ export default function SaleDrawer({
     }
   }, []);
 
-  const loadContacts = useCallback(async (search) => {
+  const runContactSearch = useCallback(async (rawTerm) => {
+    const query = String(rawTerm ?? "").trim();
+    if (!query) {
+      setContactSearchLoading(false);
+      setContactSearchError(false);
+      return;
+    }
+
+    contactTypedRef.current = query;
+    if (contactAbortRef.current) contactAbortRef.current.abort();
+    const controller = new AbortController();
+    contactAbortRef.current = controller;
+    const requestId = ++contactRequestRef.current;
+    setContactSearchLoading(true);
+    setContactSearchError(false);
+
     try {
-      const { data } = await api.get("/contacts", {
-        params: { searchParam: search || "", pageNumber: 1 },
-      });
-      setContacts(Array.isArray(data.contacts) ? data.contacts : []);
+      const { data } = await searchInventoryCustomers(
+        { search: query, limit: 20 },
+        axiosAbortConfig(controller)
+      );
+      if (
+        !mountedRef.current ||
+        !openRef.current ||
+        controller.signal.aborted ||
+        requestId !== contactRequestRef.current ||
+        contactTypedRef.current !== query
+      ) {
+        return;
+      }
+      const rows = Array.isArray(data?.customers) ? data.customers : [];
+      setContactOptions(rows);
     } catch (err) {
-      toastError(err);
+      if (
+        !mountedRef.current ||
+        !openRef.current ||
+        controller.signal.aborted ||
+        isAbortError(err) ||
+        requestId !== contactRequestRef.current ||
+        contactTypedRef.current !== query
+      ) {
+        return;
+      }
+      setContactSearchError(true);
+      setContactOptions([]);
+    } finally {
+      if (
+        mountedRef.current &&
+        requestId === contactRequestRef.current &&
+        !controller.signal.aborted
+      ) {
+        setContactSearchLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
-    if (!open) return;
-    loadRefs();
-    if (!ticketLink) {
-      loadContacts("");
+    openRef.current = open;
+  }, [open]);
+
+  useEffect(() => () => {
+    mountedRef.current = false;
+    if (contactAbortRef.current) contactAbortRef.current.abort();
+    clearTimeout(contactDebounceRef.current);
+  }, []);
+
+  useEffect(() => {
+    if (!open) {
+      if (contactAbortRef.current) contactAbortRef.current.abort();
+      clearTimeout(contactDebounceRef.current);
+      return;
     }
-  }, [open, loadRefs, loadContacts, ticketLink]);
+    loadRefs();
+  }, [open, loadRefs]);
 
   useEffect(() => {
     if (!open || !saleId) return;
     loadSale();
   }, [open, saleId, loadSale]);
 
-  useEffect(() => {
-    if (!open || ticketLink) return;
-    const t = setTimeout(() => loadContacts(contactSearch), contactSearch ? 300 : 0);
-    return () => clearTimeout(t);
-  }, [open, contactSearch, loadContacts, ticketLink]);
-
   const editable = isSaleEditable(sale) && perms.canCreateSale;
+
+  useEffect(() => {
+    if (!open || ticketLink || !editable) return undefined;
+    const query = contactInput.trim();
+    contactTypedRef.current = query;
+    if (contactAbortRef.current) {
+      contactAbortRef.current.abort();
+      contactAbortRef.current = null;
+    }
+    if (!query) {
+      setContactOptions(selectedContact ? [selectedContact] : []);
+      setContactSearchLoading(false);
+      setContactSearchError(false);
+      return undefined;
+    }
+    if (
+      selectedContact &&
+      query === String(selectedContact.name || "").trim()
+    ) {
+      setContactSearchLoading(false);
+      return undefined;
+    }
+    contactDebounceRef.current = setTimeout(() => {
+      runContactSearch(query);
+    }, 300);
+    return () => clearTimeout(contactDebounceRef.current);
+  }, [open, ticketLink, editable, contactInput, selectedContact, runContactSearch]);
 
   // Persiste apenas o cabeçalho da venda (rascunho). Nunca envia campos
   // financeiros pelo endpoint geral — pagamento só vai pela rota protegida.
@@ -268,21 +387,46 @@ export default function SaleDrawer({
   };
 
   const handleSaveHeader = async () => {
-    if (!sale?.id || !editable) return;
-    setSaving(true);
+    if (!sale?.id || !editable || savingHeader || savingPayment) return;
+    setSavingHeader(true);
     try {
-      await persistHeader();
-      if (perms.canManagePayments) {
-        await persistDraftPayment();
-      }
-      const fresh = await refreshSale();
-      if (fresh) applySaleToForm(fresh);
-      toast.success(i18n.t("inventorySales.sales.toasts.saved"));
+      const data = await persistHeader();
+      setSale(data);
+      setHeaderForm((prev) => ({
+        ...prev,
+        contactId: data.contactId != null ? String(data.contactId) : "",
+        sellerUserId: data.sellerUserId != null ? String(data.sellerUserId) : "",
+        notes: data.notes || "",
+      }));
+      applyContact(contactOptionFromSale(data));
+      toast.success(i18n.t("inventorySales.sales.toasts.headerSaved"));
       if (onChanged) onChanged();
     } catch (err) {
       toastError(err);
     } finally {
-      setSaving(false);
+      setSavingHeader(false);
+    }
+  };
+
+  const handleSavePayment = async () => {
+    if (!sale?.id || !editable || !perms.canManagePayments || savingHeader || savingPayment) {
+      return;
+    }
+    setSavingPayment(true);
+    try {
+      const data = await persistDraftPayment();
+      setSale(data);
+      setHeaderForm((prev) => ({
+        ...prev,
+        paymentMethod: data.paymentMethod || "",
+        paymentNotes: data.paymentNotes || "",
+      }));
+      toast.success(i18n.t("inventorySales.sales.toasts.paymentSaved"));
+      if (onChanged) onChanged();
+    } catch (err) {
+      toastError(err);
+    } finally {
+      setSavingPayment(false);
     }
   };
 
@@ -386,6 +530,21 @@ export default function SaleDrawer({
       : i18n.t("inventorySales.sales.payment.noMethod");
 
   const displayDate = getSaleDisplayDate(sale);
+  const customerOptions = useMemo(() => {
+    if (!selectedContact) return contactOptions;
+    if (contactOptions.some((row) => row.id === selectedContact.id)) {
+      return contactOptions;
+    }
+    return [selectedContact, ...contactOptions];
+  }, [contactOptions, selectedContact]);
+  const headerDirty = Boolean(
+    editable &&
+      sale &&
+      (!sameHeaderId(headerForm.contactId, sale.contactId) ||
+        !sameHeaderId(headerForm.sellerUserId, sale.sellerUserId) ||
+        (headerForm.notes || "") !== (sale.notes || ""))
+  );
+  const savesLocked = savingHeader || savingPayment || actionLoading;
 
   return (
     <>
@@ -445,6 +604,9 @@ export default function SaleDrawer({
             ) : sale ? (
               <>
                 <div className={classes.fieldGroup}>
+                  <Typography variant="subtitle1" className={classes.sectionTitle}>
+                    {i18n.t("inventorySales.sales.sections.saleData")}
+                  </Typography>
                   {ticketLink ? (
                     <>
                       <TextField
@@ -469,57 +631,80 @@ export default function SaleDrawer({
                       />
                     </>
                   ) : (
-                    <>
-                      <FormControl
-                        variant="outlined"
-                        size="small"
-                        fullWidth
-                        disabled={!editable}
-                      >
-                        <InputLabel id="sale-contact-label">
-                          {i18n.t("inventorySales.sales.fields.contact")}
-                        </InputLabel>
-                        <Select
-                          labelId="sale-contact-label"
-                          value={headerForm.contactId}
-                          onChange={(e) =>
-                            setHeaderForm((prev) => ({
-                              ...prev,
-                              contactId: e.target.value,
-                            }))
+                    <Autocomplete
+                      options={customerOptions}
+                      value={selectedContact}
+                      inputValue={contactInput}
+                      disabled={!editable}
+                      onChange={(_, value) => {
+                        setSelectedContact(value);
+                        setHeaderForm((prev) => ({
+                          ...prev,
+                          contactId: value?.id != null ? String(value.id) : "",
+                        }));
+                        if (!value) {
+                          setContactOptions([]);
+                          setContactInput("");
+                          setContactSearchError(false);
+                        }
+                      }}
+                      onInputChange={(_, value, reason) => {
+                        setContactInput(value);
+                        if (reason === "input" || reason === "clear") {
+                          setSelectedContact(null);
+                          setHeaderForm((prev) => ({ ...prev, contactId: "" }));
+                          if (reason === "clear") {
+                            setContactOptions([]);
+                            setContactSearchError(false);
                           }
-                          label={i18n.t("inventorySales.sales.fields.contact")}
-                          onOpen={() => loadContacts(contactSearch)}
-                        >
-                          <MenuItem value="">
-                            <em>{i18n.t("inventorySales.common.none")}</em>
-                          </MenuItem>
-                          {contacts.map((c) => (
-                            <MenuItem key={c.id} value={String(c.id)}>
-                              {c.name}
-                              {c.number ? ` (${c.number})` : ""}
-                            </MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
-                      {!editable && sale.contact ? (
-                        <Typography variant="caption" color="textSecondary">
-                          {sale.contact.name}
-                        </Typography>
-                      ) : (
+                        }
+                      }}
+                      loading={contactSearchLoading}
+                      filterOptions={(opts) => opts}
+                      getOptionSelected={(option, value) => option.id === value.id}
+                      getOptionLabel={(option) => option?.name || ""}
+                      noOptionsText={
+                        contactSearchError
+                          ? i18n.t("inventorySales.sales.customerSearch.error")
+                          : i18n.t("inventorySales.sales.customerSearch.empty")
+                      }
+                      loadingText={i18n.t("inventorySales.sales.customerSearch.loading")}
+                      renderOption={(option) => (
+                        <Box minWidth={0} style={{ overflowWrap: "anywhere" }}>
+                          <Typography variant="body2">{option.name}</Typography>
+                          {option.number ? (
+                            <Typography variant="caption" color="textSecondary" display="block">
+                              {option.number}
+                            </Typography>
+                          ) : null}
+                        </Box>
+                      )}
+                      renderInput={(params) => (
                         <TextField
-                          size="small"
+                          {...params}
+                          label={i18n.t("inventorySales.sales.fields.contact")}
+                          placeholder={i18n.t("inventorySales.sales.customerSearch.placeholder")}
                           variant="outlined"
-                          placeholder={i18n.t(
-                            "inventorySales.sales.searchContact"
-                          )}
-                          value={contactSearch}
-                          onChange={(e) => setContactSearch(e.target.value)}
-                          disabled={!editable}
-                          fullWidth
+                          size="small"
+                          autoFocus={editable && shouldAutofocusSaleProductSearch()}
+                          inputProps={{
+                            ...params.inputProps,
+                            "data-testid": "sale-customer-search",
+                          }}
+                          InputProps={{
+                            ...params.InputProps,
+                            endAdornment: (
+                              <>
+                                {contactSearchLoading ? (
+                                  <CircularProgress color="inherit" size={18} />
+                                ) : null}
+                                {params.InputProps.endAdornment}
+                              </>
+                            ),
+                          }}
                         />
                       )}
-                    </>
+                    />
                   )}
 
                   <FormControl
@@ -565,6 +750,7 @@ export default function SaleDrawer({
                     multiline
                     rows={2}
                     disabled={!editable}
+                    inputProps={{ "data-testid": "sale-notes" }}
                   />
 
                   {sale.status === "cancelled" && sale.cancelReason ? (
@@ -573,7 +759,26 @@ export default function SaleDrawer({
                       {sale.cancelReason}
                     </Typography>
                   ) : null}
+
+                  {editable ? (
+                    <Box>
+                      {headerDirty ? (
+                        <Typography variant="caption" color="textSecondary" display="block">
+                          {i18n.t("inventorySales.sales.unsavedChanges")}
+                        </Typography>
+                      ) : null}
+                      <AppSecondaryButton onClick={handleSaveHeader} disabled={savesLocked}>
+                        {i18n.t("inventorySales.sales.saveHeader")}
+                      </AppSecondaryButton>
+                    </Box>
+                  ) : null}
                 </div>
+
+                <SaleItemsEditor
+                  sale={sale}
+                  readOnly={!editable}
+                  onSaleUpdated={refreshSale}
+                />
 
                 <Typography variant="subtitle1" className={classes.sectionTitle}>
                   {i18n.t("inventorySales.sales.payment.sectionTitle")}
@@ -625,8 +830,8 @@ export default function SaleDrawer({
                         rows={2}
                       />
                       <Box>
-                        <AppSecondaryButton onClick={handleSaveHeader} disabled={saving}>
-                          {i18n.t("inventorySales.sales.saveHeader")}
+                        <AppSecondaryButton onClick={handleSavePayment} disabled={savesLocked}>
+                          {i18n.t("inventorySales.sales.payment.savePayment")}
                         </AppSecondaryButton>
                       </Box>
                     </>
@@ -678,11 +883,30 @@ export default function SaleDrawer({
                   )}
                 </div>
 
-                <SaleItemsEditor
-                  sale={sale}
-                  readOnly={!editable}
-                  onSaleUpdated={refreshSale}
-                />
+                <Typography variant="subtitle1" className={classes.sectionTitle}>
+                  {i18n.t("inventorySales.sales.sections.summary")}
+                </Typography>
+                <Box display="flex" flexDirection="column" alignItems="flex-end" style={{ gap: 4 }}>
+                  <Typography variant="body2" color="textSecondary">
+                    {i18n.t("inventorySales.sales.totals.subtotal")}:{" "}
+                    {formatCurrencyBRL(sale.subtotalAmount)}
+                  </Typography>
+                  <Typography variant="body2" color="textSecondary">
+                    {i18n.t("inventorySales.sales.totals.discount")}:{" "}
+                    {formatCurrencyBRL(sale.discountAmount)}
+                  </Typography>
+                  <Typography variant="subtitle1" style={{ fontWeight: 700 }}>
+                    {i18n.t("inventorySales.sales.totals.total")}:{" "}
+                    {formatCurrencyBRL(sale.totalAmount)}
+                  </Typography>
+                  {sale.status === "completed" && sale.commissionAmount != null ? (
+                    <Typography variant="body2" color="textSecondary">
+                      {i18n.t("inventorySales.sales.totals.commission")} (
+                      {Number(sale.commissionRate) || 0}%):{" "}
+                      {formatCurrencyBRL(sale.commissionAmount)}
+                    </Typography>
+                  ) : null}
+                </Box>
               </>
             ) : null}
           </div>

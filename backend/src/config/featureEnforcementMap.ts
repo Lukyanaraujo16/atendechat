@@ -211,6 +211,7 @@ export const FEATURE_ENFORCEMENT_MAP: Array<{
       "GET /inventory/products/:id",
       "GET /inventory/sales",
       "GET /inventory/sales/:id",
+      "GET /inventory/customers/search",
     ],
   },
   {

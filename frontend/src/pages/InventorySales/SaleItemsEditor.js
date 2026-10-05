@@ -35,7 +35,7 @@ import toastError from "../../errors/toastError";
 import { i18n } from "../../translate/i18n";
 import useIsMobile from "../../hooks/useIsMobile";
 import { formatCurrencyBRL, parseBrazilianCurrencyToNumber } from "../../utils/brazilianCurrency";
-import { formatQuantity, toNumber } from "./utils";
+import { formatQuantity } from "./utils";
 import SaleItemIdentifiersEditor from "./SaleItemIdentifiersEditor";
 import SaleItemIdentifiersList from "./SaleItemIdentifiersList";
 import {
@@ -947,28 +947,6 @@ export default function SaleItemsEditor({
           </Box>
         </Box>
       ) : null}
-
-      <Box mt={2} display="flex" flexDirection="column" alignItems="flex-end" style={{ gap: 4 }}>
-        <Typography variant="body2" color="textSecondary">
-          {i18n.t("inventorySales.sales.totals.subtotal")}:{" "}
-          {formatCurrencyBRL(sale?.subtotalAmount)}
-        </Typography>
-        <Typography variant="body2" color="textSecondary">
-          {i18n.t("inventorySales.sales.totals.discount")}:{" "}
-          {formatCurrencyBRL(sale?.discountAmount)}
-        </Typography>
-        <Typography variant="subtitle1" style={{ fontWeight: 700 }}>
-          {i18n.t("inventorySales.sales.totals.total")}:{" "}
-          {formatCurrencyBRL(sale?.totalAmount)}
-        </Typography>
-        {sale?.status === "completed" && sale.commissionAmount != null ? (
-          <Typography variant="body2" color="textSecondary">
-            {i18n.t("inventorySales.sales.totals.commission")} (
-            {toNumber(sale.commissionRate)}%):{" "}
-            {formatCurrencyBRL(sale.commissionAmount)}
-          </Typography>
-        ) : null}
-      </Box>
     </Box>
   );
 }

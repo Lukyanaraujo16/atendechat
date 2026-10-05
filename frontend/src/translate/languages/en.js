@@ -430,6 +430,17 @@ const messages = {
 					endDate: "End date",
 					drawerTitle: "Sale {{number}}",
 					saveHeader: "Save details",
+					unsavedChanges: "Unsaved changes",
+					sections: {
+						saleData: "Sale details",
+						summary: "Summary",
+					},
+					customerSearch: {
+						placeholder: "Search by name or phone...",
+						empty: "No customers found",
+						loading: "Searching customers...",
+						error: "Could not search customers.",
+					},
 					complete: "Complete sale",
 					cancelSale: "Cancel sale",
 					deleteDraft: "Delete draft",
@@ -606,6 +617,8 @@ const messages = {
 					toasts: {
 						created: "Sale created.",
 						saved: "Sale updated.",
+						headerSaved: "Sale details saved.",
+						paymentSaved: "Payment saved.",
 						completed: "Sale completed.",
 						cancelled: "Sale cancelled.",
 						deleted: "Draft deleted.",

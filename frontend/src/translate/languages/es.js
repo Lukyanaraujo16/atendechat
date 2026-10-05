@@ -424,6 +424,17 @@ const messages = {
           endDate: "Fecha final",
           drawerTitle: "Venta {{number}}",
           saveHeader: "Guardar datos",
+          unsavedChanges: "Cambios sin guardar",
+          sections: {
+            saleData: "Datos de la venta",
+            summary: "Resumen",
+          },
+          customerSearch: {
+            placeholder: "Buscar por nombre o teléfono...",
+            empty: "Ningún cliente encontrado",
+            loading: "Buscando clientes...",
+            error: "No fue posible buscar clientes.",
+          },
           complete: "Concluir venta",
           cancelSale: "Cancelar venta",
           deleteDraft: "Eliminar borrador",
@@ -600,6 +611,8 @@ const messages = {
           toasts: {
             created: "Venta creada.",
             saved: "Venta actualizada.",
+            headerSaved: "Datos de la venta guardados.",
+            paymentSaved: "Pago guardado.",
             completed: "Venta concluida.",
             cancelled: "Venta cancelada.",
             deleted: "Borrador eliminado.",

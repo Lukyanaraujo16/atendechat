@@ -59,6 +59,9 @@ export const listProductStockMovements = (productId, params) =>
 export const listInventorySales = (params) =>
   api.get("/inventory/sales", { params });
 
+export const searchInventoryCustomers = (params, config = {}) =>
+  api.get("/inventory/customers/search", { ...config, params });
+
 export const createInventorySale = (body) =>
   api.post("/inventory/sales", body);
 

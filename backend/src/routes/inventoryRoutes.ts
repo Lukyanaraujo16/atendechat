@@ -149,6 +149,12 @@ inventoryRoutes.get(
 );
 
 inventoryRoutes.get(
+  "/inventory/customers/search",
+  isAuth,
+  requireInventorySalesPermission(INVENTORY_SALES_VIEW),
+  InventorySaleController.searchCustomers
+);
+inventoryRoutes.get(
   "/inventory/sales",
   isAuth,
   requireInventorySalesPermission(INVENTORY_SALES_VIEW),

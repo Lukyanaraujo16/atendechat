@@ -11,6 +11,7 @@ import DeleteInventorySaleItemService from "../services/InventoryService/DeleteI
 import CompleteInventorySaleService from "../services/InventoryService/CompleteInventorySaleService";
 import CancelInventorySaleService from "../services/InventoryService/CancelInventorySaleService";
 import UpdateInventorySalePaymentService from "../services/InventoryService/UpdateInventorySalePaymentService";
+import SearchInventoryCustomersService from "../services/InventoryService/SearchInventoryCustomersService";
 
 function companyIdOrThrow(req: Request): number {
   const id = req.user?.companyId;
@@ -31,6 +32,19 @@ function userIdOrNull(req: Request): number | null {
     ? Number(req.user.id)
     : null;
 }
+
+export const searchCustomers = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const customers = await SearchInventoryCustomersService({
+    companyId,
+    search: req.query.search,
+    limit: req.query.limit
+  });
+  return res.json({ customers });
+};
 
 export const listSales = async (
   req: Request,
