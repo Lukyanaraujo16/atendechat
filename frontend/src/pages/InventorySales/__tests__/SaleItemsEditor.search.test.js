@@ -7,6 +7,7 @@ import path from "path";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { createTheme, ThemeProvider } from "@material-ui/core/styles";
 import { changeLanguage } from "../../../translate/i18n";
+import { toast } from "react-toastify";
 import SaleItemsEditor from "../SaleItemsEditor";
 import {
   addInventorySaleItem,
@@ -258,25 +259,30 @@ describe("busca de produto na venda", () => {
   });
 
   it("não aplica uma busca antiga depois que o termo foi apagado", async () => {
-    let resolveSearch;
+    const resolvers = [];
     listInventoryProducts.mockImplementation(
       () =>
         new Promise((resolve) => {
-          resolveSearch = resolve;
+          resolvers.push(resolve);
         })
     );
     renderEditor();
     fireEvent.change(searchInput(), { target: { value: "789123" } });
     fireEvent.keyDown(searchInput(), { key: "Enter" });
-    await waitFor(() => expect(listInventoryProducts).toHaveBeenCalled());
+    await waitFor(() => expect(resolvers.length).toBe(1));
     fireEvent.change(searchInput(), { target: { value: "" } });
+    await waitFor(() => expect(resolvers.length).toBe(2));
+    expect(listInventoryProducts.mock.calls[1][0]).toEqual({
+      active: true,
+      limit: 20,
+    });
     await act(async () => {
-      resolveSearch({
+      resolvers[0]({
         data: [product({ barcode: "789123" })],
       });
     });
     expect(searchInput().value).toBe("");
-    expect(screen.queryByRole("option")).toBeNull();
+    expect(screen.queryByText("Capinha iPhone")).toBeNull();
     expect(addInventorySaleItem).not.toHaveBeenCalled();
   });
 
@@ -390,5 +396,40 @@ describe("busca de produto na venda", () => {
     ).toBe(`Estoque: ${formatQuantity(0.5)} kg`);
     expect(pickExactSaleProduct([{ id: 1, barcode: "ABC" }], "abc")).toBeNull();
     expect(pickExactSaleProduct([{ id: 1, barcode: "ABC" }], " ABC ").id).toBe(1);
+  });
+
+  it("a seta com campo vazio pede só os primeiros 20", async () => {
+    listInventoryProducts.mockResolvedValue({ data: [product()] });
+    renderEditor();
+    expect(listInventoryProducts).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByLabelText("Open"));
+    await waitFor(() =>
+      expect(listInventoryProducts).toHaveBeenCalledWith(
+        { active: true, limit: 20 },
+        expect.any(Object)
+      )
+    );
+    expect(listInventoryProducts.mock.calls[0][0].search).toBeUndefined();
+    expect(await screen.findByRole("option")).toBeTruthy();
+  });
+
+  it("fechar o campo cancela a busca sem toast", async () => {
+    let resolveSearch;
+    listInventoryProducts.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveSearch = resolve;
+        })
+    );
+    renderEditor();
+    fireEvent.click(screen.getByLabelText("Open"));
+    await waitFor(() => expect(listInventoryProducts).toHaveBeenCalled());
+    fireEvent.click(screen.getByLabelText("Close"));
+    expect(screen.queryByRole("progressbar")).toBeNull();
+    await act(async () => {
+      resolveSearch({ data: [product()] });
+    });
+    expect(screen.queryByRole("option")).toBeNull();
+    expect(toast.error).not.toHaveBeenCalled();
   });
 });

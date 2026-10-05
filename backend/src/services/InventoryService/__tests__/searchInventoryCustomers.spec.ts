@@ -18,11 +18,22 @@ describe("SearchInventoryCustomersService", () => {
     findAll.mockRestore();
   });
 
-  it("termo vazio não consulta o catálogo", async () => {
+  it("termo vazio lista no máximo 20 da empresa", async () => {
     await expect(
       SearchInventoryCustomersService({ companyId: 4, search: "   " })
     ).resolves.toEqual([]);
-    expect(findAll).not.toHaveBeenCalled();
+    expect(findAll).toHaveBeenCalledTimes(1);
+    const options = findAll.mock.calls[0][0] as {
+      where: any;
+      limit: number;
+      order: unknown;
+    };
+    expect(options.where).toEqual({ companyId: 4 });
+    expect(options.limit).toBe(20);
+    expect(options.order).toEqual([
+      ["name", "ASC"],
+      ["id", "ASC"]
+    ]);
   });
 
   it("busca nome e telefone na empresa da sessão, com limite padrão 20", async () => {
@@ -49,10 +60,12 @@ describe("SearchInventoryCustomersService", () => {
       limit: number;
     };
     expect(options.where.companyId).toBe(4);
-    expect(options.where[Op.or]).toEqual([
-      { name: { [Op.like]: "%João%" } },
-      { number: { [Op.like]: "%João%" } }
-    ]);
+    const folded = JSON.stringify(options.where[Op.or][0]);
+    expect(folded).toContain("utf8mb4_unicode_ci");
+    expect(options.where[Op.or][0].logic[Op.like]).toBe("%João%");
+    expect(options.where[Op.or][1]).toEqual({
+      number: { [Op.like]: "%João%" }
+    });
     expect(options.attributes).toEqual(["id", "name", "number"]);
     expect(options.limit).toBe(20);
     expect(rows[0]).not.toHaveProperty("email");
@@ -66,10 +79,12 @@ describe("SearchInventoryCustomersService", () => {
     });
     const options = findAll.mock.calls[0][0] as { where: any; limit: number };
     expect(options.where.companyId).toBe(8);
-    expect(options.where[Op.or]).toEqual([
-      { name: { [Op.like]: "%9999%" } },
-      { number: { [Op.like]: "%9999%" } }
-    ]);
+    const folded = JSON.stringify(options.where[Op.or][0]);
+    expect(folded).toContain("utf8mb4_unicode_ci");
+    expect(options.where[Op.or][0].logic[Op.like]).toBe("%9999%");
+    expect(options.where[Op.or][1]).toEqual({
+      number: { [Op.like]: "%9999%" }
+    });
     expect(options.limit).toBe(10);
   });
 
@@ -103,6 +118,31 @@ describe("SearchInventoryCustomersService", () => {
     expect(contact).toMatchObject({
       attributes: ["id", "name", "number"],
       required: false
+    });
+  });
+
+  it("joao e JOAO pedem comparação insensível no nome e o telefone continua literal", async () => {
+    await SearchInventoryCustomersService({ companyId: 4, search: "joao" });
+    const joao = JSON.stringify(
+      (findAll.mock.calls[0][0] as { where: any }).where[Op.or][0]
+    );
+    expect(joao).toContain("utf8mb4_unicode_ci");
+    expect(
+      (findAll.mock.calls[0][0] as { where: any }).where[Op.or][0].logic[
+        Op.like
+      ]
+    ).toBe("%joao%");
+
+    findAll.mockClear();
+    await SearchInventoryCustomersService({ companyId: 9, search: "JOAO" });
+    const upper = findAll.mock.calls[0][0] as { where: any };
+    expect(upper.where.companyId).toBe(9);
+    expect(JSON.stringify(upper.where[Op.or][0])).toContain(
+      "utf8mb4_unicode_ci"
+    );
+    expect(upper.where[Op.or][0].logic[Op.like]).toBe("%JOAO%");
+    expect(upper.where[Op.or][1]).toEqual({
+      number: { [Op.like]: "%JOAO%" }
     });
   });
 });

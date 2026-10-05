@@ -173,9 +173,9 @@ export default function SaleItemsEditor({
     typedQueryRef.current = "";
   }, []);
 
-  const runSearch = useCallback(async (rawTerm, { exactOnSingle }) => {
+  const runSearch = useCallback(async (rawTerm, { exactOnSingle, browse }) => {
     const query = String(rawTerm ?? "").trim();
-    if (!query) {
+    if (!query && !browse) {
       setOptions([]);
       setSearchLoading(false);
       setSearchError(false);
@@ -193,8 +193,10 @@ export default function SaleItemsEditor({
     setPopupOpen(true);
 
     try {
+      const params = { active: true, limit: 20 };
+      if (query) params.search = query;
       const { data } = await listInventoryProducts(
-        { active: true, search: query, limit: 20 },
+        params,
         axiosAbortConfig(controller)
       );
       if (
@@ -246,16 +248,20 @@ export default function SaleItemsEditor({
   useEffect(() => {
     if (readOnly) return undefined;
     const query = inputValue.trim();
+    const queryChanged = typedQueryRef.current !== query;
     typedQueryRef.current = query;
-    if (abortRef.current) {
-      abortRef.current.abort();
-      abortRef.current = null;
-    }
-    if (!query) {
+    if (!query && !popupOpen) {
+      if (abortRef.current) {
+        abortRef.current.abort();
+        abortRef.current = null;
+      }
       setOptions([]);
       setSearchLoading(false);
       setSearchError(false);
-      setPopupOpen(false);
+      return undefined;
+    }
+    if (!query) {
+      runSearch("", { exactOnSingle: false, browse: true });
       return undefined;
     }
     if (
@@ -265,11 +271,16 @@ export default function SaleItemsEditor({
       setSearchLoading(false);
       return undefined;
     }
+    if (!queryChanged) return undefined;
+    if (abortRef.current) {
+      abortRef.current.abort();
+      abortRef.current = null;
+    }
     debounceTimerRef.current = setTimeout(() => {
       runSearch(query, { exactOnSingle: false });
     }, 300);
     return () => clearTimeout(debounceTimerRef.current);
-  }, [inputValue, readOnly, selectedProduct, runSearch]);
+  }, [inputValue, popupOpen, readOnly, selectedProduct, runSearch]);
 
   const focusSearchIfWide = () => {
     if (!shouldAutofocusSaleProductSearch()) return;
@@ -780,11 +791,13 @@ export default function SaleItemsEditor({
               inputValue={inputValue}
               open={popupOpen}
               onOpen={() => {
-                if (inputValue.trim()) setPopupOpen(true);
+                setPopupOpen(true);
               }}
               onClose={() => {
                 highlightedRef.current = null;
                 highlightChosenRef.current = false;
+                if (abortRef.current) abortRef.current.abort();
+                setSearchLoading(false);
                 setPopupOpen(false);
               }}
               onHighlightChange={(_, option, reason) => {
@@ -807,9 +820,8 @@ export default function SaleItemsEditor({
                   setSelectedProduct(null);
                   setAddForm((prev) => ({ ...prev, productId: "" }));
                   if (reason === "clear") {
-                    setOptions([]);
-                    setPopupOpen(false);
                     setSearchError(false);
+                    setPopupOpen(true);
                   }
                 }
               }}

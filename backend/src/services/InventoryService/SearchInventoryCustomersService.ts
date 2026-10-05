@@ -1,6 +1,7 @@
 import { Op } from "sequelize";
 import AppError from "../../errors/AppError";
 import Contact from "../../models/Contact";
+import { inventoryInsensitiveLike } from "./inventoryTextMatch";
 
 const DEFAULT_CUSTOMER_SEARCH_LIMIT = 20;
 const MAX_CUSTOMER_SEARCH_LIMIT = 50;
@@ -50,14 +51,16 @@ export default async function SearchInventoryCustomersService(input: {
 }): Promise<InventoryCustomerOption[]> {
   const limit = parseInventoryCustomerSearchLimit(input.limit);
   const search = normalizeSearch(input.search);
-  if (!search) return [];
+  const where: any = { companyId: input.companyId };
+  if (search) {
+    where[Op.or] = [
+      inventoryInsensitiveLike("name", search),
+      { number: { [Op.like]: `%${search}%` } }
+    ];
+  }
 
-  const term = `%${search}%`;
   const rows = await Contact.findAll({
-    where: {
-      companyId: input.companyId,
-      [Op.or]: [{ name: { [Op.like]: term } }, { number: { [Op.like]: term } }]
-    },
+    where,
     attributes: ["id", "name", "number"],
     limit,
     order: [

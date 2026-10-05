@@ -437,4 +437,56 @@ describe("SaleDrawer cliente e persistência", () => {
     expect(updateInventorySale).not.toHaveBeenCalled();
     expect(searchInventoryCustomers).not.toHaveBeenCalled();
   });
+
+  it("a seta lista os primeiros clientes e apagar o texto restaura essa lista", async () => {
+    renderDrawer();
+    await ready();
+    const opens = screen.getAllByLabelText("Open");
+    fireEvent.click(opens[0]);
+    await waitFor(() =>
+      expect(searchInventoryCustomers).toHaveBeenCalledWith(
+        { limit: 20 },
+        expect.any(Object)
+      )
+    );
+    expect(searchInventoryCustomers.mock.calls[0][0].search).toBeUndefined();
+
+    searchInventoryCustomers.mockResolvedValue({
+      data: { customers: [{ id: 3, name: "Marina", number: "27988887777" }] },
+    });
+    fireEvent.change(screen.getByTestId("sale-customer-search"), {
+      target: { value: "mari" },
+    });
+    await waitFor(() =>
+      expect(searchInventoryCustomers).toHaveBeenLastCalledWith(
+        { search: "mari", limit: 20 },
+        expect.any(Object)
+      )
+    );
+
+    searchInventoryCustomers.mockClear();
+    searchInventoryCustomers.mockResolvedValue({
+      data: { customers: [{ id: 4, name: "Ana", number: "1" }] },
+    });
+    fireEvent.change(screen.getByTestId("sale-customer-search"), {
+      target: { value: "" },
+    });
+    await waitFor(() =>
+      expect(searchInventoryCustomers).toHaveBeenCalledWith(
+        { limit: 20 },
+        expect.any(Object)
+      )
+    );
+    expect(await screen.findByText("Ana")).toBeTruthy();
+  });
+
+  it("o fluxo de ticket não oferece busca editável de cliente", async () => {
+    renderDrawer(draftSale(), {
+      ticketLink: { ticketId: 5, contactId: 9, contactName: "Do ticket" },
+    });
+    await ready();
+    expect(screen.getByDisplayValue("Do ticket")).toBeTruthy();
+    expect(screen.queryByTestId("sale-customer-search")).toBeNull();
+    expect(searchInventoryCustomers).not.toHaveBeenCalled();
+  });
 });

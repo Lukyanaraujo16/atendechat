@@ -158,6 +158,7 @@ export default function SaleDrawer({
   const [contactInput, setContactInput] = useState("");
   const [contactSearchLoading, setContactSearchLoading] = useState(false);
   const [contactSearchError, setContactSearchError] = useState(false);
+  const [contactPopupOpen, setContactPopupOpen] = useState(false);
   const contactAbortRef = useRef(null);
   const contactRequestRef = useRef(0);
   const contactTypedRef = useRef("");
@@ -244,9 +245,9 @@ export default function SaleDrawer({
     }
   }, []);
 
-  const runContactSearch = useCallback(async (rawTerm) => {
+  const runContactSearch = useCallback(async (rawTerm, { browse } = {}) => {
     const query = String(rawTerm ?? "").trim();
-    if (!query) {
+    if (!query && !browse) {
       setContactSearchLoading(false);
       setContactSearchError(false);
       return;
@@ -261,8 +262,10 @@ export default function SaleDrawer({
     setContactSearchError(false);
 
     try {
+      const params = { limit: 20 };
+      if (query) params.search = query;
       const { data } = await searchInventoryCustomers(
-        { search: query, limit: 20 },
+        params,
         axiosAbortConfig(controller)
       );
       if (
@@ -329,15 +332,20 @@ export default function SaleDrawer({
   useEffect(() => {
     if (!open || ticketLink || !editable) return undefined;
     const query = contactInput.trim();
+    const queryChanged = contactTypedRef.current !== query;
     contactTypedRef.current = query;
-    if (contactAbortRef.current) {
-      contactAbortRef.current.abort();
-      contactAbortRef.current = null;
-    }
-    if (!query) {
+    if (!query && !contactPopupOpen) {
+      if (contactAbortRef.current) {
+        contactAbortRef.current.abort();
+        contactAbortRef.current = null;
+      }
       setContactOptions(selectedContact ? [selectedContact] : []);
       setContactSearchLoading(false);
       setContactSearchError(false);
+      return undefined;
+    }
+    if (!query) {
+      runContactSearch("", { browse: true });
       return undefined;
     }
     if (
@@ -347,11 +355,24 @@ export default function SaleDrawer({
       setContactSearchLoading(false);
       return undefined;
     }
+    if (!queryChanged) return undefined;
+    if (contactAbortRef.current) {
+      contactAbortRef.current.abort();
+      contactAbortRef.current = null;
+    }
     contactDebounceRef.current = setTimeout(() => {
       runContactSearch(query);
     }, 300);
     return () => clearTimeout(contactDebounceRef.current);
-  }, [open, ticketLink, editable, contactInput, selectedContact, runContactSearch]);
+  }, [
+    open,
+    ticketLink,
+    editable,
+    contactInput,
+    contactPopupOpen,
+    selectedContact,
+    runContactSearch
+  ]);
 
   // Persiste apenas o cabeçalho da venda (rascunho). Nunca envia campos
   // financeiros pelo endpoint geral — pagamento só vai pela rota protegida.
@@ -635,6 +656,13 @@ export default function SaleDrawer({
                       options={customerOptions}
                       value={selectedContact}
                       inputValue={contactInput}
+                      open={contactPopupOpen}
+                      onOpen={() => setContactPopupOpen(true)}
+                      onClose={() => {
+                        if (contactAbortRef.current) contactAbortRef.current.abort();
+                        setContactSearchLoading(false);
+                        setContactPopupOpen(false);
+                      }}
                       disabled={!editable}
                       onChange={(_, value) => {
                         setSelectedContact(value);
@@ -653,8 +681,8 @@ export default function SaleDrawer({
                         if (reason === "input" || reason === "clear") {
                           setSelectedContact(null);
                           setHeaderForm((prev) => ({ ...prev, contactId: "" }));
+                          setContactPopupOpen(true);
                           if (reason === "clear") {
-                            setContactOptions([]);
                             setContactSearchError(false);
                           }
                         }

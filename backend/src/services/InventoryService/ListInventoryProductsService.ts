@@ -2,6 +2,7 @@ import { Op, col, where as sequelizeWhere } from "sequelize";
 import AppError from "../../errors/AppError";
 import InventoryCategory from "../../models/InventoryCategory";
 import InventoryProduct from "../../models/InventoryProduct";
+import { inventoryInsensitiveLike } from "./inventoryTextMatch";
 import { parseBooleanQuery } from "./inventoryTenant";
 
 const MAX_PRODUCT_LIST_LIMIT = 50;
@@ -73,12 +74,9 @@ function buildBaseWhere(input: {
 }
 
 function partialMatch(search: string) {
-  const term = `%${search}%`;
-  return [
-    { name: { [Op.like]: term } },
-    { sku: { [Op.like]: term } },
-    { barcode: { [Op.like]: term } }
-  ];
+  return ["name", "sku", "barcode"].map(column =>
+    inventoryInsensitiveLike(column, search, undefined, "InventoryProduct")
+  );
 }
 
 const productInclude = [
@@ -125,9 +123,9 @@ function excludeIds(where: any, ids: number[]) {
 
 /**
  * Com search + limit, a ordem é:
- * 1. barcode igual ao termo (comparação do banco, depois do trim; sem lower/unaccent);
+ * 1. barcode igual ao termo, comparação binária, sem remover caracteres;
  * 2. SKU igual ao termo, que ainda não entrou;
- * 3. LIKE parcial em nome, SKU e barcode.
+ * 3. busca parcial insensível a caixa; o nome também ignora acento.
  * Duplicatas exatas permanecem, até o limit. Sem limit, uma única query LIKE, como antes.
  */
 async function findRanked(

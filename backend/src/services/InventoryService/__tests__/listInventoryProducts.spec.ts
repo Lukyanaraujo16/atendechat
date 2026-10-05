@@ -5,6 +5,19 @@ import ListInventoryProductsService, {
   parseOptionalProductListLimit
 } from "../ListInventoryProductsService";
 
+function expectFolded(clauses: any, term: string) {
+  expect(clauses).toHaveLength(3);
+  const dumped = JSON.stringify(clauses);
+  ["name", "sku", "barcode"].forEach(column => {
+    expect(dumped).toContain(column);
+  });
+  expect(dumped).toContain("utf8mb4_unicode_ci");
+  expect(dumped).toContain("InventoryProduct");
+  clauses.forEach((clause: any) => {
+    expect(clause.logic[Op.like]).toBe(`%${term}%`);
+  });
+}
+
 function expectInvalidLimit(value: unknown) {
   try {
     parseOptionalProductListLimit(value);
@@ -50,16 +63,22 @@ describe("ListInventoryProductsService", () => {
     const options = findAll.mock.calls[0][0] as { limit?: number; where: any };
     expect(options.limit).toBeUndefined();
     expect(options.where.companyId).toBe(4);
-    expect(options.where[Op.or]).toEqual([
-      { name: { [Op.like]: "%abc%" } },
-      { sku: { [Op.like]: "%abc%" } },
-      { barcode: { [Op.like]: "%abc%" } }
-    ]);
+    expectFolded(options.where[Op.or], "abc");
   });
 
   it("limit=20 e o teto 50 aplicam o limite sem clamp acima disso", async () => {
     await ListInventoryProductsService({ companyId: 4, limit: "20" });
-    expect((findAll.mock.calls[0][0] as { limit: number }).limit).toBe(20);
+    const listed = findAll.mock.calls[0][0] as {
+      limit: number;
+      order: unknown;
+      where: any;
+    };
+    expect(listed.limit).toBe(20);
+    expect(listed.order).toEqual([
+      ["name", "ASC"],
+      ["id", "ASC"]
+    ]);
+    expect(listed.where[Op.or]).toBeUndefined();
 
     findAll.mockClear();
     await ListInventoryProductsService({ companyId: 4, limit: 50 });
@@ -178,5 +197,49 @@ describe("ListInventoryProductsService", () => {
     });
     expect(update).not.toHaveBeenCalled();
     expect(create).not.toHaveBeenCalled();
+  });
+
+  it("busca parcial ignora caixa e acento sem alterar o barcode exato", async () => {
+    await ListInventoryProductsService({
+      companyId: 4,
+      search: "capinha",
+      limit: 20
+    });
+    expect((findAll.mock.calls[0][0] as { where: any }).where.barcode).toBe(
+      "capinha"
+    );
+    const partial = findAll.mock.calls.find(
+      call => (call[0] as { where: any }).where[Op.or]
+    );
+    expectFolded((partial?.[0] as { where: any }).where[Op.or], "capinha");
+
+    findAll.mockClear();
+    await ListInventoryProductsService({
+      companyId: 4,
+      search: "Película",
+      limit: 20
+    });
+    const accent = findAll.mock.calls.find(
+      call => (call[0] as { where: any }).where[Op.or]
+    );
+    expectFolded((accent?.[0] as { where: any }).where[Op.or], "Película");
+
+    findAll.mockClear();
+    await ListInventoryProductsService({
+      companyId: 4,
+      search: "ABC-123",
+      limit: 20
+    });
+    expect((findAll.mock.calls[0][0] as { where: any }).where.barcode).toBe(
+      "ABC-123"
+    );
+    const code = findAll.mock.calls.find(
+      call => (call[0] as { where: any }).where[Op.or]
+    );
+    const dumped = JSON.stringify((code?.[0] as { where: any }).where[Op.or]);
+    expect(dumped).toContain("utf8mb4_unicode_ci");
+    (code?.[0] as { where: any }).where[Op.or].forEach((clause: any) => {
+      expect(clause.logic[Op.like]).toBe("%ABC-123%");
+    });
   });
 });
