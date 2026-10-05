@@ -249,7 +249,9 @@ export default function ProductFormDialog({
               </Grid>
               <Grid item xs={12} sm={6}>
                 <TextField
+                  id="product-barcode"
                   label={i18n.t("inventorySales.products.fields.barcode")}
+                  helperText={i18n.t("inventorySales.products.fields.barcodeHelp")}
                   value={form.barcode}
                   onChange={setField("barcode")}
                   variant="outlined"

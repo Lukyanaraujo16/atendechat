@@ -1,3 +1,7 @@
+import {
+  assertInventoryBarcodeUnique,
+  rethrowInventoryBarcodeConstraint
+} from "./inventoryBarcode";
 import AppError from "../../errors/AppError";
 import InventoryProduct from "../../models/InventoryProduct";
 import { resolveInventoryProductUnitForUpdate } from "./inventoryProductUnit";
@@ -66,6 +70,11 @@ export default async function UpdateInventoryProductService(input: {
 
   if (input.body.barcode !== undefined) {
     patch.barcode = normalizeOptionalString(input.body.barcode, 64);
+    await assertInventoryBarcodeUnique(
+      input.companyId,
+      patch.barcode,
+      product.id
+    );
   }
 
   if (input.body.name !== undefined) {
@@ -139,6 +148,10 @@ export default async function UpdateInventoryProductService(input: {
     return product;
   }
 
-  await product.update(patch);
+  try {
+    await product.update(patch);
+  } catch (error) {
+    rethrowInventoryBarcodeConstraint(error);
+  }
   return product.reload();
 }

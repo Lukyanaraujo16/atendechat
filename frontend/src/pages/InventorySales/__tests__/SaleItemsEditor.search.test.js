@@ -172,6 +172,16 @@ describe("busca de produto na venda", () => {
     expect(optionText).not.toContain("999");
   });
 
+  it("exibe resultado humano sem refiltrar caixa e acento no navegador", async () => {
+    listInventoryProducts.mockResolvedValue({
+      data: [product({ name: "PELÍCULA", sku: "PEL", barcode: "0099" })],
+    });
+    renderEditor();
+    await typeSearch("pelicula");
+    expect(screen.getByRole("option", { name: /PELÍCULA/ })).toBeTruthy();
+    expect(addInventorySaleItem).not.toHaveBeenCalled();
+  });
+
   it("omite SKU vazio, marca sem estoque e sem controle, e ainda permite adicionar", async () => {
     const out = product({
       id: 11,
@@ -431,5 +441,15 @@ describe("busca de produto na venda", () => {
     });
     expect(screen.queryByRole("option")).toBeNull();
     expect(toast.error).not.toHaveBeenCalled();
+  });
+});
+
+describe("identidade exata de barcode", () => {
+  it("distingue caixa, acento e zeros; preserva espaços internos", () => {
+    const exact = product({ barcode: "00ÁbC 12", sku: "OTHER" });
+    ["00ábc 12", "00AbC 12", "ÁbC 12", "00ÁbC12"].forEach((term) => {
+      expect(pickExactSaleProduct([exact], term)).toBeNull();
+    });
+    expect(pickExactSaleProduct([exact], " 00ÁbC 12 ")).toBe(exact);
   });
 });

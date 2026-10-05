@@ -298,6 +298,7 @@ const messages = {
 						name: "Name",
 						sku: "SKU",
 						barcode: "Barcode",
+						barcodeHelp: "EAN, UPC or internal code.",
 						category: "Category",
 						unit: "Unit of measure",
 						unitHelp: "How the product is counted. E.g. un, kg, L, m, cx.",
@@ -7805,6 +7806,7 @@ const messages = {
 				operationFailed: "Could not complete the action. Please try again.",
 			},
 			backendErrors: {
+				ERR_INVENTORY_PRODUCT_BARCODE_DUPLICATE: "This barcode is already being used by another product.",
 				ERR_INTERNAL_SERVER_ERROR: "An unexpected error occurred. Please try again later",
 				ERR_NO_OTHER_WHATSAPP: "There must be at least one default WhatsApp.",
 				ERR_NO_DEF_WAPP_FOUND: "No default WhatsApp found. Check the connections page.",

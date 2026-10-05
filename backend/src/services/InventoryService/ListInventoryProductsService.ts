@@ -1,4 +1,5 @@
 import { Op, col, where as sequelizeWhere } from "sequelize";
+import { inventoryBarcodeWhere } from "./inventoryBarcode";
 import AppError from "../../errors/AppError";
 import InventoryCategory from "../../models/InventoryCategory";
 import InventoryProduct from "../../models/InventoryProduct";
@@ -126,15 +127,21 @@ function excludeIds(where: any, ids: number[]) {
  * 1. barcode igual ao termo, comparação binária, sem remover caracteres;
  * 2. SKU igual ao termo, que ainda não entrou;
  * 3. busca parcial insensível a caixa; o nome também ignora acento.
- * Duplicatas exatas permanecem, até o limit. Sem limit, uma única query LIKE, como antes.
+ * A unicidade por empresa é garantida pelo índice de barcode.
+ * Sem limit, uma única query LIKE, como antes.
  */
 async function findRanked(
   baseWhere: any,
   search: string,
   limit: number
 ): Promise<InventoryProduct[]> {
+  const barcodeWhere = inventoryBarcodeWhere(search);
   const exactBarcode = await findProducts(
-    { ...baseWhere, barcode: search },
+    {
+      ...baseWhere,
+      ...barcodeWhere,
+      [Op.and]: [...(baseWhere[Op.and] || []), ...(barcodeWhere[Op.and] || [])]
+    },
     limit
   );
   let merged = exactBarcode;

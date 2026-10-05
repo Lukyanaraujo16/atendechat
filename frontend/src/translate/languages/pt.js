@@ -300,6 +300,7 @@ const messages = {
             name: "Nome",
             sku: "SKU",
             barcode: "Código de barras",
+            barcodeHelp: "EAN, UPC ou código interno.",
             category: "Categoria",
             unit: "Unidade de medida",
             unitHelp: "Como o produto é contado. Ex.: un, kg, L, m, cx.",
@@ -7978,6 +7979,7 @@ const messages = {
         operationFailed: "Não foi possível concluir a operação. Tente novamente.",
       },
       backendErrors: {
+        ERR_INVENTORY_PRODUCT_BARCODE_DUPLICATE: "Este código de barras já está sendo usado por outro produto.",
         ERR_KNOWLEDGE_BASE_NOT_FOUND: "Base de conhecimento não encontrada.",
         ERR_KNOWLEDGE_DOCUMENT_NOT_FOUND: "Documento não encontrado.",
         ERR_KNOWLEDGE_BASE_HAS_DOCUMENTS:

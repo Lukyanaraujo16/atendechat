@@ -292,6 +292,7 @@ const messages = {
             name: "Nombre",
             sku: "SKU",
             barcode: "Código de barras",
+            barcodeHelp: "EAN, UPC o código interno.",
             category: "Categoría",
             unit: "Unidad de medida",
             unitHelp: "Cómo se cuenta el producto. Ej.: un, kg, L, m, cx.",
@@ -7044,6 +7045,7 @@ const messages = {
         operationFailed: "No se pudo completar la acción. Intente nuevamente.",
       },
       backendErrors: {
+        ERR_INVENTORY_PRODUCT_BARCODE_DUPLICATE: "Este código de barras ya está siendo utilizado por otro producto.",
         ERR_INTERNAL_SERVER_ERROR: "Ocurrió un error inesperado. Por favor, intente nuevamente más tarde",
         ERR_NO_OTHER_WHATSAPP: "Debe haber al menos un WhatsApp predeterminado.",
         ERR_NO_DEF_WAPP_FOUND: "No se encontró WhatsApp predeterminado. Verifique la página de conexiones.",

@@ -1,3 +1,7 @@
+import {
+  assertInventoryBarcodeUnique,
+  rethrowInventoryBarcodeConstraint
+} from "./inventoryBarcode";
 import AppError from "../../errors/AppError";
 import InventoryProduct from "../../models/InventoryProduct";
 import { assertNewInventoryProductUnit } from "./inventoryProductUnit";
@@ -59,6 +63,9 @@ export default async function CreateInventoryProductService(input: {
   const sku = normalizeOptionalString(input.body.sku, 64);
   await assertInventoryProductSkuUnique(input.companyId, sku);
 
+  const barcode = normalizeOptionalString(input.body.barcode, 64);
+  await assertInventoryBarcodeUnique(input.companyId, barcode);
+
   const salePrice = parseRequiredDecimal(input.body.salePrice, "salePrice");
   if (salePrice < 0) {
     throw new AppError("ERR_VALIDATION_ERROR", 400, "salePrice inválido.");
@@ -108,20 +115,24 @@ export default async function CreateInventoryProductService(input: {
         input.body.active === 1 ||
         input.body.active === "1";
 
-  return InventoryProduct.create({
-    companyId: input.companyId,
-    categoryId,
-    sku,
-    barcode: normalizeOptionalString(input.body.barcode, 64),
-    name,
-    description: normalizeOptionalString(input.body.description),
-    unit,
-    salePrice,
-    costPrice,
-    trackStock,
-    currentQuantity,
-    minStock,
-    imageUrl: normalizeOptionalString(input.body.imageUrl, 500),
-    active
-  });
+  try {
+    return await InventoryProduct.create({
+      companyId: input.companyId,
+      categoryId,
+      sku,
+      barcode,
+      name,
+      description: normalizeOptionalString(input.body.description),
+      unit,
+      salePrice,
+      costPrice,
+      trackStock,
+      currentQuantity,
+      minStock,
+      imageUrl: normalizeOptionalString(input.body.imageUrl, 500),
+      active
+    });
+  } catch (error) {
+    return rethrowInventoryBarcodeConstraint(error);
+  }
 }
