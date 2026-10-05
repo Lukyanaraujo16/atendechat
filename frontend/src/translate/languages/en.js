@@ -482,6 +482,8 @@ const messages = {
 						print: "Print",
 						printError: "Could not prepare the receipt for printing.",
 						format: "Print format",
+						thermalPrintHint:
+							"In the print dialog, select the matching paper and turn off headers and footers.",
 						formats: {
 							a4: "A4",
 							thermal80: "80 mm",

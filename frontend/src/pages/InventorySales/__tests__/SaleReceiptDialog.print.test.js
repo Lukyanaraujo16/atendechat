@@ -60,9 +60,10 @@ function installBridge() {
         win.focus = function focus() {};
         win.print = function print() {
           const doc = child.contentDocument;
+          const doctype = doc.doctype ? "<!DOCTYPE html>" : "";
           printCalls.push({
             frame: child,
-            html: doc.documentElement.outerHTML,
+            html: doctype + doc.documentElement.outerHTML,
             text: doc.body.textContent,
             compatMode: doc.compatMode,
           });
@@ -179,7 +180,10 @@ describe("SaleReceiptDialog impressão isolada A4", () => {
 
     expect(html).toContain("@page");
     expect(html).toContain("size: A4 portrait");
+    expect(html).toContain("margin: 16mm 12mm");
+    expect(printCalls[0].frame.style.height).toBe("297mm");
     expect(printCalls[0].compatMode).toBe("CSS1Compat");
+    expect(html).toMatch(/^<!DOCTYPE html>/);
     expect(html).not.toMatch(/80mm|58mm/);
     expect(text).toContain("Cliente Silva");
     expect(text).toContain("Vendedor Souza");
@@ -379,24 +383,45 @@ describe("SaleReceiptDialog impressão isolada A4", () => {
   });
 });
 
-function assertThermalReceipt(printed, { formatId, pageSize, frameWidth, productName = "Roteador XYZ" }) {
+function assertThermalReceipt(
+  printed,
+  { formatId, paperWidth, productName = "Roteador XYZ", notes = "Obs <script>alert(1)</script>" }
+) {
   const { html, text, frame } = printed;
   expect(frame.getAttribute("data-sale-receipt-print")).toBe(formatId);
-  expect(frame.style.width).toBe(frameWidth);
+  expect(frame.style.width).toBe(paperWidth);
+  expect(frame.style.height).toBe("200mm");
   const cssMatch = html.match(
     /<style data-sale-receipt-print-css="[^"]+">([\s\S]*?)<\/style>/
   );
   const printCss = cssMatch ? cssMatch[1] : "";
-  expect(printCss).toContain(`size: ${pageSize}`);
+  expect(printCss).toContain(`size: ${paperWidth} 100mm`);
   expect(printCss).toContain("margin: 0");
+  expect(printCss).toContain(`width: ${paperWidth} !important`);
+  expect(printCss).toContain(`max-width: ${paperWidth} !important`);
+  expect(printCss).toContain("#sale-receipt-mount");
+  expect(printCss).toContain("padding: 0 3mm !important");
+  expect(printCss).not.toContain("max-width: 720");
   expect(printCss).not.toMatch(/size:\s*\d+mm auto/);
+  expect(printCss).not.toContain("72mm");
+  expect(printCss).not.toContain("48mm 100mm");
   expect(printCss).not.toContain("A4 portrait");
   expect(printCss).not.toContain("297mm");
   expect(printCss).not.toMatch(/transform\s*:|scale\s*\(|zoom\s*:/);
+  expect(html).toMatch(/^<!DOCTYPE html>/);
+  expect(html).toContain("<head>");
+  expect(html).not.toMatch(/name=["']viewport["']/i);
+  const styleTags = html.match(/<style\b[^>]*>/gi) || [];
+  expect(styleTags.length).toBeGreaterThan(0);
+  expect(styleTags[styleTags.length - 1]).toContain(
+    `data-sale-receipt-print-css="${formatId}"`
+  );
+  expect(printed.compatMode).toBe("CSS1Compat");
   expect(html).not.toContain("<table");
   expect(html).not.toContain("sale-receipt-items-desktop");
   expect(html).toContain("sale-receipt-thermal");
   expect(html).toContain("overflow-wrap: anywhere");
+  expect(html).toContain("word-break: break-word");
   expect(text).toContain("Cliente Silva");
   expect(text).toContain("Vendedor Souza");
   expect(text).toContain(productName);
@@ -413,7 +438,7 @@ function assertThermalReceipt(printed, { formatId, pageSize, frameWidth, product
   expect(text).toContain(formatCurrencyBRL("200"));
   expect(text).toContain(formatCurrencyBRL("150"));
   expect(text).toContain(formatCurrencyBRL("50"));
-  expect(text).toContain("Obs <script>alert(1)</script>");
+  expect(text).toContain(notes);
   expect(text).toContain("Pago no balcão");
   expect(html).not.toMatch(/<script/i);
   expect(html).not.toMatch(/<img[\s>]/i);
@@ -438,8 +463,7 @@ describe("SaleReceiptDialog formatos térmicos", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
     assertThermalReceipt(printCalls[0], {
       formatId: "thermal80",
-      pageSize: "72mm 100mm",
-      frameWidth: "72mm",
+      paperWidth: "80mm",
     });
     fetchSpy.mockRestore();
   });
@@ -465,12 +489,58 @@ describe("SaleReceiptDialog formatos térmicos", () => {
 
     assertThermalReceipt(printCalls[0], {
       formatId: "thermal58",
-      pageSize: "48mm 100mm",
-      frameWidth: "48mm",
+      paperWidth: "58mm",
       productName: longName,
     });
     expect(printCalls[0].text).toContain(longName);
     expect(window.print).not.toHaveBeenCalled();
+  });
+
+  it("80 mm quebra nome, item e observação longos na largura nominal", async () => {
+    const longTrade = "Loja com nome fantasia extremamente longo para a bobina térmica";
+    const longItem = "Produto com descrição longa demais para caber numa única linha da bobina";
+    const longNotes = "Observação longa que precisa quebrar dentro da área útil do papel térmico";
+    mockGetInventoryReceiptBranding.mockResolvedValue({
+      data: { receiptTradeName: longTrade },
+    });
+    const { getByRole } = renderDialog(
+      baseSale({
+        notes: longNotes,
+        items: [{ ...baseSale().items[0], productName: longItem }],
+      })
+    );
+    await whenPrintReady({ getByRole });
+    fireEvent.click(getByRole("button", { name: "80 mm" }));
+    fireEvent.click(getByRole("button", { name: "Imprimir" }));
+    await waitFor(() => expect(printCalls.length).toBe(1));
+
+    assertThermalReceipt(printCalls[0], {
+      formatId: "thermal80",
+      paperWidth: "80mm",
+      productName: longItem,
+      notes: longNotes,
+    });
+    expect(printCalls[0].text).toContain(longTrade);
+    expect(printCalls[0].text).toContain(longNotes);
+    expect(printCalls[0].html).toContain("sale-receipt-branding-trade");
+    expect(printCalls[0].html).toContain("sale-receipt-thermal-item-name");
+    expect(printCalls[0].html).toContain("sale-receipt-thermal-notes");
+    expect(printCalls[0].html).toContain("white-space: pre-wrap");
+  });
+
+  it("orienta papel e cabeçalhos só nos formatos térmicos", async () => {
+    const view = renderDialog(baseSale());
+    await whenPrintReady(view);
+    expect(view.queryByText(/Cabeçalhos e rodapés/)).toBeNull();
+
+    fireEvent.click(view.getByRole("button", { name: "80 mm" }));
+    expect(view.getByText(/Cabeçalhos e rodapés/)).toBeTruthy();
+
+    fireEvent.click(view.getByRole("button", { name: "58 mm" }));
+    expect(view.getByText(/Cabeçalhos e rodapés/)).toBeTruthy();
+
+    fireEvent.click(view.getByRole("button", { name: "A4" }));
+    expect(view.queryByText(/Cabeçalhos e rodapés/)).toBeNull();
   });
 
   it("térmica 80 imprime venda cancelada em texto", async () => {
@@ -539,7 +609,7 @@ describe("SaleReceiptDialog formatos térmicos", () => {
     fireEvent.click(desktop.getByRole("button", { name: "58 mm" }));
     fireEvent.click(desktop.getByRole("button", { name: "Imprimir" }));
     await waitFor(() => expect(printCalls.length).toBe(1));
-    expect(printCalls[0].frame.style.width).toBe("48mm");
+    expect(printCalls[0].frame.style.width).toBe("58mm");
     expect(printCalls[0].html).toContain("sale-receipt-thermal");
     expect(printCalls[0].html).not.toContain("sale-receipt-items-desktop");
   });
@@ -591,7 +661,7 @@ describe("SaleReceiptDialog formatos térmicos", () => {
     await waitFor(() => expect(printCalls.length).toBe(1));
     expect(getByRole("button", { name: "58 mm" }).disabled).toBe(true);
     expect(printCalls).toHaveLength(1);
-    expect(printCalls[0].frame.style.width).toBe("72mm");
+    expect(printCalls[0].frame.style.width).toBe("80mm");
     printCalls[0].frame.contentWindow.dispatchEvent(new Event("afterprint"));
     await waitFor(() => {
       expect(document.querySelector("[data-sale-receipt-print]")).toBeNull();
@@ -748,15 +818,18 @@ describe("SaleReceiptDialog branding textual", () => {
     expect(printed.text).toContain("Loja ABC");
     expect(printed.text).toContain("Recibo de venda");
     if (logoWidth) {
-      expect(printed.html).toContain(`max-width: ${logoWidth}`);
+      expect(printed.html).toContain(`max-width: min(${logoWidth}, 100%)`);
       expect(printed.html).toContain("object-fit: contain");
+      expect(printed.html).not.toContain("72mm 100mm");
+      expect(printed.html).not.toContain("48mm 100mm");
     } else {
       expect(printed.html).toContain("max-width: 160px");
       expect(printed.html).toContain("size: A4 portrait");
-      expect(printed.html).not.toContain("72mm 100mm");
+      expect(printed.html).not.toContain("80mm 100mm");
+      expect(printed.html).not.toContain("58mm 100mm");
     }
-    if (formatLabel === "80 mm") expect(printed.html).toContain("size: 72mm 100mm");
-    if (formatLabel === "58 mm") expect(printed.html).toContain("size: 48mm 100mm");
+    if (formatLabel === "80 mm") expect(printed.html).toContain("size: 80mm 100mm");
+    if (formatLabel === "58 mm") expect(printed.html).toContain("size: 58mm 100mm");
   });
 
   it("esconde a logo quebrada e segue a impressão depois do erro da imagem", async () => {

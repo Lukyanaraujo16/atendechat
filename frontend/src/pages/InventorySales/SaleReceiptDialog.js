@@ -19,6 +19,7 @@ import { getInventoryReceiptBranding } from "../../services/inventoryApi";
 import {
   DEFAULT_SALE_RECEIPT_PRINT_FORMAT,
   SALE_RECEIPT_PRINT_FORMAT_LIST,
+  isThermalSaleReceiptFormat,
 } from "./saleReceiptPrintFormats";
 import {
   EMPTY_RECEIPT_BRANDING,
@@ -181,6 +182,11 @@ export default function SaleReceiptDialog({ open, onClose, sale }) {
               </ToggleButton>
             ))}
           </ToggleButtonGroup>
+          {isThermalSaleReceiptFormat(format) ? (
+            <span style={{ fontSize: 12, color: "#666", maxWidth: 420 }}>
+              {i18n.t("inventorySales.sales.receipt.thermalPrintHint")}
+            </span>
+          ) : null}
         </div>
         <div>
           <AppSecondaryButton onClick={onClose}>

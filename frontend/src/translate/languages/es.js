@@ -476,6 +476,8 @@ const messages = {
             print: "Imprimir",
             printError: "No fue posible preparar la impresión del recibo.",
             format: "Formato de impresión",
+            thermalPrintHint:
+              "En la ventana de impresión, seleccione el papel correspondiente y desactive Encabezados y pies de página.",
             formats: {
               a4: "A4",
               thermal80: "80 mm",

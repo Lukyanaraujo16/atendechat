@@ -484,6 +484,8 @@ const messages = {
             print: "Imprimir",
             printError: "Não foi possível preparar a impressão do recibo.",
             format: "Formato de impressão",
+            thermalPrintHint:
+              "Na janela de impressão, selecione o papel correspondente e desative Cabeçalhos e rodapés.",
             formats: {
               a4: "A4",
               thermal80: "80 mm",

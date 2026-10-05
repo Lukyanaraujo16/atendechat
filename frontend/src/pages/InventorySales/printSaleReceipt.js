@@ -80,39 +80,56 @@ html, body {
 `;
 
 /**
+ * O @page declara o papel nominal da bobina. A área útil é o padding
+ * horizontal do recibo, não uma página mais estreita.
+ *
  * `size: 80mm auto` é inválido: a gramática aceita um ou dois comprimentos,
  * `auto` sozinho, ou um papel nomeado. O Chromium descarta a declaração inteira
- * quando o segundo valor é `auto`, e a página volta ao papel do diálogo.
- * Um único comprimento vira página quadrada.
+ * quando o segundo valor é `auto`, e a página volta ao papel do diálogo
+ * (em geral A4). Um único comprimento vira página quadrada.
  *
- * A largura usada é a área imprimível típica da bobina a 203 dpi:
- * 72 mm em 80 mm nominais (576 pontos) e 48 mm em 58 mm nominais (384 pontos).
  * A altura de 100 mm é o tamanho de cada página. O CSS não expressa
- * “altura igual ao conteúdo”. O espaço vazio fica no fim da última página,
- * no máximo essa altura, e o recibo longo segue na página seguinte.
- * O driver ainda precisa da bobina correspondente.
+ * “altura igual ao conteúdo” de forma confiável. Uma página bem mais alta
+ * que a folha reportada pelo driver faz o encaixe reduzir também a largura.
+ * 100 mm fica abaixo das bobinas contínuas e das folhas altas típicas, então,
+ * com a largura igual à do papel e escala 100%, a altura não encolhe a largura.
+ * O espaço vazio fica no fim da última página, no máximo essa altura, e o
+ * recibo longo segue na página seguinte.
  */
-function thermalPrintCss({ pageSize, fontSize, logoMaxWidth }) {
+const THERMAL_PAGE_HEIGHT = "100mm";
+const THERMAL_CONTENT_PADDING = "3mm";
+
+function thermalPrintCss({ paperWidth, fontSize, logoMaxWidth }) {
   return `
 @page {
-  size: ${pageSize};
+  size: ${paperWidth} ${THERMAL_PAGE_HEIGHT};
   margin: 0;
 }
 html {
   color-scheme: light;
 }
 html, body {
-  margin: 0;
-  padding: 0;
-  width: 100%;
+  margin: 0 !important;
+  padding: 0 !important;
+  width: ${paperWidth} !important;
+  max-width: ${paperWidth} !important;
+  min-width: 0 !important;
   height: auto;
   background: #fff !important;
   color: #111 !important;
   font-family: Montserrat, Roboto, "Helvetica Neue", Arial, sans-serif;
 }
+#sale-receipt-mount {
+  width: ${paperWidth} !important;
+  max-width: ${paperWidth} !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
 .sale-receipt-print-page {
-  width: 100%;
-  max-width: 100%;
+  width: ${paperWidth} !important;
+  max-width: ${paperWidth} !important;
+  min-width: 0 !important;
   height: auto;
   box-sizing: border-box;
   margin: 0 !important;
@@ -131,12 +148,27 @@ html, body {
 }
 .sale-receipt-thermal {
   background: #fff !important;
-  width: 100%;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
   height: auto;
+  padding: 0 ${THERMAL_CONTENT_PADDING} !important;
   font-size: ${fontSize};
   line-height: 1.35;
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+@media print {
+  html, body, #sale-receipt-mount, .sale-receipt-print-page {
+    width: ${paperWidth} !important;
+    max-width: ${paperWidth} !important;
+    min-width: 0 !important;
+  }
+  .sale-receipt-thermal {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
 }
 .sale-receipt-thermal-top {
   text-align: center;
@@ -158,7 +190,7 @@ html, body {
 .sale-receipt-branding-logo {
   display: block;
   margin: 0 auto 4px;
-  max-width: ${logoMaxWidth};
+  max-width: min(${logoMaxWidth}, 100%);
   max-height: 16mm;
   width: auto;
   height: auto;
@@ -229,20 +261,20 @@ const PRINT_PROFILES = {
   },
   [SALE_RECEIPT_PRINT_FORMATS.thermal80]: {
     id: SALE_RECEIPT_PRINT_FORMATS.thermal80,
-    frameWidth: "72mm",
+    frameWidth: "80mm",
     frameHeight: "200mm",
     css: thermalPrintCss({
-      pageSize: "72mm 100mm",
+      paperWidth: "80mm",
       fontSize: "12px",
       logoMaxWidth: "48mm",
     }),
   },
   [SALE_RECEIPT_PRINT_FORMATS.thermal58]: {
     id: SALE_RECEIPT_PRINT_FORMATS.thermal58,
-    frameWidth: "48mm",
+    frameWidth: "58mm",
     frameHeight: "200mm",
     css: thermalPrintCss({
-      pageSize: "48mm 100mm",
+      paperWidth: "58mm",
       fontSize: "11px",
       logoMaxWidth: "36mm",
     }),
@@ -352,8 +384,8 @@ function createPrintFrame(profile) {
   iframe.setAttribute("aria-hidden", "true");
   iframe.setAttribute("title", "Impressão do recibo");
   iframe.tabIndex = -1;
-  // Fora da tela, na largura do perfil. A altura do iframe só organiza o layout;
-  // o @page térmico não fixa a altura da bobina. Sem display:none, visibility:hidden
+  // Fora da tela, na largura nominal do papel. A altura do iframe só organiza
+  // o layout; o @page térmico não acompanha o conteúdo. Sem display:none, visibility:hidden
   // ou opacity:0, que em alguns browsers geram página em branco. Sem popup.
   iframe.style.position = "fixed";
   iframe.style.left = "-10000px";
