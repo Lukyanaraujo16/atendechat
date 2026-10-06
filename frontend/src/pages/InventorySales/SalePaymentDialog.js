@@ -23,6 +23,11 @@ import toastError from "../../errors/toastError";
 import { i18n } from "../../translate/i18n";
 import { formatCurrencyBRL } from "../../utils/brazilianCurrency";
 import { PAYMENT_METHODS, PAYMENT_STATUSES } from "./constants";
+import {
+  CARD_INSTALLMENT_OPTIONS,
+  cardInstallmentFormValue,
+  formatCardInstallmentCaption,
+} from "./cardInstallments";
 import { toNumber } from "./utils";
 
 function formatDateInput(value) {
@@ -46,16 +51,23 @@ export default function SalePaymentDialog({
   const [form, setForm] = useState({
     paymentStatus: "unpaid",
     paymentMethod: "",
+    cardInstallmentCount: "",
     paidAmount: "0",
     paidAt: "",
     paymentNotes: "",
   });
+  const [installmentsTouched, setInstallmentsTouched] = useState(false);
 
   useEffect(() => {
     if (!open || !sale) return;
+    setInstallmentsTouched(false);
     setForm({
       paymentStatus: sale.paymentStatus || "unpaid",
       paymentMethod: sale.paymentMethod || "",
+      cardInstallmentCount: cardInstallmentFormValue(
+        sale.paymentMethod,
+        sale.cardInstallmentCount
+      ),
       paidAmount:
         sale.paidAmount != null ? String(sale.paidAmount) : "0",
       paidAt: formatDateInput(sale.paidAt),
@@ -92,6 +104,16 @@ export default function SalePaymentDialog({
         paidAmount,
         paymentNotes: form.paymentNotes.trim() || null,
       };
+      if (form.paymentMethod === "credit_card") {
+        const stored = Number(sale.cardInstallmentCount);
+        const hasStored =
+          Number.isInteger(stored) && stored >= 1 && stored <= 18;
+        if (hasStored || installmentsTouched) {
+          payload.cardInstallmentCount = Number(form.cardInstallmentCount || 1);
+        }
+      } else {
+        payload.cardInstallmentCount = null;
+      }
       if (form.paidAt) {
         payload.paidAt = new Date(form.paidAt).toISOString();
       }
@@ -149,9 +171,18 @@ export default function SalePaymentDialog({
             <Select
               labelId="payment-method-label"
               value={form.paymentMethod}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, paymentMethod: e.target.value }))
-              }
+              onChange={(e) => {
+                const nextMethod = e.target.value;
+                setForm((prev) => ({
+                  ...prev,
+                  paymentMethod: nextMethod,
+                  cardInstallmentCount:
+                    nextMethod === "credit_card" ? "1" : "",
+                }));
+                if (nextMethod === "credit_card") {
+                  setInstallmentsTouched(true);
+                }
+              }}
               label={i18n.t("inventorySales.sales.fields.paymentMethod")}
             >
               <MenuItem value="">
@@ -164,6 +195,47 @@ export default function SalePaymentDialog({
               ))}
             </Select>
           </FormControl>
+
+          {form.paymentMethod === "credit_card" ? (
+            <>
+              <FormControl variant="outlined" size="small" fullWidth>
+                <InputLabel id="payment-installments-label">
+                  {i18n.t("inventorySales.sales.payment.installments")}
+                </InputLabel>
+                <Select
+                  labelId="payment-installments-label"
+                  value={form.cardInstallmentCount || "1"}
+                  onChange={(e) => {
+                    setInstallmentsTouched(true);
+                    setForm((prev) => ({
+                      ...prev,
+                      cardInstallmentCount: String(e.target.value),
+                    }));
+                  }}
+                  label={i18n.t("inventorySales.sales.payment.installments")}
+                  SelectDisplayProps={{
+                    "data-testid": "sale-payment-dialog-installments",
+                  }}
+                >
+                  {CARD_INSTALLMENT_OPTIONS.map((count) => (
+                    <MenuItem key={count} value={String(count)}>
+                      {count}x
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <Typography
+                variant="body2"
+                color="textSecondary"
+                data-testid="sale-payment-dialog-installment-caption"
+              >
+                {formatCardInstallmentCaption(
+                  Number(form.cardInstallmentCount || 1),
+                  sale?.totalAmount
+                )}
+              </Typography>
+            </>
+          ) : null}
 
           <TextField
             label={i18n.t("inventorySales.sales.fields.paidAmount")}

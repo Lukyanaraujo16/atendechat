@@ -499,6 +499,9 @@ const messages = {
             paidAmount: "Valor pago",
             paidAt: "Data do pagamento",
             noMethod: "Sem forma definida",
+            installments: "Parcelas",
+            installmentsExact: "{{times}}x de {{amount}}",
+            installmentsOfTotal: "{{times}}x — total {{amount}}",
           },
           receipt: {
             title: "Recibo de venda",

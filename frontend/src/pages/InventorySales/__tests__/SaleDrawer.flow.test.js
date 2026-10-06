@@ -317,6 +317,7 @@ describe("SaleDrawer cliente e persistência", () => {
     expect(updateInventorySale).not.toHaveBeenCalled();
     expect(updateInventorySalePayment.mock.calls[0][1]).toEqual({
       paymentMethod: null,
+      cardInstallmentCount: null,
       paymentNotes: null,
       paymentStatus: "unpaid",
       paidAmount: 0,

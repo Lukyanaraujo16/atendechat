@@ -18,10 +18,7 @@ import {
   toMoney
 } from "./inventorySaleHelpers";
 import { toInventoryQuantity } from "./inventoryTenant";
-import {
-  derivePaymentStatusFromAmount,
-  resolvePaidAtForPaymentUpdate
-} from "./inventoryPaymentHelpers";
+import { settlePaymentOnComplete } from "./inventoryPaymentHelpers";
 import { assertIdentifiersForCompleteSale } from "./inventorySaleItemIdentifiers";
 
 export default async function CompleteInventorySaleService(input: {
@@ -214,13 +211,11 @@ export default async function CompleteInventorySaleService(input: {
 
     const totalAmount = toMoney(sale.totalAmount);
     const commissionAmount = roundMoney((totalAmount * commissionRate) / 100);
-    const paidAmount = toMoney(sale.paidAmount);
-    const paymentStatus = derivePaymentStatusFromAmount(
-      paidAmount,
-      totalAmount
-    );
-    const paidAt = resolvePaidAtForPaymentUpdate({
-      paymentStatus,
+    const settled = settlePaymentOnComplete({
+      paymentMethod: sale.paymentMethod,
+      cardInstallmentCount: sale.cardInstallmentCount,
+      totalAmount,
+      paidAmount: toMoney(sale.paidAmount),
       existingPaidAt: sale.paidAt
     });
 
@@ -237,9 +232,9 @@ export default async function CompleteInventorySaleService(input: {
         commissionRate,
         commissionAmount,
         completedAt: new Date(),
-        paymentStatus,
-        paidAmount,
-        paidAt
+        paymentStatus: settled.paymentStatus,
+        paidAmount: settled.paidAmount,
+        paidAt: settled.paidAt
       },
       { transaction: t }
     );

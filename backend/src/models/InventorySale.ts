@@ -170,6 +170,10 @@ class InventorySale extends Model<InventorySale> {
   paymentNotes: string | null;
 
   @AllowNull
+  @Column(DataType.INTEGER)
+  cardInstallmentCount: number | null;
+
+  @AllowNull
   @ForeignKey(() => User)
   @Column
   createdBy: number | null;

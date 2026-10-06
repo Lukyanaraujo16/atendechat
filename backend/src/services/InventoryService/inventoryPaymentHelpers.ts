@@ -184,3 +184,132 @@ export function resolvePaidAtForPaymentUpdate(input: {
 
   return new Date();
 }
+
+const MIN_CARD_INSTALLMENTS = 1;
+const MAX_CARD_INSTALLMENTS = 18;
+
+function invalidCardInstallmentCount(): AppError {
+  return new AppError(
+    "ERR_VALIDATION_ERROR",
+    400,
+    "Parcelas do cartão devem ser um inteiro de 1 a 18."
+  );
+}
+
+export function parseCardInstallmentCount(value: unknown): number {
+  if (typeof value === "boolean" || value == null || typeof value === "object") {
+    throw invalidCardInstallmentCount();
+  }
+  if (typeof value === "number") {
+    if (
+      !Number.isInteger(value) ||
+      value < MIN_CARD_INSTALLMENTS ||
+      value > MAX_CARD_INSTALLMENTS
+    ) {
+      throw invalidCardInstallmentCount();
+    }
+    return value;
+  }
+  const raw = String(value).trim();
+  if (!/^\d+$/.test(raw)) {
+    throw invalidCardInstallmentCount();
+  }
+  const count = Number(raw);
+  if (count < MIN_CARD_INSTALLMENTS || count > MAX_CARD_INSTALLMENTS) {
+    throw invalidCardInstallmentCount();
+  }
+  return count;
+}
+
+function storedCardInstallmentCount(value: unknown): number | null {
+  if (typeof value === "number" && Number.isInteger(value)) return value;
+  if (typeof value === "string" && /^\d+$/.test(value.trim())) {
+    return Number(value.trim());
+  }
+  return null;
+}
+
+/**
+ * Cartão novo exige 1–18. Qualquer outra forma zera as parcelas.
+ * NULL histórico só permanece quando a venda já era cartão e esta gravação omite o campo.
+ */
+export function resolveCardInstallmentCount(input: {
+  paymentMethod: InventoryPaymentMethod | null;
+  raw: unknown;
+  rawProvided: boolean;
+  existing: number | null;
+  preserveHistoricalNull?: boolean;
+}): number | null {
+  if (input.paymentMethod !== "credit_card") {
+    return null;
+  }
+  if (input.rawProvided) {
+    return parseCardInstallmentCount(input.raw);
+  }
+  const existing = storedCardInstallmentCount(input.existing);
+  if (
+    existing != null &&
+    existing >= MIN_CARD_INSTALLMENTS &&
+    existing <= MAX_CARD_INSTALLMENTS
+  ) {
+    return existing;
+  }
+  if (input.preserveHistoricalNull && input.existing == null) {
+    return null;
+  }
+  throw new AppError(
+    "ERR_VALIDATION_ERROR",
+    400,
+    "Informe as parcelas do cartão, de 1 a 18."
+  );
+}
+
+export function assertStoredCardInstallments(
+  paymentMethod: InventoryPaymentMethod | null,
+  cardInstallmentCount: number | null
+): number | null {
+  if (paymentMethod !== "credit_card") return null;
+  return parseCardInstallmentCount(cardInstallmentCount);
+}
+
+/** Conclusão: só cartão com parcelas já gravadas nasce pago pelo total. */
+export function settlePaymentOnComplete(input: {
+  paymentMethod: InventoryPaymentMethod | null;
+  cardInstallmentCount: number | null;
+  totalAmount: number;
+  paidAmount: number;
+  existingPaidAt: Date | null;
+}): {
+  paymentStatus: InventoryPaymentStatus;
+  paidAmount: number;
+  paidAt: Date | null;
+} {
+  if (input.paymentMethod === "credit_card") {
+    assertStoredCardInstallments(
+      input.paymentMethod,
+      input.cardInstallmentCount
+    );
+    const paymentStatus: InventoryPaymentStatus = "paid";
+    return {
+      paymentStatus,
+      paidAmount: input.totalAmount,
+      paidAt: resolvePaidAtForPaymentUpdate({
+        paymentStatus,
+        existingPaidAt: input.existingPaidAt
+      })
+    };
+  }
+
+  const paymentStatus = derivePaymentStatusFromAmount(
+    input.paidAmount,
+    input.totalAmount
+  );
+  return {
+    paymentStatus,
+    paidAmount: input.paidAmount,
+    paidAt: resolvePaidAtForPaymentUpdate({
+      paymentStatus,
+      existingPaidAt: input.existingPaidAt
+    })
+  };
+}

@@ -22,6 +22,7 @@ import {
 } from "./utils";
 import { identifiersFromSaleItem } from "./saleItemIdentifiers";
 import { isThermalSaleReceiptFormat } from "./saleReceiptPrintFormats";
+import { formatCardPaymentLabel } from "./cardInstallments";
 import {
   hasReceiptBrandingFooter,
   hasReceiptBrandingHeader,
@@ -342,7 +343,15 @@ function ThermalReceipt({ sale, classes, branding }) {
     sale.paymentStatus || "unpaid"
   );
   const paymentMethodLabel = sale.paymentMethod
-    ? i18n.t(`inventorySales.sales.paymentMethods.${sale.paymentMethod}`, sale.paymentMethod)
+    ? formatCardPaymentLabel(
+        i18n.t(
+          `inventorySales.sales.paymentMethods.${sale.paymentMethod}`,
+          sale.paymentMethod
+        ),
+        sale.paymentMethod,
+        sale.cardInstallmentCount,
+        sale.totalAmount
+      )
     : "";
 
   return (
@@ -529,9 +538,14 @@ export default function SaleReceiptContent({
     i18n.t(`inventorySales.sales.paymentStatus.${status}`, status);
 
   const paymentMethodLabel = (method) =>
-    method
-      ? i18n.t(`inventorySales.sales.paymentMethods.${method}`, method)
-      : i18n.t("inventorySales.sales.payment.noMethod");
+    formatCardPaymentLabel(
+      method
+        ? i18n.t(`inventorySales.sales.paymentMethods.${method}`, method)
+        : i18n.t("inventorySales.sales.payment.noMethod"),
+      method,
+      sale.cardInstallmentCount,
+      sale.totalAmount
+    );
 
   const metaRows = [
     {

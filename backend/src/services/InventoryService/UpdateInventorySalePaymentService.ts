@@ -5,6 +5,7 @@ import {
   parseOptionalPaymentMethod,
   parsePaidAmount,
   parsePaymentStatus,
+  resolveCardInstallmentCount,
   resolvePaidAtForPaymentUpdate,
   validatePaymentConsistency
 } from "./inventoryPaymentHelpers";
@@ -18,6 +19,7 @@ import { normalizeOptionalString } from "./inventoryTenant";
 type PaymentBody = {
   paymentStatus?: unknown;
   paymentMethod?: unknown;
+  cardInstallmentCount?: unknown;
   paidAmount?: unknown;
   paidAt?: unknown;
   paymentNotes?: unknown;
@@ -99,8 +101,27 @@ export default async function UpdateInventorySalePaymentService(input: {
     });
   }
 
-  if (input.body.paymentMethod !== undefined) {
-    patch.paymentMethod = parseOptionalPaymentMethod(input.body.paymentMethod);
+  const methodProvided = input.body.paymentMethod !== undefined;
+  const countProvided = Object.prototype.hasOwnProperty.call(
+    input.body,
+    "cardInstallmentCount"
+  );
+
+  let nextMethod = sale.paymentMethod;
+  if (methodProvided) {
+    nextMethod = parseOptionalPaymentMethod(input.body.paymentMethod);
+    patch.paymentMethod = nextMethod;
+  }
+
+  if (methodProvided || countProvided) {
+    patch.cardInstallmentCount = resolveCardInstallmentCount({
+      paymentMethod: nextMethod,
+      raw: input.body.cardInstallmentCount,
+      rawProvided: countProvided,
+      existing: sale.cardInstallmentCount,
+      preserveHistoricalNull:
+        !countProvided && sale.paymentMethod === "credit_card"
+    });
   }
 
   if (input.body.paymentNotes !== undefined) {

@@ -50,6 +50,7 @@ import {
   paymentStatusChipColor,
 } from "./utils";
 import { SALE_STATUSES, PAYMENT_STATUSES } from "./constants";
+import { formatCardPaymentLabel } from "./cardInstallments";
 import { useManualSale } from "./ManualSaleProvider";
 
 const useStyles = makeStyles((theme) => ({
@@ -174,10 +175,18 @@ export default function InventorySalesTab() {
   const paymentStatusLabel = (s) =>
     i18n.t(`inventorySales.sales.paymentStatus.${s}`, s);
 
-  const paymentMethodLabel = (method) =>
-    method
-      ? i18n.t(`inventorySales.sales.paymentMethods.${method}`, method)
-      : "—";
+  const paymentMethodLabel = (sale) => {
+    if (!sale?.paymentMethod) return "—";
+    return formatCardPaymentLabel(
+      i18n.t(
+        `inventorySales.sales.paymentMethods.${sale.paymentMethod}`,
+        sale.paymentMethod
+      ),
+      sale.paymentMethod,
+      sale.cardInstallmentCount,
+      sale.totalAmount
+    );
+  };
 
   const renderRow = (sale) => {
     const displayDate = getSaleDisplayDate(sale);
@@ -203,7 +212,7 @@ export default function InventorySalesTab() {
         <TableCell>{sale.contact?.name || "—"}</TableCell>
         <TableCell>{sale.seller?.name || "—"}</TableCell>
         <TableCell align="right">{formatCurrencyBRL(sale.totalAmount)}</TableCell>
-        <TableCell>{paymentMethodLabel(sale.paymentMethod)}</TableCell>
+        <TableCell>{paymentMethodLabel(sale)}</TableCell>
         <TableCell align="right">
           {sale.commissionAmount != null
             ? formatCurrencyBRL(sale.commissionAmount)
@@ -383,7 +392,7 @@ export default function InventorySalesTab() {
                   {sale.seller?.name || "—"} · {formatCurrencyBRL(sale.totalAmount)}
                 </Typography>
                 <Typography variant="caption" color="textSecondary">
-                  {paymentMethodLabel(sale.paymentMethod)}
+                  {paymentMethodLabel(sale)}
                 </Typography>
                 <Typography variant="caption" color="textSecondary">
                   {formatDate(getSaleDisplayDate(sale))}

@@ -42,6 +42,12 @@ import SalePaymentDialog from "./SalePaymentDialog";
 import SaleReceiptDialog from "./SaleReceiptDialog";
 import { PAYMENT_METHODS } from "./constants";
 import {
+  CARD_INSTALLMENT_OPTIONS,
+  cardInstallmentFormValue,
+  formatCardInstallmentCaption,
+  formatCardPaymentLabel,
+} from "./cardInstallments";
+import {
   formatSaleNumber,
   getSaleDisplayDate,
   isSaleEditable,
@@ -171,6 +177,7 @@ export default function SaleDrawer({
     sellerUserId: "",
     notes: "",
     paymentMethod: "",
+    cardInstallmentCount: "",
     paymentNotes: "",
   });
 
@@ -198,6 +205,10 @@ export default function SaleDrawer({
         data.sellerUserId != null ? String(data.sellerUserId) : "",
       notes: data.notes || "",
       paymentMethod: data.paymentMethod || "",
+      cardInstallmentCount: cardInstallmentFormValue(
+        data.paymentMethod,
+        data.cardInstallmentCount
+      ),
       paymentNotes: data.paymentNotes || "",
     });
     applyContact(contactOptionFromSale(data));
@@ -400,6 +411,10 @@ export default function SaleDrawer({
   const persistDraftPayment = async () => {
     const { data } = await updateInventorySalePayment(sale.id, {
       paymentMethod: headerForm.paymentMethod || null,
+      cardInstallmentCount:
+        headerForm.paymentMethod === "credit_card"
+          ? Number(headerForm.cardInstallmentCount)
+          : null,
       paymentNotes: headerForm.paymentNotes.trim() || null,
       paymentStatus: "unpaid",
       paidAmount: 0,
@@ -440,6 +455,10 @@ export default function SaleDrawer({
       setHeaderForm((prev) => ({
         ...prev,
         paymentMethod: data.paymentMethod || "",
+        cardInstallmentCount: cardInstallmentFormValue(
+          data.paymentMethod,
+          data.cardInstallmentCount
+        ),
         paymentNotes: data.paymentNotes || "",
       }));
       toast.success(i18n.t("inventorySales.sales.toasts.paymentSaved"));
@@ -549,6 +568,14 @@ export default function SaleDrawer({
     method
       ? i18n.t(`inventorySales.sales.paymentMethods.${method}`, method)
       : i18n.t("inventorySales.sales.payment.noMethod");
+
+  const salePaymentLabel = (current) =>
+    formatCardPaymentLabel(
+      paymentMethodLabel(current?.paymentMethod),
+      current?.paymentMethod,
+      current?.cardInstallmentCount,
+      current?.totalAmount
+    );
 
   const displayDate = getSaleDisplayDate(sale);
   const customerOptions = useMemo(() => {
@@ -821,12 +848,15 @@ export default function SaleDrawer({
                         <Select
                           labelId="sale-payment-method-label"
                           value={headerForm.paymentMethod}
-                          onChange={(e) =>
+                          onChange={(e) => {
+                            const nextMethod = e.target.value;
                             setHeaderForm((prev) => ({
                               ...prev,
-                              paymentMethod: e.target.value,
-                            }))
-                          }
+                              paymentMethod: nextMethod,
+                              cardInstallmentCount:
+                                nextMethod === "credit_card" ? "1" : "",
+                            }));
+                          }}
                           label={i18n.t("inventorySales.sales.fields.paymentMethod")}
                         >
                           <MenuItem value="">
@@ -842,6 +872,45 @@ export default function SaleDrawer({
                           ))}
                         </Select>
                       </FormControl>
+                      {headerForm.paymentMethod === "credit_card" ? (
+                        <>
+                          <FormControl variant="outlined" size="small" fullWidth>
+                            <InputLabel id="sale-card-installments-label">
+                              {i18n.t("inventorySales.sales.payment.installments")}
+                            </InputLabel>
+                            <Select
+                              labelId="sale-card-installments-label"
+                              value={headerForm.cardInstallmentCount || "1"}
+                              onChange={(e) =>
+                                setHeaderForm((prev) => ({
+                                  ...prev,
+                                  cardInstallmentCount: String(e.target.value),
+                                }))
+                              }
+                              label={i18n.t("inventorySales.sales.payment.installments")}
+                              SelectDisplayProps={{
+                                "data-testid": "sale-card-installments",
+                              }}
+                            >
+                              {CARD_INSTALLMENT_OPTIONS.map((count) => (
+                                <MenuItem key={count} value={String(count)}>
+                                  {count}x
+                                </MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+                          <Typography
+                            variant="body2"
+                            color="textSecondary"
+                            data-testid="sale-card-installment-caption"
+                          >
+                            {formatCardInstallmentCaption(
+                              Number(headerForm.cardInstallmentCount || 1),
+                              sale.totalAmount
+                            )}
+                          </Typography>
+                        </>
+                      ) : null}
                       <TextField
                         label={i18n.t("inventorySales.sales.fields.paymentNotes")}
                         value={headerForm.paymentNotes}
@@ -871,8 +940,8 @@ export default function SaleDrawer({
                           color={paymentStatusChipColor(sale.paymentStatus)}
                           label={paymentStatusLabel(sale.paymentStatus)}
                         />
-                        <Typography variant="body2">
-                          {paymentMethodLabel(sale.paymentMethod)}
+                        <Typography variant="body2" data-testid="sale-payment-method-display">
+                          {salePaymentLabel(sale)}
                         </Typography>
                       </div>
                       <Typography variant="body2">
@@ -905,8 +974,8 @@ export default function SaleDrawer({
                       label={paymentStatusLabel(sale.paymentStatus)}
                     />
                   ) : (
-                    <Typography variant="body2" color="textSecondary">
-                      {paymentMethodLabel(sale.paymentMethod)}
+                    <Typography variant="body2" color="textSecondary" data-testid="sale-payment-method-display">
+                      {salePaymentLabel(sale)}
                     </Typography>
                   )}
                 </div>
