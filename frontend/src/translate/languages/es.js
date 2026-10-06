@@ -38,6 +38,7 @@ const messages = {
           attendance: "Atención",
           management: "Gestión",
           marketing: "Marketing / Automatización de atención",
+          inventorySales: "Inventario y ventas",
           administration: "Administración",
         },
         presets: {

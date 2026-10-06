@@ -1,4 +1,9 @@
 import { getAllFeatureKeys } from "../../config/features";
+import {
+  INVENTORY_SALES_FEATURE_KEY,
+  INVENTORY_SALES_GRANULAR_KEYS,
+  INVENTORY_SALES_VIEW,
+} from "../../config/inventorySalesPermissions";
 
 /** Grupos de UI (chaves = features do plano). */
 export const PERMISSION_UI_GROUPS = [
@@ -26,6 +31,11 @@ export const PERMISSION_UI_GROUPS = [
       "dashboard.main",
       "dashboard.reports",
     ],
+  },
+  {
+    id: "inventorySales",
+    titleKey: "userPermissions.categories.inventorySales",
+    keys: [...INVENTORY_SALES_GRANULAR_KEYS],
   },
   {
     id: "marketing",
@@ -97,6 +107,11 @@ function emptyStateForPlan(planMap) {
   getAllFeatureKeys().forEach((k) => {
     if (planMap[k] === true) o[k] = false;
   });
+  if (planMap[INVENTORY_SALES_FEATURE_KEY] === true) {
+    INVENTORY_SALES_GRANULAR_KEYS.forEach((k) => {
+      if (o[k] === undefined) o[k] = false;
+    });
+  }
   return o;
 }
 
@@ -137,5 +152,32 @@ export function applyActorCeiling(state, ceiling) {
 }
 
 export function keysForGroupInPlan(group, planMap) {
-  return group.keys.filter((k) => planMap[k] === true);
+  return group.keys.filter((k) => {
+    if (
+      k.startsWith("inventory.sales.") &&
+      planMap[INVENTORY_SALES_FEATURE_KEY] === true
+    ) {
+      return true;
+    }
+    return planMap[k] === true;
+  });
+}
+
+const INVENTORY_CHILD_KEYS = INVENTORY_SALES_GRANULAR_KEYS.filter(
+  (k) => k !== INVENTORY_SALES_VIEW
+);
+
+/** Marcar uma ação do módulo implica view. Desmarcar view desmarca as demais. */
+export function toggleInventoryPermission(state, key, checked) {
+  const next = { ...(state || {}), [key]: checked };
+  if (!String(key).startsWith("inventory.sales.")) return next;
+  if (key !== INVENTORY_SALES_VIEW && checked) {
+    next[INVENTORY_SALES_VIEW] = true;
+  }
+  if (key === INVENTORY_SALES_VIEW && !checked) {
+    INVENTORY_CHILD_KEYS.forEach((child) => {
+      next[child] = false;
+    });
+  }
+  return next;
 }

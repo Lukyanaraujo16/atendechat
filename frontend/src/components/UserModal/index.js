@@ -44,6 +44,7 @@ import {
 	selectAllAllowedForActor,
 	clearAllInPlan,
 	keysForGroupInPlan,
+	toggleInventoryPermission,
 } from "./permissionUiConfig";
 import useIsMobile from "../../hooks/useIsMobile";
 import {
@@ -624,10 +625,14 @@ const UserModal = ({ open, onClose, userId, reload }) => {
 																	}
 																	onChange={e => {
 																		setFieldValue("permissionPreset", "custom");
-																		setFieldValue("featurePermissions", {
-																			...(values.featurePermissions || {}),
-																			[key]: e.target.checked,
-																		});
+																		setFieldValue(
+																			"featurePermissions",
+																			toggleInventoryPermission(
+																				values.featurePermissions,
+																				key,
+																				e.target.checked
+																			)
+																		);
 																	}}
 																/>
 															}
