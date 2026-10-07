@@ -58,6 +58,10 @@ jest.mock("../inventorySaleHelpers", () => {
   };
 });
 
+jest.mock("../inventorySalePaymentEngine", () => ({
+  syncDraftPendingAfterTotalChange: jest.fn().mockResolvedValue(undefined)
+}));
+
 const findSale = InventorySale.findOne as jest.Mock;
 const findItem = InventorySaleItem.findOne as jest.Mock;
 const findItems = InventorySaleItem.findAll as jest.Mock;
@@ -68,12 +72,25 @@ const bulkCreateIdentifiers =
 const stockCount = InventoryStockMovement.count as jest.Mock;
 
 function draftSale(overrides: Record<string, unknown> = {}) {
-  return {
+  const sale: any = {
     id: 7,
     companyId: 1,
     status: "draft",
+    paymentMethod: null,
+    paymentStatus: "unpaid",
+    paidAmount: 0,
+    paidAt: null,
+    paymentNotes: null,
+    cardInstallmentCount: null,
+    totalAmount: 0,
+    update: jest.fn(async (patch: Record<string, unknown>) => {
+      Object.assign(sale, patch);
+      return sale;
+    }),
+    reload: jest.fn(async () => sale),
     ...overrides
   };
+  return sale;
 }
 
 function saleItem(overrides: Record<string, unknown> = {}) {

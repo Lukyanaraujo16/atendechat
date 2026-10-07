@@ -11,6 +11,7 @@ import {
   recalculateInventorySaleTotals,
   roundMoney
 } from "./inventorySaleHelpers";
+import { syncDraftPendingAfterTotalChange } from "./inventorySalePaymentEngine";
 import {
   buildInventorySaleItemIdentifierInclude,
   parseAndNormalizeIdentifiers,
@@ -117,6 +118,8 @@ export default async function AddInventorySaleItemService(input: {
     });
 
     await recalculateInventorySaleTotals(sale.id, input.companyId, t);
+    await sale.reload({ transaction: t });
+    await syncDraftPendingAfterTotalChange(sale, t);
     return item.reload({
       transaction: t,
       include: [

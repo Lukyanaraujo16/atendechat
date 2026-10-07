@@ -12,6 +12,7 @@ import {
   roundMoney,
   toMoney
 } from "./inventorySaleHelpers";
+import { syncDraftPendingAfterTotalChange } from "./inventorySalePaymentEngine";
 import {
   assertQuantityReductionAllowsIdentifiers,
   buildInventorySaleItemIdentifierInclude,
@@ -148,6 +149,8 @@ export default async function UpdateInventorySaleItemService(input: {
 
     if (Object.keys(patch).length > 0) {
       await recalculateInventorySaleTotals(sale.id, input.companyId, t);
+      await sale.reload({ transaction: t });
+      await syncDraftPendingAfterTotalChange(sale, t);
     }
 
     return item.reload({

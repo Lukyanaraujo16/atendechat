@@ -6,6 +6,7 @@ import {
   findInventorySaleOrThrow,
   recalculateInventorySaleTotals
 } from "./inventorySaleHelpers";
+import { syncDraftPendingAfterTotalChange } from "./inventorySalePaymentEngine";
 
 export default async function DeleteInventorySaleItemService(input: {
   companyId: number;
@@ -34,5 +35,7 @@ export default async function DeleteInventorySaleItemService(input: {
 
     await item.destroy({ transaction: t });
     await recalculateInventorySaleTotals(sale.id, input.companyId, t);
+    await sale.reload({ transaction: t });
+    await syncDraftPendingAfterTotalChange(sale, t);
   });
 }

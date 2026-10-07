@@ -76,6 +76,10 @@ jest.mock("../../../models/InventorySaleItemIdentifier", () => ({
   default: {}
 }));
 
+jest.mock("../inventorySalePaymentEngine", () => ({
+  syncDraftPendingAfterTotalChange: jest.fn().mockResolvedValue(undefined)
+}));
+
 const methodFindOne = InventoryDeliveryMethod.findOne as jest.Mock;
 const methodFindAll = InventoryDeliveryMethod.findAll as jest.Mock;
 const methodCreate = InventoryDeliveryMethod.create as jest.Mock;

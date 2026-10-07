@@ -17,6 +17,7 @@ import {
   recalculateInventorySaleTotals,
   toMoney
 } from "./inventorySaleHelpers";
+import { syncDraftPendingAfterTotalChange } from "./inventorySalePaymentEngine";
 
 type DeliveryBody = {
   deliveryMethodId?: unknown;
@@ -184,6 +185,8 @@ export default async function UpdateInventorySaleDeliveryService(input: {
 
     await normalizeDraftPaymentIfNeeded(sale, t);
     await recalculateInventorySaleTotals(sale.id, input.companyId, t);
+    await sale.reload({ transaction: t });
+    await syncDraftPendingAfterTotalChange(sale, t);
   });
 
   const updated = await InventorySale.findOne({

@@ -231,7 +231,8 @@ export const updateSalePayment = async (
   const sale = await UpdateInventorySalePaymentService({
     companyId,
     saleId: parseIdParam(req.params.id),
-    body: req.body
+    body: req.body,
+    actorUserId: userIdOrNull(req)
   });
   return res.json(sale);
 };

@@ -153,14 +153,11 @@ export function assertSaleAllowsPaymentUpdate(input: {
     );
   }
 
-  if (
-    input.saleStatus === "cancelled" &&
-    input.paymentStatus !== "refunded"
-  ) {
+  if (input.saleStatus === "cancelled") {
     throw new AppError(
       "ERR_INVENTORY_SALE_PAYMENT_CANCELLED",
       400,
-      "Venda cancelada só permite status de pagamento reembolsado."
+      "Não é possível atualizar pagamento de venda cancelada."
     );
   }
 }

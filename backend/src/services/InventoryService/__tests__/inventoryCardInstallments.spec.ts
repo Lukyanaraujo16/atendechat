@@ -7,6 +7,56 @@ import UpdateInventorySaleService from "../UpdateInventorySaleService";
 import CancelInventorySaleService from "../CancelInventorySaleService";
 import { settlePaymentOnComplete } from "../inventoryPaymentHelpers";
 
+jest.mock("../inventorySalePaymentEngine", () => ({
+  syncDraftPaymentIntention: jest.fn(
+    async (
+      _sale: unknown,
+      input: {
+        paymentMethod: string | null;
+        cardInstallmentCount: number | null;
+        paymentNotes: string | null;
+      }
+    ) => ({
+      paymentStatus: "unpaid",
+      paidAmount: 0,
+      paidAt: null,
+      paymentMethod: input.paymentMethod,
+      cardInstallmentCount:
+        input.paymentMethod === "credit_card"
+          ? input.cardInstallmentCount
+          : null,
+      paymentNotes: input.paymentNotes
+    })
+  ),
+  applyLegacyAbsolutePayment: jest.fn(
+    async (
+      _sale: unknown,
+      input: {
+        paymentStatus: string;
+        targetPaidAmount: number;
+        paidAt: Date | null;
+        paymentMethod: string | null;
+        cardInstallmentCount: number | null;
+        paymentNotes: string | null;
+      }
+    ) => ({
+      paymentStatus: input.paymentStatus,
+      paidAmount: input.targetPaidAmount,
+      paidAt: input.paidAt,
+      paymentMethod: input.paymentMethod,
+      cardInstallmentCount:
+        input.paymentMethod === "credit_card"
+          ? input.cardInstallmentCount
+          : null,
+      paymentNotes: input.paymentNotes
+    })
+  ),
+  applyCompletePaymentSettlement: jest.fn(),
+  syncDraftPendingAfterTotalChange: jest.fn(),
+  bootstrapLegacyPaymentsIfNeeded: jest.fn(),
+  listSalePayments: jest.fn()
+}));
+
 function saleRecord(overrides: Record<string, unknown> = {}) {
   const sale: any = {
     id: 9,
@@ -111,6 +161,7 @@ describe("parcelas do cartão na conclusão", () => {
       "utf8"
     );
     expect(complete).toContain("settlePaymentOnComplete");
+    expect(complete).toContain("applyCompletePaymentSettlement");
     expect(summary).not.toContain("cardInstallmentCount");
     expect(summary).toContain("paidAmount");
     expect(summary).toContain("totalPending");
@@ -119,13 +170,17 @@ describe("parcelas do cartão na conclusão", () => {
 
 describe("UpdateInventorySalePaymentService parcelas", () => {
   const findSale = jest.spyOn(InventorySale, "findOne");
+  const tx = jest.spyOn(sequelize, "transaction");
 
   beforeEach(() => {
     findSale.mockReset();
+    tx.mockImplementation(((fn: any) =>
+      fn({ LOCK: { UPDATE: "UPDATE" } })) as any);
   });
 
   afterAll(() => {
     findSale.mockRestore();
+    tx.mockRestore();
   });
 
   async function save(
@@ -244,8 +299,9 @@ describe("UpdateInventorySalePaymentService parcelas", () => {
       paidAmount: 1000,
       paymentNotes: "consulta"
     });
-    expect(patch).not.toHaveProperty("cardInstallmentCount");
-    expect(patch).not.toHaveProperty("paymentMethod");
+    // P2 grava cache completo; parcelas históricas NULL permanecem NULL.
+    expect(patch.cardInstallmentCount).toBeNull();
+    expect(patch.paymentMethod).toBe("credit_card");
     expect(sale.cardInstallmentCount).toBeNull();
     expect(sale.paymentStatus).toBe("paid");
   });

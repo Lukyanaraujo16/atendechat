@@ -19,6 +19,7 @@ import {
 } from "./inventorySaleHelpers";
 import { toInventoryQuantity } from "./inventoryTenant";
 import { settlePaymentOnComplete } from "./inventoryPaymentHelpers";
+import { applyCompletePaymentSettlement } from "./inventorySalePaymentEngine";
 import { assertIdentifiersForCompleteSale } from "./inventorySaleItemIdentifiers";
 
 export default async function CompleteInventorySaleService(input: {
@@ -230,6 +231,18 @@ export default async function CompleteInventorySaleService(input: {
       canManagePayments: input.canManagePayments === true
     });
 
+    // Lines = fonte de verdade; sale.payment* = cache na mesma transaction.
+    const paymentCache = await applyCompletePaymentSettlement(
+      sale,
+      {
+        targetPaidAmount: settled.paidAmount,
+        paymentStatus: settled.paymentStatus,
+        paidAt: settled.paidAt,
+        actorUserId: input.completedBy
+      },
+      t
+    );
+
     await settings.update(
       { nextSaleNumber: saleNumber + 1 },
       { transaction: t }
@@ -243,9 +256,12 @@ export default async function CompleteInventorySaleService(input: {
         commissionRate,
         commissionAmount,
         completedAt: new Date(),
-        paymentStatus: settled.paymentStatus,
-        paidAmount: settled.paidAmount,
-        paidAt: settled.paidAt
+        paymentStatus: paymentCache.paymentStatus,
+        paidAmount: paymentCache.paidAmount,
+        paidAt: paymentCache.paidAt,
+        paymentMethod: paymentCache.paymentMethod,
+        cardInstallmentCount: paymentCache.cardInstallmentCount,
+        paymentNotes: paymentCache.paymentNotes
       },
       { transaction: t }
     );
