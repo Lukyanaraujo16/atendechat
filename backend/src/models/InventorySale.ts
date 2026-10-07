@@ -21,6 +21,7 @@ import User from "./User";
 import InventorySaleItem from "./InventorySaleItem";
 import InventoryDeliveryMethod from "./InventoryDeliveryMethod";
 import InventorySaleDelivery from "./InventorySaleDelivery";
+import InventorySalePayment from "./InventorySalePayment";
 
 export type InventorySaleStatus = "draft" | "completed" | "cancelled";
 export type InventorySaleSource = "manual" | "ticket" | "whatsapp";
@@ -223,6 +224,14 @@ class InventorySale extends Model<InventorySale> {
     hooks: true
   })
   delivery: InventorySaleDelivery;
+
+  /** Linhas 1:N — P1 fundação; escrita autoritativa entra na P2. */
+  @HasMany(() => InventorySalePayment, {
+    onUpdate: "CASCADE",
+    onDelete: "CASCADE",
+    hooks: true
+  })
+  payments: InventorySalePayment[];
 }
 
 export default InventorySale;
