@@ -272,13 +272,21 @@ export function assertStoredCardInstallments(
   return parseCardInstallmentCount(cardInstallmentCount);
 }
 
-/** Conclusão: só cartão com parcelas já gravadas nasce pago pelo total. */
+/**
+ * Conclusão do draft:
+ * - cartão: sempre pago pelo total (parcelas 1–18 obrigatórias);
+ * - demais métodos: se managePayments + registerAsPaid, liquida pelo total;
+ * - registerAsPaid explícito false (autorizado): unpaid;
+ * - sem autorização / sem flag: comportamento histórico (derive de paidAmount).
+ */
 export function settlePaymentOnComplete(input: {
   paymentMethod: InventoryPaymentMethod | null;
   cardInstallmentCount: number | null;
   totalAmount: number;
   paidAmount: number;
   existingPaidAt: Date | null;
+  registerAsPaid?: boolean;
+  canManagePayments?: boolean;
 }): {
   paymentStatus: InventoryPaymentStatus;
   paidAmount: number;
@@ -297,6 +305,26 @@ export function settlePaymentOnComplete(input: {
         paymentStatus,
         existingPaidAt: input.existingPaidAt
       })
+    };
+  }
+
+  if (input.canManagePayments === true && input.registerAsPaid === true) {
+    const paymentStatus: InventoryPaymentStatus = "paid";
+    return {
+      paymentStatus,
+      paidAmount: input.totalAmount,
+      paidAt: resolvePaidAtForPaymentUpdate({
+        paymentStatus,
+        existingPaidAt: input.existingPaidAt
+      })
+    };
+  }
+
+  if (input.canManagePayments === true && input.registerAsPaid === false) {
+    return {
+      paymentStatus: "unpaid",
+      paidAmount: 0,
+      paidAt: null
     };
   }
 

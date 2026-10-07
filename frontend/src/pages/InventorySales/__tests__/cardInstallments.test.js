@@ -269,7 +269,7 @@ describe("divisão informativa e diálogo já pago", () => {
     );
 
     expect(screen.getByTestId("sale-payment-dialog-installments").textContent).toBe("6x");
-    expect(screen.getByDisplayValue("1000")).toBeTruthy();
+    expect(screen.getByDisplayValue(/1\.000,00/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: /receber/i })).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Guardar pagamento" }));

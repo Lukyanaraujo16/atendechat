@@ -1,5 +1,8 @@
 import { Request, Response } from "express";
 import AppError from "../errors/AppError";
+import { INVENTORY_SALES_MANAGE_PAYMENTS } from "../config/inventorySalesPermissions";
+import { loadCompanyPlanContext } from "../middleware/loadCompanyEffectiveFeatures";
+import { isPlatformSuperUser } from "../middleware/platformSuperBypass";
 import CreateInventorySaleService from "../services/InventoryService/CreateInventorySaleService";
 import ListInventorySalesService from "../services/InventoryService/ListInventorySalesService";
 import ShowInventorySaleService from "../services/InventoryService/ShowInventorySaleService";
@@ -12,6 +15,7 @@ import CompleteInventorySaleService from "../services/InventoryService/CompleteI
 import CancelInventorySaleService from "../services/InventoryService/CancelInventorySaleService";
 import UpdateInventorySalePaymentService from "../services/InventoryService/UpdateInventorySalePaymentService";
 import SearchInventoryCustomersService from "../services/InventoryService/SearchInventoryCustomersService";
+import { computeEffectiveUserFeatureMapForRequest } from "../services/UserFeaturePermission/UserFeaturePermissionService";
 
 function companyIdOrThrow(req: Request): number {
   const id = req.user?.companyId;
@@ -31,6 +35,28 @@ function userIdOrNull(req: Request): number | null {
   return req.user?.id != null && Number.isFinite(Number(req.user.id))
     ? Number(req.user.id)
     : null;
+}
+
+function parseOptionalRegisterAsPaid(raw: unknown): boolean | undefined {
+  if (raw === undefined || raw === null || raw === "") return undefined;
+  if (raw === true || raw === "true" || raw === 1 || raw === "1") return true;
+  if (raw === false || raw === "false" || raw === 0 || raw === "0") return false;
+  throw new AppError(
+    "ERR_VALIDATION_ERROR",
+    400,
+    "registerAsPaid inválido."
+  );
+}
+
+async function resolveCanManagePayments(req: Request): Promise<boolean> {
+  if (await isPlatformSuperUser(req)) return true;
+  const ctx = await loadCompanyPlanContext(req);
+  if (!ctx) return false;
+  const merged = await computeEffectiveUserFeatureMapForRequest(
+    req,
+    ctx.featureMap
+  );
+  return merged[INVENTORY_SALES_MANAGE_PAYMENTS] === true;
 }
 
 export const searchCustomers = async (
@@ -162,11 +188,22 @@ export const completeSale = async (
   res: Response
 ): Promise<Response> => {
   const companyId = companyIdOrThrow(req);
+  const canManagePayments = await resolveCanManagePayments(req);
+  const requestedRegisterAsPaid = parseOptionalRegisterAsPaid(
+    req.body?.registerAsPaid
+  );
+  // Sem managePayments a flag é ignorada (não forja liquidação).
+  const registerAsPaid = canManagePayments
+    ? requestedRegisterAsPaid
+    : undefined;
+
   const sale = await CompleteInventorySaleService({
     companyId,
     saleId: parseIdParam(req.params.id),
     sellerUserId: req.body?.sellerUserId,
-    completedBy: userIdOrNull(req)
+    completedBy: userIdOrNull(req),
+    registerAsPaid,
+    canManagePayments
   });
   return res.json(sale);
 };

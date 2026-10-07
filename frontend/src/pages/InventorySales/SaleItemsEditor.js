@@ -36,6 +36,7 @@ import { i18n } from "../../translate/i18n";
 import useIsMobile from "../../hooks/useIsMobile";
 import { formatCurrencyBRL, parseBrazilianCurrencyToNumber } from "../../utils/brazilianCurrency";
 import { formatQuantity } from "./utils";
+import CurrencyInput from "./CurrencyInput";
 import SaleItemIdentifiersEditor from "./SaleItemIdentifiersEditor";
 import SaleItemIdentifiersList from "./SaleItemIdentifiersList";
 import {
@@ -380,7 +381,10 @@ export default function SaleItemsEditor({
     }
 
     const payload = { productId, quantity };
-    if (addForm.unitPrice.trim()) {
+    if (
+      addForm.unitPrice !== "" &&
+      addForm.unitPrice != null
+    ) {
       const unitPrice = parseBrazilianCurrencyToNumber(addForm.unitPrice);
       if (unitPrice == null || unitPrice < 0) {
         toast.error(i18n.t("inventorySales.sales.items.validation.unitPrice"));
@@ -600,28 +604,28 @@ export default function SaleItemsEditor({
                         fullWidth
                         style={{ marginBottom: 8 }}
                       />
-                      <TextField
-                        size="small"
-                        variant="outlined"
-                        label={i18n.t("inventorySales.sales.items.unitPrice")}
-                        value={draft.unitPrice}
-                        onChange={(e) =>
-                          setRowField(item.id, "unitPrice", e.target.value)
-                        }
-                        fullWidth
-                        style={{ marginBottom: 8 }}
-                      />
-                      <TextField
-                        size="small"
-                        variant="outlined"
-                        label={i18n.t("inventorySales.sales.items.discount")}
-                        value={draft.discountAmount}
-                        onChange={(e) =>
-                          setRowField(item.id, "discountAmount", e.target.value)
-                        }
-                        fullWidth
-                        style={{ marginBottom: 8 }}
-                      />
+                      <Box style={{ marginBottom: 8 }}>
+                        <CurrencyInput
+                          label={i18n.t("inventorySales.sales.items.unitPrice")}
+                          value={Number(draft.unitPrice) || 0}
+                          onChange={(reais) =>
+                            setRowField(item.id, "unitPrice", String(reais ?? 0))
+                          }
+                        />
+                      </Box>
+                      <Box style={{ marginBottom: 8 }}>
+                        <CurrencyInput
+                          label={i18n.t("inventorySales.sales.items.discount")}
+                          value={Number(draft.discountAmount) || 0}
+                          onChange={(reais) =>
+                            setRowField(
+                              item.id,
+                              "discountAmount",
+                              String(reais ?? 0)
+                            )
+                          }
+                        />
+                      </Box>
                       <Typography variant="body2" style={{ fontWeight: 600 }}>
                         {formatCurrencyBRL(item.totalAmount)}
                       </Typography>
@@ -708,15 +712,16 @@ export default function SaleItemsEditor({
                           {readOnly ? (
                             formatCurrencyBRL(draft.unitPrice)
                           ) : (
-                            <TextField
-                              size="small"
-                              variant="outlined"
-                              value={draft.unitPrice}
-                              onChange={(e) =>
-                                setRowField(item.id, "unitPrice", e.target.value)
+                            <CurrencyInput
+                              value={Number(draft.unitPrice) || 0}
+                              onChange={(reais) =>
+                                setRowField(
+                                  item.id,
+                                  "unitPrice",
+                                  String(reais ?? 0)
+                                )
                               }
                               className={classes.numericField}
-                              fullWidth
                             />
                           )}
                         </TableCell>
@@ -724,15 +729,16 @@ export default function SaleItemsEditor({
                           {readOnly ? (
                             formatCurrencyBRL(draft.discountAmount)
                           ) : (
-                            <TextField
-                              size="small"
-                              variant="outlined"
-                              value={draft.discountAmount}
-                              onChange={(e) =>
-                                setRowField(item.id, "discountAmount", e.target.value)
+                            <CurrencyInput
+                              value={Number(draft.discountAmount) || 0}
+                              onChange={(reais) =>
+                                setRowField(
+                                  item.id,
+                                  "discountAmount",
+                                  String(reais ?? 0)
+                                )
                               }
                               className={classes.numericField}
-                              fullWidth
                             />
                           )}
                         </TableCell>
@@ -910,29 +916,35 @@ export default function SaleItemsEditor({
                 inputProps={{ min: 0, step: "any" }}
                 style={{ flex: 1, minWidth: 100 }}
               />
-              <TextField
-                size="small"
-                variant="outlined"
-                label={i18n.t("inventorySales.sales.items.unitPriceOptional")}
-                value={addForm.unitPrice}
-                onChange={(e) =>
-                  setAddForm((prev) => ({ ...prev, unitPrice: e.target.value }))
-                }
-                style={{ flex: 1, minWidth: 120 }}
-              />
-              <TextField
-                size="small"
-                variant="outlined"
-                label={i18n.t("inventorySales.sales.items.discount")}
-                value={addForm.discountAmount}
-                onChange={(e) =>
-                  setAddForm((prev) => ({
-                    ...prev,
-                    discountAmount: e.target.value,
-                  }))
-                }
-                style={{ flex: 1, minWidth: 100 }}
-              />
+              <Box style={{ flex: 1, minWidth: 120 }}>
+                <CurrencyInput
+                  label={i18n.t("inventorySales.sales.items.unitPriceOptional")}
+                  value={
+                    addForm.unitPrice === "" || addForm.unitPrice == null
+                      ? null
+                      : Number(addForm.unitPrice)
+                  }
+                  allowEmpty
+                  onChange={(reais) =>
+                    setAddForm((prev) => ({
+                      ...prev,
+                      unitPrice: reais == null ? "" : String(reais),
+                    }))
+                  }
+                />
+              </Box>
+              <Box style={{ flex: 1, minWidth: 100 }}>
+                <CurrencyInput
+                  label={i18n.t("inventorySales.sales.items.discount")}
+                  value={Number(addForm.discountAmount) || 0}
+                  onChange={(reais) =>
+                    setAddForm((prev) => ({
+                      ...prev,
+                      discountAmount: String(reais ?? 0),
+                    }))
+                  }
+                />
+              </Box>
             </Box>
             <SaleItemIdentifiersEditor
               quantity={addForm.quantity}

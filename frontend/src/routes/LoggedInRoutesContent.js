@@ -62,6 +62,8 @@ import Reports from "../pages/Reports";
 import UserNotifications from "../pages/UserNotifications";
 import CrmBoard from "../pages/CRM";
 import InventorySales from "../pages/InventorySales";
+import NewSaleRedirectPage from "../pages/InventorySales/NewSaleRedirectPage";
+import SaleWizardPage from "../pages/InventorySales/SaleWizardPage";
 import { canViewInventory, planHasInventoryModule } from "../utils/inventoryAccess";
 import CRMReports from "../pages/CRMReports";
 import CrmAutomations from "../pages/CrmAutomations";
@@ -1238,6 +1240,44 @@ export default function LoggedInRoutesContent() {
             return <PlanFeatureBlocked variant="user" />;
           }
           return <InventorySales />;
+        }}
+      />
+
+      <Route
+        exact
+        path="/inventory-sales/new"
+        render={() => {
+          if (!planFlags.loaded) {
+            return <PlanFlagsLoadingState />;
+          }
+          if (!planHasInventoryModule(planFlags)) {
+            return (
+              <FeatureBlocked planFlags={planFlags} anyOf={["inventory.sales"]} />
+            );
+          }
+          if (!canViewInventory(planFlags, user)) {
+            return <PlanFeatureBlocked variant="user" />;
+          }
+          return <NewSaleRedirectPage />;
+        }}
+      />
+
+      <Route
+        exact
+        path="/inventory-sales/sales/:saleId"
+        render={() => {
+          if (!planFlags.loaded) {
+            return <PlanFlagsLoadingState />;
+          }
+          if (!planHasInventoryModule(planFlags)) {
+            return (
+              <FeatureBlocked planFlags={planFlags} anyOf={["inventory.sales"]} />
+            );
+          }
+          if (!canViewInventory(planFlags, user)) {
+            return <PlanFeatureBlocked variant="user" />;
+          }
+          return <SaleWizardPage />;
         }}
       />
 

@@ -1,10 +1,23 @@
 import React from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 
 import InventorySummaryTab from "../InventorySummaryTab";
 import { ManualSaleProvider } from "../ManualSaleProvider";
 import { INVENTORY_TABS } from "../constants";
+
+const mockHistoryPush = jest.fn();
+jest.mock("react-router-dom", () => {
+  const actual = jest.requireActual("react-router-dom");
+  return {
+    ...actual,
+    useHistory: () => ({
+      push: mockHistoryPush,
+      replace: jest.fn(),
+    }),
+  };
+});
 
 class MockMutationObserver {
   observe() {}
@@ -52,19 +65,22 @@ const mockNavigateTab = jest.fn();
 
 function renderSummary() {
   return render(
-    <ManualSaleProvider>
-      <InventorySummaryTab
-        onNavigateTab={mockNavigateTab}
-        onNewProduct={jest.fn()}
-        onNewMovement={jest.fn()}
-      />
-    </ManualSaleProvider>
+    <MemoryRouter>
+      <ManualSaleProvider>
+        <InventorySummaryTab
+          onNavigateTab={mockNavigateTab}
+          onNewProduct={jest.fn()}
+          onNewMovement={jest.fn()}
+        />
+      </ManualSaleProvider>
+    </MemoryRouter>
   );
 }
 
 describe("aba Resumo", () => {
   beforeEach(() => {
     mockNavigateTab.mockClear();
+    mockHistoryPush.mockClear();
     mockPerms.canCreateSale = true;
     mockPerms.canManageProducts = true;
     mockPerms.canManageStock = true;
@@ -132,12 +148,13 @@ describe("aba Resumo", () => {
     expect(await screen.findByText("Nenhuma venda recente.")).toBeTruthy();
   });
 
-  it("reusa o POST manual ao criar a venda", async () => {
+  it("abre o wizard de nova venda", async () => {
     renderSummary();
     const button = await screen.findByText("Nova venda");
     userEvent.click(button);
     await waitFor(() => {
-      expect(mockCreateInventorySale).toHaveBeenCalledWith({ source: "manual" });
+      expect(mockHistoryPush).toHaveBeenCalledWith("/inventory-sales/new");
     });
+    expect(mockCreateInventorySale).not.toHaveBeenCalled();
   });
 });

@@ -28,6 +28,7 @@ import {
   cardInstallmentFormValue,
   formatCardInstallmentCaption,
 } from "./cardInstallments";
+import CurrencyInput from "./CurrencyInput";
 import { toNumber } from "./utils";
 
 function formatDateInput(value) {
@@ -237,17 +238,15 @@ export default function SalePaymentDialog({
             </>
           ) : null}
 
-          <TextField
+          <CurrencyInput
             label={i18n.t("inventorySales.sales.fields.paidAmount")}
-            value={form.paidAmount}
-            onChange={(e) =>
-              setForm((prev) => ({ ...prev, paidAmount: e.target.value }))
+            value={Number(form.paidAmount) || 0}
+            onChange={(reais) =>
+              setForm((prev) => ({
+                ...prev,
+                paidAmount: String(reais ?? 0),
+              }))
             }
-            variant="outlined"
-            size="small"
-            fullWidth
-            type="number"
-            inputProps={{ min: 0, step: "0.01" }}
           />
 
           <TextField

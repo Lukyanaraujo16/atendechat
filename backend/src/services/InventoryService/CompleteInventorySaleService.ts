@@ -26,6 +26,9 @@ export default async function CompleteInventorySaleService(input: {
   saleId: number;
   sellerUserId?: unknown;
   completedBy: number | null;
+  /** Só honrado quando canManagePayments === true (resolvido no controller). */
+  registerAsPaid?: boolean;
+  canManagePayments?: boolean;
 }): Promise<InventorySale> {
   await GetOrCreateInventorySettingsService(input.companyId);
 
@@ -216,7 +219,9 @@ export default async function CompleteInventorySaleService(input: {
       cardInstallmentCount: sale.cardInstallmentCount,
       totalAmount,
       paidAmount: toMoney(sale.paidAmount),
-      existingPaidAt: sale.paidAt
+      existingPaidAt: sale.paidAt,
+      registerAsPaid: input.registerAsPaid,
+      canManagePayments: input.canManagePayments === true
     });
 
     await settings.update(
