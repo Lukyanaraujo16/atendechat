@@ -213,7 +213,13 @@ export default async function CompleteInventorySaleService(input: {
     }
 
     const totalAmount = toMoney(sale.totalAmount);
-    const commissionAmount = roundMoney((totalAmount * commissionRate) / 100);
+    // Frete não entra na base de comissão (mercadoria após descontos).
+    const commissionBase = roundMoney(
+      totalAmount - toMoney(sale.freightAmount)
+    );
+    const commissionAmount = roundMoney(
+      (commissionBase * commissionRate) / 100
+    );
     const settled = settlePaymentOnComplete({
       paymentMethod: sale.paymentMethod,
       cardInstallmentCount: sale.cardInstallmentCount,

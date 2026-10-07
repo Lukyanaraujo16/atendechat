@@ -76,6 +76,34 @@ class Contact extends Model<Contact> {
   @Column(DataType.TEXT)
   notes: string;
 
+  @AllowNull(true)
+  @Column(DataType.STRING(20))
+  postalCode: string | null;
+
+  @AllowNull(true)
+  @Column(DataType.STRING(255))
+  street: string | null;
+
+  @AllowNull(true)
+  @Column(DataType.STRING(30))
+  addressNumber: string | null;
+
+  @AllowNull(true)
+  @Column(DataType.STRING(120))
+  addressComplement: string | null;
+
+  @AllowNull(true)
+  @Column(DataType.STRING(120))
+  district: string | null;
+
+  @AllowNull(true)
+  @Column(DataType.STRING(120))
+  city: string | null;
+
+  @AllowNull(true)
+  @Column(DataType.STRING(2))
+  state: string | null;
+
   @CreatedAt
   createdAt: Date;
 

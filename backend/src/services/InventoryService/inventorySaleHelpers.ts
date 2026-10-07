@@ -6,13 +6,26 @@ import User from "../../models/User";
 import InventorySale, { InventorySaleStatus } from "../../models/InventorySale";
 import InventorySaleItem from "../../models/InventorySaleItem";
 import InventoryProduct from "../../models/InventoryProduct";
+import InventorySaleDelivery from "../../models/InventorySaleDelivery";
+import InventoryDeliveryMethod from "../../models/InventoryDeliveryMethod";
 import { buildInventorySaleItemIdentifierInclude } from "./inventorySaleItemIdentifiers";
 
 export function buildInventorySaleIncludes(companyId: number) {
   return [
     {
       model: Contact,
-      attributes: ["id", "name", "number"],
+      attributes: [
+        "id",
+        "name",
+        "number",
+        "postalCode",
+        "street",
+        "addressNumber",
+        "addressComplement",
+        "district",
+        "city",
+        "state"
+      ],
       required: false
     },
     {
@@ -50,6 +63,24 @@ export function buildInventorySaleIncludes(companyId: number) {
         },
         buildInventorySaleItemIdentifierInclude(companyId)
       ]
+    },
+    {
+      model: InventoryDeliveryMethod,
+      attributes: [
+        "id",
+        "name",
+        "kind",
+        "defaultAmount",
+        "allowAmountOverride",
+        "requiresAddress",
+        "active"
+      ],
+      required: false
+    },
+    {
+      model: InventorySaleDelivery,
+      as: "delivery",
+      required: false
     }
   ];
 }
@@ -158,6 +189,14 @@ export async function recalculateInventorySaleTotals(
   companyId: number,
   transaction?: Transaction
 ): Promise<void> {
+  const sale = await InventorySale.findOne({
+    where: { id: saleId, companyId },
+    transaction
+  });
+  if (!sale) {
+    throw new AppError("ERR_INVENTORY_SALE_NOT_FOUND", 404);
+  }
+
   const items = await InventorySaleItem.findAll({
     where: { saleId, companyId },
     transaction
@@ -165,7 +204,7 @@ export async function recalculateInventorySaleTotals(
 
   let subtotalAmount = 0;
   let discountAmount = 0;
-  let totalAmount = 0;
+  let merchandiseTotal = 0;
 
   for (const item of items) {
     const unitPrice = toMoney(item.unitPrice);
@@ -176,18 +215,21 @@ export async function recalculateInventorySaleTotals(
 
     subtotalAmount += lineSubtotal;
     discountAmount += lineDiscount;
-    totalAmount += lineTotal;
+    merchandiseTotal += lineTotal;
 
     if (toMoney(item.totalAmount) !== lineTotal) {
       await item.update({ totalAmount: lineTotal }, { transaction });
     }
   }
 
+  const freightAmount = toMoney(sale.freightAmount);
+  const totalAmount = roundMoney(merchandiseTotal + freightAmount);
+
   await InventorySale.update(
     {
       subtotalAmount: roundMoney(subtotalAmount),
       discountAmount: roundMoney(discountAmount),
-      totalAmount: roundMoney(totalAmount)
+      totalAmount
     },
     { where: { id: saleId, companyId }, transaction }
   );

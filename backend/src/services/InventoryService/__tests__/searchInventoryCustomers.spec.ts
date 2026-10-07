@@ -116,7 +116,18 @@ describe("SearchInventoryCustomersService", () => {
       include => include.model === Contact
     );
     expect(contact).toMatchObject({
-      attributes: ["id", "name", "number"],
+      attributes: [
+        "id",
+        "name",
+        "number",
+        "postalCode",
+        "street",
+        "addressNumber",
+        "addressComplement",
+        "district",
+        "city",
+        "state"
+      ],
       required: false
     });
   });

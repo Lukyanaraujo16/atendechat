@@ -14,6 +14,7 @@ import DeleteInventorySaleItemService from "../services/InventoryService/DeleteI
 import CompleteInventorySaleService from "../services/InventoryService/CompleteInventorySaleService";
 import CancelInventorySaleService from "../services/InventoryService/CancelInventorySaleService";
 import UpdateInventorySalePaymentService from "../services/InventoryService/UpdateInventorySalePaymentService";
+import UpdateInventorySaleDeliveryService from "../services/InventoryService/UpdateInventorySaleDeliveryService";
 import SearchInventoryCustomersService from "../services/InventoryService/SearchInventoryCustomersService";
 import { computeEffectiveUserFeatureMapForRequest } from "../services/UserFeaturePermission/UserFeaturePermissionService";
 
@@ -228,6 +229,19 @@ export const updateSalePayment = async (
 ): Promise<Response> => {
   const companyId = companyIdOrThrow(req);
   const sale = await UpdateInventorySalePaymentService({
+    companyId,
+    saleId: parseIdParam(req.params.id),
+    body: req.body
+  });
+  return res.json(sale);
+};
+
+export const updateSaleDelivery = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const sale = await UpdateInventorySaleDeliveryService({
     companyId,
     saleId: parseIdParam(req.params.id),
     body: req.body

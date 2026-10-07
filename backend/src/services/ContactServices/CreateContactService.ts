@@ -6,6 +6,10 @@ import {
   ContactAccessUser,
   getVisibleContactIdsForUser
 } from "../../helpers/contactAccess";
+import {
+  ContactAddressFields,
+  pickContactAddressFields
+} from "../../helpers/contactAddressFields";
 import CreateContactAssignmentService from "./CreateContactAssignmentService";
 
 interface ExtraInfo extends ContactCustomField {
@@ -13,7 +17,7 @@ interface ExtraInfo extends ContactCustomField {
   value: string;
 }
 
-interface Request {
+interface Request extends ContactAddressFields {
   name: string;
   number: string;
   email?: string;
@@ -31,8 +35,10 @@ const CreateContactService = async ({
   companyId,
   extraInfo = [],
   accessUser,
-  creatorUserId
+  creatorUserId,
+  ...rest
 }: Request): Promise<Contact> => {
+  const address = pickContactAddressFields(rest as Record<string, unknown>);
   const numberExists = await Contact.findOne({
     where: { number, companyId }
   });
@@ -90,7 +96,8 @@ const CreateContactService = async ({
       number,
       email,
       extraInfo,
-      companyId
+      companyId,
+      ...address
     },
     {
       include: ["extraInfo"]

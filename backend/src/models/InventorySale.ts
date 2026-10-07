@@ -9,6 +9,7 @@ import {
   ForeignKey,
   BelongsTo,
   HasMany,
+  HasOne,
   AllowNull,
   Default,
   DataType
@@ -18,6 +19,8 @@ import Contact from "./Contact";
 import Ticket from "./Ticket";
 import User from "./User";
 import InventorySaleItem from "./InventorySaleItem";
+import InventoryDeliveryMethod from "./InventoryDeliveryMethod";
+import InventorySaleDelivery from "./InventorySaleDelivery";
 
 export type InventorySaleStatus = "draft" | "completed" | "cancelled";
 export type InventorySaleSource = "manual" | "ticket" | "whatsapp";
@@ -117,6 +120,26 @@ class InventorySale extends Model<InventorySale> {
   @Column(DataType.DECIMAL(12, 2))
   totalAmount: string | number;
 
+  @Default(0)
+  @Column(DataType.DECIMAL(12, 2))
+  freightAmount: string | number;
+
+  @AllowNull
+  @ForeignKey(() => InventoryDeliveryMethod)
+  @Column
+  deliveryMethodId: number | null;
+
+  @BelongsTo(() => InventoryDeliveryMethod)
+  deliveryMethod: InventoryDeliveryMethod;
+
+  @AllowNull
+  @Column(DataType.STRING(120))
+  deliveryMethodName: string | null;
+
+  @AllowNull
+  @Column(DataType.STRING(32))
+  deliveryKind: string | null;
+
   @AllowNull
   @Column(DataType.DECIMAL(5, 2))
   commissionRate: string | number | null;
@@ -193,6 +216,13 @@ class InventorySale extends Model<InventorySale> {
     hooks: true
   })
   items: InventorySaleItem[];
+
+  @HasOne(() => InventorySaleDelivery, {
+    onUpdate: "CASCADE",
+    onDelete: "CASCADE",
+    hooks: true
+  })
+  delivery: InventorySaleDelivery;
 }
 
 export default InventorySale;

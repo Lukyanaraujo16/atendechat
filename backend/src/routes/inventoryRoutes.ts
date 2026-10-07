@@ -17,6 +17,7 @@ import * as InventoryController from "../controllers/InventoryController";
 import * as InventorySaleController from "../controllers/InventorySaleController";
 import * as InventorySellerProfileController from "../controllers/InventorySellerProfileController";
 import * as InventoryReportController from "../controllers/InventoryReportController";
+import * as InventoryDeliveryMethodController from "../controllers/InventoryDeliveryMethodController";
 
 const inventoryRoutes = express.Router();
 
@@ -83,6 +84,35 @@ inventoryRoutes.delete(
   isAuth,
   requireInventorySalesPermission(INVENTORY_SALES_MANAGE_SETTINGS),
   InventorySellerProfileController.deleteSellerProfile
+);
+
+inventoryRoutes.get(
+  "/inventory/delivery-methods",
+  isAuth,
+  requireInventorySalesPermission(
+    INVENTORY_SALES_VIEW,
+    INVENTORY_SALES_CREATE_SALE,
+    INVENTORY_SALES_MANAGE_SETTINGS
+  ),
+  InventoryDeliveryMethodController.listDeliveryMethods
+);
+inventoryRoutes.post(
+  "/inventory/delivery-methods",
+  isAuth,
+  requireInventorySalesPermission(INVENTORY_SALES_MANAGE_SETTINGS),
+  InventoryDeliveryMethodController.createDeliveryMethod
+);
+inventoryRoutes.put(
+  "/inventory/delivery-methods/:id",
+  isAuth,
+  requireInventorySalesPermission(INVENTORY_SALES_MANAGE_SETTINGS),
+  InventoryDeliveryMethodController.updateDeliveryMethod
+);
+inventoryRoutes.delete(
+  "/inventory/delivery-methods/:id",
+  isAuth,
+  requireInventorySalesPermission(INVENTORY_SALES_MANAGE_SETTINGS),
+  InventoryDeliveryMethodController.deactivateDeliveryMethod
 );
 
 inventoryRoutes.get(
@@ -177,6 +207,12 @@ inventoryRoutes.put(
   isAuth,
   requireInventorySalesPermission(INVENTORY_SALES_CREATE_SALE),
   InventorySaleController.updateSale
+);
+inventoryRoutes.put(
+  "/inventory/sales/:id/delivery",
+  isAuth,
+  requireInventorySalesPermission(INVENTORY_SALES_CREATE_SALE),
+  InventorySaleController.updateSaleDelivery
 );
 inventoryRoutes.delete(
   "/inventory/sales/:id",

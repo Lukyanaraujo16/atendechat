@@ -60,6 +60,13 @@ interface ContactData {
   notes?: string | null;
   extraInfo?: ExtraInfo[];
   assigneeUserIds?: number[];
+  postalCode?: string | null;
+  street?: string | null;
+  addressNumber?: string | null;
+  addressComplement?: string | null;
+  district?: string | null;
+  city?: string | null;
+  state?: string | null;
 }
 
 export const index = async (req: Request, res: Response): Promise<Response> => {
@@ -126,7 +133,14 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
     email: body.email,
     notes: body.notes,
     extraInfo: body.extraInfo,
-    assigneeUserIds: body.assigneeUserIds
+    assigneeUserIds: body.assigneeUserIds,
+    postalCode: body.postalCode,
+    street: body.street,
+    addressNumber: body.addressNumber,
+    addressComplement: body.addressComplement,
+    district: body.district,
+    city: body.city,
+    state: body.state
   };
   newContact.number = String(newContact.number || "").replace(/\D/g, "");
 
