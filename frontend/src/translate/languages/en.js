@@ -609,6 +609,8 @@ const messages = {
 							updated: "Item updated.",
 							removed: "Item removed.",
 						},
+						autoSaving: "Saving…",
+						autoSaveError: "Save failed",
 						identifiers: {
 							title: "Unit identification",
 							hint:
@@ -660,6 +662,8 @@ const messages = {
 						products: {
 							title: "Products",
 							needItems: "Add at least one product before continuing.",
+							saveBeforeContinue:
+								"Could not save the items. Fix the errors and try again.",
 						},
 						payment: {
 							title: "How will the customer pay {{total}}?",

@@ -27,6 +27,7 @@ import {
   receiptPrintFormatFromPayload,
   sameReceiptBranding,
 } from "./receiptBranding";
+import { normalizeInventorySale } from "./normalizeInventorySale";
 
 const PREFERENCE_TIMEOUT_MS = 4000;
 
@@ -108,6 +109,8 @@ export default function SaleReceiptDialog({ open, onClose, sale }) {
 
   if (!sale) return null;
 
+  const receiptSale = normalizeInventorySale(sale);
+
   const handleFormat = (_event, next) => {
     if (printingRef.current || !formatReady || !next) return;
     formatTouchedRef.current = true;
@@ -127,7 +130,7 @@ export default function SaleReceiptDialog({ open, onClose, sale }) {
       }),
     ])
       .then((loaded) =>
-        printSaleReceipt(sale, format, loaded || EMPTY_RECEIPT_BRANDING)
+        printSaleReceipt(receiptSale, format, loaded || EMPTY_RECEIPT_BRANDING)
       )
       .catch(() => {
         toast.error(i18n.t("inventorySales.sales.receipt.printError"));
@@ -154,7 +157,7 @@ export default function SaleReceiptDialog({ open, onClose, sale }) {
         {i18n.t("inventorySales.sales.receipt.title")}
       </AppDialogTitle>
       <AppDialogContent dividers style={{ padding: 0, backgroundColor: "#fff" }}>
-        <SaleReceiptContent sale={sale} layout="screen" branding={branding} />
+        <SaleReceiptContent sale={receiptSale} layout="screen" branding={branding} />
       </AppDialogContent>
       <AppDialogActions
         className="sale-receipt-no-print"

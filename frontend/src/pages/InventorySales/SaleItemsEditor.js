@@ -1,4 +1,11 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from "react";
 import {
   Box,
   CircularProgress,
@@ -107,6 +114,17 @@ const emptyAddForm = {
   ...emptyIdentifierDraft(),
 };
 
+/** Debounce curto para preço/desconto digitados (CurrencyInput). */
+const AUTO_SAVE_MONEY_DEBOUNCE_MS = 450;
+/** Quantidade (setas/input) — delay curto para agrupar +/- rápidos. */
+const AUTO_SAVE_QTY_DEBOUNCE_MS = 250;
+
+function moneyEqual(left, right) {
+  const a = parseBrazilianCurrencyToNumber(left) ?? 0;
+  const b = parseBrazilianCurrencyToNumber(right) ?? 0;
+  return Math.round(a * 100) === Math.round(b * 100);
+}
+
 function toastIdentifierValidation(result) {
   if (!result || result.ok) return false;
   if (result.code === "duplicate") {
@@ -134,17 +152,23 @@ function toastIdentifierValidation(result) {
   return true;
 }
 
-export default function SaleItemsEditor({
-  sale,
-  readOnly,
-  onSaleUpdated,
-}) {
+const SaleItemsEditor = forwardRef(function SaleItemsEditor(
+  {
+    sale,
+    readOnly,
+    onSaleUpdated,
+    /** Wizard PDV: persiste qty/preço/desconto sem botão salvar. Drawer legado: false. */
+    autoSave = false,
+  },
+  ref
+) {
   const classes = useStyles();
   const isMobile = useIsMobile();
   const [addForm, setAddForm] = useState(emptyAddForm);
   const [adding, setAdding] = useState(false);
   const [rowSaving, setRowSaving] = useState(null);
   const [rowDrafts, setRowDrafts] = useState({});
+  const [saveErrors, setSaveErrors] = useState({});
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [inputValue, setInputValue] = useState("");
   const [options, setOptions] = useState([]);
@@ -158,9 +182,22 @@ export default function SaleItemsEditor({
   const highlightedRef = useRef(null);
   const highlightChosenRef = useRef(false);
   const typedQueryRef = useRef("");
+  const rowDraftsRef = useRef({});
+  const itemsRef = useRef([]);
+  const autoSaveTimersRef = useRef({});
+  const saveSeqByItemRef = useRef({});
+  const inflightByItemRef = useRef({});
 
   const items = Array.isArray(sale?.items) ? sale.items : [];
   const saleId = sale?.id;
+
+  useEffect(() => {
+    rowDraftsRef.current = rowDrafts;
+  }, [rowDrafts]);
+
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
 
   const clearProductSearch = useCallback(() => {
     setSelectedProduct(null);
@@ -315,7 +352,8 @@ export default function SaleItemsEditor({
   };
 
   const patchRowDraft = (itemId, patch) => {
-    const item = items.find((i) => i.id === itemId);
+    const item = items.find((i) => i.id === itemId) ||
+      itemsRef.current.find((i) => i.id === itemId);
     const base = item
       ? {
           quantity: String(item.quantity ?? ""),
@@ -329,19 +367,230 @@ export default function SaleItemsEditor({
           discountAmount: "0",
           ...emptyIdentifierDraft(),
         };
-    setRowDrafts((prev) => ({
-      ...prev,
-      [itemId]: {
-        ...base,
-        ...prev[itemId],
-        ...patch,
-      },
-    }));
+    setRowDrafts((prev) => {
+      const next = {
+        ...prev,
+        [itemId]: {
+          ...base,
+          ...prev[itemId],
+          ...patch,
+        },
+      };
+      rowDraftsRef.current = next;
+      return next;
+    });
+  };
+
+  const getDraftForItem = (item) => {
+    const identifierDefaults = identifierDraftFromItem(item);
+    const fromRef = rowDraftsRef.current[item.id];
+    return {
+      quantity: String(item.quantity ?? ""),
+      unitPrice: String(item.unitPrice ?? ""),
+      discountAmount: String(item.discountAmount ?? "0"),
+      ...identifierDefaults,
+      ...fromRef,
+    };
+  };
+
+  const isRowDirty = (item) => {
+    const draft = getDraftForItem(item);
+    const identifiersDirty =
+      draft.identifiersTouched &&
+      !identifierPayloadsEqual(
+        draft.identifierValues,
+        identifierValuesFromItem(item)
+      );
+    return (
+      String(draft.quantity) !== String(item.quantity ?? "") ||
+      !moneyEqual(draft.unitPrice, item.unitPrice) ||
+      !moneyEqual(draft.discountAmount, item.discountAmount ?? "0") ||
+      identifiersDirty
+    );
+  };
+
+  const clearAutoSaveTimer = (itemId) => {
+    const timer = autoSaveTimersRef.current[itemId];
+    if (timer) {
+      clearTimeout(timer);
+      delete autoSaveTimersRef.current[itemId];
+    }
+  };
+
+  const persistItem = async (item, { fromAutoSave = false } = {}) => {
+    if (!sale?.id || !item?.id) return { ok: false };
+    const draft = getDraftForItem(item);
+    const quantity = Number(draft.quantity);
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      if (!fromAutoSave) {
+        toast.error(i18n.t("inventorySales.sales.items.validation.quantity"));
+      }
+      return { ok: false };
+    }
+    const unitPrice = parseBrazilianCurrencyToNumber(draft.unitPrice);
+    if (unitPrice == null || unitPrice < 0) {
+      if (!fromAutoSave) {
+        toast.error(i18n.t("inventorySales.sales.items.validation.unitPrice"));
+      }
+      return { ok: false };
+    }
+    const discountAmount =
+      parseBrazilianCurrencyToNumber(draft.discountAmount) ?? 0;
+
+    const identifierCheck = validateIdentifiersForSubmit({
+      quantity,
+      values: draft.identifierValues,
+    });
+    if (!identifierCheck.ok) {
+      toastIdentifierValidation(identifierCheck);
+      return { ok: false };
+    }
+
+    if (!isRowDirty(item) && !fromAutoSave) {
+      return { ok: true };
+    }
+    // Autosave: se não está dirty, nada a fazer.
+    if (fromAutoSave && !isRowDirty(item)) {
+      return { ok: true };
+    }
+
+    const payload = {
+      quantity,
+      unitPrice,
+      discountAmount,
+    };
+    const identifiersField = buildUpdateIdentifiersField({
+      identifiersTouched: draft.identifiersTouched,
+      quantity,
+      values: draft.identifierValues,
+      originalValues: identifierValuesFromItem(item),
+    });
+    if (identifiersField.include) {
+      payload.identifiers = identifiersField.identifiers;
+    }
+
+    const seq = (saveSeqByItemRef.current[item.id] || 0) + 1;
+    saveSeqByItemRef.current[item.id] = seq;
+    setRowSaving(item.id);
+    setSaveErrors((prev) => {
+      if (!prev[item.id]) return prev;
+      const next = { ...prev };
+      delete next[item.id];
+      return next;
+    });
+
+    const run = (async () => {
+      try {
+        await updateInventorySaleItem(sale.id, item.id, payload);
+        if (saveSeqByItemRef.current[item.id] !== seq) {
+          return { ok: true, stale: true };
+        }
+        setRowDrafts((prev) => {
+          if (saveSeqByItemRef.current[item.id] !== seq) return prev;
+          const next = { ...prev };
+          delete next[item.id];
+          rowDraftsRef.current = next;
+          return next;
+        });
+        if (onSaleUpdated) await onSaleUpdated();
+        if (saveSeqByItemRef.current[item.id] !== seq) {
+          return { ok: true, stale: true };
+        }
+        if (!fromAutoSave) {
+          toast.success(i18n.t("inventorySales.sales.items.toasts.updated"));
+        }
+        return { ok: true };
+      } catch (err) {
+        if (saveSeqByItemRef.current[item.id] !== seq) {
+          return { ok: false, stale: true };
+        }
+        setSaveErrors((prev) => ({ ...prev, [item.id]: true }));
+        toastError(err);
+        return { ok: false, error: err };
+      } finally {
+        if (saveSeqByItemRef.current[item.id] === seq) {
+          setRowSaving((current) => (current === item.id ? null : current));
+        }
+        delete inflightByItemRef.current[item.id];
+      }
+    })();
+
+    inflightByItemRef.current[item.id] = run;
+    return run;
+  };
+
+  const scheduleAutoSave = (itemId, delayMs) => {
+    if (!autoSave || readOnly) return;
+    clearAutoSaveTimer(itemId);
+    autoSaveTimersRef.current[itemId] = setTimeout(() => {
+      delete autoSaveTimersRef.current[itemId];
+      const item = itemsRef.current.find((row) => row.id === itemId);
+      if (!item) return;
+      persistItem(item, { fromAutoSave: true });
+    }, delayMs);
   };
 
   const setRowField = (itemId, field, value) => {
     patchRowDraft(itemId, { [field]: value });
+    if (!autoSave || readOnly) return;
+    if (field === "quantity") {
+      scheduleAutoSave(itemId, AUTO_SAVE_QTY_DEBOUNCE_MS);
+    } else if (field === "unitPrice" || field === "discountAmount") {
+      scheduleAutoSave(itemId, AUTO_SAVE_MONEY_DEBOUNCE_MS);
+    }
   };
+
+  const flushItemNow = async (item) => {
+    if (!autoSave || readOnly || !item?.id) return { ok: true };
+    clearAutoSaveTimer(item.id);
+    if (inflightByItemRef.current[item.id]) {
+      await inflightByItemRef.current[item.id];
+    }
+    const latest = itemsRef.current.find((row) => row.id === item.id) || item;
+    if (!isRowDirty(latest)) return { ok: true };
+    return persistItem(latest, { fromAutoSave: true });
+  };
+
+  const flushPendingSaves = async () => {
+    Object.keys(autoSaveTimersRef.current).forEach((id) => {
+      clearAutoSaveTimer(Number(id) || id);
+    });
+    const pendingIds = new Set([
+      ...Object.keys(rowDraftsRef.current).map((id) => Number(id) || id),
+      ...Object.keys(inflightByItemRef.current).map((id) => Number(id) || id),
+    ]);
+    const results = [];
+    for (const id of pendingIds) {
+      if (inflightByItemRef.current[id]) {
+        results.push(await inflightByItemRef.current[id]);
+      }
+      const item = itemsRef.current.find((row) => row.id === id);
+      if (item && isRowDirty(item)) {
+        results.push(await persistItem(item, { fromAutoSave: true }));
+      }
+    }
+    if (results.some((result) => result && result.ok === false && !result.stale)) {
+      const err = new Error("autosave-failed");
+      err.code = "autosave-failed";
+      throw err;
+    }
+  };
+
+  useImperativeHandle(ref, () => ({
+    flushPendingSaves,
+    hasPendingWork: () =>
+      Object.keys(autoSaveTimersRef.current).length > 0 ||
+      Object.keys(inflightByItemRef.current).length > 0 ||
+      itemsRef.current.some((item) => isRowDirty(item)),
+  }));
+
+  useEffect(() => {
+    return () => {
+      Object.keys(autoSaveTimersRef.current).forEach((id) => {
+        clearAutoSaveTimer(Number(id) || id);
+      });
+    };
+  }, []);
 
   const handleQuantityBlur = (item) => {
     const draft = getRowDraft(item);
@@ -355,6 +604,22 @@ export default function SaleItemsEditor({
       result.code === "fractionalNeedsClear"
     ) {
       toastIdentifierValidation(result);
+      return;
+    }
+    if (autoSave) {
+      flushItemNow(item);
+    }
+  };
+
+  const handleMoneyBlur = (item) => {
+    if (autoSave) {
+      flushItemNow(item);
+    }
+  };
+
+  const handleIdentifiersBlur = (item) => {
+    if (autoSave) {
+      flushItemNow(item);
     }
   };
 
@@ -421,60 +686,7 @@ export default function SaleItemsEditor({
   };
 
   const handleUpdateItem = async (item) => {
-    if (!sale?.id) return;
-    const draft = getRowDraft(item);
-    const quantity = Number(draft.quantity);
-    if (!Number.isFinite(quantity) || quantity <= 0) {
-      toast.error(i18n.t("inventorySales.sales.items.validation.quantity"));
-      return;
-    }
-    const unitPrice = parseBrazilianCurrencyToNumber(draft.unitPrice);
-    if (unitPrice == null || unitPrice < 0) {
-      toast.error(i18n.t("inventorySales.sales.items.validation.unitPrice"));
-      return;
-    }
-    const discountAmount =
-      parseBrazilianCurrencyToNumber(draft.discountAmount) ?? 0;
-
-    const identifierCheck = validateIdentifiersForSubmit({
-      quantity,
-      values: draft.identifierValues,
-    });
-    if (!identifierCheck.ok) {
-      toastIdentifierValidation(identifierCheck);
-      return;
-    }
-
-    const payload = {
-      quantity,
-      unitPrice,
-      discountAmount,
-    };
-    const identifiersField = buildUpdateIdentifiersField({
-      identifiersTouched: draft.identifiersTouched,
-      quantity,
-      values: draft.identifierValues,
-      originalValues: identifierValuesFromItem(item),
-    });
-    if (identifiersField.include) {
-      payload.identifiers = identifiersField.identifiers;
-    }
-
-    setRowSaving(item.id);
-    try {
-      await updateInventorySaleItem(sale.id, item.id, payload);
-      toast.success(i18n.t("inventorySales.sales.items.toasts.updated"));
-      setRowDrafts((prev) => {
-        const next = { ...prev };
-        delete next[item.id];
-        return next;
-      });
-      if (onSaleUpdated) await onSaleUpdated();
-    } catch (err) {
-      toastError(err);
-    } finally {
-      setRowSaving(null);
-    }
+    await persistItem(item, { fromAutoSave: false });
   };
 
   const handleDeleteItem = async (item) => {
@@ -505,41 +717,54 @@ export default function SaleItemsEditor({
             identifiersTouched: true,
           })
         }
+        onBlur={autoSave ? () => handleIdentifiersBlur(item) : undefined}
       />
     );
   };
 
   const renderItemActions = (item) => {
     if (readOnly) return null;
-    const draft = getRowDraft(item);
-    const originalQty = String(item.quantity ?? "");
-    const originalPrice = String(item.unitPrice ?? "");
-    const originalDiscount = String(item.discountAmount ?? "0");
-    const identifiersDirty =
-      draft.identifiersTouched &&
-      !identifierPayloadsEqual(
-        draft.identifierValues,
-        identifierValuesFromItem(item)
-      );
-    const dirty =
-      draft.quantity !== originalQty ||
-      draft.unitPrice !== originalPrice ||
-      draft.discountAmount !== originalDiscount ||
-      identifiersDirty;
+    const dirty = isRowDirty(item);
+    const saving = rowSaving === item.id;
+    const errored = Boolean(saveErrors[item.id]);
 
     return (
-      <Box display="flex" justifyContent="flex-end">
-        {dirty ? (
+      <Box display="flex" justifyContent="flex-end" alignItems="center">
+        {autoSave && saving ? (
+          <Typography
+            variant="caption"
+            color="textSecondary"
+            style={{ marginRight: 4 }}
+            data-testid={`sale-item-autosaving-${item.id}`}
+          >
+            {i18n.t("inventorySales.sales.items.autoSaving")}
+          </Typography>
+        ) : null}
+        {autoSave && errored && !saving ? (
+          <Typography
+            variant="caption"
+            color="error"
+            style={{ marginRight: 4 }}
+            data-testid={`sale-item-autosave-error-${item.id}`}
+          >
+            {i18n.t("inventorySales.sales.items.autoSaveError")}
+          </Typography>
+        ) : null}
+        {!autoSave && dirty ? (
           <IconButton
             size="small"
             onClick={() => handleUpdateItem(item)}
-            disabled={rowSaving === item.id}
+            disabled={saving}
             data-testid={`sale-item-save-${item.id}`}
           >
             <SaveIcon fontSize="small" />
           </IconButton>
         ) : null}
-        <IconButton size="small" onClick={() => handleDeleteItem(item)}>
+        <IconButton
+          size="small"
+          onClick={() => handleDeleteItem(item)}
+          data-testid={`sale-item-delete-${item.id}`}
+        >
           <DeleteOutlineIcon fontSize="small" />
         </IconButton>
       </Box>
@@ -611,6 +836,7 @@ export default function SaleItemsEditor({
                           onChange={(reais) =>
                             setRowField(item.id, "unitPrice", String(reais ?? 0))
                           }
+                          onBlur={() => handleMoneyBlur(item)}
                         />
                       </Box>
                       <Box style={{ marginBottom: 8 }}>
@@ -624,6 +850,7 @@ export default function SaleItemsEditor({
                               String(reais ?? 0)
                             )
                           }
+                          onBlur={() => handleMoneyBlur(item)}
                         />
                       </Box>
                       <Typography variant="body2" style={{ fontWeight: 600 }}>
@@ -702,7 +929,11 @@ export default function SaleItemsEditor({
                               }
                               onBlur={() => handleQuantityBlur(item)}
                               type="number"
-                              inputProps={{ min: 0, step: "any" }}
+                              inputProps={{
+                                min: 0,
+                                step: "any",
+                                "data-testid": `sale-item-qty-${item.id}`,
+                              }}
                               className={classes.numericField}
                               fullWidth
                             />
@@ -721,7 +952,9 @@ export default function SaleItemsEditor({
                                   String(reais ?? 0)
                                 )
                               }
+                              onBlur={() => handleMoneyBlur(item)}
                               className={classes.numericField}
+                              data-testid={`sale-item-price-${item.id}`}
                             />
                           )}
                         </TableCell>
@@ -738,7 +971,9 @@ export default function SaleItemsEditor({
                                   String(reais ?? 0)
                                 )
                               }
+                              onBlur={() => handleMoneyBlur(item)}
                               className={classes.numericField}
+                              data-testid={`sale-item-discount-${item.id}`}
                             />
                           )}
                         </TableCell>
@@ -973,4 +1208,6 @@ export default function SaleItemsEditor({
       ) : null}
     </Box>
   );
-}
+});
+
+export default SaleItemsEditor;

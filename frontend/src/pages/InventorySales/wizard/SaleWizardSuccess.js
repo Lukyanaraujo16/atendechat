@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Box, Chip, Typography } from "@material-ui/core";
+import { Box, Chip, CircularProgress, Typography } from "@material-ui/core";
 import ReceiptIcon from "@material-ui/icons/Receipt";
 import { makeStyles } from "@material-ui/core/styles";
 import { useHistory } from "react-router-dom";
@@ -10,10 +10,16 @@ import {
 } from "../../../ui";
 import { formatCurrencyBRL } from "../../../utils/brazilianCurrency";
 import { i18n } from "../../../translate/i18n";
+import { getInventorySale } from "../../../services/inventoryApi";
+import toastError from "../../../errors/toastError";
 import { formatCardPaymentLabel } from "../cardInstallments";
 import { formatSaleNumber, paymentStatusChipColor } from "../utils";
 import SaleReceiptDialog from "../SaleReceiptDialog";
 import SaleWizardTotals from "./SaleWizardTotals";
+import {
+  getInventorySaleItems,
+  normalizeInventorySale,
+} from "../normalizeInventorySale";
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -40,6 +46,10 @@ export default function SaleWizardSuccess({
   const classes = useStyles();
   const history = useHistory();
   const [receiptOpen, setReceiptOpen] = useState(false);
+  const [receiptSale, setReceiptSale] = useState(null);
+  const [receiptLoading, setReceiptLoading] = useState(false);
+
+  const itemCount = getInventorySaleItems(sale).length;
 
   const methodLabel = sale?.paymentMethod
     ? formatCardPaymentLabel(
@@ -53,6 +63,23 @@ export default function SaleWizardSuccess({
       )
     : i18n.t("inventorySales.sales.payment.noMethod");
 
+  const handleOpenReceipt = async () => {
+    if (!sale?.id || receiptLoading) return;
+    setReceiptOpen(true);
+    setReceiptLoading(true);
+    setReceiptSale(null);
+    try {
+      // Mesmo caminho do drawer: GET fresco com includes completos.
+      const { data } = await getInventorySale(sale.id);
+      setReceiptSale(normalizeInventorySale(data));
+    } catch (err) {
+      toastError(err);
+      setReceiptSale(normalizeInventorySale(sale));
+    } finally {
+      setReceiptLoading(false);
+    }
+  };
+
   return (
     <Box className={classes.root} data-testid="sale-wizard-success">
       <Typography variant="h5" className={classes.title}>
@@ -61,10 +88,7 @@ export default function SaleWizardSuccess({
         })}
       </Typography>
 
-      <SaleWizardTotals
-        sale={sale}
-        itemCount={Array.isArray(sale?.items) ? sale.items.length : undefined}
-      />
+      <SaleWizardTotals sale={sale} itemCount={itemCount} />
 
       <Typography variant="body1">
         {i18n.t("inventorySales.sales.fields.paymentMethod")}: {methodLabel}
@@ -89,8 +113,11 @@ export default function SaleWizardSuccess({
 
       <Box className={classes.actions}>
         <AppSecondaryButton
-          startIcon={<ReceiptIcon />}
-          onClick={() => setReceiptOpen(true)}
+          startIcon={
+            receiptLoading ? <CircularProgress size={16} /> : <ReceiptIcon />
+          }
+          onClick={handleOpenReceipt}
+          disabled={receiptLoading}
           data-testid="sale-wizard-print-receipt"
         >
           {i18n.t("inventorySales.sales.wizard.success.printReceipt")}
@@ -117,8 +144,11 @@ export default function SaleWizardSuccess({
 
       <SaleReceiptDialog
         open={receiptOpen}
-        onClose={() => setReceiptOpen(false)}
-        sale={sale}
+        onClose={() => {
+          setReceiptOpen(false);
+          setReceiptSale(null);
+        }}
+        sale={receiptSale || normalizeInventorySale(sale)}
       />
     </Box>
   );

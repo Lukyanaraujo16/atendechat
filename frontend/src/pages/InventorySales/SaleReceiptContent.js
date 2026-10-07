@@ -27,6 +27,7 @@ import {
   hasReceiptBrandingFooter,
   hasReceiptBrandingHeader,
 } from "./receiptBranding";
+import { getInventorySaleItems } from "./normalizeInventorySale";
 
 const useStyles = makeStyles((theme) => ({
   receiptRoot: {
@@ -333,7 +334,7 @@ function getPendingAmount(sale) {
 }
 
 function ThermalReceipt({ sale, classes, branding }) {
-  const items = Array.isArray(sale.items) ? sale.items : [];
+  const items = getInventorySaleItems(sale);
   const isCancelled = sale.status === "cancelled";
   const customerName = sale.contact?.name || "";
   const sellerName = sale.seller?.name || "";
@@ -524,7 +525,7 @@ export default function SaleReceiptContent({
     return <ThermalReceipt sale={sale} classes={classes} branding={branding} />;
   }
 
-  const items = Array.isArray(sale.items) ? sale.items : [];
+  const items = getInventorySaleItems(sale);
   const isCancelled = sale.status === "cancelled";
   const rootClass =
     layout === "print"
@@ -659,8 +660,11 @@ export default function SaleReceiptContent({
             </TableHead>
             <TableBody>
               {items.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell>
+                <TableRow
+                  key={item.id}
+                  data-testid={`sale-receipt-item-row-${item.id}`}
+                >
+                  <TableCell data-testid={`sale-receipt-item-name-${item.id}`}>
                     {getItemName(item)}
                     {item.productSku ? (
                       <span className={classes.productSku}>{item.productSku}</span>

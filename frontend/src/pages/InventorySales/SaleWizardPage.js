@@ -130,6 +130,7 @@ export default function SaleWizardPage() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const completingRef = useRef(false);
+  const itemsEditorRef = useRef(null);
 
   const applySaleForms = useCallback(
     (data) => {
@@ -287,11 +288,26 @@ export default function SaleWizardPage() {
     }
 
     if (step === SALE_WIZARD_STEP_IDS.PRODUCTS) {
-      if (itemCount < 1) {
-        toast.error(i18n.t("inventorySales.sales.wizard.products.needItems"));
-        return;
+      setSaving(true);
+      try {
+        if (itemsEditorRef.current?.flushPendingSaves) {
+          await itemsEditorRef.current.flushPendingSaves();
+        }
+        const latest = await refreshSale();
+        const count = Array.isArray(latest?.items) ? latest.items.length : itemCount;
+        if (count < 1) {
+          toast.error(i18n.t("inventorySales.sales.wizard.products.needItems"));
+          return;
+        }
+        setStep(SALE_WIZARD_STEP_IDS.PAYMENT);
+      } catch (err) {
+        if (err?.code !== "autosave-failed") {
+          toastError(err);
+        }
+        toast.error(i18n.t("inventorySales.sales.wizard.products.saveBeforeContinue"));
+      } finally {
+        setSaving(false);
       }
-      setStep(SALE_WIZARD_STEP_IDS.PAYMENT);
       return;
     }
 
@@ -356,6 +372,16 @@ export default function SaleWizardPage() {
       const { data } = await completeInventorySale(sale.id, body);
       setSale(data);
       applySaleForms(data);
+      try {
+        const refreshed = await getInventorySale(sale.id);
+        // Só substitui se o GET confirmar a venda concluída (evita rascunho stale).
+        if (refreshed?.data?.status === "completed") {
+          setSale(refreshed.data);
+          applySaleForms(refreshed.data);
+        }
+      } catch {
+        // Mantém payload do complete.
+      }
       toast.success(i18n.t("inventorySales.sales.toasts.completed"));
     } catch (err) {
       toastError(err);
@@ -456,9 +482,11 @@ export default function SaleWizardPage() {
                   {i18n.t("inventorySales.sales.wizard.products.title")}
                 </Typography>
                 <SaleItemsEditor
+                  ref={itemsEditorRef}
                   sale={sale}
                   readOnly={!editable}
                   onSaleUpdated={refreshSale}
+                  autoSave
                 />
                 <Box className={classes.productsTotals}>
                   <SaleWizardTotals sale={sale} itemCount={itemCount} />

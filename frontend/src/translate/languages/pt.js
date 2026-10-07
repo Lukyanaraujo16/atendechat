@@ -611,6 +611,8 @@ const messages = {
               updated: "Item atualizado.",
               removed: "Item removido.",
             },
+            autoSaving: "Salvando…",
+            autoSaveError: "Erro ao salvar",
             identifiers: {
               title: "Identificação da unidade",
               hint:
@@ -662,6 +664,8 @@ const messages = {
             products: {
               title: "Produtos",
               needItems: "Adicione ao menos um produto antes de continuar.",
+              saveBeforeContinue:
+                "Não foi possível salvar os itens. Corrija e tente novamente.",
             },
             payment: {
               title: "Como o cliente vai pagar {{total}}?",

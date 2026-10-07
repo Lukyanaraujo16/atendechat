@@ -32,7 +32,7 @@ export default async function CompleteInventorySaleService(input: {
 }): Promise<InventorySale> {
   await GetOrCreateInventorySettingsService(input.companyId);
 
-  return sequelize.transaction(async (t: Transaction) => {
+  const completedSaleId = await sequelize.transaction(async (t: Transaction) => {
     const sale = await InventorySale.findOne({
       where: { id: input.saleId, companyId: input.companyId },
       transaction: t,
@@ -244,9 +244,19 @@ export default async function CompleteInventorySaleService(input: {
       { transaction: t }
     );
 
-    return sale.reload({
-      transaction: t,
-      include: buildInventorySaleIncludes(input.companyId)
-    });
+    // Não faz reload com includes aninhados (items + identifiers separate)
+    // dentro da transaction com LOCK — o payload pode sair incompleto.
+    // O GET pós-commit espelha ShowInventorySaleService / drawer.
+    return sale.id;
+  });
+
+  const completed = await InventorySale.findOne({
+    where: { id: completedSaleId, companyId: input.companyId }
+  });
+  if (!completed) {
+    throw new AppError("ERR_INVENTORY_SALE_NOT_FOUND", 404);
+  }
+  return completed.reload({
+    include: buildInventorySaleIncludes(input.companyId)
   });
 }

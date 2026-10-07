@@ -301,8 +301,17 @@ describe("SaleItemsEditor identifiers", () => {
   });
 
   it("23. update de preço não envia identifiers", async () => {
-    const { getByDisplayValue, getByTestId } = renderEditor();
-    fireEvent.change(getByDisplayValue("100"), { target: { value: "120" } });
+    const { getByTestId } = renderEditor();
+    const priceInput = getByTestId("sale-item-price-21");
+    // CurrencyInput: limpa (backspaces) e digita 12000 centavos = R$ 120,00
+    for (let i = 0; i < 8; i += 1) {
+      fireEvent.keyDown(priceInput, { key: "Backspace" });
+    }
+    fireEvent.keyDown(priceInput, { key: "1" });
+    fireEvent.keyDown(priceInput, { key: "2" });
+    fireEvent.keyDown(priceInput, { key: "0" });
+    fireEvent.keyDown(priceInput, { key: "0" });
+    fireEvent.keyDown(priceInput, { key: "0" });
     fireEvent.click(getByTestId("sale-item-save-21"));
     await waitFor(() => expect(updateInventorySaleItem).toHaveBeenCalled());
     expect(updateInventorySaleItem).toHaveBeenCalledWith(7, 21, {

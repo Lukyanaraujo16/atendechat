@@ -79,6 +79,7 @@ export default function SaleItemIdentifiersEditor({
   values = {},
   extraPositions = [],
   onChange,
+  onBlur,
   itemId,
 }) {
   const classes = useStyles();
@@ -235,6 +236,7 @@ export default function SaleItemIdentifiersEditor({
                 placeholder={showUnitLabel ? undefined : hint}
                 value={values[position] == null ? "" : String(values[position])}
                 onChange={(e) => handleValueChange(position, e.target.value)}
+                onBlur={onBlur}
                 inputProps={{
                   maxLength: IDENTIFIER_MAX_LEN,
                   "data-testid":

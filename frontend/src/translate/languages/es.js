@@ -603,6 +603,8 @@ const messages = {
               updated: "Ítem actualizado.",
               removed: "Ítem eliminado.",
             },
+            autoSaving: "Guardando…",
+            autoSaveError: "Error al guardar",
             identifiers: {
               title: "Identificación de la unidad",
               hint:
@@ -654,6 +656,8 @@ const messages = {
             products: {
               title: "Productos",
               needItems: "Agregue al menos un producto antes de continuar.",
+              saveBeforeContinue:
+                "No se pudieron guardar los ítems. Corrija e intente de nuevo.",
             },
             payment: {
               title: "¿Cómo pagará el cliente {{total}}?",
