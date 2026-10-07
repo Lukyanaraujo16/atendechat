@@ -1,20 +1,20 @@
 /**
  * Orquestração do wizard de nova venda.
- * Etapas atuais: cliente → produtos → pagamento → conferência.
- * Extensível: inserir "delivery" entre products e payment sem redesign.
+ * Etapas: cliente → produtos → entrega → pagamento → conferência.
  */
 export const SALE_WIZARD_STEP_IDS = {
   CUSTOMER: "customer",
   PRODUCTS: "products",
-  // Futuro: DELIVERY: "delivery",
+  DELIVERY: "delivery",
   PAYMENT: "payment",
   REVIEW: "review",
 };
 
-/** Ordem ativa. Quando frete existir, incluir delivery entre products e payment. */
+/** Ordem ativa — navegação via next/prevSaleWizardStep (sem hardcode). */
 export const SALE_WIZARD_ACTIVE_STEPS = [
   SALE_WIZARD_STEP_IDS.CUSTOMER,
   SALE_WIZARD_STEP_IDS.PRODUCTS,
+  SALE_WIZARD_STEP_IDS.DELIVERY,
   SALE_WIZARD_STEP_IDS.PAYMENT,
   SALE_WIZARD_STEP_IDS.REVIEW,
 ];

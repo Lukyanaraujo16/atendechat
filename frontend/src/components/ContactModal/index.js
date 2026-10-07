@@ -158,6 +158,13 @@ const ContactModal = ({
 		number: "",
 		email: "",
 		notes: "",
+		postalCode: "",
+		street: "",
+		addressNumber: "",
+		addressComplement: "",
+		district: "",
+		city: "",
+		state: "",
 		extraInfo: [],
 	};
 
@@ -226,6 +233,13 @@ const ContactModal = ({
 						...data,
 						number: data.number,
 						notes: data.notes ?? "",
+						postalCode: data.postalCode ?? "",
+						street: data.street ?? "",
+						addressNumber: data.addressNumber ?? "",
+						addressComplement: data.addressComplement ?? "",
+						district: data.district ?? "",
+						city: data.city ?? "",
+						state: data.state ?? "",
 					});
 					setLocalTags(Array.isArray(data.tags) ? data.tags : []);
 					setCampaignLists(
@@ -386,6 +400,13 @@ const ContactModal = ({
 				number: normalizeWhatsAppInput(values.number),
 				email: values.email,
 				notes: values.notes,
+				postalCode: values.postalCode || null,
+				street: values.street || null,
+				addressNumber: values.addressNumber || null,
+				addressComplement: values.addressComplement || null,
+				district: values.district || null,
+				city: values.city || null,
+				state: values.state ? String(values.state).toUpperCase() : null,
 				extraInfo: values.extraInfo,
 			};
 
@@ -645,6 +666,84 @@ const ContactModal = ({
 											variant="outlined"
 											multiline
 											minRows={2}
+										/>
+									</Grid>
+								</Grid>
+
+								<Divider style={{ margin: "16px 0" }} />
+								<Typography variant="subtitle1" gutterBottom>
+									{i18n.t("contactModal.form.address")}
+								</Typography>
+								<Grid container spacing={1}>
+									<Grid item xs={8} md={4}>
+										<Field
+											as={TextField}
+											label={i18n.t("contactModal.form.postalCode")}
+											name="postalCode"
+											variant="outlined"
+											margin="dense"
+											fullWidth
+										/>
+									</Grid>
+									<Grid item xs={4} md={2}>
+										<Field
+											as={TextField}
+											label={i18n.t("contactModal.form.state")}
+											name="state"
+											variant="outlined"
+											margin="dense"
+											fullWidth
+											inputProps={{ maxLength: 2 }}
+										/>
+									</Grid>
+									<Grid item xs={12}>
+										<Field
+											as={TextField}
+											label={i18n.t("contactModal.form.street")}
+											name="street"
+											variant="outlined"
+											margin="dense"
+											fullWidth
+										/>
+									</Grid>
+									<Grid item xs={4} md={3}>
+										<Field
+											as={TextField}
+											label={i18n.t("contactModal.form.addressNumber")}
+											name="addressNumber"
+											variant="outlined"
+											margin="dense"
+											fullWidth
+										/>
+									</Grid>
+									<Grid item xs={8} md={9}>
+										<Field
+											as={TextField}
+											label={i18n.t("contactModal.form.addressComplement")}
+											name="addressComplement"
+											variant="outlined"
+											margin="dense"
+											fullWidth
+										/>
+									</Grid>
+									<Grid item xs={12} md={6}>
+										<Field
+											as={TextField}
+											label={i18n.t("contactModal.form.district")}
+											name="district"
+											variant="outlined"
+											margin="dense"
+											fullWidth
+										/>
+									</Grid>
+									<Grid item xs={12} md={6}>
+										<Field
+											as={TextField}
+											label={i18n.t("contactModal.form.city")}
+											name="city"
+											variant="outlined"
+											margin="dense"
+											fullWidth
 										/>
 									</Grid>
 								</Grid>

@@ -27,7 +27,35 @@ import {
   hasReceiptBrandingFooter,
   hasReceiptBrandingHeader,
 } from "./receiptBranding";
-import { getInventorySaleItems } from "./normalizeInventorySale";
+import {
+  getInventorySaleItems,
+  normalizeInventorySale,
+} from "./normalizeInventorySale";
+
+function receiptDeliverySnapshot(sale) {
+  const normalized = normalizeInventorySale(sale);
+  return normalized?.delivery || null;
+}
+
+function receiptFreightAmount(sale) {
+  const n = Number(sale?.freightAmount);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function formatReceiptDeliveryAddress(delivery, compact) {
+  if (!delivery) return null;
+  const parts = [];
+  if (delivery.recipientName) parts.push(delivery.recipientName);
+  const street = [delivery.street, delivery.number].filter(Boolean).join(", ");
+  if (street) parts.push(street);
+  if (!compact && delivery.complement) parts.push(delivery.complement);
+  const cityLine = [delivery.district, [delivery.city, delivery.state].filter(Boolean).join("/")]
+    .filter(Boolean)
+    .join(" — ");
+  if (cityLine) parts.push(cityLine);
+  if (!compact && delivery.postalCode) parts.push(`CEP ${delivery.postalCode}`);
+  return parts.length ? parts.join(compact ? " · " : "\n") : null;
+}
 
 const useStyles = makeStyles((theme) => ({
   receiptRoot: {
@@ -424,6 +452,26 @@ function ThermalReceipt({ sale, classes, branding }) {
           {paymentMethodLabel}
         </div>
       ) : null}
+      {sale.deliveryMethodName ? (
+        <div className="sale-receipt-thermal-line" data-testid="receipt-delivery-method">
+          <span className="sale-receipt-thermal-label">
+            {i18n.t("inventorySales.sales.receipt.delivery")}:{" "}
+          </span>
+          {sale.deliveryMethodName}
+        </div>
+      ) : null}
+      {(() => {
+        const addr = formatReceiptDeliveryAddress(
+          receiptDeliverySnapshot(sale),
+          true
+        );
+        if (!addr) return null;
+        return (
+          <div className="sale-receipt-thermal-line" data-testid="receipt-delivery-address">
+            {addr}
+          </div>
+        );
+      })()}
 
       <hr className="sale-receipt-thermal-rule" />
 
@@ -465,6 +513,15 @@ function ThermalReceipt({ sale, classes, branding }) {
           <span>{i18n.t("inventorySales.sales.receipt.totalDiscount")}</span>
           <span>{formatCurrencyBRL(sale.discountAmount)}</span>
         </div>
+        {receiptFreightAmount(sale) > 0 ? (
+          <div
+            className="sale-receipt-thermal-total-row"
+            data-testid="receipt-freight-line"
+          >
+            <span>{i18n.t("inventorySales.sales.receipt.freight")}</span>
+            <span>{formatCurrencyBRL(sale.freightAmount)}</span>
+          </div>
+        ) : null}
         <div className="sale-receipt-thermal-total-row sale-receipt-thermal-total">
           <span>{i18n.t("inventorySales.sales.receipt.total")}</span>
           <span>{formatCurrencyBRL(sale.totalAmount)}</span>
@@ -586,6 +643,26 @@ export default function SaleReceiptContent({
     },
   ];
 
+  if (sale.deliveryMethodName) {
+    metaRows.push({
+      label: i18n.t("inventorySales.sales.receipt.delivery"),
+      value: sale.deliveryMethodName,
+      testId: "receipt-delivery-method",
+    });
+  }
+  const a4DeliveryAddress = formatReceiptDeliveryAddress(
+    receiptDeliverySnapshot(sale),
+    false
+  );
+  if (a4DeliveryAddress) {
+    metaRows.push({
+      label: i18n.t("inventorySales.sales.receipt.deliveryRecipient"),
+      value: a4DeliveryAddress,
+      testId: "receipt-delivery-address",
+      multiline: true,
+    });
+  }
+
   return (
     <div className={rootClass}>
       <ReceiptBrandingHeader branding={branding} classes={classes} />
@@ -602,9 +679,14 @@ export default function SaleReceiptContent({
 
       <div className={classes.metaGrid}>
         {metaRows.map((row) => (
-          <Box key={row.label}>
+          <Box key={row.label} data-testid={row.testId}>
             <Typography className={classes.metaLabel}>{row.label}</Typography>
-            <Typography className={classes.metaValue}>{row.value}</Typography>
+            <Typography
+              className={classes.metaValue}
+              style={row.multiline ? { whiteSpace: "pre-line" } : undefined}
+            >
+              {row.value}
+            </Typography>
           </Box>
         ))}
       </div>
@@ -706,6 +788,12 @@ export default function SaleReceiptContent({
           <span>{i18n.t("inventorySales.sales.receipt.totalDiscount")}</span>
           <span>{formatCurrencyBRL(sale.discountAmount)}</span>
         </div>
+        {receiptFreightAmount(sale) > 0 ? (
+          <div className={classes.totalRow} data-testid="receipt-freight-line">
+            <span>{i18n.t("inventorySales.sales.receipt.freight")}</span>
+            <span>{formatCurrencyBRL(sale.freightAmount)}</span>
+          </div>
+        ) : null}
         <div className={classes.totalRowFinal}>
           <span>{i18n.t("inventorySales.sales.receipt.total")}</span>
           <span>{formatCurrencyBRL(sale.totalAmount)}</span>

@@ -92,6 +92,21 @@ export const cancelInventorySale = (saleId, body) =>
 export const updateInventorySalePayment = (saleId, body) =>
   api.put(`/inventory/sales/${saleId}/payment`, body);
 
+export const updateInventorySaleDelivery = (saleId, body) =>
+  api.put(`/inventory/sales/${saleId}/delivery`, body);
+
+export const listInventoryDeliveryMethods = (params) =>
+  api.get("/inventory/delivery-methods", { params });
+
+export const createInventoryDeliveryMethod = (body) =>
+  api.post("/inventory/delivery-methods", body);
+
+export const updateInventoryDeliveryMethod = (id, body) =>
+  api.put(`/inventory/delivery-methods/${id}`, body);
+
+export const deactivateInventoryDeliveryMethod = (id) =>
+  api.delete(`/inventory/delivery-methods/${id}`);
+
 export const getInventoryReportSummary = (params) =>
   api.get("/inventory/reports/summary", { params });
 

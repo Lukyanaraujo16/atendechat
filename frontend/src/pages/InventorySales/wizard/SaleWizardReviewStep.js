@@ -4,8 +4,13 @@ import { makeStyles } from "@material-ui/core/styles";
 
 import { AppPrimaryButton } from "../../../ui";
 import { i18n } from "../../../translate/i18n";
+import { formatCurrencyBRL } from "../../../utils/brazilianCurrency";
 import { formatCardPaymentLabel } from "../cardInstallments";
 import SaleWizardTotals from "./SaleWizardTotals";
+import {
+  formatAddressOneLine,
+  getSaleDeliverySnapshot,
+} from "./deliveryAddressUtils";
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -107,6 +112,32 @@ export default function SaleWizardReviewStep({
           {i18n.t("inventorySales.sales.wizard.totals.itemsCount", { count: itemCount })}
         </Typography>
       </Box>
+
+      {sale?.deliveryMethodName ? (
+        <Box className={classes.row} data-testid="sale-wizard-review-delivery">
+          <Typography className={classes.label}>
+            {i18n.t("inventorySales.sales.wizard.delivery.reviewLabel")}
+          </Typography>
+          <Typography className={classes.value}>
+            {sale.deliveryMethodName}
+          </Typography>
+          {Number(sale.freightAmount) > 0 ? (
+            <Typography variant="body2" color="textSecondary">
+              {i18n.t("inventorySales.sales.wizard.delivery.feeLabel")}:{" "}
+              {formatCurrencyBRL(sale.freightAmount)}
+            </Typography>
+          ) : null}
+          {(() => {
+            const snap = getSaleDeliverySnapshot(sale);
+            if (!snap?.street) return null;
+            return (
+              <Typography variant="body2" style={{ whiteSpace: "pre-line" }}>
+                {formatAddressOneLine(snap)}
+              </Typography>
+            );
+          })()}
+        </Box>
+      ) : null}
 
       <SaleWizardTotals sale={sale} itemCount={itemCount} />
 

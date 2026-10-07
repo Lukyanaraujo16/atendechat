@@ -66,7 +66,18 @@ describe("SearchInventoryCustomersService", () => {
     expect(options.where[Op.or][1]).toEqual({
       number: { [Op.like]: "%João%" }
     });
-    expect(options.attributes).toEqual(["id", "name", "number"]);
+    expect(options.attributes).toEqual([
+      "id",
+      "name",
+      "number",
+      "postalCode",
+      "street",
+      "addressNumber",
+      "addressComplement",
+      "district",
+      "city",
+      "state"
+    ]);
     expect(options.limit).toBe(20);
     expect(rows[0]).not.toHaveProperty("email");
   });

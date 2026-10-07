@@ -30,6 +30,7 @@ import toastError from "../../errors/toastError";
 import { i18n } from "../../translate/i18n";
 import { receiptLogoDisplayUrl, receiptPrintFormatFromPayload } from "./receiptBranding";
 import { SALE_RECEIPT_PRINT_FORMAT_LIST } from "./saleReceiptPrintFormats";
+import InventoryDeliveryMethodsSection from "./InventoryDeliveryMethodsSection";
 
 const RECEIPT_LOGO_MAX_BYTES = 2 * 1024 * 1024;
 
@@ -260,6 +261,7 @@ export default function InventorySettingsTab() {
                   />
                 </Box>
               </AppSectionCard>
+              <InventoryDeliveryMethodsSection />
               <AppSectionCard variant="outlined">
                 <Typography variant="h6" style={{ fontWeight: 600 }}>
                   {i18n.t("inventorySales.settings.printPreferences.title")}

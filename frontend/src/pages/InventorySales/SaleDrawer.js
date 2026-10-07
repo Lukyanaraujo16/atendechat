@@ -982,7 +982,36 @@ export default function SaleDrawer({
 
                 <Typography variant="subtitle1" className={classes.sectionTitle}>
                   {i18n.t("inventorySales.sales.sections.summary")}
-                </Typography>
+                  </Typography>
+                  {sale.deliveryMethodName ? (
+                    <Box mb={1} data-testid="sale-drawer-delivery">
+                      <Typography variant="body2">
+                        <strong>
+                          {i18n.t("inventorySales.sales.wizard.delivery.reviewLabel")}:
+                        </strong>{" "}
+                        {sale.deliveryMethodName}
+                      </Typography>
+                      {Number(sale.freightAmount) > 0 ? (
+                        <Typography variant="body2" color="textSecondary">
+                          {i18n.t("inventorySales.sales.wizard.delivery.feeLabel")}:{" "}
+                          {formatCurrencyBRL(sale.freightAmount)}
+                        </Typography>
+                      ) : null}
+                      {sale.delivery?.street || sale.InventorySaleDelivery?.street ? (
+                        <Typography variant="body2" color="textSecondary">
+                          {[
+                            sale.delivery?.street || sale.InventorySaleDelivery?.street,
+                            sale.delivery?.number || sale.InventorySaleDelivery?.number,
+                          ]
+                            .filter(Boolean)
+                            .join(", ")}
+                          {(sale.delivery?.city || sale.InventorySaleDelivery?.city)
+                            ? ` — ${sale.delivery?.city || sale.InventorySaleDelivery?.city}/${sale.delivery?.state || sale.InventorySaleDelivery?.state || ""}`
+                            : ""}
+                        </Typography>
+                      ) : null}
+                    </Box>
+                  ) : null}
                 <Box display="flex" flexDirection="column" alignItems="flex-end" style={{ gap: 4 }}>
                   <Typography variant="body2" color="textSecondary">
                     {i18n.t("inventorySales.sales.totals.subtotal")}:{" "}
@@ -992,6 +1021,12 @@ export default function SaleDrawer({
                     {i18n.t("inventorySales.sales.totals.discount")}:{" "}
                     {formatCurrencyBRL(sale.discountAmount)}
                   </Typography>
+                  {Number(sale.freightAmount) > 0 ? (
+                    <Typography variant="body2" color="textSecondary" data-testid="sale-drawer-freight">
+                      {i18n.t("inventorySales.sales.wizard.totals.freight")}:{" "}
+                      {formatCurrencyBRL(sale.freightAmount)}
+                    </Typography>
+                  ) : null}
                   <Typography variant="subtitle1" style={{ fontWeight: 700 }}>
                     {i18n.t("inventorySales.sales.totals.total")}:{" "}
                     {formatCurrencyBRL(sale.totalAmount)}

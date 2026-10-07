@@ -15,18 +15,27 @@ const useStyles = makeStyles((theme) => ({
   total: {
     fontWeight: 700,
   },
-  /** Slot futuro: frete/entrega entre desconto e total. */
   freightSlot: {},
 }));
 
+function money(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function roundMoney(value) {
+  return Math.round(Number(value) * 100) / 100;
+}
+
 /**
- * Resumo monetário autoritativo a partir de `sale`.
- * Estrutura preparada para linha de frete futura sem redesign.
+ * Resumo monetário a partir de `sale` (backend autoritativo).
+ * `previewFreightAmount` só para UX local antes do PUT delivery.
  */
 export default function SaleWizardTotals({
   sale,
   itemCount,
   freightAmount = null,
+  previewFreightAmount = null,
   dense = false,
 }) {
   const classes = useStyles();
@@ -34,6 +43,20 @@ export default function SaleWizardTotals({
     itemCount != null
       ? i18n.t("inventorySales.sales.wizard.totals.itemsCount", { count: itemCount })
       : null;
+
+  const persistedFreight = money(sale?.freightAmount);
+  const shownFreight =
+    previewFreightAmount != null
+      ? money(previewFreightAmount)
+      : freightAmount != null
+        ? money(freightAmount)
+        : persistedFreight;
+
+  const merchandise = roundMoney(money(sale?.totalAmount) - persistedFreight);
+  const shownTotal =
+    previewFreightAmount != null
+      ? roundMoney(merchandise + shownFreight)
+      : money(sale?.totalAmount);
 
   return (
     <Box className={classes.root} data-testid="sale-wizard-totals">
@@ -50,7 +73,7 @@ export default function SaleWizardTotals({
         {i18n.t("inventorySales.sales.totals.discount")}:{" "}
         {formatCurrencyBRL(sale?.discountAmount)}
       </Typography>
-      {freightAmount != null && Number(freightAmount) > 0 ? (
+      {shownFreight > 0 ? (
         <Typography
           variant={dense ? "caption" : "body2"}
           color="textSecondary"
@@ -58,7 +81,7 @@ export default function SaleWizardTotals({
           data-testid="sale-wizard-freight-line"
         >
           {i18n.t("inventorySales.sales.wizard.totals.freight")}:{" "}
-          {formatCurrencyBRL(freightAmount)}
+          {formatCurrencyBRL(shownFreight)}
         </Typography>
       ) : null}
       <Typography
@@ -67,7 +90,7 @@ export default function SaleWizardTotals({
         data-testid="sale-wizard-total"
       >
         {i18n.t("inventorySales.sales.totals.total")}:{" "}
-        {formatCurrencyBRL(sale?.totalAmount)}
+        {formatCurrencyBRL(shownTotal)}
       </Typography>
     </Box>
   );

@@ -51,10 +51,26 @@ export function getInventorySaleItems(sale) {
   return raw.map(normalizeSaleItem).filter(Boolean);
 }
 
+function unwrapDelivery(sale) {
+  if (!sale || typeof sale !== "object") return null;
+  const raw = sale.delivery || sale.InventorySaleDelivery || null;
+  if (!raw || typeof raw !== "object") return null;
+  if (raw.dataValues && typeof raw.dataValues === "object") {
+    return { ...raw.dataValues, ...raw };
+  }
+  return raw;
+}
+
 export function normalizeInventorySale(sale) {
   if (!sale || typeof sale !== "object") return sale;
+  const delivery = unwrapDelivery(sale);
   return {
     ...sale,
     items: getInventorySaleItems(sale),
+    freightAmount: sale.freightAmount != null ? sale.freightAmount : 0,
+    deliveryMethodId: sale.deliveryMethodId ?? null,
+    deliveryMethodName: sale.deliveryMethodName ?? null,
+    deliveryKind: sale.deliveryKind ?? null,
+    delivery,
   };
 }

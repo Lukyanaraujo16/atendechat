@@ -57,6 +57,13 @@ function contactOptionFromSale(sale) {
     id: contact.id,
     name: contact.name || "",
     number: contact.number || "",
+    postalCode: contact.postalCode || null,
+    street: contact.street || null,
+    addressNumber: contact.addressNumber || null,
+    addressComplement: contact.addressComplement || null,
+    district: contact.district || null,
+    city: contact.city || null,
+    state: contact.state || null,
   };
 }
 

@@ -61,7 +61,18 @@ export default async function SearchInventoryCustomersService(input: {
 
   const rows = await Contact.findAll({
     where,
-    attributes: ["id", "name", "number"],
+    attributes: [
+      "id",
+      "name",
+      "number",
+      "postalCode",
+      "street",
+      "addressNumber",
+      "addressComplement",
+      "district",
+      "city",
+      "state"
+    ],
     limit,
     order: [
       ["name", "ASC"],
@@ -72,6 +83,13 @@ export default async function SearchInventoryCustomersService(input: {
   return rows.map(row => ({
     id: row.id,
     name: row.name,
-    number: row.number
+    number: row.number,
+    postalCode: row.postalCode,
+    street: row.street,
+    addressNumber: row.addressNumber,
+    addressComplement: row.addressComplement,
+    district: row.district,
+    city: row.city,
+    state: row.state
   }));
 }

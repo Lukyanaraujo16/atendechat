@@ -43,6 +43,7 @@ import SaleWizardCustomerStep, {
   contactOptionFromSale,
 } from "./wizard/SaleWizardCustomerStep";
 import SaleWizardPaymentStep from "./wizard/SaleWizardPaymentStep";
+import SaleWizardDeliveryStep from "./wizard/SaleWizardDeliveryStep";
 import SaleWizardReviewStep from "./wizard/SaleWizardReviewStep";
 import SaleWizardSuccess from "./wizard/SaleWizardSuccess";
 import SaleWizardTotals from "./wizard/SaleWizardTotals";
@@ -131,6 +132,7 @@ export default function SaleWizardPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const completingRef = useRef(false);
   const itemsEditorRef = useRef(null);
+  const deliveryStepRef = useRef(null);
 
   const applySaleForms = useCallback(
     (data) => {
@@ -269,6 +271,7 @@ export default function SaleWizardPage() {
 
   const handleNext = async () => {
     if (!editable || saving) return;
+    const nextStep = nextSaleWizardStep(step);
 
     if (step === SALE_WIZARD_STEP_IDS.CUSTOMER) {
       if (!headerForm.sellerUserId) {
@@ -278,7 +281,7 @@ export default function SaleWizardPage() {
       setSaving(true);
       try {
         await persistHeader();
-        setStep(SALE_WIZARD_STEP_IDS.PRODUCTS);
+        if (nextStep) setStep(nextStep);
       } catch (err) {
         toastError(err);
       } finally {
@@ -299,12 +302,38 @@ export default function SaleWizardPage() {
           toast.error(i18n.t("inventorySales.sales.wizard.products.needItems"));
           return;
         }
-        setStep(SALE_WIZARD_STEP_IDS.PAYMENT);
+        if (nextStep) setStep(nextStep);
       } catch (err) {
         if (err?.code !== "autosave-failed") {
           toastError(err);
         }
         toast.error(i18n.t("inventorySales.sales.wizard.products.saveBeforeContinue"));
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+
+    if (step === SALE_WIZARD_STEP_IDS.DELIVERY) {
+      setSaving(true);
+      try {
+        const updated = await deliveryStepRef.current?.persist?.();
+        if (!updated) {
+          toast.error(i18n.t("inventorySales.sales.wizard.delivery.fixIncomplete"));
+          return;
+        }
+        setSale(updated);
+        applySaleForms(updated);
+        if (nextStep) setStep(nextStep);
+      } catch (err) {
+        toastError(err);
+        // Modalidade inativa / erro: recarrega modalidades via remount ao retry;
+        // não avança.
+        try {
+          await refreshSale();
+        } catch {
+          /* ignore */
+        }
       } finally {
         setSaving(false);
       }
@@ -324,7 +353,7 @@ export default function SaleWizardPage() {
         if (perms.canManagePayments && (paymentDirty || paymentForm.paymentMethod)) {
           await persistPayment();
         }
-        setStep(SALE_WIZARD_STEP_IDS.REVIEW);
+        if (nextStep) setStep(nextStep);
       } catch (err) {
         toastError(err);
       } finally {
@@ -492,6 +521,20 @@ export default function SaleWizardPage() {
                   <SaleWizardTotals sale={sale} itemCount={itemCount} />
                 </Box>
               </Box>
+            ) : null}
+
+            {step === SALE_WIZARD_STEP_IDS.DELIVERY ? (
+              <SaleWizardDeliveryStep
+                ref={deliveryStepRef}
+                sale={sale}
+                contact={selectedContact || sale?.contact || null}
+                itemCount={itemCount}
+                disabled={!editable || busy}
+                onSaleUpdated={(data) => {
+                  setSale(data);
+                  applySaleForms(data);
+                }}
+              />
             ) : null}
 
             {step === SALE_WIZARD_STEP_IDS.PAYMENT ? (
