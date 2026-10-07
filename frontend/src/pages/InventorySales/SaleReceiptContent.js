@@ -22,7 +22,7 @@ import {
 } from "./utils";
 import { identifiersFromSaleItem } from "./saleItemIdentifiers";
 import { isThermalSaleReceiptFormat } from "./saleReceiptPrintFormats";
-import { formatCardPaymentLabel } from "./cardInstallments";
+import { describeSalePaymentMethod } from "./paymentDisplay";
 import {
   hasReceiptBrandingFooter,
   hasReceiptBrandingHeader,
@@ -378,17 +378,12 @@ function ThermalReceipt({ sale, classes, branding }) {
     `inventorySales.sales.paymentStatus.${sale.paymentStatus || "unpaid"}`,
     sale.paymentStatus || "unpaid"
   );
-  const paymentMethodLabel = sale.paymentMethod
-    ? formatCardPaymentLabel(
-        i18n.t(
-          `inventorySales.sales.paymentMethods.${sale.paymentMethod}`,
-          sale.paymentMethod
-        ),
-        sale.paymentMethod,
-        sale.cardInstallmentCount,
-        sale.totalAmount
-      )
-    : "";
+  const paymentMethodLabel = describeSalePaymentMethod(sale);
+  const showPaymentMethod =
+    Boolean(sale.paymentMethod) ||
+    toNumber(sale.paidAmount) > 0 ||
+    sale.paymentStatus === "paid" ||
+    sale.paymentStatus === "partial";
 
   return (
     <div className="sale-receipt-print-page sale-receipt-thermal">
@@ -444,7 +439,7 @@ function ThermalReceipt({ sale, classes, branding }) {
           {sellerName}
         </div>
       ) : null}
-      {paymentMethodLabel ? (
+      {showPaymentMethod ? (
         <div className="sale-receipt-thermal-line">
           <span className="sale-receipt-thermal-label">
             {i18n.t("inventorySales.sales.receipt.paymentMethod")}:{" "}
@@ -602,16 +597,6 @@ export default function SaleReceiptContent({
   const paymentStatusLabel = (status) =>
     i18n.t(`inventorySales.sales.paymentStatus.${status}`, status);
 
-  const paymentMethodLabel = (method) =>
-    formatCardPaymentLabel(
-      method
-        ? i18n.t(`inventorySales.sales.paymentMethods.${method}`, method)
-        : i18n.t("inventorySales.sales.payment.noMethod"),
-      method,
-      sale.cardInstallmentCount,
-      sale.totalAmount
-    );
-
   const metaRows = [
     {
       label: i18n.t("inventorySales.sales.receipt.saleNumber"),
@@ -639,7 +624,7 @@ export default function SaleReceiptContent({
     },
     {
       label: i18n.t("inventorySales.sales.receipt.paymentMethod"),
-      value: paymentMethodLabel(sale.paymentMethod),
+      value: describeSalePaymentMethod(sale),
     },
   ];
 

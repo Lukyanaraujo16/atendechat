@@ -35,7 +35,8 @@ jest.mock("../../../components/ConfirmationModal", () => ({ open, onConfirm, chi
 
 const mockGet = jest.fn();
 const mockUpdate = jest.fn();
-const mockUpdatePayment = jest.fn();
+const mockGetPayments = jest.fn();
+const mockAddPayment = jest.fn();
 const mockUpdateDelivery = jest.fn();
 const mockComplete = jest.fn();
 const mockDelete = jest.fn();
@@ -67,7 +68,11 @@ jest.mock("../../../utils/inventoryAccess", () => ({
 jest.mock("../../../services/inventoryApi", () => ({
   getInventorySale: (...a) => mockGet(...a),
   updateInventorySale: (...a) => mockUpdate(...a),
-  updateInventorySalePayment: (...a) => mockUpdatePayment(...a),
+  getInventorySalePayments: (...a) => mockGetPayments(...a),
+  addInventorySalePayment: (...a) => mockAddPayment(...a),
+  updateInventorySalePaymentLine: jest.fn(),
+  deleteInventorySalePaymentLine: jest.fn(),
+  settleInventorySalePaymentLine: jest.fn(),
   updateInventorySaleDelivery: (...a) => mockUpdateDelivery(...a),
   completeInventorySale: (...a) => mockComplete(...a),
   deleteInventorySale: (...a) => mockDelete(...a),
@@ -158,12 +163,48 @@ function draftSale(overrides = {}) {
   };
 }
 
+function paymentsBundle(overrides = {}) {
+  return {
+    payments: overrides.payments || [
+      {
+        id: 1,
+        method: "pix",
+        amount: 100,
+        status: "paid",
+        cardInstallmentCount: null,
+      },
+    ],
+    summary: {
+      totalAmount: 100,
+      effectivePaid: 100,
+      pendingAmount: 0,
+      remainingToReceive: 0,
+      remainingToAllocate: 0,
+      paymentStatus: "paid",
+      ...(overrides.summary || {}),
+    },
+  };
+}
+
 function renderWizard() {
   return render(
     <ThemeProvider theme={createTheme()}>
       <SaleWizardPage />
     </ThemeProvider>
   );
+}
+
+async function goToPaymentStep() {
+  renderWizard();
+  await screen.findByTestId("sale-wizard-customer-step");
+  userEvent.click(screen.getByTestId("sale-wizard-walk-in"));
+  userEvent.click(screen.getByTestId("sale-wizard-next"));
+  await screen.findByTestId("sale-wizard-products-step");
+  userEvent.click(screen.getByTestId("sale-wizard-next"));
+  await screen.findByTestId("sale-wizard-delivery-step");
+  userEvent.click(screen.getByTestId("sale-wizard-next"));
+  await waitFor(() => expect(mockUpdateDelivery).toHaveBeenCalled());
+  await screen.findByTestId("sale-wizard-payment-step");
 }
 
 describe("SaleWizardPage", () => {
@@ -176,13 +217,22 @@ describe("SaleWizardPage", () => {
     mockPerms.canCreateSale = true;
     mockGet.mockReset();
     mockUpdate.mockReset();
-    mockUpdatePayment.mockReset();
+    mockGetPayments.mockReset();
+    mockAddPayment.mockReset();
     mockUpdateDelivery.mockReset();
     mockComplete.mockReset();
     mockPush.mockClear();
     mockGet.mockResolvedValue({ data: draftSale() });
     mockUpdate.mockImplementation((_id, body) =>
-      Promise.resolve({ data: draftSale({ ...body, id: 12, status: "draft", items: draftSale().items, seller: { id: 3, name: "João" } }) })
+      Promise.resolve({
+        data: draftSale({
+          ...body,
+          id: 12,
+          status: "draft",
+          items: draftSale().items,
+          seller: { id: 3, name: "João" },
+        }),
+      })
     );
     mockUpdateDelivery.mockResolvedValue({
       data: draftSale({
@@ -192,19 +242,7 @@ describe("SaleWizardPage", () => {
         freightAmount: 0,
       }),
     });
-    mockUpdatePayment.mockImplementation((_id, body) =>
-      Promise.resolve({
-        data: draftSale({
-          paymentMethod: body.paymentMethod,
-          cardInstallmentCount: body.cardInstallmentCount,
-          paymentNotes: body.paymentNotes,
-          deliveryMethodId: 1,
-          deliveryMethodName: "Retirada na loja",
-          deliveryKind: "pickup",
-          freightAmount: 0,
-        }),
-      })
-    );
+    mockGetPayments.mockResolvedValue({ data: paymentsBundle() });
     mockComplete.mockResolvedValue({
       data: draftSale({
         status: "completed",
@@ -225,72 +263,70 @@ describe("SaleWizardPage", () => {
     expect(screen.getByTestId("sale-wizard-walk-in")).toBeTruthy();
   });
 
-  it("venda sem cliente + PIX pago até sucesso", async () => {
-    renderWizard();
-    await screen.findByTestId("sale-wizard-customer-step");
-    userEvent.click(screen.getByTestId("sale-wizard-walk-in"));
-    userEvent.click(screen.getByTestId("sale-wizard-next"));
-    await waitFor(() => expect(mockUpdate).toHaveBeenCalled());
-    expect(mockUpdate.mock.calls[0][1].contactId).toBeNull();
-    expect(mockUpdate.mock.calls[0][1].sellerUserId).toBe(3);
-
-    await screen.findByTestId("sale-wizard-products-step");
-    userEvent.click(screen.getByTestId("sale-wizard-next"));
-    await screen.findByTestId("sale-wizard-delivery-step");
-    expect(screen.getByTestId("sale-wizard-step-delivery")).toBeTruthy();
-    userEvent.click(screen.getByTestId("sale-wizard-next"));
-    await waitFor(() => expect(mockUpdateDelivery).toHaveBeenCalled());
-    await screen.findByTestId("sale-wizard-payment-step");
-    userEvent.click(screen.getByTestId("sale-wizard-pay-pix"));
-    expect(screen.getByTestId("sale-wizard-register-as-paid").checked).toBe(true);
-    userEvent.click(screen.getByTestId("sale-wizard-next"));
-    await waitFor(() => expect(mockUpdatePayment).toHaveBeenCalled());
-    expect(mockUpdatePayment.mock.calls[0][1].paymentMethod).toBe("pix");
-
-    await screen.findByTestId("sale-wizard-review-step");
-    expect(screen.getByTestId("sale-wizard-review-paid-status").textContent).toMatch(
-      /pago/i
+  it("venda com payments lines até sucesso com paymentMode lines", async () => {
+    await goToPaymentStep();
+    await waitFor(() => expect(mockGetPayments).toHaveBeenCalled());
+    expect(screen.getByTestId("sale-wizard-payment-summary")).toBeTruthy();
+    expect(screen.getByTestId("sale-wizard-payment-remaining").textContent).toMatch(
+      /R\$\s*0,00/
     );
+
+    userEvent.click(screen.getByTestId("sale-wizard-next"));
+    await screen.findByTestId("sale-wizard-review-step");
+    expect(screen.getByTestId("sale-wizard-review-payment").textContent).toMatch(/PIX/i);
+
     userEvent.click(screen.getByTestId("sale-wizard-confirm"));
     await waitFor(() => expect(mockComplete).toHaveBeenCalledTimes(1));
     expect(mockComplete.mock.calls[0][1]).toEqual({
       sellerUserId: 3,
-      registerAsPaid: true,
+      paymentMode: "lines",
     });
     expect(await screen.findByTestId("sale-wizard-success")).toBeTruthy();
   });
 
-  it("cartão exige pago e parcelas 1..18", async () => {
-    renderWizard();
-    await screen.findByTestId("sale-wizard-customer-step");
-    userEvent.click(screen.getByTestId("sale-wizard-walk-in"));
+  it("bloqueia Continuar se falta distribuir", async () => {
+    mockGetPayments.mockResolvedValue({
+      data: paymentsBundle({
+        payments: [],
+        summary: {
+          totalAmount: 100,
+          effectivePaid: 0,
+          pendingAmount: 0,
+          remainingToReceive: 100,
+          remainingToAllocate: 100,
+          paymentStatus: "unpaid",
+        },
+      }),
+    });
+    await goToPaymentStep();
+    await waitFor(() => expect(mockGetPayments).toHaveBeenCalled());
     userEvent.click(screen.getByTestId("sale-wizard-next"));
-    await screen.findByTestId("sale-wizard-products-step");
-    userEvent.click(screen.getByTestId("sale-wizard-next"));
-    await screen.findByTestId("sale-wizard-delivery-step");
-    userEvent.click(screen.getByTestId("sale-wizard-next"));
-    await screen.findByTestId("sale-wizard-payment-step");
-    userEvent.click(screen.getByTestId("sale-wizard-pay-credit_card"));
-    const paidBox = screen.getByTestId("sale-wizard-register-as-paid");
-    expect(paidBox.disabled).toBe(true);
-    expect(paidBox.checked).toBe(true);
-    expect(screen.getByTestId("sale-wizard-card-installments")).toBeTruthy();
+    await waitFor(() =>
+      expect(screen.getByTestId("sale-wizard-payment-step")).toBeTruthy()
+    );
+    expect(screen.queryByTestId("sale-wizard-review-step")).toBeNull();
   });
 
-  it("boleto default pendente", async () => {
-    renderWizard();
-    await screen.findByTestId("sale-wizard-customer-step");
-    userEvent.click(screen.getByTestId("sale-wizard-next"));
-    await screen.findByTestId("sale-wizard-products-step");
-    userEvent.click(screen.getByTestId("sale-wizard-next"));
-    await screen.findByTestId("sale-wizard-delivery-step");
-    userEvent.click(screen.getByTestId("sale-wizard-next"));
-    await screen.findByTestId("sale-wizard-payment-step");
-    userEvent.click(screen.getByTestId("sale-wizard-pay-boleto"));
-    expect(screen.getByTestId("sale-wizard-register-as-paid").checked).toBe(false);
+  it("empty state e botão adicionar", async () => {
+    mockGetPayments.mockResolvedValue({
+      data: paymentsBundle({
+        payments: [],
+        summary: {
+          totalAmount: 100,
+          effectivePaid: 0,
+          pendingAmount: 0,
+          remainingToReceive: 100,
+          remainingToAllocate: 100,
+          paymentStatus: "unpaid",
+        },
+      }),
+    });
+    await goToPaymentStep();
+    expect(await screen.findByText(/Nenhuma forma de pagamento/i)).toBeTruthy();
+    expect(screen.getByTestId("sale-wizard-payment-add")).toBeTruthy();
   });
 
-  it("sem managePayments não edita pagamento e conclui sem registerAsPaid", async () => {
+  it("sem managePayments não edita pagamento e conclui sem paymentMode", async () => {
     mockPerms.canManagePayments = false;
     renderWizard();
     await screen.findByTestId("sale-wizard-customer-step");
@@ -299,30 +335,14 @@ describe("SaleWizardPage", () => {
     userEvent.click(screen.getByTestId("sale-wizard-next"));
     await screen.findByTestId("sale-wizard-delivery-step");
     userEvent.click(screen.getByTestId("sale-wizard-next"));
-    await screen.findByTestId("sale-wizard-payment-readonly");
+    await screen.findByTestId("sale-wizard-payment-step");
+    expect(screen.getByText(/Pagamento não informado/i)).toBeTruthy();
     userEvent.click(screen.getByTestId("sale-wizard-next"));
     await screen.findByTestId("sale-wizard-review-step");
     userEvent.click(screen.getByTestId("sale-wizard-confirm"));
     await waitFor(() => expect(mockComplete).toHaveBeenCalled());
     expect(mockComplete.mock.calls[0][1]).toEqual({ sellerUserId: 3 });
-    expect(mockUpdatePayment).not.toHaveBeenCalled();
-  });
-
-  it("erro ao salvar pagamento impede complete", async () => {
-    mockUpdatePayment.mockRejectedValueOnce(new Error("fail"));
-    renderWizard();
-    await screen.findByTestId("sale-wizard-customer-step");
-    userEvent.click(screen.getByTestId("sale-wizard-next"));
-    await screen.findByTestId("sale-wizard-products-step");
-    userEvent.click(screen.getByTestId("sale-wizard-next"));
-    await screen.findByTestId("sale-wizard-delivery-step");
-    userEvent.click(screen.getByTestId("sale-wizard-next"));
-    await screen.findByTestId("sale-wizard-payment-step");
-    userEvent.click(screen.getByTestId("sale-wizard-pay-cash"));
-    userEvent.click(screen.getByTestId("sale-wizard-next"));
-    await waitFor(() => expect(mockUpdatePayment).toHaveBeenCalled());
-    expect(mockComplete).not.toHaveBeenCalled();
-    expect(screen.getByTestId("sale-wizard-payment-step")).toBeTruthy();
+    expect(mockGetPayments).not.toHaveBeenCalled();
   });
 
   it("double submit não duplica conclusão", async () => {
@@ -333,15 +353,7 @@ describe("SaleWizardPage", () => {
           resolveComplete = resolve;
         })
     );
-    renderWizard();
-    await screen.findByTestId("sale-wizard-customer-step");
-    userEvent.click(screen.getByTestId("sale-wizard-next"));
-    await screen.findByTestId("sale-wizard-products-step");
-    userEvent.click(screen.getByTestId("sale-wizard-next"));
-    await screen.findByTestId("sale-wizard-delivery-step");
-    userEvent.click(screen.getByTestId("sale-wizard-next"));
-    await screen.findByTestId("sale-wizard-payment-step");
-    userEvent.click(screen.getByTestId("sale-wizard-pay-pix"));
+    await goToPaymentStep();
     userEvent.click(screen.getByTestId("sale-wizard-next"));
     await screen.findByTestId("sale-wizard-confirm");
     const btn = screen.getByTestId("sale-wizard-confirm");

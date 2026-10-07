@@ -265,6 +265,17 @@ export async function applyLegacyAbsolutePayment(
     actorUserId
   );
 
+  const activeMethods = new Set(
+    lines.filter(l => l.status !== "reversed").map(l => l.method)
+  );
+  if (activeMethods.size > 1) {
+    throw new AppError(
+      "ERR_INVENTORY_SALE_PAYMENT_USE_LINES_API",
+      400,
+      "Esta venda possui múltiplas formas de pagamento. Use a gestão de pagamentos do PDV."
+    );
+  }
+
   const paidLines = lines.filter(l => l.status === "paid");
   const currentPaid = calculateSalePaymentAggregate(total, lines).effectivePaid;
 
@@ -357,8 +368,140 @@ export async function applyLegacyAbsolutePayment(
   return cache;
 }
 
+export type PaymentFinancialSummary = {
+  totalAmount: number;
+  effectivePaid: number;
+  pendingAmount: number;
+  remainingToReceive: number;
+  remainingToAllocate: number;
+  paymentStatus: InventoryPaymentStatus;
+};
+
+export function sumPendingAmount(
+  payments: Array<{ amount: string | number; status: string }>
+): number {
+  let sum = 0;
+  for (const row of payments || []) {
+    if (row.status === "pending") {
+      sum = roundMoney(sum + toMoney(row.amount));
+    }
+  }
+  return sum;
+}
+
+export function buildPaymentFinancialSummary(
+  totalAmount: string | number,
+  payments: Array<{ amount: string | number; status: string }>
+): PaymentFinancialSummary {
+  const total = roundMoney(toMoney(totalAmount));
+  const aggregate = calculateSalePaymentAggregate(total, payments);
+  const pendingAmount = sumPendingAmount(payments);
+  return {
+    totalAmount: total,
+    effectivePaid: aggregate.effectivePaid,
+    pendingAmount,
+    remainingToReceive: aggregate.pendingAmount,
+    remainingToAllocate: roundMoney(
+      total - aggregate.effectivePaid - pendingAmount
+    ),
+    paymentStatus: aggregate.paymentStatus
+  };
+}
+
 /**
- * Intenção de rascunho: no máximo um pending; nunca paid.
+ * Cache legado a partir das lines.
+ * Múltiplos métodos → paymentMethod=null (catálogo não aceita "multiple").
+ */
+export function deriveLegacyPaymentCache(
+  payments: InventorySalePayment[],
+  aggregate: { effectivePaid: number; paymentStatus: InventoryPaymentStatus }
+): Omit<PaymentCachePatch, "paymentStatus" | "paidAmount"> {
+  const active = payments.filter(p => p.status !== "reversed");
+  const paidLines = active.filter(p => p.status === "paid");
+  const methods = Array.from(new Set(active.map(p => p.method)));
+
+  let paymentMethod: InventoryPaymentMethod | null = null;
+  let cardInstallmentCount: number | null = null;
+  let paymentNotes: string | null = null;
+
+  if (methods.length === 1) {
+    paymentMethod = methods[0] as InventoryPaymentMethod;
+    if (paymentMethod === "credit_card") {
+      const cardLines = active.filter(p => p.method === "credit_card");
+      if (cardLines.length === 1) {
+        cardInstallmentCount =
+          cardLines[0].cardInstallmentCount == null
+            ? null
+            : Number(cardLines[0].cardInstallmentCount);
+      } else {
+        cardInstallmentCount = null;
+      }
+    }
+    if (active.length === 1) {
+      paymentNotes = active[0].notes ?? null;
+    }
+  }
+
+  const paidAt = resolveSalePaidAtCache({
+    paymentStatus: aggregate.paymentStatus,
+    paidAt: null,
+    paidLines
+  });
+
+  return {
+    paidAt,
+    paymentMethod,
+    cardInstallmentCount,
+    paymentNotes
+  };
+}
+
+export function assertSaleTotalSupportsPayments(
+  totalAmount: string | number,
+  payments: Array<{ amount: string | number; status: string }>
+): void {
+  const summary = buildPaymentFinancialSummary(totalAmount, payments);
+  if (summary.effectivePaid > summary.totalAmount) {
+    throw new AppError(
+      "ERR_INVENTORY_SALE_PAYMENT_TOTAL_CONFLICT",
+      400,
+      "O total da venda não pode ser menor que o valor já recebido. Ajuste ou remova pagamentos antes."
+    );
+  }
+  if (summary.remainingToAllocate < 0) {
+    throw new AppError(
+      "ERR_INVENTORY_SALE_PAYMENT_TOTAL_CONFLICT",
+      400,
+      "O total da venda ficou abaixo dos pagamentos já distribuídos. Ajuste ou remova pagamentos pendentes antes."
+    );
+  }
+}
+
+export async function persistSalePaymentCache(
+  sale: InventorySale,
+  payments: InventorySalePayment[],
+  transaction: Transaction
+): Promise<PaymentCachePatch> {
+  const aggregate = calculateSalePaymentAggregate(sale.totalAmount, payments);
+  const legacy = deriveLegacyPaymentCache(payments, aggregate);
+  const cache: PaymentCachePatch = {
+    paymentStatus: aggregate.paymentStatus,
+    paidAmount: aggregate.effectivePaid,
+    ...legacy
+  };
+  await sale.update(cache, { transaction });
+  return cache;
+}
+
+function isLegacySinglePendingIntention(payments: InventorySalePayment[]): boolean {
+  if (payments.length === 0) return true;
+  if (payments.length !== 1) return false;
+  return payments[0].status === "pending";
+}
+
+/**
+ * Intenção legada de rascunho (PUT /payment): no máximo um pending.
+ * Não apaga paid (P3); se já houver recebido, bloqueia o fluxo legado.
  */
 export async function syncDraftPaymentIntention(
   sale: InventorySale,
@@ -382,11 +525,21 @@ export async function syncDraftPaymentIntention(
   const total = roundMoney(toMoney(sale.totalAmount));
   let lines = await listSalePayments(sale.companyId, sale.id, transaction);
 
-  // Draft nunca deve ter paid — remove se existir dado sujo.
-  for (const row of lines.filter(l => l.status === "paid")) {
-    await row.destroy({ transaction });
+  if (lines.some(l => l.status === "paid")) {
+    throw new AppError(
+      "ERR_INVENTORY_SALE_PAYMENT_USE_LINES_API",
+      400,
+      "Esta venda já possui pagamentos recebidos. Use a gestão de pagamentos do PDV."
+    );
   }
-  lines = await listSalePayments(sale.companyId, sale.id, transaction);
+
+  if (lines.length > 1) {
+    throw new AppError(
+      "ERR_INVENTORY_SALE_PAYMENT_USE_LINES_API",
+      400,
+      "Esta venda já possui pagamentos múltiplos. Use a gestão de pagamentos do PDV."
+    );
+  }
 
   const pendingLines = lines.filter(l => l.status === "pending");
 
@@ -406,27 +559,28 @@ export async function syncDraftPaymentIntention(
     });
   }
 
-  return {
-    paymentStatus: "unpaid",
-    paidAmount: 0,
-    paidAt: null,
-    paymentMethod: input.paymentMethod,
-    cardInstallmentCount:
-      input.paymentMethod === "credit_card"
-        ? input.cardInstallmentCount
-        : null,
-    paymentNotes: input.paymentNotes
-  };
+  lines = await listSalePayments(sale.companyId, sale.id, transaction);
+  return persistSalePaymentCache(sale, lines, transaction);
 }
 
 /**
- * Após recálculo de total no draft: redimensiona pending da intenção legada.
+ * Após recálculo de total no draft:
+ * - intenção legada (0–1 pending): redimensiona;
+ * - alocação P3 explícita: apenas valida (não escolhe pending para reduzir).
  */
 export async function syncDraftPendingAfterTotalChange(
   sale: InventorySale,
   transaction: Transaction
 ): Promise<void> {
   if (sale.status !== "draft") return;
+
+  const lines = await listSalePayments(sale.companyId, sale.id, transaction);
+
+  if (!isLegacySinglePendingIntention(lines)) {
+    assertSaleTotalSupportsPayments(sale.totalAmount, lines);
+    await persistSalePaymentCache(sale, lines, transaction);
+    return;
+  }
 
   const method = sale.paymentMethod;
   const notes = sale.paymentNotes ?? null;
@@ -442,19 +596,6 @@ export async function syncDraftPendingAfterTotalChange(
     },
     transaction
   );
-
-  // Cache financeiro do draft permanece unpaid/0/null; method/notes já na sale.
-  const paid = toMoney(sale.paidAmount);
-  if (paid !== 0 || sale.paymentStatus !== "unpaid" || sale.paidAt != null) {
-    await sale.update(
-      {
-        paymentStatus: "unpaid",
-        paidAmount: 0,
-        paidAt: null
-      },
-      { transaction }
-    );
-  }
 }
 
 /**

@@ -45,8 +45,8 @@ import {
   CARD_INSTALLMENT_OPTIONS,
   cardInstallmentFormValue,
   formatCardInstallmentCaption,
-  formatCardPaymentLabel,
 } from "./cardInstallments";
+import { describeSalePaymentMethod } from "./paymentDisplay";
 import {
   formatSaleNumber,
   getSaleDisplayDate,
@@ -569,13 +569,7 @@ export default function SaleDrawer({
       ? i18n.t(`inventorySales.sales.paymentMethods.${method}`, method)
       : i18n.t("inventorySales.sales.payment.noMethod");
 
-  const salePaymentLabel = (current) =>
-    formatCardPaymentLabel(
-      paymentMethodLabel(current?.paymentMethod),
-      current?.paymentMethod,
-      current?.cardInstallmentCount,
-      current?.totalAmount
-    );
+  const salePaymentLabel = (current) => describeSalePaymentMethod(current);
 
   const displayDate = getSaleDisplayDate(sale);
   const customerOptions = useMemo(() => {

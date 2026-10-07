@@ -27,8 +27,8 @@ import {
   completeInventorySale,
   deleteInventorySale,
   getInventorySale,
+  getInventorySalePayments,
   updateInventorySale,
-  updateInventorySalePayment,
 } from "../../services/inventoryApi";
 import toastError from "../../errors/toastError";
 import { i18n } from "../../translate/i18n";
@@ -36,7 +36,7 @@ import { useInventoryPermissions } from "../../utils/inventoryAccess";
 import ConfirmationModal from "../../components/ConfirmationModal";
 import SaleItemsEditor from "./SaleItemsEditor";
 import SaleDrawer from "./SaleDrawer";
-import { cardInstallmentFormValue } from "./cardInstallments";
+import { formatCurrencyBRL } from "../../utils/brazilianCurrency";
 import { formatSaleNumber, isSaleEditable } from "./utils";
 import SaleWizardStepper from "./wizard/SaleWizardStepper";
 import SaleWizardCustomerStep, {
@@ -52,10 +52,6 @@ import {
   nextSaleWizardStep,
   prevSaleWizardStep,
 } from "./wizard/saleWizardSteps";
-import {
-  defaultRegisterAsPaid,
-  resolveRegisterAsPaidForComplete,
-} from "./wizard/paymentDefaults";
 
 const useStyles = makeStyles((theme) => ({
   pageRoot: {
@@ -120,12 +116,7 @@ export default function SaleWizardPage() {
     sellerUserId: "",
     notes: "",
   });
-  const [paymentForm, setPaymentForm] = useState({
-    paymentMethod: "",
-    cardInstallmentCount: "",
-    paymentNotes: "",
-  });
-  const [registerAsPaid, setRegisterAsPaid] = useState(false);
+  const [paymentsBundle, setPaymentsBundle] = useState(null);
   const [saving, setSaving] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -150,19 +141,6 @@ export default function SaleWizardPage() {
       const contact = contactOptionFromSale(data);
       setSelectedContact(contact);
       setWalkIn(!contact && data.contactId == null);
-      setPaymentForm({
-        paymentMethod: data.paymentMethod || "",
-        cardInstallmentCount: cardInstallmentFormValue(
-          data.paymentMethod,
-          data.cardInstallmentCount
-        ),
-        paymentNotes: data.paymentNotes || "",
-      });
-      setRegisterAsPaid(
-        data.paymentMethod
-          ? defaultRegisterAsPaid(data.paymentMethod)
-          : false
-      );
     },
     [user?.id]
   );
@@ -214,17 +192,6 @@ export default function SaleWizardPage() {
       (headerForm.notes || "") !== (sale.notes || "") ||
       (walkIn && sale.contactId != null));
 
-  const paymentDirty =
-    editable &&
-    perms.canManagePayments &&
-    sale &&
-    ((paymentForm.paymentMethod || "") !== (sale.paymentMethod || "") ||
-      (paymentForm.paymentMethod === "credit_card"
-        ? Number(paymentForm.cardInstallmentCount || 1) !==
-          Number(sale.cardInstallmentCount || 0)
-        : Boolean(sale.cardInstallmentCount)) ||
-      (paymentForm.paymentNotes || "") !== (sale.paymentNotes || ""));
-
   const persistHeader = async () => {
     const payload = {
       notes: headerForm.notes.trim() || null,
@@ -238,21 +205,6 @@ export default function SaleWizardPage() {
           : null,
     };
     const { data } = await updateInventorySale(sale.id, payload);
-    setSale(data);
-    return data;
-  };
-
-  const persistPayment = async () => {
-    const { data } = await updateInventorySalePayment(sale.id, {
-      paymentMethod: paymentForm.paymentMethod || null,
-      cardInstallmentCount:
-        paymentForm.paymentMethod === "credit_card"
-          ? Number(paymentForm.cardInstallmentCount || 1)
-          : null,
-      paymentNotes: paymentForm.paymentNotes.trim() || null,
-      paymentStatus: "unpaid",
-      paidAmount: 0,
-    });
     setSale(data);
     return data;
   };
@@ -341,24 +293,27 @@ export default function SaleWizardPage() {
     }
 
     if (step === SALE_WIZARD_STEP_IDS.PAYMENT) {
-      if (perms.canManagePayments && paymentForm.paymentMethod === "credit_card") {
-        const count = Number(paymentForm.cardInstallmentCount);
-        if (!Number.isInteger(count) || count < 1 || count > 18) {
-          toast.error(i18n.t("inventorySales.sales.wizard.payment.installmentsRequired"));
+      if (perms.canManagePayments) {
+        let bundle = paymentsBundle;
+        try {
+          const { data } = await getInventorySalePayments(sale.id);
+          bundle = data;
+          setPaymentsBundle(data);
+        } catch (err) {
+          toastError(err);
+          return;
+        }
+        const remaining = Number(bundle?.summary?.remainingToAllocate ?? 0);
+        if (Math.abs(remaining) > 0.00001) {
+          toast.error(
+            i18n.t("inventorySales.sales.wizard.payment.needAllocate", {
+              amount: formatCurrencyBRL(remaining),
+            })
+          );
           return;
         }
       }
-      setSaving(true);
-      try {
-        if (perms.canManagePayments && (paymentDirty || paymentForm.paymentMethod)) {
-          await persistPayment();
-        }
-        if (nextStep) setStep(nextStep);
-      } catch (err) {
-        toastError(err);
-      } finally {
-        setSaving(false);
-      }
+      if (nextStep) setStep(nextStep);
     }
   };
 
@@ -378,13 +333,8 @@ export default function SaleWizardPage() {
     completingRef.current = true;
     setConfirming(true);
     try {
-      if (editable) {
-        if (headerDirty) {
-          await persistHeader();
-        }
-        if (perms.canManagePayments && (paymentDirty || paymentForm.paymentMethod)) {
-          await persistPayment();
-        }
+      if (editable && headerDirty) {
+        await persistHeader();
       }
 
       const sellerUserId = Number(
@@ -392,10 +342,7 @@ export default function SaleWizardPage() {
       );
       const body = { sellerUserId };
       if (perms.canManagePayments) {
-        body.registerAsPaid = resolveRegisterAsPaidForComplete(
-          paymentForm.paymentMethod || sale.paymentMethod,
-          registerAsPaid
-        );
+        body.paymentMode = "lines";
       }
 
       const { data } = await completeInventorySale(sale.id, body);
@@ -540,12 +487,11 @@ export default function SaleWizardPage() {
             {step === SALE_WIZARD_STEP_IDS.PAYMENT ? (
               <SaleWizardPaymentStep
                 sale={sale}
-                paymentForm={paymentForm}
-                setPaymentForm={setPaymentForm}
-                registerAsPaid={registerAsPaid}
-                setRegisterAsPaid={setRegisterAsPaid}
                 canManagePayments={perms.canManagePayments}
                 disabled={!editable || busy}
+                paymentsBundle={paymentsBundle}
+                setPaymentsBundle={setPaymentsBundle}
+                onSaleCacheMaybeChanged={refreshSale}
               />
             ) : null}
 
@@ -553,8 +499,7 @@ export default function SaleWizardPage() {
               <SaleWizardReviewStep
                 sale={sale}
                 headerForm={headerForm}
-                paymentForm={paymentForm}
-                registerAsPaid={registerAsPaid}
+                paymentsBundle={paymentsBundle}
                 canManagePayments={perms.canManagePayments}
                 users={users}
                 selectedContact={selectedContact}

@@ -50,7 +50,7 @@ import {
   paymentStatusChipColor,
 } from "./utils";
 import { SALE_STATUSES, PAYMENT_STATUSES } from "./constants";
-import { formatCardPaymentLabel } from "./cardInstallments";
+import { describeSalePaymentMethod } from "./paymentDisplay";
 import { useManualSale } from "./ManualSaleProvider";
 
 const useStyles = makeStyles((theme) => ({
@@ -175,18 +175,7 @@ export default function InventorySalesTab() {
   const paymentStatusLabel = (s) =>
     i18n.t(`inventorySales.sales.paymentStatus.${s}`, s);
 
-  const paymentMethodLabel = (sale) => {
-    if (!sale?.paymentMethod) return "—";
-    return formatCardPaymentLabel(
-      i18n.t(
-        `inventorySales.sales.paymentMethods.${sale.paymentMethod}`,
-        sale.paymentMethod
-      ),
-      sale.paymentMethod,
-      sale.cardInstallmentCount,
-      sale.totalAmount
-    );
-  };
+  const paymentMethodLabel = (sale) => describeSalePaymentMethod(sale);
 
   const renderRow = (sale) => {
     const displayDate = getSaleDisplayDate(sale);

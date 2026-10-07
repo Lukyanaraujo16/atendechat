@@ -19,7 +19,12 @@ import {
 } from "./inventorySaleHelpers";
 import { toInventoryQuantity } from "./inventoryTenant";
 import { settlePaymentOnComplete } from "./inventoryPaymentHelpers";
-import { applyCompletePaymentSettlement } from "./inventorySalePaymentEngine";
+import {
+  applyCompletePaymentSettlement,
+  listSalePayments,
+  persistSalePaymentCache
+} from "./inventorySalePaymentEngine";
+import { validateExplicitPaymentLinesForComplete } from "./InventorySalePaymentLinesService";
 import { assertIdentifiersForCompleteSale } from "./inventorySaleItemIdentifiers";
 
 export default async function CompleteInventorySaleService(input: {
@@ -30,6 +35,8 @@ export default async function CompleteInventorySaleService(input: {
   /** Só honrado quando canManagePayments === true (resolvido no controller). */
   registerAsPaid?: boolean;
   canManagePayments?: boolean;
+  /** Wizard P3: payments já explícitos — não reaplicar settle legado. */
+  paymentMode?: "legacy" | "lines";
 }): Promise<InventorySale> {
   await GetOrCreateInventorySettingsService(input.companyId);
 
@@ -221,27 +228,37 @@ export default async function CompleteInventorySaleService(input: {
     const commissionAmount = roundMoney(
       (commissionBase * commissionRate) / 100
     );
-    const settled = settlePaymentOnComplete({
-      paymentMethod: sale.paymentMethod,
-      cardInstallmentCount: sale.cardInstallmentCount,
-      totalAmount,
-      paidAmount: toMoney(sale.paidAmount),
-      existingPaidAt: sale.paidAt,
-      registerAsPaid: input.registerAsPaid,
-      canManagePayments: input.canManagePayments === true
-    });
+    const useExplicitLines = input.paymentMode === "lines";
+    let paymentCache;
 
-    // Lines = fonte de verdade; sale.payment* = cache na mesma transaction.
-    const paymentCache = await applyCompletePaymentSettlement(
-      sale,
-      {
-        targetPaidAmount: settled.paidAmount,
-        paymentStatus: settled.paymentStatus,
-        paidAt: settled.paidAt,
-        actorUserId: input.completedBy
-      },
-      t
-    );
+    if (useExplicitLines) {
+      await validateExplicitPaymentLinesForComplete(sale, t, {
+        requireFullAllocation: input.canManagePayments === true
+      });
+      const lines = await listSalePayments(sale.companyId, sale.id, t);
+      paymentCache = await persistSalePaymentCache(sale, lines, t);
+    } else {
+      const settled = settlePaymentOnComplete({
+        paymentMethod: sale.paymentMethod,
+        cardInstallmentCount: sale.cardInstallmentCount,
+        totalAmount,
+        paidAmount: toMoney(sale.paidAmount),
+        existingPaidAt: sale.paidAt,
+        registerAsPaid: input.registerAsPaid,
+        canManagePayments: input.canManagePayments === true
+      });
+
+      paymentCache = await applyCompletePaymentSettlement(
+        sale,
+        {
+          targetPaidAmount: settled.paidAmount,
+          paymentStatus: settled.paymentStatus,
+          paidAt: settled.paidAt,
+          actorUserId: input.completedBy
+        },
+        t
+      );
+    }
 
     await settings.update(
       { nextSaleNumber: saleNumber + 1 },

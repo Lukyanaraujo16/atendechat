@@ -5,7 +5,8 @@ import { makeStyles } from "@material-ui/core/styles";
 import { AppPrimaryButton } from "../../../ui";
 import { i18n } from "../../../translate/i18n";
 import { formatCurrencyBRL } from "../../../utils/brazilianCurrency";
-import { formatCardPaymentLabel } from "../cardInstallments";
+import { formatCardInstallmentCaption } from "../cardInstallments";
+import { describeSalePaymentMethod } from "../paymentDisplay";
 import SaleWizardTotals from "./SaleWizardTotals";
 import {
   formatAddressOneLine,
@@ -33,13 +34,23 @@ const useStyles = makeStyles((theme) => ({
   value: {
     fontWeight: 600,
   },
+  payRow: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 2,
+    padding: theme.spacing(1, 0),
+    borderBottom: `1px solid ${theme.palette.divider}`,
+  },
 }));
+
+function methodLabel(method) {
+  return i18n.t(`inventorySales.sales.paymentMethods.${method}`, method);
+}
 
 export default function SaleWizardReviewStep({
   sale,
   headerForm,
-  paymentForm,
-  registerAsPaid,
+  paymentsBundle,
   canManagePayments,
   users,
   selectedContact,
@@ -59,26 +70,10 @@ export default function SaleWizardReviewStep({
     sale?.seller?.name ||
     "—";
 
-  const method = canManagePayments
-    ? paymentForm.paymentMethod || sale?.paymentMethod
-    : sale?.paymentMethod;
-
-  const installmentCount = canManagePayments
-    ? paymentForm.cardInstallmentCount || sale?.cardInstallmentCount
-    : sale?.cardInstallmentCount;
-
-  const methodLabel = method
-    ? formatCardPaymentLabel(
-        i18n.t(`inventorySales.sales.paymentMethods.${method}`, method),
-        method,
-        installmentCount,
-        sale?.totalAmount
-      )
-    : i18n.t("inventorySales.sales.payment.noMethod");
-
-  const willBePaid =
-    method === "credit_card" ||
-    (canManagePayments && Boolean(registerAsPaid) && Boolean(method));
+  const payments = Array.isArray(paymentsBundle?.payments)
+    ? paymentsBundle.payments
+    : [];
+  const summary = paymentsBundle?.summary;
 
   return (
     <Box className={classes.root} data-testid="sale-wizard-review-step">
@@ -141,27 +136,45 @@ export default function SaleWizardReviewStep({
 
       <SaleWizardTotals sale={sale} itemCount={itemCount} />
 
-      <Box className={classes.row}>
+      <Box className={classes.row} data-testid="sale-wizard-review-payment">
         <Typography className={classes.label}>
           {i18n.t("inventorySales.sales.fields.paymentMethod")}
         </Typography>
-        <Typography className={classes.value} data-testid="sale-wizard-review-payment">
-          {methodLabel}
-        </Typography>
-      </Box>
-
-      <Box className={classes.row}>
-        <Typography className={classes.label}>
-          {i18n.t("inventorySales.sales.wizard.review.expectedStatus")}
-        </Typography>
-        <Typography
-          className={classes.value}
-          data-testid="sale-wizard-review-paid-status"
-        >
-          {willBePaid
-            ? i18n.t("inventorySales.sales.wizard.review.willBePaid")
-            : i18n.t("inventorySales.sales.wizard.review.willBePending")}
-        </Typography>
+        {canManagePayments && payments.length > 0 ? (
+          <>
+            {payments.map((payment) => (
+              <Box key={payment.id} className={classes.payRow}>
+                <Typography className={classes.value}>
+                  {methodLabel(payment.method)}
+                  {payment.method === "credit_card" && payment.cardInstallmentCount
+                    ? ` · ${formatCardInstallmentCaption(
+                        payment.cardInstallmentCount,
+                        payment.amount
+                      )}`
+                    : ""}
+                </Typography>
+                <Typography variant="body2">
+                  {formatCurrencyBRL(payment.amount)} —{" "}
+                  {payment.status === "paid"
+                    ? i18n.t("inventorySales.sales.wizard.payment.statusPaid")
+                    : i18n.t("inventorySales.sales.wizard.payment.statusPending")}
+                </Typography>
+              </Box>
+            ))}
+            <Typography variant="body2" color="textSecondary">
+              {i18n.t("inventorySales.sales.wizard.payment.received")}:{" "}
+              {formatCurrencyBRL(summary?.effectivePaid ?? 0)}
+            </Typography>
+            <Typography variant="body2" color="textSecondary">
+              {i18n.t("inventorySales.sales.wizard.payment.pending")}:{" "}
+              {formatCurrencyBRL(summary?.pendingAmount ?? 0)}
+            </Typography>
+          </>
+        ) : (
+          <Typography className={classes.value}>
+            {describeSalePaymentMethod(sale)}
+          </Typography>
+        )}
       </Box>
 
       {headerForm.notes ? (

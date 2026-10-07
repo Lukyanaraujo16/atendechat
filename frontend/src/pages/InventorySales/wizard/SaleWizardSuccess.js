@@ -12,7 +12,7 @@ import { formatCurrencyBRL } from "../../../utils/brazilianCurrency";
 import { i18n } from "../../../translate/i18n";
 import { getInventorySale } from "../../../services/inventoryApi";
 import toastError from "../../../errors/toastError";
-import { formatCardPaymentLabel } from "../cardInstallments";
+import { describeSalePaymentMethod } from "../paymentDisplay";
 import { formatSaleNumber, paymentStatusChipColor } from "../utils";
 import SaleReceiptDialog from "../SaleReceiptDialog";
 import SaleWizardTotals from "./SaleWizardTotals";
@@ -51,17 +51,7 @@ export default function SaleWizardSuccess({
 
   const itemCount = getInventorySaleItems(sale).length;
 
-  const methodLabel = sale?.paymentMethod
-    ? formatCardPaymentLabel(
-        i18n.t(
-          `inventorySales.sales.paymentMethods.${sale.paymentMethod}`,
-          sale.paymentMethod
-        ),
-        sale.paymentMethod,
-        sale.cardInstallmentCount,
-        sale.totalAmount
-      )
-    : i18n.t("inventorySales.sales.payment.noMethod");
+  const methodLabel = describeSalePaymentMethod(sale);
 
   const handleOpenReceipt = async () => {
     if (!sale?.id || receiptLoading) return;

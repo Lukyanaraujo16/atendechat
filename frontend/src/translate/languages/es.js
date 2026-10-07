@@ -491,6 +491,7 @@ const messages = {
             paidAmount: "Valor pagado",
             paidAt: "Fecha de pago",
             noMethod: "Sin forma definida",
+            multipleMethods: "Múltiples formas de pago",
             installments: "Cuotas",
             installmentsExact: "{{times}}x de {{amount}}",
             installmentsOfTotal: "{{times}}x — total {{amount}}",

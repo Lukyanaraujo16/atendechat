@@ -16,6 +16,13 @@ import CancelInventorySaleService from "../services/InventoryService/CancelInven
 import UpdateInventorySalePaymentService from "../services/InventoryService/UpdateInventorySalePaymentService";
 import UpdateInventorySaleDeliveryService from "../services/InventoryService/UpdateInventorySaleDeliveryService";
 import SearchInventoryCustomersService from "../services/InventoryService/SearchInventoryCustomersService";
+import {
+  addInventorySalePayment,
+  deletePendingInventorySalePayment,
+  listInventorySalePayments,
+  settleInventorySalePayment,
+  updatePendingInventorySalePayment
+} from "../services/InventoryService/InventorySalePaymentLinesService";
 import { computeEffectiveUserFeatureMapForRequest } from "../services/UserFeaturePermission/UserFeaturePermissionService";
 
 function companyIdOrThrow(req: Request): number {
@@ -46,6 +53,17 @@ function parseOptionalRegisterAsPaid(raw: unknown): boolean | undefined {
     "ERR_VALIDATION_ERROR",
     400,
     "registerAsPaid inválido."
+  );
+}
+
+function parseOptionalPaymentMode(raw: unknown): "legacy" | "lines" | undefined {
+  if (raw === undefined || raw === null || raw === "") return undefined;
+  const mode = String(raw).trim();
+  if (mode === "legacy" || mode === "lines") return mode;
+  throw new AppError(
+    "ERR_VALIDATION_ERROR",
+    400,
+    "paymentMode inválido."
   );
 }
 
@@ -204,7 +222,8 @@ export const completeSale = async (
     sellerUserId: req.body?.sellerUserId,
     completedBy: userIdOrNull(req),
     registerAsPaid,
-    canManagePayments
+    canManagePayments,
+    paymentMode: parseOptionalPaymentMode(req.body?.paymentMode)
   });
   return res.json(sale);
 };
@@ -248,4 +267,73 @@ export const updateSaleDelivery = async (
     body: req.body
   });
   return res.json(sale);
+};
+
+export const listSalePayments = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const bundle = await listInventorySalePayments({
+    companyId,
+    saleId: parseIdParam(req.params.id)
+  });
+  return res.json(bundle);
+};
+
+export const createSalePayment = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const bundle = await addInventorySalePayment({
+    companyId,
+    saleId: parseIdParam(req.params.id),
+    body: req.body || {},
+    actorUserId: userIdOrNull(req)
+  });
+  return res.status(201).json(bundle);
+};
+
+export const updateSalePaymentLine = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const bundle = await updatePendingInventorySalePayment({
+    companyId,
+    saleId: parseIdParam(req.params.id),
+    paymentId: parseIdParam(req.params.paymentId),
+    body: req.body || {},
+    actorUserId: userIdOrNull(req)
+  });
+  return res.json(bundle);
+};
+
+export const deleteSalePaymentLine = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const bundle = await deletePendingInventorySalePayment({
+    companyId,
+    saleId: parseIdParam(req.params.id),
+    paymentId: parseIdParam(req.params.paymentId)
+  });
+  return res.json(bundle);
+};
+
+export const settleSalePaymentLine = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const bundle = await settleInventorySalePayment({
+    companyId,
+    saleId: parseIdParam(req.params.id),
+    paymentId: parseIdParam(req.params.paymentId),
+    body: req.body || {},
+    actorUserId: userIdOrNull(req)
+  });
+  return res.json(bundle);
 };

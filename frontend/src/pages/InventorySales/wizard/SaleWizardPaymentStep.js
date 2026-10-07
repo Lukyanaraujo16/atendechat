@@ -1,29 +1,42 @@
-import React from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Box,
-  Checkbox,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   FormControl,
-  FormControlLabel,
+  IconButton,
   InputLabel,
   MenuItem,
   Select,
   TextField,
   Typography,
 } from "@material-ui/core";
+import DeleteOutlineIcon from "@material-ui/icons/DeleteOutline";
+import CheckCircleOutlineIcon from "@material-ui/icons/CheckCircleOutline";
 import { makeStyles } from "@material-ui/core/styles";
 
+import {
+  AppPrimaryButton,
+  AppSecondaryButton,
+} from "../../../ui";
 import { formatCurrencyBRL } from "../../../utils/brazilianCurrency";
 import { i18n } from "../../../translate/i18n";
+import toastError from "../../../errors/toastError";
+import {
+  addInventorySalePayment,
+  deleteInventorySalePaymentLine,
+  getInventorySalePayments,
+  settleInventorySalePaymentLine,
+} from "../../../services/inventoryApi";
 import { PAYMENT_METHODS } from "../constants";
 import {
   CARD_INSTALLMENT_OPTIONS,
   formatCardInstallmentCaption,
 } from "../cardInstallments";
-import {
-  defaultRegisterAsPaid,
-  isRegisterAsPaidLocked,
-} from "./paymentDefaults";
-import SaleWizardTotals from "./SaleWizardTotals";
+import CurrencyInput from "../CurrencyInput";
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -34,206 +47,500 @@ const useStyles = makeStyles((theme) => ({
   title: {
     fontWeight: 700,
   },
-  methods: {
+  summary: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
-    gap: theme.spacing(1),
-  },
-  methodBtn: {
-    border: `1px solid ${theme.palette.divider}`,
-    borderRadius: theme.shape.borderRadius,
-    padding: theme.spacing(1.5, 1),
-    textAlign: "center",
-    cursor: "pointer",
-    background: "transparent",
-    font: "inherit",
-    color: theme.palette.text.primary,
-    minHeight: 56,
-    "&:disabled": {
-      opacity: 0.5,
-      cursor: "not-allowed",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gap: theme.spacing(1.5),
+    [theme.breakpoints.up("sm")]: {
+      gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
     },
   },
-  methodSelected: {
-    borderColor: theme.palette.primary.main,
+  summaryItem: {
+    minWidth: 0,
+  },
+  summaryLabel: {
+    color: theme.palette.text.secondary,
+    fontSize: "0.75rem",
+  },
+  summaryValue: {
+    fontWeight: 700,
+    fontSize: "1.05rem",
+  },
+  remaining: {
     color: theme.palette.primary.main,
+  },
+  list: {
+    display: "flex",
+    flexDirection: "column",
+    gap: theme.spacing(1),
+  },
+  row: {
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: theme.spacing(1),
+    padding: theme.spacing(1.5, 0),
+    borderBottom: `1px solid ${theme.palette.divider}`,
+  },
+  rowMain: {
+    minWidth: 0,
+    flex: 1,
+  },
+  rowActions: {
+    display: "flex",
+    alignItems: "center",
+    gap: 4,
+    flexShrink: 0,
+  },
+  statusPaid: {
+    color: theme.palette.success.main,
     fontWeight: 600,
-    boxShadow: `inset 0 0 0 1px ${theme.palette.primary.main}`,
+    fontSize: "0.8rem",
+  },
+  statusPending: {
+    color: theme.palette.warning.dark,
+    fontWeight: 600,
+    fontSize: "0.8rem",
+  },
+  empty: {
+    padding: theme.spacing(3, 0),
+    color: theme.palette.text.secondary,
   },
   readonly: {
     padding: theme.spacing(2),
     border: `1px solid ${theme.palette.divider}`,
     borderRadius: theme.shape.borderRadius,
   },
+  formStack: {
+    display: "flex",
+    flexDirection: "column",
+    gap: theme.spacing(2),
+    paddingTop: theme.spacing(1),
+  },
 }));
+
+function defaultStatusForMethod(method) {
+  if (
+    method === "cash" ||
+    method === "pix" ||
+    method === "credit_card" ||
+    method === "debit_card" ||
+    method === "bank_transfer"
+  ) {
+    return "paid";
+  }
+  return "pending";
+}
+
+function methodLabel(method) {
+  return i18n.t(`inventorySales.sales.paymentMethods.${method}`, method);
+}
+
+function paymentLineCaption(payment) {
+  const base = methodLabel(payment.method);
+  if (payment.method === "credit_card" && payment.cardInstallmentCount) {
+    return `${base} · ${formatCardInstallmentCaption(
+      payment.cardInstallmentCount,
+      payment.amount
+    )}`;
+  }
+  return base;
+}
 
 export default function SaleWizardPaymentStep({
   sale,
-  paymentForm,
-  setPaymentForm,
-  registerAsPaid,
-  setRegisterAsPaid,
   canManagePayments,
   disabled,
+  paymentsBundle,
+  setPaymentsBundle,
+  onSaleCacheMaybeChanged,
 }) {
   const classes = useStyles();
-  const totalLabel = formatCurrencyBRL(sale?.totalAmount);
-  const itemCount = Array.isArray(sale?.items) ? sale.items.length : 0;
+  const [loading, setLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [busyId, setBusyId] = useState(null);
+  const submitLock = useRef(false);
+
+  const [formMethod, setFormMethod] = useState("cash");
+  const [formAmount, setFormAmount] = useState(0);
+  const [formStatus, setFormStatus] = useState("paid");
+  const [formInstallments, setFormInstallments] = useState("1");
+  const [formNotes, setFormNotes] = useState("");
+
+  const summary = paymentsBundle?.summary;
+  const payments = Array.isArray(paymentsBundle?.payments)
+    ? paymentsBundle.payments
+    : [];
+
+  const loadPayments = useCallback(async () => {
+    if (!sale?.id || !canManagePayments) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    try {
+      const { data } = await getInventorySalePayments(sale.id);
+      setPaymentsBundle(data);
+    } catch (err) {
+      toastError(err);
+    } finally {
+      setLoading(false);
+    }
+  }, [sale?.id, canManagePayments, setPaymentsBundle]);
+
+  useEffect(() => {
+    loadPayments();
+  }, [loadPayments]);
+
+  const openAddDialog = () => {
+    const remaining = Number(summary?.remainingToAllocate ?? sale?.totalAmount ?? 0);
+    setFormMethod("cash");
+    setFormAmount(remaining > 0 ? remaining : 0);
+    setFormStatus("paid");
+    setFormInstallments("1");
+    setFormNotes("");
+    setDialogOpen(true);
+  };
+
+  const handleMethodChange = (method) => {
+    setFormMethod(method);
+    const nextStatus =
+      method === "credit_card" ? "paid" : defaultStatusForMethod(method);
+    setFormStatus(nextStatus);
+    if (method !== "credit_card") setFormInstallments("1");
+  };
+
+  const handleAdd = async () => {
+    if (submitLock.current || submitting || !sale?.id) return;
+    if (!(formAmount > 0)) {
+      return;
+    }
+    if (formMethod === "credit_card") {
+      const count = Number(formInstallments);
+      if (!Number.isInteger(count) || count < 1 || count > 18) return;
+    }
+    submitLock.current = true;
+    setSubmitting(true);
+    try {
+      const body = {
+        method: formMethod,
+        amount: formAmount,
+        status: formMethod === "credit_card" ? "paid" : formStatus,
+        notes: formNotes.trim() || null,
+      };
+      if (formMethod === "credit_card") {
+        body.cardInstallmentCount = Number(formInstallments);
+      }
+      const { data } = await addInventorySalePayment(sale.id, body);
+      setPaymentsBundle(data);
+      setDialogOpen(false);
+      if (onSaleCacheMaybeChanged) await onSaleCacheMaybeChanged();
+    } catch (err) {
+      toastError(err);
+    } finally {
+      setSubmitting(false);
+      submitLock.current = false;
+    }
+  };
+
+  const handleDelete = async (payment) => {
+    if (payment.status !== "pending" || busyId != null) return;
+    setBusyId(payment.id);
+    try {
+      const { data } = await deleteInventorySalePaymentLine(sale.id, payment.id);
+      setPaymentsBundle(data);
+      if (onSaleCacheMaybeChanged) await onSaleCacheMaybeChanged();
+    } catch (err) {
+      toastError(err);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleSettle = async (payment) => {
+    if (payment.status !== "pending" || busyId != null) return;
+    setBusyId(payment.id);
+    try {
+      const { data } = await settleInventorySalePaymentLine(sale.id, payment.id);
+      setPaymentsBundle(data);
+      if (onSaleCacheMaybeChanged) await onSaleCacheMaybeChanged();
+    } catch (err) {
+      toastError(err);
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   if (!canManagePayments) {
-    const method = sale?.paymentMethod;
     return (
       <Box className={classes.root} data-testid="sale-wizard-payment-step">
         <Typography variant="h5" className={classes.title}>
-          {i18n.t("inventorySales.sales.wizard.payment.title", { total: totalLabel })}
+          {i18n.t("inventorySales.sales.wizard.payment.titleSplit")}
         </Typography>
-        <Box className={classes.readonly} data-testid="sale-wizard-payment-readonly">
-          {method ? (
-            <>
-              <Typography variant="body1">
-                {i18n.t(`inventorySales.sales.paymentMethods.${method}`, method)}
-                {method === "credit_card" && sale.cardInstallmentCount
-                  ? ` — ${formatCardInstallmentCaption(
-                      sale.cardInstallmentCount,
-                      sale.totalAmount
-                    )}`
-                  : ""}
-              </Typography>
-              <Typography variant="body2" color="textSecondary">
-                {i18n.t("inventorySales.sales.wizard.payment.readonlyHint")}
-              </Typography>
-            </>
-          ) : (
-            <>
-              <Typography variant="body1">
-                {i18n.t("inventorySales.sales.wizard.payment.noPermissionTitle")}
-              </Typography>
-              <Typography variant="body2" color="textSecondary">
-                {i18n.t("inventorySales.sales.wizard.payment.noPermissionBody")}
-              </Typography>
-            </>
-          )}
+        <Box className={classes.readonly}>
+          <Typography variant="subtitle1" style={{ fontWeight: 600 }}>
+            {i18n.t("inventorySales.sales.wizard.payment.noPermissionTitle")}
+          </Typography>
+          <Typography variant="body2" color="textSecondary">
+            {i18n.t("inventorySales.sales.wizard.payment.noPermissionBody")}
+          </Typography>
         </Box>
-        <SaleWizardTotals sale={sale} itemCount={itemCount} />
       </Box>
     );
   }
 
-  const selectMethod = (method) => {
-    setPaymentForm((prev) => ({
-      ...prev,
-      paymentMethod: method,
-      cardInstallmentCount: method === "credit_card" ? "1" : "",
-    }));
-    setRegisterAsPaid(defaultRegisterAsPaid(method));
-  };
-
-  const lockedPaid = isRegisterAsPaidLocked(paymentForm.paymentMethod);
-
   return (
     <Box className={classes.root} data-testid="sale-wizard-payment-step">
       <Typography variant="h5" className={classes.title}>
-        {i18n.t("inventorySales.sales.wizard.payment.title", { total: totalLabel })}
+        {i18n.t("inventorySales.sales.wizard.payment.titleSplit")}
       </Typography>
 
-      <Box className={classes.methods} role="group" aria-label={i18n.t("inventorySales.sales.fields.paymentMethod")}>
-        {PAYMENT_METHODS.map((method) => {
-          const selected = paymentForm.paymentMethod === method;
-          return (
-            <button
-              key={method}
-              type="button"
-              className={`${classes.methodBtn} ${
-                selected ? classes.methodSelected : ""
-              }`}
-              disabled={disabled}
-              aria-pressed={selected}
-              data-testid={`sale-wizard-pay-${method}`}
-              onClick={() => selectMethod(method)}
-            >
-              {i18n.t(`inventorySales.sales.paymentMethods.${method}`, method)}
-            </button>
-          );
-        })}
-      </Box>
-
-      {paymentForm.paymentMethod === "credit_card" ? (
+      {loading ? (
+        <Box display="flex" justifyContent="center" py={4}>
+          <CircularProgress size={28} />
+        </Box>
+      ) : (
         <>
-          <FormControl variant="outlined" size="small" fullWidth disabled={disabled}>
-            <InputLabel id="wizard-installments-label">
-              {i18n.t("inventorySales.sales.payment.installments")}
-            </InputLabel>
-            <Select
-              labelId="wizard-installments-label"
-              value={paymentForm.cardInstallmentCount || "1"}
-              onChange={(e) =>
-                setPaymentForm((prev) => ({
-                  ...prev,
-                  cardInstallmentCount: String(e.target.value),
-                }))
-              }
-              label={i18n.t("inventorySales.sales.payment.installments")}
-              SelectDisplayProps={{
-                "data-testid": "sale-wizard-card-installments",
-              }}
-            >
-              {CARD_INSTALLMENT_OPTIONS.map((count) => (
-                <MenuItem key={count} value={String(count)}>
-                  {count}x
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <Typography
-            variant="body2"
-            color="textSecondary"
-            data-testid="sale-wizard-card-caption"
-          >
-            {formatCardInstallmentCaption(
-              Number(paymentForm.cardInstallmentCount || 1),
-              sale?.totalAmount
+          <Box className={classes.summary} data-testid="sale-wizard-payment-summary">
+            <Box className={classes.summaryItem}>
+              <Typography className={classes.summaryLabel}>
+                {i18n.t("inventorySales.sales.wizard.payment.total")}
+              </Typography>
+              <Typography className={classes.summaryValue}>
+                {formatCurrencyBRL(summary?.totalAmount ?? sale?.totalAmount)}
+              </Typography>
+            </Box>
+            <Box className={classes.summaryItem}>
+              <Typography className={classes.summaryLabel}>
+                {i18n.t("inventorySales.sales.wizard.payment.received")}
+              </Typography>
+              <Typography className={classes.summaryValue}>
+                {formatCurrencyBRL(summary?.effectivePaid ?? 0)}
+              </Typography>
+            </Box>
+            <Box className={classes.summaryItem}>
+              <Typography className={classes.summaryLabel}>
+                {i18n.t("inventorySales.sales.wizard.payment.pending")}
+              </Typography>
+              <Typography className={classes.summaryValue}>
+                {formatCurrencyBRL(summary?.pendingAmount ?? 0)}
+              </Typography>
+            </Box>
+            <Box className={classes.summaryItem}>
+              <Typography className={classes.summaryLabel}>
+                {i18n.t("inventorySales.sales.wizard.payment.remaining")}
+              </Typography>
+              <Typography
+                className={`${classes.summaryValue} ${classes.remaining}`}
+                data-testid="sale-wizard-payment-remaining"
+              >
+                {formatCurrencyBRL(summary?.remainingToAllocate ?? 0)}
+              </Typography>
+            </Box>
+          </Box>
+
+          <Box className={classes.list} data-testid="sale-wizard-payment-list">
+            {payments.length === 0 ? (
+              <Typography className={classes.empty}>
+                {i18n.t("inventorySales.sales.wizard.payment.empty")}
+              </Typography>
+            ) : (
+              payments.map((payment) => (
+                <Box
+                  key={payment.id}
+                  className={classes.row}
+                  data-testid={`sale-wizard-payment-row-${payment.id}`}
+                >
+                  <Box className={classes.rowMain}>
+                    <Typography style={{ fontWeight: 600 }}>
+                      {paymentLineCaption(payment)}
+                    </Typography>
+                    <Typography variant="body2">
+                      {formatCurrencyBRL(payment.amount)}
+                    </Typography>
+                    <Typography
+                      className={
+                        payment.status === "paid"
+                          ? classes.statusPaid
+                          : classes.statusPending
+                      }
+                    >
+                      {payment.status === "paid"
+                        ? i18n.t("inventorySales.sales.wizard.payment.statusPaid")
+                        : i18n.t(
+                            "inventorySales.sales.wizard.payment.statusPending"
+                          )}
+                    </Typography>
+                  </Box>
+                  <Box className={classes.rowActions}>
+                    {payment.status === "pending" && (
+                      <>
+                        <IconButton
+                          size="small"
+                          aria-label={i18n.t(
+                            "inventorySales.sales.wizard.payment.markReceived"
+                          )}
+                          disabled={disabled || busyId === payment.id}
+                          onClick={() => handleSettle(payment)}
+                        >
+                          {busyId === payment.id ? (
+                            <CircularProgress size={18} />
+                          ) : (
+                            <CheckCircleOutlineIcon fontSize="small" />
+                          )}
+                        </IconButton>
+                        <IconButton
+                          size="small"
+                          aria-label={i18n.t(
+                            "inventorySales.sales.wizard.payment.remove"
+                          )}
+                          disabled={disabled || busyId === payment.id}
+                          onClick={() => handleDelete(payment)}
+                        >
+                          <DeleteOutlineIcon fontSize="small" />
+                        </IconButton>
+                      </>
+                    )}
+                    {payment.status === "paid" && (
+                      <Typography variant="caption" color="textSecondary">
+                        {i18n.t("inventorySales.sales.wizard.payment.registered")}
+                      </Typography>
+                    )}
+                  </Box>
+                </Box>
+              ))
             )}
-          </Typography>
+          </Box>
+
+          <AppPrimaryButton
+            onClick={openAddDialog}
+            disabled={disabled || Number(summary?.remainingToAllocate) <= 0}
+            data-testid="sale-wizard-payment-add"
+          >
+            {i18n.t("inventorySales.sales.wizard.payment.add")}
+          </AppPrimaryButton>
         </>
-      ) : null}
+      )}
 
-      {paymentForm.paymentMethod ? (
-        <FormControlLabel
-          control={
-            <Checkbox
-              color="primary"
-              checked={Boolean(registerAsPaid)}
-              disabled={disabled || lockedPaid}
-              onChange={(e) => setRegisterAsPaid(e.target.checked)}
-              inputProps={{ "data-testid": "sale-wizard-register-as-paid" }}
-            />
-          }
-          label={
-            lockedPaid
-              ? i18n.t("inventorySales.sales.wizard.payment.registerAsPaidLocked")
-              : i18n.t("inventorySales.sales.wizard.payment.registerAsPaid")
-          }
-        />
-      ) : null}
-
-      <TextField
-        label={i18n.t("inventorySales.sales.fields.paymentNotes")}
-        value={paymentForm.paymentNotes}
-        onChange={(e) =>
-          setPaymentForm((prev) => ({
-            ...prev,
-            paymentNotes: e.target.value,
-          }))
-        }
-        variant="outlined"
-        size="small"
+      <Dialog
+        open={dialogOpen}
+        onClose={() => !submitting && setDialogOpen(false)}
         fullWidth
-        multiline
-        rows={2}
-        disabled={disabled}
-      />
+        maxWidth="xs"
+        data-testid="sale-wizard-payment-dialog"
+      >
+        <DialogTitle>
+          {i18n.t("inventorySales.sales.wizard.payment.add")}
+        </DialogTitle>
+        <DialogContent>
+          <Box className={classes.formStack}>
+            <FormControl variant="outlined" fullWidth size="small">
+              <InputLabel>
+                {i18n.t("inventorySales.sales.wizard.payment.method")}
+              </InputLabel>
+              <Select
+                label={i18n.t("inventorySales.sales.wizard.payment.method")}
+                value={formMethod}
+                onChange={(e) => handleMethodChange(e.target.value)}
+                disabled={submitting}
+              >
+                {PAYMENT_METHODS.map((method) => (
+                  <MenuItem key={method} value={method}>
+                    {methodLabel(method)}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
 
-      <SaleWizardTotals sale={sale} itemCount={itemCount} />
+            <CurrencyInput
+              label={i18n.t("inventorySales.sales.wizard.payment.amount")}
+              value={formAmount}
+              onChange={setFormAmount}
+              disabled={submitting}
+              fullWidth
+              size="small"
+              variant="outlined"
+            />
+
+            {formMethod === "credit_card" ? (
+              <FormControl variant="outlined" fullWidth size="small">
+                <InputLabel>
+                  {i18n.t("inventorySales.sales.wizard.payment.installments")}
+                </InputLabel>
+                <Select
+                  label={i18n.t(
+                    "inventorySales.sales.wizard.payment.installments"
+                  )}
+                  value={formInstallments}
+                  onChange={(e) => setFormInstallments(e.target.value)}
+                  disabled={submitting}
+                >
+                  {CARD_INSTALLMENT_OPTIONS.map((n) => (
+                    <MenuItem key={n} value={String(n)}>
+                      {formatCardInstallmentCaption(n, formAmount)}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            ) : (
+              formMethod !== "credit_card" && (
+                <FormControl variant="outlined" fullWidth size="small">
+                  <InputLabel>
+                    {i18n.t("inventorySales.sales.wizard.payment.situation")}
+                  </InputLabel>
+                  <Select
+                    label={i18n.t(
+                      "inventorySales.sales.wizard.payment.situation"
+                    )}
+                    value={formStatus}
+                    onChange={(e) => setFormStatus(e.target.value)}
+                    disabled={submitting}
+                  >
+                    <MenuItem value="paid">
+                      {i18n.t("inventorySales.sales.wizard.payment.statusPaid")}
+                    </MenuItem>
+                    <MenuItem value="pending">
+                      {i18n.t(
+                        "inventorySales.sales.wizard.payment.statusPending"
+                      )}
+                    </MenuItem>
+                  </Select>
+                </FormControl>
+              )
+            )}
+
+            <TextField
+              label={i18n.t("inventorySales.sales.wizard.payment.notes")}
+              value={formNotes}
+              onChange={(e) => setFormNotes(e.target.value)}
+              disabled={submitting}
+              fullWidth
+              size="small"
+              variant="outlined"
+              multiline
+              minRows={2}
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <AppSecondaryButton
+            onClick={() => setDialogOpen(false)}
+            disabled={submitting}
+          >
+            {i18n.t("inventorySales.sales.wizard.nav.back")}
+          </AppSecondaryButton>
+          <AppPrimaryButton
+            onClick={handleAdd}
+            disabled={submitting || !(formAmount > 0)}
+            data-testid="sale-wizard-payment-submit"
+          >
+            {submitting
+              ? i18n.t("inventorySales.sales.wizard.nav.saving")
+              : i18n.t("inventorySales.sales.wizard.payment.save")}
+          </AppPrimaryButton>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

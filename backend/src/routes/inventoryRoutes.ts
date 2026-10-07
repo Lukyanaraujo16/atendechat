@@ -256,6 +256,36 @@ inventoryRoutes.put(
   requireInventorySalesPermission(INVENTORY_SALES_MANAGE_PAYMENTS),
   InventorySaleController.updateSalePayment
 );
+inventoryRoutes.get(
+  "/inventory/sales/:id/payments",
+  isAuth,
+  requireInventorySalesPermission(INVENTORY_SALES_MANAGE_PAYMENTS),
+  InventorySaleController.listSalePayments
+);
+inventoryRoutes.post(
+  "/inventory/sales/:id/payments",
+  isAuth,
+  requireInventorySalesPermission(INVENTORY_SALES_MANAGE_PAYMENTS),
+  InventorySaleController.createSalePayment
+);
+inventoryRoutes.put(
+  "/inventory/sales/:id/payments/:paymentId",
+  isAuth,
+  requireInventorySalesPermission(INVENTORY_SALES_MANAGE_PAYMENTS),
+  InventorySaleController.updateSalePaymentLine
+);
+inventoryRoutes.delete(
+  "/inventory/sales/:id/payments/:paymentId",
+  isAuth,
+  requireInventorySalesPermission(INVENTORY_SALES_MANAGE_PAYMENTS),
+  InventorySaleController.deleteSalePaymentLine
+);
+inventoryRoutes.post(
+  "/inventory/sales/:id/payments/:paymentId/settle",
+  isAuth,
+  requireInventorySalesPermission(INVENTORY_SALES_MANAGE_PAYMENTS),
+  InventorySaleController.settleSalePaymentLine
+);
 
 inventoryRoutes.get(
   "/inventory/products/low-stock",

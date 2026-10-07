@@ -92,6 +92,21 @@ export const cancelInventorySale = (saleId, body) =>
 export const updateInventorySalePayment = (saleId, body) =>
   api.put(`/inventory/sales/${saleId}/payment`, body);
 
+export const getInventorySalePayments = (saleId) =>
+  api.get(`/inventory/sales/${saleId}/payments`);
+
+export const addInventorySalePayment = (saleId, body) =>
+  api.post(`/inventory/sales/${saleId}/payments`, body);
+
+export const updateInventorySalePaymentLine = (saleId, paymentId, body) =>
+  api.put(`/inventory/sales/${saleId}/payments/${paymentId}`, body);
+
+export const deleteInventorySalePaymentLine = (saleId, paymentId) =>
+  api.delete(`/inventory/sales/${saleId}/payments/${paymentId}`);
+
+export const settleInventorySalePaymentLine = (saleId, paymentId, body) =>
+  api.post(`/inventory/sales/${saleId}/payments/${paymentId}/settle`, body || {});
+
 export const updateInventorySaleDelivery = (saleId, body) =>
   api.put(`/inventory/sales/${saleId}/delivery`, body);
 
