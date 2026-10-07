@@ -121,6 +121,11 @@ const useStyles = makeStyles((theme) => ({
     marginTop: theme.spacing(2),
   },
   itemsTable: {
+    /**
+     * Recibo é sempre papel branco (receiptRoot). Em tema escuro o MuiTableCell
+     * usa text.primary claro; sem cor explícita no td as linhas somem (cabeçalhos
+     * continuavam visíveis porque th já fixava #444).
+     */
     "& th": {
       fontSize: "0.75rem",
       fontWeight: 600,
@@ -130,6 +135,7 @@ const useStyles = makeStyles((theme) => ({
     },
     "& td": {
       fontSize: "0.8125rem",
+      color: "#111",
       borderBottom: "1px solid #eee",
       padding: theme.spacing(1, 0.5),
       verticalAlign: "top",
@@ -197,6 +203,7 @@ const useStyles = makeStyles((theme) => ({
   mobileItem: {
     padding: theme.spacing(1.5, 0),
     borderBottom: "1px solid #eee",
+    color: "#111",
   },
 }));
 
