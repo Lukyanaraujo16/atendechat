@@ -55,6 +55,13 @@ jest.mock("../../../services/inventoryApi", () => ({
   cancelInventorySale: jest.fn(),
   deleteInventorySale: jest.fn(),
   searchInventoryCustomers: jest.fn(),
+  getInventorySalePayments: jest.fn(() =>
+    Promise.resolve({ data: { payments: [], summary: null } })
+  ),
+  addInventorySalePayment: jest.fn(),
+  updateInventorySalePaymentLine: jest.fn(),
+  deleteInventorySalePaymentLine: jest.fn(),
+  settleInventorySalePaymentLine: jest.fn(),
 }));
 
 if (typeof global.MutationObserver === "undefined") {
@@ -156,7 +163,7 @@ describe("SaleDrawer cliente e persistência", () => {
     expect(screen.getAllByTestId("sale-customer-search")).toHaveLength(1);
     expect(screen.queryByPlaceholderText("Pesquisar cliente…")).toBeNull();
     expect(screen.getByText("Dados da venda")).toBeTruthy();
-    expect(screen.getByText("Pagamento")).toBeTruthy();
+    expect(screen.getByText("Pagamentos")).toBeTruthy();
     expect(screen.getByText("Resumo")).toBeTruthy();
     expect(screen.getByText(/Subtotal/)).toBeTruthy();
     expect(screen.getByRole("button", { name: "Guardar dados" })).toBeTruthy();

@@ -15,6 +15,9 @@ jest.mock("../../../hooks/useIsMobile", () => ({
 
 jest.mock("../../../services/inventoryApi", () => ({
   getInventoryReceiptBranding: jest.fn(() => Promise.resolve({ data: {} })),
+  getInventorySalePayments: jest.fn(() =>
+    Promise.resolve({ data: { payments: [], summary: null } })
+  ),
 }));
 
 const theme = createTheme();

@@ -24,10 +24,14 @@ jest.mock("react-toastify", () => ({
 
 const mockGetInventoryReceiptBranding = jest.fn(() => Promise.resolve({ data: {} }));
 const mockUpdateInventorySettings = jest.fn();
+const mockGetInventorySalePayments = jest.fn(() =>
+  Promise.resolve({ data: { payments: [], summary: null } })
+);
 
 jest.mock("../../../services/inventoryApi", () => ({
   getInventoryReceiptBranding: (...args) => mockGetInventoryReceiptBranding(...args),
   updateInventorySettings: (...args) => mockUpdateInventorySettings(...args),
+  getInventorySalePayments: (...args) => mockGetInventorySalePayments(...args),
 }));
 
 class MutationObserverMock {
@@ -146,6 +150,10 @@ beforeEach(() => {
   mockGetInventoryReceiptBranding.mockReset();
   mockGetInventoryReceiptBranding.mockResolvedValue({ data: {} });
   mockUpdateInventorySettings.mockReset();
+  mockGetInventorySalePayments.mockReset();
+  mockGetInventorySalePayments.mockResolvedValue({
+    data: { payments: [], summary: null },
+  });
   installBridge();
   jest.spyOn(window, "print").mockImplementation(() => {
     throw new Error("parent-print");

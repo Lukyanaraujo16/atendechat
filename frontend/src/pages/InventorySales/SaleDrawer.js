@@ -39,6 +39,7 @@ import { i18n } from "../../translate/i18n";
 import ConfirmationModal from "../../components/ConfirmationModal";
 import SaleItemsEditor from "./SaleItemsEditor";
 import SalePaymentDialog from "./SalePaymentDialog";
+import SalePaymentsSection from "./SalePaymentsSection";
 import SaleReceiptDialog from "./SaleReceiptDialog";
 import { PAYMENT_METHODS } from "./constants";
 import {
@@ -926,46 +927,19 @@ export default function SaleDrawer({
                         </AppSecondaryButton>
                       </Box>
                     </>
-                  ) : sale.status === "completed" ? (
-                    <>
-                      <div className={classes.paymentInfoRow}>
-                        <Chip
-                          size="small"
-                          color={paymentStatusChipColor(sale.paymentStatus)}
-                          label={paymentStatusLabel(sale.paymentStatus)}
-                        />
-                        <Typography variant="body2" data-testid="sale-payment-method-display">
-                          {salePaymentLabel(sale)}
-                        </Typography>
-                      </div>
-                      <Typography variant="body2">
-                        {i18n.t("inventorySales.sales.payment.paidAmount")}:{" "}
-                        {formatCurrencyBRL(sale.paidAmount)} /{" "}
-                        {formatCurrencyBRL(sale.totalAmount)}
-                      </Typography>
-                      {sale.paidAt ? (
-                        <Typography variant="body2" color="textSecondary">
-                          {i18n.t("inventorySales.sales.payment.paidAt")}:{" "}
-                          {formatDate(sale.paidAt)}
-                        </Typography>
-                      ) : null}
-                      {sale.paymentNotes ? (
-                        <Typography variant="body2" color="textSecondary">
-                          {sale.paymentNotes}
-                        </Typography>
-                      ) : null}
-                      <Box>
-                        {perms.canManagePayments ? (
-                          <AppSecondaryButton onClick={() => setPaymentDialogOpen(true)}>
-                            {i18n.t("inventorySales.sales.payment.update")}
-                          </AppSecondaryButton>
-                        ) : null}
-                      </Box>
-                    </>
-                  ) : sale.status === "cancelled" && sale.paymentStatus === "refunded" ? (
-                    <Chip
-                      size="small"
-                      label={paymentStatusLabel(sale.paymentStatus)}
+                  ) : sale.status === "completed" || sale.status === "cancelled" ? (
+                    <SalePaymentsSection
+                      sale={sale}
+                      canManagePayments={perms.canManagePayments}
+                      onSaleMaybeChanged={async () => {
+                        await refreshSale();
+                        if (onChanged) onChanged();
+                      }}
+                      onLegacyUpdateClick={
+                        sale.status === "completed"
+                          ? () => setPaymentDialogOpen(true)
+                          : undefined
+                      }
                     />
                   ) : (
                     <Typography variant="body2" color="textSecondary" data-testid="sale-payment-method-display">

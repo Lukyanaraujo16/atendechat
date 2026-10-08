@@ -28,6 +28,9 @@ jest.mock("react-router-dom", () => ({
 jest.mock("../../../services/inventoryApi", () => ({
   getInventorySale: (...a) => mockGet(...a),
   getInventoryReceiptBranding: jest.fn().mockResolvedValue({ data: {} }),
+  getInventorySalePayments: jest.fn(() =>
+    Promise.resolve({ data: { payments: [], summary: null } })
+  ),
 }));
 
 jest.mock("../../../errors/toastError", () => jest.fn());

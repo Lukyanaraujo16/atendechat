@@ -96,8 +96,23 @@ html, body {
  * O espaço vazio fica no fim da última página, no máximo essa altura, e o
  * recibo longo segue na página seguinte.
  */
-const THERMAL_PAGE_HEIGHT = "100mm";
-const THERMAL_CONTENT_PADDING = "3mm";
+export const THERMAL_PAGE_HEIGHT = "100mm";
+export const THERMAL_CONTENT_PADDING = "3mm";
+
+/** Contrato de geometria homologada — usado por testes de regressão. */
+export const SALE_RECEIPT_GEOMETRY_CONTRACT = {
+  a4: {
+    pageSize: "A4 portrait",
+  },
+  thermal80: {
+    paperWidth: "80mm",
+    contentPadding: `0 ${THERMAL_CONTENT_PADDING}`,
+  },
+  thermal58: {
+    paperWidth: "58mm",
+    contentPadding: `0 ${THERMAL_CONTENT_PADDING}`,
+  },
+};
 
 function thermalPrintCss({ paperWidth, fontSize, logoMaxWidth }) {
   return `
@@ -239,6 +254,19 @@ html, body {
   gap: 6px;
   flex-wrap: wrap;
 }
+.sale-receipt-thermal-payments {
+  margin: 6px 0;
+}
+.sale-receipt-thermal-payment-line {
+  margin: 0 0 6px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.sale-receipt-thermal-payment-method {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
 .sale-receipt-thermal-total {
   border-top: 2px solid #111;
   margin-top: 4px;
@@ -281,7 +309,7 @@ const PRINT_PROFILES = {
   },
 };
 
-function getPrintProfile(format) {
+export function getPrintProfile(format) {
   const profile = PRINT_PROFILES[format];
   if (!profile) {
     throw new Error("print-format-invalid");
@@ -411,12 +439,16 @@ function destroyPrintFrame(iframe, mount) {
   }
 }
 
-function runPrint(sale, format, branding) {
+function runPrint(sale, format, branding, paymentBundle) {
   return new Promise((resolve, reject) => {
     let iframe = null;
     let mount = null;
     let finished = false;
     let fallbackTimer = null;
+    const payments = Array.isArray(paymentBundle?.payments)
+      ? paymentBundle.payments
+      : null;
+    const paymentSummary = paymentBundle?.summary || null;
 
     const detach = () => {
       if (fallbackTimer) clearTimeout(fallbackTimer);
@@ -467,6 +499,8 @@ function runPrint(sale, format, branding) {
             layout="print"
             format={profile.id}
             branding={branding}
+            payments={payments}
+            paymentSummary={paymentSummary}
           />
         </ThemeProvider>,
         mount
@@ -512,13 +546,14 @@ function runPrint(sale, format, branding) {
 export function printSaleReceipt(
   sale,
   format = DEFAULT_SALE_RECEIPT_PRINT_FORMAT,
-  branding = null
+  branding = null,
+  paymentBundle = null
 ) {
   if (!isSaleReceiptPrintFormat(format)) {
     return Promise.reject(new Error("print-format-invalid"));
   }
   if (activeJob) return activeJob;
-  activeJob = runPrint(sale, format, branding).finally(() => {
+  activeJob = runPrint(sale, format, branding, paymentBundle).finally(() => {
     activeJob = null;
   });
   return activeJob;

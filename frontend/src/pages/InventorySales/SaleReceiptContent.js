@@ -22,7 +22,11 @@ import {
 } from "./utils";
 import { identifiersFromSaleItem } from "./saleItemIdentifiers";
 import { isThermalSaleReceiptFormat } from "./saleReceiptPrintFormats";
-import { describeSalePaymentMethod } from "./paymentDisplay";
+import {
+  describeSalePaymentMethod,
+  getInventoryPaymentStatusLabel,
+  paymentLineReceiptCaption,
+} from "./paymentDisplay";
 import {
   hasReceiptBrandingFooter,
   hasReceiptBrandingHeader,
@@ -110,6 +114,28 @@ const useStyles = makeStyles((theme) => ({
     fontSize: "0.8125rem",
     whiteSpace: "pre-line",
     wordBreak: "break-word",
+  },
+  paymentsBlock: {
+    marginTop: theme.spacing(2),
+    marginBottom: theme.spacing(1),
+  },
+  paymentLine: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 2,
+    padding: theme.spacing(0.75, 0),
+    borderBottom: "1px solid #eee",
+    wordBreak: "break-word",
+    overflowWrap: "anywhere",
+  },
+  paymentLineTitle: {
+    fontWeight: 600,
+    fontSize: "0.875rem",
+    color: "#111",
+  },
+  paymentLineDetail: {
+    fontSize: "0.8125rem",
+    color: "#111",
   },
   cancelledBanner: {
     marginTop: theme.spacing(1.5),
@@ -368,7 +394,83 @@ function getPendingAmount(sale) {
   return Math.max(0, Math.round((total - paid) * 100) / 100);
 }
 
-function ThermalReceipt({ sale, classes, branding }) {
+function resolveReceiptPaidAmount(sale, payments, paymentSummary) {
+  if (paymentSummary && paymentSummary.effectivePaid != null) {
+    return toNumber(paymentSummary.effectivePaid);
+  }
+  if (Array.isArray(payments) && payments.length > 0) {
+    return payments
+      .filter((p) => p.status === "paid")
+      .reduce((sum, p) => sum + toNumber(p.amount), 0);
+  }
+  return toNumber(sale?.paidAmount);
+}
+
+function resolveReceiptPendingAmount(sale, payments, paymentSummary) {
+  if (paymentSummary && paymentSummary.pendingAmount != null) {
+    return toNumber(paymentSummary.pendingAmount);
+  }
+  if (Array.isArray(payments) && payments.length > 0) {
+    return payments
+      .filter((p) => p.status === "pending")
+      .reduce((sum, p) => sum + toNumber(p.amount), 0);
+  }
+  return getPendingAmount(sale);
+}
+
+function ThermalPaymentsBlock({ payments }) {
+  if (!Array.isArray(payments) || payments.length === 0) return null;
+  return (
+    <div className="sale-receipt-thermal-payments" data-testid="receipt-payments">
+      <div className="sale-receipt-thermal-label">
+        {i18n.t("inventorySales.sales.receipt.paymentsTitle")}
+      </div>
+      {payments.map((payment) => (
+        <div
+          key={payment.id}
+          className="sale-receipt-thermal-payment-line"
+          data-testid={`receipt-payment-line-${payment.id}`}
+        >
+          <div className="sale-receipt-thermal-payment-method">
+            {paymentLineReceiptCaption(payment)}
+          </div>
+          <div className="sale-receipt-thermal-money">
+            <span>{formatCurrencyBRL(payment.amount)}</span>
+            <span>{getInventoryPaymentStatusLabel(payment.status)}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function A4PaymentsBlock({ payments, classes }) {
+  if (!Array.isArray(payments) || payments.length === 0) return null;
+  return (
+    <div className={classes.paymentsBlock} data-testid="receipt-payments">
+      <Typography className={classes.sectionTitle}>
+        {i18n.t("inventorySales.sales.receipt.paymentsTitle")}
+      </Typography>
+      {payments.map((payment) => (
+        <div
+          key={payment.id}
+          className={classes.paymentLine}
+          data-testid={`receipt-payment-line-${payment.id}`}
+        >
+          <span className={classes.paymentLineTitle}>
+            {paymentLineReceiptCaption(payment)}
+          </span>
+          <span className={classes.paymentLineDetail}>
+            {formatCurrencyBRL(payment.amount)} —{" "}
+            {getInventoryPaymentStatusLabel(payment.status)}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ThermalReceipt({ sale, classes, branding, payments, paymentSummary }) {
   const items = getInventorySaleItems(sale);
   const isCancelled = sale.status === "cancelled";
   const customerName = sale.contact?.name || "";
@@ -378,12 +480,20 @@ function ThermalReceipt({ sale, classes, branding }) {
     `inventorySales.sales.paymentStatus.${sale.paymentStatus || "unpaid"}`,
     sale.paymentStatus || "unpaid"
   );
+  const hasPaymentLines = Array.isArray(payments) && payments.length > 0;
   const paymentMethodLabel = describeSalePaymentMethod(sale);
-  const showPaymentMethod =
-    Boolean(sale.paymentMethod) ||
-    toNumber(sale.paidAmount) > 0 ||
-    sale.paymentStatus === "paid" ||
-    sale.paymentStatus === "partial";
+  const showLegacyPaymentMethod =
+    !hasPaymentLines &&
+    (Boolean(sale.paymentMethod) ||
+      toNumber(sale.paidAmount) > 0 ||
+      sale.paymentStatus === "paid" ||
+      sale.paymentStatus === "partial");
+  const paidDisplay = resolveReceiptPaidAmount(sale, payments, paymentSummary);
+  const pendingDisplay = resolveReceiptPendingAmount(
+    sale,
+    payments,
+    paymentSummary
+  );
 
   return (
     <div className="sale-receipt-print-page sale-receipt-thermal">
@@ -439,7 +549,7 @@ function ThermalReceipt({ sale, classes, branding }) {
           {sellerName}
         </div>
       ) : null}
-      {showPaymentMethod ? (
+      {showLegacyPaymentMethod ? (
         <div className="sale-receipt-thermal-line">
           <span className="sale-receipt-thermal-label">
             {i18n.t("inventorySales.sales.receipt.paymentMethod")}:{" "}
@@ -499,6 +609,8 @@ function ThermalReceipt({ sale, classes, branding }) {
 
       <hr className="sale-receipt-thermal-rule" />
 
+      {hasPaymentLines ? <ThermalPaymentsBlock payments={payments} /> : null}
+
       <div className="sale-receipt-totals">
         <div className="sale-receipt-thermal-total-row">
           <span>{i18n.t("inventorySales.sales.receipt.subtotal")}</span>
@@ -522,12 +634,20 @@ function ThermalReceipt({ sale, classes, branding }) {
           <span>{formatCurrencyBRL(sale.totalAmount)}</span>
         </div>
         <div className="sale-receipt-thermal-total-row">
-          <span>{i18n.t("inventorySales.sales.receipt.paidAmount")}</span>
-          <span>{formatCurrencyBRL(sale.paidAmount)}</span>
+          <span>
+            {hasPaymentLines
+              ? i18n.t("inventorySales.sales.receipt.received")
+              : i18n.t("inventorySales.sales.receipt.paidAmount")}
+          </span>
+          <span>{formatCurrencyBRL(paidDisplay)}</span>
         </div>
         <div className="sale-receipt-thermal-total-row">
-          <span>{i18n.t("inventorySales.sales.receipt.pendingAmount")}</span>
-          <span>{formatCurrencyBRL(getPendingAmount(sale))}</span>
+          <span>
+            {hasPaymentLines
+              ? i18n.t("inventorySales.sales.receipt.pending")
+              : i18n.t("inventorySales.sales.receipt.pendingAmount")}
+          </span>
+          <span>{formatCurrencyBRL(pendingDisplay)}</span>
         </div>
       </div>
 
@@ -572,6 +692,8 @@ export default function SaleReceiptContent({
   layout = "screen",
   format,
   branding = null,
+  payments = null,
+  paymentSummary = null,
 }) {
   const classes = useStyles();
   const isMobileViewport = useIsMobile();
@@ -581,11 +703,26 @@ export default function SaleReceiptContent({
   if (!sale) return null;
 
   if (isThermalPrint) {
-    return <ThermalReceipt sale={sale} classes={classes} branding={branding} />;
+    return (
+      <ThermalReceipt
+        sale={sale}
+        classes={classes}
+        branding={branding}
+        payments={payments}
+        paymentSummary={paymentSummary}
+      />
+    );
   }
 
   const items = getInventorySaleItems(sale);
   const isCancelled = sale.status === "cancelled";
+  const hasPaymentLines = Array.isArray(payments) && payments.length > 0;
+  const paidDisplay = resolveReceiptPaidAmount(sale, payments, paymentSummary);
+  const pendingDisplay = resolveReceiptPendingAmount(
+    sale,
+    payments,
+    paymentSummary
+  );
   const rootClass =
     layout === "print"
       ? `${classes.receiptRoot} sale-receipt-print-page`
@@ -622,11 +759,14 @@ export default function SaleReceiptContent({
       label: i18n.t("inventorySales.sales.receipt.seller"),
       value: sale.seller?.name || i18n.t("inventorySales.sales.receipt.noSeller"),
     },
-    {
+  ];
+
+  if (!hasPaymentLines) {
+    metaRows.push({
       label: i18n.t("inventorySales.sales.receipt.paymentMethod"),
       value: describeSalePaymentMethod(sale),
-    },
-  ];
+    });
+  }
 
   if (sale.deliveryMethodName) {
     metaRows.push({
@@ -784,14 +924,26 @@ export default function SaleReceiptContent({
           <span>{formatCurrencyBRL(sale.totalAmount)}</span>
         </div>
         <div className={classes.totalRow}>
-          <span>{i18n.t("inventorySales.sales.receipt.paidAmount")}</span>
-          <span>{formatCurrencyBRL(sale.paidAmount)}</span>
+          <span>
+            {hasPaymentLines
+              ? i18n.t("inventorySales.sales.receipt.received")
+              : i18n.t("inventorySales.sales.receipt.paidAmount")}
+          </span>
+          <span>{formatCurrencyBRL(paidDisplay)}</span>
         </div>
         <div className={classes.totalRow}>
-          <span>{i18n.t("inventorySales.sales.receipt.pendingAmount")}</span>
-          <span>{formatCurrencyBRL(getPendingAmount(sale))}</span>
+          <span>
+            {hasPaymentLines
+              ? i18n.t("inventorySales.sales.receipt.pending")
+              : i18n.t("inventorySales.sales.receipt.pendingAmount")}
+          </span>
+          <span>{formatCurrencyBRL(pendingDisplay)}</span>
         </div>
       </div>
+
+      {hasPaymentLines ? (
+        <A4PaymentsBlock payments={payments} classes={classes} />
+      ) : null}
 
       {sale.notes ? (
         <Box mt={2}>

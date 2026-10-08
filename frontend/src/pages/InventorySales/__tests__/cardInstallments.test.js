@@ -59,6 +59,13 @@ jest.mock("../../../services/inventoryApi", () => ({
   cancelInventorySale: jest.fn(),
   deleteInventorySale: jest.fn(),
   searchInventoryCustomers: jest.fn(),
+  getInventorySalePayments: jest.fn(() =>
+    Promise.resolve({ data: { payments: [], summary: null } })
+  ),
+  addInventorySalePayment: jest.fn(),
+  updateInventorySalePaymentLine: jest.fn(),
+  deleteInventorySalePaymentLine: jest.fn(),
+  settleInventorySalePaymentLine: jest.fn(),
 }));
 
 if (typeof global.MutationObserver === "undefined") {
