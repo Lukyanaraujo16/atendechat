@@ -77,7 +77,10 @@ jest.mock("../../../models/InventorySaleItemIdentifier", () => ({
 }));
 
 jest.mock("../inventorySalePaymentEngine", () => ({
-  syncDraftPendingAfterTotalChange: jest.fn().mockResolvedValue(undefined)
+  syncDraftPendingAfterTotalChange: jest.fn().mockResolvedValue(undefined),
+  bootstrapLegacyPaymentsIfNeeded: jest.fn().mockResolvedValue([]),
+  assertCompletedSaleTotalAgainstPayments: jest.fn(),
+  persistSalePaymentCache: jest.fn().mockResolvedValue({})
 }));
 
 const methodFindOne = InventoryDeliveryMethod.findOne as jest.Mock;
@@ -367,16 +370,7 @@ describe("fundação entrega/frete", () => {
       ).rejects.toBeInstanceOf(AppError);
     });
 
-    it("completed/cancelled não altera; courier sem endereço rejeita", async () => {
-      saleFindOne.mockResolvedValue(draftSale({ status: "completed" }));
-      await expect(
-        UpdateInventorySaleDeliveryService({
-          companyId: 1,
-          saleId: 50,
-          body: { deliveryMethodId: 11 }
-        })
-      ).rejects.toBeInstanceOf(AppError);
-
+    it("cancelled bloqueia; courier sem endereço rejeita; completed permitido", async () => {
       saleFindOne.mockResolvedValue(draftSale({ status: "cancelled" }));
       await expect(
         UpdateInventorySaleDeliveryService({
@@ -395,6 +389,47 @@ describe("fundação entrega/frete", () => {
           body: { deliveryMethodId: 11, recipient: { street: "Só rua" } }
         })
       ).rejects.toBeInstanceOf(AppError);
+
+      const completed = draftSale({
+        status: "completed",
+        totalAmount: 100,
+        freightAmount: 0,
+        paidAmount: 100,
+        paymentStatus: "paid",
+        commissionAmount: 5,
+        commissionRate: 5
+      });
+      saleFindOne
+        .mockResolvedValueOnce(completed)
+        .mockResolvedValueOnce(completed);
+      methodFindOne.mockResolvedValue(
+        methodRecord({
+          id: 11,
+          kind: "pickup",
+          defaultAmount: 0,
+          allowAmountOverride: false,
+          requiresAddress: false
+        })
+      );
+      deliveryFindOne.mockResolvedValue(null);
+      itemFindAll.mockResolvedValue([
+        {
+          unitPrice: 100,
+          quantity: 1,
+          discountAmount: 0,
+          totalAmount: 100,
+          update: jest.fn()
+        }
+      ]);
+      saleUpdate.mockResolvedValue([1]);
+      await expect(
+        UpdateInventorySaleDeliveryService({
+          companyId: 1,
+          saleId: 50,
+          body: { deliveryMethodId: 11 }
+        })
+      ).resolves.toBeTruthy();
+      expect(completed.commissionAmount).toBe(5);
     });
 
     it("walk-in sem contactId + endereço completo funciona; CEP opcional", async () => {

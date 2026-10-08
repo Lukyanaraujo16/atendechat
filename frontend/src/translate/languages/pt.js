@@ -448,6 +448,14 @@ const messages = {
             saleData: "Dados da venda",
             summary: "Resumo",
           },
+          delivery: {
+            edit: "Editar entrega",
+            editTitle: "Editar entrega",
+            editSuccess: "Entrega atualizada.",
+            currentTotal: "Total atual",
+            newTotal: "Novo total",
+            alreadyReceived: "Já recebido",
+          },
           customerSearch: {
             placeholder: "Buscar por nome ou telefone...",
             empty: "Nenhum cliente encontrado",

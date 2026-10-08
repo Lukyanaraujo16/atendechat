@@ -184,7 +184,13 @@ export default function SalePaymentsSection({
     } finally {
       setLoading(false);
     }
-  }, [sale?.id]);
+  }, [
+    sale?.id,
+    sale?.totalAmount,
+    sale?.paidAmount,
+    sale?.paymentStatus,
+    sale?.freightAmount,
+  ]);
 
   useEffect(() => {
     loadPayments();

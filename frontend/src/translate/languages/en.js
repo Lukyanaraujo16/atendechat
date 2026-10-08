@@ -446,6 +446,14 @@ const messages = {
 						saleData: "Sale details",
 						summary: "Summary",
 					},
+					delivery: {
+						edit: "Edit delivery",
+						editTitle: "Edit delivery",
+						editSuccess: "Delivery updated.",
+						currentTotal: "Current total",
+						newTotal: "New total",
+						alreadyReceived: "Already received",
+					},
 					customerSearch: {
 						placeholder: "Search by name or phone...",
 						empty: "No customers found",

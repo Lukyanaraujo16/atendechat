@@ -477,6 +477,41 @@ export function assertSaleTotalSupportsPayments(
   }
 }
 
+/**
+ * E3 — pós-complete: valida newTotal vs paid / allocation sem redimensionar pending.
+ * Não passa por calculateSalePaymentAggregate (que lança OVERPAYMENT) para
+ * devolver códigos/mensagens específicos da edição de frete.
+ */
+export function assertCompletedSaleTotalAgainstPayments(
+  totalAmount: string | number,
+  payments: Array<{ amount: string | number; status: string }>
+): void {
+  const total = roundMoney(toMoney(totalAmount));
+  let effectivePaid = 0;
+  let pendingSum = 0;
+  for (const row of payments || []) {
+    if (row.status === "paid") {
+      effectivePaid = roundMoney(effectivePaid + toMoney(row.amount));
+    } else if (row.status === "pending") {
+      pendingSum = roundMoney(pendingSum + toMoney(row.amount));
+    }
+  }
+  if (effectivePaid > total) {
+    throw new AppError(
+      "ERR_INVENTORY_SALE_TOTAL_BELOW_PAID",
+      400,
+      "Não é possível reduzir o total da venda para menos do que o valor já recebido."
+    );
+  }
+  if (roundMoney(effectivePaid + pendingSum) > total) {
+    throw new AppError(
+      "ERR_INVENTORY_SALE_TOTAL_BELOW_ALLOCATION",
+      400,
+      "Existem pagamentos pendentes acima do novo total. Ajuste os pagamentos antes de reduzir o frete."
+    );
+  }
+}
+
 export async function persistSalePaymentCache(
   sale: InventorySale,
   payments: InventorySalePayment[],
