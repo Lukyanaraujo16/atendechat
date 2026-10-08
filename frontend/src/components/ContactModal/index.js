@@ -44,6 +44,8 @@ import {
   AppSecondaryButton,
   AppNeutralButton,
 } from "../../ui";
+import useCepLookup, { cepLookupHelperText } from "../../hooks/useCepLookup";
+import { formatCepDisplay } from "../../utils/cepLookup";
 
 const useStyles = makeStyles(theme => ({
 	root: {
@@ -138,6 +140,125 @@ const sameAssigneeIds = (a, b) => {
 	const right = [...b].sort((x, y) => x - y);
 	return left.length === right.length && left.every((id, index) => id === right[index]);
 };
+
+/** Campos de endereço + ViaCEP (não consulta no mount; só ao digitar CEP). */
+function ContactAddressFields({ setFieldValue }) {
+	const { status, lookup } = useCepLookup({
+		onSuccess: (addr) => {
+			if (addr.postalCode) setFieldValue("postalCode", addr.postalCode);
+			if (addr.street) setFieldValue("street", addr.street);
+			if (addr.district) setFieldValue("district", addr.district);
+			if (addr.city) setFieldValue("city", addr.city);
+			if (addr.state) setFieldValue("state", addr.state);
+			// addressNumber / addressComplement nunca sobrescritos pelo ViaCEP
+		},
+	});
+	const cepHelper = cepLookupHelperText(status, (key) => i18n.t(key));
+
+	return (
+		<>
+			<Divider style={{ margin: "16px 0" }} />
+			<Typography variant="subtitle1" gutterBottom>
+				{i18n.t("contactModal.form.address")}
+			</Typography>
+			<Grid container spacing={1}>
+				<Grid item xs={8} md={4}>
+					<Field name="postalCode">
+						{({ field }) => (
+							<TextField
+								{...field}
+								label={i18n.t("contactModal.form.postalCode")}
+								variant="outlined"
+								margin="dense"
+								fullWidth
+								helperText={cepHelper}
+								FormHelperTextProps={{
+									"data-testid": "contact-cep-helper",
+								}}
+								inputProps={{
+									"data-testid": "contact-field-postalCode",
+									inputMode: "numeric",
+									maxLength: 9,
+								}}
+								onChange={(e) => {
+									const formatted = formatCepDisplay(e.target.value);
+									setFieldValue("postalCode", formatted);
+									lookup(formatted);
+								}}
+							/>
+						)}
+					</Field>
+				</Grid>
+				<Grid item xs={4} md={2}>
+					<Field
+						as={TextField}
+						label={i18n.t("contactModal.form.state")}
+						name="state"
+						variant="outlined"
+						margin="dense"
+						fullWidth
+						inputProps={{ maxLength: 2, "data-testid": "contact-field-state" }}
+					/>
+				</Grid>
+				<Grid item xs={12}>
+					<Field
+						as={TextField}
+						label={i18n.t("contactModal.form.street")}
+						name="street"
+						variant="outlined"
+						margin="dense"
+						fullWidth
+						inputProps={{ "data-testid": "contact-field-street" }}
+					/>
+				</Grid>
+				<Grid item xs={4} md={3}>
+					<Field
+						as={TextField}
+						label={i18n.t("contactModal.form.addressNumber")}
+						name="addressNumber"
+						variant="outlined"
+						margin="dense"
+						fullWidth
+						inputProps={{ "data-testid": "contact-field-addressNumber" }}
+					/>
+				</Grid>
+				<Grid item xs={8} md={9}>
+					<Field
+						as={TextField}
+						label={i18n.t("contactModal.form.addressComplement")}
+						name="addressComplement"
+						variant="outlined"
+						margin="dense"
+						fullWidth
+						inputProps={{ "data-testid": "contact-field-addressComplement" }}
+					/>
+				</Grid>
+				<Grid item xs={12} md={6}>
+					<Field
+						as={TextField}
+						label={i18n.t("contactModal.form.district")}
+						name="district"
+						variant="outlined"
+						margin="dense"
+						fullWidth
+						inputProps={{ "data-testid": "contact-field-district" }}
+					/>
+				</Grid>
+				<Grid item xs={12} md={6}>
+					<Field
+						as={TextField}
+						label={i18n.t("contactModal.form.city")}
+						name="city"
+						variant="outlined"
+						margin="dense"
+						fullWidth
+						inputProps={{ "data-testid": "contact-field-city" }}
+					/>
+				</Grid>
+			</Grid>
+		</>
+	);
+}
 
 const ContactModal = ({
 	open,
@@ -670,83 +791,7 @@ const ContactModal = ({
 									</Grid>
 								</Grid>
 
-								<Divider style={{ margin: "16px 0" }} />
-								<Typography variant="subtitle1" gutterBottom>
-									{i18n.t("contactModal.form.address")}
-								</Typography>
-								<Grid container spacing={1}>
-									<Grid item xs={8} md={4}>
-										<Field
-											as={TextField}
-											label={i18n.t("contactModal.form.postalCode")}
-											name="postalCode"
-											variant="outlined"
-											margin="dense"
-											fullWidth
-										/>
-									</Grid>
-									<Grid item xs={4} md={2}>
-										<Field
-											as={TextField}
-											label={i18n.t("contactModal.form.state")}
-											name="state"
-											variant="outlined"
-											margin="dense"
-											fullWidth
-											inputProps={{ maxLength: 2 }}
-										/>
-									</Grid>
-									<Grid item xs={12}>
-										<Field
-											as={TextField}
-											label={i18n.t("contactModal.form.street")}
-											name="street"
-											variant="outlined"
-											margin="dense"
-											fullWidth
-										/>
-									</Grid>
-									<Grid item xs={4} md={3}>
-										<Field
-											as={TextField}
-											label={i18n.t("contactModal.form.addressNumber")}
-											name="addressNumber"
-											variant="outlined"
-											margin="dense"
-											fullWidth
-										/>
-									</Grid>
-									<Grid item xs={8} md={9}>
-										<Field
-											as={TextField}
-											label={i18n.t("contactModal.form.addressComplement")}
-											name="addressComplement"
-											variant="outlined"
-											margin="dense"
-											fullWidth
-										/>
-									</Grid>
-									<Grid item xs={12} md={6}>
-										<Field
-											as={TextField}
-											label={i18n.t("contactModal.form.district")}
-											name="district"
-											variant="outlined"
-											margin="dense"
-											fullWidth
-										/>
-									</Grid>
-									<Grid item xs={12} md={6}>
-										<Field
-											as={TextField}
-											label={i18n.t("contactModal.form.city")}
-											name="city"
-											variant="outlined"
-											margin="dense"
-											fullWidth
-										/>
-									</Grid>
-								</Grid>
+								<ContactAddressFields setFieldValue={setFieldValue} />
 
 								{canManageAssignees && (
 									<>

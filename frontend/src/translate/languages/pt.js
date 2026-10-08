@@ -6,6 +6,12 @@ const messages = {
         requirements:
           "A senha deve ter no mínimo 8 caracteres, incluindo letra maiúscula, letra minúscula e número.",
       },
+      cepLookup: {
+        loading: "Buscando endereço...",
+        notFound: "CEP não encontrado. Preencha o endereço manualmente.",
+        error:
+          "Não foi possível consultar o CEP. Você pode preencher o endereço manualmente.",
+      },
       planFeature: {
         blockedTitle: "Recurso indisponível",
         blockedBody:

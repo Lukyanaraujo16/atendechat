@@ -44,6 +44,11 @@ import {
   moneyNumber,
   requiredDeliveryAddressErrors,
 } from "./deliveryAddressUtils";
+import useCepLookup, { cepLookupHelperText } from "../../../hooks/useCepLookup";
+import {
+  formatCepDisplay,
+  mergeCepLookupIntoAddress,
+} from "../../../utils/cepLookup";
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -270,6 +275,31 @@ const SaleWizardDeliveryStep = forwardRef(function SaleWizardDeliveryStep(
       delete next[field];
       return next;
     });
+  };
+
+  const cepLookupEnabled = Boolean(
+    !disabled &&
+      selectedMethod?.requiresAddress &&
+      selectedMethod?.kind !== "pickup"
+  );
+
+  const { status: cepStatus, lookup: lookupCep } = useCepLookup({
+    enabled: cepLookupEnabled,
+    onSuccess: (addr) => {
+      setAddress((prev) => mergeCepLookupIntoAddress(prev, addr));
+    },
+  });
+
+  const handlePostalCodeChange = (e) => {
+    const formatted = formatCepDisplay(e.target.value);
+    setAddress((prev) => ({ ...prev, postalCode: formatted }));
+    setFieldErrors((prev) => {
+      if (!prev.postalCode) return prev;
+      const next = { ...prev };
+      delete next.postalCode;
+      return next;
+    });
+    if (cepLookupEnabled) lookupCep(formatted);
   };
 
   const resolveAddressPayload = () => {
@@ -545,12 +575,22 @@ const SaleWizardDeliveryStep = forwardRef(function SaleWizardDeliveryStep(
                 <TextField
                   label={i18n.t("inventorySales.sales.wizard.delivery.fields.postalCode")}
                   value={address.postalCode}
-                  onChange={setAddressField("postalCode")}
+                  onChange={handlePostalCodeChange}
                   variant="outlined"
                   size="small"
                   fullWidth
                   disabled={disabled}
-                  inputProps={{ "data-testid": "delivery-field-postalCode" }}
+                  helperText={cepLookupHelperText(cepStatus, (key) =>
+                    i18n.t(key)
+                  )}
+                  FormHelperTextProps={{
+                    "data-testid": "delivery-cep-helper",
+                  }}
+                  inputProps={{
+                    "data-testid": "delivery-field-postalCode",
+                    inputMode: "numeric",
+                    maxLength: 9,
+                  }}
                 />
               </Grid>
               <Grid item xs={12} sm={8}>

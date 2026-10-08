@@ -37,6 +37,11 @@ import {
   moneyNumber,
   requiredDeliveryAddressErrors,
 } from "./wizard/deliveryAddressUtils";
+import useCepLookup, { cepLookupHelperText } from "../../hooks/useCepLookup";
+import {
+  formatCepDisplay,
+  mergeCepLookupIntoAddress,
+} from "../../utils/cepLookup";
 
 const useStyles = makeStyles((theme) => ({
   form: {
@@ -200,6 +205,32 @@ export default function SaleDeliveryEditDialog({
       delete next[field];
       return next;
     });
+  };
+
+  const cepLookupEnabled = Boolean(
+    !submitting &&
+      selectedMethod &&
+      selectedMethod.kind !== "pickup" &&
+      selectedMethod.requiresAddress
+  );
+
+  const { status: cepStatus, lookup: lookupCep } = useCepLookup({
+    enabled: cepLookupEnabled,
+    onSuccess: (addr) => {
+      setAddress((prev) => mergeCepLookupIntoAddress(prev, addr));
+    },
+  });
+
+  const handlePostalCodeChange = (e) => {
+    const formatted = formatCepDisplay(e.target.value);
+    setAddress((prev) => ({ ...prev, postalCode: formatted }));
+    setFieldErrors((prev) => {
+      if (!prev.postalCode) return prev;
+      const next = { ...prev };
+      delete next.postalCode;
+      return next;
+    });
+    if (cepLookupEnabled) lookupCep(formatted);
   };
 
   const handleSave = async () => {
@@ -367,14 +398,31 @@ export default function SaleDeliveryEditDialog({
                       `inventorySales.sales.wizard.delivery.fields.${labelKey}`
                     )}
                     value={address[field] || ""}
-                    onChange={setAddressField(field)}
+                    onChange={
+                      field === "postalCode"
+                        ? handlePostalCodeChange
+                        : setAddressField(field)
+                    }
                     error={Boolean(fieldErrors[field])}
+                    helperText={
+                      field === "postalCode"
+                        ? cepLookupHelperText(cepStatus, (key) => i18n.t(key))
+                        : undefined
+                    }
+                    FormHelperTextProps={
+                      field === "postalCode"
+                        ? { "data-testid": "sale-delivery-edit-cep-helper" }
+                        : undefined
+                    }
                     disabled={submitting}
                     fullWidth
                     size="small"
                     variant="outlined"
                     inputProps={{
                       "data-testid": `sale-delivery-edit-${field}`,
+                      ...(field === "postalCode"
+                        ? { inputMode: "numeric", maxLength: 9 }
+                        : {}),
                     }}
                   />
                 </Grid>

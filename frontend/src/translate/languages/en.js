@@ -6,6 +6,12 @@ const messages = {
 				requirements:
 					"Password must be at least 8 characters and include an uppercase letter, a lowercase letter, and a number.",
 			},
+			cepLookup: {
+				loading: "Looking up address...",
+				notFound: "ZIP/postal code not found. Fill in the address manually.",
+				error:
+					"Could not look up the ZIP/postal code. You can fill in the address manually.",
+			},
 			planFeature: {
 				blockedTitle: "Feature unavailable",
 				blockedBody:

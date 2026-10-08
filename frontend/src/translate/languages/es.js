@@ -6,6 +6,12 @@ const messages = {
         requirements:
           "La contraseña debe tener al menos 8 caracteres, incluyendo una letra mayúscula, una minúscula y un número.",
       },
+      cepLookup: {
+        loading: "Buscando dirección...",
+        notFound: "CEP no encontrado. Complete la dirección manualmente.",
+        error:
+          "No fue posible consultar el CEP. Puede completar la dirección manualmente.",
+      },
       planFeature: {
         blockedTitle: "Recurso no disponible",
         blockedBody:
