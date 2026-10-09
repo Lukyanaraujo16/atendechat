@@ -64,8 +64,10 @@ import CurrencyInput from "./CurrencyInput";
 import { printReceivablePaymentReceipt } from "./printReceivablePaymentReceipt";
 import { formatReceivablePaymentHistoryLine } from "./receivablePaymentDisplay";
 import {
+  combineCivilDateWithLocalClockToIso,
   formatCivilDueDate,
   formatStoreCreditInstallmentPreviewLine,
+  todayCivilDate,
 } from "./storeCreditInstallmentDisplay";
 
 const useStyles = makeStyles((theme) => ({
@@ -252,7 +254,7 @@ export default function InventoryReceivablesTab({
     setReceiveReceivableId(receivableId);
     setReceiveMethod("pix");
     setReceiveNotes("");
-    setReceivePaidAt("");
+    setReceivePaidAt(todayCivilDate());
     setReceiveInstallmentIds(
       row.installmentId != null ? [row.installmentId] : []
     );
@@ -279,6 +281,16 @@ export default function InventoryReceivablesTab({
       toast.error(i18n.t("inventorySales.receivables.validation.method"));
       return;
     }
+    // DATA = civil escolhida (type=date). HORA = relógio local na confirmação.
+    // Evita new Date("YYYY-MM-DD") (UTC midnight → dia errado em BR).
+    let paidAtIso = null;
+    if (receivePaidAt) {
+      paidAtIso = combineCivilDateWithLocalClockToIso(receivePaidAt);
+      if (!paidAtIso) {
+        toast.error(i18n.t("inventorySales.receivables.validation.paidAt"));
+        return;
+      }
+    }
     setReceiveSubmitting(true);
     try {
       const body = {
@@ -286,7 +298,7 @@ export default function InventoryReceivablesTab({
         paymentMethod: receiveMethod,
         notes: receiveNotes.trim() || null,
       };
-      if (receivePaidAt) body.paidAt = new Date(receivePaidAt).toISOString();
+      if (paidAtIso) body.paidAt = paidAtIso;
       if (receiveInstallmentIds.length) {
         body.installmentIds = receiveInstallmentIds;
       }
@@ -324,7 +336,10 @@ export default function InventoryReceivablesTab({
             updated?.customer?.document || detail?.customer?.document || "",
           amount: received,
           paymentMethod: receiveMethod,
-          paidAt: body.paidAt || new Date().toISOString(),
+          paidAt:
+            lastPay?.paidAt ||
+            body.paidAt ||
+            new Date().toISOString(),
           notes: body.notes,
           remainingOpenAmount: remainingOpen,
           previousOpenAmount: previousOpen,
@@ -793,7 +808,7 @@ export default function InventoryReceivablesTab({
               </Select>
             </FormControl>
             <TextField
-              type="datetime-local"
+              type="date"
               label={i18n.t("inventorySales.receivables.receiveDialog.paidAt")}
               value={receivePaidAt}
               onChange={(e) => setReceivePaidAt(e.target.value)}
@@ -802,6 +817,9 @@ export default function InventoryReceivablesTab({
               fullWidth
               InputLabelProps={{ shrink: true }}
               disabled={receiveSubmitting}
+              inputProps={{
+                "data-testid": "receivable-receive-paid-at",
+              }}
             />
             {detail?.installments?.length ? (
               <Box>

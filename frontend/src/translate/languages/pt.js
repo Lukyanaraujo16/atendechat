@@ -1100,6 +1100,7 @@ const messages = {
           validation: {
             amount: "Informe um valor válido.",
             method: "Selecione a forma de recebimento.",
+            paidAt: "Informe uma data de recebimento válida.",
           },
         },
         storeCredit: {

@@ -1036,6 +1036,7 @@ const messages = {
 					validation: {
 						amount: "Enter a valid amount.",
 						method: "Select a payment method.",
+						paidAt: "Enter a valid payment date.",
 					},
 				},
 				storeCredit: {

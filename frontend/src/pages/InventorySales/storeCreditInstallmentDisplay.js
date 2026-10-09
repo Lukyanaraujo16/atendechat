@@ -15,6 +15,54 @@ export function formatCivilDueDate(value, language) {
   return `${d}/${mo}/${y}`;
 }
 
+/** Data civil local de `Date` → YYYY-MM-DD (componentes locais, sem UTC). */
+export function todayCivilDate(now = new Date()) {
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+/**
+ * Combina data civil YYYY-MM-DD com o relógio local atual → ISO.
+ * Usa construtor local (y, m-1, d, h, min…) — NÃO `new Date("YYYY-MM-DD")`
+ * (que interpreta UTC e desloca o dia em fusos negativos).
+ */
+export function combineCivilDateWithLocalClockToIso(civilYmd, now = new Date()) {
+  const m = String(civilYmd || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return null;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  if (!y || mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+  const local = new Date(
+    y,
+    mo - 1,
+    d,
+    now.getHours(),
+    now.getMinutes(),
+    now.getSeconds(),
+    now.getMilliseconds()
+  );
+  if (Number.isNaN(local.getTime())) return null;
+  // Guarda: componentes locais devem coincidir com a data civil escolhida.
+  if (
+    local.getFullYear() !== y ||
+    local.getMonth() !== mo - 1 ||
+    local.getDate() !== d
+  ) {
+    return null;
+  }
+  return local.toISOString();
+}
+
+/** Extrai YYYY-MM-DD local de um instante (ISO/Date) para asserts de timezone. */
+export function civilDateFromLocalInstant(value) {
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return todayCivilDate(d);
+}
+
 /**
  * Linha de preview do cronograma de Crédito da Loja.
  * Não altera amounts/dueDate — só apresentação.
