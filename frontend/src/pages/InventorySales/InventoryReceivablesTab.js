@@ -63,6 +63,10 @@ import {
 import CurrencyInput from "./CurrencyInput";
 import { printReceivablePaymentReceipt } from "./printReceivablePaymentReceipt";
 import { formatReceivablePaymentHistoryLine } from "./receivablePaymentDisplay";
+import {
+  formatCivilDueDate,
+  formatStoreCreditInstallmentPreviewLine,
+} from "./storeCreditInstallmentDisplay";
 
 const useStyles = makeStyles((theme) => ({
   headerRow: {
@@ -114,10 +118,7 @@ const useStyles = makeStyles((theme) => ({
 }));
 
 function formatDue(value) {
-  if (!value) return "—";
-  const [y, m, d] = String(value).split("-");
-  if (y && m && d) return `${d}/${m}/${y}`;
-  return String(value);
+  return formatCivilDueDate(value);
 }
 
 function statusLabel(status) {
@@ -298,22 +299,40 @@ export default function InventoryReceivablesTab({
         const allocs = Array.isArray(updated?.lastPaymentAllocations)
           ? updated.lastPaymentAllocations
           : [];
-        printReceivablePaymentReceipt({
+        const received =
+          updated?.receivedAmount != null
+            ? Number(updated.receivedAmount)
+            : receiveAmount;
+        const remainingOpen =
+          updated?.openAmount != null ? Number(updated.openAmount) : null;
+        const previousOpen =
+          remainingOpen != null && Number.isFinite(received)
+            ? Math.round((remainingOpen + received) * 100) / 100
+            : null;
+        const payments = Array.isArray(updated?.payments)
+          ? updated.payments
+          : [];
+        const lastPay = [...payments]
+          .reverse()
+          .find((p) => !p.reverseOfPaymentId);
+        const saleNumber =
+          updated?.sale?.saleNumber ?? detail?.sale?.saleNumber ?? null;
+        await printReceivablePaymentReceipt({
           customerName:
             updated?.customer?.name || detail?.customer?.name || "",
           customerDocument:
             updated?.customer?.document || detail?.customer?.document || "",
-          amount:
-            updated?.receivedAmount != null
-              ? Number(updated.receivedAmount)
-              : receiveAmount,
+          amount: received,
           paymentMethod: receiveMethod,
           paidAt: body.paidAt || new Date().toISOString(),
           notes: body.notes,
-          remainingOpenAmount:
-            updated?.openAmount != null ? Number(updated.openAmount) : null,
+          remainingOpenAmount: remainingOpen,
+          previousOpenAmount: previousOpen,
+          saleNumber,
+          operatorName: lastPay?.createdByUser?.name || null,
+          paymentId: lastPay?.id ?? null,
           allocations: allocs.map((a) => ({
-            saleNumber: updated?.sale?.saleNumber ?? detail?.sale?.saleNumber,
+            saleNumber,
             sequence: a.sequence,
             dueDate: a.dueDate,
             amount: a.amount,
@@ -661,7 +680,11 @@ export default function InventoryReceivablesTab({
                   py={0.5}
                 >
                   <Typography variant="body2">
-                    #{inst.sequence} · {formatDue(inst.dueDate)} ·{" "}
+                    {i18n.t(
+                      "inventorySales.sales.wizard.payment.installmentLine",
+                      { n: inst.sequence }
+                    )}{" "}
+                    · {formatDue(inst.dueDate)} ·{" "}
                     {statusLabel(inst.displayStatus)}
                   </Typography>
                   <Typography variant="body2">
@@ -809,9 +832,11 @@ export default function InventoryReceivablesTab({
                           size="small"
                         />
                       }
-                      label={`#${inst.sequence} · ${formatDue(
-                        inst.dueDate
-                      )} · ${formatCurrencyBRL(inst.openAmount)}`}
+                      label={formatStoreCreditInstallmentPreviewLine({
+                        sequence: inst.sequence,
+                        dueDate: inst.dueDate,
+                        amount: inst.openAmount,
+                      })}
                     />
                   ))}
               </Box>

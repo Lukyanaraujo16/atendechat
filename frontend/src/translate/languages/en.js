@@ -722,6 +722,7 @@ const messages = {
 							storeCreditInstallments: "Installments",
 							storeCreditFirstDue: "First due date",
 							storeCreditPreview: "Installment preview",
+							installmentLine: "Installment {{n}}",
 							storeCreditLimit: "Limit",
 							storeCreditUsed: "Used",
 							storeCreditAvailable: "Available",
@@ -997,10 +998,12 @@ const messages = {
 					},
 					receipt: {
 						title: "Payment receipt",
-						amount: "Amount received in this operation",
+						amount: "Amount received",
 						allocated: "Allocated amount",
 						remainingOnInstallment: "Remaining installment balance",
-						remainingOpen: "Open balance on title",
+						remainingOpen: "Remaining balance",
+						previousOpen: "Previous balance",
+						receiptId: "Receipt",
 					},
 					detail: {
 						title: "Title details",

@@ -714,6 +714,7 @@ const messages = {
               storeCreditInstallments: "N.º de cuotas",
               storeCreditFirstDue: "Primer vencimiento",
               storeCreditPreview: "Vista previa de cuotas",
+              installmentLine: "Cuota {{n}}",
               storeCreditLimit: "Límite",
               storeCreditUsed: "Utilizado",
               storeCreditAvailable: "Disponible",
@@ -988,10 +989,12 @@ const messages = {
           },
           receipt: {
             title: "Comprobante de cobro",
-            amount: "Importe recibido en esta operación",
+            amount: "Importe recibido",
             allocated: "Importe asignado",
             remainingOnInstallment: "Saldo restante de la cuota",
-            remainingOpen: "Saldo abierto del título",
+            remainingOpen: "Saldo restante",
+            previousOpen: "Saldo anterior",
+            receiptId: "Comprobante",
           },
           detail: {
             title: "Detalle del título",

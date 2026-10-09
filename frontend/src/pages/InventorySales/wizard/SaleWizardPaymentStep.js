@@ -42,6 +42,7 @@ import {
 import { defaultPaymentStatusForMethod } from "../paymentDisplay";
 import CurrencyInput from "../CurrencyInput";
 import { useInventoryPermissions } from "../../../utils/inventoryAccess";
+import { formatStoreCreditInstallmentPreviewLine } from "../storeCreditInstallmentDisplay";
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -730,9 +731,12 @@ export default function SaleWizardPaymentStep({
                     )}
                   </Typography>
                   {schedulePreview.installments.map((inst) => (
-                    <Typography key={inst.sequence} variant="body2">
-                      #{inst.sequence} · {inst.dueDate} ·{" "}
-                      {formatCurrencyBRL(inst.amount)}
+                    <Typography
+                      key={inst.sequence}
+                      variant="body2"
+                      data-testid={`store-credit-preview-line-${inst.sequence}`}
+                    >
+                      {formatStoreCreditInstallmentPreviewLine(inst)}
                     </Typography>
                   ))}
                 </Box>
