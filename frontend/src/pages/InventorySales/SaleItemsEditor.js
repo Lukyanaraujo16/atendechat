@@ -10,6 +10,7 @@ import {
   Box,
   CircularProgress,
   IconButton,
+  InputAdornment,
   Table,
   TableBody,
   TableCell,
@@ -92,16 +93,51 @@ const useStyles = makeStyles(() => ({
   },
   numericCell: {
     minWidth: 0,
-    width: "16%",
+    width: "14%",
+  },
+  discountCell: {
+    minWidth: 0,
+    width: "18%",
   },
   actionsCell: {
     minWidth: 0,
-    width: "12%",
+    width: "10%",
   },
   numericField: {
     width: "100%",
     minWidth: 0,
     maxWidth: "100%",
+  },
+  discountField: {
+    width: "100%",
+    maxWidth: 200,
+    minWidth: 0,
+  },
+  discountControl: {
+    display: "flex",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    width: "100%",
+    maxWidth: 200,
+    minWidth: 0,
+  },
+  discountTypeGroup: {
+    flexShrink: 0,
+    "& .MuiToggleButton-root": {
+      padding: "4px 8px",
+      lineHeight: 1.2,
+      minWidth: 36,
+    },
+  },
+  discountInputWrap: {
+    flex: "1 1 auto",
+    minWidth: 0,
+  },
+  addDiscountSlot: {
+    flex: "0 1 200px",
+    maxWidth: 220,
+    minWidth: 148,
   },
   identifiersCell: {
     paddingTop: 0,
@@ -147,14 +183,26 @@ function discountDraftFromItem(item) {
   };
 }
 
-function buildItemDiscountPayload(draft) {
+/**
+ * Payload autoritativo de desconto do item.
+ * Nunca “cai” de percentage → fixed só porque o % está vazio/0 durante a edição:
+ * isso era a causa do seletor voltar para R$ após autosave.
+ */
+export function buildItemDiscountPayload(draft) {
   const type = draft.discountType === "percentage" ? "percentage" : "fixed";
   if (type === "percentage") {
-    const pct = Number(draft.discountPercent);
-    if (!Number.isFinite(pct) || pct <= 0) {
-      return { discountType: "fixed", discountAmount: 0 };
+    const raw = draft.discountPercent;
+    if (raw === "" || raw == null) {
+      return { discountType: "percentage", discountPercent: 0 };
     }
-    return { discountType: "percentage", discountPercent: pct };
+    const pct = Number(raw);
+    if (!Number.isFinite(pct) || pct < 0) {
+      return { discountType: "percentage", discountPercent: 0 };
+    }
+    return {
+      discountType: "percentage",
+      discountPercent: Math.min(100, pct),
+    };
   }
   const discountAmount =
     parseBrazilianCurrencyToNumber(draft.discountAmount) ?? 0;
@@ -217,14 +265,23 @@ function SaleItemDiscountFields({
   onBlur,
   testIdPrefix,
   className,
+  controlClassName,
+  typeGroupClassName,
+  inputWrapClassName,
 }) {
+  const isPercent = draft.discountType === "percentage";
   return (
-    <Box display="flex" flexDirection="column" style={{ gap: 4 }} className={className}>
+    <Box
+      className={controlClassName || className}
+      data-testid={testIdPrefix ? `${testIdPrefix}-control` : undefined}
+    >
       <ToggleButtonGroup
         size="small"
-        value={draft.discountType === "percentage" ? "percentage" : "fixed"}
         exclusive
+        value={isPercent ? "percentage" : "fixed"}
         onChange={onTypeChange}
+        className={typeGroupClassName}
+        aria-label={i18n.t("inventorySales.sales.items.discount")}
       >
         <ToggleButton
           value="fixed"
@@ -241,34 +298,43 @@ function SaleItemDiscountFields({
           %
         </ToggleButton>
       </ToggleButtonGroup>
-      {draft.discountType === "percentage" ? (
-        <TextField
-          size="small"
-          variant="outlined"
-          value={draft.discountPercent}
-          onChange={onPercentChange}
-          onBlur={onBlur}
-          type="number"
-          inputProps={{
-            min: 0,
-            max: 100,
-            step: "0.01",
-            "data-testid": testIdPrefix ? `${testIdPrefix}-percent` : undefined,
-          }}
-          disabled={disabled}
-          className={className}
-          fullWidth
-        />
-      ) : (
-        <CurrencyInput
-          value={Number(draft.discountAmount) || 0}
-          onChange={onFixedChange}
-          onBlur={onBlur}
-          disabled={disabled}
-          className={className}
-          data-testid={testIdPrefix ? `${testIdPrefix}-amount` : undefined}
-        />
-      )}
+      <Box className={inputWrapClassName}>
+        {isPercent ? (
+          <TextField
+            size="small"
+            variant="outlined"
+            type="number"
+            value={draft.discountPercent}
+            onChange={onPercentChange}
+            onBlur={onBlur}
+            disabled={disabled}
+            fullWidth
+            inputProps={{
+              min: 0,
+              max: 100,
+              step: "0.01",
+              inputMode: "decimal",
+              "data-testid": testIdPrefix
+                ? `${testIdPrefix}-percent`
+                : undefined,
+            }}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">%</InputAdornment>
+              ),
+            }}
+          />
+        ) : (
+          <CurrencyInput
+            value={Number(draft.discountAmount) || 0}
+            onChange={onFixedChange}
+            onBlur={onBlur}
+            disabled={disabled}
+            fullWidth
+            data-testid={testIdPrefix ? `${testIdPrefix}-amount` : undefined}
+          />
+        )}
+      </Box>
     </Box>
   );
 }
@@ -967,16 +1033,7 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
 
     return (
       <Box display="flex" justifyContent="flex-end" alignItems="center">
-        {autoSave && saving ? (
-          <Typography
-            variant="caption"
-            color="textSecondary"
-            style={{ marginRight: 4 }}
-            data-testid={`sale-item-autosaving-${item.id}`}
-          >
-            {i18n.t("inventorySales.sales.items.autoSaving")}
-          </Typography>
-        ) : null}
+        {/* Autosave é silencioso no fluxo normal — só feedback de erro. */}
         {autoSave && errored && !saving ? (
           <Typography
             variant="caption"
@@ -1084,6 +1141,9 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
                           draft={draft}
                           disabled={discountInputsDisabled}
                           testIdPrefix={`sale-item-discount-${item.id}`}
+                          controlClassName={classes.discountControl}
+                          typeGroupClassName={classes.discountTypeGroup}
+                          inputWrapClassName={classes.discountInputWrap}
                           onTypeChange={(_e, next) => {
                             if (!next) return;
                             patchRowDraft(item.id, {
@@ -1142,7 +1202,7 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
                   <TableCell align="right" className={classes.numericCell}>
                     {i18n.t("inventorySales.sales.items.unitPrice")}
                   </TableCell>
-                  <TableCell align="right" className={classes.numericCell}>
+                  <TableCell align="right" className={classes.discountCell}>
                     {i18n.t("inventorySales.sales.items.discount")}
                   </TableCell>
                   <TableCell align="right" className={classes.numericCell}>
@@ -1213,14 +1273,16 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
                             />
                           )}
                         </TableCell>
-                        <TableCell align="right" className={classes.numericCell}>
+                        <TableCell align="right" className={classes.discountCell}>
                           {readOnly ? (
                             formatItemDiscountDisplay(item, draft)
                           ) : (
                             <SaleItemDiscountFields
                               draft={draft}
                               disabled={discountInputsDisabled}
-                              className={classes.numericField}
+                              controlClassName={classes.discountControl}
+                              typeGroupClassName={classes.discountTypeGroup}
+                              inputWrapClassName={classes.discountInputWrap}
                               testIdPrefix={`sale-item-discount-${item.id}`}
                               onTypeChange={(_e, next) => {
                                 if (!next) return;
@@ -1445,7 +1507,7 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
                   }
                 />
               </Box>
-              <Box style={{ flex: 1, minWidth: 120 }}>
+              <Box className={classes.addDiscountSlot}>
                 <Typography variant="caption" color="textSecondary">
                   {i18n.t("inventorySales.sales.items.discount")}
                 </Typography>
@@ -1453,6 +1515,9 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
                   draft={addForm}
                   disabled={discountInputsDisabled}
                   testIdPrefix="sale-add-discount"
+                  controlClassName={classes.discountControl}
+                  typeGroupClassName={classes.discountTypeGroup}
+                  inputWrapClassName={classes.discountInputWrap}
                   onTypeChange={(_e, next) => {
                     if (!next) return;
                     setAddForm((prev) => ({ ...prev, discountType: next }));
