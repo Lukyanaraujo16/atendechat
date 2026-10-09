@@ -659,6 +659,7 @@ const messages = {
               untracked: "Sem controle de estoque",
             },
             quantity: "Quantidade",
+            quantityShort: "Quant.",
             unitPrice: "Preço unitário",
             unitPriceOptional: "Preço unitário (opcional)",
             discount: "Desconto",

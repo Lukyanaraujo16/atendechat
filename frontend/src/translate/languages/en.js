@@ -652,6 +652,7 @@ const messages = {
 							untracked: "No stock tracking",
 						},
 						quantity: "Quantity",
+						quantityShort: "Qty.",
 						unitPrice: "Unit price",
 						unitPriceOptional: "Unit price (optional)",
 						discount: "Discount",

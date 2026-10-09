@@ -122,8 +122,12 @@ describe("SaleItemsEditor autosave", () => {
     expect(mockUpdate.mock.calls[0][2].unitPrice).toBeGreaterThan(0);
   });
 
-  it("3. desconto autosave persiste", async () => {
-    renderEditor();
+  it("3. desconto monetário autosave persiste (CurrencyInput)", async () => {
+    renderEditor({
+      saleOverrides: {
+        items: [itemBase({ discountType: "fixed", discountAmount: 0 })],
+      },
+    });
     const discountInput = screen.getByTestId("sale-item-discount-7-amount");
     fireEvent.keyDown(discountInput, { key: "5" });
     await act(async () => {
@@ -131,6 +135,26 @@ describe("SaleItemsEditor autosave", () => {
     });
     await waitFor(() => expect(mockUpdate).toHaveBeenCalled());
     expect(mockUpdate.mock.calls[0][2].discountAmount).toBe(0.05);
+    expect(mockUpdate.mock.calls[0][2].discountType).toBe("fixed");
+  });
+
+  it("3b. desconto percentual autosave envia número (não string %)", async () => {
+    renderEditor({
+      saleOverrides: {
+        items: [itemBase({ discountType: "percentage", discountPercent: 0 })],
+      },
+    });
+    const discountInput = screen.getByTestId("sale-item-discount-7-percent");
+    fireEvent.change(discountInput, { target: { value: "10" } });
+    await act(async () => {
+      jest.advanceTimersByTime(450);
+    });
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalled());
+    expect(mockUpdate.mock.calls[0][2].discountType).toBe("percentage");
+    expect(mockUpdate.mock.calls[0][2].discountPercent).toBe(10);
+    expect(String(mockUpdate.mock.calls[0][2].discountPercent)).not.toContain(
+      "%"
+    );
   });
 
   it("4. alteração rápida não aplica resposta stale", async () => {

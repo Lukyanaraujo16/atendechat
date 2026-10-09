@@ -94,16 +94,14 @@ const useStyles = makeStyles((theme) => ({
   },
   headerCell: {
     whiteSpace: "nowrap",
-    overflow: "hidden",
-    textOverflow: "ellipsis",
   },
   productCell: {
     minWidth: 0,
-    width: "34%",
+    width: "32%",
   },
   qtyCell: {
-    minWidth: 0,
-    width: "10%",
+    minWidth: 72,
+    width: "11%",
   },
   priceCell: {
     minWidth: 0,
@@ -132,7 +130,7 @@ const useStyles = makeStyles((theme) => ({
     minWidth: 64,
     marginLeft: "auto",
     "& input": {
-      textAlign: "right",
+      textAlign: "center",
     },
     [theme.breakpoints.down("sm")]: {
       maxWidth: "100%",
@@ -214,7 +212,7 @@ const emptyAddForm = {
   productId: "",
   quantity: "1",
   unitPrice: "",
-  discountType: "fixed",
+  discountType: "percentage",
   discountPercent: "",
   discountAmount: "0",
   ...emptyIdentifierDraft(),
@@ -231,20 +229,91 @@ function moneyEqual(left, right) {
   return Math.round(a * 100) === Math.round(b * 100);
 }
 
+function moneyAmount(value) {
+  if (value === "" || value == null) return 0;
+  return parseBrazilianCurrencyToNumber(value) ?? Number(value) ?? 0;
+}
+
+/**
+ * Parse de percentual digitado (pt-BR: vírgula). Nunca máscara monetária/centavos.
+ */
+export function parsePercentInput(value) {
+  if (value === "" || value == null) return null;
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+  const raw = String(value).trim().replace("%", "").replace(/\s/g, "");
+  if (!raw || raw === "," || raw === ".") return null;
+  const normalized = raw.includes(",")
+    ? raw.replace(/\./g, "").replace(",", ".")
+    : raw;
+  const n = Number(normalized);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Mantém digitação livre: dígitos + no máx. um separador decimal (, ou .).
+ * Não desloca casas, não força zeros.
+ */
+export function sanitizePercentTyping(raw) {
+  if (raw == null) return "";
+  let text = String(raw).replace("%", "").replace(/\s/g, "");
+  text = text.replace(/[^\d.,]/g, "");
+  const comma = text.indexOf(",");
+  const dot = text.indexOf(".");
+  let sep = -1;
+  if (comma >= 0 && dot >= 0) {
+    sep = Math.min(comma, dot);
+  } else {
+    sep = Math.max(comma, dot);
+  }
+  if (sep >= 0) {
+    const head = text.slice(0, sep).replace(/[^\d]/g, "");
+    const sepChar = text[sep];
+    const tail = text.slice(sep + 1).replace(/[^\d]/g, "");
+    text = `${head}${sepChar}${tail}`;
+  } else {
+    text = text.replace(/[^\d]/g, "");
+  }
+  return text;
+}
+
+/** Draft persistido → string de input sem "0.00" / zeros artificiais. */
+export function formatPercentDraftValue(value) {
+  if (value === "" || value == null) return "";
+  const n = parsePercentInput(value);
+  if (n == null) return sanitizePercentTyping(value);
+  if (n === 0) return "";
+  if (Number.isInteger(n)) return String(n);
+  return String(parseFloat(n.toFixed(4)));
+}
+
+/**
+ * Preferência visual % para novos/zero.
+ * Preserva fixed legado (null + amount > 0) e percentage persistido.
+ */
+export function resolveItemDiscountType(item) {
+  if (item?.discountType === "percentage") return "percentage";
+  if (item?.discountType === "fixed") return "fixed";
+  if (moneyAmount(item?.discountAmount) > 0) return "fixed";
+  return "percentage";
+}
+
 function discountDraftFromItem(item) {
-  const type = item?.discountType === "percentage" ? "percentage" : "fixed";
+  const type = resolveItemDiscountType(item);
   return {
     discountType: type,
     discountPercent:
-      type === "percentage" ? String(item?.discountPercent ?? "") : "",
+      type === "percentage"
+        ? formatPercentDraftValue(item?.discountPercent)
+        : "",
     discountAmount: String(item?.discountAmount ?? "0"),
   };
 }
 
 /**
  * Payload autoritativo de desconto do item.
- * Nunca “cai” de percentage → fixed só porque o % está vazio/0 durante a edição:
- * isso era a causa do seletor voltar para R$ após autosave.
+ * Percentual: digitação direta (não CurrencyInput). Vírgula → número.
  */
 export function buildItemDiscountPayload(draft) {
   const type = draft.discountType === "percentage" ? "percentage" : "fixed";
@@ -253,8 +322,8 @@ export function buildItemDiscountPayload(draft) {
     if (raw === "" || raw == null) {
       return { discountType: "percentage", discountPercent: 0 };
     }
-    const pct = Number(raw);
-    if (!Number.isFinite(pct) || pct < 0) {
+    const pct = parsePercentInput(raw);
+    if (pct == null || pct < 0) {
       return { discountType: "percentage", discountPercent: 0 };
     }
     return {
@@ -268,11 +337,12 @@ export function buildItemDiscountPayload(draft) {
 }
 
 function percentEqual(left, right) {
-  const a = Number(left);
-  const b = Number(right);
-  if (!Number.isFinite(a) && !Number.isFinite(b)) return true;
-  if (!Number.isFinite(a) || !Number.isFinite(b)) return false;
-  return Math.round(a * 100) === Math.round(b * 100);
+  const a = parsePercentInput(left);
+  const b = parsePercentInput(right);
+  if (a == null && b == null) return true;
+  if ((a == null || a === 0) && (b == null || b === 0)) return true;
+  if (a == null || b == null) return false;
+  return Math.round(a * 10000) === Math.round(b * 10000);
 }
 
 function previewLineTotal(draft, item) {
@@ -643,7 +713,7 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
       : {
           quantity: "",
           unitPrice: "",
-          discountType: "fixed",
+          discountType: "percentage",
           discountPercent: "",
           discountAmount: "0",
           ...emptyIdentifierDraft(),
@@ -841,7 +911,7 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
               : "fixed",
           discountPercent:
             discountPayload.discountType === "percentage"
-              ? String(discountPayload.discountPercent ?? 0)
+              ? formatPercentDraftValue(discountPayload.discountPercent)
               : draft.discountPercent ?? "",
           discountAmount:
             discountPayload.discountType === "percentage"
@@ -1285,8 +1355,13 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
                           inputWrapClassName={classes.discountInputWrap}
                           onTypeChange={(_e, next) => {
                             if (!next) return;
+                            const prevType = getRowDraft(item).discountType;
                             patchRowDraft(item.id, {
                               discountType: next,
+                              ...(next === "percentage" &&
+                              prevType !== "percentage"
+                                ? { discountPercent: "" }
+                                : {}),
                             });
                             scheduleAutoSave(item.id, AUTO_SAVE_MONEY_DEBOUNCE_MS);
                           }}
@@ -1301,7 +1376,7 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
                             setRowField(
                               item.id,
                               "discountPercent",
-                              e.target.value
+                              sanitizePercentTyping(e.target.value)
                             )
                           }
                           onBlur={() => handleMoneyBlur(item)}
@@ -1337,8 +1412,8 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
                   <TableCell className={`${classes.productCell} ${classes.headerCell}`}>
                     {i18n.t("inventorySales.sales.items.product")}
                   </TableCell>
-                  <TableCell align="right" className={`${classes.qtyCell} ${classes.headerCell}`}>
-                    {i18n.t("inventorySales.sales.items.quantity")}
+                  <TableCell align="center" className={`${classes.qtyCell} ${classes.headerCell}`}>
+                    {i18n.t("inventorySales.sales.items.quantityShort")}
                   </TableCell>
                   <TableCell align="right" className={`${classes.priceCell} ${classes.headerCell}`}>
                     {i18n.t("inventorySales.sales.items.unitPrice")}
@@ -1372,7 +1447,7 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
                             </Typography>
                           ) : null}
                         </TableCell>
-                        <TableCell align="right" className={classes.qtyCell}>
+                        <TableCell align="center" className={classes.qtyCell}>
                           {readOnly ? (
                             formatQuantity(draft.quantity)
                           ) : (
@@ -1426,8 +1501,13 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
                               testIdPrefix={`sale-item-discount-${item.id}`}
                               onTypeChange={(_e, next) => {
                                 if (!next) return;
+                                const prevType = getRowDraft(item).discountType;
                                 patchRowDraft(item.id, {
                                   discountType: next,
+                                  ...(next === "percentage" &&
+                                  prevType !== "percentage"
+                                    ? { discountPercent: "" }
+                                    : {}),
                                 });
                                 scheduleAutoSave(
                                   item.id,
@@ -1445,7 +1525,7 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
                                 setRowField(
                                   item.id,
                                   "discountPercent",
-                                  e.target.value
+                                  sanitizePercentTyping(e.target.value)
                                 )
                               }
                               onBlur={() => handleMoneyBlur(item)}
@@ -1677,7 +1757,14 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
                   inputWrapClassName={classes.discountInputWrap}
                   onTypeChange={(_e, next) => {
                     if (!next) return;
-                    setAddForm((prev) => ({ ...prev, discountType: next }));
+                    setAddForm((prev) => ({
+                      ...prev,
+                      discountType: next,
+                      ...(next === "percentage" &&
+                      prev.discountType !== "percentage"
+                        ? { discountPercent: "" }
+                        : {}),
+                    }));
                   }}
                   onFixedChange={(reais) =>
                     setAddForm((prev) => ({
@@ -1688,7 +1775,7 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
                   onPercentChange={(e) =>
                     setAddForm((prev) => ({
                       ...prev,
-                      discountPercent: e.target.value,
+                      discountPercent: sanitizePercentTyping(e.target.value),
                     }))
                   }
                 />

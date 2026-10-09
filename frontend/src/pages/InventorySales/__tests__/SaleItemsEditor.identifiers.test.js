@@ -289,6 +289,8 @@ describe("SaleItemsEditor identifiers", () => {
     expect(addInventorySaleItem).toHaveBeenCalledWith(7, {
       productId: 10,
       quantity: 1,
+      discountType: "percentage",
+      discountPercent: 0,
       identifiers: [{ position: 1, identifier: "SN123" }],
     });
   });
@@ -303,6 +305,8 @@ describe("SaleItemsEditor identifiers", () => {
     const payload = addInventorySaleItem.mock.calls[0][1];
     expect(payload.productId).toBe(10);
     expect(payload.quantity).toBe(1);
+    expect(payload.discountType).toBe("percentage");
+    expect(payload.discountPercent).toBe(0);
     expect(payload).not.toHaveProperty("identifiers");
   });
 
@@ -323,8 +327,8 @@ describe("SaleItemsEditor identifiers", () => {
     expect(updateInventorySaleItem).toHaveBeenCalledWith(7, 21, {
       quantity: 1,
       unitPrice: 120,
-      discountType: "fixed",
-      discountAmount: 0,
+      discountType: "percentage",
+      discountPercent: 0,
     });
     expect(updateInventorySaleItem.mock.calls[0][2]).not.toHaveProperty(
       "identifiers"
@@ -349,8 +353,8 @@ describe("SaleItemsEditor identifiers", () => {
     expect(updateInventorySaleItem).toHaveBeenCalledWith(7, 21, {
       quantity: 1,
       unitPrice: 100,
-      discountType: "fixed",
-      discountAmount: 0,
+      discountType: "percentage",
+      discountPercent: 0,
       identifiers: [],
     });
   });
@@ -403,8 +407,8 @@ describe("SaleItemsEditor identifiers", () => {
     expect(updateInventorySaleItem).toHaveBeenCalledWith(7, 21, {
       quantity: 1.5,
       unitPrice: 100,
-      discountType: "fixed",
-      discountAmount: 0,
+      discountType: "percentage",
+      discountPercent: 0,
       identifiers: [],
     });
   });
@@ -421,8 +425,8 @@ describe("SaleItemsEditor identifiers", () => {
     expect(updateInventorySaleItem.mock.calls[0][2]).toEqual({
       quantity: 1.5,
       unitPrice: 100,
-      discountType: "fixed",
-      discountAmount: 0,
+      discountType: "percentage",
+      discountPercent: 0,
     });
     expect(updateInventorySaleItem.mock.calls[0][2]).not.toHaveProperty(
       "identifiers"

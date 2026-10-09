@@ -140,4 +140,32 @@ describe("SaleItemsEditor quantity display", () => {
     fireEvent.change(input, { target: { value: "1." } });
     expect(screen.getByTestId("sale-item-qty-4").value).toBe("1.");
   });
+
+  it("quantidade centralizada e cabeçalho Quant.", () => {
+    render(
+      <ThemeProvider theme={createTheme()}>
+        <SaleItemsEditor
+          sale={{
+            id: 1,
+            items: [
+              {
+                id: 8,
+                productName: "P",
+                quantity: 1,
+                unitPrice: 10,
+                discountAmount: 0,
+                totalAmount: 10,
+                identifiers: [],
+              },
+            ],
+          }}
+          readOnly={false}
+          autoSave={false}
+        />
+      </ThemeProvider>
+    );
+    expect(screen.getByText("Quant.")).toBeTruthy();
+    const qty = screen.getByTestId("sale-item-qty-8");
+    expect(window.getComputedStyle(qty).textAlign).toBe("center");
+  });
 });
