@@ -2,9 +2,11 @@ import sequelize from "../../database";
 import AppError from "../../errors/AppError";
 import InventorySaleItem from "../../models/InventorySaleItem";
 import InventoryProduct from "../../models/InventoryProduct";
+import InventoryProductVariant from "../../models/InventoryProductVariant";
 import {
   assertInventorySaleIsDraft,
   buildProductSnapshot,
+  buildVariantSaleSnapshot,
   findInventorySaleOrThrow,
   loadActiveInventoryProductOrThrow,
   recalculateInventorySaleTotals,
@@ -26,12 +28,14 @@ import {
   replaceSaleItemIdentifiers
 } from "./inventorySaleItemIdentifiers";
 import { parseRequiredDecimal } from "./inventoryTenant";
+import { isVariableProduct } from "./inventoryProductKind";
 
 export default async function AddInventorySaleItemService(input: {
   companyId: number;
   saleId: number;
   body: {
     productId?: unknown;
+    variantId?: unknown;
     quantity?: unknown;
     unitPrice?: unknown;
     discountAmount?: unknown;
@@ -60,7 +64,52 @@ export default async function AddInventorySaleItemService(input: {
       productId,
       t
     );
-    const snapshot = buildProductSnapshot(product);
+
+    let variantId: number | null = null;
+    if (
+      input.body.variantId !== undefined &&
+      input.body.variantId !== null &&
+      input.body.variantId !== ""
+    ) {
+      variantId = Number(input.body.variantId);
+      if (!Number.isFinite(variantId)) {
+        throw new AppError("ERR_VALIDATION_ERROR", 400, "variantId inválido.");
+      }
+    }
+
+    let snapshot = buildProductSnapshot(product);
+
+    if (isVariableProduct(product)) {
+      if (variantId == null) {
+        throw new AppError(
+          "ERR_INVENTORY_VARIANT_REQUIRED",
+          400,
+          "Produto com variações exige seleção de variante."
+        );
+      }
+      const variant = await InventoryProductVariant.findOne({
+        where: {
+          id: variantId,
+          companyId: input.companyId,
+          productId: product.id
+        },
+        transaction: t
+      });
+      if (!variant || !variant.active) {
+        throw new AppError(
+          "ERR_INVENTORY_VARIANT_INACTIVE",
+          400,
+          "Variante inválida ou inativa."
+        );
+      }
+      snapshot = buildVariantSaleSnapshot(product, variant);
+    } else if (variantId != null) {
+      throw new AppError(
+        "ERR_INVENTORY_VARIANT_NOT_ALLOWED",
+        400,
+        "Produto simples não aceita variantId."
+      );
+    }
 
     const quantity = parseRequiredDecimal(input.body.quantity, "quantity");
     if (quantity <= 0) {
@@ -112,8 +161,12 @@ export default async function AddInventorySaleItemService(input: {
         companyId: input.companyId,
         saleId: sale.id,
         productId: snapshot.productId,
+        variantId: snapshot.variantId,
         productName: snapshot.productName,
         productSku: snapshot.productSku,
+        variantLabel: snapshot.variantLabel,
+        variantSku: snapshot.variantSku,
+        variantBarcode: snapshot.variantBarcode,
         unit: snapshot.unit,
         unitPrice: roundMoney(unitPrice),
         costPrice: snapshot.costPrice,

@@ -363,6 +363,37 @@ export function buildProductSnapshot(product: InventoryProduct) {
     unit: product.unit,
     unitPrice: toMoney(product.salePrice),
     costPrice: product.costPrice != null ? toMoney(product.costPrice) : null,
-    trackStock: product.trackStock === true
+    trackStock: product.trackStock === true,
+    variantId: null as number | null,
+    variantLabel: null as string | null,
+    variantSku: null as string | null,
+    variantBarcode: null as string | null
+  };
+}
+
+export function buildVariantSaleSnapshot(
+  product: InventoryProduct,
+  variant: {
+    id: number;
+    label: string;
+    sku: string | null;
+    barcode: string | null;
+    salePrice: string | number;
+    costPrice: string | number | null;
+    trackStock: boolean;
+  }
+) {
+  return {
+    productId: product.id,
+    productName: product.name,
+    productSku: variant.sku ?? product.sku,
+    unit: product.unit,
+    unitPrice: toMoney(variant.salePrice),
+    costPrice: variant.costPrice != null ? toMoney(variant.costPrice) : null,
+    trackStock: variant.trackStock === true,
+    variantId: variant.id,
+    variantLabel: variant.label,
+    variantSku: variant.sku,
+    variantBarcode: variant.barcode
   };
 }

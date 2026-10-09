@@ -192,13 +192,15 @@ export function exportInventoryProductsCsv(products, filters, t) {
     [
       t("inventorySales.reports.columns.product"),
       t("inventorySales.reports.export.columns.sku"),
+      t("inventorySales.reports.columns.variant") || "Variante",
       t("inventorySales.reports.columns.quantitySold"),
       t("inventorySales.reports.columns.totalSold"),
       t("inventorySales.reports.columns.salesCount"),
     ],
     ...products.map((row) => [
       row.productName || "—",
-      row.productSku || "",
+      row.productSku || row.variantSku || "",
+      row.variantLabel || "",
       formatCsvQuantity(row.quantitySold),
       formatCsvMoney(row.totalSold),
       String(row.salesCount ?? 0),

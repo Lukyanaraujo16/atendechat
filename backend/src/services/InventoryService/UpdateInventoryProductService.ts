@@ -1,18 +1,29 @@
+import { Transaction } from "sequelize";
+import sequelize from "../../database";
 import {
   assertInventoryBarcodeUnique,
   rethrowInventoryBarcodeConstraint
 } from "./inventoryBarcode";
 import AppError from "../../errors/AppError";
 import InventoryProduct from "../../models/InventoryProduct";
+import InventoryProductVariant from "../../models/InventoryProductVariant";
+import InventorySaleItem from "../../models/InventorySaleItem";
+import InventoryStockMovement from "../../models/InventoryStockMovement";
 import { resolveInventoryProductUnitForUpdate } from "./inventoryProductUnit";
 import {
   assertInventoryCategoryBelongsToCompany,
-  assertInventoryProductSkuUnique,
-  findInventoryProductOrThrow,
   normalizeOptionalString,
   parseDecimal,
-  parseRequiredDecimal
+  parseRequiredDecimal,
+  toInventoryQuantity
 } from "./inventoryTenant";
+import {
+  INVENTORY_PRODUCT_KIND_SIMPLE,
+  INVENTORY_PRODUCT_KIND_VARIABLE,
+  isVariableProduct,
+  normalizeInventoryProductKind
+} from "./inventoryProductKind";
+import { syncSellableCode } from "./inventorySellableCodes";
 
 type UpdateBody = {
   categoryId?: unknown;
@@ -28,6 +39,7 @@ type UpdateBody = {
   minStock?: unknown;
   imageUrl?: unknown;
   active?: unknown;
+  productKind?: unknown;
 };
 
 export default async function UpdateInventoryProductService(input: {
@@ -35,7 +47,15 @@ export default async function UpdateInventoryProductService(input: {
   id: number;
   body: UpdateBody;
 }): Promise<InventoryProduct> {
-  const product = await findInventoryProductOrThrow(input.companyId, input.id);
+  return sequelize.transaction(async (t: Transaction) => {
+  const product = await InventoryProduct.findOne({
+    where: { id: input.id, companyId: input.companyId },
+    transaction: t,
+    lock: t.LOCK.UPDATE
+  });
+  if (!product) {
+    throw new AppError("ERR_INVENTORY_PRODUCT_NOT_FOUND", 404);
+  }
   const patch: Partial<InventoryProduct> = {};
 
   if (input.body.currentQuantity !== undefined) {
@@ -45,6 +65,78 @@ export default async function UpdateInventoryProductService(input: {
       "A quantidade em estoque só pode ser alterada por movimentações de estoque."
     );
   }
+
+  if (input.body.productKind !== undefined) {
+    const nextKind = normalizeInventoryProductKind(input.body.productKind);
+    const prevKind = normalizeInventoryProductKind(product.productKind);
+    if (nextKind !== prevKind) {
+      if (
+        nextKind === INVENTORY_PRODUCT_KIND_VARIABLE &&
+        prevKind === INVENTORY_PRODUCT_KIND_SIMPLE
+      ) {
+        const [saleCount, moveCount, qty] = await Promise.all([
+          InventorySaleItem.count({
+            where: { companyId: input.companyId, productId: product.id },
+            transaction: t
+          }),
+          InventoryStockMovement.count({
+            where: { companyId: input.companyId, productId: product.id },
+            transaction: t
+          }),
+          Promise.resolve(toInventoryQuantity(product.currentQuantity))
+        ]);
+        if (saleCount > 0 || moveCount > 0 || qty > 0) {
+          throw new AppError(
+            "ERR_INVENTORY_PRODUCT_KIND_CONVERSION_BLOCKED",
+            400,
+            "Não é possível converter produto com histórico/estoque em produto com variações."
+          );
+        }
+        patch.productKind = INVENTORY_PRODUCT_KIND_VARIABLE;
+        patch.sku = null;
+        patch.barcode = null;
+        patch.trackStock = false;
+        patch.currentQuantity = 0;
+        patch.minStock = null;
+        await syncSellableCode({
+          companyId: input.companyId,
+          codeType: "sku",
+          codeValue: null,
+          productId: product.id,
+          variantId: null,
+          transaction: t
+        });
+        await syncSellableCode({
+          companyId: input.companyId,
+          codeType: "barcode",
+          codeValue: null,
+          productId: product.id,
+          variantId: null,
+          transaction: t
+        });
+      } else if (
+        nextKind === INVENTORY_PRODUCT_KIND_SIMPLE &&
+        prevKind === INVENTORY_PRODUCT_KIND_VARIABLE
+      ) {
+        const variantCount = await InventoryProductVariant.count({
+          where: { companyId: input.companyId, productId: product.id },
+          transaction: t
+        });
+        if (variantCount > 0) {
+          throw new AppError(
+            "ERR_INVENTORY_PRODUCT_KIND_CONVERSION_BLOCKED",
+            400,
+            "Remova/desative todas as variantes antes de converter para produto simples."
+          );
+        }
+        patch.productKind = INVENTORY_PRODUCT_KIND_SIMPLE;
+      }
+    }
+  }
+
+  const variable = isVariableProduct({
+    productKind: (patch.productKind as string) || product.productKind
+  });
 
   if (input.body.categoryId !== undefined) {
     if (input.body.categoryId === null || input.body.categoryId === "") {
@@ -62,19 +154,31 @@ export default async function UpdateInventoryProductService(input: {
     }
   }
 
-  if (input.body.sku !== undefined) {
+  if (!variable && input.body.sku !== undefined) {
     const sku = normalizeOptionalString(input.body.sku, 64);
-    await assertInventoryProductSkuUnique(input.companyId, sku, product.id);
     patch.sku = sku;
+    await syncSellableCode({
+      companyId: input.companyId,
+      codeType: "sku",
+      codeValue: sku,
+      productId: product.id,
+      variantId: null,
+      transaction: t
+    });
   }
 
-  if (input.body.barcode !== undefined) {
-    patch.barcode = normalizeOptionalString(input.body.barcode, 64);
-    await assertInventoryBarcodeUnique(
-      input.companyId,
-      patch.barcode,
-      product.id
-    );
+  if (!variable && input.body.barcode !== undefined) {
+    const barcode = normalizeOptionalString(input.body.barcode, 64);
+    patch.barcode = barcode;
+    await assertInventoryBarcodeUnique(input.companyId, barcode, product.id);
+    await syncSellableCode({
+      companyId: input.companyId,
+      codeType: "barcode",
+      codeValue: barcode,
+      productId: product.id,
+      variantId: null,
+      transaction: t
+    });
   }
 
   if (input.body.name !== undefined) {
@@ -149,9 +253,10 @@ export default async function UpdateInventoryProductService(input: {
   }
 
   try {
-    await product.update(patch);
+    await product.update(patch, { transaction: t });
   } catch (error) {
     rethrowInventoryBarcodeConstraint(error);
   }
-  return product.reload();
+  return product.reload({ transaction: t });
+  });
 }

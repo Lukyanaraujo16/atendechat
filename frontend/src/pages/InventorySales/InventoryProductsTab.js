@@ -49,7 +49,11 @@ import useIsMobile from "../../hooks/useIsMobile";
 import ProductFormDialog from "./ProductFormDialog";
 import ConfirmationModal from "../../components/ConfirmationModal";
 import { formatCurrencyBRL } from "../../utils/brazilianCurrency";
-import { describeProductStock } from "./utils";
+import { describeProductStock, formatQuantity } from "./utils";
+import {
+  formatVariablePriceRange,
+  isVariableProduct,
+} from "./inventoryProductKind";
 import { toast } from "react-toastify";
 import { useInventoryPermissions } from "../../utils/inventoryAccess";
 
@@ -200,6 +204,21 @@ export default function InventoryProductsTab({
   };
 
   const renderStockCell = (product) => {
+    if (isVariableProduct(product)) {
+      const qty = product.aggregatedQuantity ?? product.currentQuantity ?? 0;
+      const unit = typeof product.unit === "string" ? product.unit.trim() : "";
+      const quantityText = unit
+        ? `${formatQuantity(qty)} ${unit}`
+        : formatQuantity(qty);
+      return (
+        <Box>
+          <Typography variant="body2">{quantityText}</Typography>
+          <Typography variant="caption" color="textSecondary">
+            {i18n.t("inventorySales.products.variants.aggregatedStockHint")}
+          </Typography>
+        </Box>
+      );
+    }
     const stock = describeProductStock(product);
     if (stock.status === "untracked") {
       return (
@@ -399,6 +418,16 @@ export default function InventoryProductsTab({
                 subtitle={product.sku || product.barcode || "—"}
                 badges={
                   <Box className={classes.chipRow}>
+                    {isVariableProduct(product) ? (
+                      <Chip
+                        size="small"
+                        color="primary"
+                        variant="outlined"
+                        label={i18n.t("inventorySales.products.variants.countChip", {
+                          count: product.activeVariantCount ?? product.variantCount ?? 0,
+                        })}
+                      />
+                    ) : null}
                     {product.active === false ? (
                       <Chip
                         size="small"
@@ -410,7 +439,7 @@ export default function InventoryProductsTab({
                 footer={renderActions(product)}
               >
                 <Typography variant="body2">
-                  {formatCurrencyBRL(product.salePrice)}
+                  {formatVariablePriceRange(product, formatCurrencyBRL)}
                 </Typography>
                 {renderStockCell(product)}
               </MobileEntityCard>
@@ -441,6 +470,19 @@ export default function InventoryProductsTab({
                     <TableCell>
                       <Box display="flex" alignItems="center" style={{ gap: 8 }}>
                         <span>{product.name}</span>
+                        {isVariableProduct(product) ? (
+                          <Chip
+                            size="small"
+                            color="primary"
+                            variant="outlined"
+                            label={i18n.t("inventorySales.products.variants.countChip", {
+                              count:
+                                product.activeVariantCount ??
+                                product.variantCount ??
+                                0,
+                            })}
+                          />
+                        ) : null}
                         {product.active === false ? (
                           <Chip
                             size="small"
@@ -452,7 +494,7 @@ export default function InventoryProductsTab({
                     <TableCell>{product.sku || "—"}</TableCell>
                     <TableCell>{product.category?.name || "—"}</TableCell>
                     <TableCell align="right">
-                      {formatCurrencyBRL(product.salePrice)}
+                      {formatVariablePriceRange(product, formatCurrencyBRL)}
                     </TableCell>
                     <TableCell>{renderStockCell(product)}</TableCell>
                     {perms.canManageProducts ? (

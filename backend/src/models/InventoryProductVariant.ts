@@ -14,33 +14,30 @@ import {
   DataType
 } from "sequelize-typescript";
 import Company from "./Company";
-import InventoryCategory from "./InventoryCategory";
+import InventoryProduct from "./InventoryProduct";
+import InventoryProductVariantOption from "./InventoryProductVariantOption";
 import InventoryStockMovement from "./InventoryStockMovement";
 import InventorySaleItem from "./InventorySaleItem";
-import InventoryProductVariant from "./InventoryProductVariant";
 
 @Table({
-  tableName: "InventoryProducts",
+  tableName: "InventoryProductVariants",
   indexes: [
     {
-      name: "InventoryProducts_companyId_active_name_idx",
-      fields: ["companyId", "active", "name"]
+      name: "InventoryProductVariants_company_product_combo_uq",
+      unique: true,
+      fields: ["companyId", "productId", "combinationKey"]
     },
     {
-      name: "InventoryProducts_companyId_sku_idx",
+      name: "InventoryProductVariants_companyId_sku_idx",
       fields: ["companyId", "sku"]
     },
     {
-      name: "InventoryProducts_companyId_categoryId_idx",
-      fields: ["companyId", "categoryId"]
-    },
-    {
-      name: "InventoryProducts_companyId_currentQuantity_idx",
-      fields: ["companyId", "currentQuantity"]
+      name: "InventoryProductVariants_company_product_active_idx",
+      fields: ["companyId", "productId", "active"]
     }
   ]
 })
-class InventoryProduct extends Model<InventoryProduct> {
+class InventoryProductVariant extends Model<InventoryProductVariant> {
   @PrimaryKey
   @AutoIncrement
   @Column
@@ -53,13 +50,18 @@ class InventoryProduct extends Model<InventoryProduct> {
   @BelongsTo(() => Company)
   company: Company;
 
-  @AllowNull
-  @ForeignKey(() => InventoryCategory)
+  @ForeignKey(() => InventoryProduct)
   @Column
-  categoryId: number | null;
+  productId: number;
 
-  @BelongsTo(() => InventoryCategory)
-  category: InventoryCategory;
+  @BelongsTo(() => InventoryProduct)
+  product: InventoryProduct;
+
+  @Column(DataType.STRING(200))
+  label: string;
+
+  @Column(DataType.STRING(500))
+  combinationKey: string;
 
   @AllowNull
   @Column(DataType.STRING(64))
@@ -68,22 +70,6 @@ class InventoryProduct extends Model<InventoryProduct> {
   @AllowNull
   @Column(DataType.STRING(64))
   barcode: string | null;
-
-  @Column(DataType.STRING(200))
-  name: string;
-
-  /** simple | variable — discriminação explícita (default simple). */
-  @Default("simple")
-  @Column(DataType.STRING(16))
-  productKind: string;
-
-  @AllowNull
-  @Column(DataType.TEXT)
-  description: string | null;
-
-  @Default("un")
-  @Column(DataType.STRING(16))
-  unit: string;
 
   @Column(DataType.DECIMAL(12, 2))
   salePrice: string | number;
@@ -104,10 +90,6 @@ class InventoryProduct extends Model<InventoryProduct> {
   @Column(DataType.DECIMAL(12, 3))
   minStock: string | number | null;
 
-  @AllowNull
-  @Column(DataType.STRING(500))
-  imageUrl: string | null;
-
   @Default(true)
   @Column
   active: boolean;
@@ -118,27 +100,26 @@ class InventoryProduct extends Model<InventoryProduct> {
   @UpdatedAt
   updatedAt: Date;
 
+  @HasMany(() => InventoryProductVariantOption, {
+    foreignKey: "variantId",
+    onDelete: "CASCADE",
+    hooks: true
+  })
+  optionLinks: InventoryProductVariantOption[];
+
   @HasMany(() => InventoryStockMovement, {
-    onUpdate: "CASCADE",
+    foreignKey: "variantId",
     onDelete: "RESTRICT",
     hooks: true
   })
   stockMovements: InventoryStockMovement[];
 
   @HasMany(() => InventorySaleItem, {
-    onUpdate: "CASCADE",
+    foreignKey: "variantId",
     onDelete: "RESTRICT",
     hooks: true
   })
   saleItems: InventorySaleItem[];
-
-  @HasMany(() => InventoryProductVariant, {
-    foreignKey: "productId",
-    onUpdate: "CASCADE",
-    onDelete: "RESTRICT",
-    hooks: true
-  })
-  variants: InventoryProductVariant[];
 }
 
-export default InventoryProduct;
+export default InventoryProductVariant;

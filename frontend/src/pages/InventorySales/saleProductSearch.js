@@ -1,6 +1,7 @@
 import axios from "axios";
 import { i18n } from "../../translate/i18n";
 import { formatQuantity, toNumber } from "./utils";
+import { isVariableProduct } from "./inventoryProductKind";
 
 /** Mesmo corte em que o drawer deixa de ocupar 100vw (MUI sm / md = 960). */
 export const SALE_SEARCH_AUTOFOCUS_QUERY = "(min-width:960px)";
@@ -55,10 +56,23 @@ export function pickExactSaleProduct(products, term) {
     (product) => typeof product?.sku === "string" && product.sku === query
   );
   if (skuHits.length === 1) return skuHits[0];
+
+  const variantCodeHits = products.filter(
+    (product) => product?.selectedVariant != null
+  );
+  if (variantCodeHits.length === 1) return variantCodeHits[0];
   return null;
 }
 
 export function saleProductStockLabel(product) {
+  if (isVariableProduct(product) && !product?.selectedVariant) {
+    const qty = toNumber(product.aggregatedQuantity ?? product.currentQuantity);
+    const unit = typeof product.unit === "string" ? product.unit.trim() : "";
+    const quantityText = unit ? `${formatQuantity(qty)} ${unit}` : formatQuantity(qty);
+    return i18n.t("inventorySales.sales.items.search.variantAggregateStock", {
+      quantity: quantityText,
+    });
+  }
   if (!product?.trackStock) {
     return i18n.t("inventorySales.sales.items.search.untracked");
   }

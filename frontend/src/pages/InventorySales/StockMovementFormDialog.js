@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Box,
   FormControl,
@@ -18,14 +18,19 @@ import {
   AppPrimaryButton,
   AppSecondaryButton,
 } from "../../ui";
-import { createStockMovement } from "../../services/inventoryApi";
+import {
+  createStockMovement,
+  listInventoryProductVariants,
+} from "../../services/inventoryApi";
 import toastError from "../../errors/toastError";
 import { i18n } from "../../translate/i18n";
 import { STOCK_MOVEMENT_TYPES } from "./constants";
 import { parseBrazilianCurrencyToNumber } from "../../utils/brazilianCurrency";
+import { isVariableProduct } from "./inventoryProductKind";
 
 const emptyForm = {
   productId: "",
+  variantId: "",
   type: "in",
   quantity: "",
   unitCost: "",
@@ -41,10 +46,27 @@ export default function StockMovementFormDialog({
 }) {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(emptyForm);
+  const [variants, setVariants] = useState([]);
+  const [variantsLoading, setVariantsLoading] = useState(false);
 
-  const stockProducts = (products || []).filter(
-    (p) => p.active !== false && p.trackStock !== false
+  const stockProducts = useMemo(
+    () =>
+      (products || []).filter((p) => {
+        if (p.active === false) return false;
+        if (isVariableProduct(p)) return true;
+        return p.trackStock !== false;
+      }),
+    [products]
   );
+
+  const selectedProduct = useMemo(
+    () =>
+      stockProducts.find((p) => String(p.id) === String(form.productId)) ||
+      null,
+    [form.productId, stockProducts]
+  );
+
+  const requiresVariant = isVariableProduct(selectedProduct);
 
   useEffect(() => {
     if (!open) return;
@@ -54,8 +76,38 @@ export default function StockMovementFormDialog({
     });
   }, [open, defaultProductId]);
 
+  useEffect(() => {
+    if (!open || !requiresVariant || !form.productId) {
+      setVariants([]);
+      return;
+    }
+    let cancelled = false;
+    setVariantsLoading(true);
+    listInventoryProductVariants(Number(form.productId), { active: true })
+      .then(({ data }) => {
+        if (cancelled) return;
+        setVariants(Array.isArray(data) ? data : []);
+      })
+      .catch((err) => {
+        if (!cancelled) toastError(err);
+      })
+      .finally(() => {
+        if (!cancelled) setVariantsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, requiresVariant, form.productId]);
+
   const setField = (field) => (e) => {
-    setForm((prev) => ({ ...prev, [field]: e.target.value }));
+    const value = e.target.value;
+    setForm((prev) => {
+      const next = { ...prev, [field]: value };
+      if (field === "productId") {
+        next.variantId = "";
+      }
+      return next;
+    });
   };
 
   const notesRequired = form.type === "out" || form.type === "adjustment";
@@ -64,6 +116,10 @@ export default function StockMovementFormDialog({
     e.preventDefault();
     if (!form.productId) {
       toast.error(i18n.t("inventorySales.stock.validation.product"));
+      return;
+    }
+    if (requiresVariant && !form.variantId) {
+      toast.error(i18n.t("inventorySales.stock.validation.variant"));
       return;
     }
     const quantity = Number(form.quantity);
@@ -84,15 +140,20 @@ export default function StockMovementFormDialog({
       ? parseBrazilianCurrencyToNumber(form.unitCost)
       : null;
 
+    const body = {
+      productId: Number(form.productId),
+      type: form.type,
+      quantity,
+      unitCost,
+      notes: form.notes.trim() || null,
+    };
+    if (requiresVariant) {
+      body.variantId = Number(form.variantId);
+    }
+
     setSaving(true);
     try {
-      await createStockMovement({
-        productId: Number(form.productId),
-        type: form.type,
-        quantity,
-        unitCost,
-        notes: form.notes.trim() || null,
-      });
+      await createStockMovement(body);
       toast.success(i18n.t("inventorySales.stock.toasts.created"));
       if (onSaved) onSaved();
       onClose();
@@ -132,6 +193,30 @@ export default function StockMovementFormDialog({
                 ))}
               </Select>
             </FormControl>
+            {requiresVariant ? (
+              <FormControl variant="outlined" size="small" fullWidth required>
+                <InputLabel id="movement-variant-label">
+                  {i18n.t("inventorySales.stock.fields.variant")}
+                </InputLabel>
+                <Select
+                  labelId="movement-variant-label"
+                  value={form.variantId}
+                  onChange={setField("variantId")}
+                  label={i18n.t("inventorySales.stock.fields.variant")}
+                  disabled={variantsLoading}
+                >
+                  <MenuItem value="">
+                    <em>{i18n.t("inventorySales.common.select")}</em>
+                  </MenuItem>
+                  {variants.map((v) => (
+                    <MenuItem key={v.id} value={String(v.id)}>
+                      {v.label || `#${v.id}`}
+                      {v.sku ? ` (${v.sku})` : ""}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            ) : null}
             <FormControl variant="outlined" size="small" fullWidth required>
               <InputLabel id="movement-type-label">
                 {i18n.t("inventorySales.stock.fields.type")}

@@ -20,6 +20,13 @@ import CreateInventoryStockMovementService from "../services/InventoryService/Cr
 import ListInventoryStockMovementsService from "../services/InventoryService/ListInventoryStockMovementsService";
 import ListInventoryProductStockMovementsService from "../services/InventoryService/ListInventoryProductStockMovementsService";
 import ListInventoryLowStockProductsService from "../services/InventoryService/ListInventoryLowStockProductsService";
+import ListInventoryProductAttributesService from "../services/InventoryService/ListInventoryProductAttributesService";
+import CreateInventoryProductAttributeService from "../services/InventoryService/CreateInventoryProductAttributeService";
+import CreateInventoryProductAttributeOptionService from "../services/InventoryService/CreateInventoryProductAttributeOptionService";
+import ListInventoryProductVariantsService from "../services/InventoryService/ListInventoryProductVariantsService";
+import CreateInventoryProductVariantService from "../services/InventoryService/CreateInventoryProductVariantService";
+import UpdateInventoryProductVariantService from "../services/InventoryService/UpdateInventoryProductVariantService";
+import { parseBooleanQuery } from "../services/InventoryService/inventoryTenant";
 
 function companyIdOrThrow(req: Request): number {
   const id = req.user?.companyId;
@@ -260,4 +267,91 @@ export const listLowStockProducts = async (
   const companyId = companyIdOrThrow(req);
   const rows = await ListInventoryLowStockProductsService(companyId);
   return res.json(rows);
+};
+
+export const listProductAttributes = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const rows = await ListInventoryProductAttributesService({
+    companyId,
+    activeOnly: parseBooleanQuery(req.query.activeOnly) === true
+  });
+  return res.json(rows);
+};
+
+export const createProductAttribute = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const row = await CreateInventoryProductAttributeService({
+    companyId,
+    body: req.body
+  });
+  return res.status(201).json(row);
+};
+
+export const createProductAttributeOption = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const attributeId = parseIdParam(req.params.attributeId);
+  const row = await CreateInventoryProductAttributeOptionService({
+    companyId,
+    attributeId,
+    body: req.body
+  });
+  return res.status(201).json(row);
+};
+
+export const listProductVariants = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const productId = parseIdParam(req.params.id);
+  const active = parseBooleanQuery(req.query.active);
+  const rows = await ListInventoryProductVariantsService({
+    companyId,
+    productId,
+    active: active === undefined ? null : active
+  });
+  return res.json(rows);
+};
+
+export const createProductVariant = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const productId = parseIdParam(req.params.id);
+  const row = await CreateInventoryProductVariantService({
+    companyId,
+    productId,
+    body: req.body,
+    createdBy:
+      req.user?.id != null && Number.isFinite(Number(req.user.id))
+        ? Number(req.user.id)
+        : null
+  });
+  return res.status(201).json(row);
+};
+
+export const updateProductVariant = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const productId = parseIdParam(req.params.id);
+  const variantId = parseIdParam(req.params.variantId);
+  const row = await UpdateInventoryProductVariantService({
+    companyId,
+    productId,
+    variantId,
+    body: req.body
+  });
+  return res.json(row);
 };

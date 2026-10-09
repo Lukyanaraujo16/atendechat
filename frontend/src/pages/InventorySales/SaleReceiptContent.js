@@ -291,7 +291,10 @@ function displayValue(value, fallback = "—") {
 }
 
 function getItemName(item) {
-  return item?.productName || item?.product?.name || "—";
+  const base = item?.productName || item?.product?.name || "—";
+  const variant = item?.variantLabel;
+  if (variant) return `${base} — ${variant}`;
+  return base;
 }
 
 function ReceiptItemIdentifiers({ item, classes }) {

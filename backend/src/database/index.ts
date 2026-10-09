@@ -80,6 +80,11 @@ import Sticker from "../models/Sticker";
 import InventorySettings from "../models/InventorySettings";
 import InventoryCategory from "../models/InventoryCategory";
 import InventoryProduct from "../models/InventoryProduct";
+import InventoryProductAttribute from "../models/InventoryProductAttribute";
+import InventoryProductAttributeOption from "../models/InventoryProductAttributeOption";
+import InventoryProductVariant from "../models/InventoryProductVariant";
+import InventoryProductVariantOption from "../models/InventoryProductVariantOption";
+import InventorySellableCode from "../models/InventorySellableCode";
 import InventoryStockMovement from "../models/InventoryStockMovement";
 import InventorySellerProfile from "../models/InventorySellerProfile";
 import InventorySale from "../models/InventorySale";
@@ -235,6 +240,11 @@ const models = [
   InventorySettings,
   InventoryCategory,
   InventoryProduct,
+  InventoryProductAttribute,
+  InventoryProductAttributeOption,
+  InventoryProductVariant,
+  InventoryProductVariantOption,
+  InventorySellableCode,
   InventoryStockMovement,
   InventorySellerProfile,
   InventorySale,

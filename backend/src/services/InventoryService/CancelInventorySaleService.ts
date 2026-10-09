@@ -3,11 +3,14 @@ import sequelize from "../../database";
 import AppError from "../../errors/AppError";
 import InventorySale from "../../models/InventorySale";
 import InventorySaleItem from "../../models/InventorySaleItem";
-import InventoryProduct from "../../models/InventoryProduct";
 import InventoryStockMovement from "../../models/InventoryStockMovement";
 import { buildInventorySaleIncludes } from "./inventorySaleHelpers";
-import { normalizeOptionalString, toInventoryQuantity } from "./inventoryTenant";
+import { normalizeOptionalString } from "./inventoryTenant";
 import CancelInventoryReceivableForSaleService from "./CancelInventoryReceivableForSaleService";
+import {
+  applySellableQuantity,
+  lockSellableStockTarget
+} from "./inventorySellableStock";
 
 export default async function CancelInventorySaleService(input: {
   companyId: number;
@@ -66,26 +69,32 @@ export default async function CancelInventorySaleService(input: {
         transaction: t
       });
 
-      for (const item of items) {
-        if (!item.trackStock) continue;
-
-        const product = await InventoryProduct.findOne({
-          where: { id: item.productId, companyId: input.companyId },
-          transaction: t,
-          lock: t.LOCK.UPDATE
+      const stockItems = [...items]
+        .filter(item => item.trackStock)
+        .sort((a, b) => {
+          if (a.productId !== b.productId) return a.productId - b.productId;
+          return Number(a.variantId || 0) - Number(b.variantId || 0);
         });
-        if (!product) {
-          throw new AppError("ERR_INVENTORY_PRODUCT_NOT_FOUND", 404);
-        }
+
+      for (const item of stockItems) {
+        // Restaura mesmo se variante/produto estiver inativo (histórico).
+        const target = await lockSellableStockTarget({
+          companyId: input.companyId,
+          productId: item.productId,
+          variantId: item.variantId,
+          transaction: t,
+          requireActive: false
+        });
 
         const returnQty = Number(item.quantity);
-        const currentQty = toInventoryQuantity(product.currentQuantity);
+        const currentQty = target.currentQuantity;
         const newBalance = currentQty + returnQty;
 
         await InventoryStockMovement.create(
           {
             companyId: input.companyId,
-            productId: product.id,
+            productId: target.product.id,
+            variantId: target.kind === "variant" ? target.variant.id : null,
             type: "sale_reversal",
             quantity: returnQty,
             balanceAfter: newBalance,
@@ -98,7 +107,7 @@ export default async function CancelInventorySaleService(input: {
           { transaction: t }
         );
 
-        await product.update({ currentQuantity: newBalance }, { transaction: t });
+        await applySellableQuantity(target, newBalance, t);
       }
     } else if (sale.status !== "draft") {
       throw new AppError(

@@ -441,6 +441,25 @@ inventoryRoutes.get(
 );
 
 inventoryRoutes.get(
+  "/inventory/product-attributes",
+  isAuth,
+  requireInventorySalesPermission(INVENTORY_SALES_VIEW),
+  InventoryController.listProductAttributes
+);
+inventoryRoutes.post(
+  "/inventory/product-attributes",
+  isAuth,
+  requireInventorySalesPermission(INVENTORY_SALES_MANAGE_PRODUCTS),
+  InventoryController.createProductAttribute
+);
+inventoryRoutes.post(
+  "/inventory/product-attributes/:attributeId/options",
+  isAuth,
+  requireInventorySalesPermission(INVENTORY_SALES_MANAGE_PRODUCTS),
+  InventoryController.createProductAttributeOption
+);
+
+inventoryRoutes.get(
   "/inventory/products",
   isAuth,
   requireInventorySalesPermission(INVENTORY_SALES_VIEW),
@@ -451,6 +470,24 @@ inventoryRoutes.post(
   isAuth,
   requireInventorySalesPermission(INVENTORY_SALES_MANAGE_PRODUCTS),
   InventoryController.createProduct
+);
+inventoryRoutes.get(
+  "/inventory/products/:id/variants",
+  isAuth,
+  requireInventorySalesPermission(INVENTORY_SALES_VIEW),
+  InventoryController.listProductVariants
+);
+inventoryRoutes.post(
+  "/inventory/products/:id/variants",
+  isAuth,
+  requireInventorySalesPermission(INVENTORY_SALES_MANAGE_PRODUCTS),
+  InventoryController.createProductVariant
+);
+inventoryRoutes.put(
+  "/inventory/products/:id/variants/:variantId",
+  isAuth,
+  requireInventorySalesPermission(INVENTORY_SALES_MANAGE_PRODUCTS),
+  InventoryController.updateProductVariant
 );
 inventoryRoutes.get(
   "/inventory/products/:id/stock-movements",

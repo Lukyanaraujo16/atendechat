@@ -7,6 +7,8 @@ import {
   Grid,
   InputLabel,
   MenuItem,
+  Radio,
+  RadioGroup,
   Select,
   Switch,
   TextField,
@@ -40,9 +42,15 @@ import {
   resolveProductUnit,
   splitProductUnit,
 } from "./productUnit";
+import {
+  PRODUCT_KIND_SIMPLE,
+  PRODUCT_KIND_VARIABLE,
+} from "./inventoryProductKind";
+import ProductVariantsEditor from "./ProductVariantsEditor";
 
 const emptyForm = {
   name: "",
+  productKind: PRODUCT_KIND_SIMPLE,
   sku: "",
   barcode: "",
   categoryId: "",
@@ -98,6 +106,10 @@ export default function ProductFormDialog({
         setLoadedUnit(storedUnit);
         setForm({
           name: data.name || "",
+          productKind:
+            data.productKind === PRODUCT_KIND_VARIABLE
+              ? PRODUCT_KIND_VARIABLE
+              : PRODUCT_KIND_SIMPLE,
           sku: data.sku || "",
           barcode: data.barcode || "",
           categoryId: data.categoryId != null ? String(data.categoryId) : "",
@@ -126,10 +138,14 @@ export default function ProductFormDialog({
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
+  const isVariable = form.productKind === PRODUCT_KIND_VARIABLE;
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const salePrice = parseBrazilianCurrencyToNumber(form.salePrice);
-    if (salePrice == null || salePrice < 0) {
+    const salePrice = isVariable
+      ? 0
+      : parseBrazilianCurrencyToNumber(form.salePrice);
+    if (!isVariable && (salePrice == null || salePrice < 0)) {
       toast.error(i18n.t("inventorySales.products.validation.salePrice"));
       return;
     }
@@ -164,19 +180,28 @@ export default function ProductFormDialog({
 
     const payload = {
       name: form.name.trim(),
-      sku: form.sku.trim() || null,
-      barcode: form.barcode.trim() || null,
+      productKind: form.productKind,
       categoryId: form.categoryId ? Number(form.categoryId) : null,
       unit,
-      salePrice,
-      costPrice,
-      trackStock: form.trackStock,
-      minStock,
       imageUrl: form.imageUrl.trim() || null,
       active: form.active,
     };
 
-    if (!isEdit && form.trackStock && form.currentQuantity !== "") {
+    if (isVariable) {
+      payload.salePrice = 0;
+      payload.trackStock = false;
+    } else {
+      Object.assign(payload, {
+        sku: form.sku.trim() || null,
+        barcode: form.barcode.trim() || null,
+        salePrice,
+        costPrice,
+        trackStock: form.trackStock,
+        minStock,
+      });
+    }
+
+    if (!isVariable && !isEdit && form.trackStock && form.currentQuantity !== "") {
       const qty = Number(form.currentQuantity);
       if (!Number.isFinite(qty) || qty < 0) {
         toast.error(i18n.t("inventorySales.products.validation.initialQty"));
@@ -212,7 +237,12 @@ export default function ProductFormDialog({
   const showLegacyWarning = Boolean(unitIssue && keepsLegacyUnit);
 
   return (
-    <AppDialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+    <AppDialog
+      open={open}
+      onClose={onClose}
+      maxWidth={isEdit && isVariable ? "md" : "sm"}
+      fullWidth
+    >
       <form onSubmit={handleSubmit}>
         <AppDialogTitle>
           {isEdit
@@ -235,32 +265,65 @@ export default function ProductFormDialog({
               required
               disabled={loading}
             />
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  label={i18n.t("inventorySales.products.fields.sku")}
-                  value={form.sku}
-                  onChange={setField("sku")}
-                  variant="outlined"
-                  size="small"
-                  fullWidth
-                  disabled={loading}
+            <FormControl component="fieldset" disabled={loading || isEdit}>
+              <Typography variant="caption" color="textSecondary" gutterBottom>
+                {i18n.t("inventorySales.products.fields.productKind")}
+              </Typography>
+              <RadioGroup
+                row
+                name="productKind"
+                value={form.productKind}
+                onChange={setField("productKind")}
+              >
+                <FormControlLabel
+                  value={PRODUCT_KIND_SIMPLE}
+                  control={<Radio color="primary" size="small" />}
+                  label={i18n.t("inventorySales.products.fields.productKindSimple")}
                 />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  id="product-barcode"
-                  label={i18n.t("inventorySales.products.fields.barcode")}
-                  helperText={i18n.t("inventorySales.products.fields.barcodeHelp")}
-                  value={form.barcode}
-                  onChange={setField("barcode")}
-                  variant="outlined"
-                  size="small"
-                  fullWidth
-                  disabled={loading}
+                <FormControlLabel
+                  value={PRODUCT_KIND_VARIABLE}
+                  control={<Radio color="primary" size="small" />}
+                  label={i18n.t("inventorySales.products.fields.productKindVariable")}
                 />
+              </RadioGroup>
+              {isEdit ? (
+                <FormHelperText>
+                  {i18n.t("inventorySales.products.fields.productKindLocked")}
+                </FormHelperText>
+              ) : null}
+            </FormControl>
+            {isVariable ? (
+              <Typography variant="body2" color="textSecondary">
+                {i18n.t("inventorySales.products.variants.parentCommercialNote")}
+              </Typography>
+            ) : (
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    label={i18n.t("inventorySales.products.fields.sku")}
+                    value={form.sku}
+                    onChange={setField("sku")}
+                    variant="outlined"
+                    size="small"
+                    fullWidth
+                    disabled={loading}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    id="product-barcode"
+                    label={i18n.t("inventorySales.products.fields.barcode")}
+                    helperText={i18n.t("inventorySales.products.fields.barcodeHelp")}
+                    value={form.barcode}
+                    onChange={setField("barcode")}
+                    variant="outlined"
+                    size="small"
+                    fullWidth
+                    disabled={loading}
+                  />
+                </Grid>
               </Grid>
-            </Grid>
+            )}
             <FormControl variant="outlined" size="small" fullWidth>
               <InputLabel id="product-category-label">
                 {i18n.t("inventorySales.products.fields.category")}
@@ -345,78 +408,86 @@ export default function ProductFormDialog({
                 inputProps={{ maxLength: PRODUCT_UNIT_MAX_LENGTH }}
               />
             ) : null}
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  id="product-sale-price"
-                  label={i18n.t("inventorySales.products.fields.salePrice")}
-                  value={form.salePrice}
-                  onChange={setField("salePrice")}
-                  variant="outlined"
-                  size="small"
-                  fullWidth
-                  required
-                  disabled={loading}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  label={i18n.t("inventorySales.products.fields.costPrice")}
-                  value={form.costPrice}
-                  onChange={setField("costPrice")}
-                  variant="outlined"
-                  size="small"
-                  fullWidth
-                  disabled={loading}
-                />
-              </Grid>
-            </Grid>
+            {!isVariable ? (
+              <>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      id="product-sale-price"
+                      label={i18n.t("inventorySales.products.fields.salePrice")}
+                      value={form.salePrice}
+                      onChange={setField("salePrice")}
+                      variant="outlined"
+                      size="small"
+                      fullWidth
+                      required
+                      disabled={loading}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      label={i18n.t("inventorySales.products.fields.costPrice")}
+                      value={form.costPrice}
+                      onChange={setField("costPrice")}
+                      variant="outlined"
+                      size="small"
+                      fullWidth
+                      disabled={loading}
+                    />
+                  </Grid>
+                </Grid>
 
-            <SectionLabel>
-              {i18n.t("inventorySales.products.sections.stock")}
-            </SectionLabel>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={form.trackStock}
-                  onChange={setField("trackStock")}
-                  color="primary"
-                  disabled={loading}
+                <SectionLabel>
+                  {i18n.t("inventorySales.products.sections.stock")}
+                </SectionLabel>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={form.trackStock}
+                      onChange={setField("trackStock")}
+                      color="primary"
+                      disabled={loading}
+                    />
+                  }
+                  label={i18n.t("inventorySales.products.fields.trackStock")}
                 />
-              }
-              label={i18n.t("inventorySales.products.fields.trackStock")}
-            />
-            {form.trackStock && !isEdit ? (
-              <TextField
-                id="product-initial-quantity"
-                label={i18n.t("inventorySales.products.fields.initialQuantity")}
-                value={form.currentQuantity}
-                onChange={setField("currentQuantity")}
-                variant="outlined"
-                size="small"
-                fullWidth
-                type="number"
-                helperText={i18n.t(
-                  "inventorySales.products.fields.initialQuantityHelp"
-                )}
-                inputProps={{ min: 0, step: "any" }}
-                disabled={loading}
-              />
+                {form.trackStock && !isEdit ? (
+                  <TextField
+                    id="product-initial-quantity"
+                    label={i18n.t("inventorySales.products.fields.initialQuantity")}
+                    value={form.currentQuantity}
+                    onChange={setField("currentQuantity")}
+                    variant="outlined"
+                    size="small"
+                    fullWidth
+                    type="number"
+                    helperText={i18n.t(
+                      "inventorySales.products.fields.initialQuantityHelp"
+                    )}
+                    inputProps={{ min: 0, step: "any" }}
+                    disabled={loading}
+                  />
+                ) : null}
+                {form.trackStock ? (
+                  <TextField
+                    id="product-min-stock"
+                    label={i18n.t("inventorySales.products.fields.minStock")}
+                    value={form.minStock}
+                    onChange={setField("minStock")}
+                    variant="outlined"
+                    size="small"
+                    fullWidth
+                    type="number"
+                    helperText={i18n.t("inventorySales.products.fields.minStockHelp")}
+                    inputProps={{ min: 0, step: "any" }}
+                    disabled={loading}
+                  />
+                ) : null}
+              </>
             ) : null}
-            {form.trackStock ? (
-              <TextField
-                id="product-min-stock"
-                label={i18n.t("inventorySales.products.fields.minStock")}
-                value={form.minStock}
-                onChange={setField("minStock")}
-                variant="outlined"
-                size="small"
-                fullWidth
-                type="number"
-                helperText={i18n.t("inventorySales.products.fields.minStockHelp")}
-                inputProps={{ min: 0, step: "any" }}
-                disabled={loading}
-              />
+
+            {isEdit && isVariable ? (
+              <ProductVariantsEditor productId={productId} />
             ) : null}
 
             <SectionLabel>

@@ -16,6 +16,7 @@ import {
 import Company from "./Company";
 import InventorySale from "./InventorySale";
 import InventoryProduct from "./InventoryProduct";
+import InventoryProductVariant from "./InventoryProductVariant";
 import InventorySaleItemIdentifier from "./InventorySaleItemIdentifier";
 
 @Table({
@@ -28,6 +29,10 @@ import InventorySaleItemIdentifier from "./InventorySaleItemIdentifier";
     {
       name: "InventorySaleItems_companyId_productId_idx",
       fields: ["companyId", "productId"]
+    },
+    {
+      name: "InventorySaleItems_companyId_variantId_idx",
+      fields: ["companyId", "variantId"]
     }
   ]
 })
@@ -58,12 +63,33 @@ class InventorySaleItem extends Model<InventorySaleItem> {
   @BelongsTo(() => InventoryProduct)
   product: InventoryProduct;
 
+  /** Null = produto simples/legado. */
+  @AllowNull
+  @ForeignKey(() => InventoryProductVariant)
+  @Column
+  variantId: number | null;
+
+  @BelongsTo(() => InventoryProductVariant)
+  variant: InventoryProductVariant;
+
   @Column(DataType.STRING(200))
   productName: string;
 
   @AllowNull
   @Column(DataType.STRING(64))
   productSku: string | null;
+
+  @AllowNull
+  @Column(DataType.STRING(200))
+  variantLabel: string | null;
+
+  @AllowNull
+  @Column(DataType.STRING(64))
+  variantSku: string | null;
+
+  @AllowNull
+  @Column(DataType.STRING(64))
+  variantBarcode: string | null;
 
   @Column(DataType.STRING(16))
   unit: string;

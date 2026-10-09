@@ -3,10 +3,14 @@ import sequelize from "../../database";
 import AppError from "../../errors/AppError";
 import InventorySaleItem from "../../models/InventorySaleItem";
 import InventoryProduct from "../../models/InventoryProduct";
+import InventoryProductVariant from "../../models/InventoryProductVariant";
 import InventorySaleItemIdentifier from "../../models/InventorySaleItemIdentifier";
 import {
   assertInventorySaleIsDraft,
+  buildProductSnapshot,
+  buildVariantSaleSnapshot,
   findInventorySaleOrThrow,
+  loadActiveInventoryProductOrThrow,
   recalculateInventorySaleTotals,
   roundMoney,
   toMoney
@@ -28,6 +32,7 @@ import {
   replaceSaleItemIdentifiers
 } from "./inventorySaleItemIdentifiers";
 import { parseRequiredDecimal } from "./inventoryTenant";
+import { isVariableProduct } from "./inventoryProductKind";
 
 async function findSaleItemOrThrow(
   companyId: number,
@@ -46,11 +51,62 @@ async function findSaleItemOrThrow(
   return item;
 }
 
+async function resolveSellableSnapshot(
+  companyId: number,
+  productId: number,
+  variantId: number | null,
+  transaction: Transaction
+) {
+  const product = await loadActiveInventoryProductOrThrow(
+    companyId,
+    productId,
+    transaction
+  );
+
+  if (isVariableProduct(product)) {
+    if (variantId == null) {
+      throw new AppError(
+        "ERR_INVENTORY_VARIANT_REQUIRED",
+        400,
+        "Produto com variações exige seleção de variante."
+      );
+    }
+    const variant = await InventoryProductVariant.findOne({
+      where: {
+        id: variantId,
+        companyId,
+        productId: product.id
+      },
+      transaction
+    });
+    if (!variant || !variant.active) {
+      throw new AppError(
+        "ERR_INVENTORY_VARIANT_INACTIVE",
+        400,
+        "Variante inválida ou inativa."
+      );
+    }
+    return buildVariantSaleSnapshot(product, variant);
+  }
+
+  if (variantId != null) {
+    throw new AppError(
+      "ERR_INVENTORY_VARIANT_NOT_ALLOWED",
+      400,
+      "Produto simples não aceita variantId."
+    );
+  }
+
+  return buildProductSnapshot(product);
+}
+
 export default async function UpdateInventorySaleItemService(input: {
   companyId: number;
   saleId: number;
   itemId: number;
   body: {
+    productId?: unknown;
+    variantId?: unknown;
     quantity?: unknown;
     unitPrice?: unknown;
     discountAmount?: unknown;
@@ -84,6 +140,73 @@ export default async function UpdateInventorySaleItemService(input: {
     let discountAmount: unknown = item.discountAmount;
     let discountPercent: unknown = item.discountPercent;
     let discountFieldsTouched = false;
+    let sellableChanged = false;
+
+    const productIdTouched = input.body.productId !== undefined;
+    const variantIdTouched = input.body.variantId !== undefined;
+
+    if (productIdTouched || variantIdTouched) {
+      let nextProductId = item.productId;
+      if (productIdTouched) {
+        nextProductId = Number(input.body.productId);
+        if (!Number.isFinite(nextProductId)) {
+          throw new AppError(
+            "ERR_VALIDATION_ERROR",
+            400,
+            "productId inválido."
+          );
+        }
+      }
+
+      let nextVariantId: number | null =
+        item.variantId != null ? Number(item.variantId) : null;
+      if (variantIdTouched) {
+        if (
+          input.body.variantId === null ||
+          input.body.variantId === ""
+        ) {
+          nextVariantId = null;
+        } else {
+          nextVariantId = Number(input.body.variantId);
+          if (!Number.isFinite(nextVariantId)) {
+            throw new AppError(
+              "ERR_VALIDATION_ERROR",
+              400,
+              "variantId inválido."
+            );
+          }
+        }
+      }
+
+      const prevVariantId =
+        item.variantId != null ? Number(item.variantId) : null;
+      sellableChanged =
+        nextProductId !== item.productId || nextVariantId !== prevVariantId;
+
+      if (sellableChanged) {
+        const snapshot = await resolveSellableSnapshot(
+          input.companyId,
+          nextProductId,
+          nextVariantId,
+          t
+        );
+        patch.productId = snapshot.productId;
+        patch.variantId = snapshot.variantId;
+        patch.productName = snapshot.productName;
+        patch.productSku = snapshot.productSku;
+        patch.variantLabel = snapshot.variantLabel;
+        patch.variantSku = snapshot.variantSku;
+        patch.variantBarcode = snapshot.variantBarcode;
+        patch.unit = snapshot.unit;
+        patch.costPrice = snapshot.costPrice;
+        patch.trackStock = snapshot.trackStock;
+        // Preço da nova unidade vendável, salvo override explícito no mesmo request.
+        if (input.body.unitPrice === undefined) {
+          unitPrice = snapshot.unitPrice;
+          patch.unitPrice = roundMoney(unitPrice);
+        }
+      }
+    }
 
     if (input.body.quantity !== undefined) {
       quantity = parseRequiredDecimal(input.body.quantity, "quantity");
@@ -138,12 +261,23 @@ export default async function UpdateInventorySaleItemService(input: {
       });
     }
 
+    const existingIdentifiers = await InventorySaleItemIdentifier.findAll({
+      where: { saleItemId: item.id, companyId: input.companyId },
+      transaction: t
+    });
+
+    if (sellableChanged && existingIdentifiers.length > 0) {
+      if (identifiersField === "omitted") {
+        throw new AppError(
+          "ERR_INVENTORY_IDENTIFIERS_NEED_REVIEW",
+          400,
+          "Troca de produto/variante exige revisar ou limpar as identificações das unidades."
+        );
+      }
+    }
+
     if (identifiersField === "omitted") {
-      const existing = await InventorySaleItemIdentifier.findAll({
-        where: { saleItemId: item.id, companyId: input.companyId },
-        transaction: t
-      });
-      assertQuantityReductionAllowsIdentifiers(existing, quantity);
+      assertQuantityReductionAllowsIdentifiers(existingIdentifiers, quantity);
     }
 
     const identifiers =
@@ -159,7 +293,12 @@ export default async function UpdateInventorySaleItemService(input: {
       quantity
     });
 
-    if (discountFieldsTouched || patch.quantity != null || patch.unitPrice != null) {
+    if (
+      discountFieldsTouched ||
+      patch.quantity != null ||
+      patch.unitPrice != null ||
+      sellableChanged
+    ) {
       assertCanApplyDiscount({
         canApplyDiscount: input.canApplyDiscount !== false,
         discountAmount: computed.discountAmount

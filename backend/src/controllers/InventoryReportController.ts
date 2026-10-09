@@ -42,7 +42,10 @@ export const getReportProducts = async (
   req: Request,
   res: Response
 ): Promise<Response> => {
-  const rows = await GetInventoryReportProductsService(reportFilters(req));
+  const rows = await GetInventoryReportProductsService({
+    ...reportFilters(req),
+    groupByVariant: req.query.groupByVariant
+  });
   return res.json(rows);
 };
 

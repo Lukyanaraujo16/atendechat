@@ -3,6 +3,7 @@ import sequelize from "../../database";
 import AppError from "../../errors/AppError";
 import InventoryStockMovement from "../../models/InventoryStockMovement";
 import InventoryProduct from "../../models/InventoryProduct";
+import InventoryProductVariant from "../../models/InventoryProductVariant";
 import User from "../../models/User";
 import GetOrCreateInventorySettingsService from "./GetOrCreateInventorySettingsService";
 import {
@@ -10,15 +11,18 @@ import {
   InventoryStockMovementType
 } from "./inventoryStockMovementTypes";
 import {
-  findInventoryProductOrThrow,
   normalizeOptionalString,
   parseDecimal,
-  parseRequiredDecimal,
-  toInventoryQuantity
+  parseRequiredDecimal
 } from "./inventoryTenant";
+import {
+  applySellableQuantity,
+  lockSellableStockTarget
+} from "./inventorySellableStock";
 
 type CreateBody = {
   productId?: unknown;
+  variantId?: unknown;
   type?: unknown;
   quantity?: unknown;
   unitCost?: unknown;
@@ -35,6 +39,18 @@ export default async function CreateInventoryStockMovementService(input: {
   const productId = Number(input.body.productId);
   if (!Number.isFinite(productId)) {
     throw new AppError("ERR_VALIDATION_ERROR", 400, "productId inválido.");
+  }
+
+  let variantId: number | null = null;
+  if (
+    input.body.variantId !== undefined &&
+    input.body.variantId !== null &&
+    input.body.variantId !== ""
+  ) {
+    variantId = Number(input.body.variantId);
+    if (!Number.isFinite(variantId)) {
+      throw new AppError("ERR_VALIDATION_ERROR", 400, "variantId inválido.");
+    }
   }
 
   const typeRaw = String(input.body.type ?? "").trim();
@@ -74,31 +90,23 @@ export default async function CreateInventoryStockMovementService(input: {
   return sequelize.transaction(async (t: Transaction) => {
     const settings = await GetOrCreateInventorySettingsService(input.companyId);
 
-    const product = await InventoryProduct.findOne({
-      where: { id: productId, companyId: input.companyId },
+    const target = await lockSellableStockTarget({
+      companyId: input.companyId,
+      productId,
+      variantId,
       transaction: t,
-      lock: t.LOCK.UPDATE
+      requireActive: true
     });
 
-    if (!product) {
-      throw new AppError("ERR_INVENTORY_PRODUCT_NOT_FOUND", 404);
-    }
-    if (!product.active) {
-      throw new AppError(
-        "ERR_INVENTORY_PRODUCT_INACTIVE",
-        400,
-        "Produto inativo não aceita movimentações."
-      );
-    }
-    if (!product.trackStock) {
+    if (!target.trackStock) {
       throw new AppError(
         "ERR_INVENTORY_PRODUCT_NO_STOCK_TRACKING",
         400,
-        "Produto não controla estoque."
+        "Unidade vendável não controla estoque."
       );
     }
 
-    const currentQty = toInventoryQuantity(product.currentQuantity);
+    const currentQty = target.currentQuantity;
     let movementQty: number;
     let newBalance: number;
 
@@ -144,15 +152,24 @@ export default async function CreateInventoryStockMovementService(input: {
             "Saldo inicial só é permitido com estoque zerado."
           );
         }
+        const existingWhere: Record<string, unknown> = {
+          companyId: input.companyId,
+          productId
+        };
+        if (target.kind === "variant") {
+          existingWhere.variantId = target.variant.id;
+        } else {
+          existingWhere.variantId = null;
+        }
         const existing = await InventoryStockMovement.count({
-          where: { companyId: input.companyId, productId },
+          where: existingWhere,
           transaction: t
         });
         if (existing > 0) {
           throw new AppError(
             "ERR_INVENTORY_INITIAL_ALREADY_EXISTS",
             400,
-            "Produto já possui movimentações de estoque."
+            "Unidade já possui movimentações de estoque."
           );
         }
         movementQty = qty;
@@ -172,6 +189,7 @@ export default async function CreateInventoryStockMovementService(input: {
       {
         companyId: input.companyId,
         productId,
+        variantId: target.kind === "variant" ? target.variant.id : null,
         type,
         quantity: movementQty,
         balanceAfter: newBalance,
@@ -184,15 +202,20 @@ export default async function CreateInventoryStockMovementService(input: {
       { transaction: t }
     );
 
-    await product.update({ currentQuantity: newBalance }, { transaction: t });
+    await applySellableQuantity(target, newBalance, t);
 
     return movement.reload({
       transaction: t,
       include: [
         {
           model: InventoryProduct,
-          attributes: ["id", "name", "sku", "unit"],
+          attributes: ["id", "name", "sku", "unit", "productKind"],
           required: true
+        },
+        {
+          model: InventoryProductVariant,
+          attributes: ["id", "label", "sku", "barcode"],
+          required: false
         },
         {
           model: User,

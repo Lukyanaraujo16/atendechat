@@ -12,6 +12,7 @@ import {
 } from "sequelize-typescript";
 import Company from "./Company";
 import InventoryProduct from "./InventoryProduct";
+import InventoryProductVariant from "./InventoryProductVariant";
 import User from "./User";
 
 @Table({
@@ -21,6 +22,10 @@ import User from "./User";
     {
       name: "InventoryStockMovements_companyId_productId_createdAt_idx",
       fields: ["companyId", "productId", "createdAt"]
+    },
+    {
+      name: "InventoryStockMovements_companyId_variantId_createdAt_idx",
+      fields: ["companyId", "variantId", "createdAt"]
     },
     {
       name: "InventoryStockMovements_companyId_reference_idx",
@@ -47,6 +52,15 @@ class InventoryStockMovement extends Model<InventoryStockMovement> {
 
   @BelongsTo(() => InventoryProduct)
   product: InventoryProduct;
+
+  /** Null = produto simples/legado. */
+  @AllowNull
+  @ForeignKey(() => InventoryProductVariant)
+  @Column
+  variantId: number | null;
+
+  @BelongsTo(() => InventoryProductVariant)
+  variant: InventoryProductVariant;
 
   @Column(DataType.STRING(32))
   type: string;

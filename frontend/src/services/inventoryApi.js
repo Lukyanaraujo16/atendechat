@@ -44,6 +44,24 @@ export const updateInventoryProduct = (id, body) =>
 export const deleteInventoryProduct = (id) =>
   api.delete(`/inventory/products/${id}`);
 
+export const listInventoryProductAttributes = (params) =>
+  api.get("/inventory/product-attributes", { params });
+
+export const createInventoryProductAttribute = (body) =>
+  api.post("/inventory/product-attributes", body);
+
+export const createInventoryProductAttributeOption = (attributeId, body) =>
+  api.post(`/inventory/product-attributes/${attributeId}/options`, body);
+
+export const listInventoryProductVariants = (productId, params) =>
+  api.get(`/inventory/products/${productId}/variants`, { params });
+
+export const createInventoryProductVariant = (productId, body) =>
+  api.post(`/inventory/products/${productId}/variants`, body);
+
+export const updateInventoryProductVariant = (productId, variantId, body) =>
+  api.put(`/inventory/products/${productId}/variants/${variantId}`, body);
+
 export const listLowStockProducts = () =>
   api.get("/inventory/products/low-stock");
 

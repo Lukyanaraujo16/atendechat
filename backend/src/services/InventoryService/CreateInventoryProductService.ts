@@ -1,3 +1,5 @@
+import { Transaction } from "sequelize";
+import sequelize from "../../database";
 import {
   assertInventoryBarcodeUnique,
   rethrowInventoryBarcodeConstraint
@@ -7,11 +9,15 @@ import InventoryProduct from "../../models/InventoryProduct";
 import { assertNewInventoryProductUnit } from "./inventoryProductUnit";
 import {
   assertInventoryCategoryBelongsToCompany,
-  assertInventoryProductSkuUnique,
   normalizeOptionalString,
   parseDecimal,
   parseRequiredDecimal
 } from "./inventoryTenant";
+import {
+  INVENTORY_PRODUCT_KIND_VARIABLE,
+  normalizeInventoryProductKind
+} from "./inventoryProductKind";
+import { syncSellableCode } from "./inventorySellableCodes";
 
 type CreateBody = {
   categoryId?: unknown;
@@ -27,6 +33,7 @@ type CreateBody = {
   minStock?: unknown;
   imageUrl?: unknown;
   active?: unknown;
+  productKind?: unknown;
 };
 
 export default async function CreateInventoryProductService(input: {
@@ -60,13 +67,22 @@ export default async function CreateInventoryProductService(input: {
     await assertInventoryCategoryBelongsToCompany(input.companyId, categoryId);
   }
 
-  const sku = normalizeOptionalString(input.body.sku, 64);
-  await assertInventoryProductSkuUnique(input.companyId, sku);
+  const productKind = normalizeInventoryProductKind(input.body.productKind);
+  const isVariable = productKind === INVENTORY_PRODUCT_KIND_VARIABLE;
 
-  const barcode = normalizeOptionalString(input.body.barcode, 64);
-  await assertInventoryBarcodeUnique(input.companyId, barcode);
+  // Produto variável: códigos/estoque comerciais ficam nas variantes.
+  const sku = isVariable ? null : normalizeOptionalString(input.body.sku, 64);
+  const barcode = isVariable
+    ? null
+    : normalizeOptionalString(input.body.barcode, 64);
 
-  const salePrice = parseRequiredDecimal(input.body.salePrice, "salePrice");
+  if (!isVariable) {
+    await assertInventoryBarcodeUnique(input.companyId, barcode);
+  }
+
+  const salePrice = isVariable
+    ? 0
+    : parseRequiredDecimal(input.body.salePrice, "salePrice");
   if (salePrice < 0) {
     throw new AppError("ERR_VALIDATION_ERROR", 400, "salePrice inválido.");
   }
@@ -78,6 +94,7 @@ export default async function CreateInventoryProductService(input: {
 
   let currentQuantity = 0;
   if (
+    !isVariable &&
     input.body.currentQuantity !== undefined &&
     input.body.currentQuantity !== null
   ) {
@@ -94,13 +111,16 @@ export default async function CreateInventoryProductService(input: {
     }
   }
 
-  const minStock = parseDecimal(input.body.minStock, "minStock");
+  const minStock = isVariable
+    ? null
+    : parseDecimal(input.body.minStock, "minStock");
   if (minStock !== null && minStock < 0) {
     throw new AppError("ERR_VALIDATION_ERROR", 400, "minStock inválido.");
   }
 
-  const trackStock =
-    input.body.trackStock === undefined
+  const trackStock = isVariable
+    ? false
+    : input.body.trackStock === undefined
       ? true
       : input.body.trackStock === true ||
         input.body.trackStock === "true" ||
@@ -116,21 +136,48 @@ export default async function CreateInventoryProductService(input: {
         input.body.active === "1";
 
   try {
-    return await InventoryProduct.create({
-      companyId: input.companyId,
-      categoryId,
-      sku,
-      barcode,
-      name,
-      description: normalizeOptionalString(input.body.description),
-      unit,
-      salePrice,
-      costPrice,
-      trackStock,
-      currentQuantity,
-      minStock,
-      imageUrl: normalizeOptionalString(input.body.imageUrl, 500),
-      active
+    return await sequelize.transaction(async (t: Transaction) => {
+      const product = await InventoryProduct.create(
+        {
+          companyId: input.companyId,
+          categoryId,
+          productKind,
+          sku,
+          barcode,
+          name,
+          description: normalizeOptionalString(input.body.description),
+          unit,
+          salePrice,
+          costPrice: isVariable ? null : costPrice,
+          trackStock,
+          currentQuantity: isVariable ? 0 : currentQuantity,
+          minStock,
+          imageUrl: normalizeOptionalString(input.body.imageUrl, 500),
+          active
+        },
+        { transaction: t }
+      );
+
+      if (!isVariable) {
+        await syncSellableCode({
+          companyId: input.companyId,
+          codeType: "sku",
+          codeValue: sku,
+          productId: product.id,
+          variantId: null,
+          transaction: t
+        });
+        await syncSellableCode({
+          companyId: input.companyId,
+          codeType: "barcode",
+          codeValue: barcode,
+          productId: product.id,
+          variantId: null,
+          transaction: t
+        });
+      }
+
+      return product;
     });
   } catch (error) {
     return rethrowInventoryBarcodeConstraint(error);

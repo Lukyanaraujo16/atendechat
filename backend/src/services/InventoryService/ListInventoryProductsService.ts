@@ -3,8 +3,11 @@ import { inventoryBarcodeWhere } from "./inventoryBarcode";
 import AppError from "../../errors/AppError";
 import InventoryCategory from "../../models/InventoryCategory";
 import InventoryProduct from "../../models/InventoryProduct";
+import InventoryProductVariant from "../../models/InventoryProductVariant";
 import { inventoryInsensitiveLike } from "./inventoryTextMatch";
 import { parseBooleanQuery } from "./inventoryTenant";
+import { enrichInventoryProducts } from "./inventoryProductListEnrichment";
+import { resolveSellableByCode } from "./inventorySellableCodes";
 
 const MAX_PRODUCT_LIST_LIMIT = 50;
 
@@ -178,18 +181,89 @@ export default async function ListInventoryProductsService(input: {
   active?: unknown;
   lowStock?: unknown;
   limit?: unknown;
-}): Promise<InventoryProduct[]> {
+}): Promise<any[]> {
   const limit = parseOptionalProductListLimit(input.limit);
   const baseWhere = buildBaseWhere(input);
   const search = normalizeSearch(input.search);
 
+  // Scanner / PDV: barcode ou SKU exato de variante resolve a folha diretamente.
   if (search && limit != null) {
-    return findRanked(baseWhere, search, limit);
+    const byBarcode = await resolveSellableByCode({
+      companyId: input.companyId,
+      codeType: "barcode",
+      codeValue: search
+    });
+    const hit =
+      byBarcode ||
+      (await resolveSellableByCode({
+        companyId: input.companyId,
+        codeType: "sku",
+        codeValue: search
+      }));
+
+    if (hit) {
+      const product = await InventoryProduct.findOne({
+        where: { id: hit.product.id, ...baseWhere },
+        include: productInclude
+      });
+      if (product) {
+        const [enriched] = await enrichInventoryProducts(input.companyId, [
+          product
+        ]);
+        if (hit.kind === "variant") {
+          return [
+            {
+              ...enriched,
+              selectedVariant: hit.variant,
+              sellable: hit.variant.active === true,
+              salePrice: hit.variant.salePrice,
+              sku: hit.variant.sku,
+              barcode: hit.variant.barcode,
+              currentQuantity: hit.variant.currentQuantity,
+              trackStock: hit.variant.trackStock
+            }
+          ];
+        }
+        return [enriched];
+      }
+    }
+
+    let ranked = await findRanked(baseWhere, search, limit);
+
+    // Inclui pais cujas variantes batem no rótulo/sku/barcode parcial.
+    if (ranked.length < limit) {
+      const variantHits = await InventoryProductVariant.findAll({
+        where: {
+          companyId: input.companyId,
+          active: true,
+          [Op.or]: [
+            { label: { [Op.like]: `%${search}%` } },
+            { sku: search },
+            { barcode: search }
+          ]
+        },
+        attributes: ["productId"],
+        limit: limit - ranked.length
+      });
+      const missingIds = variantHits
+        .map(v => v.productId)
+        .filter(id => !ranked.some(p => p.id === id));
+      if (missingIds.length) {
+        const extra = await findProducts(
+          { ...baseWhere, id: { [Op.in]: missingIds } },
+          limit - ranked.length
+        );
+        ranked = appendUnique(ranked, extra);
+      }
+    }
+
+    return enrichInventoryProducts(input.companyId, ranked);
   }
 
   const where = search
     ? { ...baseWhere, [Op.or]: partialMatch(search) }
     : baseWhere;
 
-  return findProducts(where, limit);
+  const rows = await findProducts(where, limit);
+  return enrichInventoryProducts(input.companyId, rows);
 }

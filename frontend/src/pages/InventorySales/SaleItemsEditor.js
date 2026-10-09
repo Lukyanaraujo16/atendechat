@@ -71,6 +71,11 @@ import {
   saleProductStockLabel,
   shouldAutofocusSaleProductSearch,
 } from "./saleProductSearch";
+import {
+  formatSaleItemProductLabel,
+  isVariableProduct,
+} from "./inventoryProductKind";
+import SaleVariantPickerDialog from "./SaleVariantPickerDialog";
 import { computeItemDiscountPreview } from "./saleDiscountPreview";
 import InventoryDiscountAuthorizationDialog from "./InventoryDiscountAuthorizationDialog";
 import {
@@ -222,6 +227,7 @@ const useStyles = makeStyles((theme) => ({
 
 const emptyAddForm = {
   productId: "",
+  variantId: "",
   quantity: "1",
   unitPrice: "",
   discountType: "percentage",
@@ -469,6 +475,8 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState(false);
   const [popupOpen, setPopupOpen] = useState(false);
+  const [variantPickerOpen, setVariantPickerOpen] = useState(false);
+  const [variantPickerProduct, setVariantPickerProduct] = useState(null);
   const abortRef = useRef(null);
   const requestSeqRef = useRef(0);
   const debounceTimerRef = useRef(null);
@@ -500,9 +508,55 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
     setSearchError(false);
     setSearchLoading(false);
     setPopupOpen(false);
+    setVariantPickerOpen(false);
+    setVariantPickerProduct(null);
     highlightedRef.current = null;
     highlightChosenRef.current = false;
     typedQueryRef.current = "";
+  }, []);
+
+  const applySaleProductSelection = useCallback((product) => {
+    if (!product) {
+      setSelectedProduct(null);
+      setAddForm((prev) => ({
+        ...prev,
+        productId: "",
+        variantId: "",
+        unitPrice: "",
+      }));
+      return;
+    }
+    if (isVariableProduct(product)) {
+      if (product.selectedVariant) {
+        const variant = product.selectedVariant;
+        setSelectedProduct({ ...product, selectedVariant: variant });
+        setAddForm((prev) => ({
+          ...prev,
+          productId: String(product.id),
+          variantId: String(variant.id),
+          unitPrice:
+            variant.salePrice != null ? String(variant.salePrice) : "",
+        }));
+        return;
+      }
+      setSelectedProduct(product);
+      setAddForm((prev) => ({
+        ...prev,
+        productId: String(product.id),
+        variantId: "",
+        unitPrice: "",
+      }));
+      setVariantPickerProduct(product);
+      setVariantPickerOpen(true);
+      return;
+    }
+    setSelectedProduct(product);
+    setAddForm((prev) => ({
+      ...prev,
+      productId: String(product.id),
+      variantId: "",
+      unitPrice: "",
+    }));
   }, []);
 
   const runSearch = useCallback(async (rawTerm, { exactOnSingle, browse }) => {
@@ -544,9 +598,8 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
       if (exactOnSingle) {
         const picked = pickExactSaleProduct(rows, query);
         if (picked) {
-          setSelectedProduct(picked);
+          applySaleProductSelection(picked);
           setInputValue(picked.name || "");
-          setAddForm((prev) => ({ ...prev, productId: String(picked.id) }));
         }
       }
     } catch (err) {
@@ -566,7 +619,7 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
         setSearchLoading(false);
       }
     }
-  }, []);
+  }, [applySaleProductSelection]);
 
   useEffect(() => {
     clearProductSearch();
@@ -1052,7 +1105,17 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
       return;
     }
 
+    if (isVariableProduct(selectedProduct) && !addForm.variantId) {
+      toast.error(
+        i18n.t("inventorySales.sales.items.variants.validation.required")
+      );
+      return;
+    }
+
     const payload = { productId, quantity };
+    if (addForm.variantId) {
+      payload.variantId = Number(addForm.variantId);
+    }
     if (
       addForm.unitPrice !== "" &&
       addForm.unitPrice != null
@@ -1238,7 +1301,7 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
               return (
                 <MobileEntityCard
                   key={item.id}
-                  title={item.productName}
+                  title={formatSaleItemProductLabel(item)}
                   subtitle={item.productSku || undefined}
                   footer={readOnly ? null : renderItemActions(item)}
                 >
@@ -1389,7 +1452,9 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
                     <React.Fragment key={item.id}>
                       <TableRow>
                         <TableCell className={classes.productCell}>
-                          <Typography variant="body2">{item.productName}</Typography>
+                          <Typography variant="body2">
+                            {formatSaleItemProductLabel(item)}
+                          </Typography>
                           {item.productSku ? (
                             <Typography variant="caption" color="textSecondary">
                               {item.productSku}
@@ -1556,18 +1621,19 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
                 }
               }}
               onChange={(_, value) => {
-                setSelectedProduct(value);
-                setAddForm((prev) => ({
-                  ...prev,
-                  productId: value?.id != null ? String(value.id) : "",
-                }));
+                applySaleProductSelection(value);
               }}
               onInputChange={(_, value, reason) => {
                 setInputValue(value);
                 if (reason === "input" || reason === "clear") {
                   highlightChosenRef.current = false;
                   setSelectedProduct(null);
-                  setAddForm((prev) => ({ ...prev, productId: "" }));
+                  setAddForm((prev) => ({
+                    ...prev,
+                    productId: "",
+                    variantId: "",
+                    unitPrice: "",
+                  }));
                   if (reason === "clear") {
                     setSearchError(false);
                     setPopupOpen(true);
@@ -1768,6 +1834,39 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
           }
         }}
         onConfirm={handleDiscountAuthConfirm}
+      />
+
+      <SaleVariantPickerDialog
+        open={variantPickerOpen}
+        product={variantPickerProduct}
+        onClose={() => {
+          setVariantPickerOpen(false);
+          setVariantPickerProduct(null);
+          clearProductSearch();
+          setAddForm(emptyAddForm);
+        }}
+        onSelect={(variant) => {
+          setVariantPickerOpen(false);
+          const base = variantPickerProduct;
+          setVariantPickerProduct(null);
+          if (!base || !variant) return;
+          setSelectedProduct({
+            ...base,
+            selectedVariant: variant,
+            salePrice: variant.salePrice,
+            sku: variant.sku,
+            barcode: variant.barcode,
+            currentQuantity: variant.currentQuantity,
+            trackStock: variant.trackStock,
+          });
+          setAddForm((prev) => ({
+            ...prev,
+            productId: String(base.id),
+            variantId: String(variant.id),
+            unitPrice:
+              variant.salePrice != null ? String(variant.salePrice) : "",
+          }));
+        }}
       />
     </Box>
   );

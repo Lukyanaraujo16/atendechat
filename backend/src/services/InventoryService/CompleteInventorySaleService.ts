@@ -4,7 +4,6 @@ import AppError from "../../errors/AppError";
 import InventorySettings from "../../models/InventorySettings";
 import InventorySale from "../../models/InventorySale";
 import InventorySaleItem from "../../models/InventorySaleItem";
-import InventoryProduct from "../../models/InventoryProduct";
 import InventoryStockMovement from "../../models/InventoryStockMovement";
 import InventorySellerProfile from "../../models/InventorySellerProfile";
 import InventorySaleItemIdentifier from "../../models/InventorySaleItemIdentifier";
@@ -17,7 +16,11 @@ import {
   roundMoney,
   toMoney
 } from "./inventorySaleHelpers";
-import { toInventoryQuantity } from "./inventoryTenant";
+import { isVariableProduct } from "./inventoryProductKind";
+import {
+  applySellableQuantity,
+  lockSellableStockTarget
+} from "./inventorySellableStock";
 import { settlePaymentOnComplete } from "./inventoryPaymentHelpers";
 import {
   applyCompletePaymentSettlement,
@@ -170,42 +173,53 @@ export default async function CompleteInventorySaleService(input: {
 
     const saleNumber = settings.nextSaleNumber;
 
-    for (const item of items) {
-      if (!item.trackStock) continue;
-
-      const product = await InventoryProduct.findOne({
-        where: { id: item.productId, companyId: input.companyId },
-        transaction: t,
-        lock: t.LOCK.UPDATE
+    // Ordena locks por (productId, variantId) para reduzir deadlocks.
+    const stockItems = [...items]
+      .filter(item => item.trackStock)
+      .sort((a, b) => {
+        if (a.productId !== b.productId) return a.productId - b.productId;
+        return Number(a.variantId || 0) - Number(b.variantId || 0);
       });
-      if (!product) {
-        throw new AppError("ERR_INVENTORY_PRODUCT_NOT_FOUND", 404);
-      }
 
-      if (!product.active) {
+    for (const item of stockItems) {
+      const target = await lockSellableStockTarget({
+        companyId: input.companyId,
+        productId: item.productId,
+        variantId: item.variantId,
+        transaction: t,
+        requireActive: true
+      });
+
+      if (isVariableProduct(target.product) && item.variantId == null) {
         throw new AppError(
-          "ERR_INVENTORY_PRODUCT_INACTIVE",
+          "ERR_INVENTORY_VARIANT_REQUIRED",
           400,
-          `O produto ${product.name} está inativo e não pode ser vendido.`
+          `O produto ${target.product.name} exige variante.`
         );
       }
 
+      const label =
+        target.kind === "variant"
+          ? `${target.product.name} — ${target.variant.label}`
+          : target.product.name;
+
       const deductQty = Number(item.quantity);
-      const currentQty = toInventoryQuantity(product.currentQuantity);
+      const currentQty = target.currentQuantity;
       const newBalance = currentQty - deductQty;
 
       if (newBalance < 0 && !settings.allowNegativeStock) {
         throw new AppError(
           "ERR_INVENTORY_INSUFFICIENT_STOCK",
           400,
-          `Estoque insuficiente para o produto ${product.name}.`
+          `Estoque insuficiente para ${label}.`
         );
       }
 
       await InventoryStockMovement.create(
         {
           companyId: input.companyId,
-          productId: product.id,
+          productId: target.product.id,
+          variantId: target.kind === "variant" ? target.variant.id : null,
           type: "sale",
           quantity: -deductQty,
           balanceAfter: newBalance,
@@ -218,7 +232,7 @@ export default async function CompleteInventorySaleService(input: {
         { transaction: t }
       );
 
-      await product.update({ currentQuantity: newBalance }, { transaction: t });
+      await applySellableQuantity(target, newBalance, t);
     }
 
     await recalculateInventorySaleTotals(sale.id, input.companyId, t);
