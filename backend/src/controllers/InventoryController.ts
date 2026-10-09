@@ -26,6 +26,7 @@ import CreateInventoryProductAttributeOptionService from "../services/InventoryS
 import ListInventoryProductVariantsService from "../services/InventoryService/ListInventoryProductVariantsService";
 import CreateInventoryProductVariantService from "../services/InventoryService/CreateInventoryProductVariantService";
 import UpdateInventoryProductVariantService from "../services/InventoryService/UpdateInventoryProductVariantService";
+import SaveInventoryVariableProductService from "../services/InventoryService/SaveInventoryVariableProductService";
 import { parseBooleanQuery } from "../services/InventoryService/inventoryTenant";
 
 function companyIdOrThrow(req: Request): number {
@@ -183,6 +184,28 @@ export const createProduct = async (
     body: req.body
   });
   return res.status(201).json(row);
+};
+
+export const saveVariableProduct = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const productIdRaw = req.params.id;
+  const productId =
+    productIdRaw != null && productIdRaw !== ""
+      ? parseIdParam(productIdRaw)
+      : null;
+  const result = await SaveInventoryVariableProductService({
+    companyId,
+    productId,
+    body: req.body || {},
+    createdBy:
+      req.user?.id != null && Number.isFinite(Number(req.user.id))
+        ? Number(req.user.id)
+        : null
+  });
+  return res.status(productId == null ? 201 : 200).json(result);
 };
 
 export const updateProduct = async (

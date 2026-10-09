@@ -1,14 +1,12 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useState } from "react";
 import {
   Box,
+  Checkbox,
   Chip,
-  FormControl,
+  Collapse,
   FormControlLabel,
   Grid,
   IconButton,
-  InputLabel,
-  MenuItem,
-  Select,
   Switch,
   Table,
   TableBody,
@@ -17,452 +15,764 @@ import {
   TableRow,
   TextField,
   Typography,
+  useMediaQuery,
 } from "@material-ui/core";
+import { makeStyles, useTheme } from "@material-ui/core/styles";
 import AddIcon from "@material-ui/icons/Add";
-import BlockIcon from "@material-ui/icons/Block";
-import { toast } from "react-toastify";
+import DeleteOutlineIcon from "@material-ui/icons/DeleteOutline";
+import ExpandLessIcon from "@material-ui/icons/ExpandLess";
+import ExpandMoreIcon from "@material-ui/icons/ExpandMore";
 
-import { AppPrimaryButton, AppTableContainer } from "../../ui";
-import {
-  createInventoryProductAttribute,
-  createInventoryProductAttributeOption,
-  createInventoryProductVariant,
-  listInventoryProductAttributes,
-  listInventoryProductVariants,
-  updateInventoryProductVariant,
-} from "../../services/inventoryApi";
-import toastError from "../../errors/toastError";
+import { AppSecondaryButton, AppTableContainer } from "../../ui";
 import { i18n } from "../../translate/i18n";
 import {
-  formatCurrencyBRL,
-  parseBrazilianCurrencyToNumber,
-} from "../../utils/brazilianCurrency";
-import { formatQuantity } from "./utils";
+  MAX_AUTO_VARIANT_COMBINATIONS,
+  combinationKey,
+  mergeCombinationPreview,
+} from "./productVariantCombinations";
 
-const emptyVariantForm = {
-  optionByAttribute: {},
-  salePrice: "",
-  costPrice: "",
-  sku: "",
-  barcode: "",
-  minStock: "",
-  currentQuantity: "",
-  active: true,
-};
+const useStyles = makeStyles((theme) => ({
+  section: {
+    display: "flex",
+    flexDirection: "column",
+    gap: theme.spacing(1.5),
+  },
+  charCard: {
+    border: `1px solid ${theme.palette.divider}`,
+    borderRadius: 8,
+    padding: theme.spacing(1.5),
+  },
+  chips: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: theme.spacing(0.75),
+    marginTop: theme.spacing(1),
+    marginBottom: theme.spacing(1),
+  },
+  optionRow: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: theme.spacing(1),
+    alignItems: "center",
+  },
+  applyRow: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: theme.spacing(1),
+    alignItems: "center",
+    marginBottom: theme.spacing(1),
+  },
+  mobileCard: {
+    border: `1px solid ${theme.palette.divider}`,
+    borderRadius: 8,
+    padding: theme.spacing(1.5),
+    marginBottom: theme.spacing(1.5),
+  },
+  comboList: {
+    display: "flex",
+    flexDirection: "column",
+    gap: theme.spacing(0.5),
+    maxHeight: 180,
+    overflowY: "auto",
+    border: `1px solid ${theme.palette.divider}`,
+    borderRadius: 8,
+    padding: theme.spacing(1),
+  },
+  tableInput: {
+    minWidth: 96,
+  },
+}));
 
-export default function ProductVariantsEditor({ productId }) {
-  const [attributes, setAttributes] = useState([]);
-  const [variants, setVariants] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [savingVariant, setSavingVariant] = useState(false);
-  const [newAttributeName, setNewAttributeName] = useState("");
-  const [newOptionByAttribute, setNewOptionByAttribute] = useState({});
-  const [variantForm, setVariantForm] = useState(emptyVariantForm);
-
-  const activeAttributes = useMemo(
-    () => (attributes || []).filter((attr) => attr.active !== false),
-    [attributes]
-  );
-
-  const loadAll = useCallback(async () => {
-    if (!productId) return;
-    setLoading(true);
-    try {
-      const [attrRes, varRes] = await Promise.all([
-        listInventoryProductAttributes({ activeOnly: true }),
-        listInventoryProductVariants(productId, {}),
-      ]);
-      setAttributes(Array.isArray(attrRes.data) ? attrRes.data : []);
-      setVariants(Array.isArray(varRes.data) ? varRes.data : []);
-    } catch (err) {
-      toastError(err);
-    } finally {
-      setLoading(false);
-    }
-  }, [productId]);
-
-  useEffect(() => {
-    loadAll();
-  }, [loadAll]);
-
-  const handleCreateAttribute = async () => {
-    const name = newAttributeName.trim();
-    if (!name) {
-      toast.error(i18n.t("inventorySales.products.variants.validation.attributeName"));
-      return;
-    }
-    try {
-      await createInventoryProductAttribute({ name });
-      setNewAttributeName("");
-      toast.success(i18n.t("inventorySales.products.variants.toasts.attributeCreated"));
-      await loadAll();
-    } catch (err) {
-      toastError(err);
-    }
+export function newCharacteristic() {
+  return {
+    localId: `c-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    name: "",
+    options: [],
+    optionDraft: "",
   };
+}
 
-  const handleCreateOption = async (attributeId) => {
-    const value = String(newOptionByAttribute[attributeId] || "").trim();
-    if (!value) {
-      toast.error(i18n.t("inventorySales.products.variants.validation.optionValue"));
-      return;
-    }
-    try {
-      await createInventoryProductAttributeOption(attributeId, { value });
-      setNewOptionByAttribute((prev) => ({ ...prev, [attributeId]: "" }));
-      toast.success(i18n.t("inventorySales.products.variants.toasts.optionCreated"));
-      await loadAll();
-    } catch (err) {
-      toastError(err);
-    }
-  };
+function normalizeChars(characteristics) {
+  return (characteristics || [])
+    .map((c) => ({
+      name: String(c.name || "").trim(),
+      options: (c.options || []).map((o) => String(o).trim()).filter(Boolean),
+    }))
+    .filter((c) => c.name && c.options.length);
+}
 
-  const setVariantField = (field) => (e) => {
-    const value =
-      e.target.type === "checkbox" ? e.target.checked : e.target.value;
-    setVariantForm((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const setVariantOption = (attributeId) => (e) => {
-    const optionId = e.target.value;
-    setVariantForm((prev) => ({
-      ...prev,
-      optionByAttribute: {
-        ...prev.optionByAttribute,
-        [attributeId]: optionId,
-      },
-    }));
-  };
-
-  const handleCreateVariant = async () => {
-    const optionIds = activeAttributes
-      .map((attr) => {
-        const raw = variantForm.optionByAttribute[attr.id];
-        if (!raw) return null;
-        return { attributeId: attr.id, optionId: Number(raw) };
-      })
-      .filter(Boolean);
-    if (!optionIds.length) {
-      toast.error(i18n.t("inventorySales.products.variants.validation.options"));
-      return;
-    }
-    const salePrice = parseBrazilianCurrencyToNumber(variantForm.salePrice);
-    if (salePrice == null || salePrice < 0) {
-      toast.error(i18n.t("inventorySales.products.validation.salePrice"));
-      return;
-    }
-    const payload = {
-      optionIds,
-      salePrice,
-      active: variantForm.active,
-      sku: variantForm.sku.trim() || null,
-      barcode: variantForm.barcode.trim() || null,
+function rebuildDrafts(characteristics, drafts) {
+  const chars = normalizeChars(characteristics);
+  if (!chars.length) {
+    return {
+      drafts: (drafts || []).filter((d) => d.persisted || d.id),
+      truncated: false,
+      totalPossible: 0,
     };
-    const costPrice = variantForm.costPrice
-      ? parseBrazilianCurrencyToNumber(variantForm.costPrice)
-      : null;
-    if (costPrice != null) payload.costPrice = costPrice;
-    const minStock = variantForm.minStock ? Number(variantForm.minStock) : null;
-    if (minStock != null && Number.isFinite(minStock)) payload.minStock = minStock;
-    if (variantForm.currentQuantity !== "") {
-      const qty = Number(variantForm.currentQuantity);
-      if (!Number.isFinite(qty) || qty < 0) {
-        toast.error(i18n.t("inventorySales.products.validation.initialQty"));
-        return;
-      }
-      payload.currentQuantity = qty;
-    }
+  }
+  return mergeCombinationPreview(chars, drafts || []);
+}
 
-    setSavingVariant(true);
-    try {
-      await createInventoryProductVariant(productId, payload);
-      toast.success(i18n.t("inventorySales.products.variants.toasts.variantCreated"));
-      setVariantForm(emptyVariantForm);
-      await loadAll();
-    } catch (err) {
-      toastError(err);
-    } finally {
-      setSavingVariant(false);
-    }
+export default function ProductVariantsEditor({
+  value,
+  onChange,
+  disabled = false,
+  isEdit = false,
+}) {
+  const classes = useStyles();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const characteristics = value?.characteristics?.length
+    ? value.characteristics
+    : [newCharacteristic()];
+  const drafts = value?.drafts || [];
+  const [bulkSalePrice, setBulkSalePrice] = useState("");
+  const [expandedKeys, setExpandedKeys] = useState({});
+
+  const emit = (nextCharacteristics, nextDrafts, meta = {}) => {
+    onChange({
+      characteristics: nextCharacteristics,
+      drafts: nextDrafts,
+      truncated: meta.truncated ?? false,
+      totalPossible: meta.totalPossible ?? 0,
+    });
   };
 
-  const handleDeactivateVariant = async (variant) => {
-    try {
-      await updateInventoryProductVariant(productId, variant.id, { active: false });
-      toast.success(i18n.t("inventorySales.products.variants.toasts.variantDeactivated"));
-      await loadAll();
-    } catch (err) {
-      toastError(err);
-    }
+  const emitWithRebuild = (nextCharacteristics, keepDrafts = drafts) => {
+    const rebuilt = rebuildDrafts(nextCharacteristics, keepDrafts);
+    emit(nextCharacteristics, rebuilt.drafts, rebuilt);
   };
 
-  if (!productId) return null;
+  const updateCharacteristic = (localId, patch, rebuild = false) => {
+    const next = characteristics.map((c) =>
+      c.localId === localId ? { ...c, ...patch } : c
+    );
+    if (rebuild) emitWithRebuild(next);
+    else emit(next, drafts, value);
+  };
+
+  const addOption = (localId) => {
+    const char = characteristics.find((c) => c.localId === localId);
+    if (!char) return;
+    const valueText = String(char.optionDraft || "").trim();
+    if (!valueText) return;
+    const exists = (char.options || []).some(
+      (o) => String(o).toLowerCase() === valueText.toLowerCase()
+    );
+    if (exists) {
+      updateCharacteristic(localId, { optionDraft: "" }, false);
+      return;
+    }
+    updateCharacteristic(
+      localId,
+      {
+        options: [...(char.options || []), valueText],
+        optionDraft: "",
+      },
+      true
+    );
+  };
+
+  const removeOption = (localId, optionValue) => {
+    const char = characteristics.find((c) => c.localId === localId);
+    if (!char) return;
+    updateCharacteristic(
+      localId,
+      {
+        options: (char.options || []).filter((o) => o !== optionValue),
+      },
+      true
+    );
+  };
+
+  const updateDraft = (localKey, patch) => {
+    emit(
+      characteristics,
+      drafts.map((d) =>
+        (d.localKey || combinationKey(d.options)) === localKey
+          ? { ...d, ...patch }
+          : d
+      ),
+      value
+    );
+  };
+
+  const selectedDrafts = drafts.filter((d) => d.selected !== false);
+
+  const applySalePriceToAll = () => {
+    const price = String(bulkSalePrice || "").trim();
+    if (!price) return;
+    emit(
+      characteristics,
+      drafts.map((d) =>
+        d.selected === false ? d : { ...d, salePrice: price }
+      ),
+      value
+    );
+  };
 
   return (
-    <Box display="flex" flexDirection="column" style={{ gap: 16 }}>
-      <Typography variant="subtitle2" style={{ fontWeight: 600 }}>
-        {i18n.t("inventorySales.products.variants.title")}
-      </Typography>
-      <Typography variant="body2" color="textSecondary">
-        {i18n.t("inventorySales.products.variants.hint")}
-      </Typography>
-
+    <Box className={classes.section}>
       <Box>
-        <Typography variant="caption" color="textSecondary" display="block" gutterBottom>
-          {i18n.t("inventorySales.products.variants.attributesTitle")}
+        <Typography variant="subtitle2" style={{ fontWeight: 600 }}>
+          {i18n.t("inventorySales.products.variants.howItVaries")}
         </Typography>
-        <Box display="flex" flexWrap="wrap" style={{ gap: 8 }} alignItems="center">
+        <Typography variant="body2" color="textSecondary">
+          {i18n.t("inventorySales.products.variants.howItVariesHelp")}
+        </Typography>
+      </Box>
+
+      {characteristics.map((char, index) => (
+        <Box key={char.localId} className={classes.charCard}>
+          <Box display="flex" justifyContent="space-between" alignItems="center">
+            <Typography
+              variant="caption"
+              color="textSecondary"
+              style={{ fontWeight: 600 }}
+            >
+              {i18n.t("inventorySales.products.variants.characteristicLabel", {
+                index: index + 1,
+              })}
+            </Typography>
+            {characteristics.length > 1 ? (
+              <IconButton
+                size="small"
+                type="button"
+                disabled={disabled}
+                aria-label={i18n.t(
+                  "inventorySales.products.variants.removeCharacteristic"
+                )}
+                onClick={() =>
+                  emitWithRebuild(
+                    characteristics.filter((c) => c.localId !== char.localId)
+                  )
+                }
+              >
+                <DeleteOutlineIcon fontSize="small" />
+              </IconButton>
+            ) : null}
+          </Box>
           <TextField
+            id={`product-characteristic-name-${char.localId}`}
             size="small"
             variant="outlined"
-            label={i18n.t("inventorySales.products.variants.newAttribute")}
-            value={newAttributeName}
-            onChange={(e) => setNewAttributeName(e.target.value)}
-            disabled={loading}
+            fullWidth
+            label={i18n.t("inventorySales.products.variants.characteristicName")}
+            placeholder={i18n.t(
+              "inventorySales.products.variants.characteristicNamePlaceholder"
+            )}
+            value={char.name}
+            onChange={(e) =>
+              updateCharacteristic(char.localId, { name: e.target.value }, false)
+            }
+            onBlur={() => emitWithRebuild(characteristics)}
+            disabled={disabled}
+            margin="dense"
+            InputLabelProps={{ shrink: true }}
+            helperText={
+              index === 0
+                ? i18n.t(
+                    "inventorySales.products.variants.characteristicNameHelp"
+                  )
+                : undefined
+            }
           />
-          <AppPrimaryButton
-            type="button"
-            size="small"
-            startIcon={<AddIcon />}
-            onClick={handleCreateAttribute}
-            disabled={loading}
-          >
-            {i18n.t("inventorySales.products.variants.addAttribute")}
-          </AppPrimaryButton>
-        </Box>
-        {activeAttributes.map((attr) => (
-          <Box key={attr.id} mt={1.5}>
-            <Typography variant="body2" style={{ fontWeight: 600 }}>
-              {attr.name}
-            </Typography>
-            <Box display="flex" flexWrap="wrap" style={{ gap: 4 }} mt={0.5} mb={1}>
-              {(attr.options || [])
-                .filter((opt) => opt.active !== false)
-                .map((opt) => (
-                  <Chip key={opt.id} size="small" label={opt.value} />
-                ))}
-            </Box>
-            <Box display="flex" flexWrap="wrap" style={{ gap: 8 }} alignItems="center">
-              <TextField
+          <Typography variant="caption" color="textSecondary">
+            {i18n.t("inventorySales.products.variants.optionsLabel")}
+          </Typography>
+          <Box className={classes.chips}>
+            {(char.options || []).map((opt) => (
+              <Chip
+                key={opt}
                 size="small"
-                variant="outlined"
-                label={i18n.t("inventorySales.products.variants.newOption")}
-                value={newOptionByAttribute[attr.id] || ""}
-                onChange={(e) =>
-                  setNewOptionByAttribute((prev) => ({
-                    ...prev,
-                    [attr.id]: e.target.value,
-                  }))
+                label={opt}
+                onDelete={
+                  disabled ? undefined : () => removeOption(char.localId, opt)
                 }
-                disabled={loading}
               />
-              <AppPrimaryButton
-                type="button"
-                size="small"
-                startIcon={<AddIcon />}
-                onClick={() => handleCreateOption(attr.id)}
-                disabled={loading}
-              >
-                {i18n.t("inventorySales.products.variants.addOption")}
-              </AppPrimaryButton>
-            </Box>
+            ))}
+            {!char.options?.length ? (
+              <Typography variant="body2" color="textSecondary">
+                {i18n.t("inventorySales.products.variants.optionsEmpty")}
+              </Typography>
+            ) : null}
           </Box>
-        ))}
-      </Box>
-
-      <Box>
-        <Typography variant="caption" color="textSecondary" display="block" gutterBottom>
-          {i18n.t("inventorySales.products.variants.listTitle")}
-        </Typography>
-        {loading ? (
-          <Typography variant="body2" color="textSecondary">
-            {i18n.t("inventorySales.common.loading")}
-          </Typography>
-        ) : variants.length === 0 ? (
-          <Typography variant="body2" color="textSecondary">
-            {i18n.t("inventorySales.products.variants.empty")}
-          </Typography>
-        ) : (
-          <AppTableContainer nested>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>{i18n.t("inventorySales.products.variants.columns.label")}</TableCell>
-                  <TableCell>{i18n.t("inventorySales.products.fields.sku")}</TableCell>
-                  <TableCell align="right">
-                    {i18n.t("inventorySales.products.fields.salePrice")}
-                  </TableCell>
-                  <TableCell>{i18n.t("inventorySales.products.columns.stock")}</TableCell>
-                  <TableCell>{i18n.t("inventorySales.common.active")}</TableCell>
-                  <TableCell align="right">{i18n.t("inventorySales.common.actions")}</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {variants.map((variant) => (
-                  <TableRow key={variant.id}>
-                    <TableCell>{variant.label || "—"}</TableCell>
-                    <TableCell>{variant.sku || "—"}</TableCell>
-                    <TableCell align="right">
-                      {formatCurrencyBRL(variant.salePrice)}
-                    </TableCell>
-                    <TableCell>
-                      {variant.trackStock
-                        ? formatQuantity(variant.currentQuantity)
-                        : i18n.t("inventorySales.products.noStockTracking")}
-                    </TableCell>
-                    <TableCell>
-                      {variant.active !== false
-                        ? i18n.t("inventorySales.common.active")
-                        : i18n.t("inventorySales.common.inactive")}
-                    </TableCell>
-                    <TableCell align="right">
-                      {variant.active !== false ? (
-                        <IconButton
-                          size="small"
-                          type="button"
-                          aria-label={i18n.t(
-                            "inventorySales.products.variants.deactivate"
-                          )}
-                          onClick={() => handleDeactivateVariant(variant)}
-                        >
-                          <BlockIcon fontSize="small" />
-                        </IconButton>
-                      ) : null}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </AppTableContainer>
-        )}
-      </Box>
-
-      <Box border={1} borderColor="divider" borderRadius={8} p={2}>
-        <Typography variant="subtitle2" style={{ fontWeight: 600, marginBottom: 12 }}>
-          {i18n.t("inventorySales.products.variants.newVariant")}
-        </Typography>
-        <Grid container spacing={2}>
-          {activeAttributes.map((attr) => (
-            <Grid item xs={12} sm={6} key={attr.id}>
-              <FormControl variant="outlined" size="small" fullWidth>
-                <InputLabel id={`variant-attr-${attr.id}`}>{attr.name}</InputLabel>
-                <Select
-                  labelId={`variant-attr-${attr.id}`}
-                  value={variantForm.optionByAttribute[attr.id] || ""}
-                  onChange={setVariantOption(attr.id)}
-                  label={attr.name}
-                  disabled={loading || savingVariant}
-                >
-                  <MenuItem value="">
-                    <em>{i18n.t("inventorySales.common.select")}</em>
-                  </MenuItem>
-                  {(attr.options || [])
-                    .filter((opt) => opt.active !== false)
-                    .map((opt) => (
-                      <MenuItem key={opt.id} value={String(opt.id)}>
-                        {opt.value}
-                      </MenuItem>
-                    ))}
-                </Select>
-              </FormControl>
-            </Grid>
-          ))}
-          <Grid item xs={12} sm={6}>
+          <Box className={classes.optionRow}>
             <TextField
-              label={i18n.t("inventorySales.products.fields.salePrice")}
-              value={variantForm.salePrice}
-              onChange={setVariantField("salePrice")}
-              variant="outlined"
+              id={`product-characteristic-option-${char.localId}`}
               size="small"
-              fullWidth
-              required
-              disabled={loading || savingVariant}
-            />
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <TextField
-              label={i18n.t("inventorySales.products.fields.costPrice")}
-              value={variantForm.costPrice}
-              onChange={setVariantField("costPrice")}
               variant="outlined"
-              size="small"
-              fullWidth
-              disabled={loading || savingVariant}
-            />
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <TextField
-              label={i18n.t("inventorySales.products.fields.sku")}
-              value={variantForm.sku}
-              onChange={setVariantField("sku")}
-              variant="outlined"
-              size="small"
-              fullWidth
-              disabled={loading || savingVariant}
-            />
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <TextField
-              label={i18n.t("inventorySales.products.fields.barcode")}
-              value={variantForm.barcode}
-              onChange={setVariantField("barcode")}
-              variant="outlined"
-              size="small"
-              fullWidth
-              disabled={loading || savingVariant}
-            />
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <TextField
-              label={i18n.t("inventorySales.products.fields.minStock")}
-              value={variantForm.minStock}
-              onChange={setVariantField("minStock")}
-              variant="outlined"
-              size="small"
-              fullWidth
-              type="number"
-              inputProps={{ min: 0, step: "any" }}
-              disabled={loading || savingVariant}
-            />
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <TextField
-              label={i18n.t("inventorySales.products.fields.initialQuantity")}
-              value={variantForm.currentQuantity}
-              onChange={setVariantField("currentQuantity")}
-              variant="outlined"
-              size="small"
-              fullWidth
-              type="number"
-              inputProps={{ min: 0, step: "any" }}
-              disabled={loading || savingVariant}
-            />
-          </Grid>
-          <Grid item xs={12}>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={variantForm.active}
-                  onChange={setVariantField("active")}
-                  color="primary"
-                  disabled={loading || savingVariant}
-                />
+              label={i18n.t("inventorySales.products.variants.addOptionLabel")}
+              placeholder={i18n.t(
+                "inventorySales.products.variants.addOptionPlaceholder"
+              )}
+              value={char.optionDraft || ""}
+              onChange={(e) =>
+                updateCharacteristic(
+                  char.localId,
+                  { optionDraft: e.target.value },
+                  false
+                )
               }
-              label={i18n.t("inventorySales.products.fields.active")}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addOption(char.localId);
+                }
+              }}
+              disabled={disabled}
+              InputLabelProps={{ shrink: true }}
             />
-          </Grid>
-        </Grid>
-        <Box mt={2}>
-          <AppPrimaryButton
-            type="button"
-            startIcon={<AddIcon />}
-            onClick={handleCreateVariant}
-            disabled={loading || savingVariant}
-          >
-            {i18n.t("inventorySales.products.variants.addVariant")}
-          </AppPrimaryButton>
+            <AppSecondaryButton
+              type="button"
+              size="small"
+              startIcon={<AddIcon />}
+              onClick={() => addOption(char.localId)}
+              disabled={disabled}
+            >
+              {i18n.t("inventorySales.products.variants.addOption")}
+            </AppSecondaryButton>
+          </Box>
         </Box>
-      </Box>
+      ))}
+
+      <AppSecondaryButton
+        type="button"
+        size="small"
+        startIcon={<AddIcon />}
+        disabled={disabled || characteristics.length >= 6}
+        onClick={() =>
+          emit([...characteristics, newCharacteristic()], drafts, value)
+        }
+      >
+        {i18n.t("inventorySales.products.variants.addCharacteristic")}
+      </AppSecondaryButton>
+
+      {drafts.length > 0 ? (
+        <Box>
+          <Typography variant="subtitle2" style={{ fontWeight: 600 }}>
+            {i18n.t("inventorySales.products.variants.combinationsTitle")}
+          </Typography>
+          <Typography variant="body2" color="textSecondary" paragraph>
+            {i18n.t("inventorySales.products.variants.combinationsHelp")}
+          </Typography>
+          {value?.truncated ? (
+            <Typography variant="body2" color="error" paragraph>
+              {i18n.t("inventorySales.products.variants.combinationsLimit", {
+                max: MAX_AUTO_VARIANT_COMBINATIONS,
+                total: value?.totalPossible || drafts.length,
+              })}
+            </Typography>
+          ) : null}
+          <Box className={classes.comboList}>
+            {drafts.map((draft) => {
+              const key = draft.localKey || combinationKey(draft.options);
+              return (
+                <FormControlLabel
+                  key={key}
+                  control={
+                    <Checkbox
+                      color="primary"
+                      size="small"
+                      checked={draft.selected !== false}
+                      disabled={disabled}
+                      onChange={(e) => {
+                        if (draft.persisted && !e.target.checked) {
+                          updateDraft(key, {
+                            selected: false,
+                            active: false,
+                          });
+                          return;
+                        }
+                        updateDraft(key, {
+                          selected: e.target.checked,
+                          active: e.target.checked
+                            ? draft.active !== false
+                            : false,
+                        });
+                      }}
+                    />
+                  }
+                  label={draft.label || key}
+                />
+              );
+            })}
+          </Box>
+        </Box>
+      ) : null}
+
+      {selectedDrafts.length > 0 ? (
+        <Box>
+          <Typography
+            variant="subtitle2"
+            style={{ fontWeight: 600 }}
+            gutterBottom
+          >
+            {i18n.t("inventorySales.products.variants.pricesTitle")}
+          </Typography>
+          <Typography variant="body2" color="textSecondary" paragraph>
+            {i18n.t("inventorySales.products.variants.pricesHelp")}
+          </Typography>
+
+          <Box className={classes.applyRow}>
+            <TextField
+              size="small"
+              variant="outlined"
+              label={i18n.t("inventorySales.products.variants.applySalePrice")}
+              value={bulkSalePrice}
+              onChange={(e) => setBulkSalePrice(e.target.value)}
+              disabled={disabled}
+              className={classes.tableInput}
+            />
+            <AppSecondaryButton
+              type="button"
+              size="small"
+              onClick={applySalePriceToAll}
+              disabled={disabled || !String(bulkSalePrice).trim()}
+            >
+              {i18n.t("inventorySales.products.variants.applySalePriceAction")}
+            </AppSecondaryButton>
+          </Box>
+
+          {isMobile
+            ? selectedDrafts.map((draft) => {
+                const key = draft.localKey || combinationKey(draft.options);
+                const open = Boolean(expandedKeys[key]);
+                return (
+                  <Box key={key} className={classes.mobileCard}>
+                    <Typography variant="subtitle2" style={{ fontWeight: 600 }}>
+                      {i18n.t("inventorySales.products.variants.variationLabel", {
+                        label: draft.label,
+                      })}
+                    </Typography>
+                    <Grid container spacing={1}>
+                      <Grid item xs={12}>
+                        <TextField
+                          size="small"
+                          variant="outlined"
+                          fullWidth
+                          required
+                          label={i18n.t(
+                            "inventorySales.products.fields.salePrice"
+                          )}
+                          value={draft.salePrice}
+                          onChange={(e) =>
+                            updateDraft(key, { salePrice: e.target.value })
+                          }
+                          disabled={disabled}
+                          inputProps={{ inputMode: "decimal" }}
+                        />
+                      </Grid>
+                      <Grid item xs={12}>
+                        <TextField
+                          size="small"
+                          variant="outlined"
+                          fullWidth
+                          label={i18n.t(
+                            "inventorySales.products.fields.costPrice"
+                          )}
+                          value={draft.costPrice}
+                          onChange={(e) =>
+                            updateDraft(key, { costPrice: e.target.value })
+                          }
+                          disabled={disabled}
+                          inputProps={{ inputMode: "decimal" }}
+                        />
+                      </Grid>
+                      {!isEdit || !draft.persisted ? (
+                        <Grid item xs={12}>
+                          <TextField
+                            size="small"
+                            variant="outlined"
+                            fullWidth
+                            type="number"
+                            label={i18n.t(
+                              "inventorySales.products.fields.initialQuantity"
+                            )}
+                            value={draft.currentQuantity}
+                            onChange={(e) =>
+                              updateDraft(key, {
+                                currentQuantity: e.target.value,
+                              })
+                            }
+                            disabled={disabled || draft.trackStock === false}
+                            inputProps={{
+                              min: 0,
+                              step: "any",
+                              inputMode: "decimal",
+                            }}
+                          />
+                        </Grid>
+                      ) : (
+                        <Grid item xs={12}>
+                          <Typography variant="caption" color="textSecondary">
+                            {i18n.t(
+                              "inventorySales.products.variants.stockReadonly",
+                              {
+                                quantity: draft.currentQuantityDisplay || "0",
+                              }
+                            )}
+                          </Typography>
+                        </Grid>
+                      )}
+                    </Grid>
+                    <Box mt={1}>
+                      <AppSecondaryButton
+                        type="button"
+                        size="small"
+                        endIcon={
+                          open ? <ExpandLessIcon /> : <ExpandMoreIcon />
+                        }
+                        onClick={() =>
+                          setExpandedKeys((prev) => ({
+                            ...prev,
+                            [key]: !open,
+                          }))
+                        }
+                      >
+                        {i18n.t("inventorySales.products.variants.moreDetails")}
+                      </AppSecondaryButton>
+                    </Box>
+                    <Collapse in={open}>
+                      <Grid container spacing={1} style={{ marginTop: 8 }}>
+                        <Grid item xs={12}>
+                          <TextField
+                            size="small"
+                            variant="outlined"
+                            fullWidth
+                            label={i18n.t("inventorySales.products.fields.sku")}
+                            value={draft.sku}
+                            onChange={(e) =>
+                              updateDraft(key, { sku: e.target.value })
+                            }
+                            disabled={disabled}
+                          />
+                        </Grid>
+                        <Grid item xs={12}>
+                          <TextField
+                            size="small"
+                            variant="outlined"
+                            fullWidth
+                            label={i18n.t(
+                              "inventorySales.products.fields.barcode"
+                            )}
+                            value={draft.barcode}
+                            onChange={(e) =>
+                              updateDraft(key, { barcode: e.target.value })
+                            }
+                            disabled={disabled}
+                          />
+                        </Grid>
+                        <Grid item xs={12}>
+                          <TextField
+                            size="small"
+                            variant="outlined"
+                            fullWidth
+                            type="number"
+                            label={i18n.t(
+                              "inventorySales.products.fields.minStock"
+                            )}
+                            value={draft.minStock}
+                            onChange={(e) =>
+                              updateDraft(key, { minStock: e.target.value })
+                            }
+                            disabled={disabled}
+                            inputProps={{
+                              min: 0,
+                              step: "any",
+                              inputMode: "decimal",
+                            }}
+                          />
+                        </Grid>
+                        <Grid item xs={12}>
+                          <FormControlLabel
+                            control={
+                              <Switch
+                                color="primary"
+                                checked={draft.active !== false}
+                                onChange={(e) =>
+                                  updateDraft(key, {
+                                    active: e.target.checked,
+                                  })
+                                }
+                                disabled={disabled}
+                              />
+                            }
+                            label={i18n.t(
+                              "inventorySales.products.fields.active"
+                            )}
+                          />
+                        </Grid>
+                      </Grid>
+                    </Collapse>
+                  </Box>
+                );
+              })
+            : (
+              <AppTableContainer nested>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>
+                        {i18n.t(
+                          "inventorySales.products.variants.columns.label"
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {i18n.t("inventorySales.products.fields.salePrice")}
+                      </TableCell>
+                      <TableCell>
+                        {i18n.t("inventorySales.products.fields.costPrice")}
+                      </TableCell>
+                      <TableCell>
+                        {isEdit
+                          ? i18n.t("inventorySales.products.columns.stock")
+                          : i18n.t(
+                              "inventorySales.products.fields.initialQuantity"
+                            )}
+                      </TableCell>
+                      <TableCell>
+                        {i18n.t("inventorySales.products.fields.sku")}
+                      </TableCell>
+                      <TableCell>
+                        {i18n.t("inventorySales.products.fields.barcode")}
+                      </TableCell>
+                      <TableCell>
+                        {i18n.t("inventorySales.products.fields.minStock")}
+                      </TableCell>
+                      <TableCell>
+                        {i18n.t("inventorySales.products.fields.active")}
+                      </TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {selectedDrafts.map((draft) => {
+                      const key =
+                        draft.localKey || combinationKey(draft.options);
+                      return (
+                        <TableRow key={key}>
+                          <TableCell>{draft.label}</TableCell>
+                          <TableCell>
+                            <TextField
+                              size="small"
+                              variant="outlined"
+                              required
+                              value={draft.salePrice}
+                              onChange={(e) =>
+                                updateDraft(key, { salePrice: e.target.value })
+                              }
+                              disabled={disabled}
+                              className={classes.tableInput}
+                              inputProps={{ inputMode: "decimal" }}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <TextField
+                              size="small"
+                              variant="outlined"
+                              value={draft.costPrice}
+                              onChange={(e) =>
+                                updateDraft(key, { costPrice: e.target.value })
+                              }
+                              disabled={disabled}
+                              className={classes.tableInput}
+                              inputProps={{ inputMode: "decimal" }}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            {isEdit && draft.persisted ? (
+                              <Typography variant="body2">
+                                {draft.trackStock === false
+                                  ? i18n.t(
+                                      "inventorySales.products.noStockTracking"
+                                    )
+                                  : draft.currentQuantityDisplay || "0"}
+                              </Typography>
+                            ) : (
+                              <TextField
+                                size="small"
+                                variant="outlined"
+                                type="number"
+                                value={draft.currentQuantity}
+                                onChange={(e) =>
+                                  updateDraft(key, {
+                                    currentQuantity: e.target.value,
+                                  })
+                                }
+                                disabled={
+                                  disabled || draft.trackStock === false
+                                }
+                                className={classes.tableInput}
+                                inputProps={{
+                                  min: 0,
+                                  step: "any",
+                                  inputMode: "decimal",
+                                }}
+                              />
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <TextField
+                              size="small"
+                              variant="outlined"
+                              value={draft.sku}
+                              onChange={(e) =>
+                                updateDraft(key, { sku: e.target.value })
+                              }
+                              disabled={disabled}
+                              className={classes.tableInput}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <TextField
+                              size="small"
+                              variant="outlined"
+                              value={draft.barcode}
+                              onChange={(e) =>
+                                updateDraft(key, { barcode: e.target.value })
+                              }
+                              disabled={disabled}
+                              className={classes.tableInput}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <TextField
+                              size="small"
+                              variant="outlined"
+                              type="number"
+                              value={draft.minStock}
+                              onChange={(e) =>
+                                updateDraft(key, { minStock: e.target.value })
+                              }
+                              disabled={disabled}
+                              className={classes.tableInput}
+                              inputProps={{
+                                min: 0,
+                                step: "any",
+                                inputMode: "decimal",
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Switch
+                              color="primary"
+                              size="small"
+                              checked={draft.active !== false}
+                              onChange={(e) =>
+                                updateDraft(key, { active: e.target.checked })
+                              }
+                              disabled={disabled}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </AppTableContainer>
+            )}
+        </Box>
+      ) : null}
     </Box>
   );
 }

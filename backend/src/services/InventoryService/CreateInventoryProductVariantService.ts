@@ -239,10 +239,16 @@ export default async function CreateInventoryProductVariantService(input: {
     include: [
       {
         model: InventoryProductVariantOption,
+        as: "optionLinks",
         include: [
-          { model: InventoryProductAttribute, attributes: ["id", "name"] },
+          {
+            model: InventoryProductAttribute,
+            as: "attribute",
+            attributes: ["id", "name"]
+          },
           {
             model: InventoryProductAttributeOption,
+            as: "option",
             attributes: ["id", "value"]
           }
         ]

@@ -1,8 +1,7 @@
 import InventoryCategory from "../../models/InventoryCategory";
-import InventoryProduct from "../../models/InventoryProduct";
-import InventoryProductVariant from "../../models/InventoryProductVariant";
 import { findInventoryProductOrThrow } from "./inventoryTenant";
 import { enrichInventoryProducts } from "./inventoryProductListEnrichment";
+import ListInventoryProductVariantsService from "./ListInventoryProductVariantsService";
 
 export default async function ShowInventoryProductService(input: {
   companyId: number;
@@ -15,16 +14,16 @@ export default async function ShowInventoryProductService(input: {
         model: InventoryCategory,
         attributes: ["id", "name"],
         required: false
-      },
-      {
-        model: InventoryProductVariant,
-        required: false
       }
     ]
   });
   const [enriched] = await enrichInventoryProducts(input.companyId, [full]);
+  const variants = await ListInventoryProductVariantsService({
+    companyId: input.companyId,
+    productId: input.id
+  });
   return {
     ...enriched,
-    variants: full.variants || []
+    variants
   };
 }

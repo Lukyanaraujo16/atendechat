@@ -471,6 +471,18 @@ inventoryRoutes.post(
   requireInventorySalesPermission(INVENTORY_SALES_MANAGE_PRODUCTS),
   InventoryController.createProduct
 );
+inventoryRoutes.post(
+  "/inventory/products/with-variants",
+  isAuth,
+  requireInventorySalesPermission(INVENTORY_SALES_MANAGE_PRODUCTS),
+  InventoryController.saveVariableProduct
+);
+inventoryRoutes.put(
+  "/inventory/products/:id/with-variants",
+  isAuth,
+  requireInventorySalesPermission(INVENTORY_SALES_MANAGE_PRODUCTS),
+  InventoryController.saveVariableProduct
+);
 inventoryRoutes.get(
   "/inventory/products/:id/variants",
   isAuth,

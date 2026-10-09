@@ -41,6 +41,12 @@ export const createInventoryProduct = (body) =>
 export const updateInventoryProduct = (id, body) =>
   api.put(`/inventory/products/${id}`, body);
 
+/** Cadastro/edição atômica de produto com variações. */
+export const saveInventoryVariableProduct = (body, productId) =>
+  productId != null
+    ? api.put(`/inventory/products/${productId}/with-variants`, body)
+    : api.post("/inventory/products/with-variants", body);
+
 export const deleteInventoryProduct = (id) =>
   api.delete(`/inventory/products/${id}`);
 

@@ -27,6 +27,7 @@ import {
 import {
   createInventoryProduct,
   getInventoryProduct,
+  saveInventoryVariableProduct,
   updateInventoryProduct,
 } from "../../services/inventoryApi";
 import toastError from "../../errors/toastError";
@@ -46,7 +47,11 @@ import {
   PRODUCT_KIND_SIMPLE,
   PRODUCT_KIND_VARIABLE,
 } from "./inventoryProductKind";
-import ProductVariantsEditor from "./ProductVariantsEditor";
+import ProductVariantsEditor, { newCharacteristic } from "./ProductVariantsEditor";
+import {
+  characteristicsFromVariants,
+  draftVariantsFromPersisted,
+} from "./productVariantCombinations";
 
 const emptyForm = {
   name: "",
@@ -65,6 +70,13 @@ const emptyForm = {
   active: true,
 };
 
+const emptyVariantsState = () => ({
+  characteristics: [newCharacteristic()],
+  drafts: [],
+  truncated: false,
+  totalPossible: 0,
+});
+
 function SectionLabel({ children }) {
   return (
     <Typography
@@ -75,6 +87,61 @@ function SectionLabel({ children }) {
       {children}
     </Typography>
   );
+}
+
+function buildVariablePayload(form, variantsState, unit) {
+  const characteristics = (variantsState.characteristics || [])
+    .map((c) => ({
+      name: String(c.name || "").trim(),
+      options: (c.options || []).map((o) => String(o).trim()).filter(Boolean),
+    }))
+    .filter((c) => c.name && c.options.length);
+
+  const selected = (variantsState.drafts || []).filter(
+    (d) => d.selected !== false
+  );
+
+  const variants = selected.map((draft) => {
+    const salePrice = parseBrazilianCurrencyToNumber(draft.salePrice);
+    const row = {
+      options: (draft.options || []).map((o) => ({
+        characteristicName: o.characteristicName,
+        optionValue: o.optionValue,
+      })),
+      label: draft.label || undefined,
+      salePrice,
+      sku: String(draft.sku || "").trim() || null,
+      barcode: String(draft.barcode || "").trim() || null,
+      trackStock: draft.trackStock !== false,
+      active: draft.active !== false,
+    };
+    if (draft.id != null) row.id = draft.id;
+    const costPrice = draft.costPrice
+      ? parseBrazilianCurrencyToNumber(draft.costPrice)
+      : null;
+    if (costPrice != null) row.costPrice = costPrice;
+    if (draft.minStock !== "" && draft.minStock != null) {
+      const minStock = Number(draft.minStock);
+      if (Number.isFinite(minStock)) row.minStock = minStock;
+    }
+    if (!draft.persisted && draft.currentQuantity !== "") {
+      const qty = Number(draft.currentQuantity);
+      if (Number.isFinite(qty)) row.currentQuantity = qty;
+    }
+    return { draft, row, salePrice };
+  });
+
+  return {
+    characteristics,
+    variants,
+    payloadBase: {
+      name: form.name.trim(),
+      categoryId: form.categoryId ? Number(form.categoryId) : null,
+      unit,
+      imageUrl: form.imageUrl.trim() || null,
+      active: form.active,
+    },
+  };
 }
 
 export default function ProductFormDialog({
@@ -89,12 +156,14 @@ export default function ProductFormDialog({
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [loadedUnit, setLoadedUnit] = useState(null);
+  const [variantsState, setVariantsState] = useState(emptyVariantsState);
 
   useEffect(() => {
     if (!open) return;
     if (!isEdit) {
       setForm(emptyForm);
       setLoadedUnit(null);
+      setVariantsState(emptyVariantsState());
       return;
     }
     let cancelled = false;
@@ -104,12 +173,13 @@ export default function ProductFormDialog({
         if (cancelled) return;
         const storedUnit = data.unit == null ? "" : String(data.unit);
         setLoadedUnit(storedUnit);
+        const kind =
+          data.productKind === PRODUCT_KIND_VARIABLE
+            ? PRODUCT_KIND_VARIABLE
+            : PRODUCT_KIND_SIMPLE;
         setForm({
           name: data.name || "",
-          productKind:
-            data.productKind === PRODUCT_KIND_VARIABLE
-              ? PRODUCT_KIND_VARIABLE
-              : PRODUCT_KIND_SIMPLE,
+          productKind: kind,
           sku: data.sku || "",
           barcode: data.barcode || "",
           categoryId: data.categoryId != null ? String(data.categoryId) : "",
@@ -122,6 +192,25 @@ export default function ProductFormDialog({
           imageUrl: data.imageUrl || "",
           active: data.active !== false,
         });
+        if (kind === PRODUCT_KIND_VARIABLE) {
+          const variants = Array.isArray(data.variants) ? data.variants : [];
+          const chars = characteristicsFromVariants(variants);
+          setVariantsState({
+            characteristics: chars.length
+              ? chars.map((c, idx) => ({
+                  localId: `loaded-${idx}`,
+                  name: c.name,
+                  options: c.options,
+                  optionDraft: "",
+                }))
+              : [newCharacteristic()],
+            drafts: draftVariantsFromPersisted(variants),
+            truncated: false,
+            totalPossible: variants.length,
+          });
+        } else {
+          setVariantsState(emptyVariantsState());
+        }
       })
       .catch(toastError)
       .finally(() => {
@@ -142,22 +231,10 @@ export default function ProductFormDialog({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const salePrice = isVariable
-      ? 0
-      : parseBrazilianCurrencyToNumber(form.salePrice);
-    if (!isVariable && (salePrice == null || salePrice < 0)) {
-      toast.error(i18n.t("inventorySales.products.validation.salePrice"));
-      return;
-    }
     if (!form.name.trim()) {
       toast.error(i18n.t("inventorySales.products.validation.name"));
       return;
     }
-
-    const costPrice = form.costPrice
-      ? parseBrazilianCurrencyToNumber(form.costPrice)
-      : null;
-    const minStock = form.minStock ? Number(form.minStock) : null;
 
     const unit = resolveProductUnit(form.unitChoice, form.customUnit);
     const unitIssue = inspectProductUnit(unit).issue;
@@ -178,6 +255,76 @@ export default function ProductFormDialog({
       return;
     }
 
+    if (isVariable) {
+      const built = buildVariablePayload(form, variantsState, unit);
+      if (!built.characteristics.length) {
+        toast.error(
+          i18n.t("inventorySales.products.variants.validation.characteristicName")
+        );
+        return;
+      }
+      if (!built.variants.length) {
+        toast.error(
+          i18n.t("inventorySales.products.variants.validation.selectVariation")
+        );
+        return;
+      }
+      for (const item of built.variants) {
+        if (item.salePrice == null || item.salePrice < 0) {
+          toast.error(
+            i18n.t("inventorySales.products.variants.validation.salePriceNamed", {
+              label: item.draft.label,
+            })
+          );
+          return;
+        }
+        if (
+          !item.draft.persisted &&
+          item.draft.currentQuantity !== "" &&
+          (!Number.isFinite(Number(item.draft.currentQuantity)) ||
+            Number(item.draft.currentQuantity) < 0)
+        ) {
+          toast.error(i18n.t("inventorySales.products.validation.initialQty"));
+          return;
+        }
+      }
+
+      const body = {
+        ...built.payloadBase,
+        characteristics: built.characteristics,
+        variants: built.variants.map((v) => v.row),
+      };
+
+      setSaving(true);
+      try {
+        await saveInventoryVariableProduct(body, isEdit ? productId : null);
+        toast.success(
+          i18n.t(
+            isEdit
+              ? "inventorySales.products.toasts.updated"
+              : "inventorySales.products.toasts.created"
+          )
+        );
+        if (onSaved) onSaved();
+        onClose();
+      } catch (err) {
+        toastError(err);
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+
+    const salePrice = parseBrazilianCurrencyToNumber(form.salePrice);
+    if (salePrice == null || salePrice < 0) {
+      toast.error(i18n.t("inventorySales.products.validation.salePrice"));
+      return;
+    }
+    const costPrice = form.costPrice
+      ? parseBrazilianCurrencyToNumber(form.costPrice)
+      : null;
+    const minStock = form.minStock ? Number(form.minStock) : null;
+
     const payload = {
       name: form.name.trim(),
       productKind: form.productKind,
@@ -185,23 +332,15 @@ export default function ProductFormDialog({
       unit,
       imageUrl: form.imageUrl.trim() || null,
       active: form.active,
+      sku: form.sku.trim() || null,
+      barcode: form.barcode.trim() || null,
+      salePrice,
+      costPrice,
+      trackStock: form.trackStock,
+      minStock,
     };
 
-    if (isVariable) {
-      payload.salePrice = 0;
-      payload.trackStock = false;
-    } else {
-      Object.assign(payload, {
-        sku: form.sku.trim() || null,
-        barcode: form.barcode.trim() || null,
-        salePrice,
-        costPrice,
-        trackStock: form.trackStock,
-        minStock,
-      });
-    }
-
-    if (!isVariable && !isEdit && form.trackStock && form.currentQuantity !== "") {
+    if (!isEdit && form.trackStock && form.currentQuantity !== "") {
       const qty = Number(form.currentQuantity);
       if (!Number.isFinite(qty) || qty < 0) {
         toast.error(i18n.t("inventorySales.products.validation.initialQty"));
@@ -240,7 +379,7 @@ export default function ProductFormDialog({
     <AppDialog
       open={open}
       onClose={onClose}
-      maxWidth={isEdit && isVariable ? "md" : "sm"}
+      maxWidth={isVariable ? "md" : "sm"}
       fullWidth
     >
       <form onSubmit={handleSubmit}>
@@ -283,7 +422,9 @@ export default function ProductFormDialog({
                 <FormControlLabel
                   value={PRODUCT_KIND_VARIABLE}
                   control={<Radio color="primary" size="small" />}
-                  label={i18n.t("inventorySales.products.fields.productKindVariable")}
+                  label={i18n.t(
+                    "inventorySales.products.fields.productKindVariable"
+                  )}
                 />
               </RadioGroup>
               {isEdit ? (
@@ -292,11 +433,7 @@ export default function ProductFormDialog({
                 </FormHelperText>
               ) : null}
             </FormControl>
-            {isVariable ? (
-              <Typography variant="body2" color="textSecondary">
-                {i18n.t("inventorySales.products.variants.parentCommercialNote")}
-              </Typography>
-            ) : (
+            {!isVariable ? (
               <Grid container spacing={2}>
                 <Grid item xs={12} sm={6}>
                   <TextField
@@ -313,7 +450,9 @@ export default function ProductFormDialog({
                   <TextField
                     id="product-barcode"
                     label={i18n.t("inventorySales.products.fields.barcode")}
-                    helperText={i18n.t("inventorySales.products.fields.barcodeHelp")}
+                    helperText={i18n.t(
+                      "inventorySales.products.fields.barcodeHelp"
+                    )}
                     value={form.barcode}
                     onChange={setField("barcode")}
                     variant="outlined"
@@ -323,7 +462,7 @@ export default function ProductFormDialog({
                   />
                 </Grid>
               </Grid>
-            )}
+            ) : null}
             <FormControl variant="outlined" size="small" fullWidth>
               <InputLabel id="product-category-label">
                 {i18n.t("inventorySales.products.fields.category")}
@@ -385,7 +524,9 @@ export default function ProductFormDialog({
                 disabled={loading}
                 helperText={
                   showLegacyWarning
-                    ? i18n.t("inventorySales.products.validation.unitLegacyWarning")
+                    ? i18n.t(
+                        "inventorySales.products.validation.unitLegacyWarning"
+                      )
                     : unitIssue && String(form.customUnit).trim()
                       ? i18n.t(
                           `inventorySales.products.validation.${
@@ -454,7 +595,9 @@ export default function ProductFormDialog({
                 {form.trackStock && !isEdit ? (
                   <TextField
                     id="product-initial-quantity"
-                    label={i18n.t("inventorySales.products.fields.initialQuantity")}
+                    label={i18n.t(
+                      "inventorySales.products.fields.initialQuantity"
+                    )}
                     value={form.currentQuantity}
                     onChange={setField("currentQuantity")}
                     variant="outlined"
@@ -478,17 +621,22 @@ export default function ProductFormDialog({
                     size="small"
                     fullWidth
                     type="number"
-                    helperText={i18n.t("inventorySales.products.fields.minStockHelp")}
+                    helperText={i18n.t(
+                      "inventorySales.products.fields.minStockHelp"
+                    )}
                     inputProps={{ min: 0, step: "any" }}
                     disabled={loading}
                   />
                 ) : null}
               </>
-            ) : null}
-
-            {isEdit && isVariable ? (
-              <ProductVariantsEditor productId={productId} />
-            ) : null}
+            ) : (
+              <ProductVariantsEditor
+                value={variantsState}
+                onChange={setVariantsState}
+                disabled={loading || saving}
+                isEdit={isEdit}
+              />
+            )}
 
             <SectionLabel>
               {i18n.t("inventorySales.products.sections.other")}

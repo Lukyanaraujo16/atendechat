@@ -35,6 +35,8 @@ export default async function CreateInventoryStockMovementService(input: {
   companyId: number;
   createdBy: number | null;
   body: CreateBody;
+  /** Quando informado, reutiliza a transação (cadastro composto). */
+  transaction?: Transaction;
 }): Promise<InventoryStockMovement> {
   const productId = Number(input.body.productId);
   if (!Number.isFinite(productId)) {
@@ -87,7 +89,7 @@ export default async function CreateInventoryStockMovementService(input: {
 
   const referenceType = normalizeOptionalString(input.body.referenceType, 32);
 
-  return sequelize.transaction(async (t: Transaction) => {
+  const run = async (t: Transaction) => {
     const settings = await GetOrCreateInventorySettingsService(input.companyId);
 
     const target = await lockSellableStockTarget({
@@ -225,5 +227,10 @@ export default async function CreateInventoryStockMovementService(input: {
         }
       ]
     });
-  });
+  };
+
+  if (input.transaction) {
+    return run(input.transaction);
+  }
+  return sequelize.transaction(run);
 }

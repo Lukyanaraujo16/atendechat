@@ -16,9 +16,14 @@ export async function findInventoryCategoryOrThrow(
 
 export async function findInventoryProductOrThrow(
   companyId: number,
-  id: number
+  id: number,
+  transaction?: import("sequelize").Transaction
 ): Promise<InventoryProduct> {
-  const row = await InventoryProduct.findOne({ where: { id, companyId } });
+  const row = await InventoryProduct.findOne({
+    where: { id, companyId },
+    transaction,
+    ...(transaction ? { lock: transaction.LOCK.UPDATE } : {})
+  });
   if (!row) {
     throw new AppError("ERR_INVENTORY_PRODUCT_NOT_FOUND", 404);
   }
