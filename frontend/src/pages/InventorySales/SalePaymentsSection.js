@@ -346,9 +346,11 @@ export default function SalePaymentsSection({
 
   const paymentFormFields = (opts = {}) => {
     const { forcePending = false, hideCreditCard = false } = opts;
-    const methods = hideCreditCard
+    // Pós-venda: Crédito da Loja não entra no fluxo P1–P4 (Contas a Receber).
+    const methods = (hideCreditCard
       ? PAYMENT_METHODS.filter((m) => m !== "credit_card")
-      : PAYMENT_METHODS;
+      : PAYMENT_METHODS
+    ).filter((m) => m !== "store_credit");
     return (
       <Box className={classes.formStack}>
         <FormControl variant="outlined" fullWidth size="small">
@@ -598,7 +600,9 @@ export default function SalePaymentsSection({
                 </Typography>
               ) : null}
             </Box>
-            {canMutate && payment.status === "pending" ? (
+            {canMutate &&
+            payment.status === "pending" &&
+            payment.method !== "store_credit" ? (
               <Box className={classes.rowActions}>
                 <IconButton
                   size="small"

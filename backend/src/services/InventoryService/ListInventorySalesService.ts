@@ -21,6 +21,7 @@ export default async function ListInventorySalesService(input: {
   companyId: number;
   status?: unknown;
   contactId?: unknown;
+  customerId?: unknown;
   ticketId?: unknown;
   sellerUserId?: unknown;
   startDate?: unknown;
@@ -55,6 +56,13 @@ export default async function ListInventorySalesService(input: {
 
   if (input.contactId !== undefined && input.contactId !== null && input.contactId !== "") {
     where.contactId = parseOptionalId(input.contactId);
+  }
+  if (
+    input.customerId !== undefined &&
+    input.customerId !== null &&
+    input.customerId !== ""
+  ) {
+    where.customerId = parseOptionalId(input.customerId);
   }
   if (input.ticketId !== undefined && input.ticketId !== null && input.ticketId !== "") {
     where.ticketId = parseOptionalId(input.ticketId);

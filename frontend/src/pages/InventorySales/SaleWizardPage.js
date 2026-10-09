@@ -40,7 +40,8 @@ import { formatCurrencyBRL } from "../../utils/brazilianCurrency";
 import { formatSaleNumber, isSaleEditable } from "./utils";
 import SaleWizardStepper from "./wizard/SaleWizardStepper";
 import SaleWizardCustomerStep, {
-  contactOptionFromSale,
+  customerOptionFromSale,
+  deliverySourceFromCustomer,
 } from "./wizard/SaleWizardCustomerStep";
 import SaleWizardPaymentStep from "./wizard/SaleWizardPaymentStep";
 import SaleWizardDeliveryStep from "./wizard/SaleWizardDeliveryStep";
@@ -109,14 +110,24 @@ export default function SaleWizardPage() {
   const [sale, setSale] = useState(null);
   const [step, setStep] = useState(SALE_WIZARD_STEP_IDS.CUSTOMER);
   const [users, setUsers] = useState([]);
-  const [selectedContact, setSelectedContact] = useState(null);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [walkIn, setWalkIn] = useState(false);
   const [headerForm, setHeaderForm] = useState({
     contactId: "",
+    customerId: "",
     sellerUserId: "",
     notes: "",
   });
   const [paymentsBundle, setPaymentsBundle] = useState(null);
+  const [storeCreditSchedule, setStoreCreditSchedule] = useState({
+    frequency: "monthly",
+    installmentCount: 1,
+    firstDueDate: "",
+  });
+  const [storeCreditOverride, setStoreCreditOverride] = useState({
+    authorizeOverride: false,
+    reason: "",
+  });
   const [saving, setSaving] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -135,12 +146,13 @@ export default function SaleWizardPage() {
             : "";
       setHeaderForm({
         contactId: data.contactId != null ? String(data.contactId) : "",
+        customerId: data.customerId != null ? String(data.customerId) : "",
         sellerUserId: sellerFallback,
         notes: data.notes || "",
       });
-      const contact = contactOptionFromSale(data);
-      setSelectedContact(contact);
-      setWalkIn(!contact && data.contactId == null);
+      const customer = customerOptionFromSale(data);
+      setSelectedCustomer(customer);
+      setWalkIn(!customer && data.customerId == null && data.contactId == null);
     },
     [user?.id]
   );
@@ -188,9 +200,10 @@ export default function SaleWizardPage() {
     editable &&
     sale &&
     (!sameId(headerForm.contactId, sale.contactId) ||
+      !sameId(headerForm.customerId, sale.customerId) ||
       !sameId(headerForm.sellerUserId, sale.sellerUserId) ||
       (headerForm.notes || "") !== (sale.notes || "") ||
-      (walkIn && sale.contactId != null));
+      (walkIn && (sale.contactId != null || sale.customerId != null)));
 
   const persistHeader = async () => {
     const payload = {
@@ -198,6 +211,11 @@ export default function SaleWizardPage() {
       sellerUserId: headerForm.sellerUserId
         ? Number(headerForm.sellerUserId)
         : null,
+      customerId: walkIn
+        ? null
+        : headerForm.customerId
+          ? Number(headerForm.customerId)
+          : null,
       contactId: walkIn
         ? null
         : headerForm.contactId
@@ -312,6 +330,31 @@ export default function SaleWizardPage() {
           );
           return;
         }
+        const storeCreditAmt = (bundle?.payments || [])
+          .filter((p) => p.method === "store_credit")
+          .reduce((acc, p) => acc + Number(p.amount || 0), 0);
+        if (storeCreditAmt > 0) {
+          if (!headerForm.customerId && !sale.customerId) {
+            toast.error(
+              i18n.t(
+                "inventorySales.sales.wizard.payment.storeCreditNeedsCustomer"
+              )
+            );
+            return;
+          }
+          if (
+            !storeCreditSchedule?.frequency ||
+            !storeCreditSchedule?.firstDueDate ||
+            !storeCreditSchedule?.installmentCount
+          ) {
+            toast.error(
+              i18n.t(
+                "inventorySales.sales.wizard.payment.storeCreditScheduleTitle"
+              )
+            );
+            return;
+          }
+        }
       }
       if (nextStep) setStep(nextStep);
     }
@@ -343,6 +386,26 @@ export default function SaleWizardPage() {
       const body = { sellerUserId };
       if (perms.canManagePayments) {
         body.paymentMode = "lines";
+      }
+
+      const storeCreditAmt = (paymentsBundle?.payments || [])
+        .filter((p) => p.method === "store_credit")
+        .reduce((acc, p) => acc + Number(p.amount || 0), 0);
+      if (storeCreditAmt > 0 && storeCreditSchedule?.frequency) {
+        body.storeCreditSchedule = {
+          frequency: storeCreditSchedule.frequency,
+          installmentCount:
+            storeCreditSchedule.frequency === "once"
+              ? 1
+              : Number(storeCreditSchedule.installmentCount) || 1,
+          firstDueDate: storeCreditSchedule.firstDueDate,
+        };
+        if (storeCreditOverride?.authorizeOverride) {
+          body.storeCreditOverride = {
+            authorizeOverride: true,
+            reason: storeCreditOverride.reason?.trim() || null,
+          };
+        }
       }
 
       const { data } = await completeInventorySale(sale.id, body);
@@ -442,8 +505,8 @@ export default function SaleWizardPage() {
                 sale={sale}
                 headerForm={headerForm}
                 setHeaderForm={setHeaderForm}
-                selectedContact={selectedContact}
-                setSelectedContact={setSelectedContact}
+                selectedCustomer={selectedCustomer}
+                setSelectedCustomer={setSelectedCustomer}
                 walkIn={walkIn}
                 setWalkIn={setWalkIn}
                 users={users}
@@ -474,7 +537,11 @@ export default function SaleWizardPage() {
               <SaleWizardDeliveryStep
                 ref={deliveryStepRef}
                 sale={sale}
-                contact={selectedContact || sale?.contact || null}
+                contact={
+                  deliverySourceFromCustomer(selectedCustomer) ||
+                  sale?.contact ||
+                  null
+                }
                 itemCount={itemCount}
                 disabled={!editable || busy}
                 onSaleUpdated={(data) => {
@@ -492,6 +559,11 @@ export default function SaleWizardPage() {
                 paymentsBundle={paymentsBundle}
                 setPaymentsBundle={setPaymentsBundle}
                 onSaleCacheMaybeChanged={refreshSale}
+                customerId={headerForm.customerId || sale?.customerId}
+                storeCreditSchedule={storeCreditSchedule}
+                setStoreCreditSchedule={setStoreCreditSchedule}
+                storeCreditOverride={storeCreditOverride}
+                setStoreCreditOverride={setStoreCreditOverride}
               />
             ) : null}
 
@@ -502,10 +574,12 @@ export default function SaleWizardPage() {
                 paymentsBundle={paymentsBundle}
                 canManagePayments={perms.canManagePayments}
                 users={users}
-                selectedContact={selectedContact}
+                selectedCustomer={selectedCustomer}
                 walkIn={walkIn}
                 confirming={confirming}
                 onConfirm={handleConfirm}
+                storeCreditSchedule={storeCreditSchedule}
+                storeCreditOverride={storeCreditOverride}
               />
             ) : null}
 

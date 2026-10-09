@@ -17,6 +17,7 @@ import {
 import DeleteOutlineIcon from "@material-ui/icons/DeleteOutline";
 import CheckCircleOutlineIcon from "@material-ui/icons/CheckCircleOutline";
 import { makeStyles } from "@material-ui/core/styles";
+import { toast } from "react-toastify";
 
 import {
   AppPrimaryButton,
@@ -28,15 +29,19 @@ import toastError from "../../../errors/toastError";
 import {
   addInventorySalePayment,
   deleteInventorySalePaymentLine,
+  getInventoryCustomerCredit,
   getInventorySalePayments,
+  previewInventoryStoreCreditSchedule,
   settleInventorySalePaymentLine,
 } from "../../../services/inventoryApi";
-import { PAYMENT_METHODS } from "../constants";
+import { PAYMENT_METHODS, STORE_CREDIT_FREQUENCIES } from "../constants";
 import {
   CARD_INSTALLMENT_OPTIONS,
   formatCardInstallmentCaption,
 } from "../cardInstallments";
+import { defaultPaymentStatusForMethod } from "../paymentDisplay";
 import CurrencyInput from "../CurrencyInput";
+import { useInventoryPermissions } from "../../../utils/inventoryAccess";
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -119,21 +124,16 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
-function defaultStatusForMethod(method) {
-  if (
-    method === "cash" ||
-    method === "pix" ||
-    method === "credit_card" ||
-    method === "debit_card" ||
-    method === "bank_transfer"
-  ) {
-    return "paid";
-  }
-  return "pending";
-}
-
 function methodLabel(method) {
   return i18n.t(`inventorySales.sales.paymentMethods.${method}`, method);
+}
+
+function todayCivilDate() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 function paymentLineCaption(payment) {
@@ -154,8 +154,14 @@ export default function SaleWizardPaymentStep({
   paymentsBundle,
   setPaymentsBundle,
   onSaleCacheMaybeChanged,
+  customerId,
+  storeCreditSchedule,
+  setStoreCreditSchedule,
+  storeCreditOverride,
+  setStoreCreditOverride,
 }) {
   const classes = useStyles();
+  const perms = useInventoryPermissions();
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -168,10 +174,30 @@ export default function SaleWizardPaymentStep({
   const [formInstallments, setFormInstallments] = useState("1");
   const [formNotes, setFormNotes] = useState("");
 
+  const [creditSummary, setCreditSummary] = useState(null);
+  const [schedulePreview, setSchedulePreview] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+
   const summary = paymentsBundle?.summary;
   const payments = Array.isArray(paymentsBundle?.payments)
     ? paymentsBundle.payments
     : [];
+
+  const storeCreditLines = payments.filter((p) => p.method === "store_credit");
+  const storeCreditAmount = storeCreditLines.reduce(
+    (acc, p) => acc + Number(p.amount || 0),
+    0
+  );
+  const hasStoreCredit = storeCreditAmount > 0;
+
+  const canOfferStoreCredit =
+    perms.canUseStoreCredit === true && Boolean(customerId);
+  const showDisabledStoreCreditHint =
+    perms.canUseStoreCredit === true && !customerId;
+  const availableMethods = PAYMENT_METHODS.filter((method) => {
+    if (method !== "store_credit") return true;
+    return canOfferStoreCredit;
+  });
 
   const loadPayments = useCallback(async () => {
     if (!sale?.id || !canManagePayments) {
@@ -193,6 +219,74 @@ export default function SaleWizardPaymentStep({
     loadPayments();
   }, [loadPayments]);
 
+  useEffect(() => {
+    if (!hasStoreCredit || !customerId) {
+      setCreditSummary(null);
+      return undefined;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await getInventoryCustomerCredit(customerId);
+        if (!cancelled) setCreditSummary(data);
+      } catch (err) {
+        if (!cancelled) toastError(err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [hasStoreCredit, customerId]);
+
+  useEffect(() => {
+    if (!hasStoreCredit || !setStoreCreditSchedule) return;
+    if (!storeCreditSchedule?.firstDueDate) {
+      setStoreCreditSchedule({
+        frequency: storeCreditSchedule?.frequency || "monthly",
+        installmentCount: storeCreditSchedule?.installmentCount || 1,
+        firstDueDate: todayCivilDate(),
+      });
+    }
+  }, [hasStoreCredit, setStoreCreditSchedule, storeCreditSchedule]);
+
+  useEffect(() => {
+    if (
+      !hasStoreCredit ||
+      !(storeCreditAmount > 0) ||
+      !storeCreditSchedule?.frequency ||
+      !storeCreditSchedule?.firstDueDate ||
+      !storeCreditSchedule?.installmentCount
+    ) {
+      setSchedulePreview(null);
+      return undefined;
+    }
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      setPreviewLoading(true);
+      try {
+        const { data } = await previewInventoryStoreCreditSchedule({
+          financedAmount: storeCreditAmount,
+          frequency: storeCreditSchedule.frequency,
+          installmentCount: Number(storeCreditSchedule.installmentCount),
+          firstDueDate: storeCreditSchedule.firstDueDate,
+          customerId: customerId ? Number(customerId) : undefined,
+        });
+        if (!cancelled) setSchedulePreview(data);
+      } catch (err) {
+        if (!cancelled) {
+          setSchedulePreview(null);
+          toastError(err);
+        }
+      } finally {
+        if (!cancelled) setPreviewLoading(false);
+      }
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [hasStoreCredit, storeCreditAmount, storeCreditSchedule, customerId]);
+
   const openAddDialog = () => {
     const remaining = Number(summary?.remainingToAllocate ?? sale?.totalAmount ?? 0);
     setFormMethod("cash");
@@ -206,7 +300,7 @@ export default function SaleWizardPaymentStep({
   const handleMethodChange = (method) => {
     setFormMethod(method);
     const nextStatus =
-      method === "credit_card" ? "paid" : defaultStatusForMethod(method);
+      method === "credit_card" ? "paid" : defaultPaymentStatusForMethod(method);
     setFormStatus(nextStatus);
     if (method !== "credit_card") setFormInstallments("1");
   };
@@ -214,6 +308,12 @@ export default function SaleWizardPaymentStep({
   const handleAdd = async () => {
     if (submitLock.current || submitting || !sale?.id) return;
     if (!(formAmount > 0)) {
+      return;
+    }
+    if (formMethod === "store_credit" && !customerId) {
+      toast.error(
+        i18n.t("inventorySales.sales.wizard.payment.storeCreditNeedsCustomer")
+      );
       return;
     }
     if (formMethod === "credit_card") {
@@ -226,7 +326,12 @@ export default function SaleWizardPaymentStep({
       const body = {
         method: formMethod,
         amount: formAmount,
-        status: formMethod === "credit_card" ? "paid" : formStatus,
+        status:
+          formMethod === "credit_card" || formMethod === "store_credit"
+            ? formMethod === "store_credit"
+              ? "pending"
+              : "paid"
+            : formStatus,
         notes: formNotes.trim() || null,
       };
       if (formMethod === "credit_card") {
@@ -376,20 +481,23 @@ export default function SaleWizardPaymentStep({
                   <Box className={classes.rowActions}>
                     {payment.status === "pending" && (
                       <>
-                        <IconButton
-                          size="small"
-                          aria-label={i18n.t(
-                            "inventorySales.sales.wizard.payment.markReceived"
-                          )}
-                          disabled={disabled || busyId === payment.id}
-                          onClick={() => handleSettle(payment)}
-                        >
-                          {busyId === payment.id ? (
-                            <CircularProgress size={18} />
-                          ) : (
-                            <CheckCircleOutlineIcon fontSize="small" />
-                          )}
-                        </IconButton>
+                        {payment.method !== "store_credit" ? (
+                          <IconButton
+                            size="small"
+                            aria-label={i18n.t(
+                              "inventorySales.sales.wizard.payment.markReceived"
+                            )}
+                            disabled={disabled || busyId === payment.id}
+                            onClick={() => handleSettle(payment)}
+                            data-testid={`wizard-payment-settle-${payment.id}`}
+                          >
+                            {busyId === payment.id ? (
+                              <CircularProgress size={18} />
+                            ) : (
+                              <CheckCircleOutlineIcon fontSize="small" />
+                            )}
+                          </IconButton>
+                        ) : null}
                         <IconButton
                           size="small"
                           aria-label={i18n.t(
@@ -412,6 +520,232 @@ export default function SaleWizardPaymentStep({
               ))
             )}
           </Box>
+
+          {hasStoreCredit ? (
+            <Box
+              className={classes.readonly}
+              data-testid="sale-wizard-store-credit-panel"
+            >
+              <Typography variant="subtitle1" style={{ fontWeight: 600 }}>
+                {i18n.t(
+                  "inventorySales.sales.wizard.payment.storeCreditScheduleTitle"
+                )}
+              </Typography>
+              {!customerId ? (
+                <Typography variant="body2" color="error">
+                  {i18n.t(
+                    "inventorySales.sales.wizard.payment.storeCreditNeedsCustomer"
+                  )}
+                </Typography>
+              ) : null}
+              {creditSummary ? (
+                <Box className={classes.summary} style={{ marginTop: 12 }}>
+                  <Box className={classes.summaryItem}>
+                    <Typography className={classes.summaryLabel}>
+                      {i18n.t(
+                        "inventorySales.sales.wizard.payment.storeCreditLimit"
+                      )}
+                    </Typography>
+                    <Typography className={classes.summaryValue}>
+                      {formatCurrencyBRL(creditSummary.creditLimit)}
+                    </Typography>
+                  </Box>
+                  <Box className={classes.summaryItem}>
+                    <Typography className={classes.summaryLabel}>
+                      {i18n.t(
+                        "inventorySales.sales.wizard.payment.storeCreditUsed"
+                      )}
+                    </Typography>
+                    <Typography className={classes.summaryValue}>
+                      {formatCurrencyBRL(creditSummary.creditUsed)}
+                    </Typography>
+                  </Box>
+                  <Box className={classes.summaryItem}>
+                    <Typography className={classes.summaryLabel}>
+                      {i18n.t(
+                        "inventorySales.sales.wizard.payment.storeCreditAvailable"
+                      )}
+                    </Typography>
+                    <Typography className={classes.summaryValue}>
+                      {formatCurrencyBRL(creditSummary.creditAvailable)}
+                    </Typography>
+                  </Box>
+                  <Box className={classes.summaryItem}>
+                    <Typography className={classes.summaryLabel}>
+                      {i18n.t(
+                        "inventorySales.sales.wizard.payment.storeCreditFinanced"
+                      )}
+                    </Typography>
+                    <Typography className={classes.summaryValue}>
+                      {formatCurrencyBRL(storeCreditAmount)}
+                    </Typography>
+                  </Box>
+                </Box>
+              ) : null}
+              {setStoreCreditSchedule ? (
+                <Box className={classes.formStack} style={{ marginTop: 12 }}>
+                  <FormControl variant="outlined" fullWidth size="small">
+                    <InputLabel>
+                      {i18n.t(
+                        "inventorySales.sales.wizard.payment.storeCreditFrequency"
+                      )}
+                    </InputLabel>
+                    <Select
+                      label={i18n.t(
+                        "inventorySales.sales.wizard.payment.storeCreditFrequency"
+                      )}
+                      value={storeCreditSchedule?.frequency || "monthly"}
+                      onChange={(e) =>
+                        setStoreCreditSchedule((prev) => ({
+                          ...(prev || {}),
+                          frequency: e.target.value,
+                          installmentCount:
+                            e.target.value === "once"
+                              ? 1
+                              : prev?.installmentCount || 1,
+                        }))
+                      }
+                      disabled={disabled}
+                      data-testid="store-credit-frequency"
+                    >
+                      {STORE_CREDIT_FREQUENCIES.map((freq) => (
+                        <MenuItem key={freq} value={freq}>
+                          {i18n.t(
+                            `inventorySales.sales.wizard.payment.frequencies.${freq}`
+                          )}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  {storeCreditSchedule?.frequency !== "once" ? (
+                    <TextField
+                      type="number"
+                      label={i18n.t(
+                        "inventorySales.sales.wizard.payment.storeCreditInstallments"
+                      )}
+                      value={storeCreditSchedule?.installmentCount || 1}
+                      onChange={(e) =>
+                        setStoreCreditSchedule((prev) => ({
+                          ...(prev || {}),
+                          installmentCount: Math.max(
+                            1,
+                            Number(e.target.value) || 1
+                          ),
+                        }))
+                      }
+                      variant="outlined"
+                      size="small"
+                      fullWidth
+                      disabled={disabled}
+                      inputProps={{
+                        min: 1,
+                        max: 48,
+                        "data-testid": "store-credit-installments",
+                      }}
+                    />
+                  ) : null}
+                  <TextField
+                    type="date"
+                    label={i18n.t(
+                      "inventorySales.sales.wizard.payment.storeCreditFirstDue"
+                    )}
+                    value={storeCreditSchedule?.firstDueDate || ""}
+                    onChange={(e) =>
+                      setStoreCreditSchedule((prev) => ({
+                        ...(prev || {}),
+                        firstDueDate: e.target.value,
+                      }))
+                    }
+                    variant="outlined"
+                    size="small"
+                    fullWidth
+                    disabled={disabled}
+                    InputLabelProps={{ shrink: true }}
+                    inputProps={{ "data-testid": "store-credit-first-due" }}
+                  />
+                </Box>
+              ) : null}
+              {previewLoading ? (
+                <Box display="flex" justifyContent="center" py={1}>
+                  <CircularProgress size={20} />
+                </Box>
+              ) : schedulePreview?.installments?.length ? (
+                <Box mt={1} data-testid="store-credit-preview">
+                  <Typography variant="caption" color="textSecondary">
+                    {i18n.t(
+                      "inventorySales.sales.wizard.payment.storeCreditPreview"
+                    )}
+                  </Typography>
+                  {schedulePreview.installments.map((inst) => (
+                    <Typography key={inst.sequence} variant="body2">
+                      #{inst.sequence} · {inst.dueDate} ·{" "}
+                      {formatCurrencyBRL(inst.amount)}
+                    </Typography>
+                  ))}
+                </Box>
+              ) : null}
+              {perms.canAuthorizeStoreCreditOverride &&
+              setStoreCreditOverride ? (
+                <Box mt={2}>
+                  <Typography variant="caption" color="textSecondary" display="block">
+                    {i18n.t(
+                      "inventorySales.sales.wizard.payment.storeCreditOverrideHint"
+                    )}
+                  </Typography>
+                  <FormControl variant="outlined" fullWidth size="small" style={{ marginTop: 8 }}>
+                    <InputLabel>
+                      {i18n.t(
+                        "inventorySales.sales.wizard.payment.storeCreditOverride"
+                      )}
+                    </InputLabel>
+                    <Select
+                      label={i18n.t(
+                        "inventorySales.sales.wizard.payment.storeCreditOverride"
+                      )}
+                      value={
+                        storeCreditOverride?.authorizeOverride ? "yes" : "no"
+                      }
+                      onChange={(e) =>
+                        setStoreCreditOverride((prev) => ({
+                          ...(prev || {}),
+                          authorizeOverride: e.target.value === "yes",
+                        }))
+                      }
+                      disabled={disabled}
+                    >
+                      <MenuItem value="no">
+                        {i18n.t("inventorySales.common.none")}
+                      </MenuItem>
+                      <MenuItem value="yes">
+                        {i18n.t(
+                          "inventorySales.sales.wizard.payment.storeCreditOverride"
+                        )}
+                      </MenuItem>
+                    </Select>
+                  </FormControl>
+                  {storeCreditOverride?.authorizeOverride ? (
+                    <TextField
+                      label={i18n.t(
+                        "inventorySales.sales.wizard.payment.storeCreditOverrideReason"
+                      )}
+                      value={storeCreditOverride?.reason || ""}
+                      onChange={(e) =>
+                        setStoreCreditOverride((prev) => ({
+                          ...(prev || {}),
+                          reason: e.target.value,
+                        }))
+                      }
+                      variant="outlined"
+                      size="small"
+                      fullWidth
+                      style={{ marginTop: 8 }}
+                      disabled={disabled}
+                    />
+                  ) : null}
+                </Box>
+              ) : null}
+            </Box>
+          ) : null}
 
           <AppPrimaryButton
             onClick={openAddDialog}
@@ -444,12 +778,21 @@ export default function SaleWizardPaymentStep({
                 value={formMethod}
                 onChange={(e) => handleMethodChange(e.target.value)}
                 disabled={submitting}
+                data-testid="sale-wizard-payment-method"
               >
-                {PAYMENT_METHODS.map((method) => (
+                {availableMethods.map((method) => (
                   <MenuItem key={method} value={method}>
                     {methodLabel(method)}
                   </MenuItem>
                 ))}
+                {showDisabledStoreCreditHint ? (
+                  <MenuItem value="store_credit" disabled>
+                    {methodLabel("store_credit")} —{" "}
+                    {i18n.t(
+                      "inventorySales.sales.wizard.payment.storeCreditNeedsCustomer"
+                    )}
+                  </MenuItem>
+                ) : null}
               </Select>
             </FormControl>
 
@@ -483,31 +826,35 @@ export default function SaleWizardPaymentStep({
                   ))}
                 </Select>
               </FormControl>
+            ) : formMethod === "store_credit" ? (
+              <Typography variant="body2" color="textSecondary">
+                {i18n.t(
+                  "inventorySales.sales.wizard.payment.storeCreditScheduleTitle"
+                )}
+              </Typography>
             ) : (
-              formMethod !== "credit_card" && (
-                <FormControl variant="outlined" fullWidth size="small">
-                  <InputLabel>
-                    {i18n.t("inventorySales.sales.wizard.payment.situation")}
-                  </InputLabel>
-                  <Select
-                    label={i18n.t(
-                      "inventorySales.sales.wizard.payment.situation"
+              <FormControl variant="outlined" fullWidth size="small">
+                <InputLabel>
+                  {i18n.t("inventorySales.sales.wizard.payment.situation")}
+                </InputLabel>
+                <Select
+                  label={i18n.t(
+                    "inventorySales.sales.wizard.payment.situation"
+                  )}
+                  value={formStatus}
+                  onChange={(e) => setFormStatus(e.target.value)}
+                  disabled={submitting}
+                >
+                  <MenuItem value="paid">
+                    {i18n.t("inventorySales.sales.wizard.payment.statusPaid")}
+                  </MenuItem>
+                  <MenuItem value="pending">
+                    {i18n.t(
+                      "inventorySales.sales.wizard.payment.statusPending"
                     )}
-                    value={formStatus}
-                    onChange={(e) => setFormStatus(e.target.value)}
-                    disabled={submitting}
-                  >
-                    <MenuItem value="paid">
-                      {i18n.t("inventorySales.sales.wizard.payment.statusPaid")}
-                    </MenuItem>
-                    <MenuItem value="pending">
-                      {i18n.t(
-                        "inventorySales.sales.wizard.payment.statusPending"
-                      )}
-                    </MenuItem>
-                  </Select>
-                </FormControl>
-              )
+                  </MenuItem>
+                </Select>
+              </FormControl>
             )}
 
             <TextField

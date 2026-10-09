@@ -1,6 +1,10 @@
 import { Request, Response } from "express";
 import AppError from "../errors/AppError";
-import { INVENTORY_SALES_MANAGE_PAYMENTS } from "../config/inventorySalesPermissions";
+import {
+  INVENTORY_SALES_AUTHORIZE_STORE_CREDIT_OVERRIDE,
+  INVENTORY_SALES_MANAGE_PAYMENTS,
+  INVENTORY_SALES_USE_STORE_CREDIT
+} from "../config/inventorySalesPermissions";
 import { loadCompanyPlanContext } from "../middleware/loadCompanyEffectiveFeatures";
 import { isPlatformSuperUser } from "../middleware/platformSuperBypass";
 import CreateInventorySaleService from "../services/InventoryService/CreateInventorySaleService";
@@ -16,6 +20,7 @@ import CancelInventorySaleService from "../services/InventoryService/CancelInven
 import UpdateInventorySalePaymentService from "../services/InventoryService/UpdateInventorySalePaymentService";
 import UpdateInventorySaleDeliveryService from "../services/InventoryService/UpdateInventorySaleDeliveryService";
 import SearchInventoryCustomersService from "../services/InventoryService/SearchInventoryCustomersService";
+import SearchInventoryContactsService from "../services/InventoryService/SearchInventoryContactsService";
 import {
   addInventorySalePayment,
   deletePendingInventorySalePayment,
@@ -67,7 +72,10 @@ function parseOptionalPaymentMode(raw: unknown): "legacy" | "lines" | undefined 
   );
 }
 
-async function resolveCanManagePayments(req: Request): Promise<boolean> {
+async function resolveFeatureFlag(
+  req: Request,
+  key: string
+): Promise<boolean> {
   if (await isPlatformSuperUser(req)) return true;
   const ctx = await loadCompanyPlanContext(req);
   if (!ctx) return false;
@@ -75,7 +83,11 @@ async function resolveCanManagePayments(req: Request): Promise<boolean> {
     req,
     ctx.featureMap
   );
-  return merged[INVENTORY_SALES_MANAGE_PAYMENTS] === true;
+  return merged[key] === true;
+}
+
+async function resolveCanManagePayments(req: Request): Promise<boolean> {
+  return resolveFeatureFlag(req, INVENTORY_SALES_MANAGE_PAYMENTS);
 }
 
 export const searchCustomers = async (
@@ -91,6 +103,19 @@ export const searchCustomers = async (
   return res.json({ customers });
 };
 
+export const searchContacts = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const contacts = await SearchInventoryContactsService({
+    companyId,
+    search: req.query.search,
+    limit: req.query.limit
+  });
+  return res.json({ contacts });
+};
+
 export const listSales = async (
   req: Request,
   res: Response
@@ -100,6 +125,7 @@ export const listSales = async (
     companyId,
     status: req.query.status,
     contactId: req.query.contactId,
+    customerId: req.query.customerId,
     ticketId: req.query.ticketId,
     sellerUserId: req.query.sellerUserId,
     startDate: req.query.startDate,
@@ -216,14 +242,49 @@ export const completeSale = async (
     ? requestedRegisterAsPaid
     : undefined;
 
+  const canUseStoreCredit = await resolveFeatureFlag(
+    req,
+    INVENTORY_SALES_USE_STORE_CREDIT
+  );
+  const canAuthorizeOverride = await resolveFeatureFlag(
+    req,
+    INVENTORY_SALES_AUTHORIZE_STORE_CREDIT_OVERRIDE
+  );
+  const actorId = userIdOrNull(req);
+  const overrideBody = req.body?.storeCreditOverride;
+  const storeCreditOverride =
+    overrideBody && typeof overrideBody === "object"
+      ? {
+          authorizeOverride:
+            overrideBody.authorizeOverride === true ||
+            overrideBody.authorizeOverride === "true",
+          authorizedByUserId: actorId,
+          reason: overrideBody.reason,
+          canAuthorizeOverride
+        }
+      : undefined;
+
+  const scheduleBody = req.body?.storeCreditSchedule;
+  const storeCreditSchedule =
+    scheduleBody && typeof scheduleBody === "object"
+      ? {
+          frequency: scheduleBody.frequency,
+          installmentCount: scheduleBody.installmentCount,
+          firstDueDate: scheduleBody.firstDueDate
+        }
+      : undefined;
+
   const sale = await CompleteInventorySaleService({
     companyId,
     saleId: parseIdParam(req.params.id),
     sellerUserId: req.body?.sellerUserId,
-    completedBy: userIdOrNull(req),
+    completedBy: actorId,
     registerAsPaid,
     canManagePayments,
-    paymentMode: parseOptionalPaymentMode(req.body?.paymentMode)
+    paymentMode: parseOptionalPaymentMode(req.body?.paymentMode),
+    storeCreditSchedule,
+    storeCreditOverride,
+    canUseStoreCredit
   });
   return res.json(sale);
 };

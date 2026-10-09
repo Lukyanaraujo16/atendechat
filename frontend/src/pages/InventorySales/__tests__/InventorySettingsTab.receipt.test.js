@@ -135,6 +135,7 @@ describe("InventorySettings dados do recibo", () => {
     expect(updateInventorySettings).toHaveBeenCalledWith({
       defaultCommissionRate: 8,
       allowNegativeStock: true,
+      blockStoreCreditWhenOverdue: true,
       saleNumberPrefix: "VD",
       receiptTradeName: "Nova Loja",
       receiptLegalName: null,

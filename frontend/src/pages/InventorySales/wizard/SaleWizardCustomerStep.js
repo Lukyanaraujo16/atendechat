@@ -11,16 +11,24 @@ import {
 } from "@material-ui/core";
 import Autocomplete from "@material-ui/lab/Autocomplete";
 import { makeStyles } from "@material-ui/core/styles";
+import { toast } from "react-toastify";
 
 import { AppPrimaryButton, AppSecondaryButton } from "../../../ui";
 import api from "../../../services/api";
-import { searchInventoryCustomers } from "../../../services/inventoryApi";
+import {
+  createInventoryCustomerFromContact,
+  searchInventoryCustomers,
+} from "../../../services/inventoryApi";
 import toastError from "../../../errors/toastError";
 import { i18n } from "../../../translate/i18n";
+import { formatCurrencyBRL } from "../../../utils/brazilianCurrency";
+import { useInventoryPermissions } from "../../../utils/inventoryAccess";
+import InventoryCustomerFormDialog from "../InventoryCustomerFormDialog";
 import {
   axiosAbortConfig,
   isAbortError,
 } from "../saleProductSearch";
+import { deliverySourceFromCustomer } from "./deliveryAddressUtils";
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -48,8 +56,41 @@ const useStyles = makeStyles((theme) => ({
     border: `1px solid ${theme.palette.divider}`,
     borderRadius: theme.shape.borderRadius,
   },
+  banner: {
+    padding: theme.spacing(1.5),
+    border: `1px solid ${theme.palette.divider}`,
+    borderRadius: theme.shape.borderRadius,
+    backgroundColor:
+      theme.palette.type === "light"
+        ? theme.palette.grey[50]
+        : theme.palette.background.default,
+  },
 }));
 
+function customerOptionFromSale(sale) {
+  const customer = sale?.customer;
+  if (customer?.id == null) return null;
+  return {
+    id: customer.id,
+    name: customer.name || "",
+    number: customer.phone || "",
+    phone: customer.phone || null,
+    document: customer.document || null,
+    creditLimit: customer.creditLimit,
+    creditAvailable: customer.creditAvailable,
+    contactId: customer.contactId ?? null,
+    postalCode: customer.postalCode || null,
+    street: customer.street || null,
+    addressNumber: customer.addressNumber || null,
+    addressComplement: customer.addressComplement || null,
+    district: customer.district || null,
+    city: customer.city || null,
+    state: customer.state || null,
+    isActive: customer.isActive !== false,
+  };
+}
+
+/** Compat: vendas antigas só com Contact. */
 function contactOptionFromSale(sale) {
   const contact = sale?.contact;
   if (contact?.id == null) return null;
@@ -71,8 +112,8 @@ export default function SaleWizardCustomerStep({
   sale,
   headerForm,
   setHeaderForm,
-  selectedContact,
-  setSelectedContact,
+  selectedCustomer,
+  setSelectedCustomer,
   walkIn,
   setWalkIn,
   users,
@@ -80,31 +121,47 @@ export default function SaleWizardCustomerStep({
   disabled,
 }) {
   const classes = useStyles();
-  const [contactOptions, setContactOptions] = useState([]);
-  const [contactInput, setContactInput] = useState(selectedContact?.name || "");
-  const [contactSearchLoading, setContactSearchLoading] = useState(false);
-  const [contactSearchError, setContactSearchError] = useState(false);
-  const [contactPopupOpen, setContactPopupOpen] = useState(false);
+  const perms = useInventoryPermissions();
+  const [customerOptions, setCustomerOptions] = useState([]);
+  const [customerInput, setCustomerInput] = useState(
+    selectedCustomer?.name || ""
+  );
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState(false);
+  const [popupOpen, setPopupOpen] = useState(false);
   const [sellerEditing, setSellerEditing] = useState(false);
-  const contactAbortRef = useRef(null);
-  const contactRequestRef = useRef(0);
-  const contactTypedRef = useRef("");
-  const contactDebounceRef = useRef(null);
+  const [formOpen, setFormOpen] = useState(false);
+  const [creatingFromContact, setCreatingFromContact] = useState(false);
+  const abortRef = useRef(null);
+  const requestRef = useRef(0);
+  const debounceRef = useRef(null);
   const mountedRef = useRef(true);
 
-  useEffect(() => () => {
-    mountedRef.current = false;
-    if (contactAbortRef.current) contactAbortRef.current.abort();
-    clearTimeout(contactDebounceRef.current);
-  }, []);
+  const orphanContact =
+    !selectedCustomer &&
+    !walkIn &&
+    sale?.contactId != null &&
+    sale?.customerId == null &&
+    sale?.contact
+      ? sale.contact
+      : null;
+
+  useEffect(
+    () => () => {
+      mountedRef.current = false;
+      if (abortRef.current) abortRef.current.abort();
+      clearTimeout(debounceRef.current);
+    },
+    []
+  );
 
   useEffect(() => {
-    if (!selectedContact) {
-      if (walkIn) setContactInput("");
+    if (!selectedCustomer) {
+      if (walkIn) setCustomerInput("");
       return;
     }
-    setContactInput(selectedContact.name || "");
-  }, [selectedContact, walkIn]);
+    setCustomerInput(selectedCustomer.name || "");
+  }, [selectedCustomer, walkIn]);
 
   useEffect(() => {
     let cancelled = false;
@@ -121,20 +178,39 @@ export default function SaleWizardCustomerStep({
     };
   }, [setUsers]);
 
-  const runContactSearch = useCallback(async (rawTerm, { browse } = {}) => {
+  const applyCustomer = useCallback(
+    (value) => {
+      setSelectedCustomer(value);
+      setWalkIn(false);
+      setHeaderForm((prev) => ({
+        ...prev,
+        customerId: value?.id != null ? String(value.id) : "",
+        contactId:
+          value?.contactId != null
+            ? String(value.contactId)
+            : prev.contactId && !value
+              ? ""
+              : value?.contactId == null
+                ? ""
+                : prev.contactId,
+      }));
+    },
+    [setHeaderForm, setSelectedCustomer, setWalkIn]
+  );
+
+  const runCustomerSearch = useCallback(async (rawTerm, { browse } = {}) => {
     const query = String(rawTerm ?? "").trim();
     if (!query && !browse) {
-      setContactSearchLoading(false);
-      setContactSearchError(false);
+      setSearchLoading(false);
+      setSearchError(false);
       return;
     }
-    contactTypedRef.current = query;
-    if (contactAbortRef.current) contactAbortRef.current.abort();
+    if (abortRef.current) abortRef.current.abort();
     const controller = new AbortController();
-    contactAbortRef.current = controller;
-    const requestId = ++contactRequestRef.current;
-    setContactSearchLoading(true);
-    setContactSearchError(false);
+    abortRef.current = controller;
+    const requestId = ++requestRef.current;
+    setSearchLoading(true);
+    setSearchError(false);
     try {
       const params = { limit: 20 };
       if (query) params.search = query;
@@ -145,64 +221,64 @@ export default function SaleWizardCustomerStep({
       if (
         !mountedRef.current ||
         controller.signal.aborted ||
-        requestId !== contactRequestRef.current
+        requestId !== requestRef.current
       ) {
         return;
       }
-      setContactOptions(Array.isArray(data?.customers) ? data.customers : []);
+      setCustomerOptions(Array.isArray(data?.customers) ? data.customers : []);
     } catch (err) {
       if (
         !mountedRef.current ||
         controller.signal.aborted ||
         isAbortError(err) ||
-        requestId !== contactRequestRef.current
+        requestId !== requestRef.current
       ) {
         return;
       }
-      setContactSearchError(true);
-      setContactOptions([]);
+      setSearchError(true);
+      setCustomerOptions([]);
     } finally {
-      if (mountedRef.current && requestId === contactRequestRef.current) {
-        setContactSearchLoading(false);
+      if (mountedRef.current && requestId === requestRef.current) {
+        setSearchLoading(false);
       }
     }
   }, []);
 
   useEffect(() => {
     if (disabled || walkIn) return undefined;
-    const query = contactInput.trim();
-    if (!query && !contactPopupOpen) {
-      setContactOptions(selectedContact ? [selectedContact] : []);
+    const query = customerInput.trim();
+    if (!query && !popupOpen) {
+      setCustomerOptions(selectedCustomer ? [selectedCustomer] : []);
       return undefined;
     }
     if (!query) {
-      runContactSearch("", { browse: true });
+      runCustomerSearch("", { browse: true });
       return undefined;
     }
     if (
-      selectedContact &&
-      query === String(selectedContact.name || "").trim()
+      selectedCustomer &&
+      query === String(selectedCustomer.name || "").trim()
     ) {
       return undefined;
     }
-    contactDebounceRef.current = setTimeout(() => runContactSearch(query), 300);
-    return () => clearTimeout(contactDebounceRef.current);
+    debounceRef.current = setTimeout(() => runCustomerSearch(query), 300);
+    return () => clearTimeout(debounceRef.current);
   }, [
-    contactInput,
-    contactPopupOpen,
+    customerInput,
+    popupOpen,
     disabled,
     walkIn,
-    selectedContact,
-    runContactSearch,
+    selectedCustomer,
+    runCustomerSearch,
   ]);
 
-  const customerOptions = useMemo(() => {
-    if (!selectedContact) return contactOptions;
-    if (contactOptions.some((row) => row.id === selectedContact.id)) {
-      return contactOptions;
+  const options = useMemo(() => {
+    if (!selectedCustomer) return customerOptions;
+    if (customerOptions.some((row) => row.id === selectedCustomer.id)) {
+      return customerOptions;
     }
-    return [selectedContact, ...contactOptions];
-  }, [contactOptions, selectedContact]);
+    return [selectedCustomer, ...customerOptions];
+  }, [customerOptions, selectedCustomer]);
 
   const sellerName =
     users.find((u) => String(u.id) === String(headerForm.sellerUserId))?.name ||
@@ -211,13 +287,51 @@ export default function SaleWizardCustomerStep({
 
   const chooseWalkIn = () => {
     setWalkIn(true);
-    setSelectedContact(null);
-    setContactInput("");
-    setHeaderForm((prev) => ({ ...prev, contactId: "" }));
+    setSelectedCustomer(null);
+    setCustomerInput("");
+    setHeaderForm((prev) => ({
+      ...prev,
+      customerId: "",
+      contactId: "",
+    }));
   };
 
   const chooseSearch = () => {
     setWalkIn(false);
+  };
+
+  const handleCreateFromContact = async () => {
+    if (!orphanContact?.id || creatingFromContact) return;
+    setCreatingFromContact(true);
+    try {
+      const { data } = await createInventoryCustomerFromContact(
+        orphanContact.id
+      );
+      toast.success(
+        i18n.t("inventorySales.customers.toasts.createdFromContact")
+      );
+      applyCustomer({
+        id: data.id,
+        name: data.name,
+        number: data.phone || "",
+        phone: data.phone,
+        document: data.document,
+        contactId: data.contactId ?? orphanContact.id,
+        postalCode: data.postalCode,
+        street: data.street,
+        addressNumber: data.addressNumber,
+        addressComplement: data.addressComplement,
+        district: data.district,
+        city: data.city,
+        state: data.state,
+        creditLimit: data.creditLimit,
+        isActive: data.isActive !== false,
+      });
+    } catch (err) {
+      toastError(err);
+    } finally {
+      setCreatingFromContact(false);
+    }
   };
 
   return (
@@ -228,6 +342,29 @@ export default function SaleWizardCustomerStep({
       <Typography variant="body2" color="textSecondary">
         {i18n.t("inventorySales.sales.wizard.customer.subtitle")}
       </Typography>
+
+      {orphanContact ? (
+        <Box className={classes.banner} data-testid="sale-wizard-from-contact">
+          <Typography variant="body2" gutterBottom>
+            {i18n.t("inventorySales.sales.wizard.customer.createFromContactHint")}
+          </Typography>
+          <Typography variant="subtitle2" style={{ fontWeight: 600 }}>
+            {orphanContact.name}
+            {orphanContact.number ? ` · ${orphanContact.number}` : ""}
+          </Typography>
+          <Box mt={1} className={classes.choiceRow}>
+            <AppPrimaryButton
+              onClick={handleCreateFromContact}
+              disabled={disabled || creatingFromContact}
+              data-testid="sale-wizard-create-from-contact"
+            >
+              {creatingFromContact
+                ? i18n.t("inventorySales.common.loading")
+                : i18n.t("inventorySales.sales.wizard.customer.createFromContact")}
+            </AppPrimaryButton>
+          </Box>
+        </Box>
+      ) : null}
 
       <Box className={classes.choiceRow}>
         <AppPrimaryButton onClick={chooseSearch} disabled={disabled}>
@@ -240,10 +377,22 @@ export default function SaleWizardCustomerStep({
         >
           {i18n.t("inventorySales.sales.wizard.customer.walkIn")}
         </AppSecondaryButton>
+        {perms.canManageCustomers ? (
+          <AppSecondaryButton
+            onClick={() => setFormOpen(true)}
+            disabled={disabled}
+            data-testid="sale-wizard-new-customer"
+          >
+            {i18n.t("inventorySales.sales.wizard.customer.newCustomer")}
+          </AppSecondaryButton>
+        ) : null}
       </Box>
 
       {walkIn ? (
-        <Box className={classes.selectedCard} data-testid="sale-wizard-walk-in-selected">
+        <Box
+          className={classes.selectedCard}
+          data-testid="sale-wizard-walk-in-selected"
+        >
           <Typography variant="subtitle1" style={{ fontWeight: 600 }}>
             {i18n.t("inventorySales.sales.wizard.customer.walkInSelected")}
           </Typography>
@@ -259,44 +408,43 @@ export default function SaleWizardCustomerStep({
       ) : (
         <>
           <Autocomplete
-            options={customerOptions}
-            value={selectedContact}
-            inputValue={contactInput}
-            open={contactPopupOpen}
-            onOpen={() => setContactPopupOpen(true)}
+            options={options}
+            value={selectedCustomer}
+            inputValue={customerInput}
+            open={popupOpen}
+            onOpen={() => setPopupOpen(true)}
             onClose={() => {
-              if (contactAbortRef.current) contactAbortRef.current.abort();
-              setContactSearchLoading(false);
-              setContactPopupOpen(false);
+              if (abortRef.current) abortRef.current.abort();
+              setSearchLoading(false);
+              setPopupOpen(false);
             }}
             disabled={disabled}
             onChange={(_, value) => {
-              setSelectedContact(value);
-              setWalkIn(false);
-              setHeaderForm((prev) => ({
-                ...prev,
-                contactId: value?.id != null ? String(value.id) : "",
-              }));
+              applyCustomer(value);
               if (!value) {
-                setContactOptions([]);
-                setContactInput("");
+                setCustomerOptions([]);
+                setCustomerInput("");
               }
             }}
             onInputChange={(_, value, reason) => {
-              setContactInput(value);
+              setCustomerInput(value);
               if (reason === "input" || reason === "clear") {
-                setSelectedContact(null);
+                setSelectedCustomer(null);
                 setWalkIn(false);
-                setHeaderForm((prev) => ({ ...prev, contactId: "" }));
-                setContactPopupOpen(true);
+                setHeaderForm((prev) => ({
+                  ...prev,
+                  customerId: "",
+                  contactId: "",
+                }));
+                setPopupOpen(true);
               }
             }}
-            loading={contactSearchLoading}
+            loading={searchLoading}
             filterOptions={(opts) => opts}
             getOptionSelected={(option, value) => option.id === value.id}
             getOptionLabel={(option) => option?.name || ""}
             noOptionsText={
-              contactSearchError
+              searchError
                 ? i18n.t("inventorySales.sales.customerSearch.error")
                 : i18n.t("inventorySales.sales.customerSearch.empty")
             }
@@ -304,18 +452,27 @@ export default function SaleWizardCustomerStep({
             renderOption={(option) => (
               <Box minWidth={0}>
                 <Typography variant="body2">{option.name}</Typography>
-                {option.number ? (
-                  <Typography variant="caption" color="textSecondary" display="block">
-                    {option.number}
-                  </Typography>
-                ) : null}
+                <Typography
+                  variant="caption"
+                  color="textSecondary"
+                  display="block"
+                >
+                  {[option.document, option.phone || option.number]
+                    .filter(Boolean)
+                    .join(" · ")}
+                  {option.creditAvailable != null
+                    ? ` · ${formatCurrencyBRL(option.creditAvailable)}`
+                    : ""}
+                </Typography>
               </Box>
             )}
             renderInput={(params) => (
               <TextField
                 {...params}
                 label={i18n.t("inventorySales.sales.fields.contact")}
-                placeholder={i18n.t("inventorySales.sales.customerSearch.placeholder")}
+                placeholder={i18n.t(
+                  "inventorySales.sales.customerSearch.placeholder"
+                )}
                 variant="outlined"
                 size="small"
                 inputProps={{
@@ -326,7 +483,7 @@ export default function SaleWizardCustomerStep({
                   ...params.InputProps,
                   endAdornment: (
                     <>
-                      {contactSearchLoading ? (
+                      {searchLoading ? (
                         <CircularProgress color="inherit" size={18} />
                       ) : null}
                       {params.InputProps.endAdornment}
@@ -336,14 +493,31 @@ export default function SaleWizardCustomerStep({
               />
             )}
           />
-          {selectedContact ? (
-            <Box className={classes.selectedCard} data-testid="sale-wizard-customer-selected">
+          {selectedCustomer ? (
+            <Box
+              className={classes.selectedCard}
+              data-testid="sale-wizard-customer-selected"
+            >
               <Typography variant="subtitle1" style={{ fontWeight: 600 }}>
-                {selectedContact.name}
+                {selectedCustomer.name}
               </Typography>
-              {selectedContact.number ? (
+              {selectedCustomer.document ||
+              selectedCustomer.phone ||
+              selectedCustomer.number ? (
                 <Typography variant="body2" color="textSecondary">
-                  {selectedContact.number}
+                  {[
+                    selectedCustomer.document,
+                    selectedCustomer.phone || selectedCustomer.number,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </Typography>
+              ) : null}
+              {selectedCustomer.creditAvailable != null ? (
+                <Typography variant="body2" color="textSecondary">
+                  {i18n.t("inventorySales.sales.wizard.customer.selectedCredit", {
+                    amount: formatCurrencyBRL(selectedCustomer.creditAvailable),
+                  })}
                 </Typography>
               ) : null}
             </Box>
@@ -370,7 +544,12 @@ export default function SaleWizardCustomerStep({
             </AppSecondaryButton>
           </Box>
         ) : (
-          <FormControl variant="outlined" size="small" fullWidth disabled={disabled}>
+          <FormControl
+            variant="outlined"
+            size="small"
+            fullWidth
+            disabled={disabled}
+          >
             <InputLabel id="wizard-seller-label">
               {i18n.t("inventorySales.sales.fields.seller")}
             </InputLabel>
@@ -411,8 +590,39 @@ export default function SaleWizardCustomerStep({
         disabled={disabled}
         inputProps={{ "data-testid": "sale-wizard-notes" }}
       />
+
+      <InventoryCustomerFormDialog
+        open={formOpen}
+        onClose={() => setFormOpen(false)}
+        canManageCustomerCredit={perms.canManageCustomerCredit}
+        onSaved={(created) => {
+          applyCustomer({
+            id: created.id,
+            name: created.name,
+            number: created.phone || "",
+            phone: created.phone,
+            document: created.document,
+            contactId: created.contactId,
+            postalCode: created.postalCode,
+            street: created.street,
+            addressNumber: created.addressNumber,
+            addressComplement: created.addressComplement,
+            district: created.district,
+            city: created.city,
+            state: created.state,
+            creditLimit: created.creditLimit,
+            creditAvailable: created.creditLimit,
+            isActive: created.isActive !== false,
+          });
+          setWalkIn(false);
+        }}
+      />
     </Box>
   );
 }
 
-export { contactOptionFromSale };
+export {
+  contactOptionFromSale,
+  customerOptionFromSale,
+  deliverySourceFromCustomer,
+};

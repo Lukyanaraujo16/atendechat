@@ -4,8 +4,10 @@ export const INVENTORY_TABS = {
   CATEGORIES: 2,
   STOCK: 3,
   SALES: 4,
-  REPORTS: 5,
-  SETTINGS: 6,
+  CUSTOMERS: 5,
+  RECEIVABLES: 6,
+  REPORTS: 7,
+  SETTINGS: 8,
 };
 
 export const STOCK_MOVEMENT_TYPES = ["in", "out", "adjustment", "initial"];
@@ -28,5 +30,30 @@ export const PAYMENT_METHODS = [
   "debit_card",
   "bank_transfer",
   "boleto",
+  "store_credit",
   "other",
 ];
+
+/** Métodos de baixa de contas a receber — sem Crédito da Loja. */
+export const RECEIVABLE_COLLECTION_METHODS = PAYMENT_METHODS.filter(
+  (method) => method !== "store_credit"
+);
+
+export const STORE_CREDIT_FREQUENCIES = [
+  "once",
+  "weekly",
+  "biweekly",
+  "monthly",
+];
+
+export const RECEIVABLE_STATUSES = [
+  "open",
+  "partial",
+  "paid",
+  "overdue",
+  "cancelled",
+];
+
+export const RECEIVABLE_BUCKETS = ["open", "overdue", "today", "next7"];
+
+export const CUSTOMER_TYPES = ["individual", "company"];

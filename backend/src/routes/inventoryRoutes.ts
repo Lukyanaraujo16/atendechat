@@ -5,11 +5,19 @@ import requireInventorySalesPermission from "../middleware/requireInventorySales
 import {
   INVENTORY_SALES_CANCEL_SALE,
   INVENTORY_SALES_CREATE_SALE,
+  INVENTORY_SALES_MANAGE_CUSTOMERS,
+  INVENTORY_SALES_MANAGE_CUSTOMER_CREDIT,
   INVENTORY_SALES_MANAGE_PAYMENTS,
   INVENTORY_SALES_MANAGE_PRODUCTS,
   INVENTORY_SALES_MANAGE_SETTINGS,
   INVENTORY_SALES_MANAGE_STOCK,
+  INVENTORY_SALES_RECEIVE_RECEIVABLES,
+  INVENTORY_SALES_REVERSE_RECEIVABLE_PAYMENTS,
+  INVENTORY_SALES_USE_STORE_CREDIT,
   INVENTORY_SALES_VIEW,
+  INVENTORY_SALES_VIEW_CUSTOMERS,
+  INVENTORY_SALES_VIEW_CUSTOMER_FINANCIALS,
+  INVENTORY_SALES_VIEW_RECEIVABLES,
   INVENTORY_SALES_VIEW_REPORTS,
   InventorySalesGranularKey,
 } from "../config/inventorySalesPermissions";
@@ -18,6 +26,8 @@ import * as InventorySaleController from "../controllers/InventorySaleController
 import * as InventorySellerProfileController from "../controllers/InventorySellerProfileController";
 import * as InventoryReportController from "../controllers/InventoryReportController";
 import * as InventoryDeliveryMethodController from "../controllers/InventoryDeliveryMethodController";
+import * as InventoryCustomerController from "../controllers/InventoryCustomerController";
+import * as InventoryReceivableController from "../controllers/InventoryReceivableController";
 
 const inventoryRoutes = express.Router();
 
@@ -177,12 +187,141 @@ inventoryRoutes.get(
   requireInventorySalesPermission(INVENTORY_SALES_VIEW_REPORTS),
   InventoryReportController.getReportCustomers
 );
+inventoryRoutes.get(
+  "/inventory/reports/receivables",
+  isAuth,
+  requireInventorySalesPermission(INVENTORY_SALES_VIEW_REPORTS),
+  InventoryReportController.getReportReceivables
+);
+inventoryRoutes.get(
+  "/inventory/reports/store-credit",
+  isAuth,
+  requireInventorySalesPermission(INVENTORY_SALES_VIEW_REPORTS),
+  InventoryReportController.getReportStoreCredit
+);
 
 inventoryRoutes.get(
   "/inventory/customers/search",
   isAuth,
-  requireInventorySalesPermission(INVENTORY_SALES_VIEW),
+  requireInventorySalesPermission(
+    INVENTORY_SALES_VIEW,
+    INVENTORY_SALES_VIEW_CUSTOMERS,
+    INVENTORY_SALES_CREATE_SALE
+  ),
   InventorySaleController.searchCustomers
+);
+inventoryRoutes.get(
+  "/inventory/contacts/search",
+  isAuth,
+  requireInventorySalesPermission(
+    INVENTORY_SALES_VIEW,
+    INVENTORY_SALES_VIEW_CUSTOMERS,
+    INVENTORY_SALES_MANAGE_CUSTOMERS,
+    INVENTORY_SALES_CREATE_SALE
+  ),
+  InventorySaleController.searchContacts
+);
+
+inventoryRoutes.get(
+  "/inventory/customers",
+  isAuth,
+  requireInventorySalesPermission(INVENTORY_SALES_VIEW_CUSTOMERS),
+  InventoryCustomerController.listCustomers
+);
+inventoryRoutes.post(
+  "/inventory/customers",
+  isAuth,
+  requireInventorySalesPermission(INVENTORY_SALES_MANAGE_CUSTOMERS),
+  InventoryCustomerController.createCustomer
+);
+inventoryRoutes.post(
+  "/inventory/customers/from-contact/:contactId",
+  isAuth,
+  requireInventorySalesPermission(INVENTORY_SALES_MANAGE_CUSTOMERS),
+  InventoryCustomerController.createCustomerFromContact
+);
+inventoryRoutes.get(
+  "/inventory/customers/:id",
+  isAuth,
+  requireInventorySalesPermission(INVENTORY_SALES_VIEW_CUSTOMERS),
+  InventoryCustomerController.getCustomer
+);
+inventoryRoutes.put(
+  "/inventory/customers/:id",
+  isAuth,
+  requireInventorySalesPermission(INVENTORY_SALES_MANAGE_CUSTOMERS),
+  InventoryCustomerController.updateCustomer
+);
+inventoryRoutes.post(
+  "/inventory/customers/:id/activate",
+  isAuth,
+  requireInventorySalesPermission(INVENTORY_SALES_MANAGE_CUSTOMERS),
+  InventoryCustomerController.activateCustomer
+);
+inventoryRoutes.post(
+  "/inventory/customers/:id/deactivate",
+  isAuth,
+  requireInventorySalesPermission(INVENTORY_SALES_MANAGE_CUSTOMERS),
+  InventoryCustomerController.deactivateCustomer
+);
+inventoryRoutes.get(
+  "/inventory/customers/:id/credit",
+  isAuth,
+  requireInventorySalesPermission(
+    INVENTORY_SALES_VIEW_CUSTOMER_FINANCIALS,
+    INVENTORY_SALES_MANAGE_CUSTOMER_CREDIT,
+    INVENTORY_SALES_USE_STORE_CREDIT
+  ),
+  InventoryCustomerController.getCustomerCredit
+);
+inventoryRoutes.get(
+  "/inventory/customers/:id/account",
+  isAuth,
+  requireInventorySalesPermission(
+    INVENTORY_SALES_VIEW_CUSTOMER_FINANCIALS,
+    INVENTORY_SALES_MANAGE_CUSTOMER_CREDIT
+  ),
+  InventoryCustomerController.getCustomerAccount
+);
+inventoryRoutes.post(
+  "/inventory/store-credit/preview",
+  isAuth,
+  requireInventorySalesPermission(
+    INVENTORY_SALES_USE_STORE_CREDIT,
+    INVENTORY_SALES_CREATE_SALE
+  ),
+  InventoryCustomerController.previewStoreCreditSchedule
+);
+
+inventoryRoutes.get(
+  "/inventory/receivables/summary",
+  isAuth,
+  requireInventorySalesPermission(INVENTORY_SALES_VIEW_RECEIVABLES),
+  InventoryReceivableController.getReceivableSummary
+);
+inventoryRoutes.get(
+  "/inventory/receivables",
+  isAuth,
+  requireInventorySalesPermission(INVENTORY_SALES_VIEW_RECEIVABLES),
+  InventoryReceivableController.listReceivables
+);
+inventoryRoutes.get(
+  "/inventory/receivables/:id",
+  isAuth,
+  requireInventorySalesPermission(INVENTORY_SALES_VIEW_RECEIVABLES),
+  InventoryReceivableController.getReceivable
+);
+inventoryRoutes.post(
+  "/inventory/receivables/:id/payments",
+  isAuth,
+  requireInventorySalesPermission(INVENTORY_SALES_RECEIVE_RECEIVABLES),
+  InventoryReceivableController.createReceivablePayment
+);
+inventoryRoutes.post(
+  "/inventory/receivable-payments/:paymentId/reverse",
+  isAuth,
+  requireInventorySalesPermission(INVENTORY_SALES_REVERSE_RECEIVABLE_PAYMENTS),
+  InventoryReceivableController.reverseReceivablePayment
 );
 inventoryRoutes.get(
   "/inventory/sales",

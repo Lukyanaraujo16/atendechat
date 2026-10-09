@@ -62,6 +62,60 @@ export const listInventorySales = (params) =>
 export const searchInventoryCustomers = (params, config = {}) =>
   api.get("/inventory/customers/search", { ...config, params });
 
+export const searchInventoryContacts = (params, config = {}) =>
+  api.get("/inventory/contacts/search", { ...config, params });
+
+export const listInventoryCustomers = (params) =>
+  api.get("/inventory/customers", { params });
+
+export const createInventoryCustomer = (body) =>
+  api.post("/inventory/customers", body);
+
+export const getInventoryCustomer = (id) =>
+  api.get(`/inventory/customers/${id}`);
+
+export const updateInventoryCustomer = (id, body) =>
+  api.put(`/inventory/customers/${id}`, body);
+
+export const activateInventoryCustomer = (id) =>
+  api.post(`/inventory/customers/${id}/activate`);
+
+export const deactivateInventoryCustomer = (id) =>
+  api.post(`/inventory/customers/${id}/deactivate`);
+
+export const getInventoryCustomerCredit = (id) =>
+  api.get(`/inventory/customers/${id}/credit`);
+
+export const getInventoryCustomerAccount = (id) =>
+  api.get(`/inventory/customers/${id}/account`);
+
+export const createInventoryCustomerFromContact = (contactId, body = {}) =>
+  api.post(`/inventory/customers/from-contact/${contactId}`, body);
+
+export const previewInventoryStoreCreditSchedule = (body) =>
+  api.post("/inventory/store-credit/preview", body);
+
+export const getInventoryReceivablesSummary = (params) =>
+  api.get("/inventory/receivables/summary", { params });
+
+export const listInventoryReceivables = (params) =>
+  api.get("/inventory/receivables", { params });
+
+export const getInventoryReceivable = (id) =>
+  api.get(`/inventory/receivables/${id}`);
+
+export const createInventoryReceivablePayment = (receivableId, body) =>
+  api.post(`/inventory/receivables/${receivableId}/payments`, body);
+
+export const reverseInventoryReceivablePayment = (paymentId, body) =>
+  api.post(`/inventory/receivable-payments/${paymentId}/reverse`, body || {});
+
+export const getInventoryReportReceivables = (params) =>
+  api.get("/inventory/reports/receivables", { params });
+
+export const getInventoryReportStoreCredit = (params) =>
+  api.get("/inventory/reports/store-credit", { params });
+
 export const createInventorySale = (body) =>
   api.post("/inventory/sales", body);
 

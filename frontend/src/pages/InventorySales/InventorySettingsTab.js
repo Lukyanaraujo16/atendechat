@@ -76,6 +76,7 @@ export default function InventorySettingsTab() {
   const [form, setForm] = useState({
     defaultCommissionRate: "0",
     allowNegativeStock: false,
+    blockStoreCreditWhenOverdue: true,
     saleNumberPrefix: "",
     receiptTradeName: "",
     receiptLegalName: "",
@@ -97,6 +98,7 @@ export default function InventorySettingsTab() {
             ? String(data.defaultCommissionRate)
             : "0",
         allowNegativeStock: data.allowNegativeStock === true,
+        blockStoreCreditWhenOverdue: data.blockStoreCreditWhenOverdue !== false,
         saleNumberPrefix: data.saleNumberPrefix || "",
         receiptTradeName: data.receiptTradeName || "",
         receiptLegalName: data.receiptLegalName || "",
@@ -143,6 +145,7 @@ export default function InventorySettingsTab() {
       await updateInventorySettings({
         defaultCommissionRate: rate,
         allowNegativeStock: form.allowNegativeStock,
+        blockStoreCreditWhenOverdue: form.blockStoreCreditWhenOverdue,
         saleNumberPrefix: form.saleNumberPrefix.trim() || null,
         receiptTradeName: form.receiptTradeName.trim() || null,
         receiptLegalName: form.receiptLegalName.trim() || null,
@@ -259,6 +262,24 @@ export default function InventorySettingsTab() {
                     }
                     label={i18n.t("inventorySales.settings.fields.allowNegativeStock")}
                   />
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={form.blockStoreCreditWhenOverdue}
+                        onChange={setField("blockStoreCreditWhenOverdue")}
+                        color="primary"
+                        data-testid="settings-block-store-credit-overdue"
+                      />
+                    }
+                    label={i18n.t(
+                      "inventorySales.settings.fields.blockStoreCreditWhenOverdue"
+                    )}
+                  />
+                  <Typography variant="caption" color="textSecondary">
+                    {i18n.t(
+                      "inventorySales.settings.hints.blockStoreCreditWhenOverdue"
+                    )}
+                  </Typography>
                 </Box>
               </AppSectionCard>
               <InventoryDeliveryMethodsSection />

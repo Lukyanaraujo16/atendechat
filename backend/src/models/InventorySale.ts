@@ -22,6 +22,7 @@ import InventorySaleItem from "./InventorySaleItem";
 import InventoryDeliveryMethod from "./InventoryDeliveryMethod";
 import InventorySaleDelivery from "./InventorySaleDelivery";
 import InventorySalePayment from "./InventorySalePayment";
+import InventoryCustomer from "./InventoryCustomer";
 
 export type InventorySaleStatus = "draft" | "completed" | "cancelled";
 export type InventorySaleSource = "manual" | "ticket" | "whatsapp";
@@ -33,7 +34,8 @@ export type InventoryPaymentMethod =
   | "debit_card"
   | "bank_transfer"
   | "boleto"
-  | "other";
+  | "other"
+  | "store_credit";
 
 @Table({
   tableName: "InventorySales",
@@ -58,6 +60,10 @@ export type InventoryPaymentMethod =
     {
       name: "InventorySales_companyId_ticketId_idx",
       fields: ["companyId", "ticketId"]
+    },
+    {
+      name: "InventorySales_companyId_customerId_completedAt_idx",
+      fields: ["companyId", "customerId", "completedAt"]
     }
   ]
 })
@@ -92,6 +98,14 @@ class InventorySale extends Model<InventorySale> {
 
   @BelongsTo(() => Contact)
   contact: Contact;
+
+  @AllowNull
+  @ForeignKey(() => InventoryCustomer)
+  @Column
+  customerId: number | null;
+
+  @BelongsTo(() => InventoryCustomer)
+  customer: InventoryCustomer;
 
   @AllowNull
   @ForeignKey(() => Ticket)

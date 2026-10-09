@@ -15,6 +15,7 @@ type UpdateBody = {
   receiptAddress?: unknown;
   receiptFooterMessage?: unknown;
   receiptPrintFormat?: unknown;
+  blockStoreCreditWhenOverdue?: unknown;
 };
 
 const RECEIPT_TEXT_FIELDS: Array<{
@@ -81,6 +82,14 @@ export default async function UpdateInventorySettingsService(input: {
       input.body.allowNegativeStock === "true" ||
       input.body.allowNegativeStock === 1 ||
       input.body.allowNegativeStock === "1";
+  }
+
+  if (input.body.blockStoreCreditWhenOverdue !== undefined) {
+    patch.blockStoreCreditWhenOverdue =
+      input.body.blockStoreCreditWhenOverdue === true ||
+      input.body.blockStoreCreditWhenOverdue === "true" ||
+      input.body.blockStoreCreditWhenOverdue === 1 ||
+      input.body.blockStoreCreditWhenOverdue === "1";
   }
 
   if (input.body.saleNumberPrefix !== undefined) {

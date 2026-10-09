@@ -88,6 +88,11 @@ import InventorySaleItemIdentifier from "../models/InventorySaleItemIdentifier";
 import InventoryDeliveryMethod from "../models/InventoryDeliveryMethod";
 import InventorySaleDelivery from "../models/InventorySaleDelivery";
 import InventorySalePayment from "../models/InventorySalePayment";
+import InventoryCustomer from "../models/InventoryCustomer";
+import InventoryReceivable from "../models/InventoryReceivable";
+import InventoryReceivableInstallment from "../models/InventoryReceivableInstallment";
+import InventoryReceivablePayment from "../models/InventoryReceivablePayment";
+import InventoryStoreCreditOverride from "../models/InventoryStoreCreditOverride";
 import AiAgent from "../models/AiAgent";
 import AiAgentProfile from "../models/AiAgentProfile";
 import AiAgentRuntimeLog from "../models/AiAgentRuntimeLog";
@@ -237,6 +242,11 @@ const models = [
   InventoryDeliveryMethod,
   InventorySaleDelivery,
   InventorySalePayment,
+  InventoryCustomer,
+  InventoryReceivable,
+  InventoryReceivableInstallment,
+  InventoryReceivablePayment,
+  InventoryStoreCreditOverride,
   AiAgent,
   AiAgentProfile,
   AiAgentRuntimeLog,

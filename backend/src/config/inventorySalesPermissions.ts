@@ -9,6 +9,20 @@ export const INVENTORY_SALES_CANCEL_SALE = "inventory.sales.cancelSale";
 export const INVENTORY_SALES_MANAGE_PAYMENTS = "inventory.sales.managePayments";
 export const INVENTORY_SALES_VIEW_REPORTS = "inventory.sales.viewReports";
 export const INVENTORY_SALES_MANAGE_SETTINGS = "inventory.sales.manageSettings";
+export const INVENTORY_SALES_VIEW_CUSTOMERS = "inventory.sales.viewCustomers";
+export const INVENTORY_SALES_MANAGE_CUSTOMERS = "inventory.sales.manageCustomers";
+export const INVENTORY_SALES_VIEW_CUSTOMER_FINANCIALS =
+  "inventory.sales.viewCustomerFinancials";
+export const INVENTORY_SALES_MANAGE_CUSTOMER_CREDIT =
+  "inventory.sales.manageCustomerCredit";
+export const INVENTORY_SALES_USE_STORE_CREDIT = "inventory.sales.useStoreCredit";
+export const INVENTORY_SALES_AUTHORIZE_STORE_CREDIT_OVERRIDE =
+  "inventory.sales.authorizeStoreCreditOverride";
+export const INVENTORY_SALES_VIEW_RECEIVABLES = "inventory.sales.viewReceivables";
+export const INVENTORY_SALES_RECEIVE_RECEIVABLES =
+  "inventory.sales.receiveReceivables";
+export const INVENTORY_SALES_REVERSE_RECEIVABLE_PAYMENTS =
+  "inventory.sales.reverseReceivablePayments";
 
 export const INVENTORY_SALES_GRANULAR_KEYS = [
   INVENTORY_SALES_VIEW,
@@ -18,7 +32,16 @@ export const INVENTORY_SALES_GRANULAR_KEYS = [
   INVENTORY_SALES_CANCEL_SALE,
   INVENTORY_SALES_MANAGE_PAYMENTS,
   INVENTORY_SALES_VIEW_REPORTS,
-  INVENTORY_SALES_MANAGE_SETTINGS
+  INVENTORY_SALES_MANAGE_SETTINGS,
+  INVENTORY_SALES_VIEW_CUSTOMERS,
+  INVENTORY_SALES_MANAGE_CUSTOMERS,
+  INVENTORY_SALES_VIEW_CUSTOMER_FINANCIALS,
+  INVENTORY_SALES_MANAGE_CUSTOMER_CREDIT,
+  INVENTORY_SALES_USE_STORE_CREDIT,
+  INVENTORY_SALES_AUTHORIZE_STORE_CREDIT_OVERRIDE,
+  INVENTORY_SALES_VIEW_RECEIVABLES,
+  INVENTORY_SALES_RECEIVE_RECEIVABLES,
+  INVENTORY_SALES_REVERSE_RECEIVABLE_PAYMENTS
 ] as const;
 
 export type InventorySalesGranularKey =

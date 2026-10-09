@@ -3,13 +3,22 @@ import { useContext, useMemo } from "react";
 import { AuthContext } from "../context/Auth/AuthContext";
 import usePlanFlags from "../hooks/usePlanFlags";
 import {
+  INVENTORY_SALES_AUTHORIZE_STORE_CREDIT_OVERRIDE,
   INVENTORY_SALES_CANCEL_SALE,
   INVENTORY_SALES_CREATE_SALE,
+  INVENTORY_SALES_MANAGE_CUSTOMER_CREDIT,
+  INVENTORY_SALES_MANAGE_CUSTOMERS,
   INVENTORY_SALES_MANAGE_PAYMENTS,
   INVENTORY_SALES_MANAGE_PRODUCTS,
   INVENTORY_SALES_MANAGE_SETTINGS,
   INVENTORY_SALES_MANAGE_STOCK,
+  INVENTORY_SALES_RECEIVE_RECEIVABLES,
+  INVENTORY_SALES_REVERSE_RECEIVABLE_PAYMENTS,
+  INVENTORY_SALES_USE_STORE_CREDIT,
   INVENTORY_SALES_VIEW,
+  INVENTORY_SALES_VIEW_CUSTOMER_FINANCIALS,
+  INVENTORY_SALES_VIEW_CUSTOMERS,
+  INVENTORY_SALES_VIEW_RECEIVABLES,
   INVENTORY_SALES_VIEW_REPORTS,
   planHasInventoryModule,
 } from "../config/inventorySalesPermissions";
@@ -78,6 +87,78 @@ export function canManageInventorySettings(planFlags, user) {
   );
 }
 
+export function canViewInventoryCustomers(planFlags, user) {
+  return hasInventoryPermission(
+    planFlags,
+    user,
+    INVENTORY_SALES_VIEW_CUSTOMERS
+  );
+}
+
+export function canManageInventoryCustomers(planFlags, user) {
+  return hasInventoryPermission(
+    planFlags,
+    user,
+    INVENTORY_SALES_MANAGE_CUSTOMERS
+  );
+}
+
+export function canViewInventoryCustomerFinancials(planFlags, user) {
+  return hasInventoryPermission(
+    planFlags,
+    user,
+    INVENTORY_SALES_VIEW_CUSTOMER_FINANCIALS
+  );
+}
+
+export function canManageInventoryCustomerCredit(planFlags, user) {
+  return hasInventoryPermission(
+    planFlags,
+    user,
+    INVENTORY_SALES_MANAGE_CUSTOMER_CREDIT
+  );
+}
+
+export function canUseInventoryStoreCredit(planFlags, user) {
+  return hasInventoryPermission(
+    planFlags,
+    user,
+    INVENTORY_SALES_USE_STORE_CREDIT
+  );
+}
+
+export function canAuthorizeInventoryStoreCreditOverride(planFlags, user) {
+  return hasInventoryPermission(
+    planFlags,
+    user,
+    INVENTORY_SALES_AUTHORIZE_STORE_CREDIT_OVERRIDE
+  );
+}
+
+export function canViewInventoryReceivables(planFlags, user) {
+  return hasInventoryPermission(
+    planFlags,
+    user,
+    INVENTORY_SALES_VIEW_RECEIVABLES
+  );
+}
+
+export function canReceiveInventoryReceivables(planFlags, user) {
+  return hasInventoryPermission(
+    planFlags,
+    user,
+    INVENTORY_SALES_RECEIVE_RECEIVABLES
+  );
+}
+
+export function canReverseInventoryReceivablePayments(planFlags, user) {
+  return hasInventoryPermission(
+    planFlags,
+    user,
+    INVENTORY_SALES_REVERSE_RECEIVABLE_PAYMENTS
+  );
+}
+
 export { planHasInventoryModule };
 
 export function useInventoryPermissions() {
@@ -95,6 +176,25 @@ export function useInventoryPermissions() {
       canManagePayments: canManageInventoryPayments(planFlags, user),
       canViewReports: canViewInventoryReports(planFlags, user),
       canManageSettings: canManageInventorySettings(planFlags, user),
+      canViewCustomers: canViewInventoryCustomers(planFlags, user),
+      canManageCustomers: canManageInventoryCustomers(planFlags, user),
+      canViewCustomerFinancials: canViewInventoryCustomerFinancials(
+        planFlags,
+        user
+      ),
+      canManageCustomerCredit: canManageInventoryCustomerCredit(
+        planFlags,
+        user
+      ),
+      canUseStoreCredit: canUseInventoryStoreCredit(planFlags, user),
+      canAuthorizeStoreCreditOverride:
+        canAuthorizeInventoryStoreCreditOverride(planFlags, user),
+      canViewReceivables: canViewInventoryReceivables(planFlags, user),
+      canReceiveReceivables: canReceiveInventoryReceivables(planFlags, user),
+      canReverseReceivablePayments: canReverseInventoryReceivablePayments(
+        planFlags,
+        user
+      ),
     }),
     [planFlags, user]
   );

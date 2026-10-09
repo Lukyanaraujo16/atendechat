@@ -66,6 +66,7 @@ export function defaultPaymentStatusForMethod(method) {
   ) {
     return "paid";
   }
+  // store_credit, boleto, other → pendente até liquidação / geração de recebível
   return "pending";
 }
 

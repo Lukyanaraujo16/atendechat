@@ -7,6 +7,7 @@ import InventoryProduct from "../../models/InventoryProduct";
 import InventoryStockMovement from "../../models/InventoryStockMovement";
 import { buildInventorySaleIncludes } from "./inventorySaleHelpers";
 import { normalizeOptionalString, toInventoryQuantity } from "./inventoryTenant";
+import CancelInventoryReceivableForSaleService from "./CancelInventoryReceivableForSaleService";
 
 export default async function CancelInventorySaleService(input: {
   companyId: number;
@@ -105,6 +106,14 @@ export default async function CancelInventorySaleService(input: {
         400,
         "Status da venda não permite cancelamento."
       );
+    }
+
+    if (sale.status === "completed") {
+      await CancelInventoryReceivableForSaleService({
+        companyId: input.companyId,
+        saleId: sale.id,
+        transaction: t
+      });
     }
 
     await sale.update(

@@ -84,6 +84,24 @@ function assertMutableSale(sale: InventorySale): void {
   }
 }
 
+/**
+ * store_credit só pode existir em draft — receivable nasce no complete.
+ * Pós-venda: Contas a Receber; nunca payment line órfã.
+ */
+function assertStoreCreditAllowedOnSale(
+  sale: InventorySale,
+  method: string
+): void {
+  if (method !== "store_credit") return;
+  if (sale.status !== "draft") {
+    throw new AppError(
+      "ERR_INVENTORY_STORE_CREDIT_AFTER_COMPLETE",
+      400,
+      "Crédito da Loja só pode ser definido antes de concluir a venda. Após a conclusão, use Contas a Receber."
+    );
+  }
+}
+
 function parseLineStatus(raw: unknown): "pending" | "paid" {
   const status = String(raw ?? "").trim();
   if (status !== "pending" && status !== "paid") {
@@ -205,9 +223,12 @@ export async function addInventorySalePayment(input: {
     const { method, cardInstallmentCount } = resolveMethodAndInstallments(
       input.body
     );
+    assertStoreCreditAllowedOnSale(sale, method);
     const amount = parsePositiveAmount(input.body.amount);
     let status = parseLineStatus(input.body.status ?? "paid");
     if (method === "credit_card") status = "paid";
+    // Crédito da Loja representa valor financiado — permanece pending até gerar recebível.
+    if (method === "store_credit") status = "pending";
     assertCreditCardPaid(method, status);
 
     const notes =
@@ -283,6 +304,13 @@ export async function updatePendingInventorySalePayment(input: {
         "Pagamento já recebido não pode ser alterado."
       );
     }
+    if (payment.method === "store_credit" && sale.status !== "draft") {
+      throw new AppError(
+        "ERR_INVENTORY_STORE_CREDIT_AFTER_COMPLETE",
+        400,
+        "Crédito da Loja desta venda não pode ser editado pelo fluxo de pagamentos. Use Contas a Receber."
+      );
+    }
 
     const methodProvided = input.body.method !== undefined;
     const amountProvided = input.body.amount !== undefined;
@@ -304,6 +332,7 @@ export async function updatePendingInventorySalePayment(input: {
       }
       method = parsed;
     }
+    assertStoreCreditAllowedOnSale(sale, method);
 
     const amount = amountProvided
       ? parsePositiveAmount(input.body.amount)
@@ -323,6 +352,13 @@ export async function updatePendingInventorySalePayment(input: {
         "ERR_VALIDATION_ERROR",
         400,
         "Cartão de crédito deve ser registrado como pagamento recebido."
+      );
+    }
+    if (method === "store_credit" && payment.status !== "pending") {
+      throw new AppError(
+        "ERR_VALIDATION_ERROR",
+        400,
+        "Crédito da Loja deve permanecer pendente até a geração do recebível."
       );
     }
 
@@ -389,6 +425,13 @@ export async function deletePendingInventorySalePayment(input: {
         "Pagamento já recebido não pode ser excluído."
       );
     }
+    if (payment.method === "store_credit" && sale.status !== "draft") {
+      throw new AppError(
+        "ERR_INVENTORY_STORE_CREDIT_AFTER_COMPLETE",
+        400,
+        "Crédito da Loja desta venda não pode ser removido pelo fluxo de pagamentos. Use Contas a Receber."
+      );
+    }
 
     await payment.destroy({ transaction: t });
     const payments = await listSalePayments(sale.companyId, sale.id, t);
@@ -430,6 +473,13 @@ export async function settleInventorySalePayment(input: {
         "ERR_INVENTORY_SALE_PAYMENT_IMMUTABLE",
         400,
         "Somente pagamento pendente pode ser marcado como recebido."
+      );
+    }
+    if (payment.method === "store_credit") {
+      throw new AppError(
+        "ERR_INVENTORY_STORE_CREDIT_NOT_CASH",
+        400,
+        "Crédito da Loja não pode ser liquidado como pagamento à vista. Use Contas a Receber."
       );
     }
 

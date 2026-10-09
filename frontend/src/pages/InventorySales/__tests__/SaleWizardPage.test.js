@@ -59,6 +59,10 @@ const mockPerms = {
   canCreateSale: true,
   canManagePayments: true,
   canCancelSale: true,
+  canManageCustomers: true,
+  canManageCustomerCredit: true,
+  canUseStoreCredit: true,
+  canAuthorizeStoreCreditOverride: true,
 };
 
 jest.mock("../../../utils/inventoryAccess", () => ({
@@ -77,6 +81,21 @@ jest.mock("../../../services/inventoryApi", () => ({
   completeInventorySale: (...a) => mockComplete(...a),
   deleteInventorySale: (...a) => mockDelete(...a),
   searchInventoryCustomers: jest.fn().mockResolvedValue({ data: { customers: [] } }),
+  searchInventoryContacts: jest.fn().mockResolvedValue({ data: { contacts: [] } }),
+  getInventoryCustomerCredit: jest.fn().mockResolvedValue({
+    data: {
+      creditLimit: 1000,
+      creditUsed: 0,
+      creditAvailable: 1000,
+      openAmount: 0,
+      overdueOpenAmount: 0,
+    },
+  }),
+  previewInventoryStoreCreditSchedule: jest.fn().mockResolvedValue({
+    data: { installments: [], total: 0 },
+  }),
+  createInventoryCustomer: jest.fn(),
+  createInventoryCustomerFromContact: jest.fn(),
   listInventoryProducts: jest.fn().mockResolvedValue({ data: [] }),
   listInventoryDeliveryMethods: jest.fn().mockResolvedValue({
     data: [

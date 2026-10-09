@@ -1,9 +1,10 @@
-import { Transaction } from "sequelize";
+import { Op, Transaction } from "sequelize";
 import sequelize from "../../database";
 import AppError from "../../errors/AppError";
 import InventoryDeliveryMethod from "../../models/InventoryDeliveryMethod";
 import InventorySale from "../../models/InventorySale";
 import InventorySaleDelivery from "../../models/InventorySaleDelivery";
+import InventoryReceivable from "../../models/InventoryReceivable";
 import {
   assertAddressRequiredWhenNeeded,
   normalizeSaleDeliveryAddress,
@@ -203,6 +204,27 @@ export default async function UpdateInventorySaleDeliveryService(input: {
       extractAddressInput(input.body)
     );
     assertAddressRequiredWhenNeeded(method.requiresAddress, address);
+
+    const previousFreight = roundMoney(toMoney(sale.freightAmount));
+    const freightChanged = freightAmount !== previousFreight;
+
+    if (sale.status === "completed" && freightChanged) {
+      const activeReceivable = await InventoryReceivable.count({
+        where: {
+          companyId: input.companyId,
+          saleId: sale.id,
+          status: { [Op.in]: ["open", "partial", "paid"] }
+        },
+        transaction: t
+      });
+      if (activeReceivable > 0) {
+        throw new AppError(
+          "ERR_INVENTORY_SALE_FREIGHT_LOCKED_BY_RECEIVABLE",
+          400,
+          "Esta venda possui Crédito da Loja / Contas a Receber. Não é possível alterar o frete nem o total. Ajuste apenas endereço ou dados de entrega sem mudar o valor."
+        );
+      }
+    }
 
     // commissionAmount / commissionRate intocados — frete não entra na base.
     await sale.update(

@@ -13,6 +13,8 @@ import InventoryProductsTab from "./InventoryProductsTab";
 import InventoryCategoriesTab from "./InventoryCategoriesTab";
 import InventoryStockTab from "./InventoryStockTab";
 import InventorySalesTab from "./InventorySalesTab";
+import InventoryCustomersTab from "./InventoryCustomersTab";
+import InventoryReceivablesTab from "./InventoryReceivablesTab";
 import InventoryReportsTab from "./InventoryReportsTab";
 import InventorySettingsTab from "./InventorySettingsTab";
 import { ManualSaleProvider } from "./ManualSaleProvider";
@@ -55,6 +57,7 @@ const InventorySales = () => {
   const [autoOpenProductForm, setAutoOpenProductForm] = useState(false);
   const [autoOpenStockForm, setAutoOpenStockForm] = useState(false);
   const [stockProductFilter, setStockProductFilter] = useState("");
+  const [receivablesCustomerId, setReceivablesCustomerId] = useState("");
 
   const tabDefs = useMemo(
     () =>
@@ -83,6 +86,16 @@ const InventorySales = () => {
           value: INVENTORY_TABS.SALES,
           label: i18n.t("inventorySales.tabs.sales"),
           show: perms.canView,
+        },
+        {
+          value: INVENTORY_TABS.CUSTOMERS,
+          label: i18n.t("inventorySales.tabs.customers"),
+          show: perms.canViewCustomers,
+        },
+        {
+          value: INVENTORY_TABS.RECEIVABLES,
+          label: i18n.t("inventorySales.tabs.receivables"),
+          show: perms.canViewReceivables,
         },
         {
           value: INVENTORY_TABS.REPORTS,
@@ -126,6 +139,11 @@ const InventorySales = () => {
   const viewStockHistory = useCallback((productId) => {
     setStockProductFilter(String(productId));
     setTab(INVENTORY_TABS.STOCK);
+  }, []);
+
+  const goToReceivablesForCustomer = useCallback((customerId) => {
+    setReceivablesCustomerId(customerId != null ? String(customerId) : "");
+    setTab(INVENTORY_TABS.RECEIVABLES);
   }, []);
 
   return (
@@ -207,6 +225,20 @@ const InventorySales = () => {
           {perms.canView ? (
             <TabPanel value={tab} name={INVENTORY_TABS.SALES}>
               <InventorySalesTab />
+            </TabPanel>
+          ) : null}
+          {perms.canViewCustomers ? (
+            <TabPanel value={tab} name={INVENTORY_TABS.CUSTOMERS}>
+              <InventoryCustomersTab
+                onNavigateReceivables={goToReceivablesForCustomer}
+              />
+            </TabPanel>
+          ) : null}
+          {perms.canViewReceivables ? (
+            <TabPanel value={tab} name={INVENTORY_TABS.RECEIVABLES}>
+              <InventoryReceivablesTab
+                initialCustomerId={receivablesCustomerId}
+              />
             </TabPanel>
           ) : null}
           {perms.canViewReports ? (

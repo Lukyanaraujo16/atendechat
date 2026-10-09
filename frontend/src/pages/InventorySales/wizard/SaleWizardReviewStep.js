@@ -53,17 +53,20 @@ export default function SaleWizardReviewStep({
   paymentsBundle,
   canManagePayments,
   users,
-  selectedContact,
+  selectedCustomer,
   walkIn,
   confirming,
   onConfirm,
+  storeCreditSchedule,
+  storeCreditOverride,
 }) {
   const classes = useStyles();
   const itemCount = Array.isArray(sale?.items) ? sale.items.length : 0;
 
-  const customerLabel = walkIn || !selectedContact
-    ? i18n.t("inventorySales.sales.wizard.customer.walkInSelected")
-    : selectedContact.name;
+  const customerLabel =
+    walkIn || !selectedCustomer
+      ? i18n.t("inventorySales.sales.wizard.customer.walkInSelected")
+      : selectedCustomer.name;
 
   const sellerName =
     users.find((u) => String(u.id) === String(headerForm.sellerUserId))?.name ||
@@ -74,6 +77,9 @@ export default function SaleWizardReviewStep({
     ? paymentsBundle.payments
     : [];
   const summary = paymentsBundle?.summary;
+  const storeCreditAmount = payments
+    .filter((p) => p.method === "store_credit")
+    .reduce((acc, p) => acc + Number(p.amount || 0), 0);
 
   return (
     <Box className={classes.root} data-testid="sale-wizard-review-step">
@@ -176,6 +182,40 @@ export default function SaleWizardReviewStep({
           </Typography>
         )}
       </Box>
+
+      {storeCreditAmount > 0 ? (
+        <Box className={classes.row} data-testid="sale-wizard-review-store-credit">
+          <Typography className={classes.label}>
+            {i18n.t("inventorySales.storeCredit.label")}
+          </Typography>
+          <Typography className={classes.value}>
+            {formatCurrencyBRL(storeCreditAmount)}
+          </Typography>
+          {storeCreditSchedule?.frequency ? (
+            <Typography variant="body2" color="textSecondary">
+              {i18n.t(
+                `inventorySales.sales.wizard.payment.frequencies.${storeCreditSchedule.frequency}`
+              )}
+              {storeCreditSchedule.frequency !== "once"
+                ? ` · ${storeCreditSchedule.installmentCount}x`
+                : ""}
+              {storeCreditSchedule.firstDueDate
+                ? ` · ${storeCreditSchedule.firstDueDate}`
+                : ""}
+            </Typography>
+          ) : null}
+          {storeCreditOverride?.authorizeOverride ? (
+            <Typography variant="body2" color="textSecondary">
+              {i18n.t(
+                "inventorySales.sales.wizard.payment.storeCreditOverride"
+              )}
+              {storeCreditOverride.reason
+                ? `: ${storeCreditOverride.reason}`
+                : ""}
+            </Typography>
+          ) : null}
+        </Box>
+      ) : null}
 
       {headerForm.notes ? (
         <Box className={classes.row}>

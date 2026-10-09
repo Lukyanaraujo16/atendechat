@@ -85,6 +85,10 @@ class InventorySettings extends Model<InventorySettings> {
   @Column({ type: DataType.STRING(16), allowNull: false, defaultValue: "a4" })
   receiptPrintFormat: string;
 
+  @Default(true)
+  @Column
+  blockStoreCreditWhenOverdue: boolean;
+
   @CreatedAt
   createdAt: Date;
 

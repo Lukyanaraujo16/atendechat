@@ -1,6 +1,7 @@
 import sequelize from "../../database";
 import AppError from "../../errors/AppError";
 import InventorySale from "../../models/InventorySale";
+import InventoryCustomer from "../../models/InventoryCustomer";
 import {
   buildInventorySaleIncludes,
   parseOptionalId,
@@ -10,6 +11,7 @@ import { normalizeOptionalString } from "./inventoryTenant";
 
 type CreateBody = {
   contactId?: unknown;
+  customerId?: unknown;
   ticketId?: unknown;
   sellerUserId?: unknown;
   notes?: unknown;
@@ -23,9 +25,22 @@ export default async function CreateInventorySaleService(input: {
   createdBy: number | null;
   body: CreateBody;
 }): Promise<InventorySale> {
-  const contactId = parseOptionalId(input.body.contactId);
+  let contactId = parseOptionalId(input.body.contactId);
+  const customerId = parseOptionalId(input.body.customerId);
   const ticketId = parseOptionalId(input.body.ticketId);
   const sellerUserId = parseOptionalId(input.body.sellerUserId);
+
+  if (customerId != null) {
+    const customer = await InventoryCustomer.findOne({
+      where: { id: customerId, companyId: input.companyId }
+    });
+    if (!customer) {
+      throw new AppError("ERR_INVENTORY_CUSTOMER_NOT_FOUND", 404);
+    }
+    if (contactId == null && customer.contactId != null) {
+      contactId = customer.contactId;
+    }
+  }
 
   await validateInventorySaleLinks({
     companyId: input.companyId,
@@ -53,6 +68,7 @@ export default async function CreateInventorySaleService(input: {
         status: "draft",
         source: source as InventorySale["source"],
         contactId,
+        customerId,
         ticketId,
         sellerUserId,
         notes,

@@ -26,6 +26,10 @@ import {
 } from "./inventorySalePaymentEngine";
 import { validateExplicitPaymentLinesForComplete } from "./InventorySalePaymentLinesService";
 import { assertIdentifiersForCompleteSale } from "./inventorySaleItemIdentifiers";
+import CreateInventoryReceivableFromSaleService, {
+  StoreCreditScheduleInput
+} from "./CreateInventoryReceivableFromSaleService";
+import { StoreCreditOverrideInput } from "./ValidateInventoryStoreCreditForCompleteService";
 
 export default async function CompleteInventorySaleService(input: {
   companyId: number;
@@ -37,6 +41,10 @@ export default async function CompleteInventorySaleService(input: {
   canManagePayments?: boolean;
   /** Wizard P3: payments já explícitos — não reaplicar settle legado. */
   paymentMode?: "legacy" | "lines";
+  /** Condição do Crédito da Loja quando há linhas store_credit. */
+  storeCreditSchedule?: StoreCreditScheduleInput;
+  storeCreditOverride?: StoreCreditOverrideInput;
+  canUseStoreCredit?: boolean;
 }): Promise<InventorySale> {
   await GetOrCreateInventorySettingsService(input.companyId);
 
@@ -230,14 +238,22 @@ export default async function CompleteInventorySaleService(input: {
     );
     const useExplicitLines = input.paymentMode === "lines";
     let paymentCache;
+    let lines = await listSalePayments(sale.companyId, sale.id, t);
 
     if (useExplicitLines) {
       await validateExplicitPaymentLinesForComplete(sale, t, {
         requireFullAllocation: input.canManagePayments === true
       });
-      const lines = await listSalePayments(sale.companyId, sale.id, t);
+      lines = await listSalePayments(sale.companyId, sale.id, t);
       paymentCache = await persistSalePaymentCache(sale, lines, t);
     } else {
+      if (sale.paymentMethod === "store_credit") {
+        throw new AppError(
+          "ERR_INVENTORY_STORE_CREDIT_LINES_REQUIRED",
+          400,
+          "Crédito da Loja exige pagamento explícito por linhas (paymentMode=lines)."
+        );
+      }
       const settled = settlePaymentOnComplete({
         paymentMethod: sale.paymentMethod,
         cardInstallmentCount: sale.cardInstallmentCount,
@@ -258,6 +274,40 @@ export default async function CompleteInventorySaleService(input: {
         },
         t
       );
+      lines = await listSalePayments(sale.companyId, sale.id, t);
+    }
+
+    const storeCreditLines = lines.filter(
+      l => l.method === "store_credit" && l.status === "pending"
+    );
+    const financedAmount = roundMoney(
+      storeCreditLines.reduce((acc, l) => acc + toMoney(l.amount), 0)
+    );
+
+    if (financedAmount > 0) {
+      if (input.canUseStoreCredit !== true) {
+        throw new AppError(
+          "ERR_NO_PERMISSION",
+          403,
+          "Sem permissão para usar Crédito da Loja."
+        );
+      }
+      if (!input.storeCreditSchedule) {
+        throw new AppError(
+          "ERR_INVENTORY_STORE_CREDIT_SCHEDULE_REQUIRED",
+          400,
+          "Informe a condição de pagamento do Crédito da Loja."
+        );
+      }
+      await CreateInventoryReceivableFromSaleService({
+        companyId: input.companyId,
+        sale,
+        financedAmount,
+        schedule: input.storeCreditSchedule,
+        createdByUserId: input.completedBy,
+        override: input.storeCreditOverride,
+        transaction: t
+      });
     }
 
     await settings.update(

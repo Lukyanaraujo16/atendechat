@@ -4,6 +4,8 @@ import GetInventoryReportSummaryService from "../services/InventoryService/GetIn
 import GetInventoryReportSellersService from "../services/InventoryService/GetInventoryReportSellersService";
 import GetInventoryReportProductsService from "../services/InventoryService/GetInventoryReportProductsService";
 import GetInventoryReportCustomersService from "../services/InventoryService/GetInventoryReportCustomersService";
+import GetInventoryReportReceivablesService from "../services/InventoryService/GetInventoryReportReceivablesService";
+import GetInventoryReportStoreCreditService from "../services/InventoryService/GetInventoryReportStoreCreditService";
 
 function companyIdOrThrow(req: Request): number {
   const id = req.user?.companyId;
@@ -49,5 +51,24 @@ export const getReportCustomers = async (
   res: Response
 ): Promise<Response> => {
   const rows = await GetInventoryReportCustomersService(reportFilters(req));
+  return res.json(rows);
+};
+
+export const getReportReceivables = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const rows = await GetInventoryReportReceivablesService({
+    ...reportFilters(req),
+    asOfDate: req.query.asOfDate
+  });
+  return res.json(rows);
+};
+
+export const getReportStoreCredit = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const rows = await GetInventoryReportStoreCreditService(reportFilters(req));
   return res.json(rows);
 };

@@ -17,8 +17,47 @@ export const PAYMENT_METHODS = [
   "debit_card",
   "bank_transfer",
   "boleto",
+  "other",
+  "store_credit"
+] as const;
+
+/** Métodos aceitos em baixas de Contas a Receber (sem Crédito da Loja). */
+export const RECEIVABLE_PAYMENT_METHODS = [
+  "cash",
+  "pix",
+  "credit_card",
+  "debit_card",
+  "bank_transfer",
+  "boleto",
   "other"
 ] as const;
+
+export type InventoryReceivablePaymentMethod =
+  (typeof RECEIVABLE_PAYMENT_METHODS)[number];
+
+const RECEIVABLE_PAYMENT_METHOD_SET = new Set<string>(
+  RECEIVABLE_PAYMENT_METHODS
+);
+
+export function isInventoryReceivablePaymentMethod(
+  value: string
+): value is InventoryReceivablePaymentMethod {
+  return RECEIVABLE_PAYMENT_METHOD_SET.has(value);
+}
+
+export function parseReceivablePaymentMethod(
+  value: unknown
+): InventoryReceivablePaymentMethod {
+  const method = String(value ?? "").trim();
+  if (!isInventoryReceivablePaymentMethod(method)) {
+    throw new AppError(
+      "ERR_VALIDATION_ERROR",
+      400,
+      "Método de recebimento inválido para Contas a Receber."
+    );
+  }
+  return method;
+}
 
 export type InventoryPaymentStatus = (typeof PAYMENT_STATUSES)[number];
 export type InventoryPaymentMethod = (typeof PAYMENT_METHODS)[number];
@@ -289,6 +328,15 @@ export function settlePaymentOnComplete(input: {
   paidAmount: number;
   paidAt: Date | null;
 } {
+  // Crédito da Loja nunca liquida como caixa na conclusão.
+  if (input.paymentMethod === "store_credit") {
+    return {
+      paymentStatus: "unpaid",
+      paidAmount: 0,
+      paidAt: null
+    };
+  }
+
   if (input.paymentMethod === "credit_card") {
     assertStoredCardInstallments(
       input.paymentMethod,

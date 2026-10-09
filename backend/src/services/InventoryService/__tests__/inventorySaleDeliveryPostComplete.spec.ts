@@ -4,6 +4,7 @@ import InventorySale from "../../../models/InventorySale";
 import InventorySaleDelivery from "../../../models/InventorySaleDelivery";
 import InventorySaleItem from "../../../models/InventorySaleItem";
 import InventorySalePayment from "../../../models/InventorySalePayment";
+import InventoryReceivable from "../../../models/InventoryReceivable";
 import sequelize from "../../../database";
 import UpdateInventorySaleDeliveryService from "../UpdateInventorySaleDeliveryService";
 import { assertCompletedSaleTotalAgainstPayments } from "../inventorySalePaymentEngine";
@@ -43,6 +44,11 @@ jest.mock("../../../models/InventorySalePayment", () => ({
   default: { findAll: jest.fn(), create: jest.fn() }
 }));
 
+jest.mock("../../../models/InventoryReceivable", () => ({
+  __esModule: true,
+  default: { count: jest.fn().mockResolvedValue(0) }
+}));
+
 jest.mock("../../../models/Contact", () => ({ __esModule: true, default: {} }));
 jest.mock("../../../models/Ticket", () => ({ __esModule: true, default: {} }));
 jest.mock("../../../models/User", () => ({ __esModule: true, default: {} }));
@@ -62,6 +68,7 @@ const deliveryFindOne = InventorySaleDelivery.findOne as jest.Mock;
 const deliveryCreate = InventorySaleDelivery.create as jest.Mock;
 const itemFindAll = InventorySaleItem.findAll as jest.Mock;
 const paymentFindAll = InventorySalePayment.findAll as jest.Mock;
+const receivableCount = InventoryReceivable.count as jest.Mock;
 
 function methodRecord(overrides: Record<string, unknown> = {}) {
   return {
@@ -230,7 +237,106 @@ describe("assertCompletedSaleTotalAgainstPayments", () => {
 describe("UpdateInventorySaleDeliveryService pós-complete", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    saleFindOne.mockReset();
+    methodFindOne.mockReset();
+    deliveryFindOne.mockReset();
+    paymentFindAll.mockReset();
+    receivableCount.mockReset();
     paymentFindAll.mockResolvedValue([]);
+    receivableCount.mockResolvedValue(0);
+  });
+
+  it("M2: completed + receivable ativo + frete↑ bloqueado", async () => {
+    const sale = completedSale({
+      freightAmount: 0,
+      totalAmount: 100,
+      paidAmount: 0,
+      paymentStatus: "unpaid"
+    });
+    paymentFindAll.mockResolvedValue([
+      paymentRow({
+        method: "store_credit",
+        amount: 100,
+        status: "pending",
+        paidAt: null
+      })
+    ]);
+    receivableCount.mockResolvedValue(1);
+
+    await expect(
+      runDelivery(sale, { freightAmount: 20 }, methodRecord({ defaultAmount: 20 }))
+    ).rejects.toMatchObject({
+      message: "ERR_INVENTORY_SALE_FREIGHT_LOCKED_BY_RECEIVABLE"
+    });
+  });
+
+  it("M2: completed + receivable ativo + frete↓ bloqueado", async () => {
+    const sale = completedSale({
+      freightAmount: 20,
+      totalAmount: 120,
+      paidAmount: 0,
+      paymentStatus: "unpaid"
+    });
+    paymentFindAll.mockResolvedValue([
+      paymentRow({
+        method: "store_credit",
+        amount: 120,
+        status: "pending",
+        paidAt: null
+      })
+    ]);
+    receivableCount.mockResolvedValue(1);
+
+    await expect(
+      runDelivery(
+        sale,
+        { freightAmount: 5 },
+        methodRecord({ defaultAmount: 20, allowAmountOverride: true })
+      )
+    ).rejects.toMatchObject({
+      message: "ERR_INVENTORY_SALE_FREIGHT_LOCKED_BY_RECEIVABLE"
+    });
+  });
+
+  it("M2: completed + receivable ativo + endereço sem mudar frete permitido", async () => {
+    const sale = completedSale({
+      freightAmount: 20,
+      totalAmount: 120,
+      paidAmount: 0,
+      paymentStatus: "unpaid",
+      deliveryMethodId: 11
+    });
+    paymentFindAll.mockResolvedValue([
+      paymentRow({
+        method: "store_credit",
+        amount: 120,
+        status: "pending",
+        paidAt: null
+      })
+    ]);
+    receivableCount.mockResolvedValue(1);
+    deliveryFindOne.mockResolvedValue({
+      update: jest.fn(),
+      destroy: jest.fn()
+    });
+
+    await runDelivery(
+      sale,
+      {
+        freightAmount: 20,
+        recipientName: "Novo",
+        street: "Rua Nova",
+        number: "10",
+        city: "Vitória",
+        state: "ES",
+        postalCode: "29000000",
+        district: "Centro"
+      },
+      methodRecord({ defaultAmount: 20 })
+    );
+
+    expect(sale.freightAmount).toBe(20);
+    expect(sale.totalAmount).toBe(120);
   });
 
   it("cancelled bloqueia; draft continua permitido", async () => {

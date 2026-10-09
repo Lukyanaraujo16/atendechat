@@ -35,7 +35,9 @@ import api from "../../services/api";
 import {
   getInventoryReportCustomers,
   getInventoryReportProducts,
+  getInventoryReportReceivables,
   getInventoryReportSellers,
+  getInventoryReportStoreCredit,
   getInventoryReportSummary,
 } from "../../services/inventoryApi";
 import toastError from "../../errors/toastError";
@@ -143,6 +145,8 @@ export default function InventoryReportsTab() {
   const [sellers, setSellers] = useState([]);
   const [products, setProducts] = useState([]);
   const [customers, setCustomers] = useState([]);
+  const [receivablesReport, setReceivablesReport] = useState([]);
+  const [storeCreditReport, setStoreCreditReport] = useState([]);
   const [exportAnchor, setExportAnchor] = useState(null);
 
   const exportFilters = useMemo(() => {
@@ -178,17 +182,31 @@ export default function InventoryReportsTab() {
     setLoadError(false);
     const params = buildParams(startDate, endDate, sellerUserId);
     try {
-      const [summaryRes, sellersRes, productsRes, customersRes] =
-        await Promise.all([
-          getInventoryReportSummary(params),
-          getInventoryReportSellers(params),
-          getInventoryReportProducts(params),
-          getInventoryReportCustomers(params),
-        ]);
+      const [
+        summaryRes,
+        sellersRes,
+        productsRes,
+        customersRes,
+        receivablesRes,
+        storeCreditRes,
+      ] = await Promise.all([
+        getInventoryReportSummary(params),
+        getInventoryReportSellers(params),
+        getInventoryReportProducts(params),
+        getInventoryReportCustomers(params),
+        getInventoryReportReceivables(params),
+        getInventoryReportStoreCredit(params),
+      ]);
       setSummary(summaryRes.data || null);
       setSellers(Array.isArray(sellersRes.data) ? sellersRes.data : []);
       setProducts(Array.isArray(productsRes.data) ? productsRes.data : []);
       setCustomers(Array.isArray(customersRes.data) ? customersRes.data : []);
+      setReceivablesReport(
+        Array.isArray(receivablesRes.data) ? receivablesRes.data : []
+      );
+      setStoreCreditReport(
+        Array.isArray(storeCreditRes.data) ? storeCreditRes.data : []
+      );
     } catch (err) {
       setLoadError(true);
       toastError(err);
@@ -207,7 +225,9 @@ export default function InventoryReportsTab() {
       summary.cancelledSalesCount > 0 ||
       sellers.length > 0 ||
       products.length > 0 ||
-      customers.length > 0);
+      customers.length > 0 ||
+      receivablesReport.length > 0 ||
+      storeCreditReport.length > 0);
 
   const handleExportClick = (event) => {
     if (!hasData) {
@@ -612,6 +632,122 @@ export default function InventoryReportsTab() {
                         </TableCell>
                         <TableCell>
                           {formatReportDate(row.lastPurchaseAt)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </AppTableContainer>
+            )}
+          </AppSectionCard>
+
+          <Typography variant="subtitle1" className={classes.sectionTitle}>
+            {i18n.t("inventorySales.reports.receivablesTitle")}
+          </Typography>
+          <AppSectionCard variant="outlined" dense>
+            {loading ? (
+              <AppTableRowSkeleton columns={isMobile ? 1 : 4} />
+            ) : receivablesReport.length === 0 ? (
+              <Typography variant="body2" color="textSecondary">
+                {i18n.t("inventorySales.reports.noRows")}
+              </Typography>
+            ) : (
+              <AppTableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>
+                        {i18n.t(
+                          "inventorySales.reports.receivablesColumns.customer"
+                        )}
+                      </TableCell>
+                      <TableCell align="right">
+                        {i18n.t(
+                          "inventorySales.reports.receivablesColumns.openAmount"
+                        )}
+                      </TableCell>
+                      <TableCell align="right">
+                        {i18n.t(
+                          "inventorySales.reports.receivablesColumns.overdueAmount"
+                        )}
+                      </TableCell>
+                      <TableCell align="right">
+                        {i18n.t(
+                          "inventorySales.reports.receivablesColumns.installmentCount"
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {receivablesReport.map((row) => (
+                      <TableRow key={row.customerId}>
+                        <TableCell>{row.customerName || "—"}</TableCell>
+                        <TableCell align="right">
+                          {formatCurrencyBRL(row.openAmount)}
+                        </TableCell>
+                        <TableCell align="right">
+                          {formatCurrencyBRL(row.overdueAmount)}
+                        </TableCell>
+                        <TableCell align="right">
+                          {row.installmentCount}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </AppTableContainer>
+            )}
+          </AppSectionCard>
+
+          <Typography variant="subtitle1" className={classes.sectionTitle}>
+            {i18n.t("inventorySales.reports.storeCreditTitle")}
+          </Typography>
+          <AppSectionCard variant="outlined" dense>
+            {loading ? (
+              <AppTableRowSkeleton columns={isMobile ? 1 : 4} />
+            ) : storeCreditReport.length === 0 ? (
+              <Typography variant="body2" color="textSecondary">
+                {i18n.t("inventorySales.reports.noRows")}
+              </Typography>
+            ) : (
+              <AppTableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>
+                        {i18n.t(
+                          "inventorySales.reports.storeCreditColumns.customer"
+                        )}
+                      </TableCell>
+                      <TableCell align="right">
+                        {i18n.t(
+                          "inventorySales.reports.storeCreditColumns.receivablesCount"
+                        )}
+                      </TableCell>
+                      <TableCell align="right">
+                        {i18n.t(
+                          "inventorySales.reports.storeCreditColumns.originatedAmount"
+                        )}
+                      </TableCell>
+                      <TableCell align="right">
+                        {i18n.t(
+                          "inventorySales.reports.storeCreditColumns.openAmount"
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {storeCreditReport.map((row) => (
+                      <TableRow key={row.customerId}>
+                        <TableCell>{row.customerName || "—"}</TableCell>
+                        <TableCell align="right">
+                          {row.receivablesCount}
+                        </TableCell>
+                        <TableCell align="right">
+                          {formatCurrencyBRL(row.originatedAmount)}
+                        </TableCell>
+                        <TableCell align="right">
+                          {formatCurrencyBRL(row.openAmount)}
                         </TableCell>
                       </TableRow>
                     ))}

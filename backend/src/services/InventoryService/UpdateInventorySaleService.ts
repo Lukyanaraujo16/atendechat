@@ -1,5 +1,6 @@
 import AppError from "../../errors/AppError";
 import InventorySale from "../../models/InventorySale";
+import InventoryCustomer from "../../models/InventoryCustomer";
 import {
   assertInventorySaleIsDraft,
   buildInventorySaleIncludes,
@@ -11,6 +12,7 @@ import { normalizeOptionalString } from "./inventoryTenant";
 
 type UpdateBody = {
   contactId?: unknown;
+  customerId?: unknown;
   ticketId?: unknown;
   sellerUserId?: unknown;
   notes?: unknown;
@@ -30,9 +32,30 @@ export default async function UpdateInventorySaleService(input: {
   const patch: Partial<InventorySale> = {};
 
   let contactId = sale.contactId;
+  let customerId = sale.customerId;
   let ticketId = sale.ticketId;
   let sellerUserId = sale.sellerUserId;
 
+  if (input.body.customerId !== undefined) {
+    customerId = parseOptionalId(input.body.customerId);
+    patch.customerId = customerId;
+    if (customerId != null) {
+      const customer = await InventoryCustomer.findOne({
+        where: { id: customerId, companyId: input.companyId }
+      });
+      if (!customer) {
+        throw new AppError("ERR_INVENTORY_CUSTOMER_NOT_FOUND", 404);
+      }
+      if (
+        input.body.contactId === undefined &&
+        customer.contactId != null &&
+        contactId == null
+      ) {
+        contactId = customer.contactId;
+        patch.contactId = contactId;
+      }
+    }
+  }
   if (input.body.contactId !== undefined) {
     contactId = parseOptionalId(input.body.contactId);
     patch.contactId = contactId;

@@ -108,6 +108,15 @@ export function legacyPlanFeatureValueFromColumns(plan, featureKey) {
     case "inventory.sales.managePayments":
     case "inventory.sales.viewReports":
     case "inventory.sales.manageSettings":
+    case "inventory.sales.viewCustomers":
+    case "inventory.sales.manageCustomers":
+    case "inventory.sales.viewCustomerFinancials":
+    case "inventory.sales.manageCustomerCredit":
+    case "inventory.sales.useStoreCredit":
+    case "inventory.sales.authorizeStoreCreditOverride":
+    case "inventory.sales.viewReceivables":
+    case "inventory.sales.receiveReceivables":
+    case "inventory.sales.reverseReceivablePayments":
     case "automation.ai_agent":
     case "automation.knowledge_base":
       return false;

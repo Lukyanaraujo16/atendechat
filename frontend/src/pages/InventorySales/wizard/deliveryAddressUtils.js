@@ -22,7 +22,7 @@ export function addressFromContact(contact) {
   if (!contact) return emptyDeliveryAddress();
   return {
     recipientName: contact.name || "",
-    recipientPhone: contact.number || "",
+    recipientPhone: contact.number || contact.phone || "",
     postalCode: contact.postalCode || "",
     street: contact.street || "",
     number: contact.addressNumber || "",
@@ -31,6 +31,39 @@ export function addressFromContact(contact) {
     city: contact.city || "",
     state: (contact.state || "").toUpperCase(),
     notes: "",
+  };
+}
+
+/** Prefill de entrega a partir de InventoryCustomer (não muta o cadastro). */
+export function addressFromCustomer(customer) {
+  if (!customer) return emptyDeliveryAddress();
+  return addressFromContact({
+    name: customer.name,
+    number: customer.phone || customer.number || "",
+    postalCode: customer.postalCode,
+    street: customer.street,
+    addressNumber: customer.addressNumber,
+    addressComplement: customer.addressComplement,
+    district: customer.district,
+    city: customer.city,
+    state: customer.state,
+  });
+}
+
+/** Objeto compatível com isContactAddressComplete / addressFromContact. */
+export function deliverySourceFromCustomer(customer) {
+  if (!customer) return null;
+  return {
+    id: customer.id,
+    name: customer.name || "",
+    number: customer.phone || customer.number || "",
+    postalCode: customer.postalCode || null,
+    street: customer.street || null,
+    addressNumber: customer.addressNumber || null,
+    addressComplement: customer.addressComplement || null,
+    district: customer.district || null,
+    city: customer.city || null,
+    state: customer.state || null,
   };
 }
 

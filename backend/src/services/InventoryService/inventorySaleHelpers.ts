@@ -8,6 +8,7 @@ import InventorySaleItem from "../../models/InventorySaleItem";
 import InventoryProduct from "../../models/InventoryProduct";
 import InventorySaleDelivery from "../../models/InventorySaleDelivery";
 import InventoryDeliveryMethod from "../../models/InventoryDeliveryMethod";
+import InventoryCustomer from "../../models/InventoryCustomer";
 import { buildInventorySaleItemIdentifierInclude } from "./inventorySaleItemIdentifiers";
 
 export function buildInventorySaleIncludes(companyId: number) {
@@ -18,6 +19,27 @@ export function buildInventorySaleIncludes(companyId: number) {
         "id",
         "name",
         "number",
+        "postalCode",
+        "street",
+        "addressNumber",
+        "addressComplement",
+        "district",
+        "city",
+        "state"
+      ],
+      required: false
+    },
+    {
+      model: InventoryCustomer,
+      attributes: [
+        "id",
+        "name",
+        "document",
+        "phone",
+        "type",
+        "creditLimit",
+        "isActive",
+        "contactId",
         "postalCode",
         "street",
         "addressNumber",
