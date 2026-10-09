@@ -44,6 +44,7 @@ import CurrencyInput from "../CurrencyInput";
 import { useInventoryPermissions } from "../../../utils/inventoryAccess";
 import { formatStoreCreditInstallmentPreviewLine } from "../storeCreditInstallmentDisplay";
 import SaleGlobalDiscountEditor from "../SaleGlobalDiscountEditor";
+import { resolvePaymentSummaryDisplay } from "../paymentSummaryDisplay";
 import SaleWizardTotals from "./SaleWizardTotals";
 
 const useStyles = makeStyles((theme) => ({
@@ -186,7 +187,10 @@ export default function SaleWizardPaymentStep({
   const [installmentCountDraft, setInstallmentCountDraft] = useState("");
   const [installmentCountFocused, setInstallmentCountFocused] = useState(false);
 
-  const summary = paymentsBundle?.summary;
+  const summary = resolvePaymentSummaryDisplay(
+    sale,
+    paymentsBundle?.summary
+  );
   const payments = Array.isArray(paymentsBundle?.payments)
     ? paymentsBundle.payments
     : [];
@@ -207,25 +211,60 @@ export default function SaleWizardPaymentStep({
     return canOfferStoreCredit;
   });
 
-  const loadPayments = useCallback(async () => {
-    if (!sale?.id || !canManagePayments) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    try {
-      const { data } = await getInventorySalePayments(sale.id);
-      setPaymentsBundle(data);
-    } catch (err) {
-      toastError(err);
-    } finally {
-      setLoading(false);
-    }
-  }, [sale?.id, canManagePayments, setPaymentsBundle]);
+  const loadPayments = useCallback(
+    async ({ quiet = false } = {}) => {
+      if (!sale?.id || !canManagePayments) {
+        setLoading(false);
+        return;
+      }
+      if (!quiet) setLoading(true);
+      try {
+        const { data } = await getInventorySalePayments(sale.id);
+        setPaymentsBundle(data);
+      } catch (err) {
+        toastError(err);
+      } finally {
+        if (!quiet) setLoading(false);
+      }
+    },
+    [sale?.id, canManagePayments, setPaymentsBundle]
+  );
 
   useEffect(() => {
     loadPayments();
   }, [loadPayments]);
+
+  // Após desconto global / totais da venda mudarem, reidrata o summary
+  // sem spinner (display já usa sale.totalAmount via resolvePaymentSummaryDisplay).
+  useEffect(() => {
+    if (!sale?.id || !canManagePayments) return;
+    const summaryTotal = Number(paymentsBundle?.summary?.totalAmount);
+    const saleTotal = Number(sale?.totalAmount);
+    if (paymentsBundle?.summary == null) return;
+    if (
+      Number.isFinite(summaryTotal) &&
+      Number.isFinite(saleTotal) &&
+      Math.round(summaryTotal * 100) === Math.round(saleTotal * 100)
+    ) {
+      return;
+    }
+    loadPayments({ quiet: true });
+    // Intencional: não depender de paymentsBundle (evita loop). Display já usa sale.totalAmount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    sale?.id,
+    sale?.totalAmount,
+    sale?.globalDiscountAmount,
+    sale?.globalDiscountType,
+    sale?.globalDiscountPercent,
+    canManagePayments,
+    loadPayments,
+  ]);
+
+  const handleGlobalDiscountUpdated = useCallback(async () => {
+    if (onSaleUpdated) await onSaleUpdated();
+    await loadPayments({ quiet: true });
+  }, [onSaleUpdated, loadPayments]);
 
   useEffect(() => {
     if (!hasStoreCredit || !customerId) {
@@ -444,7 +483,7 @@ export default function SaleWizardPaymentStep({
         sale={sale}
         disabled={disabled}
         canApplyDiscount={canApplyDiscount}
-        onSaleUpdated={onSaleUpdated}
+        onSaleUpdated={handleGlobalDiscountUpdated}
       />
 
       <SaleWizardTotals sale={sale} itemCount={itemCount} dense />
@@ -460,8 +499,11 @@ export default function SaleWizardPaymentStep({
               <Typography className={classes.summaryLabel}>
                 {i18n.t("inventorySales.sales.wizard.payment.total")}
               </Typography>
-              <Typography className={classes.summaryValue}>
-                {formatCurrencyBRL(summary?.totalAmount ?? sale?.totalAmount)}
+              <Typography
+                className={classes.summaryValue}
+                data-testid="sale-wizard-payment-total"
+              >
+                {formatCurrencyBRL(summary.totalAmount)}
               </Typography>
             </Box>
             <Box className={classes.summaryItem}>
