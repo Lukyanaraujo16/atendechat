@@ -130,21 +130,18 @@ export function draftVariantsFromPersisted(variants) {
         };
       })
       .filter(Boolean);
+    const saleN = Number(variant.salePrice);
+    const costN = Number(variant.costPrice);
     return {
       localKey: combinationKey(options) || `id:${variant.id}`,
       id: variant.id,
       options,
       label: variant.label || combinationLabel(options),
-      salePrice:
-        variant.salePrice != null && variant.salePrice !== ""
-          ? String(variant.salePrice)
-          : "",
-      costPrice:
-        variant.costPrice != null && variant.costPrice !== ""
-          ? String(variant.costPrice)
-          : "",
+      salePrice: Number.isFinite(saleN) ? saleN : null,
+      costPrice: Number.isFinite(costN) ? costN : null,
       sku: variant.sku || "",
       barcode: variant.barcode || "",
+      imageUrl: variant.imageUrl || "",
       minStock:
         variant.minStock != null && variant.minStock !== ""
           ? String(variant.minStock)
@@ -166,10 +163,11 @@ export function emptyDraftVariant(options) {
     id: null,
     options,
     label: combinationLabel(options),
-    salePrice: "",
-    costPrice: "",
+    salePrice: null,
+    costPrice: null,
     sku: "",
     barcode: "",
+    imageUrl: "",
     minStock: "",
     currentQuantity: "",
     trackStock: true,
@@ -178,6 +176,18 @@ export function emptyDraftVariant(options) {
     persisted: false,
     currentQuantityDisplay: null,
   };
+}
+
+/**
+ * Imagem efetiva para apresentação: variante → produto → null.
+ */
+export function resolveVariantImageUrl(variant, product) {
+  const own =
+    variant?.imageUrl != null ? String(variant.imageUrl).trim() : "";
+  if (own) return own;
+  const parent =
+    product?.imageUrl != null ? String(product.imageUrl).trim() : "";
+  return parent || null;
 }
 
 /**

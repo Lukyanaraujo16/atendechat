@@ -46,4 +46,37 @@ describe("CurrencyInput", () => {
     fireEvent.keyDown(screen.getByTestId("money"), { key: "Backspace" });
     expect(onChange).toHaveBeenLastCalledWith(0.1);
   });
+
+  it("formata milhares e centavos (R$ 7.200,50)", () => {
+    const onChange = jest.fn();
+    render(
+      <CurrencyInput
+        allowEmpty
+        value={null}
+        onChange={onChange}
+        data-testid="money"
+      />
+    );
+    const input = screen.getByTestId("money");
+    for (const d of "720050") {
+      fireEvent.keyDown(input, { key: d });
+    }
+    expect(onChange).toHaveBeenLastCalledWith(7200.5);
+    expect(input.value).toMatch(/7\.200,50/);
+  });
+
+  it("allowEmpty limpa o campo", () => {
+    const onChange = jest.fn();
+    render(
+      <CurrencyInput
+        allowEmpty
+        value={0.01}
+        onChange={onChange}
+        data-testid="money"
+      />
+    );
+    const input = screen.getByTestId("money");
+    fireEvent.keyDown(input, { key: "Backspace" });
+    expect(onChange).toHaveBeenLastCalledWith(null);
+  });
 });

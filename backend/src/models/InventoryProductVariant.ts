@@ -71,6 +71,11 @@ class InventoryProductVariant extends Model<InventoryProductVariant> {
   @Column(DataType.STRING(64))
   barcode: string | null;
 
+  /** Imagem própria da variante; null = usar fallback do produto na UI. */
+  @AllowNull
+  @Column(DataType.STRING(500))
+  imageUrl: string | null;
+
   @Column(DataType.DECIMAL(12, 2))
   salePrice: string | number;
 

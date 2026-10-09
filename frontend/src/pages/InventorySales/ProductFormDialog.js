@@ -32,9 +32,7 @@ import {
 } from "../../services/inventoryApi";
 import toastError from "../../errors/toastError";
 import { i18n } from "../../translate/i18n";
-import {
-  parseBrazilianCurrencyToNumber,
-} from "../../utils/brazilianCurrency";
+import { parseBrazilianCurrencyToNumber } from "../../utils/brazilianCurrency";
 import {
   KNOWN_PRODUCT_UNITS,
   PRODUCT_UNIT_MAX_LENGTH,
@@ -102,7 +100,10 @@ function buildVariablePayload(form, variantsState, unit) {
   );
 
   const variants = selected.map((draft) => {
-    const salePrice = parseBrazilianCurrencyToNumber(draft.salePrice);
+    const salePrice =
+      typeof draft.salePrice === "number"
+        ? draft.salePrice
+        : parseBrazilianCurrencyToNumber(draft.salePrice);
     const row = {
       options: (draft.options || []).map((o) => ({
         characteristicName: o.characteristicName,
@@ -112,13 +113,17 @@ function buildVariablePayload(form, variantsState, unit) {
       salePrice,
       sku: String(draft.sku || "").trim() || null,
       barcode: String(draft.barcode || "").trim() || null,
+      imageUrl: String(draft.imageUrl || "").trim() || null,
       trackStock: draft.trackStock !== false,
       active: draft.active !== false,
     };
     if (draft.id != null) row.id = draft.id;
-    const costPrice = draft.costPrice
-      ? parseBrazilianCurrencyToNumber(draft.costPrice)
-      : null;
+    const costPrice =
+      draft.costPrice == null || draft.costPrice === ""
+        ? null
+        : typeof draft.costPrice === "number"
+          ? draft.costPrice
+          : parseBrazilianCurrencyToNumber(draft.costPrice);
     if (costPrice != null) row.costPrice = costPrice;
     if (draft.minStock !== "" && draft.minStock != null) {
       const minStock = Number(draft.minStock);
@@ -635,6 +640,7 @@ export default function ProductFormDialog({
                 onChange={setVariantsState}
                 disabled={loading || saving}
                 isEdit={isEdit}
+                productImageUrl={form.imageUrl}
               />
             )}
 

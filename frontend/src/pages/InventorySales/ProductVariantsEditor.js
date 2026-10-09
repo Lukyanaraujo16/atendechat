@@ -25,10 +25,12 @@ import ExpandMoreIcon from "@material-ui/icons/ExpandMore";
 
 import { AppSecondaryButton, AppTableContainer } from "../../ui";
 import { i18n } from "../../translate/i18n";
+import CurrencyInput from "./CurrencyInput";
 import {
   MAX_AUTO_VARIANT_COMBINATIONS,
   combinationKey,
   mergeCombinationPreview,
+  resolveVariantImageUrl,
 } from "./productVariantCombinations";
 
 const useStyles = makeStyles((theme) => ({
@@ -59,8 +61,12 @@ const useStyles = makeStyles((theme) => ({
     display: "flex",
     flexWrap: "wrap",
     gap: theme.spacing(1),
-    alignItems: "center",
+    alignItems: "flex-end",
     marginBottom: theme.spacing(1),
+  },
+  applyField: {
+    minWidth: 160,
+    maxWidth: 220,
   },
   mobileCard: {
     border: `1px solid ${theme.palette.divider}`,
@@ -78,8 +84,51 @@ const useStyles = makeStyles((theme) => ({
     borderRadius: 8,
     padding: theme.spacing(1),
   },
-  tableInput: {
-    minWidth: 96,
+  moneyCell: {
+    minWidth: 140,
+    maxWidth: 180,
+  },
+  stockCell: {
+    minWidth: 110,
+    maxWidth: 140,
+  },
+  labelCell: {
+    minWidth: 120,
+    fontWeight: 500,
+  },
+  detailsBox: {
+    backgroundColor:
+      theme.palette.type === "dark"
+        ? "rgba(255,255,255,0.04)"
+        : "rgba(0,0,0,0.02)",
+    borderRadius: 8,
+    padding: theme.spacing(1.5),
+    marginTop: theme.spacing(0.5),
+    marginBottom: theme.spacing(1),
+  },
+  preview: {
+    width: 72,
+    height: 72,
+    objectFit: "cover",
+    borderRadius: 6,
+    border: `1px solid ${theme.palette.divider}`,
+    backgroundColor: theme.palette.action.hover,
+  },
+  previewBroken: {
+    width: 72,
+    height: 72,
+    borderRadius: 6,
+    border: `1px dashed ${theme.palette.divider}`,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: 11,
+    color: theme.palette.text.secondary,
+    textAlign: "center",
+    padding: 4,
+  },
+  codeField: {
+    minWidth: 200,
   },
 }));
 
@@ -113,11 +162,165 @@ function rebuildDrafts(characteristics, drafts) {
   return mergeCombinationPreview(chars, drafts || []);
 }
 
+function VariantImagePreview({ draft, productImageUrl }) {
+  const classes = useStyles();
+  const [brokenSrc, setBrokenSrc] = useState(null);
+  const effective = resolveVariantImageUrl(draft, { imageUrl: productImageUrl });
+  const usingParent =
+    !String(draft.imageUrl || "").trim() && Boolean(productImageUrl);
+
+  if (!effective) {
+    return (
+      <Box className={classes.previewBroken}>
+        {i18n.t("inventorySales.products.variants.imageEmpty")}
+      </Box>
+    );
+  }
+  if (brokenSrc === effective) {
+    return (
+      <Box className={classes.previewBroken}>
+        {i18n.t("inventorySales.products.variants.imageUnavailable")}
+      </Box>
+    );
+  }
+  return (
+    <Box>
+      <img
+        key={effective}
+        src={effective}
+        alt=""
+        className={classes.preview}
+        onError={() => setBrokenSrc(effective)}
+      />
+      {usingParent ? (
+        <Typography variant="caption" color="textSecondary" display="block">
+          {i18n.t("inventorySales.products.variants.imageUsingProduct")}
+        </Typography>
+      ) : null}
+    </Box>
+  );
+}
+
+function VariantDetailsFields({
+  draft,
+  localKey,
+  disabled,
+  isEdit,
+  productImageUrl,
+  updateDraft,
+  classes,
+}) {
+  return (
+    <Grid container spacing={2}>
+      <Grid item xs={12} sm={6}>
+        <TextField
+          size="small"
+          variant="outlined"
+          fullWidth
+          label={i18n.t("inventorySales.products.fields.sku")}
+          value={draft.sku}
+          onChange={(e) => updateDraft(localKey, { sku: e.target.value })}
+          disabled={disabled}
+          className={classes.codeField}
+          inputProps={{ maxLength: 64 }}
+        />
+      </Grid>
+      <Grid item xs={12} sm={6}>
+        <TextField
+          size="small"
+          variant="outlined"
+          fullWidth
+          label={i18n.t("inventorySales.products.fields.barcode")}
+          value={draft.barcode}
+          onChange={(e) => updateDraft(localKey, { barcode: e.target.value })}
+          disabled={disabled}
+          className={classes.codeField}
+          inputProps={{ maxLength: 64 }}
+        />
+      </Grid>
+      <Grid item xs={12} sm={6}>
+        <TextField
+          size="small"
+          variant="outlined"
+          fullWidth
+          type="number"
+          label={i18n.t("inventorySales.products.fields.minStock")}
+          value={draft.minStock}
+          onChange={(e) => updateDraft(localKey, { minStock: e.target.value })}
+          disabled={disabled}
+          inputProps={{ min: 0, step: "any", inputMode: "decimal" }}
+        />
+      </Grid>
+      <Grid item xs={12} sm={6}>
+        <FormControlLabel
+          control={
+            <Switch
+              color="primary"
+              checked={draft.active !== false}
+              onChange={(e) =>
+                updateDraft(localKey, { active: e.target.checked })
+              }
+              disabled={disabled}
+            />
+          }
+          label={i18n.t("inventorySales.products.fields.active")}
+        />
+      </Grid>
+      <Grid item xs={12} sm={8}>
+        <TextField
+          size="small"
+          variant="outlined"
+          fullWidth
+          label={i18n.t("inventorySales.products.variants.imageUrl")}
+          helperText={i18n.t("inventorySales.products.variants.imageUrlHelp")}
+          value={draft.imageUrl || ""}
+          onChange={(e) => updateDraft(localKey, { imageUrl: e.target.value })}
+          disabled={disabled}
+          InputLabelProps={{ shrink: true }}
+        />
+        {draft.imageUrl ? (
+          <Box mt={1}>
+            <AppSecondaryButton
+              type="button"
+              size="small"
+              onClick={() => updateDraft(localKey, { imageUrl: "" })}
+              disabled={disabled}
+            >
+              {i18n.t("inventorySales.products.variants.imageClear")}
+            </AppSecondaryButton>
+          </Box>
+        ) : null}
+      </Grid>
+      <Grid item xs={12} sm={4}>
+        <Typography variant="caption" color="textSecondary" display="block">
+          {i18n.t("inventorySales.products.variants.imagePreview")}
+        </Typography>
+        <Box mt={0.5}>
+          <VariantImagePreview
+            draft={draft}
+            productImageUrl={productImageUrl}
+          />
+        </Box>
+      </Grid>
+      {isEdit && draft.persisted ? (
+        <Grid item xs={12}>
+          <Typography variant="caption" color="textSecondary">
+            {i18n.t("inventorySales.products.variants.stockReadonly", {
+              quantity: draft.currentQuantityDisplay || "0",
+            })}
+          </Typography>
+        </Grid>
+      ) : null}
+    </Grid>
+  );
+}
+
 export default function ProductVariantsEditor({
   value,
   onChange,
   disabled = false,
   isEdit = false,
+  productImageUrl = "",
 }) {
   const classes = useStyles();
   const theme = useTheme();
@@ -126,7 +329,7 @@ export default function ProductVariantsEditor({
     ? value.characteristics
     : [newCharacteristic()];
   const drafts = value?.drafts || [];
-  const [bulkSalePrice, setBulkSalePrice] = useState("");
+  const [bulkSalePrice, setBulkSalePrice] = useState(null);
   const [expandedKeys, setExpandedKeys] = useState({});
 
   const emit = (nextCharacteristics, nextDrafts, meta = {}) => {
@@ -200,8 +403,8 @@ export default function ProductVariantsEditor({
   const selectedDrafts = drafts.filter((d) => d.selected !== false);
 
   const applySalePriceToAll = () => {
-    const price = String(bulkSalePrice || "").trim();
-    if (!price) return;
+    if (bulkSalePrice == null || !Number.isFinite(Number(bulkSalePrice))) return;
+    const price = Number(bulkSalePrice);
     emit(
       characteristics,
       drafts.map((d) =>
@@ -209,6 +412,19 @@ export default function ProductVariantsEditor({
       ),
       value
     );
+  };
+
+  const toggleExpand = (key) => {
+    setExpandedKeys((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const stockLabel = (draft) => {
+    if (isEdit && draft.persisted) {
+      return draft.trackStock === false
+        ? i18n.t("inventorySales.products.noStockTracking")
+        : draft.currentQuantityDisplay || "0";
+    }
+    return null;
   };
 
   return (
@@ -415,20 +631,25 @@ export default function ProductVariantsEditor({
           </Typography>
 
           <Box className={classes.applyRow}>
-            <TextField
-              size="small"
-              variant="outlined"
-              label={i18n.t("inventorySales.products.variants.applySalePrice")}
-              value={bulkSalePrice}
-              onChange={(e) => setBulkSalePrice(e.target.value)}
-              disabled={disabled}
-              className={classes.tableInput}
-            />
+            <Box className={classes.applyField}>
+              <CurrencyInput
+                allowEmpty
+                label={i18n.t("inventorySales.products.variants.applySalePrice")}
+                value={bulkSalePrice}
+                onChange={setBulkSalePrice}
+                disabled={disabled}
+                data-testid="variant-bulk-sale-price"
+              />
+            </Box>
             <AppSecondaryButton
               type="button"
               size="small"
               onClick={applySalePriceToAll}
-              disabled={disabled || !String(bulkSalePrice).trim()}
+              disabled={
+                disabled ||
+                bulkSalePrice == null ||
+                !Number.isFinite(Number(bulkSalePrice))
+              }
             >
               {i18n.t("inventorySales.products.variants.applySalePriceAction")}
             </AppSecondaryButton>
@@ -447,40 +668,44 @@ export default function ProductVariantsEditor({
                     </Typography>
                     <Grid container spacing={1}>
                       <Grid item xs={12}>
-                        <TextField
-                          size="small"
-                          variant="outlined"
-                          fullWidth
+                        <CurrencyInput
+                          allowEmpty
                           required
                           label={i18n.t(
                             "inventorySales.products.fields.salePrice"
                           )}
                           value={draft.salePrice}
-                          onChange={(e) =>
-                            updateDraft(key, { salePrice: e.target.value })
+                          onChange={(n) =>
+                            updateDraft(key, { salePrice: n })
                           }
                           disabled={disabled}
-                          inputProps={{ inputMode: "decimal" }}
+                          data-testid={`variant-sale-${key}`}
                         />
                       </Grid>
                       <Grid item xs={12}>
-                        <TextField
-                          size="small"
-                          variant="outlined"
-                          fullWidth
+                        <CurrencyInput
+                          allowEmpty
                           label={i18n.t(
                             "inventorySales.products.fields.costPrice"
                           )}
                           value={draft.costPrice}
-                          onChange={(e) =>
-                            updateDraft(key, { costPrice: e.target.value })
+                          onChange={(n) =>
+                            updateDraft(key, { costPrice: n })
                           }
                           disabled={disabled}
-                          inputProps={{ inputMode: "decimal" }}
+                          data-testid={`variant-cost-${key}`}
                         />
                       </Grid>
-                      {!isEdit || !draft.persisted ? (
-                        <Grid item xs={12}>
+                      <Grid item xs={12}>
+                        {stockLabel(draft) != null ? (
+                          <Typography variant="body2">
+                            {i18n.t(
+                              "inventorySales.products.variants.currentStockLabel"
+                            )}
+                            {": "}
+                            {stockLabel(draft)}
+                          </Typography>
+                        ) : (
                           <TextField
                             size="small"
                             variant="outlined"
@@ -502,19 +727,8 @@ export default function ProductVariantsEditor({
                               inputMode: "decimal",
                             }}
                           />
-                        </Grid>
-                      ) : (
-                        <Grid item xs={12}>
-                          <Typography variant="caption" color="textSecondary">
-                            {i18n.t(
-                              "inventorySales.products.variants.stockReadonly",
-                              {
-                                quantity: draft.currentQuantityDisplay || "0",
-                              }
-                            )}
-                          </Typography>
-                        </Grid>
-                      )}
+                        )}
+                      </Grid>
                     </Grid>
                     <Box mt={1}>
                       <AppSecondaryButton
@@ -523,87 +737,23 @@ export default function ProductVariantsEditor({
                         endIcon={
                           open ? <ExpandLessIcon /> : <ExpandMoreIcon />
                         }
-                        onClick={() =>
-                          setExpandedKeys((prev) => ({
-                            ...prev,
-                            [key]: !open,
-                          }))
-                        }
+                        onClick={() => toggleExpand(key)}
                       >
                         {i18n.t("inventorySales.products.variants.moreDetails")}
                       </AppSecondaryButton>
                     </Box>
                     <Collapse in={open}>
-                      <Grid container spacing={1} style={{ marginTop: 8 }}>
-                        <Grid item xs={12}>
-                          <TextField
-                            size="small"
-                            variant="outlined"
-                            fullWidth
-                            label={i18n.t("inventorySales.products.fields.sku")}
-                            value={draft.sku}
-                            onChange={(e) =>
-                              updateDraft(key, { sku: e.target.value })
-                            }
-                            disabled={disabled}
-                          />
-                        </Grid>
-                        <Grid item xs={12}>
-                          <TextField
-                            size="small"
-                            variant="outlined"
-                            fullWidth
-                            label={i18n.t(
-                              "inventorySales.products.fields.barcode"
-                            )}
-                            value={draft.barcode}
-                            onChange={(e) =>
-                              updateDraft(key, { barcode: e.target.value })
-                            }
-                            disabled={disabled}
-                          />
-                        </Grid>
-                        <Grid item xs={12}>
-                          <TextField
-                            size="small"
-                            variant="outlined"
-                            fullWidth
-                            type="number"
-                            label={i18n.t(
-                              "inventorySales.products.fields.minStock"
-                            )}
-                            value={draft.minStock}
-                            onChange={(e) =>
-                              updateDraft(key, { minStock: e.target.value })
-                            }
-                            disabled={disabled}
-                            inputProps={{
-                              min: 0,
-                              step: "any",
-                              inputMode: "decimal",
-                            }}
-                          />
-                        </Grid>
-                        <Grid item xs={12}>
-                          <FormControlLabel
-                            control={
-                              <Switch
-                                color="primary"
-                                checked={draft.active !== false}
-                                onChange={(e) =>
-                                  updateDraft(key, {
-                                    active: e.target.checked,
-                                  })
-                                }
-                                disabled={disabled}
-                              />
-                            }
-                            label={i18n.t(
-                              "inventorySales.products.fields.active"
-                            )}
-                          />
-                        </Grid>
-                      </Grid>
+                      <Box className={classes.detailsBox} mt={1}>
+                        <VariantDetailsFields
+                          draft={draft}
+                          localKey={key}
+                          disabled={disabled}
+                          isEdit={isEdit}
+                          productImageUrl={productImageUrl}
+                          updateDraft={updateDraft}
+                          classes={classes}
+                        />
+                      </Box>
                     </Collapse>
                   </Box>
                 );
@@ -626,22 +776,15 @@ export default function ProductVariantsEditor({
                       </TableCell>
                       <TableCell>
                         {isEdit
-                          ? i18n.t("inventorySales.products.columns.stock")
+                          ? i18n.t(
+                              "inventorySales.products.variants.currentStockLabel"
+                            )
                           : i18n.t(
                               "inventorySales.products.fields.initialQuantity"
                             )}
                       </TableCell>
-                      <TableCell>
-                        {i18n.t("inventorySales.products.fields.sku")}
-                      </TableCell>
-                      <TableCell>
-                        {i18n.t("inventorySales.products.fields.barcode")}
-                      </TableCell>
-                      <TableCell>
-                        {i18n.t("inventorySales.products.fields.minStock")}
-                      </TableCell>
-                      <TableCell>
-                        {i18n.t("inventorySales.products.fields.active")}
+                      <TableCell align="right">
+                        {i18n.t("inventorySales.common.actions")}
                       </TableCell>
                     </TableRow>
                   </TableHead>
@@ -649,122 +792,108 @@ export default function ProductVariantsEditor({
                     {selectedDrafts.map((draft) => {
                       const key =
                         draft.localKey || combinationKey(draft.options);
+                      const open = Boolean(expandedKeys[key]);
                       return (
-                        <TableRow key={key}>
-                          <TableCell>{draft.label}</TableCell>
-                          <TableCell>
-                            <TextField
-                              size="small"
-                              variant="outlined"
-                              required
-                              value={draft.salePrice}
-                              onChange={(e) =>
-                                updateDraft(key, { salePrice: e.target.value })
-                              }
-                              disabled={disabled}
-                              className={classes.tableInput}
-                              inputProps={{ inputMode: "decimal" }}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <TextField
-                              size="small"
-                              variant="outlined"
-                              value={draft.costPrice}
-                              onChange={(e) =>
-                                updateDraft(key, { costPrice: e.target.value })
-                              }
-                              disabled={disabled}
-                              className={classes.tableInput}
-                              inputProps={{ inputMode: "decimal" }}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            {isEdit && draft.persisted ? (
-                              <Typography variant="body2">
-                                {draft.trackStock === false
-                                  ? i18n.t(
-                                      "inventorySales.products.noStockTracking"
-                                    )
-                                  : draft.currentQuantityDisplay || "0"}
-                              </Typography>
-                            ) : (
-                              <TextField
-                                size="small"
-                                variant="outlined"
-                                type="number"
-                                value={draft.currentQuantity}
-                                onChange={(e) =>
-                                  updateDraft(key, {
-                                    currentQuantity: e.target.value,
-                                  })
+                        <React.Fragment key={key}>
+                          <TableRow>
+                            <TableCell className={classes.labelCell}>
+                              {draft.label}
+                            </TableCell>
+                            <TableCell className={classes.moneyCell}>
+                              <CurrencyInput
+                                allowEmpty
+                                required
+                                value={draft.salePrice}
+                                onChange={(n) =>
+                                  updateDraft(key, { salePrice: n })
                                 }
-                                disabled={
-                                  disabled || draft.trackStock === false
-                                }
-                                className={classes.tableInput}
-                                inputProps={{
-                                  min: 0,
-                                  step: "any",
-                                  inputMode: "decimal",
-                                }}
+                                disabled={disabled}
+                                data-testid={`variant-sale-${key}`}
                               />
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <TextField
-                              size="small"
-                              variant="outlined"
-                              value={draft.sku}
-                              onChange={(e) =>
-                                updateDraft(key, { sku: e.target.value })
-                              }
-                              disabled={disabled}
-                              className={classes.tableInput}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <TextField
-                              size="small"
-                              variant="outlined"
-                              value={draft.barcode}
-                              onChange={(e) =>
-                                updateDraft(key, { barcode: e.target.value })
-                              }
-                              disabled={disabled}
-                              className={classes.tableInput}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <TextField
-                              size="small"
-                              variant="outlined"
-                              type="number"
-                              value={draft.minStock}
-                              onChange={(e) =>
-                                updateDraft(key, { minStock: e.target.value })
-                              }
-                              disabled={disabled}
-                              className={classes.tableInput}
-                              inputProps={{
-                                min: 0,
-                                step: "any",
-                                inputMode: "decimal",
+                            </TableCell>
+                            <TableCell className={classes.moneyCell}>
+                              <CurrencyInput
+                                allowEmpty
+                                value={draft.costPrice}
+                                onChange={(n) =>
+                                  updateDraft(key, { costPrice: n })
+                                }
+                                disabled={disabled}
+                                data-testid={`variant-cost-${key}`}
+                              />
+                            </TableCell>
+                            <TableCell className={classes.stockCell}>
+                              {stockLabel(draft) != null ? (
+                                <Typography variant="body2">
+                                  {stockLabel(draft)}
+                                </Typography>
+                              ) : (
+                                <TextField
+                                  size="small"
+                                  variant="outlined"
+                                  type="number"
+                                  fullWidth
+                                  value={draft.currentQuantity}
+                                  onChange={(e) =>
+                                    updateDraft(key, {
+                                      currentQuantity: e.target.value,
+                                    })
+                                  }
+                                  disabled={
+                                    disabled || draft.trackStock === false
+                                  }
+                                  inputProps={{
+                                    min: 0,
+                                    step: "any",
+                                    inputMode: "decimal",
+                                  }}
+                                />
+                              )}
+                            </TableCell>
+                            <TableCell align="right">
+                              <AppSecondaryButton
+                                type="button"
+                                size="small"
+                                endIcon={
+                                  open ? (
+                                    <ExpandLessIcon />
+                                  ) : (
+                                    <ExpandMoreIcon />
+                                  )
+                                }
+                                onClick={() => toggleExpand(key)}
+                              >
+                                {i18n.t(
+                                  "inventorySales.products.variants.moreDetails"
+                                )}
+                              </AppSecondaryButton>
+                            </TableCell>
+                          </TableRow>
+                          <TableRow>
+                            <TableCell
+                              colSpan={5}
+                              style={{
+                                paddingTop: 0,
+                                paddingBottom: open ? 16 : 0,
+                                borderBottom: open ? undefined : "none",
                               }}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Switch
-                              color="primary"
-                              size="small"
-                              checked={draft.active !== false}
-                              onChange={(e) =>
-                                updateDraft(key, { active: e.target.checked })
-                              }
-                              disabled={disabled}
-                            />
-                          </TableCell>
-                        </TableRow>
+                            >
+                              <Collapse in={open} unmountOnExit={false}>
+                                <Box className={classes.detailsBox}>
+                                  <VariantDetailsFields
+                                    draft={draft}
+                                    localKey={key}
+                                    disabled={disabled}
+                                    isEdit={isEdit}
+                                    productImageUrl={productImageUrl}
+                                    updateDraft={updateDraft}
+                                    classes={classes}
+                                  />
+                                </Box>
+                              </Collapse>
+                            </TableCell>
+                          </TableRow>
+                        </React.Fragment>
                       );
                     })}
                   </TableBody>

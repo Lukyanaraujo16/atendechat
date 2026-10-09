@@ -5,6 +5,7 @@ import {
   combinationLabel,
   emptyDraftVariant,
   mergeCombinationPreview,
+  resolveVariantImageUrl,
 } from "../productVariantCombinations";
 
 describe("productVariantCombinations", () => {
@@ -52,7 +53,7 @@ describe("productVariantCombinations", () => {
         ...emptyDraftVariant([
           { characteristicName: "Cor", optionValue: "Azul" },
         ]),
-        salePrice: "8500",
+        salePrice: 8500,
         id: 11,
         persisted: true,
       },
@@ -64,7 +65,7 @@ describe("productVariantCombinations", () => {
     const azul = drafts.find(
       (d) => combinationKey(d.options) === combinationKey(existing[0].options)
     );
-    expect(azul.salePrice).toBe("8500");
+    expect(azul.salePrice).toBe(8500);
     expect(azul.id).toBe(11);
     expect(drafts).toHaveLength(2);
   });
@@ -77,5 +78,18 @@ describe("productVariantCombinations", () => {
     drafts[1].selected = false;
     const selected = drafts.filter((d) => d.selected !== false);
     expect(selected).toHaveLength(2);
+  });
+
+  it("resolve imagem da variante com fallback no produto", () => {
+    expect(
+      resolveVariantImageUrl(
+        { imageUrl: "https://img/azul.png" },
+        { imageUrl: "https://img/pai.png" }
+      )
+    ).toBe("https://img/azul.png");
+    expect(
+      resolveVariantImageUrl({ imageUrl: "" }, { imageUrl: "https://img/pai.png" })
+    ).toBe("https://img/pai.png");
+    expect(resolveVariantImageUrl({}, {})).toBeNull();
   });
 });

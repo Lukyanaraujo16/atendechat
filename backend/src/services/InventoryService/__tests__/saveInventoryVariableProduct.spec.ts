@@ -49,12 +49,14 @@ describe("payload shape with-variants", () => {
           options: [{ characteristicName: "Cor", optionValue: "Azul" }],
           salePrice: 8500,
           costPrice: 6500,
-          currentQuantity: 5
+          currentQuantity: 5,
+          imageUrl: "https://cdn.example/azul.png"
         },
         {
           options: [{ characteristicName: "Cor", optionValue: "Branco" }],
           salePrice: 8700,
-          currentQuantity: 3
+          currentQuantity: 3,
+          imageUrl: null
         },
         {
           options: [{ characteristicName: "Cor", optionValue: "Rosé" }],
@@ -66,5 +68,6 @@ describe("payload shape with-variants", () => {
     expect(body.characteristics[0].options).toHaveLength(3);
     expect(body.variants).toHaveLength(3);
     expect(new Set(body.variants.map(v => v.salePrice)).size).toBe(3);
+    expect(body.variants[0].imageUrl).toContain("azul");
   });
 });

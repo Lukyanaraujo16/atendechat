@@ -16,6 +16,7 @@ type UpdateBody = {
   label?: unknown;
   sku?: unknown;
   barcode?: unknown;
+  imageUrl?: unknown;
   salePrice?: unknown;
   costPrice?: unknown;
   trackStock?: unknown;
@@ -117,6 +118,10 @@ export default async function UpdateInventoryProductVariantService(input: {
         variantId: variant.id,
         transaction: t
       });
+    }
+
+    if (input.body.imageUrl !== undefined) {
+      patch.imageUrl = normalizeOptionalString(input.body.imageUrl, 500);
     }
 
     if (Object.keys(patch).length) {

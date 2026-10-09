@@ -50,6 +50,7 @@ type VariantInput = {
   label?: unknown;
   sku?: unknown;
   barcode?: unknown;
+  imageUrl?: unknown;
   salePrice?: unknown;
   costPrice?: unknown;
   trackStock?: unknown;
@@ -567,6 +568,7 @@ export default async function SaveInventoryVariableProductService(input: {
             row.active === "1";
       const sku = normalizeOptionalString(row.sku, 64);
       const barcode = normalizeOptionalString(row.barcode, 64);
+      const imageUrl = normalizeOptionalString(row.imageUrl, 500);
 
       let existingId: number | null = null;
       if (row.id !== undefined && row.id !== null && row.id !== "") {
@@ -642,7 +644,8 @@ export default async function SaveInventoryVariableProductService(input: {
               trackStock,
               active,
               sku,
-              barcode
+              barcode,
+              imageUrl
             },
             { transaction: t }
           );
@@ -656,7 +659,8 @@ export default async function SaveInventoryVariableProductService(input: {
               trackStock,
               active,
               sku,
-              barcode
+              barcode,
+              imageUrl
             },
             { transaction: t }
           );
@@ -707,6 +711,7 @@ export default async function SaveInventoryVariableProductService(input: {
           combinationKey,
           sku,
           barcode,
+          imageUrl,
           salePrice,
           costPrice,
           trackStock,

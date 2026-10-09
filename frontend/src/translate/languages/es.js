@@ -386,8 +386,16 @@ const messages = {
             applySalePriceAction: "Aplicar",
             variationLabel: "Variación: {{label}}",
             moreDetails: "Más detalles",
+            currentStockLabel: "Stock actual",
             stockReadonly:
               "Stock actual: {{quantity}}. Para cambiarlo, use Movimientos de stock.",
+            imageUrl: "Imagen de la variación",
+            imageUrlHelp: "URL de la imagen. Si está vacía, usa la imagen del producto principal.",
+            imagePreview: "Vista previa",
+            imageClear: "Quitar imagen",
+            imageEmpty: "Sin imagen",
+            imageUnavailable: "Imagen no disponible",
+            imageUsingProduct: "Usando imagen del producto",
             countChip: "{{count}} variaciones",
             aggregatedStockHint:
               "Total sumado de las variantes (no es un ítem vendible único).",

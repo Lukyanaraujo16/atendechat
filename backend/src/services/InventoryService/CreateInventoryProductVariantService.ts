@@ -27,6 +27,7 @@ type CreateBody = {
   label?: unknown;
   sku?: unknown;
   barcode?: unknown;
+  imageUrl?: unknown;
   salePrice?: unknown;
   costPrice?: unknown;
   trackStock?: unknown;
@@ -151,6 +152,7 @@ export default async function CreateInventoryProductVariantService(input: {
 
   const sku = normalizeOptionalString(input.body.sku, 64);
   const barcode = normalizeOptionalString(input.body.barcode, 64);
+  const imageUrl = normalizeOptionalString(input.body.imageUrl, 500);
 
   const variantId = await sequelize.transaction(async (t: Transaction) => {
     const dup = await InventoryProductVariant.findOne({
@@ -178,6 +180,7 @@ export default async function CreateInventoryProductVariantService(input: {
         combinationKey,
         sku,
         barcode,
+        imageUrl,
         salePrice,
         costPrice,
         trackStock,

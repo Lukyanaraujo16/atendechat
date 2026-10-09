@@ -8,6 +8,7 @@ import {
   Select,
   Typography,
 } from "@material-ui/core";
+import { makeStyles } from "@material-ui/core/styles";
 
 import {
   AppDialog,
@@ -22,6 +23,23 @@ import toastError from "../../errors/toastError";
 import { i18n } from "../../translate/i18n";
 import { formatCurrencyBRL } from "../../utils/brazilianCurrency";
 import { formatQuantity } from "./utils";
+import { resolveVariantImageUrl } from "./productVariantCombinations";
+
+const useStyles = makeStyles((theme) => ({
+  menuItem: {
+    display: "flex",
+    alignItems: "center",
+    gap: theme.spacing(1),
+  },
+  thumb: {
+    width: 28,
+    height: 28,
+    borderRadius: 4,
+    objectFit: "cover",
+    border: `1px solid ${theme.palette.divider}`,
+    flexShrink: 0,
+  },
+}));
 
 export default function SaleVariantPickerDialog({
   open,
@@ -29,6 +47,7 @@ export default function SaleVariantPickerDialog({
   onClose,
   onSelect,
 }) {
+  const classes = useStyles();
   const [loading, setLoading] = useState(false);
   const [variants, setVariants] = useState([]);
   const [variantId, setVariantId] = useState("");
@@ -97,16 +116,33 @@ export default function SaleVariantPickerDialog({
               onChange={(e) => setVariantId(e.target.value)}
               label={i18n.t("inventorySales.sales.items.variants.field")}
             >
-              {variants.map((variant) => (
-                <MenuItem key={variant.id} value={String(variant.id)}>
-                  {variant.label || `#${variant.id}`}
-                  {" · "}
-                  {formatCurrencyBRL(variant.salePrice)}
-                  {variant.trackStock
-                    ? ` · ${formatQuantity(variant.currentQuantity)}`
-                    : ""}
-                </MenuItem>
-              ))}
+              {variants.map((variant) => {
+                const imageUrl = resolveVariantImageUrl(variant, product);
+                return (
+                  <MenuItem key={variant.id} value={String(variant.id)}>
+                    <Box className={classes.menuItem}>
+                      {imageUrl ? (
+                        <img
+                          src={imageUrl}
+                          alt=""
+                          className={classes.thumb}
+                          onError={(e) => {
+                            e.currentTarget.style.display = "none";
+                          }}
+                        />
+                      ) : null}
+                      <span>
+                        {variant.label || `#${variant.id}`}
+                        {" · "}
+                        {formatCurrencyBRL(variant.salePrice)}
+                        {variant.trackStock
+                          ? ` · ${formatQuantity(variant.currentQuantity)}`
+                          : ""}
+                      </span>
+                    </Box>
+                  </MenuItem>
+                );
+              })}
             </Select>
           </FormControl>
         )}

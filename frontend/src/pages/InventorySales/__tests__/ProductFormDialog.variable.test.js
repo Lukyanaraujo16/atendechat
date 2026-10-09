@@ -35,6 +35,12 @@ jest.mock("react-toastify", () => ({
 
 jest.mock("@material-ui/core/useMediaQuery", () => () => false);
 
+function typeCents(input, digits) {
+  for (const d of String(digits)) {
+    fireEvent.keyDown(input, { key: d });
+  }
+}
+
 function renderDialog(props) {
   return render(
     <ProductFormDialog
@@ -64,7 +70,7 @@ describe("ProductFormDialog — produto com variações", () => {
     expect(screen.getByPlaceholderText("Ex.: Cor")).toBeTruthy();
   });
 
-  it("cadastra três cores em um único salvamento", async () => {
+  it("cadastra três cores com máscara BRL em um único salvamento", async () => {
     renderDialog();
     userEvent.click(screen.getByLabelText("Produto com variações"));
     userEvent.type(screen.getByLabelText("Nome *"), "iPhone 17 Pro Max");
@@ -73,8 +79,7 @@ describe("ProductFormDialog — produto com variações", () => {
     userEvent.type(charInput, "Cor");
     fireEvent.blur(charInput);
 
-    const optionInput = screen.getByPlaceholderText("Ex.: Azul");
-    userEvent.type(optionInput, "Azul");
+    userEvent.type(screen.getByPlaceholderText("Ex.: Azul"), "Azul");
     userEvent.click(screen.getByRole("button", { name: "Adicionar opção" }));
     userEvent.type(screen.getByPlaceholderText("Ex.: Azul"), "Branco");
     userEvent.click(screen.getByRole("button", { name: "Adicionar opção" }));
@@ -85,14 +90,14 @@ describe("ProductFormDialog — produto com variações", () => {
       expect(screen.getByText("Preços e estoque por variação")).toBeTruthy();
     });
 
-    const rows = document.querySelectorAll("table tbody tr");
-    expect(rows.length).toBe(3);
-    rows.forEach((row, idx) => {
-      const inputs = row.querySelectorAll("input");
-      fireEvent.change(inputs[0], {
-        target: { value: String(8500 + idx * 200) },
-      });
-    });
+    const saleInputs = screen.getAllByTestId(/^variant-sale-/);
+    expect(saleInputs).toHaveLength(3);
+    // 850000 cents → R$ 8.500,00
+    typeCents(saleInputs[0], "850000");
+    typeCents(saleInputs[1], "870000");
+    typeCents(saleInputs[2], "890000");
+
+    expect(saleInputs[0].value).toMatch(/8\.500,00/);
 
     fireEvent.submit(document.querySelector("form"));
 
@@ -107,6 +112,9 @@ describe("ProductFormDialog — produto com variações", () => {
     ]);
     expect(body.variants).toHaveLength(3);
     expect(body.variants.map((v) => v.salePrice)).toEqual([8500, 8700, 8900]);
+    expect(body.variants.every((v) => typeof v.salePrice === "number")).toBe(
+      true
+    );
   });
 
   it("produto simples continua usando createInventoryProduct", async () => {
