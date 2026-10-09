@@ -1055,6 +1055,11 @@ const messages = {
             method: "Método",
           },
           reversed: "Estornado",
+          paymentKind: {
+            receipt: "Recebimento",
+            reversal: "Estorno",
+            reversed: "Estornado",
+          },
           receipt: {
             title: "Comprovante de recebimento",
             amount: "Valor recebido nesta operação",

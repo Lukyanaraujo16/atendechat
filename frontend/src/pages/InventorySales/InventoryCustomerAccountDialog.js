@@ -33,7 +33,11 @@ import {
 import toastError from "../../errors/toastError";
 import { i18n } from "../../translate/i18n";
 import { formatCurrencyBRL } from "../../utils/brazilianCurrency";
-import { getInventoryPaymentMethodLabel } from "./paymentDisplay";
+import {
+  formatInventoryCustomerDocument,
+  formatInventoryCustomerPhone,
+} from "./inventoryCustomerMasks";
+import { formatReceivablePaymentHistoryLine } from "./receivablePaymentDisplay";
 
 const useStyles = makeStyles((theme) => ({
   statCard: {
@@ -182,7 +186,16 @@ export default function InventoryCustomerAccountDialog({
             </Box>
             {customer.document || customer.phone ? (
               <Typography variant="body2" color="textSecondary" gutterBottom>
-                {[customer.document, customer.phone].filter(Boolean).join(" · ")}
+                {[
+                  customer.document
+                    ? formatInventoryCustomerDocument(customer.document)
+                    : null,
+                  customer.phone
+                    ? formatInventoryCustomerPhone(customer.phone)
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
               </Typography>
             ) : null}
 
@@ -323,8 +336,7 @@ export default function InventoryCustomerAccountDialog({
                         </TableCell>
                         <TableCell>
                           {i18n.t(
-                            "inventorySales.sales.paymentStatus",
-                            "Status financeiro"
+                            "inventorySales.sales.fields.paymentStatus"
                           )}
                         </TableCell>
                       </TableRow>
@@ -370,13 +382,9 @@ export default function InventoryCustomerAccountDialog({
                           <TableCell>
                             {i18n.t("inventorySales.customers.account.paidAt")}
                           </TableCell>
-                          <TableCell align="right">
-                            {i18n.t("inventorySales.common.total", "Total")}
-                          </TableCell>
                           <TableCell>
                             {i18n.t(
-                              "inventorySales.receivables.columns.method",
-                              "Método"
+                              "inventorySales.receivables.detail.payments"
                             )}
                           </TableCell>
                           <TableCell>
@@ -386,24 +394,17 @@ export default function InventoryCustomerAccountDialog({
                       </TableHead>
                       <TableBody>
                         {payments.map((pay) => (
-                          <TableRow key={pay.id}>
+                          <TableRow
+                            key={pay.id}
+                            data-testid={`account-payment-row-${pay.id}`}
+                          >
                             <TableCell>
                               {formatDateTime(pay.paidAt)}
-                              {pay.reversedAt ? (
-                                <Chip
-                                  size="small"
-                                  label={i18n.t(
-                                    "inventorySales.receivables.reversed"
-                                  )}
-                                  style={{ marginLeft: 8 }}
-                                />
-                              ) : null}
                             </TableCell>
-                            <TableCell align="right">
-                              {formatCurrencyBRL(pay.amount)}
-                            </TableCell>
-                            <TableCell>
-                              {getInventoryPaymentMethodLabel(pay.paymentMethod)}
+                            <TableCell
+                              data-testid={`account-payment-line-${pay.id}`}
+                            >
+                              {formatReceivablePaymentHistoryLine(pay)}
                             </TableCell>
                             <TableCell>
                               {pay.createdByUser?.name || "—"}

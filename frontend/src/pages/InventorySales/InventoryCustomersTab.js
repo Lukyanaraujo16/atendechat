@@ -42,6 +42,10 @@ import { i18n } from "../../translate/i18n";
 import useIsMobile from "../../hooks/useIsMobile";
 import { useInventoryPermissions } from "../../utils/inventoryAccess";
 import { formatCurrencyBRL } from "../../utils/brazilianCurrency";
+import {
+  formatInventoryCustomerDocument,
+  formatInventoryCustomerPhone,
+} from "./inventoryCustomerMasks";
 import InventoryCustomerFormDialog from "./InventoryCustomerFormDialog";
 import InventoryCustomerAccountDialog from "./InventoryCustomerAccountDialog";
 
@@ -254,7 +258,14 @@ export default function InventoryCustomersTab({
             <MobileEntityCard
               key={row.id}
               title={row.name}
-              subtitle={[row.document, row.phone].filter(Boolean).join(" · ")}
+              subtitle={[
+                row.document
+                  ? formatInventoryCustomerDocument(row.document)
+                  : null,
+                row.phone ? formatInventoryCustomerPhone(row.phone) : null,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
               onClick={() => setAccountId(row.id)}
               actions={
                 <>
@@ -344,8 +355,16 @@ export default function InventoryCustomersTab({
                   customers.map((row) => (
                     <TableRow key={row.id} hover>
                       <TableCell>{row.name}</TableCell>
-                      <TableCell>{row.document || "—"}</TableCell>
-                      <TableCell>{row.phone || "—"}</TableCell>
+                      <TableCell>
+                        {row.document
+                          ? formatInventoryCustomerDocument(row.document)
+                          : "—"}
+                      </TableCell>
+                      <TableCell>
+                        {row.phone
+                          ? formatInventoryCustomerPhone(row.phone)
+                          : "—"}
+                      </TableCell>
                       {perms.canViewCustomerFinancials ? (
                         <>
                           <TableCell align="right">

@@ -177,6 +177,9 @@ export default function SaleWizardPaymentStep({
   const [creditSummary, setCreditSummary] = useState(null);
   const [schedulePreview, setSchedulePreview] = useState(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  /** Rascunho textual p/ digitar Nº parcelas sem clamp forçar 1 no meio da digitação. */
+  const [installmentCountDraft, setInstallmentCountDraft] = useState("");
+  const [installmentCountFocused, setInstallmentCountFocused] = useState(false);
 
   const summary = paymentsBundle?.summary;
   const payments = Array.isArray(paymentsBundle?.payments)
@@ -248,6 +251,35 @@ export default function SaleWizardPaymentStep({
       });
     }
   }, [hasStoreCredit, setStoreCreditSchedule, storeCreditSchedule]);
+
+  useEffect(() => {
+    if (!hasStoreCredit) {
+      setInstallmentCountDraft("");
+      return;
+    }
+    // Não sobrescrever enquanto o operador digita (pai pode não ter recomputado ainda).
+    if (installmentCountFocused) return;
+    const n = Number(storeCreditSchedule?.installmentCount);
+    if (Number.isFinite(n) && n >= 1) {
+      setInstallmentCountDraft(String(n));
+    }
+  }, [
+    hasStoreCredit,
+    storeCreditSchedule?.installmentCount,
+    installmentCountFocused,
+  ]);
+
+  const commitInstallmentCount = (raw) => {
+    const digits = String(raw ?? "").replace(/\D/g, "");
+    let n = digits === "" ? 1 : Number(digits);
+    if (!Number.isFinite(n) || n < 1) n = 1;
+    if (n > 48) n = 48;
+    setInstallmentCountDraft(String(n));
+    setStoreCreditSchedule((prev) => ({
+      ...(prev || {}),
+      installmentCount: n,
+    }));
+  };
 
   useEffect(() => {
     if (
@@ -619,25 +651,46 @@ export default function SaleWizardPaymentStep({
                   </FormControl>
                   {storeCreditSchedule?.frequency !== "once" ? (
                     <TextField
-                      type="number"
+                      type="text"
                       label={i18n.t(
                         "inventorySales.sales.wizard.payment.storeCreditInstallments"
                       )}
-                      value={storeCreditSchedule?.installmentCount || 1}
-                      onChange={(e) =>
+                      value={
+                        installmentCountFocused
+                          ? installmentCountDraft
+                          : String(
+                              installmentCountDraft !== ""
+                                ? installmentCountDraft
+                                : storeCreditSchedule?.installmentCount || 1
+                            )
+                      }
+                      onChange={(e) => {
+                        const raw = e.target.value.replace(/[^\d]/g, "");
+                        setInstallmentCountDraft(raw);
+                        if (raw === "") return;
+                        const n = Number(raw);
+                        if (!Number.isFinite(n) || n < 1) return;
+                        const clamped = Math.min(48, n);
                         setStoreCreditSchedule((prev) => ({
                           ...(prev || {}),
-                          installmentCount: Math.max(
-                            1,
-                            Number(e.target.value) || 1
-                          ),
-                        }))
-                      }
+                          installmentCount: clamped,
+                        }));
+                        if (n > 48) setInstallmentCountDraft("48");
+                      }}
+                      onFocus={() => {
+                        setInstallmentCountFocused(true);
+                      }}
+                      onBlur={() => {
+                        commitInstallmentCount(installmentCountDraft);
+                        setInstallmentCountFocused(false);
+                      }}
                       variant="outlined"
                       size="small"
                       fullWidth
                       disabled={disabled}
                       inputProps={{
+                        inputMode: "numeric",
+                        pattern: "[0-9]*",
                         min: 1,
                         max: 48,
                         "data-testid": "store-credit-installments",

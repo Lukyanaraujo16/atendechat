@@ -4,8 +4,12 @@ import { getInventoryPaymentMethodLabel } from "./paymentDisplay";
 
 /**
  * Comprovante simples de recebimento (Contas a Receber).
- * Usa window.print — não altera recibos A4/80/58 de venda.
+ * Não altera recibos A4/80/58 de venda.
  * amount = valor efetivamente recebido nesta operação (não saldo residual).
+ *
+ * Usa Blob URL + window.open para evitar aba branca: com
+ * `noopener` o browser abre a aba mas `window.open` retorna null,
+ * então document.write nunca rodava.
  */
 export function printReceivablePaymentReceipt({
   customerName,
@@ -121,13 +125,47 @@ export function printReceivablePaymentReceipt({
         )}: ${formatCurrencyBRL(remainingOpenAmount)}</div>`
       : ""
   }
-  <script>window.onload = function () { window.print(); };</script>
+  <script>
+    window.addEventListener("load", function () {
+      try { window.focus(); window.print(); } catch (e) {}
+    });
+  </script>
 </body>
 </html>`;
 
-  const win = window.open("", "_blank", "noopener,noreferrer,width=720,height=800");
-  if (!win) return;
-  win.document.open();
-  win.document.write(html);
-  win.document.close();
+  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  // Mesmo com noopener (retorno null), a URL é carregada na nova aba —
+  // evita aba órfã em branco que ocorriam com document.write após open("", …).
+  const win = window.open(
+    url,
+    "_blank",
+    "noopener,noreferrer,width=720,height=800"
+  );
+  const revoke = () => {
+    try {
+      URL.revokeObjectURL(url);
+    } catch (_) {
+      /* ignore */
+    }
+  };
+  if (win) {
+    const t = setTimeout(revoke, 120000);
+    try {
+      win.addEventListener("afterprint", () => {
+        clearTimeout(t);
+        revoke();
+        try {
+          win.close();
+        } catch (_) {
+          /* ignore */
+        }
+      });
+    } catch (_) {
+      /* ignore */
+    }
+  } else {
+    setTimeout(revoke, 120000);
+  }
+  return { url, window: win };
 }

@@ -990,6 +990,11 @@ const messages = {
 						method: "Method",
 					},
 					reversed: "Reversed",
+					paymentKind: {
+						receipt: "Receipt",
+						reversal: "Reversal",
+						reversed: "Reversed",
+					},
 					receipt: {
 						title: "Payment receipt",
 						amount: "Amount received in this operation",

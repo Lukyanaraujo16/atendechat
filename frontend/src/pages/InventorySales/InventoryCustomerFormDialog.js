@@ -36,6 +36,11 @@ import {
   axiosAbortConfig,
   isAbortError,
 } from "./saleProductSearch";
+import {
+  digitsForPersist,
+  formatInventoryCustomerDocument,
+  formatInventoryCustomerPhone,
+} from "./inventoryCustomerMasks";
 
 const emptyForm = {
   type: "individual",
@@ -98,8 +103,8 @@ export default function InventoryCustomerFormDialog({
         type: customer.type || "individual",
         name: customer.name || "",
         tradeName: customer.tradeName || "",
-        document: customer.document || "",
-        phone: customer.phone || "",
+        document: formatInventoryCustomerDocument(customer.document || ""),
+        phone: formatInventoryCustomerPhone(customer.phone || ""),
         email: customer.email || "",
         postalCode: customer.postalCode || "",
         street: customer.street || "",
@@ -118,7 +123,7 @@ export default function InventoryCustomerFormDialog({
       setForm({
         ...emptyForm,
         name: initialContact.name || "",
-        phone: initialContact.number || "",
+        phone: formatInventoryCustomerPhone(initialContact.number || ""),
         email: initialContact.email || "",
         postalCode: initialContact.postalCode || "",
         street: initialContact.street || "",
@@ -188,8 +193,8 @@ export default function InventoryCustomerFormDialog({
         type: form.type,
         name: form.name.trim(),
         tradeName: form.tradeName.trim() || null,
-        document: form.document.trim() || null,
-        phone: form.phone.trim() || null,
+        document: digitsForPersist(form.document),
+        phone: digitsForPersist(form.phone),
         email: form.email.trim() || null,
         postalCode: form.postalCode.trim() || null,
         street: form.street.trim() || null,
@@ -288,22 +293,42 @@ export default function InventoryCustomerFormDialog({
               <TextField
                 label={i18n.t("inventorySales.customers.form.document")}
                 value={form.document}
-                onChange={setField("document")}
+                onChange={(e) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    document: formatInventoryCustomerDocument(e.target.value),
+                  }))
+                }
                 variant="outlined"
                 size="small"
                 fullWidth
                 disabled={saving}
+                inputProps={{
+                  inputMode: "numeric",
+                  autoComplete: "off",
+                  "data-testid": "customer-form-document",
+                }}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
               <TextField
                 label={i18n.t("inventorySales.customers.form.phone")}
                 value={form.phone}
-                onChange={setField("phone")}
+                onChange={(e) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    phone: formatInventoryCustomerPhone(e.target.value),
+                  }))
+                }
                 variant="outlined"
                 size="small"
                 fullWidth
                 disabled={saving}
+                inputProps={{
+                  inputMode: "tel",
+                  autoComplete: "tel",
+                  "data-testid": "customer-form-phone",
+                }}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -451,7 +476,9 @@ export default function InventoryCustomerFormDialog({
                       ...prev,
                       contactId: String(value.id),
                       name: prev.name || value.name || "",
-                      phone: prev.phone || value.number || "",
+                      phone:
+                        prev.phone ||
+                        formatInventoryCustomerPhone(value.number || ""),
                       email: prev.email || value.email || "",
                       postalCode: prev.postalCode || value.postalCode || "",
                       street: prev.street || value.street || "",

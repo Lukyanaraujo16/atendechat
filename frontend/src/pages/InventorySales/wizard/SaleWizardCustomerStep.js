@@ -29,6 +29,10 @@ import {
   isAbortError,
 } from "../saleProductSearch";
 import { deliverySourceFromCustomer } from "./deliveryAddressUtils";
+import {
+  formatInventoryCustomerDocument,
+  formatInventoryCustomerPhone,
+} from "../inventoryCustomerMasks";
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -506,8 +510,16 @@ export default function SaleWizardCustomerStep({
               selectedCustomer.number ? (
                 <Typography variant="body2" color="textSecondary">
                   {[
-                    selectedCustomer.document,
-                    selectedCustomer.phone || selectedCustomer.number,
+                    selectedCustomer.document
+                      ? formatInventoryCustomerDocument(
+                          selectedCustomer.document
+                        )
+                      : null,
+                    selectedCustomer.phone || selectedCustomer.number
+                      ? formatInventoryCustomerPhone(
+                          selectedCustomer.phone || selectedCustomer.number
+                        )
+                      : null,
                   ]
                     .filter(Boolean)
                     .join(" · ")}

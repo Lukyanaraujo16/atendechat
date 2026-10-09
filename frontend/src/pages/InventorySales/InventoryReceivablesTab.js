@@ -62,6 +62,7 @@ import {
 } from "./constants";
 import CurrencyInput from "./CurrencyInput";
 import { printReceivablePaymentReceipt } from "./printReceivablePaymentReceipt";
+import { formatReceivablePaymentHistoryLine } from "./receivablePaymentDisplay";
 
 const useStyles = makeStyles((theme) => ({
   headerRow: {
@@ -684,17 +685,14 @@ export default function InventoryReceivablesTab({
                     alignItems="center"
                     py={0.5}
                   >
-                    <Typography variant="body2">
-                      {methodLabel(p.paymentMethod)} ·{" "}
-                      {formatCurrencyBRL(p.amount)}
-                      {p.reversedAt
-                        ? ` (${i18n.t(
-                            "inventorySales.sales.payment.statusReversed"
-                          )})`
-                        : ""}
-                      {p.createdByUser?.name
-                        ? ` · ${p.createdByUser.name}`
-                        : ""}
+                    <Typography
+                      variant="body2"
+                      data-testid={`receivable-payment-line-${p.id}`}
+                    >
+                      {formatReceivablePaymentHistoryLine(p, {
+                        includeOperator: true,
+                        includeNotes: true,
+                      })}
                     </Typography>
                     {perms.canReverseReceivablePayments &&
                     !p.reversedAt &&
