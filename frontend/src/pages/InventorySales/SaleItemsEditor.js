@@ -45,7 +45,12 @@ import toastError from "../../errors/toastError";
 import { i18n } from "../../translate/i18n";
 import useIsMobile from "../../hooks/useIsMobile";
 import { formatCurrencyBRL, parseBrazilianCurrencyToNumber } from "../../utils/brazilianCurrency";
-import { formatQuantity } from "./utils";
+import {
+  formatQuantity,
+  normalizeQuantityInputValue,
+  parseQuantityValue,
+  quantityValuesEqual,
+} from "./utils";
 import CurrencyInput from "./CurrencyInput";
 import SaleItemIdentifiersEditor from "./SaleItemIdentifiersEditor";
 import SaleItemIdentifiersList from "./SaleItemIdentifiersList";
@@ -75,7 +80,7 @@ import {
 } from "./inventoryDiscountAuth";
 import { useInventoryPermissions } from "../../utils/inventoryAccess";
 
-const useStyles = makeStyles(() => ({
+const useStyles = makeStyles((theme) => ({
   tableContainer: {
     width: "100%",
     maxWidth: "100%",
@@ -87,31 +92,52 @@ const useStyles = makeStyles(() => ({
     maxWidth: "100%",
     tableLayout: "fixed",
   },
+  headerCell: {
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  },
   productCell: {
     minWidth: 0,
-    width: "auto",
+    width: "34%",
   },
-  numericCell: {
+  qtyCell: {
     minWidth: 0,
-    width: "14%",
+    width: "10%",
+  },
+  priceCell: {
+    minWidth: 0,
+    width: "16%",
   },
   discountCell: {
     minWidth: 0,
-    width: "18%",
+    width: "22%",
+  },
+  totalCell: {
+    minWidth: 0,
+    width: "10%",
   },
   actionsCell: {
     minWidth: 0,
-    width: "10%",
+    width: "8%",
   },
   numericField: {
     width: "100%",
     minWidth: 0,
     maxWidth: "100%",
   },
-  discountField: {
+  qtyField: {
     width: "100%",
-    maxWidth: 200,
-    minWidth: 0,
+    maxWidth: 96,
+    minWidth: 64,
+    marginLeft: "auto",
+    "& input": {
+      textAlign: "right",
+    },
+    [theme.breakpoints.down("sm")]: {
+      maxWidth: "100%",
+      marginLeft: 0,
+    },
   },
   discountControl: {
     display: "flex",
@@ -119,8 +145,13 @@ const useStyles = makeStyles(() => ({
     alignItems: "center",
     gap: 6,
     width: "100%",
-    maxWidth: 200,
+    maxWidth: 280,
     minWidth: 0,
+    marginLeft: "auto",
+    [theme.breakpoints.down("sm")]: {
+      maxWidth: "100%",
+      marginLeft: 0,
+    },
   },
   discountTypeGroup: {
     flexShrink: 0,
@@ -131,13 +162,40 @@ const useStyles = makeStyles(() => ({
     },
   },
   discountInputWrap: {
-    flex: "1 1 auto",
-    minWidth: 0,
+    flex: "1 1 120px",
+    minWidth: 108,
+    maxWidth: 168,
+    "& input[type=number]": {
+      MozAppearance: "textfield",
+    },
+    "& input[type=number]::-webkit-outer-spin-button, & input[type=number]::-webkit-inner-spin-button": {
+      WebkitAppearance: "none",
+      margin: 0,
+    },
+    [theme.breakpoints.down("sm")]: {
+      maxWidth: "none",
+    },
+  },
+  addFormRow: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: 12,
+    alignItems: "flex-end",
+  },
+  addQtySlot: {
+    flex: "0 1 96px",
+    maxWidth: 110,
+    minWidth: 80,
+  },
+  addPriceSlot: {
+    flex: "1 1 140px",
+    maxWidth: 200,
+    minWidth: 120,
   },
   addDiscountSlot: {
-    flex: "0 1 200px",
-    maxWidth: 220,
-    minWidth: 148,
+    flex: "1 1 220px",
+    maxWidth: 280,
+    minWidth: 200,
   },
   identifiersCell: {
     paddingTop: 0,
@@ -218,12 +276,12 @@ function percentEqual(left, right) {
 }
 
 function previewLineTotal(draft, item) {
-  const quantity = Number(draft.quantity);
+  const quantity = parseQuantityValue(draft.quantity);
   const unitPrice =
     parseBrazilianCurrencyToNumber(draft.unitPrice) ??
     Number(item?.unitPrice) ??
     0;
-  if (!Number.isFinite(quantity) || quantity <= 0) {
+  if (quantity == null || quantity <= 0) {
     return Number(item?.totalAmount) || 0;
   }
   const built = buildItemDiscountPayload(draft);
@@ -303,16 +361,13 @@ function SaleItemDiscountFields({
           <TextField
             size="small"
             variant="outlined"
-            type="number"
+            type="text"
             value={draft.discountPercent}
             onChange={onPercentChange}
             onBlur={onBlur}
             disabled={disabled}
             fullWidth
             inputProps={{
-              min: 0,
-              max: 100,
-              step: "0.01",
               inputMode: "decimal",
               "data-testid": testIdPrefix
                 ? `${testIdPrefix}-percent`
@@ -552,6 +607,9 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
       ? [selectedProduct, ...options]
       : options;
 
+  const itemQuantityDraftValue = (item) =>
+    normalizeQuantityInputValue(item?.quantity);
+
   const getRowDraft = (item) => {
     const identifierDefaults = identifierDraftFromItem(item);
     const discountDefaults = discountDraftFromItem(item);
@@ -564,7 +622,7 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
       };
     }
     return {
-      quantity: String(item.quantity ?? ""),
+      quantity: itemQuantityDraftValue(item),
       unitPrice: String(item.unitPrice ?? ""),
       ...discountDefaults,
       ...identifierDefaults,
@@ -577,7 +635,7 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
       itemsRef.current.find((i) => i.id === itemId);
     const base = item
       ? {
-          quantity: String(item.quantity ?? ""),
+          quantity: itemQuantityDraftValue(item),
           unitPrice: String(item.unitPrice ?? ""),
           ...discountDraftFromItem(item),
           ...identifierDraftFromItem(item),
@@ -608,7 +666,7 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
     const identifierDefaults = identifierDraftFromItem(item);
     const fromRef = rowDraftsRef.current[item.id];
     return {
-      quantity: String(item.quantity ?? ""),
+      quantity: itemQuantityDraftValue(item),
       unitPrice: String(item.unitPrice ?? ""),
       ...discountDraftFromItem(item),
       ...identifierDefaults,
@@ -633,12 +691,62 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
         ? !percentEqual(draft.discountPercent, item.discountPercent ?? "")
         : !moneyEqual(draft.discountAmount, item.discountAmount ?? "0"));
     return (
-      String(draft.quantity) !== String(item.quantity ?? "") ||
+      !quantityValuesEqual(draft.quantity, item.quantity) ||
       !moneyEqual(draft.unitPrice, item.unitPrice) ||
       discountDirty ||
       identifiersDirty
     );
   };
+
+  /** Remove drafts já sincronizados com o item (após refresh), sem apagar mid-edit. */
+  useEffect(() => {
+    setRowDrafts((prev) => {
+      const ids = Object.keys(prev);
+      if (!ids.length) return prev;
+      let changed = false;
+      const next = { ...prev };
+      ids.forEach((id) => {
+        const item = items.find((row) => String(row.id) === String(id));
+        if (!item) return;
+        const draft = {
+          quantity: itemQuantityDraftValue(item),
+          unitPrice: String(item.unitPrice ?? ""),
+          ...discountDraftFromItem(item),
+          ...identifierDraftFromItem(item),
+          ...next[id],
+        };
+        const identifiersDirty =
+          draft.identifiersTouched &&
+          !identifierPayloadsEqual(
+            draft.identifierValues,
+            identifierValuesFromItem(item)
+          );
+        const discountDirty =
+          (draft.discountType === "percentage"
+            ? "percentage"
+            : "fixed") !== discountDraftFromItem(item).discountType ||
+          (draft.discountType === "percentage"
+            ? !percentEqual(draft.discountPercent, item.discountPercent ?? "")
+            : !moneyEqual(draft.discountAmount, item.discountAmount ?? "0"));
+        const dirty =
+          !quantityValuesEqual(draft.quantity, item.quantity) ||
+          !moneyEqual(draft.unitPrice, item.unitPrice) ||
+          discountDirty ||
+          identifiersDirty;
+        // Não podar digitação intermediária ("1.", "0.") — só drafts já canônicos.
+        const quantityCommitted =
+          String(draft.quantity ?? "") ===
+          normalizeQuantityInputValue(draft.quantity);
+        if (!dirty && quantityCommitted) {
+          delete next[id];
+          changed = true;
+        }
+      });
+      if (!changed) return prev;
+      rowDraftsRef.current = next;
+      return next;
+    });
+  }, [items]);
 
   const clearAutoSaveTimer = (itemId) => {
     const timer = autoSaveTimersRef.current[itemId];
@@ -654,8 +762,8 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
   ) => {
     if (!sale?.id || !item?.id) return { ok: false };
     const draft = getDraftForItem(item);
-    const quantity = Number(draft.quantity);
-    if (!Number.isFinite(quantity) || quantity <= 0) {
+    const quantity = parseQuantityValue(draft.quantity);
+    if (quantity == null || quantity <= 0) {
       if (!fromAutoSave) {
         toast.error(i18n.t("inventorySales.sales.items.validation.quantity"));
       }
@@ -720,10 +828,29 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
         if (saveSeqByItemRef.current[item.id] !== seq) {
           return { ok: true, stale: true };
         }
+        // Mantém draft alinhado ao payload salvo até o refresh do parent —
+        // evita flicker R$↔% (apagar draft antes do item atualizar voltava ao tipo antigo).
+        const discountPayload = buildItemDiscountPayload(draft);
+        const syncedDraft = {
+          ...draft,
+          quantity: normalizeQuantityInputValue(payload.quantity),
+          unitPrice: String(payload.unitPrice),
+          discountType:
+            discountPayload.discountType === "percentage"
+              ? "percentage"
+              : "fixed",
+          discountPercent:
+            discountPayload.discountType === "percentage"
+              ? String(discountPayload.discountPercent ?? 0)
+              : draft.discountPercent ?? "",
+          discountAmount:
+            discountPayload.discountType === "percentage"
+              ? draft.discountAmount
+              : String(discountPayload.discountAmount ?? 0),
+        };
         setRowDrafts((prev) => {
           if (saveSeqByItemRef.current[item.id] !== seq) return prev;
-          const next = { ...prev };
-          delete next[item.id];
+          const next = { ...prev, [item.id]: syncedDraft };
           rowDraftsRef.current = next;
           return next;
         });
@@ -847,9 +974,17 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
 
   const handleQuantityBlur = (item) => {
     const draft = getRowDraft(item);
+    const normalized = normalizeQuantityInputValue(draft.quantity);
+    if (normalized !== String(draft.quantity ?? "")) {
+      patchRowDraft(item.id, { quantity: normalized });
+    }
+    const latest = {
+      ...draft,
+      quantity: normalized !== String(draft.quantity ?? "") ? normalized : draft.quantity,
+    };
     const result = validateIdentifiersForSubmit({
-      quantity: draft.quantity,
-      values: draft.identifierValues,
+      quantity: latest.quantity,
+      values: latest.identifierValues,
     });
     if (
       result.code === "reduceQuantity" ||
@@ -883,8 +1018,8 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
       toast.error(i18n.t("inventorySales.sales.items.validation.product"));
       return;
     }
-    const quantity = Number(addForm.quantity);
-    if (!Number.isFinite(quantity) || quantity <= 0) {
+    const quantity = parseQuantityValue(addForm.quantity);
+    if (quantity == null || quantity <= 0) {
       toast.error(i18n.t("inventorySales.sales.items.validation.quantity"));
       return;
     }
@@ -1118,8 +1253,12 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
                           setRowField(item.id, "quantity", e.target.value)
                         }
                         onBlur={() => handleQuantityBlur(item)}
-                        type="number"
-                        inputProps={{ min: 0, step: "any" }}
+                        type="text"
+                        inputProps={{
+                          inputMode: "decimal",
+                          "data-testid": `sale-item-qty-${item.id}`,
+                        }}
+                        className={classes.qtyField}
                         fullWidth
                         style={{ marginBottom: 8 }}
                       />
@@ -1195,21 +1334,23 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
             >
               <TableHead>
                 <TableRow>
-                  <TableCell className={classes.productCell}>{i18n.t("inventorySales.sales.items.product")}</TableCell>
-                  <TableCell align="right" className={classes.numericCell}>
+                  <TableCell className={`${classes.productCell} ${classes.headerCell}`}>
+                    {i18n.t("inventorySales.sales.items.product")}
+                  </TableCell>
+                  <TableCell align="right" className={`${classes.qtyCell} ${classes.headerCell}`}>
                     {i18n.t("inventorySales.sales.items.quantity")}
                   </TableCell>
-                  <TableCell align="right" className={classes.numericCell}>
+                  <TableCell align="right" className={`${classes.priceCell} ${classes.headerCell}`}>
                     {i18n.t("inventorySales.sales.items.unitPrice")}
                   </TableCell>
-                  <TableCell align="right" className={classes.discountCell}>
+                  <TableCell align="right" className={`${classes.discountCell} ${classes.headerCell}`}>
                     {i18n.t("inventorySales.sales.items.discount")}
                   </TableCell>
-                  <TableCell align="right" className={classes.numericCell}>
+                  <TableCell align="right" className={`${classes.totalCell} ${classes.headerCell}`}>
                     {i18n.t("inventorySales.sales.items.total")}
                   </TableCell>
                   {!readOnly ? (
-                    <TableCell align="right" className={classes.actionsCell}>
+                    <TableCell align="right" className={`${classes.actionsCell} ${classes.headerCell}`}>
                       {i18n.t("inventorySales.common.actions")}
                     </TableCell>
                   ) : null}
@@ -1231,7 +1372,7 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
                             </Typography>
                           ) : null}
                         </TableCell>
-                        <TableCell align="right" className={classes.numericCell}>
+                        <TableCell align="right" className={classes.qtyCell}>
                           {readOnly ? (
                             formatQuantity(draft.quantity)
                           ) : (
@@ -1243,18 +1384,17 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
                                 setRowField(item.id, "quantity", e.target.value)
                               }
                               onBlur={() => handleQuantityBlur(item)}
-                              type="number"
+                              type="text"
                               inputProps={{
-                                min: 0,
-                                step: "any",
+                                inputMode: "decimal",
                                 "data-testid": `sale-item-qty-${item.id}`,
                               }}
-                              className={classes.numericField}
+                              className={classes.qtyField}
                               fullWidth
                             />
                           )}
                         </TableCell>
-                        <TableCell align="right" className={classes.numericCell}>
+                        <TableCell align="right" className={classes.priceCell}>
                           {readOnly ? (
                             formatCurrencyBRL(draft.unitPrice)
                           ) : (
@@ -1312,7 +1452,7 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
                             />
                           )}
                         </TableCell>
-                        <TableCell align="right" className={classes.numericCell}>
+                        <TableCell align="right" className={classes.totalCell}>
                           {formatCurrencyBRL(
                             readOnly
                               ? item.totalAmount
@@ -1477,20 +1617,37 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
                 />
               )}
             />
-            <Box display="flex" flexWrap="wrap" style={{ gap: 12 }}>
-              <TextField
-                size="small"
-                variant="outlined"
-                label={i18n.t("inventorySales.sales.items.quantity")}
-                value={addForm.quantity}
-                onChange={(e) =>
-                  setAddForm((prev) => ({ ...prev, quantity: e.target.value }))
-                }
-                type="number"
-                inputProps={{ min: 0, step: "any" }}
-                style={{ flex: 1, minWidth: 100 }}
-              />
-              <Box style={{ flex: 1, minWidth: 120 }}>
+            <Box className={classes.addFormRow}>
+              <Box className={classes.addQtySlot}>
+                <TextField
+                  size="small"
+                  variant="outlined"
+                  label={i18n.t("inventorySales.sales.items.quantity")}
+                  value={addForm.quantity}
+                  onChange={(e) =>
+                    setAddForm((prev) => ({ ...prev, quantity: e.target.value }))
+                  }
+                  onBlur={() => {
+                    const normalized = normalizeQuantityInputValue(
+                      addForm.quantity
+                    );
+                    if (normalized !== String(addForm.quantity ?? "")) {
+                      setAddForm((prev) => ({
+                        ...prev,
+                        quantity: normalized,
+                      }));
+                    }
+                  }}
+                  type="text"
+                  inputProps={{
+                    inputMode: "decimal",
+                    "data-testid": "sale-add-qty",
+                  }}
+                  className={classes.qtyField}
+                  fullWidth
+                />
+              </Box>
+              <Box className={classes.addPriceSlot}>
                 <CurrencyInput
                   label={i18n.t("inventorySales.sales.items.unitPriceOptional")}
                   value={

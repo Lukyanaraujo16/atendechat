@@ -202,7 +202,13 @@ describe("SaleItemsEditor discount autosave persistence", () => {
   });
 
   it("clicar % no item existente envia percentage (não fixed) e permanece após reidratação", async () => {
-    const onSaleUpdated = jest.fn().mockResolvedValue(undefined);
+    let resolveRefresh;
+    const onSaleUpdated = jest.fn(
+      () =>
+        new Promise((resolve) => {
+          resolveRefresh = resolve;
+        })
+    );
     const { rerender } = render(
       <ThemeProvider theme={createTheme()}>
         <SaleItemsEditor
@@ -231,8 +237,18 @@ describe("SaleItemsEditor discount autosave persistence", () => {
     expect(body.discountPercent).toBe(0);
     expect(body.discountType).not.toBe("fixed");
 
-    expect(screen.queryByTestId("sale-item-autosaving-5")).toBeNull();
+    // Enquanto o parent ainda não reidratou, % deve permanecer (sem flicker para R$).
+    expect(
+      screen.getByTestId("sale-item-discount-5-type-percent").getAttribute(
+        "aria-pressed"
+      )
+    ).toBe("true");
+    expect(screen.getByTestId("sale-item-discount-5-percent")).toBeTruthy();
+    expect(screen.queryByTestId("sale-item-discount-5-amount")).toBeNull();
 
+    await act(async () => {
+      resolveRefresh();
+    });
     await waitFor(() => expect(onSaleUpdated).toHaveBeenCalled());
 
     rerender(
