@@ -365,6 +365,13 @@ inventoryRoutes.post(
   requireInventorySalesPermission(INVENTORY_SALES_CREATE_SALE),
   InventorySaleController.addSaleItem
 );
+
+inventoryRoutes.put(
+  "/inventory/sales/:id/global-discount",
+  isAuth,
+  requireInventorySalesPermission(INVENTORY_SALES_CREATE_SALE),
+  InventorySaleController.updateSaleGlobalDiscount
+);
 inventoryRoutes.put(
   "/inventory/sales/:id/items/:itemId",
   isAuth,

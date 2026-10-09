@@ -134,6 +134,18 @@ export function exportInventorySummaryCsv(summary, filters, t) {
       formatCsvMoney(summary.totalCommission),
     ],
     [
+      t("inventorySales.reports.summary.totalItemDiscounts"),
+      formatCsvMoney(summary.totalItemDiscounts),
+    ],
+    [
+      t("inventorySales.reports.summary.totalGlobalDiscounts"),
+      formatCsvMoney(summary.totalGlobalDiscounts),
+    ],
+    [
+      t("inventorySales.reports.summary.totalDiscountsGranted"),
+      formatCsvMoney(summary.totalDiscountsGranted),
+    ],
+    [
       t("inventorySales.reports.summary.cancelledCount"),
       String(summary.cancelledSalesCount ?? 0),
     ],

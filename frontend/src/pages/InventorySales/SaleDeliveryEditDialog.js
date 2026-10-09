@@ -70,8 +70,11 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
+/** Mercadoria líquida após itens + global (sem frete) — backend autoritativo via total−freight. */
 function merchandiseTotal(sale) {
-  return moneyNumber(sale?.subtotalAmount) - moneyNumber(sale?.discountAmount);
+  return (
+    moneyNumber(sale?.totalAmount) - moneyNumber(sale?.freightAmount)
+  );
 }
 
 export default function SaleDeliveryEditDialog({

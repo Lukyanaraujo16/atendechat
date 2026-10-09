@@ -30,6 +30,11 @@ import CreateInventoryReceivableFromSaleService, {
   StoreCreditScheduleInput
 } from "./CreateInventoryReceivableFromSaleService";
 import { StoreCreditOverrideInput } from "./ValidateInventoryStoreCreditForCompleteService";
+import {
+  assertMerchandiseDiscountGovernance,
+  DiscountAuthorizationInput,
+  snapshotSaleMerchandiseDiscount
+} from "./inventoryDiscountGovernance";
 
 export default async function CompleteInventorySaleService(input: {
   companyId: number;
@@ -45,6 +50,7 @@ export default async function CompleteInventorySaleService(input: {
   storeCreditSchedule?: StoreCreditScheduleInput;
   storeCreditOverride?: StoreCreditOverrideInput;
   canUseStoreCredit?: boolean;
+  discountAuthorization?: DiscountAuthorizationInput;
 }): Promise<InventorySale> {
   await GetOrCreateInventorySettingsService(input.companyId);
 
@@ -218,6 +224,16 @@ export default async function CompleteInventorySaleService(input: {
     await recalculateInventorySaleTotals(sale.id, input.companyId, t);
     await sale.reload({ transaction: t });
 
+    const discountSnapshot = await snapshotSaleMerchandiseDiscount(sale, t);
+    await assertMerchandiseDiscountGovernance({
+      companyId: input.companyId,
+      sale,
+      snapshot: discountSnapshot,
+      authorization: input.discountAuthorization,
+      actorUserId: input.completedBy,
+      transaction: t
+    });
+
     const sellerProfile = await InventorySellerProfile.findOne({
       where: { companyId: input.companyId, userId: sellerUserId, active: true },
       transaction: t
@@ -229,9 +245,9 @@ export default async function CompleteInventorySaleService(input: {
     }
 
     const totalAmount = toMoney(sale.totalAmount);
-    // Frete não entra na base de comissão (mercadoria após descontos).
+    // Comissão sobre mercadoria líquida após TODOS os descontos, SEM frete.
     const commissionBase = roundMoney(
-      totalAmount - toMoney(sale.freightAmount)
+      Math.max(0, totalAmount - toMoney(sale.freightAmount))
     );
     const commissionAmount = roundMoney(
       (commissionBase * commissionRate) / 100

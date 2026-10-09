@@ -127,9 +127,26 @@ class InventorySale extends Model<InventorySale> {
   @Column(DataType.DECIMAL(12, 2))
   subtotalAmount: string | number;
 
+  /** Soma dos descontos dos itens (semântica histórica — NÃO é desconto global). */
   @Default(0)
   @Column(DataType.DECIMAL(12, 2))
   discountAmount: string | number;
+
+  /**
+   * Desconto global da venda: fixed | percentage | null (sem desconto global).
+   * Independente de discountAmount (itens).
+   */
+  @AllowNull
+  @Column(DataType.STRING(16))
+  globalDiscountType: string | null;
+
+  @AllowNull
+  @Column(DataType.DECIMAL(5, 2))
+  globalDiscountPercent: string | number | null;
+
+  @Default(0)
+  @Column(DataType.DECIMAL(12, 2))
+  globalDiscountAmount: string | number;
 
   @Default(0)
   @Column(DataType.DECIMAL(12, 2))

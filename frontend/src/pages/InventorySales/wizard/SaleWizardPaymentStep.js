@@ -43,6 +43,8 @@ import { defaultPaymentStatusForMethod } from "../paymentDisplay";
 import CurrencyInput from "../CurrencyInput";
 import { useInventoryPermissions } from "../../../utils/inventoryAccess";
 import { formatStoreCreditInstallmentPreviewLine } from "../storeCreditInstallmentDisplay";
+import SaleGlobalDiscountEditor from "../SaleGlobalDiscountEditor";
+import SaleWizardTotals from "./SaleWizardTotals";
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -160,6 +162,8 @@ export default function SaleWizardPaymentStep({
   setStoreCreditSchedule,
   storeCreditOverride,
   setStoreCreditOverride,
+  onSaleUpdated,
+  canApplyDiscount = true,
 }) {
   const classes = useStyles();
   const perms = useInventoryPermissions();
@@ -428,11 +432,22 @@ export default function SaleWizardPaymentStep({
     );
   }
 
+  const itemCount = Array.isArray(sale?.items) ? sale.items.length : 0;
+
   return (
     <Box className={classes.root} data-testid="sale-wizard-payment-step">
       <Typography variant="h5" className={classes.title}>
         {i18n.t("inventorySales.sales.wizard.payment.titleSplit")}
       </Typography>
+
+      <SaleGlobalDiscountEditor
+        sale={sale}
+        disabled={disabled}
+        canApplyDiscount={canApplyDiscount}
+        onSaleUpdated={onSaleUpdated}
+      />
+
+      <SaleWizardTotals sale={sale} itemCount={itemCount} dense />
 
       {loading ? (
         <Box display="flex" justifyContent="center" py={4}>

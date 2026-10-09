@@ -61,6 +61,12 @@ jest.mock("../../../hooks/useIsMobile", () => ({
   default: jest.fn(() => false),
 }));
 
+jest.mock("../../../utils/inventoryAccess", () => ({
+  useInventoryPermissions: () => ({
+    canAuthorizeDiscount: true,
+  }),
+}));
+
 jest.mock("react-toastify", () => ({
   toast: { success: jest.fn(), error: jest.fn() },
 }));

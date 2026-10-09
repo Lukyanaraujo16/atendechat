@@ -78,6 +78,19 @@ class InventorySaleItem extends Model<InventorySaleItem> {
   @Column(DataType.DECIMAL(12, 3))
   quantity: string | number;
 
+  /**
+   * fixed | percentage | null (legado = monetário da linha via discountAmount).
+   */
+  @AllowNull
+  @Column(DataType.STRING(16))
+  discountType: string | null;
+
+  /** Percentual original quando discountType=percentage; null no legado/fixed. */
+  @AllowNull
+  @Column(DataType.DECIMAL(5, 2))
+  discountPercent: string | number | null;
+
+  /** Desconto monetário da LINHA (semântica histórica preservada). */
   @Default(0)
   @Column(DataType.DECIMAL(12, 2))
   discountAmount: string | number;

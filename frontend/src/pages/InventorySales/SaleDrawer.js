@@ -830,6 +830,7 @@ export default function SaleDrawer({
                   sale={sale}
                   readOnly={!editable}
                   onSaleUpdated={refreshSale}
+                  canApplyDiscount={perms.canApplyDiscount}
                 />
 
                 <Typography variant="subtitle1" className={classes.sectionTitle}>

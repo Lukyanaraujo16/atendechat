@@ -53,6 +53,12 @@ import {
   nextSaleWizardStep,
   prevSaleWizardStep,
 } from "./wizard/saleWizardSteps";
+import InventoryDiscountAuthorizationDialog from "./InventoryDiscountAuthorizationDialog";
+import {
+  buildDiscountAuthorizationBody,
+  discountAuthorizationRequiredMessage,
+  isDiscountAuthorizationRequiredError,
+} from "./inventoryDiscountAuth";
 
 const useStyles = makeStyles((theme) => ({
   pageRoot: {
@@ -132,6 +138,10 @@ export default function SaleWizardPage() {
   const [confirming, setConfirming] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [discountAuthOpen, setDiscountAuthOpen] = useState(false);
+  const [discountAuthDetail, setDiscountAuthDetail] = useState("");
+  const [discountAuthConfirming, setDiscountAuthConfirming] = useState(false);
+  const pendingCompleteBodyRef = useRef(null);
   const completingRef = useRef(false);
   const itemsEditorRef = useRef(null);
   const deliveryStepRef = useRef(null);
@@ -360,7 +370,29 @@ export default function SaleWizardPage() {
     }
   };
 
-  const handleConfirm = async () => {
+  const runCompleteSale = async (body) => {
+    const { data } = await completeInventorySale(sale.id, body);
+    setSale(data);
+    applySaleForms(data);
+    try {
+      const refreshed = await getInventorySale(sale.id);
+      if (refreshed?.data?.status === "completed") {
+        setSale(refreshed.data);
+        applySaleForms(refreshed.data);
+      }
+    } catch {
+      // Mantém payload do complete.
+    }
+    toast.success(i18n.t("inventorySales.sales.toasts.completed"));
+  };
+
+  const handleConfirm = async (discountAuthorization) => {
+    const authPayload =
+      discountAuthorization &&
+      typeof discountAuthorization === "object" &&
+      discountAuthorization.authorize === true
+        ? discountAuthorization
+        : undefined;
     if (!sale?.id || completingRef.current || confirming) return;
     if (!headerForm.sellerUserId && !sale.sellerUserId) {
       toast.error(i18n.t("inventorySales.sales.validation.sellerRequired"));
@@ -375,6 +407,7 @@ export default function SaleWizardPage() {
 
     completingRef.current = true;
     setConfirming(true);
+    let body;
     try {
       if (editable && headerDirty) {
         await persistHeader();
@@ -383,7 +416,7 @@ export default function SaleWizardPage() {
       const sellerUserId = Number(
         headerForm.sellerUserId || sale.sellerUserId
       );
-      const body = { sellerUserId };
+      body = { sellerUserId };
       if (perms.canManagePayments) {
         body.paymentMode = "lines";
       }
@@ -407,26 +440,50 @@ export default function SaleWizardPage() {
           };
         }
       }
-
-      const { data } = await completeInventorySale(sale.id, body);
-      setSale(data);
-      applySaleForms(data);
-      try {
-        const refreshed = await getInventorySale(sale.id);
-        // Só substitui se o GET confirmar a venda concluída (evita rascunho stale).
-        if (refreshed?.data?.status === "completed") {
-          setSale(refreshed.data);
-          applySaleForms(refreshed.data);
-        }
-      } catch {
-        // Mantém payload do complete.
+      if (authPayload) {
+        body.discountAuthorization = authPayload;
       }
-      toast.success(i18n.t("inventorySales.sales.toasts.completed"));
+
+      await runCompleteSale(body);
+    } catch (err) {
+      if (
+        isDiscountAuthorizationRequiredError(err) &&
+        !authPayload
+      ) {
+        pendingCompleteBodyRef.current = body;
+        setDiscountAuthDetail(discountAuthorizationRequiredMessage(err));
+        setDiscountAuthOpen(true);
+      } else {
+        toastError(err);
+      }
+    } finally {
+      completingRef.current = false;
+      setConfirming(false);
+    }
+  };
+
+  const handleCompleteDiscountAuth = async (reason) => {
+    const body = pendingCompleteBodyRef.current;
+    if (!body) {
+      setDiscountAuthOpen(false);
+      return;
+    }
+    setDiscountAuthConfirming(true);
+    completingRef.current = true;
+    setConfirming(true);
+    try {
+      await runCompleteSale({
+        ...body,
+        discountAuthorization: buildDiscountAuthorizationBody(reason),
+      });
+      setDiscountAuthOpen(false);
+      pendingCompleteBodyRef.current = null;
     } catch (err) {
       toastError(err);
     } finally {
       completingRef.current = false;
       setConfirming(false);
+      setDiscountAuthConfirming(false);
     }
   };
 
@@ -526,6 +583,7 @@ export default function SaleWizardPage() {
                   readOnly={!editable}
                   onSaleUpdated={refreshSale}
                   autoSave
+                  canApplyDiscount={perms.canApplyDiscount}
                 />
                 <Box className={classes.productsTotals}>
                   <SaleWizardTotals sale={sale} itemCount={itemCount} />
@@ -559,6 +617,8 @@ export default function SaleWizardPage() {
                 paymentsBundle={paymentsBundle}
                 setPaymentsBundle={setPaymentsBundle}
                 onSaleCacheMaybeChanged={refreshSale}
+                onSaleUpdated={refreshSale}
+                canApplyDiscount={perms.canApplyDiscount}
                 customerId={headerForm.customerId || sale?.customerId}
                 storeCreditSchedule={storeCreditSchedule}
                 setStoreCreditSchedule={setStoreCreditSchedule}
@@ -623,6 +683,20 @@ export default function SaleWizardPage() {
           </>
         )}
       </div>
+
+      <InventoryDiscountAuthorizationDialog
+        open={discountAuthOpen}
+        detailMessage={discountAuthDetail}
+        canAuthorize={perms.canAuthorizeDiscount}
+        confirming={discountAuthConfirming || confirming}
+        onClose={() => {
+          if (!discountAuthConfirming && !confirming) {
+            setDiscountAuthOpen(false);
+            pendingCompleteBodyRef.current = null;
+          }
+        }}
+        onConfirm={handleCompleteDiscountAuth}
+      />
 
       <ConfirmationModal
         open={confirmDelete}

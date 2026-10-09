@@ -15,6 +15,8 @@ import {
   INVENTORY_SALES_RECEIVE_RECEIVABLES,
   INVENTORY_SALES_REVERSE_RECEIVABLE_PAYMENTS,
   INVENTORY_SALES_USE_STORE_CREDIT,
+  INVENTORY_SALES_APPLY_DISCOUNT,
+  INVENTORY_SALES_AUTHORIZE_DISCOUNT,
   INVENTORY_SALES_VIEW,
   INVENTORY_SALES_VIEW_CUSTOMER_FINANCIALS,
   INVENTORY_SALES_VIEW_CUSTOMERS,
@@ -135,6 +137,22 @@ export function canAuthorizeInventoryStoreCreditOverride(planFlags, user) {
   );
 }
 
+export function canApplyInventorySaleDiscount(planFlags, user) {
+  return hasInventoryPermission(
+    planFlags,
+    user,
+    INVENTORY_SALES_APPLY_DISCOUNT
+  );
+}
+
+export function canAuthorizeInventorySaleDiscount(planFlags, user) {
+  return hasInventoryPermission(
+    planFlags,
+    user,
+    INVENTORY_SALES_AUTHORIZE_DISCOUNT
+  );
+}
+
 export function canViewInventoryReceivables(planFlags, user) {
   return hasInventoryPermission(
     planFlags,
@@ -189,6 +207,8 @@ export function useInventoryPermissions() {
       canUseStoreCredit: canUseInventoryStoreCredit(planFlags, user),
       canAuthorizeStoreCreditOverride:
         canAuthorizeInventoryStoreCreditOverride(planFlags, user),
+      canApplyDiscount: canApplyInventorySaleDiscount(planFlags, user),
+      canAuthorizeDiscount: canAuthorizeInventorySaleDiscount(planFlags, user),
       canViewReceivables: canViewInventoryReceivables(planFlags, user),
       canReceiveReceivables: canReceiveInventoryReceivables(planFlags, user),
       canReverseReceivablePayments: canReverseInventoryReceivablePayments(

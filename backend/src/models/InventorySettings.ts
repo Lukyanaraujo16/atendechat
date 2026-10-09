@@ -89,6 +89,14 @@ class InventorySettings extends Model<InventorySettings> {
   @Column
   blockStoreCreditWhenOverdue: boolean;
 
+  /**
+   * Percentual máximo de desconto efetivo na mercadoria sem autorização.
+   * Default 100: compatível com operações legadas (não bloqueia silenciosamente).
+   */
+  @Default(100)
+  @Column(DataType.DECIMAL(5, 2))
+  maxDiscountPercentWithoutAuthorization: string | number;
+
   @CreatedAt
   createdAt: Date;
 

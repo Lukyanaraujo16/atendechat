@@ -559,7 +559,9 @@ const messages = {
 						noSeller: "No seller",
 						cancelled: "SALE CANCELLED",
 						subtotal: "Subtotal",
-						totalDiscount: "Discounts",
+						totalDiscount: "Item discounts",
+						globalDiscount: "Global discount",
+						itemDiscountPercentage: "{{percent}}% ({{amount}})",
 						total: "Total",
 						paidAmount: "Amount paid",
 						pendingAmount: "Pending amount",
@@ -607,8 +609,31 @@ const messages = {
 					totals: {
 						subtotal: "Subtotal",
 						discount: "Discounts",
+						grossSubtotal: "Gross subtotal",
+						itemDiscounts: "Item discounts",
+						merchandiseAfterItems: "Merchandise after items",
+						globalDiscount: "Global discount",
 						total: "Total",
 						commission: "Commission",
+					},
+					globalDiscount: {
+						title: "Sale-wide discount",
+						amount: "Amount",
+						percent: "Percent (%)",
+						noPermission: "You do not have permission to apply discounts.",
+						previewLine: "Global discount applied: {{amount}}",
+						toasts: {
+							saved: "Global discount updated.",
+						},
+					},
+					discountAuth: {
+						title: "Discount authorization",
+						body:
+							"The effective discount on this sale exceeds the configured limit. Enter a reason to authorize.",
+						reason: "Authorization reason",
+						confirm: "Authorize discount",
+						noPermission:
+							"You cannot authorize discounts above the limit. Ask a supervisor.",
 					},
 					items: {
 						title: "Sale items",
@@ -630,6 +655,7 @@ const messages = {
 						unitPrice: "Unit price",
 						unitPriceOptional: "Unit price (optional)",
 						discount: "Discount",
+						discountPercentDisplay: "{{percent}}% ({{amount}})",
 						total: "Total",
 						validation: {
 							product: "Select a product.",
@@ -823,6 +849,9 @@ const messages = {
 						cancelledTotal: "Cancelled amount",
 						totalPaid: "Total paid",
 						totalPending: "Total pending",
+						totalItemDiscounts: "Item discounts",
+						totalGlobalDiscounts: "Sale discounts",
+						totalDiscountsGranted: "Discounts granted",
 					},
 					columns: {
 						seller: "Seller",
@@ -1064,14 +1093,20 @@ const messages = {
 						saleNumberPrefix: "Sale number prefix",
 						blockStoreCreditWhenOverdue:
 							"Block store credit when there is overdue balance",
+						maxDiscountPercentWithoutAuthorization:
+							"Max discount without authorization (%)",
 					},
 					hints: {
 						commission: "Used when the seller has no active commission profile.",
 						blockStoreCreditWhenOverdue:
 							"When enabled, new store-credit sales require authorization if the customer has overdue installments.",
+						maxDiscountPercentWithoutAuthorization:
+							"Maximum effective discount percent on gross merchandise before authorization is required (0–100). Default: 100.",
 					},
 					validation: {
 						commission: "Commission must be between 0 and 100.",
+						maxDiscountPercent:
+							"Max discount without authorization must be between 0 and 100.",
 					},
 					toasts: {
 						saved: "Settings saved.",
@@ -2255,6 +2290,16 @@ const messages = {
 							label: "Authorize credit override",
 							description:
 								"Authorize store-credit sales above the limit or with overdue balance.",
+						},
+						"sales.applyDiscount": {
+							label: "Apply discounts",
+							description:
+								"Grant line-item and sale-wide discounts at the POS.",
+						},
+						"sales.authorizeDiscount": {
+							label: "Authorize discounts above limit",
+							description:
+								"Authorize discounts that exceed the configured maximum, with a reason.",
 						},
 						"sales.viewReceivables": {
 							label: "View accounts receivable",
@@ -8191,6 +8236,8 @@ const messages = {
 				operationFailed: "Could not complete the action. Please try again.",
 			},
 			backendErrors: {
+				ERR_INVENTORY_DISCOUNT_AUTHORIZATION_REQUIRED:
+					"Discount exceeds the allowed limit. Authorization required.",
 				ERR_INVENTORY_PRODUCT_BARCODE_DUPLICATE: "This barcode is already being used by another product.",
 				ERR_INVENTORY_PRODUCT_HAS_HISTORY:
 					"This product has sales or stock history and cannot be deleted. You can deactivate it instead.",

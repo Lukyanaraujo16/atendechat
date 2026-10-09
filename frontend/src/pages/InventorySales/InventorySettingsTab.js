@@ -77,6 +77,7 @@ export default function InventorySettingsTab() {
     defaultCommissionRate: "0",
     allowNegativeStock: false,
     blockStoreCreditWhenOverdue: true,
+    maxDiscountPercentWithoutAuthorization: "100",
     saleNumberPrefix: "",
     receiptTradeName: "",
     receiptLegalName: "",
@@ -99,6 +100,10 @@ export default function InventorySettingsTab() {
             : "0",
         allowNegativeStock: data.allowNegativeStock === true,
         blockStoreCreditWhenOverdue: data.blockStoreCreditWhenOverdue !== false,
+        maxDiscountPercentWithoutAuthorization:
+          data.maxDiscountPercentWithoutAuthorization != null
+            ? String(data.maxDiscountPercentWithoutAuthorization)
+            : "100",
         saleNumberPrefix: data.saleNumberPrefix || "",
         receiptTradeName: data.receiptTradeName || "",
         receiptLegalName: data.receiptLegalName || "",
@@ -139,6 +144,13 @@ export default function InventorySettingsTab() {
       toast.error(i18n.t("inventorySales.settings.validation.commission"));
       return;
     }
+    const maxDisc = Number(form.maxDiscountPercentWithoutAuthorization);
+    if (!Number.isFinite(maxDisc) || maxDisc < 0 || maxDisc > 100) {
+      toast.error(
+        i18n.t("inventorySales.settings.validation.maxDiscountPercent")
+      );
+      return;
+    }
 
     setSaving(true);
     try {
@@ -146,6 +158,7 @@ export default function InventorySettingsTab() {
         defaultCommissionRate: rate,
         allowNegativeStock: form.allowNegativeStock,
         blockStoreCreditWhenOverdue: form.blockStoreCreditWhenOverdue,
+        maxDiscountPercentWithoutAuthorization: maxDisc,
         saleNumberPrefix: form.saleNumberPrefix.trim() || null,
         receiptTradeName: form.receiptTradeName.trim() || null,
         receiptLegalName: form.receiptLegalName.trim() || null,
@@ -242,6 +255,26 @@ export default function InventorySettingsTab() {
                     type="number"
                     inputProps={{ min: 0, max: 100, step: "0.01" }}
                     helperText={i18n.t("inventorySales.settings.hints.commission")}
+                  />
+                  <TextField
+                    label={i18n.t(
+                      "inventorySales.settings.fields.maxDiscountPercentWithoutAuthorization"
+                    )}
+                    value={form.maxDiscountPercentWithoutAuthorization}
+                    onChange={setField("maxDiscountPercentWithoutAuthorization")}
+                    variant="outlined"
+                    size="small"
+                    fullWidth
+                    type="number"
+                    inputProps={{
+                      min: 0,
+                      max: 100,
+                      step: "0.01",
+                      "data-testid": "max-discount-percent-without-auth",
+                    }}
+                    helperText={i18n.t(
+                      "inventorySales.settings.hints.maxDiscountPercentWithoutAuthorization"
+                    )}
                   />
                   <TextField
                     label={i18n.t("inventorySales.settings.fields.saleNumberPrefix")}

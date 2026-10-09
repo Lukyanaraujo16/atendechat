@@ -6,12 +6,19 @@ import InventoryProduct from "../../models/InventoryProduct";
 import InventorySaleItemIdentifier from "../../models/InventorySaleItemIdentifier";
 import {
   assertInventorySaleIsDraft,
-  computeLineTotal,
   findInventorySaleOrThrow,
   recalculateInventorySaleTotals,
   roundMoney,
   toMoney
 } from "./inventorySaleHelpers";
+import { computeItemDiscountAmount } from "./inventoryDiscountHelpers";
+import {
+  assertCanApplyDiscount,
+  assertMerchandiseDiscountGovernance,
+  buildMerchandiseDiscountSnapshot,
+  DiscountAuthorizationInput,
+  loadMaxDiscountPercent
+} from "./inventoryDiscountGovernance";
 import { syncDraftPendingAfterTotalChange } from "./inventorySalePaymentEngine";
 import {
   assertQuantityReductionAllowsIdentifiers,
@@ -20,7 +27,7 @@ import {
   parseIdentifiersField,
   replaceSaleItemIdentifiers
 } from "./inventorySaleItemIdentifiers";
-import { parseDecimal, parseRequiredDecimal } from "./inventoryTenant";
+import { parseRequiredDecimal } from "./inventoryTenant";
 
 async function findSaleItemOrThrow(
   companyId: number,
@@ -47,8 +54,12 @@ export default async function UpdateInventorySaleItemService(input: {
     quantity?: unknown;
     unitPrice?: unknown;
     discountAmount?: unknown;
+    discountType?: unknown;
+    discountPercent?: unknown;
+    discountAuthorization?: DiscountAuthorizationInput;
     identifiers?: unknown;
   };
+  canApplyDiscount?: boolean;
 }): Promise<InventorySaleItem> {
   return sequelize.transaction(async t => {
     const sale = await findInventorySaleOrThrow(
@@ -69,7 +80,10 @@ export default async function UpdateInventorySaleItemService(input: {
 
     let quantity = Number(item.quantity);
     let unitPrice = toMoney(item.unitPrice);
-    let discountAmount = toMoney(item.discountAmount);
+    let discountType: unknown = item.discountType;
+    let discountAmount: unknown = item.discountAmount;
+    let discountPercent: unknown = item.discountPercent;
+    let discountFieldsTouched = false;
 
     if (input.body.quantity !== undefined) {
       quantity = parseRequiredDecimal(input.body.quantity, "quantity");
@@ -91,22 +105,26 @@ export default async function UpdateInventorySaleItemService(input: {
       patch.unitPrice = roundMoney(unitPrice);
     }
 
+    if (input.body.discountType !== undefined) {
+      discountType = input.body.discountType;
+      discountFieldsTouched = true;
+    }
     if (input.body.discountAmount !== undefined) {
-      discountAmount =
-        parseDecimal(input.body.discountAmount, "discountAmount") ?? 0;
-      if (discountAmount < 0) {
-        throw new AppError(
-          "ERR_VALIDATION_ERROR",
-          400,
-          "discountAmount inválido."
-        );
-      }
-      patch.discountAmount = roundMoney(discountAmount);
+      discountAmount = input.body.discountAmount;
+      discountFieldsTouched = true;
+    }
+    if (input.body.discountPercent !== undefined) {
+      discountPercent = input.body.discountPercent;
+      discountFieldsTouched = true;
     }
 
     const identifiersField = parseIdentifiersField(input.body.identifiers);
 
-    if (Object.keys(patch).length === 0 && identifiersField === "omitted") {
+    if (
+      Object.keys(patch).length === 0 &&
+      !discountFieldsTouched &&
+      identifiersField === "omitted"
+    ) {
       return item.reload({
         transaction: t,
         include: [
@@ -133,8 +151,32 @@ export default async function UpdateInventorySaleItemService(input: {
         ? null
         : parseAndNormalizeIdentifiers(identifiersField, quantity);
 
+    const computed = computeItemDiscountAmount({
+      discountType,
+      discountAmount,
+      discountPercent,
+      unitPrice,
+      quantity
+    });
+
+    if (discountFieldsTouched || patch.quantity != null || patch.unitPrice != null) {
+      assertCanApplyDiscount({
+        canApplyDiscount: input.canApplyDiscount !== false,
+        discountAmount: computed.discountAmount
+      });
+
+      if (discountFieldsTouched) {
+        patch.discountType = computed.discountType;
+        patch.discountPercent = computed.discountPercent;
+      } else if (item.discountType === "percentage") {
+        // Recalcula monetary a partir do % quando qty/preço mudam.
+        patch.discountPercent = computed.discountPercent;
+      }
+      patch.discountAmount = computed.discountAmount;
+      patch.totalAmount = computed.lineTotal;
+    }
+
     if (Object.keys(patch).length > 0) {
-      patch.totalAmount = computeLineTotal(unitPrice, quantity, discountAmount);
       await item.update(patch, { transaction: t });
     }
 
@@ -150,6 +192,27 @@ export default async function UpdateInventorySaleItemService(input: {
     if (Object.keys(patch).length > 0) {
       await recalculateInventorySaleTotals(sale.id, input.companyId, t);
       await sale.reload({ transaction: t });
+
+      const maxAllowedPercent = await loadMaxDiscountPercent(input.companyId, t);
+      const items = await InventorySaleItem.findAll({
+        where: { saleId: sale.id, companyId: input.companyId },
+        transaction: t
+      });
+      const snapshotDisc = buildMerchandiseDiscountSnapshot({
+        items,
+        globalDiscountType: sale.globalDiscountType,
+        globalDiscountAmount: sale.globalDiscountAmount,
+        globalDiscountPercent: sale.globalDiscountPercent,
+        maxAllowedPercent
+      });
+      await assertMerchandiseDiscountGovernance({
+        companyId: input.companyId,
+        sale,
+        snapshot: snapshotDisc,
+        authorization: input.body.discountAuthorization,
+        transaction: t
+      });
+
       await syncDraftPendingAfterTotalChange(sale, t);
     }
 

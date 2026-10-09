@@ -134,6 +134,9 @@ export const addInventorySaleItem = (saleId, body) =>
 export const updateInventorySaleItem = (saleId, itemId, body) =>
   api.put(`/inventory/sales/${saleId}/items/${itemId}`, body);
 
+export const updateInventorySaleGlobalDiscount = (saleId, body) =>
+  api.put(`/inventory/sales/${saleId}/global-discount`, body);
+
 export const deleteInventorySaleItem = (saleId, itemId) =>
   api.delete(`/inventory/sales/${saleId}/items/${itemId}`);
 

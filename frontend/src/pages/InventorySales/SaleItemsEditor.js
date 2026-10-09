@@ -18,6 +18,8 @@ import {
   TextField,
   Typography,
 } from "@material-ui/core";
+import ToggleButton from "@material-ui/lab/ToggleButton";
+import ToggleButtonGroup from "@material-ui/lab/ToggleButtonGroup";
 import { makeStyles } from "@material-ui/core/styles";
 import Autocomplete from "@material-ui/lab/Autocomplete";
 import DeleteOutlineIcon from "@material-ui/icons/DeleteOutline";
@@ -63,6 +65,14 @@ import {
   saleProductStockLabel,
   shouldAutofocusSaleProductSearch,
 } from "./saleProductSearch";
+import { computeItemDiscountPreview } from "./saleDiscountPreview";
+import InventoryDiscountAuthorizationDialog from "./InventoryDiscountAuthorizationDialog";
+import {
+  buildDiscountAuthorizationBody,
+  discountAuthorizationRequiredMessage,
+  isDiscountAuthorizationRequiredError,
+} from "./inventoryDiscountAuth";
+import { useInventoryPermissions } from "../../utils/inventoryAccess";
 
 const useStyles = makeStyles(() => ({
   tableContainer: {
@@ -110,6 +120,8 @@ const emptyAddForm = {
   productId: "",
   quantity: "1",
   unitPrice: "",
+  discountType: "fixed",
+  discountPercent: "",
   discountAmount: "0",
   ...emptyIdentifierDraft(),
 };
@@ -123,6 +135,142 @@ function moneyEqual(left, right) {
   const a = parseBrazilianCurrencyToNumber(left) ?? 0;
   const b = parseBrazilianCurrencyToNumber(right) ?? 0;
   return Math.round(a * 100) === Math.round(b * 100);
+}
+
+function discountDraftFromItem(item) {
+  const type = item?.discountType === "percentage" ? "percentage" : "fixed";
+  return {
+    discountType: type,
+    discountPercent:
+      type === "percentage" ? String(item?.discountPercent ?? "") : "",
+    discountAmount: String(item?.discountAmount ?? "0"),
+  };
+}
+
+function buildItemDiscountPayload(draft) {
+  const type = draft.discountType === "percentage" ? "percentage" : "fixed";
+  if (type === "percentage") {
+    const pct = Number(draft.discountPercent);
+    if (!Number.isFinite(pct) || pct <= 0) {
+      return { discountType: "fixed", discountAmount: 0 };
+    }
+    return { discountType: "percentage", discountPercent: pct };
+  }
+  const discountAmount =
+    parseBrazilianCurrencyToNumber(draft.discountAmount) ?? 0;
+  return { discountType: "fixed", discountAmount };
+}
+
+function percentEqual(left, right) {
+  const a = Number(left);
+  const b = Number(right);
+  if (!Number.isFinite(a) && !Number.isFinite(b)) return true;
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return false;
+  return Math.round(a * 100) === Math.round(b * 100);
+}
+
+function previewLineTotal(draft, item) {
+  const quantity = Number(draft.quantity);
+  const unitPrice =
+    parseBrazilianCurrencyToNumber(draft.unitPrice) ??
+    Number(item?.unitPrice) ??
+    0;
+  if (!Number.isFinite(quantity) || quantity <= 0) {
+    return Number(item?.totalAmount) || 0;
+  }
+  const built = buildItemDiscountPayload(draft);
+  return computeItemDiscountPreview({
+    discountType: built.discountType,
+    discountPercent: built.discountPercent,
+    discountAmount: built.discountAmount,
+    unitPrice,
+    quantity,
+  }).lineTotal;
+}
+
+function formatItemDiscountDisplay(item, draft) {
+  const type =
+    (draft?.discountType ?? item?.discountType) === "percentage"
+      ? "percentage"
+      : item?.discountType === "percentage"
+        ? "percentage"
+        : "fixed";
+  const amount = draft?.discountAmount ?? item?.discountAmount ?? 0;
+  if (type === "percentage") {
+    const pct = draft?.discountPercent ?? item?.discountPercent;
+    if (pct != null && pct !== "") {
+      return i18n.t("inventorySales.sales.items.discountPercentDisplay", {
+        percent: pct,
+        amount: formatCurrencyBRL(amount),
+      });
+    }
+  }
+  return formatCurrencyBRL(amount);
+}
+
+function SaleItemDiscountFields({
+  draft,
+  disabled,
+  onTypeChange,
+  onFixedChange,
+  onPercentChange,
+  onBlur,
+  testIdPrefix,
+  className,
+}) {
+  return (
+    <Box display="flex" flexDirection="column" style={{ gap: 4 }} className={className}>
+      <ToggleButtonGroup
+        size="small"
+        value={draft.discountType === "percentage" ? "percentage" : "fixed"}
+        exclusive
+        onChange={onTypeChange}
+      >
+        <ToggleButton
+          value="fixed"
+          disabled={disabled}
+          data-testid={testIdPrefix ? `${testIdPrefix}-type-fixed` : undefined}
+        >
+          R$
+        </ToggleButton>
+        <ToggleButton
+          value="percentage"
+          disabled={disabled}
+          data-testid={testIdPrefix ? `${testIdPrefix}-type-percent` : undefined}
+        >
+          %
+        </ToggleButton>
+      </ToggleButtonGroup>
+      {draft.discountType === "percentage" ? (
+        <TextField
+          size="small"
+          variant="outlined"
+          value={draft.discountPercent}
+          onChange={onPercentChange}
+          onBlur={onBlur}
+          type="number"
+          inputProps={{
+            min: 0,
+            max: 100,
+            step: "0.01",
+            "data-testid": testIdPrefix ? `${testIdPrefix}-percent` : undefined,
+          }}
+          disabled={disabled}
+          className={className}
+          fullWidth
+        />
+      ) : (
+        <CurrencyInput
+          value={Number(draft.discountAmount) || 0}
+          onChange={onFixedChange}
+          onBlur={onBlur}
+          disabled={disabled}
+          className={className}
+          data-testid={testIdPrefix ? `${testIdPrefix}-amount` : undefined}
+        />
+      )}
+    </Box>
+  );
 }
 
 function toastIdentifierValidation(result) {
@@ -159,11 +307,17 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
     onSaleUpdated,
     /** Wizard PDV: persiste qty/preço/desconto sem botão salvar. Drawer legado: false. */
     autoSave = false,
+    canApplyDiscount = true,
   },
   ref
 ) {
   const classes = useStyles();
   const isMobile = useIsMobile();
+  const perms = useInventoryPermissions();
+  const [authOpen, setAuthOpen] = useState(false);
+  const [authDetail, setAuthDetail] = useState("");
+  const [authConfirming, setAuthConfirming] = useState(false);
+  const pendingItemSaveRef = useRef(null);
   const [addForm, setAddForm] = useState(emptyAddForm);
   const [adding, setAdding] = useState(false);
   const [rowSaving, setRowSaving] = useState(null);
@@ -334,18 +488,19 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
 
   const getRowDraft = (item) => {
     const identifierDefaults = identifierDraftFromItem(item);
+    const discountDefaults = discountDraftFromItem(item);
     if (!item?.id) {
       return {
         quantity: "",
         unitPrice: "",
-        discountAmount: "0",
+        ...discountDefaults,
         ...identifierDefaults,
       };
     }
     return {
       quantity: String(item.quantity ?? ""),
       unitPrice: String(item.unitPrice ?? ""),
-      discountAmount: String(item.discountAmount ?? "0"),
+      ...discountDefaults,
       ...identifierDefaults,
       ...rowDrafts[item.id],
     };
@@ -358,12 +513,14 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
       ? {
           quantity: String(item.quantity ?? ""),
           unitPrice: String(item.unitPrice ?? ""),
-          discountAmount: String(item.discountAmount ?? "0"),
+          ...discountDraftFromItem(item),
           ...identifierDraftFromItem(item),
         }
       : {
           quantity: "",
           unitPrice: "",
+          discountType: "fixed",
+          discountPercent: "",
           discountAmount: "0",
           ...emptyIdentifierDraft(),
         };
@@ -387,7 +544,7 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
     return {
       quantity: String(item.quantity ?? ""),
       unitPrice: String(item.unitPrice ?? ""),
-      discountAmount: String(item.discountAmount ?? "0"),
+      ...discountDraftFromItem(item),
       ...identifierDefaults,
       ...fromRef,
     };
@@ -395,16 +552,24 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
 
   const isRowDirty = (item) => {
     const draft = getDraftForItem(item);
+    const savedDiscount = discountDraftFromItem(item);
     const identifiersDirty =
       draft.identifiersTouched &&
       !identifierPayloadsEqual(
         draft.identifierValues,
         identifierValuesFromItem(item)
       );
+    const discountDirty =
+      (draft.discountType === "percentage"
+        ? "percentage"
+        : "fixed") !== savedDiscount.discountType ||
+      (draft.discountType === "percentage"
+        ? !percentEqual(draft.discountPercent, item.discountPercent ?? "")
+        : !moneyEqual(draft.discountAmount, item.discountAmount ?? "0"));
     return (
       String(draft.quantity) !== String(item.quantity ?? "") ||
       !moneyEqual(draft.unitPrice, item.unitPrice) ||
-      !moneyEqual(draft.discountAmount, item.discountAmount ?? "0") ||
+      discountDirty ||
       identifiersDirty
     );
   };
@@ -417,7 +582,10 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
     }
   };
 
-  const persistItem = async (item, { fromAutoSave = false } = {}) => {
+  const persistItem = async (
+    item,
+    { fromAutoSave = false, discountAuthorization } = {}
+  ) => {
     if (!sale?.id || !item?.id) return { ok: false };
     const draft = getDraftForItem(item);
     const quantity = Number(draft.quantity);
@@ -434,8 +602,6 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
       }
       return { ok: false };
     }
-    const discountAmount =
-      parseBrazilianCurrencyToNumber(draft.discountAmount) ?? 0;
 
     const identifierCheck = validateIdentifiersForSubmit({
       quantity,
@@ -457,8 +623,11 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
     const payload = {
       quantity,
       unitPrice,
-      discountAmount,
+      ...buildItemDiscountPayload(draft),
     };
+    if (discountAuthorization) {
+      payload.discountAuthorization = discountAuthorization;
+    }
     const identifiersField = buildUpdateIdentifiersField({
       identifiersTouched: draft.identifiersTouched,
       quantity,
@@ -504,6 +673,19 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
         if (saveSeqByItemRef.current[item.id] !== seq) {
           return { ok: false, stale: true };
         }
+        if (
+          isDiscountAuthorizationRequiredError(err) &&
+          !discountAuthorization
+        ) {
+          pendingItemSaveRef.current = {
+            item,
+            fromAutoSave,
+            draftSnapshot: { ...draft },
+          };
+          setAuthDetail(discountAuthorizationRequiredMessage(err));
+          setAuthOpen(true);
+          return { ok: false, needsAuth: true, error: err };
+        }
         setSaveErrors((prev) => ({ ...prev, [item.id]: true }));
         toastError(err);
         return { ok: false, error: err };
@@ -535,7 +717,12 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
     if (!autoSave || readOnly) return;
     if (field === "quantity") {
       scheduleAutoSave(itemId, AUTO_SAVE_QTY_DEBOUNCE_MS);
-    } else if (field === "unitPrice" || field === "discountAmount") {
+    } else if (
+      field === "unitPrice" ||
+      field === "discountAmount" ||
+      field === "discountType" ||
+      field === "discountPercent"
+    ) {
       scheduleAutoSave(itemId, AUTO_SAVE_MONEY_DEBOUNCE_MS);
     }
   };
@@ -657,9 +844,12 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
       }
       payload.unitPrice = unitPrice;
     }
-    const discount = parseBrazilianCurrencyToNumber(addForm.discountAmount);
-    if (discount != null && discount > 0) {
-      payload.discountAmount = discount;
+    const discountPayload = buildItemDiscountPayload(addForm);
+    if (
+      discountPayload.discountType === "percentage" ||
+      (discountPayload.discountAmount ?? 0) > 0
+    ) {
+      Object.assign(payload, discountPayload);
     }
 
     const identifiersField = buildCreateIdentifiersField({
@@ -670,20 +860,67 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
       payload.identifiers = identifiersField.identifiers;
     }
 
-    setAdding(true);
-    try {
-      await addInventorySaleItem(sale.id, payload);
+    const runAdd = async (discountAuthorization) => {
+      const body = { ...payload };
+      if (discountAuthorization) {
+        body.discountAuthorization = discountAuthorization;
+      }
+      await addInventorySaleItem(sale.id, body);
       toast.success(i18n.t("inventorySales.sales.items.toasts.added"));
       setAddForm(emptyAddForm);
       clearProductSearch();
       focusSearchIfWide();
       if (onSaleUpdated) await onSaleUpdated();
+    };
+
+    setAdding(true);
+    try {
+      await runAdd();
     } catch (err) {
-      toastError(err);
+      if (isDiscountAuthorizationRequiredError(err)) {
+        pendingItemSaveRef.current = {
+          add: true,
+          runAdd,
+        };
+        setAuthDetail(discountAuthorizationRequiredMessage(err));
+        setAuthOpen(true);
+      } else {
+        toastError(err);
+      }
     } finally {
       setAdding(false);
     }
   };
+
+  const handleDiscountAuthConfirm = async (reason) => {
+    const pending = pendingItemSaveRef.current;
+    if (!pending) {
+      setAuthOpen(false);
+      return;
+    }
+    setAuthConfirming(true);
+    const authBody = buildDiscountAuthorizationBody(reason);
+    try {
+      if (pending.add && pending.runAdd) {
+        setAdding(true);
+        await pending.runAdd(authBody);
+      } else if (pending.item) {
+        await persistItem(pending.item, {
+          fromAutoSave: pending.fromAutoSave,
+          discountAuthorization: authBody,
+        });
+      }
+      setAuthOpen(false);
+      pendingItemSaveRef.current = null;
+    } catch (err) {
+      toastError(err);
+    } finally {
+      setAuthConfirming(false);
+      setAdding(false);
+    }
+  };
+
+  const discountInputsDisabled = readOnly || !canApplyDiscount;
 
   const handleUpdateItem = async (item) => {
     await persistItem(item, { fromAutoSave: false });
@@ -802,7 +1039,7 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
                       </Typography>
                       <Typography variant="caption" color="textSecondary">
                         {i18n.t("inventorySales.sales.items.discount")}:{" "}
-                        {formatCurrencyBRL(draft.discountAmount)}
+                        {formatItemDiscountDisplay(item, draft)}
                       </Typography>
                       <Typography variant="body2" style={{ fontWeight: 600 }}>
                         {formatCurrencyBRL(item.totalAmount)}
@@ -840,21 +1077,39 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
                         />
                       </Box>
                       <Box style={{ marginBottom: 8 }}>
-                        <CurrencyInput
-                          label={i18n.t("inventorySales.sales.items.discount")}
-                          value={Number(draft.discountAmount) || 0}
-                          onChange={(reais) =>
+                        <Typography variant="caption" color="textSecondary">
+                          {i18n.t("inventorySales.sales.items.discount")}
+                        </Typography>
+                        <SaleItemDiscountFields
+                          draft={draft}
+                          disabled={discountInputsDisabled}
+                          testIdPrefix={`sale-item-discount-${item.id}`}
+                          onTypeChange={(_e, next) => {
+                            if (!next) return;
+                            patchRowDraft(item.id, {
+                              discountType: next,
+                            });
+                            scheduleAutoSave(item.id, AUTO_SAVE_MONEY_DEBOUNCE_MS);
+                          }}
+                          onFixedChange={(reais) =>
                             setRowField(
                               item.id,
                               "discountAmount",
                               String(reais ?? 0)
                             )
                           }
+                          onPercentChange={(e) =>
+                            setRowField(
+                              item.id,
+                              "discountPercent",
+                              e.target.value
+                            )
+                          }
                           onBlur={() => handleMoneyBlur(item)}
                         />
                       </Box>
                       <Typography variant="body2" style={{ fontWeight: 600 }}>
-                        {formatCurrencyBRL(item.totalAmount)}
+                        {formatCurrencyBRL(previewLineTotal(draft, item))}
                       </Typography>
                       {identifiersBlock ? (
                         <Box mt={1} style={{ minWidth: 0, maxWidth: "100%" }}>
@@ -960,25 +1215,47 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
                         </TableCell>
                         <TableCell align="right" className={classes.numericCell}>
                           {readOnly ? (
-                            formatCurrencyBRL(draft.discountAmount)
+                            formatItemDiscountDisplay(item, draft)
                           ) : (
-                            <CurrencyInput
-                              value={Number(draft.discountAmount) || 0}
-                              onChange={(reais) =>
+                            <SaleItemDiscountFields
+                              draft={draft}
+                              disabled={discountInputsDisabled}
+                              className={classes.numericField}
+                              testIdPrefix={`sale-item-discount-${item.id}`}
+                              onTypeChange={(_e, next) => {
+                                if (!next) return;
+                                patchRowDraft(item.id, {
+                                  discountType: next,
+                                });
+                                scheduleAutoSave(
+                                  item.id,
+                                  AUTO_SAVE_MONEY_DEBOUNCE_MS
+                                );
+                              }}
+                              onFixedChange={(reais) =>
                                 setRowField(
                                   item.id,
                                   "discountAmount",
                                   String(reais ?? 0)
                                 )
                               }
+                              onPercentChange={(e) =>
+                                setRowField(
+                                  item.id,
+                                  "discountPercent",
+                                  e.target.value
+                                )
+                              }
                               onBlur={() => handleMoneyBlur(item)}
-                              className={classes.numericField}
-                              data-testid={`sale-item-discount-${item.id}`}
                             />
                           )}
                         </TableCell>
                         <TableCell align="right" className={classes.numericCell}>
-                          {formatCurrencyBRL(item.totalAmount)}
+                          {formatCurrencyBRL(
+                            readOnly
+                              ? item.totalAmount
+                              : previewLineTotal(draft, item)
+                          )}
                         </TableCell>
                         {!readOnly ? (
                           <TableCell align="right" className={classes.actionsCell}>{renderItemActions(item)}</TableCell>
@@ -1168,14 +1445,28 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
                   }
                 />
               </Box>
-              <Box style={{ flex: 1, minWidth: 100 }}>
-                <CurrencyInput
-                  label={i18n.t("inventorySales.sales.items.discount")}
-                  value={Number(addForm.discountAmount) || 0}
-                  onChange={(reais) =>
+              <Box style={{ flex: 1, minWidth: 120 }}>
+                <Typography variant="caption" color="textSecondary">
+                  {i18n.t("inventorySales.sales.items.discount")}
+                </Typography>
+                <SaleItemDiscountFields
+                  draft={addForm}
+                  disabled={discountInputsDisabled}
+                  testIdPrefix="sale-add-discount"
+                  onTypeChange={(_e, next) => {
+                    if (!next) return;
+                    setAddForm((prev) => ({ ...prev, discountType: next }));
+                  }}
+                  onFixedChange={(reais) =>
                     setAddForm((prev) => ({
                       ...prev,
                       discountAmount: String(reais ?? 0),
+                    }))
+                  }
+                  onPercentChange={(e) =>
+                    setAddForm((prev) => ({
+                      ...prev,
+                      discountPercent: e.target.value,
                     }))
                   }
                 />
@@ -1206,6 +1497,20 @@ const SaleItemsEditor = forwardRef(function SaleItemsEditor(
           </Box>
         </Box>
       ) : null}
+
+      <InventoryDiscountAuthorizationDialog
+        open={authOpen}
+        detailMessage={authDetail}
+        canAuthorize={perms.canAuthorizeDiscount}
+        confirming={authConfirming || adding}
+        onClose={() => {
+          if (!authConfirming && !adding) {
+            setAuthOpen(false);
+            pendingItemSaveRef.current = null;
+          }
+        }}
+        onConfirm={handleDiscountAuthConfirm}
+      />
     </Box>
   );
 });

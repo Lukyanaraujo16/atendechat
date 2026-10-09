@@ -4,6 +4,7 @@ import { makeStyles } from "@material-ui/core/styles";
 
 import { formatCurrencyBRL } from "../../../utils/brazilianCurrency";
 import { i18n } from "../../../translate/i18n";
+import { computeSaleTotalsPreview } from "../saleDiscountPreview";
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -17,15 +18,6 @@ const useStyles = makeStyles((theme) => ({
   },
   freightSlot: {},
 }));
-
-function money(value) {
-  const n = Number(value);
-  return Number.isFinite(n) ? n : 0;
-}
-
-function roundMoney(value) {
-  return Math.round(Number(value) * 100) / 100;
-}
 
 /**
  * Resumo monetário a partir de `sale` (backend autoritativo).
@@ -44,19 +36,17 @@ export default function SaleWizardTotals({
       ? i18n.t("inventorySales.sales.wizard.totals.itemsCount", { count: itemCount })
       : null;
 
-  const persistedFreight = money(sale?.freightAmount);
-  const shownFreight =
-    previewFreightAmount != null
-      ? money(previewFreightAmount)
-      : freightAmount != null
-        ? money(freightAmount)
-        : persistedFreight;
+  const previewOpts = {};
+  if (previewFreightAmount != null) {
+    previewOpts.previewFreightAmount = previewFreightAmount;
+  } else if (freightAmount != null) {
+    previewOpts.previewFreightAmount = freightAmount;
+  }
 
-  const merchandise = roundMoney(money(sale?.totalAmount) - persistedFreight);
-  const shownTotal =
-    previewFreightAmount != null
-      ? roundMoney(merchandise + shownFreight)
-      : money(sale?.totalAmount);
+  const totals = computeSaleTotalsPreview(sale, previewOpts);
+  const shownFreight = totals.freight;
+
+  const variant = dense ? "caption" : "body2";
 
   return (
     <Box className={classes.root} data-testid="sale-wizard-totals">
@@ -65,17 +55,31 @@ export default function SaleWizardTotals({
           {itemsLabel}
         </Typography>
       ) : null}
-      <Typography variant={dense ? "caption" : "body2"} color="textSecondary">
-        {i18n.t("inventorySales.sales.totals.subtotal")}:{" "}
-        {formatCurrencyBRL(sale?.subtotalAmount)}
+      <Typography variant={variant} color="textSecondary">
+        {i18n.t("inventorySales.sales.totals.grossSubtotal")}:{" "}
+        {formatCurrencyBRL(totals.grossSubtotal)}
       </Typography>
-      <Typography variant={dense ? "caption" : "body2"} color="textSecondary">
-        {i18n.t("inventorySales.sales.totals.discount")}:{" "}
-        {formatCurrencyBRL(sale?.discountAmount)}
+      <Typography variant={variant} color="textSecondary">
+        {i18n.t("inventorySales.sales.totals.itemDiscounts")}:{" "}
+        {formatCurrencyBRL(totals.itemDiscountTotal)}
       </Typography>
+      <Typography variant={variant} color="textSecondary">
+        {i18n.t("inventorySales.sales.totals.merchandiseAfterItems")}:{" "}
+        {formatCurrencyBRL(totals.merchandiseAfterItems)}
+      </Typography>
+      {totals.globalDiscountAmount > 0 ? (
+        <Typography
+          variant={variant}
+          color="textSecondary"
+          data-testid="sale-wizard-global-discount-line"
+        >
+          {i18n.t("inventorySales.sales.totals.globalDiscount")}:{" "}
+          {formatCurrencyBRL(totals.globalDiscountAmount)}
+        </Typography>
+      ) : null}
       {shownFreight > 0 ? (
         <Typography
-          variant={dense ? "caption" : "body2"}
+          variant={variant}
           color="textSecondary"
           className={classes.freightSlot}
           data-testid="sale-wizard-freight-line"
@@ -90,7 +94,7 @@ export default function SaleWizardTotals({
         data-testid="sale-wizard-total"
       >
         {i18n.t("inventorySales.sales.totals.total")}:{" "}
-        {formatCurrencyBRL(shownTotal)}
+        {formatCurrencyBRL(totals.total)}
       </Typography>
     </Box>
   );

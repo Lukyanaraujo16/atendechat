@@ -46,6 +46,21 @@ function receiptFreightAmount(sale) {
   return Number.isFinite(n) ? n : 0;
 }
 
+function receiptGlobalDiscountAmount(sale) {
+  const n = Number(sale?.globalDiscountAmount);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function formatReceiptItemDiscount(item) {
+  if (item?.discountType === "percentage" && item.discountPercent != null) {
+    return i18n.t("inventorySales.sales.receipt.itemDiscountPercentage", {
+      percent: item.discountPercent,
+      amount: formatCurrencyBRL(item.discountAmount),
+    });
+  }
+  return formatCurrencyBRL(item.discountAmount);
+}
+
 function formatReceiptDeliveryAddress(delivery, compact) {
   if (!delivery) return null;
   const parts = [];
@@ -598,7 +613,7 @@ function ThermalReceipt({ sale, classes, branding, payments, paymentSummary }) {
             <div className="sale-receipt-thermal-money">
               <span>
                 {i18n.t("inventorySales.sales.receipt.columns.discount")}:{" "}
-                {formatCurrencyBRL(item.discountAmount)}
+                {formatReceiptItemDiscount(item)}
               </span>
               <span>{formatCurrencyBRL(item.totalAmount)}</span>
             </div>
@@ -620,6 +635,15 @@ function ThermalReceipt({ sale, classes, branding, payments, paymentSummary }) {
           <span>{i18n.t("inventorySales.sales.receipt.totalDiscount")}</span>
           <span>{formatCurrencyBRL(sale.discountAmount)}</span>
         </div>
+        {receiptGlobalDiscountAmount(sale) > 0 ? (
+          <div
+            className="sale-receipt-thermal-total-row"
+            data-testid="receipt-global-discount-line"
+          >
+            <span>{i18n.t("inventorySales.sales.receipt.globalDiscount")}</span>
+            <span>{formatCurrencyBRL(sale.globalDiscountAmount)}</span>
+          </div>
+        ) : null}
         {receiptFreightAmount(sale) > 0 ? (
           <div
             className="sale-receipt-thermal-total-row"
@@ -842,7 +866,7 @@ export default function SaleReceiptContent({
               </Typography>
               <Typography variant="body2">
                 {i18n.t("inventorySales.sales.receipt.columns.discount")}:{" "}
-                {formatCurrencyBRL(item.discountAmount)} ·{" "}
+                {formatReceiptItemDiscount(item)} ·{" "}
                 {i18n.t("inventorySales.sales.receipt.columns.total")}:{" "}
                 {formatCurrencyBRL(item.totalAmount)}
               </Typography>
@@ -892,7 +916,7 @@ export default function SaleReceiptContent({
                     {formatCurrencyBRL(item.unitPrice)}
                   </TableCell>
                   <TableCell align="right">
-                    {formatCurrencyBRL(item.discountAmount)}
+                    {formatReceiptItemDiscount(item)}
                   </TableCell>
                   <TableCell align="right">
                     {formatCurrencyBRL(item.totalAmount)}
@@ -913,6 +937,12 @@ export default function SaleReceiptContent({
           <span>{i18n.t("inventorySales.sales.receipt.totalDiscount")}</span>
           <span>{formatCurrencyBRL(sale.discountAmount)}</span>
         </div>
+        {receiptGlobalDiscountAmount(sale) > 0 ? (
+          <div className={classes.totalRow} data-testid="receipt-global-discount-line">
+            <span>{i18n.t("inventorySales.sales.receipt.globalDiscount")}</span>
+            <span>{formatCurrencyBRL(sale.globalDiscountAmount)}</span>
+          </div>
+        ) : null}
         {receiptFreightAmount(sale) > 0 ? (
           <div className={classes.totalRow} data-testid="receipt-freight-line">
             <span>{i18n.t("inventorySales.sales.receipt.freight")}</span>

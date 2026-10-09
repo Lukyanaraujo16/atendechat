@@ -50,6 +50,38 @@ jest.mock("../../../models/InventoryStockMovement", () => ({
   default: { count: jest.fn(), create: jest.fn() }
 }));
 
+jest.mock("../../../models/InventorySettings", () => ({
+  __esModule: true,
+  default: {
+    findOne: jest.fn().mockResolvedValue({
+      maxDiscountPercentWithoutAuthorization: 100
+    })
+  }
+}));
+
+jest.mock("../../../models/InventoryDiscountAuthorization", () => ({
+  __esModule: true,
+  default: { create: jest.fn() }
+}));
+
+jest.mock("../../../models/User", () => ({
+  __esModule: true,
+  default: { findOne: jest.fn() }
+}));
+
+jest.mock("../../../models/InventoryReceivable", () => ({
+  __esModule: true,
+  default: { findAll: jest.fn().mockResolvedValue([]) }
+}));
+
+jest.mock("../CancelInventoryReceivableForSaleService", () => ({
+  __esModule: true,
+  default: jest.fn().mockResolvedValue({
+    cancelledReceivableIds: [],
+    releasedAmount: 0
+  })
+}));
+
 jest.mock("../inventorySaleHelpers", () => {
   const actual = jest.requireActual("../inventorySaleHelpers");
   return {
@@ -119,6 +151,7 @@ describe("identifiers — Update omitido vs [], lock, tenant, rollback, cancel",
     destroyIdentifiers.mockResolvedValue(1);
     bulkCreateIdentifiers.mockResolvedValue([]);
     findIdentifiers.mockResolvedValue([]);
+    findItems.mockResolvedValue([]);
     stockCount.mockResolvedValue(0);
   });
 

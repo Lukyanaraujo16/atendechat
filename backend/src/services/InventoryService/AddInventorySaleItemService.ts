@@ -5,12 +5,19 @@ import InventoryProduct from "../../models/InventoryProduct";
 import {
   assertInventorySaleIsDraft,
   buildProductSnapshot,
-  computeLineTotal,
   findInventorySaleOrThrow,
   loadActiveInventoryProductOrThrow,
   recalculateInventorySaleTotals,
   roundMoney
 } from "./inventorySaleHelpers";
+import { computeItemDiscountAmount } from "./inventoryDiscountHelpers";
+import {
+  assertCanApplyDiscount,
+  assertMerchandiseDiscountGovernance,
+  buildMerchandiseDiscountSnapshot,
+  DiscountAuthorizationInput,
+  loadMaxDiscountPercent
+} from "./inventoryDiscountGovernance";
 import { syncDraftPendingAfterTotalChange } from "./inventorySalePaymentEngine";
 import {
   buildInventorySaleItemIdentifierInclude,
@@ -18,7 +25,7 @@ import {
   parseIdentifiersField,
   replaceSaleItemIdentifiers
 } from "./inventorySaleItemIdentifiers";
-import { parseDecimal, parseRequiredDecimal } from "./inventoryTenant";
+import { parseRequiredDecimal } from "./inventoryTenant";
 
 export default async function AddInventorySaleItemService(input: {
   companyId: number;
@@ -28,8 +35,12 @@ export default async function AddInventorySaleItemService(input: {
     quantity?: unknown;
     unitPrice?: unknown;
     discountAmount?: unknown;
+    discountType?: unknown;
+    discountPercent?: unknown;
+    discountAuthorization?: DiscountAuthorizationInput;
     identifiers?: unknown;
   };
+  canApplyDiscount?: boolean;
 }): Promise<InventorySaleItem> {
   return sequelize.transaction(async t => {
     const sale = await findInventorySaleOrThrow(
@@ -74,23 +85,27 @@ export default async function AddInventorySaleItemService(input: {
       }
     }
 
-    let discountAmount = 0;
-    if (
-      input.body.discountAmount !== undefined &&
-      input.body.discountAmount !== null
-    ) {
-      discountAmount =
-        parseDecimal(input.body.discountAmount, "discountAmount") ?? 0;
-      if (discountAmount < 0) {
-        throw new AppError(
-          "ERR_VALIDATION_ERROR",
-          400,
-          "discountAmount inválido."
-        );
-      }
-    }
+    const computed = computeItemDiscountAmount({
+      discountType: input.body.discountType,
+      discountAmount: input.body.discountAmount,
+      discountPercent: input.body.discountPercent,
+      unitPrice,
+      quantity
+    });
 
-    const totalAmount = computeLineTotal(unitPrice, quantity, discountAmount);
+    assertCanApplyDiscount({
+      canApplyDiscount: input.canApplyDiscount !== false,
+      discountAmount: computed.discountAmount
+    });
+
+    const persistType =
+      input.body.discountType === undefined ||
+      input.body.discountType === null ||
+      input.body.discountType === ""
+        ? computed.discountAmount > 0
+          ? "fixed"
+          : null
+        : computed.discountType;
 
     const item = await InventorySaleItem.create(
       {
@@ -103,8 +118,10 @@ export default async function AddInventorySaleItemService(input: {
         unitPrice: roundMoney(unitPrice),
         costPrice: snapshot.costPrice,
         quantity,
-        discountAmount: roundMoney(discountAmount),
-        totalAmount,
+        discountType: persistType,
+        discountPercent: computed.discountPercent,
+        discountAmount: computed.discountAmount,
+        totalAmount: computed.lineTotal,
         trackStock: snapshot.trackStock
       },
       { transaction: t }
@@ -119,6 +136,28 @@ export default async function AddInventorySaleItemService(input: {
 
     await recalculateInventorySaleTotals(sale.id, input.companyId, t);
     await sale.reload({ transaction: t });
+
+    const maxAllowedPercent = await loadMaxDiscountPercent(input.companyId, t);
+    const items = await InventorySaleItem.findAll({
+      where: { saleId: sale.id, companyId: input.companyId },
+      transaction: t
+    });
+    const snapshotDisc = buildMerchandiseDiscountSnapshot({
+      items,
+      globalDiscountType: sale.globalDiscountType,
+      globalDiscountAmount: sale.globalDiscountAmount,
+      globalDiscountPercent: sale.globalDiscountPercent,
+      maxAllowedPercent
+    });
+    await assertMerchandiseDiscountGovernance({
+      companyId: input.companyId,
+      sale,
+      snapshot: snapshotDisc,
+      authorization: input.body.discountAuthorization,
+      actorUserId: input.body.discountAuthorization?.authorizedByUserId,
+      transaction: t
+    });
+
     await syncDraftPendingAfterTotalChange(sale, t);
     return item.reload({
       transaction: t,

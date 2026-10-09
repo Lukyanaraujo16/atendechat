@@ -563,7 +563,9 @@ const messages = {
             noSeller: "Sem vendedor",
             cancelled: "VENDA CANCELADA",
             subtotal: "Subtotal",
-            totalDiscount: "Descontos",
+            totalDiscount: "Descontos nos itens",
+            globalDiscount: "Desconto global",
+            itemDiscountPercentage: "{{percent}}% ({{amount}})",
             freight: "Entrega",
             delivery: "Entrega",
             deliveryRecipient: "Destinatário",
@@ -614,8 +616,31 @@ const messages = {
           totals: {
             subtotal: "Subtotal",
             discount: "Descontos",
+            grossSubtotal: "Subtotal bruto",
+            itemDiscounts: "Descontos nos itens",
+            merchandiseAfterItems: "Mercadoria após itens",
+            globalDiscount: "Desconto global",
             total: "Total",
             commission: "Comissão",
+          },
+          globalDiscount: {
+            title: "Desconto global da venda",
+            amount: "Valor (R$)",
+            percent: "Percentual (%)",
+            noPermission: "Sem permissão para aplicar descontos.",
+            previewLine: "Desconto global aplicado: {{amount}}",
+            toasts: {
+              saved: "Desconto global atualizado.",
+            },
+          },
+          discountAuth: {
+            title: "Autorização de desconto",
+            body:
+              "O desconto efetivo desta venda excede o limite configurado. Informe o motivo para autorizar.",
+            reason: "Motivo da autorização",
+            confirm: "Autorizar desconto",
+            noPermission:
+              "Você não tem permissão para autorizar descontos acima do limite. Peça a um responsável.",
           },
           items: {
             title: "Itens da venda",
@@ -637,6 +662,7 @@ const messages = {
             unitPrice: "Preço unitário",
             unitPriceOptional: "Preço unitário (opcional)",
             discount: "Desconto",
+            discountPercentDisplay: "{{percent}}% ({{amount}})",
             total: "Total",
             validation: {
               product: "Selecione um produto.",
@@ -886,6 +912,9 @@ const messages = {
             cancelledTotal: "Valor cancelado",
             totalPaid: "Total pago",
             totalPending: "Total pendente",
+            totalItemDiscounts: "Descontos nos itens",
+            totalGlobalDiscounts: "Descontos da venda",
+            totalDiscountsGranted: "Descontos concedidos",
           },
           columns: {
             seller: "Vendedor",
@@ -1170,14 +1199,20 @@ const messages = {
             saleNumberPrefix: "Prefixo do número da venda",
             blockStoreCreditWhenOverdue:
               "Bloquear Crédito da Loja quando houver saldo vencido",
+            maxDiscountPercentWithoutAuthorization:
+              "Desconto máximo sem autorização (%)",
           },
           hints: {
             commission: "Usada quando o vendedor não tem perfil de comissão ativo.",
             blockStoreCreditWhenOverdue:
               "Quando ativo, novas vendas em Crédito da Loja exigem autorização se o cliente tiver parcelas vencidas.",
+            maxDiscountPercentWithoutAuthorization:
+              "Percentual efetivo máximo sobre a mercadoria bruta antes de exigir autorização (0–100). Padrão: 100.",
           },
           validation: {
             commission: "Comissão deve estar entre 0 e 100.",
+            maxDiscountPercent:
+              "O desconto máximo sem autorização deve estar entre 0 e 100.",
           },
           toasts: {
             saved: "Configurações salvas.",
@@ -2432,6 +2467,16 @@ const messages = {
               label: "Autorizar excesso / atraso no crédito",
               description:
                 "Autorizar vendas em Crédito da Loja acima do limite ou com saldo vencido.",
+            },
+            "sales.applyDiscount": {
+              label: "Aplicar descontos",
+              description:
+                "Conceder descontos por item ou desconto global no PDV.",
+            },
+            "sales.authorizeDiscount": {
+              label: "Autorizar descontos acima do limite",
+              description:
+                "Autorizar descontos que excedem o percentual máximo configurado, com motivo.",
             },
             "sales.viewReceivables": {
               label: "Visualizar contas a receber",
@@ -8476,6 +8521,8 @@ const messages = {
         operationFailed: "Não foi possível concluir a operação. Tente novamente.",
       },
       backendErrors: {
+        ERR_INVENTORY_DISCOUNT_AUTHORIZATION_REQUIRED:
+          "Desconto acima do limite permitido. Autorização necessária.",
         ERR_INVENTORY_PRODUCT_BARCODE_DUPLICATE: "Este código de barras já está sendo usado por outro produto.",
         ERR_INVENTORY_PRODUCT_HAS_HISTORY:
           "Este produto possui histórico de vendas ou movimentações e não pode ser excluído. Você pode desativá-lo.",

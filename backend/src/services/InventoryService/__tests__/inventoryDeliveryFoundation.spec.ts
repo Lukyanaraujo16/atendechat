@@ -492,6 +492,9 @@ describe("fundação entrega/frete", () => {
         {
           subtotalAmount: 100,
           discountAmount: 10,
+          globalDiscountType: null,
+          globalDiscountPercent: null,
+          globalDiscountAmount: 0,
           totalAmount: 110
         },
         { where: { id: 50, companyId: 1 }, transaction: undefined }

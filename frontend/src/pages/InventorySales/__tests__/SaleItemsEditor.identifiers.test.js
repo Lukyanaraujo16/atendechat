@@ -53,6 +53,12 @@ jest.mock("../../../hooks/useIsMobile", () => ({
   default: jest.fn(() => false),
 }));
 
+jest.mock("../../../utils/inventoryAccess", () => ({
+  useInventoryPermissions: () => ({
+    canAuthorizeDiscount: true,
+  }),
+}));
+
 jest.mock("react-toastify", () => ({
   toast: {
     success: jest.fn(),
@@ -317,6 +323,7 @@ describe("SaleItemsEditor identifiers", () => {
     expect(updateInventorySaleItem).toHaveBeenCalledWith(7, 21, {
       quantity: 1,
       unitPrice: 120,
+      discountType: "fixed",
       discountAmount: 0,
     });
     expect(updateInventorySaleItem.mock.calls[0][2]).not.toHaveProperty(
@@ -342,6 +349,7 @@ describe("SaleItemsEditor identifiers", () => {
     expect(updateInventorySaleItem).toHaveBeenCalledWith(7, 21, {
       quantity: 1,
       unitPrice: 100,
+      discountType: "fixed",
       discountAmount: 0,
       identifiers: [],
     });
@@ -395,6 +403,7 @@ describe("SaleItemsEditor identifiers", () => {
     expect(updateInventorySaleItem).toHaveBeenCalledWith(7, 21, {
       quantity: 1.5,
       unitPrice: 100,
+      discountType: "fixed",
       discountAmount: 0,
       identifiers: [],
     });
@@ -412,6 +421,7 @@ describe("SaleItemsEditor identifiers", () => {
     expect(updateInventorySaleItem.mock.calls[0][2]).toEqual({
       quantity: 1.5,
       unitPrice: 100,
+      discountType: "fixed",
       discountAmount: 0,
     });
     expect(updateInventorySaleItem.mock.calls[0][2]).not.toHaveProperty(

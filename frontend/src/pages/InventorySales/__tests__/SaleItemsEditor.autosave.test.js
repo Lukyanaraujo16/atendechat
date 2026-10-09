@@ -27,6 +27,12 @@ jest.mock("react-toastify", () => ({
 
 jest.mock("../../../hooks/useIsMobile", () => () => false);
 
+jest.mock("../../../utils/inventoryAccess", () => ({
+  useInventoryPermissions: () => ({
+    canAuthorizeDiscount: true,
+  }),
+}));
+
 function itemBase(overrides = {}) {
   return {
     id: 7,
@@ -118,7 +124,7 @@ describe("SaleItemsEditor autosave", () => {
 
   it("3. desconto autosave persiste", async () => {
     renderEditor();
-    const discountInput = screen.getByTestId("sale-item-discount-7");
+    const discountInput = screen.getByTestId("sale-item-discount-7-amount");
     fireEvent.keyDown(discountInput, { key: "5" });
     await act(async () => {
       jest.advanceTimersByTime(450);

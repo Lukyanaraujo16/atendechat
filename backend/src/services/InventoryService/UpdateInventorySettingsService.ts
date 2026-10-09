@@ -16,6 +16,7 @@ type UpdateBody = {
   receiptFooterMessage?: unknown;
   receiptPrintFormat?: unknown;
   blockStoreCreditWhenOverdue?: unknown;
+  maxDiscountPercentWithoutAuthorization?: unknown;
 };
 
 const RECEIPT_TEXT_FIELDS: Array<{
@@ -90,6 +91,21 @@ export default async function UpdateInventorySettingsService(input: {
       input.body.blockStoreCreditWhenOverdue === "true" ||
       input.body.blockStoreCreditWhenOverdue === 1 ||
       input.body.blockStoreCreditWhenOverdue === "1";
+  }
+
+  if (input.body.maxDiscountPercentWithoutAuthorization !== undefined) {
+    const max = parseDecimal(
+      input.body.maxDiscountPercentWithoutAuthorization,
+      "maxDiscountPercentWithoutAuthorization"
+    );
+    if (max === null || max < 0 || max > 100) {
+      throw new AppError(
+        "ERR_VALIDATION_ERROR",
+        400,
+        "Limite de desconto sem autorização deve estar entre 0 e 100."
+      );
+    }
+    patch.maxDiscountPercentWithoutAuthorization = max;
   }
 
   if (input.body.saleNumberPrefix !== undefined) {

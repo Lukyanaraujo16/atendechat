@@ -1,10 +1,14 @@
 import { Request, Response } from "express";
 import AppError from "../errors/AppError";
 import {
+  INVENTORY_SALES_APPLY_DISCOUNT,
+  INVENTORY_SALES_AUTHORIZE_DISCOUNT,
   INVENTORY_SALES_AUTHORIZE_STORE_CREDIT_OVERRIDE,
   INVENTORY_SALES_MANAGE_PAYMENTS,
   INVENTORY_SALES_USE_STORE_CREDIT
 } from "../config/inventorySalesPermissions";
+import UpdateInventorySaleGlobalDiscountService from "../services/InventoryService/UpdateInventorySaleGlobalDiscountService";
+import { DiscountAuthorizationInput } from "../services/InventoryService/inventoryDiscountGovernance";
 import { loadCompanyPlanContext } from "../middleware/loadCompanyEffectiveFeatures";
 import { isPlatformSuperUser } from "../middleware/platformSuperBypass";
 import CreateInventorySaleService from "../services/InventoryService/CreateInventorySaleService";
@@ -88,6 +92,34 @@ async function resolveFeatureFlag(
 
 async function resolveCanManagePayments(req: Request): Promise<boolean> {
   return resolveFeatureFlag(req, INVENTORY_SALES_MANAGE_PAYMENTS);
+}
+
+async function resolveDiscountAuthorization(
+  req: Request
+): Promise<DiscountAuthorizationInput | undefined> {
+  const raw = req.body?.discountAuthorization;
+  if (!raw || typeof raw !== "object") return undefined;
+  const canAuthorizeDiscount = await resolveFeatureFlag(
+    req,
+    INVENTORY_SALES_AUTHORIZE_DISCOUNT
+  );
+  return {
+    authorize:
+      raw.authorize === true ||
+      raw.authorize === "true" ||
+      raw.authorizeOverride === true,
+    authorizedByUserId: userIdOrNull(req),
+    reason: raw.reason,
+    canAuthorizeDiscount
+  };
+}
+
+function mergeDiscountAuthIntoBody(
+  body: Record<string, unknown>,
+  auth: DiscountAuthorizationInput | undefined
+): Record<string, unknown> {
+  if (!auth) return body;
+  return { ...body, discountAuthorization: auth };
 }
 
 export const searchCustomers = async (
@@ -193,10 +225,16 @@ export const addSaleItem = async (
   res: Response
 ): Promise<Response> => {
   const companyId = companyIdOrThrow(req);
+  const canApplyDiscount = await resolveFeatureFlag(
+    req,
+    INVENTORY_SALES_APPLY_DISCOUNT
+  );
+  const discountAuthorization = await resolveDiscountAuthorization(req);
   const item = await AddInventorySaleItemService({
     companyId,
     saleId: parseIdParam(req.params.id),
-    body: req.body
+    body: mergeDiscountAuthIntoBody(req.body || {}, discountAuthorization),
+    canApplyDiscount
   });
   return res.status(201).json(item);
 };
@@ -206,13 +244,38 @@ export const updateSaleItem = async (
   res: Response
 ): Promise<Response> => {
   const companyId = companyIdOrThrow(req);
+  const canApplyDiscount = await resolveFeatureFlag(
+    req,
+    INVENTORY_SALES_APPLY_DISCOUNT
+  );
+  const discountAuthorization = await resolveDiscountAuthorization(req);
   const item = await UpdateInventorySaleItemService({
     companyId,
     saleId: parseIdParam(req.params.id),
     itemId: parseIdParam(req.params.itemId),
-    body: req.body
+    body: mergeDiscountAuthIntoBody(req.body || {}, discountAuthorization),
+    canApplyDiscount
   });
   return res.json(item);
+};
+
+export const updateSaleGlobalDiscount = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = companyIdOrThrow(req);
+  const canApplyDiscount = await resolveFeatureFlag(
+    req,
+    INVENTORY_SALES_APPLY_DISCOUNT
+  );
+  const discountAuthorization = await resolveDiscountAuthorization(req);
+  const sale = await UpdateInventorySaleGlobalDiscountService({
+    companyId,
+    saleId: parseIdParam(req.params.id),
+    body: mergeDiscountAuthIntoBody(req.body || {}, discountAuthorization),
+    canApplyDiscount
+  });
+  return res.json(sale);
 };
 
 export const deleteSaleItem = async (
@@ -274,6 +337,8 @@ export const completeSale = async (
         }
       : undefined;
 
+  const discountAuthorization = await resolveDiscountAuthorization(req);
+
   const sale = await CompleteInventorySaleService({
     companyId,
     saleId: parseIdParam(req.params.id),
@@ -284,7 +349,8 @@ export const completeSale = async (
     paymentMode: parseOptionalPaymentMode(req.body?.paymentMode),
     storeCreditSchedule,
     storeCreditOverride,
-    canUseStoreCredit
+    canUseStoreCredit,
+    discountAuthorization
   });
   return res.json(sale);
 };

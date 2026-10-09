@@ -133,6 +133,16 @@ export function computeLineTotal(
   return roundMoney(unitPrice * quantity - discountAmount);
 }
 
+/** Mercadoria líquida (após itens + global, sem frete). */
+export function computeNetMerchandiseFromSale(sale: {
+  totalAmount: string | number;
+  freightAmount?: string | number | null;
+}): number {
+  return roundMoney(
+    toMoney(sale.totalAmount) - toMoney(sale.freightAmount ?? 0)
+  );
+}
+
 export async function findInventorySaleOrThrow(
   companyId: number,
   id: number,
@@ -211,6 +221,12 @@ export async function recalculateInventorySaleTotals(
   companyId: number,
   transaction?: Transaction
 ): Promise<void> {
+  // Import local evita ciclo estático com inventoryDiscountHelpers.
+  const {
+    computeItemDiscountAmount,
+    computeGlobalDiscountAmount
+  } = await import("./inventoryDiscountHelpers");
+
   const sale = await InventorySale.findOne({
     where: { id: saleId, companyId },
     transaction
@@ -226,32 +242,73 @@ export async function recalculateInventorySaleTotals(
 
   let subtotalAmount = 0;
   let discountAmount = 0;
-  let merchandiseTotal = 0;
+  let merchandiseAfterItemDiscounts = 0;
 
   for (const item of items) {
     const unitPrice = toMoney(item.unitPrice);
     const qty = Number(item.quantity);
-    const lineDiscount = toMoney(item.discountAmount);
-    const lineSubtotal = roundMoney(unitPrice * qty);
-    const lineTotal = computeLineTotal(unitPrice, qty, lineDiscount);
+    const computed = computeItemDiscountAmount({
+      discountType: item.discountType,
+      discountAmount: item.discountAmount,
+      discountPercent: item.discountPercent,
+      unitPrice,
+      quantity: qty
+    });
 
-    subtotalAmount += lineSubtotal;
-    discountAmount += lineDiscount;
-    merchandiseTotal += lineTotal;
+    subtotalAmount += computed.lineGross;
+    discountAmount += computed.discountAmount;
+    merchandiseAfterItemDiscounts += computed.lineTotal;
 
-    if (toMoney(item.totalAmount) !== lineTotal) {
-      await item.update({ totalAmount: lineTotal }, { transaction });
+    const itemPatch: Partial<InventorySaleItem> = {};
+    if (toMoney(item.discountAmount) !== computed.discountAmount) {
+      itemPatch.discountAmount = computed.discountAmount;
+    }
+    if (toMoney(item.totalAmount) !== computed.lineTotal) {
+      itemPatch.totalAmount = computed.lineTotal;
+    }
+    // Percentual: mantém type/% sincronizados. Legado null+fixed: não força type.
+    if (item.discountType === "percentage" || computed.discountType === "percentage") {
+      if (item.discountType !== "percentage") {
+        itemPatch.discountType = "percentage";
+      }
+      if (
+        item.discountPercent == null ||
+        toMoney(item.discountPercent) !== (computed.discountPercent ?? 0)
+      ) {
+        itemPatch.discountPercent = computed.discountPercent;
+      }
+    }
+
+    if (Object.keys(itemPatch).length > 0) {
+      await item.update(itemPatch, { transaction });
     }
   }
 
+  const global = computeGlobalDiscountAmount({
+    globalDiscountType: sale.globalDiscountType,
+    globalDiscountAmount: sale.globalDiscountAmount,
+    globalDiscountPercent: sale.globalDiscountPercent,
+    merchandiseAfterItemDiscounts: roundMoney(merchandiseAfterItemDiscounts)
+  });
+
   const freightAmount = toMoney(sale.freightAmount);
-  const totalAmount = roundMoney(merchandiseTotal + freightAmount);
+  const totalAmount = roundMoney(global.netMerchandise + freightAmount);
+  if (totalAmount < -1e-9) {
+    throw new AppError(
+      "ERR_INVENTORY_SALE_TOTAL_NEGATIVE",
+      400,
+      "Total da venda não pode ser negativo."
+    );
+  }
 
   await InventorySale.update(
     {
       subtotalAmount: roundMoney(subtotalAmount),
       discountAmount: roundMoney(discountAmount),
-      totalAmount
+      globalDiscountType: global.globalDiscountType,
+      globalDiscountPercent: global.globalDiscountPercent,
+      globalDiscountAmount: global.globalDiscountAmount,
+      totalAmount: roundMoney(Math.max(0, totalAmount))
     },
     { where: { id: saleId, companyId }, transaction }
   );

@@ -422,6 +422,24 @@ export default function InventoryReportsTab() {
             </Grid>
             <Grid item xs={6} sm={4} md={2}>
               <StatCard
+                label={i18n.t("inventorySales.reports.summary.totalItemDiscounts")}
+                value={formatCurrencyBRL(summary?.totalItemDiscounts)}
+              />
+            </Grid>
+            <Grid item xs={6} sm={4} md={2}>
+              <StatCard
+                label={i18n.t("inventorySales.reports.summary.totalGlobalDiscounts")}
+                value={formatCurrencyBRL(summary?.totalGlobalDiscounts)}
+              />
+            </Grid>
+            <Grid item xs={6} sm={4} md={2}>
+              <StatCard
+                label={i18n.t("inventorySales.reports.summary.totalDiscountsGranted")}
+                value={formatCurrencyBRL(summary?.totalDiscountsGranted)}
+              />
+            </Grid>
+            <Grid item xs={6} sm={4} md={2}>
+              <StatCard
                 label={i18n.t("inventorySales.reports.summary.cancelledCount")}
                 value={summary?.cancelledSalesCount ?? 0}
               />

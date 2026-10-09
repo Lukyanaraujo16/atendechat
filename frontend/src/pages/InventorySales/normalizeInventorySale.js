@@ -28,6 +28,8 @@ function normalizeSaleItem(raw) {
     unit: row.unit,
     quantity: row.quantity,
     unitPrice: row.unitPrice,
+    discountType: row.discountType ?? null,
+    discountPercent: row.discountPercent ?? null,
     discountAmount: row.discountAmount,
     totalAmount: row.totalAmount,
     product,
@@ -67,6 +69,10 @@ export function normalizeInventorySale(sale) {
   return {
     ...sale,
     items: getInventorySaleItems(sale),
+    globalDiscountType: sale.globalDiscountType ?? null,
+    globalDiscountPercent: sale.globalDiscountPercent ?? null,
+    globalDiscountAmount:
+      sale.globalDiscountAmount != null ? sale.globalDiscountAmount : 0,
     freightAmount: sale.freightAmount != null ? sale.freightAmount : 0,
     deliveryMethodId: sale.deliveryMethodId ?? null,
     deliveryMethodName: sale.deliveryMethodName ?? null,
