@@ -1,5 +1,6 @@
 import express from "express";
 import isAuth from "../middleware/isAuth";
+import isSuper from "../middleware/isSuper";
 import requireAnyPlanFeature from "../middleware/requirePlanFeature";
 
 import * as SubscriptionController from "../controllers/SubscriptionController";
@@ -11,7 +12,13 @@ subscriptionRoutes.post(
   requireAnyPlanFeature("finance.subscription"),
   SubscriptionController.createSubscription
 );
-subscriptionRoutes.post("/subscription/create/webhook", SubscriptionController.createWebhook);
+/** Configuração de webhook Efí — apenas Super Admin (Marco 1). */
+subscriptionRoutes.post(
+  "/subscription/create/webhook",
+  isAuth,
+  isSuper,
+  SubscriptionController.createWebhook
+);
 subscriptionRoutes.post("/subscription/webhook", SubscriptionController.webhook);
 
 export default subscriptionRoutes;

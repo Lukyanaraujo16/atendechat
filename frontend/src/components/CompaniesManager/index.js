@@ -83,6 +83,7 @@ import {
 import AppTableContainer from "../../ui/components/AppTableContainer";
 import FeatureGroupsEditor from "../ModuleSettings/FeatureGroupsEditor";
 import CompanyPlanChangeDialog from "../ModuleSettings/CompanyPlanChangeDialog";
+import CompanyFinanceSection from "../CompanyFinanceSection";
 import {
   defaultModulePermissions,
   mergeModulePermissions,
@@ -827,12 +828,6 @@ export function CompanyForm(props) {
     dueDate: "",
     recurrence: "",
     timezone: "America/Sao_Paulo",
-    contractedPlanValueStr: "",
-    storageLimitGbStr: "",
-    storageUsedFormatted: null,
-    storageLimitFormatted: null,
-    storageUsagePercent: null,
-    storageCalculatedAt: null,
     ...initialValue,
     contractedPlanValueStr:
       initialValue?.contractedPlanValue != null && initialValue?.contractedPlanValue !== ""
@@ -1494,6 +1489,9 @@ export function CompanyForm(props) {
                         margin="dense"
                       >
                         <MenuItem value="MENSAL">{i18n.t("settings.company.form.monthly")}</MenuItem>
+                        <MenuItem value="TRIMESTRAL">Trimestral</MenuItem>
+                        <MenuItem value="SEMESTRAL">Semestral</MenuItem>
+                        <MenuItem value="ANUAL">Anual</MenuItem>
                       </Field>
                     </FormControl>
                   </Grid>
@@ -1705,6 +1703,11 @@ export function CompanyForm(props) {
                   ) : null}
                 </Grid>
               </AppSectionCard>
+
+              {/* Bloco Financeiro SaaS (Super Admin) */}
+              {initialValue?.id && user?.super ? (
+                <CompanyFinanceSection companyId={initialValue.id} />
+              ) : null}
 
               {/* Bloco 3 — Módulos e funcionalidades */}
               <AppSectionCard>
@@ -3032,6 +3035,7 @@ export default function CompaniesManager() {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const fid = params.get("focus");
+    const section = params.get("section");
     if (!fid || records.length === 0) return;
     const id = Number(fid);
     if (Number.isNaN(id)) return;
@@ -3039,6 +3043,12 @@ export default function CompaniesManager() {
     if (!row) return;
     handleSelectRef.current(row);
     history.replace({ pathname: "/saas/companies" });
+    if (section === "finance") {
+      setTimeout(() => {
+        const el = document.getElementById("company-finance-section");
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 400);
+    }
   }, [location.search, records, history]);
 
   const openGridDeleteDialog = (row) => {

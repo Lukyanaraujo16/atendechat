@@ -3,18 +3,33 @@ import Company from "../models/Company";
 export interface CompanyFinanceFlags {
   /** Data de vencimento da assinatura/cobrança já passou (comparado ao início do dia). */
   overdue: boolean;
-  /** Mesmo critério que overdue — linguagem de produto (inadimplência). */
+  /**
+   * Inadimplência operacional: overdue além da tolerância (default 3 dias).
+   * Alinhado a billingAuto_daysAfterDueBlock quando disponível via opts.
+   */
   delinquent: boolean;
   dueDate: string | null;
   /** Dias após o vencimento quando em atraso; null se não aplicável. */
   daysPastDue: number | null;
 }
 
+export type FinanceFlagsOptions = {
+  /** Dias de tolerância antes de considerar delinquent (default 3). */
+  graceDays?: number;
+};
+
 /**
- * Política V1 (Fase 2): inadimplência derivada de company.dueDate.
- * Não bloqueia login; flags alimentam UI e futuras regras de bloqueio parcial.
+ * Política unificada: overdue = dueDate < hoje; delinquent = daysPastDue >= graceDays.
  */
-export const getCompanyFinanceFlags = (company: Company): CompanyFinanceFlags => {
+export const getCompanyFinanceFlags = (
+  company: Company,
+  opts?: FinanceFlagsOptions
+): CompanyFinanceFlags => {
+  const graceDays =
+    opts?.graceDays != null && Number.isFinite(opts.graceDays)
+      ? Math.max(0, Number(opts.graceDays))
+      : Number(process.env.SAAS_BILLING_GRACE_DAYS || 3);
+
   if (!company?.dueDate) {
     return {
       overdue: false,
@@ -32,9 +47,12 @@ export const getCompanyFinanceFlags = (company: Company): CompanyFinanceFlags =>
   const daysPastDue =
     overdue && diffMs > 0 ? Math.max(0, Math.floor(diffMs / 86400000)) : null;
 
+  const delinquent =
+    overdue && daysPastDue != null ? daysPastDue >= graceDays : false;
+
   return {
     overdue,
-    delinquent: overdue,
+    delinquent,
     dueDate: company.dueDate,
     daysPastDue
   };

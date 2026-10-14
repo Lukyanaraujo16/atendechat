@@ -1389,99 +1389,21 @@ async function handleLoginStatus(job) {
 
 
 async function handleInvoiceCreate() {
-  logger.info("Iniciando geração de boletos");
-  const job = new CronJob('*/5 * * * * *', async () => {
-
-
-    const companies = await Company.findAll();
-    companies.map(async c => {
-      var dueDate = c.dueDate;
-      const date = moment(dueDate).format();
-      const hoje = moment(moment()).format("DD/MM/yyyy");
-      var vencimento = moment(dueDate).format("DD/MM/yyyy");
-
-      var diff = moment(vencimento, "DD/MM/yyyy").diff(moment(hoje, "DD/MM/yyyy"));
-      var dias = moment.duration(diff).asDays();
-
-      if (dias < 20) {
-        const planPid = resolvePlanIdForQuery(c.planId);
-        if (planPid == null) {
-          return;
-        }
-        const plan = await Plan.findByPk(planPid);
-        if (!plan) {
-          return;
-        }
-
-        const billValue = getCompanyEffectivePlanValue({
-          contractedPlanValue: (c as { contractedPlanValue?: unknown }).contractedPlanValue,
-          plan
-        });
-
-        const datePrefix = moment(dueDate).format("YYYY-MM-DD");
-        const likePattern = `${datePrefix}%`;
-        const existingCount = await Invoices.count({
-          where: {
-            [Op.and]: [
-              { companyId: c.id },
-              Sequelize.literal(
-                `"Invoices"."dueDate"::text LIKE ${sequelize.escape(likePattern)}`
-              )
-            ]
-          }
-        });
-
-        if (existingCount > 0) {
-          // já existe fatura para este ciclo
-        } else {
-          await Invoices.create({
-            detail: plan.name,
-            status: "open",
-            value: billValue,
-            dueDate: date,
-            companyId: c.id
-          });
-
-          /*           let transporter = nodemailer.createTransport({
-                      service: 'gmail',
-                      auth: {
-                        user: 'email@gmail.com',
-                        pass: 'senha'
-                      }
-                    });
-
-                    const mailOptions = {
-                      from: 'heenriquega@gmail.com', // sender address
-                      to: `${c.email}`, // receiver (use array of string for a list)
-                      subject: 'Fatura gerada - Sistema', // Subject line
-                      html: `Olá ${c.name} esté é um email sobre sua fatura!<br>
-          <br>
-          Vencimento: ${vencimento}<br>
-          Valor: ${billValue}<br>
-          Link: ${process.env.FRONTEND_URL}/financeiro<br>
-          <br>
-          Qualquer duvida estamos a disposição!
-                      `// plain text body
-                    };
-
-                    transporter.sendMail(mailOptions, (err, info) => {
-                      if (err)
-                        console.log(err)
-                      else
-                        console.log(info);
-                    }); */
-
-        }
-
-
-
-
-
-      }
-
-    });
+  logger.info(
+    "[SaasBilling] Agendando geração de faturas (flag SAAS_BILLING_AUTO_INVOICE)"
+  );
+  // A cada 15 min — não a cada 5s; emissão controlada por flag (default OFF)
+  const job = new CronJob("*/15 * * * *", async () => {
+    try {
+      const { runSaasInvoiceGenerationJob } = await import(
+        "./services/SaasBilling/GenerateSaasInvoiceService"
+      );
+      await runSaasInvoiceGenerationJob();
+    } catch (err) {
+      logger.warn({ err }, "[SaasBilling] invoice_cron_failed");
+    }
   });
-  job.start()
+  job.start();
 }
 
 handleCloseTicketsAutomatic()

@@ -19,4 +19,19 @@ export function startBillingAutomationScheduler(): void {
       billingJobRunning = false;
     }
   });
+
+  // Conciliação settle Cobranças — retries limitados (flag OFF por default)
+  cron.schedule("40 * * * *", async () => {
+    try {
+      const { retryPendingSettles } = await import(
+        "../services/SaasBilling/retryReconciliationSettle"
+      );
+      const result = await retryPendingSettles();
+      if (result.processed > 0) {
+        logger.info(result, "[SaasBilling] reconciliation_retry");
+      }
+    } catch (e) {
+      logger.warn(e, "[SaasBilling] reconciliation_retry_failed");
+    }
+  });
 }

@@ -4,15 +4,14 @@ import Gerencianet from "gn-api-sdk-typescript";
 import AppError from "../errors/AppError";
 
 import options from "../config/Gn";
-import Company from "../models/Company";
 import Invoices from "../models/Invoices";
-import { getIO } from "../libs/socket";
+import SaaSPaymentAttempt from "../models/SaaSPaymentAttempt";
 import { logger } from "../utils/logger";
+import { saasBillingFlags } from "../config/saasBillingFlags";
+import { confirmGatewayPayment } from "../services/SaasBilling/confirmGatewayPayment";
 
 /**
  * URL do webhook PIX configurada na Efí/Gerencianet.
- * - Sem WEBHOOK_SUBSCRIPTION_SECRET: `{BACKEND_URL}/subscription/webhook`
- * - Com segredo: mesma URL com `?token=<segredo>` (deve coincidir com a env no servidor)
  */
 function buildSubscriptionWebhookUrl(): string {
   const base = (process.env.BACKEND_URL || "").replace(/\/$/, "");
@@ -31,10 +30,12 @@ function buildSubscriptionWebhookUrl(): string {
 }
 
 function formatPixAmount(value: number): string {
-  return Number(value).toLocaleString("pt-BR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  }).replace(",", ".");
+  return Number(value)
+    .toLocaleString("pt-BR", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    })
+    .replace(",", ".");
 }
 
 function extractPaidAmountFromCharge(detahe: Record<string, unknown>): number {
@@ -56,7 +57,15 @@ function amountsMatchInvoice(expected: number, paid: number): boolean {
 
 function verifyWebhookSecret(req: Request): boolean {
   const secret = process.env.WEBHOOK_SUBSCRIPTION_SECRET;
-  if (!secret) {
+  if (saasBillingFlags.requireWebhookSecret()) {
+    if (!secret) {
+      logger.error("[webhook] WEBHOOK_SUBSCRIPTION_SECRET obrigatório neste ambiente");
+      return false;
+    }
+  } else if (!secret) {
+    logger.warn(
+      "[webhook] WEBHOOK_SUBSCRIPTION_SECRET ausente — aceito apenas em development/test"
+    );
     return true;
   }
   const queryToken = req.query.token as string | undefined;
@@ -73,6 +82,10 @@ export const createSubscription = async (
   req: Request,
   res: Response
 ): Promise<Response> => {
+  if (!saasBillingFlags.pixEnabled()) {
+    throw new AppError("ERR_PIX_DISABLED", 403);
+  }
+
   const gerencianet = Gerencianet(options);
   const { companyId } = req.user;
 
@@ -102,6 +115,10 @@ export const createSubscription = async (
     throw new AppError("ERR_INVOICE_ALREADY_PAID", 400);
   }
 
+  if (String(invoice.status).toLowerCase() === "cancelled") {
+    throw new AppError("ERR_INVOICE_CANCELLED", 400);
+  }
+
   const body = {
     calendario: {
       expiracao: 3600
@@ -118,6 +135,28 @@ export const createSubscription = async (
 
     const qrcode = await gerencianet.pixGenerateQRCode({
       id: pix.loc.id
+    });
+
+    await SaaSPaymentAttempt.create({
+      companyId: invoice.companyId,
+      invoiceId: invoice.id,
+      method: "pix",
+      status: "pending",
+      externalTxid: pix.txid || null,
+      gatewayProvider: "efi",
+      gatewayStatus: pix.status || "ATIVA",
+      amount: Number(invoice.value),
+      payloadSummary: {
+        locId: pix.loc?.id,
+        solicitacaoPagador: `#Fatura:${invoiceId}`
+      }
+    });
+
+    await invoice.update({
+      externalTxid: pix.txid || invoice.externalTxid,
+      gatewayProvider: "efi",
+      gatewayStatus: pix.status || "ATIVA",
+      gatewaySyncStatus: "pending"
     });
 
     const bodyWebhook = {
@@ -140,13 +179,16 @@ export const createSubscription = async (
   }
 };
 
+/**
+ * Configuração de webhook — apenas Super Admin (Marco 1).
+ */
 export const createWebhook = async (
   req: Request,
   res: Response
 ): Promise<Response> => {
   const schema = Yup.object().shape({
     chave: Yup.string().required(),
-    url: Yup.string().required()
+    url: Yup.string().url().required()
   });
 
   if (!(await schema.isValid(req.body))) {
@@ -155,20 +197,23 @@ export const createWebhook = async (
 
   const { chave, url } = req.body;
 
-  const body = {
-    webhookUrl: url
-  };
-
-  const params = {
-    chave
-  };
-
   try {
     const gerencianet = Gerencianet(options);
-    const create = await gerencianet.pixConfigWebhook(params, body);
+    const create = await gerencianet.pixConfigWebhook(
+      { chave },
+      { webhookUrl: url }
+    );
+    logger.info(
+      {
+        actorUserId: req.user?.id,
+        chaveSuffix: String(chave).slice(-4)
+      },
+      "[subscription] webhook_config_updated"
+    );
     return res.json(create);
   } catch (error) {
-    console.log(error);
+    logger.error({ err: error }, "[subscription] createWebhook failed");
+    throw new AppError("ERR_SUBSCRIPTION_WEBHOOK_CONFIG", 400);
   }
 };
 
@@ -190,74 +235,68 @@ export const webhook = async (
   if (req.body.pix) {
     const gerencianet = Gerencianet(options);
     for (const pix of req.body.pix) {
-      const detahe = await gerencianet.pixDetailCharge({
-        txid: pix.txid
-      });
-
-      if (detahe.status !== "CONCLUIDA") {
-        continue;
-      }
-
-      const { solicitacaoPagador } = detahe;
-      if (!solicitacaoPagador || typeof solicitacaoPagador !== "string") {
-        logger.warn("[webhook] solicitacaoPagador ausente", { txid: pix.txid });
-        continue;
-      }
-
-      const invoiceID = solicitacaoPagador.replace("#Fatura:", "").trim();
-      const invoices = await Invoices.findByPk(invoiceID);
-
-      if (!invoices) {
-        logger.warn("[webhook] fatura não encontrada", { invoiceID, txid: pix.txid });
-        continue;
-      }
-
-      const paid = extractPaidAmountFromCharge(detahe as Record<string, unknown>);
-      const expected = Number(invoices.value);
-
-      if (!amountsMatchInvoice(expected, paid)) {
-        logger.warn("[webhook] valor pago diverge da fatura — não marcando como pago", {
-          txid: pix.txid,
-          invoiceId: invoices.id,
-          expected,
-          paid
+      try {
+        // Prova real: consulta o gateway — não confia só no payload
+        const detahe = await gerencianet.pixDetailCharge({
+          txid: pix.txid
         });
-        continue;
-      }
 
-      const companyId = invoices.companyId;
-      const company = await Company.findByPk(companyId);
-
-      if (!company) {
-        logger.warn("[webhook] empresa não encontrada", { companyId, txid: pix.txid });
-        continue;
-      }
-
-      const expiresAt = new Date(company.dueDate);
-      expiresAt.setDate(expiresAt.getDate() + 30);
-      const date = expiresAt.toISOString().split("T")[0];
-
-      await company.update({
-        dueDate: date
-      });
-
-      await invoices.update({
-        status: "paid"
-      });
-
-      await company.reload();
-
-      const io = getIO();
-      const companyUpdate = await Company.findOne({
-        where: {
-          id: companyId
+        if (detahe.status !== "CONCLUIDA") {
+          continue;
         }
-      });
 
-      io.to(`company-${companyId}-mainchannel`).emit(`company-${companyId}-payment`, {
-        action: detahe.status,
-        company: companyUpdate
-      });
+        const { solicitacaoPagador } = detahe;
+        if (!solicitacaoPagador || typeof solicitacaoPagador !== "string") {
+          logger.warn("[webhook] solicitacaoPagador ausente", { txid: pix.txid });
+          continue;
+        }
+
+        const invoiceID = solicitacaoPagador.replace("#Fatura:", "").trim();
+        const invoice = await Invoices.findByPk(invoiceID);
+
+        if (!invoice) {
+          logger.warn("[webhook] fatura não encontrada", {
+            invoiceID,
+            txid: pix.txid
+          });
+          continue;
+        }
+
+        const paid = extractPaidAmountFromCharge(
+          detahe as Record<string, unknown>
+        );
+        const expected = Number(invoice.value);
+
+        if (!amountsMatchInvoice(expected, paid)) {
+          logger.warn(
+            "[webhook] valor pago diverge da fatura — não marcando como pago",
+            {
+              txid: pix.txid,
+              invoiceId: invoice.id,
+              expected,
+              paid
+            }
+          );
+          continue;
+        }
+
+        await confirmGatewayPayment({
+          invoiceId: invoice.id,
+          amount: paid,
+          method: "pix",
+          externalTxid: pix.txid,
+          gatewayProvider: "efi",
+          gatewayStatus: "CONCLUIDA",
+          metadata: { endToEndId: pix.endToEndId || null }
+        });
+
+        await SaaSPaymentAttempt.update(
+          { status: "completed", gatewayStatus: "CONCLUIDA" },
+          { where: { externalTxid: pix.txid } }
+        );
+      } catch (err) {
+        logger.error({ err, txid: pix?.txid }, "[webhook] processing_failed");
+      }
     }
   }
 

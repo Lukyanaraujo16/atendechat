@@ -48,6 +48,11 @@ import ChatUser from "../models/ChatUser";
 import ChatMessage from "../models/ChatMessage";
 import Invoices from "../models/Invoices";
 import Subscriptions from "../models/Subscriptions";
+import SaaSPayment from "../models/SaaSPayment";
+import SaaSPaymentAttempt from "../models/SaaSPaymentAttempt";
+import SaaSFinancialEvent from "../models/SaaSFinancialEvent";
+import SaaSSubscriptionRenewal from "../models/SaaSSubscriptionRenewal";
+import SaaSReconciliationItem from "../models/SaaSReconciliationItem";
 import BaileysChats from "../models/BaileysChats";
 import Files from "../models/Files";
 import FilesOptions from "../models/FilesOptions";
@@ -208,6 +213,11 @@ const models = [
   ChatMessage,
   Invoices,
   Subscriptions,
+  SaaSPayment,
+  SaaSPaymentAttempt,
+  SaaSFinancialEvent,
+  SaaSSubscriptionRenewal,
+  SaaSReconciliationItem,
   BaileysChats,
   Files,
   FilesOptions,
