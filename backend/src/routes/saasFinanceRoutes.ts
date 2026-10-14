@@ -3,8 +3,23 @@ import isAuth from "../middleware/isAuth";
 import isSuper from "../middleware/isSuper";
 import requireAnyPlanFeature from "../middleware/requirePlanFeature";
 import * as SaasFinanceController from "../controllers/SaasFinanceController";
+import * as EfiIntegrationController from "../controllers/EfiIntegrationController";
 
 const saasFinanceRoutes = express.Router();
+
+/** Integração Efí Pay — diagnóstico e teste OAuth (somente Super Admin) */
+saasFinanceRoutes.get(
+  "/saas/finance/efi/status",
+  isAuth,
+  isSuper,
+  EfiIntegrationController.status
+);
+saasFinanceRoutes.post(
+  "/saas/finance/efi/test-auth",
+  isAuth,
+  isSuper,
+  EfiIntegrationController.testAuth
+);
 
 /** Central financeira Super Admin */
 saasFinanceRoutes.get(

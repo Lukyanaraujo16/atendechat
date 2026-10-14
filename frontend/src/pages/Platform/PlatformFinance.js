@@ -27,6 +27,7 @@ import {
   AppLoadingState,
 } from "../../ui";
 import AppTableContainer from "../../ui/components/AppTableContainer";
+import EfiIntegrationPanel from "./EfiIntegrationPanel";
 
 const useStyles = makeStyles((theme) => ({
   page: {
@@ -145,6 +146,8 @@ export default function PlatformFinance() {
           title={i18n.t("platform.finance.title") || "Financeiro"}
           subtitle="KPIs a partir de faturas e pagamentos confirmados (cortesia não conta como receita)."
         />
+
+        <EfiIntegrationPanel />
 
         <AppActionBar>
           <Box className={classes.filters}>
