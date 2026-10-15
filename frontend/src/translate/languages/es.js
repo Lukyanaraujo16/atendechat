@@ -5117,8 +5117,11 @@ const messages = {
         billingAutomation: {
           title: "Automatización de facturación",
           subtitle:
-            "Configure avisos automáticos y bloqueo por mora en el vencimiento del plan. Los cambios aplican al trabajo horario de la plataforma.",
+            "Avisos, bloqueos, métodos de pago y diagnóstico de la integración Efí. Informes y facturas permanecen en Finanzas.",
           loading: "Cargando configuración…",
+          tabWarnings: "Avisos y bloqueos",
+          tabPaymentMethods: "Métodos de pago",
+          tabEfi: "Integración Efí Pay",
           sectionWarnings: "Avisos automáticos",
           sectionBlock: "Bloqueo automático",
           introWarnings:

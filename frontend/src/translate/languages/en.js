@@ -5621,8 +5621,11 @@ const messages = {
 				billingAutomation: {
 					title: "Billing automation",
 					subtitle:
-						"Configure automatic notices and blocking when plan due dates pass. Changes apply to the hourly platform job.",
+						"Notices, blocking, payment methods, and Efí integration diagnostics. Reports and invoices stay under Financial.",
 					loading: "Loading settings…",
+					tabWarnings: "Notices and blocking",
+					tabPaymentMethods: "Payment methods",
+					tabEfi: "Efí Pay integration",
 					sectionWarnings: "Automatic notices",
 					sectionBlock: "Automatic blocking",
 					introWarnings:

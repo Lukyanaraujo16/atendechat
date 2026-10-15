@@ -4,7 +4,10 @@ import Typography from "@material-ui/core/Typography";
 import TextField from "@material-ui/core/TextField";
 import FormControlLabel from "@material-ui/core/FormControlLabel";
 import Switch from "@material-ui/core/Switch";
+import Tabs from "@material-ui/core/Tabs";
+import Tab from "@material-ui/core/Tab";
 import { makeStyles, useTheme } from "@material-ui/core/styles";
+import { useHistory, useLocation } from "react-router-dom";
 
 import MainContainer from "../../components/MainContainer";
 import PlatformPageHeader from "../Platform/PlatformPageHeader";
@@ -13,8 +16,12 @@ import toastError from "../../errors/toastError";
 import { i18n } from "../../translate/i18n";
 import { toast } from "react-toastify";
 import { AppSectionCard, AppPrimaryButton, AppLoadingState } from "../../ui";
+import PaymentMethodsReadonlyPanel from "./PaymentMethodsReadonlyPanel";
+import EfiIntegrationPanel from "../Platform/EfiIntegrationPanel";
 
 const MAX_DAYS = 365;
+
+const TAB_KEYS = ["warnings", "payment-methods", "efi"];
 
 const defaultForm = {
   daysBeforeDueWarning: 3,
@@ -32,14 +39,18 @@ const useStyles = makeStyles((theme) => ({
     flexDirection: "column",
     gap: theme.spacing(2),
     width: "100%",
-    maxWidth: 640,
+    maxWidth: 900,
+  },
+  tabs: {
+    marginBottom: theme.spacing(1),
+    borderBottom: `1px solid ${theme.palette.divider}`,
   },
   hint: {
     fontSize: "0.8125rem",
     color: theme.palette.text.secondary,
     lineHeight: 1.55,
     marginTop: theme.spacing(0.5),
-    maxWidth: 520,
+    maxWidth: 640,
   },
   fields: {
     display: "flex",
@@ -64,24 +75,48 @@ function clampSenderCompanyId(raw) {
   return Math.min(999999, Math.max(1, n));
 }
 
+function tabIndexFromSearch(search) {
+  const params = new URLSearchParams(search || "");
+  const tab = params.get("tab");
+  const idx = TAB_KEYS.indexOf(tab);
+  return idx >= 0 ? idx : 0;
+}
+
 /**
- * Configuração da automação de faturação (Super Admin). Consome GET/PUT /system-settings/billing-automation.
+ * Automação de faturamento (Super Admin).
+ * Guias: avisos/bloqueios | métodos (somente leitura) | integração Efí.
+ * Rota preservada: /saas/billing-automation
  */
 export default function BillingAutomationPage() {
   const classes = useStyles();
   const theme = useTheme();
+  const history = useHistory();
+  const location = useLocation();
+  const [tabIndex, setTabIndex] = useState(() =>
+    tabIndexFromSearch(location.search)
+  );
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(defaultForm);
+
+  useEffect(() => {
+    setTabIndex(tabIndexFromSearch(location.search));
+  }, [location.search]);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const { data } = await api.get("/system-settings/billing-automation");
       setForm({
-        daysBeforeDueWarning: clampDayValue(data?.daysBeforeDueWarning ?? defaultForm.daysBeforeDueWarning),
-        daysAfterDueWarning: clampDayValue(data?.daysAfterDueWarning ?? defaultForm.daysAfterDueWarning),
-        daysAfterDueBlock: clampDayValue(data?.daysAfterDueBlock ?? defaultForm.daysAfterDueBlock),
+        daysBeforeDueWarning: clampDayValue(
+          data?.daysBeforeDueWarning ?? defaultForm.daysBeforeDueWarning
+        ),
+        daysAfterDueWarning: clampDayValue(
+          data?.daysAfterDueWarning ?? defaultForm.daysAfterDueWarning
+        ),
+        daysAfterDueBlock: clampDayValue(
+          data?.daysAfterDueBlock ?? defaultForm.daysAfterDueBlock
+        ),
         enableAutoWarning: Boolean(data?.enableAutoWarning),
         enableAutoBlock: Boolean(data?.enableAutoBlock),
         enableAutoWhatsAppWarning: Boolean(data?.enableAutoWhatsAppWarning),
@@ -105,6 +140,15 @@ export default function BillingAutomationPage() {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
+  const handleTabChange = (_e, next) => {
+    setTabIndex(next);
+    const key = TAB_KEYS[next] || TAB_KEYS[0];
+    history.replace({
+      pathname: location.pathname,
+      search: key === "warnings" ? "" : `?tab=${key}`,
+    });
+  };
+
   const handleSave = async () => {
     const payload = {
       daysBeforeDueWarning: clampDayValue(form.daysBeforeDueWarning),
@@ -118,11 +162,20 @@ export default function BillingAutomationPage() {
 
     setSaving(true);
     try {
-      const { data } = await api.put("/system-settings/billing-automation", payload);
+      const { data } = await api.put(
+        "/system-settings/billing-automation",
+        payload
+      );
       setForm({
-        daysBeforeDueWarning: clampDayValue(data?.daysBeforeDueWarning ?? payload.daysBeforeDueWarning),
-        daysAfterDueWarning: clampDayValue(data?.daysAfterDueWarning ?? payload.daysAfterDueWarning),
-        daysAfterDueBlock: clampDayValue(data?.daysAfterDueBlock ?? payload.daysAfterDueBlock),
+        daysBeforeDueWarning: clampDayValue(
+          data?.daysBeforeDueWarning ?? payload.daysBeforeDueWarning
+        ),
+        daysAfterDueWarning: clampDayValue(
+          data?.daysAfterDueWarning ?? payload.daysAfterDueWarning
+        ),
+        daysAfterDueBlock: clampDayValue(
+          data?.daysAfterDueBlock ?? payload.daysAfterDueBlock
+        ),
         enableAutoWarning: Boolean(data?.enableAutoWarning),
         enableAutoBlock: Boolean(data?.enableAutoBlock),
         enableAutoWhatsAppWarning: Boolean(data?.enableAutoWhatsAppWarning),
@@ -138,7 +191,7 @@ export default function BillingAutomationPage() {
     }
   };
 
-  if (loading) {
+  if (loading && tabIndex === 0) {
     return (
       <MainContainer>
         <PlatformPageHeader
@@ -157,134 +210,201 @@ export default function BillingAutomationPage() {
         subtitleKey="platform.billingAutomation.subtitle"
       />
       <Box className={classes.page}>
-        <AppSectionCard>
-          <Typography variant="subtitle1" style={{ fontWeight: 600 }}>
-            {i18n.t("platform.billingAutomation.sectionWarnings")}
-          </Typography>
-          <Typography variant="body2" color="textSecondary" component="p" className={classes.hint} style={{ marginTop: 8 }}>
-            {i18n.t("platform.billingAutomation.introWarnings")}
-          </Typography>
+        <Tabs
+          className={classes.tabs}
+          value={tabIndex}
+          onChange={handleTabChange}
+          indicatorColor="primary"
+          textColor="primary"
+          variant="scrollable"
+          scrollButtons="auto"
+        >
+          <Tab label={i18n.t("platform.billingAutomation.tabWarnings")} />
+          <Tab label={i18n.t("platform.billingAutomation.tabPaymentMethods")} />
+          <Tab label={i18n.t("platform.billingAutomation.tabEfi")} />
+        </Tabs>
 
-          <FormControlLabel
-            control={
-              <Switch
-                color="primary"
-                checked={form.enableAutoWarning}
-                onChange={(e) => setField("enableAutoWarning", e.target.checked)}
+        {tabIndex === 0 && (
+          <>
+            <AppSectionCard>
+              <Typography variant="subtitle1" style={{ fontWeight: 600 }}>
+                {i18n.t("platform.billingAutomation.sectionWarnings")}
+              </Typography>
+              <Typography
+                variant="body2"
+                color="textSecondary"
+                component="p"
+                className={classes.hint}
+                style={{ marginTop: 8 }}
+              >
+                {i18n.t("platform.billingAutomation.introWarnings")}
+              </Typography>
+
+              <FormControlLabel
+                control={
+                  <Switch
+                    color="primary"
+                    checked={form.enableAutoWarning}
+                    onChange={(e) =>
+                      setField("enableAutoWarning", e.target.checked)
+                    }
+                  />
+                }
+                label={i18n.t("platform.billingAutomation.enableWarnings")}
               />
-            }
-            label={i18n.t("platform.billingAutomation.enableWarnings")}
-          />
 
-          <Box className={classes.fields}>
-            <TextField
-              type="number"
-              variant="outlined"
-              size="small"
-              fullWidth
-              disabled={!form.enableAutoWarning}
-              label={i18n.t("platform.billingAutomation.daysBefore")}
-              value={form.daysBeforeDueWarning}
-              onChange={(e) => setField("daysBeforeDueWarning", e.target.value)}
-              inputProps={{ min: 0, max: MAX_DAYS, step: 1 }}
-              helperText={i18n.t("platform.billingAutomation.hintDaysBefore")}
-            />
-            <TextField
-              type="number"
-              variant="outlined"
-              size="small"
-              fullWidth
-              disabled={!form.enableAutoWarning}
-              label={i18n.t("platform.billingAutomation.daysAfter")}
-              value={form.daysAfterDueWarning}
-              onChange={(e) => setField("daysAfterDueWarning", e.target.value)}
-              inputProps={{ min: 0, max: MAX_DAYS, step: 1 }}
-              helperText={i18n.t("platform.billingAutomation.hintDaysAfter")}
-            />
-          </Box>
-
-          <Box
-            marginTop={2}
-            paddingTop={2}
-            style={{ borderTop: `1px solid ${theme.palette.divider}` }}
-          >
-            <Typography variant="subtitle2" style={{ fontWeight: 600, marginBottom: 8 }}>
-              {i18n.t("platform.billingAutomation.sectionWhatsApp")}
-            </Typography>
-            <Typography variant="body2" color="textSecondary" component="p" className={classes.hint}>
-              {i18n.t("platform.billingAutomation.introWhatsApp")}
-            </Typography>
-            <FormControlLabel
-              control={
-                <Switch
-                  color="primary"
-                  checked={form.enableAutoWhatsAppWarning}
-                  onChange={(e) => setField("enableAutoWhatsAppWarning", e.target.checked)}
+              <Box className={classes.fields}>
+                <TextField
+                  type="number"
+                  variant="outlined"
+                  size="small"
+                  fullWidth
                   disabled={!form.enableAutoWarning}
+                  label={i18n.t("platform.billingAutomation.daysBefore")}
+                  value={form.daysBeforeDueWarning}
+                  onChange={(e) =>
+                    setField("daysBeforeDueWarning", e.target.value)
+                  }
+                  inputProps={{ min: 0, max: MAX_DAYS, step: 1 }}
+                  helperText={i18n.t("platform.billingAutomation.hintDaysBefore")}
                 />
-              }
-              label={i18n.t("platform.billingAutomation.enableWhatsApp")}
-            />
-            <TextField
-              type="number"
-              variant="outlined"
-              size="small"
-              fullWidth
-              style={{ marginTop: 12 }}
-              disabled={!form.enableAutoWarning || !form.enableAutoWhatsAppWarning}
-              label={i18n.t("platform.billingAutomation.whatsappSenderCompanyId")}
-              value={form.whatsappSenderCompanyId}
-              onChange={(e) => setField("whatsappSenderCompanyId", e.target.value)}
-              inputProps={{ min: 1, max: 999999, step: 1 }}
-              helperText={i18n.t("platform.billingAutomation.hintWhatsappSender")}
-            />
-          </Box>
-        </AppSectionCard>
+                <TextField
+                  type="number"
+                  variant="outlined"
+                  size="small"
+                  fullWidth
+                  disabled={!form.enableAutoWarning}
+                  label={i18n.t("platform.billingAutomation.daysAfter")}
+                  value={form.daysAfterDueWarning}
+                  onChange={(e) =>
+                    setField("daysAfterDueWarning", e.target.value)
+                  }
+                  inputProps={{ min: 0, max: MAX_DAYS, step: 1 }}
+                  helperText={i18n.t("platform.billingAutomation.hintDaysAfter")}
+                />
+              </Box>
 
-        <AppSectionCard>
-          <Typography variant="subtitle1" style={{ fontWeight: 600 }}>
-            {i18n.t("platform.billingAutomation.sectionBlock")}
-          </Typography>
-          <Typography variant="body2" color="textSecondary" component="p" className={classes.hint} style={{ marginTop: 8 }}>
-            {i18n.t("platform.billingAutomation.introBlock")}
-          </Typography>
+              <Box
+                marginTop={2}
+                paddingTop={2}
+                style={{ borderTop: `1px solid ${theme.palette.divider}` }}
+              >
+                <Typography
+                  variant="subtitle2"
+                  style={{ fontWeight: 600, marginBottom: 8 }}
+                >
+                  {i18n.t("platform.billingAutomation.sectionWhatsApp")}
+                </Typography>
+                <Typography
+                  variant="body2"
+                  color="textSecondary"
+                  component="p"
+                  className={classes.hint}
+                >
+                  {i18n.t("platform.billingAutomation.introWhatsApp")}
+                </Typography>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      color="primary"
+                      checked={form.enableAutoWhatsAppWarning}
+                      onChange={(e) =>
+                        setField("enableAutoWhatsAppWarning", e.target.checked)
+                      }
+                      disabled={!form.enableAutoWarning}
+                    />
+                  }
+                  label={i18n.t("platform.billingAutomation.enableWhatsApp")}
+                />
+                <TextField
+                  type="number"
+                  variant="outlined"
+                  size="small"
+                  fullWidth
+                  style={{ marginTop: 12 }}
+                  disabled={
+                    !form.enableAutoWarning || !form.enableAutoWhatsAppWarning
+                  }
+                  label={i18n.t(
+                    "platform.billingAutomation.whatsappSenderCompanyId"
+                  )}
+                  value={form.whatsappSenderCompanyId}
+                  onChange={(e) =>
+                    setField("whatsappSenderCompanyId", e.target.value)
+                  }
+                  inputProps={{ min: 1, max: 999999, step: 1 }}
+                  helperText={i18n.t(
+                    "platform.billingAutomation.hintWhatsappSender"
+                  )}
+                />
+              </Box>
+            </AppSectionCard>
 
-          <FormControlLabel
-            control={
-              <Switch
-                color="primary"
-                checked={form.enableAutoBlock}
-                onChange={(e) => setField("enableAutoBlock", e.target.checked)}
+            <AppSectionCard>
+              <Typography variant="subtitle1" style={{ fontWeight: 600 }}>
+                {i18n.t("platform.billingAutomation.sectionBlock")}
+              </Typography>
+              <Typography
+                variant="body2"
+                color="textSecondary"
+                component="p"
+                className={classes.hint}
+                style={{ marginTop: 8 }}
+              >
+                {i18n.t("platform.billingAutomation.introBlock")}
+              </Typography>
+
+              <FormControlLabel
+                control={
+                  <Switch
+                    color="primary"
+                    checked={form.enableAutoBlock}
+                    onChange={(e) =>
+                      setField("enableAutoBlock", e.target.checked)
+                    }
+                  />
+                }
+                label={i18n.t("platform.billingAutomation.enableBlock")}
               />
-            }
-            label={i18n.t("platform.billingAutomation.enableBlock")}
-          />
 
-          <Box className={classes.fields}>
-            <TextField
-              type="number"
-              variant="outlined"
-              size="small"
-              fullWidth
-              disabled={!form.enableAutoBlock}
-              label={i18n.t("platform.billingAutomation.daysBlock")}
-              value={form.daysAfterDueBlock}
-              onChange={(e) => setField("daysAfterDueBlock", e.target.value)}
-              inputProps={{ min: 0, max: MAX_DAYS, step: 1 }}
-              helperText={i18n.t("platform.billingAutomation.hintDaysBlock")}
-            />
-          </Box>
-        </AppSectionCard>
+              <Box className={classes.fields}>
+                <TextField
+                  type="number"
+                  variant="outlined"
+                  size="small"
+                  fullWidth
+                  disabled={!form.enableAutoBlock}
+                  label={i18n.t("platform.billingAutomation.daysBlock")}
+                  value={form.daysAfterDueBlock}
+                  onChange={(e) =>
+                    setField("daysAfterDueBlock", e.target.value)
+                  }
+                  inputProps={{ min: 0, max: MAX_DAYS, step: 1 }}
+                  helperText={i18n.t("platform.billingAutomation.hintDaysBlock")}
+                />
+              </Box>
+            </AppSectionCard>
 
-        <Typography variant="caption" color="textSecondary" component="p" style={{ lineHeight: 1.5 }}>
-          {i18n.t("platform.billingAutomation.footerNote")}
-        </Typography>
+            <Typography
+              variant="caption"
+              color="textSecondary"
+              component="p"
+              style={{ lineHeight: 1.5 }}
+            >
+              {i18n.t("platform.billingAutomation.footerNote")}
+            </Typography>
 
-        <Box className={classes.actions}>
-          <AppPrimaryButton onClick={handleSave} loading={saving}>
-            {i18n.t("platform.billingAutomation.save")}
-          </AppPrimaryButton>
-        </Box>
+            <Box className={classes.actions}>
+              <AppPrimaryButton onClick={handleSave} loading={saving}>
+                {i18n.t("platform.billingAutomation.save")}
+              </AppPrimaryButton>
+            </Box>
+          </>
+        )}
+
+        {tabIndex === 1 && <PaymentMethodsReadonlyPanel />}
+
+        {tabIndex === 2 && <EfiIntegrationPanel />}
       </Box>
     </MainContainer>
   );

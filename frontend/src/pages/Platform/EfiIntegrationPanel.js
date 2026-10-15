@@ -33,6 +33,15 @@ const useStyles = makeStyles((theme) => ({
     marginTop: theme.spacing(1),
     color: theme.palette.text.secondary,
     fontSize: "0.8rem",
+    lineHeight: 1.5,
+  },
+  warning: {
+    marginBottom: theme.spacing(2),
+    padding: theme.spacing(1.5),
+    borderRadius: theme.shape.borderRadius,
+    border: `1px solid ${theme.palette.warning.main}`,
+    backgroundColor:
+      theme.palette.type === "dark" ? "rgba(255, 193, 7, 0.08)" : "#fff8e1",
   },
   testBox: {
     marginTop: theme.spacing(2),
@@ -43,13 +52,13 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
-function StatusChip({ ok, yesLabel, noLabel }) {
+function PresenceChip({ present }) {
   return (
     <Chip
       size="small"
-      label={ok ? yesLabel : noLabel}
-      color={ok ? "primary" : "default"}
-      variant={ok ? "default" : "outlined"}
+      label={present ? "Presente no ambiente" : "Ausente"}
+      color={present ? "primary" : "default"}
+      variant={present ? "default" : "outlined"}
     />
   );
 }
@@ -58,7 +67,7 @@ function FlagChip({ enabled }) {
   return (
     <Chip
       size="small"
-      label={enabled ? "Habilitado" : "Desabilitado"}
+      label={enabled ? "Flag habilitada" : "Flag desabilitada"}
       style={
         enabled
           ? { backgroundColor: "#e8f5e9", color: "#1b5e20" }
@@ -68,6 +77,10 @@ function FlagChip({ enabled }) {
   );
 }
 
+/**
+ * Diagnóstico Efí Pay (Super Admin).
+ * Presença de env ≠ autenticação validada. OAuth só via “Testar conexão”.
+ */
 export default function EfiIntegrationPanel() {
   const classes = useStyles();
   const [loading, setLoading] = useState(true);
@@ -98,9 +111,9 @@ export default function EfiIntegrationPanel() {
       const { data } = await api.post("/saas/finance/efi/test-auth");
       setTestResult(data);
       if (data?.cobrancas?.ok) {
-        toast.success("Conexão Cobranças validada");
+        toast.success("OAuth Cobranças validado");
       } else {
-        toast.error(data?.cobrancas?.message || "Falha na autenticação");
+        toast.error(data?.cobrancas?.message || "Falha na autenticação OAuth");
       }
     } catch (e) {
       toastError(e);
@@ -125,13 +138,19 @@ export default function EfiIntegrationPanel() {
 
   const connectionChip = (() => {
     if (!testResult) {
-      return <Chip size="small" label="Conexão não testada" variant="outlined" />;
+      return (
+        <Chip
+          size="small"
+          label="Autenticação não validada nesta sessão"
+          variant="outlined"
+        />
+      );
     }
     if (testResult.cobrancas?.ok) {
       return (
         <Chip
           size="small"
-          label="Conexão validada"
+          label="OAuth Cobranças validado"
           style={{ backgroundColor: "#e8f5e9", color: "#1b5e20" }}
         />
       );
@@ -139,11 +158,20 @@ export default function EfiIntegrationPanel() {
     return (
       <Chip
         size="small"
-        label="Erro de autenticação"
+        label="Falha no OAuth Cobranças"
         style={{ backgroundColor: "#ffebee", color: "#b71c1c" }}
       />
     );
   })();
+
+  const efiEnvLabel =
+    status.environment === "sandbox"
+      ? "Sandbox (Efí)"
+      : "Produção (Efí)";
+
+  const cobrancasPresence =
+    status.credentials.cobrancasClientIdConfigured &&
+    status.credentials.cobrancasClientSecretConfigured;
 
   return (
     <AppSectionCard>
@@ -158,7 +186,7 @@ export default function EfiIntegrationPanel() {
         <Box>
           <Typography variant="h6">Integração Efí Pay</Typography>
           <Typography variant="body2" color="textSecondary">
-            Diagnóstico da conta global da plataforma. Credenciais continuam
+            Diagnóstico da conta global da plataforma. Credenciais permanecem
             apenas em variáveis de ambiente — esta tela não edita secrets.
           </Typography>
         </Box>
@@ -167,83 +195,108 @@ export default function EfiIntegrationPanel() {
             Atualizar status
           </AppSecondaryButton>
           <AppPrimaryButton onClick={runTest} disabled={testing || loading}>
-            {testing ? "Testando…" : "Testar conexão"}
+            {testing ? "Testando…" : "Testar OAuth Cobranças"}
           </AppPrimaryButton>
         </Box>
       </Box>
 
+      <Box className={classes.warning}>
+        <Typography variant="body2" style={{ fontWeight: 600 }}>
+          Aviso sobre credenciais
+        </Typography>
+        <Typography variant="body2" style={{ marginTop: 4 }}>
+          As credenciais exibidas podem ser provenientes de configurações
+          herdadas do ambiente. Presença de valores não significa autenticação
+          validada.
+        </Typography>
+      </Box>
+
       <Box className={classes.row}>
-        <Typography className={classes.label}>Ambiente</Typography>
+        <Typography className={classes.label}>Ambiente Efí</Typography>
         <Chip
           size="small"
-          label={status.environment === "sandbox" ? "Sandbox" : "Produção"}
+          label={efiEnvLabel}
           color={status.environment === "sandbox" ? "default" : "secondary"}
         />
+        <Typography variant="caption" color="textSecondary">
+          (GERENCIANET_SANDBOX — independente do host StreamHUB)
+        </Typography>
+      </Box>
+
+      <Box className={classes.row}>
+        <Typography className={classes.label}>Autenticação</Typography>
         {connectionChip}
       </Box>
 
       <Grid container spacing={2}>
         <Grid item xs={12} md={6}>
           <Typography variant="subtitle2" gutterBottom>
-            Credenciais
+            Presença de variáveis (não valida login)
           </Typography>
           <Box className={classes.row}>
-            <Typography className={classes.label}>Client ID</Typography>
-            <StatusChip
-              ok={status.credentials.clientIdConfigured}
-              yesLabel="Configurado"
-              noLabel="Não configurado"
+            <Typography className={classes.label}>Client ID (Pix)</Typography>
+            <PresenceChip present={status.credentials.clientIdConfigured} />
+          </Box>
+          <Box className={classes.row}>
+            <Typography className={classes.label}>Client Secret (Pix)</Typography>
+            <PresenceChip present={status.credentials.clientSecretConfigured} />
+          </Box>
+          <Box className={classes.row}>
+            <Typography className={classes.label}>Client ID Cobranças</Typography>
+            <PresenceChip
+              present={status.credentials.cobrancasClientIdConfigured}
             />
           </Box>
           <Box className={classes.row}>
-            <Typography className={classes.label}>Client Secret</Typography>
-            <StatusChip
-              ok={status.credentials.clientSecretConfigured}
-              yesLabel="Configurado"
-              noLabel="Não configurado"
+            <Typography className={classes.label}>
+              Client Secret Cobranças
+            </Typography>
+            <PresenceChip
+              present={status.credentials.cobrancasClientSecretConfigured}
             />
           </Box>
           <Box className={classes.row}>
             <Typography className={classes.label}>Certificado P12</Typography>
-            <StatusChip
-              ok={status.certificate.fileFound}
-              yesLabel="Encontrado"
-              noLabel={
-                status.certificate.nameConfigured
-                  ? "Não encontrado"
+            <Chip
+              size="small"
+              label={
+                status.certificate.fileFound
+                  ? "Arquivo encontrado"
+                  : status.certificate.nameConfigured
+                  ? "Nome configurado, arquivo ausente"
                   : "Não configurado"
               }
+              color={status.certificate.fileFound ? "primary" : "default"}
+              variant={status.certificate.fileFound ? "default" : "outlined"}
             />
           </Box>
           <Box className={classes.row}>
             <Typography className={classes.label}>Chave Pix</Typography>
-            <StatusChip
-              ok={status.credentials.pixKeyConfigured}
-              yesLabel="Configurado"
-              noLabel="Não configurado"
-            />
+            <PresenceChip present={status.credentials.pixKeyConfigured} />
           </Box>
           <Box className={classes.row}>
             <Typography className={classes.label}>Webhook secret</Typography>
-            <StatusChip
-              ok={status.credentials.webhookSecretConfigured}
-              yesLabel="Configurado"
-              noLabel="Não configurado"
+            <PresenceChip
+              present={status.credentials.webhookSecretConfigured}
             />
           </Box>
         </Grid>
 
         <Grid item xs={12} md={6}>
           <Typography variant="subtitle2" gutterBottom>
-            Funcionalidades
+            Flags e prontidão (somente leitura)
           </Typography>
           <Box className={classes.row}>
             <Typography className={classes.label}>Pix</Typography>
             <FlagChip enabled={status.flags.pixEnabled} />
-            <StatusChip
-              ok={status.readiness.pix.ready}
-              yesLabel="Pronto"
-              noLabel="Incompleto"
+            <Chip
+              size="small"
+              variant="outlined"
+              label={
+                status.readiness.pix.ready
+                  ? "Variáveis completas"
+                  : "Variáveis incompletas"
+              }
             />
           </Box>
           <Box className={classes.row}>
@@ -253,6 +306,7 @@ export default function EfiIntegrationPanel() {
           <Box className={classes.row}>
             <Typography className={classes.label}>Cartão</Typography>
             <FlagChip enabled={status.flags.cardEnabled} />
+            <Chip size="small" variant="outlined" label="Não implementado" />
           </Box>
           <Box className={classes.row}>
             <Typography className={classes.label}>Emissão automática</Typography>
@@ -264,10 +318,14 @@ export default function EfiIntegrationPanel() {
           </Box>
           <Box className={classes.row}>
             <Typography className={classes.label}>API Cobranças</Typography>
-            <StatusChip
-              ok={status.readiness.cobrancas.ready}
-              yesLabel="Credenciais OK"
-              noLabel="Incompleto"
+            <Chip
+              size="small"
+              variant="outlined"
+              label={
+                cobrancasPresence
+                  ? "Credenciais presentes (não validadas)"
+                  : "Credenciais ausentes"
+              }
             />
           </Box>
         </Grid>
@@ -275,19 +333,20 @@ export default function EfiIntegrationPanel() {
 
       {status.readiness.pix.missing?.length ? (
         <Typography className={classes.hint}>
-          Pix incompleto: {status.readiness.pix.missing.join(", ")}
+          Pix — variáveis ausentes: {status.readiness.pix.missing.join(", ")}
         </Typography>
       ) : null}
       {status.readiness.cobrancas.missing?.length ? (
         <Typography className={classes.hint}>
-          Cobranças incompleto: {status.readiness.cobrancas.missing.join(", ")}
+          Cobranças — variáveis ausentes:{" "}
+          {status.readiness.cobrancas.missing.join(", ")}
         </Typography>
       ) : null}
 
       {testResult ? (
         <Box className={classes.testBox}>
           <Typography variant="subtitle2" gutterBottom>
-            Resultado do teste
+            Resultado do teste OAuth
           </Typography>
           <Typography variant="body2">
             Cobranças (OAuth):{" "}
@@ -301,7 +360,11 @@ export default function EfiIntegrationPanel() {
               ? ` (${testResult.cobrancas.durationMs} ms)`
               : ""}
           </Typography>
-          <Typography variant="body2" color="textSecondary" style={{ marginTop: 8 }}>
+          <Typography
+            variant="body2"
+            color="textSecondary"
+            style={{ marginTop: 8 }}
+          >
             Pix:{" "}
             {testResult.pix?.message ||
               "Teste isolado indisponível (sem geração de cobrança)."}
@@ -309,8 +372,9 @@ export default function EfiIntegrationPanel() {
         </Box>
       ) : (
         <Typography className={classes.hint}>
-          O botão “Testar conexão” valida apenas OAuth da API Cobranças — não
-          cria Pix, boleto nem fatura.
+          O botão “Testar OAuth Cobranças” valida apenas autenticação na API
+          Cobranças — não cria Pix, boleto nem fatura. Presença de variáveis
+          acima não implica integração operacional.
         </Typography>
       )}
     </AppSectionCard>

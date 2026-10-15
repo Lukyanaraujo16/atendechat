@@ -5446,7 +5446,7 @@ const messages = {
           myAccount: "Minha conta",
           branding: "Branding",
           financial: "Financeiro",
-          billingAutomation: "Automação de faturação",
+          billingAutomation: "Automação de faturamento",
           backup: "Backup",
           systemTools: "Monitoramento",
           helps: "Ajuda (conteúdos)",
@@ -5847,10 +5847,13 @@ const messages = {
             "Tutoriais e links exibidos na área de ajuda da aplicação para todos os utilizadores. Conteúdo global da plataforma.",
         },
         billingAutomation: {
-          title: "Automação de faturação",
+          title: "Automação de faturamento",
           subtitle:
-            "Defina avisos automáticos e bloqueio por atraso no vencimento do plano. As alterações aplicam-se ao job horário da plataforma.",
+            "Avisos, bloqueios, métodos de pagamento e diagnóstico da integração Efí. Relatórios e faturas ficam em Financeiro.",
           loading: "A carregar configurações…",
+          tabWarnings: "Avisos e bloqueios",
+          tabPaymentMethods: "Métodos de pagamento",
+          tabEfi: "Integração Efí Pay",
           sectionWarnings: "Avisos automáticos",
           sectionBlock: "Bloqueio automático",
           introWarnings:
@@ -6150,7 +6153,7 @@ const messages = {
             "Anterior: {{from}} → novo: {{to}} (valor de catálogo do plano: {{planBase}}).",
           logDetailPlanChange: "Plano (id): {{from}} → {{to}}.",
           logActor: "Por {{name}}",
-          logActorSystem: "Automático (job de faturação)",
+          logActorSystem: "Automático (job de faturamento)",
           logWhatsappSent: "WhatsApp enviado (final ••{{last4}})",
           logWhatsappNotSent: "WhatsApp: não enviado ({{reason}})",
           dueAlertExpiredTooltip: "Vencimento ultrapassado — requer atenção",
