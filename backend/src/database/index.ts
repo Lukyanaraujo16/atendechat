@@ -136,6 +136,8 @@ import AutomationToolExecution from "../models/AutomationToolExecution";
 import AutomationToolPolicy from "../models/AutomationToolPolicy";
 import AutomationToolConfirmation from "../models/AutomationToolConfirmation";
 import AiProviderCredential from "../models/AiProviderCredential";
+import PlatformEfiConfig from "../models/PlatformEfiConfig";
+import PlatformEfiConfigAudit from "../models/PlatformEfiConfigAudit";
 import WhatsappEvolutionCredential from "../models/WhatsappEvolutionCredential";
 import AutomationCognitiveMemory from "../models/AutomationCognitiveMemory";
 import AutomationMultiAgent from "../models/AutomationMultiAgent";
@@ -301,6 +303,8 @@ const models = [
   AutomationToolPolicy,
   AutomationToolConfirmation,
   AiProviderCredential,
+  PlatformEfiConfig,
+  PlatformEfiConfigAudit,
   WhatsappEvolutionCredential,
   AutomationCognitiveMemory,
   AutomationMultiAgent,
