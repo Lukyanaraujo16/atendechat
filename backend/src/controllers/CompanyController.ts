@@ -54,6 +54,11 @@ import {
   normalizeBusinessSegment
 } from "../config/businessSegment";
 import moment from "moment-timezone";
+import { toDomainDate } from "../helpers/saasDueDate";
+import {
+  COMPANY_REGISTRATION_FIELDS,
+  normalizeCompanyRegistrationInput
+} from "../helpers/brDocuments";
 
 function parseListPlanAuthToken(req: Request): string | null {
   const authHeader = req.headers.authorization;
@@ -98,7 +103,26 @@ type UpdateCompanyBody = {
   storageLimitGb?: unknown;
   businessSegment?: string | null;
   crmVisibilityMode?: string | null;
+  /** Fase 8.4 — dados cadastrais (opcionais). */
+  tradeName?: string | null;
+  legalName?: string | null;
+  document?: string | null;
+  documentType?: string | null;
+  addressZipCode?: string | null;
+  addressStreet?: string | null;
+  addressNumber?: string | null;
+  addressComplement?: string | null;
+  addressNeighborhood?: string | null;
+  addressCity?: string | null;
+  addressState?: string | null;
 };
+
+/** Campos auditados na alteração cadastral (sem dados sensíveis). */
+const REGISTRATION_AUDIT_FIELDS = ["name", "phone", "email", ...COMPANY_REGISTRATION_FIELDS];
+
+function registrationValue(v: unknown): unknown {
+  return v === undefined || v === "" ? null : v;
+}
 
 type CreateCompanyRequest = UpdateCompanyBody & { name: string };
 
@@ -205,6 +229,24 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
       ? await User.findByPk(req.user.id, { attributes: ["super"] })
       : null;
   const payload: CreateCompanyRequest = { ...newCompany };
+  // Fase 8.4: telefone/e-mail validados apenas quando preenchidos (só dígitos / minúsculas).
+  const contactNormalized = normalizeCompanyRegistrationInput(
+    {
+      ...(Object.prototype.hasOwnProperty.call(newCompany, "phone")
+        ? { phone: newCompany.phone }
+        : {}),
+      ...(Object.prototype.hasOwnProperty.call(newCompany, "email")
+        ? { email: newCompany.email }
+        : {})
+    },
+    { includeContact: true }
+  );
+  if (Object.prototype.hasOwnProperty.call(contactNormalized, "phone")) {
+    payload.phone = (contactNormalized.phone as string | null) ?? undefined;
+  }
+  if (Object.prototype.hasOwnProperty.call(contactNormalized, "email")) {
+    payload.email = (contactNormalized.email as string | null) ?? undefined;
+  }
   if (!requestUserForStore?.super) {
     delete payload.internalNotes;
     delete (payload as Record<string, unknown>).contractedPlanValue;
@@ -313,11 +355,27 @@ export const show = async (req: Request, res: Response): Promise<Response> => {
   }
 
   const planRow = row.planId
-    ? await Plan.findByPk(row.planId, { attributes: ["storageLimitGb"] })
+    ? await Plan.findByPk(row.planId, {
+        attributes: ["id", "name", "value", "storageLimitGb"]
+      })
     : null;
-  const planJson = planRow?.toJSON() as { storageLimitGb?: unknown } | null;
+  const planJson = planRow?.toJSON() as
+    | { id?: number; name?: string; value?: unknown; storageLimitGb?: unknown }
+    | null;
+
+  // Página da empresa (Gestão SaaS): plano e admin principal, como na listagem. Só para Super Admin.
+  const superExtras = requestUser?.super
+    ? {
+        plan: planJson
+          ? { id: planJson.id, name: planJson.name, value: planJson.value }
+          : null,
+        primaryAdmin: (await buildPrimaryAdminMap([companyId]))[companyId] ?? null
+      }
+    : {};
+
   return res.status(200).json({
     ...row,
+    ...superExtras,
     ...buildCompanyStorageEnrichmentPayload(row as Record<string, unknown>, planJson)
   });
 };
@@ -446,7 +504,15 @@ export const update = async (
   }
 
   const pre = await Company.findByPk(companyId, {
-    attributes: ["id", "status", "contractedPlanValue", "planId"],
+    attributes: [
+      "id",
+      "status",
+      "contractedPlanValue",
+      "planId",
+      "dueDate",
+      "timezone",
+      ...REGISTRATION_AUDIT_FIELDS
+    ],
     include: [
       { model: Plan, as: "plan", attributes: ["value"], required: false }
     ]
@@ -525,6 +591,46 @@ export const update = async (
         planValue: Number(pre.plan?.value ?? 0)
       }
     });
+  }
+
+  if (
+    pre &&
+    Object.prototype.hasOwnProperty.call(req.body as object, "dueDate")
+  ) {
+    // Edição manual do vencimento pelo formulário: auditar só quando muda de fato.
+    const tz = (company as any).timezone || (pre as any).timezone;
+    const previousDueDate = toDomainDate((pre as any).dueDate, tz);
+    const newDueDate = toDomainDate((company as any).dueDate, tz);
+    if (previousDueDate !== newDueDate) {
+      await createCompanyLog({
+        companyId,
+        action: "due_date_manual_edit",
+        userId: req.user.id,
+        metadata: { previousDueDate, newDueDate }
+      });
+    }
+  }
+
+  if (pre) {
+    const before: Record<string, unknown> = {};
+    const after: Record<string, unknown> = {};
+    for (const field of REGISTRATION_AUDIT_FIELDS) {
+      const prev = registrationValue((pre as any).get(field));
+      const next = registrationValue((company as any).get(field));
+      if (prev !== next) {
+        // CPF/CNPJ não vai completo para a auditoria (visível em logs e na linha do tempo).
+        before[field] = field === "document" ? maskDocumentForAudit(prev) : prev;
+        after[field] = field === "document" ? maskDocumentForAudit(next) : next;
+      }
+    }
+    if (Object.keys(after).length > 0) {
+      await createCompanyLog({
+        companyId,
+        action: "registration_update",
+        userId: req.user.id,
+        metadata: { fields: Object.keys(after), before, after }
+      });
+    }
   }
 
   await company.reload({
@@ -911,20 +1017,41 @@ export const remove = async (
   return res.status(200).json({ ok: true });
 };
 
+function maskDocumentForAudit(value: unknown): unknown {
+  if (value === null || value === undefined || value === "") return value;
+  const digits = String(value).replace(/\D/g, "");
+  if (digits.length <= 4) return "****";
+  return `${"*".repeat(digits.length - 4)}${digits.slice(-4)}`;
+}
+
 export const renewDueDate = async (
   req: Request,
   res: Response
 ): Promise<Response> => {
   const { id } = req.params;
-  const { company, autoUnblocked } = await RenewCompanyDueDateService(
+  const body = req.body || {};
+  const expected = body.expectedCurrentDueDate;
+  if (
+    expected !== undefined &&
+    expected !== null &&
+    !/^\d{4}-\d{2}-\d{2}$/.test(String(expected))
+  ) {
+    throw new AppError(
+      "ERR_INVALID_DUE_DATE",
+      400,
+      "expectedCurrentDueDate deve estar no formato AAAA-MM-DD."
+    );
+  }
+  const { company, autoUnblocked, renewal } = await RenewCompanyDueDateService(
     id,
-    req.user.id
+    req.user.id,
+    { reason: body.reason, expectedCurrentDueDate: expected }
   );
   const row =
     typeof (company as any).toJSON === "function"
       ? (company as any).toJSON()
       : { ...(company as any) };
-  return res.status(200).json({ ...row, autoUnblocked });
+  return res.status(200).json({ ...row, autoUnblocked, renewal });
 };
 
 export const listCompanyLogs = async (

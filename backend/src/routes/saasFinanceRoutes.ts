@@ -157,6 +157,24 @@ saasFinanceRoutes.get(
   isSuper,
   SaasFinanceController.companyReconciliation
 );
+saasFinanceRoutes.post(
+  "/saas/companies/:companyId/finance/invoices",
+  isAuth,
+  isSuper,
+  SaasFinanceController.createInvoice
+);
+saasFinanceRoutes.put(
+  "/saas/companies/:companyId/finance/invoices/:invoiceId",
+  isAuth,
+  isSuper,
+  SaasFinanceController.updateInvoice
+);
+saasFinanceRoutes.get(
+  "/saas/companies/:companyId/finance/renewal-preview",
+  isAuth,
+  isSuper,
+  SaasFinanceController.renewalPreview
+);
 saasFinanceRoutes.get(
   "/saas/companies/:companyId/finance/invoices/:invoiceId",
   isAuth,

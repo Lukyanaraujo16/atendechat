@@ -2,9 +2,14 @@ import { Transaction } from "sequelize";
 import AppError from "../../errors/AppError";
 import Invoices from "../../models/Invoices";
 import SaaSPayment from "../../models/SaaSPayment";
+import SaaSReconciliationItem from "../../models/SaaSReconciliationItem";
 import sequelize from "../../database";
 import { saasBillingFlags } from "../../config/saasBillingFlags";
-import { applySubscriptionRenewal } from "./applySubscriptionRenewal";
+import {
+  applySubscriptionRenewal,
+  ApplySubscriptionRenewalResult,
+  runRenewalSideEffects
+} from "./applySubscriptionRenewal";
 import { recordFinancialEvent } from "./recordFinancialEvent";
 import { getIO } from "../../libs/socket";
 import Company from "../../models/Company";
@@ -22,13 +27,113 @@ export type ConfirmGatewayPaymentInput = {
   metadata?: Record<string, unknown>;
 };
 
+export type ConfirmGatewayPaymentResult = {
+  /** null apenas quando a fatura já estava quitada sem nenhum SaaSPayment (legado) — ver conciliação. */
+  payment: SaaSPayment | null;
+  renewed: boolean;
+  alreadyApplied: boolean;
+};
+
+export const GATEWAY_ON_SETTLED_KIND = "gateway_payment_on_settled_invoice";
+
+/**
+ * Item de conciliação "possível pagamento em duplicidade", idempotente por txid
+ * (a fatura está sob lock FOR UPDATE: confirmações simultâneas serializam aqui).
+ */
+async function openSettledInvoiceReconciliation(
+  invoice: Invoices,
+  existing: SaaSPayment | null,
+  input: ConfirmGatewayPaymentInput,
+  t: Transaction
+): Promise<void> {
+  const txid = String(input.externalTxid);
+  const already = await SaaSReconciliationItem.findOne({
+    where: {
+      companyId: invoice.companyId,
+      invoiceId: invoice.id,
+      kind: GATEWAY_ON_SETTLED_KIND,
+      metadata: { externalTxid: txid }
+    } as any,
+    transaction: t
+  });
+  const logPayload = {
+    invoiceId: invoice.id,
+    companyId: invoice.companyId,
+    externalTxid: txid,
+    amount: input.amount,
+    settledBy: existing?.source ?? invoice.paymentSource ?? null,
+    existingPaymentId: existing?.id ?? null,
+    duplicateNotice: !!already
+  };
+  if (already) {
+    logger.info(logPayload, "[SaasBilling] gateway_payment_on_settled_invoice_replay");
+    return;
+  }
+  const settledBy = existing?.source ?? invoice.paymentSource ?? "desconhecida";
+  // Fatura legada quitada sem SaaSPayment e com o mesmo txid: pode ser o próprio Pix original
+  // (reentrega do webhook) — continua sem receita/renovação, mas o operador é avisado.
+  const sameTxidAsInvoice = !!invoice.externalTxid && invoice.externalTxid === txid;
+  const message = `Possível pagamento em duplicidade: a Efí confirmou o Pix ${txid} (R$ ${Number(
+    input.amount
+  ).toFixed(2)}) para a fatura #${invoice.id}, que já estava quitada (origem: ${settledBy}). Nada foi renovado nem contado como receita; verifique estorno ou crédito.${
+    sameTxidAsInvoice && !existing
+      ? " Atenção: é o mesmo Pix da cobrança desta fatura e não há pagamento registrado — pode ser o pagamento original de uma fatura legada."
+      : ""
+  }`;
+  await SaaSReconciliationItem.create(
+    {
+      companyId: invoice.companyId,
+      invoiceId: invoice.id,
+      paymentId: existing?.id ?? null,
+      kind: GATEWAY_ON_SETTLED_KIND,
+      status: "pending",
+      message,
+      retryCount: 0,
+      lastError: null,
+      metadata: {
+        externalTxid: txid,
+        externalChargeId: input.externalChargeId ?? null,
+        gatewayProvider: input.gatewayProvider || "efi",
+        gatewayStatus: input.gatewayStatus || null,
+        amount: input.amount,
+        method: input.method,
+        gatewayPaidAt: input.paidAt ? input.paidAt.toISOString() : null,
+        settledBySource: existing?.source ?? invoice.paymentSource ?? null,
+        existingPaymentId: existing?.id ?? null,
+        possibleDuplicatePayment: true,
+        sameTxidAsInvoice,
+        gatewayMetadata: input.metadata || null
+      }
+    },
+    { transaction: t }
+  );
+  await recordFinancialEvent({
+    companyId: invoice.companyId,
+    invoiceId: invoice.id,
+    paymentId: existing?.id ?? null,
+    eventType: "gateway_payment_on_settled_invoice",
+    actorUserId: null,
+    idempotencyKey: `evt:gw-on-settled:${txid}`,
+    payload: {
+      externalTxid: txid,
+      amount: input.amount,
+      settledBySource: existing?.source ?? invoice.paymentSource ?? null,
+      countsAsRevenue: false,
+      renewed: false
+    },
+    transaction: t
+  });
+  logger.warn(logPayload, "[SaasBilling] gateway_payment_on_settled_invoice");
+}
+
 /**
  * Confirma pagamento externo verificável (webhook após consulta ao gateway).
  * Idempotente por externalTxid ou invoice já paid + mesmo txid.
  */
 export async function confirmGatewayPayment(
   input: ConfirmGatewayPaymentInput
-): Promise<{ payment: SaaSPayment; renewed: boolean; alreadyApplied: boolean }> {
+): Promise<ConfirmGatewayPaymentResult> {
+  let renewResult: ApplySubscriptionRenewalResult | null = null;
   return sequelize.transaction(async (t: Transaction) => {
     if (input.externalTxid) {
       const byTxid = await SaaSPayment.findOne({
@@ -36,6 +141,29 @@ export async function confirmGatewayPayment(
         transaction: t
       });
       if (byTxid) {
+        if (byTxid.source !== "gateway") {
+          // A baixa manual copiou o txid da cobrança Pix e agora a Efí confirmou esse Pix (o webhook só
+          // chega aqui após consultar a cobrança CONCLUIDA): o cliente pagou também pelo Pix.
+          // Não renova nem duplica receita, mas abre conciliação "possível duplicidade" (idempotente).
+          logger.warn(
+            {
+              invoiceId: byTxid.invoiceId,
+              paymentId: byTxid.id,
+              source: byTxid.source,
+              externalTxid: input.externalTxid
+            },
+            "[SaasBilling] gateway_confirmation_matches_non_gateway_payment"
+          );
+          const settledInvoice = byTxid.invoiceId
+            ? await Invoices.findByPk(byTxid.invoiceId, {
+                transaction: t,
+                lock: t.LOCK.UPDATE
+              })
+            : null;
+          if (settledInvoice) {
+            await openSettledInvoiceReconciliation(settledInvoice, byTxid, input, t);
+          }
+        }
         return { payment: byTxid, renewed: false, alreadyApplied: true };
       }
     }
@@ -47,29 +175,34 @@ export async function confirmGatewayPayment(
     if (!invoice) throw new AppError("ERR_INVOICE_NOT_FOUND", 404);
 
     if (String(invoice.status).toLowerCase() === "paid") {
-      if (
-        input.externalTxid &&
-        invoice.externalTxid &&
-        invoice.externalTxid === input.externalTxid
-      ) {
-        const existing = await SaaSPayment.findOne({
-          where: { invoiceId: invoice.id },
-          transaction: t,
-          order: [["id", "DESC"]]
+      if (input.externalTxid) {
+        // Rechecagem sob o lock da fatura: uma confirmação simultânea do MESMO txid pode ter
+        // acabado de commitar (não é duplicidade, é replay).
+        const sameTxid = await SaaSPayment.findOne({
+          where: { externalTxid: input.externalTxid },
+          transaction: t
         });
-        if (existing) {
-          return { payment: existing, renewed: false, alreadyApplied: true };
+        if (sameTxid) {
+          return { payment: sameTxid, renewed: false, alreadyApplied: true };
         }
       }
-      // Já paga por outro meio — não renovar de novo
       const existing = await SaaSPayment.findOne({
         where: { invoiceId: invoice.id },
         transaction: t,
         order: [["id", "DESC"]]
       });
-      if (existing) {
-        return { payment: existing, renewed: false, alreadyApplied: true };
+      // F6/F-D5: a fatura já está quitada e ESTE txid não tem SaaSPayment (a checagem por txid acima
+      // falhou): o dinheiro chegou pela Efí para uma fatura quitada por outra fonte (manual, histórica,
+      // cortesia, legado ou outra cobrança). Não renova, não cria receita: abre conciliação.
+      if (input.externalTxid) {
+        await openSettledInvoiceReconciliation(invoice, existing, input, t);
+      } else if (!existing) {
+        logger.warn(
+          { invoiceId: invoice.id },
+          "[SaasBilling] gateway_payment_on_paid_invoice_without_txid"
+        );
       }
+      return { payment: existing, renewed: false, alreadyApplied: true };
     }
 
     const expected = Number(invoice.value);
@@ -135,20 +268,52 @@ export async function confirmGatewayPayment(
 
     let renewed = false;
     if (saasBillingFlags.autoRenewOnPayment()) {
-      const renewResult = await applySubscriptionRenewal({
-        companyId: invoice.companyId,
-        reason: "payment_confirmed",
-        invoiceId: invoice.id,
-        paymentId: payment.id,
-        idempotencyKey: `renew:${idempotencyKey}`,
-        transaction: t
-      });
-      renewed = !renewResult.alreadyApplied;
+      // Mesma chave da baixa manual: uma renovação por fatura.
+      try {
+        renewResult = await applySubscriptionRenewal({
+          companyId: invoice.companyId,
+          reason: "payment_confirmed",
+          invoiceId: invoice.id,
+          paymentId: payment.id,
+          idempotencyKey: `renew-invoice:${invoice.id}`,
+          coversInvoiceDueDate: invoice.dueDate,
+          transaction: t
+        });
+        renewed = !!renewResult.renewal && !renewResult.alreadyApplied;
+      } catch (err: any) {
+        // Erro determinístico de cadastro (recorrência inválida), lançado pelo planner ANTES de qualquer
+        // escrita: reverter tudo faria a Efí reenviar para sempre e o Pix recebido nunca seria registrado.
+        // Registra o pagamento e pede ação do operador via conciliação.
+        if (!(err instanceof AppError) || err.message !== "ERR_INVALID_RECURRENCE") throw err;
+        renewResult = null;
+        await SaaSReconciliationItem.create(
+          {
+            companyId: invoice.companyId,
+            invoiceId: invoice.id,
+            paymentId: payment.id,
+            kind: "gateway_payment_renewal_failed",
+            status: "pending",
+            message:
+              "Pix recebido e registrado, mas a assinatura NÃO foi renovada: a recorrência da empresa é inválida. Corrija a recorrência e renove administrativamente.",
+            retryCount: 0,
+            lastError: err.message,
+            metadata: { externalTxid: input.externalTxid ?? null }
+          },
+          { transaction: t }
+        );
+        logger.warn(
+          { invoiceId: invoice.id, companyId: invoice.companyId },
+          "[SaasBilling] gateway_payment_renewal_failed"
+        );
+      }
     }
 
     return { payment, renewed, alreadyApplied: false };
   }).then(async result => {
-    if (!result.alreadyApplied) {
+    if (renewResult) {
+      await runRenewalSideEffects({ reason: "payment_confirmed" }, renewResult);
+    }
+    if (!result.alreadyApplied && result.payment) {
       try {
         const company = await Company.findByPk(result.payment.companyId);
         const io = getIO();

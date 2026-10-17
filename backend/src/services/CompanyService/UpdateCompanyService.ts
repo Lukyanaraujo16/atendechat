@@ -4,6 +4,7 @@ import Company from "../../models/Company";
 import Setting from "../../models/Setting";
 import { normalizeBusinessSegment } from "../../config/businessSegment";
 import { normalizeCrmVisibilityMode } from "../CrmService/crmDealVisibility";
+import { normalizeCompanyRegistrationInput } from "../../helpers/brDocuments";
 
 interface CompanyData {
   name?: string;
@@ -24,6 +25,19 @@ interface CompanyData {
   storageLimitGb?: number | null;
   businessSegment?: string | null;
   crmVisibilityMode?: string | null;
+  /** Fase 8.4 — dados cadastrais (opcionais; "" limpa o campo). */
+  tradeName?: string | null;
+  legalName?: string | null;
+  document?: string | null;
+  /** Ignorado na entrada: derivado do documento. */
+  documentType?: string | null;
+  addressZipCode?: string | null;
+  addressStreet?: string | null;
+  addressNumber?: string | null;
+  addressComplement?: string | null;
+  addressNeighborhood?: string | null;
+  addressCity?: string | null;
+  addressState?: string | null;
 }
 
 const UpdateCompanyService = async (
@@ -59,10 +73,18 @@ const UpdateCompanyService = async (
     }
   }
 
-  const payload: Record<string, unknown> = {};
+  // Cadastro (Fase 8.4): só processa chaves enviadas; telefone/e-mail legados
+  // inalterados não são revalidados para não travar a edição de empresas antigas.
+  const registrationInput: Record<string, unknown> = { ...companyData };
+  if (phone === undefined) delete registrationInput.phone;
+  if (email === undefined) delete registrationInput.email;
+  const registration = normalizeCompanyRegistrationInput(registrationInput, {
+    includeContact: true,
+    current: { phone: company.phone, email: company.email }
+  });
+
+  const payload: Record<string, unknown> = { ...registration };
   if (name !== undefined) payload.name = name;
-  if (phone !== undefined) payload.phone = phone;
-  if (email !== undefined) payload.email = email;
   if (status !== undefined) payload.status = status;
   if (planId !== undefined) {
     const raw = planId as unknown;

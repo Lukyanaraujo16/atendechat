@@ -53,6 +53,7 @@ import SaaSPaymentAttempt from "../models/SaaSPaymentAttempt";
 import SaaSFinancialEvent from "../models/SaaSFinancialEvent";
 import SaaSSubscriptionRenewal from "../models/SaaSSubscriptionRenewal";
 import SaaSReconciliationItem from "../models/SaaSReconciliationItem";
+import SaaSInvoiceHistoricalReview from "../models/SaaSInvoiceHistoricalReview";
 import BaileysChats from "../models/BaileysChats";
 import Files from "../models/Files";
 import FilesOptions from "../models/FilesOptions";
@@ -220,6 +221,7 @@ const models = [
   SaaSFinancialEvent,
   SaaSSubscriptionRenewal,
   SaaSReconciliationItem,
+  SaaSInvoiceHistoricalReview,
   BaileysChats,
   Files,
   FilesOptions,

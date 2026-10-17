@@ -17,7 +17,12 @@ import {
 } from "../services/SaasBilling/PlatformFinanceDashboardService";
 import { registerManualPayment } from "../services/SaasBilling/registerManualPayment";
 import { cancelSaasInvoice } from "../services/SaasBilling/cancelSaasInvoice";
-import { applySubscriptionRenewal } from "../services/SaasBilling/applySubscriptionRenewal";
+import { previewSubscriptionRenewal } from "../services/SaasBilling/applySubscriptionRenewal";
+import {
+  adjustCompanyDueDate,
+  createManualInvoice,
+  updateOpenInvoice
+} from "../services/SaasBilling/ManageSaasInvoiceService";
 import { createEfiBoletoCharge } from "../services/SaasBilling/efiCobrancasClient";
 import Invoices from "../models/Invoices";
 import Company from "../models/Company";
@@ -27,6 +32,29 @@ import SaaSReconciliationItem from "../models/SaaSReconciliationItem";
 import { saasBillingFlags } from "../config/saasBillingFlags";
 import { Op } from "sequelize";
 import moment from "moment";
+
+const DOMAIN_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** companyId do path — sempre usado no where (isolamento entre empresas). */
+function parseCompanyId(req: Request): number {
+  const companyId = Number(req.params.companyId);
+  if (!Number.isInteger(companyId) || companyId <= 0) {
+    throw new AppError("ERR_INVALID_COMPANY", 400);
+  }
+  return companyId;
+}
+
+/** Converte ValidationError do Yup em 400 com mensagem legível. */
+async function validateOr400(schema: Yup.ObjectSchema<any>, body: unknown) {
+  try {
+    await schema.validate(body);
+  } catch (err: any) {
+    if (err?.name === "ValidationError") {
+      throw new AppError("ERR_VALIDATION", 400, String(err.message));
+    }
+    throw err;
+  }
+}
 
 export const platformKpis = async (
   req: Request,
@@ -85,11 +113,12 @@ export const platformExportCsv = async (
   if (kind === "payments") {
     const payments = await SaaSPayment.findAll({
       where: { countsAsRevenue: true },
-      order: [["paidAt", "DESC"]],
+      order: [["paidAt", "DESC NULLS LAST"], ["id", "DESC"]],
       limit: 5000
     });
+    // paidAt vazio + paidAtUnknown=true: pagamento histórico com data desconhecida (nunca inventada).
     const rows = [
-      "id,companyId,invoiceId,amount,method,source,countsAsRevenue,paidAt,gatewaySyncStatus"
+      "id,companyId,invoiceId,amount,method,source,countsAsRevenue,paidAt,gatewaySyncStatus,paidAtUnknown"
     ];
     for (const p of payments) {
       rows.push(
@@ -101,8 +130,9 @@ export const platformExportCsv = async (
           p.method,
           p.source,
           p.countsAsRevenue,
-          p.paidAt instanceof Date ? p.paidAt.toISOString() : p.paidAt,
-          p.gatewaySyncStatus ?? ""
+          p.paidAt instanceof Date ? p.paidAt.toISOString() : p.paidAt ?? "",
+          p.gatewaySyncStatus ?? "",
+          p.paidAt === null || p.paidAt === undefined
         ].join(",")
       );
     }
@@ -158,10 +188,11 @@ export const companyInvoices = async (
   req: Request,
   res: Response
 ): Promise<Response> => {
-  const companyId = Number(req.params.companyId);
-  const { status, page, limit } = req.query as Record<string, string>;
+  const companyId = parseCompanyId(req);
+  const { status, legacy, page, limit } = req.query as Record<string, string>;
   const data = await listCompanyInvoices(companyId, {
-    status,
+    status: status ? String(status).toLowerCase() : undefined,
+    legacy: legacy === "true" ? true : legacy === "false" ? false : undefined,
     page: page ? Number(page) : 1,
     limit: limit ? Number(limit) : 20
   });
@@ -233,7 +264,7 @@ export const manualPayment = async (
     renewSubscription: Yup.boolean().optional()
   });
 
-  await schema.validate(req.body);
+  await validateOr400(schema, req.body);
 
   const result = await registerManualPayment({
     invoiceId: Number(req.body.invoiceId),
@@ -242,9 +273,15 @@ export const manualPayment = async (
     kind: req.body.kind,
     amount: Number(req.body.amount),
     method: String(req.body.method),
-    paidAt: new Date(req.body.paidAt),
+    // "YYYY-MM-DD" vira meio-dia UTC: new Date("YYYY-MM-DD") é meia-noite UTC
+    // e cairia no dia anterior no fuso de Brasília.
+    paidAt: DOMAIN_DATE_RE.test(String(req.body.paidAt))
+      ? new Date(`${req.body.paidAt}T12:00:00.000Z`)
+      : new Date(req.body.paidAt),
     reason: String(req.body.reason),
-    renewSubscription: req.body.renewSubscription !== false
+    renewSubscription: req.body.renewSubscription !== false,
+    // Vencimento visto na prévia: o serviço revalida sob lock (409 ERR_PAYMENT_STATE_CHANGED).
+    expectedCurrentDueDate: req.body.expectedCurrentDueDate
   });
 
   return res.status(201).json(result);
@@ -254,12 +291,12 @@ export const cancelInvoice = async (
   req: Request,
   res: Response
 ): Promise<Response> => {
-  const companyId = Number(req.params.companyId);
+  const companyId = parseCompanyId(req);
   const invoiceId = Number(req.params.invoiceId);
   const schema = Yup.object().shape({
     reason: Yup.string().trim().min(3).required()
   });
-  await schema.validate(req.body);
+  await validateOr400(schema, req.body);
 
   const invoice = await cancelSaasInvoice({
     invoiceId,
@@ -274,26 +311,100 @@ export const adjustDueDate = async (
   req: Request,
   res: Response
 ): Promise<Response> => {
-  const companyId = Number(req.params.companyId);
+  const companyId = parseCompanyId(req);
   const schema = Yup.object().shape({
-    dueDate: Yup.string().required(),
+    dueDate: Yup.string()
+      .matches(DOMAIN_DATE_RE, "dueDate deve estar no formato YYYY-MM-DD")
+      .required(),
     reason: Yup.string().trim().min(3).required()
   });
-  await schema.validate(req.body);
+  await validateOr400(schema, req.body);
 
-  const result = await applySubscriptionRenewal({
+  const result = await adjustCompanyDueDate({
     companyId,
-    reason: "due_date_adjustment",
     actorUserId: Number(req.user.id),
-    explicitDueDate: String(req.body.dueDate),
-    idempotencyKey: `adj:${companyId}:${req.body.dueDate}:${Date.now()}`
+    dueDate: String(req.body.dueDate),
+    reason: String(req.body.reason)
   });
 
   return res.json({
     company: result.company,
     renewal: result.renewal,
-    reason: req.body.reason
+    alreadyApplied: result.alreadyApplied,
+    reason: result.reason
   });
+};
+
+export const renewalPreview = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = parseCompanyId(req);
+  const preview = await previewSubscriptionRenewal(companyId);
+  return res.json(preview);
+};
+
+export const createInvoice = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = parseCompanyId(req);
+  const schema = Yup.object().shape({
+    dueDate: Yup.string()
+      .matches(DOMAIN_DATE_RE, "dueDate deve estar no formato YYYY-MM-DD")
+      .required(),
+    value: Yup.number().positive().nullable().notRequired(),
+    competence: Yup.string()
+      .matches(/^\d{4}-(0[1-9]|1[0-2])$/, "competence deve estar no formato YYYY-MM")
+      .nullable()
+      .notRequired(),
+    detail: Yup.string().trim().max(255).nullable().notRequired(),
+    reason: Yup.string().trim().min(3).required()
+  });
+  await validateOr400(schema, req.body);
+
+  const invoice = await createManualInvoice({
+    companyId,
+    actorUserId: Number(req.user.id),
+    dueDate: String(req.body.dueDate),
+    value: req.body.value ?? null,
+    competence: req.body.competence || null,
+    detail: req.body.detail ?? null,
+    reason: String(req.body.reason)
+  });
+  return res.status(201).json({ invoice });
+};
+
+export const updateInvoice = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = parseCompanyId(req);
+  const invoiceId = Number(req.params.invoiceId);
+  if (!Number.isInteger(invoiceId) || invoiceId <= 0) {
+    throw new AppError("ERR_INVOICE_NOT_FOUND", 404);
+  }
+  const schema = Yup.object().shape({
+    value: Yup.number().positive().nullable().notRequired(),
+    dueDate: Yup.string()
+      .matches(DOMAIN_DATE_RE, "dueDate deve estar no formato YYYY-MM-DD")
+      .nullable()
+      .notRequired(),
+    detail: Yup.string().trim().max(255).nullable().notRequired(),
+    reason: Yup.string().trim().min(3).required()
+  });
+  await validateOr400(schema, req.body);
+
+  const invoice = await updateOpenInvoice({
+    companyId,
+    invoiceId,
+    actorUserId: Number(req.user.id),
+    value: req.body.value ?? null,
+    dueDate: req.body.dueDate || null,
+    detail: req.body.detail ?? null,
+    reason: String(req.body.reason)
+  });
+  return res.json({ invoice });
 };
 
 /** Tenant: resumo da própria empresa */

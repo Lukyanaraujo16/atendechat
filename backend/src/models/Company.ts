@@ -51,6 +51,44 @@ class Company extends Model<Company> {
   @Column
   status: boolean;
 
+  /** Fase 8.4 — dados cadastrais (todos opcionais). */
+  @Column({ type: DataType.STRING, allowNull: true })
+  tradeName: string | null;
+
+  @Column({ type: DataType.STRING, allowNull: true })
+  legalName: string | null;
+
+  /** CPF/CNPJ somente dígitos. */
+  @Column({ type: DataType.STRING(14), allowNull: true })
+  document: string | null;
+
+  /** "cpf" | "cnpj" (derivado do tamanho do documento). */
+  @Column({ type: DataType.STRING(4), allowNull: true })
+  documentType: string | null;
+
+  /** CEP somente dígitos (8). */
+  @Column({ type: DataType.STRING(8), allowNull: true })
+  addressZipCode: string | null;
+
+  @Column({ type: DataType.STRING, allowNull: true })
+  addressStreet: string | null;
+
+  @Column({ type: DataType.STRING(20), allowNull: true })
+  addressNumber: string | null;
+
+  @Column({ type: DataType.STRING, allowNull: true })
+  addressComplement: string | null;
+
+  @Column({ type: DataType.STRING, allowNull: true })
+  addressNeighborhood: string | null;
+
+  @Column({ type: DataType.STRING, allowNull: true })
+  addressCity: string | null;
+
+  /** UF em maiúsculas. */
+  @Column({ type: DataType.STRING(2), allowNull: true })
+  addressState: string | null;
+
   @Column
   dueDate: string;
 

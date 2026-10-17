@@ -7,6 +7,7 @@ import Setting from "../../models/Setting";
 import provisionPrimaryAdminForCompany from "./provisionPrimaryAdminForCompany";
 import { normalizeBusinessSegment } from "../../config/businessSegment";
 import BootstrapCrmForCompanyService from "../CrmService/BootstrapCrmForCompanyService";
+import { normalizeCompanyRegistrationInput } from "../../helpers/brDocuments";
 
 interface CompanyData {
   name: string;
@@ -26,6 +27,18 @@ interface CompanyData {
   contractedPlanValue?: number | null;
   /** Segmento de negócio (templates CRM). */
   businessSegment?: string | null;
+  /** Fase 8.4 — dados cadastrais (opcionais). */
+  tradeName?: string | null;
+  legalName?: string | null;
+  document?: string | null;
+  documentType?: string | null;
+  addressZipCode?: string | null;
+  addressStreet?: string | null;
+  addressNumber?: string | null;
+  addressComplement?: string | null;
+  addressNeighborhood?: string | null;
+  addressCity?: string | null;
+  addressState?: string | null;
 }
 
 export interface CreateCompanyOptions {
@@ -91,6 +104,12 @@ const CreateCompanyService = async (
     throw new AppError(err.message);
   }
 
+  // Cadastro (Fase 8.4): valida somente campos preenchidos; telefone/e-mail
+  // seguem o fluxo existente (validados no controller para criação manual).
+  const registration = normalizeCompanyRegistrationInput(
+    companyData as unknown as Record<string, unknown>
+  );
+
   const notes =
     internalNotes === undefined || internalNotes === null
       ? null
@@ -117,7 +136,8 @@ const CreateCompanyService = async (
         ...(modulePermissions && typeof modulePermissions === "object"
           ? { modulePermissions }
           : {}),
-        businessSegment: normalizeBusinessSegment(companyData.businessSegment)
+        businessSegment: normalizeBusinessSegment(companyData.businessSegment),
+        ...registration
       },
       { transaction }
     );

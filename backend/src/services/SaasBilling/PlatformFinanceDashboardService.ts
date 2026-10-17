@@ -7,6 +7,8 @@ import SaaSPayment from "../../models/SaaSPayment";
 import { getCompanyEffectivePlanValue } from "../../helpers/getCompanyEffectivePlanValue";
 import { getCompanyFinanceFlags } from "../../helpers/companyFinanceStatus";
 import { getRecurrenceMonths } from "../../helpers/recurrenceMonths";
+import { countHistoricalReviewPending } from "./HistoricalReviewService";
+import { withPaidAtUnknown } from "./ListCompanyFinanceService";
 
 function toNumber(v: unknown): number {
   const n = Number(v);
@@ -93,18 +95,37 @@ export async function getPlatformFinanceKpis(opts?: {
     }
   }
 
-  const paymentWhere: any = { countsAsRevenue: true };
-  if (from || to) {
-    paymentWhere.paidAt = {};
-    if (from) paymentWhere.paidAt[Op.gte] = from.toDate();
-    if (to) paymentWhere.paidAt[Op.lte] = to.toDate();
-  }
+  // Pagamentos com data: filtráveis por período e distribuídos por mês.
+  const paymentWhere: any = { countsAsRevenue: true, paidAt: { [Op.not]: null } };
+  if (from) paymentWhere.paidAt[Op.gte] = from.toDate();
+  if (to) paymentWhere.paidAt[Op.lte] = to.toDate();
 
   const payments = await SaaSPayment.findAll({ where: paymentWhere });
   let received = 0;
+  let historicalReceived = 0;
   for (const p of payments) {
     received += toNumber(p.amount);
+    if (p.source === "historical_payment") historicalReceived += toNumber(p.amount);
   }
+
+  // Pagamentos históricos com data desconhecida: nunca atribuídos a período/competência.
+  // Sem filtro de período entram em `received`; sempre aparecem em `receivedDateUnknown`.
+  const undatedPayments = await SaaSPayment.findAll({
+    where: { countsAsRevenue: true, paidAt: null }
+  });
+  let receivedDateUnknown = 0;
+  for (const p of undatedPayments) {
+    receivedDateUnknown += toNumber(p.amount);
+  }
+  const periodFiltered = !!(from || to);
+  if (!periodFiltered) {
+    received += receivedDateUnknown;
+    for (const p of undatedPayments) {
+      if (p.source === "historical_payment") historicalReceived += toNumber(p.amount);
+    }
+  }
+
+  const historicalPending = await countHistoricalReviewPending();
 
   // Evolução mensal (últimos 6 meses) — faturamento e recebimento
   const evolution: Array<{ month: string; invoiced: number; received: number }> =
@@ -125,6 +146,7 @@ export async function getPlatformFinanceKpis(opts?: {
       }
     }
     for (const p of payments) {
+      if (!p.paidAt) continue;
       const paidAt = moment(p.paidAt);
       if (paidAt.isBetween(start, end, undefined, "[]")) {
         paySum += toNumber(p.amount);
@@ -138,6 +160,12 @@ export async function getPlatformFinanceKpis(opts?: {
     arr: Math.round(mrr * 12 * 100) / 100,
     invoiced: Math.round(invoiced * 100) / 100,
     received: Math.round(received * 100) / 100,
+    /** Recebido sem data conhecida (regularização histórica) — fora da evolução mensal. */
+    receivedDateUnknown: Math.round(receivedDateUnknown * 100) / 100,
+    /** `received` inclui `receivedDateUnknown` somente sem filtro de período. */
+    receivedIncludesDateUnknown: !periodFiltered,
+    historicalReceived: Math.round(historicalReceived * 100) / 100,
+    historicalPending,
     open: Math.round(openAmount * 100) / 100,
     overdueAmount: Math.round(overdueAmount * 100) / 100,
     activeCompanies: activeCount,
@@ -209,10 +237,14 @@ export async function listPlatformPayments(opts: {
         attributes: ["id", "name"]
       }
     ],
-    order: [["paidAt", "DESC"], ["id", "DESC"]],
+    order: [["paidAt", "DESC NULLS LAST"], ["id", "DESC"]],
     limit,
     offset: (page - 1) * limit
   });
 
-  return { payments: rows, count, hasMore: count > page * limit };
+  return {
+    payments: rows.map(withPaidAtUnknown),
+    count,
+    hasMore: count > page * limit
+  };
 }

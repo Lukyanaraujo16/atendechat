@@ -7,10 +7,12 @@ import { canAccessSaasPlatform } from "../../utils/platformUser";
 
 import PlatformDashboard from "./PlatformDashboard";
 import PlatformCompanies from "./PlatformCompanies";
+import CompanyDetailPage from "./CompanyDetail";
 import PlatformBranding from "./PlatformBranding";
 import PlatformSuperAdmins from "./PlatformSuperAdmins";
 import PlatformMyAccount from "./PlatformMyAccount";
 import PlatformFinance from "./PlatformFinance";
+import HistoricalReviewPage from "./HistoricalReview";
 import PlatformBackup from "./PlatformBackup";
 import PlatformSystemTools from "./PlatformSystemTools";
 import PlatformPlans from "./PlatformPlans";
@@ -36,6 +38,7 @@ export default function PlatformModule() {
       <Switch>
         <Route exact path="/saas" component={PlatformDashboard} />
         <Route exact path="/saas/companies" component={PlatformCompanies} />
+        <Route exact path="/saas/companies/:companyId/:tab?" component={CompanyDetailPage} />
         <Route exact path="/saas/signup-requests" component={PlatformSignupRequests} />
         <Route exact path="/saas/admins" component={PlatformSuperAdmins} />
         <Route exact path="/saas/account" component={PlatformMyAccount} />
@@ -44,6 +47,7 @@ export default function PlatformModule() {
         <Route exact path="/saas/email-settings" component={PlatformEmailSettings} />
         <Route exact path="/saas/plans" component={PlatformPlans} />
         <Route exact path="/saas/finance" component={PlatformFinance} />
+        <Route exact path="/saas/finance/historical-review" component={HistoricalReviewPage} />
         <Route exact path="/saas/billing-automation" component={BillingAutomationPage} />
         <Route exact path="/saas/backup" component={PlatformBackup} />
         <Route exact path="/saas/system-tools" component={PlatformSystemTools} />

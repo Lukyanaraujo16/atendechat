@@ -44,7 +44,7 @@ class SaaSPayment extends Model<SaaSPayment> {
   @Column
   method: string;
 
-  /** gateway | paid_offline | courtesy | admin_adjustment — cortesia não é receita */
+  /** gateway | paid_offline | courtesy | admin_adjustment | historical_payment | historical_courtesy — cortesia não é receita */
   @Column
   source: string;
 
@@ -52,8 +52,13 @@ class SaaSPayment extends Model<SaaSPayment> {
   @Column
   countsAsRevenue: boolean;
 
+  /**
+   * Data real do pagamento. NULL somente em pagamento histórico com data desconhecida
+   * (`metadata.paidAtUnknown=true`) — Fase 8.4-F. Nunca inventar data.
+   */
+  @AllowNull(true)
   @Column
-  paidAt: Date;
+  paidAt: Date | null;
 
   @ForeignKey(() => User)
   @AllowNull(true)

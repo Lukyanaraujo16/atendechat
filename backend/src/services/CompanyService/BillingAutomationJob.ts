@@ -1,7 +1,9 @@
 import moment from "moment-timezone";
 import Company from "../../models/Company";
 import Plan from "../../models/Plan";
-import GetSystemBillingSettingsService from "../SystemSettingService/GetSystemBillingSettingsService";
+import GetSystemBillingSettingsService, {
+  SystemBillingSettings
+} from "../SystemSettingService/GetSystemBillingSettingsService";
 import { createCompanyLog } from "./CreateCompanyLogService";
 import { hasCompanyBillingWarningLog } from "./BillingAutomationDedupeService";
 import { dispatchBillingAutomationEvent } from "./billingAutomationHooks";
@@ -13,6 +15,85 @@ import {
 } from "./notifySuperAdminsBilling";
 import { getCompanyEffectivePlanValue } from "../../helpers/getCompanyEffectivePlanValue";
 import { formatBillingAmountBrl } from "./billingWhatsAppTemplates";
+import {
+  evaluateCompanyBilling,
+  resolveBillingJobMode
+} from "../SaasBilling/billingEvaluation";
+
+/**
+ * Fase 8.4-F — modo do job (DECISOES D10/D15):
+ * - "legacy" (default): comportamento histórico INALTERADO — só processa `dueDate` string `YYYY-MM-DD`;
+ *   como `Companies.dueDate` é timestamptz e chega como `Date`, na prática pula as empresas.
+ * - "normalized" (`BILLING_AUTOMATION_NORMALIZED_DATES=true|1`): normaliza o vencimento com o motor C1
+ *   (`toDomainDate` no fuso da empresa) e aplica as mesmas regras de aviso/bloqueio.
+ * A flag é lida a cada execução. Settings, defaults e agendamento não mudam.
+ */
+type JobPlan = {
+  dueRaw: string;
+  currentDateStr: string;
+  daysUntilDue: number;
+  daysLate: number;
+  warnBefore: boolean;
+  warnAfter: boolean;
+  block: boolean;
+};
+
+type JobSettings = SystemBillingSettings;
+
+/** Caminho legado — idêntico ao código anterior à 8.4-F. null = pular empresa. */
+function planLegacy(company: Company, settings: JobSettings): JobPlan | null {
+  if (!company.dueDate || typeof company.dueDate !== "string") return null;
+  const dueRaw = company.dueDate.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dueRaw)) return null;
+
+  const tzRaw = company.timezone?.trim();
+  const tz = tzRaw && moment.tz.zone(tzRaw) ? tzRaw : "America/Sao_Paulo";
+
+  const today = moment.tz(tz).startOf("day");
+  const due = moment.tz(dueRaw, "YYYY-MM-DD", tz).startOf("day");
+  if (!due.isValid()) return null;
+
+  const daysUntilDue = due.diff(today, "days");
+  const daysLate = today.diff(due, "days");
+  return {
+    dueRaw,
+    currentDateStr: today.format("YYYY-MM-DD"),
+    daysUntilDue,
+    daysLate,
+    warnBefore:
+      settings.enableAutoWarning &&
+      daysUntilDue === settings.daysBeforeDueWarning,
+    warnAfter:
+      settings.enableAutoWarning && daysLate === settings.daysAfterDueWarning,
+    block: settings.enableAutoBlock && daysLate >= settings.daysAfterDueBlock
+  };
+}
+
+/** Caminho normalizado — motor C1 (aceita Date/ISO/YYYY-MM-DD). null = pular empresa. */
+function planNormalized(
+  company: Company,
+  settings: JobSettings
+): JobPlan | null {
+  const evaluation = evaluateCompanyBilling({
+    company: {
+      id: company.id,
+      dueDate: company.dueDate as unknown as Date | string | null,
+      status: company.status === true,
+      timezone: company.timezone
+    },
+    settings
+  });
+  if (!evaluation.dueDate) return null;
+  return {
+    dueRaw: evaluation.dueDate,
+    currentDateStr: evaluation.today,
+    daysUntilDue: evaluation.daysUntilDue ?? 0,
+    daysLate: evaluation.daysLate ?? 0,
+    warnBefore: evaluation.wouldWarnBeforeDue,
+    warnAfter: evaluation.wouldWarnAfterDue,
+    block: evaluation.wouldBlock
+  };
+}
 
 /**
  * Avalia empresas ativas com dueDate, regista avisos (uma vez por vencimento) e bloqueia após atraso configurável.
@@ -35,23 +116,16 @@ export async function runBillingAutomationJob(): Promise<void> {
     include: [{ model: Plan, as: "plan", attributes: ["value"], required: false }]
   });
 
+  const jobMode = resolveBillingJobMode();
+
   for (const company of companies) {
     try {
-      if (!company.dueDate || typeof company.dueDate !== "string") continue;
-      const dueRaw = company.dueDate.trim();
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(dueRaw)) continue;
-
-      const tzRaw = company.timezone?.trim();
-      const tz =
-        tzRaw && moment.tz.zone(tzRaw) ? tzRaw : "America/Sao_Paulo";
-
-      const today = moment.tz(tz).startOf("day");
-      const due = moment.tz(dueRaw, "YYYY-MM-DD", tz).startOf("day");
-      if (!due.isValid()) continue;
-
-      const currentDateStr = today.format("YYYY-MM-DD");
-      const daysUntilDue = due.diff(today, "days");
-      const daysLate = today.diff(due, "days");
+      const plan =
+        jobMode === "normalized"
+          ? planNormalized(company, settings)
+          : planLegacy(company, settings);
+      if (!plan) continue;
+      const { dueRaw, currentDateStr, daysUntilDue, daysLate } = plan;
 
       const effectiveAmount = getCompanyEffectivePlanValue({
         contractedPlanValue: company.contractedPlanValue,
@@ -59,8 +133,8 @@ export async function runBillingAutomationJob(): Promise<void> {
       });
       const amountBrl = formatBillingAmountBrl(effectiveAmount);
 
-      if (settings.enableAutoWarning) {
-        if (daysUntilDue === settings.daysBeforeDueWarning) {
+      if (plan.warnBefore || plan.warnAfter) {
+        if (plan.warnBefore) {
           const exists = await hasCompanyBillingWarningLog(
             company.id,
             "warning_before_due",
@@ -99,7 +173,7 @@ export async function runBillingAutomationJob(): Promise<void> {
           }
         }
 
-        if (daysLate === settings.daysAfterDueWarning) {
+        if (plan.warnAfter) {
           const exists = await hasCompanyBillingWarningLog(
             company.id,
             "warning_after_due",
@@ -139,10 +213,7 @@ export async function runBillingAutomationJob(): Promise<void> {
         }
       }
 
-      if (
-        settings.enableAutoBlock &&
-        daysLate >= settings.daysAfterDueBlock
-      ) {
+      if (plan.block) {
         const [affected] = await Company.update(
           { status: false },
           { where: { id: company.id, status: true } }

@@ -45,11 +45,13 @@ jest.mock("../../../models/SaaSReconciliationItem", () => ({
 }));
 
 jest.mock("../applySubscriptionRenewal", () => ({
+  runRenewalSideEffects: jest.fn(async () => undefined),
   applySubscriptionRenewal: jest.fn(async () => ({
     alreadyApplied: false,
     company: { id: 5 },
     renewal: {},
-    autoUnblocked: false
+    autoUnblocked: false,
+    skippedReason: null
   }))
 }));
 
@@ -157,5 +159,61 @@ describe("registerManualPayment", () => {
       }),
       expect.anything()
     );
+  });
+
+  const base = {
+    invoiceId: 10,
+    companyId: 5,
+    actorUserId: 2,
+    kind: "paid_offline" as const,
+    method: "pix",
+    paidAt: new Date("2026-10-17T12:00:00Z"),
+    reason: "Pix recebido na conta"
+  };
+
+  it("rejeita pagamento insuficiente sem gravar nada", async () => {
+    await expect(
+      registerManualPayment({ ...base, amount: 199.99 })
+    ).rejects.toMatchObject({ message: "ERR_PAYMENT_AMOUNT_INSUFFICIENT", statusCode: 400 });
+    expect(SaaSPayment.create).not.toHaveBeenCalled();
+    expect(invoiceState.update).not.toHaveBeenCalled();
+    expect(applySubscriptionRenewal).not.toHaveBeenCalled();
+  });
+
+  it("rejeita pagamento acima do valor da fatura", async () => {
+    await expect(
+      registerManualPayment({ ...base, amount: 250 })
+    ).rejects.toMatchObject({ message: "ERR_PAYMENT_AMOUNT_EXCEEDS" });
+    expect(SaaSPayment.create).not.toHaveBeenCalled();
+  });
+
+  it("fatura já paga retorna 409 e não renova de novo", async () => {
+    invoiceState.status = "paid";
+    await expect(
+      registerManualPayment({ ...base, amount: 200 })
+    ).rejects.toMatchObject({ message: "ERR_INVOICE_NOT_OPEN", statusCode: 409 });
+    expect(applySubscriptionRenewal).not.toHaveBeenCalled();
+  });
+
+  it("renova com chave idempotente por fatura e cobertura do ciclo da fatura", async () => {
+    (invoiceState as any).dueDate = "2026-10-10";
+    const result = await registerManualPayment({ ...base, amount: 200 });
+    expect(applySubscriptionRenewal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reason: "payment_confirmed",
+        idempotencyKey: "renew-invoice:10",
+        coversInvoiceDueDate: "2026-10-10",
+        invoiceId: 10,
+        paymentId: 77
+      })
+    );
+    expect(result.renewed).toBe(true);
+    expect(result.renewalSkippedReason).toBeNull();
+  });
+
+  it("renewSubscription=false não renova", async () => {
+    const result = await registerManualPayment({ ...base, amount: 200, renewSubscription: false });
+    expect(applySubscriptionRenewal).not.toHaveBeenCalled();
+    expect(result.renewalSkippedReason).toBe("disabled");
   });
 });

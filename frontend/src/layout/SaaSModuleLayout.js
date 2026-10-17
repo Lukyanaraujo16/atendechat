@@ -15,6 +15,7 @@ import DashboardOutlinedIcon from "@material-ui/icons/DashboardOutlined";
 import BusinessIcon from "@material-ui/icons/Business";
 import LayersIcon from "@material-ui/icons/Layers";
 import EuroSymbolIcon from "@material-ui/icons/EuroSymbol";
+import FactCheckIcon from "@material-ui/icons/AssignmentLate";
 import AutorenewIcon from "@material-ui/icons/Autorenew";
 import PaletteOutlinedIcon from "@material-ui/icons/PaletteOutlined";
 import SecurityIcon from "@material-ui/icons/Security";
@@ -137,6 +138,11 @@ function navItems() {
     },
     { path: "/saas/plans", label: i18n.t("platform.tabs.plans"), icon: LayersIcon },
     { path: "/saas/finance", label: i18n.t("platform.tabs.financial"), icon: EuroSymbolIcon },
+    {
+      path: "/saas/finance/historical-review",
+      label: "Revisão de históricas",
+      icon: FactCheckIcon,
+    },
     {
       path: "/saas/billing-automation",
       label: i18n.t("platform.tabs.billingAutomation"),

@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo, useRef, useContext, useCallback } from "react";
-import { useHistory, useLocation } from "react-router-dom";
+import React, { useState, useEffect, useMemo, useContext, useCallback } from "react";
+import { useHistory, Link as RouterLink } from "react-router-dom";
 import {
   makeStyles,
   Box,
@@ -7,9 +7,6 @@ import {
   FormControl,
   InputLabel,
   MenuItem,
-  FormControlLabel,
-  Radio,
-  RadioGroup,
   TextField,
   Table,
   TableHead,
@@ -18,43 +15,18 @@ import {
   TableRow,
   Select,
   Typography,
-  CircularProgress,
   Chip,
   InputAdornment,
-  Button,
   Tooltip,
   IconButton,
+  Link,
+  useMediaQuery,
 } from "@material-ui/core";
 import { useTheme, alpha } from "@material-ui/core/styles";
 import SearchIcon from "@material-ui/icons/Search";
 import EditOutlined from "@material-ui/icons/EditOutlined";
-import DeleteOutline from "@material-ui/icons/DeleteOutline";
-import ExitToApp from "@material-ui/icons/ExitToApp";
-import Block from "@material-ui/icons/Block";
-import CheckCircleOutline from "@material-ui/icons/CheckCircleOutline";
 import HeadsetMic from "@material-ui/icons/HeadsetMic";
 import ChatBubbleOutline from "@material-ui/icons/ChatBubbleOutline";
-import { Formik, Form, Field } from "formik";
-import ConfirmationModal from "../ConfirmationModal";
-import Alert from "@material-ui/lab/Alert";
-
-import { toast } from "react-toastify";
-import useCompanies from "../../hooks/useCompanies";
-import usePlans from "../../hooks/usePlans";
-import ModalUsers from "../ModalUsers";
-import CompanyUserPasswordDialog from "../CompanyUserPasswordDialog";
-import { SocketContext } from "../../context/Socket/SocketContext";
-import api from "../../services/api";
-import { isArray, has } from "lodash";
-import { useDate } from "../../hooks/useDate";
-
-import moment from "moment-timezone";
-import { i18n } from "../../translate/i18n";
-import toastError from "../../errors/toastError";
-import Dialog from "@material-ui/core/Dialog";
-import DialogTitle from "@material-ui/core/DialogTitle";
-import DialogContent from "@material-ui/core/DialogContent";
-import DialogActions from "@material-ui/core/DialogActions";
 import LockOutlined from "@material-ui/icons/LockOutlined";
 import LockOpen from "@material-ui/icons/LockOpen";
 import Autorenew from "@material-ui/icons/Autorenew";
@@ -62,407 +34,68 @@ import DeleteForever from "@material-ui/icons/DeleteForever";
 import NoteOutlined from "@material-ui/icons/NoteOutlined";
 import History from "@material-ui/icons/History";
 import Warning from "@material-ui/icons/Warning";
-import { AuthContext } from "../../context/Auth/AuthContext";
-import { getIanaTimezones } from "../../utils/ianaTimezones";
-import {
-  parseBrazilianCurrencyToNumber,
-  formatPlanValueForInput,
-} from "../../utils/brazilianCurrency";
-import {
-  getCompanyEffectivePlanValue,
-  formatBrlBrief,
-} from "../../utils/companyPlanValue";
+import AccountBalanceWalletOutlined from "@material-ui/icons/AccountBalanceWalletOutlined";
+import FindInPageOutlined from "@material-ui/icons/FindInPageOutlined";
+import Dialog from "@material-ui/core/Dialog";
+import DialogTitle from "@material-ui/core/DialogTitle";
+import DialogContent from "@material-ui/core/DialogContent";
+import DialogActions from "@material-ui/core/DialogActions";
+import { Formik, Form, Field } from "formik";
+import { toast } from "react-toastify";
 
+import useCompanies from "../../hooks/useCompanies";
+import usePlans from "../../hooks/usePlans";
+import { useDate } from "../../hooks/useDate";
+import { i18n } from "../../translate/i18n";
+import toastError from "../../errors/toastError";
+import { AuthContext } from "../../context/Auth/AuthContext";
+import { getCompanyEffectivePlanValue } from "../../utils/companyPlanValue";
 import {
   AppSectionCard,
-  AppEmptyState,
+  AppLoadingState,
   AppPrimaryButton,
-  AppSecondaryButton,
   AppNeutralButton,
 } from "../../ui";
 import AppTableContainer from "../../ui/components/AppTableContainer";
 import FeatureGroupsEditor from "../ModuleSettings/FeatureGroupsEditor";
-import CompanyPlanChangeDialog from "../ModuleSettings/CompanyPlanChangeDialog";
-import CompanyFinanceSection from "../CompanyFinanceSection";
+import { defaultModulePermissions } from "../ModuleSettings/moduleSync";
+import { maskPhone, isValidEmail, isValidPhone } from "../../helpers/brMasks";
+import CompanyPlanFields from "./CompanyPlanFields";
 import {
-  defaultModulePermissions,
-  mergeModulePermissions,
-  mergeModulePermissionsFromPlan,
-} from "../ModuleSettings/moduleSync";
-import { BUSINESS_SEGMENTS } from "../../config/businessSegment.js";
+  PrimaryAdminSetupDialog,
+  useCompanyQuickActions,
+} from "./CompanyActionDialogs";
+import {
+  previewRenewedDueDate,
+  companyStorageBarColor,
+  companyStorageStatusLabel,
+  getDueCategory,
+  getDueDisplayMeta,
+  planNameForSort,
+  comparePriorityDue,
+  formatPlanValueDiscrete,
+  getFinanceStateLabel,
+  compareByDueDateAsc,
+  compareByStatusBlockedFirst,
+  campaignsLabelForRow,
+  buildCompanyPayload,
+} from "./companyHelpers";
+import {
+  OPERATIONAL_FILTERS,
+  financialStatusLabel,
+  financialStatusTone,
+  blockKindLabel,
+  indexBillingStatus,
+  normalizeHistoricalSummary,
+  historicalReviewPath,
+} from "./billingStatusHelpers";
 
-const REC_MONTHS = {
-  MENSAL: 1,
-  BIMESTRAL: 2,
-  TRIMESTRAL: 3,
-  SEMESTRAL: 6,
-  ANUAL: 12,
-};
+export * from "./companyHelpers";
 
-/** Pré-visualização alinhada ao backend RenewCompanyDueDateService. */
-function previewRenewedDueDate(row) {
-  if (!row) return null;
-  const rec = String(row.recurrence || "").toUpperCase();
-  const months = REC_MONTHS[rec];
-  if (!months) return null;
-  const tz =
-    row.timezone && typeof row.timezone === "string"
-      ? row.timezone
-      : "America/Sao_Paulo";
-  try {
-    if (!moment.tz.zone(tz)) return null;
-    const now = moment.tz(tz).startOf("day");
-    let base = now;
-    if (row.dueDate) {
-      const due = moment.tz(row.dueDate, tz).startOf("day");
-      if (due.isValid() && due.isSameOrAfter(now)) {
-        base = due;
-      }
-    }
-    return base.clone().add(months, "months").format("YYYY-MM-DD");
-  } catch (e) {
-    return null;
-  }
-}
-
-/** Exibe GB no input (vírgula decimal). */
-function formatGbInputFromApi(gb) {
-  if (gb == null || gb === "") return "";
-  return String(gb).replace(".", ",");
-}
-
-function companyStorageBarColor(percent, palette) {
-  if (percent == null) return palette.primary.main;
-  if (percent >= 100) return palette.error.main;
-  if (percent >= 90) return palette.error.main;
-  if (percent >= 80) return palette.warning.main;
-  return palette.success.main;
-}
-
-function companyStorageStatusLabel(alertLevel) {
-  const lev = alertLevel && typeof alertLevel === "string" ? alertLevel : "ok";
-  const key =
-    lev === "attention"
-      ? "storageStatusAttention"
-      : lev === "critical"
-        ? "storageStatusCritical"
-        : lev === "exceeded"
-          ? "storageStatusExceeded"
-          : "storageStatusNormal";
-  return i18n.t(`platform.companies.${key}`);
-}
-
-function formatStorageBytesBrief(n) {
-  const x = Number(n) || 0;
-  if (x >= 1073741824) return `${(x / 1073741824).toFixed(2)} GB`;
-  if (x >= 1048576) return `${(x / 1048576).toFixed(1)} MB`;
-  if (x >= 1024) return `${(x / 1024).toFixed(1)} KB`;
-  return `${x} B`;
-}
-
-/**
- * Contexto para automação futura (avisos / bloqueio por inadimplência / desbloqueio pós-renovação).
- * Buckets estáveis: expired | today | soon | ok | neutral — usar estes nomes em jobs e regras.
- */
-function getDueCategory(row) {
-  if (!row?.dueDate || !moment(row.dueDate).isValid()) {
-    return { category: "neutral", diff: null };
-  }
-  const dueDay = moment(row.dueDate).startOf("day");
-  const today = moment().startOf("day");
-  const diff = dueDay.diff(today, "days");
-  if (diff < 0) return { category: "expired", diff };
-  if (diff === 0) return { category: "today", diff };
-  if (diff <= 3) return { category: "soon", diff };
-  return { category: "ok", diff };
-}
-
-/** Vencido → vermelho; hoje → laranja; 1–3 dias → amarelo; em dia → verde. */
-function getDueDisplayMeta(row, dateToClient) {
-  const { category, diff } = getDueCategory(row);
-  if (category === "neutral") {
-    return {
-      category,
-      tone: "neutral",
-      dateLabel: "—",
-      shortLabel: "",
-      recurrence: row?.recurrence || "",
-      tooltip: i18n.t("platform.companies.dueTooltipNoDate"),
-      dueClassKey: "dueDateNeutral",
-    };
-  }
-  const dateLabel = dateToClient(row.dueDate);
-  const fullDateLine = moment(row.dueDate).isValid()
-    ? moment(row.dueDate).format("dddd, DD/MM/YYYY")
-    : dateLabel;
-  let dueClassKey;
-  let shortLabel;
-  let tooltip;
-  if (category === "expired") {
-    dueClassKey = "dueDateExpired";
-    const days = Math.abs(diff);
-    shortLabel = i18n.t("platform.companies.dueShortExpired", { days });
-    tooltip = i18n.t("platform.companies.dueTooltipFullExpired", {
-      date: dateLabel,
-      longDate: fullDateLine,
-      days,
-    });
-  } else if (category === "today") {
-    dueClassKey = "dueDateToday";
-    shortLabel = i18n.t("platform.companies.dueShortToday");
-    tooltip = i18n.t("platform.companies.dueTooltipFullToday", {
-      date: dateLabel,
-      longDate: fullDateLine,
-    });
-  } else if (category === "soon") {
-    dueClassKey = "dueDateSoon";
-    shortLabel = i18n.t("platform.companies.dueShortSoon", { days: diff });
-    tooltip = i18n.t("platform.companies.dueTooltipFullSoon", {
-      date: dateLabel,
-      longDate: fullDateLine,
-      days: diff,
-    });
-  } else {
-    dueClassKey = "dueDateOk";
-    shortLabel = i18n.t("platform.companies.dueShortOk");
-    tooltip = i18n.t("platform.companies.dueTooltipFullOk", {
-      date: dateLabel,
-      longDate: fullDateLine,
-      days: diff,
-    });
-  }
-  return {
-    category,
-    tone: category,
-    dateLabel,
-    shortLabel,
-    recurrence: row.recurrence || "",
-    tooltip,
-    dueClassKey,
-  };
-}
-
-function planNameForSort(row) {
-  return row?.planId != null && row?.plan?.name ? String(row.plan.name) : "";
-}
-
-/** Ordenação: vencidos → hoje → próximos → em dia → sem data; desempate por dias e nome. */
-function comparePriorityDue(a, b) {
-  const ca = getDueCategory(a);
-  const cb = getDueCategory(b);
-  const rank = (c) => {
-    if (c.category === "expired") return 0;
-    if (c.category === "today") return 1;
-    if (c.category === "soon") return 2;
-    if (c.category === "ok") return 3;
-    return 4;
-  };
-  const ra = rank(ca);
-  const rb = rank(cb);
-  if (ra !== rb) return ra - rb;
-  if (ca.category === "expired" && cb.category === "expired") {
-    if ((ca.diff ?? 0) !== (cb.diff ?? 0)) return (ca.diff ?? 0) - (cb.diff ?? 0);
-  }
-  if (ca.category === "soon" && cb.category === "soon") {
-    if ((ca.diff ?? 0) !== (cb.diff ?? 0)) return (ca.diff ?? 0) - (cb.diff ?? 0);
-  }
-  if (ca.category === "ok" && cb.category === "ok") {
-    if ((ca.diff ?? 0) !== (cb.diff ?? 0)) return (ca.diff ?? 0) - (cb.diff ?? 0);
-  }
-  const blockRank = (x) => (x.status === false ? 0 : 1);
-  if (blockRank(a) !== blockRank(b)) return blockRank(a) - blockRank(b);
-  return (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base" });
-}
-
-function buildBillingReminderMessage(row, dateToClientFn) {
-  const name = row?.name || i18n.t("platform.companies.billingMessageFallbackName");
-  let dateStr = i18n.t("platform.companies.billingMessageNoDue");
-  if (row?.dueDate && moment(row.dueDate).isValid()) {
-    dateStr = dateToClientFn(row.dueDate);
-  }
-  const plan =
-    row?.planId != null && row?.plan?.name
-      ? row.plan.name
-      : i18n.t("platform.companies.billingMessageNoPlan");
-  const amount = formatBrlBrief(getCompanyEffectivePlanValue(row));
-  return i18n.t("platform.companies.billingMessageTemplate", {
-    name,
-    date: dateStr,
-    plan,
-    amount,
-  });
-}
-
-function formatPlanValueDiscrete(value) {
-  if (value === undefined || value === null || value === "") return null;
-  const n = Number(value);
-  if (Number.isNaN(n)) return null;
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-    maximumFractionDigits: 2,
-  }).format(n);
-}
-
-function digitsForWhatsApp(phone) {
-  if (!phone || typeof phone !== "string") return "";
-  const d = phone.replace(/\D/g, "");
-  return d.length >= 10 ? d : "";
-}
-
-function getFinanceStateLabel(category) {
-  switch (category) {
-    case "expired":
-      return i18n.t("platform.companies.financeStateOverdue");
-    case "today":
-      return i18n.t("platform.companies.financeStateToday");
-    case "soon":
-      return i18n.t("platform.companies.financeStateSoon");
-    case "ok":
-      return i18n.t("platform.companies.financeStateOk");
-    default:
-      return i18n.t("platform.companies.financeStateNoDue");
-  }
-}
-
-function dueDateSortKey(row) {
-  if (!row?.dueDate || !moment(row.dueDate).isValid()) return Number.POSITIVE_INFINITY;
-  return moment(row.dueDate).startOf("day").valueOf();
-}
-
-function compareByDueDateAsc(a, b) {
-  const ka = dueDateSortKey(a);
-  const kb = dueDateSortKey(b);
-  if (ka !== kb) return ka - kb;
-  return (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base" });
-}
-
-function compareByStatusBlockedFirst(a, b) {
-  const ra = a.status === false ? 0 : 1;
-  const rb = b.status === false ? 0 : 1;
-  if (ra !== rb) return ra - rb;
-  return (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base" });
-}
-
-function formatCompanyLogEntry(log, dateToClient, datetimeToClient) {
-  const meta =
-    log?.metadata && typeof log.metadata === "object" ? log.metadata : {};
-  const actionKey = `platform.companies.companyLogActions.${log.action}`;
-  let title = i18n.t(actionKey);
-  if (title === actionKey) {
-    title = log.action || "—";
-  }
-  let detail = "";
-  switch (log.action) {
-    case "renew":
-      detail = i18n.t("platform.companies.logDetailRenew", {
-        from: meta.previousDueDate ? dateToClient(meta.previousDueDate) : "—",
-        to: meta.newDueDate ? dateToClient(meta.newDueDate) : "—",
-      });
-      break;
-    case "block":
-      detail = i18n.t("platform.companies.logDetailBlock");
-      break;
-    case "unblock":
-      detail = i18n.t("platform.companies.logDetailUnblock");
-      break;
-    case "delete":
-      detail = i18n.t("platform.companies.logDetailDelete", {
-        name: meta.name != null ? String(meta.name) : "—",
-      });
-      break;
-    case "warning_before_due":
-      detail = i18n.t("platform.companies.logDetailWarningBefore", {
-        date: meta.dueDate ? dateToClient(meta.dueDate) : "—",
-        days: meta.daysUntilDue != null ? String(meta.daysUntilDue) : "—",
-      });
-      break;
-    case "warning_after_due":
-      detail = i18n.t("platform.companies.logDetailWarningAfter", {
-        date: meta.dueDate ? dateToClient(meta.dueDate) : "—",
-        days: meta.daysLate != null ? String(meta.daysLate) : "—",
-      });
-      break;
-    case "auto_block":
-      detail = i18n.t("platform.companies.logDetailAutoBlock", {
-        date: meta.dueDate ? dateToClient(meta.dueDate) : "—",
-        days: meta.daysLate != null ? String(meta.daysLate) : "—",
-      });
-      break;
-    case "auto_unblock_after_renew":
-      detail = i18n.t("platform.companies.logDetailAutoUnblockAfterRenew", {
-        from: meta.previousDueDate ? dateToClient(meta.previousDueDate) : "—",
-        to: meta.newDueDate ? dateToClient(meta.newDueDate) : "—",
-      });
-      break;
-    case "contracted_value_change":
-      detail = i18n.t("platform.companies.logDetailContractedValueChange", {
-        from:
-          meta.previousValue != null
-            ? formatPlanValueDiscrete(meta.previousValue)
-            : i18n.t("platform.companies.contractedFallbackDefault"),
-        to:
-          meta.newValue != null
-            ? formatPlanValueDiscrete(meta.newValue)
-            : i18n.t("platform.companies.contractedFallbackDefault"),
-        planBase: formatPlanValueDiscrete(meta.planValue ?? 0),
-      });
-      break;
-    case "plan_change":
-      detail = i18n.t("platform.companies.logDetailPlanChange", {
-        from:
-          meta.previousPlanId != null && meta.previousPlanId !== ""
-            ? String(meta.previousPlanId)
-            : "—",
-        to:
-          meta.newPlanId != null && meta.newPlanId !== ""
-            ? String(meta.newPlanId)
-            : "—",
-      });
-      break;
-    default:
-      detail = "";
-  }
-  const isAutomated = meta.kind === "automated";
-  const actor =
-    log.user && (log.user.name || log.user.email)
-      ? i18n.t("platform.companies.logActor", {
-          name: log.user.name || log.user.email,
-        })
-      : isAutomated
-        ? i18n.t("platform.companies.logActorSystem")
-        : "";
-  let whatsappLine = "";
-  if (meta.whatsapp && typeof meta.whatsapp === "object" && meta.whatsapp.channel === "whatsapp") {
-    const w = meta.whatsapp;
-    if (w.sent === true) {
-      whatsappLine = i18n.t("platform.companies.logWhatsappSent", {
-        last4: w.destinationLast4 != null ? String(w.destinationLast4) : "—",
-      });
-    } else if (w.attempted === true || w.error || w.skippedReason) {
-      whatsappLine = i18n.t("platform.companies.logWhatsappNotSent", {
-        reason: String(w.error || w.skippedReason || "—"),
-      });
-    }
-  }
-  const parts = [detail, actor, whatsappLine].filter(Boolean);
-  return {
-    whenLabel: datetimeToClient(log.createdAt),
-    title,
-    subtitle: parts.length ? parts.join(" · ") : "",
-  };
-}
-
-function campaignsLabelForRow(row) {
-  if (has(row, "settings") && isArray(row.settings) && row.settings.length > 0) {
-    const setting = row.settings.find((s) => s.key === "campaignsEnabled");
-    if (setting) {
-      return setting.value === "true"
-        ? i18n.t("settings.company.form.enabled")
-        : i18n.t("settings.company.form.disabled");
-    }
-  }
-  return i18n.t("settings.company.form.disabled");
+/** Rota da página individual de uma empresa (Fase 8.4). */
+export function companyDetailPath(companyId, tab) {
+  const base = `/saas/companies/${companyId}`;
+  return tab ? `${base}/${tab}` : base;
 }
 
 const useStyles = makeStyles((theme) => ({
@@ -785,6 +418,50 @@ const useStyles = makeStyles((theme) => ({
     maxWidth: 220,
     marginLeft: "auto",
   },
+  opFilterLabel: {
+    fontSize: "0.75rem",
+    fontWeight: 600,
+    color: theme.palette.text.secondary,
+    marginRight: theme.spacing(0.5),
+  },
+  opChip: {
+    height: "auto",
+    minHeight: 22,
+    marginTop: 4,
+    fontWeight: 600,
+    maxWidth: "100%",
+  },
+  opChipLabel: {
+    whiteSpace: "normal",
+    lineHeight: 1.25,
+    paddingTop: 2,
+    paddingBottom: 2,
+  },
+  opTone_success: {
+    backgroundColor: alpha(theme.palette.success.main, 0.14),
+    color: theme.palette.type === "dark" ? theme.palette.success.light : theme.palette.success.dark,
+  },
+  opTone_warning: {
+    backgroundColor: alpha(theme.palette.warning.main, 0.18),
+    color: theme.palette.type === "dark" ? theme.palette.warning.light : theme.palette.warning.dark,
+  },
+  opTone_error: {
+    backgroundColor: alpha(theme.palette.error.main, 0.12),
+    color: theme.palette.type === "dark" ? theme.palette.error.light : theme.palette.error.dark,
+  },
+  opTone_info: {
+    backgroundColor: alpha(theme.palette.info.main, 0.14),
+    color: theme.palette.type === "dark" ? theme.palette.info.light : theme.palette.info.dark,
+  },
+  opTone_default: {},
+  blockKindCaption: {
+    display: "block",
+    marginTop: 4,
+    fontSize: "0.7rem",
+    lineHeight: 1.3,
+    fontWeight: 600,
+    color: theme.palette.type === "dark" ? theme.palette.error.light : theme.palette.error.dark,
+  },
   registeredSectionSubtitle: {
     marginBottom: theme.spacing(2),
     lineHeight: 1.55,
@@ -792,1227 +469,150 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
-export function CompanyForm(props) {
-  const {
-    onSubmit,
-    onDelete,
-    onCancel,
-    initialValue,
-    loading,
-    reloadCompanySnapshot,
-    storageSnapshots = [],
-  } = props;
+const EMPTY_CREATE_VALUES = () => ({
+  name: "",
+  email: "",
+  phone: "",
+  planId: "",
+  status: true,
+  campaignsEnabled: false,
+  dueDate: "",
+  recurrence: "",
+  timezone: "America/Sao_Paulo",
+  contractedPlanValueStr: "",
+  storageLimitGbStr: "",
+  storageUsedFormatted: null,
+  storageLimitFormatted: null,
+  modulePermissions: defaultModulePermissions(),
+  businessSegment: "general",
+  crmVisibilityMode: "all",
+});
+
+function validateCreateValues(values) {
+  const errors = {};
+  if (!String(values.name || "").trim()) errors.name = "Informe o nome da empresa.";
+  if (!String(values.email || "").trim()) errors.email = "Informe o e-mail principal.";
+  else if (!isValidEmail(values.email)) errors.email = "E-mail inválido.";
+  if (String(values.phone || "").trim() && !isValidPhone(values.phone)) {
+    errors.phone = "Telefone inválido. Use DDD + número, ex.: (11) 91234-5678.";
+  }
+  return errors;
+}
+
+/**
+ * Formulário de criação de empresa (diálogo na listagem).
+ * A edição completa acontece na página individual /saas/companies/:id/:tab.
+ */
+export function CompanyCreateForm({ formId, onSubmit, loading }) {
   const { user } = useContext(AuthContext);
-  const socketManager = useContext(SocketContext);
-  const classes = useStyles();
-  const theme = useTheme();
-  const [plans, setPlans] = useState([]);
-  const [modalUser, setModalUser] = useState(false);
-  const [selectedUserId, setSelectedUserId] = useState(null);
-  const [companyUsers, setCompanyUsers] = useState([]);
-  const [usersLoading, setUsersLoading] = useState(false);
-  const [userToggleConfirm, setUserToggleConfirm] = useState(null);
-  const [userToggleLoading, setUserToggleLoading] = useState(false);
-  const [passwordDialogUser, setPasswordDialogUser] = useState(null);
-  const [forceLogoutConfirm, setForceLogoutConfirm] = useState(null);
-  const [forceLogoutLoading, setForceLogoutLoading] = useState(false);
-  const [planChangeCtx, setPlanChangeCtx] = useState(null);
-
-  const [record, setRecord] = useState(() => ({
-    name: "",
-    email: "",
-    phone: "",
-    planId: "",
-    status: true,
-    campaignsEnabled: false,
-    dueDate: "",
-    recurrence: "",
-    timezone: "America/Sao_Paulo",
-    ...initialValue,
-    contractedPlanValueStr:
-      initialValue?.contractedPlanValue != null && initialValue?.contractedPlanValue !== ""
-        ? formatPlanValueForInput(initialValue.contractedPlanValue)
-        : "",
-    storageLimitGbStr: formatGbInputFromApi(initialValue?.storageLimitGb),
-    storageUsedFormatted: initialValue?.storageUsedFormatted ?? null,
-    storageLimitFormatted: initialValue?.storageLimitFormatted ?? null,
-    storageUsagePercent:
-      initialValue?.storageUsagePercent != null
-        ? Number(initialValue.storageUsagePercent)
-        : null,
-    storageCalculatedAt: initialValue?.storageCalculatedAt ?? null,
-    storageAlertLevel: initialValue?.storageAlertLevel ?? "ok",
-    modulePermissions: mergeModulePermissions(initialValue?.modulePermissions),
-    businessSegment: initialValue?.businessSegment || "general",
-    crmVisibilityMode: initialValue?.crmVisibilityMode || "all",
-  }));
-
   const { list: listPlans } = usePlans();
+  const [plans, setPlans] = useState([]);
+  const initialValues = useMemo(() => EMPTY_CREATE_VALUES(), []);
 
   useEffect(() => {
-    async function fetchData() {
-      const list = await listPlans();
-      setPlans(list);
-    }
-    fetchData();
+    let alive = true;
+    listPlans()
+      .then((list) => {
+        if (alive) setPlans(Array.isArray(list) ? list : []);
+      })
+      .catch(toastError);
+    return () => {
+      alive = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    setRecord((prev) => {
-      if (moment(initialValue).isValid()) {
-        initialValue.dueDate = moment(initialValue.dueDate).format(
-          "YYYY-MM-DD"
-        );
-      }
-      return {
-        ...prev,
-        ...initialValue,
-        contractedPlanValueStr:
-          initialValue?.contractedPlanValue != null && initialValue?.contractedPlanValue !== ""
-            ? formatPlanValueForInput(initialValue.contractedPlanValue)
-            : "",
-        storageLimitGbStr: formatGbInputFromApi(initialValue?.storageLimitGb),
-        storageUsedFormatted: initialValue?.storageUsedFormatted ?? null,
-        storageLimitFormatted: initialValue?.storageLimitFormatted ?? null,
-        storageUsagePercent:
-          initialValue?.storageUsagePercent != null
-            ? Number(initialValue.storageUsagePercent)
-            : null,
-        storageCalculatedAt: initialValue?.storageCalculatedAt ?? null,
-        storageAlertLevel: initialValue?.storageAlertLevel ?? "ok",
-        modulePermissions: mergeModulePermissions(initialValue?.modulePermissions),
-        businessSegment: initialValue?.businessSegment || "general",
-        crmVisibilityMode: initialValue?.crmVisibilityMode || "all",
-      };
-    });
-  }, [initialValue]);
-
-  const handleSubmit = async (data) => {
-    const outgoing = { ...data };
-    if (user?.super && Object.prototype.hasOwnProperty.call(outgoing, "contractedPlanValueStr")) {
-      const trimmed = String(outgoing.contractedPlanValueStr ?? "").trim();
-      let contractedPlanValue;
-      if (!trimmed) contractedPlanValue = null;
-      else {
-        const n = parseBrazilianCurrencyToNumber(trimmed);
-        if (n === null || Number.isNaN(n)) {
-          toast.error(i18n.t("settings.company.form.contractedPlanValueInvalid"));
-          return;
-        }
-        contractedPlanValue = n;
-      }
-      delete outgoing.contractedPlanValueStr;
-      outgoing.contractedPlanValue = contractedPlanValue;
-    } else if (!user?.super) {
-      delete outgoing.contractedPlanValueStr;
-    }
-    if (outgoing.dueDate === "" || moment(outgoing.dueDate).isValid() === false) {
-      outgoing.dueDate = null;
-    }
-
-    if (user?.super && Object.prototype.hasOwnProperty.call(outgoing, "storageLimitGbStr")) {
-      const trimmed = String(outgoing.storageLimitGbStr ?? "").trim();
-      let storageLimitGb;
-      if (!trimmed) storageLimitGb = null;
-      else {
-        const n = parseBrazilianCurrencyToNumber(trimmed);
-        if (n === null || Number.isNaN(n)) {
-          toast.error(i18n.t("platform.companies.storageLimitInvalid"));
-          return;
-        }
-        storageLimitGb = n;
-      }
-      delete outgoing.storageLimitGbStr;
-      outgoing.storageLimitGb = storageLimitGb;
-      delete outgoing.storageUsedFormatted;
-      delete outgoing.storageLimitFormatted;
-      delete outgoing.storageUsagePercent;
-      delete outgoing.storageCalculatedAt;
-      delete outgoing.storageAlertLevel;
-    } else if (!user?.super) {
-      delete outgoing.storageLimitGbStr;
-      delete outgoing.storageUsedFormatted;
-      delete outgoing.storageLimitFormatted;
-      delete outgoing.storageUsagePercent;
-      delete outgoing.storageCalculatedAt;
-      delete outgoing.storageAlertLevel;
-    }
-
-    onSubmit(outgoing);
-  };
-
-  const companyIdForUsers = initialValue && initialValue.id;
-
-  const patchCompanyUser = useCallback((userId, patch) => {
-    setCompanyUsers((prev) =>
-      prev.map((row) => (row.id === userId ? { ...row, ...patch } : row))
-    );
-  }, []);
-
-  const upsertCompanyUser = useCallback((savedUser) => {
-    if (!savedUser?.id) return;
-    setCompanyUsers((prev) => {
-      const idx = prev.findIndex((row) => row.id === savedUser.id);
-      const normalized = {
-        id: savedUser.id,
-        name: savedUser.name,
-        email: savedUser.email,
-        profile: savedUser.profile,
-        active: savedUser.active !== false,
-        online: savedUser.online === true,
-        queues: savedUser.queues || [],
-      };
-      if (idx === -1) {
-        return [...prev, normalized].sort((a, b) => a.id - b.id);
-      }
-      const next = [...prev];
-      next[idx] = { ...next[idx], ...normalized };
-      return next;
-    });
-  }, []);
-
-  const fetchCompanyUsers = useCallback(async () => {
-    if (!companyIdForUsers) {
-      setCompanyUsers([]);
-      return;
-    }
-    const endpoint = "/users/list";
-    setUsersLoading(true);
-    console.info("[CompanyUsers] fetch_start", {
-      companyId: companyIdForUsers,
-      endpoint
-    });
-    try {
-      const { data } = await api.get(endpoint, {
-        params: { companyId: companyIdForUsers }
-      });
-      const users = Array.isArray(data) ? data : [];
-      setCompanyUsers(users);
-      console.info("[CompanyUsers] fetch_success", {
-        companyId: companyIdForUsers,
-        count: users.length,
-        userIds: users.map((u) => u.id)
-      });
-    } catch (err) {
-      setCompanyUsers([]);
-      console.warn("[CompanyUsers] fetch_failed", {
-        companyId: companyIdForUsers,
-        status: err?.response?.status ?? null,
-        error: err?.response?.data?.error || err?.message || "unknown"
-      });
-    } finally {
-      setUsersLoading(false);
-    }
-  }, [companyIdForUsers]);
-
-  useEffect(() => {
-    fetchCompanyUsers();
-  }, [fetchCompanyUsers]);
-
-  useEffect(() => {
-    if (!companyIdForUsers || !socketManager) return undefined;
-    const companyId = String(companyIdForUsers);
-    const socket = socketManager.getSocket(companyId);
-    const onUserEvent = (data) => {
-      if (!data?.user?.id) return;
-      if (data.action === "update") {
-        patchCompanyUser(data.user.id, {
-          name: data.user.name,
-          email: data.user.email,
-          profile: data.user.profile,
-          active: data.user.active !== false,
-          online: data.user.online === true,
-        });
-      }
-      if (data.action === "create") {
-        upsertCompanyUser(data.user);
-      }
-    };
-    socket.on(`company-${companyId}-user`, onUserEvent);
-    return () => {
-      socket.off(`company-${companyId}-user`, onUserEvent);
-    };
-  }, [companyIdForUsers, socketManager, patchCompanyUser, upsertCompanyUser]);
-
-  const handleOpenCreateUser = () => {
-    setSelectedUserId(null);
-    setModalUser(true);
-  };
-
-  const handleOpenEditUser = (userRow) => {
-    console.info("[CompanyUsers] open_manage_users", {
-      companyId: companyIdForUsers,
-      companyName: initialValue?.name ?? null,
-      passedId: userRow?.id ?? null,
-      routeOrEndpoint: `/users/${userRow?.id}`
-    });
-    setSelectedUserId(userRow.id);
-    setModalUser(true);
-  };
-
-  const handleCloseUserModal = () => {
-    setModalUser(false);
-    setSelectedUserId(null);
-  };
-
-  const handleConfirmToggleUserActive = async () => {
-    if (!userToggleConfirm?.user) return;
-    const { user: targetUser, nextActive } = userToggleConfirm;
-    setUserToggleLoading(true);
-    try {
-      const { data } = await api.put(`/users/${targetUser.id}`, { active: nextActive });
-      toast.success(
-        nextActive
-          ? i18n.t("settings.company.form.usersActivated")
-          : i18n.t("settings.company.form.usersDeactivated")
-      );
-      patchCompanyUser(targetUser.id, {
-        active: data?.active !== false,
-        online: data?.online === true,
-      });
-      setUserToggleConfirm(null);
-    } catch (err) {
-      toastError(err);
-    } finally {
-      setUserToggleLoading(false);
-    }
-  };
-
-  const handleConfirmForceLogout = async () => {
-    if (!forceLogoutConfirm?.id) return;
-    setForceLogoutLoading(true);
-    try {
-      const { data } = await api.put(`/users/${forceLogoutConfirm.id}`, {
-        forceLogout: true,
-      });
-      toast.success(i18n.t("settings.company.form.usersForceLogoutSuccess"));
-      patchCompanyUser(forceLogoutConfirm.id, {
-        online: data?.online === true,
-      });
-      setForceLogoutConfirm(null);
-    } catch (err) {
-      toastError(err);
-    } finally {
-      setForceLogoutLoading(false);
-    }
-  };
-
-  const handleUserSaved = async (savedUser) => {
-    upsertCompanyUser(savedUser);
-  };
-
-  const formatUserProfile = (profile) => {
-    const key = `users.profileLabels.${profile}`;
-    const t = i18n.t(key);
-    return t !== key ? t : profile || "—";
-  };
-
-  const formatUserOnline = (online) =>
-    online
-      ? i18n.t("users.online.yes")
-      : i18n.t("users.online.no");
-
-  const profileChipColor = (profile) => {
-    const p = (profile || "").toLowerCase();
-    if (p === "admin") return "primary";
-    if (p === "supervisor") return "secondary";
-    return "default";
-  };
-
-  const incrementDueDate = () => {
-    const data = { ...record };
-    if (data.dueDate !== "" && data.dueDate !== null) {
-      switch (data.recurrence) {
-        case "MENSAL":
-          data.dueDate = moment(data.dueDate)
-            .add(1, "month")
-            .format("YYYY-MM-DD");
-          break;
-        case "BIMESTRAL":
-          data.dueDate = moment(data.dueDate)
-            .add(2, "month")
-            .format("YYYY-MM-DD");
-          break;
-        case "TRIMESTRAL":
-          data.dueDate = moment(data.dueDate)
-            .add(3, "month")
-            .format("YYYY-MM-DD");
-          break;
-        case "SEMESTRAL":
-          data.dueDate = moment(data.dueDate)
-            .add(6, "month")
-            .format("YYYY-MM-DD");
-          break;
-        case "ANUAL":
-          data.dueDate = moment(data.dueDate)
-            .add(12, "month")
-            .format("YYYY-MM-DD");
-          break;
-        default:
-          break;
-      }
-    }
-    setRecord(data);
-  };
-
   return (
-    <>
-      <ConfirmationModal
-        title={
-          userToggleConfirm?.nextActive
-            ? i18n.t("settings.company.form.usersActivateTitle")
-            : i18n.t("settings.company.form.usersDeactivateTitle")
+    <Formik
+      initialValues={initialValues}
+      validate={validateCreateValues}
+      onSubmit={(values) => {
+        const built = buildCompanyPayload(values, { isSuper: Boolean(user?.super) });
+        if (!built.ok) {
+          toast.error(built.message);
+          return;
         }
-        open={Boolean(userToggleConfirm)}
-        onClose={() => !userToggleLoading && setUserToggleConfirm(null)}
-        onConfirm={handleConfirmToggleUserActive}
-        loading={userToggleLoading}
-        asyncConfirm
-        confirmText={
-          userToggleConfirm?.nextActive
-            ? i18n.t("settings.company.form.usersActivateAction")
-            : i18n.t("settings.company.form.usersDeactivateAction")
-        }
-      >
-        {userToggleConfirm?.nextActive
-          ? i18n.t("settings.company.form.usersActivateMessage", {
-              name: userToggleConfirm?.user?.name || userToggleConfirm?.user?.email
-            })
-          : i18n.t("settings.company.form.usersDeactivateMessage", {
-              name: userToggleConfirm?.user?.name || userToggleConfirm?.user?.email
-            })}
-      </ConfirmationModal>
-      <ConfirmationModal
-        title={i18n.t("settings.company.form.usersForceLogoutTitle")}
-        open={Boolean(forceLogoutConfirm)}
-        onClose={() => !forceLogoutLoading && setForceLogoutConfirm(null)}
-        onConfirm={handleConfirmForceLogout}
-        loading={forceLogoutLoading}
-        asyncConfirm
-        confirmText={i18n.t("settings.company.form.usersForceLogoutAction")}
-      >
-        {i18n.t("settings.company.form.usersForceLogoutMessage", {
-          name: forceLogoutConfirm?.name || forceLogoutConfirm?.email,
-        })}
-      </ConfirmationModal>
-      <CompanyUserPasswordDialog
-        open={Boolean(passwordDialogUser)}
-        user={passwordDialogUser}
-        onClose={() => setPasswordDialogUser(null)}
-      />
-      <ModalUsers
-        userId={selectedUserId}
-        companyId={initialValue?.id}
-        open={modalUser}
-        onClose={handleCloseUserModal}
-        onSaved={handleUserSaved}
-      />
-      <Formik
-        enableReinitialize
-        className={classes.fullWidth}
-        initialValues={record}
-        onSubmit={(values) => {
-          handleSubmit(values);
-        }}
-      >
-        {(formik) => (
-          <>
-          <Form className={classes.fullWidth}>
-            <Box className={classes.formStack}>
-              {/* Bloco 1 — Dados da empresa */}
-              <AppSectionCard>
-                <Typography className={classes.sectionTitle} component="h2">
-                  {i18n.t("settings.company.form.sectionCompanyData")}
-                </Typography>
-                <Typography
-                  variant="body2"
-                  color="textSecondary"
-                  className={classes.sectionSubtitle}
-                >
-                  {i18n.t("settings.company.form.sectionCompanyDataHint")}
-                </Typography>
-                <Grid container spacing={2}>
-                  <Grid item xs={12} sm={6} md={4}>
-                    <Field
-                      as={TextField}
-                      label={i18n.t("settings.company.form.name")}
-                      name="name"
-                      variant="outlined"
-                      className={classes.fullWidth}
-                      margin="dense"
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={4}>
-                    <Field
-                      as={TextField}
-                      label={i18n.t("settings.company.form.emailMain")}
-                      name="email"
-                      variant="outlined"
-                      className={classes.fullWidth}
-                      margin="dense"
-                      required
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={4}>
-                    <Field
-                      as={TextField}
-                      label={i18n.t("settings.company.form.phone")}
-                      name="phone"
-                      variant="outlined"
-                      className={classes.fullWidth}
-                      margin="dense"
-                    />
-                  </Grid>
-                  {initialValue && initialValue.id ? (
-                    <Grid item xs={12} md={8}>
-                      <TextField
-                        fullWidth
-                        margin="dense"
-                        variant="outlined"
-                        label={i18n.t("settings.company.form.primaryAdmin")}
-                        value={
-                          initialValue.primaryAdmin
-                            ? `${initialValue.primaryAdmin.name || "—"} (${initialValue.primaryAdmin.email || "—"})`
-                            : i18n.t("settings.company.form.noPrimaryAdmin")
-                        }
-                        InputProps={{ readOnly: true }}
-                      />
-                    </Grid>
-                  ) : null}
+        onSubmit(built.payload);
+      }}
+    >
+      {(formik) => (
+        <Form id={formId}>
+          <Box display="flex" flexDirection="column" style={{ gap: 16 }}>
+            <AppSectionCard>
+              <Typography style={{ fontWeight: 600, marginBottom: 4 }} component="h2">
+                {i18n.t("settings.company.form.sectionCompanyData")}
+              </Typography>
+              <Typography variant="body2" color="textSecondary" style={{ marginBottom: 8 }}>
+                Dados básicos para criar a empresa. Razão social, documento e endereço podem ser
+                preenchidos depois, na aba “Cadastro” da página da empresa.
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={6} md={4}>
+                  <Field
+                    as={TextField}
+                    label={i18n.t("settings.company.form.name")}
+                    name="name"
+                    variant="outlined"
+                    fullWidth
+                    margin="dense"
+                    required
+                    error={Boolean(formik.touched.name && formik.errors.name)}
+                    helperText={formik.touched.name && formik.errors.name}
+                  />
                 </Grid>
-              </AppSectionCard>
-
-              {/* Bloco 2 — Plano e operação (sem Campanhas: controlado em Módulos) */}
-              <AppSectionCard>
-                <Typography className={classes.sectionTitle} component="h2">
-                  {i18n.t("settings.company.form.sectionPlanOperation")}
-                </Typography>
-                <Typography
-                  variant="body2"
-                  color="textSecondary"
-                  className={classes.sectionSubtitle}
-                >
-                  {i18n.t("settings.company.form.sectionPlanOperationHint")}
-                </Typography>
-                <Grid container spacing={2}>
-                  <Grid item xs={12} sm={6} md={4}>
-                    <FormControl margin="dense" variant="outlined" fullWidth>
-                      <InputLabel htmlFor="plan-selection">
-                        {i18n.t("settings.company.form.plan")}
-                      </InputLabel>
-                      <Field name="planId">
-                        {({ field, form }) => (
-                          <Select
-                            id="plan-selection"
-                            label={i18n.t("settings.company.form.plan")}
-                            labelId="plan-selection-label"
-                            margin="dense"
-                            required
-                            value={field.value === "" ? "" : field.value}
-                            onChange={(e) => {
-                              const v = e.target.value;
-                              const prevId = field.value;
-                              const modulesBefore = mergeModulePermissions(
-                                form.values.modulePermissions
-                              );
-                              field.onChange(e);
-                              if (String(prevId) === String(v)) return;
-                              const newPlan = plans.find(
-                                (pl) => String(pl.id) === String(v)
-                              );
-                              if (!newPlan) return;
-                              setPlanChangeCtx({
-                                prevPlanId: prevId,
-                                modulesBefore,
-                                newPlan,
-                              });
-                            }}
-                          >
-                            {plans.map((plan) => (
-                              <MenuItem key={plan.id} value={plan.id}>
-                                {plan.name}
-                              </MenuItem>
-                            ))}
-                          </Select>
-                        )}
-                      </Field>
-                    </FormControl>
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={4}>
-                    <FormControl margin="dense" variant="outlined" fullWidth>
-                      <InputLabel htmlFor="status-selection">
-                        {i18n.t("settings.company.form.status")}
-                      </InputLabel>
-                      <Field
-                        as={Select}
-                        id="status-selection"
-                        label={i18n.t("settings.company.form.status")}
-                        labelId="status-selection-label"
-                        name="status"
-                        margin="dense"
-                      >
-                        <MenuItem value={true}>{i18n.t("settings.company.form.yes")}</MenuItem>
-                        <MenuItem value={false}>{i18n.t("settings.company.form.no")}</MenuItem>
-                      </Field>
-                    </FormControl>
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={4}>
-                    <Field
-                      as={TextField}
-                      select
-                      name="timezone"
-                      label={i18n.t("settings.company.form.timezone")}
-                      variant="outlined"
-                      className={classes.fullWidth}
-                      margin="dense"
-                    >
-                      {getIanaTimezones().map((z) => (
-                        <MenuItem key={z} value={z}>
-                          {z}
-                        </MenuItem>
-                      ))}
-                    </Field>
-                  </Grid>
-                  {user?.super ? (
-                    <>
-                      <Grid item xs={12} sm={6} md={4}>
-                        <FormControl margin="dense" variant="outlined" fullWidth>
-                          <InputLabel id="biz-seg-lbl">
-                            {i18n.t("settings.company.form.businessSegment")}
-                          </InputLabel>
-                          <Field name="businessSegment">
-                            {({ field }) => (
-                              <Select
-                                labelId="biz-seg-lbl"
-                                label={i18n.t("settings.company.form.businessSegment")}
-                                {...field}
-                                value={field.value || "general"}
-                              >
-                                {BUSINESS_SEGMENTS.map((s) => (
-                                  <MenuItem key={s.value} value={s.value}>
-                                    {i18n.t(s.labelKey)}
-                                  </MenuItem>
-                                ))}
-                              </Select>
-                            )}
-                          </Field>
-                        </FormControl>
-                      </Grid>
-                      <Grid item xs={12}>
-                        <FormControl component="fieldset" margin="dense" fullWidth>
-                          <Typography variant="caption" color="textSecondary" display="block" gutterBottom>
-                            {i18n.t("settings.company.crmVisibility.label")}
-                          </Typography>
-                          <Field name="crmVisibilityMode">
-                            {({ field }) => (
-                              <RadioGroup row {...field} value={field.value || "all"}>
-                                <FormControlLabel
-                                  value="all"
-                                  control={<Radio color="primary" />}
-                                  label={i18n.t("settings.company.crmVisibility.optionAll")}
-                                />
-                                <FormControlLabel
-                                  value="assigned"
-                                  control={<Radio color="primary" />}
-                                  label={i18n.t("settings.company.crmVisibility.optionAssigned")}
-                                />
-                              </RadioGroup>
-                            )}
-                          </Field>
-                        </FormControl>
-                      </Grid>
-                      <Grid item xs={12} sm={6} md={4}>
-                        {initialValue && initialValue.id ? (
-                          <Box mt={0.5}>
-                            <Typography
-                              variant="caption"
-                              color="textSecondary"
-                              display="block"
-                              style={{ marginBottom: 8 }}
-                            >
-                              {i18n.t("settings.company.form.bootstrapCrmHint")}
-                            </Typography>
-                            <Button
-                              variant="outlined"
-                              color="primary"
-                              size="small"
-                              onClick={async () => {
-                                try {
-                                  const { data } = await api.post(
-                                    `/companies/${initialValue.id}/crm/bootstrap`
-                                  );
-                                  toast.success(
-                                    data.bootstrapped
-                                      ? i18n.t("settings.company.form.bootstrapCrmOk")
-                                      : i18n.t("settings.company.form.bootstrapCrmAlready")
-                                  );
-                                } catch (e) {
-                                  toastError(e);
-                                }
-                              }}
-                            >
-                              {i18n.t("settings.company.form.bootstrapCrm")}
-                            </Button>
-                          </Box>
-                        ) : null}
-                      </Grid>
-                    </>
-                  ) : null}
-                  <Grid item xs={12} sm={6} md={4}>
-                    <FormControl variant="outlined" fullWidth>
-                      <Field
-                        as={TextField}
-                        label={i18n.t("settings.company.form.dueDate")}
-                        type="date"
-                        name="dueDate"
-                        InputLabelProps={{
-                          shrink: true,
-                        }}
-                        variant="outlined"
-                        fullWidth
-                        margin="dense"
-                      />
-                    </FormControl>
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={4}>
-                    <FormControl margin="dense" variant="outlined" fullWidth>
-                      <InputLabel htmlFor="recorrencia-selection">
-                        {i18n.t("settings.company.form.recurrence")}
-                      </InputLabel>
-                      <Field
-                        as={Select}
-                        label={i18n.t("settings.company.form.recurrence")}
-                        labelId="recorrencia-selection-label"
-                        id="recurrence"
-                        name="recurrence"
-                        margin="dense"
-                      >
-                        <MenuItem value="MENSAL">{i18n.t("settings.company.form.monthly")}</MenuItem>
-                        <MenuItem value="TRIMESTRAL">Trimestral</MenuItem>
-                        <MenuItem value="SEMESTRAL">Semestral</MenuItem>
-                        <MenuItem value="ANUAL">Anual</MenuItem>
-                      </Field>
-                    </FormControl>
-                  </Grid>
-                  {user?.super ? (
-                    <>
-                      <Grid item xs={12}>
-                        <Typography variant="subtitle2" style={{ fontWeight: 600, marginBottom: 8 }}>
-                          {i18n.t("settings.company.form.contractedPlanSection")}
-                        </Typography>
-                        <Typography
-                          variant="body2"
-                          color="textSecondary"
-                          paragraph
-                          style={{ marginBottom: 12 }}
-                        >
-                          {i18n.t("settings.company.form.contractedPlanHint")}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={12} sm={12} md={8}>
-                        <Field name="contractedPlanValueStr">
-                          {({ field, form }) => {
-                            const selectedPlan = plans.find(
-                              (p) => String(p.id) === String(form.values.planId)
-                            );
-                            const planBaseline = Number(selectedPlan?.value);
-                            const hasPlan = Boolean(selectedPlan);
-                            const raw = String(field.value ?? "").trim();
-                            let parsedContr = raw ? parseBrazilianCurrencyToNumber(raw) : null;
-                            if (parsedContr !== null && Number.isNaN(parsedContr))
-                              parsedContr = null;
-                            const effective = hasPlan
-                              ? parsedContr !== null
-                                ? parsedContr
-                                : planBaseline
-                              : parsedContr ?? 0;
-                            let deltaLine = "";
-                            if (hasPlan && !Number.isNaN(planBaseline) && parsedContr !== null) {
-                              const delta = parsedContr - planBaseline;
-                              if (Math.round(delta * 100) !== 0) {
-                                deltaLine =
-                                  delta < 0
-                                    ? i18n.t("settings.company.form.contractedPlanDiscountLabel", {
-                                        value: formatBrlBrief(Math.abs(delta)),
-                                      })
-                                    : i18n.t("settings.company.form.contractedPlanSurchargeLabel", {
-                                        value: formatBrlBrief(delta),
-                                      });
-                              }
-                            }
-                            return (
-                              <>
-                                <TextField
-                                  {...field}
-                                  fullWidth
-                                  margin="dense"
-                                  variant="outlined"
-                                  label={i18n.t("settings.company.form.contractedPlanLabel")}
-                                  placeholder={
-                                    selectedPlan ? formatPlanValueForInput(selectedPlan.value) : ""
-                                  }
-                                />
-                                <Box mt={1} display="flex" flexWrap="wrap" alignItems="center">
-                                  <Typography
-                                    variant="caption"
-                                    color="textSecondary"
-                                    component="span"
-                                    style={{ marginRight: theme.spacing(1) }}
-                                  >
-                                    {selectedPlan
-                                      ? i18n.t("settings.company.form.contractedPlanBaseline", {
-                                          value: formatPlanValueForInput(selectedPlan.value),
-                                        })
-                                      : i18n.t("settings.company.form.contractedPlanNoPlanSelected")}
-                                  </Typography>
-                                  <Typography variant="caption" color="textPrimary" component="span">
-                                    {hasPlan || parsedContr !== null
-                                      ? i18n.t("settings.company.form.contractedPlanEffective", {
-                                          value: formatBrlBrief(effective),
-                                        })
-                                      : null}
-                                  </Typography>
-                                </Box>
-                                {deltaLine ? (
-                                  <Typography variant="caption" color="secondary" component="div" style={{ marginTop: 6 }}>
-                                    {deltaLine}
-                                  </Typography>
-                                ) : null}
-                                <Box mt={1.5}>
-                                  <AppNeutralButton
-                                    type="button"
-                                    size="small"
-                                    disabled={loading}
-                                    onClick={() => form.setFieldValue("contractedPlanValueStr", "")}
-                                  >
-                                    {i18n.t("settings.company.form.contractedPlanClear")}
-                                  </AppNeutralButton>
-                                </Box>
-                              </>
-                            );
-                          }}
-                        </Field>
-                      </Grid>
-                      <Grid item xs={12}>
-                        <Typography variant="subtitle2" style={{ fontWeight: 600, marginBottom: 8 }}>
-                          {i18n.t("platform.companies.storageSectionTitle")}
-                        </Typography>
-                        <Typography
-                          variant="body2"
-                          color="textSecondary"
-                          paragraph
-                          style={{ marginBottom: 8 }}
-                        >
-                          {i18n.t("platform.companies.storageSectionHint")}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={12} sm={8}>
-                        <Field name="storageLimitGbStr">
-                          {({ field }) => (
-                            <TextField
-                              {...field}
-                              fullWidth
-                              margin="dense"
-                              variant="outlined"
-                              label={i18n.t("platform.companies.storageLimitLabel")}
-                              helperText={i18n.t("platform.companies.storageLimitHelper")}
-                            />
-                          )}
-                        </Field>
-                      </Grid>
-                      <Grid item xs={12}>
-                        <Field name="storageLimitGbStr">
-                          {({ form }) => {
-                            const selectedPlan = plans.find(
-                              (p) => String(p.id) === String(form.values.planId)
-                            );
-                            const planGb =
-                              selectedPlan?.storageLimitGb != null &&
-                              selectedPlan?.storageLimitGb !== ""
-                                ? String(selectedPlan.storageLimitGb).replace(".", ",")
-                                : null;
-                            return (
-                              <Typography variant="caption" color="textSecondary" component="div">
-                                <div style={{ marginBottom: 4 }}>
-                                  {i18n.t("platform.companies.storagePreviewPlan", {
-                                    value: planGb ? `${planGb} GB` : i18n.t("platform.companies.storageNoPlanLimit"),
-                                  })}
-                                </div>
-                                <div style={{ marginBottom: 4 }}>
-                                  {i18n.t("platform.companies.storagePreviewUsage", {
-                                    used: form.values.storageUsedFormatted || "—",
-                                    limit:
-                                      form.values.storageLimitFormatted ||
-                                      i18n.t("platform.companies.storageUnlimitedLabel"),
-                                  })}
-                                </div>
-                              </Typography>
-                            );
-                          }}
-                        </Field>
-                      </Grid>
-                      {initialValue?.id ? (
-                        <>
-                          <Grid item xs={12}>
-                            <AppSecondaryButton
-                              type="button"
-                              startIcon={<Autorenew />}
-                              disabled={loading}
-                              onClick={async () => {
-                                try {
-                                  await api.post(
-                                    `/companies/${initialValue.id}/recalculate-storage`
-                                  );
-                                  toast.success(i18n.t("platform.companies.storageRecalculated"));
-                                  if (typeof reloadCompanySnapshot === "function") {
-                                    await reloadCompanySnapshot();
-                                  }
-                                } catch (e) {
-                                  toastError(e);
-                                }
-                              }}
-                            >
-                              {i18n.t("platform.companies.storageRecalculate")}
-                            </AppSecondaryButton>
-                          </Grid>
-                          {storageSnapshots.length > 0 ? (
-                            <Grid item xs={12}>
-                              <Typography variant="subtitle2" style={{ fontWeight: 600, marginBottom: 6 }}>
-                                {i18n.t("platform.companies.storageHistoryTitle")}
-                              </Typography>
-                              <Box component="ul" style={{ paddingLeft: 18, margin: 0 }}>
-                                {storageSnapshots.slice(0, 12).map((s) => (
-                                  <li key={s.id} style={{ marginBottom: 4 }}>
-                                    <Typography variant="caption" component="span" color="textSecondary">
-                                      {moment(s.createdAt).format("DD/MM/YYYY HH:mm")} —{" "}
-                                      {i18n.t(`platform.companies.storageSnapshotReason.${s.reason}`)} —{" "}
-                                      {formatStorageBytesBrief(s.usedBytes)}
-                                      {s.usagePercent != null && Number(s.limitBytes) > 0
-                                        ? ` (${Number(s.usagePercent).toFixed(1)}%)`
-                                        : ""}
-                                    </Typography>
-                                  </li>
-                                ))}
-                              </Box>
-                            </Grid>
-                          ) : null}
-                        </>
-                      ) : null}
-                    </>
-                  ) : null}
+                <Grid item xs={12} sm={6} md={4}>
+                  <Field
+                    as={TextField}
+                    label={i18n.t("settings.company.form.emailMain")}
+                    name="email"
+                    type="email"
+                    variant="outlined"
+                    fullWidth
+                    margin="dense"
+                    required
+                    error={Boolean(formik.touched.email && formik.errors.email)}
+                    helperText={formik.touched.email && formik.errors.email}
+                  />
                 </Grid>
-              </AppSectionCard>
-
-              {/* Bloco Financeiro SaaS (Super Admin) */}
-              {initialValue?.id && user?.super ? (
-                <CompanyFinanceSection companyId={initialValue.id} />
-              ) : null}
-
-              {/* Bloco 3 — Módulos e funcionalidades */}
-              <AppSectionCard>
-                <Field name="modulePermissions">
-                  {({ field, form }) => {
-                    const selectedPlan = plans.find(
-                      (p) => String(p.id) === String(form.values.planId)
-                    );
-                    return (
-                      <FeatureGroupsEditor
-                        mode="company"
-                        title={i18n.t("settings.company.form.modulesFeaturesSectionTitle")}
-                        hint={i18n.t("settings.company.form.modulesFeaturesSectionHint")}
-                        plan={selectedPlan}
-                        modulePermissions={field.value}
-                        onModulePermissionsChange={(next) =>
-                          form.setFieldValue("modulePermissions", next)
-                        }
-                      />
-                    );
-                  }}
-                </Field>
-              </AppSectionCard>
-
-              {/* Bloco 4 — Utilizadores */}
-              {initialValue && initialValue.id ? (
-                <AppSectionCard>
-                  <Typography className={classes.sectionTitle} component="h2">
-                    {i18n.t("settings.company.form.usersSectionTitle")}
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    color="textSecondary"
-                    className={classes.sectionSubtitle}
-                  >
-                    {i18n.t("settings.company.form.usersSectionHint")}
-                  </Typography>
-                  <Box display="flex" justifyContent="flex-end" mb={2}>
-                    <AppSecondaryButton type="button" onClick={handleOpenCreateUser}>
-                      {i18n.t("settings.company.form.usersNewButton")}
-                    </AppSecondaryButton>
-                  </Box>
-                  {usersLoading ? (
-                    <Box display="flex" alignItems="center" py={3} justifyContent="center">
-                      <CircularProgress size={32} />
-                    </Box>
-                  ) : companyUsers.length === 0 ? (
-                    <AppEmptyState title={i18n.t("settings.company.form.usersEmpty")}>
-                      <AppSecondaryButton type="button" onClick={handleOpenCreateUser}>
-                        {i18n.t("settings.company.form.usersNewButton")}
-                      </AppSecondaryButton>
-                    </AppEmptyState>
-                  ) : (
-                    <Box className={classes.usersScroll}>
-                      <Table size="small" aria-label={i18n.t("settings.company.form.usersSectionTitle")}>
-                        <TableHead>
-                          <TableRow>
-                            <TableCell>{i18n.t("users.table.name")}</TableCell>
-                            <TableCell>{i18n.t("users.table.email")}</TableCell>
-                            <TableCell>{i18n.t("users.table.profile")}</TableCell>
-                            <TableCell>{i18n.t("settings.company.form.usersAccountStatus")}</TableCell>
-                            <TableCell>{i18n.t("users.table.online")}</TableCell>
-                            <TableCell align="right">{i18n.t("users.table.actions")}</TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {companyUsers.map((u) => (
-                            <TableRow key={u.id}>
-                              <TableCell>
-                                <Typography variant="body2">{u.name || "—"}</Typography>
-                              </TableCell>
-                              <TableCell>
-                                <Typography variant="body2" color="textSecondary">
-                                  {u.email || "—"}
-                                </Typography>
-                              </TableCell>
-                              <TableCell>
-                                <Chip
-                                  size="small"
-                                  label={formatUserProfile(u.profile)}
-                                  color={profileChipColor(u.profile)}
-                                  variant={profileChipColor(u.profile) === "default" ? "outlined" : "default"}
-                                  className={classes.userProfileChip}
-                                />
-                              </TableCell>
-                              <TableCell>
-                                <Chip
-                                  size="small"
-                                  label={
-                                    u.active === false
-                                      ? i18n.t("settings.company.form.usersInactive")
-                                      : i18n.t("settings.company.form.usersActive")
-                                  }
-                                  color={u.active === false ? "default" : "primary"}
-                                  variant={u.active === false ? "outlined" : "default"}
-                                />
-                              </TableCell>
-                              <TableCell>
-                                <Box display="flex" alignItems="center">
-                                  <Box
-                                    className={classes.userOnlineDot}
-                                    style={{
-                                      backgroundColor: u.online
-                                        ? theme.palette.success.main
-                                        : theme.palette.grey[400],
-                                    }}
-                                    aria-hidden
-                                  />
-                                  <Typography variant="body2" color="textSecondary" component="span">
-                                    {formatUserOnline(u.online)}
-                                  </Typography>
-                                </Box>
-                              </TableCell>
-                              <TableCell align="right">
-                                <Box className={classes.userActionsCell}>
-                                  <Tooltip title={i18n.t("users.buttons.edit")}>
-                                    <span>
-                                      <IconButton
-                                        size="small"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleOpenEditUser(u);
-                                        }}
-                                        aria-label={i18n.t("users.buttons.edit")}
-                                        disabled={userToggleLoading || forceLogoutLoading}
-                                      >
-                                        <EditOutlined fontSize="small" />
-                                      </IconButton>
-                                    </span>
-                                  </Tooltip>
-                                  <Tooltip
-                                    title={i18n.t("settings.company.form.usersChangePasswordAction")}
-                                  >
-                                    <span>
-                                      <IconButton
-                                        size="small"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setPasswordDialogUser(u);
-                                        }}
-                                        aria-label={i18n.t(
-                                          "settings.company.form.usersChangePasswordAction"
-                                        )}
-                                        disabled={userToggleLoading || forceLogoutLoading}
-                                      >
-                                        <LockOutlined fontSize="small" />
-                                      </IconButton>
-                                    </span>
-                                  </Tooltip>
-                                  <Tooltip
-                                    title={i18n.t("settings.company.form.usersForceLogoutAction")}
-                                  >
-                                    <span>
-                                      <IconButton
-                                        size="small"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setForceLogoutConfirm(u);
-                                        }}
-                                        aria-label={i18n.t(
-                                          "settings.company.form.usersForceLogoutAction"
-                                        )}
-                                        disabled={
-                                          forceLogoutLoading ||
-                                          userToggleLoading
-                                        }
-                                      >
-                                        {forceLogoutLoading &&
-                                        forceLogoutConfirm?.id === u.id ? (
-                                          <CircularProgress size={18} />
-                                        ) : (
-                                          <ExitToApp fontSize="small" />
-                                        )}
-                                      </IconButton>
-                                    </span>
-                                  </Tooltip>
-                                  <Tooltip
-                                    title={
-                                      u.active === false
-                                        ? i18n.t("settings.company.form.usersActivateAction")
-                                        : i18n.t("settings.company.form.usersDeactivateAction")
-                                    }
-                                  >
-                                    <span>
-                                      <IconButton
-                                        size="small"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setUserToggleConfirm({
-                                            user: u,
-                                            nextActive: u.active === false,
-                                          });
-                                        }}
-                                        aria-label={
-                                          u.active === false
-                                            ? i18n.t("settings.company.form.usersActivateAction")
-                                            : i18n.t("settings.company.form.usersDeactivateAction")
-                                        }
-                                        disabled={
-                                          userToggleLoading || forceLogoutLoading
-                                        }
-                                      >
-                                        {userToggleLoading &&
-                                        userToggleConfirm?.user?.id === u.id ? (
-                                          <CircularProgress size={18} />
-                                        ) : u.active === false ? (
-                                          <CheckCircleOutline fontSize="small" />
-                                        ) : (
-                                          <Block fontSize="small" />
-                                        )}
-                                      </IconButton>
-                                    </span>
-                                  </Tooltip>
-                                </Box>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </Box>
-                  )}
-                </AppSectionCard>
-              ) : null}
-
-              {/* Ações */}
-              <Box className={classes.actionBar}>
-                <Box className={classes.actionGroup}>
-                  <AppNeutralButton type="button" onClick={() => onCancel()}>
-                    {i18n.t("settings.company.buttons.clear")}
-                  </AppNeutralButton>
-                  {record.id !== undefined ? (
-                      <AppSecondaryButton type="button" onClick={() => incrementDueDate()}>
-                        {i18n.t("settings.company.buttons.adjustDueDate")}
-                      </AppSecondaryButton>
-                  ) : null}
-                </Box>
-                <Box className={classes.rightActions}>
-                  {record.id !== undefined ? (
-                    <Box className={classes.dangerZone}>
-                      <Button
-                        type="button"
-                        variant="outlined"
-                        className={classes.dangerDeleteButton}
-                        startIcon={<DeleteOutline fontSize="small" />}
-                        onClick={() => onDelete(record)}
-                        aria-label={i18n.t("settings.company.buttons.delete")}
-                      >
-                        {i18n.t("settings.company.buttons.delete")}
-                      </Button>
-                    </Box>
-                  ) : null}
-                  <AppPrimaryButton type="submit" loading={loading}>
-                    {i18n.t("settings.company.buttons.save")}
-                  </AppPrimaryButton>
-                </Box>
-              </Box>
-            </Box>
-          </Form>
-          <CompanyPlanChangeDialog
-            open={Boolean(planChangeCtx)}
-            onClose={(event, reason) => {
-              if (reason !== "backdropClick" && reason !== "escapeKeyDown") {
-                return;
-              }
-              setPlanChangeCtx((ctx) => {
-                if (ctx) {
-                  formik.setFieldValue("planId", ctx.prevPlanId);
-                }
-                return null;
-              });
-            }}
-            onKeepModules={() => {
-              if (!planChangeCtx) return;
-              const nextPlanId = planChangeCtx.newPlan?.id;
-              formik.setFieldValue(
-                "modulePermissions",
-                planChangeCtx.modulesBefore
-              );
-              if (nextPlanId != null && nextPlanId !== "") {
-                formik.setFieldValue("planId", nextPlanId);
-              }
-              setPlanChangeCtx(null);
-            }}
-            onApplyPlanModules={() => {
-              if (!planChangeCtx) return;
-              const nextPlanId = planChangeCtx.newPlan?.id;
-              formik.setFieldValue(
-                "modulePermissions",
-                mergeModulePermissionsFromPlan(
-                  planChangeCtx.newPlan,
-                  planChangeCtx.modulesBefore
-                )
-              );
-              if (nextPlanId != null && nextPlanId !== "") {
-                formik.setFieldValue("planId", nextPlanId);
-              }
-              setPlanChangeCtx(null);
-            }}
-          />
-        </>
-        )}
-      </Formik>
-    </>
+                <Grid item xs={12} sm={6} md={4}>
+                  <TextField
+                    label={i18n.t("settings.company.form.phone")}
+                    name="phone"
+                    variant="outlined"
+                    fullWidth
+                    margin="dense"
+                    inputProps={{ inputMode: "tel" }}
+                    value={formik.values.phone}
+                    onChange={(e) => formik.setFieldValue("phone", maskPhone(e.target.value))}
+                    onBlur={formik.handleBlur}
+                    error={Boolean(formik.touched.phone && formik.errors.phone)}
+                    helperText={formik.touched.phone && formik.errors.phone}
+                  />
+                </Grid>
+              </Grid>
+            </AppSectionCard>
+            <CompanyPlanFields plans={plans} loading={loading} />
+            <AppSectionCard>
+              <FeatureGroupsEditor
+                mode="company"
+                title={i18n.t("settings.company.form.modulesFeaturesSectionTitle")}
+                hint={i18n.t("settings.company.form.modulesFeaturesSectionHint")}
+                plan={plans.find((p) => String(p.id) === String(formik.values.planId))}
+                modulePermissions={formik.values.modulePermissions}
+                onModulePermissionsChange={(next) => formik.setFieldValue("modulePermissions", next)}
+              />
+            </AppSectionCard>
+          </Box>
+        </Form>
+      )}
+    </Formik>
   );
 }
+
+/** Compatibilidade: nome antigo do formulário exportado. */
+export const CompanyForm = CompanyCreateForm;
+
+const EMPTY_OBJ = Object.freeze({});
 
 export function CompaniesManagerGrid(props) {
   const {
@@ -2027,6 +627,14 @@ export function CompaniesManagerGrid(props) {
     onOpenDeleteDialog,
     onOpenInternalNotes,
     onOpenCompanyHistory,
+    onOpenBilling,
+    getCompanyHref,
+    billingStatusById,
+    historicalByCompany,
+    billingStatusState = "idle",
+    historicalTotal,
+    onOpenFinance,
+    onOpenHistoricalReview,
   } = props;
   const classes = useStyles();
   const theme = useTheme();
@@ -2034,39 +642,22 @@ export function CompaniesManagerGrid(props) {
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("priority");
   const [dueFilter, setDueFilter] = useState("all");
-  const [billingDialogRow, setBillingDialogRow] = useState(null);
+  const [opFilter, setOpFilter] = useState("all");
+
+  const statusById = billingStatusById || EMPTY_OBJ;
+  const historicalById = historicalByCompany || EMPTY_OBJ;
+  const statusOf = (row) => statusById[String(row.id)] || null;
+  const historicalOf = (row) => Number(historicalById[String(row.id)]) || 0;
+  const opFiltersAvailable = billingStatusState === "ok";
 
   const gridOpsEnabled =
     typeof onToggleCompanyStatus === "function" &&
     typeof onOpenRenewDialog === "function" &&
     typeof onOpenDeleteDialog === "function";
 
-  const billingMessagePreview = useMemo(
-    () =>
-      billingDialogRow ? buildBillingReminderMessage(billingDialogRow, dateToClient) : "",
-    [billingDialogRow, dateToClient]
-  );
-
-  const billingWhatsAppDigits = billingDialogRow ? digitsForWhatsApp(billingDialogRow.phone) : "";
-
   const openBillingDialog = (e, row) => {
     e.stopPropagation();
-    setBillingDialogRow(row);
-  };
-
-  const handleBillingCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(billingMessagePreview);
-      toast.success(i18n.t("platform.companies.billingCopiedToast"));
-    } catch (err) {
-      toastError(err);
-    }
-  };
-
-  const handleBillingWhatsApp = () => {
-    if (!billingWhatsAppDigits) return;
-    const url = `https://wa.me/${billingWhatsAppDigits}?text=${encodeURIComponent(billingMessagePreview)}`;
-    window.open(url, "_blank", "noopener,noreferrer");
+    if (typeof onOpenBilling === "function") onOpenBilling(row);
   };
 
   const filteredRecords = useMemo(() => {
@@ -2096,6 +687,14 @@ export function CompaniesManagerGrid(props) {
     } else if (dueFilter === "active") {
       list = list.filter((row) => row.status !== false);
     }
+    if (opFilter !== "all") {
+      const def = OPERATIONAL_FILTERS.find((f) => f.key === opFilter);
+      if (def) {
+        list = list.filter((row) =>
+          def.match(statusById[String(row.id)] || null, Number(historicalById[String(row.id)]) || 0)
+        );
+      }
+    }
     if (sortBy === "priority") {
       list.sort(comparePriorityDue);
     } else if (sortBy === "name") {
@@ -2115,7 +714,18 @@ export function CompaniesManagerGrid(props) {
       );
     }
     return list;
-  }, [records, search, sortBy, dueFilter]);
+  }, [records, search, sortBy, dueFilter, opFilter, statusById, historicalById]);
+
+  const opFilterCounts = useMemo(() => {
+    const base = Array.isArray(records) ? records : [];
+    const counts = {};
+    OPERATIONAL_FILTERS.forEach((f) => {
+      counts[f.key] = base.filter((row) =>
+        f.match(statusById[String(row.id)] || null, Number(historicalById[String(row.id)]) || 0)
+      ).length;
+    });
+    return counts;
+  }, [records, statusById, historicalById]);
 
   const dueFilterCounts = useMemo(() => {
     const base = Array.isArray(records) ? records : [];
@@ -2201,7 +811,7 @@ export function CompaniesManagerGrid(props) {
         {i18n.t("platform.companies.registeredListSubtitle")}
       </Typography>
       <Typography variant="caption" color="textSecondary" display="block" style={{ marginBottom: 16 }}>
-        {i18n.t("platform.companies.listRowHint")}
+        Clique no nome da empresa (ou no ícone de edição) para abrir a página da empresa.
       </Typography>
       <Box className={classes.filterChipsRow}>
         <Chip
@@ -2261,6 +871,45 @@ export function CompaniesManagerGrid(props) {
           onClick={() => setDueFilter("active")}
         />
       </Box>
+      {opFiltersAvailable || historicalByCompany ? (
+        <Box className={classes.filterChipsRow} data-testid="operational-filters">
+          <Typography component="span" className={classes.opFilterLabel}>
+            Situação financeira:
+          </Typography>
+          <Chip
+            size="small"
+            label="Todas"
+            clickable
+            color={opFilter === "all" ? "primary" : "default"}
+            variant={opFilter === "all" ? "default" : "outlined"}
+            onClick={() => setOpFilter("all")}
+          />
+          {OPERATIONAL_FILTERS.filter((f) => (f.key === "historical" ? Boolean(historicalByCompany) : opFiltersAvailable)).map((f) => {
+            const extra =
+              f.key === "historical" && Number(historicalTotal) > 0
+                ? ` · ${historicalTotal} fatura${Number(historicalTotal) === 1 ? "" : "s"}`
+                : "";
+            return (
+              <Tooltip key={f.key} title={f.hint} arrow enterDelay={400}>
+                <Chip
+                  size="small"
+                  label={`${f.label} (${opFilterCounts[f.key] || 0})${extra}`}
+                  clickable
+                  color={opFilter === f.key ? "primary" : "default"}
+                  variant={opFilter === f.key ? "default" : "outlined"}
+                  onClick={() => setOpFilter(f.key)}
+                />
+              </Tooltip>
+            );
+          })}
+        </Box>
+      ) : null}
+      {billingStatusState === "unavailable" ? (
+        <Typography variant="caption" color="textSecondary" display="block" style={{ marginBottom: 12 }}>
+          A situação financeira detalhada (carência, tipo de bloqueio) ainda não está disponível no servidor.
+          A listagem continua funcionando normalmente.
+        </Typography>
+      ) : null}
       <Box className={classes.tableToolbar}>
         {typeof onNewCompany === "function" ? (
           <AppPrimaryButton
@@ -2315,7 +964,7 @@ export function CompaniesManagerGrid(props) {
               <TableCell
                 align="center"
                 className={classes.tableHeadCell}
-                style={{ width: 252, minWidth: 252 }}
+                style={{ width: 280, minWidth: 280 }}
               >
                 {i18n.t("platform.companies.actionsColumn")}
               </TableCell>
@@ -2325,7 +974,7 @@ export function CompaniesManagerGrid(props) {
               <TableCell align="left" className={classes.tableHeadCell} style={{ width: "16%" }}>
                 {i18n.t("settings.company.form.plan")}
               </TableCell>
-              <TableCell align="left" className={classes.tableHeadCell} style={{ width: 108 }}>
+              <TableCell align="left" className={classes.tableHeadCell} style={{ width: 132 }}>
                 {i18n.t("settings.company.form.status")}
               </TableCell>
               <TableCell align="left" className={classes.tableHeadCell} style={{ width: 168 }}>
@@ -2334,7 +983,7 @@ export function CompaniesManagerGrid(props) {
               <TableCell align="left" className={classes.tableHeadCell} style={{ width: 160 }}>
                 {i18n.t("platform.companies.columnStorage")}
               </TableCell>
-              <TableCell align="left" className={classes.tableHeadCell} style={{ width: 132 }}>
+              <TableCell align="left" className={classes.tableHeadCell} style={{ width: 168 }}>
                 {i18n.t("platform.companies.columnFinance")}
               </TableCell>
             </TableRow>
@@ -2356,6 +1005,9 @@ export function CompaniesManagerGrid(props) {
               const adminEmail = row.primaryAdmin?.email || "";
               const planTitle = renderPlan(row);
               const recurrenceLine = row.recurrence ? String(row.recurrence) : "";
+              const opStatus = statusOf(row);
+              const historicalCount = historicalOf(row);
+              const blockLabel = row.status === false && opStatus ? blockKindLabel(opStatus.blockKind) : "";
               return (
                 <TableRow
                   key={row.id}
@@ -2387,6 +1039,33 @@ export function CompaniesManagerGrid(props) {
                           <EditOutlined fontSize="small" />
                         </IconButton>
                       </Tooltip>
+                      {typeof onOpenFinance === "function" ? (
+                        <Tooltip title="Financeiro da empresa" arrow enterDelay={300}>
+                          <IconButton
+                            size="small"
+                            onClick={() => onOpenFinance(row)}
+                            aria-label="Financeiro"
+                          >
+                            <AccountBalanceWalletOutlined fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      ) : null}
+                      {typeof onOpenHistoricalReview === "function" && historicalCount > 0 ? (
+                        <Tooltip
+                          title={`Regularizar faturas históricas (${historicalCount})`}
+                          arrow
+                          enterDelay={300}
+                        >
+                          <IconButton
+                            size="small"
+                            onClick={() => onOpenHistoricalReview(row)}
+                            aria-label="Regularizar históricas"
+                            style={{ color: theme.palette.warning.dark }}
+                          >
+                            <FindInPageOutlined fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      ) : null}
                       {typeof onOpenInternalNotes === "function" ? (
                         <Tooltip
                           title={i18n.t("platform.companies.internalNotesTooltip")}
@@ -2494,9 +1173,23 @@ export function CompaniesManagerGrid(props) {
                       leaveDelay={200}
                     >
                       <Box minWidth={0}>
-                        <Typography className={classes.companyNameLine} component="div">
-                          {row.name || "—"}
-                        </Typography>
+                        {typeof getCompanyHref === "function" ? (
+                          <Link
+                            component={RouterLink}
+                            to={getCompanyHref(row)}
+                            className={classes.companyNameLine}
+                            style={{ display: "block" }}
+                            color="inherit"
+                            underline="hover"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {row.name || "—"}
+                          </Link>
+                        ) : (
+                          <Typography className={classes.companyNameLine} component="div">
+                            {row.name || "—"}
+                          </Typography>
+                        )}
                         <Typography className={classes.companyAdminLine} component="div">
                           {adminName}
                         </Typography>
@@ -2544,6 +1237,11 @@ export function CompaniesManagerGrid(props) {
                             : classes.statusChipActive,
                       }}
                     />
+                    {blockLabel ? (
+                      <Typography component="span" className={classes.blockKindCaption}>
+                        {blockLabel}
+                      </Typography>
+                    ) : null}
                   </TableCell>
                   <TableCell align="left" className={classes.dueCell}>
                     <Tooltip
@@ -2709,6 +1407,30 @@ export function CompaniesManagerGrid(props) {
                         ) : null}
                       </Box>
                     </Tooltip>
+                    {opStatus ? (
+                      <Chip
+                        size="small"
+                        label={
+                          opStatus.daysLate > 0 &&
+                          (opStatus.financialStatus === "carencia" || opStatus.financialStatus === "vencido")
+                            ? `${financialStatusLabel(opStatus.financialStatus)} · ${opStatus.daysLate} dia${opStatus.daysLate === 1 ? "" : "s"}`
+                            : financialStatusLabel(opStatus.financialStatus)
+                        }
+                        className={`${classes.opChip} ${classes[`opTone_${financialStatusTone(opStatus.financialStatus)}`]}`}
+                        classes={{ label: classes.opChipLabel }}
+                      />
+                    ) : null}
+                    {historicalCount > 0 ? (
+                      <Box>
+                        <Chip
+                          size="small"
+                          variant="outlined"
+                          label={`${historicalCount} histórica${historicalCount === 1 ? "" : "s"} a revisar`}
+                          className={`${classes.opChip} ${classes.opTone_info}`}
+                          classes={{ label: classes.opChipLabel }}
+                        />
+                      </Box>
+                    ) : null}
                   </TableCell>
                 </TableRow>
               );
@@ -2717,756 +1439,179 @@ export function CompaniesManagerGrid(props) {
         </Table>
       </AppTableContainer>
 
-      <Dialog
-        open={Boolean(billingDialogRow)}
-        onClose={() => setBillingDialogRow(null)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>{i18n.t("platform.companies.billingDialogTitle")}</DialogTitle>
-        <DialogContent dividers>
-          <Typography variant="caption" color="textSecondary" display="block" paragraph>
-            {billingDialogRow
-              ? `${billingDialogRow.name || "—"} · ${dateToClient(billingDialogRow.dueDate) || "—"}`
-              : ""}
-          </Typography>
-          <TextField
-            fullWidth
-            multiline
-            minRows={5}
-            variant="outlined"
-            size="small"
-            value={billingMessagePreview}
-            InputProps={{
-              readOnly: true,
-              className: classes.billingMessageField,
-            }}
-          />
-          {!billingWhatsAppDigits ? (
-            <Typography variant="caption" color="textSecondary" display="block" style={{ marginTop: 8 }}>
-              {i18n.t("platform.companies.billingPhoneMissingHint")}
-            </Typography>
-          ) : null}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setBillingDialogRow(null)} color="primary">
-            {i18n.t("confirmationModal.buttons.cancel")}
-          </Button>
-          <Button onClick={handleBillingCopy} color="primary">
-            {i18n.t("platform.companies.billingCopyButton")}
-          </Button>
-          <Button
-            onClick={handleBillingWhatsApp}
-            color="primary"
-            variant="contained"
-            disabled={!billingWhatsAppDigits}
-          >
-            {i18n.t("platform.companies.billingOpenWhatsApp")}
-          </Button>
-        </DialogActions>
-      </Dialog>
     </AppSectionCard>
   );
 }
 
 export default function CompaniesManager() {
   const classes = useStyles();
-  const { list, save, update, remove, renewDueDate, fetchCompanyLogs, finding } = useCompanies();
+  const theme = useTheme();
+  const fullScreenDialog = useMediaQuery(theme.breakpoints.down("xs"));
+  const history = useHistory();
+  const { list, save, fetchBillingStatus, fetchHistoricalReviewSummary } = useCompanies();
   const { user, enterSupportMode } = useContext(AuthContext);
-  const { dateToClient, datetimeToClient } = useDate();
 
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  const [blockDialogRow, setBlockDialogRow] = useState(null);
-  const [renewDialogRow, setRenewDialogRow] = useState(null);
-  const [gridDeleteRow, setGridDeleteRow] = useState(null);
-  const [gridDeleteNameInput, setGridDeleteNameInput] = useState("");
-  const [internalNotesRow, setInternalNotesRow] = useState(null);
-  const [internalNotesDraft, setInternalNotesDraft] = useState("");
-  const [internalNotesSaving, setInternalNotesSaving] = useState(false);
-  const [historyRow, setHistoryRow] = useState(null);
-  const [historyItems, setHistoryItems] = useState([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [storageSnapshots, setStorageSnapshots] = useState([]);
-  const [primaryAdminSetupDialog, setPrimaryAdminSetupDialog] = useState(null);
-  const [formOpen, setFormOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [records, setRecords] = useState([]);
-  const [record, setRecord] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    planId: "",
-    status: true,
-    campaignsEnabled: false,
-    dueDate: "",
-    recurrence: "",
-    timezone: "America/Sao_Paulo",
-    contractedPlanValueStr: "",
-    storageLimitGbStr: "",
-    storageUsedFormatted: null,
-    storageLimitFormatted: null,
-    storageUsagePercent: null,
-    storageCalculatedAt: null,
-    storageAlertLevel: "ok",
-    modulePermissions: defaultModulePermissions(),
-    primaryAdmin: null,
-    businessSegment: "general",
-    crmVisibilityMode: "all",
-  });
+  const [listLoading, setListLoading] = useState(true);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [primaryAdminSetup, setPrimaryAdminSetup] = useState(null);
+  const [pendingNavigateId, setPendingNavigateId] = useState(null);
 
-  useEffect(() => {
-    loadPlans();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const [billingStatusById, setBillingStatusById] = useState(null);
+  const [billingStatusState, setBillingStatusState] = useState("idle");
+  const [historicalSummary, setHistoricalSummary] = useState(null);
 
-  const loadPlans = async () => {
-    setLoading(true);
+  /**
+   * Situação financeira em lote (C2) + resumo de históricas (C5): duas chamadas para a
+   * listagem inteira (sem N+1). Falha/404 não quebra a listagem — só esconde os filtros novos.
+   */
+  const isSuperUser = Boolean(user?.super);
+  const loadOperationalStatus = useCallback(async () => {
+    if (!isSuperUser) return;
+    setBillingStatusState("loading");
+    const [statusRes, summaryRes] = await Promise.allSettled([
+      typeof fetchBillingStatus === "function" ? fetchBillingStatus() : Promise.reject(new Error("n/a")),
+      typeof fetchHistoricalReviewSummary === "function"
+        ? fetchHistoricalReviewSummary()
+        : Promise.reject(new Error("n/a")),
+    ]);
+    if (statusRes.status === "fulfilled") {
+      setBillingStatusById(indexBillingStatus(statusRes.value));
+      setBillingStatusState("ok");
+    } else {
+      setBillingStatusById(null);
+      setBillingStatusState("unavailable");
+    }
+    setHistoricalSummary(
+      summaryRes.status === "fulfilled" ? normalizeHistoricalSummary(summaryRes.value) : null
+    );
+  }, [isSuperUser, fetchBillingStatus, fetchHistoricalReviewSummary]);
+
+  const loadList = useCallback(async () => {
+    setListLoading(true);
     try {
       const companyList = await list();
-      setRecords(companyList);
+      setRecords(Array.isArray(companyList) ? companyList : []);
     } catch (e) {
       toast.error(i18n.t("settings.company.toasts.errorList"));
+    } finally {
+      setListLoading(false);
     }
-    setLoading(false);
-  };
-
-  const loadStorageSnapshotsForCompany = useCallback(async (companyId) => {
-    if (!companyId) {
-      setStorageSnapshots([]);
-      return;
-    }
-    try {
-      const { data } = await api.get(`/companies/${companyId}/storage-snapshots`);
-      setStorageSnapshots(Array.isArray(data) ? data : []);
-    } catch (e) {
-      setStorageSnapshots([]);
-    }
-  }, []);
-
-  const reloadCompanySnapshot = useCallback(async () => {
-    if (!record.id) return;
-    try {
-      const data = await finding(record.id);
-      setRecord((prev) => ({
-        ...prev,
-        ...data,
-        contractedPlanValueStr:
-          data.contractedPlanValue != null && data.contractedPlanValue !== ""
-            ? formatPlanValueForInput(data.contractedPlanValue)
-            : "",
-        storageLimitGbStr: formatGbInputFromApi(data.storageLimitGb),
-        storageUsedFormatted: data.storageUsedFormatted ?? null,
-        storageLimitFormatted: data.storageLimitFormatted ?? null,
-        storageUsagePercent:
-          data.storageUsagePercent != null ? Number(data.storageUsagePercent) : null,
-        storageCalculatedAt: data.storageCalculatedAt ?? null,
-        storageAlertLevel: data.storageAlertLevel ?? "ok",
-        modulePermissions: mergeModulePermissions(data.modulePermissions),
-        businessSegment: data.businessSegment || "general",
-        crmVisibilityMode: data.crmVisibilityMode || "all",
-      }));
-      await loadStorageSnapshotsForCompany(record.id);
-    } catch (e) {
-      toastError(e);
-    }
-  }, [record.id, finding, loadStorageSnapshotsForCompany]);
-
-  const handleSubmit = async (data) => {
-    setLoading(true);
-    try {
-      if (data.id !== 0 && data.id !== undefined) {
-        await update(data);
-        await loadPlans();
-        handleCancel();
-      } else {
-        const created = await save(data);
-        if (created?.primaryAdminSetup) {
-          const s = created.primaryAdminSetup;
-          if (s.temporaryPassword || s.inviteEmailSent !== true) {
-            setPrimaryAdminSetupDialog(s);
-          }
-        }
-        const companyList = await list();
-        setRecords(companyList);
-        const createdRow =
-          companyList.find((row) => row.id === created?.id) || created;
-        if (createdRow?.id) {
-          handleSelect({
-            ...createdRow,
-            primaryAdmin:
-              created?.primaryAdmin ??
-              createdRow.primaryAdmin ??
-              (created?.primaryAdminSetup?.userId
-                ? {
-                    id: created.primaryAdminSetup.userId,
-                    name: created.primaryAdminSetup.name,
-                    email: created.primaryAdminSetup.email
-                  }
-                : null)
-          });
-        } else {
-          handleCancel();
-        }
-      }
-      toast.success(i18n.t("settings.company.toasts.success"));
-    } catch (e) {
-      toast.error(
-        i18n.t("settings.company.toasts.error")
-      );
-    }
-    setLoading(false);
-  };
-
-  const handleDelete = async () => {
-    setLoading(true);
-    try {
-      await remove(record.id);
-      await loadPlans();
-      handleCancel();
-      toast.success(i18n.t("settings.company.toasts.success"));
-    } catch (e) {
-      toast.error(i18n.t("settings.company.toasts.errorOperation"));
-    }
-    setLoading(false);
-  };
-
-  const handleOpenDeleteDialog = () => {
-    setShowConfirmDialog(true);
-  };
-
-  const handleCancel = () => {
-    setFormOpen(false);
-    setStorageSnapshots([]);
-    setRecord((prev) => ({
-      ...prev,
-      id: undefined,
-      name: "",
-      email: "",
-      phone: "",
-      planId: "",
-      status: true,
-      campaignsEnabled: false,
-      dueDate: "",
-      recurrence: "",
-      timezone: "America/Sao_Paulo",
-      contractedPlanValueStr: "",
-      storageLimitGbStr: "",
-      storageUsedFormatted: null,
-      storageLimitFormatted: null,
-      storageUsagePercent: null,
-      storageCalculatedAt: null,
-      storageAlertLevel: "ok",
-      modulePermissions: defaultModulePermissions(),
-      primaryAdmin: null,
-    }));
-  };
-
-  const handleNewCompany = () => {
-    setStorageSnapshots([]);
-    setRecord({
-      name: "",
-      email: "",
-      phone: "",
-      planId: "",
-      status: true,
-      campaignsEnabled: false,
-      dueDate: "",
-      recurrence: "",
-      timezone: "America/Sao_Paulo",
-      contractedPlanValueStr: "",
-      storageLimitGbStr: "",
-      storageUsedFormatted: null,
-      storageLimitFormatted: null,
-      storageUsagePercent: null,
-      storageCalculatedAt: null,
-      storageAlertLevel: "ok",
-      modulePermissions: defaultModulePermissions(),
-      primaryAdmin: null,
-    });
-    setFormOpen(true);
-  };
-
-  const handleSelect = (data) => {
-    let campaignsEnabled = false;
-
-    const setting = (data.settings || []).find(
-      (s) => s.key.indexOf("campaignsEnabled") > -1
-    );
-    if (setting) {
-      campaignsEnabled =
-        setting.value === "true" || setting.value === "enabled";
-    }
-
-    setRecord((prev) => ({
-      ...prev,
-      id: data.id,
-      name: data.name || "",
-      phone: data.phone || "",
-      email: data.email || "",
-      planId: data.planId || "",
-      status: data.status === false ? false : true,
-      campaignsEnabled,
-      dueDate: data.dueDate || "",
-      recurrence: data.recurrence || "",
-      timezone: data.timezone || "America/Sao_Paulo",
-      contractedPlanValueStr:
-        data.contractedPlanValue != null && data.contractedPlanValue !== ""
-          ? formatPlanValueForInput(data.contractedPlanValue)
-          : "",
-      storageLimitGbStr: formatGbInputFromApi(data.storageLimitGb),
-      storageUsedFormatted: data.storageUsedFormatted ?? null,
-      storageLimitFormatted: data.storageLimitFormatted ?? null,
-      storageUsagePercent:
-        data.storageUsagePercent != null ? Number(data.storageUsagePercent) : null,
-      storageCalculatedAt: data.storageCalculatedAt ?? null,
-      storageAlertLevel: data.storageAlertLevel ?? "ok",
-      modulePermissions: mergeModulePermissions(data.modulePermissions),
-      primaryAdmin: data.primaryAdmin ?? null,
-    }));
-    setFormOpen(true);
-    loadStorageSnapshotsForCompany(data.id);
-  };
-
-  const history = useHistory();
-  const location = useLocation();
-  const handleSelectRef = useRef(() => {});
-  handleSelectRef.current = handleSelect;
+  }, [list]);
 
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const fid = params.get("focus");
-    const section = params.get("section");
-    if (!fid || records.length === 0) return;
-    const id = Number(fid);
-    if (Number.isNaN(id)) return;
-    const row = records.find((r) => r.id === id);
-    if (!row) return;
-    handleSelectRef.current(row);
-    history.replace({ pathname: "/saas/companies" });
-    if (section === "finance") {
-      setTimeout(() => {
-        const el = document.getElementById("company-finance-section");
-        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-      }, 400);
-    }
-  }, [location.search, records, history]);
+    loadList();
+  }, [loadList]);
 
-  const openGridDeleteDialog = (row) => {
-    setGridDeleteRow(row);
-    setGridDeleteNameInput("");
+  useEffect(() => {
+    loadOperationalStatus();
+  }, [loadOperationalStatus]);
+
+  const reloadAll = useCallback(async () => {
+    await Promise.all([loadList(), loadOperationalStatus()]);
+  }, [loadList, loadOperationalStatus]);
+
+  const { actions, dialogs } = useCompanyQuickActions({ onChanged: reloadAll });
+
+  const openCompany = (row) => {
+    if (row?.id) history.push(companyDetailPath(row.id));
   };
 
-  const handleConfirmBlockToggle = async () => {
-    const row = blockDialogRow;
-    if (!row) return;
-    setBlockDialogRow(null);
+  const handleCreate = async (payload) => {
+    setCreating(true);
     try {
-      await update({ id: row.id, status: row.status === false ? true : false });
-      await loadPlans();
-      toast.success(i18n.t("platform.companies.statusUpdateSuccess"));
-    } catch (e) {
-      toastError(e);
-    }
-  };
-
-  const handleConfirmRenew = async () => {
-    const row = renewDialogRow;
-    if (!row) return;
-    try {
-      const data = await renewDueDate(row.id);
-      setRenewDialogRow(null);
-      await loadPlans();
-      toast.success(
-        data?.autoUnblocked
-          ? i18n.t("platform.companies.renewSuccessReactivated")
-          : i18n.t("platform.companies.renewSuccess")
-      );
-    } catch (e) {
-      toastError(e);
-    }
-  };
-
-  const handleConfirmGridDelete = async () => {
-    const row = gridDeleteRow;
-    if (!row) return;
-    const expected = (row.name || "").trim();
-    if (gridDeleteNameInput.trim() !== expected) return;
-    try {
-      await remove(row.id);
-      setGridDeleteRow(null);
-      setGridDeleteNameInput("");
-      await loadPlans();
-      toast.success(i18n.t("platform.companies.deleteGridSuccess"));
-    } catch (e) {
-      toastError(e);
-    }
-  };
-
-  const handleSaveInternalNotes = async () => {
-    if (!internalNotesRow) return;
-    setInternalNotesSaving(true);
-    try {
-      await update({
-        id: internalNotesRow.id,
-        internalNotes: internalNotesDraft,
-      });
-      await loadPlans();
-      toast.success(i18n.t("platform.companies.internalNotesSaved"));
-      setInternalNotesRow(null);
+      const created = await save(payload);
+      toast.success(i18n.t("settings.company.toasts.success"));
+      setCreateOpen(false);
+      const setup = created?.primaryAdminSetup;
+      if (setup && (setup.temporaryPassword || setup.inviteEmailSent !== true)) {
+        // Mostra credenciais antes de sair da listagem.
+        setPrimaryAdminSetup(setup);
+        setPendingNavigateId(created?.id || null);
+        await loadList();
+      } else if (created?.id) {
+        history.push(companyDetailPath(created.id, "cadastro"));
+      } else {
+        await loadList();
+      }
     } catch (e) {
       toastError(e);
     } finally {
-      setInternalNotesSaving(false);
-    }
-  };
-
-  const openCompanyHistory = async (row) => {
-    setHistoryRow(row);
-    setHistoryItems([]);
-    setHistoryLoading(true);
-    try {
-      const items = await fetchCompanyLogs(row.id);
-      setHistoryItems(Array.isArray(items) ? items : []);
-    } catch (e) {
-      toastError(e);
-    } finally {
-      setHistoryLoading(false);
+      setCreating(false);
     }
   };
 
   const gridOpsEnabled = Boolean(user?.super);
-  const renewPreviewDate =
-    renewDialogRow && previewRenewedDueDate(renewDialogRow)
-      ? dateToClient(previewRenewedDueDate(renewDialogRow))
-      : null;
-  const renewBaseUsesCurrentDue =
-    renewDialogRow?.dueDate &&
-    moment(renewDialogRow.dueDate).isValid() &&
-    moment(renewDialogRow.dueDate).startOf("day").isSameOrAfter(moment().startOf("day"));
 
   return (
     <Box className={classes.pageStack}>
-      <CompaniesManagerGrid
-        records={records}
-        onSelect={handleSelect}
-        selectedId={record.id}
-        onNewCompany={handleNewCompany}
-        onAccessCompany={
-          user?.super && !user?.supportMode ? (row) => enterSupportMode(row.id) : undefined
-        }
-        currentUserCompanyId={user?.companyId}
-        onToggleCompanyStatus={gridOpsEnabled ? (r) => setBlockDialogRow(r) : undefined}
-        onOpenRenewDialog={gridOpsEnabled ? (r) => setRenewDialogRow(r) : undefined}
-        onOpenDeleteDialog={gridOpsEnabled ? openGridDeleteDialog : undefined}
-        onOpenInternalNotes={
-          gridOpsEnabled
-            ? (r) => {
-                setInternalNotesRow(r);
-                setInternalNotesDraft(r.internalNotes || "");
-              }
-            : undefined
-        }
-        onOpenCompanyHistory={gridOpsEnabled ? openCompanyHistory : undefined}
+      {listLoading && records.length === 0 ? (
+        <AppLoadingState message="Carregando empresas…" />
+      ) : (
+        <CompaniesManagerGrid
+          records={records}
+          onSelect={openCompany}
+          selectedId={null}
+          getCompanyHref={(row) => companyDetailPath(row.id)}
+          onNewCompany={() => setCreateOpen(true)}
+          onAccessCompany={
+            user?.super && !user?.supportMode ? (row) => enterSupportMode(row.id) : undefined
+          }
+          currentUserCompanyId={user?.companyId}
+          onToggleCompanyStatus={gridOpsEnabled ? actions.openBlock : undefined}
+          onOpenRenewDialog={gridOpsEnabled ? actions.openRenew : undefined}
+          onOpenDeleteDialog={gridOpsEnabled ? actions.openDelete : undefined}
+          onOpenInternalNotes={gridOpsEnabled ? actions.openNotes : undefined}
+          onOpenCompanyHistory={gridOpsEnabled ? actions.openHistory : undefined}
+          onOpenBilling={actions.openBilling}
+          billingStatusById={billingStatusById}
+          billingStatusState={billingStatusState}
+          historicalByCompany={historicalSummary ? historicalSummary.byCompany : null}
+          historicalTotal={historicalSummary ? historicalSummary.total : 0}
+          onOpenFinance={(row) => history.push(companyDetailPath(row.id, "financeiro"))}
+          onOpenHistoricalReview={(row) => history.push(historicalReviewPath(row.id))}
+        />
+      )}
+
+      <Dialog
+        open={createOpen}
+        onClose={() => !creating && setCreateOpen(false)}
+        maxWidth="md"
+        fullWidth
+        fullScreen={fullScreenDialog}
+        scroll="paper"
+        aria-labelledby="company-create-title"
+      >
+        <DialogTitle id="company-create-title">{i18n.t("platform.companies.newCompany")}</DialogTitle>
+        <DialogContent dividers>
+          {createOpen ? (
+            <CompanyCreateForm formId="company-create-form" onSubmit={handleCreate} loading={creating} />
+          ) : null}
+        </DialogContent>
+        <DialogActions>
+          <AppNeutralButton type="button" onClick={() => setCreateOpen(false)} disabled={creating}>
+            {i18n.t("confirmationModal.buttons.cancel")}
+          </AppNeutralButton>
+          <AppPrimaryButton type="submit" form="company-create-form" loading={creating}>
+            Criar empresa
+          </AppPrimaryButton>
+        </DialogActions>
+      </Dialog>
+
+      <PrimaryAdminSetupDialog
+        setup={primaryAdminSetup}
+        onClose={() => {
+          setPrimaryAdminSetup(null);
+          if (pendingNavigateId) {
+            const id = pendingNavigateId;
+            setPendingNavigateId(null);
+            history.push(companyDetailPath(id, "cadastro"));
+          }
+        }}
       />
-      {formOpen ? (
-        <>
-          {record.id !== undefined ? (
-            <Box className={classes.editingBanner}>
-              <Typography className={classes.editingBannerTitle} component="p">
-                {i18n.t("settings.company.form.editingBanner", { name: record.name || "—" })}
-              </Typography>
-              <Typography
-                variant="body2"
-                color="textSecondary"
-                className={classes.editingBannerHint}
-                component="p"
-              >
-                {i18n.t("settings.company.form.editingContextHint")}
-              </Typography>
-            </Box>
-          ) : null}
-          <CompanyForm
-            initialValue={record}
-            onDelete={handleOpenDeleteDialog}
-            onSubmit={handleSubmit}
-            onCancel={handleCancel}
-            loading={loading}
-            reloadCompanySnapshot={reloadCompanySnapshot}
-            storageSnapshots={storageSnapshots}
-          />
-        </>
-      ) : null}
-      <ConfirmationModal
-        title={i18n.t("settings.company.confirmModal.title")}
-        open={showConfirmDialog}
-        onClose={() => setShowConfirmDialog(false)}
-        onConfirm={() => handleDelete()}
-      >
-        {i18n.t("settings.company.confirmModal.confirm")}
-      </ConfirmationModal>
 
-      <Dialog
-        open={Boolean(primaryAdminSetupDialog)}
-        onClose={() => setPrimaryAdminSetupDialog(null)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>{i18n.t("platform.companies.primaryAdminDialogTitle")}</DialogTitle>
-        <DialogContent dividers>
-          <Typography variant="body2" paragraph>
-            {i18n.t("platform.companies.primaryAdminDialogIntro")}
-          </Typography>
-          {primaryAdminSetupDialog?.inviteEmailSent ? (
-            <Alert severity="info" style={{ marginBottom: 12 }}>
-              {i18n.t("platform.companies.primaryAdminInviteSent")}
-            </Alert>
-          ) : null}
-          <TextField
-            fullWidth
-            margin="dense"
-            label={i18n.t("platform.companies.primaryAdminEmail")}
-            value={primaryAdminSetupDialog?.email || ""}
-            InputProps={{ readOnly: true }}
-            variant="outlined"
-          />
-          {primaryAdminSetupDialog?.temporaryPassword ? (
-            <TextField
-              fullWidth
-              margin="dense"
-              label={i18n.t("platform.companies.primaryAdminTempPassword")}
-              value={primaryAdminSetupDialog.temporaryPassword}
-              InputProps={{ readOnly: true }}
-              variant="outlined"
-              helperText={i18n.t("platform.companies.primaryAdminMustChange")}
-            />
-          ) : null}
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={() => setPrimaryAdminSetupDialog(null)}
-            color="primary"
-            variant="contained"
-          >
-            {i18n.t("confirmationModal.buttons.confirm")}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <Dialog open={Boolean(blockDialogRow)} onClose={() => setBlockDialogRow(null)} maxWidth="xs" fullWidth>
-        <DialogTitle>
-          {blockDialogRow?.status === false
-            ? i18n.t("platform.companies.confirmUnblockTitle")
-            : i18n.t("platform.companies.confirmBlockTitle")}
-        </DialogTitle>
-        <DialogContent dividers>
-          <Typography variant="body2" component="p">
-            {blockDialogRow?.status === false
-              ? i18n.t("platform.companies.confirmUnblockMessage", {
-                  name: blockDialogRow?.name || "—",
-                })
-              : i18n.t("platform.companies.confirmBlockMessage", {
-                  name: blockDialogRow?.name || "—",
-                })}
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setBlockDialogRow(null)} color="primary">
-            {i18n.t("confirmationModal.buttons.cancel")}
-          </Button>
-          <Button onClick={handleConfirmBlockToggle} color="primary" variant="contained">
-            {i18n.t("confirmationModal.buttons.confirm")}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <Dialog open={Boolean(renewDialogRow)} onClose={() => setRenewDialogRow(null)} maxWidth="sm" fullWidth>
-        <DialogTitle>{i18n.t("platform.companies.renewDialogTitle")}</DialogTitle>
-        <DialogContent dividers>
-          {renewDialogRow && renewPreviewDate ? (
-            <Box display="flex" flexDirection="column" style={{ gap: 10 }}>
-              <Typography variant="subtitle1" component="p" style={{ fontWeight: 600 }}>
-                {renewDialogRow.name || "—"}
-              </Typography>
-              <Typography variant="body2" color="textSecondary" component="p">
-                <strong>{i18n.t("settings.company.form.plan")}:</strong>{" "}
-                {renewDialogRow.plan?.name || "—"}
-              </Typography>
-              <Typography variant="body2" color="textSecondary" component="p">
-                <strong>{i18n.t("settings.company.form.expire")}:</strong>{" "}
-                {renewDialogRow.dueDate ? dateToClient(renewDialogRow.dueDate) : "—"}
-              </Typography>
-              <Typography variant="body2" color="textSecondary" component="p">
-                <strong>{i18n.t("platform.companies.renewDialogRecurrence")}:</strong>{" "}
-                {renewDialogRow.recurrence || "—"}
-              </Typography>
-              <Typography variant="body2" component="p">
-                <strong>{i18n.t("platform.companies.renewDialogNewDue")}:</strong> {renewPreviewDate}
-              </Typography>
-              <Typography variant="caption" color="textSecondary" component="p">
-                {renewBaseUsesCurrentDue
-                  ? i18n.t("platform.companies.renewBaseFromCurrentDue")
-                  : i18n.t("platform.companies.renewBaseFromToday")}
-              </Typography>
-            </Box>
-          ) : (
-            <Typography variant="body2" color="error" component="p">
-              {i18n.t("platform.companies.renewInvalidRecurrence")}
-            </Typography>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setRenewDialogRow(null)} color="primary">
-            {i18n.t("confirmationModal.buttons.cancel")}
-          </Button>
-          <Button
-            onClick={handleConfirmRenew}
-            color="primary"
-            variant="contained"
-            disabled={!renewPreviewDate}
-          >
-            {i18n.t("platform.companies.renewConfirm")}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <Dialog
-        open={Boolean(internalNotesRow)}
-        onClose={() => !internalNotesSaving && setInternalNotesRow(null)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>{i18n.t("platform.companies.internalNotesDialogTitle")}</DialogTitle>
-        <DialogContent dividers>
-          {internalNotesRow ? (
-            <Box display="flex" flexDirection="column" style={{ gap: 12 }}>
-              <Typography variant="body2" color="textSecondary" component="p">
-                {i18n.t("platform.companies.internalNotesHint")}
-              </Typography>
-              <Typography variant="subtitle2" component="p" style={{ fontWeight: 600 }}>
-                {internalNotesRow.name || "—"}
-              </Typography>
-              <TextField
-                multiline
-                minRows={6}
-                fullWidth
-                variant="outlined"
-                size="small"
-                value={internalNotesDraft}
-                onChange={(e) => setInternalNotesDraft(e.target.value)}
-                placeholder={i18n.t("platform.companies.internalNotesPlaceholder")}
-                disabled={internalNotesSaving}
-                inputProps={{ "aria-label": i18n.t("platform.companies.internalNotesPlaceholder") }}
-              />
-            </Box>
-          ) : null}
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={() => setInternalNotesRow(null)}
-            color="primary"
-            disabled={internalNotesSaving}
-          >
-            {i18n.t("confirmationModal.buttons.cancel")}
-          </Button>
-          <Button
-            onClick={handleSaveInternalNotes}
-            color="primary"
-            variant="contained"
-            disabled={internalNotesSaving}
-          >
-            {i18n.t("platform.companies.internalNotesSave")}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <Dialog
-        open={Boolean(historyRow)}
-        onClose={() => setHistoryRow(null)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>{i18n.t("platform.companies.companyHistoryTitle")}</DialogTitle>
-        <DialogContent dividers>
-          {historyRow ? (
-            <Typography variant="subtitle2" component="p" style={{ fontWeight: 600, marginBottom: 12 }}>
-              {historyRow.name || "—"}
-            </Typography>
-          ) : null}
-          {historyLoading ? (
-            <Box display="flex" justifyContent="center" py={2}>
-              <CircularProgress size={28} />
-            </Box>
-          ) : !historyItems.length ? (
-            <Typography variant="body2" color="textSecondary" component="p">
-              {i18n.t("platform.companies.companyHistoryEmpty")}
-            </Typography>
-          ) : (
-            <Box display="flex" flexDirection="column" style={{ gap: 16 }}>
-              {historyItems.map((log) => {
-                const entry = formatCompanyLogEntry(log, dateToClient, datetimeToClient);
-                return (
-                  <Box key={log.id} data-log-id={log.id}>
-                    <Typography variant="caption" color="textSecondary" component="p">
-                      {entry.whenLabel}
-                    </Typography>
-                    <Typography variant="body2" style={{ fontWeight: 600 }} component="p">
-                      {entry.title}
-                    </Typography>
-                    {entry.subtitle ? (
-                      <Typography variant="body2" color="textSecondary" component="p">
-                        {entry.subtitle}
-                      </Typography>
-                    ) : null}
-                  </Box>
-                );
-              })}
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setHistoryRow(null)} color="primary">
-            {i18n.t("confirmationModal.buttons.cancel")}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <Dialog open={Boolean(gridDeleteRow)} onClose={() => setGridDeleteRow(null)} maxWidth="sm" fullWidth>
-        <DialogTitle>{i18n.t("platform.companies.deleteGridTitle")}</DialogTitle>
-        <DialogContent dividers>
-          <Typography variant="body2" component="p" paragraph>
-            {i18n.t("platform.companies.deleteGridMessage", { name: gridDeleteRow?.name || "—" })}
-          </Typography>
-          <TextField
-            fullWidth
-            variant="outlined"
-            size="small"
-            label={i18n.t("platform.companies.deleteGridNameLabel")}
-            placeholder={gridDeleteRow?.name || ""}
-            value={gridDeleteNameInput}
-            onChange={(e) => setGridDeleteNameInput(e.target.value)}
-            autoComplete="off"
-          />
-          <Typography variant="caption" color="textSecondary" display="block" style={{ marginTop: 8 }}>
-            {i18n.t("platform.companies.deleteGridHint")}
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setGridDeleteRow(null)} color="primary">
-            {i18n.t("confirmationModal.buttons.cancel")}
-          </Button>
-          <Button
-            onClick={handleConfirmGridDelete}
-            color="secondary"
-            variant="contained"
-            disabled={
-              !gridDeleteRow ||
-              gridDeleteNameInput.trim() !== (gridDeleteRow.name || "").trim()
-            }
-          >
-            {i18n.t("platform.companies.deleteGridConfirm")}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      {dialogs}
     </Box>
   );
 }

@@ -46,6 +46,7 @@ jest.mock("../../../models/Company", () => ({
 }));
 
 jest.mock("../applySubscriptionRenewal", () => ({
+  runRenewalSideEffects: jest.fn(async () => undefined),
   applySubscriptionRenewal: jest.fn(async () => ({
     alreadyApplied: false,
     company: { id: 7 },

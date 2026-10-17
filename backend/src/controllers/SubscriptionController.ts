@@ -232,6 +232,10 @@ export const webhook = async (
     return res.json({ ok: true });
   }
 
+  // Falhas de processamento não podem ser confirmadas ao provedor como sucesso:
+  // respondemos 500 para a Efí reenviar. O reprocessamento é idempotente por txid/fatura.
+  const failedTxids: string[] = [];
+
   if (req.body.pix) {
     const gerencianet = Gerencianet(options);
     for (const pix of req.body.pix) {
@@ -295,9 +299,16 @@ export const webhook = async (
           { where: { externalTxid: pix.txid } }
         );
       } catch (err) {
+        failedTxids.push(String(pix?.txid || ""));
         logger.error({ err, txid: pix?.txid }, "[webhook] processing_failed");
       }
     }
+  }
+
+  if (failedTxids.length > 0) {
+    return res
+      .status(500)
+      .json({ error: "ERR_WEBHOOK_PROCESSING_FAILED", failed: failedTxids.length });
   }
 
   return res.json({ ok: true });

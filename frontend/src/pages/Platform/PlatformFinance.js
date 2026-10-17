@@ -27,6 +27,11 @@ import {
   AppLoadingState,
 } from "../../ui";
 import AppTableContainer from "../../ui/components/AppTableContainer";
+import {
+  formatPaidAt,
+  sourceLabel,
+  methodLabel,
+} from "../../components/CompanyFinanceSection/financeFormat";
 
 const useStyles = makeStyles((theme) => ({
   page: {
@@ -96,6 +101,25 @@ export default function PlatformFinance() {
   const [search, setSearch] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [historicalPending, setHistoricalPending] = useState(null);
+
+  // Atalho para a fila de revisão de faturas históricas (Fase 8.4-F). 404 = recurso ainda
+  // não disponível no servidor: o atalho continua visível, sem contador.
+  useEffect(() => {
+    let alive = true;
+    api
+      .get("/saas/finance/historical-review/summary")
+      .then(({ data }) => {
+        const total = Number(data?.total);
+        if (alive) setHistoricalPending(Number.isFinite(total) ? total : null);
+      })
+      .catch(() => {
+        if (alive) setHistoricalPending(null);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -189,6 +213,38 @@ export default function PlatformFinance() {
           </Box>
         </AppActionBar>
 
+        <AppSectionCard>
+          <Box
+            display="flex"
+            flexWrap="wrap"
+            alignItems="center"
+            justifyContent="space-between"
+            gridGap={12}
+          >
+            <Box maxWidth={640}>
+              <Typography variant="subtitle1" style={{ fontWeight: 600 }}>
+                Revisão de faturas históricas
+                {historicalPending != null ? (
+                  <Chip
+                    size="small"
+                    color={historicalPending > 0 ? "secondary" : "default"}
+                    label={`${historicalPending} não resolvida${historicalPending === 1 ? "" : "s"}`}
+                    style={{ marginLeft: 8 }}
+                    data-testid="historical-pending-chip"
+                  />
+                ) : null}
+              </Typography>
+              <Typography variant="body2" color="textSecondary">
+                Faturas antigas que precisam de uma decisão (pagas por fora, cobradas por engano ou cortesia)
+                antes de cobrar o cliente.
+              </Typography>
+            </Box>
+            <AppSecondaryButton component={Link} to="/saas/finance/historical-review?state=unresolved">
+              Abrir fila de revisão
+            </AppSecondaryButton>
+          </Box>
+        </AppSectionCard>
+
         {loading && !kpis ? (
           <AppLoadingState />
         ) : (
@@ -203,7 +259,23 @@ export default function PlatformFinance() {
               <Kpi label="Faturado" value={formatBrl(kpis?.invoiced)} />
             </Grid>
             <Grid item xs={6} sm={4} md={2}>
-              <Kpi label="Recebido" value={formatBrl(kpis?.received)} hint="Só countsAsRevenue" />
+              <Kpi
+                label="Recebido"
+                value={formatBrl(kpis?.received)}
+                hint={
+                  <>
+                    Só o que conta como receita
+                    {Number(kpis?.receivedDateUnknown) > 0 &&
+                    (typeof kpis?.receivedIncludesDateUnknown === "boolean"
+                      ? !kpis.receivedIncludesDateUnknown
+                      : Boolean(from || to)) ? (
+                      <span style={{ display: "block" }} data-testid="received-date-unknown-note">
+                        + {formatBrl(kpis.receivedDateUnknown)} sem data informada, fora do período
+                      </span>
+                    ) : null}
+                  </>
+                }
+              />
             </Grid>
             <Grid item xs={6} sm={4} md={2}>
               <Kpi label="A receber" value={formatBrl(kpis?.open)} />
@@ -306,7 +378,7 @@ export default function PlatformFinance() {
                       <TableCell>
                         <AppSecondaryButton
                           component={Link}
-                          to={`/saas/companies?focus=${inv.companyId}&section=finance`}
+                          to={`/saas/companies/${inv.companyId}/financeiro`}
                         >
                           Abrir
                         </AppSecondaryButton>
@@ -337,13 +409,11 @@ export default function PlatformFinance() {
                 <TableBody>
                   {payments.map((p) => (
                     <TableRow key={p.id}>
-                      <TableCell>
-                        {moment(p.paidAt).format("DD/MM/YYYY HH:mm")}
-                      </TableCell>
+                      <TableCell>{formatPaidAt(p.paidAt, p.paidAtUnknown)}</TableCell>
                       <TableCell>{p.company?.name || p.companyId}</TableCell>
                       <TableCell>{formatBrl(p.amount)}</TableCell>
-                      <TableCell>{p.method}</TableCell>
-                      <TableCell>{p.source}</TableCell>
+                      <TableCell>{methodLabel(p.method)}</TableCell>
+                      <TableCell>{sourceLabel(p.source)}</TableCell>
                       <TableCell>{p.countsAsRevenue ? "Sim" : "Não"}</TableCell>
                     </TableRow>
                   ))}

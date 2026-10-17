@@ -18,10 +18,11 @@ import { toast } from "react-toastify";
 import { AppSectionCard, AppPrimaryButton, AppLoadingState } from "../../ui";
 import PaymentMethodsReadonlyPanel from "./PaymentMethodsReadonlyPanel";
 import EfiIntegrationPanel from "../Platform/EfiIntegrationPanel";
+import BillingSimulationPanel from "./BillingSimulationPanel";
 
 const MAX_DAYS = 365;
 
-const TAB_KEYS = ["warnings", "payment-methods", "efi"];
+const TAB_KEYS = ["warnings", "payment-methods", "efi", "simulation"];
 
 const defaultForm = {
   daysBeforeDueWarning: 3,
@@ -84,7 +85,7 @@ function tabIndexFromSearch(search) {
 
 /**
  * Automação de faturamento (Super Admin).
- * Guias: avisos/bloqueios | métodos (somente leitura) | integração Efí.
+ * Guias: avisos/bloqueios | métodos (somente leitura) | integração Efí | simulação (somente leitura).
  * Rota preservada: /saas/billing-automation
  */
 export default function BillingAutomationPage() {
@@ -222,6 +223,7 @@ export default function BillingAutomationPage() {
           <Tab label={i18n.t("platform.billingAutomation.tabWarnings")} />
           <Tab label={i18n.t("platform.billingAutomation.tabPaymentMethods")} />
           <Tab label={i18n.t("platform.billingAutomation.tabEfi")} />
+          <Tab label="Simulação (somente leitura)" />
         </Tabs>
 
         {tabIndex === 0 && (
@@ -405,6 +407,8 @@ export default function BillingAutomationPage() {
         {tabIndex === 1 && <PaymentMethodsReadonlyPanel />}
 
         {tabIndex === 2 && <EfiIntegrationPanel />}
+
+        {tabIndex === 3 && <BillingSimulationPanel />}
       </Box>
     </MainContainer>
   );
