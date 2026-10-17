@@ -35,8 +35,20 @@ describe("efiCertificateStore", () => {
     process.env = original;
   });
 
+  function fakeP12(): Buffer {
+    const oid = Buffer.from([
+      0x06, 0x08, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x0c, 0x01
+    ]);
+    return Buffer.concat([
+      Buffer.from([0x30, 0x82]),
+      Buffer.alloc(80, 0x01),
+      oid,
+      Buffer.alloc(40, 0x02)
+    ]);
+  }
+
   it("persiste blob cifrado com fingerprint e storageKey opaca", () => {
-    const buf = Buffer.from([0x30, 0x82, 0x01, 0xaa, 0xbb]);
+    const buf = fakeP12();
     const result = persistEfiCertificateEncrypted("homologation", buf);
     expect(result.storageKey.startsWith("efi-cert-homologation-")).toBe(true);
     expect(result.storageKey).not.toContain("..");
@@ -55,7 +67,7 @@ describe("efiCertificateStore", () => {
   });
 
   it("materializa em cache runtime privado e permite revogar arquivo", () => {
-    const buf = Buffer.from([0x30, 0x82, 0x00, 0x99]);
+    const buf = fakeP12();
     const persisted = persistEfiCertificateEncrypted("homologation", buf);
     const abs = materializeEfiCertificateToRuntimePath({
       storageKey: persisted.storageKey,

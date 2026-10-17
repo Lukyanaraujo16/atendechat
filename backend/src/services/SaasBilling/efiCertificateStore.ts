@@ -31,15 +31,31 @@ export type EfiCertificatePersistResult = {
   encryptedPayload: string;
 };
 
-const MAX_P12_BYTES = 2 * 1024 * 1024;
+export const MAX_P12_BYTES = 2 * 1024 * 1024;
 
-/** Heurística leve PKCS#12 / ASN.1 SEQUENCE. */
-function assertLooksLikePkcs12(buf: Buffer): void {
-  if (buf.length < 4 || buf[0] !== 0x30) {
+/**
+ * Validação estrutural PKCS#12 sem depender só de extensão/MIME.
+ * - ASN.1 SEQUENCE (0x30)
+ * - tamanho mínimo
+ * - OID PKCS#12 / PKCS#7 comum (1.2.840.113549.1.12 ou .1.7)
+ */
+export function assertLooksLikePkcs12(buf: Buffer): void {
+  if (buf.length < 64 || buf[0] !== 0x30) {
     throw new AppError(
       "ERR_EFI_CERTIFICATE_INVALID_TYPE",
       400,
       "Arquivo não parece um certificado PKCS#12 (.p12/.pfx) válido."
+    );
+  }
+  // OID prefix 1.2.840.113549.1 → 06 08 2a 86 48 86 f7 0d 01
+  const pkcsOidPrefix = Buffer.from([
+    0x06, 0x08, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01
+  ]);
+  if (buf.indexOf(pkcsOidPrefix) < 0) {
+    throw new AppError(
+      "ERR_EFI_CERTIFICATE_INVALID_TYPE",
+      400,
+      "Estrutura PKCS#12/PKCS#7 não reconhecida no arquivo enviado."
     );
   }
 }

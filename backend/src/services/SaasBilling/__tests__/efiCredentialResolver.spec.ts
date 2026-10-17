@@ -54,7 +54,14 @@ describe("efiCredentialResolver", () => {
       cobrancasClientIdEncrypted: null,
       cobrancasClientSecretEncrypted: null,
       certificateEncrypted: encryptEfiBinary(
-        Buffer.from([0x30, 0x82, 0x00, 0x01, 0x02])
+        Buffer.concat([
+          Buffer.from([0x30, 0x82]),
+          Buffer.alloc(80, 1),
+          Buffer.from([
+            0x06, 0x08, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x0c
+          ]),
+          Buffer.alloc(20, 2)
+        ])
       ),
       certificateStorageKey: "efi-cert-homologation-aabb",
       certificateFingerprint: "deadbeef",

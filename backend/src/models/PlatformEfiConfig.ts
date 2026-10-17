@@ -129,6 +129,24 @@ class PlatformEfiConfig extends Model<PlatformEfiConfig> {
   @Column
   activatedByUserId: number | null;
 
+  /**
+   * Habilitação administrativa (B2). Não altera checkout legado.
+   * Não implica Pix operacional.
+   */
+  @AllowNull(false)
+  @Default(false)
+  @Column
+  adminEnabled: boolean;
+
+  /**
+   * Pix homologado ponta a ponta. Somente após cutover/homologação (B3+).
+   * OAuth Cobranças NÃO define este flag.
+   */
+  @AllowNull(false)
+  @Default(false)
+  @Column
+  pixHomologated: boolean;
+
   @AllowNull(true)
   @Column
   updatedByUserId: number | null;

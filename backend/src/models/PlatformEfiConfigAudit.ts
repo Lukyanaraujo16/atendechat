@@ -18,6 +18,7 @@ export type PlatformEfiAuditAction =
   | "update_meta"
   | "rotate_secret"
   | "upload_cert"
+  | "delete_cert"
   | "revoke"
   | "activate"
   | "deactivate"

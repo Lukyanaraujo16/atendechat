@@ -3,7 +3,17 @@ import Box from "@material-ui/core/Box";
 import Grid from "@material-ui/core/Grid";
 import Typography from "@material-ui/core/Typography";
 import Chip from "@material-ui/core/Chip";
+import TextField from "@material-ui/core/TextField";
+import IconButton from "@material-ui/core/IconButton";
+import InputAdornment from "@material-ui/core/InputAdornment";
+import Table from "@material-ui/core/Table";
+import TableBody from "@material-ui/core/TableBody";
+import TableCell from "@material-ui/core/TableCell";
+import TableHead from "@material-ui/core/TableHead";
+import TableRow from "@material-ui/core/TableRow";
 import { makeStyles } from "@material-ui/core/styles";
+import Visibility from "@material-ui/icons/Visibility";
+import VisibilityOff from "@material-ui/icons/VisibilityOff";
 import { toast } from "react-toastify";
 
 import api from "../../services/api";
@@ -16,18 +26,19 @@ import {
 } from "../../ui";
 
 const useStyles = makeStyles((theme) => ({
+  section: { marginBottom: theme.spacing(2) },
   row: {
     display: "flex",
     flexWrap: "wrap",
     gap: theme.spacing(1),
     alignItems: "center",
-    marginBottom: theme.spacing(1.5),
+    marginBottom: theme.spacing(1),
   },
   label: {
     fontWeight: 600,
     fontSize: "0.8rem",
     color: theme.palette.text.secondary,
-    minWidth: 160,
+    minWidth: 140,
   },
   hint: {
     marginTop: theme.spacing(1),
@@ -43,56 +54,65 @@ const useStyles = makeStyles((theme) => ({
     backgroundColor:
       theme.palette.type === "dark" ? "rgba(255, 193, 7, 0.08)" : "#fff8e1",
   },
-  testBox: {
-    marginTop: theme.spacing(2),
-    padding: theme.spacing(1.5),
-    borderRadius: theme.shape.borderRadius,
-    border: `1px solid ${theme.palette.divider}`,
-    backgroundColor: theme.palette.background.default,
+  field: { marginBottom: theme.spacing(1.5) },
+  actions: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: theme.spacing(1),
+    marginTop: theme.spacing(1),
   },
 }));
 
-function PresenceChip({ present }) {
-  return (
-    <Chip
-      size="small"
-      label={present ? "Presente no ambiente" : "Ausente"}
-      color={present ? "primary" : "default"}
-      variant={present ? "default" : "outlined"}
-    />
-  );
-}
+const DIAG_LABELS = {
+  runtime_invalid: "Runtime inválido",
+  empty: "Não configurado",
+  incomplete: "Incompleto",
+  configured: "Configurado (não validado)",
+  auth_validated: "Autenticação Cobranças validada",
+  admin_enabled_awaiting_pix: "Habilitado — aguardando homologação Pix",
+  pix_operational: "Pix operacional",
+  revoked: "Revogado",
+};
 
-function FlagChip({ enabled }) {
-  return (
-    <Chip
-      size="small"
-      label={enabled ? "Flag habilitada" : "Flag desabilitada"}
-      style={
-        enabled
-          ? { backgroundColor: "#e8f5e9", color: "#1b5e20" }
-          : { backgroundColor: "#fafafa", color: "#616161" }
-      }
-    />
-  );
-}
+const emptyForm = () => ({
+  clientId: "",
+  clientSecret: "",
+  pixKey: "",
+  webhookSecret: "",
+});
 
 /**
- * Diagnóstico Efí Pay (Super Admin).
- * Presença de env ≠ autenticação validada. OAuth só via “Testar conexão”.
+ * Gestão administrativa Efí Pay (8.3-B2).
+ * Credenciais no banco; checkout legado permanece em env até B3.
  */
 export default function EfiIntegrationPanel() {
   const classes = useStyles();
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [status, setStatus] = useState(null);
+  const [config, setConfig] = useState(null);
+  const [audits, setAudits] = useState([]);
   const [testResult, setTestResult] = useState(null);
+  const [form, setForm] = useState(emptyForm);
+  const [show, setShow] = useState({
+    clientId: false,
+    clientSecret: false,
+    pixKey: false,
+    webhookSecret: false,
+  });
+  const [certFile, setCertFile] = useState(null);
+
+  const slot = config?.allowedSlot || config?.slot || "homologation";
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await api.get("/saas/finance/efi/status");
-      setStatus(data);
+      const [cfgRes, audRes] = await Promise.all([
+        api.get("/saas/finance/efi/config"),
+        api.get("/saas/finance/efi/config/audits").catch(() => ({ data: { items: [] } })),
+      ]);
+      setConfig(cfgRes.data);
+      setAudits(audRes.data?.items || []);
     } catch (e) {
       toastError(e);
     } finally {
@@ -104,29 +124,213 @@ export default function EfiIntegrationPanel() {
     load();
   }, [load]);
 
-  const runTest = async () => {
+  const setField = (key, value) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const clearSensitiveForm = () => {
+    setForm(emptyForm());
+    setCertFile(null);
+    setShow({
+      clientId: false,
+      clientSecret: false,
+      pixKey: false,
+      webhookSecret: false,
+    });
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const body = {};
+      if (form.clientId.trim()) body.clientId = form.clientId.trim();
+      if (form.clientSecret.trim()) body.clientSecret = form.clientSecret.trim();
+      if (form.pixKey.trim()) body.pixKey = form.pixKey.trim();
+      if (form.webhookSecret.trim()) body.webhookSecret = form.webhookSecret.trim();
+
+      const { data } = await api.put(`/saas/finance/efi/config/${slot}`, body);
+      setConfig(data);
+      clearSensitiveForm();
+      toast.success("Credenciais salvas (campos vazios preservam valores existentes).");
+      await load();
+    } catch (e) {
+      toastError(e);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleUploadCert = async () => {
+    if (!certFile) {
+      toast.error("Selecione um arquivo .p12 ou .pfx");
+      return;
+    }
+    setSaving(true);
+    try {
+      const fd = new FormData();
+      fd.append("certificate", certFile);
+      const { data } = await api.post(
+        `/saas/finance/efi/config/${slot}/certificate`,
+        fd
+      );
+      setConfig(data);
+      setCertFile(null);
+      toast.success("Certificado armazenado com segurança.");
+      await load();
+    } catch (e) {
+      toastError(e);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteCert = async () => {
+    if (!window.confirm("Remover o certificado P12 cadastrado?")) return;
+    setSaving(true);
+    try {
+      const { data } = await api.delete(
+        `/saas/finance/efi/config/${slot}/certificate`
+      );
+      setConfig(data);
+      toast.success("Certificado removido.");
+      await load();
+    } catch (e) {
+      toastError(e);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleTest = async () => {
     setTesting(true);
     setTestResult(null);
     try {
-      const { data } = await api.post("/saas/finance/efi/test-auth");
+      const { data } = await api.post(
+        `/saas/finance/efi/config/${slot}/test-auth`
+      );
       setTestResult(data);
+      if (data?.config) setConfig(data.config);
       if (data?.cobrancas?.ok) {
-        toast.success("OAuth Cobranças validado");
+        toast.success("OAuth Cobranças validado (Pix não validado).");
       } else {
-        toast.error(data?.cobrancas?.message || "Falha na autenticação OAuth");
+        toast.error(data?.cobrancas?.message || "Falha no OAuth");
       }
+      await load();
     } catch (e) {
       toastError(e);
-      setTestResult({
-        cobrancas: { ok: false, message: "Erro ao testar conexão" },
-        pix: { available: false, tested: false },
-      });
     } finally {
       setTesting(false);
     }
   };
 
-  if (loading && !status) {
+  const handleActivate = async () => {
+    if (
+      !window.confirm(
+        "Ativar administrativamente esta configuração?\n\nIsso NÃO altera o checkout Pix legado nem cria cobranças. O cutover ocorre na fase 8.3-B3."
+      )
+    ) {
+      return;
+    }
+    setSaving(true);
+    try {
+      const { data } = await api.post(
+        `/saas/finance/efi/config/${slot}/activate`,
+        { confirm: true }
+      );
+      setConfig(data);
+      toast.success("Configuração habilitada administrativamente.");
+      await load();
+    } catch (e) {
+      toastError(e);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeactivate = async () => {
+    if (!window.confirm("Desativar a habilitação administrativa?")) return;
+    setSaving(true);
+    try {
+      const { data } = await api.post(
+        `/saas/finance/efi/config/${slot}/deactivate`
+      );
+      setConfig(data);
+      toast.success("Desativado.");
+      await load();
+    } catch (e) {
+      toastError(e);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRevoke = async () => {
+    if (
+      !window.confirm(
+        "REVOGAR todas as credenciais deste slot?\nEsta ação remove secrets e certificado do banco."
+      )
+    ) {
+      return;
+    }
+    setSaving(true);
+    try {
+      const { data } = await api.post(
+        `/saas/finance/efi/config/${slot}/revoke`,
+        { confirm: true }
+      );
+      setConfig(data);
+      clearSensitiveForm();
+      toast.success("Credenciais revogadas.");
+      await load();
+    } catch (e) {
+      toastError(e);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const secretField = (key, label, configured) => (
+    <TextField
+      className={classes.field}
+      fullWidth
+      variant="outlined"
+      size="small"
+      type={show[key] ? "text" : "password"}
+      autoComplete="new-password"
+      label={label}
+      placeholder={configured ? "•••• cadastrado — deixe vazio para preservar" : ""}
+      helperText={
+        configured
+          ? `Cadastrado${
+              key === "clientId" && config?.credentials?.clientIdMasked
+                ? `: ${config.credentials.clientIdMasked}`
+                : key === "pixKey" && config?.credentials?.pixKeyMasked
+                ? `: ${config.credentials.pixKeyMasked}`
+                : ""
+            }. Envie vazio para manter.`
+          : "Não cadastrado"
+      }
+      value={form[key]}
+      onChange={(e) => setField(key, e.target.value)}
+      InputProps={{
+        endAdornment: (
+          <InputAdornment position="end">
+            <IconButton
+              size="small"
+              onClick={() =>
+                setShow((s) => ({ ...s, [key]: !s[key] }))
+              }
+              tabIndex={-1}
+            >
+              {show[key] ? <VisibilityOff /> : <Visibility />}
+            </IconButton>
+          </InputAdornment>
+        ),
+      }}
+    />
+  );
+
+  if (loading && !config) {
     return (
       <AppSectionCard>
         <AppLoadingState />
@@ -134,249 +338,293 @@ export default function EfiIntegrationPanel() {
     );
   }
 
-  if (!status) return null;
+  if (!config) return null;
 
-  const connectionChip = (() => {
-    if (!testResult) {
-      return (
-        <Chip
-          size="small"
-          label="Autenticação não validada nesta sessão"
-          variant="outlined"
-        />
-      );
-    }
-    if (testResult.cobrancas?.ok) {
-      return (
-        <Chip
-          size="small"
-          label="OAuth Cobranças validado"
-          style={{ backgroundColor: "#e8f5e9", color: "#1b5e20" }}
-        />
-      );
-    }
-    return (
-      <Chip
-        size="small"
-        label="Falha no OAuth Cobranças"
-        style={{ backgroundColor: "#ffebee", color: "#b71c1c" }}
-      />
-    );
-  })();
-
-  const efiEnvLabel =
-    status.environment === "sandbox"
-      ? "Sandbox (Efí)"
-      : "Produção (Efí)";
-
-  const cobrancasPresence =
-    status.credentials.cobrancasClientIdConfigured &&
-    status.credentials.cobrancasClientSecretConfigured;
+  const diag =
+    DIAG_LABELS[config.diagnosticState] || config.diagnosticState || "—";
 
   return (
-    <AppSectionCard>
-      <Box
-        display="flex"
-        justifyContent="space-between"
-        alignItems="flex-start"
-        flexWrap="wrap"
-        gridGap={12}
-        marginBottom={2}
-      >
-        <Box>
-          <Typography variant="h6">Integração Efí Pay</Typography>
-          <Typography variant="body2" color="textSecondary">
-            Diagnóstico da conta global da plataforma. Credenciais permanecem
-            apenas em variáveis de ambiente — esta tela não edita secrets.
+    <>
+      <AppSectionCard className={classes.section}>
+        <Typography variant="h6">Integração Efí Pay</Typography>
+        <Typography variant="body2" color="textSecondary">
+          Conta recebedora global da plataforma (assinaturas SaaS). Credenciais
+          no banco cifrado — o checkout Pix atual ainda usa variáveis de
+          ambiente até a fase 8.3-B3.
+        </Typography>
+
+        <Box className={classes.warning} mt={2}>
+          <Typography variant="body2" style={{ fontWeight: 600 }}>
+            Aviso
+          </Typography>
+          <Typography variant="body2" style={{ marginTop: 4 }}>
+            As credenciais exibidas como “cadastrado” são máscaras. Presença não
+            significa autenticação validada. OAuth Cobranças não valida Pix.
+            Ativação administrativa não altera cobranças em produção/teste
+            legado.
           </Typography>
         </Box>
-        <Box display="flex" gridGap={8}>
-          <AppSecondaryButton onClick={load} disabled={loading || testing}>
-            Atualizar status
-          </AppSecondaryButton>
-          <AppPrimaryButton onClick={runTest} disabled={testing || loading}>
-            {testing ? "Testando…" : "Testar OAuth Cobranças"}
+
+        <Typography variant="subtitle2" gutterBottom>
+          Ambiente
+        </Typography>
+        <Box className={classes.row}>
+          <Typography className={classes.label}>StreamHUB</Typography>
+          <Chip
+            size="small"
+            label={`Ambiente StreamHUB: ${config.runtime?.label || "—"}`}
+            color={config.runtime?.valid ? "primary" : "default"}
+          />
+        </Box>
+        <Box className={classes.row}>
+          <Typography className={classes.label}>Efí</Typography>
+          <Chip
+            size="small"
+            label={`Ambiente Efí: ${config.efiEnvironmentLabel || "—"}`}
+          />
+          <Chip size="small" variant="outlined" label={`Slot: ${slot}`} />
+        </Box>
+        <Box className={classes.row}>
+          <Typography className={classes.label}>Estado</Typography>
+          <Chip size="small" label={diag} />
+          {config.adminEnabled ? (
+            <Chip size="small" label="Admin habilitado" color="primary" />
+          ) : null}
+          <Chip
+            size="small"
+            variant="outlined"
+            label={
+              config.pixOperational
+                ? "Pix operacional"
+                : "Pix não operacional"
+            }
+          />
+        </Box>
+      </AppSectionCard>
+
+      <AppSectionCard className={classes.section}>
+        <Typography variant="subtitle1" style={{ fontWeight: 600 }}>
+          Credenciais
+        </Typography>
+        <Typography className={classes.hint} component="p">
+          Campos vazios preservam o valor já cadastrado. Client ID e secrets são
+          criptografados; nunca reenviados ao navegador.
+        </Typography>
+        <Grid container spacing={2}>
+          <Grid item xs={12} md={6}>
+            {secretField(
+              "clientId",
+              "Client ID",
+              config.credentials?.clientIdConfigured
+            )}
+            {secretField(
+              "clientSecret",
+              "Client Secret",
+              config.credentials?.clientSecretConfigured
+            )}
+          </Grid>
+          <Grid item xs={12} md={6}>
+            {secretField(
+              "pixKey",
+              "Chave Pix",
+              config.credentials?.pixKeyConfigured
+            )}
+            {secretField(
+              "webhookSecret",
+              "Webhook secret (interno)",
+              config.credentials?.webhookSecretConfigured
+            )}
+          </Grid>
+        </Grid>
+        <Box className={classes.actions}>
+          <AppPrimaryButton onClick={handleSave} loading={saving} disabled={testing}>
+            Salvar credenciais
           </AppPrimaryButton>
         </Box>
-      </Box>
+      </AppSectionCard>
 
-      <Box className={classes.warning}>
-        <Typography variant="body2" style={{ fontWeight: 600 }}>
-          Aviso sobre credenciais
+      <AppSectionCard className={classes.section}>
+        <Typography variant="subtitle1" style={{ fontWeight: 600 }}>
+          Certificado P12
         </Typography>
-        <Typography variant="body2" style={{ marginTop: 4 }}>
-          As credenciais exibidas podem ser provenientes de configurações
-          herdadas do ambiente. Presença de valores não significa autenticação
-          validada.
-        </Typography>
-      </Box>
-
-      <Box className={classes.row}>
-        <Typography className={classes.label}>Ambiente Efí</Typography>
-        <Chip
-          size="small"
-          label={efiEnvLabel}
-          color={status.environment === "sandbox" ? "default" : "secondary"}
-        />
-        <Typography variant="caption" color="textSecondary">
-          (GERENCIANET_SANDBOX — independente do host StreamHUB)
-        </Typography>
-      </Box>
-
-      <Box className={classes.row}>
-        <Typography className={classes.label}>Autenticação</Typography>
-        {connectionChip}
-      </Box>
-
-      <Grid container spacing={2}>
-        <Grid item xs={12} md={6}>
-          <Typography variant="subtitle2" gutterBottom>
-            Presença de variáveis (não valida login)
-          </Typography>
-          <Box className={classes.row}>
-            <Typography className={classes.label}>Client ID (Pix)</Typography>
-            <PresenceChip present={status.credentials.clientIdConfigured} />
-          </Box>
-          <Box className={classes.row}>
-            <Typography className={classes.label}>Client Secret (Pix)</Typography>
-            <PresenceChip present={status.credentials.clientSecretConfigured} />
-          </Box>
-          <Box className={classes.row}>
-            <Typography className={classes.label}>Client ID Cobranças</Typography>
-            <PresenceChip
-              present={status.credentials.cobrancasClientIdConfigured}
-            />
-          </Box>
-          <Box className={classes.row}>
-            <Typography className={classes.label}>
-              Client Secret Cobranças
+        <Box className={classes.row}>
+          <Chip
+            size="small"
+            label={
+              config.certificate?.configured
+                ? "Certificado cadastrado"
+                : "Sem certificado"
+            }
+            color={config.certificate?.configured ? "primary" : "default"}
+          />
+          {config.certificate?.friendlyName ? (
+            <Typography variant="caption">
+              {config.certificate.friendlyName}
             </Typography>
-            <PresenceChip
-              present={status.credentials.cobrancasClientSecretConfigured}
-            />
-          </Box>
-          <Box className={classes.row}>
-            <Typography className={classes.label}>Certificado P12</Typography>
-            <Chip
-              size="small"
-              label={
-                status.certificate.fileFound
-                  ? "Arquivo encontrado"
-                  : status.certificate.nameConfigured
-                  ? "Nome configurado, arquivo ausente"
-                  : "Não configurado"
-              }
-              color={status.certificate.fileFound ? "primary" : "default"}
-              variant={status.certificate.fileFound ? "default" : "outlined"}
-            />
-          </Box>
-          <Box className={classes.row}>
-            <Typography className={classes.label}>Chave Pix</Typography>
-            <PresenceChip present={status.credentials.pixKeyConfigured} />
-          </Box>
-          <Box className={classes.row}>
-            <Typography className={classes.label}>Webhook secret</Typography>
-            <PresenceChip
-              present={status.credentials.webhookSecretConfigured}
-            />
-          </Box>
-        </Grid>
-
-        <Grid item xs={12} md={6}>
-          <Typography variant="subtitle2" gutterBottom>
-            Flags e prontidão (somente leitura)
-          </Typography>
-          <Box className={classes.row}>
-            <Typography className={classes.label}>Pix</Typography>
-            <FlagChip enabled={status.flags.pixEnabled} />
-            <Chip
-              size="small"
-              variant="outlined"
-              label={
-                status.readiness.pix.ready
-                  ? "Variáveis completas"
-                  : "Variáveis incompletas"
-              }
-            />
-          </Box>
-          <Box className={classes.row}>
-            <Typography className={classes.label}>Boleto</Typography>
-            <FlagChip enabled={status.flags.boletoEnabled} />
-          </Box>
-          <Box className={classes.row}>
-            <Typography className={classes.label}>Cartão</Typography>
-            <FlagChip enabled={status.flags.cardEnabled} />
-            <Chip size="small" variant="outlined" label="Não implementado" />
-          </Box>
-          <Box className={classes.row}>
-            <Typography className={classes.label}>Emissão automática</Typography>
-            <FlagChip enabled={status.flags.autoInvoiceEnabled} />
-          </Box>
-          <Box className={classes.row}>
-            <Typography className={classes.label}>Conciliação (settle)</Typography>
-            <FlagChip enabled={status.flags.cobrancasSettleEnabled} />
-          </Box>
-          <Box className={classes.row}>
-            <Typography className={classes.label}>API Cobranças</Typography>
-            <Chip
-              size="small"
-              variant="outlined"
-              label={
-                cobrancasPresence
-                  ? "Credenciais presentes (não validadas)"
-                  : "Credenciais ausentes"
-              }
-            />
-          </Box>
-        </Grid>
-      </Grid>
-
-      {status.readiness.pix.missing?.length ? (
-        <Typography className={classes.hint}>
-          Pix — variáveis ausentes: {status.readiness.pix.missing.join(", ")}
-        </Typography>
-      ) : null}
-      {status.readiness.cobrancas.missing?.length ? (
-        <Typography className={classes.hint}>
-          Cobranças — variáveis ausentes:{" "}
-          {status.readiness.cobrancas.missing.join(", ")}
-        </Typography>
-      ) : null}
-
-      {testResult ? (
-        <Box className={classes.testBox}>
-          <Typography variant="subtitle2" gutterBottom>
-            Resultado do teste OAuth
-          </Typography>
-          <Typography variant="body2">
-            Cobranças (OAuth):{" "}
-            <strong>
-              {testResult.cobrancas?.ok ? "Sucesso" : "Falha"}
-            </strong>
-            {testResult.cobrancas?.message
-              ? ` — ${testResult.cobrancas.message}`
-              : ""}
-            {typeof testResult.cobrancas?.durationMs === "number"
-              ? ` (${testResult.cobrancas.durationMs} ms)`
-              : ""}
-          </Typography>
-          <Typography
-            variant="body2"
-            color="textSecondary"
-            style={{ marginTop: 8 }}
-          >
-            Pix:{" "}
-            {testResult.pix?.message ||
-              "Teste isolado indisponível (sem geração de cobrança)."}
-          </Typography>
+          ) : null}
         </Box>
-      ) : (
-        <Typography className={classes.hint}>
-          O botão “Testar OAuth Cobranças” valida apenas autenticação na API
-          Cobranças — não cria Pix, boleto nem fatura. Presença de variáveis
-          acima não implica integração operacional.
+        {config.certificate?.fingerprint ? (
+          <Typography variant="caption" color="textSecondary" component="p">
+            Fingerprint SHA-256: {config.certificate.fingerprint}
+            {config.certificate.uploadedAt
+              ? ` · ${new Date(config.certificate.uploadedAt).toLocaleString()}`
+              : ""}
+          </Typography>
+        ) : null}
+        <Box mt={1}>
+          <input
+            type="file"
+            accept=".p12,.pfx"
+            onChange={(e) => setCertFile(e.target.files?.[0] || null)}
+          />
+        </Box>
+        <Box className={classes.actions}>
+          <AppPrimaryButton
+            onClick={handleUploadCert}
+            loading={saving}
+            disabled={!certFile}
+          >
+            Enviar certificado
+          </AppPrimaryButton>
+          <AppSecondaryButton
+            onClick={handleDeleteCert}
+            disabled={!config.certificate?.configured || saving}
+          >
+            Remover certificado
+          </AppSecondaryButton>
+        </Box>
+      </AppSectionCard>
+
+      <AppSectionCard className={classes.section}>
+        <Typography variant="subtitle1" style={{ fontWeight: 600 }}>
+          Webhook
         </Typography>
-      )}
-    </AppSectionCard>
+        <Typography className={classes.hint} component="p">
+          {config.webhook?.note}
+        </Typography>
+        <Box className={classes.row}>
+          <Chip
+            size="small"
+            label={
+              config.webhook?.secretConfigured
+                ? "Secret interno cadastrado"
+                : "Secret interno ausente"
+            }
+          />
+          <Chip
+            size="small"
+            variant="outlined"
+            label={`Callback: ${config.webhook?.callbackPath || "/subscription/webhook"}`}
+          />
+          <Chip
+            size="small"
+            variant="outlined"
+            label="Registro na Efí: pendente (B3)"
+          />
+        </Box>
+      </AppSectionCard>
+
+      <AppSectionCard className={classes.section}>
+        <Typography variant="subtitle1" style={{ fontWeight: 600 }}>
+          Diagnóstico e ações
+        </Typography>
+        <Box className={classes.actions}>
+          <AppSecondaryButton onClick={load} disabled={loading || testing}>
+            Atualizar
+          </AppSecondaryButton>
+          <AppPrimaryButton onClick={handleTest} disabled={testing || saving}>
+            {testing ? "Testando…" : "Testar OAuth Cobranças"}
+          </AppPrimaryButton>
+          <AppPrimaryButton
+            onClick={handleActivate}
+            disabled={saving || config.adminEnabled}
+          >
+            Ativar (admin)
+          </AppPrimaryButton>
+          <AppSecondaryButton
+            onClick={handleDeactivate}
+            disabled={saving || !config.adminEnabled}
+          >
+            Desativar
+          </AppSecondaryButton>
+          <AppSecondaryButton onClick={handleRevoke} disabled={saving}>
+            Revogar
+          </AppSecondaryButton>
+        </Box>
+
+        {config.lastAuthTest?.at ? (
+          <Typography className={classes.hint} component="p">
+            Último OAuth:{" "}
+            {config.lastAuthTest.ok ? "sucesso" : "falha"}
+            {config.lastAuthTest.message
+              ? ` — ${config.lastAuthTest.message}`
+              : ""}{" "}
+            ({new Date(config.lastAuthTest.at).toLocaleString()}). Pix validado:
+            não.
+          </Typography>
+        ) : (
+          <Typography className={classes.hint} component="p">
+            OAuth ainda não testado com as credenciais do banco.
+          </Typography>
+        )}
+
+        {testResult ? (
+          <Box mt={1}>
+            <Typography variant="body2">
+              Cobranças:{" "}
+              <strong>
+                {testResult.cobrancas?.ok ? "Sucesso" : "Falha"}
+              </strong>
+              {testResult.cobrancas?.message
+                ? ` — ${testResult.cobrancas.message}`
+                : ""}
+            </Typography>
+            <Typography variant="body2" color="textSecondary">
+              Pix: {testResult.pix?.message || "não validado"}
+            </Typography>
+          </Box>
+        ) : null}
+      </AppSectionCard>
+
+      <AppSectionCard>
+        <Typography variant="subtitle1" style={{ fontWeight: 600 }}>
+          Histórico administrativo
+        </Typography>
+        {audits.length === 0 ? (
+          <Typography className={classes.hint}>Nenhum evento ainda.</Typography>
+        ) : (
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>Data</TableCell>
+                <TableCell>Ação</TableCell>
+                <TableCell>Admin</TableCell>
+                <TableCell>Resumo</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {audits.map((a) => (
+                <TableRow key={a.id}>
+                  <TableCell>
+                    {a.createdAt
+                      ? new Date(a.createdAt).toLocaleString()
+                      : "—"}
+                  </TableCell>
+                  <TableCell>{a.action}</TableCell>
+                  <TableCell>{a.actorUserId ?? "—"}</TableCell>
+                  <TableCell>
+                    <Typography variant="caption" component="span">
+                      {a.diffSummary
+                        ? JSON.stringify(a.diffSummary)
+                        : "—"}
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </AppSectionCard>
+    </>
   );
 }

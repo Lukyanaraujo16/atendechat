@@ -4,10 +4,11 @@ import isSuper from "../middleware/isSuper";
 import requireAnyPlanFeature from "../middleware/requirePlanFeature";
 import * as SaasFinanceController from "../controllers/SaasFinanceController";
 import * as EfiIntegrationController from "../controllers/EfiIntegrationController";
+import * as EfiConfigAdminController from "../controllers/EfiConfigAdminController";
 
 const saasFinanceRoutes = express.Router();
 
-/** Integração Efí Pay — diagnóstico e teste OAuth (somente Super Admin) */
+/** Integração Efí Pay — diagnóstico legado env (somente Super Admin; mantido até B3) */
 saasFinanceRoutes.get(
   "/saas/finance/efi/status",
   isAuth,
@@ -19,6 +20,66 @@ saasFinanceRoutes.post(
   isAuth,
   isSuper,
   EfiIntegrationController.testAuth
+);
+
+/**
+ * Fase 8.3-B2 — gestão administrativa de credenciais (banco).
+ * Não altera checkout/webhook legado.
+ */
+saasFinanceRoutes.get(
+  "/saas/finance/efi/config",
+  isAuth,
+  isSuper,
+  EfiConfigAdminController.getConfig
+);
+saasFinanceRoutes.get(
+  "/saas/finance/efi/config/audits",
+  isAuth,
+  isSuper,
+  EfiConfigAdminController.listAudits
+);
+saasFinanceRoutes.put(
+  "/saas/finance/efi/config/:slot",
+  isAuth,
+  isSuper,
+  EfiConfigAdminController.upsertConfig
+);
+saasFinanceRoutes.post(
+  "/saas/finance/efi/config/:slot/certificate",
+  isAuth,
+  isSuper,
+  EfiConfigAdminController.efiCertUpload.single("certificate"),
+  EfiConfigAdminController.uploadCertificate
+);
+saasFinanceRoutes.delete(
+  "/saas/finance/efi/config/:slot/certificate",
+  isAuth,
+  isSuper,
+  EfiConfigAdminController.removeCertificate
+);
+saasFinanceRoutes.post(
+  "/saas/finance/efi/config/:slot/test-auth",
+  isAuth,
+  isSuper,
+  EfiConfigAdminController.testAuth
+);
+saasFinanceRoutes.post(
+  "/saas/finance/efi/config/:slot/activate",
+  isAuth,
+  isSuper,
+  EfiConfigAdminController.activate
+);
+saasFinanceRoutes.post(
+  "/saas/finance/efi/config/:slot/deactivate",
+  isAuth,
+  isSuper,
+  EfiConfigAdminController.deactivate
+);
+saasFinanceRoutes.post(
+  "/saas/finance/efi/config/:slot/revoke",
+  isAuth,
+  isSuper,
+  EfiConfigAdminController.revoke
 );
 
 /** Central financeira Super Admin */
