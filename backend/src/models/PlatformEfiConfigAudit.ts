@@ -22,7 +22,9 @@ export type PlatformEfiAuditAction =
   | "revoke"
   | "activate"
   | "deactivate"
-  | "test_auth";
+  | "test_auth"
+  /** Registro de homologação (D-P17). Criado só a partir da B3.3. */
+  | "homologate";
 
 @Table({
   tableName: "PlatformEfiConfigAudits",

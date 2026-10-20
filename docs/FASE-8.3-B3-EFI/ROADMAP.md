@@ -6,7 +6,7 @@ desenvolvimento. Referências: `AUDITORIA.md` (R*), `DECISOES.md` (D-P*, R-*, PT
 
 | Etapa | Nome | Estado |
 |-------|------|--------|
-| B3.1 | Integração de credenciais | **NÃO INICIADO** |
+| B3.1 | Integração de credenciais | **IMPLEMENTADA + fechamento técnico — aguardando aprovação final** (2026-10-20) |
 | B3.2 | Geração e consulta de cobranças Pix | **NÃO INICIADO** |
 | B3.3 | Webhooks assíncronos, confirmação e conciliação | **NÃO INICIADO** |
 | B3.4 | Testes e homologação completa | **NÃO INICIADO** |
@@ -29,7 +29,8 @@ desenvolvimento. Referências: `AUDITORIA.md` (R*), `DECISOES.md` (D-P*, R-*, PT
 
 ## B3.1 — Integração de credenciais
 
-**Estado:** NÃO INICIADO
+**Estado:** IMPLEMENTADA localmente em 2026-10-20; fechamento técnico concluído no mesmo dia (P-B31-01, 03, 08). Aguardando aprovação final. Sem commit, push ou deploy.
+Controles no default; nenhum fluxo financeiro trocado. Progresso por tarefa em “Progresso B3.1” abaixo.
 
 **Objetivo:** provedor único de credenciais, cliente Pix próprio com mTLS em memória e separação entre configuração
 válida e integração homologada (fingerprint e bloqueio de produção). Nenhum fluxo financeiro é trocado.
@@ -83,6 +84,30 @@ T-NET-01, 02, 09 · T-SEC-01…04, 13 · T-REG-01, 02. (T-CERT-05 → B3.4.)
 **Riscos:** confusão de ambiente (R9); P12 com senha (o SDK usa senha vazia), a documentar; regressão no painel B2.
 
 **Condições para avançar:** relatório B3.1 aprovado; suíte local verde; PT-4 e PT-9 registrados.
+
+### Progresso B3.1 (2026-10-20)
+
+| # | Tarefa | Estado | Onde |
+|---|--------|--------|------|
+| 0 | PT-4 e PT-9 | concluída | DECISOES §5 (PT-4, PT-9 resolvidas) |
+| 1 | Controles RF0 + log de boot + status | concluída | `config/saasBillingFlags.ts` (`getEfiActivationControls`), `logEfiActivationControlsAtBoot` em `server.ts` |
+| 2 | Provedor `getEfiRuntimeCredentials()` | concluída (não ligado a checkout/webhook) | `efiRuntimeCredentials.ts` |
+| 3 | Status unificado | concluída | `derivePlatformEfiConfigStatus` em `efiCredentialResolver.ts` |
+| 4 | Fingerprint + D-P2 | concluída | `efiConfigFingerprint.ts`, `findEfiHomologationForConfig` |
+| 5 | Cliente Pix próprio | concluída | `efiPixClient.ts`; gravação de P12 removida de `efiCertificateStore.ts` |
+| 6 | Teste de conexão Pix + validação P12 | concluída | `testEfiPixOAuth`; `testEfiAdminAuth` e `activateEfiAdminConfig` |
+| 7 | Webhook secret ≥ 32 | concluída (sem geração no servidor) | `PlatformEfiConfigAdminService.ts` |
+| 8 | `efiCobrancasClient` | concluída | cache por credencial; base pelo slot no `database` |
+| 9 | Status/diagnóstico | concluída | `credentialsSource` em `efiIntegrationStatus.ts` |
+
+**Fechamento técnico (2026-10-20):**
+- P-B31-08: fonte `database` isolada do financeiro real (checkout, webhook, settle/boleto seguem `legacy_env`) — B31-T17.
+- P-B31-01: versão por `dist/build-info.json` gerado no `npm run build` — B31-T15. Docker sem `.git` fica `null` (ajuste opcional de infraestrutura, para aprovação).
+- P-B31-03: configuração só é válida com validação Pix registrada para o fingerprint atual — B31-T16.
+- Testes parciais completados ou justificados (TESTES §Registro B3.1 — fechamento).
+
+Decisões de implementação: DECISOES §10. Pendências: DECISOES §10.1 (P-B31-01…09). Resultados: TESTES §Registro B3.1.
+Itens da lista de testes obrigatórios sem cobertura completa estão marcados como parciais ou não executados em TESTES.
 
 ---
 

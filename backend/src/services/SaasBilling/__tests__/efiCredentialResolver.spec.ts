@@ -1,12 +1,19 @@
 import AppError from "../../../errors/AppError";
 import { encryptEfiBinary, encryptEfiSecret } from "../../../helpers/efiCredentialCrypto";
 import PlatformEfiConfig from "../../../models/PlatformEfiConfig";
+import PlatformEfiConfigAudit from "../../../models/PlatformEfiConfigAudit";
 import {
   assertResolverIgnoresLegacyEnv,
   derivePlatformEfiConfigStatus,
+  evaluateEfiConfigReadiness,
   getEfiResolverPublicSnapshot,
   resolveEfiCredentials
 } from "../efiCredentialResolver";
+import {
+  EFI_B2_ACTIVATION_AUDIT,
+  efiActivationAudit,
+  efiTestP12
+} from "./fixtures/efiTestP12";
 
 jest.mock("../../../models/PlatformEfiConfig", () => ({
   __esModule: true,
@@ -14,8 +21,13 @@ jest.mock("../../../models/PlatformEfiConfig", () => ({
     findOne: jest.fn()
   }
 }));
+jest.mock("../../../models/PlatformEfiConfigAudit", () => ({
+  __esModule: true,
+  default: { findOne: jest.fn() }
+}));
 
 const findOne = PlatformEfiConfig.findOne as jest.Mock;
+const auditFindOne = PlatformEfiConfigAudit.findOne as jest.Mock;
 
 describe("efiCredentialResolver", () => {
   const original = { ...process.env };
@@ -30,6 +42,12 @@ describe("efiCredentialResolver", () => {
     process.env.EFI_COBRANCAS_CLIENT_ID = "LEGACY_COBRANCAS_ID";
     process.env.EFI_COBRANCAS_CLIENT_SECRET = "LEGACY_COBRANCAS_SECRET";
     findOne.mockReset();
+    // Ativação B3.1 válida para a linha devolvida por findOne (P-B31-03).
+    auditFindOne.mockReset().mockImplementation(async (opts: any) => {
+      if (opts?.where?.action !== "activate") return null;
+      const current = await findOne.getMockImplementation()?.();
+      return current ? efiActivationAudit(current) : null;
+    });
   });
 
   afterAll(() => {
@@ -53,20 +71,13 @@ describe("efiCredentialResolver", () => {
       webhookSecretConfigured: true,
       cobrancasClientIdEncrypted: null,
       cobrancasClientSecretEncrypted: null,
-      certificateEncrypted: encryptEfiBinary(
-        Buffer.concat([
-          Buffer.from([0x30, 0x82]),
-          Buffer.alloc(80, 1),
-          Buffer.from([
-            0x06, 0x08, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x0c
-          ]),
-          Buffer.alloc(20, 2)
-        ])
-      ),
+      certificateEncrypted: encryptEfiBinary(efiTestP12()),
       certificateStorageKey: "efi-cert-homologation-aabb",
       certificateFingerprint: "deadbeef",
       activatedAt: new Date(),
       lastAuthTestOk: true,
+      adminEnabled: true,
+      pixHomologated: false,
       ...overrides
     };
   }
@@ -81,7 +92,7 @@ describe("efiCredentialResolver", () => {
 
   it("resolve do banco e ignora GERENCIANET_*/EFI_COBRANCAS_*", async () => {
     findOne.mockResolvedValue(buildRow());
-    const resolved = await resolveEfiCredentials({ requireCertificate: false });
+    const resolved = await resolveEfiCredentials();
     expect(resolved.clientId).toBe("Client_Id_FROM_DB_abc");
     expect(resolved.clientSecret).toBe("Client_Secret_FROM_DB_xyz");
     expect(resolved.clientId).not.toBe(process.env.GERENCIANET_CLIENT_ID);
@@ -89,6 +100,7 @@ describe("efiCredentialResolver", () => {
     expect(JSON.stringify(resolved)).not.toContain("LEGACY_");
     expect(resolved.slot).toBe("homologation");
     expect(resolved.runtime).toBe("test");
+    expect(resolved.certificatePfx.equals(efiTestP12())).toBe(true);
   });
 
   it("falha com runtime inválido", async () => {
@@ -114,10 +126,10 @@ describe("efiCredentialResolver", () => {
     });
   });
 
-  it("falha se não operacional", async () => {
-    findOne.mockResolvedValue(buildRow({ status: "configured" }));
-    await expect(resolveEfiCredentials()).rejects.toMatchObject({
-      message: "ERR_EFI_CONFIG_NOT_OPERATIONAL"
+  it("B3.1: não exige mais `operational` cegamente (D-P2 no slot homologation)", async () => {
+    findOne.mockResolvedValue(buildRow({ status: "auth_validated" }));
+    await expect(resolveEfiCredentials()).resolves.toMatchObject({
+      status: "auth_validated"
     });
   });
 
@@ -128,9 +140,7 @@ describe("efiCredentialResolver", () => {
         certificateStorageKey: null
       })
     );
-    await expect(
-      resolveEfiCredentials({ requireCertificate: true })
-    ).rejects.toMatchObject({
+    await expect(resolveEfiCredentials()).rejects.toMatchObject({
       message: "ERR_EFI_CERTIFICATE_MISSING"
     });
   });
@@ -148,41 +158,60 @@ describe("efiCredentialResolver", () => {
     expect(snap.clientIdMasked).toBe("****_abc");
   });
 
-  it("derivePlatformEfiConfigStatus cobre empty/incomplete/configured", () => {
-    expect(
-      derivePlatformEfiConfigStatus({
-        clientIdEncrypted: null,
-        clientSecretEncrypted: null,
-        certificateEncrypted: null,
-        webhookSecretConfigured: false,
-        lastAuthTestOk: null,
-        activatedAt: null,
-        status: "empty"
-      })
-    ).toBe("empty");
+  it("P-B31-03: ativação da B2 sem validação Pix → ERR_EFI_PIX_VALIDATION_REQUIRED", async () => {
+    findOne.mockResolvedValue(buildRow());
+    auditFindOne.mockImplementation(async (opts: any) =>
+      opts?.where?.action === "activate" ? EFI_B2_ACTIVATION_AUDIT : null
+    );
+    await expect(resolveEfiCredentials()).rejects.toMatchObject({
+      message: "ERR_EFI_PIX_VALIDATION_REQUIRED",
+      statusCode: 403
+    });
+    const row: any = buildRow();
+    expect(evaluateEfiConfigReadiness(row, { pixValidated: false })).toEqual({
+      validConfig: false,
+      missing: ["pixValidation"]
+    });
+    expect(evaluateEfiConfigReadiness(row, { pixValidated: true }).validConfig).toBe(true);
+  });
 
-    expect(
-      derivePlatformEfiConfigStatus({
-        clientIdEncrypted: encryptEfiSecret("a"),
-        clientSecretEncrypted: null,
-        certificateEncrypted: null,
-        webhookSecretConfigured: false,
-        lastAuthTestOk: null,
-        activatedAt: null,
-        status: "incomplete"
-      })
-    ).toBe("incomplete");
-
-    expect(
-      derivePlatformEfiConfigStatus({
-        clientIdEncrypted: encryptEfiSecret("a"),
-        clientSecretEncrypted: encryptEfiSecret("b"),
-        certificateEncrypted: null,
-        webhookSecretConfigured: false,
-        lastAuthTestOk: null,
-        activatedAt: null,
-        status: "configured"
-      })
-    ).toBe("configured");
+  it("T-CRED-16: status unificado — tabela com todas as combinações", () => {
+    const enc = encryptEfiSecret("v");
+    const bools = [false, true];
+    const seen = new Set<string>();
+    for (const status of ["empty", "configured", "operational", "revoked"] as const)
+      for (const id of bools)
+        for (const secret of bools)
+          for (const cert of bools)
+            for (const pix of bools)
+              for (const wh of bools)
+                for (const auth of [null, false, true])
+                  for (const admin of bools)
+                    for (const homolog of bools) {
+                      const row: any = {
+                        status,
+                        clientIdEncrypted: id ? enc : null,
+                        clientSecretEncrypted: secret ? enc : null,
+                        certificateEncrypted: cert ? enc : null,
+                        pixKeyEncrypted: pix ? enc : null,
+                        webhookSecretConfigured: wh,
+                        lastAuthTestOk: auth,
+                        adminEnabled: admin,
+                        pixHomologated: homolog
+                      };
+                      const got = derivePlatformEfiConfigStatus(row);
+                      seen.add(got);
+                      let expected: string;
+                      if (status === "revoked" && !id) expected = "revoked";
+                      else if (!(id && secret))
+                        expected = id || secret || cert || pix || wh ? "incomplete" : "empty";
+                      else if (homolog && admin) expected = "operational";
+                      else if (auth === true) expected = "auth_validated";
+                      else expected = "configured";
+                      expect(got).toBe(expected);
+                    }
+    expect([...seen].sort()).toEqual(
+      ["auth_validated", "configured", "empty", "incomplete", "operational", "revoked"]
+    );
   });
 });

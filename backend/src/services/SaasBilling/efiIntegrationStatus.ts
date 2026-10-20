@@ -1,8 +1,35 @@
 import fs from "fs";
 import path from "path";
 import axios from "axios";
-import { saasBillingFlags } from "../../config/saasBillingFlags";
+import {
+  EfiActivationControls,
+  getEfiActivationControls,
+  saasBillingFlags
+} from "../../config/saasBillingFlags";
+import {
+  AppBuildInfo,
+  getAppBuildCommit,
+  getAppBuildInfo,
+  isSameAppCommit
+} from "../../config/appBuildInfo";
+import {
+  getAllowedEfiSlotForRuntime,
+  tryGetStreamhubRuntimeEnv
+} from "../../config/streamhubRuntimeEnv";
+import AppError from "../../errors/AppError";
 import { logger } from "../../utils/logger";
+import {
+  EfiConfigReadiness,
+  evaluateEfiConfigReadiness,
+  findEfiHomologationForConfig,
+  findEfiPixValidationForConfig,
+  loadEfiConfigForRuntimeSlot
+} from "./efiCredentialResolver";
+import { computeEfiConfigFingerprint } from "./efiConfigFingerprint";
+import {
+  EFI_DATABASE_SOURCE_FINANCIAL_RELEASED,
+  getEfiFinancialCredentialsSource
+} from "./efiFinancialSource";
 
 const AUTH_TIMEOUT_MS = 15_000;
 
@@ -67,12 +94,173 @@ export type EfiIntegrationStatusDto = {
     pixIsolatedAuthNote: string;
     cobrancasOAuthAvailable: boolean;
   };
+  /** Valor efetivo dos controles de ativação (RF0.2). */
+  controls: EfiActivationControls;
+  /** Versão em execução (PT-9, P-B31-01); commit null = desconhecido (nunca inventado). */
+  version: {
+    currentCommit: string | null;
+    source: AppBuildInfo["source"];
+    dirty: boolean | null;
+    builtAt: string | null;
+  };
+  /** Fonte ativa e prontidão da configuração do banco (RF1.6). Sem segredos. */
+  credentialsSource: {
+    /** Valor de `EFI_CREDENTIALS_SOURCE` (diagnóstico). */
+    active: EfiActivationControls["credentialsSource"];
+    /** Fonte usada por checkout, webhook e settle (P-B31-08). */
+    financial: EfiActivationControls["credentialsSource"];
+    /** `false` na B3.1: a fonte `database` não opera o financeiro real. */
+    databaseFinancialReleased: boolean;
+    database: EfiDatabaseSourceStatus;
+  };
 };
+
+export type EfiDatabaseSourceStatus = {
+  runtime: "test" | "production" | null;
+  slot: "homologation" | "production" | null;
+  efiEnvironment: "sandbox" | "production" | null;
+  configFound: boolean;
+  status: string | null;
+  validConfig: boolean;
+  missing: EfiConfigReadiness["missing"];
+  configFingerprint: string | null;
+  /** Validação Pix (mTLS) registrada para o fingerprint atual (P-B31-03). */
+  pixValidation: { validated: boolean; at: string | null };
+  homologation: {
+    /** Só o slot `production` exige (D-P2). */
+    required: boolean;
+    homologated: boolean;
+    at: string | null;
+    commit: string | null;
+    /** null quando não há homologação ou o commit atual/homologado é desconhecido. */
+    versionDiffers: boolean | null;
+  };
+  /** A fonte `database` funcionaria agora neste runtime. */
+  usable: boolean;
+  blockedReason: string | null;
+};
+
+const EMPTY_DATABASE_STATUS: EfiDatabaseSourceStatus = {
+  runtime: null,
+  slot: null,
+  efiEnvironment: null,
+  configFound: false,
+  status: null,
+  validConfig: false,
+  missing: [],
+  configFingerprint: null,
+  pixValidation: { validated: false, at: null },
+  homologation: {
+    required: false,
+    homologated: false,
+    at: null,
+    commit: null,
+    versionDiffers: null
+  },
+  usable: false,
+  blockedReason: null
+};
+
+async function getDatabaseSourceStatus(): Promise<EfiDatabaseSourceStatus> {
+  const empty = EMPTY_DATABASE_STATUS;
+  let loaded: Awaited<ReturnType<typeof loadEfiConfigForRuntimeSlot>>;
+  try {
+    loaded = await loadEfiConfigForRuntimeSlot();
+  } catch (err) {
+    if (err instanceof AppError) {
+      const runtime = tryGetStreamhubRuntimeEnv();
+      return {
+        ...empty,
+        runtime,
+        slot: runtime ? getAllowedEfiSlotForRuntime(runtime) : null,
+        homologation: {
+          ...empty.homologation,
+          required: runtime === "production"
+        },
+        blockedReason: err.message
+      };
+    }
+    throw err;
+  }
+
+  const { runtime, slot, row } = loaded;
+  const configFingerprint = computeEfiConfigFingerprint(row);
+  const pixValidation = await findEfiPixValidationForConfig(row, configFingerprint);
+  const readiness = evaluateEfiConfigReadiness(row, {
+    pixValidated: Boolean(pixValidation)
+  });
+  const homologation = await findEfiHomologationForConfig(
+    row,
+    configFingerprint
+  );
+  const required = slot === "production";
+  const currentCommit = getAppBuildCommit();
+  const versionDiffers =
+    homologation && homologation.commit && currentCommit
+      ? !isSameAppCommit(homologation.commit, currentCommit)
+      : null;
+
+  let blockedReason: string | null = null;
+  if (!readiness.validConfig)
+    blockedReason = `missing:${readiness.missing.join(",")}`;
+  else if (required && !homologation)
+    blockedReason = "ERR_EFI_INTEGRATION_NOT_HOMOLOGATED";
+
+  return {
+    runtime,
+    slot,
+    efiEnvironment: row.efiEnvironment,
+    configFound: true,
+    status: row.status,
+    validConfig: readiness.validConfig,
+    missing: readiness.missing,
+    configFingerprint,
+    pixValidation: {
+      validated: Boolean(pixValidation),
+      at: pixValidation?.at ?? null
+    },
+    homologation: {
+      required,
+      homologated: Boolean(homologation),
+      at: homologation?.at ?? null,
+      commit: homologation?.commit ?? null,
+      versionDiffers
+    },
+    usable: blockedReason === null,
+    blockedReason
+  };
+}
+
+/** Linha única no boot com o valor efetivo dos controles (RF0.2, A4). Sem segredos. */
+export function logEfiActivationControlsAtBoot(): void {
+  const controls = getEfiActivationControls();
+  const financialSource = getEfiFinancialCredentialsSource();
+  const payload = {
+    ...controls,
+    financialCredentialsSource: financialSource,
+    currentCommit: getAppBuildCommit()
+  };
+  if (controls.credentialsSource !== financialSource) {
+    logger.warn(
+      payload,
+      "[efi] EFI_CREDENTIALS_SOURCE=database ainda não liberado para o financeiro: checkout, webhook e settle seguem em legacy_env"
+    );
+  }
+  if (controls.invalid.length > 0) {
+    logger.warn(
+      payload,
+      "[efi] controles de ativação com valor inválido (default aplicado)"
+    );
+  } else {
+    logger.info(payload, "[efi] controles de ativação");
+  }
+}
 
 /**
  * Status diagnóstico da integração Efí — sem secrets, tokens ou caminhos.
  */
-export function getEfiIntegrationStatus(): EfiIntegrationStatusDto {
+export async function getEfiIntegrationStatus(): Promise<EfiIntegrationStatusDto> {
+  const controls = getEfiActivationControls();
   const clientIdConfigured = envConfigured("GERENCIANET_CLIENT_ID");
   const clientSecretConfigured = envConfigured("GERENCIANET_CLIENT_SECRET");
   const cobrancasClientIdConfigured =
@@ -135,10 +323,31 @@ export function getEfiIntegrationStatus(): EfiIntegrationStatusDto {
     authTests: {
       pixIsolatedAuthAvailable: false,
       pixIsolatedAuthNote:
-        "O SDK Pix (gn-api-sdk-typescript) não expõe autenticação isolada sem chamada de API. " +
-        "Não simulamos sucesso. Valide Client ID/Secret via OAuth Cobranças; " +
-        "o P12 é verificado apenas por presença no status.",
+        "Legado (env): o SDK Pix não expõe autenticação isolada; o P12 é verificado por presença. " +
+        "Configuração do banco: o teste de conexão do Super Admin valida o P12 e o OAuth Pix com mTLS.",
       cobrancasOAuthAvailable: true
+    },
+    controls,
+    version: (({ commit, source, dirty, builtAt }) => ({
+      currentCommit: commit,
+      source,
+      dirty,
+      builtAt
+    }))(getAppBuildInfo()),
+    credentialsSource: {
+      active: controls.credentialsSource,
+      financial: getEfiFinancialCredentialsSource(),
+      databaseFinancialReleased: EFI_DATABASE_SOURCE_FINANCIAL_RELEASED,
+      database: await getDatabaseSourceStatus().catch(err => {
+        logger.warn(
+          { err: redactEfiSensitiveText((err as Error)?.message) },
+          "[efi] status da fonte database indisponível"
+        );
+        return {
+          ...EMPTY_DATABASE_STATUS,
+          blockedReason: "ERR_EFI_STATUS_DB_UNAVAILABLE"
+        };
+      })
     }
   };
 }
@@ -157,13 +366,19 @@ export function sanitizeEfiAuthErrorMessage(err: unknown): string {
     anyErr?.message ||
     "Falha na autenticação Efí";
 
-  let msg = String(raw).slice(0, 240);
-  msg = msg.replace(/Bearer\s+\S+/gi, "Bearer ***");
-  msg = msg.replace(/client_secret[=:]\s*\S+/gi, "client_secret=***");
-  msg = msg.replace(/-----BEGIN[\s\S]*?-----END[^-]+-----/gi, "[cert omitido]");
+  const msg = redactEfiSensitiveText(raw);
   if (anyErr?.code === "ECONNABORTED" || /timeout/i.test(msg)) {
     return "Timeout ao autenticar na API Cobranças Efí";
   }
+  return msg;
+}
+
+/** Remove tokens, client_secret e PEM de um texto livre (máx. 240 caracteres). */
+export function redactEfiSensitiveText(raw: unknown): string {
+  let msg = String(raw ?? "").slice(0, 240);
+  msg = msg.replace(/(Bearer|Basic)\s+\S+/gi, "$1 ***");
+  msg = msg.replace(/client_secret[=:]\s*\S+/gi, "client_secret=***");
+  msg = msg.replace(/-----BEGIN[\s\S]*?-----END[^-]+-----/gi, "[cert omitido]");
   return msg;
 }
 

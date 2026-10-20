@@ -18,8 +18,18 @@ import {
   serializePlatformEfiConfig,
   PlatformEfiConfigPublicDto
 } from "./platformEfiConfigSerialize";
-import { decryptEfiSecret } from "../../helpers/efiCredentialCrypto";
+import {
+  decryptEfiBinary,
+  decryptEfiSecret
+} from "../../helpers/efiCredentialCrypto";
 import { assertEfiAuthTestRateLimit } from "./efiIntegrationStatus";
+import { derivePlatformEfiConfigStatus } from "./efiCredentialResolver";
+import { EfiPixAuthTestResult, testEfiPixOAuth } from "./efiPixClient";
+import { invalidateEfiRuntimeCredentialsCache } from "./efiRuntimeCredentials";
+import { computeEfiConfigFingerprint } from "./efiConfigFingerprint";
+
+/** RF1.10 / R-18: webhook secret com no mínimo 32 caracteres. */
+export const EFI_WEBHOOK_SECRET_MIN_LENGTH = 32;
 
 function hasEncrypted(value: string | null | undefined): boolean {
   return typeof value === "string" && value.startsWith("efic1:") && value.length > 10;
@@ -42,29 +52,39 @@ function assertSlotParam(
   return slot;
 }
 
+/** Regra única de status (R18): a mesma do resolvedor. */
 function recomputeStatus(row: PlatformEfiConfig): PlatformEfiConfigStatus {
-  if (row.status === "revoked" && !hasEncrypted(row.clientIdEncrypted)) {
-    return "revoked";
+  return derivePlatformEfiConfigStatus(row);
+}
+
+/** Teste Pix (P12 + OAuth mTLS) com as credenciais do registro; não usa cache. */
+async function runPixAuthTest(row: PlatformEfiConfig): Promise<EfiPixAuthTestResult> {
+  if (!hasEncrypted(row.certificateEncrypted)) {
+    return {
+      ok: false,
+      certificateValid: false,
+      message: "Certificado P12 ausente: OAuth Pix não testado.",
+      durationMs: 0
+    };
   }
-  const hasIds =
-    hasEncrypted(row.clientIdEncrypted) &&
-    hasEncrypted(row.clientSecretEncrypted);
-  if (!hasIds) {
-    const anything =
-      hasEncrypted(row.clientIdEncrypted) ||
-      hasEncrypted(row.clientSecretEncrypted) ||
-      hasEncrypted(row.certificateEncrypted) ||
-      row.webhookSecretConfigured ||
-      hasEncrypted(row.pixKeyEncrypted);
-    return anything ? "incomplete" : "empty";
+  let input: Parameters<typeof testEfiPixOAuth>[0];
+  try {
+    input = {
+      efiEnvironment: row.efiEnvironment,
+      clientId: decryptEfiSecret(row.clientIdEncrypted!),
+      clientSecret: decryptEfiSecret(row.clientSecretEncrypted!),
+      pfx: decryptEfiBinary(row.certificateEncrypted!)
+    };
+  } catch {
+    // Chave de cifra trocada ou dado corrompido: falha do teste, não 500.
+    return {
+      ok: false,
+      certificateValid: false,
+      message: "Não foi possível decifrar as credenciais/P12 salvos: OAuth Pix não testado.",
+      durationMs: 0
+    };
   }
-  if (row.pixHomologated && row.adminEnabled) {
-    return "operational";
-  }
-  if (row.lastAuthTestOk === true) {
-    return "auth_validated";
-  }
-  return "configured";
+  return testEfiPixOAuth(input);
 }
 
 async function getOrCreateRow(
@@ -159,6 +179,20 @@ export async function upsertEfiAdminConfig(input: {
     }
   }
 
+  const webhookSecretRaw = input.body?.webhookSecret;
+  if (
+    webhookSecretRaw !== undefined &&
+    webhookSecretRaw !== null &&
+    String(webhookSecretRaw).trim() !== "" &&
+    String(webhookSecretRaw).trim().length < EFI_WEBHOOK_SECRET_MIN_LENGTH
+  ) {
+    throw new AppError(
+      "ERR_EFI_WEBHOOK_SECRET_TOO_SHORT",
+      400,
+      `O webhook secret deve ter no mínimo ${EFI_WEBHOOK_SECRET_MIN_LENGTH} caracteres.`
+    );
+  }
+
   const transaction = await sequelize.transaction();
   try {
     const row = await getOrCreateRow(
@@ -231,6 +265,7 @@ export async function upsertEfiAdminConfig(input: {
     locked.status = recomputeStatus(locked);
     await locked.save({ transaction });
     await transaction.commit();
+    invalidateEfiRuntimeCredentialsCache();
 
     await recordEfiConfigAudit({
       configId: locked.id,
@@ -300,6 +335,7 @@ export async function uploadEfiCertificate(input: {
     locked.status = recomputeStatus(locked);
     await locked.save({ transaction });
     await transaction.commit();
+    invalidateEfiRuntimeCredentialsCache();
 
     if (previousKey && previousKey !== persisted.storageKey) {
       revokeEfiCertificateRuntimeFile(previousKey);
@@ -345,6 +381,7 @@ export async function deleteEfiCertificate(input: {
   row.updatedByUserId = input.actorUserId;
   row.status = recomputeStatus(row);
   await row.save();
+  invalidateEfiRuntimeCredentialsCache();
   revokeEfiCertificateRuntimeFile(previousKey);
 
   await recordEfiConfigAudit({
@@ -364,11 +401,10 @@ export async function testEfiAdminAuth(input: {
 }): Promise<{
   config: PlatformEfiConfigPublicDto;
   cobrancas: { ok: boolean; message: string; durationMs: number };
-  pix: {
-    available: false;
-    tested: false;
-    validated: false;
-    message: string;
+  pix: EfiPixAuthTestResult & {
+    available: true;
+    tested: boolean;
+    validated: boolean;
   };
 }> {
   assertEfiEncryptionKeyConfigured();
@@ -414,6 +450,9 @@ export async function testEfiAdminAuth(input: {
     sandbox: row.efiEnvironment === "sandbox"
   });
 
+  // RF1.8: P12 + OAuth Pix com mTLS; resultado separado do de Cobranças.
+  const pix = await runPixAuthTest(row);
+
   row.lastAuthTestAt = new Date();
   row.lastAuthTestOk = cobrancas.ok;
   row.lastAuthTestMessage = cobrancas.message.slice(0, 240);
@@ -430,7 +469,10 @@ export async function testEfiAdminAuth(input: {
     diffSummary: {
       cobrancasOk: cobrancas.ok,
       durationMs: cobrancas.durationMs,
-      pixValidated: false
+      pixOk: pix.ok,
+      // "certificate"/"p12" no nome da chave seriam redigidos pela sanitização da auditoria.
+      pixPfxOpened: pix.certificateValid,
+      pixDurationMs: pix.durationMs
     }
   });
 
@@ -438,11 +480,10 @@ export async function testEfiAdminAuth(input: {
     config: serializePlatformEfiConfig(row),
     cobrancas,
     pix: {
-      available: false,
-      tested: false,
-      validated: false,
-      message:
-        "Pix não validado: o SDK não oferece autenticação isolada sem cobrança. OAuth Cobranças ≠ Pix operacional."
+      ...pix,
+      available: true,
+      tested: pix.certificateValid,
+      validated: pix.ok
     }
   };
 }
@@ -489,28 +530,80 @@ export async function activateEfiAdminConfig(input: {
       "Execute o teste OAuth Cobranças com sucesso antes de ativar."
     );
   }
+  const limit = assertEfiAuthTestRateLimit(input.actorUserId);
+  if (!limit.allowed) {
+    throw new AppError(
+      `Muitas tentativas de teste. Aguarde ${limit.retryAfterSec || 60}s.`,
+      429
+    );
+  }
+  // RF1.8: a ativação valida de novo o P12 e o OAuth Pix com mTLS.
+  const testedFingerprint = computeEfiConfigFingerprint(row);
+  const pix = await runPixAuthTest(row);
+  if (!pix.ok) {
+    throw new AppError(
+      pix.certificateValid ? "ERR_EFI_PIX_AUTH_NOT_VALIDATED" : "ERR_EFI_CERTIFICATE_INVALID",
+      400,
+      `Ativação recusada: ${pix.message}`
+    );
+  }
 
-  row.adminEnabled = true;
-  row.activatedAt = new Date();
-  row.activatedByUserId = input.actorUserId;
-  // pixHomologated permanece false — checkout legado inalterado
-  row.status = recomputeStatus(row);
-  row.updatedByUserId = input.actorUserId;
-  await row.save();
-
-  await recordEfiConfigAudit({
-    configId: row.id,
-    slot,
-    actorUserId: input.actorUserId,
-    action: "activate",
-    diffSummary: {
-      adminEnabled: true,
-      pixHomologated: false,
-      checkoutUnchanged: true
+  // O teste Pix roda fora de lock: só habilita se a configuração testada ainda é a atual.
+  const transaction = await sequelize.transaction();
+  let locked: PlatformEfiConfig | null;
+  try {
+    locked = await PlatformEfiConfig.findByPk(row.id, {
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+    if (
+      !locked ||
+      computeEfiConfigFingerprint(locked) !== testedFingerprint ||
+      locked.lastAuthTestOk !== true
+    ) {
+      throw new AppError(
+        "ERR_EFI_CONFIG_CHANGED_DURING_ACTIVATION",
+        409,
+        "A configuração mudou durante a ativação. Teste e ative novamente."
+      );
     }
-  });
+    locked.adminEnabled = true;
+    locked.activatedAt = new Date();
+    locked.activatedByUserId = input.actorUserId;
+    // pixHomologated permanece false — checkout legado inalterado
+    locked.status = recomputeStatus(locked);
+    locked.updatedByUserId = input.actorUserId;
+    await locked.save({ transaction });
+    // Registro da validação Pix na mesma transação: sem ele a configuração não é válida
+    // (P-B31-03), então ativação e prova de validação entram ou saem juntas.
+    await recordEfiConfigAudit({
+      configId: row.id,
+      slot,
+      actorUserId: input.actorUserId,
+      action: "activate",
+      transaction,
+      diffSummary: {
+        adminEnabled: true,
+        pixHomologated: false,
+        pixOAuthValidated: true,
+        configFingerprint: testedFingerprint,
+        efiEnvironment: locked.efiEnvironment,
+        checkoutUnchanged: true
+      }
+    });
+    await transaction.commit();
+  } catch (err) {
+    // Se o commit falhou, a transação já terminou: o rollback não pode esconder o erro original.
+    try {
+      await transaction.rollback();
+    } catch {
+      // transação já encerrada
+    }
+    throw err;
+  }
+  invalidateEfiRuntimeCredentialsCache();
 
-  return serializePlatformEfiConfig(row);
+  return serializePlatformEfiConfig(locked);
 }
 
 export async function deactivateEfiAdminConfig(input: {
@@ -528,6 +621,7 @@ export async function deactivateEfiAdminConfig(input: {
   row.status = recomputeStatus(row);
   row.updatedByUserId = input.actorUserId;
   await row.save();
+  invalidateEfiRuntimeCredentialsCache();
 
   await recordEfiConfigAudit({
     configId: row.id,
@@ -582,6 +676,7 @@ export async function revokeEfiAdminConfig(input: {
   row.status = "revoked";
   row.updatedByUserId = input.actorUserId;
   await row.save();
+  invalidateEfiRuntimeCredentialsCache();
   revokeEfiCertificateRuntimeFile(previousKey);
 
   await recordEfiConfigAudit({

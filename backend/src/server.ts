@@ -18,6 +18,7 @@ import { startCrmFollowUpNotifierScheduler } from "./jobs/crmFollowUpNotifierJob
 import { startCrmStaleDealAttentionScheduler } from "./jobs/crmStaleDealAttentionJob";
 import { startRefreshInstagramOAuthTokensScheduler } from "./jobs/RefreshInstagramOAuthTokensJob";
 import { logWhatsAppPolicyAtProcessBoot } from "./helpers/whatsappUnavailablePresence";
+import { logEfiActivationControlsAtBoot } from "./services/SaasBilling/efiIntegrationStatus";
 import {
   startAgentOsScalabilityRuntime,
   stopAgentOsScalabilityRuntime
@@ -36,6 +37,7 @@ const server = app.listen(process.env.PORT, async () => {
   });
   logger.info(`Server started on port: ${process.env.PORT}`);
   logWhatsAppPolicyAtProcessBoot();
+  logEfiActivationControlsAtBoot();
   logger.info(
     "Super Admin API: GET/POST /platform/super-admins · PUT /platform/super-admins/:userId " +
       "(e o mesmo sob prefixo /api, ex. POST /api/platform/super-admins). " +

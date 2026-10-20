@@ -1,6 +1,7 @@
 import PlatformEfiConfigAudit, {
   PlatformEfiAuditAction
 } from "../../models/PlatformEfiConfigAudit";
+import type { Transaction } from "sequelize";
 import type { PlatformEfiSlot } from "../../models/PlatformEfiConfig";
 
 const FORBIDDEN_DIFF_KEYS = [
@@ -69,6 +70,8 @@ export type RecordEfiConfigAuditInput = {
   actorUserId?: number | null;
   action: PlatformEfiAuditAction;
   diffSummary?: Record<string, unknown> | null;
+  /** Grava na mesma transação da mudança auditada (ex.: ativação, P-B31-03). */
+  transaction?: Transaction;
 };
 
 /**
@@ -79,11 +82,14 @@ export async function recordEfiConfigAudit(
   input: RecordEfiConfigAuditInput
 ): Promise<PlatformEfiConfigAudit> {
   const safe = sanitizeEfiAuditDiff(input.diffSummary || {});
-  return PlatformEfiConfigAudit.create({
+  const values = {
     configId: input.configId ?? null,
     slot: input.slot,
     actorUserId: input.actorUserId ?? null,
     action: input.action,
     diffSummary: Object.keys(safe).length ? JSON.stringify(safe) : null
-  });
+  };
+  return input.transaction
+    ? PlatformEfiConfigAudit.create(values, { transaction: input.transaction })
+    : PlatformEfiConfigAudit.create(values);
 }

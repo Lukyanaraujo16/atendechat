@@ -1,5 +1,8 @@
+import crypto from "crypto";
 import axios, { AxiosInstance } from "axios";
 import { saasBillingFlags } from "../../config/saasBillingFlags";
+import { getEfiRuntimeCredentials } from "./efiRuntimeCredentials";
+import { getEfiFinancialCredentialsSource } from "./efiFinancialSource";
 import { logger } from "../../utils/logger";
 
 /**
@@ -10,17 +13,32 @@ import { logger } from "../../utils/logger";
  * Desabilitado por default (EFI_BOLETO_ENABLED / EFI_CARD_ENABLED / EFI_COBRANCAS_SETTLE_ENABLED).
  */
 
-function cobrancasBaseUrl(): string {
-  return saasBillingFlags.gerencianetSandbox()
-    ? "https://cobrancas-h.api.efipay.com.br"
-    : "https://cobrancas.api.efipay.com.br";
-}
+const COBRANCAS_BASE_URLS = {
+  sandbox: "https://cobrancas-h.api.efipay.com.br",
+  production: "https://cobrancas.api.efipay.com.br"
+} as const;
 
-let cachedToken: { access_token: string; expiresAt: number } | null = null;
-
-async function getCobrancasToken(): Promise<string> {
-  if (cachedToken && Date.now() < cachedToken.expiresAt - 30_000) {
-    return cachedToken.access_token;
+/**
+ * Credencial e base pela fonte financeira efetiva (D-P1, RF1.9, P-B31-08):
+ * - `legacy_env`: EFI_COBRANCAS_* → GERENCIANET_*, base por GERENCIANET_SANDBOX (comportamento atual);
+ * - `database`: credencial Cobranças do slot (ou a Pix, se não houver dedicada), base pelo ambiente do slot.
+ * Na B3.1 a fonte financeira é sempre `legacy_env`, mesmo com `EFI_CREDENTIALS_SOURCE=database`,
+ * para o settle não usar credencial diferente da do checkout/webhook.
+ */
+async function cobrancasCredentials(): Promise<{
+  clientId: string;
+  clientSecret: string;
+  baseUrl: string;
+  cacheKey: string;
+}> {
+  if (getEfiFinancialCredentialsSource() === "database") {
+    const creds = await getEfiRuntimeCredentials("financial");
+    return {
+      clientId: creds.cobrancasClientId,
+      clientSecret: creds.cobrancasClientSecret,
+      baseUrl: COBRANCAS_BASE_URLS[creds.efiEnvironment],
+      cacheKey: `cobrancas:${creds.tokenCacheKey}`
+    };
   }
 
   const clientId = process.env.EFI_COBRANCAS_CLIENT_ID || process.env.GERENCIANET_CLIENT_ID;
@@ -30,22 +48,52 @@ async function getCobrancasToken(): Promise<string> {
   if (!clientId || !clientSecret) {
     throw new Error("Credenciais API Cobranças Efí ausentes (EFI_COBRANCAS_CLIENT_ID/SECRET)");
   }
+  const baseUrl = saasBillingFlags.gerencianetSandbox()
+    ? COBRANCAS_BASE_URLS.sandbox
+    : COBRANCAS_BASE_URLS.production;
+  const credHash = crypto
+    .createHash("sha256")
+    .update(`${clientId}:${clientSecret}`)
+    .digest("hex")
+    .slice(0, 16);
+  return { clientId, clientSecret, baseUrl, cacheKey: `cobrancas:env:${baseUrl}:${credHash}` };
+}
 
-  const auth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+/** Um token por credencial/base (R14): trocar credencial nunca reaproveita token antigo. */
+let cachedToken: { key: string; access_token: string; expiresAt: number } | null = null;
+
+async function getCobrancasToken(creds: {
+  clientId: string;
+  clientSecret: string;
+  baseUrl: string;
+  cacheKey: string;
+}): Promise<string> {
+  if (
+    cachedToken &&
+    cachedToken.key === creds.cacheKey &&
+    Date.now() < cachedToken.expiresAt - 30_000
+  ) {
+    return cachedToken.access_token;
+  }
+
+  const auth = Buffer.from(`${creds.clientId}:${creds.clientSecret}`).toString("base64");
   const { data } = await axios.post(
-    `${cobrancasBaseUrl()}/v1/authorize`,
+    `${creds.baseUrl}/v1/authorize`,
     { grant_type: "client_credentials" },
     {
       headers: {
         Authorization: `Basic ${auth}`,
         "Content-Type": "application/json"
       },
-      timeout: 20000
+      timeout: 20000,
+      // Teto total (o `timeout` do axios é de inatividade do socket).
+      signal: AbortSignal.timeout(20000)
     }
   );
 
   const expiresIn = Number(data.expires_in || 600) * 1000;
   cachedToken = {
+    key: creds.cacheKey,
     access_token: data.access_token,
     expiresAt: Date.now() + expiresIn
   };
@@ -53,15 +101,22 @@ async function getCobrancasToken(): Promise<string> {
 }
 
 async function cobrancasClient(): Promise<AxiosInstance> {
-  const token = await getCobrancasToken();
-  return axios.create({
-    baseURL: cobrancasBaseUrl(),
+  const creds = await cobrancasCredentials();
+  const token = await getCobrancasToken(creds);
+  const client = axios.create({
+    baseURL: creds.baseUrl,
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json"
     },
     timeout: 30000
   });
+  // Teto total por chamada (sinal novo a cada requisição).
+  client.interceptors.request.use(config => ({
+    ...config,
+    signal: config.signal || AbortSignal.timeout(30000)
+  }));
+  return client;
 }
 
 /**

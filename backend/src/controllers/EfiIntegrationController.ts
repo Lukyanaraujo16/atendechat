@@ -11,7 +11,7 @@ import {
  * Nunca retorna secrets, tokens ou caminhos de certificado.
  */
 export const status = async (req: Request, res: Response): Promise<Response> => {
-  const dto = getEfiIntegrationStatus();
+  const dto = await getEfiIntegrationStatus();
   return res.status(200).json(dto);
 };
 

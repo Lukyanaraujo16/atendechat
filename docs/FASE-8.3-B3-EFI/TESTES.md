@@ -1,6 +1,6 @@
 # Fase 8.3-B3 — Matriz de testes
 
-**Nenhum teste desta matriz foi executado.** Coluna “Estado” = `não executado` em todas as linhas.
+Execução: só os testes da B3.1 (2026-10-20, local). Os demais seguem `não executado`. “Parcial” = cobertura incompleta, **não** aprovado. Detalhes em “Registro B3.1”, no fim.
 
 Tipos de teste:
 - **U** — unitário (jest, mocks);
@@ -16,8 +16,8 @@ D-P8). O ID foi mantido para preservar a rastreabilidade.
 
 | ID | Cenário | Esperado | Tipo | Etapa | Estado |
 |----|---------|----------|------|-------|--------|
-| T-ACT-01 | Todos os controles no default | respostas de checkout e webhook idênticas às atuais (snapshot de contrato) | I | B3.1 | não executado |
-| T-ACT-02 | Log de boot e `GET /saas/finance/efi/status` | valor efetivo de cada controle, sem segredos | U | B3.1 | não executado |
+| T-ACT-01 | Todos os controles no default | respostas de checkout e webhook idênticas às atuais (snapshot de contrato) | I | B3.1 | aprovado (B3.1, fechamento) — executado como U em vez de I: contrato completo de checkout + webhook (SDK e modelos simulados) em `efiLegacyContract.spec`; banco real coberto por T-REG-02 |
+| T-ACT-02 | Log de boot e `GET /saas/finance/efi/status` | valor efetivo de cada controle, sem segredos | U | B3.1 | aprovado (B3.1, U) |
 | T-ACT-03 | Migrations e seeds da B3 aplicados | nenhum controle ligado; comportamento = default | I | B3.2/B3.3 | não executado |
 | T-ACT-04 | `EFI_PIX_CHARGE_V2_ENABLED=false` | checkout legado, incluindo `pixConfigWebhook` | I | B3.2 | não executado |
 | T-ACT-05 | Cadastro admin de webhook com v2 desligado | recusado (C3), sem chamada à Efí | I | B3.2 | não executado |
@@ -29,29 +29,29 @@ D-P8). O ID foi mantido para preservar a rastreabilidade.
 
 | ID | Cenário | Esperado | Tipo | Etapa | Estado |
 |----|---------|----------|------|-------|--------|
-| T-CRED-01 | `EFI_CREDENTIALS_SOURCE` ausente | fonte `legacy_env`, log de boot | U | B3.1 | não executado |
-| T-CRED-02 | Valor inválido (`foo`) | `legacy_env` + warn | U | B3.1 | não executado |
-| T-CRED-03 | `database` sem registro do slot | `ERR_EFI_CONFIG_NOT_FOUND`, sem fallback env | U | B3.1 | não executado |
-| T-CRED-04 | `database` com `adminEnabled=false` | erro tipado, checkout 4xx claro | U | B3.1 | não executado |
-| T-CRED-05 | **(rev. 2026-10-20)** `database` no slot `production` sem homologação válida | bloqueado — ver T-HOM-02 | U | B3.1 | não executado |
-| T-CRED-06 | `database` revogado | `ERR_EFI_CONFIG_REVOKED` | U | B3.1 | não executado |
-| T-CRED-07 | Cache: upsert de segredo invalida o token | próxima chamada refaz o OAuth | U | B3.1 | não executado |
-| T-CRED-08 | Cache: activate/deactivate/revoke/upload/delete invalidam | idem | U | B3.1 | não executado |
-| T-CRED-09 | Cobranças usa a credencial dedicada se existir, senão a Pix | conforme resolvedor | U | B3.1 | não executado |
-| T-CRED-10 | `EFI_CREDENTIAL_ENCRYPTION_KEY` errada | `ERR_EFI_CREDENTIAL_DECRYPT_FAILED`, sem vazar ciphertext | U | B3.1 | não executado |
+| T-CRED-01 | `EFI_CREDENTIALS_SOURCE` ausente | fonte `legacy_env`, log de boot | U | B3.1 | aprovado (B3.1, U) |
+| T-CRED-02 | Valor inválido (`foo`) | `legacy_env` + warn | U | B3.1 | aprovado (B3.1, U) |
+| T-CRED-03 | `database` sem registro do slot | `ERR_EFI_CONFIG_NOT_FOUND`, sem fallback env | U | B3.1 | aprovado (B3.1, U) |
+| T-CRED-04 | `database` com `adminEnabled=false` | erro tipado, checkout 4xx claro | U | B3.1 | aprovado na parte aplicável (provedor → 403 `ERR_EFI_CONFIG_NOT_ENABLED`). Parte “checkout 4xx” **não se aplica à B3.1**: o checkout nunca consulta a fonte `database` (P-B31-08, comprovado em `efiLegacyContract`); reavaliar na B3.2 |
+| T-CRED-05 | **(rev. 2026-10-20)** `database` no slot `production` sem homologação válida | bloqueado — ver T-HOM-02 | U | B3.1 | aprovado (B3.1, U) — via T-HOM-02 |
+| T-CRED-06 | `database` revogado | `ERR_EFI_CONFIG_REVOKED` | U | B3.1 | aprovado (B3.1, U) |
+| T-CRED-07 | Cache: upsert de segredo invalida o token | próxima chamada refaz o OAuth | U | B3.1 | aprovado (B3.1, fechamento) — U ponta a ponta `efiCacheInvalidation.spec` (admin + provedor + cliente Pix reais) |
+| T-CRED-08 | Cache: activate/deactivate/revoke/upload/delete invalidam | idem | U | B3.1 | aprovado (B3.1, fechamento) — idem T-CRED-07, 6 ações |
+| T-CRED-09 | Cobranças usa a credencial dedicada se existir, senão a Pix | conforme resolvedor | U | B3.1 | aprovado (B3.1, U) |
+| T-CRED-10 | `EFI_CREDENTIAL_ENCRYPTION_KEY` errada | `ERR_EFI_CREDENTIAL_DECRYPT_FAILED`, sem vazar ciphertext | U | B3.1 | aprovado (B3.1, U) |
 | T-CRED-11 | **(rev. 2026-10-20)** Marcar homologado | substituído por T-HOM-03/04 | — | — | não executado |
-| T-CRED-12 | Teste/ativação com P12 que não abre (`createSecureContext` falha) | falha clara, não ativa | U | B3.1 | não executado |
-| T-CRED-13 | Fonte `database`: base Cobranças pelo slot, ignorando `GERENCIANET_SANDBOX` | conforme | U | B3.1 | não executado |
-| T-CRED-14 | Webhook secret curto (< 32) | 400 | U | B3.1 | não executado |
-| T-CRED-15 | **(rev. 2026-10-20)** Contrato `legacy_env` | consolidado em T-ACT-01 | — | — | não executado |
-| T-CRED-16 | Status unificado: tabela com todas as combinações de campos | admin e resolvedor devolvem o mesmo status | U | B3.1 | não executado |
+| T-CRED-12 | Teste/ativação com P12 que não abre (`createSecureContext` falha) | falha clara, não ativa | U | B3.1 | aprovado (B3.1, U) |
+| T-CRED-13 | Fonte `database`: base Cobranças pelo slot, ignorando `GERENCIANET_SANDBOX` | conforme | U | B3.1 | aprovado (B3.1, U) |
+| T-CRED-14 | Webhook secret curto (< 32) | 400 | U | B3.1 | aprovado (B3.1, U) |
+| T-CRED-15 | **(rev. 2026-10-20)** Contrato `legacy_env` | consolidado em T-ACT-01 | — | — | não executado — consolidado em T-ACT-01 |
+| T-CRED-16 | Status unificado: tabela com todas as combinações de campos | admin e resolvedor devolvem o mesmo status | U | B3.1 | aprovado (B3.1, U) |
 
 ## Homologação (D-P2, D-P17)
 
 | ID | Cenário | Esperado | Tipo | Etapa | Estado |
 |----|---------|----------|------|-------|--------|
-| T-HOM-01 | Troca de segredo ou P12 | `configFingerprint` muda; homologação anterior inválida | U | B3.1 | não executado |
-| T-HOM-02 | Slot `homologation` com configuração válida e sem homologação / slot `production` sem homologação válida | TESTE opera; PRODUÇÃO bloqueada | U | B3.1 | não executado |
+| T-HOM-01 | Troca de segredo ou P12 | `configFingerprint` muda; homologação anterior inválida | U | B3.1 | aprovado (B3.1, U) |
+| T-HOM-02 | Slot `homologation` com configuração válida e sem homologação / slot `production` sem homologação válida | TESTE opera; PRODUÇÃO bloqueada | U | B3.1 | aprovado (B3.1, U) |
 | T-HOM-03 | `homologate` em TESTE sem e com evidência (evento, pagamento gateway, renovação no mesmo fingerprint) | 400 / aceito, com auditoria de fingerprint, ambiente e commit | I | B3.3 | não executado |
 | T-HOM-04 | `homologate` em PRODUÇÃO: referência do relatório TESTE (mesmo commit), configuração válida, webhook conferido, evento `teste` persistido | aceito **sem nenhum `SaaSPayment`**; recusa se faltar um item | I | B3.3 | não executado |
 | T-HOM-05 | Deploy com commit diferente do homologado | status com aviso; integração **não** desabilitada automaticamente | U | B3.3 | não executado |
@@ -60,23 +60,23 @@ D-P8). O ID foi mantido para preservar a rastreabilidade.
 
 | ID | Cenário | Esperado | Tipo | Etapa | Estado |
 |----|---------|----------|------|-------|--------|
-| T-CERT-01 | P12 válido no banco → Agent mTLS em memória | nenhum arquivo gravado (nem temporário) no caminho `database` | U | B3.1 | não executado |
-| T-CERT-02 | P12 ausente com `database` | `ERR_EFI_CERTIFICATE_MISSING` | U | B3.1 | não executado |
-| T-CERT-03 | P12 corrompido/não PKCS#12 | erro tipado no upload e no uso | U | B3.1 | não executado |
-| T-CERT-04 | Troca de P12 | invalida token, ativação e homologação; fingerprint novo | U | B3.1 | não executado |
+| T-CERT-01 | P12 válido no banco → Agent mTLS em memória | nenhum arquivo gravado (nem temporário) no caminho `database` | U | B3.1 | aprovado (B3.1, U) |
+| T-CERT-02 | P12 ausente com `database` | `ERR_EFI_CERTIFICATE_MISSING` | U | B3.1 | aprovado (B3.1, U) |
+| T-CERT-03 | P12 corrompido/não PKCS#12 | erro tipado no upload e no uso | U | B3.1 | aprovado (B3.1, U) |
+| T-CERT-04 | Troca de P12 | invalida token, ativação e homologação; fingerprint novo | U | B3.1 | aprovado (B3.1, U) — por composição (fingerprint/`adminEnabled` + invalidação) |
 | T-CERT-05 | P12 da conta/ambiente errado | OAuth Pix falha com mensagem sanitizada | H | B3.4 | não executado |
-| T-CERT-06 | Legado: arquivo `certs/<nome>.p12` ausente | comportamento atual (400) preservado | U | B3.1 | não executado |
+| T-CERT-06 | Legado: arquivo `certs/<nome>.p12` ausente | comportamento atual (400) preservado | U | B3.1 | aprovado (B3.1, U) — SDK simulado com ENOENT |
 
 ## Ambiente homologação/produção
 
 | ID | Cenário | Esperado | Tipo | Etapa | Estado |
 |----|---------|----------|------|-------|--------|
-| T-ENV-01 | `STREAMHUB_RUNTIME_ENV=test` + `database` | slot `homologation`, base sandbox (PT-4) | U | B3.1 | não executado |
-| T-ENV-02 | `STREAMHUB_RUNTIME_ENV=production` + `database` | slot `production`, base produção (PT-4) | U | B3.1 | não executado |
-| T-ENV-03 | Runtime ausente/inválido + `database` | bloqueio total Efí, erro claro | U | B3.1 | não executado |
-| T-ENV-04 | Registro com `efiEnvironment` incompatível | `ERR_EFI_ENVIRONMENT_FORBIDDEN_FOR_RUNTIME` | U | B3.1 | não executado |
-| T-ENV-05 | `GERENCIANET_SANDBOX` ignorado na fonte `database` | ambiente vem do slot | U | B3.1 | não executado |
-| T-ENV-06 | Status mostra fonte, slot, ambiente, fingerprint e homologação | DTO sem segredos | U | B3.1 | não executado |
+| T-ENV-01 | `STREAMHUB_RUNTIME_ENV=test` + `database` | slot `homologation`, base sandbox (PT-4) | U | B3.1 | aprovado (B3.1, fechamento) — credenciais do slot → base Pix sandbox |
+| T-ENV-02 | `STREAMHUB_RUNTIME_ENV=production` + `database` | slot `production`, base produção (PT-4) | U | B3.1 | aprovado (B3.1, fechamento) — credenciais do slot → base Pix produção |
+| T-ENV-03 | Runtime ausente/inválido + `database` | bloqueio total Efí, erro claro | U | B3.1 | aprovado (B3.1, U) |
+| T-ENV-04 | Registro com `efiEnvironment` incompatível | `ERR_EFI_ENVIRONMENT_FORBIDDEN_FOR_RUNTIME` | U | B3.1 | aprovado (B3.1, U) |
+| T-ENV-05 | `GERENCIANET_SANDBOX` ignorado na fonte `database` | ambiente vem do slot | U | B3.1 | aprovado (B3.1, U) |
+| T-ENV-06 | Status mostra fonte, slot, ambiente, fingerprint e homologação | DTO sem segredos | U | B3.1 | aprovado (B3.1, U) |
 
 ## Geração de cobrança
 
@@ -196,15 +196,15 @@ D-P8). O ID foi mantido para preservar a rastreabilidade.
 
 | ID | Cenário | Esperado | Tipo | Etapa | Estado |
 |----|---------|----------|------|-------|--------|
-| T-NET-01 | Timeout OAuth Pix | erro tipado em ≤ 15 s | U | B3.1 | não executado |
-| T-NET-02 | `ECONNRESET` | promise rejeitada (nunca pendurada) | U | B3.1 | não executado |
+| T-NET-01 | Timeout OAuth Pix | erro tipado em ≤ 15 s | U | B3.1 | aprovado (B3.1, U, servidor HTTP local) |
+| T-NET-02 | `ECONNRESET` | promise rejeitada (nunca pendurada) | U | B3.1 | aprovado (B3.1, U, servidor HTTP local) |
 | T-NET-03 | Efí 5xx na criação | tentativa `failed`; o retry da mesma tentativa reusa o txid | I | B3.2 | não executado |
 | T-NET-04 | Efí 4xx (txid inválido / chave inexistente) | erro sanitizado, sem retry | U | B3.2 | não executado |
 | T-NET-05 | **(rev. 2026-10-20)** Timeout em `GET /v2/cob/:txid` no worker | `retry_scheduled` (não 500 para a Efí) | I | B3.3 | não executado |
 | T-NET-06 | **(rev. 2026-10-20)** Banco indisponível na recepção | 503 (= T-ASY-02) | I | B3.3 | não executado |
 | T-NET-07 | **(rev. 2026-10-20)** Tempo de recepção | < 5 s, sem chamada à Efí | U | B3.3 | não executado |
 | T-NET-08 | Falha ao atualizar `SaaSPaymentAttempt` no worker | não perde o pagamento; o evento termina corretamente | I | B3.3 | não executado |
-| T-NET-09 | Operação Efí > 20 s | erro tipado de timeout | U | B3.1 | não executado |
+| T-NET-09 | Operação Efí > 20 s | erro tipado de timeout | U | B3.1 | aprovado (B3.1, U, servidor HTTP local) |
 
 ## Renovação
 
@@ -248,10 +248,10 @@ D-P8). O ID foi mantido para preservar a rastreabilidade.
 
 | ID | Cenário | Esperado | Tipo | Etapa | Estado |
 |----|---------|----------|------|-------|--------|
-| T-SEC-01 | DTOs e auditoria sem segredo/ciphertext | só máscaras/fingerprint | U | B3.1 | não executado |
-| T-SEC-02 | Logs de erro OAuth sanitizados | sem `Bearer`, `client_secret`, PEM | U | B3.1 | não executado |
-| T-SEC-03 | Fonte `database` não lê `GERENCIANET_*` | teste com env poluída | U | B3.1 | não executado |
-| T-SEC-04 | Slot de produção inacessível em runtime test | 403 | U | B3.1 | não executado |
+| T-SEC-01 | DTOs e auditoria sem segredo/ciphertext | só máscaras/fingerprint | U | B3.1 | aprovado (B3.1, U) |
+| T-SEC-02 | Logs de erro OAuth sanitizados | sem `Bearer`, `client_secret`, PEM | U | B3.1 | aprovado (B3.1, fechamento) — logs (info/warn/error/debug), retorno e auditoria do test-auth sem segredo, Bearer ou PEM |
+| T-SEC-03 | Fonte `database` não lê `GERENCIANET_*` | teste com env poluída | U | B3.1 | aprovado (B3.1, U) |
+| T-SEC-04 | Slot de produção inacessível em runtime test | 403 | U | B3.1 | aprovado (B3.1, U) |
 | T-SEC-05 | URL do webhook fora dos logs da aplicação | query removida | U | B3.3 | não executado |
 | T-SEC-06 | Rate limit no webhook | 429 acima do limite; retries normais da Efí passam | I | B3.3 | não executado |
 | T-SEC-07 | Payload forjado com txid válido de outra conta | consulta Efí falha/diverge → `invalid_permanent`; nada aplicado | I | B3.3 | não executado |
@@ -260,7 +260,7 @@ D-P8). O ID foi mantido para preservar a rastreabilidade.
 | T-SEC-10 | Sentry `beforeSend` na rota de webhook | sem query e sem `Authorization` | U | B3.3 | não executado |
 | T-SEC-11 | `TRUST_PROXY_HOPS`: allowlist/rate limit usam o IP do cliente | conforme; sem o controle, comportamento atual | I | B3.3 | não executado |
 | T-SEC-12 | Logs com `invoiceId`, `companyId`, id do evento, sufixos de txid/e2eId | conforme, sem segredo nem dados do pagador | U | B3.3 | não executado |
-| T-SEC-13 | Auditoria A1 de cada ação admin nova | 1 registro com ator por ação | I | B3.1–B3.3 | não executado |
+| T-SEC-13 | Auditoria A1 de cada ação admin nova | 1 registro com ator por ação | I | B3.1–B3.3 | aprovado no escopo B3.1 (U: 7 ações admin, 1 auditoria com ator cada). Versão I com a ação nova `homologate` fica para a B3.3 |
 
 ## Rollback
 
@@ -286,9 +286,55 @@ D-P8). O ID foi mantido para preservar a rastreabilidade.
 
 | ID | Cenário | Esperado | Tipo | Etapa | Estado |
 |----|---------|----------|------|-------|--------|
-| T-REG-01 | Suíte unitária `services/SaasBilling/__tests__` | verde | U | todas | não executado |
-| T-REG-02 | Suíte de integração `src/__integration__/*.it.spec.ts` (gatewayPayment, manualPayment, renewal, subscriptionCenter, historicalReview, fechamentoFinal, httpPermissions, billingSimulation, notifications) | verde | I | todas | não executado |
+| T-REG-01 | Suíte unitária `services/SaasBilling/__tests__` | verde | U | todas | aprovado no fechamento B3.1 — 32 suítes / 354 testes |
+| T-REG-02 | Suíte de integração `src/__integration__/*.it.spec.ts` (gatewayPayment, manualPayment, renewal, subscriptionCenter, historicalReview, fechamentoFinal, httpPermissions, billingSimulation, notifications) | verde | I | todas | aprovado no fechamento B3.1 — 11 suítes / 102 testes (banco local descartável) |
 | T-REG-03 | Baixa manual Pix → `manual_pix_no_settle` | mantido | I | B3.2 | não executado |
 | T-REG-04 | Cancelamento com Pix ativo registra `externalChargeActive` | mantido | I | B3.3 | não executado |
 | T-REG-05 | Edição bloqueada com cobrança externa | mantido | I | B3.3 | não executado |
 | T-REG-06 | Simulação de bloqueio inalterada | mantido | I | B3.3 | não executado |
+
+## Registro B3.1 (2026-10-20, execução local)
+
+Ambiente: macOS, Node local, Jest 27; carga alta na máquina (load 10–14). Nenhum acesso a VPS; nenhuma chamada à Efí
+real (HTTP simulado por mock do axios ou servidor HTTP local em 127.0.0.1). P12 de teste autoassinado
+(`__tests__/fixtures/efiTestP12.ts`, CN=b31-test-fixture), sem valor real.
+
+Specs da B3.1 (`backend/src/services/SaasBilling/__tests__/`): `efiActivationControls`, `efiPixClient`,
+`efiRuntimeCredentials`, `efiLegacyContract` (novos); `efiCredentialResolver`, `PlatformEfiConfigAdminService`,
+`efiIntegrationStatus`, `efiCertificateStore` (atualizados).
+
+| Verificação | Comando | Resultado |
+|-------------|---------|-----------|
+| T-REG-01 | `NODE_ENV=test npx jest --coverage=false --bail=0 src/services/SaasBilling src/__tests__ src/controllers` | aprovado no fechamento B3.1 — 32 suítes / 354 testes |
+| T-REG-02 | `scripts/test-integration-f84.sh` (container `atendechat-f84-testdb`, banco criado e removido) | aprovado no fechamento B3.1 — 11 suítes / 102 testes (banco local descartável) |
+| Suíte unitária completa | `NODE_ENV=test npx jest --coverage=false --bail=0` | 271/283 suítes, 2566/2604 testes. Falhas: `efiPixClient` (T-NET-09 instável, corrigido depois e reexecutado: 10/10), `billingSimulation` (timeout de 5 s por carga; isolado: verde) e 10 suítes **pré-existentes** |
+| Falhas pré-existentes | as mesmas 10 suítes num worktree limpo do HEAD `88d1c30` | 10 suítes / 35 testes falham também no HEAD: `mcpRuntime`, `evolutionQuotedEcho`, `evolutionOutboundEcho`, `aiAgentNaturalResponsePacing`, `inventoryBarcode`, `listInventoryProducts`, `inventoryProductUnit`, `processors`, `knowledgeProcessing`, `aiAgentProductWizardContract` — fora do escopo B3 |
+| Typecheck | `node_modules/.bin/tsc --noEmit -p .` | exit 0 |
+| Build | `npm run build` (backend) | exit 0 |
+
+Não executados na B3.1: snapshot I de T-ACT-01, T-CRED-15, T-SEC-13 e os testes de outras etapas.
+
+### Fechamento técnico B3.1 (2026-10-20)
+
+Specs novas: `efiBuildInfo` (P-B31-01), `efiCacheInvalidation` (T-CRED-07/08). Ampliadas: `efiLegacyContract` (T-ACT-01 e
+P-B31-08: checkout + webhook idênticos com `EFI_CREDENTIALS_SOURCE=database`, zero leituras do banco; guarda estrutural de
+chamadores financeiros), `efiRuntimeCredentials` (P-B31-08 no provedor e no settle; P-B31-03; T-ENV-01/02),
+`efiCredentialResolver`, `efiIntegrationStatus`, `PlatformEfiConfigAdminService` (auditoria da ativação na transação,
+T-SEC-02, T-SEC-13, decifragem falha sem 500, commit com falha), `efiActivationControls` (aviso de boot).
+
+| Verificação | Resultado |
+|-------------|-----------|
+| P-B31-08 — isolamento financeiro | aprovado (U): checkout, webhook, settle e boleto em `legacy_env` com `database` configurado |
+| P-B31-01 — versão | aprovado (U + script real em repositório git temporário): HEAD, `dirty`, fallback env, `null` sem fonte, build nunca quebra. `npm run build` real gravou `dist/build-info.json` com o HEAD local e `dirty: true` |
+| P-B31-03 — validação Pix | aprovado (U): ativação B2, fingerprint/ambiente diferentes, `pixOAuthValidated=false` e segredo trocado depois → `ERR_EFI_PIX_VALIDATION_REQUIRED` |
+| Typecheck | `node_modules/.bin/tsc --noEmit -p .` exit 0 |
+| Build | `npm run build` exit 0 |
+| T-REG-01 | 32 suítes / 354 testes verdes |
+| T-REG-02 | 11 suítes / 102 testes verdes (1ª execução abortou: o Docker Desktop local tinha parado; reiniciado, verde) |
+| Suíte completa | 276/286 suítes, 2603/2638 testes. Falham **só** as 10 suítes / 35 testes pré-existentes (mesmas do HEAD `88d1c30`) |
+
+**Contagem da suíte (investigada):** a execução anterior listou 283 suítes contra 284 arquivos porque
+`efiLegacyContract.spec.ts` foi criado depois de a execução começar. Agora `find` e `jest --listTests` dão 286 = 286 suítes
+executadas. O total passou de 2604 para 2638 testes só pelos testes novos do fechamento; as falhas seguem as mesmas 35.
+
+Seguem não executados: T-CRED-15 (consolidado em T-ACT-01) e os testes das outras etapas.

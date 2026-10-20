@@ -6,6 +6,8 @@ import PlatformEfiConfigAudit from "../../../models/PlatformEfiConfigAudit";
 import sequelize from "../../../database";
 import {
   activateEfiAdminConfig,
+  deactivateEfiAdminConfig,
+  deleteEfiCertificate,
   getEfiAdminConfigSafe,
   revokeEfiAdminConfig,
   testEfiAdminAuth,
@@ -13,6 +15,16 @@ import {
   upsertEfiAdminConfig
 } from "../PlatformEfiConfigAdminService";
 import { __resetEfiAuthTestRateLimitForTests } from "../efiIntegrationStatus";
+import { derivePlatformEfiConfigStatus } from "../efiCredentialResolver";
+import { computeEfiConfigFingerprint } from "../efiConfigFingerprint";
+import { invalidateEfiRuntimeCredentialsCache } from "../efiRuntimeCredentials";
+import { encryptEfiBinary } from "../../../helpers/efiCredentialCrypto";
+import { efiTestP12 } from "./fixtures/efiTestP12";
+
+jest.mock("../efiRuntimeCredentials", () => ({
+  invalidateEfiRuntimeCredentialsCache: jest.fn()
+}));
+const invalidateCache = invalidateEfiRuntimeCredentialsCache as jest.Mock;
 
 jest.mock("axios");
 jest.mock("../../../database", () => ({
@@ -46,17 +58,7 @@ const create = PlatformEfiConfig.create as jest.Mock;
 const auditCreate = PlatformEfiConfigAudit.create as jest.Mock;
 const transaction = sequelize.transaction as jest.Mock;
 
-function fakeP12(): Buffer {
-  const oid = Buffer.from([
-    0x06, 0x08, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x0c, 0x01
-  ]);
-  return Buffer.concat([
-    Buffer.from([0x30, 0x82]),
-    Buffer.alloc(80, 0x01),
-    oid,
-    Buffer.alloc(40, 0x02)
-  ]);
-}
+const fakeP12 = efiTestP12;
 
 describe("PlatformEfiConfigAdminService", () => {
   const original = { ...process.env };
@@ -301,7 +303,17 @@ describe("PlatformEfiConfigAdminService", () => {
     ).rejects.toMatchObject({ message: "ERR_EFI_CERTIFICATE_MISSING" });
 
     row.certificateEncrypted = encryptEfiSecret("not-really-cert-but-presence");
-    // encryptEfiSecret makes efic1 for text — enough for hasEncrypted check
+    // B3.1: a ativação abre o P12 de verdade (RF1.8).
+    await expect(
+      activateEfiAdminConfig({ slot: "homologation", actorUserId: 1, confirm: true })
+    ).rejects.toMatchObject({ message: "ERR_EFI_CERTIFICATE_INVALID" });
+    expect(row.adminEnabled).toBe(false);
+
+    row.certificateEncrypted = encryptEfiBinary(efiTestP12());
+    mockedAxios.post.mockResolvedValue({
+      status: 200,
+      data: { access_token: "pix-tok", expires_in: 3600 }
+    });
     const dto = await activateEfiAdminConfig({
       slot: "homologation",
       actorUserId: 1,
@@ -328,5 +340,249 @@ describe("PlatformEfiConfigAdminService", () => {
       (c: any[]) => c[0]?.action === "revoke"
     )?.[0];
     expect(JSON.stringify(auditArg || {})).not.toContain("efic1:");
+  });
+  describe("B3.1", () => {
+    beforeEach(() => {
+      row.clientIdEncrypted = encryptEfiSecret("db-client-id");
+      row.clientSecretEncrypted = encryptEfiSecret("db-client-secret");
+      row.certificateEncrypted = encryptEfiBinary(efiTestP12());
+      row.certificateFingerprint = "a".repeat(64);
+      row.lastAuthTestOk = true;
+      row.status = "auth_validated";
+    });
+
+    it("T-CRED-14: webhook secret com menos de 32 caracteres → 400", async () => {
+      await expect(
+        upsertEfiAdminConfig({
+          slot: "homologation",
+          actorUserId: 1,
+          body: { webhookSecret: "x".repeat(31) }
+        })
+      ).rejects.toMatchObject({ message: "ERR_EFI_WEBHOOK_SECRET_TOO_SHORT", statusCode: 400 });
+      expect(transaction).not.toHaveBeenCalled();
+
+      await upsertEfiAdminConfig({
+        slot: "homologation",
+        actorUserId: 1,
+        body: { webhookSecret: "x".repeat(32) }
+      });
+      expect(row.webhookSecretConfigured).toBe(true);
+    });
+
+    it("T-CRED-12: test-auth valida P12 + OAuth Pix mTLS; resultado separado do Cobranças", async () => {
+      // Simula a rejeição real do axios (HTTP 401) só para o OAuth Pix.
+      mockedAxios.post.mockImplementation(async (url: string) => {
+        if (String(url).includes("pix-h.api.efipay.com.br")) {
+          throw { response: { status: 401, data: { error_description: "invalid_client" } } };
+        }
+        return { status: 200, data: { access_token: "cob", expires_in: 600 } } as any;
+      });
+
+      const result = await testEfiAdminAuth({ slot: "homologation", actorUserId: 1 });
+      const pixCall = mockedAxios.post.mock.calls.find(c =>
+        String(c[0]).startsWith("https://pix-h.api.efipay.com.br/oauth/token")
+      );
+      expect(pixCall).toBeDefined();
+      expect((pixCall![2] as any).httpsAgent.options.pfx.equals(efiTestP12())).toBe(true);
+      expect(result.cobrancas.ok).toBe(true);
+      expect(result.pix).toMatchObject({ ok: false, certificateValid: true, validated: false });
+      expect(row.lastAuthTestOk).toBe(true);
+      const audit = auditCreate.mock.calls.find(c => c[0]?.action === "test_auth")?.[0];
+      expect(JSON.parse(audit.diffSummary)).toMatchObject({ cobrancasOk: true, pixOk: false });
+      expect(JSON.stringify(auditCreate.mock.calls)).not.toContain("db-client-secret");
+    });
+
+    it("RF1.8: ativação recusada se o OAuth Pix falhar", async () => {
+      mockedAxios.post.mockRejectedValue({ response: { status: 401, data: {} } });
+      await expect(
+        activateEfiAdminConfig({ slot: "homologation", actorUserId: 1, confirm: true })
+      ).rejects.toMatchObject({ message: "ERR_EFI_PIX_AUTH_NOT_VALIDATED" });
+      expect(row.adminEnabled).toBe(false);
+      expect(row.save).not.toHaveBeenCalled();
+    });
+
+    it("ativação aborta (409) se a configuração mudou durante o teste Pix", async () => {
+      mockedAxios.post.mockResolvedValue({
+        status: 200,
+        data: { access_token: "tok", expires_in: 3600 }
+      });
+      findByPk.mockResolvedValue({
+        ...row,
+        clientSecretEncrypted: encryptEfiSecret("rotacionado-no-meio"),
+        save: jest.fn()
+      });
+      await expect(
+        activateEfiAdminConfig({ slot: "homologation", actorUserId: 1, confirm: true })
+      ).rejects.toMatchObject({ message: "ERR_EFI_CONFIG_CHANGED_DURING_ACTIVATION", statusCode: 409 });
+      expect(tx.rollback).toHaveBeenCalled();
+      expect(row.adminEnabled).toBe(false);
+    });
+
+    it("T-CRED-07/08: toda ação admin invalida o cache de credenciais", async () => {
+      mockedAxios.post.mockResolvedValue({
+        status: 200,
+        data: { access_token: "tok", expires_in: 3600 }
+      });
+      await upsertEfiAdminConfig({
+        slot: "homologation",
+        actorUserId: 1,
+        body: { clientSecret: "new-secret" }
+      });
+      await uploadEfiCertificate({
+        slot: "homologation",
+        actorUserId: 1,
+        buffer: efiTestP12(),
+        originalName: "efi.p12"
+      });
+      row.lastAuthTestOk = true;
+      await activateEfiAdminConfig({ slot: "homologation", actorUserId: 1, confirm: true });
+      await deactivateEfiAdminConfig({ slot: "homologation", actorUserId: 1 });
+      await deleteEfiCertificate({ slot: "homologation", actorUserId: 1 });
+      await revokeEfiAdminConfig({ slot: "homologation", actorUserId: 1, confirm: true });
+      expect(invalidateCache).toHaveBeenCalledTimes(6);
+    });
+
+    it("T-CERT-04/T-HOM-01: troca de P12 ou segredo muda o fingerprint e desabilita", async () => {
+      row.adminEnabled = true;
+      const before = computeEfiConfigFingerprint(row);
+      await uploadEfiCertificate({
+        slot: "homologation",
+        actorUserId: 1,
+        buffer: efiTestP12(),
+        originalName: "efi.p12"
+      });
+      const afterCert = computeEfiConfigFingerprint(row);
+      expect(afterCert).not.toBe(before);
+      expect(row.adminEnabled).toBe(false);
+      expect(row.lastAuthTestOk).toBeNull();
+
+      await upsertEfiAdminConfig({
+        slot: "homologation",
+        actorUserId: 1,
+        body: { pixKey: "nova-chave" }
+      });
+      expect(computeEfiConfigFingerprint(row)).not.toBe(afterCert);
+    });
+
+    it("T-CRED-16: status gravado pelo admin = status do resolvedor", async () => {
+      await upsertEfiAdminConfig({
+        slot: "homologation",
+        actorUserId: 1,
+        body: { pixKey: "chave" }
+      });
+      expect(row.status).toBe(derivePlatformEfiConfigStatus(row));
+      await deleteEfiCertificate({ slot: "homologation", actorUserId: 1 });
+      expect(row.status).toBe(derivePlatformEfiConfigStatus(row));
+    });
+
+    it("P-B31-03: ativação grava, na mesma transação, a validação Pix do fingerprint ativado", async () => {
+      mockedAxios.post.mockResolvedValue({
+        status: 200,
+        data: { access_token: "tok", expires_in: 3600 }
+      });
+      const fingerprint = computeEfiConfigFingerprint(row);
+      await activateEfiAdminConfig({ slot: "homologation", actorUserId: 7, confirm: true });
+      const call = auditCreate.mock.calls.find(c => c[0]?.action === "activate")!;
+      expect(call[1]).toEqual({ transaction: tx });
+      expect(call[0].actorUserId).toBe(7);
+      expect(JSON.parse(call[0].diffSummary)).toMatchObject({
+        pixOAuthValidated: true,
+        configFingerprint: fingerprint,
+        efiEnvironment: "sandbox"
+      });
+      expect(tx.commit).toHaveBeenCalled();
+    });
+
+    it("P-B31-03: falha ao gravar a validação desfaz a ativação", async () => {
+      mockedAxios.post.mockResolvedValue({
+        status: 200,
+        data: { access_token: "tok", expires_in: 3600 }
+      });
+      auditCreate.mockImplementation(async (values: any) => {
+        if (values.action === "activate") throw new Error("audit down");
+        return {};
+      });
+      await expect(
+        activateEfiAdminConfig({ slot: "homologation", actorUserId: 1, confirm: true })
+      ).rejects.toThrow("audit down");
+      expect(tx.rollback).toHaveBeenCalled();
+      expect(tx.commit).not.toHaveBeenCalled();
+      expect(invalidateCache).not.toHaveBeenCalled();
+    });
+
+    it("test-auth com P12 que não decifra → Pix falha tipada, sem 500", async () => {
+      mockedAxios.post.mockResolvedValue({
+        status: 200,
+        data: { access_token: "cob", expires_in: 600 }
+      });
+      row.certificateEncrypted = "efic1:corrompido-nao-decifra";
+      const result = await testEfiAdminAuth({ slot: "homologation", actorUserId: 1 });
+      expect(result.cobrancas.ok).toBe(true);
+      expect(result.pix).toMatchObject({ ok: false, certificateValid: false, validated: false });
+      expect(row.save).toHaveBeenCalled();
+    });
+
+    it("commit que falha propaga o erro original (rollback não o esconde)", async () => {
+      mockedAxios.post.mockResolvedValue({
+        status: 200,
+        data: { access_token: "tok", expires_in: 3600 }
+      });
+      tx.commit.mockRejectedValue(new Error("commit failed"));
+      tx.rollback.mockRejectedValue(new Error("Transaction already finished"));
+      await expect(
+        activateEfiAdminConfig({ slot: "homologation", actorUserId: 1, confirm: true })
+      ).rejects.toThrow("commit failed");
+      expect(invalidateCache).not.toHaveBeenCalled();
+    });
+
+    it("T-SEC-02: falha OAuth (Pix e Cobranças) não põe segredo, Bearer ou PEM nos logs", async () => {
+      const leak =
+        "client_secret=db-client-secret Bearer tok.abc.def -----BEGIN PRIVATE KEY-----MIIx-----END PRIVATE KEY-----";
+      mockedAxios.post.mockRejectedValue({
+        response: { status: 401, data: { error_description: leak } },
+        message: leak
+      });
+      const { logger } = require("../../../utils/logger");
+      const spies = ["info", "warn", "error", "debug"].map(level =>
+        jest.spyOn(logger, level).mockImplementation(() => undefined)
+      );
+      const result = await testEfiAdminAuth({ slot: "homologation", actorUserId: 1 });
+      expect(result.pix.ok).toBe(false);
+      const logged = JSON.stringify(spies.map(s => s.mock.calls));
+      const returned = JSON.stringify(result);
+      const audited = JSON.stringify(auditCreate.mock.calls);
+      for (const text of [logged, returned, audited]) {
+        expect(text).not.toContain("db-client-secret");
+        expect(text).not.toContain("tok.abc.def");
+        expect(text).not.toContain("BEGIN PRIVATE KEY");
+      }
+      spies.forEach(s => s.mockRestore());
+    });
+
+    it("T-SEC-13: cada ação admin grava exatamente 1 auditoria, com o ator", async () => {
+      mockedAxios.post.mockResolvedValue({
+        status: 200,
+        data: { access_token: "tok", expires_in: 3600 }
+      });
+      const actions: Array<[string, () => Promise<unknown>]> = [
+        ["update", () =>
+          upsertEfiAdminConfig({ slot: "homologation", actorUserId: 11, body: { pixKey: "chave-nova" } })],
+        ["upload_cert", () =>
+          uploadEfiCertificate({ slot: "homologation", actorUserId: 12, buffer: efiTestP12(), originalName: "e.p12" })],
+        ["test_auth", () => testEfiAdminAuth({ slot: "homologation", actorUserId: 13 })],
+        ["activate", () => activateEfiAdminConfig({ slot: "homologation", actorUserId: 14, confirm: true })],
+        ["deactivate", () => deactivateEfiAdminConfig({ slot: "homologation", actorUserId: 15 })],
+        ["delete_cert", () => deleteEfiCertificate({ slot: "homologation", actorUserId: 16 })],
+        ["revoke", () => revokeEfiAdminConfig({ slot: "homologation", actorUserId: 17, confirm: true })]
+      ];
+      for (const [, run] of actions) {
+        row.lastAuthTestOk = true;
+        auditCreate.mockClear();
+        __resetEfiAuthTestRateLimitForTests();
+        await run();
+        expect(auditCreate).toHaveBeenCalledTimes(1);
+        expect(auditCreate.mock.calls[0][0].actorUserId).toEqual(expect.any(Number));
+      }
+    });
   });
 });
