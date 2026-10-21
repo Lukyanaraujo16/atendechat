@@ -551,3 +551,13 @@ Pacote de implantação: `IMPLANTACAO-TESTE.md`. Nada foi executado em VPS.
 
 Pendências que seguem para a B3.4 (dependem de sandbox ou decisão): PT-2, PT-3, PT-5, PT-6, PT-7, PT-10, PT-12, P-B31-02,
 P-B31-04, P-B32-01, P-B32-02, P-B32-03, P-B32-08, P-B32-10. Ver `IMPLANTACAO-TESTE.md` §1.
+- **B34-T7 — guarda de fonte `database` (2026-10-21).** Diagnóstico da VPS de TESTE: `GERENCIANET_SANDBOX=false`,
+  ou seja, o legado de TESTE usa a conta Efí de produção. Liberar `pixChargeV2`, `webhookPipeline` ou
+  `pixReconciliationSweep` sem `databaseFinancial` faria o caminho B3 operar nessa conta. `evaluateEfiActivation`
+  (regra pura em `efiFinancialSource.ts`) passa a exigir a fonte `database` efetiva no mesmo runtime para as três;
+  `efiActivationGuard.spec` cobre o estado misto e reprova um release inconsistente. Defaults e legado inalterados.
+- **B34-T8 — testes sem rede Efí (2026-10-21).** `backend/jest.blockEfiNetwork.js` (setupFiles das configs de
+  unidade e integração) faz `tls.connect` lançar erro para `*.efipay.com.br` e `*.gerencianet.com.br`. Rede de
+  segurança caso falte um mock.
+- **B34-T9 — roteiro sem cobrança legada (2026-10-21).** IMPLANTACAO-TESTE §1.3/§5/§7.2: smoke sem Pix pelo
+  checkout legado; D-P14 não vale nesta VPS (H-20 e H-36 não aplicáveis); R-6 passa a secret novo só do slot.

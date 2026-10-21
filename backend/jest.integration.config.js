@@ -10,6 +10,7 @@ module.exports = {
   rootDir: __dirname,
   roots: ["<rootDir>/src"],
   testMatch: ["**/__integration__/**/*.it.spec.ts"],
+  setupFiles: ["<rootDir>/jest.blockEfiNetwork.js"],
   collectCoverage: false,
   clearMocks: true,
   testTimeout: 60000,

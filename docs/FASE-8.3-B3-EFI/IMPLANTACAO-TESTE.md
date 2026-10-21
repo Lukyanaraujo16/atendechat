@@ -36,7 +36,7 @@ quando autorizada (sem acesso a VPS).
 | R-3 | Autorizar o deploy 1 (inerte) em TESTE | — | §5 |
 | R-4 | Autorizar o commit "liberação TESTE" (§6.1) e o deploy 2 | Só depois de H-01…H-05 aprovados | §6 |
 | R-5 | PT-10 — retenção de `SaaSGatewayWebhookEvents` | Proposta em DECISOES §12.1 (indefinida para eventos com efeito financeiro; 180 dias para `teste`/`ignored_not_saas`); nenhuma exclusão automática até decidir | promoção |
-| R-6 | PT-12 — secret do webhook na troca `legacy_env` → `database` | Cadastrar no slot `homologation` **o mesmo valor** de `WEBHOOK_SUBSCRIPTION_SECRET` de TESTE (≥ 32 caracteres): a URL cadastrada continua válida na troca de fonte. Alternativa: recadastrar o webhook logo após a troca (a Efí retenta ~5 h) | H-20, H-36 |
+| R-6 | PT-12 — secret do webhook do slot | Na VPS de TESTE atual não há `WEBHOOK_SUBSCRIPTION_SECRET` e o legado usa a conta de **produção** (§1.3): gerar um secret novo (≥ 32 caracteres) só para o slot `homologation`; **não** reaproveitar nada do legado | H-05 |
 | R-7 | PT-6 — mTLS do webhook (ver §4.4) | Tentar o cadastro em sandbox como está (com `x-skip-mtls-checking`, paridade com o SDK). Se a Efí recusar com `webhook_invalido`, decidir pela opção B (mTLS no nginx de TESTE) | H-07, H-10 |
 | R-8 | P-B31-04 — webhook secret curto gravado antes da B3.1 | Regravar o secret do slot (≥ 32) antes de ativar | H-05 |
 | R-9 | P-B32-02 — checkout legado formata valores ≥ R$ 1.000 errado | Em TESTE usar faturas < R$ 1.000; a v2 já corrige (`toFixed(2)`); decidir se corrige o legado | — |
@@ -50,6 +50,30 @@ quando autorizada (sem acesso a VPS).
 - Acesso Super Admin pessoal em TESTE.
 - Acesso operacional (O) à VPS de TESTE: systemd, Redis, nginx, `psql` só leitura, `pg_dump`.
 - `BACKEND_URL` público com HTTPS e certificado válido (cadeia de CA) alcançável pela Efí.
+
+### 1.3 Constatações da VPS de TESTE (diagnóstico de 2026-10-21, só leitura)
+- Identidade: hostname `vmi3163669`, IP `89.117.79.221`, `api.teste.streamhubchat.com.br`, `/var/www/atendechat`,
+  `atendechat-backend.service` (systemd, root). Implantado: `2445edb`. Node 20.20.2, npm 10.8.2, Postgres 16 local,
+  Redis local, 133 GB livres.
+- **`GERENCIANET_SANDBOX=false`: o checkout legado de TESTE usa a conta Efí de PRODUÇÃO.** Todo Pix gerado pelo
+  checkout legado, pelo webhook legado ou por `/subscription/create/webhook` é real. D-P14 **não** vale nesta VPS.
+  Consequências:
+  - nenhum smoke ou teste gera Pix pelo checkout legado (§5 passo 13);
+  - homologação só no caminho `database` (slot `homologation`, sandbox). A guarda B34-T7 impede v2, pipeline e
+    varredura fora da fonte `database` efetiva;
+  - H-20 e H-36 (comparação com o legado na mesma conta) não são válidos aqui: registrar como não aplicáveis;
+  - rollback de `EFI_CREDENTIALS_SOURCE` volta ao legado = conta de produção (§7.2).
+- `STREAMHUB_RUNTIME_ENV` ausente: definir `test` antes de configurar o slot (R).
+- `EFI_CREDENTIAL_ENCRYPTION_KEY` ausente: definir antes de configurar o slot (R). O código exige string não vazia e
+  deriva a chave por SHA-256 (AES-256-GCM). Gerar na própria VPS, uma por ambiente, sem exibir:
+  `openssl rand -base64 48`. Nunca trocar depois sem recifrar o slot.
+- `WEBHOOK_SUBSCRIPTION_SECRET` ausente com `NODE_ENV=production`: o webhook legado responde 401 a tudo (estado
+  pré-existente, inalterado pelo deploy).
+- Árvore com `install.sh` (só modo 644→755) e `frontend/yarn.lock` (o `npm install` remove as entradas `fsevents`,
+  exclusivas do macOS). Nenhum serviço ou cron usa `install.sh`; o frontend usa npm, yarn não está instalado.
+  Cópias em `/root/backups/vps-local-files-20261021-154351/`. Restaurar os dois antes do build (§5 passo 4).
+- Backup pré-deploy: `/root/backups/atendechat-teste-20261021-154306-pre-b34-deploy1.dump` (`pg_dump -Fc`,
+  158/158 tabelas, leitura completa ok, `.sha256` ao lado).
 
 ---
 
@@ -173,27 +197,38 @@ A aplicação já não loga a query nem envia query/`Authorization` ao Sentry ne
 
 ## 5. Deploy 1 — inerte (O, com autorização R-3)
 
-Sequência da 8.4 (HOMOLOGACAO 8.4 §1.3), com parada curta:
-1. Pré-checagens só leitura (§2) + `preflight-teste.sql` → `preflight-antes.txt`; `git rev-parse HEAD` atual anotado.
-2. Backup: `pg_dump -Fc` fora do diretório do projeto; conferir o tamanho.
-3. `git fetch` + `git checkout <commit aprovado em R-2>`; `git status` limpo.
-4. `cd backend && npm install --production=false` (serviço no ar).
-5. `sudo systemctl stop atendechat-backend`.
-6. `npm run build`. Conferir: `dist/server.js`,
+Sequência da 8.4 (HOMOLOGACAO 8.4 §1.3), com parada curta. Alvo: o commit aprovado (hoje `origin/main`).
+Tudo como root na VPS de TESTE, depois de conferir `hostname` = `vmi3163669` e `BACKEND_URL` de TESTE.
+1. Pré-checagens só leitura (§2) + `preflight-teste.sql` → `/root/backups/preflight-antes.txt`; anotar
+   `git rev-parse HEAD` (hoje `2445edb`).
+2. Backup: `pg_dump -Fc` em `/root/backups/` (modo 700), sem sobrescrever; conferir com `pg_restore -l` e
+   `pg_restore -f /dev/null`. Já existe o de 2026-10-21 (§1.3); refazer se houver mudança no banco desde então.
+3. `cp -p install.sh frontend/yarn.lock` para `/root/backups/` (já feito em §1.3) e
+   `git checkout -- install.sh frontend/yarn.lock`; `git status --porcelain --untracked-files=no` vazio.
+4. `git fetch origin` + `git checkout <commit aprovado>` (os commits novos não tocam esses dois arquivos).
+5. `cd backend && npm install --production=false` (serviço no ar; dependências inalteradas desde `2445edb`).
+6. `npm run build` **com o serviço no ar** é impossível (o build apaga `dist`): por isso
+   `sudo systemctl stop atendechat-backend` imediatamente antes. Início da indisponibilidade da API.
+7. `npm run build`. Conferir: `dist/server.js`,
    `dist/database/migrations/20261020120000-saas-payment-attempts-txid-unique.js`,
    `dist/database/migrations/20261021120000-saas-gateway-webhook-events.js`, e `dist/build-info.json` com o commit
    aprovado e `"dirty": false`.
-7. `npx sequelize db:migrate`. Se parar por txid repetido: **não** iniciar o backend novo; ver rollback §7.1.
+8. `npx sequelize db:migrate`. Se parar por txid repetido: **não** iniciar o backend novo; ver rollback §7.1.
    Conferir: `SELECT name FROM "SequelizeMeta" WHERE name LIKE '2026102%';` → as duas.
-8. `sudo systemctl start atendechat-backend`; `journalctl -u atendechat-backend -n 200`:
+9. `sudo systemctl start atendechat-backend` (fim da indisponibilidade); `journalctl -u atendechat-backend -n 200`:
    - linha `[efi] controles de ativação` com todos os controles no default e `webhookPipelineAsyncActive: false`;
    - linha `[gatewayWebhook] pipeline async inativo — worker e recuperação não registrados`;
    - nenhum `does not exist` / `ERR_INTERNAL`.
-9. Frontend: `cd frontend && npm install && npm run build`; `sudo nginx -t && sudo systemctl reload nginx`.
-10. `preflight-teste.sql` → `preflight-depois.txt`: seção 10 igual à de antes; seções 2 e 4 agora presentes.
-11. Smoke (H-01/H-02): login; Central de Assinaturas; `/financeiro` do tenant; checkout Pix de uma fatura de teste
-    (legado, com `pixConfigWebhook` como hoje); painel Efí → card de status com tudo "não liberado".
-12. H-03…H-05 (§4.2).
+10. Frontend: `cd frontend && npm install && npm run build`; `sudo nginx -t && sudo systemctl reload nginx`.
+11. `git checkout -- frontend/yarn.lock` (o `npm install` volta a alterá-lo; mantém a árvore limpa para o próximo
+    build). O `dist/build-info.json` do backend já foi gravado limpo no passo 7.
+12. `preflight-teste.sql` → `/root/backups/preflight-depois.txt`: seção 10 igual à de antes; seções 2 e 4 presentes.
+13. Smoke **sem cobrança** (H-01/H-02): login; Central de Assinaturas; `/financeiro` do tenant (só abrir a lista de
+    faturas); painel Efí → card de status com tudo "não liberado" e fonte `legacy_env`.
+    **Proibido** gerar Pix pelo checkout legado ou chamar `/subscription/create/webhook`: nesta VPS é a conta de
+    produção (§1.3). A ausência de regressão do checkout legado é coberta pelos testes de contrato (T-ACT-01,
+    `efiLegacyContract.spec`), não por cobrança real.
+14. H-03…H-05 (§4.2), só depois de `STREAMHUB_RUNTIME_ENV=test` e `EFI_CREDENTIAL_ENCRYPTION_KEY` (R).
 
 ---
 
@@ -215,10 +250,13 @@ Sequência da 8.4 (HOMOLOGACAO 8.4 §1.3), com parada curta:
 ```
 mais o ajuste dos testes que afirmam as listas vazias (`efiWebhookReception.spec`, `efiPixChargeV2.spec`,
 `efiRuntimeCredentials.spec`, `gatewayWebhookPipeline.it.spec`), que passam a afirmar `["test"]` e "nenhum `production`".
+Liberação parcial não tem efeito: pela guarda B34-T7, v2, pipeline e varredura só ativam com a fonte `database`
+efetiva no mesmo runtime, e `efiActivationGuard.spec` reprova um release que libere uma delas sem `databaseFinancial`.
 Deploy igual ao §5 (sem migration nova). Sem variáveis novas, o comportamento continua o atual: cada controle só muda
 algo quando a variável correspondente for ligada.
 
 ### 6.2 Ordem de ativação em TESTE (uma variável por vez; restart após cada uma; registrar antes/depois)
+As fases D, E e F só têm efeito com a fase C ativa (B34-T7); o card mostra "configurado" e "liberado" sem "efetivo" se C cair.
 | Fase | Variável (TESTE) | Cenários | Conferir no card de status |
 |------|------------------|----------|----------------------------|
 | C | `EFI_CREDENTIALS_SOURCE=database` | H-06 | fonte financeira `database`, slot `homologation`, sandbox, `usable` |
@@ -245,6 +283,8 @@ Do mais leve ao mais pesado. Migrations **nunca** são revertidas (aditivas; `do
 
 ### 7.1 Durante o deploy
 - Falha antes da migration: `git checkout <commit anterior>`, `npm run build`, `systemctl start`.
+- Serviço não sobe depois da migration: `journalctl` para o erro; se não for corrigível na hora, `git checkout
+  <commit anterior>`, `npm run build`, `systemctl start` (o código anterior ignora a tabela e o índice novos).
 - Migration parou por txid repetido: nada foi alterado; voltar ao commit anterior como acima; analisar a duplicidade.
 - Falha depois da migration: reverter só o código (as tabelas/índices novos não afetam o código anterior).
 - `pg_dump` só em corrupção comprovada, com decisão do responsável.
@@ -255,7 +295,7 @@ Do mais leve ao mais pesado. Migrations **nunca** são revertidas (aditivas; `do
 | Pipeline com problema | **preferencial:** `EFI_WEBHOOK_WORKER_PAUSED=true` + restart | recepção segue gravando; nada processado; retomar = remover a variável |
 | Pipeline total | `EFI_WEBHOOK_PIPELINE` removida + restart **e** recadastrar a URL antiga (`?token=`) (C4) | webhook legado; eventos já gravados ficam para retomada |
 | Cobrança v2 | `EFI_PIX_CHARGE_V2_ENABLED` removida + restart | checkout legado; cobranças v2 abertas seguem pagáveis (`#Fatura:` preservado, T-RB-02) |
-| Fonte de credenciais | `EFI_CREDENTIALS_SOURCE` removida + restart | `legacy_env`; mesma conta (D-P14) |
+| Fonte de credenciais | `EFI_CREDENTIALS_SOURCE` removida + restart | `legacy_env`; pela guarda B34-T7, v2, pipeline e varredura desligam juntas. **Nesta VPS o legado é a conta de produção** (§1.3): depois do rollback, nenhum teste de pagamento |
 | Liberação de código | deploy do commit anterior (listas vazias) | tudo volta ao comportamento atual, mesmo com variáveis ligadas |
 
 Depois de qualquer rollback: conferir as cobranças abertas criadas no período por 24 h; nenhum evento `processing`

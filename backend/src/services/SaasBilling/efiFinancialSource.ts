@@ -1,4 +1,5 @@
 import {
+  EfiActivationControls,
   EfiCredentialsSource,
   getEfiActivationControls
 } from "../../config/saasBillingFlags";
@@ -23,6 +24,10 @@ import {
  * - `pixChargeV2`: cobrança Pix v2 (B3.2); tira o `pixConfigWebhook` do checkout.
  * - `webhookPipeline`: pipeline assíncrono do webhook (B3.3), inclusive o ramo D-P6.
  * - `pixReconciliationSweep`: varredura Pix Efí × local (B3.3, só leitura na Efí).
+ *
+ * Guarda B34-T7: `pixChargeV2`, `webhookPipeline` e `pixReconciliationSweep` só valem com a fonte
+ * `database` efetiva no mesmo runtime (controle `EFI_CREDENTIALS_SOURCE=database` + `databaseFinancial`
+ * liberado). Sem ela usariam as credenciais `GERENCIANET_*` do ambiente, que podem ser de produção.
  */
 export const EFI_RELEASED_RUNTIMES: Readonly<
   Record<
@@ -51,30 +56,59 @@ export function isEfiFeatureReleased(feature: EfiReleasedFeature): boolean {
   return isRuntimeReleased(EFI_RELEASED_RUNTIMES[feature], tryGetStreamhubRuntimeEnv());
 }
 
+export type EfiEffectiveActivation = {
+  credentialsSource: EfiCredentialsSource;
+  pixChargeV2: boolean;
+  webhookPipeline: boolean;
+  pixReconciliationSweep: boolean;
+};
+
+/** Regra pura da ativação efetiva (controles × liberação × runtime), incluindo a guarda B34-T7. */
+export function evaluateEfiActivation(
+  controls: Pick<
+    EfiActivationControls,
+    "credentialsSource" | "pixChargeV2Enabled" | "webhookPipeline" | "pixReconciliationSweepEnabled"
+  >,
+  released: Readonly<Record<EfiReleasedFeature, readonly StreamhubRuntimeEnv[]>>,
+  runtime: StreamhubRuntimeEnv | null
+): EfiEffectiveActivation {
+  const onDatabase =
+    controls.credentialsSource === "database" &&
+    isRuntimeReleased(released.databaseFinancial, runtime);
+  const dependent = (on: boolean, feature: EfiReleasedFeature) =>
+    on && onDatabase && isRuntimeReleased(released[feature], runtime);
+  return {
+    credentialsSource: onDatabase ? "database" : "legacy_env",
+    pixChargeV2: dependent(controls.pixChargeV2Enabled, "pixChargeV2"),
+    webhookPipeline: dependent(controls.webhookPipeline === "async", "webhookPipeline"),
+    pixReconciliationSweep: dependent(controls.pixReconciliationSweepEnabled, "pixReconciliationSweep")
+  };
+}
+
+function currentActivation(): EfiEffectiveActivation {
+  return evaluateEfiActivation(
+    getEfiActivationControls(),
+    EFI_RELEASED_RUNTIMES,
+    tryGetStreamhubRuntimeEnv()
+  );
+}
+
 /** Fonte efetiva das operações financeiras reais. */
 export function getEfiFinancialCredentialsSource(): EfiCredentialsSource {
-  return getEfiActivationControls().credentialsSource === "database" &&
-    isEfiFeatureReleased("databaseFinancial")
-    ? "database"
-    : "legacy_env";
+  return currentActivation().credentialsSource;
 }
 
-/** Cobrança v2 efetivamente ativa: controle de ambiente ligado e liberação de código. */
+/** Cobrança v2 efetivamente ativa: controle, liberação e fonte `database` efetiva. */
 export function isEfiPixChargeV2Active(): boolean {
-  return getEfiActivationControls().pixChargeV2Enabled && isEfiFeatureReleased("pixChargeV2");
+  return currentActivation().pixChargeV2;
 }
 
-/** Pipeline `async` efetivamente ativo: controle de ambiente e liberação de código. Senão, webhook legado (C4). */
+/** Pipeline `async` efetivamente ativo (controle, liberação e fonte `database`). Senão, webhook legado (C4). */
 export function isEfiWebhookPipelineAsyncActive(): boolean {
-  return (
-    getEfiActivationControls().webhookPipeline === "async" && isEfiFeatureReleased("webhookPipeline")
-  );
+  return currentActivation().webhookPipeline;
 }
 
-/** Varredura Pix ativa: controle de ambiente e liberação de código. */
+/** Varredura Pix ativa: controle, liberação e fonte `database` efetiva. */
 export function isEfiPixReconciliationSweepActive(): boolean {
-  return (
-    getEfiActivationControls().pixReconciliationSweepEnabled &&
-    isEfiFeatureReleased("pixReconciliationSweep")
-  );
+  return currentActivation().pixReconciliationSweep;
 }

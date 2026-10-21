@@ -423,3 +423,16 @@ Preparação local da B3.4 (DECISOES §13, B34-T1…T6). Nada executado em VPS, 
 Observação: o `liveHardening.spec` isolado passa, mas o processo jest não encerra sozinho (handle aberto no módulo, não da B3); rodar com `--forceExit`.
 
 **Não executados / pendentes (dependem da VPS de TESTE e sandbox Efí, B3.4):** PT-2, PT-5, PT-6 (mTLS), PT-7, P-B32-01/03, T-UI-01…03, H-* (IMPLANTACAO-TESTE §8).
+
+### Guarda B34-T7/T8 (2026-10-21, execução local)
+| Verificação | Resultado |
+|-------------|-----------|
+| `efiActivationGuard.spec` (novo) | 8/8: estado misto, `legacy_env`, runtime errado/ausente, defaults, invariante do release, bloqueio de rede |
+| Typecheck (`tsc --noEmit`) | exit 0 |
+| T-REG-01 | 35/35 suítes, 405/405 testes |
+| Integração (`test-integration-f84.sh`, `REDIS_IT_URI`) | 209/210; a falha foi timeout de 60 s em `historicalReview.it.spec` (8.4, não B3). Reexecutada isolada: 18/18 |
+| Unitária completa (`--bail=0 --forceExit`) | 278/289 suítes, 2651/2689 testes. As mesmas 11 suítes de antes (P-B31-09 + `liveHardening`, que só falha sob carga: 3 testes agora, 1 antes). Bloqueio Efí não disparou em nenhuma suíte |
+| Build backend | exit 0, `build-info` → `c1e1b42` (árvore suja até o commit destas correções) |
+| Build frontend | não reexecutado: nenhum arquivo do frontend mudou desde o último build verde |
+
+Observação: `jest.config.js` tem `bail: 1`; a suíte completa precisa de `--bail=0` para rodar inteira.
