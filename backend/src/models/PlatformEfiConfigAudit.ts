@@ -24,7 +24,16 @@ export type PlatformEfiAuditAction =
   | "deactivate"
   | "test_auth"
   /** Registro de homologação (D-P17). Criado só a partir da B3.3. */
-  | "homologate";
+  | "homologate"
+  /** Cadastro do webhook Pix pelo Super Admin (B3.2, RF2.7). */
+  | "webhook_register"
+  /** B3.3 (A1): reprocessamento e classificação manual de evento de webhook. */
+  | "webhook_event_reprocess"
+  | "webhook_event_classify"
+  /** B3.3 (A1, R-11): resolução de item de conciliação. */
+  | "reconciliation_resolve"
+  /** B3.3 (A1, D-P10): varredura Pix Efí × local. */
+  | "pix_sweep";
 
 @Table({
   tableName: "PlatformEfiConfigAudits",

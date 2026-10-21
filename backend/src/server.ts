@@ -19,6 +19,7 @@ import { startCrmStaleDealAttentionScheduler } from "./jobs/crmStaleDealAttentio
 import { startRefreshInstagramOAuthTokensScheduler } from "./jobs/RefreshInstagramOAuthTokensJob";
 import { logWhatsAppPolicyAtProcessBoot } from "./helpers/whatsappUnavailablePresence";
 import { logEfiActivationControlsAtBoot } from "./services/SaasBilling/efiIntegrationStatus";
+import { startGatewayWebhookPipeline } from "./services/SaasBilling/gatewayWebhookPipeline";
 import {
   startAgentOsScalabilityRuntime,
   stopAgentOsScalabilityRuntime
@@ -53,6 +54,8 @@ const server = app.listen(process.env.PORT, async () => {
   });
   startBackupAutoScheduler();
   startBillingAutomationScheduler();
+  // B3.3: só registra worker/recuperação com o pipeline async liberado e ligado (default: nada).
+  startGatewayWebhookPipeline();
   startSignupCriticalSocketScheduler();
   startUserNotificationCleanupScheduler();
   startLiveHardeningCleanupScheduler();

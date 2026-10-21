@@ -199,6 +199,12 @@ describe("efiIntegrationStatus", () => {
       mockEfiAuditsByAction(auditFindOne, { activate: efiActivationAudit(r), homologate });
     };
 
+    it("B3.2: status mostra a cobrança v2 configurada × liberada × ativa", async () => {
+      process.env.EFI_PIX_CHARGE_V2_ENABLED = "true";
+      const status = await getEfiIntegrationStatus();
+      expect(status.pixChargeV2).toEqual({ configured: true, released: false, releasedRuntimes: [], active: false });
+    });
+
     it("T-ENV-06: TESTE com configuração válida → usable, fingerprint, sem segredos", async () => {
       process.env.STREAMHUB_RUNTIME_ENV = "test";
       process.env.EFI_CREDENTIALS_SOURCE = "database";

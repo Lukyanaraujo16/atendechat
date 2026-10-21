@@ -7,9 +7,9 @@ desenvolvimento. Referências: `AUDITORIA.md` (R*), `DECISOES.md` (D-P*, R-*, PT
 | Etapa | Nome | Estado |
 |-------|------|--------|
 | B3.1 | Integração de credenciais | **IMPLEMENTADA + fechamento técnico — aguardando aprovação final** (2026-10-20) |
-| B3.2 | Geração e consulta de cobranças Pix | **NÃO INICIADO** |
-| B3.3 | Webhooks assíncronos, confirmação e conciliação | **NÃO INICIADO** |
-| B3.4 | Testes e homologação completa | **NÃO INICIADO** |
+| B3.2 | Geração e consulta de cobranças Pix | **IMPLEMENTADA localmente — aguardando aprovação; sem ativação** (2026-10-20) |
+| B3.3 | Webhooks assíncronos, confirmação e conciliação | **IMPLEMENTADA localmente — aguardando aprovação; sem ativação** (2026-10-21) |
+| B3.4 | Testes e homologação completa | **NÃO INICIADA** — preparação local concluída (2026-10-21); aguarda autorização de implantação em TESTE |
 
 ## Regras transversais (aprovadas — DECISOES §8)
 
@@ -113,7 +113,9 @@ Itens da lista de testes obrigatórios sem cobertura completa estão marcados co
 
 ## B3.2 — Geração e consulta de cobranças Pix
 
-**Estado:** NÃO INICIADO
+**Estado:** IMPLEMENTADA localmente em 2026-10-20, aguardando aprovação. **Não ativada:** gate de código
+`EFI_RELEASED_RUNTIMES.pixChargeV2` vazio (DECISOES B32-T1) — com `EFI_PIX_CHARGE_V2_ENABLED=true` o checkout segue o legado.
+Sem commit, push ou deploy. Tarefa 0 (sandbox) **não executada** (P-B32-01).
 
 **Objetivo:** com `EFI_PIX_CHARGE_V2_ENABLED=true`, o checkout cria ou reusa uma única cobrança por fatura, com txid
 local e sem chamada Efí sob lock. A etapa também entrega a consulta administrativa por txid e o cadastro de webhook pelo
@@ -168,11 +170,30 @@ T-SEC-08, 13 · T-MIG-01, 02 · T-RB-02 · T-REG-01…03. (T-IDEM-03 → B3.4.)
 
 **Condições para avançar:** relatório B3.2 aprovado; PT-2, PT-3 e PT-5 registrados com evidência.
 
+### Progresso B3.2 (2026-10-20)
+
+| # | Tarefa | Estado | Onde |
+|---|--------|--------|------|
+| 0 | Validação em sandbox (PT-2/3/5) | **não executada** — documentação oficial conferida; sandbox depende de TESTE (P-B32-01) | DECISOES §5 |
+| 1 | txid local, PUT/GET, conflito → GET + comparação | concluída | `createOrReusePixCharge.ts`, `efiPixChargeGateway.ts` |
+| 2 | Três passos + recuperação de órfã | concluída | `createOrReusePixCharge.ts` |
+| 3 | Reuso conferido, `expiresAt`, legado 1 h | concluída (com GET conclusivo antes de abandonar, B32-T6) | idem |
+| 4 | `#Fatura:<id>` mantido | concluída | idem |
+| 5 | v2 sem `pixConfigWebhook` | concluída | `SubscriptionController.ts` (ramo v2) |
+| 6 | Endpoints Super Admin (txid, webhook) | concluída (cadastro só com v2 ativa e formato atual) | `efiPixAdminService.ts`, `saasFinanceRoutes.ts` |
+| 7 | Resposta enxuta | concluída; frontend compatível | `CheckoutSuccess.js`, `EfiPixOperationsCard.js` |
+| 8 | Migration aditiva | concluída | `20261020120000-saas-payment-attempts-txid-unique.ts` |
+
+Decisões: DECISOES §11. Pendências e dependências da B3.3: DECISOES §11.1–11.2. Resultados: TESTES §Registro B3.2.
+
 ---
 
 ## B3.3 — Webhooks assíncronos, confirmação e conciliação
 
-**Estado:** NÃO INICIADO
+**Estado:** IMPLEMENTADA localmente em 2026-10-21, aguardando aprovação. **Não ativada:** gates de código
+`EFI_RELEASED_RUNTIMES.webhookPipeline` vazio e `EFI_RELEASED_RUNTIMES.pixReconciliationSweep` vazio (DECISOES B33-T1) — com
+`EFI_WEBHOOK_PIPELINE=async` o webhook segue o legado e nenhum worker é registrado. Sem commit, push ou deploy.
+Validações de sandbox pendentes (PT-2, PT-5, PT-6, PT-7; P-B32-01).
 
 **Objetivo:** com `EFI_WEBHOOK_PIPELINE=async`, entregar:
 - recepção durável no PostgreSQL antes do 200;
@@ -253,11 +274,45 @@ T-REN-01…06 · T-REC-01…10 · T-MT-04…07 · T-HOM-03…05 · T-SEC-05…07
 
 **Condições para avançar:** relatório B3.3 aprovado; suíte local verde; D-P11 planejada.
 
+### Progresso B3.3 (2026-10-21)
+
+| # | Tarefa | Estado | Onde |
+|---|--------|--------|------|
+| 1 | Autenticação v2 (whToken + token, `/pix`, `timingSafeEqual`), 400 para corpo sem estrutura, `invalid_permanent` no lote, formato novo da URL só com async | concluída | `webhookReception.ts`, `subscriptionWebhookUrl.ts`, `efiPixAdminService.ts` |
+| 2 | Recepção durável (transação, `ON CONFLICT`, 200 após commit, 503) | concluída | `webhookReception.ts`, migration `20261021120000` |
+| 3 | Publicação pós-commit independente do Redis | concluída | `libs/gatewayWebhookQueue.ts` |
+| 4 | Worker (claim, GET na Efí, classificação RF3.10, `confirmGatewayPayment`) | concluída | `processGatewayWebhookEvent.ts` |
+| 5 | Retentativas e estados terminais | concluída | idem (B33-T18) |
+| 6 | Recuperação (cron) | concluída | `gatewayWebhookPipeline.ts` |
+| 7 | Pausa do worker | concluída | idem |
+| 8 | D-P6 + SF-1 + SF-2 | concluída | `confirmGatewayPayment.ts` (`cancelledInvoicePolicy`), `ListCompanyFinanceService.ts` |
+| 9 | D-P7, D-P8, SF-3 | concluída | `processGatewayWebhookEvent.ts` |
+| 10 | Reprocessamento manual e conversão de `unlinked` | concluída | `gatewayWebhookAdminService.ts` |
+| 11 | Conciliação auditada e paginada | concluída | idem, `SaasFinanceController.ts` |
+| 12 | Varredura manual atrás de flag + gate | concluída | idem (B33-T22) |
+| 13 | Ação `homologate` (TESTE e PRODUÇÃO) | concluída | `efiHomologationService.ts` |
+| 14 | Sentry, logs e `TRUST_PROXY_HOPS` | concluída | `app.ts`, `helpers/webhookLogSanitizer.ts` |
+| 15 | Telas (eventos, conciliação global, varredura, homologação) | concluída (sem teste manual H) | `frontend/src/pages/Platform/EfiWebhookEventsCard.js`, `EfiReconciliationQueueCard.js` |
+
+Decisões: DECISOES §12. Pendências: DECISOES §12.1; riscos: §12.2. Resultados: TESTES §Registro B3.3.
+
+**Critérios para iniciar a B3.4 (não iniciada):**
+- aprovação explícita do relatório B3.3 e decisão sobre PT-10 (retenção);
+- commit revisado do conjunto B3.1–B3.3 (inclui `backend/scripts/`, P-B31-10) e build limpo (`dirty: false`);
+- release revisado que troque os gates de código (listas de `EFI_RELEASED_RUNTIMES`, B34-T1) **somente para TESTE**, com aprovação;
+- aprovação para deploy em TESTE, backup do dia, Redis de TESTE e conta sandbox;
+- validação em sandbox de PT-2/PT-5 (path e query com `/pix` e `ignorar=`), PT-6 (cadastro sem mTLS ou mTLS no nginx),
+  PT-7 (evento de teste no cadastro), PT-3 e P-B32-03;
+- D-P11 planejada (levantamento só leitura antes da promoção).
+
 ---
 
 ## B3.4 — Testes e homologação completa
 
-**Estado:** NÃO INICIADO
+**Estado:** NÃO INICIADA. Preparação local concluída em 2026-10-21 (DECISOES §13): liberação por runtime (B34-T1),
+pacote `IMPLANTACAO-TESTE.md` (checklist, preflight de migrations, Efí, certificados, webhook, rollback, testes reais e
+ações do responsável), `preflight-teste.sql`, `backend/scripts/check-efi-p12.js`, card de status (P-B31-06).
+Aguarda as autorizações R-1…R-4 de `IMPLANTACAO-TESTE.md` §1.
 
 **Objetivo:** executar `TESTES.md` e `HOMOLOGACAO.md` na VPS de TESTE com conta sandbox, ativando os controles **em
 TESTE**, um a um. Produzir as evidências e o registro `homologate` do slot `homologation` para a decisão de promoção.

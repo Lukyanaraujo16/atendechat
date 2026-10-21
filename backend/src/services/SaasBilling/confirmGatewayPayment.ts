@@ -1,4 +1,4 @@
-import { Transaction } from "sequelize";
+import { Op, Transaction } from "sequelize";
 import AppError from "../../errors/AppError";
 import Invoices from "../../models/Invoices";
 import SaaSPayment from "../../models/SaaSPayment";
@@ -25,6 +25,11 @@ export type ConfirmGatewayPaymentInput = {
   gatewayStatus?: string;
   paidAt?: Date;
   metadata?: Record<string, unknown>;
+  /**
+   * D-P6/SF-1/SF-2 (B3.3, RF3.14a): só o pipeline `async` passa este parâmetro. Sem ele, o
+   * comportamento da 8.4 é mantido integralmente (T-ACT-06).
+   */
+  cancelledInvoicePolicy?: "receive_for_reconciliation";
 };
 
 export type ConfirmGatewayPaymentResult = {
@@ -32,9 +37,164 @@ export type ConfirmGatewayPaymentResult = {
   payment: SaaSPayment | null;
   renewed: boolean;
   alreadyApplied: boolean;
+  /** D-P6: recebimento registrado em fatura cancelada (sem receita, sem renovação). */
+  cancelledInvoiceReceipt?: boolean;
+  reconciliationItemId?: number | null;
 };
 
 export const GATEWAY_ON_SETTLED_KIND = "gateway_payment_on_settled_invoice";
+export const GATEWAY_ON_CANCELLED_KIND = "gateway_payment_on_cancelled_invoice";
+
+/**
+ * D-P6 + SF-1 + SF-2 (B3.3): Pix confirmado para fatura cancelada.
+ * - 1º txid da fatura: grava o recebimento (`SaaSPayment` gateway, `countsAsRevenue=false`,
+ *   fora da receita consolidada até a conciliação), a fatura continua `cancelled`, nada é
+ *   renovado e abre conciliação "pagamento em fatura cancelada".
+ * - Com fatura substituta do mesmo ciclo (SF-2): mesma coisa, com a substituta identificada
+ *   e `requiresManualDecision`; nada é aplicado à substituta.
+ * - 2º txid da mesma fatura cancelada: só conciliação de duplicidade (um recebimento por fatura).
+ * Idempotente por txid (índice único de `SaaSPayments.externalTxid`) e por fatura (lock).
+ */
+async function receiveOnCancelledInvoice(
+  invoice: Invoices,
+  input: ConfirmGatewayPaymentInput,
+  t: Transaction
+): Promise<ConfirmGatewayPaymentResult> {
+  const txid = input.externalTxid ? String(input.externalTxid) : null;
+  const replacement = invoice.cycleKey
+    ? await Invoices.findOne({
+        where: {
+          companyId: invoice.companyId,
+          cycleKey: invoice.cycleKey,
+          id: { [Op.ne]: invoice.id },
+          status: { [Op.ne]: "cancelled" }
+        } as any,
+        order: [["id", "DESC"]],
+        transaction: t
+      })
+    : null;
+  const previous = await SaaSPayment.findOne({
+    where: { invoiceId: invoice.id, source: "gateway" },
+    order: [["id", "ASC"]],
+    transaction: t
+  });
+
+  const findItem = () =>
+    SaaSReconciliationItem.findOne({
+      where: {
+        invoiceId: invoice.id,
+        kind: GATEWAY_ON_CANCELLED_KIND,
+        metadata: { externalTxid: txid }
+      } as any,
+      transaction: t
+    });
+
+  let payment: SaaSPayment | null = null;
+  if (!previous) {
+    payment = await SaaSPayment.create(
+      {
+        companyId: invoice.companyId,
+        invoiceId: invoice.id,
+        amount: input.amount,
+        method: input.method,
+        source: "gateway",
+        // SF-1: recebimento rastreável, fora da receita consolidada até a conciliação.
+        countsAsRevenue: false,
+        paidAt: input.paidAt || new Date(),
+        recordedByUserId: null,
+        reason: null,
+        externalTxid: txid,
+        externalChargeId: input.externalChargeId ?? null,
+        gatewayProvider: input.gatewayProvider || "efi",
+        gatewaySyncStatus: "synced",
+        gatewaySyncError: null,
+        metadata: {
+          ...(input.metadata || {}),
+          cancelledInvoiceReceipt: true,
+          pendingReconciliation: true
+        }
+      },
+      { transaction: t }
+    );
+  }
+
+  const existingItem = await findItem();
+  let item = existingItem;
+  if (!item) {
+    const duplicate = !!previous;
+    const base = `a Efí confirmou o Pix ${txid ?? "(sem txid)"} (R$ ${Number(input.amount).toFixed(
+      2
+    )}) para a fatura #${invoice.id}, que está CANCELADA.`;
+    const message = duplicate
+      ? `Possível pagamento em duplicidade: ${base} A fatura já tem outro recebimento (pagamento #${previous!.id}); este Pix não foi registrado como recebimento. Verifique devolução ou crédito.`
+      : `Pagamento em fatura cancelada: ${base} O recebimento foi registrado fora da receita consolidada, a fatura continua cancelada e a assinatura NÃO foi renovada.${
+          replacement
+            ? ` Existe a fatura substituta #${replacement.id} do mesmo ciclo: decida manualmente (nada foi aplicado a ela).`
+            : " Decida: devolver, reconhecer ou aplicar manualmente."
+        }`;
+    item = await SaaSReconciliationItem.create(
+      {
+        companyId: invoice.companyId,
+        invoiceId: invoice.id,
+        paymentId: payment?.id ?? previous?.id ?? null,
+        kind: GATEWAY_ON_CANCELLED_KIND,
+        status: "pending",
+        message,
+        retryCount: 0,
+        lastError: null,
+        metadata: {
+          externalTxid: txid,
+          amount: input.amount,
+          method: input.method,
+          gatewayProvider: input.gatewayProvider || "efi",
+          gatewayPaidAt: input.paidAt ? input.paidAt.toISOString() : null,
+          countsAsRevenue: false,
+          renewed: false,
+          duplicateOfPaymentId: previous?.id ?? null,
+          replacementInvoiceId: replacement?.id ?? null,
+          requiresManualDecision: true,
+          gatewayMetadata: input.metadata || null
+        }
+      },
+      { transaction: t }
+    );
+    await recordFinancialEvent({
+      companyId: invoice.companyId,
+      invoiceId: invoice.id,
+      paymentId: payment?.id ?? null,
+      eventType: GATEWAY_ON_CANCELLED_KIND,
+      actorUserId: null,
+      idempotencyKey: `evt:gw-on-cancelled:${txid ?? `invoice:${invoice.id}`}`,
+      payload: {
+        externalTxid: txid,
+        amount: input.amount,
+        countsAsRevenue: false,
+        renewed: false,
+        receiptRecorded: !!payment,
+        replacementInvoiceId: replacement?.id ?? null,
+        endToEndId: (input.metadata as any)?.endToEndId ?? null
+      },
+      transaction: t
+    });
+    logger.warn(
+      {
+        invoiceId: invoice.id,
+        companyId: invoice.companyId,
+        externalTxid: txid,
+        duplicate,
+        replacementInvoiceId: replacement?.id ?? null
+      },
+      "[SaasBilling] gateway_payment_on_cancelled_invoice"
+    );
+  }
+  return {
+    payment: payment ?? previous,
+    renewed: false,
+    alreadyApplied: !payment,
+    cancelledInvoiceReceipt: !!payment,
+    reconciliationItemId: item?.id ?? null
+  };
+}
 
 /**
  * Item de conciliação "possível pagamento em duplicidade", idempotente por txid
@@ -173,6 +333,13 @@ export async function confirmGatewayPayment(
       lock: t.LOCK.UPDATE
     });
     if (!invoice) throw new AppError("ERR_INVOICE_NOT_FOUND", 404);
+
+    if (
+      input.cancelledInvoicePolicy === "receive_for_reconciliation" &&
+      String(invoice.status).toLowerCase() === "cancelled"
+    ) {
+      return receiveOnCancelledInvoice(invoice, input, t);
+    }
 
     if (String(invoice.status).toLowerCase() === "paid") {
       if (input.externalTxid) {
@@ -313,7 +480,7 @@ export async function confirmGatewayPayment(
     if (renewResult) {
       await runRenewalSideEffects({ reason: "payment_confirmed" }, renewResult);
     }
-    if (!result.alreadyApplied && result.payment) {
+    if (!result.alreadyApplied && result.payment && !result.cancelledInvoiceReceipt) {
       try {
         const company = await Company.findByPk(result.payment.companyId);
         const io = getIO();

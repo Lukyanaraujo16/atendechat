@@ -110,6 +110,19 @@ describe("B3.1 — controles de ativação (RF0) e versão (PT-9)", () => {
     info.mockRestore();
   });
 
+  it("B3.2: EFI_PIX_CHARGE_V2_ENABLED=true sem liberação → aviso de boot; v2 inativa", () => {
+    process.env.EFI_PIX_CHARGE_V2_ENABLED = "true";
+    const warn = jest.spyOn(logger, "warn").mockImplementation(() => undefined as never);
+    const info = jest.spyOn(logger, "info").mockImplementation(() => undefined as never);
+    logEfiActivationControlsAtBoot();
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({ pixChargeV2Enabled: true, pixChargeV2Active: false }),
+      expect.stringContaining("checkout segue o fluxo legado")
+    );
+    warn.mockRestore();
+    info.mockRestore();
+  });
+
   it("PT-9: commit vem de GIT_COMMIT (ou nomes legados) e só aceita SHA", () => {
     expect(getAppBuildCommit()).toBeNull();
     process.env.BACKEND_BUILD_STAMP = "build-42";

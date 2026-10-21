@@ -78,6 +78,12 @@ function isTimeout(err: any): boolean {
   );
 }
 
+/** Código de erro Efí (`nome`), só `[a-z_]`, para decisões (ex.: `txid_duplicado`). */
+function efiErrorName(err: any): string | null {
+  const nome = err?.response?.data?.nome;
+  return typeof nome === "string" && /^[a-z_]{1,64}$/.test(nome) ? nome : null;
+}
+
 function efiErrorText(err: any): string {
   const data = err?.response?.data;
   const raw =
@@ -115,7 +121,7 @@ function toEfiPixError(err: any, stage: "oauth" | "request"): AppError {
       "ERR_EFI_PIX_HTTP_ERROR",
       502,
       `API Pix Efí respondeu HTTP ${status}: ${efiErrorText(err)}`,
-      { efiStatus: status }
+      { efiStatus: status, efiNome: efiErrorName(err) }
     );
   }
   return new AppError(
@@ -183,6 +189,7 @@ export function createEfiPixClient(input: EfiPixClientInput) {
     method: Method;
     path: string;
     data?: unknown;
+    headers?: Record<string, string>;
   }): Promise<EfiPixResponse<T>> {
     const token = await getAccessToken();
     try {
@@ -191,7 +198,11 @@ export function createEfiPixClient(input: EfiPixClientInput) {
         url: `${baseURL}${opts.path}`,
         data: opts.data,
         httpsAgent,
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        headers: {
+          ...(opts.headers || {}),
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
         timeout: EFI_PIX_REQUEST_TIMEOUT_MS,
         signal: AbortSignal.timeout(EFI_PIX_REQUEST_TIMEOUT_MS)
       });

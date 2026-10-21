@@ -28,9 +28,11 @@ import Invoices from "../models/Invoices";
 import Company from "../models/Company";
 import SaaSPayment from "../models/SaaSPayment";
 import SaaSPaymentAttempt from "../models/SaaSPaymentAttempt";
-import SaaSReconciliationItem from "../models/SaaSReconciliationItem";
 import { saasBillingFlags } from "../config/saasBillingFlags";
-import { Op } from "sequelize";
+import {
+  listReconciliationItemsPaged,
+  resolveReconciliationItemAudited
+} from "../services/SaasBilling/gatewayWebhookAdminService";
 import moment from "moment";
 
 const DOMAIN_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -494,12 +496,8 @@ export const listReconciliationQueue = async (
   req: Request,
   res: Response
 ): Promise<Response> => {
-  const items = await SaaSReconciliationItem.findAll({
-    where: { status: { [Op.ne]: "resolved" } },
-    order: [["id", "DESC"]],
-    limit: 100
-  });
-  return res.json({ items });
+  // B3.3 (RF3.17, R13): paginada; default = não resolvidos, 100 por página (contrato anterior).
+  return res.json(await listReconciliationItemsPaged(req.query as Record<string, unknown>));
 };
 
 export const resolveReconciliationItem = async (
@@ -507,12 +505,12 @@ export const resolveReconciliationItem = async (
   res: Response
 ): Promise<Response> => {
   const id = Number(req.params.id);
-  const item = await SaaSReconciliationItem.findByPk(id);
-  if (!item) throw new AppError("ERR_NOT_FOUND", 404);
-  await item.update({
-    status: "resolved",
-    resolvedAt: new Date(),
-    message: req.body?.note || item.message
+  if (!Number.isInteger(id) || id <= 0) throw new AppError("ERR_NOT_FOUND", 404);
+  // R-11: nota obrigatória, lock, só item aberto, ator, ledger e mensagem original preservada.
+  const item = await resolveReconciliationItemAudited({
+    id,
+    actorUserId: Number(req.user?.id),
+    note: req.body?.note
   });
   return res.json({ item });
 };

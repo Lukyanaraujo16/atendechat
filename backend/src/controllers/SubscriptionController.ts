@@ -9,25 +9,13 @@ import SaaSPaymentAttempt from "../models/SaaSPaymentAttempt";
 import { logger } from "../utils/logger";
 import { saasBillingFlags } from "../config/saasBillingFlags";
 import { confirmGatewayPayment } from "../services/SaasBilling/confirmGatewayPayment";
-
-/**
- * URL do webhook PIX configurada na Efí/Gerencianet.
- */
-function buildSubscriptionWebhookUrl(): string {
-  const base = (process.env.BACKEND_URL || "").replace(/\/$/, "");
-  const path = "/subscription/webhook";
-  if (!base) {
-    logger.warn(
-      "[subscription] BACKEND_URL ausente — configure para registrar webhook PIX corretamente"
-    );
-    return path;
-  }
-  const secret = process.env.WEBHOOK_SUBSCRIPTION_SECRET;
-  if (secret) {
-    return `${base}${path}?token=${encodeURIComponent(secret)}`;
-  }
-  return `${base}${path}`;
-}
+import { buildSubscriptionWebhookUrl } from "../services/SaasBilling/subscriptionWebhookUrl";
+import {
+  isEfiPixChargeV2Active,
+  isEfiWebhookPipelineAsyncActive
+} from "../services/SaasBilling/efiFinancialSource";
+import { receiveGatewayWebhook } from "../services/SaasBilling/webhookReception";
+import { createOrReusePixChargeV2 } from "../services/SaasBilling/createOrReusePixCharge";
 
 function formatPixAmount(value: number): string {
   return Number(value)
@@ -100,6 +88,12 @@ export const createSubscription = async (
   }
 
   const { invoiceId } = req.body;
+
+  // B3.2 (RF2.1): cobrança v2 só com o controle ligado E liberada no código; senão, legado intacto.
+  if (isEfiPixChargeV2Active()) {
+    const charge = await createOrReusePixChargeV2({ invoiceId: Number(invoiceId), companyId });
+    return res.json(charge);
+  }
 
   const invoice = await Invoices.findByPk(invoiceId);
 
@@ -221,6 +215,15 @@ export const webhook = async (
   req: Request,
   res: Response
 ): Promise<Response> => {
+  // B3.3 (RF3.1, C4): recepção durável só com o pipeline async liberado e ligado; senão, legado intacto.
+  if (isEfiWebhookPipelineAsyncActive()) {
+    const reception = await receiveGatewayWebhook(req);
+    const response = res.status(reception.status).json(reception.body);
+    // Publicação depois do 200: Redis fora ou lento não afeta a resposta (RF3.5).
+    void reception.afterResponse();
+    return response;
+  }
+
   if (!verifyWebhookSecret(req)) {
     logger.warn("[webhook] subscription: token inválido ou ausente");
     return res.status(401).json({ error: "ERR_WEBHOOK_UNAUTHORIZED" });

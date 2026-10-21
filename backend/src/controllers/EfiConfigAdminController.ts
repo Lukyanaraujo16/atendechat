@@ -13,6 +13,11 @@ import {
   uploadEfiCertificate,
   upsertEfiAdminConfig
 } from "../services/SaasBilling/PlatformEfiConfigAdminService";
+import {
+  getEfiChargeForAdmin,
+  getEfiWebhookForAdmin,
+  registerEfiWebhookForAdmin
+} from "../services/SaasBilling/efiPixAdminService";
 
 export const efiCertUpload = multer({
   storage: multer.memoryStorage(),
@@ -146,4 +151,23 @@ export const listAudits = async (
     limit: Number(req.query.limit) || 50
   });
   return res.status(200).json({ items });
+};
+
+/** GET /saas/finance/efi/charges/:txid (B3.2, RF2.6) */
+export const getCharge = async (req: Request, res: Response): Promise<Response> => {
+  return res.status(200).json(await getEfiChargeForAdmin(String(req.params.txid || "")));
+};
+
+/** GET /saas/finance/efi/webhook (B3.2, RF2.7) */
+export const getWebhook = async (_req: Request, res: Response): Promise<Response> => {
+  return res.status(200).json(await getEfiWebhookForAdmin());
+};
+
+/** POST /saas/finance/efi/webhook/register (B3.2, RF2.7; exige v2 ativa — C3) */
+export const registerWebhook = async (req: Request, res: Response): Promise<Response> => {
+  const result = await registerEfiWebhookForAdmin({
+    actorUserId: actorId(req),
+    confirm: Boolean(req.body?.confirm)
+  });
+  return res.status(200).json(result);
 };

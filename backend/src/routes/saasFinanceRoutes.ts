@@ -5,6 +5,7 @@ import requireAnyPlanFeature from "../middleware/requirePlanFeature";
 import * as SaasFinanceController from "../controllers/SaasFinanceController";
 import * as EfiIntegrationController from "../controllers/EfiIntegrationController";
 import * as EfiConfigAdminController from "../controllers/EfiConfigAdminController";
+import * as GatewayWebhookAdminController from "../controllers/GatewayWebhookAdminController";
 
 const saasFinanceRoutes = express.Router();
 
@@ -26,6 +27,70 @@ saasFinanceRoutes.post(
  * Fase 8.3-B2 — gestão administrativa de credenciais (banco).
  * Não altera checkout/webhook legado.
  */
+/** Fase 8.3-B3.2 — consulta de txid e webhook (Super Admin). Cadastro exige v2 ativa (C3). */
+saasFinanceRoutes.get(
+  "/saas/finance/efi/charges/:txid",
+  isAuth,
+  isSuper,
+  EfiConfigAdminController.getCharge
+);
+saasFinanceRoutes.get(
+  "/saas/finance/efi/webhook",
+  isAuth,
+  isSuper,
+  EfiConfigAdminController.getWebhook
+);
+saasFinanceRoutes.post(
+  "/saas/finance/efi/webhook/register",
+  isAuth,
+  isSuper,
+  EfiConfigAdminController.registerWebhook
+);
+
+/** Fase 8.3-B3.3 — eventos do webhook, varredura Pix e homologação (Super Admin). */
+saasFinanceRoutes.get(
+  "/saas/finance/efi/webhook-events",
+  isAuth,
+  isSuper,
+  GatewayWebhookAdminController.listEvents
+);
+saasFinanceRoutes.get(
+  "/saas/finance/efi/webhook-events/stats",
+  isAuth,
+  isSuper,
+  GatewayWebhookAdminController.eventStats
+);
+saasFinanceRoutes.get(
+  "/saas/finance/efi/webhook-events/:id",
+  isAuth,
+  isSuper,
+  GatewayWebhookAdminController.eventDetail
+);
+saasFinanceRoutes.post(
+  "/saas/finance/efi/webhook-events/:id/reprocess",
+  isAuth,
+  isSuper,
+  GatewayWebhookAdminController.reprocessEvent
+);
+saasFinanceRoutes.post(
+  "/saas/finance/efi/webhook-events/:id/classify",
+  isAuth,
+  isSuper,
+  GatewayWebhookAdminController.classifyEvent
+);
+saasFinanceRoutes.post(
+  "/saas/finance/efi/pix-sweep",
+  isAuth,
+  isSuper,
+  GatewayWebhookAdminController.pixSweep
+);
+saasFinanceRoutes.post(
+  "/saas/finance/efi/config/:slot/homologate",
+  isAuth,
+  isSuper,
+  GatewayWebhookAdminController.homologate
+);
+
 saasFinanceRoutes.get(
   "/saas/finance/efi/config",
   isAuth,

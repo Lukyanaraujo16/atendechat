@@ -52,6 +52,8 @@ export async function getCompanyFinanceSummary(companyId: number) {
   let totalBilled = 0;
   let totalReceived = 0;
   let totalCourtesy = 0;
+  /** SF-1 (B3.3): Pix recebido em fatura cancelada, fora da receita até a conciliação. */
+  let totalInReconciliation = 0;
   let totalOpen = 0;
   let totalOverdue = 0;
   let openCount = 0;
@@ -80,7 +82,9 @@ export async function getCompanyFinanceSummary(companyId: number) {
     const amount = toNumber(p.amount);
     const source = String((p as any).source || "");
     // Cortesia (countsAsRevenue=false) nunca entra como receita.
-    if ((p as any).countsAsRevenue === false) {
+    if ((p as any).countsAsRevenue === false && (p as any).metadata?.cancelledInvoiceReceipt === true) {
+      totalInReconciliation += amount;
+    } else if ((p as any).countsAsRevenue === false) {
       totalCourtesy += amount;
       if (source === "historical_courtesy") totalHistoricalCourtesy += amount;
     } else {
@@ -122,6 +126,7 @@ export async function getCompanyFinanceSummary(companyId: number) {
       invoiced: roundMoney(totalBilled),
       received: roundMoney(totalReceived),
       courtesy: roundMoney(totalCourtesy),
+      receivedInReconciliation: roundMoney(totalInReconciliation),
       open: roundMoney(totalOpen),
       overdue: roundMoney(totalOverdue),
       openCount,

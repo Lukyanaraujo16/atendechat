@@ -27,8 +27,12 @@ import {
 } from "./efiCredentialResolver";
 import { computeEfiConfigFingerprint } from "./efiConfigFingerprint";
 import {
-  EFI_DATABASE_SOURCE_FINANCIAL_RELEASED,
-  getEfiFinancialCredentialsSource
+  EFI_RELEASED_RUNTIMES,
+  isEfiFeatureReleased,
+  getEfiFinancialCredentialsSource,
+  isEfiPixChargeV2Active,
+  isEfiPixReconciliationSweepActive,
+  isEfiWebhookPipelineAsyncActive
 } from "./efiFinancialSource";
 
 const AUTH_TIMEOUT_MS = 15_000;
@@ -96,6 +100,20 @@ export type EfiIntegrationStatusDto = {
   };
   /** Valor efetivo dos controles de ativação (RF0.2). */
   controls: EfiActivationControls;
+  /** Cobrança Pix v2 (B3.2): controle de ambiente × liberação de código. */
+  /** `released` = liberada no código para o runtime atual; `releasedRuntimes` = lista do código. */
+  pixChargeV2: { configured: boolean; released: boolean; releasedRuntimes: string[]; active: boolean };
+  /** Pipeline do webhook (B3.3): controle × liberação, pausa, varredura e métricas (RNF9). */
+  webhookPipeline: {
+    configured: string;
+    released: boolean;
+    releasedRuntimes: string[];
+    active: boolean;
+    workerPaused: boolean;
+    sweep: { configured: boolean; released: boolean; releasedRuntimes: string[]; active: boolean };
+    /** null = tabela indisponível (migration não aplicada ou banco fora). */
+    stats: Record<string, unknown> | null;
+  };
   /** Versão em execução (PT-9, P-B31-01); commit null = desconhecido (nunca inventado). */
   version: {
     currentCommit: string | null;
@@ -111,6 +129,7 @@ export type EfiIntegrationStatusDto = {
     financial: EfiActivationControls["credentialsSource"];
     /** `false` na B3.1: a fonte `database` não opera o financeiro real. */
     databaseFinancialReleased: boolean;
+    databaseFinancialReleasedRuntimes: string[];
     database: EfiDatabaseSourceStatus;
   };
 };
@@ -238,8 +257,26 @@ export function logEfiActivationControlsAtBoot(): void {
   const payload = {
     ...controls,
     financialCredentialsSource: financialSource,
+    pixChargeV2Active: isEfiPixChargeV2Active(),
+    webhookPipelineAsyncActive: isEfiWebhookPipelineAsyncActive(),
+    pixReconciliationSweepActive: isEfiPixReconciliationSweepActive(),
     currentCommit: getAppBuildCommit()
   };
+  if (controls.pixChargeV2Enabled && !payload.pixChargeV2Active) {
+    logger.warn(
+      payload,
+      "[efi] EFI_PIX_CHARGE_V2_ENABLED=true ainda não liberado no código: checkout segue o fluxo legado"
+    );
+  }
+  if (controls.webhookPipeline === "async" && !payload.webhookPipelineAsyncActive) {
+    logger.warn(
+      payload,
+      "[efi] EFI_WEBHOOK_PIPELINE=async ainda não liberado no código: webhook segue o fluxo legado"
+    );
+  }
+  if (controls.pixReconciliationSweepEnabled && !payload.pixReconciliationSweepActive) {
+    logger.warn(payload, "[efi] EFI_PIX_RECONCILIATION_SWEEP_ENABLED=true ainda não liberado no código");
+  }
   if (controls.credentialsSource !== financialSource) {
     logger.warn(
       payload,
@@ -328,6 +365,29 @@ export async function getEfiIntegrationStatus(): Promise<EfiIntegrationStatusDto
       cobrancasOAuthAvailable: true
     },
     controls,
+    pixChargeV2: {
+      configured: controls.pixChargeV2Enabled,
+      released: isEfiFeatureReleased("pixChargeV2"),
+      releasedRuntimes: [...EFI_RELEASED_RUNTIMES.pixChargeV2],
+      active: isEfiPixChargeV2Active()
+    },
+    webhookPipeline: {
+      configured: controls.webhookPipeline,
+      released: isEfiFeatureReleased("webhookPipeline"),
+      releasedRuntimes: [...EFI_RELEASED_RUNTIMES.webhookPipeline],
+      active: isEfiWebhookPipelineAsyncActive(),
+      workerPaused: controls.webhookWorkerPaused,
+      sweep: {
+        configured: controls.pixReconciliationSweepEnabled,
+        released: isEfiFeatureReleased("pixReconciliationSweep"),
+        releasedRuntimes: [...EFI_RELEASED_RUNTIMES.pixReconciliationSweep],
+        active: isEfiPixReconciliationSweepActive()
+      },
+      stats: await import("./gatewayWebhookPipeline")
+        .then(m => m.getGatewayWebhookPipelineStats())
+        .then(s => s as unknown as Record<string, unknown>)
+        .catch(() => null)
+    },
     version: (({ commit, source, dirty, builtAt }) => ({
       currentCommit: commit,
       source,
@@ -337,7 +397,8 @@ export async function getEfiIntegrationStatus(): Promise<EfiIntegrationStatusDto
     credentialsSource: {
       active: controls.credentialsSource,
       financial: getEfiFinancialCredentialsSource(),
-      databaseFinancialReleased: EFI_DATABASE_SOURCE_FINANCIAL_RELEASED,
+      databaseFinancialReleased: isEfiFeatureReleased("databaseFinancial"),
+      databaseFinancialReleasedRuntimes: [...EFI_RELEASED_RUNTIMES.databaseFinancial],
       database: await getDatabaseSourceStatus().catch(err => {
         logger.warn(
           { err: redactEfiSensitiveText((err as Error)?.message) },

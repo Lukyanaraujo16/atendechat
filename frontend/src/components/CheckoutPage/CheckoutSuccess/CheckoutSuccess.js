@@ -38,7 +38,12 @@ function CheckoutSuccess(props) {
   const [pixString] = useState(() => pix?.qrcode?.qrcode || "");
   const [copied, setCopied] = useState(false);
   const [paymentState, setPaymentState] = useState("waiting");
-  const [secondsLeft, setSecondsLeft] = useState(PIX_EXPIRY_SEC);
+  // Cobrança v2 reusada informa o prazo restante; legado: 1 h a partir da exibição.
+  const [secondsLeft, setSecondsLeft] = useState(() =>
+    Number.isFinite(pix?.expiresInSeconds) && pix.expiresInSeconds > 0
+      ? pix.expiresInSeconds
+      : PIX_EXPIRY_SEC
+  );
   const history = useHistory();
   const { dateToClient } = useDate();
   const socketManager = useContext(SocketContext);

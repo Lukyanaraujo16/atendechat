@@ -127,7 +127,7 @@ describe("B3.1 — getEfiRuntimeCredentials (D-P1/D-P2)", () => {
     });
 
     it("liberação financeira desligada por constante de código", () => {
-      expect(efiFinancialSource.EFI_DATABASE_SOURCE_FINANCIAL_RELEASED).toBe(false);
+      expect(efiFinancialSource.EFI_RELEASED_RUNTIMES.databaseFinancial).toEqual([]);
       expect(efiFinancialSource.getEfiFinancialCredentialsSource()).toBe("legacy_env");
     });
 

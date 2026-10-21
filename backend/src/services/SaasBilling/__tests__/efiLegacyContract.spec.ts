@@ -23,12 +23,22 @@ jest.mock("../../../models/SaaSPaymentAttempt", () => ({
 jest.mock("../../../models/PlatformEfiConfig", () => ({ __esModule: true, default: { findOne: jest.fn() } }));
 jest.mock("../../../models/PlatformEfiConfigAudit", () => ({ __esModule: true, default: { findOne: jest.fn() } }));
 jest.mock("../confirmGatewayPayment", () => ({ confirmGatewayPayment: jest.fn() }));
+// Ramo v2 (B3.2): só entra com a cobrança v2 ativa; aqui o gate real está desligado.
+const mockCreateOrReuse = jest.fn();
+jest.mock("../createOrReusePixCharge", () => ({
+  createOrReusePixChargeV2: (...args: unknown[]) => mockCreateOrReuse(...args)
+}));
+// B3.3: recepção durável só com o pipeline async liberado; no default nunca é chamada.
+const mockReceive = jest.fn();
+jest.mock("../webhookReception", () => ({
+  receiveGatewayWebhook: (...args: unknown[]) => mockReceive(...args)
+}));
 jest.mock("../../../utils/logger", () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() }
 }));
 
 const SRC = path.join(__dirname, "../../..");
-const B31_MODULES = /efiRuntimeCredentials|efiPixClient|efiConfigFingerprint|efiFinancialSource|getEfiActivationControls/;
+const B31_MODULES = /efiRuntimeCredentials|efiPixClient|efiConfigFingerprint|efiPixChargeGateway|getEfiActivationControls/;
 const WH_SECRET = "w".repeat(40);
 
 const LEGACY_ENV = {
@@ -127,8 +137,11 @@ async function runFinancialFlows(env: Record<string, string>): Promise<Record<st
       detail: mockSdk.pixDetailCharge.mock.calls,
       confirm: confirmGatewayPayment.mock.calls,
       attemptUpdate: SaaSPaymentAttempt.update.mock.calls,
-      dbReads: PlatformEfiConfig.findOne.mock.calls.length
+      dbReads: PlatformEfiConfig.findOne.mock.calls.length,
+      v2Calls: mockCreateOrReuse.mock.calls.length
     };
+    // T-ACT-06: com o pipeline no default (ou `async` sem liberação de código), só o legado responde.
+    expect(mockReceive).not.toHaveBeenCalled();
     return observed;
   }
 }
@@ -146,6 +159,13 @@ describe("B3.1 — contrato legado (controles no default)", () => {
     }
     const controller = fs.readFileSync(path.join(SRC, "controllers/SubscriptionController.ts"), "utf8");
     expect(controller).toContain('import options from "../config/Gn"');
+    // B3.2: do gate o controller só usa a decisão da v2; nunca a fonte de credenciais.
+    // B3.3: do gate, só as decisões da v2 e do pipeline async; nunca a fonte de credenciais.
+    expect(controller).toMatch(
+      /import \{\s*isEfiPixChargeV2Active,\s*isEfiWebhookPipelineAsyncActive\s*\} from "\.\.\/services\/SaasBilling\/efiFinancialSource"/
+    );
+    expect(controller).toMatch(/if \(isEfiWebhookPipelineAsyncActive\(\)\) \{\s*const reception = await receiveGatewayWebhook\(req\);/);
+    expect(controller).not.toMatch(/getEfiFinancialCredentialsSource/);
   });
 
   it("P-B31-08: só efiCobrancasClient pede credencial financeira, e só atrás do gate", () => {
@@ -159,16 +179,29 @@ describe("B3.1 — contrato legado (controles no default)", () => {
       .filter(f => /getEfiRuntimeCredentials\(|resolveEfiCredentials\(/.test(fs.readFileSync(f, "utf8")))
       .map(f => path.relative(SRC, f))
       .sort();
-    // Provedor e resolvedor (definições) + o único consumidor financeiro.
+    // Provedor e resolvedor (definições) + os consumidores financeiros (Cobranças, Pix v2).
     expect(callers).toEqual([
       "services/SaasBilling/efiCobrancasClient.ts",
       "services/SaasBilling/efiCredentialResolver.ts",
-      "services/SaasBilling/efiRuntimeCredentials.ts"
+      "services/SaasBilling/efiPixChargeGateway.ts",
+      "services/SaasBilling/efiRuntimeCredentials.ts",
+      // B3.3: secret do webhook da fonte financeira efetiva, só atrás do gate.
+      "services/SaasBilling/webhookReception.ts"
     ]);
+    const reception = fs.readFileSync(path.join(SRC, "services/SaasBilling/webhookReception.ts"), "utf8");
+    expect(reception).toMatch(
+      /const source = getEfiFinancialCredentialsSource\(\);\s*if \(source === "database"\) \{\s*const creds = await getEfiRuntimeCredentials\("financial"\)/
+    );
     const cobrancas = fs.readFileSync(path.join(SRC, "services/SaasBilling/efiCobrancasClient.ts"), "utf8");
     expect(cobrancas).toMatch(
       /if \(getEfiFinancialCredentialsSource\(\) === "database"\) \{\s*const creds = await getEfiRuntimeCredentials\("financial"\)/
     );
+    const pix = fs.readFileSync(path.join(SRC, "services/SaasBilling/efiPixChargeGateway.ts"), "utf8");
+    expect(pix).toMatch(
+      /return getEfiFinancialCredentialsSource\(\) === "database" \? databaseGateway\(\) : legacyGateway\(\);/
+    );
+    expect(pix.match(/getEfiRuntimeCredentials\(/g)).toHaveLength(1);
+    expect(pix).toContain('getEfiRuntimeCredentials("financial")');
   });
 
   it("T-ACT-01: contrato de checkout e webhook com os controles no default", async () => {
@@ -257,7 +290,8 @@ describe("B3.1 — contrato legado (controles no default)", () => {
       attemptUpdate: [
         [{ status: "completed", gatewayStatus: "CONCLUIDA" }, { where: { externalTxid: "tx-1" } }]
       ],
-      dbReads: 0
+      dbReads: 0,
+      v2Calls: 0
     });
     // As duas instâncias do SDK (checkout e webhook) usam as mesmas opções do env.
     expect(observed.sdkOptions[1]).toEqual(observed.sdkOptions[0]);
@@ -268,6 +302,14 @@ describe("B3.1 — contrato legado (controles no default)", () => {
     const database = await runFinancialFlows({ ...LEGACY_ENV, EFI_CREDENTIALS_SOURCE: "database" });
     expect(database).toEqual(legacy);
     expect(database.dbReads).toBe(0);
+  });
+
+  it("T-ACT-04: EFI_PIX_CHARGE_V2_ENABLED=true sem liberação de código → contrato legado idêntico", async () => {
+    const legacy = await runFinancialFlows(LEGACY_ENV);
+    const v2Env = await runFinancialFlows({ ...LEGACY_ENV, EFI_PIX_CHARGE_V2_ENABLED: "true" });
+    expect(v2Env).toEqual(legacy);
+    expect(v2Env.webhookConfig).toHaveLength(1); // pixConfigWebhook mantido
+    expect(v2Env.v2Calls).toBe(0);
   });
 
   it("T-CERT-06: P12 legado ausente → 400 ERR_SUBSCRIPTION_PIX_CREATE (comportamento atual)", async () => {

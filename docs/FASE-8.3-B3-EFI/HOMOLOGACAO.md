@@ -1,6 +1,7 @@
 # Fase 8.3-B3 — Plano de homologação (VPS de TESTE)
 
-**Plano não executado.** Executar só na B3.4, com aprovação. A VPS de PRODUÇÃO não é usada em nenhuma etapa deste plano.
+**Plano não executado.** Executar só na B3.4, com aprovação. Sequência operacional, preflight, configuração Efí,
+certificados, webhook, rollback e ações do responsável: `IMPLANTACAO-TESTE.md` (2026-10-21). A VPS de PRODUÇÃO não é usada em nenhuma etapa deste plano.
 Revisado em 2026-10-20 para as decisões aprovadas (D-P18 assíncrono, D-P2/D-P17, controles de ativação).
 
 ## 1. Pré-requisitos

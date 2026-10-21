@@ -19,10 +19,26 @@ import { logger } from "./utils/logger";
 import { messageQueue, sendScheduledMessages } from "./queues";
 import agentOsSecurityHeaders from "./middleware/agentOsSecurityHeaders";
 import { AGENTOS_SECRET_KEY_RE } from "./config/automationAgentOsSecurityConstants";
+import { getEfiActivationControls } from "./config/saasBillingFlags";
+import { isEfiWebhookPipelineAsyncActive } from "./services/SaasBilling/efiFinancialSource";
+import {
+  isSubscriptionWebhookPath,
+  respondWebhookRouteError,
+  safeRequestPath,
+  scrubWebhookSentryEvent
+} from "./helpers/webhookLogSanitizer";
 
-Sentry.init({ dsn: process.env.SENTRY_DSN });
+Sentry.init({
+  dsn: process.env.SENTRY_DSN,
+  // R-17/S2: evento da rota do webhook vai sem query, sem Authorization, sem cookies e sem corpo.
+  beforeSend: event => scrubWebhookSentryEvent(event)
+});
 
 const app = express();
+
+// R-16/S2a: `trust proxy` só com TRUST_PROXY_HOPS configurado (ausente = comportamento atual).
+const trustProxyHops = getEfiActivationControls().trustProxyHops;
+if (trustProxyHops !== null) app.set("trust proxy", trustProxyHops);
 
 /** Webhook Meta: raw body necessário para validar X-Hub-Signature-256 */
 app.use("/webhooks/meta", metaWebhookRoutes);
@@ -93,7 +109,7 @@ app.use(async (err: Error, req: Request, res: Response, _: NextFunction) => {
     logger.warn({
       error: err.message,
       statusCode: err.statusCode,
-      path: req.originalUrl || req.url
+      path: safeRequestPath(req.originalUrl || req.url)
     });
     return res.status(err.statusCode).json({
       error: err.message,
@@ -118,6 +134,9 @@ app.use(async (err: Error, req: Request, res: Response, _: NextFunction) => {
   }
 
   const pathStr = req.originalUrl || req.url || "";
+  if (isSubscriptionWebhookPath(pathStr)) {
+    return respondWebhookRouteError(err, req, res, isEfiWebhookPipelineAsyncActive());
+  }
   if (
     pathStr.includes("/tickets") ||
     pathStr.includes("/messages/") ||

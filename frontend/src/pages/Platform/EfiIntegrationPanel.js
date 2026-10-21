@@ -24,6 +24,10 @@ import {
   AppSecondaryButton,
   AppLoadingState,
 } from "../../ui";
+import EfiActivationStatusCard from "./EfiActivationStatusCard";
+import EfiPixOperationsCard from "./EfiPixOperationsCard";
+import EfiWebhookEventsCard from "./EfiWebhookEventsCard";
+import EfiReconciliationQueueCard from "./EfiReconciliationQueueCard";
 
 const useStyles = makeStyles((theme) => ({
   section: { marginBottom: theme.spacing(2) },
@@ -211,7 +215,13 @@ export default function EfiIntegrationPanel() {
       setTestResult(data);
       if (data?.config) setConfig(data.config);
       if (data?.cobrancas?.ok) {
-        toast.success("OAuth Cobranças validado (Pix não validado).");
+        toast.success(
+          data?.pix?.ok
+            ? "OAuth Cobranças validado; Pix validado (mTLS)."
+            : `OAuth Cobranças validado; Pix não validado: ${
+                data?.pix?.message || "sem detalhe"
+              }`
+        );
       } else {
         toast.error(data?.cobrancas?.message || "Falha no OAuth");
       }
@@ -585,6 +595,14 @@ export default function EfiIntegrationPanel() {
           </Box>
         ) : null}
       </AppSectionCard>
+
+      <EfiActivationStatusCard />
+
+      <EfiPixOperationsCard />
+
+      <EfiWebhookEventsCard slot={slot} />
+
+      <EfiReconciliationQueueCard />
 
       <AppSectionCard>
         <Typography variant="subtitle1" style={{ fontWeight: 600 }}>
