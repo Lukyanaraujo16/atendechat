@@ -2572,6 +2572,10 @@ const messages = {
 					expiredHint:
 						"This charge may have expired. Close, return to Billing, and generate a new PIX.",
 					paidToast: "Payment confirmed! New date: {{date}}",
+					paidTitle: "Payment confirmed!",
+					paidRenewed: "Subscription renewed until {{date}}.",
+					paidCloseHint: "The invoice is settled. You can close this window.",
+					checkRetrying: "Could not check the payment right now. Retrying…",
 					instructions:
 						"Open your bank app, pay with PIX copy-and-paste or QR code, then wait for automatic confirmation.",
 					copyPix: "Copy PIX code",

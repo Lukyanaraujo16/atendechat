@@ -268,6 +268,14 @@ describe("B3.2 — cobrança Pix v2 (unidade)", () => {
       expect(mockSdk.pixDetailWebhook).not.toHaveBeenCalled();
     });
 
+    it("Efí real: 400 webhook_nao_encontrado → sem webhook; outro 400 continua erro", async () => {
+      const req = jest.spyOn(axios, "request");
+      req.mockRejectedValueOnce({ response: { status: 400, data: { nome: "webhook_nao_encontrado", mensagem: "Webhook não encontrado" } } });
+      await expect(getEfiSlotWebhookForAdmin()).resolves.toMatchObject({ registered: false, webhookUrlMasked: null });
+      req.mockRejectedValueOnce({ response: { status: 400, data: { nome: "chave_invalida", mensagem: "Chave inválida" } } });
+      await expect(getEfiSlotWebhookForAdmin()).rejects.toMatchObject({ message: "ERR_EFI_PIX_REJECTED" });
+    });
+
     it("sem webhook (404) → registered false; mesmo host → pointsToThisBackend true", async () => {
       const req = jest.spyOn(axios, "request");
       req.mockRejectedValueOnce({ response: { status: 404, data: { nome: "webhook_nao_encontrado" } } });

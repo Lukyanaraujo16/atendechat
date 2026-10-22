@@ -2530,6 +2530,10 @@ const messages = {
           expiredHint:
             "Este cobro puede haber caducado. Cierre, vuelva a Facturación y genere otro PIX.",
           paidToast: "¡Pago confirmado! Nueva fecha: {{date}}",
+          paidTitle: "¡Pago confirmado!",
+          paidRenewed: "Suscripción renovada hasta {{date}}.",
+          paidCloseHint: "La factura fue liquidada. Ya puede cerrar esta ventana.",
+          checkRetrying: "No fue posible consultar el pago ahora. Reintentando…",
           instructions:
             "Abra la app del banco, pague con PIX y espere la confirmación automática.",
           copyPix: "Copiar código PIX",

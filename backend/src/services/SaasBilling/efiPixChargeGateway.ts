@@ -242,7 +242,21 @@ async function databaseGateway(
       // Mesmo cabeçalho que o SDK envia hoje no cadastro (mTLS do receptor: PT-6, B3.3).
       await call("PUT", `/v2/webhook/${enc(chave)}`, { webhookUrl }, { "x-skip-mtls-checking": "true" });
     },
-    getWebhook: chave => notFoundToNull(() => call("GET", `/v2/webhook/${enc(chave)}`))
+    getWebhook: async chave => {
+      try {
+        return await call("GET", `/v2/webhook/${enc(chave)}`);
+      } catch (err) {
+        const data = ((err as AppError).data as any) || {};
+        // Chave sem webhook: a Efí responde 400 `webhook_nao_encontrado` (conferido em 2026-10-22), não 404.
+        if (
+          data.efiStatus === 404 ||
+          (data.efiStatus === 400 && data.efiNome === "webhook_nao_encontrado")
+        ) {
+          return null;
+        }
+        throw err;
+      }
+    }
   };
 }
 

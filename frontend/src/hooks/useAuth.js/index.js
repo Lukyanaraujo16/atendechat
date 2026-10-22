@@ -253,7 +253,8 @@ const useAuth = () => {
     const companyId = String(user.companyId);
     const socket = socketManager.getSocket(companyId);
     const handler = (data) => {
-      if (data.action !== "CONCLUIDA" || !data.company) return;
+      // O backend emite `paid` (confirmGatewayPayment); `CONCLUIDA` mantido por compatibilidade.
+      if (!["paid", "CONCLUIDA"].includes(data?.action) || !data.company) return;
       setUser((prev) => {
         const dueDate = data.company.dueDate;
         const finance = computeFinanceFromDueDate(dueDate);

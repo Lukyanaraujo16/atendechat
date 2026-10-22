@@ -9,7 +9,7 @@ desenvolvimento. Referências: `AUDITORIA.md` (R*), `DECISOES.md` (D-P*, R-*, PT
 | B3.1 | Integração de credenciais | **IMPLEMENTADA + fechamento técnico — aguardando aprovação final** (2026-10-20) |
 | B3.2 | Geração e consulta de cobranças Pix | **IMPLEMENTADA localmente — aguardando aprovação; sem ativação** (2026-10-20) |
 | B3.3 | Webhooks assíncronos, confirmação e conciliação | **IMPLEMENTADA localmente — aguardando aprovação; sem ativação** (2026-10-21) |
-| B3.4 | Testes e homologação completa | **EM ANDAMENTO** — deploy 1 em TESTE (2026-10-22); Opção B (conta Efí real, B34-T10) implementada localmente; aguarda commit e deploy |
+| B3.4 | Testes e homologação completa | **CONCLUÍDA em TESTE** (2026-10-22) — fluxo Pix real de ponta a ponta aprovado (`RELATORIO-HOMOLOGACAO.md`); PRODUÇÃO pendente |
 
 ## Regras transversais (aprovadas — DECISOES §8)
 
@@ -322,8 +322,8 @@ Aguarda as autorizações R-1…R-4 de `IMPLANTACAO-TESTE.md` §1.
 | 3 | Slot `homologation` com credenciais de produção: OAuth Cobranças ok, OAuth Pix 403 | diagnosticado: P12 de produção contra `pix-h` (runtime `test` obrigava sandbox) |
 | 4 | Opção B — `EFI_TEST_RUNTIME_ALLOW_PRODUCTION_API`, troca auditada de ambiente, painel, `webhook-check` (DECISOES §14) | implementada localmente; testes em TESTES §Registro B3.4-B |
 | 5 | H1–H3b com conta real (`IMPLANTACAO-TESTE.md` §10): deploy `ed2e097`, autorização ligada, slot em `production`, OAuth Cobranças e Pix ok, ativação admin, `webhook-check` sem webhook na chave | concluído (2026-10-22) |
-| 6 | Commit "liberação TESTE" (§6.1): `"test"` nas quatro listas de `EFI_RELEASED_RUNTIMES` | preparado localmente; aguarda commit e deploy 2 |
-| 7 | H4–H12 (ativações C → D → E, webhook, cobrança real) | não iniciado; aguarda deploy 2 e autorizações R-12 |
+| 6 | Commit "liberação TESTE" (§6.1) `8f6babd` e deploy 2 | concluído (2026-10-22) |
+| 7 | H4–H12: ativações C → D → E, webhook, cobrança real de R$ 1,00, baixa, renovação, idempotência, `homologate` | **aprovado** (2026-10-22) — `RELATORIO-HOMOLOGACAO.md` |
 
 O objetivo e os critérios abaixo valem com a conta real no lugar do sandbox (DECISOES §14).
 

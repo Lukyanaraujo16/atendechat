@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useContext, useMemo, useRef } from "react";
-import { useHistory } from "react-router-dom";
+import React, { useState, useEffect, useContext, useMemo, useRef, useCallback } from "react";
 import QRCode from "react-qr-code";
-import { Typography, Box, CircularProgress } from "@material-ui/core";
+import { Typography, Box } from "@material-ui/core";
 import Alert from "@material-ui/lab/Alert";
 import useCheckoutStyles from "../styles";
 import { SuccessContent, Total } from "./style";
@@ -10,9 +9,14 @@ import { FaCopy, FaCheckCircle } from "react-icons/fa";
 import { SocketContext } from "../../../context/Socket/SocketContext";
 import { useDate } from "../../../hooks/useDate";
 import { toast } from "react-toastify";
+import api from "../../../services/api";
 import { i18n } from "../../../translate/i18n";
 
 const PIX_EXPIRY_SEC = 3600;
+/** Consulta leve da fatura enquanto aguarda: reserva para socket perdido ou reconexão. */
+export const PIX_STATUS_POLL_MS = 10000;
+/** O backend emite `paid` (confirmGatewayPayment); `CONCLUIDA` mantido por compatibilidade. */
+const PAID_SOCKET_ACTIONS = ["paid", "CONCLUIDA"];
 
 function formatPixTotal(pix) {
   if (!pix?.valor) return "—";
@@ -38,16 +42,40 @@ function CheckoutSuccess(props) {
   const [pixString] = useState(() => pix?.qrcode?.qrcode || "");
   const [copied, setCopied] = useState(false);
   const [paymentState, setPaymentState] = useState("waiting");
+  const [renewedUntil, setRenewedUntil] = useState(null);
+  const [checkFailed, setCheckFailed] = useState(false);
   // Cobrança v2 reusada informa o prazo restante; legado: 1 h a partir da exibição.
   const [secondsLeft, setSecondsLeft] = useState(() =>
     Number.isFinite(pix?.expiresInSeconds) && pix.expiresInSeconds > 0
       ? pix.expiresInSeconds
       : PIX_EXPIRY_SEC
   );
-  const history = useHistory();
   const { dateToClient } = useDate();
   const socketManager = useContext(SocketContext);
   const paymentHandledRef = useRef(false);
+  const mountedRef = useRef(true);
+  const invoiceId = invoice?.id;
+
+  useEffect(() => () => {
+    mountedRef.current = false;
+  }, []);
+
+  // Fonte da verdade: status persistido da fatura (GET /invoices/:id, filtrado pela empresa do usuário).
+  const checkInvoice = useCallback(async () => {
+    if (!invoiceId || paymentHandledRef.current) return;
+    try {
+      const { data } = await api.get(`/invoices/${invoiceId}`);
+      if (!mountedRef.current) return; // modal fechado durante a consulta
+      setCheckFailed(false);
+      if (String(data?.status).toLowerCase() !== "paid" || paymentHandledRef.current) return;
+      paymentHandledRef.current = true;
+      setPaymentState("paid");
+      toast.success(i18n.t("checkoutPage.pix.paidTitle"));
+    } catch {
+      // Falha temporária de rede: não muda o estado do pagamento; a próxima consulta tenta de novo.
+      if (mountedRef.current) setCheckFailed(true);
+    }
+  }, [invoiceId]);
 
   const totalLabel = useMemo(() => formatPixTotal(pix), [pix]);
 
@@ -66,29 +94,35 @@ function CheckoutSuccess(props) {
     return () => clearInterval(t);
   }, [paymentState]);
 
+  // Aguardando: consulta já ao abrir (fatura pode estar paga) e a cada PIX_STATUS_POLL_MS.
+  // Expirada: uma última consulta (pagamento feito pouco antes de expirar). Para ao pagar ou desmontar.
+  useEffect(() => {
+    if (paymentState === "expired") {
+      checkInvoice();
+      return undefined;
+    }
+    if (paymentState !== "waiting") return undefined;
+    checkInvoice();
+    const t = setInterval(checkInvoice, PIX_STATUS_POLL_MS);
+    return () => clearInterval(t);
+  }, [paymentState, checkInvoice]);
+
   useEffect(() => {
     const companyId = localStorage.getItem("companyId");
     const socket = socketManager.getSocket(companyId);
 
+    // O evento é da empresa (qualquer pagamento): só a fatura persistida confirma este.
     const handler = (data) => {
-      if (data.action !== "CONCLUIDA" || paymentHandledRef.current) return;
-      paymentHandledRef.current = true;
-      setPaymentState("paid");
-      toast.success(
-        i18n.t("checkoutPage.pix.paidToast", {
-          date: dateToClient(data.company?.dueDate),
-        })
-      );
-      setTimeout(() => {
-        history.push("/");
-      }, 4000);
+      if (!PAID_SOCKET_ACTIONS.includes(data?.action)) return;
+      if (data.company?.dueDate) setRenewedUntil(data.company.dueDate);
+      checkInvoice();
     };
 
     socket.on(`company-${companyId}-payment`, handler);
     return () => {
       socket.off(`company-${companyId}-payment`, handler);
     };
-  }, [history, socketManager, dateToClient]);
+  }, [socketManager, checkInvoice]);
 
   const handleCopyQR = () => {
     setTimeout(() => {
@@ -136,6 +170,11 @@ function CheckoutSuccess(props) {
               minutes: Math.ceil(secondsLeft / 60),
             })}
           </Typography>
+          {checkFailed && (
+            <Typography variant="caption" component="p" align="center">
+              {i18n.t("checkoutPage.pix.checkRetrying")}
+            </Typography>
+          )}
         </Alert>
       )}
 
@@ -152,9 +191,22 @@ function CheckoutSuccess(props) {
       )}
 
       {paymentState === "paid" && (
-        <Box display="flex" justifyContent="center" alignItems="center" py={2}>
-          <CircularProgress size={28} style={{ marginRight: 12 }} />
-          <Typography>{i18n.t("checkoutPage.pix.redirecting")}</Typography>
+        <Box py={2} width="100%">
+          <Alert severity="success" variant="outlined" role="status">
+            <Typography variant="h6" component="p">
+              {i18n.t("checkoutPage.pix.paidTitle")}
+            </Typography>
+            {renewedUntil && (
+              <Typography variant="body2" component="p">
+                {i18n.t("checkoutPage.pix.paidRenewed", {
+                  date: dateToClient(renewedUntil),
+                })}
+              </Typography>
+            )}
+            <Typography variant="body2" component="p">
+              {i18n.t("checkoutPage.pix.paidCloseHint")}
+            </Typography>
+          </Alert>
         </Box>
       )}
 
