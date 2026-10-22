@@ -45,13 +45,18 @@ Não executados: varredura (desligada; H11 coberto sem itens pendentes), ensaios
   pagar, fechar ou desmontar; falha de rede só mostra "tentando novamente"); exibe "Pagamento confirmado!" e a nova
   data da assinatura, sem redirecionar. Fechar o modal recarrega a lista do Financeiro. Testes: `CheckoutSuccess.test.js` (6).
 
+### Homologação visual do modal (commit `7385f06`, 2026-10-22)
+Fatura 3 (StreamHUB, R$ 1,00, competência 2026-12): cobrança `…bfbde9` gerada às 15:00:12, paga, webhook recebido
+às 15:00:28 e processado em ~0,5 s; fatura `paid`, um pagamento, uma renovação (2026-12-14 → 2027-01-14), nenhum
+item de conciliação. O responsável confirmou a confirmação automática no modal e a fatura como paga. **Aprovado.**
+
 ## 4. Pendências impeditivas para PRODUÇÃO
 1. Release "liberação PRODUÇÃO": acrescentar `"production"` às quatro listas (passa por TESTE antes; HOMOLOGACAO §9).
 2. **Chave Pix e webhook por ambiente:** a chave `04fd` está com o webhook apontado para TESTE. PRODUÇÃO precisa de
    uma chave própria (ou mover este webhook, desligando TESTE). Uma chave nunca serve aos dois ambientes.
 3. R-5 / PT-10: decisão de retenção de `SaaSGatewayWebhookEvents`.
 4. D-P11: comunicação aos clientes antes de ativar (Pix pago passa a renovar automaticamente).
-5. Publicar e implantar em TESTE as correções do §3 (modal Pix e `webhook-check`) e conferir visualmente.
+5. ~~Correções do §3 (modal Pix e `webhook-check`)~~ — implantadas em TESTE (`7385f06`) e homologadas.
 
 ## 5. Checklist de implantação em PRODUÇÃO (com autorização explícita, um controle por vez)
 1. Backup do banco e do `.env`; `preflight-teste.sql` sem txid repetido.
