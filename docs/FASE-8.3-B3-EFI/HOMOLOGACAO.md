@@ -4,6 +4,12 @@
 certificados, webhook, rollback e ações do responsável: `IMPLANTACAO-TESTE.md` (2026-10-21). A VPS de PRODUÇÃO não é usada em nenhuma etapa deste plano.
 Revisado em 2026-10-20 para as decisões aprovadas (D-P18 assíncrono, D-P2/D-P17, controles de ativação).
 
+> **Atualização 2026-10-22 — Opção B (DECISOES §14, B34-T10).** Com o sandbox indisponível, a homologação na VPS de
+> TESTE usa a conta Efí **real** (`EFI_TEST_RUNTIME_ALLOW_PRODUCTION_API=true`, slot `homologation` em `production`).
+> Os cenários abaixo valem com essa troca. Onde se lê "sandbox", entenda "conta real, valores baixos". Sequência
+> H1–H12, cuidados com webhook e reversão: `IMPLANTACAO-TESTE.md` §10. **Cada cobrança real exige autorização
+> específica (R-12).** H-20 e H-36 seguem não aplicáveis nesta VPS.
+
 ## 1. Pré-requisitos
 
 - B3.1, B3.2 e B3.3 aprovadas; suíte local verde (T-REG-01/02, T-ACT-01).

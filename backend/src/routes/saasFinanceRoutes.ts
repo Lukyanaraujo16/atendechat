@@ -103,6 +103,12 @@ saasFinanceRoutes.get(
   isSuper,
   EfiConfigAdminController.listAudits
 );
+saasFinanceRoutes.get(
+  "/saas/finance/efi/config/webhook-check",
+  isAuth,
+  isSuper,
+  EfiConfigAdminController.webhookCheck
+);
 saasFinanceRoutes.put(
   "/saas/finance/efi/config/:slot",
   isAuth,
@@ -139,6 +145,12 @@ saasFinanceRoutes.post(
   isAuth,
   isSuper,
   EfiConfigAdminController.deactivate
+);
+saasFinanceRoutes.post(
+  "/saas/finance/efi/config/:slot/environment",
+  isAuth,
+  isSuper,
+  EfiConfigAdminController.changeEnvironment
 );
 saasFinanceRoutes.post(
   "/saas/finance/efi/config/:slot/revoke",

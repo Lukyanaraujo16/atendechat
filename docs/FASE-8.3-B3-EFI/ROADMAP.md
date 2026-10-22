@@ -9,7 +9,7 @@ desenvolvimento. Referências: `AUDITORIA.md` (R*), `DECISOES.md` (D-P*, R-*, PT
 | B3.1 | Integração de credenciais | **IMPLEMENTADA + fechamento técnico — aguardando aprovação final** (2026-10-20) |
 | B3.2 | Geração e consulta de cobranças Pix | **IMPLEMENTADA localmente — aguardando aprovação; sem ativação** (2026-10-20) |
 | B3.3 | Webhooks assíncronos, confirmação e conciliação | **IMPLEMENTADA localmente — aguardando aprovação; sem ativação** (2026-10-21) |
-| B3.4 | Testes e homologação completa | **NÃO INICIADA** — preparação local concluída (2026-10-21); aguarda autorização de implantação em TESTE |
+| B3.4 | Testes e homologação completa | **EM ANDAMENTO** — deploy 1 em TESTE (2026-10-22); Opção B (conta Efí real, B34-T10) implementada localmente; aguarda commit e deploy |
 
 ## Regras transversais (aprovadas — DECISOES §8)
 
@@ -313,6 +313,17 @@ Decisões: DECISOES §12. Pendências: DECISOES §12.1; riscos: §12.2. Resultad
 pacote `IMPLANTACAO-TESTE.md` (checklist, preflight de migrations, Efí, certificados, webhook, rollback, testes reais e
 ações do responsável), `preflight-teste.sql`, `backend/scripts/check-efi-p12.js`, card de status (P-B31-06).
 Aguarda as autorizações R-1…R-4 de `IMPLANTACAO-TESTE.md` §1.
+
+### Progresso B3.4 (2026-10-22)
+| # | Item | Estado |
+|---|------|--------|
+| 1 | Deploy 1 (inerte) em TESTE, commit `a1e6a2d` | concluído pelo responsável; Super Admin conferido |
+| 2 | `STREAMHUB_RUNTIME_ENV=test` e `EFI_CREDENTIAL_ENCRYPTION_KEY` na VPS de TESTE | concluído (2026-10-22) |
+| 3 | Slot `homologation` com credenciais de produção: OAuth Cobranças ok, OAuth Pix 403 | diagnosticado: P12 de produção contra `pix-h` (runtime `test` obrigava sandbox) |
+| 4 | Opção B — `EFI_TEST_RUNTIME_ALLOW_PRODUCTION_API`, troca auditada de ambiente, painel, `webhook-check` (DECISOES §14) | implementada localmente; testes em TESTES §Registro B3.4-B |
+| 5 | H1–H12 com conta real (`IMPLANTACAO-TESTE.md` §10) | não iniciado; aguarda commit, deploy e autorizações R-10…R-12 |
+
+O objetivo e os critérios abaixo valem com a conta real no lugar do sandbox (DECISOES §14).
 
 **Objetivo:** executar `TESTES.md` e `HOMOLOGACAO.md` na VPS de TESTE com conta sandbox, ativando os controles **em
 TESTE**, um a um. Produzir as evidências e o registro `homologate` do slot `homologation` para a decisão de promoção.

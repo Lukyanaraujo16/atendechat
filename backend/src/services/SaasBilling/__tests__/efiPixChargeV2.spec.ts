@@ -8,7 +8,12 @@ import {
   PIX_V2_TXID_RE
 } from "../createOrReusePixCharge";
 import { getEfiPixChargeGateway, isEfiPixRetryable } from "../efiPixChargeGateway";
-import { maskPixKey, maskWebhookUrl, registerEfiWebhookForAdmin } from "../efiPixAdminService";
+import {
+  getEfiSlotWebhookForAdmin,
+  maskPixKey,
+  maskWebhookUrl,
+  registerEfiWebhookForAdmin
+} from "../efiPixAdminService";
 import { EFI_PIX_REQUEST_TIMEOUT_MS, invalidateEfiPixTokenCache } from "../efiPixClient";
 import { efiTestP12 } from "./fixtures/efiTestP12";
 
@@ -207,6 +212,64 @@ describe("B3.2 — cobrança Pix v2 (unidade)", () => {
         data: { webhookUrl: "https://x.test/w?token=s" },
         headers: expect.objectContaining({ "x-skip-mtls-checking": "true" })
       });
+    });
+  });
+
+  describe("B34-T10: consulta do webhook da chave do slot (só leitura)", () => {
+    let credsSpy: jest.SpyInstance;
+    beforeEach(() => {
+      credsSpy = jest.spyOn(runtimeCredentials, "getEfiRuntimeCredentials").mockResolvedValue({
+        source: "database",
+        efiEnvironment: "production",
+        slot: "homologation",
+        configId: 7,
+        configFingerprint: "f".repeat(64),
+        clientId: "id",
+        clientSecret: "secret",
+        pixKey: "chave-db-1234",
+        webhookSecret: "w".repeat(40),
+        cobrancasClientId: "id",
+        cobrancasClientSecret: "secret",
+        certificate: { kind: "memory", pfx: efiTestP12() },
+        tokenCacheKey: "db:7:1:production"
+      });
+      jest.spyOn(axios, "post").mockResolvedValue({ status: 200, data: { access_token: "tok", expires_in: 3600 } });
+      process.env.BACKEND_URL = "https://api.teste.example.com";
+    });
+
+    it("usa o slot do banco com a fonte financeira em legacy_env; só GET; URL mascarada", async () => {
+      expect(efiFinancialSource.getEfiFinancialCredentialsSource()).toBe("legacy_env");
+      const req = jest.spyOn(axios, "request").mockResolvedValue({
+        status: 200,
+        data: { webhookUrl: "https://outro.example.com/hook?token=SEGREDO", chave: "chave-db-1234", criacao: "2026-01-01" }
+      } as any);
+
+      const out = await getEfiSlotWebhookForAdmin();
+
+      expect(credsSpy).toHaveBeenCalledWith("database");
+      expect(req).toHaveBeenCalledTimes(1);
+      expect(req.mock.calls[0][0]).toMatchObject({
+        method: "GET",
+        url: "https://pix.api.efipay.com.br/v2/webhook/chave-db-1234"
+      });
+      expect(out).toMatchObject({
+        registered: true,
+        webhookUrlMasked: "https://outro.example.com/hook?token=***",
+        pointsToThisBackend: false,
+        chaveMasked: "****1234",
+        credentialsSource: "database",
+        efiEnvironment: "production"
+      });
+      expect(JSON.stringify(out)).not.toMatch(/SEGREDO|"secret"|chave-db-1234/);
+      expect(mockSdk.pixDetailWebhook).not.toHaveBeenCalled();
+    });
+
+    it("sem webhook (404) → registered false; mesmo host → pointsToThisBackend true", async () => {
+      const req = jest.spyOn(axios, "request");
+      req.mockRejectedValueOnce({ response: { status: 404, data: { nome: "webhook_nao_encontrado" } } });
+      await expect(getEfiSlotWebhookForAdmin()).resolves.toMatchObject({ registered: false, pointsToThisBackend: null });
+      req.mockResolvedValueOnce({ status: 200, data: { webhookUrl: "https://api.teste.example.com/subscription/webhook?whToken=x" } } as any);
+      await expect(getEfiSlotWebhookForAdmin()).resolves.toMatchObject({ registered: true, pointsToThisBackend: true });
     });
   });
 });

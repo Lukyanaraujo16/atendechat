@@ -1,6 +1,7 @@
 # Fase 8.3-B3 — Pacote de implantação e homologação na VPS de TESTE
 
-**Preparado em 2026-10-21, localmente. Nada aqui foi executado na VPS.** Este documento complementa `HOMOLOGACAO.md`
+**Preparado em 2026-10-21, localmente. Nada aqui foi executado na VPS.** **Atualização 2026-10-22:** a homologação passa a usar a conta
+Efí **real** (Opção B, DECISOES §14); ver §10, que prevalece sobre as menções a sandbox deste documento. Este documento complementa `HOMOLOGACAO.md`
 (cenários H-*) e `ROADMAP.md` (B3.4). PRODUÇÃO não é tocada em nenhum passo.
 
 Abreviações: **R** = ação do responsável (você); **O** = operador com acesso à VPS de TESTE; **A** = pode ser feita pelo agente
@@ -40,6 +41,9 @@ quando autorizada (sem acesso a VPS).
 | R-7 | PT-6 — mTLS do webhook (ver §4.4) | Tentar o cadastro em sandbox como está (com `x-skip-mtls-checking`, paridade com o SDK). Se a Efí recusar com `webhook_invalido`, decidir pela opção B (mTLS no nginx de TESTE) | H-07, H-10 |
 | R-8 | P-B31-04 — webhook secret curto gravado antes da B3.1 | Regravar o secret do slot (≥ 32) antes de ativar | H-05 |
 | R-9 | P-B32-02 — checkout legado formata valores ≥ R$ 1.000 errado | Em TESTE usar faturas < R$ 1.000; a v2 já corrige (`toFixed(2)`); decidir se corrige o legado | — |
+| R-10 | Opção B (B34-T10) — conta Efí **real** na VPS de TESTE | Aprovada em 2026-10-22 pelo responsável (sandbox indisponível). Procedimento em §10 | §10 |
+| R-11 | Chave Pix exclusiva para TESTE (B34-T10d) | Confirmar que a chave do slot não está em uso em outra integração; conferir com o `webhook-check` antes de cadastrar qualquer webhook | H7 |
+| R-12 | Cobrança e pagamento reais (H5/H6) | Autorização específica, por escrito, a cada cobrança real; valor baixo e distinto | H5 |
 
 ### 1.2 Insumos que só você tem
 - Conta Efí **sandbox** com: aplicação com os escopos `cob.write`, `cob.read`, `pix.read`, `webhook.write`,
@@ -357,3 +361,58 @@ a renovação dele, todos com a fonte `database` e o fingerprint atual.
 - [ ] Ativações §6.2 uma a uma, com registro
 - [ ] Ensaios §6.3, rollbacks §7.2, homologação H-23/H-35/H-36
 - [ ] Relatório `RELATORIO-HOMOLOGACAO.md` com aprovado/reprovado por cenário e o commit homologado
+
+---
+
+## 10. Opção B — conta Efí real na VPS de TESTE (B34-T10, 2026-10-22)
+
+Decisão e riscos: DECISOES §14. **Toda cobrança gerada depois da liberação TESTE movimenta dinheiro real.**
+
+### 10.1 Configuração necessária (VPS de TESTE, O com autorização)
+| Variável | Valor | Observação |
+|----------|-------|------------|
+| `STREAMHUB_RUNTIME_ENV` | `test` | já configurada; **não** mudar |
+| `EFI_CREDENTIAL_ENCRYPTION_KEY` | já configurada | **não** trocar (recifrar exigiria recadastro) |
+| `EFI_TEST_RUNTIME_ALLOW_PRODUCTION_API` | `true` | **nova**; única variável desta etapa |
+| `GERENCIANET_*`, `GERENCIANET_SANDBOX` | inalteradas | o caminho B3 nunca as lê (B34-T7) |
+| Controles B3 (`EFI_CREDENTIALS_SOURCE` etc.) | ausentes | só nas fases do §6.2, uma por vez |
+
+### 10.2 Impacto nas credenciais já cadastradas
+O slot `homologation` da VPS está com `efiEnvironment = sandbox` e as credenciais e o P12 de produção gravados.
+A troca de ambiente (H2) **apaga** Client ID/Secret, chave Pix, webhook secret e P12 do slot. Tenha os originais à
+mão para recadastrar. A auditoria anterior é preservada.
+
+### 10.3 Sequência
+| Etapa | O quê | Quem | Conferir |
+|-------|-------|------|----------|
+| H1 | Commit/push desta entrega (R) e deploy igual ao §5, **sem migration nova** (`db:migrate` deve dizer `No migrations were executed`) | R + O | boot: `[efi] controles de ativação` com `runtime: "test"`, `testRuntimeProductionApiAllowed: false`; controles no default |
+| H2 | Backup do `.env` (modo 600) → acrescentar `EFI_TEST_RUNTIME_ALLOW_PRODUCTION_API=true` → restart só do backend. No painel: "Usar API Efí de PRODUÇÃO" (confirmar) → recadastrar Client ID/Secret, chave Pix (**exclusiva**, R-11), webhook secret (≥ 32) e P12 | O + R | boot: `warn` `EFI_TEST_RUNTIME_ALLOW_PRODUCTION_API=true…`; painel: alerta vermelho de dinheiro real, "Ambiente Efí: PRODUÇÃO", fingerprint do P12 igual ao de `check-efi-p12.js`; auditoria `change_environment` (sandbox → production) |
+| H3 | "Testar OAuth Cobranças" → Cobranças ok **e** "Pix validado (mTLS)". Ativar (admin) | R | auditoria `test_auth` com `pixOk: true`; `activate` com `efiEnvironment: "production"`. Base Pix usada: `https://pix.api.efipay.com.br` |
+| H3b | "Verificar webhook da chave (somente leitura)" | R | `registered: false`, ou URL que aponta para este backend. **Se apontar para outro destino, parar**: a chave está em uso (R-11) |
+| H4 | Commit "liberação TESTE" (§6.1) e deploy 2; depois ativações §6.2, uma por vez (C → D → E). Cadastro do webhook pelo painel (formato novo, fase E) **só depois de H3b** e **antes** de H5 | R + O | card: fonte `database`, slot `homologation`, ambiente `production`, `usable`; `webhook-check` aponta para este backend |
+| H5 | Gerar **uma** cobrança Pix real de valor baixo e distinto | R, **com autorização R-12** | `SaaSPaymentAttempts.payloadSummary` com `source: database`, `configId`; cobrança na Efí com `#Fatura:` |
+| H6 | Pagar a cobrança | R | Efí: cobrança `CONCLUIDA`; `endToEndId` |
+| H7 | Receber a notificação da Efí | R + O | evento persistido, `payload.authVia = whToken`, processado pelo worker |
+| H8 | Baixa | O | fatura paga; um `SaaSPayments` gateway |
+| H9 | Renovação | O | uma renovação para a fatura (consulta do §8) |
+| H10 | Idempotência: reprocessar o mesmo evento pelo painel; reenvio da Efí, se houver | R + O | nenhuma baixa, renovação ou lançamento duplicado |
+| H11 | Conciliação | R | fila de conciliação sem item inesperado; varredura (fase F) só leitura |
+| H12 | Relatório `RELATORIO-HOMOLOGACAO.md` (aprovado/reprovado por etapa, commit) e decisão de manter ou reverter (§10.4) | R | — |
+
+Cuidados:
+- **Nunca** gerar Pix pelo checkout legado nem chamar `/subscription/create/webhook` nesta VPS (§5, passo 13).
+- Cancelar uma cobrança não devolve um Pix pago. Nenhuma devolução é automática; se necessária, é feita manualmente no
+  painel Efí, com registro.
+- mTLS do webhook (R-7): na conta real vale a cadeia de **produção** da Efí. Se o cadastro for recusado com
+  `webhook_invalido`, decidir a opção B do §4.4 com a cadeia de produção (conferir a URL na documentação oficial).
+
+### 10.4 Reversão
+| Situação | Ação | Efeito |
+|----------|------|--------|
+| Encerrar o uso da conta real | Painel → "Voltar para API Efí de HOMOLOGAÇÃO" → remover `EFI_TEST_RUNTIME_ALLOW_PRODUCTION_API` + restart | credenciais reais apagadas do slot; slot em sandbox, vazio |
+| Bloqueio imediato | Remover `EFI_TEST_RUNTIME_ALLOW_PRODUCTION_API` + restart | slot em `production` passa a ser recusado em toda leitura (`ERR_EFI_ENVIRONMENT_FORBIDDEN_FOR_RUNTIME`); **sem** fallback para `GERENCIANET_*`. O painel mostra o alerta de ambiente bloqueado e o botão para voltar ao sandbox |
+| Liberações já ativas (fases C–F) | §7.2, antes dos passos acima | — |
+| Webhook cadastrado na chave real | Removê-lo ou reapontá-lo na Efí só com decisão do responsável; a aplicação não remove webhooks | — |
+
+Depois da reversão: conferir que não há cobranças v2 abertas na conta real (consultas do §8) e registrar no relatório.
+

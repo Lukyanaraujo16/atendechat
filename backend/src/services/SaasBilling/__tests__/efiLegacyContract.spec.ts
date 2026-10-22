@@ -201,7 +201,23 @@ describe("B3.1 — contrato legado (controles no default)", () => {
       /return getEfiFinancialCredentialsSource\(\) === "database" \? databaseGateway\(\) : legacyGateway\(\);/
     );
     expect(pix.match(/getEfiRuntimeCredentials\(/g)).toHaveLength(1);
-    expect(pix).toContain('getEfiRuntimeCredentials("financial")');
+    expect(pix).toContain('purpose: "financial" | "database" = "financial"');
+    expect(pix).toContain("getEfiRuntimeCredentials(purpose)");
+    // B34-T10d: a finalidade `database` (slot do banco, nunca legado) só serve à consulta só leitura do webhook.
+    expect(pix.match(/databaseGateway\("database"\)/g)).toHaveLength(1);
+    const dbGatewayUsers = walk(SRC)
+      .filter(f => /getEfiDatabasePixGateway\(/.test(fs.readFileSync(f, "utf8")))
+      .map(f => path.relative(SRC, f))
+      .sort();
+    expect(dbGatewayUsers).toEqual([
+      "services/SaasBilling/efiPixAdminService.ts",
+      "services/SaasBilling/efiPixChargeGateway.ts"
+    ]);
+    const admin = fs.readFileSync(path.join(SRC, "services/SaasBilling/efiPixAdminService.ts"), "utf8");
+    const slotCheck = admin.slice(admin.indexOf("export async function getEfiSlotWebhookForAdmin"));
+    const slotCheckBody = slotCheck.slice(0, slotCheck.indexOf("\n}\n"));
+    expect(slotCheckBody).toContain("getEfiDatabasePixGateway()");
+    expect(slotCheckBody).not.toMatch(/putWebhook|putCharge|qrCode|recordEfiConfigAudit/);
   });
 
   it("T-ACT-01: contrato de checkout e webhook com os controles no default", async () => {

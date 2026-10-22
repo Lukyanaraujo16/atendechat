@@ -129,11 +129,13 @@ async function databaseCredentials(): Promise<EfiRuntimeCredentials> {
   return creds;
 }
 
-export type EfiCredentialsPurpose = "financial" | "diagnostic";
+/** `database`: sempre o slot do banco, nunca `legacy_env` (consultas admin só leitura, B34-T10). */
+export type EfiCredentialsPurpose = "financial" | "diagnostic" | "database";
 
 export async function getEfiRuntimeCredentials(
   purpose: EfiCredentialsPurpose
 ): Promise<EfiRuntimeCredentials> {
+  if (purpose === "database") return databaseCredentials();
   const source =
     purpose === "financial"
       ? getEfiFinancialCredentialsSource()

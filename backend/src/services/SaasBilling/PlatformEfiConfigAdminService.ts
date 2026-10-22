@@ -1,7 +1,10 @@
 import sequelize from "../../database";
 import AppError from "../../errors/AppError";
 import { assertEfiEncryptionKeyConfigured, encryptEfiSecret, maskEfiSecret } from "../../helpers/efiCredentialCrypto";
-import { assertEfiSlotAllowedForRuntime } from "../../config/streamhubRuntimeEnv";
+import {
+  assertEfiSlotAllowedForRuntime,
+  PlatformEfiApiEnvironment
+} from "../../config/streamhubRuntimeEnv";
 import PlatformEfiConfig, {
   PlatformEfiConfigStatus,
   PlatformEfiSlot
@@ -50,6 +53,31 @@ function assertSlotParam(
     );
   }
   return slot;
+}
+
+/** Apaga credenciais, P12, testes e habilitação do slot (revogação e troca de ambiente). */
+function clearEfiConfigSecrets(row: PlatformEfiConfig): void {
+  row.clientIdEncrypted = null;
+  row.clientSecretEncrypted = null;
+  row.clientIdMasked = null;
+  row.pixKeyEncrypted = null;
+  row.pixKeyMasked = null;
+  row.webhookSecretEncrypted = null;
+  row.webhookSecretConfigured = false;
+  row.cobrancasClientIdEncrypted = null;
+  row.cobrancasClientSecretEncrypted = null;
+  row.cobrancasClientIdMasked = null;
+  row.certificateEncrypted = null;
+  row.certificateStorageKey = null;
+  row.certificateFingerprint = null;
+  row.certificateUploadedAt = null;
+  row.lastAuthTestAt = null;
+  row.lastAuthTestOk = null;
+  row.lastAuthTestMessage = null;
+  row.adminEnabled = false;
+  row.pixHomologated = false;
+  row.activatedAt = null;
+  row.activatedByUserId = null;
 }
 
 /** Regra única de status (R18): a mesma do resolvedor. */
@@ -260,7 +288,7 @@ export async function upsertEfiAdminConfig(input: {
       diff.adminDisabled = true;
     }
 
-    locked.efiEnvironment = runtime.efiEnvironment;
+    // O ambiente da API só muda pela ação auditada `change_environment` (B34-T10).
     locked.updatedByUserId = input.actorUserId;
     locked.status = recomputeStatus(locked);
     await locked.save({ transaction });
@@ -652,27 +680,7 @@ export async function revokeEfiAdminConfig(input: {
   if (!row) throw new AppError("ERR_EFI_CONFIG_NOT_FOUND", 404);
 
   const previousKey = row.certificateStorageKey;
-  row.clientIdEncrypted = null;
-  row.clientSecretEncrypted = null;
-  row.clientIdMasked = null;
-  row.pixKeyEncrypted = null;
-  row.pixKeyMasked = null;
-  row.webhookSecretEncrypted = null;
-  row.webhookSecretConfigured = false;
-  row.cobrancasClientIdEncrypted = null;
-  row.cobrancasClientSecretEncrypted = null;
-  row.cobrancasClientIdMasked = null;
-  row.certificateEncrypted = null;
-  row.certificateStorageKey = null;
-  row.certificateFingerprint = null;
-  row.certificateUploadedAt = null;
-  row.lastAuthTestAt = null;
-  row.lastAuthTestOk = null;
-  row.lastAuthTestMessage = null;
-  row.adminEnabled = false;
-  row.pixHomologated = false;
-  row.activatedAt = null;
-  row.activatedByUserId = null;
+  clearEfiConfigSecrets(row);
   row.status = "revoked";
   row.updatedByUserId = input.actorUserId;
   await row.save();
@@ -688,6 +696,114 @@ export async function revokeEfiAdminConfig(input: {
   });
 
   return serializePlatformEfiConfig(row);
+}
+
+/**
+ * Troca o ambiente da API Efí do slot (B34-T10). Valida o destino contra o runtime e
+ * `EFI_TEST_RUNTIME_ALLOW_PRODUCTION_API`, apaga credenciais, P12, testes e habilitação
+ * (nada de um ambiente é reaproveitado no outro) e audita. O ambiente atual não é validado:
+ * voltar para `sandbox` precisa funcionar mesmo depois de removida a autorização.
+ * Não altera fonte financeira, liberações nem controles.
+ */
+export async function changeEfiApiEnvironment(input: {
+  slot: string;
+  actorUserId: number;
+  efiEnvironment: string;
+  confirm: boolean;
+}): Promise<PlatformEfiConfigPublicDto> {
+  if (!input.confirm) {
+    throw new AppError(
+      "ERR_EFI_ENVIRONMENT_CONFIRM_REQUIRED",
+      400,
+      "Confirmação explícita obrigatória para trocar o ambiente da API Efí."
+    );
+  }
+  const target = input.efiEnvironment;
+  if (target !== "sandbox" && target !== "production") {
+    throw new AppError(
+      "ERR_EFI_ENVIRONMENT_INVALID",
+      400,
+      "Ambiente Efí inválido."
+    );
+  }
+  const runtime = assertRuntimeReadyForEfiAdmin();
+  const slot = assertSlotParam(input.slot, runtime.slot);
+  assertEfiSlotAllowedForRuntime(slot, target as PlatformEfiApiEnvironment);
+
+  const transaction = await sequelize.transaction();
+  let locked: PlatformEfiConfig | null;
+  let previousEnvironment: string | null;
+  let previousKey: string | null = null;
+  let previousFingerprint: string | null = null;
+  try {
+    locked = await PlatformEfiConfig.findOne({
+      where: { slot },
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+    previousEnvironment = locked?.efiEnvironment ?? null;
+    if (previousEnvironment === target) {
+      throw new AppError(
+        "ERR_EFI_ENVIRONMENT_UNCHANGED",
+        400,
+        "O slot já usa este ambiente da API Efí."
+      );
+    }
+    if (locked) {
+      previousKey = locked.certificateStorageKey;
+      previousFingerprint = locked.certificateFingerprint;
+      clearEfiConfigSecrets(locked);
+      locked.efiEnvironment = target;
+      locked.updatedByUserId = input.actorUserId;
+      // Slot zerado: recomeça a configuração, inclusive se estava revogado.
+      locked.status = "empty";
+      await locked.save({ transaction });
+    } else {
+      locked = await PlatformEfiConfig.create(
+        {
+          slot,
+          efiEnvironment: target,
+          status: "empty",
+          webhookSecretConfigured: false,
+          adminEnabled: false,
+          pixHomologated: false,
+          updatedByUserId: input.actorUserId
+        },
+        { transaction }
+      );
+    }
+    await recordEfiConfigAudit({
+      configId: locked.id,
+      slot,
+      actorUserId: input.actorUserId,
+      action: "change_environment",
+      transaction,
+      diffSummary: {
+        runtime: runtime.runtime,
+        fromEfiEnvironment: previousEnvironment,
+        toEfiEnvironment: target,
+        productionApiInTestRuntime:
+          runtime.runtime === "test" && target === "production",
+        credentialsCleared: true,
+        previousCertificateFingerprint: previousFingerprint,
+        authInvalidated: true,
+        adminDisabled: true,
+        financialControlsUnchanged: true
+      }
+    });
+    await transaction.commit();
+  } catch (err) {
+    try {
+      await transaction.rollback();
+    } catch {
+      // transação já encerrada
+    }
+    throw err;
+  }
+  invalidateEfiRuntimeCredentialsCache();
+  revokeEfiCertificateRuntimeFile(previousKey);
+
+  return serializePlatformEfiConfig(locked);
 }
 
 export async function listEfiAdminAudits(input: {

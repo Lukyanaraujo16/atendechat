@@ -33,7 +33,9 @@ export type PlatformEfiAuditAction =
   /** B3.3 (A1, R-11): resolução de item de conciliação. */
   | "reconciliation_resolve"
   /** B3.3 (A1, D-P10): varredura Pix Efí × local. */
-  | "pix_sweep";
+  | "pix_sweep"
+  /** B3.4 (B34-T10): troca do ambiente da API Efí do slot; apaga credenciais e P12. */
+  | "change_environment";
 
 @Table({
   tableName: "PlatformEfiConfigAudits",

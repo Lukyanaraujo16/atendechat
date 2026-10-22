@@ -58,6 +58,14 @@ const useStyles = makeStyles((theme) => ({
     backgroundColor:
       theme.palette.type === "dark" ? "rgba(255, 193, 7, 0.08)" : "#fff8e1",
   },
+  danger: {
+    marginBottom: theme.spacing(2),
+    padding: theme.spacing(1.5),
+    borderRadius: theme.shape.borderRadius,
+    border: `2px solid ${theme.palette.error.main}`,
+    backgroundColor:
+      theme.palette.type === "dark" ? "rgba(244, 67, 54, 0.12)" : "#ffebee",
+  },
   field: { marginBottom: theme.spacing(1.5) },
   actions: {
     display: "flex",
@@ -105,6 +113,7 @@ export default function EfiIntegrationPanel() {
     webhookSecret: false,
   });
   const [certFile, setCertFile] = useState(null);
+  const [webhookCheck, setWebhookCheck] = useState(null);
 
   const slot = config?.allowedSlot || config?.slot || "homologation";
 
@@ -274,6 +283,45 @@ export default function EfiIntegrationPanel() {
     }
   };
 
+  // B34-T10: troca auditada do ambiente da API Efí; o backend apaga credenciais e P12.
+  const handleChangeEnvironment = async (efiEnvironment) => {
+    const toProduction = efiEnvironment === "production";
+    const message = toProduction
+      ? "Usar a API Efí de PRODUÇÃO neste ambiente?\n\nOperações financeiras poderão movimentar DINHEIRO REAL.\nCredenciais, chave Pix, webhook secret e certificado P12 atuais serão APAGADOS e terão de ser cadastrados de novo.\nNenhuma funcionalidade financeira é ativada por esta ação."
+      : "Voltar para a API Efí de HOMOLOGAÇÃO (sandbox)?\n\nCredenciais, chave Pix, webhook secret e certificado P12 atuais serão APAGADOS.";
+    if (!window.confirm(message)) return;
+    setSaving(true);
+    try {
+      const { data } = await api.post(
+        `/saas/finance/efi/config/${slot}/environment`,
+        { efiEnvironment, confirm: true }
+      );
+      setConfig(data);
+      clearSensitiveForm();
+      setTestResult(null);
+      setWebhookCheck(null);
+      toast.success("Ambiente da API Efí alterado. Cadastre credenciais e certificado novamente.");
+      await load();
+    } catch (e) {
+      toastError(e);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleWebhookCheck = async () => {
+    setTesting(true);
+    setWebhookCheck(null);
+    try {
+      const { data } = await api.get("/saas/finance/efi/config/webhook-check");
+      setWebhookCheck(data);
+    } catch (e) {
+      toastError(e);
+    } finally {
+      setTesting(false);
+    }
+  };
+
   const handleRevoke = async () => {
     if (
       !window.confirm(
@@ -352,6 +400,10 @@ export default function EfiIntegrationPanel() {
 
   const diag =
     DIAG_LABELS[config.diagnosticState] || config.diagnosticState || "—";
+  const efiApi = config.efiApi || {};
+  const otherEnvironments = (efiApi.permittedEnvironments || []).filter(
+    (env) => env !== config.efiEnvironment
+  );
 
   return (
     <>
@@ -362,6 +414,23 @@ export default function EfiIntegrationPanel() {
           no banco cifrado — o checkout Pix atual ainda usa variáveis de
           ambiente até a fase 8.3-B3.
         </Typography>
+
+        {efiApi.realMoneyWarning ? (
+          <Box className={classes.danger} mt={2} role="alert">
+            <Typography variant="body2" style={{ fontWeight: 700 }}>
+              {efiApi.realMoneyWarning}
+            </Typography>
+          </Box>
+        ) : null}
+        {efiApi.environmentPermitted === false ? (
+          <Box className={classes.danger} mt={2} role="alert">
+            <Typography variant="body2" style={{ fontWeight: 700 }}>
+              Ambiente da API Efí deste slot não autorizado neste runtime: uso
+              bloqueado. Volte para HOMOLOGAÇÃO ou restabeleça a autorização
+              EFI_TEST_RUNTIME_ALLOW_PRODUCTION_API no servidor.
+            </Typography>
+          </Box>
+        ) : null}
 
         <Box className={classes.warning} mt={2}>
           <Typography variant="body2" style={{ fontWeight: 600 }}>
@@ -393,7 +462,29 @@ export default function EfiIntegrationPanel() {
             label={`Ambiente Efí: ${config.efiEnvironmentLabel || "—"}`}
           />
           <Chip size="small" variant="outlined" label={`Slot: ${slot}`} />
+          {efiApi.productionAllowedInTestRuntime ? (
+            <Chip
+              size="small"
+              variant="outlined"
+              label="API Efí de produção autorizada neste runtime"
+            />
+          ) : null}
         </Box>
+        {otherEnvironments.length > 0 ? (
+          <Box className={classes.actions}>
+            {otherEnvironments.map((env) => (
+              <AppSecondaryButton
+                key={env}
+                onClick={() => handleChangeEnvironment(env)}
+                disabled={saving || testing}
+              >
+                {env === "production"
+                  ? "Usar API Efí de PRODUÇÃO"
+                  : "Voltar para API Efí de HOMOLOGAÇÃO"}
+              </AppSecondaryButton>
+            ))}
+          </Box>
+        ) : null}
         <Box className={classes.row}>
           <Typography className={classes.label}>Estado</Typography>
           <Chip size="small" label={diag} />
@@ -532,6 +623,34 @@ export default function EfiIntegrationPanel() {
             label="Registro na Efí: pendente (B3)"
           />
         </Box>
+        <Typography className={classes.hint} component="p">
+          A Efí mantém um webhook por chave Pix: cadastrar outro substitui o
+          atual. Antes de qualquer cadastro, consulte o webhook já existente na
+          chave deste slot (somente leitura; exige a configuração ativada).
+        </Typography>
+        <Box className={classes.actions}>
+          <AppSecondaryButton
+            onClick={handleWebhookCheck}
+            disabled={testing || saving || !config.adminEnabled}
+          >
+            Verificar webhook da chave (somente leitura)
+          </AppSecondaryButton>
+        </Box>
+        {webhookCheck ? (
+          <Typography className={classes.hint} component="p">
+            Chave {webhookCheck.chaveMasked || "—"} (API{" "}
+            {webhookCheck.efiEnvironment || "—"}):{" "}
+            {webhookCheck.registered
+              ? `webhook cadastrado — ${webhookCheck.webhookUrlMasked || "—"}${
+                  webhookCheck.pointsToThisBackend === true
+                    ? " (aponta para este backend)"
+                    : webhookCheck.pointsToThisBackend === false
+                    ? " (aponta para OUTRO destino: não substituir sem confirmar)"
+                    : ""
+                }`
+              : "nenhum webhook cadastrado"}
+          </Typography>
+        ) : null}
       </AppSectionCard>
 
       <AppSectionCard className={classes.section}>

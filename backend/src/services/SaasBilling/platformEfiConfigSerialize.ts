@@ -1,7 +1,9 @@
 import {
   getAllowedEfiApiEnvironment,
   getAllowedEfiSlotForRuntime,
+  getPermittedEfiApiEnvironments,
   getStreamhubRuntimeEnv,
+  isEfiProductionApiAllowedInTestRuntime,
   tryGetStreamhubRuntimeEnv
 } from "../../config/streamhubRuntimeEnv";
 import PlatformEfiConfig, {
@@ -66,6 +68,14 @@ export type PlatformEfiConfigPublicDto = {
   allowedSlot: PlatformEfiSlot | null;
   efiEnvironment: "sandbox" | "production" | null;
   efiEnvironmentLabel: string | null;
+  /** B34-T10: ambientes aceitos neste runtime e alerta de conta Efí real em TESTE. */
+  efiApi: {
+    productionAllowedInTestRuntime: boolean;
+    permittedEnvironments: Array<"sandbox" | "production">;
+    /** false = slot gravado com ambiente não aceito agora (ex.: autorização removida); uso bloqueado. */
+    environmentPermitted: boolean;
+    realMoneyWarning: string | null;
+  };
   status: PlatformEfiConfigStatus | null;
   diagnosticState: EfiAdminDiagnosticState;
   adminEnabled: boolean;
@@ -121,6 +131,10 @@ export function serializePlatformEfiConfig(
   }
 
   const slot = row?.slot ?? opts?.slot ?? allowedSlot;
+  const permittedEnvironments = runtimeValid
+    ? getPermittedEfiApiEnvironments(runtimeRaw)
+    : [];
+  const efiEnvironment = row?.efiEnvironment ?? efiEnvExpected;
   const diagnosticState = computeDiagnosticState(row, runtimeValid);
 
   const backendUrl = (process.env.BACKEND_URL || "").replace(/\/$/, "");
@@ -138,13 +152,24 @@ export function serializePlatformEfiConfig(
     },
     slot,
     allowedSlot,
-    efiEnvironment: row?.efiEnvironment ?? efiEnvExpected,
+    efiEnvironment,
     efiEnvironmentLabel:
-      (row?.efiEnvironment ?? efiEnvExpected) === "sandbox"
+      efiEnvironment === "sandbox"
         ? "HOMOLOGAÇÃO"
-        : (row?.efiEnvironment ?? efiEnvExpected) === "production"
+        : efiEnvironment === "production"
         ? "PRODUÇÃO"
         : null,
+    efiApi: {
+      productionAllowedInTestRuntime:
+        runtimeRaw === "test" && isEfiProductionApiAllowedInTestRuntime(),
+      permittedEnvironments,
+      environmentPermitted:
+        !efiEnvironment || permittedEnvironments.includes(efiEnvironment),
+      realMoneyWarning:
+        runtimeRaw === "test" && efiEnvironment === "production"
+          ? "ATENÇÃO: conta Efí de PRODUÇÃO utilizada na VPS de TESTE. Operações financeiras podem movimentar dinheiro real."
+          : null
+    },
     status: row?.status ?? null,
     diagnosticState,
     adminEnabled: Boolean(row?.adminEnabled),

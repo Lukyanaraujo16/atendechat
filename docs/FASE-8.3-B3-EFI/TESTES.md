@@ -436,3 +436,24 @@ Observação: o `liveHardening.spec` isolado passa, mas o processo jest não enc
 | Build frontend | não reexecutado: nenhum arquivo do frontend mudou desde o último build verde |
 
 Observação: `jest.config.js` tem `bail: 1`; a suíte completa precisa de `--bail=0` para rodar inteira.
+
+### Registro B3.4-B — API Efí de produção em TESTE (B34-T10, 2026-10-22, execução local)
+Sem credenciais reais e sem rede Efí (mocks + `jest.blockEfiNetwork.js`).
+
+| Verificação | Resultado |
+|-------------|-----------|
+| `streamhubRuntimeEnv.spec` (+4) | default desligado; só `true` exato liga; test aceita `production` só no slot `homologation`; default do slot novo segue `sandbox`; runtime `production` inalterado (cenários A, B, C, D) |
+| `PlatformEfiConfigAdminService.spec` (+8) | troca bloqueada sem autorização; troca autorizada apaga credenciais/P12/testes/`adminEnabled`/`pixHomologated` e audita `change_environment` na transação (sem segredos); confirmação, valor inválido e "sem mudança"; upsert preserva o ambiente; autorização removida bloqueia upsert, teste OAuth e ativação sem chamar a Efí e permite voltar ao sandbox; test-auth autorizado usa `cobrancas.api` e `pix.api/oauth/token`, nunca `-h` nem legado; runtime `production` ignora a autorização (cenários B, C, D, E, F, G, I) |
+| `efiRuntimeCredentials.spec` (+3) | finalidade `database` com produção autorizada → base `pix.api`, nada do env; sem autorização bloqueia mesmo com cache quente, em `database` e `diagnostic`, sem cair no legado; autorização não libera fonte `database`, v2, pipeline nem varredura (cenários C, E, H, I) |
+| `efiPixChargeV2.spec` (+2) | `webhook-check`: slot do banco com fonte financeira `legacy_env`, um único GET em `pix.api/v2/webhook/:chave`, URL mascarada, `pointsToThisBackend`; 404 → `registered: false`; SDK legado não usado |
+| `efiLegacyContract.spec` (ajustado) | P-B31-08 atualizado: o gateway pede credencial por `purpose` (`financial` default); `database` só via `getEfiDatabasePixGateway`, usado só pela consulta só leitura (sem `put*`, sem auditoria) |
+| SaasBilling + config | 34/34 suítes, 423/423 testes |
+| Unitária completa (`--bail=0`) | 278/289 suítes, 2670/2706 testes. Falhas: as 10 suítes / 35 testes pré-existentes (P-B31-09) + `efiLegacyContract` (contrato estático, rodou antes do ajuste acima; depois do ajuste 6/6). Nenhuma outra falha B3 |
+| Typecheck (`tsc --noEmit`) | exit 0 |
+| Lint (arquivos tocados) | nenhum aviso novo em relação ao `HEAD` |
+| Build backend | exit 0 (`build-info` → `a1e6a2d`, árvore suja até o commit) |
+| Build frontend | exit 0 |
+| Integração (`__integration__`) | **não executada**: sem Docker/Postgres nesta máquina. Nenhuma migration nova; mudança coberta pelas unitárias acima |
+
+Pendentes (VPS de TESTE, conta real, com autorização): H1–H12 de `IMPLANTACAO-TESTE.md` §10; T-UI do painel (troca de
+ambiente, alertas, `webhook-check`) a conferir manualmente após o deploy.

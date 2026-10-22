@@ -191,8 +191,10 @@ function legacyGateway(): EfiPixChargeGateway {
   };
 }
 
-async function databaseGateway(): Promise<EfiPixChargeGateway> {
-  const creds = await getEfiRuntimeCredentials("financial");
+async function databaseGateway(
+  purpose: "financial" | "database" = "financial"
+): Promise<EfiPixChargeGateway> {
+  const creds = await getEfiRuntimeCredentials(purpose);
   if (creds.certificate.kind !== "memory" || !creds.pixKey) {
     throw new AppError("ERR_EFI_CONFIG_INCOMPLETE", 400, "Configuração Efí do banco incompleta.");
   }
@@ -242,6 +244,15 @@ async function databaseGateway(): Promise<EfiPixChargeGateway> {
     },
     getWebhook: chave => notFoundToNull(() => call("GET", `/v2/webhook/${enc(chave)}`))
   };
+}
+
+/**
+ * Gateway do slot do banco, independente da fonte financeira (B34-T10). Só para consultas admin
+ * só leitura (ex.: webhook já cadastrado na chave antes da ativação). Exige a configuração
+ * pronta (D-P2) e nunca cai em `legacy_env`.
+ */
+export async function getEfiDatabasePixGateway(): Promise<EfiPixChargeGateway> {
+  return databaseGateway("database");
 }
 
 /** Gateway da fonte financeira efetiva (hoje sempre `legacy_env`, P-B31-08). */

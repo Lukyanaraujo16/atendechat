@@ -10,7 +10,10 @@ import { logger } from "../../utils/logger";
 import { recordEfiConfigAudit } from "./efiConfigAudit";
 import { isEfiPixChargeV2Active, isEfiWebhookPipelineAsyncActive } from "./efiFinancialSource";
 import { getExpectedWebhookSecret } from "./webhookReception";
-import { getEfiPixChargeGateway } from "./efiPixChargeGateway";
+import {
+  getEfiDatabasePixGateway,
+  getEfiPixChargeGateway
+} from "./efiPixChargeGateway";
 import { buildSubscriptionWebhookUrl, buildSubscriptionWebhookUrlV2 } from "./subscriptionWebhookUrl";
 
 /**
@@ -103,6 +106,37 @@ export async function getEfiWebhookForAdmin(): Promise<Record<string, unknown>> 
     credentialsSource: gateway.context.source,
     efiEnvironment: gateway.context.efiEnvironment,
     registerAvailable: isEfiPixChargeV2Active()
+  };
+}
+
+/**
+ * GET /saas/finance/efi/config/webhook-check (B34-T10) — só leitura: webhook já cadastrado na
+ * chave Pix do slot do banco, mesmo com a fonte financeira em `legacy_env`. A Efí mantém um
+ * webhook por chave: cadastrar outro substitui o atual. Usar antes de qualquer cadastro.
+ */
+export async function getEfiSlotWebhookForAdmin(): Promise<
+  Record<string, unknown>
+> {
+  const gateway = await getEfiDatabasePixGateway();
+  const wh = await gateway.getWebhook(gateway.context.pixKey);
+  const url = typeof wh?.webhookUrl === "string" ? wh.webhookUrl : null;
+  let pointsToThisBackend: boolean | null = null;
+  try {
+    const backend = process.env.BACKEND_URL
+      ? new URL(process.env.BACKEND_URL).host
+      : null;
+    pointsToThisBackend = url && backend ? new URL(url).host === backend : null;
+  } catch {
+    pointsToThisBackend = null;
+  }
+  return {
+    registered: Boolean(url),
+    webhookUrlMasked: maskWebhookUrl(url),
+    pointsToThisBackend,
+    chaveMasked: maskPixKey(gateway.context.pixKey),
+    criacao: wh?.criacao ?? null,
+    credentialsSource: gateway.context.source,
+    efiEnvironment: gateway.context.efiEnvironment
   };
 }
 

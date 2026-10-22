@@ -14,6 +14,7 @@ import {
 } from "../../config/appBuildInfo";
 import {
   getAllowedEfiSlotForRuntime,
+  isEfiProductionApiAllowedInTestRuntime,
   tryGetStreamhubRuntimeEnv
 } from "../../config/streamhubRuntimeEnv";
 import AppError from "../../errors/AppError";
@@ -260,8 +261,19 @@ export function logEfiActivationControlsAtBoot(): void {
     pixChargeV2Active: isEfiPixChargeV2Active(),
     webhookPipelineAsyncActive: isEfiWebhookPipelineAsyncActive(),
     pixReconciliationSweepActive: isEfiPixReconciliationSweepActive(),
+    runtime: tryGetStreamhubRuntimeEnv(),
+    // B34-T10: o ambiente do slot fica no banco (card de status); aqui só a autorização.
+    testRuntimeProductionApiAllowed: isEfiProductionApiAllowedInTestRuntime(),
     currentCommit: getAppBuildCommit()
   };
+  if (payload.testRuntimeProductionApiAllowed) {
+    logger.warn(
+      payload,
+      payload.runtime === "test"
+        ? "[efi] EFI_TEST_RUNTIME_ALLOW_PRODUCTION_API=true: slot homologation pode usar a API Efí de PRODUÇÃO (dinheiro real) neste runtime test"
+        : "[efi] EFI_TEST_RUNTIME_ALLOW_PRODUCTION_API ignorada: vale só no runtime test"
+    );
+  }
   if (controls.pixChargeV2Enabled && !payload.pixChargeV2Active) {
     logger.warn(
       payload,

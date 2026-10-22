@@ -6,6 +6,7 @@ import PlatformEfiConfigAudit from "../../../models/PlatformEfiConfigAudit";
 import sequelize from "../../../database";
 import {
   activateEfiAdminConfig,
+  changeEfiApiEnvironment,
   deactivateEfiAdminConfig,
   deleteEfiCertificate,
   getEfiAdminConfigSafe,
@@ -583,6 +584,168 @@ describe("PlatformEfiConfigAdminService", () => {
         expect(auditCreate).toHaveBeenCalledTimes(1);
         expect(auditCreate.mock.calls[0][0].actorUserId).toEqual(expect.any(Number));
       }
+    });
+  });
+
+  describe("B3.4 — API Efí de produção no runtime test (B34-T10)", () => {
+    const fill = () => {
+      row.clientIdEncrypted = encryptEfiSecret("Client_Id_x");
+      row.clientSecretEncrypted = encryptEfiSecret("Client_Secret_x");
+      row.clientIdMasked = "****id_x";
+      row.pixKeyEncrypted = encryptEfiSecret("chave");
+      row.pixKeyMasked = "****ave";
+      row.webhookSecretEncrypted = encryptEfiSecret("w".repeat(40));
+      row.webhookSecretConfigured = true;
+      row.certificateEncrypted = encryptEfiBinary(fakeP12());
+      row.certificateStorageKey = "homologation-abc.p12";
+      row.certificateFingerprint = "f".repeat(64);
+      row.certificateUploadedAt = new Date();
+      row.lastAuthTestOk = true;
+      row.lastAuthTestAt = new Date();
+      row.lastAuthTestMessage = "ok";
+      row.adminEnabled = true;
+      row.pixHomologated = true;
+      row.activatedAt = new Date();
+      row.activatedByUserId = 1;
+      row.status = "operational";
+    };
+    const change = (efiEnvironment: string, confirm = true) =>
+      changeEfiApiEnvironment({ slot: "homologation", actorUserId: 7, efiEnvironment, confirm });
+    const code = async (p: Promise<unknown>) => {
+      try {
+        await p;
+      } catch (e) {
+        return (e as AppError).message;
+      }
+      return "no-error";
+    };
+
+    it("cenário B: sem a autorização, test não troca para a API de produção", async () => {
+      fill();
+      expect(await code(change("production"))).toBe("ERR_EFI_ENVIRONMENT_FORBIDDEN_FOR_RUNTIME");
+      expect(row.efiEnvironment).toBe("sandbox");
+      expect(row.clientIdEncrypted).not.toBeNull();
+      expect(auditCreate).not.toHaveBeenCalled();
+    });
+
+    it("cenários C e G: com a autorização troca, apaga credenciais/P12/testes e audita na transação", async () => {
+      process.env.EFI_TEST_RUNTIME_ALLOW_PRODUCTION_API = "true";
+      fill();
+      const dto = await change("production");
+
+      expect(row.efiEnvironment).toBe("production");
+      for (const f of [
+        "clientIdEncrypted", "clientSecretEncrypted", "clientIdMasked", "pixKeyEncrypted",
+        "webhookSecretEncrypted", "certificateEncrypted", "certificateStorageKey",
+        "certificateFingerprint", "lastAuthTestOk", "lastAuthTestAt", "activatedAt"
+      ]) {
+        expect(row[f]).toBeNull();
+      }
+      expect(row.webhookSecretConfigured).toBe(false);
+      expect(row.adminEnabled).toBe(false);
+      expect(row.pixHomologated).toBe(false);
+      expect(row.status).toBe("empty");
+      expect(tx.commit).toHaveBeenCalled();
+      expect(invalidateCache).toHaveBeenCalled();
+
+      expect(auditCreate).toHaveBeenCalledTimes(1);
+      const [audit, opts] = auditCreate.mock.calls[0];
+      expect(audit.action).toBe("change_environment");
+      expect(audit.actorUserId).toBe(7);
+      expect(opts?.transaction).toBe(tx);
+      expect(JSON.parse(audit.diffSummary)).toMatchObject({
+        fromEfiEnvironment: "sandbox",
+        toEfiEnvironment: "production",
+        productionApiInTestRuntime: true,
+        credentialsCleared: true,
+        previousCertificateFingerprint: "f".repeat(64)
+      });
+      expect(JSON.stringify(audit)).not.toContain("efic1:");
+
+      expect(dto.efiEnvironment).toBe("production");
+      expect(dto.efiApi.realMoneyWarning).toContain("dinheiro real");
+      expect(dto.efiApi.environmentPermitted).toBe(true);
+    });
+
+    it("exige confirmação, valor válido e mudança real", async () => {
+      process.env.EFI_TEST_RUNTIME_ALLOW_PRODUCTION_API = "true";
+      expect(await code(change("production", false))).toBe("ERR_EFI_ENVIRONMENT_CONFIRM_REQUIRED");
+      expect(await code(change("producao"))).toBe("ERR_EFI_ENVIRONMENT_INVALID");
+      expect(await code(change("sandbox"))).toBe("ERR_EFI_ENVIRONMENT_UNCHANGED");
+      expect(auditCreate).not.toHaveBeenCalled();
+    });
+
+    it("só o valor exato true autoriza", async () => {
+      for (const v of ["1", "yes", "TRUE ", ""]) {
+        process.env.EFI_TEST_RUNTIME_ALLOW_PRODUCTION_API = v;
+        const expected = v.trim().toLowerCase() === "true" ? "no-error" : "ERR_EFI_ENVIRONMENT_FORBIDDEN_FOR_RUNTIME";
+        row.efiEnvironment = "sandbox";
+        expect(await code(change("production"))).toBe(expected);
+      }
+    });
+
+    it("salvar credenciais preserva o ambiente do slot", async () => {
+      process.env.EFI_TEST_RUNTIME_ALLOW_PRODUCTION_API = "true";
+      row.efiEnvironment = "production";
+      await upsertEfiAdminConfig({ slot: "homologation", actorUserId: 1, body: { clientId: "Client_Id_y" } });
+      expect(row.efiEnvironment).toBe("production");
+    });
+
+    it("cenário E: autorização removida bloqueia o uso, sem fallback, e permite voltar ao sandbox", async () => {
+      row.efiEnvironment = "production";
+      fill();
+      row.adminEnabled = false;
+      expect(
+        await code(upsertEfiAdminConfig({ slot: "homologation", actorUserId: 1, body: { pixKey: "k" } }))
+      ).toBe("ERR_EFI_ENVIRONMENT_FORBIDDEN_FOR_RUNTIME");
+      expect(await code(testEfiAdminAuth({ slot: "homologation", actorUserId: 1 }))).toBe(
+        "ERR_EFI_ENVIRONMENT_FORBIDDEN_FOR_RUNTIME"
+      );
+      expect(await code(activateEfiAdminConfig({ slot: "homologation", actorUserId: 1, confirm: true }))).toBe(
+        "ERR_EFI_ENVIRONMENT_FORBIDDEN_FOR_RUNTIME"
+      );
+      expect(mockedAxios.post).not.toHaveBeenCalled();
+
+      const dto = await getEfiAdminConfigSafe();
+      expect(dto.efiApi.environmentPermitted).toBe(false);
+      expect(dto.efiApi.permittedEnvironments).toEqual(["sandbox"]);
+
+      await change("sandbox");
+      expect(row.efiEnvironment).toBe("sandbox");
+      expect(row.clientIdEncrypted).toBeNull();
+      expect(row.certificateEncrypted).toBeNull();
+    });
+
+    it("test-auth com a autorização usa os endpoints de produção (Cobranças e Pix), nunca o legado", async () => {
+      process.env.EFI_TEST_RUNTIME_ALLOW_PRODUCTION_API = "true";
+      row.efiEnvironment = "production";
+      row.clientIdEncrypted = encryptEfiSecret("Client_Id_db");
+      row.clientSecretEncrypted = encryptEfiSecret("Client_Secret_db");
+      row.certificateEncrypted = encryptEfiBinary(fakeP12());
+      row.status = "configured";
+      mockedAxios.post.mockResolvedValue({ status: 200, data: { access_token: "tok", expires_in: 600 } });
+
+      await testEfiAdminAuth({ slot: "homologation", actorUserId: 1 });
+
+      const urls = mockedAxios.post.mock.calls.map(c => String(c[0]));
+      expect(urls.some(u => u.startsWith("https://cobrancas.api.efipay.com.br"))).toBe(true);
+      expect(urls.some(u => u.startsWith("https://pix.api.efipay.com.br/oauth/token"))).toBe(true);
+      expect(urls.some(u => /-h\.api\.efipay/.test(u))).toBe(false);
+      expect(JSON.stringify(mockedAxios.post.mock.calls)).not.toContain("LEGACY_");
+    });
+
+    it("cenário D: runtime production ignora a autorização e segue só com production", async () => {
+      process.env.STREAMHUB_RUNTIME_ENV = "production";
+      process.env.EFI_TEST_RUNTIME_ALLOW_PRODUCTION_API = "true";
+      row.slot = "production";
+      row.efiEnvironment = "production";
+      expect(
+        await code(changeEfiApiEnvironment({ slot: "production", actorUserId: 1, efiEnvironment: "sandbox", confirm: true }))
+      ).toBe("ERR_EFI_ENVIRONMENT_FORBIDDEN_FOR_RUNTIME");
+      expect(await code(change("production"))).toBe("ERR_EFI_SLOT_FORBIDDEN_FOR_RUNTIME");
+      const dto = await getEfiAdminConfigSafe();
+      expect(dto.efiApi.productionAllowedInTestRuntime).toBe(false);
+      expect(dto.efiApi.realMoneyWarning).toBeNull();
     });
   });
 });

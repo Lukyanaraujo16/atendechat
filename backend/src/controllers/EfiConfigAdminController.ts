@@ -4,6 +4,7 @@ import AppError from "../errors/AppError";
 import { MAX_P12_BYTES } from "../services/SaasBilling/efiCertificateStore";
 import {
   activateEfiAdminConfig,
+  changeEfiApiEnvironment,
   deactivateEfiAdminConfig,
   deleteEfiCertificate,
   getEfiAdminConfigSafe,
@@ -15,6 +16,7 @@ import {
 } from "../services/SaasBilling/PlatformEfiConfigAdminService";
 import {
   getEfiChargeForAdmin,
+  getEfiSlotWebhookForAdmin,
   getEfiWebhookForAdmin,
   registerEfiWebhookForAdmin
 } from "../services/SaasBilling/efiPixAdminService";
@@ -140,6 +142,28 @@ export const revoke = async (
     confirm: Boolean(req.body?.confirm)
   });
   return res.status(200).json(dto);
+};
+
+/** POST /saas/finance/efi/config/:slot/environment (B34-T10) */
+export const changeEnvironment = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const dto = await changeEfiApiEnvironment({
+    slot: slotParam(req),
+    actorUserId: actorId(req),
+    efiEnvironment: String(req.body?.efiEnvironment || ""),
+    confirm: req.body?.confirm === true
+  });
+  return res.status(200).json(dto);
+};
+
+/** GET /saas/finance/efi/config/webhook-check (B34-T10, só leitura) */
+export const webhookCheck = async (
+  _req: Request,
+  res: Response
+): Promise<Response> => {
+  return res.status(200).json(await getEfiSlotWebhookForAdmin());
 };
 
 /** GET /saas/finance/efi/config/audits */

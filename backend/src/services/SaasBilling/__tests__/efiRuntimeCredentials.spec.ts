@@ -146,6 +146,52 @@ describe("B3.1 — getEfiRuntimeCredentials (D-P1/D-P2)", () => {
     });
   });
 
+  describe("B34-T10: API Efí de produção no runtime test", () => {
+    const prodRow = () => row({ efiEnvironment: "production" });
+
+    it("cenário C: autorizado, o slot homologation usa a base Pix de produção, nada do env", async () => {
+      process.env.EFI_TEST_RUNTIME_ALLOW_PRODUCTION_API = "true";
+      setRow(prodRow());
+      const creds = await getEfiRuntimeCredentials("database");
+      expect(creds).toMatchObject({ source: "database", slot: "homologation", efiEnvironment: "production" });
+      expect(
+        createEfiPixClient({
+          efiEnvironment: creds.efiEnvironment,
+          clientId: creds.clientId,
+          clientSecret: creds.clientSecret,
+          pfx: (creds.certificate as any).pfx
+        }).baseURL
+      ).toBe("https://pix.api.efipay.com.br");
+      expect(JSON.stringify({ ...creds, certificate: null })).not.toContain("LEGACY_");
+    });
+
+    it("cenários B/E/I: sem a autorização bloqueia (inclusive com cache quente) e nunca cai no legado", async () => {
+      process.env.EFI_TEST_RUNTIME_ALLOW_PRODUCTION_API = "true";
+      process.env.EFI_CREDENTIALS_SOURCE = "database";
+      setRow(prodRow());
+      await getEfiRuntimeCredentials("database");
+
+      delete process.env.EFI_TEST_RUNTIME_ALLOW_PRODUCTION_API;
+      for (const purpose of ["database", "diagnostic"] as const) {
+        await expect(getEfiRuntimeCredentials(purpose)).rejects.toMatchObject({
+          message: "ERR_EFI_ENVIRONMENT_FORBIDDEN_FOR_RUNTIME"
+        });
+      }
+    });
+
+    it("cenário H: a autorização não libera fonte database, v2, pipeline nem varredura", async () => {
+      process.env.EFI_TEST_RUNTIME_ALLOW_PRODUCTION_API = "true";
+      process.env.EFI_CREDENTIALS_SOURCE = "database";
+      process.env.EFI_PIX_CHARGE_V2_ENABLED = "true";
+      process.env.EFI_WEBHOOK_PIPELINE = "async";
+      process.env.EFI_PIX_RECONCILIATION_SWEEP_ENABLED = "true";
+      expect(efiFinancialSource.getEfiFinancialCredentialsSource()).toBe("legacy_env");
+      expect(efiFinancialSource.isEfiPixChargeV2Active()).toBe(false);
+      expect(efiFinancialSource.isEfiWebhookPipelineAsyncActive()).toBe(false);
+      expect(efiFinancialSource.isEfiPixReconciliationSweepActive()).toBe(false);
+    });
+  });
+
   describe("database (diagnostic)", () => {
     beforeEach(() => {
       process.env.EFI_CREDENTIALS_SOURCE = "database";

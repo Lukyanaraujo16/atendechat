@@ -561,3 +561,41 @@ P-B31-04, P-B32-01, P-B32-02, P-B32-03, P-B32-08, P-B32-10. Ver `IMPLANTACAO-TES
   segurança caso falte um mock.
 - **B34-T9 — roteiro sem cobrança legada (2026-10-21).** IMPLANTACAO-TESTE §1.3/§5/§7.2: smoke sem Pix pelo
   checkout legado; D-P14 não vale nesta VPS (H-20 e H-36 não aplicáveis); R-6 passa a secret novo só do slot.
+
+---
+
+## 14. API Efí de produção na VPS de TESTE — Opção B (2026-10-22)
+
+**Contexto.** A conta Efí de homologação (sandbox) não estava disponível: a Efí informou prazo de até 72 h. O
+responsável cadastrou no slot `homologation` da VPS de TESTE as credenciais e o P12 de **produção**. O OAuth Cobranças
+passou, mas o OAuth Pix retornou HTTP 403. Causa confirmada em diagnóstico só leitura: o runtime `test` obrigava o
+ambiente `sandbox`, e o P12 de produção (emissor `CN = apis.efipay.com.br`) era enviado ao `pix-h.api.efipay.com.br`.
+
+**Decisão do responsável.** Não aguardar o sandbox e homologar com a conta Efí **real** na VPS de TESTE, sem mudar a
+identidade do runtime (`STREAMHUB_RUNTIME_ENV=test`).
+
+| ID | Decisão de implementação | Motivo |
+|----|--------------------------|--------|
+| B34-T10 | Nova autorização `EFI_TEST_RUNTIME_ALLOW_PRODUCTION_API` (default desligada; só o valor exato `true` liga). Só no runtime `test`, ela acrescenta `production` aos ambientes aceitos pelo slot `homologation` (`getPermittedEfiApiEnvironments`, `assertEfiSlotAllowedForRuntime`). O runtime `production` e a regra de slots não mudam. O slot novo continua nascendo em `sandbox`: nada é selecionado implicitamente. A variável é lida a cada chamada, e o assert roda antes do cache de credenciais; sem ela, um slot gravado em `production` fica bloqueado na hora (`ERR_EFI_ENVIRONMENT_FORBIDDEN_FOR_RUNTIME`), sem fallback. | Runtime e ambiente da API passam a ser conceitos independentes, com uma única flag e falha fechada. |
+| B34-T10a | Ação admin auditada `POST /saas/finance/efi/config/:slot/environment` (`{ efiEnvironment, confirm: true }`, Super Admin). Valida o destino contra runtime e autorização. Na mesma transação, apaga Client ID/Secret, chave Pix, webhook secret, credenciais Cobranças dedicadas, P12, testes OAuth, `adminEnabled` e `pixHomologated`, e grava a auditoria `change_environment` (de/para, fingerprint do P12 anterior, sem segredos). O ambiente atual não é validado, para que voltar a `sandbox` funcione mesmo sem a autorização. O histórico de auditoria é preservado. | Nenhum segredo ou certificado é reaproveitado entre ambientes; a validação Pix e a homologação já ficam inválidas porque o fingerprint da configuração inclui o ambiente. |
+| B34-T10b | `upsert` de credenciais deixou de sobrescrever `efiEnvironment` com o default do runtime. O ambiente só muda pela ação B34-T10a. | Sem isso, salvar credenciais voltaria o slot para `sandbox` em silêncio. |
+| B34-T10c | Painel Efí: botões "Usar API Efí de PRODUÇÃO" / "Voltar para API Efí de HOMOLOGAÇÃO" (só os ambientes aceitos, com confirmação), alerta vermelho "ATENÇÃO: conta Efí de PRODUÇÃO utilizada na VPS de TESTE. Operações financeiras podem movimentar dinheiro real." e alerta de ambiente bloqueado. O DTO ganhou `efiApi` (`productionAllowedInTestRuntime`, `permittedEnvironments`, `environmentPermitted`, `realMoneyWarning`). O log de boot inclui `runtime` e `testRuntimeProductionApiAllowed` e emite um `warn` quando a autorização está ligada. | Visibilidade da combinação runtime `test` × API `production`. |
+| B34-T10d | Consulta só leitura `GET /saas/finance/efi/config/webhook-check`: lê na Efí o webhook já cadastrado na chave Pix **do slot do banco** (`getEfiDatabasePixGateway`, finalidade `database`, nunca `legacy_env`), mesmo com a fonte financeira em `legacy_env`. Retorna a URL mascarada e `pointsToThisBackend`. Exige a configuração pronta (D-P2: ativada e com validação Pix). | A Efí mantém **um webhook por chave**: cadastrar outro substitui o atual. A consulta prova o estado antes de qualquer cadastro, sem acessar a PRODUÇÃO do StreamHub. |
+
+**O que não mudou.** `EFI_RELEASED_RUNTIMES` continua com as quatro listas vazias. A guarda B34-T7 está intacta. A
+fonte financeira efetiva continua `legacy_env`, e v2, pipeline e varredura continuam desligados até o deploy 2
+(IMPLANTACAO-TESTE §6). Checkout legado, `GERENCIANET_*`, `BILLING_AUTOMATION_NORMALIZED_DATES` e automação de
+faturamento inalterados. Nenhuma migration (a coluna `action` da auditoria é `STRING(64)`).
+
+**Riscos aceitos pelo responsável.**
+- Com a liberação TESTE (deploy 2), toda cobrança Pix v2 gerada na VPS de TESTE é **dinheiro real**. Cancelar uma
+  cobrança não devolve um Pix pago. Devoluções não são automáticas e, se necessárias, são feitas manualmente no painel Efí.
+- Webhook: se a chave Pix do slot for a mesma usada em outra integração (inclusive a PRODUÇÃO do StreamHub), cadastrar o
+  webhook a partir de TESTE redireciona as notificações dessa integração. Usar uma **chave Pix exclusiva** para TESTE e
+  rodar B34-T10d antes de qualquer cadastro.
+- mTLS do webhook (PT-6/R-7): em produção, a cadeia da Efí é a de produção, não a `certificate-chain-homolog.crt`
+  (conferir a URL exata na documentação oficial antes da opção B de R-7).
+
+**Reversão.** Painel → "Voltar para API Efí de HOMOLOGAÇÃO" (apaga as credenciais reais do slot) e remover
+`EFI_TEST_RUNTIME_ALLOW_PRODUCTION_API` + restart. Só remover a variável já bloqueia o slot, sem fallback.
+Procedimento completo: IMPLANTACAO-TESTE §10.
