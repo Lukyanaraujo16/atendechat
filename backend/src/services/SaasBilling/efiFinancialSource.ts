@@ -35,10 +35,10 @@ export const EFI_RELEASED_RUNTIMES: Readonly<
     readonly StreamhubRuntimeEnv[]
   >
 > = Object.freeze({
-  databaseFinancial: [],
-  pixChargeV2: [],
-  webhookPipeline: [],
-  pixReconciliationSweep: []
+  databaseFinancial: ["test"],
+  pixChargeV2: ["test"],
+  webhookPipeline: ["test"],
+  pixReconciliationSweep: ["test"]
 });
 
 export type EfiReleasedFeature = keyof typeof EFI_RELEASED_RUNTIMES;

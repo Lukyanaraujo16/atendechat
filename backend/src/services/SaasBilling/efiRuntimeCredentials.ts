@@ -26,7 +26,7 @@ import { getEfiFinancialCredentialsSource } from "./efiFinancialSource";
  *
  * B3.1 só entrega o provedor: checkout e webhook continuam lendo `config/Gn.ts` até a
  * B3.2/B3.3 (nenhum fluxo financeiro trocado). Por isso a finalidade `financial` segue
- * `getEfiFinancialCredentialsSource()` (hoje sempre `legacy_env`, P-B31-08); só a finalidade
+ * `getEfiFinancialCredentialsSource()` (`database` só onde liberado e configurado; senão `legacy_env`, P-B31-08); só a finalidade
  * `diagnostic` respeita `EFI_CREDENTIALS_SOURCE=database`.
  */
 export type EfiRuntimeCertificate =

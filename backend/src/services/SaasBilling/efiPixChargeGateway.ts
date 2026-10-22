@@ -255,7 +255,7 @@ export async function getEfiDatabasePixGateway(): Promise<EfiPixChargeGateway> {
   return databaseGateway("database");
 }
 
-/** Gateway da fonte financeira efetiva (hoje sempre `legacy_env`, P-B31-08). */
+/** Gateway da fonte financeira efetiva (`database` só onde liberado e configurado; senão `legacy_env`, P-B31-08). */
 export async function getEfiPixChargeGateway(): Promise<EfiPixChargeGateway> {
   return getEfiFinancialCredentialsSource() === "database" ? databaseGateway() : legacyGateway();
 }

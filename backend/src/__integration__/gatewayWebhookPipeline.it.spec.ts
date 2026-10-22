@@ -2,7 +2,7 @@
  * Integração (Postgres real) — pipeline assíncrono do webhook Pix (B3.3).
  * Efí SEMPRE simulada (gateway em memória); fila Bull simulada em memória (o Redis real fica em
  * gatewayWebhookRedis.it.spec.ts). O pipeline é ligado só no teste (spy de
- * `isEfiWebhookPipelineAsyncActive`); no código ele segue desligado (`EFI_RELEASED_RUNTIMES.webhookPipeline` vazio).
+ * `isEfiWebhookPipelineAsyncActive`); sem os controles de ambiente ele segue desligado (B34-T7).
  */
 import "express-async-errors";
 import crypto from "crypto";
@@ -199,10 +199,11 @@ describe("Pipeline assíncrono do webhook Pix (Postgres real, Efí e fila simula
   });
 
   describe("controles e migration", () => {
-    it("T-ACT-03: após as migrations, pipeline e varredura seguem inativos no código", () => {
+    it("T-ACT-03: após as migrations, pipeline e varredura inativos sem a fonte database efetiva", () => {
       asyncSpy.mockRestore();
       process.env.EFI_WEBHOOK_PIPELINE = "async";
-      expect(efiFinancialSource.EFI_RELEASED_RUNTIMES.webhookPipeline).toEqual([]);
+      // Liberação TESTE: "test" na lista, mas a guarda B34-T7 exige EFI_CREDENTIALS_SOURCE=database.
+      expect(efiFinancialSource.EFI_RELEASED_RUNTIMES.webhookPipeline).toEqual(["test"]);
       expect(efiFinancialSource.isEfiWebhookPipelineAsyncActive()).toBe(false);
       expect(efiFinancialSource.isEfiPixReconciliationSweepActive()).toBe(false);
     });

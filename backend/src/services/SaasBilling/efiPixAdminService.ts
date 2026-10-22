@@ -18,7 +18,7 @@ import { buildSubscriptionWebhookUrl, buildSubscriptionWebhookUrlV2 } from "./su
 
 /**
  * Ações Super Admin da B3.2: consulta de txid (RF2.6) e consulta/cadastro do webhook (RF2.7).
- * Usam a fonte financeira efetiva (hoje `legacy_env`, P-B31-08). Nenhum segredo sai na resposta
+ * Usam a fonte financeira efetiva (`database` só onde liberado e configurado; senão `legacy_env`, P-B31-08). Nenhum segredo sai na resposta
  * nem na auditoria: query da URL e chave Pix mascaradas (T-SEC-08).
  */
 

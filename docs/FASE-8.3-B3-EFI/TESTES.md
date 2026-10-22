@@ -457,3 +457,15 @@ Sem credenciais reais e sem rede Efí (mocks + `jest.blockEfiNetwork.js`).
 
 Pendentes (VPS de TESTE, conta real, com autorização): H1–H12 de `IMPLANTACAO-TESTE.md` §10; T-UI do painel (troca de
 ambiente, alertas, `webhook-check`) a conferir manualmente após o deploy.
+
+### Registro liberação TESTE (§6.1, 2026-10-22, execução local)
+`EFI_RELEASED_RUNTIMES`: `"test"` nas quatro listas; `"production"` em nenhuma.
+
+| Verificação | Resultado |
+|-------------|-----------|
+| Testes ajustados (10) | asserções de "listas vazias" passam a afirmar `["test"]`; runtime `test` libera, `production` e ausente não; sem controles de ambiente tudo segue `legacy_env`/desligado; P-B31-08 verificado no runtime `production`; B34-T7 inalterada (v2/pipeline/varredura sem fonte `database` efetiva seguem inativos) |
+| SaasBilling + config | 34/34 suítes, 424/424 testes |
+| Unitária completa (`--bail=0 --forceExit`) | 279/289 suítes, 2672/2707 testes. Falham só as 10 suítes / 35 testes pré-existentes (P-B31-09) |
+| Typecheck / build backend | exit 0 / exit 0 |
+| Lint `efiFinancialSource.ts` | nenhum aviso novo |
+| Integração | não executada (sem Docker/Postgres local); expectativa de `gatewayWebhookPipeline.it.spec` atualizada para `["test"]` |

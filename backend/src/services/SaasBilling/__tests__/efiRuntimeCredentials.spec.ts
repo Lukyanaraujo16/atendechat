@@ -120,18 +120,30 @@ describe("B3.1 — getEfiRuntimeCredentials (D-P1/D-P2)", () => {
     });
   });
 
-  describe("P-B31-08: database não opera o financeiro na B3.1", () => {
+  describe("P-B31-08: database só opera o financeiro onde liberado (liberação TESTE)", () => {
     beforeEach(() => {
       process.env.EFI_CREDENTIALS_SOURCE = "database";
       setRow(row());
     });
 
-    it("liberação financeira desligada por constante de código", () => {
-      expect(efiFinancialSource.EFI_RELEASED_RUNTIMES.databaseFinancial).toEqual([]);
+    it("liberação financeira só no runtime test; production segue travado no código", () => {
+      expect(efiFinancialSource.EFI_RELEASED_RUNTIMES.databaseFinancial).toEqual(["test"]);
+      expect(efiFinancialSource.getEfiFinancialCredentialsSource()).toBe("database");
+      process.env.STREAMHUB_RUNTIME_ENV = "production";
+      expect(efiFinancialSource.getEfiFinancialCredentialsSource()).toBe("legacy_env");
+      delete process.env.EFI_CREDENTIALS_SOURCE;
+      process.env.STREAMHUB_RUNTIME_ENV = "test";
       expect(efiFinancialSource.getEfiFinancialCredentialsSource()).toBe("legacy_env");
     });
 
-    it("finalidade financial com database configurado → env, sem ler o banco", async () => {
+    it("runtime test liberado: finalidade financial usa o slot do banco, nada do env", async () => {
+      const creds = await getEfiRuntimeCredentials("financial");
+      expect(creds).toMatchObject({ source: "database", slot: "homologation", configId: 7 });
+      expect(JSON.stringify({ ...creds, certificate: null })).not.toContain("LEGACY_");
+    });
+
+    it("runtime production (não liberado): financial com database configurado → env, sem ler o banco", async () => {
+      process.env.STREAMHUB_RUNTIME_ENV = "production";
       const creds = await getEfiRuntimeCredentials("financial");
       expect(creds).toMatchObject({ source: "legacy_env", clientId: "LEGACY_ID", configId: null });
       expect(findOne).not.toHaveBeenCalled();
@@ -179,16 +191,23 @@ describe("B3.1 — getEfiRuntimeCredentials (D-P1/D-P2)", () => {
       }
     });
 
-    it("cenário H: a autorização não libera fonte database, v2, pipeline nem varredura", async () => {
+    it("cenário H: a autorização sozinha não ativa fonte database, v2, pipeline nem varredura", async () => {
       process.env.EFI_TEST_RUNTIME_ALLOW_PRODUCTION_API = "true";
+      const allOff = () => {
+        expect(efiFinancialSource.getEfiFinancialCredentialsSource()).toBe("legacy_env");
+        expect(efiFinancialSource.isEfiPixChargeV2Active()).toBe(false);
+        expect(efiFinancialSource.isEfiWebhookPipelineAsyncActive()).toBe(false);
+        expect(efiFinancialSource.isEfiPixReconciliationSweepActive()).toBe(false);
+      };
+      // Controles no default (só a autorização e a liberação TESTE): nada ativo.
+      allOff();
+      // Controles ligados no runtime production: não liberado no código.
       process.env.EFI_CREDENTIALS_SOURCE = "database";
       process.env.EFI_PIX_CHARGE_V2_ENABLED = "true";
       process.env.EFI_WEBHOOK_PIPELINE = "async";
       process.env.EFI_PIX_RECONCILIATION_SWEEP_ENABLED = "true";
-      expect(efiFinancialSource.getEfiFinancialCredentialsSource()).toBe("legacy_env");
-      expect(efiFinancialSource.isEfiPixChargeV2Active()).toBe(false);
-      expect(efiFinancialSource.isEfiWebhookPipelineAsyncActive()).toBe(false);
-      expect(efiFinancialSource.isEfiPixReconciliationSweepActive()).toBe(false);
+      process.env.STREAMHUB_RUNTIME_ENV = "production";
+      allOff();
     });
   });
 
@@ -440,7 +459,8 @@ describe("B3.1 — getEfiRuntimeCredentials (D-P1/D-P2)", () => {
       );
     });
 
-    it("P-B31-08: EFI_CREDENTIALS_SOURCE=database → settle segue no env, sem ler o banco", async () => {
+    it("P-B31-08: runtime production + EFI_CREDENTIALS_SOURCE=database → settle segue no env, sem ler o banco", async () => {
+      process.env.STREAMHUB_RUNTIME_ENV = "production";
       process.env.EFI_CREDENTIALS_SOURCE = "database";
       process.env.EFI_COBRANCAS_CLIENT_ID = "ISOLATION_TEST_ID"; // token próprio
       setRow(row());

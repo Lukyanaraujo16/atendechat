@@ -1,8 +1,8 @@
 /**
  * Integração (Postgres real) — cobrança Pix v2 (B3.2).
  * A Efí é SEMPRE simulada (gateway em memória + SDK mockado): nenhuma chamada real.
- * A cobrança v2 é ligada só no teste (spy de `isEfiPixChargeV2Active`); no código ela segue
- * desligada (`EFI_RELEASED_RUNTIMES.pixChargeV2` vazio).
+ * A cobrança v2 é ligada só no teste (spy de `isEfiPixChargeV2Active`); sem os controles de
+ * ambiente ela segue desligada (B34-T7).
  */
 import "express-async-errors";
 import path from "path";

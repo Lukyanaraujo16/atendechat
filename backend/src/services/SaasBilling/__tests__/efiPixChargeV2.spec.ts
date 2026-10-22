@@ -68,9 +68,13 @@ describe("B3.2 — cobrança Pix v2 (unidade)", () => {
   });
 
   it("gate: EFI_PIX_CHARGE_V2_ENABLED=true sozinho não ativa a v2", () => {
-    expect(efiFinancialSource.EFI_RELEASED_RUNTIMES.pixChargeV2).toEqual([]);
+    expect(efiFinancialSource.EFI_RELEASED_RUNTIMES.pixChargeV2).toEqual(["test"]);
     process.env.EFI_PIX_CHARGE_V2_ENABLED = "true";
-    expect(efiFinancialSource.isEfiPixChargeV2Active()).toBe(false);
+    for (const runtime of ["test", "production", ""]) {
+      process.env.STREAMHUB_RUNTIME_ENV = runtime;
+      // test: liberado, mas sem a fonte database efetiva (B34-T7); production/ausente: não liberado.
+      expect(efiFinancialSource.isEfiPixChargeV2Active()).toBe(false);
+    }
   });
 
   it("T-SEC-08: máscaras de URL e chave (sem secret)", () => {

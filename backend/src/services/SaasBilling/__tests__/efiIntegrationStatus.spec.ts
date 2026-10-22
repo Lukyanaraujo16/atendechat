@@ -202,7 +202,8 @@ describe("efiIntegrationStatus", () => {
     it("B3.2: status mostra a cobrança v2 configurada × liberada × ativa", async () => {
       process.env.EFI_PIX_CHARGE_V2_ENABLED = "true";
       const status = await getEfiIntegrationStatus();
-      expect(status.pixChargeV2).toEqual({ configured: true, released: false, releasedRuntimes: [], active: false });
+      // Sem runtime válido nada é liberado, mesmo com "test" na lista do código.
+      expect(status.pixChargeV2).toEqual({ configured: true, released: false, releasedRuntimes: ["test"], active: false });
     });
 
     it("T-ENV-06: TESTE com configuração válida → usable, fingerprint, sem segredos", async () => {
@@ -213,9 +214,9 @@ describe("efiIntegrationStatus", () => {
       const status = await getEfiIntegrationStatus();
       expect(status.credentialsSource).toMatchObject({
         active: "database",
-        // P-B31-08: o financeiro segue no env mesmo com database configurado.
-        financial: "legacy_env",
-        databaseFinancialReleased: false,
+        // Liberação TESTE (§6.1): no runtime test a fonte database configurada vale para o financeiro.
+        financial: "database",
+        databaseFinancialReleased: true,
         database: {
           runtime: "test",
           slot: "homologation",
