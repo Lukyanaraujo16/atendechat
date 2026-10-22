@@ -39,7 +39,7 @@ import {
 jest.mock("../libs/socket", () => ({ getIO: () => ({ to: () => ({ emit: () => undefined }) }) }));
 jest.mock("../services/SaasBilling/efiPixChargeGateway", () => {
   const actual = jest.requireActual("../services/SaasBilling/efiPixChargeGateway");
-  return { ...actual, getEfiPixChargeGateway: jest.fn() };
+  return { ...actual, getEfiPixChargeGateway: jest.fn(), getEfiDatabasePixGateway: jest.fn() };
 });
 
 const SECRET = "it-webhook-secret-0123456789abcdefghijkl";
@@ -110,6 +110,8 @@ describe("B3.3 — administração, conciliação, varredura e homologação (Po
     jest.restoreAllMocks();
     efi = fakeEfi();
     (gatewayModule.getEfiPixChargeGateway as jest.Mock).mockImplementation(async () => efi.gw);
+    // B34-T12: cadastro do webhook e homologação usam o gateway do slot (bootstrap admin).
+    (gatewayModule.getEfiDatabasePixGateway as jest.Mock).mockImplementation(async () => efi.gw);
     setGatewayWebhookQueueForTests({ add: jest.fn(async () => ({})) } as any);
     jest.spyOn(efiFinancialSource, "isEfiWebhookPipelineAsyncActive").mockReturnValue(true);
   });

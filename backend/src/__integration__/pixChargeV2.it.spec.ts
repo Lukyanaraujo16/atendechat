@@ -47,7 +47,7 @@ jest.mock("gn-api-sdk-typescript", () => ({ __esModule: true, default: () => moc
 
 jest.mock("../services/SaasBilling/efiPixChargeGateway", () => {
   const actual = jest.requireActual("../services/SaasBilling/efiPixChargeGateway");
-  return { ...actual, getEfiPixChargeGateway: jest.fn() };
+  return { ...actual, getEfiPixChargeGateway: jest.fn(), getEfiDatabasePixGateway: jest.fn() };
 });
 
 const PIX_KEY = "chave-pix-it";
@@ -128,6 +128,8 @@ describe("Cobrança Pix v2 (Postgres real, Efí simulada)", () => {
     Object.values(mockSdk).forEach(m => m.mockReset());
     efi = fakeEfi();
     (gatewayModule.getEfiPixChargeGateway as jest.Mock).mockImplementation(async () => efi.gw);
+    // B34-T12: cadastro do webhook e homologação usam o gateway do slot (bootstrap admin).
+    (gatewayModule.getEfiDatabasePixGateway as jest.Mock).mockImplementation(async () => efi.gw);
     jest.spyOn(efiFinancialSource, "isEfiPixChargeV2Active").mockReturnValue(true);
     companyId = (await createCompany({ dueDate: daysFromToday(-3) })).id;
   });
@@ -785,6 +787,7 @@ describe("Cobrança Pix v2 (Postgres real, Efí simulada)", () => {
       const err = await catchError(registerEfiWebhookForAdmin({ actorUserId: superUserId, confirm: true }));
       expect(err).toMatchObject({ message: "ERR_EFI_WEBHOOK_REGISTER_REQUIRES_V2", statusCode: 409 });
       expect(gatewayModule.getEfiPixChargeGateway).not.toHaveBeenCalled();
+      expect(gatewayModule.getEfiDatabasePixGateway).not.toHaveBeenCalled();
     });
 
     it("T-CHG-12/T-SEC-08/T-SEC-13: cadastro (v2) auditado com ator; secret mascarado; conferido por GET", async () => {

@@ -35,10 +35,10 @@ export const EFI_RELEASED_RUNTIMES: Readonly<
     readonly StreamhubRuntimeEnv[]
   >
 > = Object.freeze({
-  databaseFinancial: ["test"],
-  pixChargeV2: ["test"],
-  webhookPipeline: ["test"],
-  pixReconciliationSweep: ["test"]
+  databaseFinancial: ["test", "production"],
+  pixChargeV2: ["test", "production"],
+  webhookPipeline: ["test", "production"],
+  pixReconciliationSweep: ["test", "production"]
 });
 
 export type EfiReleasedFeature = keyof typeof EFI_RELEASED_RUNTIMES;
@@ -106,6 +106,15 @@ export function isEfiPixChargeV2Active(): boolean {
 /** Pipeline `async` efetivamente ativo (controle, liberação e fonte `database`). Senão, webhook legado (C4). */
 export function isEfiWebhookPipelineAsyncActive(): boolean {
   return currentActivation().webhookPipeline;
+}
+
+/**
+ * O checkout legado recadastra o webhook da chave (`pixConfigWebhook`) só com a fonte `legacy_env`.
+ * Com a fonte `database` efetiva o webhook é gerido pelo painel (B3): a URL legada (`?token=` do env)
+ * derrubaria a recepção B3, que valida o secret do slot (ex.: rollback só da v2).
+ */
+export function isLegacyPixWebhookRegistrationAllowed(): boolean {
+  return currentActivation().credentialsSource !== "database";
 }
 
 /** Varredura Pix ativa: controle, liberação e fonte `database` efetiva. */

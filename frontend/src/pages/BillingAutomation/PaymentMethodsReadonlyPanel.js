@@ -110,7 +110,8 @@ export default function PaymentMethodsReadonlyPanel() {
     {
       key: "pix",
       title: "Pix",
-      detail: "Checkout do cliente via API Pix (variáveis de ambiente).",
+      detail:
+        "Checkout do cliente via API Pix (credenciais do banco quando a fonte database está ativa; senão variáveis de ambiente).",
       state: methodState({
         enabled: flags.pixEnabled,
         ready: readiness.pix?.ready,
@@ -128,7 +129,7 @@ export default function PaymentMethodsReadonlyPanel() {
     {
       key: "card",
       title: "Cartão",
-      detail: "Não há fluxo de checkout por cartão nesta versão.",
+      detail: "Cartão de crédito não está implementado nesta versão.",
       state: methodState({ notImplemented: true }),
     },
     {

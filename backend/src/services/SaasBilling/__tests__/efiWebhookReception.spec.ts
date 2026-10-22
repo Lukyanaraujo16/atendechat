@@ -209,12 +209,12 @@ describe("B3.3 — controles e retentativas", () => {
   });
 
   it("gates de código desligados: EFI_WEBHOOK_PIPELINE=async sozinho não ativa", () => {
-    // Liberação TESTE (§6.1): só "test" nas listas; PRODUÇÃO segue travada no código.
+    // Liberação TESTE + PRODUÇÃO (B34-T11): ativação continua exigindo os controles de ambiente.
     expect(EFI_RELEASED_RUNTIMES).toEqual({
-      databaseFinancial: ["test"],
-      pixChargeV2: ["test"],
-      webhookPipeline: ["test"],
-      pixReconciliationSweep: ["test"]
+      databaseFinancial: ["test", "production"],
+      pixChargeV2: ["test", "production"],
+      webhookPipeline: ["test", "production"],
+      pixReconciliationSweep: ["test", "production"]
     });
     expect(Object.isFrozen(EFI_RELEASED_RUNTIMES)).toBe(true);
     process.env.STREAMHUB_RUNTIME_ENV = "test";
@@ -245,16 +245,13 @@ describe("B3.4 — liberação por runtime (B34-T1)", () => {
     expect(isRuntimeReleased([], "test")).toBe(false);
   });
 
-  it("liberação TESTE: só o runtime test libera; production e runtime ausente nunca", () => {
+  it("liberação: runtimes test e production liberam; runtime ausente ou inválido nunca", () => {
     const env = { ...process.env };
-    for (const [runtime, expected] of [["test", true], ["production", false], ["", false]] as const) {
+    for (const [runtime, expected] of [["test", true], ["production", true], ["", false], ["staging", false]] as const) {
       process.env.STREAMHUB_RUNTIME_ENV = runtime;
       for (const f of ["databaseFinancial", "pixChargeV2", "webhookPipeline", "pixReconciliationSweep"] as const) {
         expect(isEfiFeatureReleased(f)).toBe(expected);
       }
-    }
-    for (const list of Object.values(EFI_RELEASED_RUNTIMES)) {
-      expect(list).not.toContain("production");
     }
     process.env = env;
   });

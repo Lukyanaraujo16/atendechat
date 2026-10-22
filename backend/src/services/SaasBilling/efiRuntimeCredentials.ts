@@ -101,14 +101,17 @@ function legacyEnvCredentials(): EfiRuntimeCredentials {
 /** Cache por `configId:updatedAt` (RF1.5). Toda escrita admin muda `updatedAt` e também invalida. */
 const databaseCache = new Map<string, EfiRuntimeCredentials>();
 
-async function databaseCredentials(): Promise<EfiRuntimeCredentials> {
+async function databaseCredentials(
+  adminBootstrap = false
+): Promise<EfiRuntimeCredentials> {
   const loaded = await loadEfiConfigForRuntimeSlot();
   const updatedAt = loaded.row.updatedAt ? new Date(loaded.row.updatedAt).getTime() : 0;
   const key = `db:${loaded.row.id}:${updatedAt}:${loaded.row.efiEnvironment}`;
-  const hit = databaseCache.get(key);
+  // Bootstrap admin (B34-T12) nunca lê nem grava o cache: a dispensa de homologação não chega ao financeiro.
+  const hit = adminBootstrap ? undefined : databaseCache.get(key);
   if (hit) return hit;
 
-  const r = await resolveEfiCredentials(loaded);
+  const r = await resolveEfiCredentials(loaded, { adminBootstrap });
   const creds: EfiRuntimeCredentials = {
     source: "database",
     efiEnvironment: r.efiEnvironment,
@@ -124,18 +127,22 @@ async function databaseCredentials(): Promise<EfiRuntimeCredentials> {
     certificate: { kind: "memory", pfx: r.certificatePfx },
     tokenCacheKey: key
   };
+  if (adminBootstrap) return creds;
   databaseCache.clear();
   databaseCache.set(key, creds);
   return creds;
 }
 
-/** `database`: sempre o slot do banco, nunca `legacy_env` (consultas admin só leitura, B34-T10). */
+/**
+ * `database`: sempre o slot do banco, nunca `legacy_env`; só para ações admin auditadas de bootstrap
+ * (consulta/cadastro do webhook, conferência do `homologate`), sem exigir a homologação (B34-T10/T12).
+ */
 export type EfiCredentialsPurpose = "financial" | "diagnostic" | "database";
 
 export async function getEfiRuntimeCredentials(
   purpose: EfiCredentialsPurpose
 ): Promise<EfiRuntimeCredentials> {
-  if (purpose === "database") return databaseCredentials();
+  if (purpose === "database") return databaseCredentials(true);
   const source =
     purpose === "financial"
       ? getEfiFinancialCredentialsSource()

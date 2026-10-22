@@ -161,8 +161,12 @@ describe("B3.1 — contrato legado (controles no default)", () => {
     expect(controller).toContain('import options from "../config/Gn"');
     // B3.2: do gate o controller só usa a decisão da v2; nunca a fonte de credenciais.
     // B3.3: do gate, só as decisões da v2 e do pipeline async; nunca a fonte de credenciais.
+    // Produção (B34-T11): também a decisão de recadastrar o webhook legado.
     expect(controller).toMatch(
-      /import \{\s*isEfiPixChargeV2Active,\s*isEfiWebhookPipelineAsyncActive\s*\} from "\.\.\/services\/SaasBilling\/efiFinancialSource"/
+      /import \{\s*isEfiPixChargeV2Active,\s*isEfiWebhookPipelineAsyncActive,\s*isLegacyPixWebhookRegistrationAllowed\s*\} from "\.\.\/services\/SaasBilling\/efiFinancialSource"/
+    );
+    expect(controller).toMatch(
+      /if \(isLegacyPixWebhookRegistrationAllowed\(\)\) \{\s*await gerencianet\.pixConfigWebhook\(params, bodyWebhook\);/
     );
     expect(controller).toMatch(/if \(isEfiWebhookPipelineAsyncActive\(\)\) \{\s*const reception = await receiveGatewayWebhook\(req\);/);
     expect(controller).not.toMatch(/getEfiFinancialCredentialsSource/);
@@ -203,21 +207,27 @@ describe("B3.1 — contrato legado (controles no default)", () => {
     expect(pix.match(/getEfiRuntimeCredentials\(/g)).toHaveLength(1);
     expect(pix).toContain('purpose: "financial" | "database" = "financial"');
     expect(pix).toContain("getEfiRuntimeCredentials(purpose)");
-    // B34-T10d: a finalidade `database` (slot do banco, nunca legado) só serve à consulta só leitura do webhook.
+    // B34-T10d/T12: a finalidade `database` (slot do banco, nunca legado) só serve ao bootstrap admin:
+    // consulta e cadastro do webhook e conferência do `homologate` — nunca a cobrança.
     expect(pix.match(/databaseGateway\("database"\)/g)).toHaveLength(1);
     const dbGatewayUsers = walk(SRC)
       .filter(f => /getEfiDatabasePixGateway\(/.test(fs.readFileSync(f, "utf8")))
       .map(f => path.relative(SRC, f))
       .sort();
     expect(dbGatewayUsers).toEqual([
+      "services/SaasBilling/efiHomologationService.ts",
       "services/SaasBilling/efiPixAdminService.ts",
       "services/SaasBilling/efiPixChargeGateway.ts"
     ]);
+    const homolog = fs.readFileSync(path.join(SRC, "services/SaasBilling/efiHomologationService.ts"), "utf8");
+    expect(homolog).not.toMatch(/putCharge|putWebhook|qrCode/);
     const admin = fs.readFileSync(path.join(SRC, "services/SaasBilling/efiPixAdminService.ts"), "utf8");
     const slotCheck = admin.slice(admin.indexOf("export async function getEfiSlotWebhookForAdmin"));
     const slotCheckBody = slotCheck.slice(0, slotCheck.indexOf("\n}\n"));
     expect(slotCheckBody).toContain("getEfiDatabasePixGateway()");
     expect(slotCheckBody).not.toMatch(/putWebhook|putCharge|qrCode|recordEfiConfigAudit/);
+    const register = admin.slice(admin.indexOf("export async function registerEfiWebhookForAdmin"));
+    expect(register.slice(0, register.indexOf("\n}\n"))).not.toMatch(/putCharge|qrCode/);
   });
 
   it("T-ACT-01: contrato de checkout e webhook com os controles no default", async () => {
@@ -313,11 +323,26 @@ describe("B3.1 — contrato legado (controles no default)", () => {
     expect(observed.sdkOptions[1]).toEqual(observed.sdkOptions[0]);
   });
 
-  it("P-B31-08: EFI_CREDENTIALS_SOURCE=database não muda checkout nem webhook (sem fonte mista)", async () => {
+  it("P-B31-08/B34-T11: fonte database efetiva com v2 desligada → checkout legado igual, sem recadastrar o webhook", async () => {
     const legacy = await runFinancialFlows(LEGACY_ENV);
-    const database = await runFinancialFlows({ ...LEGACY_ENV, EFI_CREDENTIALS_SOURCE: "database" });
-    expect(database).toEqual(legacy);
-    expect(database.dbReads).toBe(0);
+    expect(legacy.webhookConfig).toHaveLength(1); // fonte legacy_env: recadastro legado mantido
+    for (const runtime of ["test", "production"]) {
+      const database = await runFinancialFlows({
+        ...LEGACY_ENV,
+        STREAMHUB_RUNTIME_ENV: runtime,
+        EFI_CREDENTIALS_SOURCE: "database"
+      });
+      // Cobrança, QR, tentativa e webhook legado (env) idênticos; só o recadastro da URL legada some.
+      expect({ ...database, webhookConfig: legacy.webhookConfig }).toEqual(legacy);
+      expect(database.webhookConfig).toEqual([]);
+      expect(database.dbReads).toBe(0);
+    }
+  });
+
+  it("B34-T11: rollback para legacy_env volta a recadastrar o webhook legado", async () => {
+    const rolledBack = await runFinancialFlows({ ...LEGACY_ENV, STREAMHUB_RUNTIME_ENV: "production" });
+    expect(rolledBack.webhookConfig).toHaveLength(1);
+    expect(rolledBack.webhookConfig[0][0]).toEqual({ chave: "chave-legado" });
   });
 
   it("T-ACT-04: EFI_PIX_CHARGE_V2_ENABLED=true sem liberação de código → contrato legado idêntico", async () => {

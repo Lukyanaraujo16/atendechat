@@ -176,7 +176,8 @@ export async function registerEfiWebhookForAdmin(input: {
   }
   const runtime = getStreamhubRuntimeEnv();
   const slot = getAllowedEfiSlotForRuntime(runtime);
-  const gateway = await getEfiPixChargeGateway();
+  // Com a v2 ativa a fonte é `database`: gateway do slot sem exigir homologação, que depende deste cadastro (B34-T12).
+  const gateway = await getEfiDatabasePixGateway();
   const url = asyncActive ? buildSubscriptionWebhookUrlV2(secret) : buildSubscriptionWebhookUrl();
   await gateway.putWebhook(gateway.context.pixKey, url);
   const check = await gateway.getWebhook(gateway.context.pixKey).catch(() => null);

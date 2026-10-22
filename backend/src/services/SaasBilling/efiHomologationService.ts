@@ -14,7 +14,7 @@ import {
   findEfiPixValidationForConfig
 } from "./efiCredentialResolver";
 import { invalidateEfiRuntimeCredentialsCache } from "./efiRuntimeCredentials";
-import { getEfiPixChargeGateway } from "./efiPixChargeGateway";
+import { getEfiDatabasePixGateway } from "./efiPixChargeGateway";
 import { getExpectedWebhookSecret } from "./webhookReception";
 import { buildSubscriptionWebhookUrlV2 } from "./subscriptionWebhookUrl";
 import { maskWebhookUrl } from "./efiPixAdminService";
@@ -153,7 +153,8 @@ export async function homologateEfiConfig(input: {
       );
     }
     // (c) webhook conferido por GET: a URL cadastrada é a do formato novo com o secret ativo.
-    const gateway = await getEfiPixChargeGateway();
+    // Gateway do slot sem exigir a homologação que este registro cria (B34-T12).
+    const gateway = await getEfiDatabasePixGateway();
     const { secret } = await getExpectedWebhookSecret();
     const wh = await gateway.getWebhook(gateway.context.pixKey);
     if (!secret || !wh?.webhookUrl || wh.webhookUrl !== buildSubscriptionWebhookUrlV2(secret)) {

@@ -12,7 +12,8 @@ import { confirmGatewayPayment } from "../services/SaasBilling/confirmGatewayPay
 import { buildSubscriptionWebhookUrl } from "../services/SaasBilling/subscriptionWebhookUrl";
 import {
   isEfiPixChargeV2Active,
-  isEfiWebhookPipelineAsyncActive
+  isEfiWebhookPipelineAsyncActive,
+  isLegacyPixWebhookRegistrationAllowed
 } from "../services/SaasBilling/efiFinancialSource";
 import { receiveGatewayWebhook } from "../services/SaasBilling/webhookReception";
 import { createOrReusePixChargeV2 } from "../services/SaasBilling/createOrReusePixCharge";
@@ -161,7 +162,10 @@ export const createSubscription = async (
       chave: pix.chave
     };
 
-    await gerencianet.pixConfigWebhook(params, bodyWebhook);
+    // Fonte `database` efetiva: o webhook da chave é gerido pelo painel B3 (não recadastrar a URL legada).
+    if (isLegacyPixWebhookRegistrationAllowed()) {
+      await gerencianet.pixConfigWebhook(params, bodyWebhook);
+    }
 
     return res.json({
       ...pix,

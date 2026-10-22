@@ -120,20 +120,24 @@ describe("B3.1 — getEfiRuntimeCredentials (D-P1/D-P2)", () => {
     });
   });
 
-  describe("P-B31-08: database só opera o financeiro onde liberado (liberação TESTE)", () => {
+  describe("P-B31-08: database só opera o financeiro onde liberado e configurado", () => {
     beforeEach(() => {
       process.env.EFI_CREDENTIALS_SOURCE = "database";
       setRow(row());
     });
 
-    it("liberação financeira só no runtime test; production segue travado no código", () => {
-      expect(efiFinancialSource.EFI_RELEASED_RUNTIMES.databaseFinancial).toEqual(["test"]);
+    it("liberado em test e production; runtime ausente ou controle no default → legacy_env", () => {
+      expect(efiFinancialSource.EFI_RELEASED_RUNTIMES.databaseFinancial).toEqual(["test", "production"]);
       expect(efiFinancialSource.getEfiFinancialCredentialsSource()).toBe("database");
       process.env.STREAMHUB_RUNTIME_ENV = "production";
+      expect(efiFinancialSource.getEfiFinancialCredentialsSource()).toBe("database");
+      delete process.env.STREAMHUB_RUNTIME_ENV;
       expect(efiFinancialSource.getEfiFinancialCredentialsSource()).toBe("legacy_env");
       delete process.env.EFI_CREDENTIALS_SOURCE;
-      process.env.STREAMHUB_RUNTIME_ENV = "test";
-      expect(efiFinancialSource.getEfiFinancialCredentialsSource()).toBe("legacy_env");
+      for (const runtime of ["test", "production"]) {
+        process.env.STREAMHUB_RUNTIME_ENV = runtime;
+        expect(efiFinancialSource.getEfiFinancialCredentialsSource()).toBe("legacy_env");
+      }
     });
 
     it("runtime test liberado: finalidade financial usa o slot do banco, nada do env", async () => {
@@ -142,8 +146,8 @@ describe("B3.1 — getEfiRuntimeCredentials (D-P1/D-P2)", () => {
       expect(JSON.stringify({ ...creds, certificate: null })).not.toContain("LEGACY_");
     });
 
-    it("runtime production (não liberado): financial com database configurado → env, sem ler o banco", async () => {
-      process.env.STREAMHUB_RUNTIME_ENV = "production";
+    it("runtime ausente (nunca liberado): financial com database configurado → env, sem ler o banco", async () => {
+      delete process.env.STREAMHUB_RUNTIME_ENV;
       const creds = await getEfiRuntimeCredentials("financial");
       expect(creds).toMatchObject({ source: "legacy_env", clientId: "LEGACY_ID", configId: null });
       expect(findOne).not.toHaveBeenCalled();
@@ -154,6 +158,40 @@ describe("B3.1 — getEfiRuntimeCredentials (D-P1/D-P2)", () => {
       await expect(getEfiRuntimeCredentials("diagnostic")).resolves.toMatchObject({
         source: "database",
         configId: 7
+      });
+    });
+  });
+
+  describe("B34-T12: bootstrap admin do slot production sem homologação", () => {
+    beforeEach(() => {
+      process.env.STREAMHUB_RUNTIME_ENV = "production";
+      process.env.EFI_CREDENTIALS_SOURCE = "database";
+      setRow(row({ slot: "production", efiEnvironment: "production" }));
+    });
+
+    it("financeiro e diagnóstico continuam exigindo a homologação", async () => {
+      for (const purpose of ["financial", "diagnostic"] as const) {
+        await expect(getEfiRuntimeCredentials(purpose)).rejects.toMatchObject({
+          message: "ERR_EFI_INTEGRATION_NOT_HOMOLOGATED"
+        });
+      }
+    });
+
+    it("finalidade database (bootstrap) libera o slot sem homologação e não contamina o cache", async () => {
+      await expect(getEfiRuntimeCredentials("database")).resolves.toMatchObject({
+        source: "database",
+        slot: "production",
+        efiEnvironment: "production"
+      });
+      await expect(getEfiRuntimeCredentials("financial")).rejects.toMatchObject({
+        message: "ERR_EFI_INTEGRATION_NOT_HOMOLOGATED"
+      });
+    });
+
+    it("configuração incompleta ou sem validação Pix continua bloqueada no bootstrap", async () => {
+      setRow(row({ slot: "production", efiEnvironment: "production" }), { activate: null });
+      await expect(getEfiRuntimeCredentials("database")).rejects.toMatchObject({
+        message: "ERR_EFI_PIX_VALIDATION_REQUIRED"
       });
     });
   });
@@ -201,12 +239,15 @@ describe("B3.1 — getEfiRuntimeCredentials (D-P1/D-P2)", () => {
       };
       // Controles no default (só a autorização e a liberação TESTE): nada ativo.
       allOff();
-      // Controles ligados no runtime production: não liberado no código.
+      // Autorização no runtime production (ignorada lá) com controles no default: nada ativo.
+      process.env.STREAMHUB_RUNTIME_ENV = "production";
+      allOff();
+      // Controles ligados sem runtime válido: nunca liberado.
       process.env.EFI_CREDENTIALS_SOURCE = "database";
       process.env.EFI_PIX_CHARGE_V2_ENABLED = "true";
       process.env.EFI_WEBHOOK_PIPELINE = "async";
       process.env.EFI_PIX_RECONCILIATION_SWEEP_ENABLED = "true";
-      process.env.STREAMHUB_RUNTIME_ENV = "production";
+      delete process.env.STREAMHUB_RUNTIME_ENV;
       allOff();
     });
   });
@@ -459,8 +500,8 @@ describe("B3.1 — getEfiRuntimeCredentials (D-P1/D-P2)", () => {
       );
     });
 
-    it("P-B31-08: runtime production + EFI_CREDENTIALS_SOURCE=database → settle segue no env, sem ler o banco", async () => {
-      process.env.STREAMHUB_RUNTIME_ENV = "production";
+    it("P-B31-08: runtime ausente + EFI_CREDENTIALS_SOURCE=database → settle segue no env, sem ler o banco", async () => {
+      delete process.env.STREAMHUB_RUNTIME_ENV;
       process.env.EFI_CREDENTIALS_SOURCE = "database";
       process.env.EFI_COBRANCAS_CLIENT_ID = "ISOLATION_TEST_ID"; // token próprio
       setRow(row());

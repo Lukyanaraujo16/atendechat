@@ -283,7 +283,13 @@ function decrypt(value: string, binary = false): string | Buffer {
  * Descriptografa apenas em memória.
  */
 export async function resolveEfiCredentials(
-  loaded?: Awaited<ReturnType<typeof loadEfiConfigForRuntimeSlot>>
+  loaded?: Awaited<ReturnType<typeof loadEfiConfigForRuntimeSlot>>,
+  /**
+   * B34-T12: dispensa a homologação do slot `production` só para o bootstrap admin auditado
+   * (cadastro/consulta do webhook e conferência do `homologate`), que é pré-requisito da própria
+   * homologação (D-P17). Cobrança e processamento nunca passam isto.
+   */
+  opts?: { adminBootstrap?: boolean }
 ): Promise<ResolvedEfiCredentials> {
   const { runtime, slot, row } = loaded || (await loadEfiConfigForRuntimeSlot());
 
@@ -303,7 +309,7 @@ export async function resolveEfiCredentials(
   }
 
   const homologation = await findEfiHomologationForConfig(row, configFingerprint);
-  if (slot === "production" && !homologation) {
+  if (slot === "production" && !homologation && !opts?.adminBootstrap) {
     throw new AppError(
       "ERR_EFI_INTEGRATION_NOT_HOMOLOGATED",
       403,

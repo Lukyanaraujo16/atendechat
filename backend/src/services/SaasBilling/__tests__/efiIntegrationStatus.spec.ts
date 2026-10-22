@@ -203,7 +203,7 @@ describe("efiIntegrationStatus", () => {
       process.env.EFI_PIX_CHARGE_V2_ENABLED = "true";
       const status = await getEfiIntegrationStatus();
       // Sem runtime válido nada é liberado, mesmo com "test" na lista do código.
-      expect(status.pixChargeV2).toEqual({ configured: true, released: false, releasedRuntimes: ["test"], active: false });
+      expect(status.pixChargeV2).toEqual({ configured: true, released: false, releasedRuntimes: ["test", "production"], active: false });
     });
 
     it("T-ENV-06: TESTE com configuração válida → usable, fingerprint, sem segredos", async () => {

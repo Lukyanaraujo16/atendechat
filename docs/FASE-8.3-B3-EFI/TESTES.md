@@ -469,3 +469,15 @@ ambiente, alertas, `webhook-check`) a conferir manualmente após o deploy.
 | Typecheck / build backend | exit 0 / exit 0 |
 | Lint `efiFinancialSource.ts` | nenhum aviso novo |
 | Integração | não executada (sem Docker/Postgres local); expectativa de `gatewayWebhookPipeline.it.spec` atualizada para `["test"]` |
+
+### Registro preparação PRODUÇÃO (B34-T11/T11a/T12, 2026-10-22, execução local)
+| Verificação | Resultado |
+|-------------|-----------|
+| `efiLegacyContract.spec` | 7/7: fonte `database` efetiva (test e production) com v2 desligada → checkout legado idêntico, sem `pixConfigWebhook`; rollback para `legacy_env` volta a recadastrar; contrato estático (controller só usa decisões do gate; finalidade `database` só no bootstrap admin, sem `putCharge`/`qrCode`) |
+| `efiRuntimeCredentials.spec` (+3) | slot `production` sem homologação: `financial`/`diagnostic` bloqueados; `database` (bootstrap) liberado sem contaminar o cache; prontidão (validação Pix) continua exigida |
+| Liberação `production` | listas `["test","production"]`; runtime ausente/inválido nunca libera; controles no default → `legacy_env`/desligado; B34-T7 inalterada |
+| SaasBilling + config + controllers | 36/36 suítes, 434/434 testes |
+| Unitária completa (`--bail=0 --forceExit`) | 279/289 suítes, 2677/2712. Falham só as 10 suítes / 35 testes pré-existentes (P-B31-09) |
+| Frontend (BillingAutomation + CheckoutPage) | 10/10 |
+| Typecheck / builds backend e frontend / lint | exit 0 / ok / nenhum aviso novo |
+| Integração | não executada (sem Docker/Postgres local); mocks de `getEfiDatabasePixGateway` adicionados em `gatewayWebhookAdmin.it` e `pixChargeV2.it` |

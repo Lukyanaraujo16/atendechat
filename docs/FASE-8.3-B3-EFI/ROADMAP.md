@@ -324,6 +324,8 @@ Aguarda as autorizações R-1…R-4 de `IMPLANTACAO-TESTE.md` §1.
 | 5 | H1–H3b com conta real (`IMPLANTACAO-TESTE.md` §10): deploy `ed2e097`, autorização ligada, slot em `production`, OAuth Cobranças e Pix ok, ativação admin, `webhook-check` sem webhook na chave | concluído (2026-10-22) |
 | 6 | Commit "liberação TESTE" (§6.1) `8f6babd` e deploy 2 | concluído (2026-10-22) |
 | 7 | H4–H12: ativações C → D → E, webhook, cobrança real de R$ 1,00, baixa, renovação, idempotência, `homologate` | **aprovado** (2026-10-22) — `RELATORIO-HOMOLOGACAO.md` |
+| 8 | Correção do modal Pix e do `webhook-check` (`7385f06`), homologada visualmente com a fatura 3 | concluído (2026-10-22) |
+| 9 | Preparação de PRODUÇÃO: release `production`, B34-T11, B34-T12, R-5, D-P11, `IMPLANTACAO-PRODUCAO.md` | preparado localmente; aguarda commit, conferência em TESTE (P-1) e janela |
 
 O objetivo e os critérios abaixo valem com a conta real no lugar do sandbox (DECISOES §14).
 

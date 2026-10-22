@@ -599,3 +599,39 @@ faturamento inalterados. Nenhuma migration (a coluna `action` da auditoria é `S
 **Reversão.** Painel → "Voltar para API Efí de HOMOLOGAÇÃO" (apaga as credenciais reais do slot) e remover
 `EFI_TEST_RUNTIME_ALLOW_PRODUCTION_API` + restart. Só remover a variável já bloqueia o slot, sem fallback.
 Procedimento completo: IMPLANTACAO-TESTE §10.
+
+---
+
+## 15. Preparação para PRODUÇÃO (2026-10-22)
+
+| ID | Decisão de implementação | Motivo |
+|----|--------------------------|--------|
+| B34-T11a | `EFI_RELEASED_RUNTIMES` passa a `["test", "production"]` nas quatro listas. Nada ativa sem os controles de ambiente; runtime ausente/inválido nunca libera; guarda B34-T7 inalterada. | Release único para a janela de PRODUÇÃO (IMPLANTACAO-PRODUCAO). |
+| B34-T11 | O checkout legado só recadastra o webhook da chave (`pixConfigWebhook`) com a fonte efetiva `legacy_env` (`isLegacyPixWebhookRegistrationAllowed`). Com a fonte `database`, o webhook é gerido pelo painel. Com a v2 ativa o legado já não rodava. | Evita que um rollback só da v2 (ou a transição) sobrescreva a URL B3 (`whToken`) pela legada (`?token=` do env), que a recepção B3 recusaria. Rollback completo para `legacy_env` restaura o recadastro legado. |
+| B34-T12 | `resolveEfiCredentials(…, { adminBootstrap: true })` dispensa a homologação do slot `production` **só** para a finalidade `database` (bootstrap admin auditado): `webhook-check`, cadastro do webhook (`registerEfiWebhookForAdmin`) e conferência do `homologate`. Sem cache: a dispensa nunca chega a cobrança, processamento ou diagnóstico, que continuam exigindo a homologação. Prontidão (ativação, validação Pix, credenciais) continua exigida. | Impasse encontrado na preparação: o slot `production` exigia homologação para obter credenciais, e a homologação exige o webhook cadastrado e conferido com essas credenciais. Os testes de integração mockavam o gateway e não pegavam o caso. |
+
+### 15.1 Boleto e cartão
+Permanecem desligados e fora do escopo: boleto só tem emissão admin (sem confirmação automática); cartão não existe.
+Textos do painel corrigidos (Pix usa o banco com a fonte `database`; cartão não implementado).
+
+### 15.2 Riscos remanescentes
+- Janela entre a ativação e o `homologate` em PRODUÇÃO: checkout Pix indisponível (sem cobrança) por minutos.
+- Transferência do webhook da `04fd`: TESTE deve ter a B3 desligada antes (IMPLANTACAO-PRODUCAO §4.3).
+- `GERENCIANET_PIX_KEY` de PRODUÇÃO desconhecida (não acessada): conferir antes (P-3).
+
+### 15.3 Retenção de eventos (R-5) — proposta conservadora, sem exclusão automática nesta entrega
+`SaaSGatewayWebhookEvents` não guarda dados do pagador (`infoPagador`/`gnExtras` descartados na recepção), só txid,
+e2eId, valor, horário, vínculos e o resultado.
+| Classe | Tabelas / estados | Retenção proposta |
+|--------|-------------------|-------------------|
+| Registros financeiros | `Invoices`, `SaaSPayments`, `SaaSSubscriptionRenewals`, `SaaSFinancialEvents`, `SaaSReconciliationItems`, `SaaSPaymentAttempts` | **sem exclusão** |
+| Eventos com efeito financeiro | eventos `applied`, `reconciliation`, `unlinked`, `failed_*`, `invalid_permanent` com txid | **no mínimo 5 anos** a partir do recebimento (prazo usual de guarda fiscal; ver dependência abaixo) |
+| Eventos técnicos | `teste`, `ignored_not_saas` sem vínculo | 180 dias |
+| Evidências de auditoria | `PlatformEfiConfigAudits` (ativação, homologação, webhook, troca de ambiente) | **sem exclusão** |
+**Dependência do responsável:** confirmar com a contabilidade/jurídico o prazo legal de guarda aplicável à operação
+(fiscal e LGPD). Até a confirmação, nada é excluído; qualquer rotina de limpeza futura só atinge eventos técnicos.
+
+### 15.4 Texto para o Alex (D-P11) — enviar só se o responsável decidir
+> Olá! Atualizamos o processamento de pagamentos Pix da sua assinatura. A partir de agora, ao pagar uma fatura pelo
+> Pix, a confirmação e a renovação acontecem automaticamente em poucos segundos, e a tela mostra "Pagamento confirmado!".
+> Nada muda na forma de pagar. Se tiver qualquer dúvida, fale com o nosso suporte.
