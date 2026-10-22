@@ -202,8 +202,8 @@ describe("Pipeline assíncrono do webhook Pix (Postgres real, Efí e fila simula
     it("T-ACT-03: após as migrations, pipeline e varredura inativos sem a fonte database efetiva", () => {
       asyncSpy.mockRestore();
       process.env.EFI_WEBHOOK_PIPELINE = "async";
-      // Liberação TESTE: "test" na lista, mas a guarda B34-T7 exige EFI_CREDENTIALS_SOURCE=database.
-      expect(efiFinancialSource.EFI_RELEASED_RUNTIMES.webhookPipeline).toEqual(["test"]);
+      // Liberado em test e production, mas a guarda B34-T7 exige EFI_CREDENTIALS_SOURCE=database.
+      expect(efiFinancialSource.EFI_RELEASED_RUNTIMES.webhookPipeline).toEqual(["test", "production"]);
       expect(efiFinancialSource.isEfiWebhookPipelineAsyncActive()).toBe(false);
       expect(efiFinancialSource.isEfiPixReconciliationSweepActive()).toBe(false);
     });

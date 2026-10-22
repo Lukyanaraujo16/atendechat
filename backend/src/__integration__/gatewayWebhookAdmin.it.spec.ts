@@ -450,7 +450,8 @@ describe("B3.3 — administração, conciliação, varredura e homologação (Po
         homologation: expect.objectContaining({ homologated: true, versionDiffers: true }),
         usable: true
       });
-      expect(status.webhookPipeline).toMatchObject({ released: false, sweep: { released: false } });
+      // Liberado no código para production (B34-T11a); `active` do pipeline vem do spy do beforeEach.
+      expect(status.webhookPipeline).toMatchObject({ released: true, sweep: { released: true, active: false } });
     });
   });
 });
