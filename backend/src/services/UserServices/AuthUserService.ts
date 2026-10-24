@@ -24,6 +24,26 @@ interface Request {
   password: string;
 }
 
+/**
+ * Campos de Company devolvidos no login a qualquer perfil da empresa: os que o frontend lê da
+ * sessão. Fora: internalNotes/contractedPlanValue (só Super Admin), dados cadastrais e operacionais.
+ */
+export const LOGIN_COMPANY_ATTRIBUTES = [
+  "id",
+  "name",
+  "email",
+  "status",
+  "dueDate",
+  "timezone",
+  "businessSegment",
+  "crmVisibilityMode",
+  "unassignedTicketsQueueId",
+  "modulePermissions"
+];
+
+/** O login só lê `campaignsEnabled`; as demais Settings guardam tokens de integração. */
+export const LOGIN_COMPANY_SETTING_KEYS = ["campaignsEnabled"];
+
 interface Response {
   serializedUser: SerializedUser;
   token: string;
@@ -36,7 +56,21 @@ const AuthUserService = async ({
 }: Request): Promise<Response> => {
   const user = await User.findOne({
     where: { email },
-    include: ["queues", { model: Company, include: [{ model: Setting }] }]
+    include: [
+      "queues",
+      {
+        model: Company,
+        attributes: LOGIN_COMPANY_ATTRIBUTES,
+        include: [
+          {
+            model: Setting,
+            attributes: ["key", "value"],
+            where: { key: LOGIN_COMPANY_SETTING_KEYS },
+            required: false
+          }
+        ]
+      }
+    ]
   });
 
   if (!user) {
