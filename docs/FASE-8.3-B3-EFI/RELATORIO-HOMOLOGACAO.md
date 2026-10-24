@@ -4,6 +4,8 @@
 **Ambiente:** VPS de TESTE `vmi3163669`, `STREAMHUB_RUNTIME_ENV=test`, slot `homologation`, API Efí **production**
 (Opção B, DECISOES §14). **Resultado: APROVADO** — fluxo Pix de ponta a ponta com dinheiro real (R$ 1,00).
 **Versão implantada e homologada em TESTE para a promoção (P-1):** `07c6b66` (2026-10-22) — ver §3.2.
+**Versão autorizada para PRODUÇÃO desde 2026-10-24:** `e9e0638` (B3-FIX01) — ver §3.3 (B2 interrompido com `07c6b66`)
+e §3.4 (homologação da correção).
 
 ## 1. Configuração ativa em TESTE
 | Item | Valor |
@@ -66,14 +68,65 @@ Inclui a liberação `["test","production"]`, B34-T11 (webhook legado) e B34-T12
 | Liberação `production` com controles no default | fonte `legacy_env`, v2/pipeline/varredura inativos; boleto, cartão e settle desligados |
 **Resultado: APROVADO, sem regressões.**
 
+### 3.3 Tentativa de ativação em PRODUÇÃO com `07c6b66` — B2 interrompido (2026-10-24)
+Etapa A (código, B3 desligada) e B1 (slot `production` cadastrado, OAuth Cobranças e Pix aprovado, `Ativar (admin)`)
+concluídas em PRODUÇÃO. No B2, depois de desligar v2/pipeline em TESTE e ativar os três controles em PRODUÇÃO, o
+cadastro do webhook foi recusado com `ERR_EFI_INTEGRATION_NOT_HOMOLOGATED`, **antes de qualquer chamada à Efí** (nenhuma
+auditoria nova; webhook da `04fd` continuou em TESTE; estado financeiro idêntico; nenhuma cobrança).
+- **Causa (confirmada):** `getExpectedWebhookSecret()` (`webhookReception.ts`) resolvia o secret pela finalidade
+  `financial`, que no slot `production` exige o `homologate`. O mesmo secret é usado no cadastro do webhook
+  (`efiPixAdminService.ts`), na recepção do webhook (`webhookReception.ts`: o `teste` receberia 503) e na conferência do
+  `homologate` (`efiHomologationService.ts`), que são pré-requisitos da homologação — dependência circular. A consulta do
+  painel (`getEfiWebhookForAdmin`, que habilita "Cadastrar webhook") também usava a finalidade `financial`.
+- **Por que os testes não pegaram:** o slot `homologation` (TESTE) não exige homologação, e os testes de integração do
+  `homologate` de produção rodavam com a fonte `legacy_env` (secret do env) e gateways simulados.
+- **Estado deixado:** configuração financeira de PRODUÇÃO restaurada ao estado da Etapa A (`.env` pré-B2; fonte
+  `legacy_env`, B3 desligada); slot `production` preservado (cadastrado, validado, `adminEnabled=true`); TESTE com v2 e
+  pipeline desligados até a homologação da correção.
+
+### 3.4 Homologação da correção B3-FIX01 (commit `e9e0638`, 2026-10-24)
+**Correção:** `getExpectedWebhookSecret()` passa a usar a finalidade `database` — mesmo slot do runtime e mesma regra D-P2
+(runtime válido, slot presente e não revogado, `adminEnabled`, validação Pix do fingerprint atual, credenciais completas),
+sem exigir a homologação. O secret só autentica: cobrança e processamento continuam na finalidade `financial`, que exige
+a homologação. `getEfiWebhookForAdmin` usa o gateway do slot quando a fonte efetiva é `database` (consulta só leitura).
+
+| Arquivo | Mudança |
+|---------|---------|
+| `backend/src/services/SaasBilling/webhookReception.ts` | secret do webhook pela finalidade `database` |
+| `backend/src/services/SaasBilling/efiPixAdminService.ts` | consulta do webhook do painel pelo gateway do slot (fonte `database`) |
+| `backend/src/services/SaasBilling/__tests__/efiLegacyContract.spec.ts` | contrato P-B31-08 atualizado (recepção usa `database`; consulta segue só leitura) |
+| `backend/src/__integration__/efiProductionBootstrap.it.spec.ts` | 12 testes novos: runtime `production`, fonte `database`, controles reais; consulta → cadastro → `teste` → conferência → `homologate`; cobrança e Pix bloqueados antes da homologação; slot ausente/desativado/revogado, secret errado, runtime inválido. Sem a correção, 7 dos 12 falham |
+
+Commit `e9e06382ef6530087911e453721f2f041a7b7b02` implantado na VPS de TESTE por fast-forward a partir de `07c6b66` (sem
+migrations, dependências nem frontend); depois, `EFI_PIX_CHARGE_V2_ENABLED` e `EFI_WEBHOOK_PIPELINE` reativados em TESTE.
+| Verificação | Resultado |
+|-------------|-----------|
+| Testes backend (SaasBilling + config, na VPS) | 429/429 |
+| Integração isolada (Postgres e Redis descartáveis, Efí simulada) | 16/16 suítes, **222/222**, nenhum pulado (inclui `gatewayWebhookRedis` e os 12 novos) |
+| Build backend | `build-info.json` → `e9e0638…`, `dirty: false`; boot `currentCommit: e9e0638…`, `invalid: []` |
+| Controles em TESTE | runtime `test`, fonte `database`, v2 e pipeline ativos, worker registrado, varredura desligada |
+| Consulta do webhook (painel) | `registered: true`, `registerAvailable: true`, fonte `database` |
+| `webhook-check` | `pointsToThisBackend: true` |
+| Notificação real da Efí | cadastro da **mesma** URL de TESTE (hash do `whToken` igual antes e depois; auditoria 21 `webhook_register`, `conferred: true`); `POST` da Efí (`34.193.116.226`) com **HTTP 200**; evento 5 `teste` / **`ignored_not_saas`**, fonte `database`, `authVia: whToken` |
+| Fila e erros | fila vazia, nenhum evento pendente, nenhum 401/503, nenhum erro de autorização |
+| Estado financeiro antes × depois | **idêntico** (3 faturas, 3 pagamentos, 3 renovações, 2 tentativas, 9 eventos financeiros, 0 conciliação); nenhuma cobrança criada |
+Não executados: "Testar OAuth" (grava no slot; o OAuth Pix com mTLS foi exercido pelas chamadas reais) e Pix real
+(o worker e a cobrança não mudaram; cobertos pela integração e pela homologação de `8f6babd`).
+**Resultado: APROVADO.** `e9e0638` substitui `07c6b66` como versão autorizada para PRODUÇÃO.
+
 ## 4. Pendências para PRODUÇÃO
-Release de PRODUÇÃO, proteção do webhook legado (B34-T11), desbloqueio do bootstrap da homologação (B34-T12),
-retenção (R-5) e texto D-P11: preparados localmente (DECISOES §15). Restam decisões/conferências do responsável:
-chave Pix de PRODUÇÃO e `GERENCIANET_PIX_KEY` (P-2/P-3), prazo legal de retenção e envio do aviso.
+Release de PRODUÇÃO, proteção do webhook legado (B34-T11), desbloqueio do bootstrap da homologação (B34-T12 + B3-FIX01),
+retenção (R-5) e texto D-P11: preparados (DECISOES §15). P-2/P-3 decididos em 2026-10-24 (chave `04fd`;
+`GERENCIANET_PIX_KEY` de PRODUÇÃO ≠ `04fd`). Slot `production` já cadastrado, validado e administrativamente ativo; B3
+desligada em PRODUÇÃO. Restam: implantar `e9e0638` em PRODUÇÃO (código), desligar v2/pipeline em TESTE, ativar e
+transferir o webhook com `homologate` usando `testReportCommit` = `e9e0638` (IMPLANTACAO-PRODUCAO §3–§6); prazo legal
+de retenção e envio do aviso.
 
 ## 5. Checklist de implantação em PRODUÇÃO
 Ver `IMPLANTACAO-PRODUCAO.md`.
 
 ## 6. Estado em que TESTE fica
-Integração ativa com a conta Efí **real**: qualquer "Pagar" no `/financeiro` da VPS de TESTE gera Pix real. Para
-desligar: remover `EFI_PIX_CHARGE_V2_ENABLED` (checkout volta ao legado) ou seguir IMPLANTACAO-TESTE §10.4.
+Atualizado em 2026-10-24 (após §3.4): commit `e9e0638`, **Pix V2 e pipeline ativos** com a conta Efí **real**, webhook
+da `04fd` apontando para TESTE. Qualquer "Pagar" no `/financeiro` da VPS de TESTE gera Pix real. **Antes da
+transferência do webhook para PRODUÇÃO**, remover `EFI_PIX_CHARGE_V2_ENABLED` e `EFI_WEBHOOK_PIPELINE` (+ restart),
+conforme IMPLANTACAO-PRODUCAO §5.1; para desligar a qualquer momento, o mesmo ou IMPLANTACAO-TESTE §10.4.

@@ -481,3 +481,17 @@ ambiente, alertas, `webhook-check`) a conferir manualmente após o deploy.
 | Frontend (BillingAutomation + CheckoutPage) | 10/10 |
 | Typecheck / builds backend e frontend / lint | exit 0 / ok / nenhum aviso novo |
 | Integração | não executada (sem Docker/Postgres local); mocks de `getEfiDatabasePixGateway` adicionados em `gatewayWebhookAdmin.it` e `pixChargeV2.it` |
+
+### Registro B3-FIX01 (dependência circular do bootstrap em PRODUÇÃO, 2026-10-24)
+Origem: B2 de PRODUÇÃO com `07c6b66` interrompido com `ERR_EFI_INTEGRATION_NOT_HOMOLOGATED` no cadastro do webhook
+(RELATORIO-HOMOLOGACAO §3.3). Correção no commit `e9e0638` (§3.4).
+
+| Verificação | Resultado |
+|-------------|-----------|
+| `efiProductionBootstrap.it.spec` (novo, I, 12 testes) | runtime `production`, fonte `database`, v2 e pipeline pelos controles reais (sem spies de gate); gateways simulados só na camada HTTP, chamando o resolvedor real. A: secret do slot para o fluxo admin com `financial` bloqueada; consulta → cadastro → `teste` 200 → `webhook-check` → `homologate` 200; cobrança antes da homologação recusada sem tentativa nem chamada à Efí; Pix recebido antes fica `retry_scheduled` sem baixa e é `applied` após homologar. B: cobrança v2 com o slot e baixa após homologar; desativar o slot ou trocar o secret volta a bloquear. C: slot ausente/desativado/revogado/alterado sem validação → 503 e cadastro recusado; secret errado/ausente → 401; runtime inválido ou de outro slot → secret do slot nunca usado; `teste` não libera liquidação |
+| Mesmo spec sem a correção | 7/12 falham (`ERR_EFI_INTEGRATION_NOT_HOMOLOGATED`) — reproduz o B2 |
+| `efiLegacyContract.spec` (P-B31-08) | contrato atualizado: recepção usa a finalidade `database` (uma chamada); consulta do webhook do painel lê o slot e segue só leitura |
+| SaasBilling + config (local e na VPS de TESTE) | 34/34 suítes, 429/429 testes |
+| Integração (`scripts/test-integration-f84.sh`, `REDIS_IT_URI` com Redis descartável) | 16/16 suítes, **222/222**, nenhum pulado |
+| Typecheck / build backend | exit 0 / `build-info` → `e9e0638`, `dirty: false` |
+| Homologação em TESTE | RELATORIO-HOMOLOGACAO §3.4: notificação real da Efí 200, evento `teste` / `ignored_not_saas`, nenhuma alteração financeira |
