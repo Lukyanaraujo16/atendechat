@@ -193,9 +193,12 @@ describe("B3.1 — contrato legado (controles no default)", () => {
       "services/SaasBilling/webhookReception.ts"
     ]);
     const reception = fs.readFileSync(path.join(SRC, "services/SaasBilling/webhookReception.ts"), "utf8");
+    // B3-FIX01: o secret vem do slot pela finalidade `database` (sem exigir a homologação, que depende
+    // dele); só autentica. A finalidade `financial` não aparece na recepção.
     expect(reception).toMatch(
-      /const source = getEfiFinancialCredentialsSource\(\);\s*if \(source === "database"\) \{\s*const creds = await getEfiRuntimeCredentials\("financial"\)/
+      /const source = getEfiFinancialCredentialsSource\(\);\s*if \(source === "database"\) \{\s*const creds = await getEfiRuntimeCredentials\("database"\)/
     );
+    expect(reception.match(/getEfiRuntimeCredentials\(/g)).toHaveLength(1);
     const cobrancas = fs.readFileSync(path.join(SRC, "services/SaasBilling/efiCobrancasClient.ts"), "utf8");
     expect(cobrancas).toMatch(
       /if \(getEfiFinancialCredentialsSource\(\) === "database"\) \{\s*const creds = await getEfiRuntimeCredentials\("financial"\)/
@@ -226,6 +229,11 @@ describe("B3.1 — contrato legado (controles no default)", () => {
     const slotCheckBody = slotCheck.slice(0, slotCheck.indexOf("\n}\n"));
     expect(slotCheckBody).toContain("getEfiDatabasePixGateway()");
     expect(slotCheckBody).not.toMatch(/putWebhook|putCharge|qrCode|recordEfiConfigAudit/);
+    // B3-FIX01: a consulta do webhook do painel também lê o slot, mas segue só leitura.
+    const consult = admin.slice(admin.indexOf("export async function getEfiWebhookForAdmin"));
+    const consultBody = consult.slice(0, consult.indexOf("\n}\n"));
+    expect(consultBody).toContain("getEfiDatabasePixGateway()");
+    expect(consultBody).not.toMatch(/putWebhook|putCharge|qrCode|recordEfiConfigAudit/);
     const register = admin.slice(admin.indexOf("export async function registerEfiWebhookForAdmin"));
     expect(register.slice(0, register.indexOf("\n}\n"))).not.toMatch(/putCharge|qrCode/);
   });

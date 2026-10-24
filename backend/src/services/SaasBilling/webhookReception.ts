@@ -64,14 +64,19 @@ export function constantTimeEquals(a: string, b: string): boolean {
   return crypto.timingSafeEqual(ha, hb);
 }
 
-/** Secret da fonte financeira efetiva (RF3.1): env no `legacy_env`, slot no `database`. */
+/**
+ * Secret da fonte financeira efetiva (RF3.1): env no `legacy_env`, slot no `database`.
+ * No `database` usa a finalidade `database` (B3-FIX01): mesmo slot do runtime e mesma regra D-P2,
+ * sem exigir a homologação — cadastro, recepção do `teste` e conferência do `homologate` são
+ * pré-requisitos dela. Só autentica: cobrança e processamento seguem na finalidade `financial`.
+ */
 export async function getExpectedWebhookSecret(): Promise<{
   secret: string | null;
   source: string;
 }> {
   const source = getEfiFinancialCredentialsSource();
   if (source === "database") {
-    const creds = await getEfiRuntimeCredentials("financial");
+    const creds = await getEfiRuntimeCredentials("database");
     return { secret: creds.webhookSecret, source };
   }
   const env = (process.env.WEBHOOK_SUBSCRIPTION_SECRET || "").trim();

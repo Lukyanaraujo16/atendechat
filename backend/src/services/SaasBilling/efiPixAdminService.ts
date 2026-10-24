@@ -8,7 +8,11 @@ import {
 } from "../../config/streamhubRuntimeEnv";
 import { logger } from "../../utils/logger";
 import { recordEfiConfigAudit } from "./efiConfigAudit";
-import { isEfiPixChargeV2Active, isEfiWebhookPipelineAsyncActive } from "./efiFinancialSource";
+import {
+  getEfiFinancialCredentialsSource,
+  isEfiPixChargeV2Active,
+  isEfiWebhookPipelineAsyncActive
+} from "./efiFinancialSource";
 import { getExpectedWebhookSecret } from "./webhookReception";
 import {
   getEfiDatabasePixGateway,
@@ -96,7 +100,12 @@ export async function getEfiChargeForAdmin(txidRaw: string): Promise<Record<stri
 
 /** GET /saas/finance/efi/webhook — webhook cadastrado para a chave da fonte efetiva. */
 export async function getEfiWebhookForAdmin(): Promise<Record<string, unknown>> {
-  const gateway = await getEfiPixChargeGateway();
+  // B3-FIX01: com a fonte `database`, consulta só leitura do slot sem exigir a homologação; é ela que
+  // libera o "Cadastrar webhook" do painel, pré-requisito da homologação.
+  const gateway =
+    getEfiFinancialCredentialsSource() === "database"
+      ? await getEfiDatabasePixGateway()
+      : await getEfiPixChargeGateway();
   const wh = await gateway.getWebhook(gateway.context.pixKey);
   return {
     registered: Boolean(wh?.webhookUrl),
