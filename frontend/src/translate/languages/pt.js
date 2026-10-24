@@ -296,11 +296,14 @@ const messages = {
           deactivateMessage: "Deseja desativar «{{name}}»? O histórico será preservado.",
           deactivateAction: "Desativar produto",
           reactivateAction: "Reativar produto",
-          deleteAction: "Excluir definitivamente",
-          deleteTitle: "Excluir produto?",
+          deleteAction: "Excluir produto",
+          deleteTitle: "Excluir produto permanentemente?",
           deleteMessage:
-            "Esta ação remove definitivamente «{{name}}». Produtos com histórico de vendas ou movimentações de estoque não podem ser excluídos — nesse caso, desative o produto.",
-          deleteConfirm: "Excluir definitivamente",
+            "O produto será removido definitivamente do catálogo, incluindo suas variantes e movimentações de estoque.",
+          deleteMessageHistory:
+            "Se houver vendas registradas, o histórico financeiro dessas vendas será preservado, mas o produto não poderá mais ser utilizado em novas operações.",
+          deleteMessageIrreversible: "Esta ação não poderá ser desfeita.",
+          deleteConfirm: "Excluir permanentemente",
           columns: {
             name: "Nome",
             sku: "SKU",
@@ -8610,6 +8613,8 @@ const messages = {
         ERR_INVENTORY_PRODUCT_BARCODE_DUPLICATE: "Este código de barras já está sendo usado por outro produto.",
         ERR_INVENTORY_PRODUCT_HAS_HISTORY:
           "Este produto possui histórico de vendas ou movimentações e não pode ser excluído. Você pode desativá-lo.",
+        ERR_INVENTORY_PRODUCT_DELETE_CONFLICT:
+          "O produto foi alterado enquanto era excluído. Atualize a página e tente novamente.",
         ERR_KNOWLEDGE_BASE_NOT_FOUND: "Base de conhecimento não encontrada.",
         ERR_KNOWLEDGE_DOCUMENT_NOT_FOUND: "Documento não encontrado.",
         ERR_KNOWLEDGE_BASE_HAS_DOCUMENTS:

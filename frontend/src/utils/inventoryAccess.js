@@ -177,6 +177,11 @@ export function canReverseInventoryReceivablePayments(planFlags, user) {
   );
 }
 
+/** Exclusão definitiva: manageProducts e admin da empresa / Super Admin (o backend exige o mesmo). */
+export function canDeleteInventoryProducts(planFlags, user) {
+  return canManageInventoryProducts(planFlags, user) && isAdminBypass(user);
+}
+
 export { planHasInventoryModule };
 
 export function useInventoryPermissions() {
@@ -188,6 +193,7 @@ export function useInventoryPermissions() {
       loaded: planFlags.loaded,
       canView: canViewInventory(planFlags, user),
       canManageProducts: canManageInventoryProducts(planFlags, user),
+      canDeleteProducts: canDeleteInventoryProducts(planFlags, user),
       canManageStock: canManageInventoryStock(planFlags, user),
       canCreateSale: canCreateInventorySale(planFlags, user),
       canCancelSale: canCancelInventorySale(planFlags, user),

@@ -69,10 +69,11 @@ export default async function CancelInventorySaleService(input: {
         transaction: t
       });
 
+      // Item de produto excluído (productId null): não há estoque a devolver.
       const stockItems = [...items]
-        .filter(item => item.trackStock)
+        .filter(item => item.trackStock && item.productId != null)
         .sort((a, b) => {
-          if (a.productId !== b.productId) return a.productId - b.productId;
+          if (a.productId !== b.productId) return Number(a.productId) - Number(b.productId);
           return Number(a.variantId || 0) - Number(b.variantId || 0);
         });
 
@@ -80,7 +81,7 @@ export default async function CancelInventorySaleService(input: {
         // Restaura mesmo se variante/produto estiver inativo (histórico).
         const target = await lockSellableStockTarget({
           companyId: input.companyId,
-          productId: item.productId,
+          productId: Number(item.productId),
           variantId: item.variantId,
           transaction: t,
           requireActive: false

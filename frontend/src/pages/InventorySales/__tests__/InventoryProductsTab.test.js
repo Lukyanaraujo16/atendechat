@@ -7,6 +7,8 @@ import { createTheme, ThemeProvider } from "@material-ui/core/styles";
 
 import { changeLanguage } from "../../../translate/i18n";
 import InventoryProductsTab from "../InventoryProductsTab";
+import toastError from "../../../errors/toastError";
+import { toast } from "react-toastify";
 import {
   deleteInventoryProduct,
   listInventoryCategories,
@@ -23,8 +25,9 @@ jest.mock("../../../services/inventoryApi", () => ({
 
 jest.mock("../../../hooks/useIsMobile", () => jest.fn(() => false));
 
+let mockPerms = { canManageProducts: true, canDeleteProducts: true };
 jest.mock("../../../utils/inventoryAccess", () => ({
-  useInventoryPermissions: () => ({ canManageProducts: true }),
+  useInventoryPermissions: () => mockPerms,
 }));
 
 jest.mock("../../../errors/toastError", () => jest.fn());
@@ -71,6 +74,7 @@ function renderTab() {
 
 describe("InventoryProductsTab exclusão e estado", () => {
   beforeEach(() => {
+    mockPerms = { canManageProducts: true, canDeleteProducts: true };
     changeLanguage("pt");
     jest.clearAllMocks();
     listInventoryCategories.mockResolvedValue({ data: [] });
@@ -81,17 +85,73 @@ describe("InventoryProductsTab exclusão e estado", () => {
     updateInventoryProduct.mockResolvedValue({ data: {} });
   });
 
-  it("lixeira confirma exclusão definitiva e não desativa", async () => {
+  it("lixeira abre a confirmação com as consequências e exclui sem desativar", async () => {
     renderTab();
     await waitFor(() => expect(screen.getByText("Capinha")).toBeTruthy());
-    const deleteButtons = screen.getAllByLabelText("Excluir definitivamente");
-    fireEvent.click(deleteButtons[0]);
-    expect(screen.getByText("Excluir produto?")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Excluir definitivamente" }));
-    await waitFor(() =>
-      expect(deleteInventoryProduct).toHaveBeenCalledWith(1)
-    );
+    fireEvent.click(screen.getAllByLabelText("Excluir produto")[0]);
+    expect(screen.getByText("Excluir produto permanentemente?")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "O produto será removido definitivamente do catálogo, incluindo suas variantes e movimentações de estoque."
+      )
+    ).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Se houver vendas registradas, o histórico financeiro dessas vendas será preservado, mas o produto não poderá mais ser utilizado em novas operações."
+      )
+    ).toBeTruthy();
+    expect(screen.getByText("Esta ação não poderá ser desfeita.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Cancelar" })).toBeTruthy();
+    const listCallsBefore = listInventoryProducts.mock.calls.length;
+    fireEvent.click(screen.getByRole("button", { name: "Excluir permanentemente" }));
+    await waitFor(() => expect(deleteInventoryProduct).toHaveBeenCalledWith(1));
     expect(updateInventoryProduct).not.toHaveBeenCalled();
+    // Sucesso: toast e listagem recarregada sem recarregar a página.
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Produto excluído."));
+    await waitFor(() => expect(listInventoryProducts.mock.calls.length).toBeGreaterThan(listCallsBefore));
+  });
+
+  it("produto inativo também pode ser excluído", async () => {
+    renderTab();
+    await waitFor(() => expect(screen.getByText("Película")).toBeTruthy());
+    fireEvent.click(screen.getAllByLabelText("Excluir produto")[1]);
+    fireEvent.click(screen.getByRole("button", { name: "Excluir permanentemente" }));
+    await waitFor(() => expect(deleteInventoryProduct).toHaveBeenCalledWith(2));
+  });
+
+  it("clique duplo na confirmação dispara uma única exclusão", async () => {
+    let resolveDelete;
+    deleteInventoryProduct.mockImplementation(() => new Promise((r) => { resolveDelete = r; }));
+    renderTab();
+    await waitFor(() => expect(screen.getByText("Capinha")).toBeTruthy());
+    fireEvent.click(screen.getAllByLabelText("Excluir produto")[0]);
+    const confirm = screen.getByRole("button", { name: "Excluir permanentemente" });
+    fireEvent.click(confirm);
+    fireEvent.click(confirm);
+    expect(deleteInventoryProduct).toHaveBeenCalledTimes(1);
+    resolveDelete({});
+    await waitFor(() => expect(toast.success).toHaveBeenCalled());
+  });
+
+  it("erro do backend na exclusão mostra o erro e mantém o produto na lista", async () => {
+    const err = { response: { status: 409, data: { error: "ERR_INVENTORY_PRODUCT_DELETE_CONFLICT" } } };
+    deleteInventoryProduct.mockRejectedValue(err);
+    renderTab();
+    await waitFor(() => expect(screen.getByText("Capinha")).toBeTruthy());
+    fireEvent.click(screen.getAllByLabelText("Excluir produto")[0]);
+    fireEvent.click(screen.getByRole("button", { name: "Excluir permanentemente" }));
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith(err));
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(screen.getByText("Capinha")).toBeTruthy();
+  });
+
+  it("sem permissão de exclusão definitiva (não admin): lixeira oculta, demais ações mantidas", async () => {
+    mockPerms = { canManageProducts: true, canDeleteProducts: false };
+    renderTab();
+    await waitFor(() => expect(screen.getByText("Capinha")).toBeTruthy());
+    expect(screen.queryByLabelText("Excluir produto")).toBeNull();
+    expect(screen.getByLabelText("Desativar produto")).toBeTruthy();
+    expect(screen.getByLabelText("Reativar produto")).toBeTruthy();
   });
 
   it("desativar usa updateInventoryProduct com active false", async () => {
@@ -117,7 +177,7 @@ describe("InventoryProductsTab exclusão e estado", () => {
   it("cancelar exclusão não chama a API", async () => {
     renderTab();
     await waitFor(() => expect(screen.getByText("Capinha")).toBeTruthy());
-    fireEvent.click(screen.getAllByLabelText("Excluir definitivamente")[0]);
+    fireEvent.click(screen.getAllByLabelText("Excluir produto")[0]);
     fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
     expect(deleteInventoryProduct).not.toHaveBeenCalled();
   });

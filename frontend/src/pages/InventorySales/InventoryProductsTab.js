@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Box,
   Chip,
@@ -99,6 +99,7 @@ export default function InventoryProductsTab({
   const [formOpen, setFormOpen] = useState(false);
   const [editId, setEditId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const deletingRef = useRef(false);
   const [deactivateTarget, setDeactivateTarget] = useState(null);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [confirmDeactivateOpen, setConfirmDeactivateOpen] = useState(false);
@@ -162,7 +163,9 @@ export default function InventoryProductsTab({
   };
 
   const handleDeletePermanently = async () => {
-    if (!deleteTarget) return;
+    // Ref (não o state): dois cliques no mesmo ciclo de render não disparam duas exclusões.
+    if (!deleteTarget || deletingRef.current) return;
+    deletingRef.current = true;
     setConfirmLoading(true);
     try {
       await deleteInventoryProduct(deleteTarget.id);
@@ -173,6 +176,7 @@ export default function InventoryProductsTab({
     } catch (err) {
       toastError(err);
     } finally {
+      deletingRef.current = false;
       setConfirmLoading(false);
     }
   };
@@ -297,18 +301,20 @@ export default function InventoryProductsTab({
               </IconButton>
             </Tooltip>
           )}
-          <Tooltip title={i18n.t("inventorySales.products.deleteAction")}>
-            <IconButton
-              size="small"
-              aria-label={i18n.t("inventorySales.products.deleteAction")}
-              onClick={() => {
-                setDeleteTarget(product);
-                setConfirmDeleteOpen(true);
-              }}
-            >
-              <DeleteOutlineIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
+          {perms.canDeleteProducts ? (
+            <Tooltip title={i18n.t("inventorySales.products.deleteAction")}>
+              <IconButton
+                size="small"
+                aria-label={i18n.t("inventorySales.products.deleteAction")}
+                onClick={() => {
+                  setDeleteTarget(product);
+                  setConfirmDeleteOpen(true);
+                }}
+              >
+                <DeleteOutlineIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          ) : null}
         </>
       ) : null}
     </Box>
@@ -539,9 +545,9 @@ export default function InventoryProductsTab({
         asyncConfirm
         loading={confirmLoading}
       >
-        {i18n.t("inventorySales.products.deleteMessage", {
-          name: deleteTarget?.name || "",
-        })}
+        <p style={{ marginTop: 0 }}>{i18n.t("inventorySales.products.deleteMessage")}</p>
+        <p>{i18n.t("inventorySales.products.deleteMessageHistory")}</p>
+        <p style={{ marginBottom: 0 }}>{i18n.t("inventorySales.products.deleteMessageIrreversible")}</p>
       </ConfirmationModal>
     </Box>
   );

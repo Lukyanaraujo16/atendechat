@@ -56,9 +56,11 @@ class InventorySaleItem extends Model<InventorySaleItem> {
   @BelongsTo(() => InventorySale)
   sale: InventorySale;
 
+  /** Null = produto excluído; o item mantém o snapshot (productName, productSku, valores). */
+  @AllowNull
   @ForeignKey(() => InventoryProduct)
   @Column
-  productId: number;
+  productId: number | null;
 
   @BelongsTo(() => InventoryProduct)
   product: InventoryProduct;

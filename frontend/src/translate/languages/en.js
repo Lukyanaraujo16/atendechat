@@ -292,10 +292,13 @@ const messages = {
 					deactivateMessage: "Deactivate \"{{name}}\"? History will be preserved.",
 					deactivateAction: "Deactivate product",
 					reactivateAction: "Reactivate product",
-					deleteAction: "Delete permanently",
-					deleteTitle: "Delete product?",
+					deleteAction: "Delete product",
+					deleteTitle: "Permanently delete product?",
 					deleteMessage:
-						"This permanently removes \"{{name}}\". Products with sales or stock movement history cannot be deleted — deactivate the product instead.",
+						"The product will be permanently removed from the catalog, including its variants and stock movements.",
+					deleteMessageHistory:
+						"If there are recorded sales, their financial history will be preserved, but the product can no longer be used in new operations.",
+					deleteMessageIrreversible: "This action cannot be undone.",
 					deleteConfirm: "Delete permanently",
 					columns: {
 						name: "Name",
@@ -8322,6 +8325,8 @@ const messages = {
 				ERR_INVENTORY_PRODUCT_BARCODE_DUPLICATE: "This barcode is already being used by another product.",
 				ERR_INVENTORY_PRODUCT_HAS_HISTORY:
 					"This product has sales or stock history and cannot be deleted. You can deactivate it instead.",
+				ERR_INVENTORY_PRODUCT_DELETE_CONFLICT:
+					"The product changed while it was being deleted. Refresh the page and try again.",
 				ERR_INTERNAL_SERVER_ERROR: "An unexpected error occurred. Please try again later",
 				ERR_NO_OTHER_WHATSAPP: "There must be at least one default WhatsApp.",
 				ERR_NO_DEF_WAPP_FOUND: "No default WhatsApp found. Check the connections page.",

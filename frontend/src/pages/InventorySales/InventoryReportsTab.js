@@ -537,9 +537,9 @@ export default function InventoryReportsTab() {
               </Typography>
             ) : isMobile ? (
               <MobileCardList>
-                {products.map((row) => (
+                {products.map((row, idx) => (
                   <MobileEntityCard
-                    key={row.productId}
+                    key={row.productId ?? `deleted-${idx}`}
                     title={row.productName}
                     subtitle={row.productSku || undefined}
                   >
@@ -570,8 +570,9 @@ export default function InventoryReportsTab() {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {products.map((row) => (
-                      <TableRow key={row.productId}>
+                    {products.map((row, idx) => (
+                      // productId null = produto excluído (histórico preservado pelo snapshot).
+                      <TableRow key={row.productId ?? `deleted-${idx}`}>
                         <TableCell>
                           {row.productName}
                           {row.productSku ? (

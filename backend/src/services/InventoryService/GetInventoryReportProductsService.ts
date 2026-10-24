@@ -9,7 +9,7 @@ import {
 } from "./inventoryReportHelpers";
 
 export type ProductReportRow = {
-  productId: number;
+  productId: number | null;
   productName: string;
   productSku: string | null;
   variantId?: number | null;
@@ -66,7 +66,8 @@ export default async function GetInventoryReportProductsService(
   })) as unknown as Array<Record<string, unknown>>;
 
   return rows.map((row) => ({
-    productId: Number(row.productId),
+    // Null = produto excluído; nome/código vêm do snapshot do item.
+    productId: row.productId != null ? Number(row.productId) : null,
     productName: String(row.productName || ""),
     productSku: row.productSku != null ? String(row.productSku) : null,
     variantId:

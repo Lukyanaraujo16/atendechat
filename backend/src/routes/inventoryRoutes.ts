@@ -2,6 +2,7 @@ import express from "express";
 import isAuth from "../middleware/isAuth";
 import { inventoryReceiptLogoUpload } from "../config/inventoryReceiptLogoUpload";
 import requireInventorySalesPermission from "../middleware/requireInventorySalesPermission";
+import requireTenantAdminOrSupport from "../middleware/requireTenantAdminOrSupport";
 import {
   INVENTORY_SALES_CANCEL_SALE,
   INVENTORY_SALES_CREATE_SALE,
@@ -519,10 +520,12 @@ inventoryRoutes.put(
   requireInventorySalesPermission(INVENTORY_SALES_MANAGE_PRODUCTS),
   InventoryController.updateProduct
 );
+// Exclusão definitiva: além de manageProducts, só admin da empresa ou Super Admin em modo suporte.
 inventoryRoutes.delete(
   "/inventory/products/:id",
   isAuth,
   requireInventorySalesPermission(INVENTORY_SALES_MANAGE_PRODUCTS),
+  requireTenantAdminOrSupport,
   InventoryController.deleteProduct
 );
 
