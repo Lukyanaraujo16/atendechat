@@ -3,13 +3,18 @@
 **Preparado em 2026-10-22, localmente. Nada aqui foi executado em PRODUÇÃO.** Cada etapa exige autorização
 explícita do responsável. Base: `RELATORIO-HOMOLOGACAO.md` (homologação aprovada em TESTE), DECISOES §14–§15.
 
+> **Versão autorizada para PRODUÇÃO: exclusivamente o commit `07c6b66`**
+> (`07c6b664b9f148c3f1ee3518aeb084992c122c6f`), implantado e homologado na VPS de TESTE (RELATORIO-HOMOLOGACAO §3.2).
+> PRODUÇÃO executa esse commit mesmo que `origin/main` esteja à frente. Commits posteriores que só alteram
+> documentação **não substituem** a versão homologada; qualquer outra versão exige nova homologação em TESTE.
+
 Escopo: só o Pix B3. Boleto e cartão ficam desligados (`EFI_BOLETO_ENABLED=false`, `EFI_CARD_ENABLED=false`);
 nenhuma variável da B3 os liga (auditoria de 2026-10-22).
 
 ## 0. Premissas e decisões antes da janela
 | # | Item | Situação |
 |---|------|----------|
-| P-1 | Commit desta entrega implantado e conferido em **TESTE** antes (smoke + `webhook-check`, sem nova cobrança) e registrado em `RELATORIO-HOMOLOGACAO.md` | o `homologate` de PRODUÇÃO exige que o commit do relatório seja o mesmo em execução (`ERR_EFI_HOMOLOGATE_COMMIT_MISMATCH`) |
+| P-1 | **Concluída:** `07c6b66` implantado e homologado em TESTE e registrado em `RELATORIO-HOMOLOGACAO.md` §3.2 | o `homologate` de PRODUÇÃO compara o commit digitado no painel com o do build em execução (`ERR_EFI_HOMOLOGATE_COMMIT_MISMATCH`): PRODUÇÃO precisa rodar `07c6b66` |
 | P-2 | Chave Pix de PRODUÇÃO: **`04fd`** (mesma conta Efí da homologação), com o webhook transferido de TESTE (§4) — ou uma chave nova exclusiva | decisão do responsável; o padrão deste roteiro é a transferência da `04fd` |
 | P-3 | `GERENCIANET_PIX_KEY` de PRODUÇÃO conferida (só os 4 últimos caracteres) | se for a `04fd`, cada Pix do checkout **legado** recadastra o webhook dela (até a B3 ser ativada); depois da ativação o legado não recadastra mais (B34-T11) |
 | P-4 | Retenção R-5 aprovada (DECISOES §15.3) e texto D-P11 (§15.4) enviado, se o responsável decidir avisar | não bloqueia o deploy |
@@ -33,16 +38,30 @@ nenhuma variável da B3 os liga (auditoria de 2026-10-22).
 1. ⚠️ **Permissões:** os builds rodam com `umask 022` explícito (em TESTE, um `umask 077` herdado deixou o frontend em
    403 por alguns minutos). Nunca encadear backup restrito e build no mesmo shell.
 2. **Preparar antes da troca** (reduz indisponibilidade), se houver espaço e acesso:
-   - frontend: build num checkout paralelo do mesmo commit (ex.: `git worktree add /var/www/atendechat-next <commit>`),
+   - frontend: build num checkout paralelo do mesmo commit (ex.: `git worktree add /var/www/atendechat-next 07c6b66`),
      depois troca da pasta `build` (`mv` atômico) — sem o 404/403 do build no lugar;
    - backend: `npx tsc --outDir dist-next` no checkout paralelo; na janela, `systemctl stop` → troca `dist` → migrations → `start`.
    Sem checkout paralelo, seguir IMPLANTACAO-TESTE §5 (build no lugar, com o serviço parado).
-3. `git merge --ff-only`; dependências só se `package*.json` mudou.
+3. Código — **nunca** `git pull` nem `git merge origin/main` (levariam ao HEAD mais recente):
+   ```
+   git fetch origin
+   git cat-file -e 07c6b664b9f148c3f1ee3518aeb084992c122c6f^{commit}   # o commit existe localmente
+   git merge-base --is-ancestor HEAD 07c6b66 && echo "avanço sem divergência"   # senão, parar e analisar
+   git status --porcelain --untracked-files=no                              # vazio; senão, parar
+   git checkout --detach 07c6b66
+   git rev-parse HEAD                                                       # 07c6b664b9f148c3f1ee3518aeb084992c122c6f
+   ```
+   Dependências só se `package*.json` mudou entre o commit anterior e `07c6b66`.
 4. Migrations da B3 (`20261020120000`, `20261021120000`) se o preflight indicar; nenhuma outra.
 5. Conferir permissões: `find frontend/build ! -perm -o=r | head` vazio; `curl` do frontend, `version.json` e de um
    `static/js/main.*.js` → 200.
 6. Boot: `[efi] controles de ativação` com `runtime: "production"`, `testRuntimeProductionApiAllowed: false`, fonte
    `legacy_env`, tudo inativo. Checkout legado segue igual.
+7. **Conferência obrigatória da versão** (parar se qualquer item falhar):
+   - `git rev-parse HEAD` → `07c6b664b9f148c3f1ee3518aeb084992c122c6f`;
+   - `backend/dist/build-info.json` → `"commit": "07c6b664b9f148c3f1ee3518aeb084992c122c6f"` e `"dirty": false`;
+   - boot `[efi] controles de ativação` → `currentCommit: "07c6b664b9f148c3f1ee3518aeb084992c122c6f"`;
+   - `frontend/build/version.json` → `"version": "07c6b664b9f1"`.
 
 ## 4. Configuração do slot `production` (painel Super Admin)
 1. Integração Efí: Client ID/Secret, chave Pix (P-2), webhook secret **novo** (≥ 32, diferente do de TESTE), P12 de produção.
@@ -64,8 +83,8 @@ notificações recebidas ficam em retentativa até a homologação (D-P2).
 2. Cadastrar o webhook pelo painel (formato `whToken`), o que **transfere** a `04fd` de TESTE para PRODUÇÃO (B34-T12
    permite o cadastro antes da homologação). Conferir: auditoria `webhook_register` com `conferred: true`;
    `webhook-check` aponta para a API de PRODUÇÃO; chega o evento `teste` / `ignored_not_saas` (`authVia: whToken`).
-3. "Registrar homologação" (slot `production`): referência `RELATORIO-HOMOLOGACAO.md`, commit em execução (P-1) e o id do
-   evento `teste`. A partir daí o checkout Pix volta a funcionar com a B3.
+3. "Registrar homologação" (slot `production`): referência `RELATORIO-HOMOLOGACAO.md`, commit **`07c6b66`** (o mesmo da
+   conferência do §3.7) e o id do evento `teste`. A partir daí o checkout Pix volta a funcionar com a B3.
 
 ## 7. Teste funcional autorizado e monitoramento
 - Uma cobrança real de baixo valor numa empresa interna, **só com autorização**; conferir baixa, renovação e duplicidade

@@ -3,6 +3,7 @@
 **Data:** 2026-10-22 · **Commit homologado:** `8f6babd` (código B3 + Opção B `ed2e097` + liberação TESTE) ·
 **Ambiente:** VPS de TESTE `vmi3163669`, `STREAMHUB_RUNTIME_ENV=test`, slot `homologation`, API Efí **production**
 (Opção B, DECISOES §14). **Resultado: APROVADO** — fluxo Pix de ponta a ponta com dinheiro real (R$ 1,00).
+**Versão implantada e homologada em TESTE para a promoção (P-1):** `07c6b66` (2026-10-22) — ver §3.2.
 
 ## 1. Configuração ativa em TESTE
 | Item | Valor |
@@ -49,6 +50,21 @@ Não executados: varredura (desligada; H11 coberto sem itens pendentes), ensaios
 Fatura 3 (StreamHUB, R$ 1,00, competência 2026-12): cobrança `…bfbde9` gerada às 15:00:12, paga, webhook recebido
 às 15:00:28 e processado em ~0,5 s; fatura `paid`, um pagamento, uma renovação (2026-12-14 → 2027-01-14), nenhum
 item de conciliação. O responsável confirmou a confirmação automática no modal e a fatura como paga. **Aprovado.**
+
+### 3.2 Homologação técnica do pacote de PRODUÇÃO (commit `07c6b66`, 2026-10-22)
+Commit `07c6b664b9f148c3f1ee3518aeb084992c122c6f` implantado na VPS de TESTE por fast-forward a partir de `7385f06`
+(sem migrations nem dependências novas; build `dirty: false`; frontend `07c6b664b9f1`, sem arquivos ilegíveis ao nginx).
+Inclui a liberação `["test","production"]`, B34-T11 (webhook legado) e B34-T12 (bootstrap da homologação).
+| Verificação | Resultado |
+|-------------|-----------|
+| Testes backend (SaasBilling + config, na VPS) | 429/429 |
+| Testes frontend (modal Pix + painel de cobrança, na VPS) | 10/10 |
+| Integração isolada (Postgres e Redis descartáveis, Efí simulada) | 210/210 |
+| Integração Efí após o deploy | runtime `test`, fonte `database`, v2 e pipeline ativos, varredura desligada, worker e Redis ok, slot utilizável |
+| Webhook da chave `****04fd` | permaneceu apontando para TESTE (`pointsToThisBackend: true`) |
+| Estado financeiro antes × depois | idêntico (3 faturas pagas, 3 pagamentos, 3 renovações, 2 tentativas, 3 eventos, 0 conciliação); nenhuma cobrança criada |
+| Liberação `production` com controles no default | fonte `legacy_env`, v2/pipeline/varredura inativos; boleto, cartão e settle desligados |
+**Resultado: APROVADO, sem regressões.**
 
 ## 4. Pendências para PRODUÇÃO
 Release de PRODUÇÃO, proteção do webhook legado (B34-T11), desbloqueio do bootstrap da homologação (B34-T12),
