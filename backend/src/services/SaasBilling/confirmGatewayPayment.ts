@@ -482,11 +482,19 @@ export async function confirmGatewayPayment(
     }
     if (!result.alreadyApplied && result.payment && !result.cancelledInvoiceReceipt) {
       try {
-        const company = await Company.findByPk(result.payment.companyId);
+        // A sala chega a todos os usuários da empresa: só o que os consumidores usam (sem internalNotes etc.).
+        const company = await Company.findByPk(result.payment.companyId, {
+          attributes: ["id", "dueDate", "status"]
+        });
         const io = getIO();
         io.to(`company-${result.payment.companyId}-mainchannel`).emit(
           `company-${result.payment.companyId}-payment`,
-          { action: "paid", company }
+          {
+            action: "paid",
+            company: company
+              ? { id: company.id, dueDate: company.dueDate, status: company.status }
+              : null
+          }
         );
       } catch (err) {
         logger.warn({ err }, "[SaasBilling] socket_emit_failed");
