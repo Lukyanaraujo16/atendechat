@@ -2756,7 +2756,7 @@ const messages = {
             "Esta cobrança pode ter expirado. Feche, volte a Financeiro e gere um novo PIX.",
           paidToast: "Pagamento confirmado! Nova data: {{date}}",
           paidTitle: "Pagamento confirmado!",
-          paidRenewed: "Assinatura renovada até {{date}}.",
+          paidActiveUntil: "Sua assinatura está ativa até {{date}}.",
           paidCloseHint: "A fatura foi baixada. Você já pode fechar esta janela.",
           checkRetrying: "Não foi possível consultar o pagamento agora. Tentando novamente…",
           instructions:

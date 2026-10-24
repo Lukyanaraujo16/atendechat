@@ -2531,7 +2531,7 @@ const messages = {
             "Este cobro puede haber caducado. Cierre, vuelva a Facturación y genere otro PIX.",
           paidToast: "¡Pago confirmado! Nueva fecha: {{date}}",
           paidTitle: "¡Pago confirmado!",
-          paidRenewed: "Suscripción renovada hasta {{date}}.",
+          paidActiveUntil: "Tu suscripción está activa hasta {{date}}.",
           paidCloseHint: "La factura fue liquidada. Ya puede cerrar esta ventana.",
           checkRetrying: "No fue posible consultar el pago ahora. Reintentando…",
           instructions:

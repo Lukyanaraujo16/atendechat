@@ -17,6 +17,8 @@ const PIX_EXPIRY_SEC = 3600;
 export const PIX_STATUS_POLL_MS = 10000;
 /** O backend emite `paid` (confirmGatewayPayment); `CONCLUIDA` mantido por compatibilidade. */
 const PAID_SOCKET_ACTIONS = ["paid", "CONCLUIDA"];
+// Só para texto renderizado pelo React (que já escapa): sem isso o i18next troca "/" por "&#x2F;" na data.
+const REACT_TEXT_INTERPOLATION = { interpolation: { escapeValue: false } };
 
 function formatPixTotal(pix) {
   if (!pix?.valor) return "—";
@@ -155,6 +157,7 @@ function CheckoutSuccess(props) {
           {i18n.t("checkoutPage.pix.invoiceRef", {
             id: invoice.id,
             detail: invoice.detail || "",
+            ...REACT_TEXT_INTERPOLATION,
           })}
         </Typography>
       )}
@@ -198,8 +201,9 @@ function CheckoutSuccess(props) {
             </Typography>
             {renewedUntil && (
               <Typography variant="body2" component="p">
-                {i18n.t("checkoutPage.pix.paidRenewed", {
+                {i18n.t("checkoutPage.pix.paidActiveUntil", {
                   date: dateToClient(renewedUntil),
+                  ...REACT_TEXT_INTERPOLATION,
                 })}
               </Typography>
             )}

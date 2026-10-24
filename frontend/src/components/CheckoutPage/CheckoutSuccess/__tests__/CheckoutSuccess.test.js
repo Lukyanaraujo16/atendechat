@@ -30,12 +30,17 @@ function fakeSocketManager() {
 const flush = () => act(async () => {});
 const tick = (ms) => act(async () => { jest.advanceTimersByTime(ms); });
 
-function renderModal(socket) {
+function renderModal(socket, invoice = INVOICE) {
   return render(
     <SocketContext.Provider value={socket.manager}>
-      <CheckoutSuccess pix={PIX} invoice={INVOICE} />
+      <CheckoutSuccess pix={PIX} invoice={invoice} />
     </SocketContext.Provider>
   );
+}
+
+async function confirmViaSocket(s, dueDate) {
+  mockApiGet.mockResolvedValue({ data: { id: 2, status: "paid" } });
+  await act(async () => { s.emit("company-1-payment", { action: "paid", company: { dueDate } }); });
 }
 
 describe("CheckoutSuccess — confirmação do Pix", () => {
@@ -70,16 +75,43 @@ describe("CheckoutSuccess — confirmação do Pix", () => {
     expect(mockApiGet.mock.calls.length).toBe(calls);
   });
 
-  it("evento de socket `paid` dispara consulta imediata e mostra a renovação", async () => {
+  it("evento de socket `paid` dispara consulta imediata e mostra o vencimento renovado", async () => {
     mockApiGet.mockResolvedValue({ data: { id: 2, status: "open" } });
     const s = fakeSocketManager();
     renderModal(s);
     await flush();
 
-    mockApiGet.mockResolvedValue({ data: { id: 2, status: "paid" } });
-    await act(async () => { s.emit("company-1-payment", { action: "paid", company: { dueDate: "2026-12-14" } }); });
+    await confirmViaSocket(s, "2026-12-14");
     expect(screen.getByText("Pagamento confirmado!")).toBeTruthy();
-    expect(screen.getByText(/Assinatura renovada até/)).toBeTruthy();
+    expect(screen.getByText("Sua assinatura está ativa até 14/12/2026.")).toBeTruthy();
+  });
+
+  it("período já coberto (renovação dispensada): mostra o vencimento atual sem dizer que renovou", async () => {
+    mockApiGet.mockResolvedValue({ data: { id: 2, status: "open" } });
+    const s = fakeSocketManager();
+    renderModal(s);
+    await flush();
+
+    await confirmViaSocket(s, "2093-03-14");
+    expect(screen.getByText("Sua assinatura está ativa até 14/03/2093.")).toBeTruthy();
+    expect(screen.queryByText(/renovada/)).toBeNull();
+    expect(document.body.innerHTML).not.toMatch(/&amp;#x2F;|&#x2F;/);
+  });
+
+  it("descrição com / e & aparece literal, e HTML interpolado não é interpretado", async () => {
+    mockApiGet.mockResolvedValue({ data: { id: 2, status: "open" } });
+    const s = fakeSocketManager();
+    const { container } = renderModal(s, { id: 7, detail: 'Plano A/B & <b id="x">Extra</b>' });
+    await flush();
+
+    expect(screen.getByText('Fatura #7 — Plano A/B & <b id="x">Extra</b>')).toBeTruthy();
+    expect(container.querySelector("#x")).toBeNull();
+    expect(container.innerHTML).not.toMatch(/&amp;#x2F;|&#x2F;|&amp;amp;/);
+  });
+
+  it("o escape padrão do i18next segue ligado fora do modal", () => {
+    const { i18n } = require("../../../../translate/i18n");
+    expect(i18n.t("checkoutPage.pix.invoiceRef", { id: 1, detail: "A/B" })).toBe("Fatura #1 — A&#x2F;B");
   });
 
   it("evento de pagamento de outra fatura não confirma esta (fonte da verdade é a fatura)", async () => {
