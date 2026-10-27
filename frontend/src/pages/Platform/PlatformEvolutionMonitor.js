@@ -37,6 +37,7 @@ const ALL = "all";
 const NO_COMPANY = "none";
 const STATES = ["connected", "connecting", "disconnected"];
 const STATE_COLORS = { connected: "#2e7d32", connecting: "#ed6c02", disconnected: "#c62828" };
+const API_STATUS_COLORS = { online: STATE_COLORS.connected, offline: STATE_COLORS.disconnected };
 
 const useStyles = makeStyles((theme) => ({
   root: { display: "flex", flexDirection: "column", gap: theme.spacing(3), width: "100%" },
@@ -49,6 +50,17 @@ const useStyles = makeStyles((theme) => ({
   },
   kpiLabel: { fontSize: "0.8125rem", fontWeight: 500, color: theme.palette.text.secondary },
   kpiValue: { fontWeight: 700, fontSize: "1.75rem", lineHeight: 1.15, marginTop: theme.spacing(0.5) },
+  apiStatus: {
+    display: "flex",
+    alignItems: "center",
+    gap: theme.spacing(0.75),
+    fontWeight: 600,
+    fontSize: "1rem",
+    lineHeight: 1.25,
+    marginTop: theme.spacing(0.5),
+  },
+  apiDot: { width: 8, height: 8, borderRadius: "50%", backgroundColor: "currentColor", flexShrink: 0 },
+  apiDetail: { fontSize: "0.75rem", lineHeight: 1.3, color: theme.palette.text.secondary },
   filters: { display: "flex", flexWrap: "wrap", gap: theme.spacing(2), marginBottom: theme.spacing(2) },
   filter: { minWidth: 200 },
   stateChip: { color: "#fff", fontWeight: 600 },
@@ -91,6 +103,35 @@ function Kpi({ label, value }) {
       </Typography>
       <Typography className={classes.kpiValue} component="div">
         {value}
+      </Typography>
+    </Box>
+  );
+}
+
+function ApiStatusKpi({ label, apiInfo, t }) {
+  const classes = useStyles();
+  const status = apiInfo?.status;
+  const latency = status === "online" && apiInfo.latencyMs != null ? `${apiInfo.latencyMs} ms` : "—";
+  return (
+    <Box className={classes.kpiCard}>
+      <Typography className={classes.kpiLabel} component="div">
+        {label}
+      </Typography>
+      <Typography
+        className={classes.apiStatus}
+        component="div"
+        style={{ color: API_STATUS_COLORS[status] }}
+        color={API_STATUS_COLORS[status] ? undefined : "textSecondary"}
+      >
+        <span className={classes.apiDot} aria-hidden="true" />
+        {t(`api.${status}`)}
+      </Typography>
+      <Typography className={classes.apiDetail} component="div">
+        {t("apiLatency")}: {latency}
+      </Typography>
+      {/* Uptime real chega com o monitoramento de infraestrutura (Fase 2). */}
+      <Typography className={classes.apiDetail} component="div">
+        {t("apiUptime")}: {t("comingSoon")}
       </Typography>
     </Box>
   );
@@ -185,15 +226,14 @@ export default function PlatformEvolutionMonitor() {
                 ["connecting", indicators.connecting],
                 ["companies", indicators.companies],
                 ["unlinked", indicators.unlinked],
-                [
-                  "apiStatus",
-                  `${t(`api.${apiStatus}`)}${apiInfo.latencyMs != null && apiStatus === "online" ? ` · ${apiInfo.latencyMs} ms` : ""}`,
-                ],
               ].map(([key, value]) => (
                 <Grid item xs={6} sm={4} md key={key}>
                   <Kpi label={t(`kpi.${key}`)} value={value} />
                 </Grid>
               ))}
+              <Grid item xs={6} sm={4} md>
+                <ApiStatusKpi label={t("kpi.apiStatus")} apiInfo={apiInfo} t={t} />
+              </Grid>
             </Grid>
 
             <AppSectionCard>

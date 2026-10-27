@@ -105,6 +105,15 @@ describe("PlatformEvolutionMonitor", () => {
     expect(screen.getByText(/42 ms/)).toBeInTheDocument();
   });
 
+  it("card da API separa status, latência e tempo online", async () => {
+    mockGet.mockResolvedValue({ data: snapshot });
+    render(<PlatformEvolutionMonitor />);
+    await screen.findByText("streamhub-c1-w10");
+    expect(screen.getByText("Online")).toHaveStyle({ color: "#2e7d32" });
+    expect(screen.getByText(/Latência: 42 ms/)).toBeInTheDocument();
+    expect(screen.getByText(/Tempo online: Em breve/)).toBeInTheDocument();
+  });
+
   it("filtra a tabela pela busca", async () => {
     mockGet.mockResolvedValue({ data: snapshot });
     render(<PlatformEvolutionMonitor />);
@@ -127,6 +136,8 @@ describe("PlatformEvolutionMonitor", () => {
     });
     render(<PlatformEvolutionMonitor />);
     expect(await screen.findByText(/ERR_EVOLUTION_TIMEOUT/)).toBeInTheDocument();
+    expect(screen.getByText("Indisponível")).toHaveStyle({ color: "#c62828" });
+    expect(screen.getByText(/Latência: —/)).toBeInTheDocument();
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
   });
 
