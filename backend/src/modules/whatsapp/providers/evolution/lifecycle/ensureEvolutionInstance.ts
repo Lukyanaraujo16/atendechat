@@ -42,7 +42,7 @@ export function assertSafeEvolutionInstanceName(name: string): string {
   return trimmed;
 }
 
-function listFromFetch(data: unknown): Array<Record<string, unknown>> {
+export function listFromFetch(data: unknown): Array<Record<string, unknown>> {
   if (data == null) return [];
   if (Array.isArray(data)) {
     return data.filter(

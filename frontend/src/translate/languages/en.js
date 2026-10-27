@@ -5231,10 +5231,57 @@ const messages = {
 					billingAutomation: "Billing automation",
 					backup: "Backup",
 					systemTools: "Monitoring",
+					evolutionMonitor: "Evolution Monitoring",
 					helps: "Help content",
 					announcements: "Announcements",
 					pushNotifications: "Push notifications",
 					emailSmtp: "Email / SMTP",
+				},
+				evolutionMonitor: {
+				  "title": "Evolution Monitoring",
+				  "subtitle": "WhatsApp instances on the central Evolution server and their companies. Read-only; refreshes every 60 seconds.",
+				  "lastUpdate": "Last update",
+				  "refresh": "Refresh now",
+				  "refreshing": "Refreshing…",
+				  "loading": "Loading instances…",
+				  "requestFailed": "Could not refresh right now. Showing the last data received.",
+				  "apiOffline": "Evolution API unavailable. Instance data could not be retrieved.",
+				  "apiNotConfigured": "Central Evolution is not configured on this server.",
+				  "empty": "No instances found on Evolution.",
+				  "emptyFiltered": "No instances match the filters.",
+				  "noCompany": "No company identified",
+				  "kpi": {
+				    "total": "Total instances",
+				    "connected": "Connected",
+				    "disconnected": "Disconnected",
+				    "connecting": "Connecting",
+				    "companies": "Companies using Evolution",
+				    "unlinked": "No company identified",
+				    "apiStatus": "Evolution API"
+				  },
+				  "api": {
+				    "online": "Online",
+				    "offline": "Unavailable",
+				    "not_configured": "Not configured"
+				  },
+				  "states": {
+				    "connected": "Connected",
+				    "connecting": "Connecting",
+				    "disconnected": "Disconnected"
+				  },
+				  "filters": {
+				    "company": "Company",
+				    "state": "Connection state",
+				    "search": "Search number or instance",
+				    "all": "All"
+				  },
+				  "columns": {
+				    "company": "Company",
+				    "number": "WhatsApp number",
+				    "instance": "Instance name",
+				    "state": "Connection state",
+				    "lastUpdate": "Last update"
+				  }
 				},
 				systemTools: {
 					title: "Monitoring and updates",

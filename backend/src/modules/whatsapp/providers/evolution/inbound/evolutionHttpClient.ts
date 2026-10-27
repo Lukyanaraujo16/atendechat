@@ -20,10 +20,14 @@ export type EvolutionGetBase64Result = {
   mimetype?: string | null;
 };
 
-function createAxiosClient(baseUrl: string, apiKey: string): AxiosInstance {
+function createAxiosClient(
+  baseUrl: string,
+  apiKey: string,
+  timeoutMs: number = EVOLUTION_MEDIA_LIMITS.downloadTimeoutMs
+): AxiosInstance {
   return axios.create({
     baseURL: baseUrl.replace(/\/+$/, ""),
-    timeout: EVOLUTION_MEDIA_LIMITS.downloadTimeoutMs,
+    timeout: timeoutMs,
     maxRedirects: 0,
     headers: {
       apikey: apiKey,
@@ -289,6 +293,51 @@ export async function evolutionConnectionState(input: {
     whatsappId: input.whatsappId,
     path: "/instance/connectionState/{instance}"
   });
+}
+
+/**
+ * GET /instance/fetchInstances (todas) com a config central — somente leitura,
+ * usado pelo monitoramento Super Admin. Não depende de whatsappId.
+ */
+export async function evolutionCentralFetchAllInstances(input: {
+  baseUrl: string;
+  apiKey: string;
+  timeoutMs: number;
+}): Promise<unknown> {
+  const client = createAxiosClient(
+    input.baseUrl,
+    input.apiKey,
+    input.timeoutMs
+  );
+  let response;
+  try {
+    response = await client.get("/instance/fetchInstances");
+  } catch (err) {
+    const code = (err as { code?: string })?.code;
+    if (code === "ECONNABORTED" || code === "ETIMEDOUT") {
+      throw new EvolutionHttpError(
+        "ERR_EVOLUTION_TIMEOUT",
+        "Timeout ao chamar Evolution API"
+      );
+    }
+    throw new EvolutionHttpError(
+      "ERR_EVOLUTION_REQUEST_FAILED",
+      "Falha de rede ao chamar Evolution API"
+    );
+  }
+  if (response.status === 401 || response.status === 403) {
+    throw new EvolutionHttpError(
+      "ERR_EVOLUTION_UNAUTHORIZED",
+      `Evolution HTTP ${response.status}`
+    );
+  }
+  if (response.status < 200 || response.status >= 300) {
+    throw new EvolutionHttpError(
+      "ERR_EVOLUTION_API_ERROR",
+      `Evolution HTTP ${response.status}`
+    );
+  }
+  return response.data;
 }
 
 /**

@@ -5456,10 +5456,57 @@ const messages = {
           billingAutomation: "Automação de faturamento",
           backup: "Backup",
           systemTools: "Monitoramento",
+          evolutionMonitor: "Monitoramento Evolution",
           helps: "Ajuda (conteúdos)",
           announcements: "Informativos",
           pushNotifications: "Notificações push",
           emailSmtp: "E-mail / SMTP",
+        },
+        evolutionMonitor: {
+          "title": "Monitoramento Evolution",
+          "subtitle": "Instâncias WhatsApp na Evolution central e empresas vinculadas. Somente leitura; atualiza a cada 60 segundos.",
+          "lastUpdate": "Última atualização",
+          "refresh": "Atualizar agora",
+          "refreshing": "Atualizando…",
+          "loading": "Carregando instâncias…",
+          "requestFailed": "Não foi possível atualizar agora. Exibindo os últimos dados recebidos.",
+          "apiOffline": "API Evolution indisponível. Os dados das instâncias não puderam ser consultados.",
+          "apiNotConfigured": "Evolution central não configurada neste servidor.",
+          "empty": "Nenhuma instância encontrada na Evolution.",
+          "emptyFiltered": "Nenhuma instância corresponde aos filtros.",
+          "noCompany": "Sem empresa identificada",
+          "kpi": {
+            "total": "Total de instâncias",
+            "connected": "Conectadas",
+            "disconnected": "Desconectadas",
+            "connecting": "Em conexão",
+            "companies": "Empresas usando Evolution",
+            "unlinked": "Sem empresa identificada",
+            "apiStatus": "API Evolution"
+          },
+          "api": {
+            "online": "Online",
+            "offline": "Indisponível",
+            "not_configured": "Não configurada"
+          },
+          "states": {
+            "connected": "Conectada",
+            "connecting": "Em conexão",
+            "disconnected": "Desconectada"
+          },
+          "filters": {
+            "company": "Empresa",
+            "state": "Estado da conexão",
+            "search": "Buscar número ou instância",
+            "all": "Todos"
+          },
+          "columns": {
+            "company": "Empresa",
+            "number": "Número WhatsApp",
+            "instance": "Nome da instância",
+            "state": "Estado da conexão",
+            "lastUpdate": "Última atualização"
+          }
         },
         systemTools: {
           title: "Monitoramento e atualizações",

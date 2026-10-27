@@ -14,6 +14,13 @@ systemAdminRoutes.get(
 );
 
 systemAdminRoutes.get(
+  "/system/evolution-monitor",
+  isAuth,
+  isSuper,
+  SystemMonitorController.evolution
+);
+
+systemAdminRoutes.get(
   "/system/update/current",
   isAuth,
   isSuper,
