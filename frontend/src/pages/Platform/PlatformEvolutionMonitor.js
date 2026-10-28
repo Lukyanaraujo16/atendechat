@@ -23,6 +23,7 @@ import MainContainer from "../../components/MainContainer";
 import api from "../../services/api";
 import { i18n } from "../../translate/i18n";
 import PlatformPageHeader from "./PlatformPageHeader";
+import { InfraSection, formatDuration } from "./EvolutionInfraPanel";
 import {
   AppSectionCard,
   AppActionBar,
@@ -108,10 +109,11 @@ function Kpi({ label, value }) {
   );
 }
 
-function ApiStatusKpi({ label, apiInfo, t }) {
+function ApiStatusKpi({ label, apiInfo, uptimeSeconds, t }) {
   const classes = useStyles();
   const status = apiInfo?.status;
   const latency = status === "online" && apiInfo.latencyMs != null ? `${apiInfo.latencyMs} ms` : "—";
+  const uptime = formatDuration(uptimeSeconds);
   return (
     <Box className={classes.kpiCard}>
       <Typography className={classes.kpiLabel} component="div">
@@ -129,9 +131,14 @@ function ApiStatusKpi({ label, apiInfo, t }) {
       <Typography className={classes.apiDetail} component="div">
         {t("apiLatency")}: {latency}
       </Typography>
-      {/* Uptime real chega com o monitoramento de infraestrutura (Fase 2). */}
+      {/* Uptime do contêiner Evolution API (coletor); sem amostra recente → "—". */}
       <Typography className={classes.apiDetail} component="div">
-        {t("apiUptime")}: {t("comingSoon")}
+        {t("apiUptime")}:{" "}
+        {uptime || (
+          <span title={t("infra.unavailable")} aria-label={t("infra.unavailable")}>
+            —
+          </span>
+        )}
       </Typography>
     </Box>
   );
@@ -232,9 +239,16 @@ export default function PlatformEvolutionMonitor() {
                 </Grid>
               ))}
               <Grid item xs={6} sm={4} md>
-                <ApiStatusKpi label={t("kpi.apiStatus")} apiInfo={apiInfo} t={t} />
+                <ApiStatusKpi
+                  label={t("kpi.apiStatus")}
+                  apiInfo={apiInfo}
+                  uptimeSeconds={data.infra?.services?.api?.uptimeSeconds}
+                  t={t}
+                />
               </Grid>
             </Grid>
+
+            <InfraSection infra={data.infra} apiInfo={apiInfo} refreshKey={data.generatedAt} />
 
             <AppSectionCard>
               <Box className={classes.filters}>

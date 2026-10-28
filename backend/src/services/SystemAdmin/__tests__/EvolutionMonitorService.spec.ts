@@ -1,4 +1,5 @@
 import {
+  extractEvolutionVersion,
   extractWhatsappNumber,
   getEvolutionMonitorSnapshot,
   resetEvolutionMonitorCache
@@ -6,6 +7,7 @@ import {
 import { EvolutionHttpError } from "../../../modules/whatsapp/providers/evolution/inbound/evolutionHttpClient";
 
 const mockFetchAll = jest.fn();
+const mockServerInfo = jest.fn();
 const mockFindAll = jest.fn();
 
 jest.mock("../../../models/WhatsappEvolutionCredential", () => ({
@@ -34,7 +36,9 @@ jest.mock(
     return {
       EvolutionHttpError: MockEvolutionHttpError,
       evolutionCentralFetchAllInstances: (...args: any[]) =>
-        mockFetchAll(...args)
+        mockFetchAll(...args),
+      evolutionCentralFetchServerInfo: (...args: any[]) =>
+        mockServerInfo(...args)
     };
   }
 );
@@ -122,6 +126,11 @@ describe("EvolutionMonitorService", () => {
       EVOLUTION_CENTRAL_API_KEY: SECRET_KEY
     };
     mockFetchAll.mockResolvedValue(remoteInstances);
+    mockServerInfo.mockResolvedValue({
+      status: 200,
+      message: "Welcome to the Evolution API, it is working!",
+      version: "2.3.7"
+    });
     mockFindAll.mockResolvedValue(credentials);
   });
 
@@ -205,6 +214,32 @@ describe("EvolutionMonitorService", () => {
       apiKey: SECRET_KEY,
       timeoutMs: 10000
     });
+  });
+
+  it("informa a versão da Evolution (GET /)", async () => {
+    const snap = await getEvolutionMonitorSnapshot();
+    expect(snap.api.version).toBe("2.3.7");
+    expect(mockServerInfo).toHaveBeenCalledWith({
+      baseUrl: "http://127.0.0.1:8081",
+      apiKey: SECRET_KEY,
+      timeoutMs: 10000
+    });
+  });
+
+  it("falha ao ler a versão não derruba o status online", async () => {
+    mockServerInfo.mockRejectedValue(new Error("boom"));
+    const snap = await getEvolutionMonitorSnapshot();
+    expect(snap.api).toMatchObject({ status: "online", version: null });
+  });
+
+  it.each([
+    [{ version: "2.3.7" }, "2.3.7"],
+    [{ version: "v2.10.0-rc1" }, "v2.10.0-rc1"],
+    [{ version: "<script>" }, null],
+    [{}, null],
+    [null, null]
+  ])("extractEvolutionVersion(%p) → %p", (payload, expected) => {
+    expect(extractEvolutionVersion(payload)).toBe(expected);
   });
 
   it("API indisponível → estado offline controlado, sem lançar", async () => {

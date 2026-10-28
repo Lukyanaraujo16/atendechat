@@ -295,15 +295,16 @@ export async function evolutionConnectionState(input: {
   });
 }
 
-/**
- * GET /instance/fetchInstances (todas) com a config central — somente leitura,
- * usado pelo monitoramento Super Admin. Não depende de whatsappId.
- */
-export async function evolutionCentralFetchAllInstances(input: {
+type EvolutionCentralInput = {
   baseUrl: string;
   apiKey: string;
   timeoutMs: number;
-}): Promise<unknown> {
+};
+
+async function evolutionCentralGet(
+  input: EvolutionCentralInput,
+  path: string
+): Promise<unknown> {
   const client = createAxiosClient(
     input.baseUrl,
     input.apiKey,
@@ -311,7 +312,7 @@ export async function evolutionCentralFetchAllInstances(input: {
   );
   let response;
   try {
-    response = await client.get("/instance/fetchInstances");
+    response = await client.get(path);
   } catch (err) {
     const code = (err as { code?: string })?.code;
     if (code === "ECONNABORTED" || code === "ETIMEDOUT") {
@@ -338,6 +339,23 @@ export async function evolutionCentralFetchAllInstances(input: {
     );
   }
   return response.data;
+}
+
+/**
+ * GET /instance/fetchInstances (todas) com a config central — somente leitura,
+ * usado pelo monitoramento Super Admin. Não depende de whatsappId.
+ */
+export async function evolutionCentralFetchAllInstances(
+  input: EvolutionCentralInput
+): Promise<unknown> {
+  return evolutionCentralGet(input, "/instance/fetchInstances");
+}
+
+/** GET / — informações públicas do servidor Evolution (versão). Somente leitura. */
+export async function evolutionCentralFetchServerInfo(
+  input: EvolutionCentralInput
+): Promise<unknown> {
+  return evolutionCentralGet(input, "/");
 }
 
 /**

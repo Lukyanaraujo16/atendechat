@@ -17,7 +17,7 @@ export const FULL_UPDATE_SEQUENCE: FullUpdateStepDef[] = [
   { action: "backend_build", stepLabel: "npm run build (backend)" },
   { action: "backend_migrate", stepLabel: "npm run db:migrate (backend)" },
   { action: "frontend_npm_install", stepLabel: "npm install (frontend)" },
-  { action: "frontend_build", stepLabel: "npm run build (frontend)" },
+  { action: "frontend_build", stepLabel: "build e publicação atômica (frontend)" },
   { action: "backend_restart", stepLabel: "Restart backend" }
 ];
 

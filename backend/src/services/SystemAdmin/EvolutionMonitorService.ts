@@ -8,7 +8,8 @@ import {
 } from "../../modules/whatsapp/providers/evolution/central/evolutionCentralConfig";
 import {
   EvolutionHttpError,
-  evolutionCentralFetchAllInstances
+  evolutionCentralFetchAllInstances,
+  evolutionCentralFetchServerInfo
 } from "../../modules/whatsapp/providers/evolution/inbound/evolutionHttpClient";
 import { listFromFetch } from "../../modules/whatsapp/providers/evolution/lifecycle/ensureEvolutionInstance";
 import { normalizeEvolutionConnectionState } from "../../modules/whatsapp/providers/evolution/lifecycle/mapEvolutionConnectionState";
@@ -45,6 +46,7 @@ export type EvolutionMonitorSnapshot = {
     status: EvolutionMonitorApiStatus;
     latencyMs: number | null;
     errorCode: string | null;
+    version: string | null;
   };
   indicators: {
     total: number;
@@ -75,6 +77,14 @@ export function extractWhatsappNumber(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
   const digits = raw.split("@")[0].split(":")[0].replace(/\D/g, "");
   return /^\d{8,15}$/.test(digits) ? digits : null;
+}
+
+/** GET / da Evolution → "2.3.7". Só aceita formato de versão. */
+export function extractEvolutionVersion(payload: unknown): string | null {
+  const raw = (payload as { version?: unknown } | null)?.version;
+  return typeof raw === "string" && /^v?\d+(\.\d+){0,3}[\w.+-]{0,16}$/.test(raw)
+    ? raw
+    : null;
 }
 
 function toMonitorState(raw: unknown): EvolutionMonitorState {
@@ -152,7 +162,7 @@ function errorSnapshot(
 ): EvolutionMonitorSnapshot {
   return {
     generatedAt: new Date().toISOString(),
-    api: { status, latencyMs, errorCode },
+    api: { status, latencyMs, errorCode, version: null },
     indicators: buildIndicators([]),
     instances: []
   };
@@ -177,14 +187,19 @@ async function buildSnapshot(): Promise<EvolutionMonitorSnapshot> {
     );
   }
 
+  const central = {
+    baseUrl: config.baseUrl,
+    apiKey: config.apiKey,
+    timeoutMs: FETCH_TIMEOUT_MS
+  };
+  // Versão é informativa: falha aqui não muda o status da API.
+  const versionPromise = evolutionCentralFetchServerInfo(central)
+    .then(extractEvolutionVersion)
+    .catch(() => null);
   const startedAt = Date.now();
   let payload: unknown;
   try {
-    payload = await evolutionCentralFetchAllInstances({
-      baseUrl: config.baseUrl,
-      apiKey: config.apiKey,
-      timeoutMs: FETCH_TIMEOUT_MS
-    });
+    payload = await evolutionCentralFetchAllInstances(central);
   } catch (err) {
     const code =
       err instanceof EvolutionHttpError
@@ -194,6 +209,7 @@ async function buildSnapshot(): Promise<EvolutionMonitorSnapshot> {
     return errorSnapshot("offline", code, Date.now() - startedAt);
   }
   const latencyMs = Date.now() - startedAt;
+  const version = await versionPromise;
 
   const credentials = await loadCredentialIndex();
   const instances: EvolutionMonitorInstance[] = listFromFetch(payload)
@@ -224,7 +240,7 @@ async function buildSnapshot(): Promise<EvolutionMonitorSnapshot> {
 
   return {
     generatedAt: new Date().toISOString(),
-    api: { status: "online", latencyMs, errorCode: null },
+    api: { status: "online", latencyMs, errorCode: null, version },
     indicators: buildIndicators(instances),
     instances
   };

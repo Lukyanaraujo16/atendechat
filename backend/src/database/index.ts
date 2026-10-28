@@ -141,6 +141,7 @@ import AiProviderCredential from "../models/AiProviderCredential";
 import PlatformEfiConfig from "../models/PlatformEfiConfig";
 import PlatformEfiConfigAudit from "../models/PlatformEfiConfigAudit";
 import WhatsappEvolutionCredential from "../models/WhatsappEvolutionCredential";
+import EvolutionMetricSample from "../models/EvolutionMetricSample";
 import AutomationCognitiveMemory from "../models/AutomationCognitiveMemory";
 import AutomationMultiAgent from "../models/AutomationMultiAgent";
 import AutomationMultiAgentVersion from "../models/AutomationMultiAgentVersion";
@@ -310,6 +311,7 @@ const models = [
   PlatformEfiConfig,
   PlatformEfiConfigAudit,
   WhatsappEvolutionCredential,
+  EvolutionMetricSample,
   AutomationCognitiveMemory,
   AutomationMultiAgent,
   AutomationMultiAgentVersion,

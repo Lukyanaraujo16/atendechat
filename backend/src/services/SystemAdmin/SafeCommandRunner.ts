@@ -100,12 +100,13 @@ export const SYSTEM_UPDATE_COMMANDS: Record<
     label: "npm install (frontend)",
     cwdKey: "frontend"
   },
+  // Compila fora da pasta publicada e troca a versão atomicamente (docs/MONITORAMENTO-EVOLUTION.md).
   frontend_build: {
-    cmd: "npm",
-    args: ["run", "build"],
-    timeoutMs: 600_000,
-    label: "npm run build (frontend)",
-    cwdKey: "frontend"
+    cmd: "bash",
+    args: ["scripts/publish-frontend.sh"],
+    timeoutMs: 900_000,
+    label: "scripts/publish-frontend.sh (frontend)",
+    cwdKey: "root"
   }
 };
 

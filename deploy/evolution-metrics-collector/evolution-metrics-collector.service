@@ -1,0 +1,46 @@
+# Coletor de métricas da VPS Evolution (Monitoramento Evolution — AtendeChat).
+# Somente leitura: /proc, /sys/fs/cgroup e <docker-root>/containers/*/config.v2.json.
+# Roda como root SEM capabilities (só para ler os arquivos 0600 do Docker, que são do root);
+# não acessa o socket do Docker e não escreve em disco.
+[Unit]
+Description=AtendeChat - coletor de metricas da VPS Evolution
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/evolution-metrics-collector/collector.env
+ExecStart=/usr/bin/python3 -I /opt/evolution-metrics-collector/evolution_metrics_collector.py
+Restart=always
+RestartSec=15
+
+User=root
+CapabilityBoundingSet=
+AmbientCapabilities=
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+InaccessiblePaths=-/run/docker.sock -/var/run/docker.sock -/run/containerd
+UMask=0077
+MemoryMax=64M
+CPUQuota=10%
+TasksMax=8
+
+[Install]
+WantedBy=multi-user.target

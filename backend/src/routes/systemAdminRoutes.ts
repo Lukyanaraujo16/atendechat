@@ -21,6 +21,19 @@ systemAdminRoutes.get(
 );
 
 systemAdminRoutes.get(
+  "/system/evolution-monitor/history",
+  isAuth,
+  isSuper,
+  SystemMonitorController.evolutionHistory
+);
+
+// Coletor da VPS Evolution: autenticação própria por token (sem sessão de usuário).
+systemAdminRoutes.post(
+  "/system/evolution-metrics",
+  SystemMonitorController.evolutionMetricsIngest
+);
+
+systemAdminRoutes.get(
   "/system/update/current",
   isAuth,
   isSuper,
