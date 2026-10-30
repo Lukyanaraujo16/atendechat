@@ -21,7 +21,9 @@ import api from "../../services/api";
 import { i18n } from "../../translate/i18n";
 import { AppSectionCard } from "../../ui";
 
-const t = (key, opts) => i18n.t(`platform.evolutionMonitor.infra.${key}`, opts);
+// Só texto renderizado pelo React (que já escapa): sem isso o i18next troca "/" por "&#x2F;" nas datas.
+export const REACT_TEXT_INTERPOLATION = { interpolation: { escapeValue: false } };
+const t = (key, opts) => i18n.t(`platform.evolutionMonitor.infra.${key}`, { ...opts, ...REACT_TEXT_INTERPOLATION });
 
 const HEALTH_COLORS = { ok: "#2e7d32", warn: "#ed6c02", error: "#c62828", unknown: "#9e9e9e" };
 
@@ -96,14 +98,25 @@ export function formatDuration(seconds) {
   return `${s}s`;
 }
 
-const formatPercent = (v) =>
-  v == null ? "—" : `${Number(v).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`;
+export const formatPercent = (v) =>
+  v == null || !Number.isFinite(Number(v))
+    ? "—"
+    : `${Number(v).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`;
 
-function formatDateTime(iso) {
-  if (!iso) return "—";
-  const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString("pt-BR");
+/** ISO (UTC) → "19/10/2026, 07:59:56" no fuso do navegador. Ausente/inválida/epoch → null. */
+export function parseDisplayDate(value) {
+  if (value == null || value === "") return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) || date.getTime() <= 0 ? null : date;
 }
+
+export function formatDateTime(value, options) {
+  const date = parseDisplayDate(value);
+  return date ? date.toLocaleString("pt-BR", options) : "—";
+}
+
+/** "Boot: 19/10/2026, 07:59:56" — sem data válida não mostra o rótulo vazio. */
+const dateDetail = (key, value) => (parseDisplayDate(value) ? t(key, { date: formatDateTime(value) }) : null);
 
 // --------------------------------------------------------------------- saúde
 
@@ -184,7 +197,10 @@ export function InfraKpis({ infra }) {
       key: "hostCpu",
       value: formatPercent(host?.cpuPercent),
       detail: host
-        ? t("cpuDetail", { cores: host.cpuCores, load: host.loadAverage.map((v) => v.toFixed(2)).join(" · ") })
+        ? t("cpuDetail", {
+            cores: host.cpuCores,
+            load: (host.loadAverage || []).map((v) => (Number.isFinite(Number(v)) ? Number(v).toFixed(2) : "—")).join(" · "),
+          })
         : null,
     },
     {
@@ -202,7 +218,7 @@ export function InfraKpis({ infra }) {
     {
       key: "hostUptime",
       value: formatDuration(host?.uptimeSeconds) || "—",
-      detail: host ? t("bootAt", { date: formatDateTime(host.bootAt) }) : null,
+      detail: host ? dateDetail("bootAt", host.bootAt) : null,
     },
     {
       key: "evoCpu",
@@ -220,11 +236,11 @@ export function InfraKpis({ infra }) {
     {
       key: "evoUptime",
       value: formatDuration(evo?.uptimeSeconds) || "—",
-      detail: evo?.startedAt ? t("since", { date: formatDateTime(evo.startedAt) }) : null,
+      detail: dateDetail("since", evo?.startedAt),
     },
     {
       key: "restarts",
-      value: evo ? String(evo.restartCount) : "—",
+      value: evo?.restartCount != null ? String(evo.restartCount) : "—",
       detail: evo ? t("restartsDetail") : null,
     },
   ];
@@ -251,13 +267,13 @@ export function InfraHealth({ infra, apiInfo }) {
   const containerDetail = (svc) => {
     if (!svc) return null;
     if (!svc.running) return t("state", { state: svc.state });
-    return svc.startedAt ? t("since", { date: formatDateTime(svc.startedAt) }) : null;
+    return dateDetail("since", svc.startedAt);
   };
   const apiVersion = apiInfo?.version ? `v${String(apiInfo.version).replace(/^v/, "")}` : null;
   const apiDetail = [apiVersion, containerDetail(services.api)].filter(Boolean).join(" · ");
   const collectorDetail =
     status === "online" || status === "stale"
-      ? t("lastCollect", { date: formatDateTime(collector.lastCollectedAt) })
+      ? dateDetail("lastCollect", collector.lastCollectedAt)
       : status === "no_data"
       ? t("waitingFirst")
       : t("notConfiguredDetail");
@@ -359,7 +375,7 @@ export function InfraHistory({ refreshKey, memTotalBytes }) {
             />
             <Tooltip
               contentStyle={tooltipStyle}
-              labelFormatter={(ts) => new Date(ts).toLocaleString("pt-BR")}
+              labelFormatter={(ts) => formatDateTime(ts)}
               formatter={(value, name, item) =>
                 item.dataKey === "apiMemPercent" && item.payload.apiMemBytes != null
                   ? [`${formatPercent(value)} (${formatBytes(item.payload.apiMemBytes)})`, name]

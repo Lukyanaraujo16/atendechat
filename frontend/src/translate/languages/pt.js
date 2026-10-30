@@ -5480,7 +5480,7 @@ const messages = {
           "evolutionUnavailable": "API Evolution indisponível no momento: o status das conexões Evolution vem do banco e aparece como não confirmado.",
           "orphans": "{{count}} instância(s) na Evolution sem conexão cadastrada (órfãs), não contabilizadas aqui. Veja a aba Evolution.",
           "kpi": {
-            "total": "Conexões",
+            "total": "Total de conexões",
             "baileys": "Baileys",
             "evolution": "Evolution",
             "connected": "Conectadas",
@@ -5519,13 +5519,15 @@ const messages = {
             "provider": "Tecnologia",
             "number": "Número WhatsApp",
             "status": "Status",
-            "lastUpdate": "Última atualização",
+            "lastUpdate": "Atualização do registro",
+            "lastUpdateHint": "Última gravação do registro da conexão (Evolution: da instância na API). Não indica necessariamente quando o status mudou.",
             "whatsappId": "ID da conexão"
           },
           "companyId": "ID {{id}}",
           "noCompany": "Sem empresa",
           "inactiveCompany": "Inativa",
           "empty": "Nenhuma conexão WhatsApp cadastrada.",
+          "emptyBaileys": "Nenhuma conexão Baileys cadastrada.",
           "emptyFiltered": "Nenhuma conexão corresponde aos filtros.",
           "rowsPerPage": "Linhas por página",
           "displayedRows": "{{from}}–{{to}} de {{count}}"

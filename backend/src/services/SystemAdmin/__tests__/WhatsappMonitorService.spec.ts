@@ -87,7 +87,13 @@ const rows = [
     connectionProvider: "evolution"
   }),
   // Registro inconsistente: empresa inexistente / desativada.
-  dbRow({ id: 12, name: "Sem empresa", status: "DISCONNECTED", companyId: 99, company: null }),
+  dbRow({
+    id: 12,
+    name: "Sem empresa",
+    status: "DISCONNECTED",
+    companyId: 99,
+    company: null
+  }),
   dbRow({
     id: 13,
     name: "Empresa inativa",
@@ -174,7 +180,10 @@ describe("WhatsappMonitorService", () => {
       statusSource: "database",
       persistedStatus: "CONNECTED"
     });
-    expect(byId(list, 3)).toMatchObject({ number: null, status: "disconnected" });
+    expect(byId(list, 3)).toMatchObject({
+      number: null,
+      status: "disconnected"
+    });
     expect(byId(list, 4)).toMatchObject({ status: "connecting" });
     expect(byId(list, 10)).toMatchObject({
       provider: "evolution",
@@ -188,8 +197,14 @@ describe("WhatsappMonitorService", () => {
       status: "unconfirmed",
       number: null
     });
-    expect(byId(list, 12)).toMatchObject({ companyId: null, companyName: null });
-    expect(byId(list, 13)).toMatchObject({ companyActive: false, status: "disconnected" });
+    expect(byId(list, 12)).toMatchObject({
+      companyId: null,
+      companyName: null
+    });
+    expect(byId(list, 13)).toMatchObject({
+      companyActive: false,
+      status: "disconnected"
+    });
   });
 
   it("indicadores coerentes, sem duplicar instâncias e com órfãs à parte", async () => {
@@ -198,12 +213,30 @@ describe("WhatsappMonitorService", () => {
     expect(summary.total).toBe(rows.length);
     expect(connections.total).toBe(rows.length);
     expect(
-      summary.connected + summary.connecting + summary.disconnected + summary.unconfirmed
+      summary.connected +
+        summary.connecting +
+        summary.disconnected +
+        summary.unconfirmed
     ).toBe(summary.total);
-    expect(summary).toMatchObject({ connected: 2, connecting: 1, disconnected: 3, unconfirmed: 2 });
-    expect(summary.byProvider.baileys.total + summary.byProvider.evolution.total).toBe(summary.total);
-    expect(summary.byProvider.baileys).toMatchObject({ total: 6, connected: 1, companies: 3 });
-    expect(summary.byProvider.evolution).toMatchObject({ total: 2, connected: 1, companies: 1 });
+    expect(summary).toMatchObject({
+      connected: 2,
+      connecting: 1,
+      disconnected: 3,
+      unconfirmed: 2
+    });
+    expect(
+      summary.byProvider.baileys.total + summary.byProvider.evolution.total
+    ).toBe(summary.total);
+    expect(summary.byProvider.baileys).toMatchObject({
+      total: 6,
+      connected: 1,
+      companies: 3
+    });
+    expect(summary.byProvider.evolution).toMatchObject({
+      total: 2,
+      connected: 1,
+      companies: 1
+    });
     // empresas 1,2,3,4 (a 99 não existe) e só 1 e 3 com conexão ativa
     expect(summary.companies).toBe(4);
     expect(summary.companiesWithActive).toBe(2);
@@ -221,17 +254,29 @@ describe("WhatsappMonitorService", () => {
 
     expect(summary.evolution.apiStatus).toBe("error");
     expect(summary.byProvider.baileys.connected).toBe(1);
-    expect(byId(connections.rows, 10)).toMatchObject({ status: "unconfirmed", statusSource: "database" });
+    expect(byId(connections.rows, 10)).toMatchObject({
+      status: "unconfirmed",
+      statusSource: "database"
+    });
   });
 
   it("Evolution offline (snapshot de erro) → instâncias via banco, não confirmadas", async () => {
     mockSnapshot.mockResolvedValue({
       ...snapshotOnline,
-      api: { status: "offline", latencyMs: 10000, errorCode: "ERR_EVOLUTION_TIMEOUT", version: null },
+      api: {
+        status: "offline",
+        latencyMs: 10000,
+        errorCode: "ERR_EVOLUTION_TIMEOUT",
+        version: null
+      },
       instances: []
     });
     const { summary, connections } = await getWhatsappMonitor(baseQuery);
-    expect(summary.evolution).toMatchObject({ apiStatus: "offline", errorCode: "ERR_EVOLUTION_TIMEOUT", orphans: 0 });
+    expect(summary.evolution).toMatchObject({
+      apiStatus: "offline",
+      errorCode: "ERR_EVOLUTION_TIMEOUT",
+      orphans: 0
+    });
     expect(byId(connections.rows, 10)?.status).toBe("unconfirmed");
   });
 
@@ -273,23 +318,105 @@ describe("WhatsappMonitorService", () => {
   });
 
   it("filtra por provider, status, empresa e busca; lista empresas do provider", async () => {
-    const baileys = await getWhatsappMonitor({ ...baseQuery, provider: "baileys" });
-    expect(baileys.connections.rows.every(r => r.provider === "baileys")).toBe(true);
+    const baileys = await getWhatsappMonitor({
+      ...baseQuery,
+      provider: "baileys"
+    });
+    expect(baileys.connections.rows.every(r => r.provider === "baileys")).toBe(
+      true
+    );
     expect(baileys.companies.map(c => c.id)).toEqual([1, 2, 4]);
 
-    const connected = await getWhatsappMonitor({ ...baseQuery, status: "connected" });
+    const connected = await getWhatsappMonitor({
+      ...baseQuery,
+      status: "connected"
+    });
     expect(connected.connections.rows.map(r => r.whatsappId)).toEqual([1, 10]);
 
     const company = await getWhatsappMonitor({ ...baseQuery, companyId: 3 });
     expect(company.connections.rows.map(r => r.whatsappId)).toEqual([10, 11]);
 
-    const byNumber = await getWhatsappMonitor({ ...baseQuery, search: "(11) 91234" });
+    const byNumber = await getWhatsappMonitor({
+      ...baseQuery,
+      search: "(11) 91234"
+    });
     expect(byNumber.connections.rows.map(r => r.whatsappId)).toEqual([2]);
 
     const byName = await getWhatsappMonitor({ ...baseQuery, search: "loja" });
     expect(byName.connections.rows.map(r => r.whatsappId)).toEqual([1, 2]);
     // filtros não alteram os indicadores globais
     expect(byName.summary.total).toBe(rows.length);
+  });
+
+  it("registros antigos/nulos: sem nome, status, data, empresa ou provider", async () => {
+    mockFindAll.mockResolvedValue([
+      dbRow({
+        id: 20,
+        name: null,
+        status: null,
+        companyId: null,
+        company: null,
+        connectionProvider: null,
+        updatedAt: null,
+        sessionJid: "999:1@lid"
+      }),
+      dbRow({
+        id: 21,
+        name: "Legado",
+        status: "",
+        companyId: 5,
+        connectionProvider: "",
+        updatedAt: "invalida"
+      })
+    ]);
+    const { connections, summary } = await getWhatsappMonitor(baseQuery);
+    expect(byId(connections.rows, 20)).toMatchObject({
+      name: "",
+      provider: "baileys",
+      companyId: null,
+      number: null,
+      status: "unconfirmed",
+      persistedStatus: null,
+      lastUpdate: null
+    });
+    expect(byId(connections.rows, 21)).toMatchObject({
+      provider: "baileys",
+      status: "unconfirmed",
+      lastUpdate: null
+    });
+    expect(summary).toMatchObject({
+      total: 2,
+      unconfirmed: 2,
+      companies: 1,
+      companiesWithActive: 0
+    });
+  });
+
+  it("Evolution não consulta sessões Baileys em memória", async () => {
+    mockFindAll.mockResolvedValue([rows[4], rows[5]]);
+    await getWhatsappMonitor(baseQuery);
+    expect(mockGetWbot).not.toHaveBeenCalled();
+  });
+
+  it("socket com erro ao ler propriedades não derruba o painel", async () => {
+    sockets[2] = {
+      get user(): never {
+        throw new Error("socket quebrado");
+      }
+    } as any;
+    const { connections } = await getWhatsappMonitor(baseQuery);
+    expect(byId(connections.rows, 2)).toMatchObject({
+      status: "unconfirmed",
+      number: "5511912345678"
+    });
+  });
+
+  it("falha do banco rejeita sem envenenar o cache; próxima chamada tenta de novo", async () => {
+    mockFindAll.mockRejectedValueOnce(new Error("db down"));
+    await expect(getWhatsappMonitor(baseQuery)).rejects.toThrow("db down");
+    const { summary } = await getWhatsappMonitor(baseQuery);
+    expect(summary.total).toBe(rows.length);
+    expect(mockFindAll).toHaveBeenCalledTimes(2);
   });
 
   it("usa cache: filtros seguintes não reconsultam banco", async () => {
@@ -314,11 +441,16 @@ describe("filterAndPaginate", () => {
       persistedStatus: "DISCONNECTED",
       lastUpdate: null,
       ...extra
-    }) as WhatsappMonitorConnection;
+    } as WhatsappMonitorConnection);
   const list = Array.from({ length: 23 }, (_, i) => make(i + 1));
 
   it("pagina e limita página fora do intervalo", () => {
-    const q = { page: 3, pageSize: 10, sortBy: "whatsappId" as const, sortDir: "asc" as const };
+    const q = {
+      page: 3,
+      pageSize: 10,
+      sortBy: "whatsappId" as const,
+      sortDir: "asc" as const
+    };
     const page3 = filterAndPaginate(list, q);
     expect(page3).toMatchObject({ total: 23, page: 3, pageSize: 10 });
     expect(page3.rows.map(r => r.whatsappId)).toEqual([21, 22, 23]);
@@ -336,9 +468,19 @@ describe("filterAndPaginate", () => {
       make(2, { status: "connected" }),
       make(3, { status: "unconfirmed" })
     ];
-    const asc = filterAndPaginate(mixed, { page: 1, pageSize: 10, sortBy: "status", sortDir: "asc" });
+    const asc = filterAndPaginate(mixed, {
+      page: 1,
+      pageSize: 10,
+      sortBy: "status",
+      sortDir: "asc"
+    });
     expect(asc.rows.map(r => r.whatsappId)).toEqual([2, 3, 1]);
-    const desc = filterAndPaginate(mixed, { page: 1, pageSize: 10, sortBy: "name", sortDir: "desc" });
+    const desc = filterAndPaginate(mixed, {
+      page: 1,
+      pageSize: 10,
+      sortBy: "name",
+      sortDir: "desc"
+    });
     expect(desc.rows.map(r => r.whatsappId)).toEqual([3, 2, 1]);
     expect(mixed.map(r => r.whatsappId)).toEqual([1, 2, 3]);
   });
@@ -356,11 +498,15 @@ describe("status helpers", () => {
   });
 
   it("resolveBaileysStatus: só socket aberto e autenticado confirma", () => {
-    expect(resolveBaileysStatus("DISCONNECTED", { open: true, number: "1" })).toEqual({
+    expect(
+      resolveBaileysStatus("DISCONNECTED", { open: true, number: "1" })
+    ).toEqual({
       status: "connected",
       source: "memory"
     });
-    expect(resolveBaileysStatus("CONNECTED", { open: false, number: null })).toEqual({
+    expect(
+      resolveBaileysStatus("CONNECTED", { open: false, number: null })
+    ).toEqual({
       status: "unconfirmed",
       source: "database"
     });
@@ -371,7 +517,12 @@ describe("status helpers", () => {
       throw new Error("ERR_WAPP_NOT_INITIALIZED");
     });
     expect(probeBaileysSession(1)).toBeNull();
-    mockGetWbot.mockReturnValue(liveSocket("5511987654321@s.whatsapp.net", false));
-    expect(probeBaileysSession(1)).toEqual({ open: false, number: "5511987654321" });
+    mockGetWbot.mockReturnValue(
+      liveSocket("5511987654321@s.whatsapp.net", false)
+    );
+    expect(probeBaileysSession(1)).toEqual({
+      open: false,
+      number: "5511987654321"
+    });
   });
 });

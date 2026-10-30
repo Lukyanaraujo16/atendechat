@@ -24,7 +24,7 @@ import api from "../../services/api";
 import { i18n } from "../../translate/i18n";
 import { maskPhone } from "../../helpers/brMasks";
 import PlatformPageHeader from "./PlatformPageHeader";
-import { InfraSection, formatDuration } from "./EvolutionInfraPanel";
+import { InfraSection, formatDateTime, formatDuration } from "./EvolutionInfraPanel";
 import {
   AppSectionCard,
   AppActionBar,
@@ -88,12 +88,6 @@ export function filterInstances(instances, { company, state, search }) {
     if (inst.instanceName.toLowerCase().includes(term)) return true;
     return Boolean(digits && inst.number && inst.number.includes(digits));
   });
-}
-
-function formatDateTime(iso) {
-  if (!iso) return "—";
-  const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString("pt-BR");
 }
 
 function Kpi({ label, value }) {

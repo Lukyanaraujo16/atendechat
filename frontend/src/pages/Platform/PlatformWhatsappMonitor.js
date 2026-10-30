@@ -29,6 +29,7 @@ import api from "../../services/api";
 import { i18n } from "../../translate/i18n";
 import PlatformPageHeader from "./PlatformPageHeader";
 import PlatformEvolutionMonitor, { REFRESH_MS, formatWhatsappNumber } from "./PlatformEvolutionMonitor";
+import { REACT_TEXT_INTERPOLATION, formatDateTime } from "./EvolutionInfraPanel";
 import {
   AppTabs,
   AppSectionCard,
@@ -72,13 +73,7 @@ const useStyles = makeStyles((theme) => ({
   inactiveChip: { marginLeft: theme.spacing(1), height: 20, fontSize: "0.6875rem" },
 }));
 
-const t = (key, options) => i18n.t(`platform.whatsappMonitor.${key}`, options);
-
-function formatDateTime(iso) {
-  if (!iso) return "—";
-  const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString("pt-BR");
-}
+const t = (key, options) => i18n.t(`platform.whatsappMonitor.${key}`, { ...options, ...REACT_TEXT_INTERPOLATION });
 
 /** Query string do endpoint; omite filtros "todos" e paginação 0-based → 1-based. */
 export function buildMonitorParams({ provider, company, status, search, page, rowsPerPage, sortBy, sortDir }) {
@@ -207,9 +202,22 @@ export function ConnectionsPanel({ fixedProvider }) {
   const evolution = summary?.evolution;
   const showProvider = !fixedProvider;
 
-  const sortableHead = (field, label) => (
+  // backend limita a página (ex.: filtro reduziu o total): acompanha para o seletor não ficar fora do intervalo
+  // roda a cada resposta (só a mais recente é aplicada em `data`)
+  useEffect(() => {
+    const serverPage = data?.connections?.page;
+    if (serverPage && serverPage - 1 !== page) setPage(serverPage - 1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
+
+  const sortableHead = (field, label, hint) => (
     <TableCell sortDirection={sortBy === field ? sortDir : false}>
-      <TableSortLabel active={sortBy === field} direction={sortBy === field ? sortDir : "asc"} onClick={() => changeSort(field)}>
+      <TableSortLabel
+        active={sortBy === field}
+        direction={sortBy === field ? sortDir : "asc"}
+        onClick={() => changeSort(field)}
+        title={hint}
+      >
         {label}
       </TableSortLabel>
     </TableCell>
@@ -297,7 +305,7 @@ export function ConnectionsPanel({ fixedProvider }) {
             </Box>
 
             {rows.length === 0 ? (
-              <AppEmptyState icon={PhonelinkOffIcon} title={counters?.total ? t("emptyFiltered") : t("empty")} />
+              <AppEmptyState icon={PhonelinkOffIcon} title={counters?.total ? t("emptyFiltered") : t(fixedProvider ? "emptyBaileys" : "empty")} />
             ) : (
               <>
                 <AppTableContainer>
@@ -309,7 +317,7 @@ export function ConnectionsPanel({ fixedProvider }) {
                         {showProvider ? sortableHead("provider", t("columns.provider")) : null}
                         {sortableHead("number", t("columns.number"))}
                         {sortableHead("status", t("columns.status"))}
-                        {sortableHead("lastUpdate", t("columns.lastUpdate"))}
+                        {sortableHead("lastUpdate", t("columns.lastUpdate"), t("columns.lastUpdateHint"))}
                         {showProvider ? null : sortableHead("whatsappId", t("columns.whatsappId"))}
                       </TableRow>
                     </TableHead>

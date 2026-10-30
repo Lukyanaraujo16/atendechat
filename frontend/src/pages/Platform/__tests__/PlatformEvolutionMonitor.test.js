@@ -2,7 +2,14 @@ import React from "react";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import "@testing-library/jest-dom";
 
-import { formatBytes, formatDuration, serviceHealth } from "../EvolutionInfraPanel";
+import {
+  formatBytes,
+  formatDateTime,
+  formatDuration,
+  formatPercent,
+  parseDisplayDate,
+  serviceHealth,
+} from "../EvolutionInfraPanel";
 import PlatformEvolutionMonitor, {
   REFRESH_MS,
   filterInstances,
@@ -132,6 +139,32 @@ describe("formatWhatsappNumber", () => {
   });
 });
 
+describe("datas", () => {
+  it("formatDateTime converte UTC para o fuso pedido em formato brasileiro", () => {
+    const iso = "2026-10-19T10:59:56.000Z";
+    expect(formatDateTime(iso, { timeZone: "UTC" })).toBe("19/10/2026, 10:59:56");
+    expect(formatDateTime(iso, { timeZone: "America/Sao_Paulo" })).toBe("19/10/2026, 07:59:56");
+    expect(formatDateTime(iso, { timeZone: "America/Manaus" })).toBe("19/10/2026, 06:59:56");
+    // virada de dia no fuso local
+    expect(formatDateTime("2026-10-20T01:30:00.000Z", { timeZone: "America/Sao_Paulo" })).toBe("19/10/2026, 22:30:00");
+    expect(formatDateTime("2026-10-20T01:30:00.000Z", { timeZone: "Asia/Tokyo" })).toBe("20/10/2026, 10:30:00");
+  });
+
+  it("ausente, inválida ou epoch não vira data inventada", () => {
+    [null, undefined, "", "invalida", "0001-01-01T00:00:00Z", "1970-01-01T00:00:00.000Z", 0].forEach((v) => {
+      expect(formatDateTime(v)).toBe("—");
+      expect(parseDisplayDate(v)).toBeNull();
+    });
+  });
+
+  it("formatPercent não mostra NaN", () => {
+    expect(formatPercent(12.345)).toBe("12,3%");
+    expect(formatPercent(0)).toBe("0%");
+    expect(formatPercent(null)).toBe("—");
+    expect(formatPercent("abc")).toBe("—");
+  });
+});
+
 describe("formatação e saúde", () => {
   it("formatDuration e formatBytes", () => {
     expect(formatDuration(8 * 86400 + 4 * 3600 + 59)).toBe("8d 4h");
@@ -210,6 +243,48 @@ describe("PlatformEvolutionMonitor", () => {
     expect(screen.getByText("300 MB")).toBeInTheDocument();
     expect(screen.getByText("Reinicializações").parentElement).toHaveTextContent("Reinicializações3Docker, contêiner atual");
     expect(mockGet).toHaveBeenCalledWith("/system/evolution-monitor/history", { params: { range: "24h" } });
+  });
+
+  it("regressão: datas de Boot, Desde e Última coleta sem entidades HTML", async () => {
+    mockApi({
+      ...snapshot,
+      infra: {
+        ...infra,
+        services: {
+          ...infra.services,
+          postgres: { ...infra.services.api, name: "evolution-postgres", startedAt: "2026-10-19T11:00:05.000Z" },
+          redis: { ...infra.services.api, name: "evolution-redis", startedAt: "2026-10-19T11:00:06.000Z" },
+        },
+      },
+    });
+    const { container } = render(<PlatformEvolutionMonitor />);
+    await screen.findByText("Saúde da infraestrutura");
+    const text = container.textContent;
+    expect(text).not.toMatch(/&#x2F;|&#x27;|&amp;|&quot;|&lt;|&gt;/);
+    expect(screen.getByText(`Boot: ${formatDateTime(infra.host.bootAt)}`)).toBeInTheDocument();
+    expect(screen.getByText(`Boot: ${formatDateTime(infra.host.bootAt)}`).textContent).toMatch(
+      /^Boot: \d{2}\/\d{2}\/\d{4}, \d{2}:\d{2}:\d{2}$/
+    );
+    expect(screen.getAllByText(`Desde ${formatDateTime(infra.services.api.startedAt)}`)).toHaveLength(1); // card Uptime
+    expect(screen.getByText(`v2.3.7 · Desde ${formatDateTime(infra.services.api.startedAt)}`)).toBeInTheDocument();
+    expect(screen.getByText(`Desde ${formatDateTime("2026-10-19T11:00:05.000Z")}`)).toBeInTheDocument();
+    expect(screen.getByText(`Desde ${formatDateTime("2026-10-19T11:00:06.000Z")}`)).toBeInTheDocument();
+    expect(screen.getByText(`Última coleta: ${formatDateTime(infra.collector.lastCollectedAt)}`)).toBeInTheDocument();
+  });
+
+  it("datas ausentes: não mostra rótulo com data vazia; reinicializações nulas viram —", async () => {
+    mockApi({
+      ...snapshot,
+      infra: {
+        ...infra,
+        host: { ...infra.host, bootAt: null },
+        services: { ...infra.services, api: { ...infra.services.api, startedAt: null, restartCount: null } },
+      },
+    });
+    const { container } = render(<PlatformEvolutionMonitor />);
+    await screen.findByText("Saúde da infraestrutura");
+    expect(container.textContent).not.toMatch(/Boot:|Desde —|null|NaN|Invalid Date/);
+    expect(screen.getByText("Reinicializações").parentElement).toHaveTextContent("Reinicializações—");
   });
 
   it("saúde: Evolution operacional com versão, Postgres parado, Redis não monitorado", async () => {

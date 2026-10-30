@@ -75,7 +75,11 @@ function toIso(value: unknown): string | null {
 /** "5511999999999@s.whatsapp.net" / "5511999999999:12@..." → dígitos E.164 sem "+". */
 export function extractWhatsappNumber(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
-  const digits = raw.split("@")[0].split(":")[0].replace(/\D/g, "");
+  const [user, server] = raw.split("@");
+  // LID, grupo, broadcast e canal têm dígitos que não são telefone.
+  if (server !== undefined && !["s.whatsapp.net", "c.us"].includes(server))
+    return null;
+  const digits = user.split(":")[0].replace(/\D/g, "");
   return /^\d{8,15}$/.test(digits) ? digits : null;
 }
 

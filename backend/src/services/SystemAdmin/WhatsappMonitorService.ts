@@ -217,7 +217,9 @@ export function buildSummary(
     ...countConnections(connections),
     byProvider: {
       baileys: countConnections(
-        connections.filter(c => c.provider === WhatsAppConnectionProvider.BAILEYS)
+        connections.filter(
+          c => c.provider === WhatsAppConnectionProvider.BAILEYS
+        )
       ),
       evolution: countConnections(
         connections.filter(
@@ -232,7 +234,7 @@ export function buildSummary(
 // Só o JID próprio (creds.me.id) é extraído do JSON de sessão, no próprio banco:
 // chaves e credenciais nunca chegam à aplicação.
 const SESSION_JID_ATTRIBUTE = literal(
-  `substring("Whatsapp"."session" from '"me":\\{[^}]*"id":"([^"]+)"')`
+  'substring("Whatsapp"."session" from \'"me":\\{[^}]*"id":"([^"]+)"\')'
 );
 
 async function loadWhatsappRows(): Promise<Whatsapp[]> {

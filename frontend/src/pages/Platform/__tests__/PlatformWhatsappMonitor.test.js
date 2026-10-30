@@ -150,6 +150,49 @@ describe("PlatformWhatsappMonitor", () => {
     expect(screen.getByText("1–25 de 60")).toBeInTheDocument();
   });
 
+  it("sem entidades HTML; datas e registro sem data", async () => {
+    const { container } = renderAt("/saas/whatsapp-monitor");
+    await screen.findByText("Loja A");
+    expect(container.textContent).not.toMatch(/&#x2F;|&amp;|&quot;|Invalid Date|NaN/);
+    const row = screen.getByText("Loja A").closest("tr");
+    expect(row).toHaveTextContent(new Date("2026-10-29T12:00:00.000Z").toLocaleString("pt-BR"));
+    expect(screen.getByText("Loja B").closest("tr")).toHaveTextContent("—");
+    // cabeçalho deixa claro que é atualização do registro, não do status
+    expect(screen.getByText("Atualização do registro").closest("[title]")).toHaveAttribute(
+      "title",
+      expect.stringContaining("Não indica necessariamente quando o status mudou")
+    );
+  });
+
+  it("tooltip do status persistido não escapa caracteres", async () => {
+    mockGet.mockResolvedValue({
+      data: response({
+        connections: {
+          rows: [{ ...rows[1], persistedStatus: "A/B" }],
+          total: 1,
+          page: 1,
+          pageSize: 25,
+        },
+      }),
+    });
+    renderAt("/saas/whatsapp-monitor/baileys");
+    await screen.findByText("Loja B");
+    expect(screen.getByTitle("Estado registrado no banco: A/B")).toBeInTheDocument();
+  });
+
+  it("página limitada pelo backend sincroniza o seletor", async () => {
+    // total caiu entre a 1ª resposta e o clique: backend devolve a página 1
+    mockGet.mockResolvedValueOnce({ data: response() }).mockResolvedValue({
+      data: response({ connections: { rows, total: 20, page: 1, pageSize: 25 } }),
+    });
+    renderAt("/saas/whatsapp-monitor");
+    await screen.findByText("Loja A");
+    fireEvent.click(screen.getByRole("button", { name: /próxima página|next page/i }));
+    await waitFor(() => expect(monitorCalls().some(([, cfg]) => cfg.params.page === 2)).toBe(true));
+    await screen.findByText("1–20 de 20");
+    await waitFor(() => expect(lastParams().page).toBe(1));
+  });
+
   it("filtros, ordenação e paginação vão para o backend", async () => {
     renderAt("/saas/whatsapp-monitor/overview");
     await screen.findByText("Loja A");
@@ -189,6 +232,20 @@ describe("PlatformWhatsappMonitor", () => {
     expect(screen.getByText("Empresas usando Baileys")).toBeInTheDocument();
     expect(screen.getByText("ID da conexão")).toBeInTheDocument();
     expect(screen.queryByLabelText("Tecnologia")).not.toBeInTheDocument();
+  });
+
+  it("aba Baileys sem conexões: indicadores zerados e vazio específico", async () => {
+    const base = response();
+    mockGet.mockResolvedValue({
+      data: response({
+        summary: { ...base.summary, byProvider: { ...base.summary.byProvider, baileys: counters() } },
+        companies: [],
+        connections: { rows: [], total: 0, page: 1, pageSize: 25 },
+      }),
+    });
+    renderAt("/saas/whatsapp-monitor/baileys");
+    expect(await screen.findByText("Nenhuma conexão Baileys cadastrada.")).toBeInTheDocument();
+    expect(screen.getByText("Empresas usando Baileys").parentElement).toHaveTextContent("0");
   });
 
   it("aba Evolution reutiliza o monitoramento Evolution existente", async () => {

@@ -306,6 +306,12 @@ describe("EvolutionMonitorService", () => {
     ["5511987654321@s.whatsapp.net", "5511987654321"],
     ["5511987654321:12@s.whatsapp.net", "5511987654321"],
     ["5511987654321", "5511987654321"],
+    ["5511987654321@c.us", "5511987654321"],
+    ["123456789012345:3@lid", null],
+    ["120363025246125486@g.us", null],
+    ["status@broadcast", null],
+    ["120363000000000000@newsletter", null],
+    ["", null],
     ["abc", null],
     [null, null]
   ])("extractWhatsappNumber(%p) → %p", (input, expected) => {

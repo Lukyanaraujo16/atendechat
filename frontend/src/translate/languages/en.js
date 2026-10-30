@@ -5255,7 +5255,7 @@ const messages = {
 					"evolutionUnavailable": "Evolution API is unavailable: Evolution connection status comes from the database and is shown as unconfirmed.",
 					"orphans": "{{count}} Evolution instance(s) without a registered connection (orphans), not counted here. See the Evolution tab.",
 					"kpi": {
-						"total": "Connections",
+						"total": "Total connections",
 						"baileys": "Baileys",
 						"evolution": "Evolution",
 						"connected": "Connected",
@@ -5294,13 +5294,15 @@ const messages = {
 						"provider": "Technology",
 						"number": "WhatsApp number",
 						"status": "Status",
-						"lastUpdate": "Last update",
+						"lastUpdate": "Record updated",
+						"lastUpdateHint": "Last write to the connection record (Evolution: the instance in the API). It does not necessarily indicate when the status changed.",
 						"whatsappId": "Connection ID"
 					},
 					"companyId": "ID {{id}}",
 					"noCompany": "No company",
 					"inactiveCompany": "Inactive",
 					"empty": "No WhatsApp connections registered.",
+					"emptyBaileys": "No Baileys connections registered.",
 					"emptyFiltered": "No connections match the filters.",
 					"rowsPerPage": "Rows per page",
 					"displayedRows": "{{from}}–{{to}} of {{count}}"
