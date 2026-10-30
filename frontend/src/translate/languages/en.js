@@ -5231,11 +5231,79 @@ const messages = {
 					billingAutomation: "Billing automation",
 					backup: "Backup",
 					systemTools: "Monitoring",
-					evolutionMonitor: "Evolution Monitoring",
+					whatsappMonitor: "WhatsApp Monitoring",
 					helps: "Help content",
 					announcements: "Announcements",
 					pushNotifications: "Push notifications",
 					emailSmtp: "Email / SMTP",
+				},
+				whatsappMonitor: {
+					"title": "WhatsApp Monitoring",
+					"subtitle": "Baileys and Evolution connections across all companies. Read-only; refreshes every 60 seconds.",
+					"tabs": {
+						"overview": "Overview",
+						"baileys": "Baileys",
+						"evolution": "Evolution"
+					},
+					"lastUpdate": "Last update",
+					"refresh": "Refresh now",
+					"refreshing": "Refreshing…",
+					"loading": "Loading connections…",
+					"requestFailed": "Could not refresh right now. Showing the last data received.",
+					"loadFailed": "Could not load WhatsApp connections.",
+					"baileysStatusHint": "Connected = active session confirmed on this server. \"Unconfirmed\" = the database says connected, but there is no active session to prove it.",
+					"evolutionUnavailable": "Evolution API is unavailable: Evolution connection status comes from the database and is shown as unconfirmed.",
+					"orphans": "{{count}} Evolution instance(s) without a registered connection (orphans), not counted here. See the Evolution tab.",
+					"kpi": {
+						"total": "Connections",
+						"baileys": "Baileys",
+						"evolution": "Evolution",
+						"connected": "Connected",
+						"disconnected": "Disconnected",
+						"connecting": "Connecting",
+						"unconfirmed": "Unconfirmed",
+						"companies": "Companies with connections",
+						"companiesWithActive": "Companies with an active connection",
+						"companiesBaileys": "Companies using Baileys"
+					},
+					"filters": {
+						"company": "Company",
+						"provider": "Technology",
+						"status": "Status",
+						"search": "Search name or number",
+						"all": "All"
+					},
+					"provider": {
+						"baileys": "Baileys",
+						"evolution": "Evolution"
+					},
+					"status": {
+						"connected": "Connected",
+						"connecting": "Connecting",
+						"unconfirmed": "Unconfirmed",
+						"disconnected": "Disconnected"
+					},
+					"source": {
+						"memory": "Confirmed by the active session on the server",
+						"evolution_api": "Confirmed by the Evolution API",
+						"database": "State stored in the database: {{status}}"
+					},
+					"columns": {
+						"company": "Company",
+						"name": "Connection",
+						"provider": "Technology",
+						"number": "WhatsApp number",
+						"status": "Status",
+						"lastUpdate": "Last update",
+						"whatsappId": "Connection ID"
+					},
+					"companyId": "ID {{id}}",
+					"noCompany": "No company",
+					"inactiveCompany": "Inactive",
+					"empty": "No WhatsApp connections registered.",
+					"emptyFiltered": "No connections match the filters.",
+					"rowsPerPage": "Rows per page",
+					"displayedRows": "{{from}}–{{to}} of {{count}}"
 				},
 				evolutionMonitor: {
 				  "title": "Evolution Monitoring",

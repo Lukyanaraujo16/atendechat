@@ -4725,11 +4725,79 @@ const messages = {
           billingAutomation: "Automatización de facturación",
           backup: "Copia de seguridad",
           systemTools: "Monitoreo",
-          evolutionMonitor: "Monitoreo Evolution",
+          whatsappMonitor: "Monitoreo WhatsApp",
           helps: "Ayuda (contenidos)",
           announcements: "Informativos",
           pushNotifications: "Notificaciones push",
           emailSmtp: "Correo / SMTP",
+        },
+        whatsappMonitor: {
+          "title": "Monitoreo WhatsApp",
+          "subtitle": "Conexiones Baileys y Evolution de todas las empresas. Solo lectura; se actualiza cada 60 segundos.",
+          "tabs": {
+            "overview": "Visión general",
+            "baileys": "Baileys",
+            "evolution": "Evolution"
+          },
+          "lastUpdate": "Última actualización",
+          "refresh": "Actualizar ahora",
+          "refreshing": "Actualizando…",
+          "loading": "Cargando conexiones…",
+          "requestFailed": "No fue posible actualizar ahora. Mostrando los últimos datos recibidos.",
+          "loadFailed": "No fue posible cargar las conexiones WhatsApp.",
+          "baileysStatusHint": "Conectada = sesión activa confirmada en este servidor. \"No confirmado\" = la base indica conexión, pero no hay sesión activa que lo compruebe.",
+          "evolutionUnavailable": "API Evolution no disponible: el estado de las conexiones Evolution viene de la base y aparece como no confirmado.",
+          "orphans": "{{count}} instancia(s) en Evolution sin conexión registrada (huérfanas), no contabilizadas aquí. Vea la pestaña Evolution.",
+          "kpi": {
+            "total": "Conexiones",
+            "baileys": "Baileys",
+            "evolution": "Evolution",
+            "connected": "Conectadas",
+            "disconnected": "Desconectadas",
+            "connecting": "Conectando",
+            "unconfirmed": "No confirmadas",
+            "companies": "Empresas con conexiones",
+            "companiesWithActive": "Empresas con conexión activa",
+            "companiesBaileys": "Empresas usando Baileys"
+          },
+          "filters": {
+            "company": "Empresa",
+            "provider": "Tecnología",
+            "status": "Estado",
+            "search": "Buscar nombre o número",
+            "all": "Todos"
+          },
+          "provider": {
+            "baileys": "Baileys",
+            "evolution": "Evolution"
+          },
+          "status": {
+            "connected": "Conectada",
+            "connecting": "Conectando",
+            "unconfirmed": "No confirmado",
+            "disconnected": "Desconectada"
+          },
+          "source": {
+            "memory": "Confirmado por la sesión activa en el servidor",
+            "evolution_api": "Confirmado por la API Evolution",
+            "database": "Estado registrado en la base: {{status}}"
+          },
+          "columns": {
+            "company": "Empresa",
+            "name": "Conexión",
+            "provider": "Tecnología",
+            "number": "Número WhatsApp",
+            "status": "Estado",
+            "lastUpdate": "Última actualización",
+            "whatsappId": "ID de la conexión"
+          },
+          "companyId": "ID {{id}}",
+          "noCompany": "Sin empresa",
+          "inactiveCompany": "Inactiva",
+          "empty": "No hay conexiones WhatsApp registradas.",
+          "emptyFiltered": "Ninguna conexión coincide con los filtros.",
+          "rowsPerPage": "Filas por página",
+          "displayedRows": "{{from}}–{{to}} de {{count}}"
         },
         evolutionMonitor: {
           "title": "Monitoreo Evolution",

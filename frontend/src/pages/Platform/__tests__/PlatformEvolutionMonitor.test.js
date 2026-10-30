@@ -6,7 +6,7 @@ import { formatBytes, formatDuration, serviceHealth } from "../EvolutionInfraPan
 import PlatformEvolutionMonitor, {
   REFRESH_MS,
   filterInstances,
-  maskWhatsappNumber,
+  formatWhatsappNumber,
 } from "../PlatformEvolutionMonitor";
 
 if (typeof global.MutationObserver === "undefined") {
@@ -122,10 +122,13 @@ function mockApi(...snapshots) {
 }
 const monitorCalls = () => mockGet.mock.calls.filter(([url]) => url === "/system/evolution-monitor").length;
 
-describe("maskWhatsappNumber", () => {
-  it("mascara o meio do número", () => {
-    expect(maskWhatsappNumber("5511987654321")).toBe("5511•••••4321");
-    expect(maskWhatsappNumber(null)).toBe("—");
+describe("formatWhatsappNumber", () => {
+  it("padroniza números brasileiros e mantém os demais completos", () => {
+    expect(formatWhatsappNumber("5511987654321")).toBe("+55 (11) 98765-4321");
+    expect(formatWhatsappNumber("551132654321")).toBe("+55 (11) 3265-4321");
+    expect(formatWhatsappNumber("14155552671")).toBe("+14155552671");
+    expect(formatWhatsappNumber(null)).toBe("—");
+    expect(formatWhatsappNumber("")).toBe("—");
   });
 });
 
@@ -175,13 +178,12 @@ describe("PlatformEvolutionMonitor", () => {
     jest.useRealTimers();
   });
 
-  it("mostra indicadores e tabela com número mascarado", async () => {
+  it("mostra indicadores e tabela com número completo formatado", async () => {
     mockApi(snapshot);
     render(<PlatformEvolutionMonitor />);
     await screen.findByText("streamhub-c1-w10");
     expect(mockGet).toHaveBeenCalledWith("/system/evolution-monitor");
-    expect(screen.getByText("5511•••••4321")).toBeInTheDocument();
-    expect(screen.queryByText("5511987654321")).not.toBeInTheDocument();
+    expect(screen.getByText("+55 (11) 98765-4321")).toBeInTheDocument();
     expect(screen.getByText(/42 ms/)).toBeInTheDocument();
   });
 

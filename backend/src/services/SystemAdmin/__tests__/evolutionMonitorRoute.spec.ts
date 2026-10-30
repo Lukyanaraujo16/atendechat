@@ -14,6 +14,7 @@ const mockFindByPk = jest.fn();
 const mockSnapshot = jest.fn();
 const mockInfra = jest.fn();
 const mockHistory = jest.fn();
+const mockWhatsappMonitor = jest.fn();
 
 jest.mock("../../../models/User", () => ({
   __esModule: true,
@@ -30,6 +31,12 @@ jest.mock("../EvolutionInfraMetricsService", () => ({
   getEvolutionInfraCurrent: (...args: any[]) => mockInfra(...args),
   getEvolutionInfraHistory: (...args: any[]) => mockHistory(...args)
 }));
+jest.mock("../WhatsappMonitorService", () => ({
+  ...jest.requireActual("../WhatsappMonitorService"),
+  getWhatsappMonitor: (...args: any[]) => mockWhatsappMonitor(...args)
+}));
+jest.mock("../../../libs/wbot", () => ({ getWbot: jest.fn() }));
+jest.mock("../../../models/Whatsapp", () => ({ __esModule: true, default: {} }));
 jest.mock("../../../models/EvolutionMetricSample", () => ({
   __esModule: true,
   default: {}
@@ -107,6 +114,75 @@ describe("GET /system/evolution-monitor", () => {
     expect(res.body.infra.collector.status).toBe("online");
     expect(res.headers["cache-control"]).toBe("no-store");
     expect(mockSnapshot).toHaveBeenCalledTimes(1);
+  });
+
+  describe("GET /system/whatsapp-monitor", () => {
+    beforeEach(() => {
+      mockWhatsappMonitor.mockResolvedValue({
+        summary: { total: 0 },
+        connections: { rows: [], total: 0, page: 1, pageSize: 25 }
+      });
+    });
+
+    it("sem token → 401", async () => {
+      const res = await request(app).get("/system/whatsapp-monitor");
+      expect(res.status).toBe(401);
+      expect(mockWhatsappMonitor).not.toHaveBeenCalled();
+    });
+
+    it("usuário comum (admin de empresa) é bloqueado", async () => {
+      mockFindByPk.mockResolvedValue({ super: false, profile: "admin" });
+      const res = await request(app)
+        .get("/system/whatsapp-monitor")
+        .set("Authorization", `Bearer ${token}`);
+      expect(res.status).toBe(401);
+      expect(mockWhatsappMonitor).not.toHaveBeenCalled();
+    });
+
+    it("super admin: repassa filtros, paginação e ordenação validados", async () => {
+      mockFindByPk.mockResolvedValue({ super: true, profile: "admin" });
+      const res = await request(app)
+        .get(
+          "/system/whatsapp-monitor?provider=baileys&status=unconfirmed&companyId=7&search=%20loja%20&page=2&pageSize=50&sortBy=status&sortDir=desc"
+        )
+        .set("Authorization", `Bearer ${token}`);
+      expect(res.status).toBe(200);
+      expect(res.headers["cache-control"]).toBe("no-store");
+      expect(mockWhatsappMonitor).toHaveBeenCalledWith({
+        provider: "baileys",
+        status: "unconfirmed",
+        companyId: 7,
+        search: "loja",
+        page: 2,
+        pageSize: 50,
+        sortBy: "status",
+        sortDir: "desc"
+      });
+    });
+
+    it("defaults quando nada é informado", async () => {
+      mockFindByPk.mockResolvedValue({ super: true, profile: "admin" });
+      await request(app)
+        .get("/system/whatsapp-monitor")
+        .set("Authorization", `Bearer ${token}`);
+      expect(mockWhatsappMonitor).toHaveBeenCalledWith(
+        expect.objectContaining({ page: 1, pageSize: 25, sortBy: "company", sortDir: "asc" })
+      );
+    });
+
+    it.each([
+      "provider=wppconnect",
+      "status=online",
+      "sortBy=session",
+      "companyId=1%20OR%201=1"
+    ])("parâmetro inválido (%s) → 400", async qs => {
+      mockFindByPk.mockResolvedValue({ super: true, profile: "admin" });
+      const res = await request(app)
+        .get(`/system/whatsapp-monitor?${qs}`)
+        .set("Authorization", `Bearer ${token}`);
+      expect(res.status).toBe(400);
+      expect(mockWhatsappMonitor).not.toHaveBeenCalled();
+    });
   });
 
   describe("GET /system/evolution-monitor/history", () => {

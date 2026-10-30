@@ -3,6 +3,17 @@ import AppError from "../errors/AppError";
 import { getSystemMonitorSnapshot } from "../services/SystemAdmin/SystemMonitorService";
 import { getEvolutionMonitorSnapshot } from "../services/SystemAdmin/EvolutionMonitorService";
 import {
+  WHATSAPP_MONITOR_SORT_FIELDS,
+  WHATSAPP_MONITOR_STATUSES,
+  WhatsappMonitorSortField,
+  WhatsappMonitorStatus,
+  getWhatsappMonitor
+} from "../services/SystemAdmin/WhatsappMonitorService";
+import {
+  isWhatsAppConnectionProvider,
+  WhatsAppConnectionProviderValue
+} from "../modules/whatsapp/connectionProvider";
+import {
   EvolutionMetricsValidationError,
   HISTORY_RANGES,
   HistoryRange,
@@ -27,6 +38,46 @@ export const evolution = async (
   ]);
   res.set("Cache-Control", "no-store");
   res.json({ ...snapshot, infra });
+};
+
+/** Central de Monitoramento WhatsApp (Baileys + Evolution), filtros e paginação no servidor. */
+export const whatsapp = async (req: Request, res: Response): Promise<void> => {
+  const q = req.query as Record<string, unknown>;
+  const pick = (key: string): string =>
+    typeof q[key] === "string" ? (q[key] as string).trim() : "";
+
+  const provider = pick("provider");
+  if (provider && !isWhatsAppConnectionProvider(provider)) {
+    throw new AppError("ERR_INVALID_PROVIDER", 400);
+  }
+  const status = pick("status");
+  if (
+    status &&
+    !(WHATSAPP_MONITOR_STATUSES as readonly string[]).includes(status)
+  ) {
+    throw new AppError("ERR_INVALID_STATUS", 400);
+  }
+  const sortBy = pick("sortBy") || "company";
+  if (!(WHATSAPP_MONITOR_SORT_FIELDS as readonly string[]).includes(sortBy)) {
+    throw new AppError("ERR_INVALID_SORT", 400);
+  }
+  const companyId = pick("companyId");
+  if (companyId && !/^\d+$/.test(companyId)) {
+    throw new AppError("ERR_INVALID_COMPANY", 400);
+  }
+
+  const result = await getWhatsappMonitor({
+    provider: (provider || undefined) as WhatsAppConnectionProviderValue,
+    status: (status || undefined) as WhatsappMonitorStatus,
+    companyId: companyId ? Number(companyId) : undefined,
+    search: pick("search").slice(0, 100),
+    page: Number(pick("page")) || 1,
+    pageSize: Number(pick("pageSize")) || 25,
+    sortBy: sortBy as WhatsappMonitorSortField,
+    sortDir: pick("sortDir") === "desc" ? "desc" : "asc"
+  });
+  res.set("Cache-Control", "no-store");
+  res.json(result);
 };
 
 export const evolutionHistory = async (

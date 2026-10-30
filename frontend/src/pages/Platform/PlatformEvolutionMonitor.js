@@ -22,6 +22,7 @@ import PhonelinkOffIcon from "@material-ui/icons/PhonelinkOff";
 import MainContainer from "../../components/MainContainer";
 import api from "../../services/api";
 import { i18n } from "../../translate/i18n";
+import { maskPhone } from "../../helpers/brMasks";
 import PlatformPageHeader from "./PlatformPageHeader";
 import { InfraSection, formatDuration } from "./EvolutionInfraPanel";
 import {
@@ -68,12 +69,12 @@ const useStyles = makeStyles((theme) => ({
   mono: { fontFamily: "monospace" },
 }));
 
-/** Mostra DDI+DDD e os 4 finais: 5511•••••4321. */
-export function maskWhatsappNumber(number) {
-  const digits = String(number || "");
+/** Número completo (endpoint exclusivo de Super Admin): BR → +55 (11) 98765-4321; demais → +DDI... */
+export function formatWhatsappNumber(number) {
+  const digits = String(number || "").replace(/\D/g, "");
   if (!digits) return "—";
-  if (digits.length <= 8) return `${"•".repeat(Math.max(0, digits.length - 4))}${digits.slice(-4)}`;
-  return `${digits.slice(0, 4)}${"•".repeat(digits.length - 8)}${digits.slice(-4)}`;
+  if (digits.startsWith("55") && (digits.length === 12 || digits.length === 13)) return maskPhone(digits);
+  return `+${digits}`;
 }
 
 export function filterInstances(instances, { company, state, search }) {
@@ -144,7 +145,8 @@ function ApiStatusKpi({ label, apiInfo, uptimeSeconds, t }) {
   );
 }
 
-export default function PlatformEvolutionMonitor() {
+/** `embedded`: renderizado como aba da Central de Monitoramento WhatsApp (sem container/cabeçalho próprios). */
+export default function PlatformEvolutionMonitor({ embedded = false }) {
   const classes = useStyles();
   const t = (key) => i18n.t(`platform.evolutionMonitor.${key}`);
   const [data, setData] = useState(null);
@@ -195,155 +197,156 @@ export default function PlatformEvolutionMonitor() {
   const indicators = data?.indicators;
   const apiStatus = apiInfo?.status;
 
-  return (
-    <MainContainer>
-      <Box className={classes.root}>
+  const content = (
+    <Box className={classes.root}>
+      {embedded ? null : (
         <PlatformPageHeader
           titleKey="platform.evolutionMonitor.title"
           subtitleKey="platform.evolutionMonitor.subtitle"
         />
+      )}
 
-        <AppActionBar>
-          <Typography variant="body2" color="textSecondary">
-            {t("lastUpdate")}: {formatDateTime(data?.generatedAt)}
-          </Typography>
-          <AppSecondaryButton startIcon={<RefreshIcon />} onClick={load} disabled={loading}>
-            {loading ? t("refreshing") : t("refresh")}
-          </AppSecondaryButton>
-        </AppActionBar>
-        {loading ? <LinearProgress aria-label={t("refreshing")} /> : null}
+      <AppActionBar>
+        <Typography variant="body2" color="textSecondary">
+          {t("lastUpdate")}: {formatDateTime(data?.generatedAt)}
+        </Typography>
+        <AppSecondaryButton startIcon={<RefreshIcon />} onClick={load} disabled={loading}>
+          {loading ? t("refreshing") : t("refresh")}
+        </AppSecondaryButton>
+      </AppActionBar>
+      {loading ? <LinearProgress aria-label={t("refreshing")} /> : null}
 
-        {requestFailed ? <Alert severity="warning">{t("requestFailed")}</Alert> : null}
-        {apiStatus === "offline" ? (
-          <Alert severity="error">
-            {t("apiOffline")} ({apiInfo.errorCode})
-          </Alert>
-        ) : null}
-        {apiStatus === "not_configured" ? <Alert severity="info">{t("apiNotConfigured")}</Alert> : null}
+      {requestFailed ? <Alert severity="warning">{t("requestFailed")}</Alert> : null}
+      {apiStatus === "offline" ? (
+        <Alert severity="error">
+          {t("apiOffline")} ({apiInfo.errorCode})
+        </Alert>
+      ) : null}
+      {apiStatus === "not_configured" ? <Alert severity="info">{t("apiNotConfigured")}</Alert> : null}
 
-        {!data && loading ? (
-          <AppLoadingState message={t("loading")} />
-        ) : data ? (
-          <>
-            <Grid container spacing={2}>
-              {[
-                ["total", indicators.total],
-                ["connected", indicators.connected],
-                ["disconnected", indicators.disconnected],
-                ["connecting", indicators.connecting],
-                ["companies", indicators.companies],
-                ["unlinked", indicators.unlinked],
-              ].map(([key, value]) => (
-                <Grid item xs={6} sm={4} md key={key}>
-                  <Kpi label={t(`kpi.${key}`)} value={value} />
-                </Grid>
-              ))}
-              <Grid item xs={6} sm={4} md>
-                <ApiStatusKpi
-                  label={t("kpi.apiStatus")}
-                  apiInfo={apiInfo}
-                  uptimeSeconds={data.infra?.services?.api?.uptimeSeconds}
-                  t={t}
-                />
+      {!data && loading ? (
+        <AppLoadingState message={t("loading")} />
+      ) : data ? (
+        <>
+          <Grid container spacing={2}>
+            {[
+              ["total", indicators.total],
+              ["connected", indicators.connected],
+              ["disconnected", indicators.disconnected],
+              ["connecting", indicators.connecting],
+              ["companies", indicators.companies],
+              ["unlinked", indicators.unlinked],
+            ].map(([key, value]) => (
+              <Grid item xs={6} sm={4} md key={key}>
+                <Kpi label={t(`kpi.${key}`)} value={value} />
               </Grid>
+            ))}
+            <Grid item xs={6} sm={4} md>
+              <ApiStatusKpi
+                label={t("kpi.apiStatus")}
+                apiInfo={apiInfo}
+                uptimeSeconds={data.infra?.services?.api?.uptimeSeconds}
+                t={t}
+              />
             </Grid>
+          </Grid>
 
-            <InfraSection infra={data.infra} apiInfo={apiInfo} refreshKey={data.generatedAt} />
+          <InfraSection infra={data.infra} apiInfo={apiInfo} refreshKey={data.generatedAt} />
 
-            <AppSectionCard>
-              <Box className={classes.filters}>
-                <FormControl variant="outlined" size="small" className={classes.filter}>
-                  <InputLabel id="evo-company">{t("filters.company")}</InputLabel>
-                  <Select
-                    labelId="evo-company"
-                    label={t("filters.company")}
-                    value={company}
-                    onChange={(e) => setCompany(e.target.value)}
-                  >
-                    <MenuItem value={ALL}>{t("filters.all")}</MenuItem>
-                    <MenuItem value={NO_COMPANY}>{t("noCompany")}</MenuItem>
-                    {companies.map(([id, name]) => (
-                      <MenuItem key={id} value={String(id)}>
-                        {name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-                <FormControl variant="outlined" size="small" className={classes.filter}>
-                  <InputLabel id="evo-state">{t("filters.state")}</InputLabel>
-                  <Select
-                    labelId="evo-state"
-                    label={t("filters.state")}
-                    value={state}
-                    onChange={(e) => setState(e.target.value)}
-                  >
-                    <MenuItem value={ALL}>{t("filters.all")}</MenuItem>
-                    {STATES.map((s) => (
-                      <MenuItem key={s} value={s}>
-                        {t(`states.${s}`)}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-                <TextField
-                  variant="outlined"
-                  size="small"
-                  className={classes.filter}
-                  label={t("filters.search")}
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  inputProps={{ "aria-label": t("filters.search") }}
-                />
-              </Box>
+          <AppSectionCard>
+            <Box className={classes.filters}>
+              <FormControl variant="outlined" size="small" className={classes.filter}>
+                <InputLabel id="evo-company">{t("filters.company")}</InputLabel>
+                <Select
+                  labelId="evo-company"
+                  label={t("filters.company")}
+                  value={company}
+                  onChange={(e) => setCompany(e.target.value)}
+                >
+                  <MenuItem value={ALL}>{t("filters.all")}</MenuItem>
+                  <MenuItem value={NO_COMPANY}>{t("noCompany")}</MenuItem>
+                  {companies.map(([id, name]) => (
+                    <MenuItem key={id} value={String(id)}>
+                      {name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <FormControl variant="outlined" size="small" className={classes.filter}>
+                <InputLabel id="evo-state">{t("filters.state")}</InputLabel>
+                <Select
+                  labelId="evo-state"
+                  label={t("filters.state")}
+                  value={state}
+                  onChange={(e) => setState(e.target.value)}
+                >
+                  <MenuItem value={ALL}>{t("filters.all")}</MenuItem>
+                  {STATES.map((s) => (
+                    <MenuItem key={s} value={s}>
+                      {t(`states.${s}`)}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <TextField
+                variant="outlined"
+                size="small"
+                className={classes.filter}
+                label={t("filters.search")}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                inputProps={{ "aria-label": t("filters.search") }}
+              />
+            </Box>
 
-              {filtered.length === 0 ? (
-                <AppEmptyState
-                  icon={PhonelinkOffIcon}
-                  title={instances.length === 0 ? t("empty") : t("emptyFiltered")}
-                />
-              ) : (
-                <AppTableContainer>
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>{t("columns.company")}</TableCell>
-                        <TableCell>{t("columns.number")}</TableCell>
-                        <TableCell>{t("columns.instance")}</TableCell>
-                        <TableCell>{t("columns.state")}</TableCell>
-                        <TableCell>{t("columns.lastUpdate")}</TableCell>
+            {filtered.length === 0 ? (
+              <AppEmptyState
+                icon={PhonelinkOffIcon}
+                title={instances.length === 0 ? t("empty") : t("emptyFiltered")}
+              />
+            ) : (
+              <AppTableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>{t("columns.company")}</TableCell>
+                      <TableCell>{t("columns.number")}</TableCell>
+                      <TableCell>{t("columns.instance")}</TableCell>
+                      <TableCell>{t("columns.state")}</TableCell>
+                      <TableCell>{t("columns.lastUpdate")}</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {filtered.map((inst) => (
+                      <TableRow key={inst.instanceName}>
+                        <TableCell>
+                          {inst.companyName || (
+                            <Typography variant="body2" color="error" component="span">
+                              {t("noCompany")}
+                            </Typography>
+                          )}
+                        </TableCell>
+                        <TableCell className={classes.mono}>{formatWhatsappNumber(inst.number)}</TableCell>
+                        <TableCell className={classes.mono}>{inst.instanceName}</TableCell>
+                        <TableCell>
+                          <Chip
+                            size="small"
+                            className={classes.stateChip}
+                            style={{ backgroundColor: STATE_COLORS[inst.state] }}
+                            label={t(`states.${inst.state}`)}
+                          />
+                        </TableCell>
+                        <TableCell>{formatDateTime(inst.lastUpdate)}</TableCell>
                       </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {filtered.map((inst) => (
-                        <TableRow key={inst.instanceName}>
-                          <TableCell>
-                            {inst.companyName || (
-                              <Typography variant="body2" color="error" component="span">
-                                {t("noCompany")}
-                              </Typography>
-                            )}
-                          </TableCell>
-                          <TableCell className={classes.mono}>{maskWhatsappNumber(inst.number)}</TableCell>
-                          <TableCell className={classes.mono}>{inst.instanceName}</TableCell>
-                          <TableCell>
-                            <Chip
-                              size="small"
-                              className={classes.stateChip}
-                              style={{ backgroundColor: STATE_COLORS[inst.state] }}
-                              label={t(`states.${inst.state}`)}
-                            />
-                          </TableCell>
-                          <TableCell>{formatDateTime(inst.lastUpdate)}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </AppTableContainer>
-              )}
-            </AppSectionCard>
-          </>
-        ) : null}
-      </Box>
-    </MainContainer>
+                    ))}
+                  </TableBody>
+                </Table>
+              </AppTableContainer>
+            )}
+          </AppSectionCard>
+        </>
+      ) : null}
+    </Box>
   );
+  return embedded ? content : <MainContainer>{content}</MainContainer>;
 }

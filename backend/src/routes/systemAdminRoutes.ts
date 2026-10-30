@@ -14,6 +14,13 @@ systemAdminRoutes.get(
 );
 
 systemAdminRoutes.get(
+  "/system/whatsapp-monitor",
+  isAuth,
+  isSuper,
+  SystemMonitorController.whatsapp
+);
+
+systemAdminRoutes.get(
   "/system/evolution-monitor",
   isAuth,
   isSuper,

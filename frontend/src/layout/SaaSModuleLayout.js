@@ -163,7 +163,7 @@ function navItems() {
     { path: "/saas/admins", label: i18n.t("platform.tabs.superAdmins"), icon: SecurityIcon },
     { path: "/saas/backup", label: i18n.t("platform.tabs.backup"), icon: BackupIcon },
     { path: "/saas/system-tools", label: i18n.t("platform.tabs.systemTools"), icon: ComputerIcon },
-    { path: "/saas/evolution-monitor", label: i18n.t("platform.tabs.evolutionMonitor"), icon: PhonelinkSetupIcon },
+    { path: "/saas/whatsapp-monitor", label: i18n.t("platform.tabs.whatsappMonitor"), icon: PhonelinkSetupIcon },
     { path: "/saas/helps", label: i18n.t("platform.tabs.helps"), icon: HelpOutlineIcon },
     { path: "/saas/announcements", label: i18n.t("platform.tabs.announcements"), icon: AnnouncementIcon },
     { path: "/saas/account", label: i18n.t("platform.tabs.myAccount"), icon: AccountCircleOutlinedIcon },

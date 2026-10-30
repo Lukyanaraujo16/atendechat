@@ -15,7 +15,7 @@ import PlatformFinance from "./PlatformFinance";
 import HistoricalReviewPage from "./HistoricalReview";
 import PlatformBackup from "./PlatformBackup";
 import PlatformSystemTools from "./PlatformSystemTools";
-import PlatformEvolutionMonitor from "./PlatformEvolutionMonitor";
+import PlatformWhatsappMonitor from "./PlatformWhatsappMonitor";
 import PlatformPlans from "./PlatformPlans";
 import PlatformHelps from "./PlatformHelps";
 import PlatformInformativos from "./PlatformInformativos";
@@ -52,7 +52,9 @@ export default function PlatformModule() {
         <Route exact path="/saas/billing-automation" component={BillingAutomationPage} />
         <Route exact path="/saas/backup" component={PlatformBackup} />
         <Route exact path="/saas/system-tools" component={PlatformSystemTools} />
-        <Route exact path="/saas/evolution-monitor" component={PlatformEvolutionMonitor} />
+        <Route exact path="/saas/whatsapp-monitor/:tab?" component={PlatformWhatsappMonitor} />
+        {/* rota antiga (favoritos/links): abre a aba Evolution da central */}
+        <Route exact path="/saas/evolution-monitor" render={() => <Redirect to="/saas/whatsapp-monitor/evolution" />} />
         <Route exact path="/saas/helps" component={PlatformHelps} />
         <Route exact path="/saas/announcements" component={PlatformInformativos} />
         <Route render={() => <Redirect to="/saas" />} />
