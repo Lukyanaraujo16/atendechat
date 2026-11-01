@@ -131,9 +131,9 @@ describe("Avisos de armazenamento (80/90/100)", () => {
     const n100 = await UserNotification.findOne({
       where: { companyId: company.id, type: "storage_limit_exceeded" }
     });
-    expect(n100?.body).toMatch(
-      /limpeza automática removerá os arquivos mais antigos/
-    );
+    // Limpeza desligada (padrão): o aviso não promete remoção automática.
+    expect(n100?.body).toMatch(/Central de Mídias para revisar e excluir/);
+    expect(n100?.body).not.toMatch(/remover automaticamente/);
 
     // 97%: ainda dentro da margem → não rearma; voltar a 100% não repete.
     await setPercent(97);

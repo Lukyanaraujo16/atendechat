@@ -37,7 +37,10 @@ jest.mock("../../../utils/logger", () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() }
 }));
 
-import { incrementCompanyStorageUsage } from "../adjustCompanyStorageUsage";
+import {
+  incrementCompanyStorageUsage,
+  storageLimitExceededBody
+} from "../adjustCompanyStorageUsage";
 
 describe("incrementCompanyStorageUsage — tabela Companies", () => {
   beforeEach(() => {
@@ -64,5 +67,33 @@ describe("incrementCompanyStorageUsage — tabela Companies", () => {
     expect(options.replacements.delta).toBe(4096);
     expect(options.replacements.id).toBe(1);
     expect(options.replacements.now).toBeInstanceOf(Date);
+  });
+});
+
+describe("aviso de 100% conforme a limpeza automática", () => {
+  const original = process.env.STORAGE_AUTO_CLEANUP_ENABLED;
+  afterEach(() => {
+    if (original === undefined) delete process.env.STORAGE_AUTO_CLEANUP_ENABLED;
+    else process.env.STORAGE_AUTO_CLEANUP_ENABLED = original;
+  });
+
+  it("limpeza desligada: orienta Central de Mídias e ampliação, sem prometer remoção", () => {
+    delete process.env.STORAGE_AUTO_CLEANUP_ENABLED;
+    const body = storageLimitExceededBody();
+    expect(body).toMatch(/Central de Mídias para revisar e excluir/);
+    expect(body).toMatch(/ampliação do armazenamento/);
+    expect(body).not.toMatch(/remover automaticamente|limpeza automática/i);
+    process.env.STORAGE_AUTO_CLEANUP_ENABLED = "false";
+    expect(storageLimitExceededBody()).toBe(body);
+  });
+
+  it("limpeza ligada: informa remoção automática dos elegíveis mais antigos", () => {
+    process.env.STORAGE_AUTO_CLEANUP_ENABLED = "true";
+    const body = storageLimitExceededBody();
+    expect(body).toMatch(
+      /poderá remover automaticamente os arquivos elegíveis mais antigos/
+    );
+    expect(body).toMatch(/preservando os mais recentes/);
+    expect(body).toMatch(/Central de Mídias/);
   });
 });

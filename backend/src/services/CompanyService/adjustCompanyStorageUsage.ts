@@ -15,7 +15,8 @@ import Plan from "../../models/Plan";
 import User from "../../models/User";
 import {
   computeStorageUsagePercent,
-  getCompanyStorageLimitBytes
+  getCompanyStorageLimitBytes,
+  isStorageAutoCleanupEnabled
 } from "../../helpers/companyStorage";
 import CreateCompanyStorageSnapshotService from "./CreateCompanyStorageSnapshotService";
 import CreateUserNotificationService from "../UserNotificationService/CreateUserNotificationService";
@@ -65,11 +66,17 @@ async function applyDeltaAtomic(companyId: number, delta: number): Promise<void>
 /** Pontos percentuais abaixo do nível para rearmar o aviso (evita repetição oscilando no limiar). */
 const REARM_MARGIN_PERCENT = 5;
 
-export const STORAGE_NOTIFICATION_BODIES: Record<80 | 90 | 100, string> = {
+export const STORAGE_NOTIFICATION_BODIES: Record<80 | 90, string> = {
   80: "O armazenamento da sua empresa atingiu 80% da cota do plano. Acesse a Central de Mídias (Configurações › Gestão de mídias) e remova os arquivos desnecessários.",
-  90: "Atenção: o armazenamento da sua empresa atingiu 90% da cota e poderá chegar ao limite em breve. Remova arquivos desnecessários na Central de Mídias ou consulte a ampliação do plano em Assinatura ou com o suporte.",
-  100: "O armazenamento da sua empresa atingiu o limite do plano. A limpeza automática removerá os arquivos mais antigos de mensagens e atendimentos, conforme a política de retenção, até cerca de 90% da cota, preservando os mais recentes e o histórico de texto. Para evitar remoções, libere espaço na Central de Mídias ou amplie o plano."
+  90: "Atenção: o armazenamento da sua empresa atingiu 90% da cota e poderá chegar ao limite em breve. Remova arquivos desnecessários na Central de Mídias ou consulte a ampliação do plano em Assinatura ou com o suporte."
 };
+
+/** Aviso de 100% conforme a limpeza automática real: nunca promete limpeza desligada. */
+export function storageLimitExceededBody(): string {
+  return isStorageAutoCleanupEnabled()
+    ? "Seu armazenamento atingiu ou ultrapassou o limite contratado. Para liberar espaço, o sistema poderá remover automaticamente os arquivos elegíveis mais antigos, preservando os mais recentes. Acesse a Central de Mídias para gerenciar seus arquivos ou solicite a ampliação do armazenamento."
+    : "Seu armazenamento atingiu ou ultrapassou o limite contratado. Acesse a Central de Mídias para revisar e excluir arquivos que não precisa mais. Você também pode solicitar a ampliação do armazenamento para continuar utilizando a plataforma com tranquilidade.";
+}
 
 async function notifyStorageThreshold(
   companyId: number,
@@ -78,7 +85,10 @@ async function notifyStorageThreshold(
 ): Promise<void> {
   const type =
     level === 100 ? "storage_limit_exceeded" : `storage_warning_${level}`;
-  const body = STORAGE_NOTIFICATION_BODIES[level];
+  const body =
+    level === 100
+      ? storageLimitExceededBody()
+      : STORAGE_NOTIFICATION_BODIES[level];
 
   const title = "Armazenamento";
 
