@@ -38,6 +38,16 @@ export function navigateFromNotificationData(data, history, options = {}) {
     return;
   }
 
+  // Avisos de armazenamento: cliente vai à Central de Mídias; Super Admin à empresa.
+  if (d.storageThreshold != null) {
+    if (d.scope === "platform" && d.companyId != null) {
+      history.push(`/saas/companies?focus=${encodeURIComponent(String(d.companyId))}`);
+    } else {
+      history.push("/settings/media-manager");
+    }
+    return;
+  }
+
   if (
     d.type === "internal_chat_message" ||
     d.chatId != null ||

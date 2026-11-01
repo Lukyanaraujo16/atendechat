@@ -11,7 +11,7 @@ import {
 } from "sequelize-typescript";
 import Company from "./Company";
 
-@Table({ tableName: "CompanyStorageSnapshots" })
+@Table({ tableName: "CompanyStorageSnapshots", updatedAt: false })
 class CompanyStorageSnapshot extends Model<CompanyStorageSnapshot> {
   @PrimaryKey
   @AutoIncrement

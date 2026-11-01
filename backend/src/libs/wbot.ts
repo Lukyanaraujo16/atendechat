@@ -72,6 +72,20 @@ export const removeWbot = async (
   }
 };
 
+/** Fecha o socket SEM logout (credenciais preservadas): usado na desativação da empresa. */
+export const closeWbotWithoutLogout = (whatsappId: number): boolean => {
+  clearUnavailablePresenceHeartbeat(whatsappId);
+  const sessionIndex = sessions.findIndex(s => s.id === whatsappId);
+  if (sessionIndex === -1) return false;
+  const [session] = sessions.splice(sessionIndex, 1);
+  try {
+    session.ws.close();
+  } catch (err) {
+    logger.error(err);
+  }
+  return true;
+};
+
 export const initWASocket = async (whatsapp: Whatsapp): Promise<Session> => {
   return new Promise(async (resolve, reject) => {
     try {

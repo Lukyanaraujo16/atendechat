@@ -79,6 +79,12 @@ companyRoutes.put(
 );
 companyRoutes.put("/companies/:id/schedules",isAuth,CompanyController.updateSchedules);
 companyRoutes.delete("/companies/:id", isAuth, isSuper, CompanyController.remove);
+companyRoutes.get(
+  "/companies/:id/deletion",
+  isAuth,
+  isSuper,
+  CompanyController.deletionStatus
+);
 companyRoutes.post("/companies/:id/renew", isAuth, isSuper, CompanyController.renewDueDate);
 companyRoutes.get("/companies/:id/logs", isAuth, isSuper, CompanyController.listCompanyLogs);
 companyRoutes.post("/companies/cadastro", CompanyController.createSignupRequest);

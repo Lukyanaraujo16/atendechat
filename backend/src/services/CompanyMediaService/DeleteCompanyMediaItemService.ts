@@ -18,6 +18,8 @@ import { isChatMessagesTableAvailable } from "../../helpers/optionalTableQuery";
 import { countAllReferencesToRelPath } from "./countAllReferencesToRelPath";
 
 export const MESSAGE_MEDIA_REMOVED_BODY = "[Mídia removida pelo administrador]";
+export const MESSAGE_MEDIA_AUTO_REMOVED_BODY =
+  "[Mídia removida automaticamente: limite de armazenamento]";
 
 export type DeleteCompanyMediaSource =
   | "message"
@@ -71,6 +73,8 @@ export type DeleteCompanyMediaItemOptions = {
   knownSizeBytes?: number;
   /** Avisos técnicos acumulados (tabelas opcionais ausentes). */
   warnings?: string[];
+  /** Limpeza por cota: preserva o texto/legenda da mensagem e acrescenta o aviso. */
+  automaticCleanup?: boolean;
 };
 
 /** Elimina uma mídia com a mesma lógica que o DELETE singular; devolve bytes contabilizados. */
@@ -116,10 +120,15 @@ export const deleteCompanyMediaItemWithOptions = async (
       const rel = msg.getDataValue("mediaUrl") as string | null;
       if (!rel) throw new AppError("ERR_VALIDATION", 400);
       const n = await countAllReferencesToRelPath(companyId, rel, warnings);
+      const currentBody = String(msg.getDataValue("body") || "").trim();
       await msg.update({
         mediaUrl: null as unknown as string,
         mediaType: null as unknown as string,
-        body: MESSAGE_MEDIA_REMOVED_BODY
+        body: opts.automaticCleanup
+          ? [currentBody, MESSAGE_MEDIA_AUTO_REMOVED_BODY]
+              .filter(Boolean)
+              .join("\n")
+          : MESSAGE_MEDIA_REMOVED_BODY
       });
       return finishPhysicalDelete(rel, null, n);
     }

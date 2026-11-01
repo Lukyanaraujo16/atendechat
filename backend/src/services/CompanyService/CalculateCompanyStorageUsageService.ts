@@ -16,7 +16,8 @@ const CalculateCompanyStorageUsageService = async (
       },
       "[CompanyStorage] calculate failed"
     );
-    return 0;
+    // Não devolver 0: zeraria o consumo persistido e esconderia a cota excedida.
+    throw err;
   }
 };
 

@@ -317,7 +317,8 @@ export async function recalculateInventorySaleTotals(
 export function parseOptionalId(value: unknown): number | null {
   if (value === undefined || value === null || value === "") return null;
   const n = Number(value);
-  if (!Number.isFinite(n)) {
+  // IDs são inteiros positivos: evita 500 do Postgres com "1.5", 0 ou negativos.
+  if (!Number.isSafeInteger(n) || n <= 0) {
     throw new AppError("ERR_VALIDATION_ERROR", 400, "ID inválido.");
   }
   return n;

@@ -1,6 +1,7 @@
 import { logger } from "../utils/logger";
 import Company from "../models/Company";
 import RecalculateCompanyStorageUsageService from "../services/CompanyService/RecalculateCompanyStorageUsageService";
+import CleanupCompanyStorageService from "../services/CompanyService/CleanupCompanyStorageService";
 
 let storageRecalcRunning = false;
 
@@ -21,6 +22,8 @@ export async function runCompanyStorageRecalcJob(): Promise<void> {
         await RecalculateCompanyStorageUsageService(r.id, {
           snapshotReason: "scheduled_recalculate"
         });
+        // Acima da cota: limpa mídias antigas elegíveis (dry-run salvo STORAGE_AUTO_CLEANUP_ENABLED=true).
+        await CleanupCompanyStorageService(r.id);
       } catch (e) {
         logger.error(
           `[StorageRecalc] Empresa ${r.id}: ${e instanceof Error ? e.message : e}`

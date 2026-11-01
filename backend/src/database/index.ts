@@ -73,6 +73,7 @@ import SupportAccessLog from "../models/SupportAccessLog";
 import CompanyLog from "../models/CompanyLog";
 import CompanySignupRequest from "../models/CompanySignupRequest";
 import CompanyStorageSnapshot from "../models/CompanyStorageSnapshot";
+import CompanyDeletion from "../models/CompanyDeletion";
 import Appointment from "../models/Appointment";
 import AppointmentParticipant from "../models/AppointmentParticipant";
 import CrmPipeline from "../models/CrmPipeline";
@@ -243,6 +244,7 @@ const models = [
   CompanyLog,
   CompanySignupRequest,
   CompanyStorageSnapshot,
+  CompanyDeletion,
   Appointment,
   AppointmentParticipant,
   CrmPipeline,

@@ -14,6 +14,10 @@ import {
   resolveWhatsAppConnectionProvider
 } from "../connectionProvider";
 import { throwEvolutionProviderNotReady } from "../providers/evolution/evolutionErrors";
+import {
+  COMPANY_INACTIVE_MESSAGE,
+  isCompanyDeactivated
+} from "../../../helpers/companyActivation";
 
 type Session = WASocket & { id?: number };
 
@@ -25,6 +29,10 @@ type Session = WASocket & { id?: number };
 export async function getWhatsAppOutboundForWhatsapp(
   whatsapp: Whatsapp
 ): Promise<WhatsAppOutbound> {
+  if (await isCompanyDeactivated(whatsapp.companyId)) {
+    throw new AppError("ERR_COMPANY_INACTIVE", 403, COMPANY_INACTIVE_MESSAGE);
+  }
+
   const provider = resolveWhatsAppConnectionProvider(whatsapp);
 
   if (isEvolutionConnection(provider)) {

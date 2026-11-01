@@ -164,7 +164,10 @@ function parseTypeFilter(input: ListCompanyMediaInput): CompanyMediaBucket | "al
   return "all";
 }
 
-async function loadMessageItems(companyId: number): Promise<CompanyMediaListItem[]> {
+async function loadMessageItems(
+  companyId: number,
+  maxRows: number | null = MAX_PER_SOURCE
+): Promise<CompanyMediaListItem[]> {
   try {
     const rows = await Message.findAll({
       where: {
@@ -174,7 +177,7 @@ async function loadMessageItems(companyId: number): Promise<CompanyMediaListItem
       attributes: ["id", "mediaUrl", "mediaType", "createdAt", "ticketId", "contactId"],
       include: [{ model: Contact, attributes: ["name"], required: false }],
       order: [["createdAt", "DESC"]],
-      limit: MAX_PER_SOURCE
+      limit: maxRows ?? undefined
     });
 
     const out: CompanyMediaListItem[] = [];
@@ -233,7 +236,10 @@ async function loadMessageItems(companyId: number): Promise<CompanyMediaListItem
   }
 }
 
-async function loadQuickMessageItems(companyId: number): Promise<CompanyMediaListItem[]> {
+async function loadQuickMessageItems(
+  companyId: number,
+  maxRows: number | null = MAX_PER_SOURCE
+): Promise<CompanyMediaListItem[]> {
   try {
     const rows = await QuickMessage.findAll({
       where: {
@@ -242,7 +248,7 @@ async function loadQuickMessageItems(companyId: number): Promise<CompanyMediaLis
       },
       attributes: ["id", "mediaPath", "mediaName", "createdAt"],
       order: [["createdAt", "DESC"]],
-      limit: MAX_PER_SOURCE
+      limit: maxRows ?? undefined
     });
     return rows.map((r) => {
       const inner = String(r.getDataValue("mediaPath") || "");
@@ -283,7 +289,10 @@ async function loadQuickMessageItems(companyId: number): Promise<CompanyMediaLis
   }
 }
 
-async function loadScheduleItems(companyId: number): Promise<CompanyMediaListItem[]> {
+async function loadScheduleItems(
+  companyId: number,
+  maxRows: number | null = MAX_PER_SOURCE
+): Promise<CompanyMediaListItem[]> {
   try {
     const rows = await Schedule.findAll({
       where: {
@@ -293,7 +302,7 @@ async function loadScheduleItems(companyId: number): Promise<CompanyMediaListIte
       attributes: ["id", "mediaPath", "mediaName", "createdAt", "updatedAt", "ticketId", "contactId"],
       include: [{ model: Contact, attributes: ["name"], required: false }],
       order: [["updatedAt", "DESC"]],
-      limit: MAX_PER_SOURCE
+      limit: maxRows ?? undefined
     });
     return rows.map((r) => {
       const rel = String(r.getDataValue("mediaPath") || "");
@@ -334,7 +343,10 @@ async function loadScheduleItems(companyId: number): Promise<CompanyMediaListIte
   }
 }
 
-async function loadCampaignItems(companyId: number): Promise<CompanyMediaListItem[]> {
+async function loadCampaignItems(
+  companyId: number,
+  maxRows: number | null = MAX_PER_SOURCE
+): Promise<CompanyMediaListItem[]> {
   try {
     const rows = await Campaign.findAll({
       where: {
@@ -343,7 +355,7 @@ async function loadCampaignItems(companyId: number): Promise<CompanyMediaListIte
       },
       attributes: ["id", "mediaPath", "mediaName", "createdAt", "updatedAt"],
       order: [["updatedAt", "DESC"]],
-      limit: MAX_PER_SOURCE
+      limit: maxRows ?? undefined
     });
     return rows.map((r) => {
       const rel = String(r.getDataValue("mediaPath") || "");
@@ -383,7 +395,10 @@ async function loadCampaignItems(companyId: number): Promise<CompanyMediaListIte
   }
 }
 
-async function loadAnnouncementItems(companyId: number): Promise<CompanyMediaListItem[]> {
+async function loadAnnouncementItems(
+  companyId: number,
+  maxRows: number | null = MAX_PER_SOURCE
+): Promise<CompanyMediaListItem[]> {
   try {
     const rows = await Announcement.findAll({
       where: {
@@ -392,7 +407,7 @@ async function loadAnnouncementItems(companyId: number): Promise<CompanyMediaLis
       },
       attributes: ["id", "mediaPath", "createdAt", "updatedAt"],
       order: [["updatedAt", "DESC"]],
-      limit: MAX_PER_SOURCE
+      limit: maxRows ?? undefined
     });
     return rows.map((r) => {
       const rel = String(r.getDataValue("mediaPath") || "");
@@ -431,12 +446,15 @@ async function loadAnnouncementItems(companyId: number): Promise<CompanyMediaLis
   }
 }
 
-async function loadFileListItems(companyId: number): Promise<CompanyMediaListItem[]> {
+async function loadFileListItems(
+  companyId: number,
+  maxRows: number | null = MAX_PER_SOURCE
+): Promise<CompanyMediaListItem[]> {
   try {
     const lists = await Files.findAll({
       where: { companyId },
       include: [{ model: FilesOptions, as: "options", required: false }],
-      limit: MAX_PER_SOURCE
+      limit: maxRows ?? undefined
     });
     const out: CompanyMediaListItem[] = [];
     for (const fl of lists) {
@@ -479,7 +497,7 @@ async function loadFileListItems(companyId: number): Promise<CompanyMediaListIte
       }
     }
     out.sort((a, b) => safeTimeMs(b.createdAt) - safeTimeMs(a.createdAt));
-    return out.slice(0, MAX_PER_SOURCE);
+    return maxRows == null ? out : out.slice(0, maxRows);
   } catch (err) {
     logger.warn(
       {
@@ -493,7 +511,10 @@ async function loadFileListItems(companyId: number): Promise<CompanyMediaListIte
   }
 }
 
-async function loadChatMessageItems(companyId: number): Promise<CompanyMediaListItem[]> {
+async function loadChatMessageItems(
+  companyId: number,
+  maxRows: number | null = MAX_PER_SOURCE
+): Promise<CompanyMediaListItem[]> {
   try {
     const rows = await ChatMessage.findAll({
       where: {
@@ -502,7 +523,7 @@ async function loadChatMessageItems(companyId: number): Promise<CompanyMediaList
       attributes: ["id", "mediaPath", "mediaName", "createdAt"],
       include: [{ model: Chat, attributes: [], where: { companyId }, required: true }],
       order: [["createdAt", "DESC"]],
-      limit: MAX_PER_SOURCE
+      limit: maxRows ?? undefined
     });
     return rows.map((r) => {
       const rel = String(r.getDataValue("mediaPath") || "");
@@ -542,13 +563,16 @@ async function loadChatMessageItems(companyId: number): Promise<CompanyMediaList
   }
 }
 
-async function loadFlowImageItems(companyId: number): Promise<CompanyMediaListItem[]> {
+async function loadFlowImageItems(
+  companyId: number,
+  maxRows: number | null = MAX_PER_SOURCE
+): Promise<CompanyMediaListItem[]> {
   try {
     const rows = await FlowImgModel.findAll({
       where: { companyId },
       attributes: ["id", "name", "createdAt", "updatedAt"],
       order: [["updatedAt", "DESC"]],
-      limit: MAX_PER_SOURCE
+      limit: maxRows ?? undefined
     });
     return rows.map((r) => {
       const rel = String(r.name || "");
@@ -587,13 +611,16 @@ async function loadFlowImageItems(companyId: number): Promise<CompanyMediaListIt
   }
 }
 
-async function loadFlowAudioItems(companyId: number): Promise<CompanyMediaListItem[]> {
+async function loadFlowAudioItems(
+  companyId: number,
+  maxRows: number | null = MAX_PER_SOURCE
+): Promise<CompanyMediaListItem[]> {
   try {
     const rows = await FlowAudioModel.findAll({
       where: { companyId },
       attributes: ["id", "name", "createdAt", "updatedAt"],
       order: [["updatedAt", "DESC"]],
-      limit: MAX_PER_SOURCE
+      limit: maxRows ?? undefined
     });
     return rows.map((r) => {
       const rel = String(r.name || "");
@@ -647,21 +674,48 @@ export type CompanyMediaTotalResult = {
  * Fonte única de verdade: mesmos loaders da tabela da Gestão de mídias,
  * com deduplicação por ficheiro em public/.
  */
+/** Arquivos físicos existentes referenciados pela empresa (todas as origens, sem teto). */
+export async function listCompanyStoredFiles(
+  companyId: number
+): Promise<Array<{ storageRel: string; sizeBytes: number; source: CompanyMediaSource }>> {
+  const loaders = [
+    loadMessageItems,
+    loadQuickMessageItems,
+    loadScheduleItems,
+    loadCampaignItems,
+    loadAnnouncementItems,
+    loadFileListItems,
+    loadChatMessageItems,
+    loadFlowImageItems,
+    loadFlowAudioItems
+  ];
+  const lists = await Promise.all(loaders.map(load => load(companyId, null)));
+  const byRel = new Map<string, { storageRel: string; sizeBytes: number; source: CompanyMediaSource }>();
+  lists.flat().forEach(item => {
+    if (!item.storageRel || item.missing || item.sizeBytes <= 0) return;
+    if (!byRel.has(item.storageRel)) {
+      byRel.set(item.storageRel, { storageRel: item.storageRel, sizeBytes: item.sizeBytes, source: item.source });
+    }
+  });
+  return Array.from(byRel.values());
+}
+
 export async function calculateCompanyMediaTotalBytes(
   companyId: number
 ): Promise<CompanyMediaTotalResult> {
   logger.info({ companyId }, "[CompanyStorage] calculate start (inventory)");
 
+  // Sem o teto da listagem: o consumo precisa considerar todos os arquivos.
   const settled = await Promise.allSettled([
-    loadMessageItems(companyId),
-    loadQuickMessageItems(companyId),
-    loadScheduleItems(companyId),
-    loadCampaignItems(companyId),
-    loadAnnouncementItems(companyId),
-    loadFileListItems(companyId),
-    loadChatMessageItems(companyId),
-    loadFlowImageItems(companyId),
-    loadFlowAudioItems(companyId)
+    loadMessageItems(companyId, null),
+    loadQuickMessageItems(companyId, null),
+    loadScheduleItems(companyId, null),
+    loadCampaignItems(companyId, null),
+    loadAnnouncementItems(companyId, null),
+    loadFileListItems(companyId, null),
+    loadChatMessageItems(companyId, null),
+    loadFlowImageItems(companyId, null),
+    loadFlowAudioItems(companyId, null)
   ]);
 
   const merged: CompanyMediaListItem[] = [];

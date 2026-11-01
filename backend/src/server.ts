@@ -4,6 +4,7 @@ import { initIO } from "./libs/socket";
 import { logger } from "./utils/logger";
 import { StartAllWhatsAppsSessions } from "./services/WbotServices/StartAllWhatsAppsSessions";
 import Company from "./models/Company";
+import { resumeCompanyDeletions } from "./services/CompanyService/CompanyDeletionService";
 import { startQueueProcess } from "./queues";
 import { TransferTicketQueue } from "./wbotTransferTicketQueue";
 import cron from "node-cron";
@@ -37,6 +38,10 @@ const server = app.listen(process.env.PORT, async () => {
   Promise.all(allPromises).then(() => {
     startQueueProcess();
   });
+  // Exclusões definitivas interrompidas por reinício voltam a executar.
+  resumeCompanyDeletions().catch(err =>
+    logger.error({ err }, "[CompanyDeletion] falha ao retomar exclusões")
+  );
   logger.info(`Server started on port: ${process.env.PORT}`);
   logWhatsAppPolicyAtProcessBoot();
   logEfiActivationControlsAtBoot();

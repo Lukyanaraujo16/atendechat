@@ -12,6 +12,7 @@ import { getIO } from "../../libs/socket";
 import wbotMonitor from "./wbotMonitor";
 import { logger } from "../../utils/logger";
 import AppError from "../../errors/AppError";
+import { isCompanyDeactivated } from "../../helpers/companyActivation";
 
 /**
  * Inicia sessão WhatsApp conforme connectionProvider.
@@ -27,6 +28,15 @@ export const StartWhatsAppSession = async (
       `[Connection] event=company_mismatch whatsappId=${whatsapp.id} wCompany=${whatsapp.companyId} reqCompany=${companyId}`
     );
     throw new AppError("ERR_FORBIDDEN", 403);
+  }
+
+  // Empresa desativada: não inicia nem reconecta (credenciais preservadas para a reativação).
+  if (await isCompanyDeactivated(companyId)) {
+    logger.info(
+      { companyId, whatsappId: whatsapp.id },
+      "[Connection] empresa desativada — sessão não iniciada"
+    );
+    return;
   }
 
   const connectionProvider = resolveWhatsAppConnectionProvider(whatsapp);

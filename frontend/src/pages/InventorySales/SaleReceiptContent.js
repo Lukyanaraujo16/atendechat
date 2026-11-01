@@ -17,9 +17,14 @@ import { formatCurrencyBRL } from "../../utils/brazilianCurrency";
 import {
   formatQuantity,
   formatSaleNumber,
+  getSaleCustomer,
   getSaleDisplayDate,
   toNumber,
 } from "./utils";
+import {
+  formatInventoryCustomerDocument,
+  formatInventoryCustomerPhone,
+} from "./inventoryCustomerMasks";
 import { identifiersFromSaleItem } from "./saleItemIdentifiers";
 import { isThermalSaleReceiptFormat } from "./saleReceiptPrintFormats";
 import {
@@ -491,7 +496,8 @@ function A4PaymentsBlock({ payments, classes }) {
 function ThermalReceipt({ sale, classes, branding, payments, paymentSummary }) {
   const items = getInventorySaleItems(sale);
   const isCancelled = sale.status === "cancelled";
-  const customerName = sale.contact?.name || "";
+  const customer = getSaleCustomer(sale);
+  const customerName = customer?.name || "";
   const sellerName = sale.seller?.name || "";
   const statusLabel = i18n.t(`inventorySales.sales.status.${sale.status}`, sale.status);
   const paymentStatusLabel = i18n.t(
@@ -557,6 +563,22 @@ function ThermalReceipt({ sale, classes, branding, payments, paymentSummary }) {
             {i18n.t("inventorySales.sales.receipt.customer")}:{" "}
           </span>
           {customerName}
+        </div>
+      ) : null}
+      {customer?.document ? (
+        <div className="sale-receipt-thermal-line">
+          <span className="sale-receipt-thermal-label">
+            {i18n.t("inventorySales.sales.receipt.customerDocument")}:{" "}
+          </span>
+          {formatInventoryCustomerDocument(customer.document)}
+        </div>
+      ) : null}
+      {customer?.phone ? (
+        <div className="sale-receipt-thermal-line">
+          <span className="sale-receipt-thermal-label">
+            {i18n.t("inventorySales.sales.receipt.customerPhone")}:{" "}
+          </span>
+          {formatInventoryCustomerPhone(customer.phone)}
         </div>
       ) : null}
       {sellerName ? (
@@ -743,6 +765,7 @@ export default function SaleReceiptContent({
 
   const items = getInventorySaleItems(sale);
   const isCancelled = sale.status === "cancelled";
+  const customer = getSaleCustomer(sale);
   const hasPaymentLines = Array.isArray(payments) && payments.length > 0;
   const paidDisplay = resolveReceiptPaidAmount(sale, payments, paymentSummary);
   const pendingDisplay = resolveReceiptPendingAmount(
@@ -780,8 +803,24 @@ export default function SaleReceiptContent({
     },
     {
       label: i18n.t("inventorySales.sales.receipt.customer"),
-      value: sale.contact?.name || i18n.t("inventorySales.sales.receipt.noCustomer"),
+      value: customer?.name || i18n.t("inventorySales.sales.receipt.noCustomer"),
     },
+    ...(customer?.document
+      ? [
+          {
+            label: i18n.t("inventorySales.sales.receipt.customerDocument"),
+            value: formatInventoryCustomerDocument(customer.document),
+          },
+        ]
+      : []),
+    ...(customer?.phone
+      ? [
+          {
+            label: i18n.t("inventorySales.sales.receipt.customerPhone"),
+            value: formatInventoryCustomerPhone(customer.phone),
+          },
+        ]
+      : []),
     {
       label: i18n.t("inventorySales.sales.receipt.seller"),
       value: sale.seller?.name || i18n.t("inventorySales.sales.receipt.noSeller"),

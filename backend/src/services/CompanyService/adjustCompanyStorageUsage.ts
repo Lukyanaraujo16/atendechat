@@ -62,26 +62,23 @@ async function applyDeltaAtomic(companyId: number, delta: number): Promise<void>
   );
 }
 
+/** Pontos percentuais abaixo do nível para rearmar o aviso (evita repetição oscilando no limiar). */
+const REARM_MARGIN_PERCENT = 5;
+
+export const STORAGE_NOTIFICATION_BODIES: Record<80 | 90 | 100, string> = {
+  80: "O armazenamento da sua empresa atingiu 80% da cota do plano. Acesse a Central de Mídias (Configurações › Gestão de mídias) e remova os arquivos desnecessários.",
+  90: "Atenção: o armazenamento da sua empresa atingiu 90% da cota e poderá chegar ao limite em breve. Remova arquivos desnecessários na Central de Mídias ou consulte a ampliação do plano em Assinatura ou com o suporte.",
+  100: "O armazenamento da sua empresa atingiu o limite do plano. A limpeza automática removerá os arquivos mais antigos de mensagens e atendimentos, conforme a política de retenção, até cerca de 90% da cota, preservando os mais recentes e o histórico de texto. Para evitar remoções, libere espaço na Central de Mídias ou amplie o plano."
+};
+
 async function notifyStorageThreshold(
   companyId: number,
   companyName: string,
   level: 80 | 90 | 100
 ): Promise<void> {
-  const { type, body } =
-    level === 80
-      ? {
-          type: "storage_warning_80",
-          body: "Sua empresa atingiu 80% do armazenamento disponível."
-        }
-      : level === 90
-        ? {
-            type: "storage_warning_90",
-            body: "Sua empresa atingiu 90% do armazenamento disponível."
-          }
-        : {
-            type: "storage_limit_exceeded",
-            body: "Sua empresa atingiu ou ultrapassou o limite de armazenamento."
-          };
+  const type =
+    level === 100 ? "storage_limit_exceeded" : `storage_warning_${level}`;
+  const body = STORAGE_NOTIFICATION_BODIES[level];
 
   const title = "Armazenamento";
 
@@ -162,6 +159,12 @@ export async function evaluateCompanyStorageThresholds(
   }
 
   if (level > watermark) {
+    // CAS: só quem eleva a marca d'água notifica (uploads concorrentes não duplicam o aviso).
+    const raised = await sequelize.query(
+      `UPDATE "Companies" SET "storageAlertWatermark" = :level WHERE "id" = :id AND "storageAlertWatermark" < :level RETURNING "id"`,
+      { replacements: { level, id: companyId }, type: QueryTypes.SELECT }
+    );
+    if (raised.length === 0) return;
     await notifyStorageThreshold(
       companyId,
       String(row.name || ""),
@@ -173,17 +176,30 @@ export async function evaluateCompanyStorageThresholds(
         : level === 90
           ? "threshold_90"
           : "threshold_100";
-    await CreateCompanyStorageSnapshotService({ companyId, reason });
-    await Company.update(
-      { storageAlertWatermark: level },
-      { where: { id: companyId } }
-    );
+    try {
+      await CreateCompanyStorageSnapshotService({ companyId, reason });
+    } catch (err) {
+      logger.warn(
+        {
+          companyId,
+          reason,
+          err: err instanceof Error ? err.message : String(err)
+        },
+        "[CompanyStorage] threshold_snapshot_failed"
+      );
+    }
     logger.info({ companyId, level, percent }, "[CompanyStorage] threshold_crossed");
-  } else if (level < watermark) {
-    await Company.update(
-      { storageAlertWatermark: level },
-      { where: { id: companyId } }
+  } else {
+    // Rearme com histerese: o nível só baixa quando o consumo cai REARM_MARGIN abaixo do limiar.
+    const rearmLevel = storageThresholdLevel(
+      percent == null ? null : percent + REARM_MARGIN_PERCENT
     );
+    if (rearmLevel < watermark) {
+      await Company.update(
+        { storageAlertWatermark: rearmLevel },
+        { where: { id: companyId } }
+      );
+    }
   }
 }
 

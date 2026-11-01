@@ -9,6 +9,10 @@ import {
   createRefreshToken
 } from "../../helpers/CreateTokens";
 import { serializeUserForSession } from "../../helpers/SerializeUser";
+import {
+  COMPANY_INACTIVE_MESSAGE,
+  isCompanyDeactivated
+} from "../../helpers/companyActivation";
 
 interface RefreshTokenPayload {
   id: string;
@@ -37,6 +41,11 @@ export const RefreshTokenService = async (
     if (user.tokenVersion !== tokenVersion) {
       res.clearCookie("jrt", { httpOnly: true, path: "/" });
       throw new AppError("ERR_SESSION_EXPIRED", 401);
+    }
+
+    if (!user.super && (await isCompanyDeactivated(user.companyId))) {
+      res.clearCookie("jrt", { httpOnly: true, path: "/" });
+      throw new AppError("ERR_COMPANY_INACTIVE", 403, COMPANY_INACTIVE_MESSAGE);
     }
 
     const normalizeHome = (v: unknown): number | null => {

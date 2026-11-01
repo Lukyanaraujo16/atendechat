@@ -9,6 +9,10 @@ import Queue from "../../models/Queue";
 import Company from "../../models/Company";
 import Setting from "../../models/Setting";
 import MarkSignupRequestActivatedForUserService from "../CompanySignupRequest/MarkSignupRequestActivatedForUserService";
+import {
+  COMPANY_INACTIVE_MESSAGE,
+  isCompanyDeactivated
+} from "../../helpers/companyActivation";
 
 interface SerializedUser {
   id: number;
@@ -83,6 +87,10 @@ const AuthUserService = async ({
 
   if (user.active === false) {
     throw new AppError("ERR_USER_INACTIVE", 403);
+  }
+
+  if (!user.super && (await isCompanyDeactivated(user.companyId))) {
+    throw new AppError("ERR_COMPANY_INACTIVE", 403, COMPANY_INACTIVE_MESSAGE);
   }
 
   await MarkSignupRequestActivatedForUserService(user, "login");

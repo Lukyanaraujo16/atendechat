@@ -34,8 +34,11 @@ import { logger } from "../../utils/logger";
 export async function countAllReferencesToRelPath(
   companyId: number,
   relRaw: string | null | undefined,
-  warnings?: string[]
+  warnings?: string[],
+  opts: { otherCompanies?: boolean } = {}
 ): Promise<number> {
+  // otherCompanies: conta referências de QUALQUER outra empresa (arquivo compartilhado em public/).
+  const cid = opts.otherCompanies ? { [Op.ne]: companyId } : companyId;
   const variants = collectPathMatchVariants(relRaw);
   const r = normalizePublicRelPath(relRaw);
   if (!variants.length && !r) return 0;
@@ -45,7 +48,7 @@ export async function countAllReferencesToRelPath(
   const msgWhere = buildMediaUrlWhere(variants);
   if (msgWhere) {
     n += await Message.count({
-      where: { companyId, ...msgWhere }
+      where: { companyId: cid, ...msgWhere }
     });
   }
 
@@ -55,16 +58,16 @@ export async function countAllReferencesToRelPath(
     const qmWhere = buildMediaPathWhere(innerVariants);
     if (qmWhere) {
       n += await QuickMessage.count({
-        where: { companyId, ...qmWhere }
+        where: { companyId: cid, ...qmWhere }
       });
     }
   }
 
   const pathWhere = buildMediaPathWhere(variants);
   if (pathWhere) {
-    n += await Schedule.count({ where: { companyId, ...pathWhere } });
-    n += await Campaign.count({ where: { companyId, ...pathWhere } });
-    n += await Announcement.count({ where: { companyId, ...pathWhere } });
+    n += await Schedule.count({ where: { companyId: cid, ...pathWhere } });
+    n += await Campaign.count({ where: { companyId: cid, ...pathWhere } });
+    n += await Announcement.count({ where: { companyId: cid, ...pathWhere } });
   }
 
   if (await isChatMessagesTableAvailable(sequelize, warnings)) {
@@ -74,7 +77,7 @@ export async function countAllReferencesToRelPath(
           mediaPath: { [Op.and]: [{ [Op.ne]: null }, { [Op.ne]: "" }] }
         },
         attributes: ["mediaPath"],
-        include: [{ model: Chat, where: { companyId }, required: true, attributes: [] }]
+        include: [{ model: Chat, where: { companyId: cid }, required: true, attributes: [] }]
       });
       for (const row of chatRows) {
         const mediaPath = row.getDataValue("mediaPath") as string | null;
@@ -100,14 +103,14 @@ export async function countAllReferencesToRelPath(
     if (Number.isFinite(fileId) && pth) {
       n += await FilesOptions.count({
         where: { path: pth },
-        include: [{ model: Files, where: { companyId, id: fileId }, required: true }]
+        include: [{ model: Files, where: { companyId: cid, id: fileId }, required: true }]
       });
     }
   }
 
   if (r) {
-    n += await FlowImgModel.count({ where: { companyId, name: r } });
-    n += await FlowAudioModel.count({ where: { companyId, name: r } });
+    n += await FlowImgModel.count({ where: { companyId: cid, name: r } });
+    n += await FlowAudioModel.count({ where: { companyId: cid, name: r } });
   }
 
   return n;

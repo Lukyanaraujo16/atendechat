@@ -236,7 +236,7 @@ export default function CompanyDetailHeader({
               onClick={() => actions.openBlock(company)}
               disabled={isOwnCompany}
             >
-              {blocked ? "Desbloquear" : "Bloquear"}
+              {blocked ? "Reativar" : "Desativar"}
             </AppNeutralButton>
             <MobileActionsMenu items={menuItems} ariaLabel="Mais ações" />
           </Box>

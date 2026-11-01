@@ -26,7 +26,12 @@ import {
 import toastError from "../../errors/toastError";
 import { i18n } from "../../translate/i18n";
 import { INVENTORY_TABS } from "./constants";
-import { formatQuantity, formatSaleNumber, getSaleDisplayDate } from "./utils";
+import {
+  formatQuantity,
+  formatSaleNumber,
+  getSaleCustomerName,
+  getSaleDisplayDate,
+} from "./utils";
 import { formatCurrencyBRL } from "../../utils/brazilianCurrency";
 import { useInventoryPermissions } from "../../utils/inventoryAccess";
 import { useManualSale } from "./ManualSaleProvider";
@@ -350,7 +355,7 @@ export default function InventorySummaryTab({
           ) : (
             <Box mt={1}>
               {recentSales.map((sale) => {
-                const party = sale.contact?.name || sale.seller?.name || "—";
+                const party = getSaleCustomerName(sale) || sale.seller?.name || "—";
                 return (
                   <div key={sale.id} className={classes.saleRow}>
                     <Box className={classes.saleIdentity}>

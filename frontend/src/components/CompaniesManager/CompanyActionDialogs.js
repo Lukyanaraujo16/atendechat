@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Box,
   Button,
@@ -56,9 +56,11 @@ export function BlockCompanyDialog({ row, onClose, onConfirm, loading }) {
   );
 }
 
-export function DeleteCompanyDialog({ row, onClose, onConfirm, loading }) {
+export function DeleteCompanyDialog({ row, onClose, onConfirm, loading, deletion }) {
   const [nameInput, setNameInput] = useState("");
   const expected = (row?.name || "").trim();
+  const inProgress = deletion?.status === "pending" || deletion?.status === "running";
+  const failed = deletion?.status === "failed";
   const handleClose = () => {
     if (loading) return;
     setNameInput("");
@@ -68,39 +70,64 @@ export function DeleteCompanyDialog({ row, onClose, onConfirm, loading }) {
     <Dialog open={Boolean(row)} onClose={handleClose} maxWidth="sm" fullWidth>
       <DialogTitle>{i18n.t("platform.companies.deleteGridTitle")}</DialogTitle>
       <DialogContent dividers>
+        <Alert severity="error" style={{ marginBottom: 12 }}>
+          {i18n.t("platform.companies.deleteGridIrreversible")}
+        </Alert>
         <Typography variant="body2" component="p" paragraph>
           {i18n.t("platform.companies.deleteGridMessage", { name: row?.name || "—" })}
         </Typography>
-        <TextField
-          fullWidth
-          variant="outlined"
-          size="small"
-          label={i18n.t("platform.companies.deleteGridNameLabel")}
-          placeholder={row?.name || ""}
-          value={nameInput}
-          onChange={(e) => setNameInput(e.target.value)}
-          autoComplete="off"
-          disabled={loading}
-        />
-        <Typography variant="caption" color="textSecondary" display="block" style={{ marginTop: 8 }}>
-          {i18n.t("platform.companies.deleteGridHint")}
-        </Typography>
+        {inProgress ? (
+          <Alert severity="info" icon={<CircularProgress size={16} />} data-testid="company-deletion-progress">
+            {i18n.t("platform.companies.deleteGridInProgress")}
+          </Alert>
+        ) : null}
+        {failed ? (
+          <Alert severity="warning" data-testid="company-deletion-failed" style={{ marginBottom: 12 }}>
+            {deletion.errorMessage || i18n.t("platform.companies.deleteGridFailed")}
+          </Alert>
+        ) : null}
+        {!inProgress ? (
+          <>
+            <TextField
+              id="company-delete-confirm-name"
+              fullWidth
+              variant="outlined"
+              size="small"
+              label={i18n.t("platform.companies.deleteGridNameLabel")}
+              placeholder={row?.name || ""}
+              value={nameInput}
+              onChange={(e) => setNameInput(e.target.value)}
+              autoComplete="off"
+              disabled={loading}
+            />
+            <Typography variant="caption" color="textSecondary" display="block" style={{ marginTop: 8 }}>
+              {i18n.t("platform.companies.deleteGridHint")}
+            </Typography>
+          </>
+        ) : null}
       </DialogContent>
       <DialogActions>
         <Button onClick={handleClose} color="primary" disabled={loading}>
-          {i18n.t("confirmationModal.buttons.cancel")}
+          {inProgress
+            ? i18n.t("platform.companies.deleteGridCloseBackground")
+            : i18n.t("confirmationModal.buttons.cancel")}
         </Button>
-        <Button
-          onClick={async () => {
-            const ok = await onConfirm(row);
-            if (ok) setNameInput("");
-          }}
-          color="secondary"
-          variant="contained"
-          disabled={loading || !row || nameInput.trim() !== expected}
-        >
-          {loading ? <CircularProgress size={18} color="inherit" /> : i18n.t("platform.companies.deleteGridConfirm")}
-        </Button>
+        {!inProgress ? (
+          <Button
+            onClick={() => onConfirm(row, nameInput)}
+            color="secondary"
+            variant="contained"
+            disabled={loading || !row || nameInput.trim() !== expected}
+          >
+            {loading ? (
+              <CircularProgress size={18} color="inherit" />
+            ) : failed ? (
+              i18n.t("platform.companies.deleteGridRetry")
+            ) : (
+              i18n.t("platform.companies.deleteGridConfirm")
+            )}
+          </Button>
+        ) : null}
       </DialogActions>
     </Dialog>
   );
@@ -304,13 +331,14 @@ export function PrimaryAdminSetupDialog({ setup, onClose }) {
  * (para recarregar a listagem ou a empresa); `onDeleted(row)` após exclusão.
  */
 export function useCompanyQuickActions({ onChanged, onDeleted } = {}) {
-  const { update, remove, fetchCompanyLogs } = useCompanies();
+  const { update, remove, fetchCompanyLogs, fetchDeletionStatus } = useCompanies();
 
   const [blockRow, setBlockRow] = useState(null);
   const [blockLoading, setBlockLoading] = useState(false);
   const [renewRow, setRenewRow] = useState(null);
   const [deleteRow, setDeleteRow] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deletion, setDeletion] = useState(null);
   const [notesRow, setNotesRow] = useState(null);
   const [notesDraft, setNotesDraft] = useState("");
   const [notesSaving, setNotesSaving] = useState(false);
@@ -342,19 +370,43 @@ export function useCompanyQuickActions({ onChanged, onDeleted } = {}) {
     }
   };
 
-  const confirmDelete = async (row) => {
-    if (!row) return false;
-    setDeleteLoading(true);
-    try {
-      await remove(row.id);
+  const finishDeletion = useCallback(
+    async (row) => {
       toast.success(i18n.t("platform.companies.deleteGridSuccess"));
       setDeleteRow(null);
+      setDeletion(null);
       if (typeof onDeleted === "function") await onDeleted(row);
       else await notifyChanged();
-      return true;
+    },
+    [onDeleted, notifyChanged]
+  );
+
+  // Acompanha a exclusão assíncrona até concluir ou falhar.
+  useEffect(() => {
+    const active = deletion?.status === "pending" || deletion?.status === "running";
+    if (!deleteRow || !active) return undefined;
+    const timer = setTimeout(async () => {
+      try {
+        const next = await fetchDeletionStatus(deleteRow.id);
+        if (next?.status === "completed") await finishDeletion(deleteRow);
+        else setDeletion(next);
+      } catch (e) {
+        toastError(e);
+      }
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [deletion, deleteRow, fetchDeletionStatus, finishDeletion]);
+
+  const confirmDelete = async (row, confirmName) => {
+    if (!row) return;
+    setDeleteLoading(true);
+    try {
+      const data = await remove(row.id, confirmName);
+      const next = data?.deletion || null;
+      if (next?.status === "completed") await finishDeletion(row);
+      else setDeletion(next);
     } catch (e) {
       toastError(e);
-      return false;
     } finally {
       setDeleteLoading(false);
     }
@@ -392,7 +444,17 @@ export function useCompanyQuickActions({ onChanged, onDeleted } = {}) {
   const actions = {
     openBlock: (row) => setBlockRow(row),
     openRenew: (row) => setRenewRow(row),
-    openDelete: (row) => setDeleteRow(row),
+    openDelete: async (row) => {
+      setDeleteRow(row);
+      setDeletion(null);
+      // Exclusão já iniciada antes (falha ou em andamento): mostra o estado atual.
+      try {
+        const current = await fetchDeletionStatus(row.id);
+        if (current && current.status !== "completed") setDeletion(current);
+      } catch {
+        /* status indisponível: o diálogo segue para nova confirmação */
+      }
+    },
     openNotes: (row) => {
       setNotesRow(row);
       setNotesDraft(row?.internalNotes || "");
@@ -428,7 +490,11 @@ export function useCompanyQuickActions({ onChanged, onDeleted } = {}) {
       <DeleteCompanyDialog
         row={deleteRow}
         loading={deleteLoading}
-        onClose={() => setDeleteRow(null)}
+        deletion={deletion}
+        onClose={() => {
+          setDeleteRow(null);
+          setDeletion(null);
+        }}
         onConfirm={confirmDelete}
       />
       <InternalNotesDialog

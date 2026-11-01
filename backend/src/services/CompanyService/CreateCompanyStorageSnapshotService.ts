@@ -14,7 +14,8 @@ export type CompanyStorageSnapshotReason =
   | "media_decrement"
   | "threshold_80"
   | "threshold_90"
-  | "threshold_100";
+  | "threshold_100"
+  | "auto_cleanup";
 
 type Input = {
   companyId: number;

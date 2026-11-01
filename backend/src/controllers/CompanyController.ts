@@ -14,7 +14,15 @@ import UpdateCompanyService from "../services/CompanyService/UpdateCompanyServic
 import ShowCompanyService from "../services/CompanyService/ShowCompanyService";
 import UpdateSchedulesService from "../services/CompanyService/UpdateSchedulesService";
 import UpdateCompanyTimezoneService from "../services/CompanyService/UpdateCompanyTimezoneService";
-import DeleteCompanyService from "../services/CompanyService/DeleteCompanyService";
+import {
+  requestCompanyDeletion,
+  serializeCompanyDeletion
+} from "../services/CompanyService/CompanyDeletionService";
+import CompanyDeletion from "../models/CompanyDeletion";
+import {
+  applyCompanyDeactivation,
+  applyCompanyReactivation
+} from "../services/CompanyService/CompanyActivationService";
 import FindAllCompaniesService from "../services/CompanyService/FindAllCompaniesService";
 import { verify } from "jsonwebtoken";
 import User from "../models/User";
@@ -573,6 +581,13 @@ export const update = async (
       userId: req.user.id,
       metadata: { previousStatus: pre.status, newStatus: companyDataRaw.status }
     });
+    // Best-effort: falha aqui não desfaz a alteração de status já gravada.
+    try {
+      if (companyDataRaw.status === false) await applyCompanyDeactivation(companyId);
+      else await applyCompanyReactivation(companyId);
+    } catch (err) {
+      logger.error({ companyId, err }, "[CompanyActivation] efeitos falharam");
+    }
   }
 
   if (
@@ -1012,9 +1027,25 @@ export const remove = async (
     );
   }
 
-  await DeleteCompanyService(id, req.user.id);
+  const deletion = await requestCompanyDeletion({
+    companyId,
+    userId: Number(req.user.id) || null,
+    confirmName: req.body?.confirmName
+  });
 
-  return res.status(200).json({ ok: true });
+  return res.status(202).json({ deletion: serializeCompanyDeletion(deletion) });
+};
+
+export const deletionStatus = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const companyId = Number(req.params.id);
+  const job = await CompanyDeletion.findOne({
+    where: { companyId },
+    order: [["id", "DESC"]]
+  });
+  return res.json({ deletion: serializeCompanyDeletion(job) });
 };
 
 function maskDocumentForAudit(value: unknown): unknown {

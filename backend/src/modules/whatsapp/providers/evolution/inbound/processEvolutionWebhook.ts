@@ -34,6 +34,7 @@ import {
   processEvolutionQrcodeUpdated
 } from "../lifecycle/processEvolutionConnectionWebhook";
 import { processEvolutionPresenceInbound } from "./processEvolutionPresenceInbound";
+import { isCompanyDeactivated } from "../../../../../helpers/companyActivation";
 
 const MAX_BODY_CHARS = 20000;
 
@@ -363,6 +364,11 @@ export async function processEvolutionWebhook(input: {
 
   if (!isEvolutionConnection(whatsapp)) {
     return { outcome: "error", reason: "not_evolution_connection" };
+  }
+
+  // Empresa desativada: eventos não geram tickets/mensagens nem alteram sessão.
+  if (await isCompanyDeactivated(whatsapp.companyId)) {
+    return { outcome: "skipped", reason: "company_inactive" };
   }
 
   if (isEvolutionPresenceUpdateEvent(eventType)) {

@@ -3,6 +3,10 @@ import { Request, Response, NextFunction } from "express";
 import AppError from "../errors/AppError";
 import authConfig from "../config/auth";
 import { logger } from "../utils/logger";
+import {
+  COMPANY_INACTIVE_MESSAGE,
+  isCompanyDeactivated
+} from "../helpers/companyActivation";
 
 interface TokenPayload {
   id: string;
@@ -85,10 +89,28 @@ const isAuth = (req: Request, res: Response, next: NextFunction): void => {
         "[DiagListPlan] isAuth rejected"
       );
     }
-    throw new AppError("Invalid token. We'll try to assign a new one on next request", 403);
+    throw new AppError(
+      "Invalid token. We'll try to assign a new one on next request",
+      403
+    );
   }
 
-  return next();
+  // Empresa desativada (ou em exclusão definitiva): tokens ainda válidos param de operar já.
+  // Modo suporte do Super Admin segue liberado; erro de consulta não bloqueia (fail-open).
+  const { companyId, supportMode } = req.user;
+  if (supportMode || companyId == null) {
+    next();
+    return;
+  }
+  isCompanyDeactivated(companyId).then(
+    deactivated =>
+      deactivated
+        ? next(
+            new AppError("ERR_COMPANY_INACTIVE", 403, COMPANY_INACTIVE_MESSAGE)
+          )
+        : next(),
+    () => next()
+  );
 };
 
 export default isAuth;

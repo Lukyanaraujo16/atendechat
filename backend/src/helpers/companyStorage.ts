@@ -29,6 +29,11 @@ export function getCompanyStorageLimitBytes(
   return null;
 }
 
+/** Limpeza automática de mídias acima da cota: desligada por padrão (só dry-run nos logs). */
+export function isStorageAutoCleanupEnabled(): boolean {
+  return process.env.STORAGE_AUTO_CLEANUP_ENABLED === "true";
+}
+
 export function formatBytesPtBr(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes < 0) return "0 B";
   if (bytes === 0) return "0 B";

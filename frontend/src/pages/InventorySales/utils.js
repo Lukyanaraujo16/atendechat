@@ -109,6 +109,28 @@ export function getSaleDisplayDate(sale) {
   return sale.createdAt;
 }
 
+/**
+ * Cliente exibido na venda: o cliente comercial (InventoryCustomer) tem prioridade; o contato
+ * do atendimento é o fallback (vendas antigas ou abertas pelo ticket sem cliente vinculado).
+ */
+export function getSaleCustomer(sale) {
+  const customer = sale?.customer;
+  if (customer?.name) {
+    return {
+      name: customer.name,
+      document: customer.document || null,
+      phone: customer.phone || null,
+    };
+  }
+  const contact = sale?.contact;
+  if (contact?.name) return { name: contact.name, document: null, phone: null };
+  return null;
+}
+
+export function getSaleCustomerName(sale) {
+  return getSaleCustomer(sale)?.name || "";
+}
+
 export function isSaleEditable(sale) {
   return sale?.status === "draft";
 }

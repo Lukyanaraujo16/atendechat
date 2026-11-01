@@ -65,13 +65,25 @@ import {
   shouldAutofocusSaleProductSearch,
 } from "./saleProductSearch";
 
-function contactOptionFromSale(data) {
+/** A busca devolve clientes comerciais; o contato só aparece em vendas antigas sem cliente. */
+function customerOptionFromSale(data) {
+  const customer = data?.customer;
+  if (customer?.id != null) {
+    return {
+      id: customer.id,
+      name: customer.name || "",
+      number: customer.phone || "",
+      contactId: customer.contactId ?? null,
+    };
+  }
   const contact = data?.contact;
   if (contact?.id == null) return null;
   return {
-    id: contact.id,
+    id: `contact:${contact.id}`,
     name: contact.name || "",
     number: contact.number || "",
+    contactId: contact.id,
+    legacyContact: true,
   };
 }
 
@@ -176,6 +188,7 @@ export default function SaleDrawer({
 
   const [headerForm, setHeaderForm] = useState({
     contactId: "",
+    customerId: "",
     sellerUserId: "",
     notes: "",
     paymentMethod: "",
@@ -204,6 +217,7 @@ export default function SaleDrawer({
   const applySaleToForm = useCallback((data) => {
     setHeaderForm({
       contactId: data.contactId != null ? String(data.contactId) : "",
+      customerId: data.customerId != null ? String(data.customerId) : "",
       sellerUserId:
         data.sellerUserId != null ? String(data.sellerUserId) : "",
       notes: data.notes || "",
@@ -214,7 +228,7 @@ export default function SaleDrawer({
       ),
       paymentNotes: data.paymentNotes || "",
     });
-    applyContact(contactOptionFromSale(data));
+    applyContact(customerOptionFromSale(data));
   }, [applyContact]);
 
   const loadSale = useCallback(async () => {
@@ -396,6 +410,7 @@ export default function SaleDrawer({
       sellerUserId: headerForm.sellerUserId
         ? Number(headerForm.sellerUserId)
         : null,
+      customerId: headerForm.customerId ? Number(headerForm.customerId) : null,
       contactId: ticketLink
         ? ticketLink.contactId
         : headerForm.contactId
@@ -434,10 +449,11 @@ export default function SaleDrawer({
       setHeaderForm((prev) => ({
         ...prev,
         contactId: data.contactId != null ? String(data.contactId) : "",
+        customerId: data.customerId != null ? String(data.customerId) : "",
         sellerUserId: data.sellerUserId != null ? String(data.sellerUserId) : "",
         notes: data.notes || "",
       }));
-      applyContact(contactOptionFromSale(data));
+      applyContact(customerOptionFromSale(data));
       toast.success(i18n.t("inventorySales.sales.toasts.headerSaved"));
       if (onChanged) onChanged();
     } catch (err) {
@@ -586,6 +602,7 @@ export default function SaleDrawer({
     editable &&
       sale &&
       (!sameHeaderId(headerForm.contactId, sale.contactId) ||
+        !sameHeaderId(headerForm.customerId, sale.customerId) ||
         !sameHeaderId(headerForm.sellerUserId, sale.sellerUserId) ||
         (headerForm.notes || "") !== (sale.notes || ""))
   );
@@ -692,7 +709,12 @@ export default function SaleDrawer({
                         setSelectedContact(value);
                         setHeaderForm((prev) => ({
                           ...prev,
-                          contactId: value?.id != null ? String(value.id) : "",
+                          customerId:
+                            value?.id != null && !value.legacyContact
+                              ? String(value.id)
+                              : "",
+                          contactId:
+                            value?.contactId != null ? String(value.contactId) : "",
                         }));
                         if (!value) {
                           setContactOptions([]);
@@ -704,7 +726,11 @@ export default function SaleDrawer({
                         setContactInput(value);
                         if (reason === "input" || reason === "clear") {
                           setSelectedContact(null);
-                          setHeaderForm((prev) => ({ ...prev, contactId: "" }));
+                          setHeaderForm((prev) => ({
+                            ...prev,
+                            customerId: "",
+                            contactId: "",
+                          }));
                           setContactPopupOpen(true);
                           if (reason === "clear") {
                             setContactSearchError(false);

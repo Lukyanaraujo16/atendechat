@@ -52,12 +52,18 @@ const useCompanies = () => {
     return responseData;
   }, []);
 
-  const remove = useCallback(async (id) => {
+  const remove = useCallback(async (id, confirmName) => {
     const { data } = await api.request({
       url: `/companies/${id}`,
       method: "DELETE",
+      data: { confirmName },
     });
     return data;
+  }, []);
+
+  const fetchDeletionStatus = useCallback(async (id) => {
+    const { data } = await api.get(`/companies/${id}/deletion`);
+    return data?.deletion || null;
   }, []);
 
   const updateSchedules = useCallback(async (data) => {
@@ -198,6 +204,7 @@ const useCompanies = () => {
     save,
     update,
     remove,
+    fetchDeletionStatus,
     list,
     find,
     finding,

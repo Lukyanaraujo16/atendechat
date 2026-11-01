@@ -304,10 +304,43 @@ describe("SaleDrawer cliente e persistência", () => {
     expect(updateInventorySale).toHaveBeenCalledWith(12, {
       notes: "Entrega",
       sellerUserId: 3,
+      customerId: null,
       contactId: 8,
     });
     expect(updateInventorySalePayment).not.toHaveBeenCalled();
     expect(toast.success).toHaveBeenCalled();
+  });
+
+  it("venda com cliente comercial (sem contato) mostra o cliente e preserva o vínculo", async () => {
+    renderDrawer(
+      draftSale({
+        customerId: 5,
+        customer: { id: 5, name: "Cliente Balcão", phone: "27988887777", contactId: null },
+      })
+    );
+    await ready();
+    expect(screen.getByTestId("sale-customer-search").value).toBe("Cliente Balcão");
+
+    fireEvent.change(screen.getByTestId("sale-notes"), { target: { value: "x" } });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar dados" }));
+    await waitFor(() => expect(updateInventorySale).toHaveBeenCalledTimes(1));
+    expect(updateInventorySale.mock.calls[0][1]).toMatchObject({ customerId: 5, contactId: null });
+  });
+
+  it("selecionar um cliente da busca envia customerId (não o id como contato)", async () => {
+    searchInventoryCustomers.mockResolvedValue({
+      data: { customers: [{ id: 8, name: "João da Silva", phone: "27999999999", contactId: 44 }] },
+    });
+    renderDrawer();
+    await ready();
+    const input = screen.getByTestId("sale-customer-search");
+    fireEvent.change(input, { target: { value: "Jo" } });
+    fireEvent.click(await screen.findByText("João da Silva", {}, { timeout: 2000 }));
+    await waitFor(() => expect(input.value).toBe("João da Silva"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Guardar dados" }));
+    await waitFor(() => expect(updateInventorySale).toHaveBeenCalledTimes(1));
+    expect(updateInventorySale.mock.calls[0][1]).toMatchObject({ customerId: 8, contactId: 44 });
   });
 
   it("guarda pagamento só com permissão e um erro financeiro não apaga a observação", async () => {

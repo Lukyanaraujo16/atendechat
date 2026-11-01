@@ -46,6 +46,7 @@ import { useInventoryPermissions } from "../../utils/inventoryAccess";
 import { formatCurrencyBRL } from "../../utils/brazilianCurrency";
 import {
   formatSaleNumber,
+  getSaleCustomerName,
   getSaleDisplayDate,
   paymentStatusChipColor,
 } from "./utils";
@@ -198,7 +199,7 @@ export default function InventorySalesTab() {
             ) : null}
           </Box>
         </TableCell>
-        <TableCell>{sale.contact?.name || "—"}</TableCell>
+        <TableCell>{getSaleCustomerName(sale) || "—"}</TableCell>
         <TableCell>{sale.seller?.name || "—"}</TableCell>
         <TableCell align="right">{formatCurrencyBRL(sale.totalAmount)}</TableCell>
         <TableCell>{paymentMethodLabel(sale)}</TableCell>
@@ -354,7 +355,7 @@ export default function InventorySalesTab() {
               <MobileEntityCard
                 key={sale.id}
                 title={formatSaleNumber(sale)}
-                subtitle={sale.contact?.name || "—"}
+                subtitle={getSaleCustomerName(sale) || "—"}
                 badges={
                   <>
                     <Chip
