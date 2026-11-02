@@ -1,0 +1,152 @@
+---
+import { faq } from "../data/faq";
+import { site } from "../config/site";
+---
+
+<section class="section faq" id="perguntas" aria-labelledby="faq-title">
+  <div class="shell faq__grid">
+    <div class="section-head" data-reveal>
+      <p class="eyebrow">Perguntas frequentes</p>
+      <h2 id="faq-title">Antes de começar.</h2>
+      <p>
+        Não encontrou o que procurava? Consulte os <a href={site.legal.terms}>Termos de Uso</a> e a
+        <a href={site.legal.privacy}>Política de Privacidade</a> ou fale com a nossa equipe.
+      </p>
+    </div>
+
+    <div class="faq__list">
+      {
+        faq.map((item, i) => (
+          <details class="faq__item" data-reveal style={`--reveal-delay: ${i * 50}ms`}>
+            <summary>
+              <span>{item.q}</span>
+              <i aria-hidden="true" />
+            </summary>
+            <p>{item.a}</p>
+          </details>
+        ))
+      }
+    </div>
+  </div>
+</section>
+
+<style>
+  .faq {
+    border-top: 1px solid var(--line);
+  }
+
+  .faq__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    gap: clamp(32px, 6vw, 88px);
+    align-items: start;
+  }
+
+  .faq .section-head {
+    position: sticky;
+    top: 110px;
+    margin-bottom: 0;
+  }
+
+  .faq .section-head a {
+    color: var(--text);
+    text-decoration: underline;
+    text-decoration-color: var(--line-2);
+    text-underline-offset: 3px;
+  }
+
+  .faq .section-head a:hover {
+    text-decoration-color: var(--accent);
+  }
+
+  .faq__list {
+    border-top: 1px solid var(--line);
+  }
+
+  .faq__item {
+    border-bottom: 1px solid var(--line);
+  }
+
+  .faq__item summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 24px 0;
+    cursor: pointer;
+    list-style: none;
+    font-family: var(--font-display);
+    font-size: clamp(1.02rem, 1.5vw, 1.18rem);
+    font-weight: 600;
+    letter-spacing: -0.015em;
+  }
+
+  .faq__item summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .faq__item summary:hover span {
+    color: var(--accent);
+  }
+
+  .faq__item summary span {
+    transition: color 0.2s;
+  }
+
+  .faq__item summary i {
+    position: relative;
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 1px solid var(--line-2);
+  }
+
+  .faq__item summary i::before,
+  .faq__item summary i::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 10px;
+    height: 1.5px;
+    background: var(--text);
+    transform: translate(-50%, -50%);
+    transition: transform 0.3s var(--ease-out);
+  }
+
+  .faq__item summary i::after {
+    transform: translate(-50%, -50%) rotate(90deg);
+  }
+
+  .faq__item[open] summary i::after {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+
+  .faq__item p {
+    padding: 0 48px 26px 0;
+    color: var(--text-2);
+    animation: faq-open 0.4s var(--ease-out);
+  }
+
+  @keyframes faq-open {
+    from {
+      opacity: 0;
+      transform: translateY(-6px);
+    }
+  }
+
+  @media (max-width: 900px) {
+    .faq__grid {
+      grid-template-columns: 1fr;
+    }
+
+    .faq .section-head {
+      position: static;
+    }
+
+    .faq__item p {
+      padding-right: 0;
+    }
+  }
+</style>

@@ -1,0 +1,34 @@
+<!doctype html>
+<!-- Modelo da imagem Open Graph (1200×630). Ver README.md → "Imagem de compartilhamento". -->
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<style>
+  @font-face { font-family: "Montserrat"; src: url("../../node_modules/@fontsource-variable/montserrat/files/montserrat-latin-wght-normal.woff2") format("woff2"); font-weight: 100 900; }
+  @font-face { font-family: "Inter"; src: url("../../node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2") format("woff2"); font-weight: 100 900; }
+  html, body { margin: 0; width: 1200px; height: 630px; overflow: hidden; }
+  body { background: #090c0b; color: #eef2ef; font-family: Inter, sans-serif; position: relative; }
+  .glow { position: absolute; inset: 0; background: radial-gradient(60% 70% at 85% 30%, rgba(43,212,111,.16), transparent 70%); }
+  .grid { position: absolute; inset: 0; background-image: linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px); background-size: 60px 60px; -webkit-mask-image: radial-gradient(70% 80% at 30% 40%, #000, transparent 75%); }
+  .copy { position: absolute; left: 72px; top: 70px; width: 560px; }
+  .logo { width: 166px; display: block; }
+  h1 { font-family: Montserrat, sans-serif; font-weight: 680; font-size: 54px; line-height: 1.04; letter-spacing: -0.04em; margin: 52px 0 22px; }
+  h1 span { color: #2bd46f; }
+  p { font-size: 22px; line-height: 1.45; color: #a9b3ae; margin: 0; }
+  .price { margin-top: 34px; display: inline-flex; gap: 10px; align-items: baseline; padding: 12px 20px; border-radius: 999px; border: 1px solid rgba(255,255,255,.14); font-size: 19px; color: #a9b3ae; }
+  .price b { color: #eef2ef; font-weight: 650; }
+  .shot { position: absolute; left: 680px; top: 92px; width: 760px; border-radius: 18px; border: 1px solid rgba(255,255,255,.16); box-shadow: 0 40px 100px -30px #000, 0 0 80px -30px rgba(43,212,111,.35); overflow: hidden; }
+  .shot img { display: block; width: 100%; }
+</style>
+</head>
+<body>
+  <div class="glow"></div><div class="grid"></div>
+  <div class="copy">
+    <img class="logo" src="../../src/assets/brand/logo-on-dark.png" alt="" />
+    <h1>Atendimento, automação e CRM <span>em uma só plataforma.</span></h1>
+    <p>WhatsApp e Instagram centralizados, fluxos automáticos, inteligência artificial e funil comercial.</p>
+    <div class="price">Planos a partir de <b>R$ 99,90/mês</b></div>
+  </div>
+  <div class="shot"><img src="../../src/assets/screens/atendimento.png" alt="" /></div>
+</body>
+</html>

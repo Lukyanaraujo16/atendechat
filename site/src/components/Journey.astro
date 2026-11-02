@@ -1,0 +1,304 @@
+---
+const steps = [
+  {
+    title: "Conecte seus canais",
+    text: "Leia o QR Code para conectar o WhatsApp e, se o seu plano incluir, vincule o Instagram Direct. As conversas passam a chegar em uma única caixa de entrada.",
+    visual: "qr",
+  },
+  {
+    title: "Organize a operação",
+    text: "Crie setores, convide a equipe com o perfil adequado, defina horários de expediente, etiquetas e respostas rápidas.",
+    visual: "queues",
+  },
+  {
+    title: "Automatize o que se repete",
+    text: "Monte fluxos de boas-vindas e triagem, configure gatilhos por palavra-chave e, quando contratado, ative um agente de IA treinado com o conteúdo da sua empresa.",
+    visual: "flow",
+  },
+  {
+    title: "Acompanhe e evolua",
+    text: "Use o dashboard, os relatórios, as avaliações e o funil comercial para ver o que funciona e ajustar a operação com base em dados.",
+    visual: "chart",
+  },
+] as const;
+
+// padrão fixo e decorativo para o mini QR (não codifica nada)
+const qr = [
+  "1110101", "1010110", "1110011", "0001100", "1011101", "0110101", "1101011",
+];
+---
+
+<section class="section journey" id="como-funciona" aria-labelledby="journey-title">
+  <div class="shell">
+    <div class="section-head" data-reveal>
+      <p class="eyebrow">Como funciona</p>
+      <h2 id="journey-title">Da conexão ao resultado em quatro etapas.</h2>
+      <p>Sem instalação: a plataforma roda no navegador, no computador ou no celular, e pode ser adicionada à tela inicial.</p>
+    </div>
+
+    <ol class="steps" data-steps-track>
+      {
+        steps.map((step, i) => (
+          <li class="step" data-reveal style={`--reveal-delay: ${i * 90}ms`}>
+            <div class="step__visual" aria-hidden="true">
+              {step.visual === "qr" && (
+                <div class="v-qr">
+                  {qr.map((row) => (
+                    <div>
+                      {row.split("").map((c) => (
+                        <i class={c === "1" ? "on" : ""} />
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {step.visual === "queues" && (
+                <div class="v-queues">
+                  <span style="--w: 82%">Comercial</span>
+                  <span style="--w: 58%">Suporte</span>
+                  <span style="--w: 36%">Financeiro</span>
+                </div>
+              )}
+              {step.visual === "flow" && (
+                <svg class="v-flow" viewBox="0 0 120 64">
+                  <rect x="4" y="24" width="26" height="16" rx="5" />
+                  <rect x="48" y="24" width="26" height="16" rx="5" class="hl" />
+                  <rect x="90" y="6" width="26" height="16" rx="5" />
+                  <rect x="90" y="42" width="26" height="16" rx="5" />
+                  <path d="M30 32 H48 M74 32 C82 32 82 14 90 14 M74 32 C82 32 82 50 90 50" />
+                </svg>
+              )}
+              {step.visual === "chart" && (
+                <svg class="v-chart" viewBox="0 0 120 64">
+                  <path class="area" d="M4 52 L22 44 L40 47 L58 34 L76 37 L94 22 L116 14 L116 60 L4 60 Z" />
+                  <path class="line" d="M4 52 L22 44 L40 47 L58 34 L76 37 L94 22 L116 14" />
+                </svg>
+              )}
+            </div>
+            <span class="step__n">0{i + 1}</span>
+            <h3>{step.title}</h3>
+            <p>{step.text}</p>
+          </li>
+        ))
+      }
+    </ol>
+  </div>
+</section>
+
+<style>
+  .journey {
+    border-top: 1px solid var(--line);
+  }
+
+  .steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+    counter-reset: step;
+    position: relative;
+  }
+
+  .step {
+    position: relative;
+    display: grid;
+    align-content: start;
+    gap: 12px;
+    padding: 24px;
+    border-radius: var(--radius-l);
+    border: 1px solid var(--line);
+    background: linear-gradient(180deg, var(--surface), var(--bg-2));
+  }
+
+  .step__visual {
+    height: 96px;
+    border-radius: var(--radius);
+    background: var(--bg);
+    border: 1px solid var(--line);
+    display: grid;
+    place-items: center;
+    margin-bottom: 8px;
+    overflow: hidden;
+  }
+
+  .step__n {
+    font-family: var(--font-display);
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: 0.04em;
+  }
+
+  .step h3 {
+    font-size: 1.2rem;
+    letter-spacing: -0.02em;
+  }
+
+  .step p {
+    color: var(--text-2);
+    font-size: 0.94rem;
+  }
+
+  /* QR decorativo */
+  .v-qr {
+    display: grid;
+    gap: 3px;
+    padding: 8px;
+    border-radius: 8px;
+    background: #f3f4f0;
+  }
+
+  .v-qr div {
+    display: flex;
+    gap: 3px;
+  }
+
+  .v-qr i {
+    width: 7px;
+    height: 7px;
+    border-radius: 1.5px;
+    background: transparent;
+  }
+
+  .v-qr i.on {
+    background: #0d1210;
+  }
+
+  .step.is-visible .v-qr {
+    animation: scan 2.6s var(--ease-in-out) 0.6s both;
+  }
+
+  @keyframes scan {
+    0% {
+      box-shadow:
+        inset 0 0 0 0 transparent,
+        0 0 0 0 rgb(43 212 111 / 0);
+    }
+    70% {
+      box-shadow: 0 0 0 0 rgb(43 212 111 / 0);
+    }
+    85% {
+      box-shadow: 0 0 0 6px rgb(43 212 111 / 0.35);
+    }
+    100% {
+      box-shadow: 0 0 0 0 rgb(43 212 111 / 0);
+    }
+  }
+
+  /* setores */
+  .v-queues {
+    width: 78%;
+    display: grid;
+    gap: 6px;
+  }
+
+  .v-queues span {
+    position: relative;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 6px;
+    color: var(--text);
+    overflow: hidden;
+    z-index: 0;
+  }
+
+  .v-queues span::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    width: var(--w);
+    background: var(--accent-soft);
+    border-right: 2px solid var(--accent);
+    z-index: -1;
+    transform-origin: left;
+  }
+
+  .step.is-visible .v-queues span::before {
+    animation: fill 1.1s var(--ease-out) 0.5s both;
+  }
+
+  @keyframes fill {
+    from {
+      transform: scaleX(0);
+    }
+  }
+
+  /* fluxo */
+  .v-flow {
+    width: 70%;
+  }
+
+  .v-flow rect {
+    fill: var(--surface-3);
+    stroke: var(--line-2);
+  }
+
+  .v-flow rect.hl {
+    fill: var(--accent);
+    stroke: var(--accent);
+  }
+
+  .v-flow path {
+    fill: none;
+    stroke: var(--text-3);
+    stroke-width: 1.2;
+    stroke-dasharray: 3 3;
+  }
+
+  .step.is-visible .v-flow path {
+    animation: march 1.2s linear infinite;
+  }
+
+  @keyframes march {
+    to {
+      stroke-dashoffset: -12;
+    }
+  }
+
+  /* gráfico */
+  .v-chart {
+    width: 80%;
+  }
+
+  .v-chart .line {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 2;
+    stroke-linejoin: round;
+    stroke-dasharray: 200;
+    stroke-dashoffset: 0;
+  }
+
+  .v-chart .area {
+    fill: var(--accent-soft);
+  }
+
+  .step.is-visible .v-chart .line {
+    animation: draw 1.6s var(--ease-out) 0.5s both;
+  }
+
+  @keyframes draw {
+    from {
+      stroke-dashoffset: 200;
+    }
+  }
+
+  @media (max-width: 1080px) {
+    .steps {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 620px) {
+    .steps {
+      grid-template-columns: 1fr;
+    }
+
+    .step {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

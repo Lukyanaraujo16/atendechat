@@ -1,0 +1,202 @@
+---
+import { Image } from "astro:assets";
+import logo from "../assets/brand/logo-on-dark.png";
+import { site, whatsappLink, messages } from "../config/site";
+import Icon from "./Icon.astro";
+
+const year = new Date().getFullYear();
+---
+
+<section class="closing" aria-labelledby="closing-title">
+  <div class="shell closing__inner" data-reveal>
+    <h2 id="closing-title">Vamos montar a configuração certa para a sua operação?</h2>
+    <p>Fale com um especialista pelo WhatsApp, conte como sua equipe atende hoje e receba uma proposta sob medida.</p>
+    <div class="closing__ctas">
+      <a class="btn btn--primary" href={whatsappLink(messages.plan)} target="_blank" rel="noopener">
+        Montar meu plano personalizado
+        <Icon name="arrow" />
+      </a>
+      <a class="btn btn--ghost" href={whatsappLink(messages.demo)} target="_blank" rel="noopener">Solicitar demonstração</a>
+    </div>
+    <p class="closing__note">Planos a partir de R$ {site.startingPrice}/mês.</p>
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="shell footer__grid">
+    <div class="footer__brand">
+      <Image src={logo} alt="StreamHub Chat" width={150} height={42} loading="lazy" />
+      <p>Atendimento omnichannel, automação, inteligência artificial e gestão comercial em uma só plataforma.</p>
+    </div>
+
+    <nav aria-label="Produto" class="footer__col">
+      <p class="footer__title">Produto</p>
+      <ul>
+        <li><a href="#plataforma">Plataforma</a></li>
+        <li><a href="#recursos">Recursos</a></li>
+        <li><a href="#como-funciona">Como funciona</a></li>
+        <li><a href="#planos">Planos</a></li>
+      </ul>
+    </nav>
+
+    <nav aria-label="Acesso" class="footer__col">
+      <p class="footer__title">Acesso</p>
+      <ul>
+        <li><a href={site.appUrl}>Entrar na plataforma</a></li>
+        <li><a href={site.signupUrl}>Solicitar acesso</a></li>
+        <li><a href={whatsappLink(messages.specialist)} target="_blank" rel="noopener">Falar com especialista</a></li>
+        <li><a href={`mailto:${site.email}`}>{site.email}</a></li>
+      </ul>
+    </nav>
+
+    <nav aria-label="Legal" class="footer__col">
+      <p class="footer__title">Legal</p>
+      <ul>
+        <li><a href={site.legal.terms}>Termos de Uso</a></li>
+        <li><a href={site.legal.privacy}>Política de Privacidade</a></li>
+        <li><a href={site.legal.dataDeletion}>Exclusão de dados</a></li>
+      </ul>
+    </nav>
+  </div>
+
+  <div class="shell footer__bottom">
+    <p>© {year} {site.name}. Operado por {site.legal.name} · CNPJ {site.legal.cnpj}</p>
+    <p>Marcas de terceiros citadas pertencem aos seus respectivos titulares.</p>
+  </div>
+</footer>
+
+<style>
+  .closing {
+    padding-block: clamp(80px, 11vw, 140px);
+    border-top: 1px solid var(--line);
+    background:
+      radial-gradient(50% 80% at 50% 100%, rgb(43 212 111 / 0.12), transparent 70%),
+      var(--bg);
+    text-align: center;
+  }
+
+  .closing__inner {
+    display: grid;
+    justify-items: center;
+    gap: 22px;
+  }
+
+  .closing h2 {
+    font-size: clamp(2rem, 4.6vw, 3.5rem);
+    letter-spacing: -0.035em;
+    max-width: 20ch;
+  }
+
+  .closing p {
+    color: var(--text-2);
+    max-width: 56ch;
+    font-size: clamp(1rem, 1.4vw, 1.12rem);
+  }
+
+  .closing__ctas {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 6px;
+  }
+
+  .closing .closing__note {
+    font-size: 0.88rem;
+    color: var(--text-3);
+  }
+
+  .footer {
+    border-top: 1px solid var(--line);
+    padding: 64px 0 calc(32px + env(safe-area-inset-bottom));
+    background: var(--bg-2);
+    font-size: 0.92rem;
+  }
+
+  .footer__grid {
+    display: grid;
+    grid-template-columns: 1.4fr 0.8fr 1.3fr 0.9fr;
+    gap: 40px;
+  }
+
+  .footer__brand {
+    display: grid;
+    gap: 16px;
+    align-content: start;
+  }
+
+  .footer__brand img {
+    width: 150px;
+    height: auto;
+  }
+
+  .footer__brand p {
+    color: var(--text-3);
+    max-width: 36ch;
+  }
+
+  .footer__title {
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    margin-bottom: 14px;
+  }
+
+  .footer__col ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 10px;
+  }
+
+  .footer__col a {
+    color: var(--text-2);
+    transition: color 0.2s;
+    overflow-wrap: anywhere;
+  }
+
+  .footer__col a:hover {
+    color: var(--text);
+  }
+
+  .footer__bottom {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 56px;
+    padding-top: 24px;
+    border-top: 1px solid var(--line);
+    color: var(--text-3);
+    font-size: 0.82rem;
+  }
+
+  @media (max-width: 900px) {
+    .footer__grid {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .footer__brand {
+      grid-column: 1 / -1;
+    }
+  }
+
+  @media (max-width: 520px) {
+    .closing__ctas {
+      width: 100%;
+      flex-direction: column;
+    }
+
+    .closing__ctas .btn {
+      width: 100%;
+      white-space: normal;
+    }
+
+    .footer__grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

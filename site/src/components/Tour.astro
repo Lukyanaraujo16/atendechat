@@ -1,0 +1,399 @@
+---
+import { Image } from "astro:assets";
+import atendimento from "../assets/screens/atendimento.png";
+import dashboard from "../assets/screens/dashboard.png";
+import crm from "../assets/screens/crm.png";
+import automacoes from "../assets/screens/automacoes.png";
+import campanhas from "../assets/screens/campanhas.png";
+import estoque from "../assets/screens/estoque.png";
+
+const slides = [
+  {
+    id: "atendimento",
+    label: "Atendimento",
+    title: "Caixa de entrada compartilhada",
+    text: "Conversas separadas por status, setor, atendente e etiqueta. Transferência, notas internas e histórico completo do contato na mesma tela.",
+    image: atendimento,
+    alt: "Tela de atendimento do StreamHub Chat com lista de conversas abertas e uma conversa de WhatsApp em andamento",
+  },
+  {
+    id: "dashboard",
+    label: "Indicadores",
+    title: "Operação visível em tempo real",
+    text: "Total de atendimentos, fila de espera, tempo médio de primeira resposta, tempo de conversa e taxa de resolução por período.",
+    image: dashboard,
+    alt: "Dashboard do StreamHub Chat com indicadores de atendimentos, tempo médio de resposta e taxa de resolução",
+  },
+  {
+    id: "crm",
+    label: "CRM",
+    title: "Pipeline de oportunidades",
+    text: "Funis e etapas configuráveis, valor em aberto, conversão, oportunidades paradas e lembretes de follow-up.",
+    image: crm,
+    alt: "Pipeline de oportunidades do CRM com etapas Novo lead, Contato iniciado, Qualificado e Proposta enviada",
+  },
+  {
+    id: "automacoes",
+    label: "Automações",
+    title: "Fluxos desenhados visualmente",
+    text: "Menus, perguntas, condições e encaminhamentos montados em um editor visual, com simulador para testar antes de publicar.",
+    image: automacoes,
+    alt: "Editor visual de fluxos com blocos de mensagem, menu, pergunta, setor e atendente conectados",
+  },
+  {
+    id: "campanhas",
+    label: "Campanhas",
+    title: "Campanhas com agendamento e acompanhamento",
+    text: "Disparos por lista de contatos e conexão, com agendamento, progresso de envio e relatório por campanha.",
+    image: campanhas,
+    alt: "Lista de campanhas com status programada e finalizada, progresso de envio e data de agendamento",
+  },
+  {
+    id: "estoque",
+    label: "Estoque e vendas",
+    title: "Vendas sem sair do atendimento",
+    text: "Produtos, categorias, movimentações de estoque, vendas e clientes em um módulo integrado à conversa.",
+    image: estoque,
+    alt: "Módulo Estoque e Vendas com resumo de produtos ativos, estoque baixo e ações rápidas",
+  },
+];
+---
+
+<section class="section tour" id="plataforma" aria-labelledby="tour-title">
+  <div class="shell">
+    <div class="section-head" data-reveal>
+      <p class="eyebrow">A plataforma</p>
+      <h2 id="tour-title">Uma interface pensada para quem atende o dia inteiro.</h2>
+      <p>
+        Telas reais do StreamHub Chat, em um ambiente de demonstração com dados fictícios. Cada módulo conversa com os
+        demais: o contato, o histórico e a oportunidade acompanham o atendimento.
+      </p>
+    </div>
+
+    <div class="tour__ui" data-tour data-reveal>
+      <div class="tour__tabs" role="tablist" aria-label="Módulos da plataforma">
+        {
+          slides.map((slide, i) => (
+            <button
+              class="tour__tab"
+              type="button"
+              role="tab"
+              id={`tab-${slide.id}`}
+              aria-controls={`panel-${slide.id}`}
+              aria-selected={i === 0 ? "true" : "false"}
+              tabindex={i === 0 ? 0 : -1}
+            >
+              <span>{slide.label}</span>
+              <i class="tour__progress" aria-hidden="true" />
+            </button>
+          ))
+        }
+      </div>
+
+      <div class="tour__frame">
+        <div class="tour__chrome" aria-hidden="true"><span></span><span></span><span></span></div>
+        <div class="tour__screens">
+          {
+            slides.map((slide, i) => (
+              <div
+                class:list={["tour__panel", { "is-active": i === 0 }]}
+                role="tabpanel"
+                id={`panel-${slide.id}`}
+                aria-labelledby={`tab-${slide.id}`}
+                hidden={i !== 0}
+              >
+                <Image
+                  src={slide.image}
+                  alt={slide.alt}
+                  widths={[640, 960, 1440, 1920]}
+                  sizes="(max-width: 1240px) 100vw, 1200px"
+                  format="webp"
+                  quality={78}
+                  loading="lazy"
+                  decoding="async"
+                />
+                <div class="tour__caption">
+                  <h3>{slide.title}</h3>
+                  <p>{slide.text}</p>
+                </div>
+              </div>
+            ))
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .tour {
+    border-top: 1px solid var(--line);
+  }
+
+  .tour__ui {
+    display: grid;
+    gap: 20px;
+  }
+
+  .tour__tabs {
+    display: flex;
+    gap: 6px;
+    padding: 6px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--bg-2);
+    width: max-content;
+    max-width: 100%;
+    margin-inline: auto;
+    overflow-x: auto;
+    scrollbar-width: none;
+    scroll-snap-type: x proximity;
+  }
+
+  .tour__tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tour__tab {
+    position: relative;
+    flex-shrink: 0;
+    scroll-snap-align: center;
+    padding: 10px 18px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text-2);
+    font-size: 0.92rem;
+    font-weight: 500;
+    cursor: pointer;
+    overflow: hidden;
+    transition:
+      color 0.2s,
+      background-color 0.2s;
+  }
+
+  .tour__tab:hover {
+    color: var(--text);
+  }
+
+  .tour__tab[aria-selected="true"] {
+    background: var(--surface-3);
+    color: var(--text);
+  }
+
+  .tour__progress {
+    position: absolute;
+    left: 18px;
+    right: 18px;
+    bottom: 5px;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--accent);
+    transform: scaleX(0);
+    transform-origin: left;
+  }
+
+  .tour__tab[aria-selected="true"] .tour__progress {
+    animation: tour-progress var(--tour-duration, 7000ms) linear both;
+    animation-play-state: var(--tour-play, running);
+  }
+
+  [data-tour]:not(.is-auto) .tour__progress {
+    display: none;
+  }
+
+  .tour__frame {
+    border-radius: var(--radius-l);
+    border: 1px solid var(--line-2);
+    background: var(--surface);
+    overflow: hidden;
+    box-shadow: 0 50px 120px -50px rgb(0 0 0 / 0.9);
+  }
+
+  .tour__chrome {
+    display: flex;
+    gap: 7px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .tour__chrome span {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: rgb(255 255 255 / 0.12);
+  }
+
+  .tour__screens {
+    display: grid;
+  }
+
+  .tour__panel {
+    grid-area: 1 / 1;
+    position: relative;
+  }
+
+  .tour__panel[hidden] {
+    display: block;
+    visibility: hidden;
+    opacity: 0;
+  }
+
+  .tour__panel.is-active {
+    animation: tour-in 0.7s var(--ease-out) both;
+  }
+
+  .tour__panel img {
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    object-fit: cover;
+    object-position: top left;
+  }
+
+  .tour__caption {
+    position: absolute;
+    left: clamp(16px, 3vw, 32px);
+    bottom: clamp(16px, 3vw, 32px);
+    max-width: 420px;
+    padding: 18px 20px;
+    border-radius: var(--radius);
+    background: rgb(12 15 14 / 0.86);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid var(--line-2);
+    display: grid;
+    gap: 6px;
+  }
+
+  .tour__caption h3 {
+    font-size: 1.1rem;
+    letter-spacing: -0.015em;
+  }
+
+  .tour__caption p {
+    font-size: 0.92rem;
+    color: var(--text-2);
+    line-height: 1.5;
+  }
+
+  @keyframes tour-in {
+    from {
+      opacity: 0;
+      transform: scale(1.01);
+    }
+  }
+
+  @keyframes tour-progress {
+    to {
+      transform: scaleX(1);
+    }
+  }
+
+  @media (max-width: 720px) {
+    .tour__tabs {
+      width: 100%;
+      border-radius: 16px;
+    }
+
+    /* no celular, aproxima a área principal da tela em vez de reduzir a captura inteira */
+    .tour__panel img {
+      aspect-ratio: 1 / 1;
+      object-position: 62% 0;
+    }
+
+    .tour__caption {
+      position: static;
+      max-width: none;
+      border: 0;
+      border-top: 1px solid var(--line);
+      border-radius: 0;
+      background: var(--surface);
+    }
+  }
+</style>
+
+<script>
+  import { onVisible, reducedMotion } from "../scripts/timeline";
+
+  const DURATION = 7000;
+
+  document.querySelectorAll<HTMLElement>("[data-tour]").forEach((root) => {
+    const tabs = Array.from(root.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+    const panels = tabs.map((tab) => document.getElementById(tab.getAttribute("aria-controls") ?? "")!);
+    let index = 0;
+    let timer: number | undefined;
+    let auto = !reducedMotion();
+    let visible = false;
+    let paused = false;
+
+    root.style.setProperty("--tour-duration", `${DURATION}ms`);
+    root.classList.toggle("is-auto", auto);
+
+    const select = (next: number, focus = false) => {
+      index = (next + tabs.length) % tabs.length;
+      tabs.forEach((tab, i) => {
+        const active = i === index;
+        tab.setAttribute("aria-selected", String(active));
+        tab.tabIndex = active ? 0 : -1;
+        panels[i].hidden = !active;
+        panels[i].classList.toggle("is-active", active);
+      });
+      // reinicia a barra de progresso para ficar em sincronia com o timer
+      const bar = tabs[index].querySelector<HTMLElement>(".tour__progress");
+      if (bar) {
+        bar.style.animation = "none";
+        void bar.offsetWidth;
+        bar.style.animation = "";
+      }
+      if (focus) tabs[index].focus();
+      const list = tabs[index].parentElement;
+      if (list && list.scrollWidth > list.clientWidth) {
+        list.scrollTo({ left: tabs[index].offsetLeft - list.clientWidth / 2 + tabs[index].offsetWidth / 2, behavior: "smooth" });
+      }
+      schedule();
+    };
+
+    const schedule = () => {
+      window.clearTimeout(timer);
+      const run = auto && visible && !paused && !document.hidden;
+      root.style.setProperty("--tour-play", run ? "running" : "paused");
+      if (run) timer = window.setTimeout(() => select(index + 1), DURATION);
+    };
+
+    const stopAuto = () => {
+      auto = false;
+      root.classList.remove("is-auto");
+      window.clearTimeout(timer);
+    };
+
+    tabs.forEach((tab, i) => {
+      tab.addEventListener("click", () => {
+        stopAuto();
+        select(i);
+      });
+      tab.addEventListener("keydown", (event) => {
+        const keys: Record<string, number> = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: tabs.length - 1 };
+        if (!(event.key in keys)) return;
+        event.preventDefault();
+        stopAuto();
+        select(keys[event.key], true);
+      });
+    });
+
+    // Pausa enquanto o visitante lê ou interage; o timer reinicia ao sair.
+    root.addEventListener("pointerenter", () => ((paused = true), schedule()));
+    root.addEventListener("pointerleave", () => ((paused = false), select(index)));
+    root.addEventListener("focusin", () => ((paused = true), schedule()));
+    root.addEventListener("focusout", (event) => {
+      if (!root.contains(event.relatedTarget as Node)) {
+        paused = false;
+        schedule();
+      }
+    });
+    document.addEventListener("visibilitychange", schedule);
+    onVisible(root, (v) => {
+      visible = v;
+      schedule();
+    });
+  });
+</script>

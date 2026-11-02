@@ -1,0 +1,899 @@
+---
+import Icon from "./Icon.astro";
+
+const extras = [
+  {
+    icon: "megaphone",
+    title: "Campanhas e envio programado",
+    text: "Disparos por lista de destinatários com agendamento e relatório, além de mensagens programadas para data e hora específicas.",
+  },
+  {
+    icon: "calendar",
+    title: "Agenda e respostas rápidas",
+    text: "Compromissos com participantes e mensagens prontas, com mídia, para padronizar o atendimento da equipe.",
+  },
+  {
+    icon: "folder",
+    title: "Biblioteca de arquivos e mídias",
+    text: "Arquivos reutilizáveis nas conversas e gestão do armazenamento de mídias da empresa em um só lugar.",
+  },
+  {
+    icon: "plug",
+    title: "Integrações e API",
+    text: "Integração por setor com n8n, Typebot, Dialogflow e webhook, requisições HTTP nos fluxos e API para envio de mensagens.",
+  },
+] as const;
+---
+
+<section class="section section--paper features" id="recursos" aria-labelledby="features-title">
+  <div class="shell">
+    <div class="section-head" data-reveal>
+      <p class="eyebrow">Recursos</p>
+      <h2 id="features-title">Tudo o que a operação precisa, organizado por resultado.</h2>
+      <p>
+        Do primeiro “olá” ao pós-venda, o StreamHub Chat cobre o caminho inteiro da conversa. Os módulos são habilitados conforme a
+        configuração contratada pela sua empresa.
+      </p>
+    </div>
+
+    <div class="bento">
+      <!-- 1. Atendimento centralizado -->
+      <article class="tile tile--wide" data-reveal>
+        <div class="tile__text">
+          <span class="tile__icon"><Icon name="inbox" size={20} /></span>
+          <h3>Atendimento centralizado</h3>
+          <p>
+            WhatsApp e Instagram Direct em uma caixa de entrada compartilhada. Conversas distribuídas por setor, com status,
+            transferência entre atendentes, notas internas, etiquetas e visão em Kanban.
+          </p>
+          <ul class="tile__list">
+            <li>Uma ou mais conexões de WhatsApp, conforme o plano</li>
+            <li>Gestão de grupos do WhatsApp</li>
+            <li>Horário de expediente com mensagem automática</li>
+          </ul>
+        </div>
+        <div class="demo demo--routing" aria-hidden="true">
+          <div class="routing__in">
+            <span class="routing__label">Novas conversas</span>
+          </div>
+          <span class="routing__pill" style="--lane: 0; --delay: 0s">Camila R.</span>
+          <span class="routing__pill" style="--lane: 1; --delay: 2s">Bruno A.</span>
+          <span class="routing__pill" style="--lane: 2; --delay: 4s">Diego M.</span>
+          <span class="routing__pill" style="--lane: 0; --delay: 6s">Larissa P.</span>
+          <ol class="routing__lanes">
+            <li style="--lane: 0; --delay: 0s"><b>Comercial</b><small>Marina Costa</small></li>
+            <li style="--lane: 1; --delay: 2s"><b>Suporte</b><small>Júlia Mendes</small></li>
+            <li style="--lane: 2; --delay: 4s"><b>Financeiro</b><small>Rafael Lima</small></li>
+          </ol>
+        </div>
+      </article>
+
+      <!-- 2. Automação -->
+      <article class="tile" data-reveal style="--reveal-delay: 80ms">
+        <div class="tile__text">
+          <span class="tile__icon"><Icon name="flow" size={20} /></span>
+          <h3>Automação de conversas</h3>
+          <p>
+            Editor visual de fluxos com menus, perguntas, condições, intervalos e encaminhamento para setor ou atendente. Gatilhos
+            por palavra-chave iniciam o fluxo certo.
+          </p>
+        </div>
+        <div class="demo demo--flow" aria-hidden="true">
+          <svg viewBox="0 0 320 170" role="presentation">
+            <g class="flow__edges">
+              <path d="M70 85 H110" />
+              <path d="M170 85 C 195 85, 195 35, 220 35" />
+              <path d="M170 85 H220" />
+              <path d="M170 85 C 195 85, 195 135, 220 135" />
+            </g>
+            <g class="flow__pulse">
+              <path d="M70 85 H110" />
+              <path d="M170 85 C 195 85, 195 35, 220 35" />
+            </g>
+            <g class="flow__nodes">
+              <rect x="10" y="68" width="60" height="34" rx="9" />
+              <text x="40" y="89">Início</text>
+              <rect x="110" y="68" width="60" height="34" rx="9" class="is-key" />
+              <text x="140" y="89">Menu</text>
+              <rect x="220" y="18" width="90" height="34" rx="9" class="is-hit" />
+              <text x="265" y="39">Comercial</text>
+              <rect x="220" y="68" width="90" height="34" rx="9" />
+              <text x="265" y="89">Dúvidas</text>
+              <rect x="220" y="118" width="90" height="34" rx="9" />
+              <text x="265" y="139">Atendente</text>
+            </g>
+          </svg>
+        </div>
+      </article>
+
+      <!-- 3. IA -->
+      <article class="tile" data-reveal>
+        <div class="tile__text">
+          <span class="tile__icon"><Icon name="spark" size={20} /></span>
+          <h3>
+            Inteligência artificial aplicada
+            <span class="tag">Conforme o plano</span>
+          </h3>
+          <p>
+            Agentes de IA vinculados às suas conexões, com base de conhecimento própria, simulador, transcrição de áudio e pausa
+            manual por atendimento. Funciona com OpenAI ou Gemini, usando a chave de API da sua empresa.
+          </p>
+        </div>
+        <div class="demo demo--ai" aria-hidden="true" data-timeline data-steps="900,1300,1600" data-hold="3800">
+          <p class="ai__msg ai__msg--in" data-at="1">Vocês atendem aos sábados?</p>
+          <p class="ai__typing" data-at="2" data-until="3"><i></i><i></i><i></i></p>
+          <div class="ai__msg ai__msg--out" data-at="3">
+            <span class="ai__who">Agente de IA</span>
+            Sim! Aos sábados atendemos das 9h às 13h. Quer que eu verifique um horário para você?
+            <span class="ai__source">Base de conhecimento · horários.pdf</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- 4. Equipe -->
+      <article class="tile tile--wide tile--reverse" data-reveal style="--reveal-delay: 80ms">
+        <div class="tile__text">
+          <span class="tile__icon"><Icon name="team" size={20} /></span>
+          <h3>Equipes organizadas e supervisionadas</h3>
+          <p>
+            Perfis de administrador, supervisor e atendente, setores com usuários vinculados e permissões por pessoa dentro do
+            plano. Chat interno para a equipe e avaliação do atendimento pelo cliente.
+          </p>
+        </div>
+        <div class="demo demo--team" aria-hidden="true">
+          <ul class="team">
+            <li>
+              <span class="avatar avatar--green">MC</span>
+              <span><b>Marina Costa</b><small>Supervisora · Comercial</small></span>
+              <span class="team__load"><i style="--v: 0.8"></i></span>
+              <span class="team__status is-on">Online</span>
+            </li>
+            <li>
+              <span class="avatar avatar--blue">JM</span>
+              <span><b>Júlia Mendes</b><small>Atendente · Suporte</small></span>
+              <span class="team__load"><i style="--v: 0.55"></i></span>
+              <span class="team__status is-on">Online</span>
+            </li>
+            <li>
+              <span class="avatar avatar--amber">RL</span>
+              <span><b>Rafael Lima</b><small>Atendente · Financeiro</small></span>
+              <span class="team__load"><i style="--v: 0.3"></i></span>
+              <span class="team__status">Ausente</span>
+            </li>
+          </ul>
+          <div class="rating">
+            <span>Avaliação do atendimento</span>
+            <span class="rating__stars">
+              {[0, 1, 2, 3, 4].map((i) => <Icon name="star" size={16} class={`star star--${i}`} />)}
+            </span>
+          </div>
+        </div>
+      </article>
+    </div>
+
+    <ul class="extras">
+      {
+        extras.map((item, i) => (
+          <li data-reveal style={`--reveal-delay: ${i * 70}ms`}>
+            <span class="tile__icon">
+              <Icon name={item.icon} size={20} />
+            </span>
+            <h3>{item.title}</h3>
+            <p>{item.text}</p>
+          </li>
+        ))
+      }
+    </ul>
+  </div>
+</section>
+
+<style>
+  .bento {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .tile {
+    grid-column: span 5;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 28px;
+    padding: clamp(24px, 3vw, 36px);
+    border-radius: var(--radius-l);
+    background: #fff;
+    border: 1px solid var(--ink-line);
+    overflow: hidden;
+  }
+
+  .tile--wide {
+    grid-column: span 7;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: center;
+  }
+
+  .tile--reverse .tile__text {
+    order: 2;
+  }
+
+  .tile__text {
+    display: grid;
+    gap: 12px;
+    align-content: start;
+  }
+
+  .tile h3 {
+    font-size: clamp(1.3rem, 2vw, 1.55rem);
+    letter-spacing: -0.025em;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 10px;
+  }
+
+  .tile p,
+  .extras p {
+    color: var(--ink-2);
+    font-size: 0.97rem;
+  }
+
+  .tile__icon {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: var(--ink);
+    color: #4ee08a;
+  }
+
+  .tile__list {
+    list-style: none;
+    padding: 0;
+    margin: 4px 0 0;
+    display: grid;
+    gap: 6px;
+    font-size: 0.92rem;
+    color: var(--ink);
+  }
+
+  .tile__list li {
+    display: flex;
+    gap: 10px;
+    align-items: baseline;
+  }
+
+  .tile__list li::before {
+    content: "";
+    flex-shrink: 0;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #13a538;
+    transform: translateY(-2px);
+  }
+
+  .tag {
+    font-family: var(--font-body);
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 4px 9px;
+    border-radius: 999px;
+    background: var(--paper-2);
+    color: var(--ink-2);
+  }
+
+  .demo {
+    position: relative;
+    border-radius: var(--radius);
+    background: var(--paper);
+    border: 1px solid var(--ink-line);
+    min-height: 210px;
+    font-size: 12.5px;
+    color: var(--ink);
+  }
+
+  /* ---------- roteamento ---------- */
+
+  .demo--routing {
+    --lane-h: 56px;
+    height: 230px;
+    overflow: hidden;
+  }
+
+  .routing__in {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 32%;
+    height: 54px;
+    border-radius: 12px;
+    border: 1px dashed rgb(13 18 16 / 0.25);
+  }
+
+  .routing__label {
+    position: absolute;
+    left: 0;
+    bottom: calc(100% + 6px);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--ink-2);
+    white-space: nowrap;
+  }
+
+  .routing__lanes {
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 44%;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 10px;
+  }
+
+  .routing__lanes li {
+    height: var(--lane-h);
+    padding: 0 12px;
+    border-radius: 12px;
+    background: #fff;
+    border: 1px solid var(--ink-line);
+    display: grid;
+    align-content: center;
+    animation: lane-hit 8s var(--ease-out) infinite;
+    animation-delay: calc(var(--delay) + 1.4s);
+  }
+
+  .routing__lanes b {
+    font-size: 12.5px;
+  }
+
+  .routing__lanes small {
+    color: var(--ink-2);
+    font-size: 11.5px;
+  }
+
+  .routing__pill {
+    position: absolute;
+    left: 24px;
+    top: calc(50% - 13px);
+    height: 26px;
+    padding: 0 10px;
+    border-radius: 999px;
+    background: var(--ink);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    display: grid;
+    place-items: center;
+    opacity: 0;
+    animation: route 8s var(--ease-in-out) infinite;
+    z-index: 2;
+    animation-delay: var(--delay);
+    /* deslocamento vertical até a faixa de destino (0, 1, 2) */
+    --dy: calc((var(--lane) - 1) * (var(--lane-h) + 10px));
+  }
+
+  @keyframes route {
+    0% {
+      opacity: 0;
+      left: 24px;
+      top: calc(50% - 13px);
+    }
+    5%,
+    12% {
+      opacity: 1;
+      left: 24px;
+      top: calc(50% - 13px);
+    }
+    20% {
+      opacity: 1;
+      left: calc(56% - 60px);
+      top: calc(50% - 13px + var(--dy));
+    }
+    26%,
+    100% {
+      opacity: 0;
+      left: calc(56% - 30px);
+      top: calc(50% - 13px + var(--dy));
+    }
+  }
+
+  @keyframes lane-hit {
+    0%,
+    100% {
+      border-color: var(--ink-line);
+      box-shadow: none;
+    }
+    3% {
+      border-color: #13a538;
+      box-shadow: 0 0 0 4px rgb(19 165 56 / 0.12);
+    }
+    12% {
+      border-color: var(--ink-line);
+      box-shadow: none;
+    }
+  }
+
+  /* ---------- fluxo ---------- */
+
+  .demo--flow {
+    display: grid;
+    place-items: center;
+    padding: 12px;
+  }
+
+  .demo--flow svg {
+    width: 100%;
+    max-width: 380px;
+    height: auto;
+    overflow: visible;
+  }
+
+  .flow__edges path {
+    fill: none;
+    stroke: rgb(13 18 16 / 0.22);
+    stroke-width: 1.5;
+  }
+
+  .flow__pulse path {
+    fill: none;
+    stroke: #13a538;
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-dasharray: 18 400;
+    stroke-dashoffset: 18;
+    animation: flow-dash 3.2s var(--ease-in-out) infinite;
+  }
+
+  .flow__pulse path:nth-child(2) {
+    animation-delay: 0.7s;
+  }
+
+  .flow__nodes rect {
+    fill: #fff;
+    stroke: rgb(13 18 16 / 0.18);
+  }
+
+  .flow__nodes rect.is-key {
+    fill: var(--ink);
+    stroke: var(--ink);
+  }
+
+  .flow__nodes rect.is-hit {
+    animation: node-hit 3.2s var(--ease-out) infinite;
+    animation-delay: 1.2s;
+  }
+
+  .flow__nodes text {
+    font-family: var(--font-body);
+    font-size: 11px;
+    font-weight: 600;
+    text-anchor: middle;
+    fill: var(--ink);
+  }
+
+  .flow__nodes rect.is-key + text {
+    fill: #fff;
+  }
+
+  @keyframes flow-dash {
+    0% {
+      stroke-dashoffset: 18;
+    }
+    45%,
+    100% {
+      stroke-dashoffset: -150;
+    }
+  }
+
+  @keyframes node-hit {
+    0%,
+    100% {
+      stroke: rgb(13 18 16 / 0.18);
+      fill: #fff;
+    }
+    10%,
+    40% {
+      stroke: #13a538;
+      fill: #e8f7ed;
+    }
+  }
+
+  /* ---------- IA ---------- */
+
+  .demo--ai {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 16px;
+    transition: opacity 0.5s;
+  }
+
+  .demo--ai.is-resetting {
+    opacity: 0.3;
+  }
+
+  .demo--ai [data-at]:not(.is-in) {
+    display: none;
+  }
+
+  .demo--ai .is-in {
+    animation: rise 0.5s var(--ease-out) both;
+  }
+
+  .ai__msg {
+    max-width: 85%;
+    padding: 9px 12px;
+    border-radius: 12px;
+    line-height: 1.45;
+  }
+
+  .ai__msg--in {
+    align-self: flex-start;
+    background: #fff;
+    border: 1px solid var(--ink-line);
+  }
+
+  .ai__msg--out {
+    align-self: flex-end;
+    background: var(--ink);
+    color: #fff;
+    display: grid;
+    gap: 6px;
+  }
+
+  .ai__who {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #4ee08a;
+  }
+
+  .ai__source {
+    justify-self: start;
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: rgb(255 255 255 / 0.12);
+    color: rgb(255 255 255 / 0.85);
+  }
+
+  .ai__typing {
+    align-self: flex-end;
+    display: flex;
+    gap: 4px;
+    padding: 11px 13px;
+    border-radius: 12px;
+    background: var(--ink);
+  }
+
+  .ai__typing i {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: rgb(255 255 255 / 0.6);
+    animation: dot 1.1s infinite;
+  }
+
+  .ai__typing i:nth-child(2) {
+    animation-delay: 0.15s;
+  }
+
+  .ai__typing i:nth-child(3) {
+    animation-delay: 0.3s;
+  }
+
+  @keyframes dot {
+    0%,
+    80%,
+    100% {
+      opacity: 0.3;
+    }
+    40% {
+      opacity: 1;
+    }
+  }
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+  }
+
+  /* ---------- equipe ---------- */
+
+  .demo--team {
+    padding: 14px;
+    display: grid;
+    gap: 10px;
+  }
+
+  .team {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 6px;
+  }
+
+  .team li {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) 52px auto;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 10px;
+    border-radius: 12px;
+    background: #fff;
+    border: 1px solid var(--ink-line);
+  }
+
+  .team b {
+    display: block;
+    font-size: 12.5px;
+  }
+
+  .team small {
+    color: var(--ink-2);
+    font-size: 11.5px;
+  }
+
+  .avatar {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    font-size: 10.5px;
+    font-weight: 700;
+  }
+
+  .avatar--green {
+    background: #dff5e6;
+    color: #0f7d35;
+  }
+
+  .avatar--blue {
+    background: #e2edfb;
+    color: #2766b5;
+  }
+
+  .avatar--amber {
+    background: #fbf0d9;
+    color: #7a5208;
+  }
+
+  .team__load {
+    height: 5px;
+    border-radius: 5px;
+    background: var(--paper-2);
+    overflow: hidden;
+  }
+
+  .team__load i {
+    display: block;
+    height: 100%;
+    width: calc(var(--v) * 100%);
+    border-radius: inherit;
+    background: #13a538;
+    transform-origin: left;
+  }
+
+  .tile.is-visible .team__load i {
+    animation: grow-x 1.2s var(--ease-out) 0.3s both;
+  }
+
+  .team__status {
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--ink-2);
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .team__status::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #c3c9c4;
+  }
+
+  .team__status.is-on::before {
+    background: #13a538;
+  }
+
+  .rating {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: var(--ink);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .rating__stars {
+    display: flex;
+    gap: 3px;
+    color: var(--amber);
+  }
+
+  .rating__stars :global(.star) {
+    fill: currentColor;
+  }
+
+  .tile.is-visible .rating__stars :global(.star) {
+    animation: pop-star 0.4s var(--ease-out) both;
+  }
+
+  .tile.is-visible .rating__stars :global(.star--1) {
+    animation-delay: 0.1s;
+  }
+
+  .tile.is-visible .rating__stars :global(.star--2) {
+    animation-delay: 0.2s;
+  }
+
+  .tile.is-visible .rating__stars :global(.star--3) {
+    animation-delay: 0.3s;
+  }
+
+  .tile.is-visible .rating__stars :global(.star--4) {
+    animation-delay: 0.4s;
+  }
+
+  @keyframes grow-x {
+    from {
+      transform: scaleX(0);
+    }
+  }
+
+  @keyframes pop-star {
+    from {
+      opacity: 0;
+      transform: scale(0.4);
+    }
+  }
+
+  /* ---------- extras ---------- */
+
+  .extras {
+    list-style: none;
+    margin: clamp(40px, 5vw, 64px) 0 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0;
+    border-top: 1px solid var(--ink-line);
+  }
+
+  .extras li {
+    display: grid;
+    align-content: start;
+    gap: 10px;
+    padding: 28px 24px 8px 0;
+  }
+
+  .extras li + li {
+    padding-left: 24px;
+    border-left: 1px solid var(--ink-line);
+  }
+
+  .extras .tile__icon {
+    width: 36px;
+    height: 36px;
+    background: transparent;
+    border: 1px solid var(--ink-line);
+    color: var(--ink);
+  }
+
+  .extras h3 {
+    font-size: 1.05rem;
+    letter-spacing: -0.015em;
+  }
+
+  .extras p {
+    font-size: 0.92rem;
+  }
+
+  /* ---------- responsivo ---------- */
+
+  @media (max-width: 1080px) {
+    .tile,
+    .tile--wide {
+      grid-column: span 12;
+    }
+
+    .extras {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .extras li:nth-child(3) {
+      padding-left: 0;
+      border-left: 0;
+    }
+
+    .extras li:nth-child(n + 3) {
+      border-top: 1px solid var(--ink-line);
+      margin-top: 20px;
+    }
+  }
+
+  @media (max-width: 720px) {
+    .tile--wide {
+      grid-template-columns: 1fr;
+    }
+
+    .tile--reverse .tile__text {
+      order: 0;
+    }
+
+    .demo--ai {
+      min-height: 190px;
+    }
+
+    .tile {
+      padding: 22px;
+      gap: 22px;
+    }
+
+    .demo {
+      font-size: 13px;
+    }
+
+    .routing__lanes small,
+    .team small,
+    .routing__label {
+      font-size: 12px;
+    }
+
+    .team__status {
+      font-size: 11.5px;
+    }
+
+    .flow__nodes text {
+      font-size: 12px;
+    }
+
+    .tile p,
+    .extras p {
+      font-size: 0.95rem;
+    }
+
+    .extras {
+      grid-template-columns: 1fr;
+    }
+
+    .extras li,
+    .extras li + li {
+      padding: 24px 0 4px;
+      border-left: 0;
+    }
+
+    .extras li + li {
+      border-top: 1px solid var(--ink-line);
+      margin-top: 16px;
+    }
+  }
+</style>
+
+<script>
+  import { initTimeline } from "../scripts/timeline";
+
+  document.querySelectorAll<HTMLElement>(".demo--ai[data-timeline]").forEach(initTimeline);
+</script>

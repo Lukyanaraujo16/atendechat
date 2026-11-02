@@ -1,0 +1,146 @@
+---
+import Base from "../layouts/Base.astro";
+import Header from "../components/Header.astro";
+import Hero from "../components/Hero.astro";
+import Tour from "../components/Tour.astro";
+import Features from "../components/Features.astro";
+import Commercial from "../components/Commercial.astro";
+import Journey from "../components/Journey.astro";
+import Plans from "../components/Plans.astro";
+import Faq from "../components/Faq.astro";
+import Footer from "../components/Footer.astro";
+import { site } from "../config/site";
+import { faq } from "../data/faq";
+
+const channels = ["WhatsApp", "Instagram Direct", "OpenAI", "Gemini", "n8n", "Typebot", "Dialogflow", "Webhook"];
+
+const jsonLd = [
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: site.name,
+    legalName: site.legal.name,
+    url: site.url,
+    logo: new URL("/icon-512.png", site.url).href,
+    email: site.email,
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: site.name,
+    url: site.url,
+    inLanguage: "pt-BR",
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: site.name,
+    applicationCategory: "BusinessApplication",
+    operatingSystem: "Web",
+    description: site.description,
+    url: site.url,
+    offers: {
+      "@type": "AggregateOffer",
+      priceCurrency: "BRL",
+      lowPrice: site.startingPrice.replace(",", "."),
+    },
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faq.map((item) => ({
+      "@type": "Question",
+      name: item.q,
+      acceptedAnswer: { "@type": "Answer", text: item.a },
+    })),
+  },
+];
+---
+
+<Base jsonLd={jsonLd}>
+  <Header />
+  <main id="conteudo">
+    <Hero />
+
+    <section class="channels" aria-label="Canais e integrações">
+      <div class="shell channels__inner">
+        <p class="channels__label">Canais e integrações</p>
+        <ul>
+          {channels.map((c) => <li>{c}</li>)}
+        </ul>
+      </div>
+    </section>
+
+    <Tour />
+    <Features />
+    <Commercial />
+    <Journey />
+    <Plans />
+    <Faq />
+  </main>
+  <Footer />
+</Base>
+
+<style>
+  .channels {
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    background: var(--bg-2);
+  }
+
+  .channels__inner {
+    display: flex;
+    align-items: center;
+    gap: 32px;
+    padding-block: 22px;
+  }
+
+  .channels__label {
+    flex-shrink: 0;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-3);
+  }
+
+  .channels ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 28px;
+  }
+
+  .channels li {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 1rem;
+    letter-spacing: -0.01em;
+    color: var(--text-2);
+  }
+
+  @media (max-width: 760px) {
+    .channels__inner {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .channels ul {
+      gap: 8px 18px;
+    }
+
+    .channels li {
+      font-size: 0.92rem;
+    }
+  }
+</style>
+
+<script>
+  import { initReveal, initTimeline } from "../scripts/timeline";
+
+  initReveal();
+  document.querySelectorAll<HTMLElement>(".console[data-timeline]").forEach(initTimeline);
+</script>

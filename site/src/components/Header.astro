@@ -1,0 +1,260 @@
+---
+import { Image } from "astro:assets";
+import logo from "../assets/brand/logo-on-dark.png";
+import { site, whatsappLink, messages } from "../config/site";
+
+const nav = [
+  { href: "#plataforma", label: "Plataforma" },
+  { href: "#recursos", label: "Recursos" },
+  { href: "#como-funciona", label: "Como funciona" },
+  { href: "#planos", label: "Planos" },
+  { href: "#perguntas", label: "Perguntas" },
+];
+---
+
+<header class="header" data-header>
+  <div class="header__inner shell">
+    <a href="/" class="header__brand" aria-label="StreamHub Chat — início">
+      <Image src={logo} alt="StreamHub Chat" width={156} height={44} loading="eager" fetchpriority="high" />
+    </a>
+
+    <nav class="header__nav" aria-label="Principal">
+      <ul>
+        {nav.map((item) => <li><a href={item.href}>{item.label}</a></li>)}
+      </ul>
+    </nav>
+
+    <div class="header__actions">
+      <a class="header__login" href={site.appUrl}>Entrar na plataforma</a>
+      <a class="btn btn--primary btn--small" href={whatsappLink(messages.demo)} target="_blank" rel="noopener">Solicitar demonstração</a>
+    </div>
+
+    <button class="header__toggle" type="button" aria-expanded="false" aria-controls="menu-mobile" data-menu-toggle>
+      <span class="sr-only">Abrir menu</span>
+      <span class="header__toggle-bar header__toggle-bar--a" aria-hidden="true"></span>
+      <span class="header__toggle-bar header__toggle-bar--b" aria-hidden="true"></span>
+    </button>
+  </div>
+
+  <div class="mobile-menu" id="menu-mobile" data-menu hidden>
+    <nav aria-label="Menu móvel">
+      <ul>
+        {nav.map((item) => <li><a href={item.href} data-menu-link>{item.label}</a></li>)}
+      </ul>
+    </nav>
+    <div class="mobile-menu__actions">
+      <a class="btn btn--primary" href={whatsappLink(messages.demo)} target="_blank" rel="noopener">Solicitar demonstração</a>
+      <a class="btn btn--ghost" href={site.appUrl}>Entrar na plataforma</a>
+    </div>
+  </div>
+</header>
+
+<style>
+  .header {
+    position: fixed;
+    inset: 0 0 auto;
+    z-index: 50;
+    padding-top: env(safe-area-inset-top);
+    transition:
+      background-color 0.3s var(--ease-out),
+      border-color 0.3s var(--ease-out),
+      backdrop-filter 0.3s;
+    border-bottom: 1px solid transparent;
+  }
+
+  .header.is-scrolled,
+  .header.is-open {
+    background: rgb(9 12 11 / 0.82);
+    backdrop-filter: saturate(140%) blur(14px);
+    -webkit-backdrop-filter: saturate(140%) blur(14px);
+    border-bottom-color: var(--line);
+  }
+
+  .header__inner {
+    display: flex;
+    align-items: center;
+    gap: 32px;
+    height: 72px;
+  }
+
+  .header__brand {
+    flex-shrink: 0;
+    display: block;
+  }
+
+  .header__brand img {
+    width: 156px;
+    height: auto;
+  }
+
+  .header__nav ul {
+    display: flex;
+    gap: 4px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .header__nav a {
+    display: block;
+    padding: 8px 12px;
+    border-radius: 999px;
+    font-size: 0.92rem;
+    color: var(--text-2);
+    transition: color 0.2s, background-color 0.2s;
+  }
+
+  .header__nav a:hover {
+    color: var(--text);
+    background: rgb(255 255 255 / 0.05);
+  }
+
+  .header__actions {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+  }
+
+  .header__login {
+    font-size: 0.92rem;
+    font-weight: 500;
+    color: var(--text-2);
+    transition: color 0.2s;
+  }
+
+  .header__login:hover {
+    color: var(--text);
+  }
+
+  .header__toggle {
+    display: none;
+    margin-left: auto;
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    border: 1px solid var(--line-2);
+    background: transparent;
+    cursor: pointer;
+    position: relative;
+  }
+
+  .header__toggle-bar {
+    position: absolute;
+    left: 13px;
+    width: 18px;
+    height: 1.5px;
+    background: var(--text);
+    border-radius: 2px;
+    transition: transform 0.3s var(--ease-out);
+  }
+
+  .header__toggle-bar--a {
+    top: 17px;
+  }
+
+  .header__toggle-bar--b {
+    top: 25px;
+  }
+
+  .header.is-open .header__toggle-bar--a {
+    transform: translateY(4px) rotate(45deg);
+  }
+
+  .header.is-open .header__toggle-bar--b {
+    transform: translateY(-4px) rotate(-45deg);
+  }
+
+  .mobile-menu {
+    border-top: 1px solid var(--line);
+    padding: 12px var(--gutter) calc(24px + env(safe-area-inset-bottom));
+    max-height: calc(100dvh - 72px);
+    overflow-y: auto;
+  }
+
+  .mobile-menu ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .mobile-menu li a {
+    display: block;
+    padding: 16px 0;
+    font-family: var(--font-display);
+    font-size: 1.35rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .mobile-menu__actions {
+    display: grid;
+    gap: 12px;
+    margin-top: 24px;
+  }
+
+  @media (max-width: 1080px) {
+    .header__nav {
+      display: none;
+    }
+
+    .header__toggle {
+      display: block;
+      margin-left: 0;
+    }
+  }
+
+  @media (max-width: 760px) {
+    .header__actions {
+      display: none;
+    }
+
+    .header__toggle {
+      margin-left: auto;
+    }
+
+    .header__brand img {
+      width: 134px;
+    }
+  }
+
+  @media (min-width: 1081px) {
+    .mobile-menu {
+      display: none;
+    }
+  }
+</style>
+
+<script>
+  const header = document.querySelector<HTMLElement>("[data-header]");
+  const toggle = document.querySelector<HTMLButtonElement>("[data-menu-toggle]");
+  const menu = document.querySelector<HTMLElement>("[data-menu]");
+
+  if (header && toggle && menu) {
+    const label = toggle.querySelector(".sr-only");
+    const setOpen = (open: boolean) => {
+      menu.hidden = !open;
+      header.classList.toggle("is-open", open);
+      toggle.setAttribute("aria-expanded", String(open));
+      if (label) label.textContent = open ? "Fechar menu" : "Abrir menu";
+      document.body.style.overflow = open ? "hidden" : "";
+    };
+
+    toggle.addEventListener("click", () => setOpen(menu.hidden));
+    menu.querySelectorAll("[data-menu-link]").forEach((link) => link.addEventListener("click", () => setOpen(false)));
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !menu.hidden) {
+        setOpen(false);
+        toggle.focus();
+      }
+    });
+    window.matchMedia("(min-width: 1081px)").addEventListener("change", (event) => {
+      if (event.matches) setOpen(false);
+    });
+
+    const onScroll = () => header.classList.toggle("is-scrolled", window.scrollY > 8);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+  }
+</script>

@@ -1,0 +1,277 @@
+---
+import { site, whatsappLink, messages } from "../config/site";
+import Icon from "./Icon.astro";
+
+// Dimensões reais de um plano na plataforma (limites e módulos habilitados por plano).
+const dimensions = [
+  { label: "Usuários da equipe", hint: "quantas pessoas atendem" },
+  { label: "Conexões de WhatsApp", hint: "números conectados" },
+  { label: "Setores", hint: "filas de atendimento" },
+  { label: "Módulos", hint: "CRM, IA, campanhas, estoque e vendas…" },
+];
+---
+
+<section class="section plans" id="planos" aria-labelledby="plans-title">
+  <div class="shell plans__grid">
+    <div class="plans__copy" data-reveal>
+      <p class="eyebrow">Planos</p>
+      <h2 id="plans-title">Sua operação é única. Seu plano também pode ser.</h2>
+      <p class="plans__lead">
+        Comece com o que sua empresa precisa e amplie a solução conforme a operação evolui. Atendimento, automações,
+        inteligência artificial, CRM e outros módulos em uma plataforma preparada para acompanhar o seu negócio.
+      </p>
+      <p class="plans__aux">Converse com a nossa equipe e descubra a configuração ideal para a sua empresa.</p>
+    </div>
+
+    <div class="offer" data-reveal style="--reveal-delay: 120ms">
+      <div class="offer__price">
+        <p class="offer__from">Planos a partir de</p>
+        <p class="offer__value">
+          <span class="offer__currency">R$</span>
+          <span class="offer__amount">{site.startingPrice}</span>
+          <span class="offer__period">/mês</span>
+        </p>
+      </div>
+
+      <div class="offer__build">
+        <p class="offer__build-title">Você define com a nossa equipe</p>
+        <ul class="offer__dims">
+          {
+            dimensions.map((d, i) => (
+              <li style={`--i: ${i}`}>
+                <span class="offer__check">
+                  <Icon name="check" size={14} />
+                </span>
+                <span>
+                  <b>{d.label}</b>
+                  <small>{d.hint}</small>
+                </span>
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+
+      <a class="btn btn--primary offer__cta" href={whatsappLink(messages.plan)} target="_blank" rel="noopener">
+        Montar meu plano personalizado
+        <Icon name="arrow" />
+      </a>
+      <p class="offer__fine">
+        Valor inicial de referência. Recursos, limites e condições variam conforme a configuração contratada. O atendimento
+        comercial é feito pelo WhatsApp.
+      </p>
+    </div>
+  </div>
+</section>
+
+<style>
+  .plans {
+    border-top: 1px solid var(--line);
+    background:
+      radial-gradient(42% 62% at 76% 50%, rgb(43 212 111 / 0.14), transparent 70%),
+      var(--bg);
+  }
+
+  .plans__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 480px);
+    gap: clamp(40px, 7vw, 110px);
+    align-items: center;
+  }
+
+  .plans__copy {
+    display: grid;
+    gap: 22px;
+  }
+
+  .plans__copy h2 {
+    font-size: clamp(2.1rem, 4.6vw, 3.6rem);
+    letter-spacing: -0.035em;
+    max-width: 15ch;
+  }
+
+  .plans__lead {
+    font-size: clamp(1.03rem, 1.4vw, 1.15rem);
+    color: var(--text-2);
+    max-width: 56ch;
+  }
+
+  .plans__aux {
+    color: var(--text);
+    font-weight: 500;
+    padding-left: 16px;
+    border-left: 2px solid var(--accent);
+  }
+
+  .offer {
+    position: relative;
+    padding: clamp(26px, 3.4vw, 40px);
+    border-radius: 26px;
+    background: linear-gradient(180deg, #16201c, #0f1412);
+    border: 1px solid rgb(43 212 111 / 0.32);
+    box-shadow:
+      0 60px 120px -60px rgb(0 0 0 / 0.95),
+      0 0 0 6px rgb(43 212 111 / 0.04),
+      0 0 90px -30px rgb(43 212 111 / 0.35),
+      inset 0 1px 0 rgb(255 255 255 / 0.06);
+    display: grid;
+    gap: 26px;
+    overflow: hidden;
+  }
+
+  .offer::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgb(43 212 111 / 0.7), transparent);
+  }
+
+  .offer__from {
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  .offer__value {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin-top: 6px;
+    font-family: var(--font-display);
+    letter-spacing: -0.04em;
+  }
+
+  .offer__currency {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-2);
+  }
+
+  .offer__amount {
+    font-size: clamp(3.8rem, 8vw, 5.4rem);
+    font-weight: 700;
+    line-height: 1;
+    color: var(--text);
+  }
+
+  .offer__period {
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: var(--text-2);
+    letter-spacing: -0.01em;
+  }
+
+  .offer__build {
+    padding-top: 22px;
+    border-top: 1px solid var(--line);
+  }
+
+  .offer__build-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 14px;
+  }
+
+  .offer__dims {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .offer__dims li {
+    display: flex;
+    gap: 10px;
+    padding: 12px;
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    background: rgb(255 255 255 / 0.02);
+  }
+
+  .offer.is-visible .offer__dims li {
+    animation: assemble 0.7s var(--ease-out) both;
+    animation-delay: calc(0.35s + var(--i) * 0.16s);
+  }
+
+  .offer__dims b {
+    display: block;
+    font-size: 0.88rem;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+
+  .offer__dims small {
+    display: block;
+    margin-top: 2px;
+    color: var(--text-3);
+    font-size: 0.78rem;
+    line-height: 1.4;
+  }
+
+  .offer__check {
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+
+  .offer__cta {
+    width: 100%;
+    min-height: 58px;
+    font-size: 1.04rem;
+    box-shadow: 0 14px 40px -14px rgb(43 212 111 / 0.65);
+  }
+
+  .offer__cta:hover {
+    box-shadow: 0 18px 48px -14px rgb(43 212 111 / 0.8);
+  }
+
+  .offer__fine {
+    font-size: 0.8rem;
+    color: var(--text-3);
+    line-height: 1.5;
+  }
+
+  @keyframes assemble {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+      border-color: rgb(43 212 111 / 0.6);
+    }
+    60% {
+      border-color: rgb(43 212 111 / 0.4);
+    }
+  }
+
+  @media (max-width: 960px) {
+    .plans__grid {
+      grid-template-columns: 1fr;
+    }
+
+    .offer {
+      max-width: 560px;
+    }
+  }
+
+  @media (max-width: 460px) {
+    .offer__dims {
+      grid-template-columns: 1fr;
+    }
+
+    .offer__cta {
+      white-space: normal;
+      text-align: center;
+      padding-block: 12px;
+      font-size: 1rem;
+    }
+  }
+</style>
