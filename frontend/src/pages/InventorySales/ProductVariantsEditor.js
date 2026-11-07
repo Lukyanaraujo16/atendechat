@@ -27,9 +27,10 @@ import { AppSecondaryButton, AppTableContainer } from "../../ui";
 import { i18n } from "../../translate/i18n";
 import CurrencyInput from "./CurrencyInput";
 import {
-  MAX_AUTO_VARIANT_COMBINATIONS,
+  MAX_VARIANTS_PER_PRODUCT,
   combinationKey,
   mergeCombinationPreview,
+  variantLimitIssue,
   resolveVariantImageUrl,
 } from "./productVariantCombinations";
 
@@ -401,6 +402,7 @@ export default function ProductVariantsEditor({
   };
 
   const selectedDrafts = drafts.filter((d) => d.selected !== false);
+  const limitIssue = variantLimitIssue(value);
 
   const applySalePriceToAll = () => {
     if (bulkSalePrice == null || !Number.isFinite(Number(bulkSalePrice))) return;
@@ -564,6 +566,21 @@ export default function ProductVariantsEditor({
         {i18n.t("inventorySales.products.variants.addCharacteristic")}
       </AppSecondaryButton>
 
+      {limitIssue === "combinations" ? (
+        <Typography
+          variant="body2"
+          color="error"
+          paragraph
+          role="alert"
+          data-testid="variant-limit-error"
+        >
+          {i18n.t("inventorySales.products.variants.combinationsLimit", {
+            max: MAX_VARIANTS_PER_PRODUCT,
+            total: value?.totalPossible,
+          })}
+        </Typography>
+      ) : null}
+
       {drafts.length > 0 ? (
         <Box>
           <Typography variant="subtitle2" style={{ fontWeight: 600 }}>
@@ -572,14 +589,18 @@ export default function ProductVariantsEditor({
           <Typography variant="body2" color="textSecondary" paragraph>
             {i18n.t("inventorySales.products.variants.combinationsHelp")}
           </Typography>
-          {value?.truncated ? (
-            <Typography variant="body2" color="error" paragraph>
-              {i18n.t("inventorySales.products.variants.combinationsLimit", {
-                max: MAX_AUTO_VARIANT_COMBINATIONS,
-                total: value?.totalPossible || drafts.length,
-              })}
-            </Typography>
-          ) : null}
+          <Typography
+            variant="body2"
+            color={limitIssue === "selected" ? "error" : "textSecondary"}
+            paragraph
+            role={limitIssue === "selected" ? "alert" : undefined}
+            data-testid="variant-selected-count"
+          >
+            {i18n.t("inventorySales.products.variants.selectedCount", {
+              count: selectedDrafts.length,
+              max: MAX_VARIANTS_PER_PRODUCT,
+            })}
+          </Typography>
           <Box className={classes.comboList}>
             {drafts.map((draft) => {
               const key = draft.localKey || combinationKey(draft.options);

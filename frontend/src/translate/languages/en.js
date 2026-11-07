@@ -387,7 +387,8 @@ const messages = {
 						combinationsHelp:
 							"Uncheck combinations the store does not sell. Only checked ones will be saved.",
 						combinationsLimit:
-							"Too many possible combinations ({{total}}). Showing the first {{max}}. Reduce options or keep only what you sell.",
+							"These options generate {{total}} combinations. The limit is {{max}} variations per product. Reduce the options to continue.",
+						selectedCount: "{{count}} of {{max}} variations selected",
 						pricesTitle: "Prices and stock per variation",
 						pricesHelp:
 							"Each row is an independent product version. Fill in the sale price for each one.",
@@ -413,6 +414,7 @@ const messages = {
 						validation: {
 							characteristicName: "Enter at least one characteristic with options.",
 							selectVariation: "Select at least one variation.",
+							limitExceeded: "Limit of {{max}} variations per product exceeded. Remove variations or reduce the options.",
 							salePriceNamed: "Enter the sale price for variation {{label}}.",
 							attributeName: "Enter the characteristic name.",
 							optionValue: "Enter the option value.",

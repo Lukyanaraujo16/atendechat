@@ -15,7 +15,8 @@ import {
 } from "./inventoryProductKind";
 import {
   buildCombinationKey,
-  buildVariantLabel
+  buildVariantLabel,
+  MAX_VARIANTS_PER_PRODUCT
 } from "./inventoryVariantCombination";
 import {
   clearSellableCodesForVariant,
@@ -29,10 +30,12 @@ import {
   parseRequiredDecimal
 } from "./inventoryTenant";
 import CreateInventoryStockMovementService from "./CreateInventoryStockMovementService";
+import {
+  assertActiveVariantLimit,
+  countActiveVariants
+} from "./inventoryVariantLimit";
 import ShowInventoryProductService from "./ShowInventoryProductService";
 import ListInventoryProductVariantsService from "./ListInventoryProductVariantsService";
-
-const MAX_VARIANTS_PER_SAVE = 64;
 
 type CharacteristicInput = {
   name?: unknown;
@@ -147,7 +150,7 @@ async function findOrCreateOption(
   }
 }
 
-function parseCharacteristics(raw: unknown): Array<{
+export function parseCharacteristics(raw: unknown): Array<{
   name: string;
   options: string[];
 }> {
@@ -209,11 +212,11 @@ function parseCharacteristics(raw: unknown): Array<{
         `Informe opções para a característica ${name}.`
       );
     }
-    if (options.length > 30) {
+    if (options.length > MAX_VARIANTS_PER_PRODUCT) {
       throw new AppError(
         "ERR_VALIDATION_ERROR",
         400,
-        `A característica ${name} tem opções demais (máx. 30).`
+        `A característica ${name} tem opções demais (máx. ${MAX_VARIANTS_PER_PRODUCT}).`
       );
     }
     out.push({ name, options });
@@ -221,7 +224,7 @@ function parseCharacteristics(raw: unknown): Array<{
   return out;
 }
 
-function parseVariantRows(raw: unknown): VariantInput[] {
+export function parseVariantRows(raw: unknown): VariantInput[] {
   if (!Array.isArray(raw) || raw.length === 0) {
     throw new AppError(
       "ERR_VALIDATION_ERROR",
@@ -229,11 +232,15 @@ function parseVariantRows(raw: unknown): VariantInput[] {
       "Selecione ao menos uma variação."
     );
   }
-  if (raw.length > MAX_VARIANTS_PER_SAVE) {
+  // Produtos legados com mais variações (antigo teto de 64) seguem editáveis enquanto não ganham variação nova.
+  const hasNewRow = (raw as VariantInput[]).some(
+    r => r?.id === undefined || r?.id === null || r?.id === ""
+  );
+  if (raw.length > MAX_VARIANTS_PER_PRODUCT && hasNewRow) {
     throw new AppError(
-      "ERR_VALIDATION_ERROR",
+      "ERR_INVENTORY_VARIANT_LIMIT",
       400,
-      `No máximo ${MAX_VARIANTS_PER_SAVE} variações por salvamento.`
+      `Limite de ${MAX_VARIANTS_PER_PRODUCT} variações por produto excedido (${raw.length} selecionadas). Remova variações ou reduza as opções.`
     );
   }
   return raw as VariantInput[];
@@ -486,6 +493,10 @@ export default async function SaveInventoryVariableProductService(input: {
       input.productId ?? null,
       t
     );
+    // Na edição o produto já está travado (FOR UPDATE) por persistProductShell.
+    const activeBefore = isCreate
+      ? 0
+      : await countActiveVariants(input.companyId, product.id, t);
 
     const attributeMap = new Map<string, InventoryProductAttribute>();
     const optionMap = new Map<string, InventoryProductAttributeOption>();
@@ -818,6 +829,12 @@ export default async function SaveInventoryVariableProductService(input: {
         }
       }
     }
+
+    // Reativações de legado acima do limite não podem aumentar as ativas.
+    assertActiveVariantLimit(
+      await countActiveVariants(input.companyId, product.id, t),
+      activeBefore
+    );
 
     return product.id;
   });

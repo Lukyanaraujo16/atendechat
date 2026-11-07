@@ -3,6 +3,12 @@
  * Ordena por attributeId para unicidade independente da ordem de entrada.
  */
 
+/**
+ * Limite de variações por produto e de opções por característica.
+ * Espelhado em frontend/src/pages/InventorySales/productVariantCombinations.js.
+ */
+export const MAX_VARIANTS_PER_PRODUCT = 50;
+
 export type CombinationOptionInput = {
   attributeId: number;
   optionId: number;

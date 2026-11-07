@@ -14,6 +14,10 @@ import {
 } from "./inventoryVariantCombination";
 import { syncSellableCode } from "./inventorySellableCodes";
 import {
+  assertActiveVariantLimit,
+  countActiveVariants
+} from "./inventoryVariantLimit";
+import {
   findInventoryProductOrThrow,
   normalizeOptionalString,
   parseDecimal,
@@ -155,6 +159,17 @@ export default async function CreateInventoryProductVariantService(input: {
   const imageUrl = normalizeOptionalString(input.body.imageUrl, 500);
 
   const variantId = await sequelize.transaction(async (t: Transaction) => {
+    // Trava o produto para serializar criações concorrentes antes de contar.
+    await findInventoryProductOrThrow(input.companyId, product.id, t);
+    if (active) {
+      const activeBefore = await countActiveVariants(
+        input.companyId,
+        product.id,
+        t
+      );
+      assertActiveVariantLimit(activeBefore + 1, activeBefore);
+    }
+
     const dup = await InventoryProductVariant.findOne({
       where: {
         companyId: input.companyId,

@@ -3,7 +3,8 @@
  * Não persistem nada — só montam a sugestão de variações.
  */
 
-export const MAX_AUTO_VARIANT_COMBINATIONS = 48;
+/** Espelha MAX_VARIANTS_PER_PRODUCT em backend/src/services/InventoryService/inventoryVariantCombination.ts. */
+export const MAX_VARIANTS_PER_PRODUCT = 50;
 
 /**
  * @param {Array<{ name: string, options: string[] }>} characteristics
@@ -28,6 +29,11 @@ export function buildCartesianCombinations(characteristics) {
     totalPossible *= c.options.length;
   }
 
+  if (totalPossible > MAX_VARIANTS_PER_PRODUCT) {
+    // Sem prévia parcial: o formulário bloqueia o salvamento até reduzir as opções.
+    return { combinations: [], truncated: true, totalPossible };
+  }
+
   let acc = [[]];
   for (const char of chars) {
     const next = [];
@@ -37,13 +43,6 @@ export function buildCartesianCombinations(characteristics) {
           ...prefix,
           { characteristicName: char.name, optionValue },
         ]);
-        if (next.length >= MAX_AUTO_VARIANT_COMBINATIONS) {
-          return {
-            combinations: next,
-            truncated: totalPossible > next.length,
-            totalPossible,
-          };
-        }
       }
     }
     acc = next;
@@ -54,6 +53,23 @@ export function buildCartesianCombinations(characteristics) {
     truncated: false,
     totalPossible,
   };
+}
+
+/**
+ * Bloqueio do limite de variações: "combinations" (cartesiano acima do limite),
+ * "selected" (selecionadas acima do limite) ou null.
+ * Produto legado acima do limite segue editável enquanto não ganha variação nova (igual ao backend).
+ */
+export function variantLimitIssue(state) {
+  if (state?.truncated) return "combinations";
+  const selected = (state?.drafts || []).filter((d) => d.selected !== false);
+  if (
+    selected.length > MAX_VARIANTS_PER_PRODUCT &&
+    selected.some((d) => d.id == null)
+  ) {
+    return "selected";
+  }
+  return null;
 }
 
 export function combinationKey(options) {
@@ -196,6 +212,10 @@ export function resolveVariantImageUrl(variant, product) {
 export function mergeCombinationPreview(characteristics, existingDrafts) {
   const { combinations, truncated, totalPossible } =
     buildCartesianCombinations(characteristics);
+  // Acima do limite mantém os rascunhos como estão (preços digitados não se perdem).
+  if (truncated) {
+    return { drafts: existingDrafts || [], truncated, totalPossible };
+  }
   const byKey = new Map(
     (existingDrafts || []).map((d) => [d.localKey || combinationKey(d.options), d])
   );

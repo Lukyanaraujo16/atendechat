@@ -7,6 +7,11 @@ import InventoryProductAttribute from "../../models/InventoryProductAttribute";
 import InventoryProductAttributeOption from "../../models/InventoryProductAttributeOption";
 import { syncSellableCode } from "./inventorySellableCodes";
 import {
+  assertActiveVariantLimit,
+  countActiveVariants
+} from "./inventoryVariantLimit";
+import {
+  findInventoryProductOrThrow,
   normalizeOptionalString,
   parseDecimal,
   parseRequiredDecimal
@@ -30,7 +35,17 @@ export default async function UpdateInventoryProductVariantService(input: {
   variantId: number;
   body: UpdateBody;
 }): Promise<InventoryProductVariant> {
+  const requestsActive =
+    input.body.active === true ||
+    input.body.active === "true" ||
+    input.body.active === 1 ||
+    input.body.active === "1";
+
   return sequelize.transaction(async (t: Transaction) => {
+    // Reativação: trava o produto antes da variação (mesma ordem do salvamento composto).
+    if (requestsActive) {
+      await findInventoryProductOrThrow(input.companyId, input.productId, t);
+    }
     const variant = await InventoryProductVariant.findOne({
       where: {
         id: input.variantId,
@@ -87,11 +102,15 @@ export default async function UpdateInventoryProductVariantService(input: {
     }
 
     if (input.body.active !== undefined) {
-      patch.active =
-        input.body.active === true ||
-        input.body.active === "true" ||
-        input.body.active === 1 ||
-        input.body.active === "1";
+      patch.active = requestsActive;
+      if (requestsActive && !variant.active) {
+        const activeBefore = await countActiveVariants(
+          input.companyId,
+          input.productId,
+          t
+        );
+        assertActiveVariantLimit(activeBefore + 1, activeBefore);
+      }
     }
 
     if (input.body.sku !== undefined) {

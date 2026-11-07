@@ -391,7 +391,8 @@ const messages = {
             combinationsHelp:
               "Desmarque as combinações que a loja não comercializa. Só as marcadas serão salvas.",
             combinationsLimit:
-              "Muitas combinações possíveis ({{total}}). Exibindo as primeiras {{max}}. Reduza opções ou cadastre manualmente o essencial.",
+              "Estas opções geram {{total}} combinações. O limite é {{max}} variações por produto. Reduza as opções para continuar.",
+            selectedCount: "{{count}} de {{max}} variações selecionadas",
             pricesTitle: "Preços e estoque por variação",
             pricesHelp:
               "Cada linha é uma versão independente do produto. Preencha o preço de venda de cada uma.",
@@ -418,6 +419,7 @@ const messages = {
             validation: {
               characteristicName: "Informe ao menos uma característica com opções.",
               selectVariation: "Selecione ao menos uma variação.",
+              limitExceeded: "Limite de {{max}} variações por produto excedido. Remova variações ou reduza as opções.",
               salePriceNamed: "Informe o preço de venda da variação {{label}}.",
               attributeName: "Informe o nome da característica.",
               optionValue: "Informe o valor da opção.",

@@ -126,4 +126,73 @@ describe("ProductFormDialog — produto com variações", () => {
     await waitFor(() => expect(mockCreate).toHaveBeenCalled());
     expect(mockSaveVariable).not.toHaveBeenCalled();
   });
+
+  describe("limite de 50 variações", () => {
+    const { toast } = require("react-toastify");
+    const persistedProduct = (n) => ({
+      id: 77,
+      name: "Camiseta",
+      productKind: "variable",
+      unit: "un",
+      active: true,
+      variants: Array.from({ length: n }, (_, i) => ({
+        id: 1000 + i,
+        label: `T${i + 1}`,
+        salePrice: "49.90",
+        costPrice: null,
+        currentQuantity: "2",
+        trackStock: true,
+        active: true,
+        optionLinks: [
+          { attribute: { name: "Tamanho" }, option: { value: `T${i + 1}` } },
+        ],
+      })),
+    });
+
+    beforeEach(() => toast.error.mockClear());
+
+    it("edita e salva produto com exatamente 50 variações", async () => {
+      mockGet.mockResolvedValue({ data: persistedProduct(50) });
+      renderDialog({ productId: 77 });
+      await waitFor(() =>
+        expect(screen.getByTestId("variant-selected-count").textContent).toBe(
+          "50 de 50 variações selecionadas"
+        )
+      );
+      expect(screen.queryByTestId("variant-limit-error")).toBeNull();
+
+      fireEvent.submit(document.querySelector("form"));
+      await waitFor(() => expect(mockSaveVariable).toHaveBeenCalled());
+      const [body, productId] = mockSaveVariable.mock.calls[0];
+      expect(productId).toBe(77);
+      expect(body.characteristics[0].options).toHaveLength(50);
+      expect(body.variants).toHaveLength(50);
+      expect(new Set(body.variants.map((v) => v.id)).size).toBe(50);
+      expect(body.variants.every((v) => v.salePrice === 49.9)).toBe(true);
+      // Estoque de variação já salva não é reenviado.
+      expect(body.variants.some((v) => "currentQuantity" in v)).toBe(false);
+    });
+
+    it("bloqueia a 51ª variação com mensagem clara", async () => {
+      mockGet.mockResolvedValue({ data: persistedProduct(50) });
+      renderDialog({ productId: 77 });
+      await waitFor(() =>
+        expect(screen.getByTestId("variant-selected-count")).toBeTruthy()
+      );
+
+      userEvent.type(screen.getByPlaceholderText("Ex.: Azul"), "T51");
+      userEvent.click(screen.getByRole("button", { name: "Adicionar opção" }));
+
+      expect(screen.getByTestId("variant-limit-error").textContent).toBe(
+        "Estas opções geram 51 combinações. O limite é 50 variações por produto. Reduza as opções para continuar."
+      );
+      fireEvent.submit(document.querySelector("form"));
+      await waitFor(() =>
+        expect(toast.error).toHaveBeenCalledWith(
+          "Limite de 50 variações por produto excedido. Remova variações ou reduza as opções."
+        )
+      );
+      expect(mockSaveVariable).not.toHaveBeenCalled();
+    });
+  });
 });

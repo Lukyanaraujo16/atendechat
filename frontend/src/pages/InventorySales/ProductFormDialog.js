@@ -49,6 +49,8 @@ import ProductVariantsEditor, { newCharacteristic } from "./ProductVariantsEdito
 import {
   characteristicsFromVariants,
   draftVariantsFromPersisted,
+  MAX_VARIANTS_PER_PRODUCT,
+  variantLimitIssue,
 } from "./productVariantCombinations";
 
 const emptyForm = {
@@ -265,6 +267,14 @@ export default function ProductFormDialog({
       if (!built.characteristics.length) {
         toast.error(
           i18n.t("inventorySales.products.variants.validation.characteristicName")
+        );
+        return;
+      }
+      if (variantLimitIssue(variantsState)) {
+        toast.error(
+          i18n.t("inventorySales.products.variants.validation.limitExceeded", {
+            max: MAX_VARIANTS_PER_PRODUCT,
+          })
         );
         return;
       }
