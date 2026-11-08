@@ -76,12 +76,15 @@ Pré-requisitos: Linux com cgroup v2 (`stat -fc %T /sys/fs/cgroup` = `cgroup2fs`
 Remoção: `systemctl disable --now evolution-metrics-collector` e apagar `/opt/evolution-metrics-collector`,
 `/etc/evolution-metrics-collector` e o unit. Nada no Docker ou na Evolution é alterado pela instalação.
 
-### TESTE (AtendeChat e Evolution Pilot na mesma VPS)
+Valores dos ambientes atuais (IPs, nomes de contêineres): `docs/ambientes/AMBIENTES_ATUAIS.md`.
+
+### Evolution na mesma VPS do backend (padrão do `install.sh`)
 
 - `COLLECTOR_INGEST_URL=http://127.0.0.1:8080/system/evolution-metrics` (loopback, sem exposição).
-- `COLLECTOR_CONTAINERS=api=evolution-pilot-api,postgres=evolution-pilot-postgres,redis=evolution-pilot-redis`
+- `COLLECTOR_CONTAINERS=api=evolution-api,postgres=evolution-postgres,redis=evolution-redis`
+  (nomes criados pelo `install.sh`).
 
-### PRODUÇÃO (VPS Evolution dedicada 209.145.57.127 → AtendeChat 216.106.178.90 por WireGuard)
+### Evolution em VPS separada (ligada ao backend por rede privada, ex.: WireGuard)
 
 - Instalar o coletor na VPS Evolution; `COLLECTOR_INGEST_URL` deve usar o **IP do backend dentro do
   túnel** (ex.: `http://<ip-wg-do-atendechat>:8080/system/evolution-metrics`), nunca a URL pública.

@@ -1,6 +1,13 @@
+import { requireJwtSecrets } from "./jwtSecrets";
+
+// Sem fallback: segredo ausente ou inseguro lança JwtConfigError (e o server.ts não inicia).
 export default {
-  secret: process.env.JWT_SECRET || "mysecret",
+  get secret(): string {
+    return requireJwtSecrets().secret;
+  },
   expiresIn: "15m",
-  refreshSecret: process.env.JWT_REFRESH_SECRET || "myanothersecret",
+  get refreshSecret(): string {
+    return requireJwtSecrets().refreshSecret;
+  },
   refreshExpiresIn: "7d"
 };

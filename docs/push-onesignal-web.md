@@ -282,9 +282,9 @@ Não há limpeza automática em massa.
 ## Validação de workers em produção
 
 ```bash
-curl -i https://app.streamhubchat.com.br/OneSignalSDKWorker.js
-curl -i https://app.streamhubchat.com.br/OneSignalSDKUpdaterWorker.js
-curl -i https://app.streamhubchat.com.br/service-worker.js
+curl -i https://app.SEUDOMINIO/OneSignalSDKWorker.js
+curl -i https://app.SEUDOMINIO/OneSignalSDKUpdaterWorker.js
+curl -i https://app.SEUDOMINIO/service-worker.js
 ```
 
 Esperado: HTTP 200, JavaScript; OneSignal com `importScripts` v16; Workbox em

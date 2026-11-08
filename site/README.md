@@ -80,7 +80,7 @@ a captura no mesmo caminho.
 ## Publicação (etapa futura, sujeita a aprovação)
 
 1. **DNS**: registros `A`/`AAAA` de `streamhubchat.com.br` e `www` apontando para o servidor
-   Em 02/11/2026: a raiz já resolve para 216.106.178.90 (mesmo IP do app), sem HTTPS respondendo;
+   Em 02/11/2026: a raiz já resolve para o mesmo IP do app (ver `docs/ambientes/AMBIENTES_ATUAIS.md`), sem HTTPS respondendo;
    `www` não tem registro — criar `A` (ou `CNAME` para a raiz).
 2. **Certificado**: `certbot certonly --nginx -d streamhubchat.com.br -d www.streamhubchat.com.br`.
 3. **Build**: `cd site && npm ci && npm run check`.

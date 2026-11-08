@@ -1,3 +1,6 @@
+> **OBSOLETO.** Este guia descreve um processo antigo. Para instalar ou atualizar use
+> `sudo bash install.sh` e siga [`docs/MANUAL_INSTALACAO.md`](docs/MANUAL_INSTALACAO.md).
+
 # 🔐 Configuração SSL/HTTPS - CoreFlow
 
 Este documento explica como configurar SSL/HTTPS para instâncias usando Nginx e Certbot.

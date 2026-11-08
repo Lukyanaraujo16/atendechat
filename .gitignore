@@ -5,3 +5,5 @@ build/
 instances.json
 brands/
 certificates/
+# Cópias de segurança de .env criadas por install.sh (contêm segredos)
+.env.bak-*

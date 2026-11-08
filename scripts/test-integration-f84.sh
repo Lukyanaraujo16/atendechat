@@ -27,9 +27,9 @@ export DB_USER=f84
 export DB_PASS=f84local
 export DB_NAME
 export DB_DEBUG=false
-# Segredos SOMENTE de teste (nunca reais).
-export JWT_SECRET="f84-it-jwt-secret"
-export JWT_REFRESH_SECRET="f84-it-jwt-refresh-secret"
+# Segredos SOMENTE de teste, aleatórios por execução (o backend recusa valores curtos/fixos).
+JWT_SECRET="$(openssl rand -hex 32)"; export JWT_SECRET
+JWT_REFRESH_SECRET="$(openssl rand -hex 32)"; export JWT_REFRESH_SECRET
 # Nunca chamar Efí real: flags seguras.
 export GERENCIANET_SANDBOX=true
 export EFI_COBRANCAS_SETTLE_ENABLED=false

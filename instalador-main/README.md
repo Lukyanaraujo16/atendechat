@@ -1,3 +1,6 @@
+> **OBSOLETO — não use.** Este instalador cria o usuário `deploy` com senha fixa e não é mantido.
+> Use `sudo bash install.sh` na raiz do repositório ([`docs/MANUAL_INSTALACAO.md`](../docs/MANUAL_INSTALACAO.md)).
+
 # CoreFlow (instalador)
 
 Base interna **CoreFlow**. Nome comercial visível ao utilizador: configurável em branding (`systemName`).

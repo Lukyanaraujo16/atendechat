@@ -92,7 +92,9 @@ case "${1:-}" in
   *) die "opção desconhecida: $1" ;;
 esac
 
-if [ -n "$(git -C "$ROOT" status --porcelain --untracked-files=no -- frontend)" ]; then
+# frontend/yarn.lock é ignorado: o npm o reescreve a cada instalação e ele não entra no build
+# (o build usa package-lock.json; yarn.lock só é usado pelo frontend/Dockerfile legado).
+if [ -n "$(git -C "$ROOT" status --porcelain --untracked-files=no -- frontend ':(exclude)frontend/yarn.lock')" ]; then
   die "há alterações locais em frontend/ — publique somente commits"
 fi
 SHA="$(git -C "$ROOT" rev-parse --short=12 HEAD)"

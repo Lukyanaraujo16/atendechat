@@ -1,3 +1,6 @@
+> **OBSOLETO.** Este guia descreve um processo antigo. Para instalar ou atualizar use
+> `sudo bash install.sh` e siga [`docs/MANUAL_INSTALACAO.md`](docs/MANUAL_INSTALACAO.md).
+
 # Deploy no Ubuntu Server 20.04 (VPS)
 
 Este guia descreve **passo a passo** como preparar e rodar o **CoreFlow** em uma VPS com **Ubuntu 20.04**, usando **PostgreSQL** e **Redis** instalados localmente no servidor.

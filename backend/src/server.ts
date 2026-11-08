@@ -2,6 +2,7 @@ import gracefulShutdown from "http-graceful-shutdown";
 import app from "./app";
 import { initIO } from "./libs/socket";
 import { logger } from "./utils/logger";
+import { requireJwtSecrets } from "./config/jwtSecrets";
 import { StartAllWhatsAppsSessions } from "./services/WbotServices/StartAllWhatsAppsSessions";
 import Company from "./models/Company";
 import { resumeCompanyDeletions } from "./services/CompanyService/CompanyDeletionService";
@@ -26,6 +27,16 @@ import {
   startAgentOsScalabilityRuntime,
   stopAgentOsScalabilityRuntime
 } from "./services/AutomationOrchestrator/scalability/Lifecycle";
+
+// Falha cedo: sem segredos JWT válidos o backend não sobe (antes usava "mysecret").
+try {
+  requireJwtSecrets();
+} catch (err) {
+  // console.error é síncrono: o transporte do pino pode perder a mensagem com process.exit.
+  console.error(`[FATAL] ${(err as Error).message}`);
+  logger.fatal((err as Error).message);
+  process.exit(1);
+}
 
 const server = app.listen(process.env.PORT, async () => {
   const companies = await Company.findAll();

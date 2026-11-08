@@ -9,7 +9,7 @@ dist
 backups/*
 !backups/.gitkeep
 
-package-lock.json
+# package-lock.json é versionado: instalação reproduzível (npm ci).
 yarn.lock
 yarn-error.log
 

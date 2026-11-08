@@ -56,7 +56,7 @@ quando autorizada (sem acesso a VPS).
 - `BACKEND_URL` público com HTTPS e certificado válido (cadeia de CA) alcançável pela Efí.
 
 ### 1.3 Constatações da VPS de TESTE (diagnóstico de 2026-10-21, só leitura)
-- Identidade: hostname `vmi3163669`, IP `89.117.79.221`, `api.teste.streamhubchat.com.br`, `/var/www/atendechat`,
+- Identidade: hostname `vmi3163669`, IP em `docs/ambientes/AMBIENTES_ATUAIS.md`, `api.teste.streamhubchat.com.br`, `/var/www/atendechat`,
   `atendechat-backend.service` (systemd, root). Implantado: `2445edb`. Node 20.20.2, npm 10.8.2, Postgres 16 local,
   Redis local, 133 GB livres.
 - **`GERENCIANET_SANDBOX=false`: o checkout legado de TESTE usa a conta Efí de PRODUÇÃO.** Todo Pix gerado pelo
